@@ -11,10 +11,12 @@ interface Props {
   onScatter: () => void;
   onImage: (file: File) => void;
   imageError: string | null;
+  /** a Jev run is on: the colony and the brain are locked (changing either strands the run) */
+  running: boolean;
   children?: ReactNode;
 }
 
-export default function Panel({ engine, controls, update, stats, fps, onScatter, onImage, imageError, children }: Props) {
+export default function Panel({ engine, controls, update, stats, fps, onScatter, onImage, imageError, running, children }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   return (
     <aside className="flex w-full flex-col gap-5 lg:w-80">
@@ -32,7 +34,11 @@ export default function Panel({ engine, controls, update, stats, fps, onScatter,
         />
         <p className="mt-1 text-xs text-fg-3">Type a word; a new line makes a second row.</p>
         <div className="mt-3 flex items-center gap-2">
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onImage(e.target.files[0])} />
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onImage(f);
+              e.target.value = "";
+            }} />
           <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised" onClick={() => fileRef.current?.click()} title="A black-and-white picture works best; drop one on the field too">
             Upload image…
           </button>
@@ -48,15 +54,15 @@ export default function Panel({ engine, controls, update, stats, fps, onScatter,
       </section>
 
       <section className="rounded-lg border border-line bg-panel p-4">
-        <Slider label="Ants" value={controls.antCount} min={200} max={2000} step={50} format={(v) => String(v)} onChange={(v) => update({ antCount: v })} />
+        <Slider label="Ants" value={controls.antCount} min={200} max={2000} step={50} format={(v) => String(v)} onChange={(v) => update({ antCount: v })} disabled={running} />
         <Slider label="Speed" value={controls.speed} min={0.25} max={3} step={0.25} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => update({ speed: v })} />
         <div className="mt-3 flex items-center justify-between">
           <span className="text-sm text-fg-2">Brain</span>
           <div className="flex overflow-hidden rounded-md border border-line text-sm">
-            <button type="button" className={seg(controls.brain === "jev")} onClick={() => update({ brain: "jev" })} title="Ants drift until you Start Jev; every step is then a Jev decision">
+            <button type="button" className={seg(controls.brain === "jev")} onClick={() => update({ brain: "jev" })} title="Ants drift until you Start Jev; every step is then a Jev decision" disabled={running}>
               Jev
             </button>
-            <button type="button" className={seg(controls.brain === "local")} onClick={() => update({ brain: "local" })} title="The greedy local rule, free, for comparison">
+            <button type="button" className={seg(controls.brain === "local")} onClick={() => update({ brain: "local" })} title={running ? "Stop the run first" : "The greedy local rule, free, for comparison"} disabled={running}>
               Local rule
             </button>
           </div>
@@ -130,17 +136,17 @@ function TargetPreview({ engine, version }: { engine: Engine; version: number })
 }
 
 function seg(active: boolean): string {
-  return `px-3 py-1.5 ${active ? "bg-accent text-accent-ink" : "bg-panel text-fg-2 hover:bg-raised"}`;
+  return `px-3 py-1.5 ${active ? "bg-accent text-accent-ink" : "bg-panel text-fg-2 hover:bg-raised"} disabled:cursor-not-allowed disabled:opacity-60`;
 }
 
-function Slider({ label, value, min, max, step, format, onChange }: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {
+function Slider({ label, value, min, max, step, format, onChange, disabled = false }: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void; disabled?: boolean }) {
   return (
-    <label className="mt-3 block first:mt-0">
+    <label className={`mt-3 block first:mt-0 ${disabled ? "opacity-60" : ""}`} title={disabled ? "Locked while Jev runs" : undefined}>
       <span className="flex justify-between text-sm text-fg-2">
         <span>{label}</span>
         <span className="font-mono text-fg">{format(value)}</span>
       </span>
-      <input className="mt-1 w-full" type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <input className="mt-1 w-full" type="range" min={min} max={max} step={step} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} />
     </label>
   );
 }

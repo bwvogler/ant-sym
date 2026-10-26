@@ -101,7 +101,12 @@ test("antState reads the engine and applyDecision writes back with pace/commit r
   assert.equal(e.world.commit[1], 4);
   assert.equal(e.world.coast[1], 1.5, "far walk: keep drifting");
   assert.equal(e.world.pace[1], e.params.local.pace * 0.5);
-  applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, st);
+  // a settle with no room (blank paper) is refused: the local rule moves the ant instead, so it is never stranded
+  const before = e.decisions.jev;
+  applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, { ...st, room: -1 });
+  assert.equal(e.world.settled[2], 0, "no room: not settled");
+  assert.equal(e.decisions.jev, before + 1, "still Jev's decision");
+  applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, { ...st, room: 0 });
   assert.equal(e.world.settled[2], 1);
   e.attractor = { x: 15, y: 9.5 };
   assert.equal(antState(e, 0).attractor, "E");

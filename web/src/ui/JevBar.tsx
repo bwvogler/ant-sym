@@ -9,6 +9,8 @@ interface Props {
   start: () => void;
   stop: () => void;
   morphPending: boolean;
+  /** why Start is unavailable right now (blank picture, brain not Jev), or null */
+  startBlocked: string | null;
   activeAnts: number;
   jevDecisions: number;
 }
@@ -20,10 +22,8 @@ export default function JevBar(p: Props) {
   const running = p.state.phase === "running";
   const stopped = p.state.phase === "stopped";
   const reason = run?.stopReason;
-  const spendShare = run ? Math.min(1, run.usd / run.caps.capUsd) : 0;
-  const timeShare = run
-    ? Math.min(1, run.elapsedSeconds / run.caps.capSeconds)
-    : 0;
+  const spendShare = run && run.caps.capUsd > 0 ? Math.min(1, run.usd / run.caps.capUsd) : 0;
+  const timeShare = run && run.caps.capSeconds > 0 ? Math.min(1, run.elapsedSeconds / run.caps.capSeconds) : 0;
   const banner =
     stopped && (reason === "spend-cap" || reason === "time-cap")
       ? {
@@ -40,9 +40,7 @@ export default function JevBar(p: Props) {
               tone: "accent",
               text: "Formed. Jev is paused; the picture costs nothing to hold.",
             }
-          : p.state.lastError
-            ? { tone: "err", text: p.state.lastError }
-            : null;
+          : null;
 
   return (
     <section
@@ -61,8 +59,10 @@ export default function JevBar(p: Props) {
         ) : (
           <button
             type="button"
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover"
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
             onClick={p.start}
+            disabled={p.startBlocked !== null}
+            title={p.startBlocked ?? undefined}
           >
             {p.morphPending ? "Morph" : "Start Jev"}
           </button>
@@ -126,6 +126,11 @@ export default function JevBar(p: Props) {
               : "idle"}
         </span>
       </div>
+      {p.state.lastError && (
+        <p className="mt-3 truncate rounded-md bg-err-soft px-3 py-1.5 text-xs text-err" title={p.state.lastError}>
+          {p.state.lastError}
+        </p>
+      )}
       {banner && (
         <p
           className={`mt-3 truncate rounded-md px-3 py-1.5 text-sm ${banner.tone === "warn" ? "bg-warn-soft text-warn" : banner.tone === "err" ? "bg-err-soft text-err" : "bg-accent-soft text-accent"}`}

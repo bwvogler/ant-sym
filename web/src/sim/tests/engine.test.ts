@@ -68,3 +68,26 @@ test("in jev mode: owned due ants are left alone; unowned ants wander before a r
   const s3 = e.tick(1 / 60);
   assert.equal(s3.decisions.local, 10);
 });
+
+test("wakeOverfull: a settled ant in a cell over-full by more than one gets up and is due again; one over by exactly one stays", () => {
+  const e = new Engine({ antCount: 4, size: { w: 8, h: 8 }, speed: 1 });
+  const t = new Float32Array(64);
+  t[3 * 8 + 3] = 1; // one cell wants one ant
+  e.setTarget(t);
+  // three ants settled in the wanting cell: deficit 1 − 3 = −2
+  for (const i of [0, 1, 2]) {
+    e.world.x[i] = 3.5;
+    e.world.y[i] = 3.5;
+    e.world.settled[i] = 1;
+    e.world.commit[i] = 1e9;
+  }
+  // one ant settled on blank paper: deficit 0 − 1 = −1, not woken (fractional targets must not oscillate)
+  e.world.x[3] = 6.5;
+  e.world.y[3] = 6.5;
+  e.world.settled[3] = 1;
+  e.refreshGrids();
+  const woke = e.wakeOverfull();
+  assert.equal(woke, 3);
+  assert.deepEqual(Array.from(e.world.settled), [0, 0, 0, 1]);
+  assert.equal(e.world.commit[0], 0, "woken ants are due at once");
+});

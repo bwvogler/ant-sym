@@ -50,10 +50,14 @@ export function useEngine(initial: Controls = DEFAULT_CONTROLS) {
 
   useEffect(() => {
     engine.params.speed = controls.speed;
+  }, [controls.speed, engine]);
+  // Brain changes only: a speed change must not reset the brain or the idle
+  // behaviour (it silently ended a run and un-formed a picture before).
+  useEffect(() => {
     engine.params.brain = controls.brain;
     // Switching to the local rule and back: a fresh jev-mode idle wanders again.
     if (controls.brain === "jev") engine.idleBehaviour = "wander";
-  }, [controls.speed, controls.brain, engine]);
+  }, [controls.brain, engine]);
 
   // The loop. dt is clamped so a background tab does not fast-forward on return.
   useEffect(() => {
@@ -95,14 +99,16 @@ export function useEngine(initial: Controls = DEFAULT_CONTROLS) {
   const [imageError, setImageError] = useState<string | null>(null);
   const loadImage = useCallback(
     async (file: File) => {
+      let bmp: ImageBitmap | null = null;
       try {
-        const bmp = await createImageBitmap(file);
+        bmp = await createImageBitmap(file);
         const darkness = imageToDarkness(bmp, engine.params.size);
-        bmp.close();
         setImageError(null);
         setControls((c) => ({ ...c, image: { name: file.name, darkness } }));
-      } catch {
-        setImageError(`Could not read ${file.name} as an image.`);
+      } catch (err) {
+        setImageError(`Could not read ${file.name} as an image: ${String(err)}`);
+      } finally {
+        bmp?.close();
       }
     },
     [engine],

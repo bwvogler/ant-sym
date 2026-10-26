@@ -34,7 +34,7 @@ export default function JevPanel(p: Props) {
             type="button"
             className={seg(p.schema === "nouls")}
             onClick={() => p.setSchema("nouls")}
-            title="3 nouls per ant: north/south, east/west, settle (178 tokens/ant)"
+            title="3 nouls per ant: north/south, east/west, settle (~178 tokens/ant, drifts; the comparison)"
             disabled={running}
           >
             nouls
@@ -43,7 +43,7 @@ export default function JevPanel(p: Props) {
             type="button"
             className={seg(p.schema === "compass")}
             onClick={() => p.setSchema("compass")}
-            title="9-way choice + settle noul (285 tokens/ant)"
+            title="9-way choice + settle noul (~296 tokens/ant, the default)"
             disabled={running}
           >
             compass

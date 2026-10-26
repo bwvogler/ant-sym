@@ -4,10 +4,11 @@ import type { Engine } from "./engine.ts";
 import { neighbourhood3x3 } from "./grid.ts";
 
 // The Jev brain, pure: builds the packed request for a batch of ants and reads
-// the answers back into decisions. Schema "nouls" (the bake-off winner, PRD
-// §8.1b): three yes/no questions per ant — north-vs-south, east-vs-west,
-// settle — read as a continuous heading. Schema "compass": a 9-way choice plus
-// a settle noul, costlier but exact, kept for the comparison.
+// the answers back into decisions. Schema "compass" (the default, PRD §8.1b
+// revision): a 9-way choice plus a settle noul, ~296 tok/ant, self-normalising.
+// Schema "nouls": three yes/no questions per ant — north-vs-south,
+// east-vs-west, settle — read as a heading against a per-request neutral
+// point; cheaper (~178 tok/ant) and visibly worse, kept for the comparison.
 
 export type Schema = "nouls" | "compass";
 
@@ -205,6 +206,14 @@ export function applyDecision(engine: Engine, i: number, d: AntDecision, state: 
   const w = engine.world;
   const basePace = engine.params.local.pace;
   if (d.settle) {
+    // A settle where there is no room (blank paper, or a full cell) would be
+    // permanent: nothing wakes a settled ant until its cell is over by more
+    // than one. Count it as Jev's decision but let the local rule move it.
+    if (state.room < 0) {
+      engine.decideLocally(i);
+      engine.decisions.jev++;
+      return;
+    }
     decide(w, i, w.heading[i] as number, 0, 0, true, engine.time, 2);
     engine.decisions.jev++;
     return;

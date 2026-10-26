@@ -133,8 +133,8 @@ export function compass(heading: number): string {
   return names[k] as string;
 }
 
-/** Heading in radians for a compass name. */
-export function headingOf(name: string): number {
+/** Heading in radians for a compass name; null for anything that is not one (the caller falls back to the local rule). */
+export function headingOf(name: string): number | null {
   const idx = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"].indexOf(name);
-  return idx < 0 ? 0 : idx * (Math.PI / 4);
+  return idx < 0 ? null : idx * (Math.PI / 4);
 }

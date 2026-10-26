@@ -18,6 +18,8 @@ export default function App() {
     imageError,
   } = useEngine();
   const jev = useJev(engine, stats?.formed ?? false, stats?.targetVersion ?? 0);
+  const running = jev.state.phase === "running";
+  const startBlocked = controls.brain !== "jev" ? "Switch Brain to Jev first" : engine.targetTotal <= 0 ? "Type a word or upload a picture first" : null;
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
       <header className="flex items-baseline justify-between">
@@ -54,6 +56,7 @@ export default function App() {
             start={jev.start}
             stop={jev.stop}
             morphPending={jev.morphPending}
+          startBlocked={startBlocked}
             activeAnts={
               stats ? controls.antCount - stats.settled : controls.antCount
             }
@@ -69,6 +72,7 @@ export default function App() {
           onScatter={scatter}
           onImage={(f) => void loadImage(f)}
           imageError={imageError}
+          running={running}
         >
           <JevPanel
             state={jev.state}

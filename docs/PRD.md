@@ -46,7 +46,7 @@ browser (Vite + React)                          node (Vite dev-server middleware
 ```
 
 - **Sim loop** runs in the browser with `requestAnimationFrame`. Each tick: move ants by heading × pace, update the density grid, decay pheromone, redraw. Jev answers arrive asynchronously and update each ant's *intent* (heading, pace, settled); the tick loop never waits on the network.
-- **Scheduler**: every 200 ms, pick the ants whose last decision is oldest (and not settled, or settled but with a deficit that changed), pack them 100 per request, post. In-flight limit configurable (default 8). Backoff on 429/529 honouring `retry-after`.
+- **Scheduler**: every 200 ms, pick the ants whose last decision is oldest (and not settled, or settled but with a deficit that changed), pack them 100 per request, post. In-flight limit 5 (browsers allow 6 connections per host; one stays free so Stop reaches the server at once). The server retries 429/529 honouring `retry-after`; the browser treats a 429 "busy" from the proxy as "release these ants, try next cycle".
 - **Server** holds the key, forwards packed requests, counts `usage.input_tokens`, enforces the session cap, and runs the overseer (renders nothing itself; the browser sends two PNGs).
 - **Connection pool**: Node's `fetch` on one dispatcher serialised our requests (10 × 50 ants took 2.9 s stacked; separate connections took 0.65 s for 8 × 100). The server must use an undici `Agent` sized for the in-flight limit, and a test must pin that parallel requests overlap.
 - `sim/` is pure and covered by `node --test`; the renderer and React layer are thin.
@@ -174,9 +174,9 @@ Two lessons. **Structure beats terseness**: the same facts as a compact string (
 ### 8.2 Levers, in order
 
 1. **Ask cheaper questions, but not wrong ones.** The default is the 9-way compass choice plus a settle noul on a structured state with an explicit `room` field (~296 tok/ant). It is 1.6× the cost of the noul brain per decision, but it steers; a brain that sends ants the wrong way costs far more in decisions. No pace question (pace follows confidence).
-2. **Make fewer decisions.** Only unsettled ants are scheduled. Each decision buys a **commit distance**: an ant walks 1 cell when near a deficit and up to 3 when far, so the far-away phase costs a third as much. Settled ants re-ask only when their cell's deficit changes sign.
-3. **Stop.** Formed, time cap, or spend cap, whichever first. The local grid error (RMS of the deficit grid) is free and is the primary "formed" signal; the overseer noul confirms it for the badge. After a stop the scheduler is off, ants idle on the local rule, and the cost line does not move.
-4. **Start/Stop is explicit.** Nothing calls Jev before Start. Scatter and Morph re-arm the scheduler and the caps.
+2. **Make fewer decisions.** Only unsettled ants are scheduled. Each decision buys a **commit distance**: an ant walks 1.1 cells when a neighbouring cell wants ants (and stops there) and up to 4 when far (then coasts), so the far-away phase costs a quarter as much. Settled ants are woken, and re-ask, only when their cell is over-full by more than one ant (fractional targets must not oscillate); Jev's "settle" is refused where there is no room.
+3. **Stop.** Formed, time cap, or spend cap, whichever first. The tolerant coverage metric (error beyond ±0.5 ant per cell, free, `grid.ts coverage`) is the "formed" signal; the overseer noul is shown beside it as "recognisable N %" and does not gate the badge (§8.5: it reads 41–65 % on formed pictures). After a stop the scheduler is off, ants idle on the local rule, and the cost line does not move.
+4. **Start/Stop is explicit.** Nothing calls Jev before Start. Scatter only scatters (after a stop the free local rule re-forms the picture); a run is always a Start, and Morph is a Start with a changed picture.
 
 ### 8.3 What a run should cost
 

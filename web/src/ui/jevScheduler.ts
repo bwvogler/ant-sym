@@ -79,6 +79,8 @@ export class JevScheduler {
   #inFlight = 0;
   /** Cuts this run's browser-side fetches on Stop, so the connections are free for the stop call itself. */
   #aborter = new AbortController();
+  /** Bumps on every start, so a look that began in an old run cannot steer the new one. */
+  #runSeq = 0;
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
   #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, sessionUsd: 0, sessionTokens: 0 };
@@ -111,13 +113,22 @@ export class JevScheduler {
 
   /** Start a run on the server and begin scheduling. */
   async start(caps: Partial<RunCaps>): Promise<void> {
-    const res = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start", caps }) });
-    const run = (await res.json()) as RunSummary;
-    if (!res.ok) {
-      this.#set({ lastError: (run as unknown as { error?: string }).error ?? `start failed (${res.status})` });
+    // The previous run's grace-period calls may have landed since its stop: take their final line first.
+    if (this.#state.phase === "stopped") await this.#refresh();
+    let run: RunSummary;
+    try {
+      const res = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start", caps }) });
+      run = (await res.json()) as RunSummary;
+      if (!res.ok) {
+        this.#set({ lastError: (run as unknown as { error?: string }).error ?? `start failed (${res.status})` });
+        return;
+      }
+    } catch (e) {
+      this.#set({ lastError: `start failed: ${String(e)}` });
       return;
     }
     this.#lastRunTokens = 0;
+    this.#runSeq++;
     this.#aborter = new AbortController();
     this.#resizePending();
     this.#pending.fill(0);
@@ -178,7 +189,8 @@ export class JevScheduler {
       this.#overseerTimer = null;
     }
     this.#engine.attractor = null;
-    this.#set({ stoppedOnTarget: this.#engine.targetVersion });
+    const overseer = this.#state.overseer;
+    this.#set({ stoppedOnTarget: this.#engine.targetVersion, overseer: overseer ? { ...overseer, box: null, steering: false } : null });
     this.#engine.jevOwned.fill(0);
     // After a run the stragglers finish with the local rule, so a formed
     // picture stays formed without spending.
@@ -196,6 +208,7 @@ export class JevScheduler {
 
   dispose(): void {
     this.#halt();
+    this.#aborter.abort();
     this.#listeners.clear();
   }
 
@@ -205,8 +218,9 @@ export class JevScheduler {
 
   /** Accumulate the session total from a run summary (tokens are cumulative within a run). */
   #absorb(run: RunSummary): void {
+    // Replies can land out of order; the run's tokens only ever grow, so take the max.
     const delta = Math.max(0, run.inputTokens - this.#lastRunTokens);
-    this.#lastRunTokens = run.inputTokens;
+    this.#lastRunTokens = Math.max(this.#lastRunTokens, run.inputTokens);
     this.#state.sessionTokens += delta;
     this.#state.sessionUsd = this.#state.sessionTokens * (0.042 / 1_000_000);
   }
@@ -214,12 +228,22 @@ export class JevScheduler {
   async #oversee(): Promise<void> {
     if (!this.opts.overseer || this.#state.phase !== "running" || this.#overseerBusy) return;
     const e = this.#engine;
+    const seq = this.#runSeq;
     this.#overseerBusy = true;
     try {
       const images = await overseerImages(e.target, e.occupancy, e.params.size);
+      if (seq !== this.#runSeq || this.#state.phase !== "running") return;
       const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildOverseerRequest(images.target, images.current)), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
-      if (res.status === 409) return; // the run ended; the ant loop handles the stop
+      if (seq !== this.#runSeq || this.#state.phase !== "running") return; // a late look must not steer a later run
+      if (res.status === 409) {
+        // A cap fired or the run was stopped elsewhere: the same halt as the ant path.
+        const run = (body as { run?: RunSummary }).run ?? null;
+        this.#halt();
+        if (run) this.#absorb(run);
+        this.#set({ phase: "stopped", run, lastError: null });
+        return;
+      }
       if (!res.ok) return; // busy or a server error: skip this look
       const reply = body as JevProxyReply;
       if (reply.status !== 200 || !reply.body || !("answers" in reply.body)) {
@@ -319,20 +343,27 @@ export class JevScheduler {
     const answers = (reply.body as JevResponse).answers;
     const neutral = calibration(answers);
     let sample: Sample | null = null;
-    for (const a of ants) {
-      const i = Number(a.id.slice(1));
-      if (!stillPending.includes(i)) continue; // halted mid-flight
-      const d = readDecision(answers, a.id, this.opts.schema, { sample: this.opts.sample, neutral });
-      if (!d) {
-        e.decideLocally(i);
-        continue;
+    try {
+      for (const a of ants) {
+        const i = Number(a.id.slice(1));
+        if (!stillPending.includes(i)) continue; // halted mid-flight
+        const d = readDecision(answers, a.id, this.opts.schema, { sample: this.opts.sample, neutral });
+        if (!d) {
+          e.decideLocally(i);
+          continue;
+        }
+        applyDecision(e, i, d, a.state);
+        if (!sample) {
+          const own: Record<string, JevAnswer> = {};
+          for (const [k, v] of Object.entries(answers)) if (k.startsWith(`${a.id}_`)) own[k] = v;
+          sample = { id: a.id, state: a.state, answers: own, decision: { heading: d.heading === null ? null : compassOf(d.heading), settle: d.settle, strength: d.strength, pSettle: d.pSettle } };
+        }
       }
-      applyDecision(e, i, d, a.state);
-      if (!sample) {
-        const own: Record<string, JevAnswer> = {};
-        for (const [k, v] of Object.entries(answers)) if (k.startsWith(`${a.id}_`)) own[k] = v;
-        sample = { id: a.id, state: a.state, answers: own, decision: { heading: d.heading === null ? null : compassOf(d.heading), settle: d.settle, strength: d.strength, pSettle: d.pSettle } };
-      }
+    } catch (err) {
+      // A bad answer must not strand the rest of the batch at commit 1e9.
+      for (const i of stillPending) if ((e.world.commit[i] as number) >= 1e9) e.decideLocally(i);
+      this.#set({ failures: this.#state.failures + 1, lastError: `reading answers: ${String(err)}`, run: reply.run });
+      return;
     }
     this.#absorb(reply.run);
     this.#set({ run: reply.run, sample: sample ?? this.#state.sample, neutral, lastError: null });

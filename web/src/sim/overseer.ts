@@ -5,7 +5,9 @@ import type { GridSize } from "./grid.ts";
 // browser renders the target and the current field as two small PNGs and asks
 // one box question ("where is current emptiest compared with target?") and one
 // noul ("is current a recognisable copy of target?"). The box becomes the
-// attractor every ant can see in its state; the noul feeds the formed badge.
+// attractor every ant can see in its state (when it sits on ink the target
+// asks for); the noul is shown as "recognisable N %" next to the grid-based
+// formed badge, which stays the authority.
 // TypeSafe calls image input "dreamer-ready": the overseer is a hint, never an
 // authority, and the ants form the picture without it.
 

@@ -54,5 +54,6 @@ test("compass names and headings round-trip in screen coordinates", () => {
   assert.equal(compass(Math.PI / 2), "S");
   assert.equal(compass(-Math.PI / 2), "N");
   assert.equal(compass(Math.PI), "W");
-  for (const n of ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]) assert.equal(compass(headingOf(n)), n);
+  for (const n of ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]) assert.equal(compass(headingOf(n) as number), n);
+  assert.equal(headingOf("north"), null, "an unknown name is not a heading (the caller falls back to the local rule)");
 });
