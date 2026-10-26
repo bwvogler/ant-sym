@@ -3,11 +3,32 @@ import { DEFAULT_CAPS, USD_PER_INPUT_TOKEN, type RunCaps, type RunSummary, type 
 // The spend ledger: one run at a time, real tokens only. The browser decides
 // *when* to stop for "formed"; the server enforces the spend and time caps so
 // a UI bug can never run the key away. Pure — the clock is injected.
+//
+// Two things the first review caught (PR #1): a cap that only counts
+// finished calls is overrun by whatever is in flight, so every admitted call
+// reserves a worst-case cost until it ends; and a stop must reach calls
+// already accepted, so each run owns an AbortController that stop() fires
+// and the handler threads into the client.
 
 const LATENCY_WINDOW = 200;
+/** Reserved per in-flight call: the 64k-token context limit, i.e. the most one request can bill. */
+export const RESERVE_TOKENS = 64_000;
+
+export interface LedgerOptions {
+  maxInFlight?: number;
+  reserveTokens?: number;
+}
+
+/** Handed out by begin(); end() ignores tokens from a run that is no longer current. */
+export interface InFlightToken {
+  runId: number;
+}
+
+export type Admission = { ok: true } | { ok: false; reason: "not-running" | "spend-cap" | "time-cap" | "busy" };
 
 export class Ledger {
   #caps: RunCaps = { ...DEFAULT_CAPS };
+  #runId = 0;
   #startedAt: number | null = null;
   #stoppedAt: number | null = null;
   #stopReason: StopReason | null = null;
@@ -16,8 +37,20 @@ export class Ledger {
   #inputTokens = 0;
   #latencies: number[] = [];
   #statuses: Record<string, number> = {};
+  #controller = new AbortController();
+  readonly #maxInFlight: number;
+  readonly #reserveTokens: number;
 
+  constructor(opts: LedgerOptions = {}) {
+    this.#maxInFlight = opts.maxInFlight ?? 6;
+    this.#reserveTokens = opts.reserveTokens ?? RESERVE_TOKENS;
+  }
+
+  /** Start a run. Anything still in flight from the previous run is aborted and will not be counted. */
   start(caps: Partial<RunCaps>, now: number): RunSummary {
+    this.#controller.abort();
+    this.#controller = new AbortController();
+    this.#runId++;
     this.#caps = {
       capUsd: clampNumber(caps.capUsd, DEFAULT_CAPS.capUsd, 0, 100),
       capSeconds: clampNumber(caps.capSeconds, DEFAULT_CAPS.capSeconds, 1, 86_400),
@@ -33,10 +66,12 @@ export class Ledger {
     return this.summary(now);
   }
 
+  /** Stop the run and abort every call it still has out. */
   stop(reason: StopReason, now: number): RunSummary {
     if (this.#startedAt !== null && this.#stoppedAt === null) {
       this.#stoppedAt = now;
       this.#stopReason = reason;
+      this.#controller.abort();
     }
     return this.summary(now);
   }
@@ -45,8 +80,17 @@ export class Ledger {
     return this.#startedAt !== null && this.#stoppedAt === null;
   }
 
-  /** May a Jev call go out now? Stops the run itself when a cap is hit. */
-  admit(now: number): { ok: true } | { ok: false; reason: "not-running" | "spend-cap" | "time-cap" } {
+  /** The current run's abort signal; fires on stop, on a cap, and when a new run starts. */
+  get signal(): AbortSignal {
+    return this.#controller.signal;
+  }
+
+  /**
+   * May a Jev call go out now? Stops the run itself when a cap is hit. A call
+   * is refused as "busy" (temporary) when the pool is full or when committed
+   * spend plus the worst case of everything in flight would pass the cap.
+   */
+  admit(now: number): Admission {
     if (!this.running) return { ok: false, reason: "not-running" };
     if (this.usd >= this.#caps.capUsd) {
       this.stop("spend-cap", now);
@@ -56,15 +100,20 @@ export class Ledger {
       this.stop("time-cap", now);
       return { ok: false, reason: "time-cap" };
     }
+    if (this.#inFlight >= this.#maxInFlight) return { ok: false, reason: "busy" };
+    const reserved = (this.#inFlight + 1) * this.#reserveTokens * USD_PER_INPUT_TOKEN;
+    if (this.usd + reserved > this.#caps.capUsd) return { ok: false, reason: "busy" };
     return { ok: true };
   }
 
-  begin(): void {
+  begin(): InFlightToken {
     this.#inFlight++;
+    return { runId: this.#runId };
   }
 
-  /** Record a finished call. Tokens are the real usage.input_tokens of the reply. */
-  end(result: { status: number; ms: number; inputTokens: number }): void {
+  /** Record a finished call. Tokens are the real usage.input_tokens of the reply. A token from an earlier run is ignored. */
+  end(token: InFlightToken, result: { status: number; ms: number; inputTokens: number }): void {
+    if (token.runId !== this.#runId) return;
     this.#inFlight = Math.max(0, this.#inFlight - 1);
     this.#requests++;
     this.#inputTokens += Math.max(0, result.inputTokens);

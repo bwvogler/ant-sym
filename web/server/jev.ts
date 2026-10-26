@@ -10,6 +10,12 @@ import type { JevRequest } from "../shared/jev.ts";
 // docs/PRD.md §3). maxSockets here is the in-flight limit, and
 // server/tests/jev.test.ts proves requests overlap.
 
+/** What the API handler needs from a caller; JevClient is the real one, tests stub it. */
+export interface JevCaller {
+  ask(req: JevRequest, signal?: AbortSignal): Promise<JevCallResult>;
+  destroy(): void;
+}
+
 export interface JevClientOptions {
   apiKey: string;
   baseUrl?: string;
@@ -17,20 +23,32 @@ export interface JevClientOptions {
   maxSockets?: number;
   /** Retries on 429/529 (TypeSafe: retry with backoff, honour retry-after). */
   maxRetries?: number;
+  /** Overall deadline per attempt, from first byte sent to last byte read. */
   timeoutMs?: number;
   /** Injected so tests do not wait. */
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 export interface JevCallResult {
   status: number;
   body: unknown;
+  /** network time only, excluding backoff sleeps */
   ms: number;
   attempts: number;
   inputTokens: number;
 }
 
+/** Thrown by ask() when the caller's signal fires: the run was stopped. */
+export class JevAbortError extends Error {
+  constructor() {
+    super("jev call aborted: the run was stopped");
+    this.name = "JevAbortError";
+  }
+}
+
 export const DEFAULT_BASE_URL = "https://api.typesafe.ai";
+/** Browsers open at most 6 HTTP/1.1 connections per host, so a tab cannot drive more than 6 through Vite anyway. */
+export const DEFAULT_IN_FLIGHT = 6;
 const RETRYABLE = new Set([429, 529]);
 
 /** How long to wait before attempt `attempt` (1-based) after a retryable status, or null to give up. */
@@ -43,6 +61,11 @@ export function retryDelayMs(status: number, retryAfter: string | undefined, att
     if (Number.isFinite(at)) return Math.max(0, Math.min(at - Date.now(), 30_000));
   }
   return Math.min(250 * 2 ** (attempt - 1), 8_000);
+}
+
+/** A keep-alive socket the server closed while idle: the request never left, retry it once. */
+export function isStaleSocketReset(err: unknown, reusedSocket: boolean): boolean {
+  return reusedSocket && (err as { code?: string } | null)?.code === "ECONNRESET";
 }
 
 /** usage.input_tokens from a reply body, 0 when absent. */
@@ -64,66 +87,119 @@ export function headersFor(apiKey: string, req: JevRequest, bodyBytes: number): 
   return h;
 }
 
-export class JevClient {
+function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new JevAbortError());
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(new JevAbortError());
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+export class JevClient implements JevCaller {
   readonly #apiKey: string;
   readonly #url: URL;
   readonly #agent: http.Agent;
   readonly #maxRetries: number;
   readonly #timeoutMs: number;
-  readonly #sleep: (ms: number) => Promise<void>;
+  readonly #sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
 
   constructor(opts: JevClientOptions) {
     this.#apiKey = opts.apiKey;
     this.#url = new URL("/v1/systemone", opts.baseUrl ?? DEFAULT_BASE_URL);
-    const maxSockets = opts.maxSockets ?? 8;
+    const maxSockets = opts.maxSockets ?? DEFAULT_IN_FLIGHT;
     this.#agent =
       this.#url.protocol === "https:"
         ? new https.Agent({ keepAlive: true, maxSockets })
         : new http.Agent({ keepAlive: true, maxSockets });
     this.#maxRetries = opts.maxRetries ?? 3;
     this.#timeoutMs = opts.timeoutMs ?? 20_000;
-    this.#sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.#sleep = opts.sleep ?? defaultSleep;
   }
 
-  /** One logical call: retries 429/529, returns the final status whatever it is. Throws only on network/timeout failure. */
-  async ask(req: JevRequest): Promise<JevCallResult> {
+  /**
+   * One logical call: retries 429/529 and one stale-socket reset, returns the
+   * final status whatever it is. Throws JevAbortError when `signal` fires
+   * (before, between or during attempts) and a plain Error on network failure.
+   */
+  async ask(req: JevRequest, signal?: AbortSignal): Promise<JevCallResult> {
     const payload = Buffer.from(JSON.stringify(req));
     const headers = headersFor(this.#apiKey, req, payload.byteLength);
-    const t0 = performance.now();
+    let networkMs = 0;
+    let resetRetried = false;
     for (let attempt = 1; ; attempt++) {
-      const { status, text, retryAfter } = await this.#post(payload, headers);
-      const delay = retryDelayMs(status, retryAfter, attempt, this.#maxRetries);
+      if (signal?.aborted) throw new JevAbortError();
+      const t0 = performance.now();
+      let posted: { status: number; text: string; retryAfter: string | undefined };
+      try {
+        posted = await this.#post(payload, headers, signal);
+      } catch (err) {
+        networkMs += performance.now() - t0;
+        if (err instanceof JevAbortError) throw err;
+        if (!resetRetried && isStaleSocketReset(err, (err as { reusedSocket?: boolean }).reusedSocket === true)) {
+          resetRetried = true;
+          continue;
+        }
+        throw err;
+      }
+      networkMs += performance.now() - t0;
+      const delay = retryDelayMs(posted.status, posted.retryAfter, attempt, this.#maxRetries);
       if (delay !== null) {
-        await this.#sleep(delay);
+        await this.#sleep(delay, signal);
         continue;
       }
       let body: unknown = null;
       try {
-        body = text ? JSON.parse(text) : null;
+        body = posted.text ? JSON.parse(posted.text) : null;
       } catch {
-        body = { error: "upstream reply was not JSON", text: text.slice(0, 200) };
+        body = { error: "upstream reply was not JSON", text: posted.text.slice(0, 200) };
       }
-      return { status, body, ms: Math.round(performance.now() - t0), attempts: attempt, inputTokens: inputTokensOf(body) };
+      return { status: posted.status, body, ms: Math.round(networkMs), attempts: attempt, inputTokens: inputTokensOf(body) };
     }
   }
 
-  #post(payload: Buffer, headers: Record<string, string>): Promise<{ status: number; text: string; retryAfter: string | undefined }> {
+  #post(payload: Buffer, headers: Record<string, string>, signal?: AbortSignal): Promise<{ status: number; text: string; retryAfter: string | undefined }> {
     const lib = this.#url.protocol === "https:" ? https : http;
     return new Promise((resolve, reject) => {
-      const r = lib.request(this.#url, { method: "POST", agent: this.#agent, headers, timeout: this.#timeoutMs }, (resp) => {
+      let settled = false;
+      const done = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(deadline);
+        signal?.removeEventListener("abort", onAbort);
+        fn();
+      };
+      const r = lib.request(this.#url, { method: "POST", agent: this.#agent, headers }, (resp) => {
         const chunks: Buffer[] = [];
         resp.on("data", (c: Buffer) => chunks.push(c));
         resp.on("end", () =>
-          resolve({
-            status: resp.statusCode ?? 0,
-            text: Buffer.concat(chunks).toString("utf8"),
-            retryAfter: typeof resp.headers["retry-after"] === "string" ? resp.headers["retry-after"] : undefined,
-          }),
+          done(() =>
+            resolve({
+              status: resp.statusCode ?? 0,
+              text: Buffer.concat(chunks).toString("utf8"),
+              retryAfter: typeof resp.headers["retry-after"] === "string" ? resp.headers["retry-after"] : undefined,
+            }),
+          ),
         );
-        resp.on("error", reject);
+        resp.on("error", (e) => done(() => reject(e)));
       });
-      r.on("timeout", () => r.destroy(new Error(`jev request timed out after ${this.#timeoutMs} ms`)));
-      r.on("error", reject);
+      // Overall deadline: a trickling upstream never trips an idle timeout.
+      const deadline = setTimeout(() => {
+        r.destroy(new Error(`jev request exceeded ${this.#timeoutMs} ms`));
+      }, this.#timeoutMs);
+      const onAbort = () => r.destroy(new JevAbortError());
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener("abort", onAbort, { once: true });
+      r.on("error", (e) => {
+        (e as { reusedSocket?: boolean }).reusedSocket = r.reusedSocket;
+        done(() => reject(e));
+      });
       r.end(payload);
     });
   }

@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { JevClient, headersFor, inputTokensOf, retryDelayMs } from "../jev.ts";
+import { DEFAULT_IN_FLIGHT, JevAbortError, JevClient, headersFor, inputTokensOf, isStaleSocketReset, retryDelayMs } from "../jev.ts";
 
 // A stand-in for api.typesafe.ai: answers after `delayMs`, counts how many
 // requests are open at once, and can be told to 429 the first N calls.
-function fakeJev(opts: { delayMs: number; rejectFirst?: number; retryAfter?: string }) {
+function fakeJev(opts: { delayMs: number; rejectFirst?: number; retryAfter?: string; trickle?: boolean }) {
   let open = 0;
   let maxOpen = 0;
   let served = 0;
@@ -21,6 +21,13 @@ function fakeJev(opts: { delayMs: number; rejectFirst?: number; retryAfter?: str
       }
       open++;
       maxOpen = Math.max(maxOpen, open);
+      if (opts.trickle) {
+        // never idle, never done: one byte every delayMs
+        res.writeHead(200, { "content-type": "application/json" });
+        const t = setInterval(() => res.write(" "), opts.delayMs);
+        res.on("close", () => clearInterval(t));
+        return;
+      }
       setTimeout(() => {
         open--;
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
@@ -62,6 +69,73 @@ test("8 parallel calls overlap on an agent sized 8 (the fixture detects serialis
   } finally {
     fake.close();
   }
+});
+
+test("the default client overlaps too (the width production uses, not just an explicit one)", async () => {
+  const fake = await fakeJev({ delayMs: 150 });
+  try {
+    assert.ok(DEFAULT_IN_FLIGHT >= 6);
+    const c = new JevClient({ apiKey: "k", baseUrl: fake.url });
+    const t0 = performance.now();
+    await Promise.all(Array.from({ length: DEFAULT_IN_FLIGHT }, () => c.ask(REQ)));
+    const wall = performance.now() - t0;
+    c.destroy();
+    assert.ok(fake.stats().maxOpen >= DEFAULT_IN_FLIGHT - 1, `saw ${fake.stats().maxOpen} overlapping`);
+    assert.ok(wall < 150 * 3, `${Math.round(wall)} ms for ${DEFAULT_IN_FLIGHT} calls is serial`);
+  } finally {
+    fake.close();
+  }
+});
+
+test("a trickling upstream hits the overall deadline; an abort signal ends a call in flight and before a backoff sleep", async () => {
+  const fake = await fakeJev({ delayMs: 50, trickle: true });
+  try {
+    const c = new JevClient({ apiKey: "k", baseUrl: fake.url, timeoutMs: 300 });
+    const t0 = performance.now();
+    await assert.rejects(c.ask(REQ), /exceeded 300 ms/);
+    assert.ok(performance.now() - t0 < 1500);
+    // abort mid-flight
+    const ac = new AbortController();
+    const p = c.ask(REQ, ac.signal);
+    setTimeout(() => ac.abort(), 60);
+    await assert.rejects(p, JevAbortError);
+    // abort before the first attempt
+    const done = new AbortController();
+    done.abort();
+    await assert.rejects(c.ask(REQ, done.signal), JevAbortError);
+    c.destroy();
+  } finally {
+    fake.close();
+  }
+  // abort during backoff: the sleep rejects, no further attempt is made
+  const limited = await fakeJev({ delayMs: 5, rejectFirst: 10, retryAfter: "0" });
+  try {
+    const ac = new AbortController();
+    let sleeps = 0;
+    const c = new JevClient({
+      apiKey: "k",
+      baseUrl: limited.url,
+      maxRetries: 3,
+      sleep: async (_ms, signal) => {
+        sleeps++;
+        ac.abort();
+        if (signal?.aborted) throw new JevAbortError();
+      },
+    });
+    await assert.rejects(c.ask(REQ, ac.signal), JevAbortError);
+    assert.equal(sleeps, 1);
+    assert.equal(limited.stats().served, 1, "no attempt after the abort");
+    c.destroy();
+  } finally {
+    limited.close();
+  }
+});
+
+test("a reset on a reused keep-alive socket is retried once; other errors are not", () => {
+  assert.equal(isStaleSocketReset({ code: "ECONNRESET" }, true), true);
+  assert.equal(isStaleSocketReset({ code: "ECONNRESET" }, false), false);
+  assert.equal(isStaleSocketReset({ code: "ECONNREFUSED" }, true), false);
+  assert.equal(isStaleSocketReset(null, true), false);
 });
 
 test("429 is retried, honouring retry-after, and the final status is reported with the attempt count", async () => {

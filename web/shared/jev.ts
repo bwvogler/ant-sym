@@ -19,8 +19,8 @@ export interface JevRequest {
 
 export type JevAnswer =
   | { type: "noul"; noul: number }
-  | { type: "choice"; choice: string; confidence: number | null; probabilities: Record<string, number> }
-  | { type: "score"; score: number; confidence: number | null; legend: Record<string, string>; probabilities: Record<string, number> }
+  | { type: "choice"; choice: string; confidence?: number | null; probabilities?: Record<string, number> }
+  | { type: "score"; score: number; confidence?: number | null; legend?: Record<string, string>; probabilities?: Record<string, number> }
   | { type: "box"; box: { top: number; bottom: number; left: number; right: number }; confidence: number | null };
 
 export interface JevResponse {

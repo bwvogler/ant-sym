@@ -1,6 +1,176 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sameOrigin, validateJevRequest } from "../api.ts";
+import http from "node:http";
+import { isJevResponse, makeHandlers, sameOrigin, validateJevRequest, wrap, type Services } from "../api.ts";
+import { Ledger } from "../ledger.ts";
+import { JevAbortError, type JevCallResult, type JevCaller } from "../jev.ts";
+import type { JevRequest } from "../../shared/jev.ts";
+
+// The routes, wired the way the Vite plugin wires them, on a real http server
+// with a stub caller: no network, no key. Every finding from the first review
+// (PR #1) that the unit tests missed is a case here.
+
+function stubCaller(opts: { delayMs?: number; tokens?: number; status?: number } = {}): JevCaller & { calls: number } {
+  const caller = {
+    calls: 0,
+    async ask(_req: JevRequest, signal?: AbortSignal): Promise<JevCallResult> {
+      caller.calls++;
+      await new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) return reject(new JevAbortError());
+        const t = setTimeout(resolve, opts.delayMs ?? 5);
+        signal?.addEventListener("abort", () => {
+          clearTimeout(t);
+          reject(new JevAbortError());
+        });
+      });
+      const tokens = opts.tokens ?? 1000;
+      return { status: opts.status ?? 200, body: { model: "jev-x", answers: { q: { type: "noul", noul: 0.5 } }, usage: { input_tokens: tokens, output_tokens: 0 } }, ms: opts.delayMs ?? 5, attempts: 1, inputTokens: tokens };
+    },
+    destroy() {},
+  };
+  return caller;
+}
+
+async function serve(svc: Services) {
+  const h = makeHandlers(svc);
+  const routes: Record<string, ReturnType<typeof wrap>> = { "/api/health": wrap(h.health), "/api/run": wrap(h.run), "/api/jev": wrap(h.jev) };
+  const server = http.createServer((req, res) => {
+    const path = new URL(req.url ?? "/", "http://x").pathname;
+    const fn = routes[path];
+    if (!fn) {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+    void fn(req, res);
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as { port: number }).port;
+  const base = `http://127.0.0.1:${port}`;
+  const post = async (path: string, body: unknown, headers: Record<string, string> = {}) => {
+    const r = await fetch(base + path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
+    return { status: r.status, json: (await r.json()) as Record<string, unknown> };
+  };
+  return { base, post, close: () => server.close() };
+}
+
+const JEV_BODY = { state: "x", questions: { q: { type: "noul", instructions: "y" } } };
+
+test("routes: cross-origin is refused by wrap(); 409 before start; a call is recorded; the cap fires", async () => {
+  const ledger = new Ledger({ reserveTokens: 0 });
+  const client = stubCaller({ tokens: 20_000 });
+  const s = await serve({ client, ledger, now: () => Date.now() });
+  try {
+    const foreign = await s.post("/api/jev", JEV_BODY, { origin: "http://evil.example" });
+    assert.equal(foreign.status, 403);
+    assert.equal(client.calls, 0);
+    const idle = await s.post("/api/jev", JEV_BODY);
+    assert.equal(idle.status, 409);
+    assert.equal(idle.json.error, "not-running");
+    await s.post("/api/run", { action: "start", caps: { capUsd: 0.001, capSeconds: 60 } });
+    const ok = await s.post("/api/jev", JEV_BODY);
+    assert.equal(ok.status, 200);
+    assert.equal(ok.json.inputTokens, 20_000);
+    assert.equal((ok.json.run as { requests: number }).requests, 1);
+    assert.equal(client.calls, 1);
+    const second = await s.post("/api/jev", JEV_BODY); // $0.00084 spent, one more passes
+    assert.equal(second.status, 200);
+    const third = await s.post("/api/jev", JEV_BODY); // $0.00168 ≥ cap
+    assert.equal(third.status, 409);
+    assert.equal(third.json.error, "spend-cap");
+    assert.equal(client.calls, 2, "nothing goes upstream past the cap");
+    const bad = await s.post("/api/jev", { questions: {} });
+    assert.equal(bad.status, 400);
+  } finally {
+    s.close();
+  }
+});
+
+test("routes: concurrent calls cannot overrun the cap (reservation) and the pool ceiling answers 429 busy", async () => {
+  const ledger = new Ledger({ maxInFlight: 3 }); // default reserve: 64k tokens = $0.002688 per call
+  const client = stubCaller({ delayMs: 80, tokens: 60_000 });
+  const s = await serve({ client, ledger, now: () => Date.now() });
+  try {
+    await s.post("/api/run", { action: "start", caps: { capUsd: 0.003, capSeconds: 60 } }); // room for one worst case
+    const results = await Promise.all(Array.from({ length: 6 }, () => s.post("/api/jev", JEV_BODY)));
+    const statuses = results.map((r) => r.status).sort();
+    assert.equal(statuses.filter((x) => x === 200).length, 1, `exactly one call may go upstream: ${statuses}`);
+    assert.equal(client.calls, 1);
+    assert.ok(ledger.usd < 0.003);
+    // pool ceiling
+    const roomy = new Ledger({ maxInFlight: 2, reserveTokens: 0 });
+    const slow = stubCaller({ delayMs: 120 });
+    const s2 = await serve({ client: slow, ledger: roomy, now: () => Date.now() });
+    try {
+      await s2.post("/api/run", { action: "start", caps: { capUsd: 10, capSeconds: 60 } });
+      const rs = await Promise.all(Array.from({ length: 4 }, () => s2.post("/api/jev", JEV_BODY)));
+      assert.deepEqual(rs.map((r) => r.status).sort(), [200, 200, 429, 429]);
+      assert.equal(rs.find((r) => r.status === 429)?.json.error, "busy");
+    } finally {
+      s2.close();
+    }
+  } finally {
+    s.close();
+  }
+});
+
+test("routes: Stop aborts calls in flight and their tokens never land; a new Start ignores the old run's calls", async () => {
+  const ledger = new Ledger({ reserveTokens: 0 });
+  const client = stubCaller({ delayMs: 300, tokens: 50_000 });
+  const s = await serve({ client, ledger, now: () => Date.now() });
+  try {
+    await s.post("/api/run", { action: "start", caps: { capUsd: 10, capSeconds: 60 } });
+    const inFlight = Promise.all(Array.from({ length: 3 }, () => s.post("/api/jev", JEV_BODY)));
+    await new Promise((r) => setTimeout(r, 40));
+    const stopped = await s.post("/api/run", { action: "stop" });
+    assert.equal((stopped.json as { running: boolean }).running, false);
+    const rs = await inFlight;
+    assert.deepEqual(rs.map((r) => r.status), [409, 409, 409]);
+    assert.deepEqual(rs.map((r) => r.json.error), ["stopped", "stopped", "stopped"]);
+    assert.equal(ledger.usd, 0, "the cost line did not move after Stop");
+    // start, send, start again: the first run's call is cut off and not counted in run 2
+    await s.post("/api/run", { action: "start", caps: { capUsd: 10, capSeconds: 60 } });
+    const old = s.post("/api/jev", JEV_BODY);
+    await new Promise((r) => setTimeout(r, 40));
+    const fresh = await s.post("/api/run", { action: "start", caps: { capUsd: 10, capSeconds: 60 } });
+    assert.equal((fresh.json as { inFlight: number }).inFlight, 0);
+    assert.equal((await old).status, 409);
+    const after = await fetch(`${s.base}/api/run`).then((r) => r.json() as Promise<{ requests: number; inputTokens: number }>);
+    assert.equal(after.requests, 0);
+    assert.equal(after.inputTokens, 0);
+  } finally {
+    s.close();
+  }
+});
+
+test("routes: a 200 without answers is flagged, a thrown client error is a 502 and still ends the call", async () => {
+  const ledger = new Ledger({ reserveTokens: 0 });
+  const empty: JevCaller = { async ask() { return { status: 200, body: { nope: true }, ms: 1, attempts: 1, inputTokens: 0 }; }, destroy() {} };
+  const s = await serve({ client: empty, ledger, now: () => Date.now() });
+  try {
+    await s.post("/api/run", { action: "start", caps: {} });
+    const r = await s.post("/api/jev", JEV_BODY);
+    assert.equal(r.status, 200);
+    assert.match(String((r.json.body as { error: string }).error), /no answers/);
+    assert.equal(isJevResponse({ answers: {} }), true);
+    assert.equal(isJevResponse({ answers: null }), false);
+  } finally {
+    s.close();
+  }
+  const broken: JevCaller = { async ask() { throw new Error("boom"); }, destroy() {} };
+  const l2 = new Ledger({ reserveTokens: 0, maxInFlight: 1 });
+  const s2 = await serve({ client: broken, ledger: l2, now: () => Date.now() });
+  try {
+    await s2.post("/api/run", { action: "start", caps: {} });
+    const r = await s2.post("/api/jev", JEV_BODY);
+    assert.equal(r.status, 502);
+    assert.equal(l2.summary(0).inFlight, 0, "the failed call was ended, the pool slot freed");
+    assert.equal(l2.summary(0).statuses["0"], 1);
+  } finally {
+    s2.close();
+  }
+});
+
 
 test("sameOrigin: no Origin passes, matching host passes, anything else is refused", () => {
   assert.equal(sameOrigin(undefined, "localhost:38500"), true);

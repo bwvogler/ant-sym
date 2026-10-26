@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import { DEFAULT_JEV_MODEL, type JevProxyReply, type JevRequest, type RunCaps } from "../shared/jev.ts";
 import { HttpError, methodNotAllowed, readJsonBody, sendJson } from "./http.ts";
-import { JevClient } from "./jev.ts";
+import { DEFAULT_IN_FLIGHT, JevAbortError, JevClient, type JevCaller } from "./jev.ts";
 import { Ledger } from "./ledger.ts";
 
 // The whole "backend": dev-server-only middleware on the Vite server, in the
@@ -27,7 +27,7 @@ export function sameOrigin(origin: string | undefined, host: string | undefined)
   }
 }
 
-type Handler = (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
+export type Handler = (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
 
 /** Every route goes through here: same-origin check, JSON error envelope for anything thrown. No exceptions. */
 export function wrap(fn: Handler): Handler {
@@ -71,8 +71,14 @@ export function validateJevRequest(raw: unknown): JevRequest {
   };
 }
 
+/** A 200 from upstream must carry an answers object to count as an answer. */
+export function isJevResponse(body: unknown): boolean {
+  const b = body as { answers?: unknown } | null;
+  return !!b && typeof b === "object" && !!b.answers && typeof b.answers === "object";
+}
+
 export interface Services {
-  client: JevClient | null;
+  client: JevCaller | null;
   ledger: Ledger;
   now: () => number;
 }
@@ -96,20 +102,28 @@ export function makeHandlers(svc: Services) {
     const request = validateJevRequest(await readJsonBody(req));
     const gate = svc.ledger.admit(svc.now());
     if (!gate.ok) {
-      // 409: the run is not accepting calls. The reply carries the summary so
-      // the client learns which cap fired without another round trip.
-      return sendJson(res, 409, { error: gate.reason, run: svc.ledger.summary(svc.now()) });
+      // 409: the run is not accepting calls right now. "busy" is temporary
+      // (pool full or spend reserved); the others end the run. The reply
+      // carries the summary so the client learns which without another trip.
+      return sendJson(res, gate.reason === "busy" ? 429 : 409, { error: gate.reason, run: svc.ledger.summary(svc.now()) });
     }
-    svc.ledger.begin();
+    const token = svc.ledger.begin();
+    const signal = svc.ledger.signal;
+    let result: Awaited<ReturnType<JevCaller["ask"]>>;
     try {
-      const result = await svc.client.ask(request);
-      svc.ledger.end(result);
-      const reply: JevProxyReply = { ...result, body: result.body as JevProxyReply["body"], run: svc.ledger.summary(svc.now()) };
-      sendJson(res, 200, reply);
+      result = await svc.client.ask(request, signal);
     } catch (e) {
-      svc.ledger.end({ status: 0, ms: 0, inputTokens: 0 });
+      svc.ledger.end(token, { status: 0, ms: 0, inputTokens: 0 });
+      if (e instanceof JevAbortError || signal.aborted) {
+        return sendJson(res, 409, { error: "stopped", run: svc.ledger.summary(svc.now()) });
+      }
       throw new HttpError(502, `jev unreachable: ${(e as Error).message}`);
     }
+    // A 200 without answers is not an answer; keep the status for the ledger but say so.
+    const body = result.status === 200 && !isJevResponse(result.body) ? { error: "upstream reply had no answers", upstream: result.body } : result.body;
+    svc.ledger.end(token, result);
+    const reply: JevProxyReply = { ...result, body: body as JevProxyReply["body"], run: svc.ledger.summary(svc.now()) };
+    sendJson(res, 200, reply);
   };
 
   return { health, run, jev };
@@ -122,12 +136,11 @@ export function apiPlugins(): Plugin {
     configureServer(server) {
       const apiKey = process.env.JEV_API_KEY ?? "";
       if (!apiKey) console.warn("[jev-ants] JEV_API_KEY is not set: /api/jev will answer 503");
-      const inFlight = Number(process.env.JEV_IN_FLIGHT) || 8;
-      const svc: Services = {
-        client: apiKey ? new JevClient({ apiKey, maxSockets: inFlight }) : null,
-        ledger: new Ledger(),
-        now: () => Date.now(),
-      };
+      const inFlight = Number(process.env.JEV_IN_FLIGHT) || DEFAULT_IN_FLIGHT;
+      const client = apiKey ? new JevClient({ apiKey, maxSockets: inFlight }) : null;
+      const svc: Services = { client, ledger: new Ledger({ maxInFlight: inFlight }), now: () => Date.now() };
+      // A server/*.ts edit restarts Vite: close the old pool so sockets do not leak across restarts.
+      server.httpServer?.once("close", () => client?.destroy());
       const h = makeHandlers(svc);
       server.middlewares.use("/api/health", wrap(h.health));
       server.middlewares.use("/api/run", wrap(h.run));
