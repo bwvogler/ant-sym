@@ -1,40 +1,94 @@
-import { useEffect, useState } from "react";
-import type { RunSummary } from "../shared/jev.ts";
-
-// Milestone 1 shell: proves the proxy, the key and the ledger are wired.
-// The field, the ants and the panel land in milestone 2.
-
-type Health = { ok: boolean; hasKey: boolean; run: RunSummary };
+import Field from "./ui/Field.tsx";
+import JevBar from "./ui/JevBar.tsx";
+import JevPanel from "./ui/JevPanel.tsx";
+import Panel from "./ui/Panel.tsx";
+import { useEngine } from "./ui/useEngine.ts";
+import { useJev } from "./ui/useJev.ts";
 
 export default function App() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch((e) => setError(String(e)));
-  }, []);
+  const {
+    engine,
+    controls,
+    update,
+    stats,
+    fps,
+    scatter,
+    onFrame,
+    loadImage,
+    imageError,
+  } = useEngine();
+  const blank = engine.targetTotal <= 0;
+  const jev = useJev(engine, stats?.formed ?? false, stats?.targetVersion ?? 0, blank);
+  const running = jev.state.phase === "running";
+  const startBlocked = controls.brain !== "jev" ? "Switch Brain to Jev first" : blank ? "Type a word or upload a picture first" : null;
   return (
-    <main className="mx-auto flex h-full max-w-3xl flex-col gap-6 px-4 py-10">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Jev Ants</h1>
-        <p className="text-fg-2">Ants that form the picture you type or upload, one Jev decision at a time.</p>
+    <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
+      <header className="flex items-baseline justify-between">
+        <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
+        <p className="text-sm text-fg-3">
+          ants that form the picture you type, one decision at a time
+        </p>
       </header>
-      <section className="rounded-lg border border-line bg-panel p-4 font-mono text-sm">
-        {error && <p className="text-err">{error}</p>}
-        {!health && !error && <p className="text-fg-3">checking the server…</p>}
-        {health && (
-          <ul className="space-y-1">
-            <li>server: {health.ok ? "ok" : "down"}</li>
-            <li>
-              JEV_API_KEY: {health.hasKey ? <span className="text-accent">present</span> : <span className="text-warn">missing — /api/jev answers 503</span>}
-            </li>
-            <li>run: {health.run.running ? "running" : "idle"}</li>
-            <li>caps: ${health.run.caps.capUsd.toFixed(2)} · {health.run.caps.capSeconds}s</li>
-          </ul>
-        )}
-      </section>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <div
+            className="min-h-[360px]"
+            style={{
+              aspectRatio: `${engine.params.size.w} / ${engine.params.size.h}`,
+            }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files?.[0];
+              if (f) void loadImage(f);
+            }}
+          >
+            <Field
+              engine={engine}
+              onFrame={onFrame}
+              showHeatmap={controls.showHeatmap}
+              showTrails={controls.showTrails}
+              box={jev.state.overseer?.box ?? null}
+              boxSteering={jev.state.overseer?.steering ?? false}
+            />
+          </div>
+          <JevBar
+            state={jev.state}
+            start={jev.start}
+            stop={jev.stop}
+            morphPending={jev.morphPending}
+          startBlocked={startBlocked}
+          blankStopped={jev.blankStopped}
+            activeAnts={
+              stats ? controls.antCount - stats.settled : controls.antCount
+            }
+            jevDecisions={stats?.decisions.jev ?? 0}
+          />
+        </div>
+        <Panel
+          engine={engine}
+          controls={controls}
+          update={update}
+          stats={stats}
+          fps={fps}
+          onScatter={scatter}
+          onImage={(f) => void loadImage(f)}
+          imageError={imageError}
+          running={running}
+        >
+          <JevPanel
+            state={jev.state}
+            caps={jev.caps}
+            setCaps={jev.setCaps}
+            schema={jev.schema}
+            setSchema={jev.setSchema}
+            stopOnFormed={jev.stopOnFormed}
+            setStopOnFormed={jev.setStopOnFormed}
+            overseer={jev.overseer}
+            setOverseer={jev.setOverseer}
+          />
+        </Panel>
+      </div>
     </main>
   );
 }

@@ -46,7 +46,7 @@ browser (Vite + React)                          node (Vite dev-server middleware
 ```
 
 - **Sim loop** runs in the browser with `requestAnimationFrame`. Each tick: move ants by heading × pace, update the density grid, decay pheromone, redraw. Jev answers arrive asynchronously and update each ant's *intent* (heading, pace, settled); the tick loop never waits on the network.
-- **Scheduler**: every 200 ms, pick the ants whose last decision is oldest (and not settled, or settled but with a deficit that changed), pack them 100 per request, post. In-flight limit configurable (default 8). Backoff on 429/529 honouring `retry-after`.
+- **Scheduler**: every 200 ms, pick the ants whose last decision is oldest (and not settled, or settled but with a deficit that changed), pack them 100 per request, post. In-flight limit 5 (browsers allow 6 connections per host; one stays free so Stop reaches the server at once). The server retries 429/529 honouring `retry-after`; the browser treats a 429 "busy" from the proxy as "release these ants, try next cycle".
 - **Server** holds the key, forwards packed requests, counts `usage.input_tokens`, enforces the session cap, and runs the overseer (renders nothing itself; the browser sends two PNGs).
 - **Connection pool**: Node's `fetch` on one dispatcher serialised our requests (10 × 50 ants took 2.9 s stacked; separate connections took 0.65 s for 8 × 100). The server must use an undici `Agent` sized for the in-flight limit, and a test must pin that parallel requests overlap.
 - `sim/` is pure and covered by `node --test`; the renderer and React layer are thin.
@@ -151,17 +151,47 @@ Jev bills per input token. Parallelism changes latency, not cost: tokens per ant
 
 Questions, not state, dominate. A choice over 9 compass points is the single most expensive thing an ant can ask.
 
+### 8.1b Bake-off result (2026-10-25, `scripts/bakeoff.mjs`, 2×100 synthetic ants per schema, live API)
+
+Synthetic states with one unambiguous wanting neighbour (or a cell with room). Chance is 12.5% exact, 37.5% within 45°.
+
+| schema | tokens/ant | latency | direction exact | within 45° | settle when room | leave when over-full |
+|---|---|---|---|---|---|---|
+| A object + choice9 + score + noul (original) | 324 | 448 ms | 73% | 88% | 63% | 99% |
+| B string + choice9 | 211 | 218 ms | 57% | 65% | 75% | 100% |
+| C string + 3 nouls | 136 | 198 ms | 25% | 62% | 58% | 91% |
+| **D object + 3 nouls (N/S, E/W, settle)** | **178** | 277 ms | 32% | **85%** | **89%** | **100%** |
+| D2 terse-key object + 3 nouls | 146 | 210 ms | 27% | 74% | 98% | 87% |
+| D3 object + choice9 + settle noul | 285 | 304 ms | 71% | 87% | 88% | 99% |
+| E string + choice5 + settle noul | 177 | 219 ms | 42% | 78% | 52% | 91% |
+
+Two lessons. **Structure beats terseness**: the same facts as a compact string (B, C) lose 20 points of steering accuracy against a plain JSON object (A, D); the token saving is not worth it. **Nouls steer as well as a 9-way choice within 45°** (85% vs 88%) at 55% of the tokens, and settle better (89% vs 63%), because the settle question is asked on its own instead of being the "stay" option of a crowded choice. Exact-direction accuracy is lower for nouls by construction: two binary axes land on diagonals, and the heading is read as a continuous angle anyway.
+
+**Default brain: D3** (`compass`). **Selectable: D** (`nouls`) for the demo's comparison. (Revised the same evening — see below.)
+
+**Revision after the first live run (2026-10-25 evening).** With the noul brain, 1,000 ants drifted into the south-west corner. Cause: Jev's "no opinion" on a noul is not 0.5. Flat ants (nothing around them) answered north 0.06 and east 0.19, so a heading read against 0.5 points south-west for every undecided ant; and because the neutral sits near zero, "south" has almost no dynamic range below it. Three calibration ants per request (flat state, answers used as that request's neutral point) fixed the far-hint cases but left the deficit cases noisy; a four-noul variant (N, S, E, W each against its own neutral) was no better (236 tok/ant). The compass choice has its calibration built in (probabilities over nine options sum to one) and, once the state carried an explicit `room` field for the ant's own cell, steered every synthetic group correctly (8/8 on N, S, E, W, SE, far hints, attractor, settle on room ≥ 0) at 296 tok/ant with mean confidence 0.78. The bake-off's synthetic states had an unambiguous wanting neighbour; the live sim is mostly ants with nothing in view, which is where the noul neutral bias bites. Lesson for the PRD: **a noul read as a signed axis needs calibration, and even calibrated it is a poor compass; a choice is self-normalising.** The noul brain stays selectable, with calibration, as the cheaper and visibly worse comparison.
+
 ### 8.2 Levers, in order
 
-1. **Ask cheaper questions.** Default to the three-noul scheme (109 tok/ant). Keep the 9-way choice as a selectable "brain" for comparison. The first probe of the noul scheme showed only loose agreement with the deficit on a terse string state, so a **schema bake-off** (bead) scores each candidate on synthetic states with a known best direction before M3 commits: cost per ant × steering accuracy.
-2. **Make fewer decisions.** Only unsettled ants are scheduled. Each decision buys a **commit distance**: an ant walks 1 cell when near a deficit and up to 3 when far, so the far-away phase costs a third as much. Settled ants re-ask only when their cell's deficit changes sign.
-3. **Stop.** Formed, time cap, or spend cap, whichever first. The local grid error (RMS of the deficit grid) is free and is the primary "formed" signal; the overseer noul confirms it for the badge. After a stop the scheduler is off, ants idle on the local rule, and the cost line does not move.
-4. **Start/Stop is explicit.** Nothing calls Jev before Start. Scatter and Morph re-arm the scheduler and the caps.
+1. **Ask cheaper questions, but not wrong ones.** The default is the 9-way compass choice plus a settle noul on a structured state with an explicit `room` field (~296 tok/ant). It is 1.6× the cost of the noul brain per decision, but it steers; a brain that sends ants the wrong way costs far more in decisions. No pace question (pace follows confidence).
+2. **Make fewer decisions.** Only unsettled ants are scheduled. Each decision buys a **commit distance**: an ant walks 1.1 cells when a neighbouring cell wants ants (and stops there) and up to 4 when far (then coasts), so the far-away phase costs a quarter as much. Settled ants are woken, and re-ask, only when their cell is over-full by more than one ant (fractional targets must not oscillate); Jev's "settle" is refused where there is no room.
+3. **Stop.** Formed, time cap, or spend cap, whichever first. The tolerant coverage metric (error beyond ±0.5 ant per cell, free, `grid.ts coverage`) is the "formed" signal; the overseer noul is shown beside it as "recognisable N %" and does not gate the badge (§8.5: it reads 41–65 % on formed pictures). After a stop the scheduler is off, ants idle on the local rule, and the cost line does not move.
+4. **Start/Stop is explicit.** Nothing calls Jev before Start. Scatter only scatters (after a stop the free local rule re-forms the picture); a run is always a Start, and Morph is a Start with a changed picture.
 
 ### 8.3 What a run should cost
 
-Estimate at 1,000 ants, three-noul schema, 2 s cadence, a ~90 s forming run where the active fraction decays from 1 to ~0.2 (mean ~0.5): about 22k decisions × 109 tokens ≈ 2.5M tokens ≈ **$0.10 per formation**; with commit distance roughly **$0.04**. Full-tilt rate is ~55k tokens/s ≈ $8/hour, but a run stops at formed, so the hourly figure only matters if the picture never forms. The $0.50 default cap is therefore several formations, not a fraction of one.
+Estimate at 1,000 ants, compass brain (~296 tok/ant), 2 s cadence, a ~90 s forming run where the active fraction decays from 1 to ~0.2 (mean ~0.5): about 22k decisions × 296 tokens ≈ 6.5M tokens ≈ **$0.27 per formation**; with commit distance roughly **$0.12**. Full-tilt rate is ~150k tokens/s ≈ $22/hour, but a run stops at formed, so the hourly figure only matters if the picture never forms. The $0.50 default cap is therefore several formations, not a fraction of one.
 
 ### 8.4 Real cost, not estimates
 
 The server keeps a ledger of `usage.input_tokens` per response and the panel shows: tokens this run, dollars this run (tokens × $0.042/M), elapsed, requests, median latency, and the active-ant count. The per-formation figure from the ledger goes into the README once measured. If TypeSafe exposes a billing endpoint later, the console total should reconcile with the ledger.
+
+### 8.5 Live results (2026-10-25, 1,000 ants, compass brain, overseer on)
+
+| Run | Formed in | Requests | Tokens | Cost |
+|---|---|---|---|---|
+| "ANTS" from scatter | 13 s | 95 | 1.71 M | $0.072 |
+| Morph "ANTS" → "JEV" (no scatter) | 9 s | 61 | 1.30 M | $0.055 |
+| Morph "JEV" → uploaded ring PNG | 13 s | 90 | 1.68 M | $0.070 |
+
+The overseer costs **1,259 input tokens per look** (two 480×320 PNGs plus the box and noul), about $0.00005, three looks per run at the 4 s cadence: noise next to the ants. Its `done` noul read 41–65 % on pictures the grid metric called formed (86–96 %), so the badge stays driven by the grid and the noul is shown as "recognisable N %". The box mostly landed on the blank middle of a formed letter or ring and was rejected by the ink-share guard (`box ignored` in the panel); it steered only early in a run. Fine as a showcase of the image path, not load-bearing, which is what §7 predicted.

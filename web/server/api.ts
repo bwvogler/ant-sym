@@ -148,7 +148,7 @@ export function apiPlugins(services?: Services): Plugin {
     configureServer(server) {
       const svc = services ?? buildServices(process.env);
       if (!svc.client) console.warn("[jev-ants] JEV_API_KEY is not set: /api/jev will answer 503");
-      // A server/*.ts edit restarts Vite: close the old pool so sockets do not leak across restarts.
+      // When Vite restarts (a config change; server/*.ts edits need a manual restart) close the old pool so sockets do not leak.
       server.httpServer?.once("close", () => svc.client?.destroy());
       const h = makeHandlers(svc);
       server.middlewares.use("/api/health", wrap(h.health));
