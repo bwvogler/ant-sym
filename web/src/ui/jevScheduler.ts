@@ -84,7 +84,6 @@ export class JevScheduler {
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
   #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, sessionUsd: 0, sessionTokens: 0 };
-  #lastRunTokens = 0;
   #startedAt = 0;
 
   constructor(engine: Engine, opts: Partial<SchedulerOptions> = {}) {
@@ -127,7 +126,6 @@ export class JevScheduler {
       this.#set({ lastError: `start failed: ${String(e)}` });
       return;
     }
-    this.#lastRunTokens = 0;
     this.#runSeq++;
     this.#aborter = new AbortController();
     this.#resizePending();
@@ -216,13 +214,10 @@ export class JevScheduler {
     if (this.#pending.length !== this.#engine.world.n) this.#pending = new Uint8Array(this.#engine.world.n);
   }
 
-  /** Accumulate the session total from a run summary (tokens are cumulative within a run). */
+  /** The session line comes from the server, which sums every billed reply across runs (replies can land out of order: take the max). */
   #absorb(run: RunSummary): void {
-    // Replies can land out of order; the run's tokens only ever grow, so take the max.
-    const delta = Math.max(0, run.inputTokens - this.#lastRunTokens);
-    this.#lastRunTokens = Math.max(this.#lastRunTokens, run.inputTokens);
-    this.#state.sessionTokens += delta;
-    this.#state.sessionUsd = this.#state.sessionTokens * (0.042 / 1_000_000);
+    this.#state.sessionTokens = Math.max(this.#state.sessionTokens, run.sessionInputTokens);
+    this.#state.sessionUsd = Math.max(this.#state.sessionUsd, run.sessionUsd);
   }
 
   async #oversee(): Promise<void> {

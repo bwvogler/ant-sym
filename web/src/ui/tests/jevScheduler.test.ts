@@ -9,7 +9,7 @@ import type { RunSummary } from "../../../shared/jev.ts";
 // "there are no scheduler tests at all" — the 429 release could be deleted
 // and the suite stayed green).
 
-const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReason: null, elapsedSeconds: 0, caps: { capUsd: 0.5, capSeconds: 180 }, requests: 0, inFlight: 0, inputTokens: 0, usd: 0, aborted: 0, medianMs: null, p90Ms: null, statuses: {}, remainingUsd: 0.5, remainingSeconds: 180 };
+const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReason: null, elapsedSeconds: 0, caps: { capUsd: 0.5, capSeconds: 180 }, requests: 0, inFlight: 0, inputTokens: 0, usd: 0, sessionInputTokens: 0, sessionUsd: 0, aborted: 0, medianMs: null, p90Ms: null, statuses: {}, remainingUsd: 0.5, remainingSeconds: 180 };
 
 type Reply = { status: number; body: unknown } | ((signal: AbortSignal | undefined) => Promise<{ status: number; body: unknown }>);
 
