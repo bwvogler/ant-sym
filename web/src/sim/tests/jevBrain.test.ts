@@ -116,8 +116,10 @@ test("antState reads the engine and applyDecision writes back with pace/commit r
   e.refreshGrids();
   applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, { ...st, room: 0 });
   assert.equal(e.world.settled[2], 0, "stale snapshot: the current cell has no room");
-  e.world.x[2] = 8.5;
-  e.world.y[2] = 8.5;
+  // and in a cell that does want ants (2 wanted, 1 there) it settles
+  e.target[5 * 16 + 5] = 2;
+  e.world.x[2] = 5.5;
+  e.world.y[2] = 5.5;
   e.refreshGrids();
   applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, { ...st, room: 0 });
   assert.equal(e.world.settled[2], 1);
