@@ -3,10 +3,10 @@
 <p align="center"><em>Ants that form the picture you type, one decision at a time.</em></p>
 
 <p align="center">
-  <img src="docs/ants.gif" width="720" alt="A thousand ants scatter and form the word ANTS">
+  <img src="docs/ants.gif" width="720" alt="A thousand ants holding the word JEV walk over to spell ANTS, then back again">
 </p>
 
-<p align="center"><sub>Live capture: 1,000 ants, compass brain, pheromone trails on. Forms in about 15 s for about seven cents.</sub></p>
+<p align="center"><sub>Live capture, played forward then back: 1,000 ants morph from JEV to ANTS with the Morph button. Each morph takes about 10 s and costs about six cents.</sub></p>
 
 Every ant is its own [Jev](https://typesafe.ai) agent. It sees the nine cells around it, how
 many ants each still wants, and the headings of its neighbours, and Jev answers *which way*
