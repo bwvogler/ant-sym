@@ -27,7 +27,8 @@ export interface SchedulerOptions {
   overseerMs: number;
 }
 
-export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 6, intervalMs: 200, minAgeSeconds: 1.5, sample: false, overseer: true, overseerMs: 4000 };
+// inFlight 5: browsers allow 6 connections per host, and Stop needs one to reach the server at once.
+export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 5, intervalMs: 200, minAgeSeconds: 1.5, sample: false, overseer: true, overseerMs: 4000 };
 
 export interface OverseerState {
   box: Box | null;
@@ -76,6 +77,8 @@ export class JevScheduler {
   #overseerTimer: ReturnType<typeof setInterval> | null = null;
   #overseerBusy = false;
   #inFlight = 0;
+  /** Cuts this run's browser-side fetches on Stop, so the connections are free for the stop call itself. */
+  #aborter = new AbortController();
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
   #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, sessionUsd: 0, sessionTokens: 0 };
@@ -115,6 +118,7 @@ export class JevScheduler {
       return;
     }
     this.#lastRunTokens = 0;
+    this.#aborter = new AbortController();
     this.#resizePending();
     this.#pending.fill(0);
     // A picture that is already half there (the local rule, or a previous run)
@@ -137,13 +141,30 @@ export class JevScheduler {
   /** Stop: tell the server why, go idle, hand every ant back to the local rule. */
   async stop(reason: "user" | "formed" = "user"): Promise<void> {
     this.#halt();
+    // Drop the browser side of every open call first: the server gives a call
+    // already on the wire a short grace and counts it, so nothing is lost, and
+    // the stop request does not queue behind them.
+    this.#aborter.abort();
     try {
       const res = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: reason === "formed" ? "formed" : "stop" }) });
       const run = (await res.json()) as RunSummary;
       this.#absorb(run);
       this.#set({ phase: "stopped", run });
+      // Calls finishing in their grace land after this reply: read the final line once they have.
+      setTimeout(() => void this.#refresh(), 2500);
     } catch (e) {
       this.#set({ phase: "stopped", lastError: String(e) });
+    }
+  }
+
+  async #refresh(): Promise<void> {
+    if (this.#state.phase !== "stopped") return;
+    try {
+      const run = (await (await fetch("/api/run")).json()) as RunSummary;
+      this.#absorb(run);
+      this.#set({ run });
+    } catch {
+      // the next start or stop reads it again
     }
   }
 
@@ -196,7 +217,7 @@ export class JevScheduler {
     this.#overseerBusy = true;
     try {
       const images = await overseerImages(e.target, e.occupancy, e.params.size);
-      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildOverseerRequest(images.target, images.current)) });
+      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildOverseerRequest(images.target, images.current)), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
       if (res.status === 409) return; // the run ended; the ant loop handles the stop
       if (!res.ok) return; // busy or a server error: skip this look
@@ -216,7 +237,7 @@ export class JevScheduler {
         overseer: { box: reading.box, steering, done: reading.done, inputTokens: reply.inputTokens, ms: reply.ms, calls: (prev?.calls ?? 0) + 1, tokensThisRun: (prev?.tokensThisRun ?? 0) + reply.inputTokens, at: performance.now() },
       });
     } catch (err) {
-      this.#set({ lastError: `overseer: ${String(err)}` });
+      if (!isAbort(err)) this.#set({ lastError: `overseer: ${String(err)}` });
     } finally {
       this.#overseerBusy = false;
     }
@@ -251,7 +272,7 @@ export class JevScheduler {
     let reply: JevProxyReply | null = null;
     let error: string | null = null;
     try {
-      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(packRequest(ants, this.opts.schema)) });
+      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(packRequest(ants, this.opts.schema)), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
       if (res.status === 409) {
         // A cap fired or the run was stopped elsewhere.
@@ -278,6 +299,11 @@ export class JevScheduler {
       if (!res.ok) error = (body as { error: string }).error ?? `HTTP ${res.status}`;
       else reply = body as JevProxyReply;
     } catch (err) {
+      if (isAbort(err)) {
+        // Stop cut this call on our side; halt() already released its ants.
+        this.#inFlight--;
+        return;
+      }
       error = String(err);
     }
     this.#inFlight--;
@@ -321,6 +347,10 @@ const OVERSEER_MIN_INK = 0.05;
 
 export function boxSteers(box: Box, target: Float32Array, size: { w: number; h: number }): boolean {
   return boxArea(box) <= OVERSEER_MAX_AREA && boxInkShare(box, target, size) >= OVERSEER_MIN_INK;
+}
+
+function isAbort(err: unknown): boolean {
+  return (err as { name?: string } | null)?.name === "AbortError";
 }
 
 function compassOf(h: number): string {
