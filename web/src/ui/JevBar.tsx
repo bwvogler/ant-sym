@@ -107,11 +107,11 @@ export default function JevBar(p: Props) {
         />
         <Stat
           label="429 / errors"
-          {run && run.aborted > 0 && <Stat label="cut off · cost unknown" value={String(run.aborted)} />}
           value={
             run ? `${run.statuses["429"] ?? 0} / ${p.state.failures}` : "—"
           }
         />
+        {run && run.aborted > 0 && <Stat label="cut off · cost unknown" value={String(run.aborted)} />}
         <Stat label="active ants" value={String(p.activeAnts)} />
         <Stat label="jev decisions" value={p.jevDecisions.toLocaleString()} />
         <Stat label="session" value={usd(p.state.sessionUsd)} />
