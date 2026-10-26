@@ -209,8 +209,15 @@ export function applyDecision(engine: Engine, i: number, d: AntDecision, state: 
     // A settle where there is no room (blank paper, or a full cell) would be
     // permanent: nothing wakes a settled ant until its cell is over by more
     // than one. Count it as Jev's decision but let the local rule move it.
-    if (state.room < 0) {
+    // The state was taken when the request went out and the ant has kept
+    // walking since, so check the cell it is in now as well.
+    const cx = Math.min(w.size.w - 1, Math.max(0, Math.floor(w.x[i] as number)));
+    const cy = Math.min(w.size.h - 1, Math.max(0, Math.floor(w.y[i] as number)));
+    const roomNow = Math.floor((engine.deficit[cy * w.size.w + cx] as number) + 0.5);
+    if (state.room < 0 || roomNow < 0) {
       engine.decideLocally(i);
+      engine.decisions.local--; // it is Jev's decision, not the local rule's
+      w.coast[i] = 0; // stop on arrival: a coasting ant drifts past the cell it was sent to and gets refused again
       engine.decisions.jev++;
       return;
     }

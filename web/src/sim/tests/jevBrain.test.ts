@@ -106,6 +106,19 @@ test("antState reads the engine and applyDecision writes back with pace/commit r
   applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, { ...st, room: -1 });
   assert.equal(e.world.settled[2], 0, "no room: not settled");
   assert.equal(e.decisions.jev, before + 1, "still Jev's decision");
+  assert.equal(e.world.coast[2], 0, "the stand-in walk stops on arrival, so the ant is not refused again two cells on");
+  const localBefore = e.decisions.local;
+  applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, { ...st, room: -1 });
+  assert.equal(e.decisions.local, localBefore, "not counted as the local rule's decision too");
+  // the snapshot said room but the ant has since walked onto blank paper: refused on the cell it is in now
+  e.world.x[2] = 14.5;
+  e.world.y[2] = 14.5;
+  e.refreshGrids();
+  applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, { ...st, room: 0 });
+  assert.equal(e.world.settled[2], 0, "stale snapshot: the current cell has no room");
+  e.world.x[2] = 8.5;
+  e.world.y[2] = 8.5;
+  e.refreshGrids();
   applyDecision(e, 2, { heading: null, settle: true, strength: 1, pSettle: 0.9 }, { ...st, room: 0 });
   assert.equal(e.world.settled[2], 1);
   e.attractor = { x: 15, y: 9.5 };

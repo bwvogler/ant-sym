@@ -17,9 +17,10 @@ export default function App() {
     loadImage,
     imageError,
   } = useEngine();
-  const jev = useJev(engine, stats?.formed ?? false, stats?.targetVersion ?? 0);
+  const blank = engine.targetTotal <= 0;
+  const jev = useJev(engine, stats?.formed ?? false, stats?.targetVersion ?? 0, blank);
   const running = jev.state.phase === "running";
-  const startBlocked = controls.brain !== "jev" ? "Switch Brain to Jev first" : engine.targetTotal <= 0 ? "Type a word or upload a picture first" : null;
+  const startBlocked = controls.brain !== "jev" ? "Switch Brain to Jev first" : blank ? "Type a word or upload a picture first" : null;
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
       <header className="flex items-baseline justify-between">
@@ -57,6 +58,7 @@ export default function App() {
             stop={jev.stop}
             morphPending={jev.morphPending}
           startBlocked={startBlocked}
+          blankStopped={jev.blankStopped}
             activeAnts={
               stats ? controls.antCount - stats.settled : controls.antCount
             }

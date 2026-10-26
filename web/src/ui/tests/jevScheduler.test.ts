@@ -125,3 +125,87 @@ test("a reply that cannot be read does not strand the batch", async () => {
   assert.ok(st.failures >= 1);
   assert.match(String(st.lastError), /reading answers/);
 });
+
+const IMAGES = async () => ({ target: "AA==", current: "AA==" });
+const OVERSEER_OK = { status: 200, body: { status: 200, body: { model: "jev-x", answers: { gap: { type: "box", box: { top: 0.2, bottom: 0.4, left: 0.2, right: 0.4 } }, done: { type: "noul", noul: 0.3 } }, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN } };
+
+/** Scripted fetch that tells the overseer's request (box question) from the ants'. */
+function scriptBoth(ants: Reply, overseer: Reply) {
+  const calls: string[] = [];
+  const fetchStub = async (url: string | URL, init?: RequestInit) => {
+    const path = String(url);
+    let r: { status: number; body: unknown };
+    if (path.startsWith("/api/run")) {
+      const action = init?.body ? (JSON.parse(String(init.body)) as { action?: string }).action : undefined;
+      r = { status: 200, body: action === "stop" || action === "formed" ? { ...RUN, running: false, stopReason: "user" } : RUN };
+      calls.push(`run:${action ?? "get"}`);
+    } else {
+      const isOverseer = String(init?.body ?? "").includes('"type":"box"');
+      calls.push(isOverseer ? "overseer" : "ants");
+      const script = isOverseer ? overseer : ants;
+      r = typeof script === "function" ? await script(init?.signal ?? undefined) : script;
+    }
+    return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body } as Response;
+  };
+  globalThis.fetch = fetchStub as typeof fetch;
+  return calls;
+}
+
+test("overseer: a look held across Stop and Start does not steer the new run; a 409 on the overseer halts like the ant path", async () => {
+  // M4 / M5 from the PR #3 review: both guards could be deleted with the suite green.
+  const e = world();
+  let release: (() => void) | null = null;
+  const held = new Promise<void>((r) => (release = r));
+  // the ant path answers busy so no ant decisions interfere; the first look (box at top 0.2) is held, later looks answer at once with a box at top 0.6
+  let looks = 0;
+  const later = { ...OVERSEER_OK, body: { ...OVERSEER_OK.body, body: { ...OVERSEER_OK.body.body, answers: { ...OVERSEER_OK.body.body.answers, gap: { type: "box", box: { top: 0.6, bottom: 0.8, left: 0.2, right: 0.4 } } } } } };
+  const calls = scriptBoth({ status: 429, body: { error: "busy", run: RUN } }, async () => {
+    if (looks++ === 0) {
+      await held;
+      return OVERSEER_OK;
+    }
+    return later;
+  });
+  const s = new JevScheduler(e, { intervalMs: 50, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: true, overseerMs: 10, renderImages: IMAGES });
+  await s.start({});
+  await tick(40); // the look is in flight
+  await s.stop("user");
+  await s.start({}); // run 2
+  release!();
+  await tick(30);
+  assert.equal(e.attractor, null, "the old run's box did not become run 2's attractor");
+  assert.notEqual(s.state.overseer?.box?.top, 0.2, "the held look's box is not in the readout");
+  s.dispose();
+
+  const e2 = world();
+  const stopped = { ...RUN, running: false, stopReason: "time-cap" as const };
+  const calls2 = scriptBoth({ status: 429, body: { error: "busy", run: RUN } }, { status: 409, body: { error: "time-cap", run: stopped } });
+  const s2 = new JevScheduler(e2, { intervalMs: 50, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: true, overseerMs: 10, renderImages: IMAGES });
+  await s2.start({});
+  await tick(60);
+  const st = s2.state;
+  s2.dispose();
+  assert.equal(st.phase, "stopped", "an overseer 409 ends the run on the browser side too");
+  assert.equal(st.run?.stopReason, "time-cap");
+  assert.equal(e2.idleBehaviour, "local");
+  assert.ok(calls2.includes("overseer") && calls.includes("overseer"));
+});
+
+test("the session line is the server's cross-run total and never goes backwards on an out-of-order reply", async () => {
+  // M6 from the PR #3 review.
+  const e = world();
+  let n = 0;
+  const totals = [500, 300, 900]; // the 300 is a reply that landed late
+  scriptFetch(async () => {
+    const t = totals[Math.min(n++, totals.length - 1)] as number;
+    return { status: 429, body: { error: "busy", run: { ...RUN, sessionInputTokens: t, sessionUsd: t * (0.042 / 1e6) } } };
+  });
+  const s = new JevScheduler(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: false });
+  await s.start({});
+  await tick(25);
+  assert.equal(s.state.sessionTokens, 500, "a late, lower total does not pull the line down");
+  await tick(40);
+  assert.equal(s.state.sessionTokens, 900);
+  s.dispose();
+});
+

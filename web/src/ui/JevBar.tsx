@@ -11,6 +11,8 @@ interface Props {
   morphPending: boolean;
   /** why Start is unavailable right now (blank picture, brain not Jev), or null */
   startBlocked: string | null;
+  /** the run was stopped because the picture went blank */
+  blankStopped: boolean;
   activeAnts: number;
   jevDecisions: number;
 }
@@ -30,7 +32,9 @@ export default function JevBar(p: Props) {
           tone: "warn",
           text: `${reason === "spend-cap" ? "Spend cap" : "Time cap"} reached. Ants are on the local rule. Raise the cap or Start again.`,
         }
-      : p.morphPending
+      : p.blankStopped
+        ? { tone: "warn", text: "The picture went blank, so the run was stopped: a blank picture never forms and would spend to the cap." }
+        : p.morphPending
         ? {
             tone: "accent",
             text: "New picture. Morph walks the ants from where they stand into it.",

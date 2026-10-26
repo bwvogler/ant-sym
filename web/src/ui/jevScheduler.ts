@@ -25,10 +25,12 @@ export interface SchedulerOptions {
   /** the image overseer: on/off and how often it looks, ms */
   overseer: boolean;
   overseerMs: number;
+  /** renders the target and the field as base64 PNGs; injectable so the overseer loop runs headless in tests */
+  renderImages: (target: Float32Array, occupancy: Uint16Array, size: { w: number; h: number }) => Promise<{ target: string; current: string }>;
 }
 
 // inFlight 5: browsers allow 6 connections per host, and Stop needs one to reach the server at once.
-export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 5, intervalMs: 200, minAgeSeconds: 1.5, sample: false, overseer: true, overseerMs: 4000 };
+export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 5, intervalMs: 200, minAgeSeconds: 1.5, sample: false, overseer: true, overseerMs: 4000, renderImages: overseerImages };
 
 export interface OverseerState {
   box: Box | null;
@@ -63,6 +65,8 @@ export interface SchedulerState {
   overseer: OverseerState | null;
   /** engine.targetVersion when the last run ended */
   stoppedOnTarget: number;
+  /** why the browser side ended the run (the server's stopReason covers caps) */
+  stoppedFor: "user" | "formed" | "blank" | null;
   /** client-side running total across runs this page-load, dollars */
   sessionUsd: number;
   sessionTokens: number;
@@ -83,7 +87,7 @@ export class JevScheduler {
   #runSeq = 0;
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
-  #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, sessionUsd: 0, sessionTokens: 0 };
+  #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, stoppedFor: null, sessionUsd: 0, sessionTokens: 0 };
   #startedAt = 0;
 
   constructor(engine: Engine, opts: Partial<SchedulerOptions> = {}) {
@@ -136,7 +140,7 @@ export class JevScheduler {
     this.#engine.jevOwned.fill(1);
     this.#engine.params.brain = "jev";
     this.#startedAt = performance.now();
-    this.#set({ phase: "running", run, lastError: null, requestsSent: 0, failures: 0, overseer: null });
+    this.#set({ phase: "running", run, lastError: null, requestsSent: 0, failures: 0, overseer: null, stoppedFor: null });
     this.#engine.attractor = null;
     if (this.#timer === null) this.#timer = setInterval(() => void this.#cycle(), this.opts.intervalMs);
     if (this.#overseerTimer === null) this.#overseerTimer = setInterval(() => void this.#oversee(), this.opts.overseerMs);
@@ -148,8 +152,9 @@ export class JevScheduler {
   }
 
   /** Stop: tell the server why, go idle, hand every ant back to the local rule. */
-  async stop(reason: "user" | "formed" = "user"): Promise<void> {
+  async stop(reason: "user" | "formed" | "blank" = "user"): Promise<void> {
     this.#halt();
+    this.#set({ stoppedFor: reason });
     // Drop the browser side of every open call first: the server gives a call
     // already on the wire a short grace and counts it, so nothing is lost, and
     // the stop request does not queue behind them.
@@ -226,7 +231,7 @@ export class JevScheduler {
     const seq = this.#runSeq;
     this.#overseerBusy = true;
     try {
-      const images = await overseerImages(e.target, e.occupancy, e.params.size);
+      const images = await this.opts.renderImages(e.target, e.occupancy, e.params.size);
       if (seq !== this.#runSeq || this.#state.phase !== "running") return;
       const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildOverseerRequest(images.target, images.current)), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
@@ -312,7 +317,9 @@ export class JevScheduler {
             e.world.commit[i] = 0;
           }
         }
-        this.#set({ pending: Math.max(0, this.#state.pending - indices.length), run: (body as { run?: RunSummary }).run ?? this.#state.run });
+        const run = (body as { run?: RunSummary }).run;
+        if (run) this.#absorb(run);
+        this.#set({ pending: Math.max(0, this.#state.pending - indices.length), run: run ?? this.#state.run });
         return;
       }
       if (!res.ok) error = (body as { error: string }).error ?? `HTTP ${res.status}`;
@@ -355,8 +362,9 @@ export class JevScheduler {
         }
       }
     } catch (err) {
-      // A bad answer must not strand the rest of the batch at commit 1e9.
+      // A bad answer must not strand the rest of the batch at commit 1e9; the reply was still billed.
       for (const i of stillPending) if ((e.world.commit[i] as number) >= 1e9) e.decideLocally(i);
+      this.#absorb(reply.run);
       this.#set({ failures: this.#state.failures + 1, lastError: `reading answers: ${String(err)}`, run: reply.run });
       return;
     }

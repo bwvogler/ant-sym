@@ -8,7 +8,7 @@ import { JevScheduler, type SchedulerState } from "./jevScheduler.ts";
 // React face of the scheduler: one instance per engine, its state mirrored
 // into React, caps and schema editable, and the "formed → stop" rule.
 
-export function useJev(engine: Engine, formed: boolean, targetVersion: number) {
+export function useJev(engine: Engine, formed: boolean, targetVersion: number, blank: boolean) {
   const scheduler = useMemo(() => new JevScheduler(engine), [engine]);
   const [state, setState] = useState<SchedulerState>(scheduler.state);
   const [caps, setCaps] = useState<RunCaps>(DEFAULT_CAPS);
@@ -49,8 +49,13 @@ export function useJev(engine: Engine, formed: boolean, targetVersion: number) {
       void scheduler.stop("formed");
     }
   }, [formed, stopOnFormed, state.phase, state.requestsSent, scheduler, engine]);
+  // A picture cleared mid-run can never form and every ant would re-ask until the cap: stop.
+  useEffect(() => {
+    if (blank && state.phase === "running") void scheduler.stop("blank");
+  }, [blank, state.phase, scheduler]);
+  const blankStopped = blank && state.phase === "stopped" && state.stoppedFor === "blank";
   // The target changed since the run ended: Start is a morph from the old shape.
   const morphPending = state.phase === "stopped" && targetVersion !== state.stoppedOnTarget;
 
-  return { state, caps, setCaps, schema, setSchema, start, stop, stopOnFormed, setStopOnFormed, overseer, setOverseer, morphPending };
+  return { state, caps, setCaps, schema, setSchema, start, stop, stopOnFormed, setStopOnFormed, overseer, setOverseer, morphPending, blankStopped };
 }
