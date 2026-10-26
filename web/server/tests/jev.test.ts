@@ -5,7 +5,7 @@ import { DEFAULT_IN_FLIGHT, JevAbortError, JevClient, headersFor, inputTokensOf,
 
 // A stand-in for api.typesafe.ai: answers after `delayMs`, counts how many
 // requests are open at once, and can be told to 429 the first N calls.
-function fakeJev(opts: { delayMs: number; rejectFirst?: number; retryAfter?: string; trickle?: boolean }) {
+function fakeJev(opts: { delayMs: number; rejectFirst?: number; retryAfter?: string; trickle?: boolean; rawText?: string }) {
   let open = 0;
   let maxOpen = 0;
   let served = 0;
@@ -30,6 +30,11 @@ function fakeJev(opts: { delayMs: number; rejectFirst?: number; retryAfter?: str
       }
       setTimeout(() => {
         open--;
+        if (opts.rawText !== undefined) {
+          res.writeHead(200, { "content-type": "text/html" });
+          res.end(opts.rawText);
+          return;
+        }
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
         const n = Object.keys(body.questions).length;
         res.writeHead(200, { "content-type": "application/json" });
@@ -74,7 +79,7 @@ test("8 parallel calls overlap on an agent sized 8 (the fixture detects serialis
 test("the default client overlaps too (the width production uses, not just an explicit one)", async () => {
   const fake = await fakeJev({ delayMs: 150 });
   try {
-    assert.ok(DEFAULT_IN_FLIGHT >= 6);
+    assert.equal(DEFAULT_IN_FLIGHT, 5, "one of the browser's 6 connections stays free for Stop");
     const c = new JevClient({ apiKey: "k", baseUrl: fake.url });
     const t0 = performance.now();
     await Promise.all(Array.from({ length: DEFAULT_IN_FLIGHT }, () => c.ask(REQ)));
@@ -87,10 +92,10 @@ test("the default client overlaps too (the width production uses, not just an ex
   }
 });
 
-test("a trickling upstream hits the overall deadline; an abort signal ends a call in flight and before a backoff sleep", async () => {
+test("a trickling upstream hits the overall deadline; an abort signal ends a call in flight and before a backoff sleep", { timeout: 5000 }, async () => {
   const fake = await fakeJev({ delayMs: 50, trickle: true });
   try {
-    const c = new JevClient({ apiKey: "k", baseUrl: fake.url, timeoutMs: 300 });
+    const c = new JevClient({ apiKey: "k", baseUrl: fake.url, timeoutMs: 300, abortGraceMs: 0 });
     const t0 = performance.now();
     await assert.rejects(c.ask(REQ), /exceeded 300 ms/);
     assert.ok(performance.now() - t0 < 1500);
@@ -193,4 +198,131 @@ test("inputTokensOf reads usage and tolerates junk", () => {
   assert.equal(inputTokensOf({ usage: { input_tokens: 42 } }), 42);
   assert.equal(inputTokensOf({ usage: { input_tokens: "42" } }), 0);
   assert.equal(inputTokensOf(null), 0);
+});
+
+test("abort grace: a call already on the wire finishes and is returned (it was billed); after the grace it is cut; an unsent one is cut at once", { timeout: 5000 }, async () => {
+  // Round 2 (PR #1): aborting sent calls under-counted real spend by up to
+  // one request per in-flight slot per Stop.
+  const fake = await fakeJev({ delayMs: 120 });
+  try {
+    const c = new JevClient({ apiKey: "k", baseUrl: fake.url, abortGraceMs: 1000 });
+    const ac = new AbortController();
+    const p = c.ask(REQ, ac.signal);
+    setTimeout(() => ac.abort(), 30);
+    const r = await p;
+    assert.equal(r.status, 200);
+    assert.equal(r.inputTokens, 100, "the reply, and its real cost, came back");
+    // aborted before the attempt is sent: no grace
+    const pre = new AbortController();
+    pre.abort();
+    await assert.rejects(c.ask(REQ, pre.signal), JevAbortError);
+    c.destroy();
+  } finally {
+    fake.close();
+  }
+  const slow = await fakeJev({ delayMs: 50, trickle: true });
+  try {
+    const c = new JevClient({ apiKey: "k", baseUrl: slow.url, timeoutMs: 5000, abortGraceMs: 100 });
+    const ac = new AbortController();
+    const p = c.ask(REQ, ac.signal);
+    setTimeout(() => ac.abort(), 30);
+    const t0 = performance.now();
+    await assert.rejects(p, JevAbortError);
+    const took = performance.now() - t0;
+    assert.ok(took >= 80 && took < 1000, `cut after the grace, took ${took.toFixed(0)} ms`);
+    c.destroy();
+  } finally {
+    slow.close();
+  }
+});
+
+test("the real backoff sleep is given the signal: Stop during a long retry-after returns at once", { timeout: 5000 }, async () => {
+  // Round 2 (PR #1): the injected test sleep aborted synchronously, so a
+  // retry sleep that ignored the signal stayed green while Stop took 4.9 s.
+  const fake = await fakeJev({ delayMs: 5, rejectFirst: 10, retryAfter: "5" });
+  try {
+    const c = new JevClient({ apiKey: "k", baseUrl: fake.url, maxRetries: 3 });
+    const ac = new AbortController();
+    const p = c.ask(REQ, ac.signal);
+    setTimeout(() => ac.abort(), 60);
+    const t0 = performance.now();
+    await assert.rejects(p, JevAbortError);
+    assert.ok(performance.now() - t0 < 1000, "did not wait out the 5 s retry-after");
+    assert.equal(fake.stats().served, 1);
+    c.destroy();
+  } finally {
+    fake.close();
+  }
+});
+
+test("latency is network time only: a backoff sleep is not in ms", async () => {
+  const fake = await fakeJev({ delayMs: 5, rejectFirst: 1, retryAfter: "0" });
+  try {
+    const c = new JevClient({ apiKey: "k", baseUrl: fake.url, maxRetries: 2, sleep: () => new Promise((r) => setTimeout(r, 250)) });
+    const r = await c.ask(REQ);
+    assert.equal(r.status, 200);
+    assert.equal(r.attempts, 2);
+    assert.ok(r.ms < 150, `ms ${r.ms} includes the 250 ms sleep`);
+    c.destroy();
+  } finally {
+    fake.close();
+  }
+});
+
+test("a non-JSON 200 is returned as an error body, not thrown", async () => {
+  const fake = await fakeJev({ delayMs: 5, rawText: "<html>maintenance</html>" });
+  try {
+    const c = new JevClient({ apiKey: "k", baseUrl: fake.url });
+    const r = await c.ask(REQ);
+    assert.equal(r.status, 200);
+    assert.match(String((r.body as { error: string }).error), /not JSON/);
+    assert.equal(r.inputTokens, 0);
+    c.destroy();
+  } finally {
+    fake.close();
+  }
+});
+
+test("a reset on a reused keep-alive socket is retried on a fresh connection; a reset on a fresh socket is not", { timeout: 5000 }, async () => {
+  // The upstream kills the socket when the second request on it arrives,
+  // before answering: what an idle keep-alive connection closing looks like.
+  let connections = 0;
+  let killOnRequest = 2;
+  const server = http.createServer((req, res) => {
+    req.resume();
+    req.on("end", () =>
+      setTimeout(() => {
+        if (res.socket?.destroyed) return;
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ answers: {}, usage: { input_tokens: 7 } }));
+      }, 10),
+    );
+  });
+  server.on("connection", (s) => {
+    connections++;
+    let n = 0;
+    s.on("data", () => {
+      n++;
+      if (n === killOnRequest) s.destroy();
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const url = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  try {
+    const c = new JevClient({ apiKey: "k", baseUrl: url, maxSockets: 1 });
+    assert.equal((await c.ask(REQ)).status, 200);
+    const second = await c.ask(REQ); // reused socket, reset by the server, retried on a new one
+    assert.equal(second.status, 200);
+    assert.equal(second.inputTokens, 7);
+    assert.equal(connections, 2);
+    c.destroy();
+    // a fresh socket that resets is a real failure
+    killOnRequest = 1;
+    const d = new JevClient({ apiKey: "k", baseUrl: url, maxSockets: 1 });
+    await assert.rejects(d.ask(REQ), (e: Error) => !(e instanceof JevAbortError));
+    assert.equal(connections, 3, "no retry on a fresh socket");
+    d.destroy();
+  } finally {
+    server.close();
+  }
 });

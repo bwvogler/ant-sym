@@ -58,8 +58,10 @@ export interface RunSummary {
   requests: number;
   inFlight: number;
   inputTokens: number;
-  /** Real cost: Σ usage.input_tokens × $0.042 / 1e6. Never an estimate. */
+  /** Real cost: Σ usage.input_tokens × $0.042 / 1e6. Never an estimate; see `aborted` for what it cannot include. */
   usd: number;
+  /** Calls cut off by Stop (or a cap) before any reply. Their cost is unknown and is not in `usd`; the client gives sent calls a short grace to finish and be counted, so this is normally 0. */
+  aborted: number;
   medianMs: number | null;
   p90Ms: number | null;
   /** Count of upstream statuses seen this run, keyed by status code ("200", "429", …). */

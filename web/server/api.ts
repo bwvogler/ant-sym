@@ -83,6 +83,14 @@ export interface Services {
   now: () => number;
 }
 
+/** The real services from the environment: key, in-flight width (JEV_IN_FLIGHT), one ledger sized to match. */
+export function buildServices(env: NodeJS.ProcessEnv): Services & { inFlight: number } {
+  const apiKey = env.JEV_API_KEY ?? "";
+  const inFlight = Math.max(1, Math.min(6, Number(env.JEV_IN_FLIGHT) || DEFAULT_IN_FLIGHT));
+  const client = apiKey ? new JevClient({ apiKey, maxSockets: inFlight }) : null;
+  return { client, ledger: new Ledger({ maxInFlight: inFlight }), now: () => Date.now(), inFlight };
+}
+
 export function makeHandlers(svc: Services) {
   const health: Handler = (_req, res) => sendJson(res, 200, { ok: true, hasKey: svc.client !== null, run: svc.ledger.summary(svc.now()) });
 
@@ -102,9 +110,10 @@ export function makeHandlers(svc: Services) {
     const request = validateJevRequest(await readJsonBody(req));
     const gate = svc.ledger.admit(svc.now());
     if (!gate.ok) {
-      // 409: the run is not accepting calls right now. "busy" is temporary
-      // (pool full or spend reserved); the others end the run. The reply
-      // carries the summary so the client learns which without another trip.
+      // 429 "busy" is temporary: the pool is full or what is in flight might
+      // use up the rest of the cap. 409 means the run is over (or never
+      // started). The reply carries the summary so the client learns which
+      // without another trip.
       return sendJson(res, gate.reason === "busy" ? 429 : 409, { error: gate.reason, run: svc.ledger.summary(svc.now()) });
     }
     const token = svc.ledger.begin();
@@ -113,10 +122,10 @@ export function makeHandlers(svc: Services) {
     try {
       result = await svc.client.ask(request, signal);
     } catch (e) {
-      svc.ledger.end(token, { status: 0, ms: 0, inputTokens: 0 });
-      if (e instanceof JevAbortError || signal.aborted) {
-        return sendJson(res, 409, { error: "stopped", run: svc.ledger.summary(svc.now()) });
-      }
+      const aborted = e instanceof JevAbortError || signal.aborted;
+      // An aborted call never got a reply: its cost is unknown, so it is counted apart, not as a free request.
+      svc.ledger.end(token, { status: 0, ms: 0, inputTokens: 0, aborted });
+      if (aborted) return sendJson(res, 409, { error: "stopped", run: svc.ledger.summary(svc.now()) });
       throw new HttpError(502, `jev unreachable: ${(e as Error).message}`);
     }
     // A 200 without answers is not an answer; keep the status for the ledger but say so.
@@ -129,18 +138,15 @@ export function makeHandlers(svc: Services) {
   return { health, run, jev };
 }
 
-export function apiPlugins(): Plugin {
+export function apiPlugins(services?: Services): Plugin {
   return {
     name: "jev-ants-api",
     apply: "serve",
     configureServer(server) {
-      const apiKey = process.env.JEV_API_KEY ?? "";
-      if (!apiKey) console.warn("[jev-ants] JEV_API_KEY is not set: /api/jev will answer 503");
-      const inFlight = Number(process.env.JEV_IN_FLIGHT) || DEFAULT_IN_FLIGHT;
-      const client = apiKey ? new JevClient({ apiKey, maxSockets: inFlight }) : null;
-      const svc: Services = { client, ledger: new Ledger({ maxInFlight: inFlight }), now: () => Date.now() };
+      const svc = services ?? buildServices(process.env);
+      if (!svc.client) console.warn("[jev-ants] JEV_API_KEY is not set: /api/jev will answer 503");
       // A server/*.ts edit restarts Vite: close the old pool so sockets do not leak across restarts.
-      server.httpServer?.once("close", () => client?.destroy());
+      server.httpServer?.once("close", () => svc.client?.destroy());
       const h = makeHandlers(svc);
       server.middlewares.use("/api/health", wrap(h.health));
       server.middlewares.use("/api/run", wrap(h.run));

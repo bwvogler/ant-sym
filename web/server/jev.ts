@@ -27,6 +27,12 @@ export interface JevClientOptions {
   timeoutMs?: number;
   /** Injected so tests do not wait. */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  /**
+   * On abort, a request already sent upstream is billed whether or not we
+   * read the reply, so it gets this long to finish and be counted; one not
+   * yet sent is dropped at once. 0 cuts everything off immediately.
+   */
+  abortGraceMs?: number;
 }
 
 export interface JevCallResult {
@@ -47,8 +53,14 @@ export class JevAbortError extends Error {
 }
 
 export const DEFAULT_BASE_URL = "https://api.typesafe.ai";
-/** Browsers open at most 6 HTTP/1.1 connections per host, so a tab cannot drive more than 6 through Vite anyway. */
-export const DEFAULT_IN_FLIGHT = 6;
+/**
+ * Browsers open at most 6 HTTP/1.1 connections per host. Five in flight
+ * leaves one for /api/run, so Stop reaches the server at once instead of
+ * queueing behind the calls it is meant to cut off (measured: 6 open, Stop
+ * waited 3.8 s and every call was billed; 5 open, 5 ms).
+ */
+export const DEFAULT_IN_FLIGHT = 5;
+export const DEFAULT_ABORT_GRACE_MS = 1500;
 const RETRYABLE = new Set([429, 529]);
 
 /** How long to wait before attempt `attempt` (1-based) after a retryable status, or null to give up. */
@@ -109,6 +121,7 @@ export class JevClient implements JevCaller {
   readonly #maxRetries: number;
   readonly #timeoutMs: number;
   readonly #sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
+  readonly #abortGraceMs: number;
 
   constructor(opts: JevClientOptions) {
     this.#apiKey = opts.apiKey;
@@ -121,12 +134,15 @@ export class JevClient implements JevCaller {
     this.#maxRetries = opts.maxRetries ?? 3;
     this.#timeoutMs = opts.timeoutMs ?? 20_000;
     this.#sleep = opts.sleep ?? defaultSleep;
+    this.#abortGraceMs = opts.abortGraceMs ?? DEFAULT_ABORT_GRACE_MS;
   }
 
   /**
    * One logical call: retries 429/529 and one stale-socket reset, returns the
    * final status whatever it is. Throws JevAbortError when `signal` fires
-   * (before, between or during attempts) and a plain Error on network failure.
+   * before an attempt is sent or during a backoff sleep, and a plain Error on
+   * network failure. An attempt already on the wire when the signal fires is
+   * given `abortGraceMs` to finish, and its reply is returned (it was billed).
    */
   async ask(req: JevRequest, signal?: AbortSignal): Promise<JevCallResult> {
     const payload = Buffer.from(JSON.stringify(req));
@@ -168,10 +184,13 @@ export class JevClient implements JevCaller {
     const lib = this.#url.protocol === "https:" ? https : http;
     return new Promise((resolve, reject) => {
       let settled = false;
+      let sent = false;
+      let grace: NodeJS.Timeout | null = null;
       const done = (fn: () => void) => {
         if (settled) return;
         settled = true;
         clearTimeout(deadline);
+        if (grace) clearTimeout(grace);
         signal?.removeEventListener("abort", onAbort);
         fn();
       };
@@ -193,7 +212,14 @@ export class JevClient implements JevCaller {
       const deadline = setTimeout(() => {
         r.destroy(new Error(`jev request exceeded ${this.#timeoutMs} ms`));
       }, this.#timeoutMs);
-      const onAbort = () => r.destroy(new JevAbortError());
+      const cut = () => r.destroy(new JevAbortError());
+      const onAbort = () => {
+        if (sent && this.#abortGraceMs > 0) grace = setTimeout(cut, this.#abortGraceMs);
+        else cut();
+      };
+      r.on("finish", () => {
+        sent = true;
+      });
       if (signal?.aborted) onAbort();
       else signal?.addEventListener("abort", onAbort, { once: true });
       r.on("error", (e) => {
