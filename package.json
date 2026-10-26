@@ -1,0 +1,14 @@
+{
+  "name": "jev-ants",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ants that form the picture you type or upload, each step a Jev decision",
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "test": "npm --prefix web test",
+    "lint": "npm --prefix web run lint",
+    "typecheck": "npm --prefix web exec tsc -- -b",
+    "probe": "node scripts/probe.mjs"
+  }
+}
