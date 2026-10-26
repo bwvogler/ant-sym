@@ -107,6 +107,7 @@ export default function JevBar(p: Props) {
         />
         <Stat
           label="429 / errors"
+          {run && run.aborted > 0 && <Stat label="cut off · cost unknown" value={String(run.aborted)} />}
           value={
             run ? `${run.statuses["429"] ?? 0} / ${p.state.failures}` : "—"
           }
