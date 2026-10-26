@@ -212,7 +212,12 @@ export class JevClient implements JevCaller {
       const deadline = setTimeout(() => {
         r.destroy(new Error(`jev request exceeded ${this.#timeoutMs} ms`));
       }, this.#timeoutMs);
-      const cut = () => r.destroy(new JevAbortError());
+      // Reject here as well as destroying: a request still queued in the agent
+      // has no socket yet, and Node only reports its destruction once it gets one.
+      const cut = () => {
+        r.destroy(new JevAbortError());
+        done(() => reject(new JevAbortError()));
+      };
       const onAbort = () => {
         if (sent && this.#abortGraceMs > 0) grace = setTimeout(cut, this.#abortGraceMs);
         else cut();

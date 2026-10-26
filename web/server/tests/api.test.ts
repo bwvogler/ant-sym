@@ -58,7 +58,7 @@ async function serve(svc: Services) {
 
 const JEV_BODY = { state: "x", questions: { q: { type: "noul", instructions: "y" } } };
 
-test("routes: cross-origin is refused by wrap(); 409 before start; a call is recorded; the cap fires", async () => {
+test("routes: cross-origin is refused by wrap(); 409 before start; a call is recorded; the cap fires", { timeout: 15_000 }, async () => {
   const ledger = new Ledger({ reserveTokens: 0 });
   const client = stubCaller({ tokens: 20_000 });
   const s = await serve({ client, ledger, now: () => Date.now() });
@@ -88,13 +88,15 @@ test("routes: cross-origin is refused by wrap(); 409 before start; a call is rec
   }
 });
 
-test("routes: concurrent calls cannot overrun the cap (reservation) and the pool ceiling answers 429 busy", async () => {
-  const ledger = new Ledger({ maxInFlight: 3 }); // default reserve: 64k tokens = $0.002688 per call
+test("routes: concurrent calls cannot overrun the cap (reservation) and the pool ceiling answers 429 busy", { timeout: 15_000 }, async () => {
+  const ledger = new Ledger({ maxInFlight: 3 });
   const client = stubCaller({ delayMs: 80, tokens: 60_000 });
   const s = await serve({ client, ledger, now: () => Date.now() });
   try {
     await s.post("/api/run", { action: "start", caps: { capUsd: 0.003, capSeconds: 60 } }); // room for one worst case
-    const results = await Promise.all(Array.from({ length: 6 }, () => s.post("/api/jev", JEV_BODY)));
+    // a 96 KB request reserves the 64k-token ceiling ($0.002688); six of them at once
+    const BIG = { state: "x".repeat(96_000), questions: JEV_BODY.questions };
+    const results = await Promise.all(Array.from({ length: 6 }, () => s.post("/api/jev", BIG)));
     const statuses = results.map((r) => r.status).sort();
     assert.equal(statuses.filter((x) => x === 200).length, 1, `exactly one call may go upstream: ${statuses}`);
     assert.equal(client.calls, 1);
@@ -116,7 +118,7 @@ test("routes: concurrent calls cannot overrun the cap (reservation) and the pool
   }
 });
 
-test("routes: Stop aborts calls in flight and their tokens never land; a new Start ignores the old run's calls", async () => {
+test("routes: Stop aborts calls in flight and their tokens never land; a new Start ignores the old run's calls", { timeout: 15_000 }, async () => {
   const ledger = new Ledger({ reserveTokens: 0 });
   const client = stubCaller({ delayMs: 300, tokens: 50_000 });
   const s = await serve({ client, ledger, now: () => Date.now() });
@@ -149,7 +151,7 @@ test("routes: Stop aborts calls in flight and their tokens never land; a new Sta
   }
 });
 
-test("routes: a 200 without answers is flagged, a thrown client error is a 502 and still ends the call", async () => {
+test("routes: a 200 without answers is flagged, a thrown client error is a 502 and still ends the call", { timeout: 15_000 }, async () => {
   const ledger = new Ledger({ reserveTokens: 0 });
   const empty: JevCaller = { async ask() { return { status: 200, body: { nope: true }, ms: 1, attempts: 1, inputTokens: 0 }; }, destroy() {} };
   const s = await serve({ client: empty, ledger, now: () => Date.now() });
@@ -200,7 +202,7 @@ test("validateJevRequest fills the model, keeps assets, rejects junk", () => {
   assert.throws(() => validateJevRequest({ state: 1, questions: { q: { type: "rank" } } }), /no valid type/);
 });
 
-test("the Vite plugin mounts every route through wrap(), sizes the pool from the environment, and closes it on restart", async () => {
+test("the Vite plugin mounts every route through wrap(), sizes the pool from the environment, and closes it on restart", { timeout: 15_000 }, async () => {
   // Round 2 (PR #1): the route tests above build their own table, so a
   // route mounted without wrap() in apiPlugins() was never exercised.
   const destroyed: string[] = [];
@@ -252,9 +254,11 @@ test("the Vite plugin mounts every route through wrap(), sizes the pool from the
   three.client?.destroy();
   assert.equal(buildServices({ JEV_IN_FLIGHT: "40" }).inFlight, 6, "never past the browser's connection count");
   assert.equal(buildServices({ JEV_IN_FLIGHT: "junk" }).inFlight, DEFAULT_IN_FLIGHT);
+  assert.equal(buildServices({ JEV_IN_FLIGHT: "-3" }).inFlight, 1, "never below one");
+  assert.equal(buildServices({ JEV_IN_FLIGHT: "0" }).inFlight, DEFAULT_IN_FLIGHT);
 });
 
-test("routes: a body over the limit is refused with 413 before anything goes upstream", async () => {
+test("routes: a body over the limit is refused with 413 before anything goes upstream", { timeout: 15_000 }, async () => {
   const ledger = new Ledger({ reserveTokens: 0 });
   const client = stubCaller();
   const s = await serve({ client, ledger, now: () => Date.now() });
@@ -272,6 +276,25 @@ test("routes: a body over the limit is refused with 413 before anything goes ups
     });
     assert.equal(status, 413);
     assert.equal(client.calls, 0);
+  } finally {
+    s.close();
+  }
+});
+
+test("routes: a call reserves from its own payload, so a big request after a small one is refused rather than overspending", { timeout: 15_000 }, async () => {
+  // Round 3 (PR #1). Cap $0.003: a 2 KB request (1,334 tokens reserved) is admitted; a 90 KB one (60k reserved = $0.00252) is not once $0.00084 is spent.
+  const ledger = new Ledger();
+  const client = stubCaller({ tokens: 20_000 });
+  const s = await serve({ client, ledger, now: () => Date.now() });
+  try {
+    await s.post("/api/run", { action: "start", caps: { capUsd: 0.003, capSeconds: 60 } });
+    const small = await s.post("/api/jev", JEV_BODY);
+    assert.equal(small.status, 200);
+    const bigBody = { state: "x".repeat(90_000), questions: { q: { type: "noul", instructions: "y" } } };
+    const big = await s.post("/api/jev", bigBody);
+    assert.equal(big.status, 409, "no room for a 60k-token call: the cap");
+    assert.equal(big.json.error, "spend-cap");
+    assert.equal(client.calls, 1);
   } finally {
     s.close();
   }

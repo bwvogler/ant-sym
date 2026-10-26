@@ -3,7 +3,7 @@ import type { Plugin } from "vite";
 import { DEFAULT_JEV_MODEL, type JevProxyReply, type JevRequest, type RunCaps } from "../shared/jev.ts";
 import { HttpError, methodNotAllowed, readJsonBody, sendJson } from "./http.ts";
 import { DEFAULT_IN_FLIGHT, JevAbortError, JevClient, type JevCaller } from "./jev.ts";
-import { Ledger } from "./ledger.ts";
+import { Ledger, reserveForBytes } from "./ledger.ts";
 
 // The whole "backend": dev-server-only middleware on the Vite server, in the
 // shape of lingo-dojo / Atlas. Single-user, localhost, no auth by design. The
@@ -86,7 +86,8 @@ export interface Services {
 /** The real services from the environment: key, in-flight width (JEV_IN_FLIGHT), one ledger sized to match. */
 export function buildServices(env: NodeJS.ProcessEnv): Services & { inFlight: number } {
   const apiKey = env.JEV_API_KEY ?? "";
-  const inFlight = Math.max(1, Math.min(6, Number(env.JEV_IN_FLIGHT) || DEFAULT_IN_FLIGHT));
+  const asked = Number(env.JEV_IN_FLIGHT);
+  const inFlight = Number.isFinite(asked) && asked !== 0 ? Math.max(1, Math.min(6, Math.trunc(asked))) : DEFAULT_IN_FLIGHT;
   const client = apiKey ? new JevClient({ apiKey, maxSockets: inFlight }) : null;
   return { client, ledger: new Ledger({ maxInFlight: inFlight }), now: () => Date.now(), inFlight };
 }
@@ -108,7 +109,9 @@ export function makeHandlers(svc: Services) {
     if (req.method !== "POST") return methodNotAllowed(res, "POST");
     if (!svc.client) throw new HttpError(503, "JEV_API_KEY is not set in the server's environment");
     const request = validateJevRequest(await readJsonBody(req));
-    const gate = svc.ledger.admit(svc.now());
+    // Reserve from this request's own size, so a big call cannot hide under a small one's room.
+    const reserve = reserveForBytes(Buffer.byteLength(JSON.stringify(request)));
+    const gate = svc.ledger.admit(svc.now(), reserve);
     if (!gate.ok) {
       // 429 "busy" is temporary: the pool is full or what is in flight might
       // use up the rest of the cap. 409 means the run is over (or never
@@ -116,7 +119,7 @@ export function makeHandlers(svc: Services) {
       // without another trip.
       return sendJson(res, gate.reason === "busy" ? 429 : 409, { error: gate.reason, run: svc.ledger.summary(svc.now()) });
     }
-    const token = svc.ledger.begin();
+    const token = svc.ledger.begin(reserve);
     const signal = svc.ledger.signal;
     let result: Awaited<ReturnType<JevCaller["ask"]>>;
     try {

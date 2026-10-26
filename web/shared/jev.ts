@@ -60,6 +60,9 @@ export interface RunSummary {
   inputTokens: number;
   /** Real cost: Σ usage.input_tokens × $0.042 / 1e6. Never an estimate; see `aborted` for what it cannot include. */
   usd: number;
+  /** Across every run this server has seen (the browser's session line comes from here, so a reply landing after its run ended still counts). */
+  sessionInputTokens: number;
+  sessionUsd: number;
   /** Calls cut off by Stop (or a cap) before any reply. Their cost is unknown and is not in `usd`; the client gives sent calls a short grace to finish and be counted, so this is normally 0. */
   aborted: number;
   medianMs: number | null;
