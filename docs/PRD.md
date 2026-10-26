@@ -16,8 +16,8 @@ Tone is the spirit of the ant colony: self-coordination, local information, a pi
 | Agent model | **Packed requests.** ~100 ants share one `state`; each ant gets its own questions. | Jev evaluates every question in isolation against the shared state, so each ant still gets an independent decision and can genuinely see its neighbours. One state per request is the API's shape; there is no batch endpoint. Measured: 100 ants in ~0.5 s. |
 | Ant brain | Three questions per ant: **direction** (choice: 8 compass points + stay), **pace** (score: creep / walk / hurry), **settle** (noul: "this cell still needs ants, stay"). | Extra questions cost almost no latency. Settling is what makes the picture sharpen instead of jitter. |
 | Scale | 500 to 2,000 ants, default 1,000. | Enough density for letters and simple images at a 64×64 grid. |
-| Cadence | Each ant re-decides about every **2 s** and coasts on its last heading in between. Scheduler takes the stalest ants every ~200 ms. | 1,000 ants → ~5 requests of 100 per second. Measured headroom: 8 parallel requests of 100 ants completed in 0.65 s wall. |
-| Spend control | Live cost meter; **session cap, default $1**, editable. At the cap Jev pauses, ants fall back to the local rule, a banner offers Resume. | Measured ~376 input tokens per ant per decision at the probe's state shape → about $23/hour at 1,000 ants every 2 s. A demo should not be able to run away. |
+| Cadence | Each **unsettled** ant re-decides about every 2 s and coasts in between; settled ants ask again only when their cell's deficit changes. Scheduler takes the stalest ants every ~200 ms. | 1,000 ants → ≤5 requests of 100 per second at the start, decaying as ants settle. Measured headroom: 8 parallel requests of 100 ants in 0.65 s wall. Parallelism buys latency, not cost (see §8). |
+| Spend control | Explicit **Start / Stop**. Running cost from the real `usage.input_tokens` of every response × $0.042/M, never estimated. Three stop conditions, whichever first: **formed** (local grid error under threshold, confirmed by the overseer noul), **time cap** (default 3 min), **spend cap** (default $0.50). Caps editable. After a stop, ants idle on the local rule and Jev is not called. | A demo must never run away, and a formed picture should cost nothing to look at. Cost plan in §8. |
 | Images (Jev) | **Overseer.** Every few seconds, send the current field and the target as two images; ask a `box` ("the region of current that most lacks ants vs target") and a `noul` ("current is a recognisable copy of target"). The box becomes an attractor hint in each ant's state; the noul drives a "formed" badge. | Showcases Jev's new image input without making the core loop depend on a feature TypeSafe calls "dreamer-ready, not production-ready". |
 | Shading | Target image → greyscale → downsample to a grid (64×64 default) → darkness per cell → normalised so Σ target = ant count. Density is tone. | Text and images are the same pipeline: text is rendered to an offscreen canvas first. |
 | Baseline | A **local-rule** mode (greedy toward max neighbouring deficit, with noise) next to Jev mode. | A greedy rule would also form the picture; the demo should show the difference, not assert it. Also the fallback at the spend cap and under 429s. |
@@ -131,3 +131,37 @@ Each is a bead (`ja-*`) and lands as one PR.
 - **Image accuracy**: TypeSafe says all models do worse on images than text. The overseer is a hint, never an authority; the noul gates the box.
 - **Rate limits** are per org and unpublished. None hit in the probe; check the console before pushing past ~10 req/s.
 - **Browser-direct calls**: CORS unconfirmed and would expose the key. Always via the proxy.
+
+## 8. Cost strategy (added 2026-10-25 after the follow-up)
+
+Jev bills per input token. Parallelism changes latency, not cost: tokens per ant were flat across pack sizes (184 at 100 ants, 187 at 50). So the plan attacks the two factors that do matter, **tokens per decision** and **number of decisions**, and reports only real cost.
+
+### 8.1 Where the tokens go (measured, 100 ants, `scratchpad/decomp.mjs`, `noul.mjs`)
+
+| part | tokens | note |
+|---|---|---|
+| ant state, compact string | ~45 / ant | `d=1,2,0,-1,3,0,1,2,0 c=0.4 h=NE n=N,SW i=3` plus a legend once |
+| one `choice` question, 9 options | ~145 | option descriptions barely matter (full 150, minimal 145) |
+| one `choice` question, 5 options | ~85 | roughly 15 tokens per option |
+| one `noul` question | ~16 | no criteria |
+| original schema (object state, 3 questions) | 376 / ant | §5 |
+| terse state, dir choice + pace score + settle noul | 269 / ant | |
+| terse state, dir choice only | 191 / ant | |
+| **terse state, 3 nouls: north-vs-south, east-vs-west, settle** | **109 / ant** | 3.4× cheaper than the original; heading = atan2(P(north)−0.5, P(east)−0.5) is continuous |
+
+Questions, not state, dominate. A choice over 9 compass points is the single most expensive thing an ant can ask.
+
+### 8.2 Levers, in order
+
+1. **Ask cheaper questions.** Default to the three-noul scheme (109 tok/ant). Keep the 9-way choice as a selectable "brain" for comparison. The first probe of the noul scheme showed only loose agreement with the deficit on a terse string state, so a **schema bake-off** (bead) scores each candidate on synthetic states with a known best direction before M3 commits: cost per ant × steering accuracy.
+2. **Make fewer decisions.** Only unsettled ants are scheduled. Each decision buys a **commit distance**: an ant walks 1 cell when near a deficit and up to 3 when far, so the far-away phase costs a third as much. Settled ants re-ask only when their cell's deficit changes sign.
+3. **Stop.** Formed, time cap, or spend cap, whichever first. The local grid error (RMS of the deficit grid) is free and is the primary "formed" signal; the overseer noul confirms it for the badge. After a stop the scheduler is off, ants idle on the local rule, and the cost line does not move.
+4. **Start/Stop is explicit.** Nothing calls Jev before Start. Scatter and Morph re-arm the scheduler and the caps.
+
+### 8.3 What a run should cost
+
+Estimate at 1,000 ants, three-noul schema, 2 s cadence, a ~90 s forming run where the active fraction decays from 1 to ~0.2 (mean ~0.5): about 22k decisions × 109 tokens ≈ 2.5M tokens ≈ **$0.10 per formation**; with commit distance roughly **$0.04**. Full-tilt rate is ~55k tokens/s ≈ $8/hour, but a run stops at formed, so the hourly figure only matters if the picture never forms. The $0.50 default cap is therefore several formations, not a fraction of one.
+
+### 8.4 Real cost, not estimates
+
+The server keeps a ledger of `usage.input_tokens` per response and the panel shows: tokens this run, dollars this run (tokens × $0.042/M), elapsed, requests, median latency, and the active-ant count. The per-formation figure from the ledger goes into the README once measured. If TypeSafe exposes a billing endpoint later, the console total should reconcile with the ledger.
