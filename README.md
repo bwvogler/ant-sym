@@ -1,12 +1,18 @@
-# Jev Ants
+<h1 align="center">Jev Ants</h1>
 
-Ants that form the picture you type, one decision at a time. Every ant is its own
-[Jev](https://typesafe.ai) agent: it sees the nine cells around it, how many ants each
-still wants, and the headings of its neighbours, and Jev answers *which way* and
-*whether to settle*. From a random scatter, a thousand of those small decisions turn
-into a word, or an uploaded picture, in about fifteen seconds and seven cents.
+<p align="center"><em>Ants that form the picture you type, one decision at a time.</em></p>
 
-![ANTS forming](docs/ants.gif)
+<p align="center">
+  <img src="docs/ants.gif" width="720" alt="A thousand ants scatter, form the word ANTS, then walk over to form JEV">
+</p>
+
+<p align="center"><sub>Live capture: 1,000 ants, compass brain, pheromone trails on. Forms in about 15 s, then morphs when the word changes. About seven cents.</sub></p>
+
+Every ant is its own [Jev](https://typesafe.ai) agent. It sees the nine cells around it, how
+many ants each still wants, and the headings of its neighbours, and Jev answers *which way*
+and *whether to settle*. From a random scatter, a thousand of those small decisions turn into
+a word, or an uploaded picture, in about fifteen seconds and seven cents. Change the word and
+they walk from the old shape into the new one.
 
 ## Run it
 
