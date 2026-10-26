@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Jev Ants — ink on warm paper. The field is the paper; ants are
+   ink, so more ants read as a darker pen stroke. One jade accent
+   for the overseer box, the selected thing and the primary action.
+   Dark mode (prefers-color-scheme) flips to pale ants on charcoal.
+
+   Raw values live on :root and flip with the colour scheme; the
+   @theme inline block maps them to Tailwind utilities (bg-panel,
+   text-fg-2, border-line, …) so components never write dark:.
+   The canvas reads the same variables via getComputedStyle, so a
+   theme change recolours the field without a code path of its own.
+   ============================================================ */
+
+:root {
+  color-scheme: light dark;
+  --ground: #f6f4ef;
+  --paper: #fbfaf7;
+  --panel: #ffffff;
+  --raised: #efece5;
+  --line: #e1dcd2;
+  --line-strong: #c9c2b5;
+  --fg: #1f1d1a;
+  --fg-2: #4a463f;
+  --fg-3: #77716a;
+  --ink: #1f1d1a;
+  --ink-settled: #0e0d0b;
+  --accent: #1f6f5c;
+  --accent-hover: #185a4a;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2efea;
+  --warn: #8a5300;
+  --warn-soft: #fbf1de;
+  --err: #b42318;
+  --err-soft: #fde9e7;
+  --heat: 31 111 92; /* rgb triplet for the deficit heatmap */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #141412;
+    --paper: #1a1a17;
+    --panel: #1c1c19;
+    --raised: #262622;
+    --line: #33322d;
+    --line-strong: #4a4840;
+    --fg: #ece8df;
+    --fg-2: #bdb7ab;
+    --fg-3: #87817a;
+    --ink: #ece8df;
+    --ink-settled: #fffdf7;
+    --accent: #5fb89d;
+    --accent-hover: #7cc9b1;
+    --accent-ink: #0d1f19;
+    --accent-soft: #1d332c;
+    --warn: #e6a44a;
+    --warn-soft: #3a2b12;
+    --err: #f28b82;
+    --err-soft: #3d1a17;
+    --heat: 95 184 157;
+  }
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-ink: var(--ink);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-err: var(--err);
+  --color-err-soft: var(--err-soft);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Native controls take the accent so sliders and checkboxes match. */
+input[type="range"],
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
