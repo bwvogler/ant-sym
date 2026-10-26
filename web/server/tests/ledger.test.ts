@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Ledger, RESERVE_TOKENS, percentile, type Timer } from "../ledger.ts";
+import { Ledger, RESERVE_TOKENS, percentile, reserveForBytes, type Timer } from "../ledger.ts";
 
 /** A timer driven by hand. */
 function fakeTimer() {
@@ -133,35 +133,68 @@ test("the spend cap is reachable: no room for one more call with nothing in flig
   assert.deepEqual(m.admit(1), { ok: true });
   const t = m.begin();
   assert.deepEqual(m.admit(2), { ok: false, reason: "busy" }, "one in flight: wait, it may still fit");
-  m.end(t, { status: 200, ms: 10, inputTokens: 40_000 }); // $0.00168 spent; the reservation shrinks to 60k ($0.00252)
-  assert.equal(m.reserveTokens, 60_000);
+  m.end(t, { status: 200, ms: 10, inputTokens: 40_000 }); // $0.00168 spent; one more unknown-size call would pass the cap
   assert.deepEqual(m.admit(3), { ok: false, reason: "spend-cap" }, "nothing in flight and no room: that is the cap");
   assert.equal(m.running, false);
   assert.equal(m.summary(3).stopReason, "spend-cap");
 });
 
-test("the reservation shrinks to 1.5× the largest request seen, never above the context limit", () => {
+test("each call reserves from its own size: a big call cannot hide under a small one's room, and a small cap is spent to the end", () => {
+  // Round 3 (PR #1): a reservation shrunk to "1.5× the largest reply seen"
+  // let 5 × 60k-token calls in under a 1k-token reply's room (+26 % overspend).
   const l = new Ledger();
   l.start({ capUsd: 0.01, capSeconds: 600 }, 0);
-  assert.equal(l.reserveTokens, RESERVE_TOKENS);
-  l.end(l.begin(), { status: 200, ms: 1, inputTokens: 2_000 });
-  assert.equal(l.reserveTokens, 3_000);
-  l.end(l.begin(), { status: 200, ms: 1, inputTokens: 50_000 });
-  assert.equal(l.reserveTokens, RESERVE_TOKENS);
-  // $0.01 cap at ~400 tokens a call: admitted until the real spend reaches the cap, not $0.0027 short of it
-  const n = new Ledger();
-  n.start({ capUsd: 0.01, capSeconds: 600 }, 0);
+  const small = reserveForBytes(1500); // 1000 tokens
+  assert.equal(small, 1000);
+  assert.deepEqual(l.admit(1, small), { ok: true });
+  l.end(l.begin(small), { status: 200, ms: 1, inputTokens: 1000 });
+  const big = reserveForBytes(90_000); // 60k tokens, $0.00252 each
+  const tokens: ReturnType<Ledger["begin"]>[] = [];
   let admitted = 0;
-  for (let i = 0; i < 1000 && n.admit(i).ok; i++) {
-    n.end(n.begin(), { status: 200, ms: 1, inputTokens: 400 });
+  for (let k = 0; k < 6; k++) {
+    if (!l.admit(2 + k, big).ok) break;
+    tokens.push(l.begin(big));
     admitted++;
   }
-  assert.ok(admitted >= 590, `admitted ${admitted}`); // $0.01 / (400 × $0.042/M) = 595, minus the last reservation
+  assert.equal(admitted, 3, "3 × $0.00252 + $0.000042 fits under $0.01, a 4th would not");
+  assert.deepEqual(l.admit(9, big), { ok: false, reason: "busy" }, "with calls in flight: wait");
+  for (const t of tokens) l.end(t, { status: 200, ms: 1, inputTokens: 60_000 });
+  assert.ok(l.usd <= 0.01, `never past the cap: $${l.usd}`);
+  // nothing in flight and no room for one more big call: the cap
+  assert.deepEqual(l.admit(10, big), { ok: false, reason: "spend-cap" });
+  // a stream of small calls spends a $0.01 cap to within one small reservation
+  const n = new Ledger();
+  n.start({ capUsd: 0.01, capSeconds: 600 }, 0);
+  const tiny = reserveForBytes(800); // 534 tokens reserved for a 400-token call
+  let count = 0;
+  for (let k = 0; k < 1000 && n.admit(k, tiny).ok; k++) {
+    n.end(n.begin(tiny), { status: 200, ms: 1, inputTokens: 400 });
+    count++;
+  }
+  assert.ok(count >= 590, `admitted ${count}`); // $0.01 / (400 × $0.042/M) = 595
   assert.equal(n.summary(1000).stopReason, "spend-cap");
-  const custom = new Ledger({ reserveTokens: 0 });
-  custom.start({}, 0);
-  custom.end(custom.begin(), { status: 200, ms: 1, inputTokens: 2_000 });
-  assert.equal(custom.reserveTokens, 0, "a zero reservation stays zero");
+  // the ceiling: an unknown size reserves the context limit; a huge hint is capped at it; a zero reserve option stays zero
+  assert.equal(l.reserveFor(), RESERVE_TOKENS);
+  assert.equal(reserveForBytes(10_000_000), RESERVE_TOKENS);
+  assert.equal(new Ledger({ reserveTokens: 0 }).reserveFor(5000), 0);
+});
+
+test("tokens are summed across runs: a reply from a replaced run is on the session line, not the run", () => {
+  const l = new Ledger({ reserveTokens: 0 });
+  l.start({}, 0);
+  const old = l.begin();
+  l.end(l.begin(), { status: 200, ms: 1, inputTokens: 1000 });
+  l.start({}, 10); // replaces run 1 with `old` still out
+  l.end(old, { status: 200, ms: 1, inputTokens: 5000 }); // billed, lands late
+  l.end(l.begin(), { status: 200, ms: 1, inputTokens: 300 });
+  const s = l.summary(20);
+  assert.equal(s.inputTokens, 300, "the run counts only its own calls");
+  assert.equal(s.sessionInputTokens, 6300, "the session counts every billed reply");
+  assert.ok(Math.abs(s.sessionUsd - 6300 * USD_PER_INPUT_TOKEN) < 1e-12);
+  const stale = l.begin();
+  l.start({}, 30);
+  l.end(stale, { status: 0, ms: 0, inputTokens: 0, aborted: true });
+  assert.equal(l.summary(31).sessionInputTokens, 6300, "an aborted stale call adds nothing");
 });
 
 test("the time cap fires from a timer, not only on the next admit; stop and a new start clear it", () => {

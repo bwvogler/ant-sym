@@ -326,3 +326,24 @@ test("a reset on a reused keep-alive socket is retried on a fresh connection; a 
     server.close();
   }
 });
+
+test("the default grace lets a sent call finish; a call still queued behind a busy socket is cut at once and never sent", { timeout: 5000 }, async () => {
+  // Round 3 (PR #1) mutation gaps G1 and G3.
+  const fake = await fakeJev({ delayMs: 150 });
+  try {
+    const c = new JevClient({ apiKey: "k", baseUrl: fake.url, maxSockets: 1 }); // default abortGraceMs
+    const ac = new AbortController();
+    const first = c.ask(REQ, ac.signal); // takes the one socket
+    const second = c.ask(REQ, ac.signal); // queued in the agent, not yet sent
+    setTimeout(() => ac.abort(), 30);
+    const t0 = performance.now();
+    await assert.rejects(second, JevAbortError);
+    assert.ok(performance.now() - t0 < 100, "the queued call was cut at once");
+    const r = await first;
+    assert.equal(r.status, 200, "the sent call finished within the default grace");
+    assert.equal(fake.stats().served, 1, "the queued call never reached upstream");
+    c.destroy();
+  } finally {
+    fake.close();
+  }
+});
