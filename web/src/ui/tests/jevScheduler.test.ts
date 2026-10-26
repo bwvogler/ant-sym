@@ -1,7 +1,7 @@
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { Engine } from "../../sim/engine.ts";
-import { JevScheduler } from "../jevScheduler.ts";
+import { JevScheduler, type SchedulerOptions } from "../jevScheduler.ts";
 import type { RunSummary } from "../../../shared/jev.ts";
 
 // The scheduler against a scripted fetch: no server, no key. Each case is a
@@ -41,6 +41,19 @@ function world(n = 20) {
 
 const tick = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// A failed assertion must not skip dispose(): live intervals would keep the
+// test process alive. Every scheduler registers here and is disposed after each test.
+const live = new Set<JevScheduler>();
+function make(e: Engine, opts: Partial<SchedulerOptions>): JevScheduler {
+  const s = new JevScheduler(e, opts);
+  live.add(s);
+  return s;
+}
+afterEach(() => {
+  for (const s of live) s.dispose();
+  live.clear();
+});
+
 function parked(e: Engine): number {
   let n = 0;
   for (let i = 0; i < e.world.n; i++) if ((e.world.commit[i] as number) >= 1e9) n++;
@@ -50,7 +63,7 @@ function parked(e: Engine): number {
 test("429 busy releases the ants it parked, keeps running, and is not a failure", async () => {
   const e = world();
   const calls = scriptFetch({ status: 429, body: { error: "busy", run: RUN } });
-  const s = new JevScheduler(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 1 });
+  const s = make(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 1 });
   await s.start({});
   await tick(60);
   const st = s.state;
@@ -66,7 +79,7 @@ test("409 (cap or stop elsewhere) halts: phase stopped, ants released to the loc
   const e = world();
   const stopped = { ...RUN, running: false, stopReason: "spend-cap" as const };
   const calls = scriptFetch({ status: 409, body: { error: "spend-cap", run: stopped } });
-  const s = new JevScheduler(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 2 });
+  const s = make(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 2 });
   await s.start({});
   await tick(60);
   const sent = calls.filter((c) => c === "/api/jev").length;
@@ -92,7 +105,7 @@ test("Stop aborts the browser side of open calls and releases their ants; the ab
         // never answers on its own
       }),
   );
-  const s = new JevScheduler(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 2 });
+  const s = make(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 2 });
   await s.start({});
   await tick(30);
   assert.ok(parked(e) > 0, "calls are open");
@@ -116,7 +129,7 @@ test("a reply that cannot be read does not strand the batch", async () => {
     answers[`a${i}_settle`] = { type: "noul", noul: 0.1 };
   }
   scriptFetch({ status: 200, body: { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN } });
-  const s = new JevScheduler(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 1, sample: true, schema: "compass" });
+  const s = make(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 1, sample: true, schema: "compass" });
   await s.start({});
   await tick(40);
   const st = s.state;
@@ -156,31 +169,32 @@ test("overseer: a look held across Stop and Start does not steer the new run; a 
   const e = world();
   let release: (() => void) | null = null;
   const held = new Promise<void>((r) => (release = r));
-  // the ant path answers busy so no ant decisions interfere; the first look (box at top 0.2) is held, later looks answer at once with a box at top 0.6
+  // the ant path answers busy so no ant decisions interfere; the first look is held and its box sits on the
+  // ink at the centre (so it would steer); later looks never answer
   let looks = 0;
-  const later = { ...OVERSEER_OK, body: { ...OVERSEER_OK.body, body: { ...OVERSEER_OK.body.body, answers: { ...OVERSEER_OK.body.body.answers, gap: { type: "box", box: { top: 0.6, bottom: 0.8, left: 0.2, right: 0.4 } } } } } };
+  const onInk = { ...OVERSEER_OK, body: { ...OVERSEER_OK.body, body: { ...OVERSEER_OK.body.body, answers: { ...OVERSEER_OK.body.body.answers, gap: { type: "box", box: { top: 0.45, bottom: 0.6, left: 0.45, right: 0.6 } } } } } };
   const calls = scriptBoth({ status: 429, body: { error: "busy", run: RUN } }, async () => {
     if (looks++ === 0) {
       await held;
-      return OVERSEER_OK;
+      return onInk;
     }
-    return later;
+    return new Promise(() => {});
   });
-  const s = new JevScheduler(e, { intervalMs: 50, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: true, overseerMs: 10, renderImages: IMAGES });
+  const s = make(e, { intervalMs: 50, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: true, overseerMs: 10, renderImages: IMAGES });
   await s.start({});
   await tick(40); // the look is in flight
   await s.stop("user");
   await s.start({}); // run 2
   release!();
-  await tick(30);
+  await tick(5);
   assert.equal(e.attractor, null, "the old run's box did not become run 2's attractor");
-  assert.notEqual(s.state.overseer?.box?.top, 0.2, "the held look's box is not in the readout");
+  assert.equal(s.state.overseer, null, "nor its readout");
   s.dispose();
 
   const e2 = world();
   const stopped = { ...RUN, running: false, stopReason: "time-cap" as const };
   const calls2 = scriptBoth({ status: 429, body: { error: "busy", run: RUN } }, { status: 409, body: { error: "time-cap", run: stopped } });
-  const s2 = new JevScheduler(e2, { intervalMs: 50, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: true, overseerMs: 10, renderImages: IMAGES });
+  const s2 = make(e2, { intervalMs: 50, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: true, overseerMs: 10, renderImages: IMAGES });
   await s2.start({});
   await tick(60);
   const st = s2.state;
@@ -200,7 +214,7 @@ test("the session line is the server's cross-run total and never goes backwards 
     const t = totals[Math.min(n++, totals.length - 1)] as number;
     return { status: 429, body: { error: "busy", run: { ...RUN, sessionInputTokens: t, sessionUsd: t * (0.042 / 1e6) } } };
   });
-  const s = new JevScheduler(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: false });
+  const s = make(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 1, overseer: false });
   await s.start({});
   await tick(25);
   assert.equal(s.state.sessionTokens, 500, "a late, lower total does not pull the line down");

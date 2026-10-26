@@ -221,8 +221,8 @@ export class JevScheduler {
 
   /** The session line comes from the server, which sums every billed reply across runs (replies can land out of order: take the max). */
   #absorb(run: RunSummary): void {
-    this.#state.sessionTokens = Math.max(this.#state.sessionTokens, run.sessionInputTokens);
-    this.#state.sessionUsd = Math.max(this.#state.sessionUsd, run.sessionUsd);
+    this.#state.sessionTokens = Math.max(this.#state.sessionTokens, run.sessionInputTokens ?? 0);
+    this.#state.sessionUsd = Math.max(this.#state.sessionUsd, run.sessionUsd ?? 0);
   }
 
   async #oversee(): Promise<void> {
