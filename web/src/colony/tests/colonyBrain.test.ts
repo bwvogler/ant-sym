@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DOCTRINES, estimateTokens, packModeRequest, policyContext, readMode, situationKey } from "../colonyBrain.ts";
 import type { Situation } from "../colony.ts";
 
-const S: Situation = { mode: "follow", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none" };
+const S: Situation = { mode: "follow", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
 
 test("situationKey is stable and tells situations apart", () => {
   assert.equal(situationKey(S), situationKey({ ...S }));
@@ -19,7 +19,7 @@ test("packModeRequest: one shared state with the doctrine, one choice per situat
   assert.deepEqual(Object.keys(state.ants), ["s0", "s1"]);
   assert.deepEqual(Object.keys(r.questions), ["s0_mode", "s1_mode"]);
   const q = r.questions.s0_mode;
-  assert.ok(q?.type === "choice" && Object.keys(q.criteria).join() === "explore,follow,return");
+  assert.ok(q?.type === "choice" && Object.keys(q.criteria).join() === "explore,follow,return,fight");
   assert.ok(estimateTokens(r) > 0);
 });
 
@@ -35,4 +35,16 @@ test("policyContext changes with the doctrine and ignores surrounding whitespace
   assert.notEqual(a, policyContext(DOCTRINES[1]!.text));
   assert.equal(a, policyContext(`  ${DOCTRINES[0]!.text}\n`));
   assert.match(a, /^colony-v\d+-[0-9a-f]{8}$/);
+});
+
+test("stances: key, pack and read; their own context per doctrine", async () => {
+  const { packStanceRequest, readStance, stanceContext, stanceKey } = await import("../colonyBrain.ts");
+  const v = { stance: "forage" as const, ants: "many" as const, losses: "none" as const, enemyNearNest: true, foodLeft: "some" as const, larder: "full" as const };
+  assert.notEqual(stanceKey(v), stanceKey({ ...v, enemyNearNest: false }));
+  const r = packStanceRequest([{ id: "c0", situation: v }], "be brave");
+  assert.deepEqual(Object.keys(r.questions), ["c0_stance"]);
+  assert.equal((r.state as { doctrine: string }).doctrine, "be brave");
+  assert.equal(readStance({ c0_stance: { type: "choice", choice: "raid" } }, "c0"), "raid");
+  assert.equal(readStance({ c0_stance: { type: "choice", choice: "nap" } }, "c0"), null);
+  assert.notEqual(stanceContext("x"), policyContext("x"));
 });

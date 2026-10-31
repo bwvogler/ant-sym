@@ -20,8 +20,8 @@ function scriptFetch(jev: Script) {
     let r: { status: number; body: unknown };
     if (path.startsWith("/api/run")) r = { status: 200, body: RUN };
     else {
-      const req = JSON.parse(String(init?.body)) as JevRequest & { state: { ants: Record<string, unknown> } };
-      sent.push(Object.values(req.state.ants).map((a) => JSON.stringify(a)));
+      const req = JSON.parse(String(init?.body)) as JevRequest & { state: { ants?: Record<string, unknown> } };
+      if (req.state.ants) sent.push(Object.values(req.state.ants).map((a) => JSON.stringify(a))); // ant situations only, not stances
       r = await jev(req);
     }
     return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body } as Response;
@@ -38,8 +38,8 @@ const answerAll =
     return { status: 200, body: { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN } };
   };
 
-function memoryStore(): CacheStore & { data: Map<string, [string, Mode][]> } {
-  const data = new Map<string, [string, Mode][]>();
+function memoryStore(): CacheStore & { data: Map<string, [string, string][]> } {
+  const data = new Map<string, [string, string][]>();
   return { data, load: (c) => data.get(c) ?? [], save: (c, e) => void data.set(c, e) };
 }
 
@@ -86,12 +86,12 @@ test("running: each new situation is asked once; the answers are cached and the 
   run(c, 3);
   await tick(40);
   const all = sent.flat();
-  assert.ok(all.length > 0 && all.length < c.n, `${all.length} situations for ${c.n} ants`);
+  assert.ok(all.length > 0 && all.length < c.population, `${all.length} situations for ${c.population} ants`);
   assert.equal(new Set(all).size, all.length, "no situation asked twice");
   assert.equal(j.state.cached, all.length);
   run(c, 1);
   const modes = c.counts();
-  assert.equal(modes.return, c.n, "every ant took Jev's answer on its next tick");
+  assert.equal(modes.return, c.population, "every ant took Jev's answer on its next tick");
   assert.ok(j.state.hits > 0);
   assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, all.length, "persisted under the doctrine");
 });
@@ -129,7 +129,7 @@ test("a 409 ends the run and the colony is back on the local rule", async () => 
   await tick(40);
   assert.equal(j.state.phase, "stopped");
   assert.match(String(j.state.lastError), /spend-cap/);
-  assert.equal(j.policy({ mode: "follow", tired: true, foodTrail: "none", homeTrail: "none", alarm: "none" }), "return", "the local rule answers");
+  assert.equal(j.policy({ mode: "follow", tired: true, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" }), "return", "the local rule answers");
 });
 
 test("busy puts the situations back in the queue; a failure cools down instead of hammering", async () => {
@@ -161,4 +161,28 @@ test("busy puts the situations back in the queue; a failure cools down instead o
   assert.equal(failed, 1, "one failed call, then a cool-down");
   assert.equal(j2.state.failures, 1);
   assert.equal(j2.state.phase, "running", "a failure is not the end of the run");
+});
+
+test("the strategist's stance goes through its own cached lane", async () => {
+  const stances: string[] = [];
+  scriptFetch((req) => {
+    const answers: Record<string, unknown> = {};
+    for (const q of Object.keys(req.questions)) {
+      if (q.endsWith("_stance")) stances.push(q);
+      answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "defend" : "explore" };
+    }
+    return { status: 200, body: { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN } };
+  });
+  const j = make();
+  const c = colony();
+  j.attach(c);
+  await j.start();
+  const v = c.stanceSituation(false);
+  assert.equal(j.stancePolicy(v), "forage", "first time: the local strategist, and the view is queued");
+  await tick(40);
+  assert.equal(stances.length, 1);
+  assert.equal(j.stancePolicy(v), "defend", "then Jev's cached stance");
+  assert.equal(j.state.stancesCached, 1);
+  await tick(30);
+  assert.equal(stances.length, 1, "asked once");
 });

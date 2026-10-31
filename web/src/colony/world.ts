@@ -1,11 +1,18 @@
-// The colony's world, pure: a procedural map from a seed. Rock from two
-// octaves of value noise, a nest with the rock cleared around it, and food
-// patches placed only where an ant can walk to them from the nest. Positions
+// The colonies' world, pure: a procedural map from a seed. Rock from two
+// octaves of value noise, the player's nest with the rock cleared around it,
+// a rival nest as far away as the ground allows, and food patches placed
+// only where an ant can walk to them from the nests. Positions
 // are in cell units, (0,0) top-left, like the picture sim.
 
 export interface WorldSize {
   w: number;
   h: number;
+}
+
+export interface Nest {
+  x: number;
+  y: number;
+  r: number;
 }
 
 export interface WorldMap {
@@ -15,7 +22,10 @@ export interface WorldMap {
   rock: Uint8Array;
   /** food units left per cell */
   food: Float32Array;
-  nest: { x: number; y: number; r: number };
+  /** the player's nest (nests[0]) */
+  nest: Nest;
+  /** every nest: the player's first, then the rival's, reachable from each other */
+  nests: Nest[];
   /** food units placed at generation */
   foodTotal: number;
 }
@@ -131,16 +141,31 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
   }
   disc(size, nest.x, nest.y, nest.r + 4, (i) => (rock[i] = 0));
 
-  // Food patches: far enough from the nest to need a trail, only where an ant can walk.
-  const food = new Float32Array(size.w * size.h);
+  // The rival's nest: of a few hundred spots the player's ants can walk to, the farthest from home.
   let reach = reachable(size, rock, nest.x, nest.y);
+  let rival = { x: size.w - nest.x, y: size.h - nest.y, r: 3 };
+  let far = -1;
+  for (let tries = 0; tries < 400; tries++) {
+    const x = 6 + rng() * (size.w - 12);
+    const y = 6 + rng() * (size.h - 12);
+    const d = Math.hypot(x - nest.x, y - nest.y);
+    if (!reach[Math.floor(y) * size.w + Math.floor(x)] || d <= far) continue;
+    far = d;
+    rival = { x, y, r: 3 };
+  }
+  disc(size, rival.x, rival.y, rival.r + 4, (i) => (rock[i] = 0));
+  const nests = [nest, rival];
+
+  // Food patches: far enough from every nest to need a trail, only where an ant can walk.
+  const food = new Float32Array(size.w * size.h);
+  reach = reachable(size, rock, nest.x, nest.y);
   const minDist = Math.min(size.w, size.h) * 0.25;
   let placed = 0;
   for (let tries = 0; placed < o.patches && tries < 2000; tries++) {
     const x = rng() * size.w;
     const y = rng() * size.h;
     const c = Math.floor(y) * size.w + Math.floor(x);
-    if (!reach[c] || Math.hypot(x - nest.x, y - nest.y) < minDist) continue;
+    if (!reach[c] || nests.some((n) => Math.hypot(x - n.x, y - n.y) < minDist)) continue;
     const r = 2 + rng() * 2;
     disc(size, x, y, r, (i) => {
       rock[i] = 0;
@@ -155,7 +180,7 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
     if (!reach[i]) food[i] = 0;
     foodTotal += food[i] as number;
   }
-  return { size, seed, rock, food, nest, foodTotal };
+  return { size, seed, rock, food, nest, nests, foodTotal };
 }
 
 /** Rock or off the map. */

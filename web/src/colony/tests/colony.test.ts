@@ -8,10 +8,11 @@ function corridor(food = 3): WorldMap {
   const size = { w: 40, h: 12 };
   const f = new Float32Array(size.w * size.h);
   f[6 * size.w + 14] = food;
-  return { size, seed: 0, rock: new Uint8Array(size.w * size.h), food: f, nest: { x: 6, y: 6.5, r: 2 }, foodTotal: food };
+  const nest = { x: 6, y: 6.5, r: 2 };
+  return { size, seed: 0, rock: new Uint8Array(size.w * size.h), food: f, nest, nests: [nest], foodTotal: food };
 }
 
-const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", ...s });
+const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
 
 test("localPolicy: tired goes home; a strong food trail is followed; none means explore; faint keeps the mode", () => {
   assert.equal(localPolicy(sit({ tired: true, foodTrail: "strong" })), "return");
@@ -67,13 +68,13 @@ test("the policy is asked only when an ant's situation changes, and its answer i
   assert.equal(c.mode[0], 1, "follow");
   assert.equal(c.decisions, 1);
   assert.equal(c.situationsSeen, 1);
-  assert.equal(SITUATIONS, 162);
+  assert.equal(SITUATIONS, 1296);
 });
 
 test("a policy answering nonsense falls back to the plain rule instead of breaking the ant", () => {
   const c = new Colony(corridor(0), { antCount: 3 }, mulberry32(3), () => "dance" as never);
   c.tick(1 / 30);
-  assert.deepEqual([...c.mode], [0, 0, 0], "explore");
+  assert.deepEqual([...c.mode].filter((_, i) => c.alive[i]), [0, 0, 0], "explore");
 });
 
 test("the colony forages on the local rule alone: food comes home within a minute", () => {

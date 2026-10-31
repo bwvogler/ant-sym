@@ -1,50 +1,68 @@
-// Offline, no key, no spend: what would Jev cost the colony? Runs the colony
-// headless for a play session with a stand-in for Jev (the local rule, so
-// the ants behave the same) behind the real cache logic: each new
-// (doctrine, situation) is one question, asked once. The player retunes the
-// doctrine every couple of minutes, back to one used before at the end, and
-// paints alarm now and then. Tokens per question are estimated from request
-// size (colonyBrain.estimateTokens); the ledger counts the real ones live.
+// Offline, no key, no spend: what would Jev cost a game? Runs the game
+// headless for a play session — your colony against the rival's — with a
+// stand-in for Jev (the local rule and the local strategist, so the colony
+// behaves the same) behind the real cache logic: each new (doctrine, ant
+// situation) and each new (doctrine, strategist view) is one question, asked
+// once. You retune the doctrine every couple of minutes, back to one used
+// before at the end, and paint alarm now and then. The rival plays the local
+// rule (free). Tokens per question are estimated from request size
+// (colonyBrain.estimateTokens); the ledger counts the real ones live.
 //
 // Usage: node scripts/colony-cost.mjs [minutes=10] [ants=800] [seed=1]
-import { Colony, localPolicy } from "../web/src/colony/colony.ts";
-import { DOCTRINES, estimateTokens, packModeRequest, policyContext, situationKey } from "../web/src/colony/colonyBrain.ts";
+import { localPolicy, localStance } from "../web/src/colony/colony.ts";
+import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
+import { Game } from "../web/src/colony/game.ts";
 import { generateWorld, mulberry32 } from "../web/src/colony/world.ts";
 
-const [minutes = 10, ants = 800, seed = 1] = process.argv.slice(2).map(Number);
+const [minutes = 10, ants = 600, seed = 1] = process.argv.slice(2).map(Number);
 const USD = 0.042 / 1e6;
 const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
 const map = generateWorld(seed);
-const asked = new Map(); // context → Set of situation keys
-const queue = new Map(); // key → situation, waiting for the next batch
 let doctrine = DOCTRINES[0].text;
-let context = policyContext(doctrine);
 let tokens = 0;
 let requests = 0;
+let questions = 0;
 const phases = [];
 
-const policy = (s) => {
-  const key = situationKey(s);
-  if (!asked.get(context)?.has(key)) queue.set(key, s);
-  return localPolicy(s); // the stand-in's answer, and what the ant does until Jev answers
-};
-const colony = new Colony(map, { antCount: ants }, mulberry32(seed + 7), policy);
-
-function flush() {
-  if (queue.size === 0) return;
-  const set = asked.get(context) ?? new Set();
-  asked.set(context, set);
-  const items = [...queue.entries()].filter(([k]) => !set.has(k));
-  queue.clear();
-  for (let b = 0; b < items.length; b += 100) {
-    const chunk = items.slice(b, b + 100);
-    tokens += estimateTokens(packModeRequest(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
-    requests++;
-    for (const [k] of chunk) set.add(k);
-  }
+/** One kind of question, cached per doctrine like ui/colonyJev.ts. */
+function lane(key, pack, contextOf, local) {
+  const asked = new Map(); // context → Set of keys
+  const queue = new Map(); // key → situation, waiting for the next batch
+  return {
+    asked,
+    policy: (s) => {
+      const k = key(s);
+      if (!asked.get(contextOf(doctrine))?.has(k)) queue.set(k, s);
+      return local(s); // the stand-in's answer, and what the colony does until Jev answers
+    },
+    flush() {
+      const context = contextOf(doctrine);
+      const set = asked.get(context) ?? new Set();
+      asked.set(context, set);
+      const items = [...queue.entries()].filter(([k]) => !set.has(k));
+      queue.clear();
+      for (let b = 0; b < items.length; b += 100) {
+        const chunk = items.slice(b, b + 100);
+        tokens += estimateTokens(pack(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
+        requests++;
+        questions += chunk.length;
+        for (const [k] of chunk) set.add(k);
+      }
+    },
+    clear: () => queue.clear(),
+    seen: (context) => asked.get(context)?.size ?? 0,
+  };
 }
+const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
+const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
+const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed + 7), { policy: modes.policy, stance: stances.policy });
+const colony = game.player;
+const flush = () => {
+  modes.flush();
+  stances.flush();
+};
 
 // The session: a doctrine for each slice of time, the first one again at the end (should be free).
 const plan = [DOCTRINES[0], DOCTRINES[1], DOCTRINES[2], { id: "custom", name: "Custom", text: "Hoard food: follow any food scent, even faint; explore otherwise; flee home at strong alarm." }, DOCTRINES[0]];
@@ -54,13 +72,13 @@ let next = 0;
 let t = 0;
 for (const d of plan) {
   doctrine = d.text;
-  context = policyContext(doctrine);
-  queue.clear();
+  modes.clear();
+  stances.clear();
   colony.reconsider();
-  const before = { tokens, requests, asked: asked.get(context)?.size ?? 0 };
+  const before = { tokens, requests, modes: modes.seen(policyContext(doctrine)), stances: stances.seen(stanceContext(doctrine)) };
   const end = t + slice;
   for (; t < end; t += DT) {
-    colony.tick(DT);
+    game.tick(DT);
     if (t >= next) {
       flush();
       next = t + BATCH_EVERY;
@@ -69,13 +87,14 @@ for (const d of plan) {
     if (rng() < DT / 20) colony.paint("alarm", rng() * map.size.w, rng() * map.size.h, 3, 12);
   }
   flush();
-  phases.push({ name: d.name, newSituations: (asked.get(context)?.size ?? 0) - before.asked, tokens: tokens - before.tokens, requests: requests - before.requests });
+  phases.push({ name: d.name, newSituations: modes.seen(policyContext(doctrine)) - before.modes, newStances: stances.seen(stanceContext(doctrine)) - before.stances, tokens: tokens - before.tokens, requests: requests - before.requests });
 }
 
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
-console.log(`colony cost, offline: seed ${seed}, ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
-console.log(`stored ${colony.stored} of ${map.foodTotal} food; ${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations\n`);
-for (const p of phases) console.log(`  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} new situations · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`);
-const perQuestion = Math.round(tokens / Math.max(1, [...asked.values()].reduce((a, s) => a + s.size, 0)));
-console.log(`\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${perQuestion} tok per question, ${(colony.decisions / Math.max(1, [...asked.values()].reduce((a, s) => a + s.size, 0))).toFixed(0)} mode choices per question)`);
+const r = game.rival;
+console.log(`game cost, offline: seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
+console.log(`you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`);
+console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations; ${game.strategyChoices / game.colonies.length} stance choices each\n`);
+for (const p of phases) console.log(`  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`);
+console.log(`\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${Math.round(tokens / Math.max(1, questions))} tok per question, ${Math.round(colony.decisions / Math.max(1, questions))} mode choices per question)`);
 console.log(`≈ ${usd((tokens * 60) / minutes)} per hour at this pace of retuning (one every ${(slice / 60).toFixed(1)} min); target ≤ $0.25/h`);

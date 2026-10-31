@@ -43,8 +43,9 @@ spend and time caps from the real `usage.input_tokens` of every reply.
   attractor when it points at ink) and a "recognisable" noul.
 - **Overlays**: deficit heatmap, pheromone trails. **Local rule** brain for a free
   comparison with a greedy gradient walk.
-- **Colony** (the *Colony* tab, `#colony`): a procedural world of rock, food and one
-  nest that the ants forage on their own. They lay a trail to food and a trail home,
+- **Colony** (the *Colony* tab, `#colony`): a procedural world of rock, food, your nest
+  and a rival's. Food makes ants, fights kill them, and each colony's strategist picks
+  forage, defend or raid. The ants forage on their own. They lay a trail to food and a trail home,
   and switch between exploring, following and going home. You are the fungus:
   paint *lure* or *alarm* scent (free), and set the colony's *doctrine*. With
   **Start Jev**, Jev picks each ant's mode, once per situation under that doctrine,

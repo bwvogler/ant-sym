@@ -5,20 +5,21 @@ import ColonyField from "./ui/ColonyField.tsx";
 import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
-import { useColony, type Brush } from "./ui/useColony.ts";
+import { useColony, type Brush, type SideStats } from "./ui/useColony.ts";
 import { TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 
-// The colony page: a procedural world the ants forage on their own, and the
-// fungus that steers them. The fungus paints scent (free: lure and alarm
-// brushes) and sets the colony's doctrine; with Jev on, each ant's mode
-// choice is Jev's answer for its situation under that doctrine, asked once
-// per situation and cached, so the spend follows new situations and
-// retunes, not ants or time.
+// The colony page: a procedural world, your colony and a rival's, and the
+// fungus (you) that steers yours. The fungus paints scent (free: lure and
+// alarm brushes) and sets the colony's doctrine; with Jev on, each ant's
+// mode and the colony's stance are Jev's answers for their situation under
+// that doctrine, asked once per situation and cached, so the spend follows
+// new situations and retunes, not ants or time. The rival plays the local
+// rule. Food makes ants; fights kill them; a colony with neither is beaten.
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 
 export default function ColonyApp() {
-  const { colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
+  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
   const jev = useColonyJev(colony);
   const { size } = colony.map;
   const share = stats && stats.foodTotal > 0 ? stats.stored / stats.foodTotal : 0;
@@ -34,12 +35,12 @@ export default function ColonyApp() {
           <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
           <Nav page="colony" />
         </div>
-        <p className="text-sm text-fg-3">a colony that forages on its own: trails, not orders</p>
+        <p className="text-sm text-fg-3">two colonies, one map: trails, not orders</p>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="relative" style={{ aspectRatio: `${size.w} / ${size.h}` }}>
-            <ColonyField colony={colony} onFrame={onFrame} showFoodTrail={controls.showFoodTrail} showHomeTrail={controls.showHomeTrail} onPaint={controls.brush === "none" ? null : paint} />
+            <ColonyField colony={colony} rival={game.rival} onFrame={onFrame} showFoodTrail={controls.showFoodTrail} showHomeTrail={controls.showHomeTrail} onPaint={controls.brush === "none" ? null : paint} />
           </div>
           <section className="rounded-lg border border-line bg-panel px-4 py-3" aria-label="colony stats">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -53,9 +54,27 @@ export default function ColonyApp() {
               <Stat label="exploring" value={stats ? String(stats.counts.explore) : "—"} />
               <Stat label="following" value={stats ? String(stats.counts.follow) : "—"} />
               <Stat label="going home" value={stats ? String(stats.counts.return) : "—"} />
+              <Stat label="fighting" value={stats ? String(stats.counts.fight) : "—"} />
               <Stat label="mode choices / s" value={stats ? Math.round(stats.choicesPerSecond).toLocaleString() : "—"} />
-              <Stat label="situations seen" value={stats ? `${stats.situationsSeen} / ${SITUATIONS}` : "—"} />
+              <Stat label="situations seen" value={stats ? `${stats.situationsSeen} / ${SITUATIONS.toLocaleString()}` : "—"} />
             </div>
+            {stats && (
+              <dl className="mt-3 grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-x-4 gap-y-1 border-t border-line pt-3 font-mono text-xs text-fg-2">
+                <dt className="text-fg-3" />
+                {["ants", "food home", "lost", "born", "stance"].map((h) => (
+                  <dt key={h} className="text-[11px] uppercase tracking-wide text-fg-3">
+                    {h}
+                  </dt>
+                ))}
+                <SideRow name="you" tone="text-fg" s={stats.you} />
+                {stats.rival && <SideRow name="rival" tone="text-warn" s={stats.rival} />}
+              </dl>
+            )}
+            {stats && stats.outcome !== "playing" && (
+              <p className={`mt-3 rounded-md px-3 py-1.5 text-sm ${stats.outcome === "won" ? "bg-accent-soft text-accent" : "bg-err-soft text-err"}`}>
+                {stats.outcome === "won" ? "The rival colony is gone. Your ants hold the map." : "Your colony is gone: no ants left and no food to raise more. Restart or try a new world."}
+              </p>
+            )}
           </section>
           <section className="rounded-lg border border-line bg-panel px-4 py-3" aria-label="colony jev">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -78,7 +97,7 @@ export default function ColonyApp() {
               <Stat label="avg $ / hour" value={perHour === null ? "—" : `$${perHour.toFixed(3)}`} />
               <Stat label="tokens" value={run ? run.inputTokens.toLocaleString() : "—"} />
               <Stat label="situations asked" value={String(jev.state.asked)} />
-              <Stat label="answers cached" value={`${jev.state.cached} / ${SITUATIONS}`} />
+              <Stat label="answers cached" value={`${jev.state.cached} · ${jev.state.stancesCached} stances`} />
               <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
               <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>{running ? "jev on" : jev.state.phase === "stopped" ? "stopped · local rule" : "local rule"}</span>
             </div>
@@ -108,8 +127,12 @@ export default function ColonyApp() {
               </button>
             </div>
             <p className="mt-2 text-xs text-fg-3">
-              {size.w}×{size.h} cells of rock, ground and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food around one nest.
+              {size.w}×{size.h} cells of rock, ground and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food. Every 4 food stored is a new ant.
             </p>
+            <label className="mt-2 flex items-center justify-between text-sm text-fg-2">
+              <span>Rival colony</span>
+              <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />
+            </label>
           </section>
 
           <section className="rounded-lg border border-line bg-panel p-4">
@@ -162,7 +185,7 @@ export default function ColonyApp() {
             </div>
             <textarea
               className="mt-2 w-full resize-none rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-fg outline-none focus:border-accent"
-              rows={3}
+              rows={4}
               value={jev.doctrine.text}
               onChange={(e) => jev.draftDoctrine({ id: "custom", text: e.target.value })}
               onBlur={(e) => jev.setDoctrine({ id: jev.doctrine.id, text: e.target.value })}
@@ -186,6 +209,21 @@ export default function ColonyApp() {
         </aside>
       </div>
     </main>
+  );
+}
+
+function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }) {
+  return (
+    <>
+      <dt className={`pr-2 ${tone}`}>{name}</dt>
+      <dd className="tabular-nums">
+        {s.population} / {s.cap}
+      </dd>
+      <dd className="tabular-nums">{s.stored.toLocaleString()}</dd>
+      <dd className="tabular-nums">{s.losses.toLocaleString()}</dd>
+      <dd className="tabular-nums">{s.births.toLocaleString()}</dd>
+      <dd>{s.stance}</dd>
+    </>
   );
 }
 
