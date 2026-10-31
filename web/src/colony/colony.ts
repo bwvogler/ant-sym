@@ -1,5 +1,5 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
-import { blocked, type Nest, type WorldMap } from "./world.ts";
+import { blocked, dropFood, rockAt, takeFood, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -54,6 +54,13 @@ export interface Situation {
 }
 
 export type Policy = (s: Situation) => Mode;
+
+/** Counts per cell, read by integer cell coordinates (the game's enemy grid). */
+export interface CellCounts {
+  get(x: number, y: number): number;
+  /** whether any cell in the rectangle x0..x1 × y0..y1 (inclusive) may hold a count: a cheap early out */
+  any(x0: number, y0: number, x1: number, y1: number): boolean;
+}
 
 /**
  * The local rule. An enemy close by: fight it. Tired: go home. Raiding:
@@ -160,7 +167,7 @@ export class Colony {
   /** the situation each ant was last asked about, encoded; −1 = never */
   #asked: Int16Array;
   /** enemy ants per cell, kept by the game each tick; null when there is no rival */
-  enemies: Uint16Array | null = null;
+  enemies: CellCounts | null = null;
   /** where raiders go: the rival's nest */
   raidTarget: Nest | null = null;
   time = 0;
@@ -177,6 +184,8 @@ export class Colony {
   /** which of the SITUATIONS the policy has been asked about: what a cached Jev policy would pay for */
   seen = new Uint8Array(SITUATIONS);
   #rng: () => number;
+  /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
+  #s = new Float64Array(9);
 
   constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
     this.map = map;
@@ -186,7 +195,7 @@ export class Colony {
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
-    this.ph = new Pheromones(map.size);
+    this.ph = new Pheromones(map);
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -199,6 +208,8 @@ export class Colony {
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
     this.#asked = new Int16Array(n).fill(-1);
+    // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
+    this.ph.phase((this.params.nest % 2) * 0.5);
     for (let k = 0; k < this.params.antCount; k++) this.#place(k);
   }
 
@@ -236,10 +247,7 @@ export class Colony {
   /** Ant i dies where it stands; food it carried drops on that cell. */
   kill(i: number): void {
     if (!this.alive[i]) return;
-    if (this.carrying[i]) {
-      const c = Math.floor(this.y[i] as number) * this.map.size.w + Math.floor(this.x[i] as number);
-      this.map.food[c] = (this.map.food[c] as number) + 1;
-    }
+    if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
     this.alive[i] = 0;
     this.carrying[i] = 0;
     this.losses++;
@@ -248,9 +256,7 @@ export class Colony {
 
   /** Food left on the map. */
   get foodLeft(): number {
-    let s = 0;
-    for (const v of this.map.food) s += v;
-    return s;
+    return this.map.foodLeft;
   }
 
   /** Every ant asks its policy again on its next tick: a new doctrine, or fresh answers from Jev, take effect at once. */
@@ -260,10 +266,10 @@ export class Colony {
 
   /** The fungus's brush: lay `amount` of a trail on every open cell within `radius` of (x, y). */
   paint(channel: Channel, x: number, y: number, radius: number, amount: number): void {
-    const { size, rock } = this.map;
+    const { size } = this.map;
     for (let cy = Math.max(0, Math.floor(y - radius)); cy <= Math.min(size.h - 1, Math.floor(y + radius)); cy++)
       for (let cx = Math.max(0, Math.floor(x - radius)); cx <= Math.min(size.w - 1, Math.floor(x + radius)); cx++) {
-        if (rock[cy * size.w + cx] || Math.hypot(cx + 0.5 - x, cy + 0.5 - y) > radius) continue;
+        if (rockAt(this.map, cx, cy) || Math.hypot(cx + 0.5 - x, cy + 0.5 - y) > radius) continue;
         this.ph.deposit(channel, cx + 0.5, cy + 0.5, amount);
       }
   }
@@ -296,15 +302,32 @@ export class Colony {
     };
   }
 
-  /** What one sensor reads: the trail, the edge or rock as −1, and food (or the nest, homing) as SEEN. */
-  #sense(i: number, angle: number, channel: Channel): number {
+  /**
+   * What the sensor in direction (dx, dy) (a unit vector) reads on every channel, into #s[slot] (food), #s[slot + 3] (home) and
+   * #s[slot + 6] (alarm): the trail, the edge or rock as −1, and food (or the nest, for home) as SEEN.
+   */
+  #sense(i: number, dx: number, dy: number, slot: number): void {
     const d = this.params.sensorDistance;
-    const sx = (this.x[i] as number) + Math.cos(angle) * d;
-    const sy = (this.y[i] as number) + Math.sin(angle) * d;
-    if (blocked(this.map, sx, sy)) return -1;
-    if (channel === "food" && (this.map.food[Math.floor(sy) * this.map.size.w + Math.floor(sx)] as number) > 0) return SEEN;
-    if (channel === "home" && Math.hypot(sx - this.nest.x, sy - this.nest.y) < this.nest.r) return SEEN;
-    return this.ph.read(channel, sx, sy);
+    const sx = (this.x[i] as number) + dx * d;
+    const sy = (this.y[i] as number) + dy * d;
+    const s = this.#s;
+    const { map, nest } = this;
+    if (sx < 0 || sy < 0 || sx >= map.size.w || sy >= map.size.h) {
+      s[slot] = s[slot + 3] = s[slot + 6] = -1;
+      return;
+    }
+    const cx = Math.floor(sx);
+    const cy = Math.floor(sy);
+    if (map.rock.get(cx, cy) === 1) {
+      s[slot] = s[slot + 3] = s[slot + 6] = -1;
+      return;
+    }
+    const f = this.ph.fields;
+    s[slot] = map.food.get(cx, cy) > 0 ? SEEN : f.food.get(cx, cy);
+    const ndx = sx - nest.x;
+    const ndy = sy - nest.y;
+    s[slot + 3] = ndx * ndx + ndy * ndy < nest.r * nest.r ? SEEN : f.home.get(cx, cy);
+    s[slot + 6] = f.alarm.get(cx, cy);
   }
 
   /** The nearest cell holding enemies within ENEMY_RANGE of ant i, as a heading, or null. */
@@ -314,6 +337,7 @@ export class Colony {
     const { w, h } = this.map.size;
     const cx = Math.floor(this.x[i] as number);
     const cy = Math.floor(this.y[i] as number);
+    if (!g.any(cx - ENEMY_RANGE, cy - ENEMY_RANGE, cx + ENEMY_RANGE, cy + ENEMY_RANGE)) return null;
     let best = Infinity;
     let heading: number | null = null;
     for (let dy = -ENEMY_RANGE; dy <= ENEMY_RANGE; dy++) {
@@ -321,7 +345,7 @@ export class Colony {
       if (y < 0 || y >= h) continue;
       for (let dx = -ENEMY_RANGE; dx <= ENEMY_RANGE; dx++) {
         const x = cx + dx;
-        if (x < 0 || x >= w || !g[y * w + x]) continue;
+        if (x < 0 || x >= w || !g.get(x, y)) continue;
         const d = dx * dx + dy * dy;
         if (d < best) {
           best = d;
@@ -338,20 +362,29 @@ export class Colony {
     const rng = this.#rng;
     const { map, ph, nest } = this;
     const a = p.sensorAngle;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
     this.time += dt;
     this.recentLosses *= Math.exp(-dt / 30);
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       let h = this.heading[i] as number;
-      const fl = this.#sense(i, h - a, "food");
-      const ff = this.#sense(i, h, "food");
-      const fr = this.#sense(i, h + a, "food");
-      const hl = this.#sense(i, h - a, "home");
-      const hf = this.#sense(i, h, "home");
-      const hr = this.#sense(i, h + a, "home");
-      const al = this.#sense(i, h - a, "alarm");
-      const af = this.#sense(i, h, "alarm");
-      const ar = this.#sense(i, h + a, "alarm");
+      // Three sensors (left, front, right), each read on every channel at once.
+      const sn = this.#s;
+      const ch = Math.cos(h);
+      const sh = Math.sin(h);
+      this.#sense(i, ch * ca + sh * sa, sh * ca - ch * sa, 0); // h − a
+      this.#sense(i, ch, sh, 1);
+      this.#sense(i, ch * ca - sh * sa, sh * ca + ch * sa, 2); // h + a
+      const fl = sn[0] as number;
+      const ff = sn[1] as number;
+      const fr = sn[2] as number;
+      const hl = sn[3] as number;
+      const hf = sn[4] as number;
+      const hr = sn[5] as number;
+      const al = sn[6] as number;
+      const af = sn[7] as number;
+      const ar = sn[8] as number;
       const toEnemy = this.#enemyHeading(i);
 
       // The mode choice, only when the situation changed since the ant was last asked.
@@ -430,10 +463,10 @@ export class Colony {
       }
 
       // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
-      const c = Math.floor(this.y[i] as number) * map.size.w + Math.floor(this.x[i] as number);
-      const atNest = Math.hypot((this.x[i] as number) - nest.x, (this.y[i] as number) - nest.y) < nest.r;
-      if (!carrying && mode !== FIGHT && (map.food[c] as number) > 0) {
-        map.food[c] = Math.max(0, (map.food[c] as number) - 1);
+      const ndx = (this.x[i] as number) - nest.x;
+      const ndy = (this.y[i] as number) - nest.y;
+      const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
+      if (!carrying && mode !== FIGHT && takeFood(map, this.x[i] as number, this.y[i] as number)) {
         this.carrying[i] = 1;
         this.since[i] = 0;
         h += Math.PI;
@@ -448,7 +481,7 @@ export class Colony {
       } else this.since[i] = (this.since[i] as number) + dt;
       this.heading[i] = h;
     }
-    ph.step(dt, map.rock);
+    ph.advance(dt);
     // Growth: the larder turns into ants while there is room.
     while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
   }

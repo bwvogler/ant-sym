@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { avoid, climb, Colony, localPolicy, SITUATIONS, trailLevel, turnToward, type Situation } from "../colony.ts";
-import { generateWorld, mulberry32, type WorldMap } from "../world.ts";
+import { foodAt, generateWorld, mulberry32, setRock, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field: the nest on the left, one food cell straight east of it. */
 function corridor(food = 3): WorldMap {
@@ -9,7 +9,7 @@ function corridor(food = 3): WorldMap {
   const f = new Float32Array(size.w * size.h);
   f[6 * size.w + 14] = food;
   const nest = { x: 6, y: 6.5, r: 2 };
-  return { size, seed: 0, rock: new Uint8Array(size.w * size.h), food: f, nest, nests: [nest], foodTotal: food };
+  return worldFromArrays(size, [nest], { food: f });
 }
 
 const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
@@ -49,7 +49,8 @@ test("an ant walks to food it can see, picks it up, carries it home and puts it 
   }
   assert.ok(picked, "it picked the food up");
   assert.equal(c.stored, 1, "and brought it home");
-  assert.equal(map.food[6 * 40 + 14], 2, "one unit left the cell");
+  assert.equal(foodAt(map, 14, 6), 2, "one unit left the cell");
+  assert.equal(map.foodLeft, 2, "the map's running count agrees");
   assert.equal(c.carrying[0], 0);
 });
 
@@ -129,7 +130,7 @@ test("reconsider makes every ant ask again on its next tick", () => {
 
 test("paint lays trail in a disc, never on rock; alarm turns ants away", () => {
   const map = corridor(0);
-  map.rock[6 * 40 + 22] = 1;
+  setRock(map, 22, 6, 1);
   const c = new Colony(map, { antCount: 1, wander: 0, deposit: 0 }, mulberry32(6), () => "explore");
   c.paint("alarm", 20.5, 6.5, 2, 5);
   assert.equal(c.ph.read("alarm", 20.5, 6.5), 5);

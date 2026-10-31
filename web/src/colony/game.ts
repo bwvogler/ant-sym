@@ -1,4 +1,4 @@
-import { resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
+import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
 import type { WorldMap } from "./world.ts";
 
@@ -31,8 +31,8 @@ export class Game {
   time = 0;
   /** stance choices made by strategists */
   strategyChoices = 0;
-  #grids: Uint16Array[];
-  #enemy: Uint16Array[];
+  #grids: CountGrid[];
+  #enemy: CountGrid[];
   #nextStrategy = 0;
   #rng: () => number;
 
@@ -43,12 +43,11 @@ export class Game {
     const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
     this.colonies = [mine];
     if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1 }, rng));
-    const cells = map.size.w * map.size.h;
-    this.#grids = this.colonies.map(() => new Uint16Array(cells));
-    this.#enemy = this.colonies.map(() => new Uint16Array(cells));
+    this.#grids = this.colonies.map(() => new CountGrid());
+    this.#enemy = this.colonies.map(() => new CountGrid());
     this.colonies.forEach((c, k) => {
       if (this.colonies.length > 1) {
-        c.enemies = this.#enemy[k] as Uint16Array;
+        c.enemies = this.#enemy[k] as CountGrid;
         c.raidTarget = this.colonies[1 - k]!.nest;
       }
     });
@@ -63,28 +62,32 @@ export class Game {
     return this.colonies[1] ?? null;
   }
 
-  /** Occupancy per colony, and for each colony the sum of everyone else's. */
+  /** Occupancy per colony, and for each colony the sum of everyone else's: built from the ants, never by scanning the map. */
   #refresh(): void {
-    this.colonies.forEach((c, k) => occupancy(c, this.#grids[k] as Uint16Array));
-    this.colonies.forEach((_, k) => {
-      const e = this.#enemy[k] as Uint16Array;
-      e.fill(0);
-      this.#grids.forEach((g, j) => {
-        if (j === k) return;
-        for (let i = 0; i < e.length; i++) e[i] = (e[i] as number) + (g[i] as number);
-      });
+    this.colonies.forEach((c, k) => occupancy(c, this.#grids[k] as CountGrid));
+    for (const e of this.#enemy) e.reset();
+    const { w, h } = this.map.size;
+    this.colonies.forEach((c, j) => {
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i]) continue;
+        const cx = Math.min(w - 1, Math.max(0, Math.floor(c.x[i] as number)));
+        const cy = Math.min(h - 1, Math.max(0, Math.floor(c.y[i] as number)));
+        this.#enemy.forEach((e, k) => {
+          if (k !== j) e.add(cx, cy);
+        });
+      }
     });
   }
 
   /** Enemies within `nestWatch` cells of colony k's nest. */
   enemiesNearNest(k: number): number {
     const c = this.colonies[k] as Colony;
-    const e = this.#enemy[k] as Uint16Array;
+    const e = this.#enemy[k] as CountGrid;
     const { w, h } = this.map.size;
     const r = this.params.nestWatch;
     let s = 0;
     for (let y = Math.max(0, Math.floor(c.nest.y - r)); y <= Math.min(h - 1, Math.floor(c.nest.y + r)); y++)
-      for (let x = Math.max(0, Math.floor(c.nest.x - r)); x <= Math.min(w - 1, Math.floor(c.nest.x + r)); x++) s += e[y * w + x] as number;
+      for (let x = Math.max(0, Math.floor(c.nest.x - r)); x <= Math.min(w - 1, Math.floor(c.nest.x + r)); x++) s += e.get(x, y);
     return s;
   }
 
