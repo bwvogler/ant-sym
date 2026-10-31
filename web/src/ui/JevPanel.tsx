@@ -1,6 +1,7 @@
 import type { RunCaps } from "../../shared/jev.ts";
 import type { Schema } from "../sim/jevBrain.ts";
 import type { SchedulerState } from "./jevScheduler.ts";
+import { seg } from "./styles.ts";
 
 interface Props {
   state: SchedulerState;
@@ -154,9 +155,6 @@ export default function JevPanel(p: Props) {
   );
 }
 
-function seg(active: boolean): string {
-  return `px-3 py-1.5 ${active ? "bg-accent text-accent-ink" : "bg-panel text-fg-2 hover:bg-raised"} disabled:cursor-not-allowed disabled:opacity-60`;
-}
 
 function Cap({
   label,

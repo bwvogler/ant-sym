@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { Engine, EngineStats } from "../sim/engine.ts";
+import { seg } from "./styles.ts";
 import type { Controls } from "./useEngine.ts";
 
 interface Props {
@@ -135,11 +136,8 @@ function TargetPreview({ engine, version }: { engine: Engine; version: number })
   return <canvas ref={ref} className="mt-3 w-full rounded border border-line bg-paper [image-rendering:pixelated]" style={{ aspectRatio: `${engine.params.size.w} / ${engine.params.size.h}` }} aria-label="target preview" />;
 }
 
-function seg(active: boolean): string {
-  return `px-3 py-1.5 ${active ? "bg-accent text-accent-ink" : "bg-panel text-fg-2 hover:bg-raised"} disabled:cursor-not-allowed disabled:opacity-60`;
-}
 
-function Slider({ label, value, min, max, step, format, onChange, disabled = false }: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void; disabled?: boolean }) {
+export function Slider({ label, value, min, max, step, format, onChange, disabled = false }: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void; disabled?: boolean }) {
   return (
     <label className={`mt-3 block first:mt-0 ${disabled ? "opacity-60" : ""}`} title={disabled ? "Locked while Jev runs" : undefined}>
       <span className="flex justify-between text-sm text-fg-2">
@@ -151,7 +149,7 @@ function Slider({ label, value, min, max, step, format, onChange, disabled = fal
   );
 }
 
-function Bar({ value }: { value: number }) {
+export function Bar({ value }: { value: number }) {
   return (
     <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-raised">
       <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${Math.round(value * 100)}%` }} />
