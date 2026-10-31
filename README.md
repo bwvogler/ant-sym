@@ -45,8 +45,10 @@ spend and time caps from the real `usage.input_tokens` of every reply.
   comparison with a greedy gradient walk.
 - **Colony** (the *Colony* tab, `#colony`): a procedural world of rock, food and one
   nest that the ants forage on their own. They lay a trail to food and a trail home,
-  and switch between exploring, following and going home. No Jev yet, so it costs
-  nothing; it is the start of a Sim-Ant-style game (PRD §9).
+  and switch between exploring, following and going home. You are the fungus:
+  paint *lure* or *alarm* scent (free), and set the colony's *doctrine*. With
+  **Start Jev**, Jev picks each ant's mode, once per situation under that doctrine,
+  for about two cents an hour (PRD §9–10).
 
 ## How it talks to Jev
 

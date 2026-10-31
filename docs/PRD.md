@@ -258,3 +258,45 @@ Known limits, left for later MRs:
 - There is no fungus input yet (painting pheromone and retuning come in MR 3).
 - There are no rivals or fights (MR 4).
 - Food does not regrow, so a long run ends with the map picked clean.
+
+## 10. The fungus and Jev in the colony (MR 3, 2026-10-31)
+
+With Jev on, each ant's mode choice is **Jev's answer for its situation under the colony's doctrine**, asked once and cached. The player is the fungus.
+
+- **Brushes are free.**
+  - *Lure* paints food scent, so ants follow it.
+  - *Alarm* paints a new alarm channel. It fades in seconds, every mode steers away from it, and it is part of the situation, so a doctrine can make ants go home on it.
+- **Doctrine is the paid lever.** It is the player's words for how ants should behave: three presets, or custom text.
+  - The doctrine rides in the shared request state and in the cache context (`colonyBrain.policyContext`).
+  - A new doctrine re-asks only the situations the colony meets. One used before is free, because caches are kept per doctrine in memory and `localStorage`.
+  - The panel shows the retune estimate before you commit to it.
+
+**Situations.** A carrying ant always goes home. That is now a mechanic, never asked. The situation is mode × tired × food trail × home trail × alarm, so 3 × 2 × 3 × 3 × 3 = **162**. Each request carries one shared state (legend, doctrine, situations) and one 3-way `choice` per situation (`packModeRequest`). Situations don't depend on the map, so the cache carries over to new worlds.
+
+**Client** (`ui/colonyJev.ts`, the colony's `JevScheduler`).
+- The colony needs a mode at once, so the policy is synchronous. It returns the cached answer, or the local rule while the situation is queued.
+- The queue goes out every 300 ms: at most 100 situations per request, 2 requests in flight, each situation asked once.
+- Answers fill the cache and every ant reconsiders on its next tick.
+- It uses the same proxy, ledger and caps as the picture, with colony defaults of $0.10 and 30 min.
+- On 409 it stops and goes back to the local rule. On busy it requeues. On a failure it cools down for 5 cycles.
+
+**Cost, offline** (`npm run colony-cost`: 800 ants, 10 sim-minutes, 5 doctrines with the first one repeated last, alarm painted every ~20 s). The stand-in for Jev is the local rule; tokens are estimated from request size.
+
+| Doctrine | New situations | Requests | Tokens | Cost |
+|---|---|---|---|---|
+| Forage | 47 | 23 | ~16.2k | $0.0007 |
+| Cautious | 47 | 28 | ~18.2k | $0.0008 |
+| Scouts | 41 | 24 | ~15.8k | $0.0007 |
+| Custom | 32 | 13 | ~9.9k | $0.0004 |
+| Forage again | 6 | 4 | ~2.5k | $0.0001 |
+
+That is about 63k tokens, **≈ $0.016 per hour** retuning every 2 minutes, against the ≤ $0.25/h target. 443k mode choices were answered by 173 questions. Tokens per question (~360) are dominated by the legend and doctrine, because situations trickle in a few per request. A longer batching interval would cut that, but it is not needed at this spend.
+
+**Browser check** with Jev stubbed to answer like the local rule:
+- Forage asked 16 situations in the first 8 s.
+- Painting alarm added 8.
+- Cautious added 25.
+- Switching back to Forage added 4: situations Forage had never met.
+- 92 % of mode choices were served from the cache.
+
+**Still to measure live:** a colony run against `api.typesafe.ai` for real tokens per question, and whether Jev follows each doctrine (e.g. Cautious sends ants home on alarm).

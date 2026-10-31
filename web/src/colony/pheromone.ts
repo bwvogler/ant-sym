@@ -4,10 +4,11 @@ import type { WorldSize } from "./world.ts";
 // their sensors, evaporating and spreading every tick. This is the colony's
 // free coordination: no ant talks to another, they all read the ground.
 // Food trail: laid by ants carrying food home, so it leads to food. Home
-// trail: laid by ants walking out, so it leads home.
+// trail: laid by ants walking out, so it leads home. Alarm: painted by the
+// fungus (and, later, laid in fights); it fades fast and ants steer away.
 
-export type Channel = "food" | "home";
-export const CHANNELS: Channel[] = ["food", "home"];
+export type Channel = "food" | "home" | "alarm";
+export const CHANNELS: Channel[] = ["food", "home", "alarm"];
 
 export interface ChannelParams {
   /** share lost per second */
@@ -19,6 +20,7 @@ export interface ChannelParams {
 export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
   food: { evaporation: 0.06, diffusion: 0.3 },
   home: { evaporation: 0.02, diffusion: 0.3 },
+  alarm: { evaporation: 0.25, diffusion: 0.8 },
 };
 
 /** No cell holds more than this, so a crowded trail does not drown the gradient. */
@@ -34,7 +36,7 @@ export class Pheromones {
     this.size = size;
     this.params = params;
     const cells = size.w * size.h;
-    this.fields = { food: new Float32Array(cells), home: new Float32Array(cells) };
+    this.fields = { food: new Float32Array(cells), home: new Float32Array(cells), alarm: new Float32Array(cells) };
     this.#scratch = new Float32Array(cells);
   }
 

@@ -56,7 +56,7 @@ test("Pheromones: deposit and read, capped; evaporation takes its share; nothing
   const size = { w: 5, h: 5 };
   const rock = new Uint8Array(25);
   rock[2 * 5 + 3] = 1; // east of the centre
-  const ph = new Pheromones(size, { food: { evaporation: 0.5, diffusion: 0 }, home: { evaporation: 0, diffusion: 1 } });
+  const ph = new Pheromones(size, { food: { evaporation: 0.5, diffusion: 0 }, home: { evaporation: 0, diffusion: 1 }, alarm: { evaporation: 0, diffusion: 0 } });
   ph.deposit("food", 2.5, 2.5, 10);
   assert.equal(ph.read("food", 2.2, 2.9), 10);
   assert.equal(ph.read("food", -1, 0), -1, "off the map reads as worse than bare ground");

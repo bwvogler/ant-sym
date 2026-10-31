@@ -171,12 +171,12 @@ export function hash(text: string): string {
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
-/** Situation key → Jev's answer, for one policy context (schema, legend, questions). */
-export class PolicyCache {
+/** Situation key → Jev's answer, for one policy context (schema, legend, questions). The colony brain stores modes in it too. */
+export class PolicyCache<T = CachedAnswer> {
   readonly context: string;
-  #map = new Map<string, CachedAnswer>();
+  #map = new Map<string, T>();
 
-  constructor(context: string, entries: [string, CachedAnswer][] = []) {
+  constructor(context: string, entries: [string, T][] = []) {
     this.context = context;
     for (const [k, v] of entries) this.#map.set(k, v);
   }
@@ -185,11 +185,11 @@ export class PolicyCache {
     return this.#map.size;
   }
 
-  get(key: string): CachedAnswer | undefined {
+  get(key: string): T | undefined {
     return this.#map.get(key);
   }
 
-  put(key: string, answer: CachedAnswer): void {
+  put(key: string, answer: T): void {
     this.#map.set(key, answer);
   }
 
@@ -197,7 +197,7 @@ export class PolicyCache {
     this.#map.clear();
   }
 
-  entries(): [string, CachedAnswer][] {
+  entries(): [string, T][] {
     return [...this.#map.entries()];
   }
 }
