@@ -2,14 +2,42 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RunCaps } from "../../shared/jev.ts";
 import { DEFAULT_CAPS } from "../../shared/jev.ts";
 import type { Engine } from "../sim/engine.ts";
-import type { Schema } from "../sim/jevBrain.ts";
+import { POLICY_CONTEXT, type Schema } from "../sim/jevBrain.ts";
+import { PolicyCache, type CachedAnswer } from "../sim/policyCache.ts";
 import { JevScheduler, type SchedulerState } from "./jevScheduler.ts";
 
 // React face of the scheduler: one instance per engine, its state mirrored
-// into React, caps and schema editable, and the "formed → stop" rule.
+// into React, caps and schema editable, and the "formed → stop" rule. The
+// situation cache is kept in localStorage under its policy context, so a
+// reload does not pay again for situations already asked.
+
+const CACHE_STORE = `jev-ants:policy-cache:${POLICY_CONTEXT}`;
+
+function loadCache(): PolicyCache {
+  try {
+    const raw = localStorage.getItem(CACHE_STORE);
+    const entries = raw ? (JSON.parse(raw) as unknown) : [];
+    if (Array.isArray(entries)) {
+      const ok = entries.filter((e): e is [string, CachedAnswer] => Array.isArray(e) && typeof e[0] === "string" && typeof e[1]?.choice === "string" && typeof e[1]?.pSettle === "number" && typeof e[1]?.probabilities === "object");
+      return new PolicyCache(POLICY_CONTEXT, ok);
+    }
+  } catch {
+    // storage blocked or unreadable: start cold
+  }
+  return new PolicyCache(POLICY_CONTEXT);
+}
+
+function saveCache(cache: PolicyCache): void {
+  try {
+    if (cache.size === 0) localStorage.removeItem(CACHE_STORE);
+    else localStorage.setItem(CACHE_STORE, JSON.stringify(cache.entries()));
+  } catch {
+    // storage blocked or full: the cache still lives for this page load
+  }
+}
 
 export function useJev(engine: Engine, formed: boolean, targetVersion: number, blank: boolean) {
-  const scheduler = useMemo(() => new JevScheduler(engine), [engine]);
+  const scheduler = useMemo(() => new JevScheduler(engine, {}, loadCache()), [engine]);
   const [state, setState] = useState<SchedulerState>(scheduler.state);
   const [caps, setCaps] = useState<RunCaps>(DEFAULT_CAPS);
   const [schema, setSchemaState] = useState<Schema>("compass");
@@ -30,6 +58,12 @@ export function useJev(engine: Engine, formed: boolean, targetVersion: number, b
       scheduler.dispose();
     };
   }, [scheduler]);
+
+  // Persist the cache whenever a run is not going (a run's end, a cleared cache).
+  useEffect(() => {
+    if (state.phase !== "running") saveCache(scheduler.cache);
+  }, [state.phase, state.cache.situations, scheduler]);
+  const clearCache = useCallback(() => scheduler.clearCache(), [scheduler]);
 
   const start = useCallback(() => void scheduler.start(caps), [scheduler, caps]);
   const stop = useCallback(() => void scheduler.stop("user"), [scheduler]);
@@ -57,5 +91,5 @@ export function useJev(engine: Engine, formed: boolean, targetVersion: number, b
   // The target changed since the run ended: Start is a morph from the old shape.
   const morphPending = state.phase === "stopped" && targetVersion !== state.stoppedOnTarget;
 
-  return { state, caps, setCaps, schema, setSchema, start, stop, stopOnFormed, setStopOnFormed, overseer, setOverseer, morphPending, blankStopped };
+  return { state, caps, setCaps, schema, setSchema, start, stop, stopOnFormed, setStopOnFormed, overseer, setOverseer, morphPending, blankStopped, clearCache };
 }

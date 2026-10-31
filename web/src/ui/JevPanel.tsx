@@ -12,6 +12,7 @@ interface Props {
   setStopOnFormed: (v: boolean) => void;
   overseer: boolean;
   setOverseer: (v: boolean) => void;
+  clearCache: () => void;
 }
 
 export default function JevPanel(p: Props) {
@@ -27,9 +28,9 @@ export default function JevPanel(p: Props) {
         </span>
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-sm text-fg-2">Brain schema</span>
-        <div className="flex overflow-hidden rounded-md border border-line text-sm">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="whitespace-nowrap text-sm text-fg-2">Brain schema</span>
+        <div className="flex shrink-0 overflow-hidden rounded-md border border-line text-sm">
           <button
             type="button"
             className={seg(p.schema === "nouls")}
@@ -48,8 +49,34 @@ export default function JevPanel(p: Props) {
           >
             compass
           </button>
+          <button
+            type="button"
+            className={seg(p.schema === "cached")}
+            onClick={() => p.setSchema("cached")}
+            title="The compass questions, asked once per situation (neighbour wants, room, far, attractor; turned and mirrored copies share one) and reused: a cached situation costs nothing"
+            disabled={running}
+          >
+            cached
+          </button>
         </div>
       </div>
+      {p.schema === "cached" && (
+        <div className="mt-2 flex items-center justify-between font-mono text-xs text-fg-3">
+          <span>
+            {p.state.cache.situations.toLocaleString()} situations cached · this run {p.state.cache.asked.toLocaleString()} asked ·{" "}
+            {p.state.cache.hits.toLocaleString()} hits
+          </span>
+          <button
+            type="button"
+            className="rounded border border-line px-2 py-0.5 text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={p.clearCache}
+            disabled={running || p.state.cache.situations === 0}
+            title="Forget every cached answer, so the next run starts cold"
+          >
+            forget
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Cap
@@ -113,6 +140,7 @@ export default function JevPanel(p: Props) {
             {JSON.stringify(
               {
                 state: p.state.sample.state,
+                situation: p.state.sample.situation,
                 answers: p.state.sample.answers,
                 decision: p.state.sample.decision,
               },

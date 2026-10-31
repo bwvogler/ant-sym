@@ -1,6 +1,7 @@
-import type { JevProxyReply, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
+import type { JevProxyReply, JevRequest, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
 import type { Engine } from "../sim/engine.ts";
-import { antState, applyDecision, calibration, packRequest, readDecision, type AntState, type Neutral, type Schema } from "../sim/jevBrain.ts";
+import { antState, applyDecision, calibration, packRequest, POLICY_CONTEXT, readDecision, type AntState, type Neutral, type Schema } from "../sim/jevBrain.ts";
+import { answersFor, canonicalState, PolicyCache, readSituation, situationKey, type CachedAnswer, type Transform } from "../sim/policyCache.ts";
 import { boxArea, boxCentre, boxInkShare, buildOverseerRequest, readOverseer, type Box } from "../sim/overseer.ts";
 import { overseerImages } from "./overseerImages.ts";
 import type { JevAnswer } from "../../shared/jev.ts";
@@ -13,6 +14,15 @@ import type { JevAnswer } from "../../shared/jev.ts";
 // becomes decisions; a failed call hands those ants to the local rule once.
 // A 409 from the server means a cap fired (or the run was stopped): the
 // scheduler goes idle and releases every ant to the local rule.
+//
+// Schema "cached" asks per situation instead of per ant: a due ant whose
+// situation is in the cache decides from the cached answer without a call;
+// the rest park on their situation, each new situation is asked once however
+// many ants wait on it, and the reply fills the cache and decides for every
+// ant parked there. Hits keep the minimum age: the coast between decisions is
+// part of how the brain moves ants (deciding every cycle instead, ants at a
+// peak of the far field turned on the spot and the picture stalled at 70 %,
+// scripts/situations.mjs).
 
 export interface SchedulerOptions {
   schema: Schema;
@@ -50,6 +60,19 @@ export interface Sample {
   state: AntState;
   answers: Record<string, JevAnswer>;
   decision: { heading: string | null; settle: boolean; strength: number; pSettle: number } | null;
+  /** the cached schema: the situation key the answer was asked (or cached) under */
+  situation?: string;
+}
+
+/** The cached schema's counters for this run; `situations` is the cache's size across runs. */
+export interface CacheStats {
+  /** ant decisions read from the cache, no call */
+  hits: number;
+  /** ant decisions that waited on a call for their situation */
+  waited: number;
+  /** situations sent to Jev */
+  asked: number;
+  situations: number;
 }
 
 export interface SchedulerState {
@@ -70,9 +93,13 @@ export interface SchedulerState {
   /** client-side running total across runs this page-load, dollars */
   sessionUsd: number;
   sessionTokens: number;
+  cache: CacheStats;
 }
 
 type Listener = (s: SchedulerState) => void;
+
+/** How one call to the proxy ended. */
+type PostResult = { kind: "halted" } | { kind: "aborted" } | { kind: "busy" } | { kind: "failed"; error: string; run: RunSummary | null } | { kind: "ok"; answers: Record<string, JevAnswer>; run: RunSummary };
 
 export class JevScheduler {
   #engine: Engine;
@@ -87,13 +114,26 @@ export class JevScheduler {
   #runSeq = 0;
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
-  #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, stoppedFor: null, sessionUsd: 0, sessionTokens: 0 };
+  #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, stoppedFor: null, sessionUsd: 0, sessionTokens: 0, cache: { hits: 0, waited: 0, asked: 0, situations: 0 } };
   #startedAt = 0;
+  /** situation → Jev's answer; kept across runs (and, through useJev, across page loads) */
+  readonly cache: PolicyCache;
+  /** situations with a call in flight, and the ants parked on each */
+  #asking = new Set<string>();
+  #waiting = new Map<string, { i: number; state: AntState; transform: Transform }[]>();
 
-  constructor(engine: Engine, opts: Partial<SchedulerOptions> = {}) {
+  constructor(engine: Engine, opts: Partial<SchedulerOptions> = {}, cache: PolicyCache = new PolicyCache(POLICY_CONTEXT)) {
     this.#engine = engine;
     this.opts = { ...DEFAULT_SCHEDULER, ...opts };
     this.#pending = new Uint8Array(engine.world.n);
+    this.cache = cache;
+    this.#state.cache.situations = cache.size;
+  }
+
+  /** Forget every cached answer, so the next run is a cold one. */
+  clearCache(): void {
+    this.cache.clear();
+    this.#set({ cache: { ...this.#state.cache, situations: 0 } });
   }
 
   get state(): SchedulerState {
@@ -134,13 +174,15 @@ export class JevScheduler {
     this.#aborter = new AbortController();
     this.#resizePending();
     this.#pending.fill(0);
+    this.#asking.clear();
+    this.#waiting.clear();
     // A picture that is already half there (the local rule, or a previous run)
     // leaves Jev nothing to do: scatter so the run is a formation from scratch.
     if (this.#engine.coverage > 0.5) this.#engine.scatter();
     this.#engine.jevOwned.fill(1);
     this.#engine.params.brain = "jev";
     this.#startedAt = performance.now();
-    this.#set({ phase: "running", run, lastError: null, requestsSent: 0, failures: 0, overseer: null, stoppedFor: null });
+    this.#set({ phase: "running", run, lastError: null, requestsSent: 0, failures: 0, overseer: null, stoppedFor: null, cache: { hits: 0, waited: 0, asked: 0, situations: this.cache.size } });
     this.#engine.attractor = null;
     if (this.#timer === null) this.#timer = setInterval(() => void this.#cycle(), this.opts.intervalMs);
     if (this.#overseerTimer === null) this.#overseerTimer = setInterval(() => void this.#oversee(), this.opts.overseerMs);
@@ -206,6 +248,8 @@ export class JevScheduler {
         this.#engine.world.commit[i] = 0;
       }
     }
+    this.#asking.clear();
+    this.#waiting.clear();
     this.#set({ pending: 0 });
   }
 
@@ -272,6 +316,7 @@ export class JevScheduler {
     this.#resizePending();
     const e = this.#engine;
     if (e.params.brain !== "jev") return;
+    if (this.opts.schema === "cached") return this.#cycleCached();
     const minAge = this.opts.minAgeSeconds;
     const free = this.opts.inFlight - this.#inFlight;
     if (free <= 0) return;
@@ -284,6 +329,47 @@ export class JevScheduler {
     }
   }
 
+  /** One POST to the proxy, with the outcomes every caller shares: a 409 halts the scheduler here; the caller releases or decides for its ants. */
+  async #post(payload: JevRequest): Promise<PostResult> {
+    this.#inFlight++;
+    let reply: JevProxyReply | null = null;
+    let error: string | null = null;
+    try {
+      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: this.#aborter.signal });
+      const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
+      if (res.status === 409) {
+        // A cap fired or the run was stopped elsewhere.
+        const run = (body as { run?: RunSummary }).run ?? null;
+        this.#halt();
+        if (run) this.#absorb(run);
+        this.#set({ phase: "stopped", run, lastError: null });
+        return { kind: "halted" };
+      }
+      if (res.status === 429 && (body as { error?: string }).error === "busy") {
+        // The server's pool is full or the cap has no room for another worst-case
+        // call right now: the caller releases its ants to be picked up next cycle, no fallback.
+        const run = (body as { run?: RunSummary }).run;
+        if (run) this.#absorb(run);
+        this.#set({ run: run ?? this.#state.run });
+        return { kind: "busy" };
+      }
+      if (!res.ok) error = (body as { error: string }).error ?? `HTTP ${res.status}`;
+      else reply = body as JevProxyReply;
+    } catch (err) {
+      // Stop cut this call on our side; halt() already released its ants.
+      if (isAbort(err)) return { kind: "aborted" };
+      error = String(err);
+    } finally {
+      this.#inFlight--;
+    }
+    if (!reply || reply.status !== 200 || !reply.body || !("answers" in reply.body)) {
+      const msg = error ?? `jev answered ${reply?.status ?? "?"}: ${JSON.stringify(reply?.body ?? "").slice(0, 120)}`;
+      this.#set({ failures: this.#state.failures + 1, lastError: msg, run: reply?.run ?? this.#state.run });
+      return { kind: "failed", error: msg, run: reply?.run ?? null };
+    }
+    return { kind: "ok", answers: (reply.body as JevResponse).answers, run: reply.run };
+  }
+
   async #send(indices: number[]): Promise<void> {
     const e = this.#engine;
     const ants = indices.map((i) => ({ id: `a${i}`, state: antState(e, i) }));
@@ -291,58 +377,27 @@ export class JevScheduler {
       this.#pending[i] = 1;
       e.world.commit[i] = 1e9; // keep walking, do not get picked again
     }
-    this.#inFlight++;
     this.#set({ pending: this.#state.pending + indices.length, requestsSent: this.#state.requestsSent + 1 });
-    let reply: JevProxyReply | null = null;
-    let error: string | null = null;
-    try {
-      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(packRequest(ants, this.opts.schema)), signal: this.#aborter.signal });
-      const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
-      if (res.status === 409) {
-        // A cap fired or the run was stopped elsewhere.
-        const run = (body as { run?: RunSummary }).run ?? null;
-        this.#inFlight--;
-        this.#halt();
-        if (run) this.#absorb(run);
-        this.#set({ phase: "stopped", run, lastError: null });
-        return;
-      }
-      if (res.status === 429 && (body as { error?: string }).error === "busy") {
-        // The server's pool is full or the cap has no room for another worst-case
-        // call right now: release these ants to be picked up next cycle, no fallback.
-        this.#inFlight--;
-        for (const i of indices) {
-          if (this.#pending[i]) {
-            this.#pending[i] = 0;
-            e.world.commit[i] = 0;
-          }
+    const r = await this.#post(packRequest(ants, this.opts.schema));
+    if (r.kind === "halted" || r.kind === "aborted") return;
+    if (r.kind === "busy") {
+      for (const i of indices) {
+        if (this.#pending[i]) {
+          this.#pending[i] = 0;
+          e.world.commit[i] = 0;
         }
-        const run = (body as { run?: RunSummary }).run;
-        if (run) this.#absorb(run);
-        this.#set({ pending: Math.max(0, this.#state.pending - indices.length), run: run ?? this.#state.run });
-        return;
       }
-      if (!res.ok) error = (body as { error: string }).error ?? `HTTP ${res.status}`;
-      else reply = body as JevProxyReply;
-    } catch (err) {
-      if (isAbort(err)) {
-        // Stop cut this call on our side; halt() already released its ants.
-        this.#inFlight--;
-        return;
-      }
-      error = String(err);
+      this.#set({ pending: Math.max(0, this.#state.pending - indices.length) });
+      return;
     }
-    this.#inFlight--;
     const stillPending = indices.filter((i) => this.#pending[i]);
     for (const i of stillPending) this.#pending[i] = 0;
     this.#set({ pending: Math.max(0, this.#state.pending - indices.length) });
-    if (!reply || reply.status !== 200 || !reply.body || !("answers" in reply.body)) {
-      const msg = error ?? `jev answered ${reply?.status ?? "?"}: ${JSON.stringify(reply?.body ?? "").slice(0, 120)}`;
+    if (r.kind === "failed") {
       for (const i of stillPending) e.decideLocally(i);
-      this.#set({ failures: this.#state.failures + 1, lastError: msg, run: reply?.run ?? this.#state.run });
       return;
     }
-    const answers = (reply.body as JevResponse).answers;
+    const answers = r.answers;
     const neutral = calibration(answers);
     let sample: Sample | null = null;
     try {
@@ -364,12 +419,120 @@ export class JevScheduler {
     } catch (err) {
       // A bad answer must not strand the rest of the batch at commit 1e9; the reply was still billed.
       for (const i of stillPending) if ((e.world.commit[i] as number) >= 1e9) e.decideLocally(i);
-      this.#absorb(reply.run);
-      this.#set({ failures: this.#state.failures + 1, lastError: `reading answers: ${String(err)}`, run: reply.run });
+      this.#absorb(r.run);
+      this.#set({ failures: this.#state.failures + 1, lastError: `reading answers: ${String(err)}`, run: r.run });
       return;
     }
-    this.#absorb(reply.run);
-    this.#set({ run: reply.run, sample: sample ?? this.#state.sample, neutral, lastError: null });
+    this.#absorb(r.run);
+    this.#set({ run: r.run, sample: sample ?? this.#state.sample, neutral, lastError: null });
+  }
+
+  /** The cached schema's cycle: hits decide now; misses park on their situation, and each new situation is asked once. */
+  #cycleCached(): void {
+    const e = this.#engine;
+    const minAge = this.opts.minAgeSeconds;
+    // How many new situations this cycle can send: the free connections' worth of batches.
+    const room = Math.max(0, this.opts.inFlight - this.#inFlight) * this.opts.batch;
+    const ask: string[] = [];
+    const asking = new Set<string>();
+    let hits = 0;
+    let parked = 0;
+    let sample: Sample | null = null;
+    for (const i of e.dueAnts()) {
+      if (this.#pending[i] || e.time - (e.world.decidedAt[i] as number) < minAge) continue;
+      const state = antState(e, i);
+      const { key, transform } = situationKey(state);
+      const cached = this.cache.get(key);
+      if (cached) {
+        const s = this.#applyCached(i, state, key, transform, cached);
+        sample ??= s;
+        hits++;
+        continue;
+      }
+      if (!this.#asking.has(key) && !asking.has(key)) {
+        if (asking.size >= room) continue; // no connection free for it this cycle: the ant is picked up next cycle
+        asking.add(key);
+        ask.push(key);
+      }
+      const list = this.#waiting.get(key) ?? [];
+      list.push({ i, state, transform });
+      this.#waiting.set(key, list);
+      this.#pending[i] = 1;
+      e.world.commit[i] = 1e9; // keep walking, do not get picked again
+      parked++;
+    }
+    if (hits > 0 || parked > 0) this.#set({ pending: this.#state.pending + parked, cache: { ...this.#state.cache, hits: this.#state.cache.hits + hits }, sample: sample ?? this.#state.sample });
+    for (let b = 0; b < ask.length; b += this.opts.batch) void this.#ask(ask.slice(b, b + this.opts.batch));
+  }
+
+  /** Decide for ant i from a cached answer, turned back into its frame. A cached answer that cannot be read hands the ant to the local rule. */
+  #applyCached(i: number, state: AntState, key: string, transform: Transform, cached: CachedAnswer): Sample | null {
+    const e = this.#engine;
+    const id = `a${i}`;
+    const answers = answersFor(id, cached, transform);
+    let d: ReturnType<typeof readDecision> = null;
+    try {
+      d = readDecision(answers, id, "cached", { sample: this.opts.sample });
+    } catch {
+      d = null;
+    }
+    if (!d) {
+      e.decideLocally(i);
+      return null;
+    }
+    applyDecision(e, i, d, state);
+    return { id, state, answers, situation: key, decision: { heading: d.heading === null ? null : compassOf(d.heading), settle: d.settle, strength: d.strength, pSettle: d.pSettle } };
+  }
+
+  /** Ask Jev about new situations, one dir + settle pair each, and decide for every ant parked on them. */
+  async #ask(keys: string[]): Promise<void> {
+    const e = this.#engine;
+    const seq = this.#runSeq;
+    for (const k of keys) this.#asking.add(k);
+    this.#set({ requestsSent: this.#state.requestsSent + 1, cache: { ...this.#state.cache, asked: this.#state.cache.asked + keys.length } });
+    const situations = keys.map((key, n) => ({ id: `s${n}`, key }));
+    const r = await this.#post(packRequest(situations.map((s) => ({ id: s.id, state: canonicalState(s.key) })), "cached"));
+    // A billed answer is worth keeping whichever run it lands in.
+    if (r.kind === "ok") {
+      for (const s of situations) {
+        const a = readSituation(r.answers, s.id);
+        if (a) this.cache.put(s.key, a);
+      }
+    }
+    // Halted, or stopped and started again since: halt() released these ants and start() cleared the parking.
+    if (r.kind === "halted" || r.kind === "aborted" || seq !== this.#runSeq) return;
+    const waiting = keys.flatMap((k) => {
+      const list = this.#waiting.get(k) ?? [];
+      this.#waiting.delete(k);
+      this.#asking.delete(k);
+      return list;
+    });
+    const still = waiting.filter((w) => this.#pending[w.i]);
+    for (const w of still) this.#pending[w.i] = 0;
+    const pending = Math.max(0, this.#state.pending - waiting.length);
+    if (r.kind === "busy") {
+      for (const w of still) e.world.commit[w.i] = 0;
+      this.#set({ pending, cache: { ...this.#state.cache, asked: this.#state.cache.asked - keys.length } });
+      return;
+    }
+    if (r.kind === "failed") {
+      for (const w of still) e.decideLocally(w.i);
+      this.#set({ pending });
+      return;
+    }
+    let sample: Sample | null = null;
+    for (const w of still) {
+      const { key } = situationKey(w.state);
+      const cached = this.cache.get(key);
+      if (!cached) {
+        e.decideLocally(w.i); // this situation's answer was missing or malformed
+        continue;
+      }
+      const s = this.#applyCached(w.i, w.state, key, w.transform, cached);
+      sample ??= s;
+    }
+    this.#absorb(r.run);
+    this.#set({ pending, run: r.run, sample: sample ?? this.#state.sample, lastError: null, cache: { ...this.#state.cache, waited: this.#state.cache.waited + still.length, situations: this.cache.size } });
   }
 }
 
