@@ -2,7 +2,9 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { Engine } from "../../sim/engine.ts";
 import { JevScheduler, type SchedulerOptions } from "../jevScheduler.ts";
-import type { RunSummary } from "../../../shared/jev.ts";
+import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
+import { antState, POLICY_CONTEXT } from "../../sim/jevBrain.ts";
+import { PolicyCache, situationKey } from "../../sim/policyCache.ts";
 
 // The scheduler against a scripted fetch: no server, no key. Each case is a
 // path that must release the ants it parked at commit 1e9 (PR #3 review:
@@ -44,8 +46,8 @@ const tick = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // A failed assertion must not skip dispose(): live intervals would keep the
 // test process alive. Every scheduler registers here and is disposed after each test.
 const live = new Set<JevScheduler>();
-function make(e: Engine, opts: Partial<SchedulerOptions>): JevScheduler {
-  const s = new JevScheduler(e, opts);
+function make(e: Engine, opts: Partial<SchedulerOptions>, cache?: PolicyCache): JevScheduler {
+  const s = new JevScheduler(e, opts, cache);
   live.add(s);
   return s;
 }
@@ -223,3 +225,127 @@ test("the session line is the server's cross-run total and never goes backwards 
   s.dispose();
 });
 
+
+// The cached schema: situations, not ants, go to Jev.
+
+/** A proxy reply answering every situation in the request: go north, do not settle. Records each request's situation states. */
+function situationReplies(sent: string[][]) {
+  return async (_signal: AbortSignal | undefined, body?: string) => {
+    const req = JSON.parse(String(body)) as JevRequest & { state: { ants: Record<string, unknown> } };
+    sent.push(Object.values(req.state.ants).map((a) => JSON.stringify(a)));
+    const answers: Record<string, unknown> = {};
+    for (const id of Object.keys(req.state.ants)) {
+      answers[`${id}_dir`] = { type: "choice", choice: "N", confidence: 0.9, probabilities: { N: 0.9, stay: 0.1 } };
+      answers[`${id}_settle`] = { type: "noul", noul: 0.1 };
+    }
+    return { status: 200, body: { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN } };
+  };
+}
+
+/** scriptFetch, with the request body passed to the script. */
+function scriptFetchBody(jev: (signal: AbortSignal | undefined, body?: string) => Promise<{ status: number; body: unknown }>) {
+  const calls: string[] = [];
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    const path = String(url);
+    calls.push(path);
+    let r: { status: number; body: unknown };
+    if (path.startsWith("/api/run")) r = { status: 200, body: RUN };
+    else r = await jev(init?.signal ?? undefined, init?.body ? String(init.body) : undefined);
+    return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body } as Response;
+  }) as typeof fetch;
+  return calls;
+}
+
+test("cached: each situation is asked once however many ants share it, and the reply decides for all of them", async () => {
+  const e = world(40);
+  const sent: string[][] = [];
+  scriptFetchBody(situationReplies(sent));
+  const s = make(e, { schema: "cached", intervalMs: 10, minAgeSeconds: 0, batch: 100, inFlight: 2, overseer: false });
+  await s.start({});
+  await tick(60);
+  const st = s.state;
+  s.dispose();
+  const all = sent.flat();
+  assert.ok(all.length > 0);
+  assert.equal(new Set(all).size, all.length, "no situation was asked twice");
+  const keys = new Set(Array.from({ length: e.world.n }, (_, i) => situationKey(antState(e, i)).key));
+  assert.ok(all.length < e.world.n, `fewer situations (${all.length}) than ants (${e.world.n})`);
+  assert.equal(parked(e), 0, "every parked ant was decided");
+  assert.equal(st.pending, 0);
+  assert.equal(st.cache.waited, e.world.n);
+  assert.equal(st.cache.asked, all.length);
+  assert.equal(s.cache.size, all.length);
+  assert.equal(all.length, keys.size, "one question per distinct situation the ants stood in");
+  assert.ok(st.sample?.situation, "the live sample names its situation");
+});
+
+test("cached: ants in situations already in the cache decide without a call", async () => {
+  const e = world(40);
+  const cache = new PolicyCache(POLICY_CONTEXT);
+  for (let i = 0; i < e.world.n; i++) cache.put(situationKey(antState(e, i)).key, { choice: "N", confidence: 0.9, probabilities: { N: 0.9, stay: 0.1 }, pSettle: 0.1 });
+  const calls = scriptFetch({ status: 500, body: { error: "should not be called" } });
+  const s = make(e, { schema: "cached", intervalMs: 10, minAgeSeconds: 0, batch: 100, inFlight: 2, overseer: false }, cache);
+  await s.start({});
+  await tick(40);
+  const st = s.state;
+  s.dispose();
+  assert.equal(calls.filter((c) => c === "/api/jev").length, 0);
+  assert.equal(st.cache.hits, e.world.n);
+  assert.equal(st.cache.asked, 0);
+  assert.equal(e.decisions.jev + e.decisions.local, e.world.n);
+  assert.equal(parked(e), 0);
+});
+
+test("cached: a hit keeps the minimum age, like a call (the coast between decisions is part of the policy)", async () => {
+  const e = world(20);
+  const cache = new PolicyCache(POLICY_CONTEXT);
+  for (let i = 0; i < e.world.n; i++) cache.put(situationKey(antState(e, i)).key, { choice: "N", confidence: 0.9, probabilities: { N: 0.9 }, pSettle: 0.1 });
+  e.world.decidedAt.fill(e.time); // everyone just decided
+  const calls = scriptFetch({ status: 500, body: { error: "should not be called" } });
+  const s = make(e, { schema: "cached", intervalMs: 10, minAgeSeconds: 5, batch: 100, inFlight: 2, overseer: false }, cache);
+  await s.start({});
+  await tick(40);
+  const st = s.state;
+  s.dispose();
+  assert.equal(st.cache.hits, 0);
+  assert.equal(calls.filter((c) => c === "/api/jev").length, 0);
+});
+
+test("cached: busy releases the ants parked on its situations and un-counts them; a failed call hands them to the local rule", async () => {
+  const e = world(30);
+  scriptFetch({ status: 429, body: { error: "busy", run: RUN } });
+  const s = make(e, { schema: "cached", intervalMs: 10, minAgeSeconds: 0, batch: 100, inFlight: 1, overseer: false });
+  await s.start({});
+  await tick(50);
+  const st = s.state;
+  s.dispose();
+  assert.equal(st.phase, "running");
+  assert.equal(st.failures, 0);
+  assert.equal(st.cache.asked, 0, "nothing was answered");
+  assert.equal(s.cache.size, 0);
+
+  const e2 = world(30);
+  scriptFetch({ status: 502, body: { error: "upstream" } });
+  const s2 = make(e2, { schema: "cached", intervalMs: 10, minAgeSeconds: 0, batch: 100, inFlight: 1, overseer: false });
+  await s2.start({});
+  await tick(30);
+  const st2 = s2.state;
+  s2.dispose();
+  assert.ok(st2.failures >= 1);
+  assert.equal(parked(e2), 0, "no ant left at commit 1e9");
+  assert.ok(e2.decisions.local > 0);
+});
+
+test("cached: a 409 halts and releases every parked ant", async () => {
+  const e = world(30);
+  const stopped = { ...RUN, running: false, stopReason: "spend-cap" as const };
+  scriptFetch({ status: 409, body: { error: "spend-cap", run: stopped } });
+  const s = make(e, { schema: "cached", intervalMs: 10, minAgeSeconds: 0, batch: 100, inFlight: 2, overseer: false });
+  await s.start({});
+  await tick(40);
+  const st = s.state;
+  s.dispose();
+  assert.equal(st.phase, "stopped");
+  assert.equal(st.pending, 0);
+  assert.equal(parked(e), 0);
+});

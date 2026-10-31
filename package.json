@@ -9,6 +9,8 @@
     "test": "npm --prefix web test",
     "lint": "npm --prefix web run lint",
     "typecheck": "npm --prefix web exec tsc -- -b",
-    "probe": "node scripts/probe.mjs"
+    "probe": "node scripts/probe.mjs",
+    "situations": "node scripts/situations.mjs",
+    "cacheprobe": "node scripts/cacheprobe.mjs"
   }
 }

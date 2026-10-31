@@ -54,6 +54,13 @@ trip (~300 ms). Six requests run in parallel, which is the browser's connection
 limit per host. Details, the schema bake-off and the measured token budget are in
 [docs/PRD.md](docs/PRD.md).
 
+The **cached** brain (Jev settings → Brain schema) asks those same questions once per
+*situation* instead of once per ant decision. A situation is which neighbours want
+ants, whether the ant's cell has room, and where the far field points, with turned
+and mirrored copies counted as one. Every later ant in a known situation reuses the
+answer without a call. Offline, it asks 11–34× fewer tokens per formation
+(`npm run situations`, PRD §8.6). `npm run cacheprobe` checks it against the live API.
+
 | | per ant | per 1,000-ant formation |
 |---|---|---|
 | State | ~45 tokens | |

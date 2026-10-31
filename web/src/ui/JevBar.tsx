@@ -15,6 +15,8 @@ interface Props {
   blankStopped: boolean;
   activeAnts: number;
   jevDecisions: number;
+  /** the cached schema is on: show the share of decisions read from the cache */
+  cached: boolean;
 }
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
@@ -118,6 +120,12 @@ export default function JevBar(p: Props) {
         {run && run.aborted > 0 && <Stat label="cut off · cost unknown" value={String(run.aborted)} />}
         <Stat label="active ants" value={String(p.activeAnts)} />
         <Stat label="jev decisions" value={p.jevDecisions.toLocaleString()} />
+        {p.cached && (
+          <Stat
+            label="from cache"
+            value={p.state.cache.hits + p.state.cache.waited > 0 ? `${Math.round((100 * p.state.cache.hits) / (p.state.cache.hits + p.state.cache.waited))}%` : "—"}
+          />
+        )}
         <Stat label="session" value={usd(p.state.sessionUsd)} />
 
         <span

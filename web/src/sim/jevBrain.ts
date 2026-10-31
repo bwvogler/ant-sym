@@ -2,6 +2,7 @@ import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { compass, decide, headingOf } from "./ants.ts";
 import type { Engine } from "./engine.ts";
 import { neighbourhood3x3 } from "./grid.ts";
+import { hash, SITUATION_VERSION, type SituationState } from "./policyCache.ts";
 
 // The Jev brain, pure: builds the packed request for a batch of ants and reads
 // the answers back into decisions. Schema "compass" (the default, PRD §8.1b
@@ -9,8 +10,10 @@ import { neighbourhood3x3 } from "./grid.ts";
 // Schema "nouls": three yes/no questions per ant — north-vs-south,
 // east-vs-west, settle — read as a heading against a per-request neutral
 // point; cheaper (~178 tok/ant) and visibly worse, kept for the comparison.
+// Schema "cached": the compass questions, asked once per situation rather
+// than once per ant decision (policyCache.ts); a cached situation costs nothing.
 
-export type Schema = "nouls" | "compass";
+export type Schema = "nouls" | "compass" | "cached";
 
 export interface AntState {
   /** ants still needed in the 9 cells around the ant, NW..SE row-major, centre = own cell */
@@ -31,6 +34,10 @@ export interface AntState {
 
 export const LEGEND =
   "Each ant is one key in `ants`. room says whether the ant's own cell still has space for it: 0 or more means it may stay, negative means it is one too many and must move. deficit3x3 lists how many more ants each of the 9 cells around the ant still needs, row-major from north-west to south-east (NW N NE / W centre E / SW S SE); the centre is the ant's own cell; positive cells want ants, negative cells have too many. When no neighbouring cell wants ants, far is the direction where ants are wanted beyond view and attractor is where the overseer says the picture is emptiest: head that way. crowd is how many ants stand in those 9 cells. nearbyHeadings are the headings of ants next to this one.";
+
+/** The legend for situations: the same rules, without the per-ant fields a situation leaves out. */
+export const SITUATION_LEGEND =
+  "Each ant is one key in `ants`. room says whether the ant's own cell still has space for it: 0 or more means it may stay, negative means it is one too many and must move. deficit3x3 lists how many more ants each of the 9 cells around the ant still needs, row-major from north-west to south-east (NW N NE / W centre E / SW S SE); the centre is the ant's own cell; positive cells want ants, negative cells have too many. When no neighbouring cell wants ants, far is the direction where ants are wanted beyond view and attractor is where the overseer says the picture is emptiest: head that way.";
 
 /**
  * Calibration: Jev's "no opinion" for a noul is nowhere near 0.5 (measured
@@ -86,7 +93,7 @@ export function antState(engine: Engine, i: number): AntState {
 }
 
 export function questionsFor(id: string, schema: Schema): JevRequest["questions"] {
-  if (schema === "compass") {
+  if (schema === "compass" || schema === "cached") {
     return {
       [`${id}_dir`]: { type: "choice", instructions: `Which way should ant \`${id}\` step so the cells that still need ants get filled, avoiding crowding?`, criteria: COMPASS_CRITERIA },
       [`${id}_settle`]: { type: "noul", instructions: `${id}'s room is 0 or more, so its cell still has space and ${id} should stay.` },
@@ -99,9 +106,15 @@ export function questionsFor(id: string, schema: Schema): JevRequest["questions"
   };
 }
 
-/** Pack a batch plus the calibration ants (nouls only; the compass schema reads a choice, which needs none). */
-export function packRequest(ants: { id: string; state: AntState }[], schema: Schema): JevRequest {
-  const state: { legend: string; ants: Record<string, AntState> } = { legend: LEGEND, ants: {} };
+/**
+ * What a cached answer was asked under: a changed legend, question wording or
+ * quantisation must not reuse answers to a different question.
+ */
+export const POLICY_CONTEXT = `cached-v${SITUATION_VERSION}-${hash(SITUATION_LEGEND + JSON.stringify(questionsFor("s0", "cached")))}`;
+
+/** Pack a batch plus the calibration ants (nouls only; the compass schema reads a choice, which needs none). For "cached" the batch is situations, not ants. */
+export function packRequest(ants: { id: string; state: AntState | SituationState }[], schema: Schema): JevRequest {
+  const state: { legend: string; ants: Record<string, AntState | SituationState> } = { legend: schema === "cached" ? SITUATION_LEGEND : LEGEND, ants: {} };
   const questions: JevRequest["questions"] = {};
   const all = schema === "nouls" ? [...ants, ...Array.from({ length: CALIBRATION_COUNT }, (_, k) => ({ id: `${CALIBRATION_PREFIX}${k}`, state: FLAT_STATE }))] : ants;
   // Spread the calibration ants through the batch rather than at the end.
@@ -172,7 +185,7 @@ const num = (v: unknown): number | null => (typeof v === "number" && Number.isFi
 
 /** Read one ant's answers; null when they are missing or malformed (the caller falls back to the local rule). */
 export function readDecision(answers: Record<string, JevAnswer>, id: string, schema: Schema, opts: { sample?: boolean; rng?: () => number; neutral?: Neutral } = {}): AntDecision | null {
-  if (schema === "compass") {
+  if (schema === "compass" || schema === "cached") {
     const dir = answers[`${id}_dir`];
     const settle = answers[`${id}_settle`];
     if (!dir || dir.type !== "choice" || !settle || settle.type !== "noul") return null;

@@ -63,6 +63,7 @@ export default function App() {
               stats ? controls.antCount - stats.settled : controls.antCount
             }
             jevDecisions={stats?.decisions.jev ?? 0}
+            cached={jev.schema === "cached"}
           />
         </div>
         <Panel
@@ -86,6 +87,7 @@ export default function App() {
             setStopOnFormed={jev.setStopOnFormed}
             overseer={jev.overseer}
             setOverseer={jev.setOverseer}
+            clearCache={jev.clearCache}
           />
         </Panel>
       </div>
