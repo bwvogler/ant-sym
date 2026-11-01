@@ -279,6 +279,8 @@ export class Colony {
     this.bumps[i] = 0;
     this.wall[i] = 0;
     this.mx[i] = NaN;
+    this.gx[i] = NO_CELL;
+    this.byCell[i] = 0;
     this.#asked[i] = -1;
     this.#question[i] = -1;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
@@ -431,7 +433,8 @@ export class Colony {
     const { map } = this;
     const x = this.x[i] as number;
     const y = this.y[i] as number;
-    const fresh = this.gx[i] === NO_CELL;
+    // A target that isn't this cell or a neighbour is stale (from before a detour, say): decide afresh.
+    const fresh = this.gx[i] === NO_CELL || Math.abs((this.gx[i] as number) - Math.floor(x)) + Math.abs((this.gy[i] as number) - Math.floor(y)) > 1;
     if (!fresh && Math.hypot((this.gx[i] as number) + 0.5 - x, (this.gy[i] as number) + 0.5 - y) > step) return true;
     const cx = fresh ? Math.floor(x) : (this.gx[i] as number);
     const cy = fresh ? Math.floor(y) : (this.gy[i] as number);
@@ -510,9 +513,21 @@ export class Colony {
   /** A wall-follower not round after FOLLOW_GIVE_UP: wander a good while, then try afresh. */
   #giveUp(i: number): void {
     this.wall[i] = 0;
+    this.gx[i] = NO_CELL;
     this.mx[i] = NaN;
     this.bumps[i] = 5;
     this.detour[i] = 8 + 16 * this.#rng();
+  }
+
+  /** Whether any open neighbour of cell (x, y) holds home scent an ant would notice (FAINT or more). */
+  #homeScentNear(x: number, y: number): boolean {
+    const home = this.ph.fields.home;
+    for (let d = 0; d < 4; d++) {
+      const tx = x + (DX[d] as number);
+      const ty = y + (DY[d] as number);
+      if (rockAt(this.map, tx, ty) === OPEN && home.get(tx, ty) >= FAINT) return true;
+    }
+    return false;
   }
 
   /** The heading from ant i to the centre of its target cell. */
@@ -688,9 +703,10 @@ export class Colony {
                   // round an island and back where it met it, with the way home open (it met the island turning, not heading home)
                   (t > 2 && cx === Math.floor(this.mx[i] as number) && cy === Math.floor(this.my[i] as number) && open) ||
                   (dist < NEST_SIGHT && this.#clearTo(ox, oy, nest.x, nest.y)));
-              if (leave || tunnel(map, cx, cy)) {
+              if (leave || (tunnel(map, cx, cy) && this.#homeScentNear(cx, cy))) {
                 // Back on its line home, nearer than where it met this wall, and the way is open; or the nest
-                // itself is in plain view; or into a tunnel, where the home scent leads it (see #walkTunnel).
+                // itself is in plain view; or into a tunnel with home scent to lead it (see #walkTunnel).
+                // A tunnel with none (a stub off a chamber) it keeps following the wall through.
                 this.wall[i] = 0;
                 h = turnToward(h, toNest, p.turnRate * dt * 0.8);
               } else {
@@ -715,7 +731,8 @@ export class Colony {
         } else h += noise * p.wander;
       } else if (!digging) {
         const seen = Math.max(fl, ff, fr) >= SEEN;
-        if (seen) h += climb(fl, ff, fr, p.turnRate * dt);
+        // Food in sight, unless soil stands between (it touched soil a moment ago): then keep a hand on the wall.
+        if (seen && !((this.hugT[i] as number) > 0)) h += climb(fl, ff, fr, p.turnRate * dt);
         else if (this.#walkTunnel(i, EXPLORE, p.speed * dt)) h = this.#towardTarget(i);
         else h += noise * p.wander;
       }
@@ -739,8 +756,9 @@ export class Colony {
         // Digging: an explorer that meets soil head-on bites at it for DIG_TIME (1–2 s), then the cell
         // is open and the ant carries the pellet home. Any other touch of soil puts a hand on the wall.
         if (face === GLANCE_X || face === GLANCE_Y) {
+          this.digT[i] = 0; // a face that stopped being diggable (a neighbour dug beside it) is left
           this.hugT[i] = HUG_TIME;
-          this.gdir[i] = (gridDir(h) - (this.hand[i] as number)) & 3;
+          this.gdir[i] = (crossedDir(map, this.x[i] as number, this.y[i] as number, nx, ny) - (this.hand[i] as number)) & 3;
           this.gx[i] = NO_CELL;
         } else if (!digging) this.digT[i] = DIG_TIME * (1 + rng());
         else {
@@ -773,7 +791,7 @@ export class Colony {
             this.hitDist[i] = Math.hypot(nest.x - x, nest.y - y);
             this.followT[i] = 0;
             // Facing the wall it met, turned away from the side it keeps the wall on; the first cell decides the way on.
-            this.gdir[i] = (gridDir(h) - (this.wall[i] as number)) & 3;
+            this.gdir[i] = (crossedDir(map, x, y, nx, ny) - (this.wall[i] as number)) & 3;
             this.gx[i] = NO_CELL;
             this.byCell[i] = rockAt(map, Math.floor(nx), Math.floor(ny)) === SOIL || tunnel(map, Math.floor(x), Math.floor(y)) ? 1 : 0;
           }
@@ -903,6 +921,23 @@ export function tunnel(map: WorldMap, x: number, y: number): boolean {
   return false;
 }
 
+/**
+ * The grid way (0 east, 1 south, 2 west, 3 north) of the solid a step from (x, y) to (nx, ny) ran into:
+ * across the cell edge it crossed; crossing a corner, toward whichever of the two side cells is solid.
+ */
+export function crossedDir(map: WorldMap, x: number, y: number, nx: number, ny: number): number {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  const dx = Math.floor(nx) - cx;
+  const dy = Math.floor(ny) - cy;
+  const ex = dx > 0 ? 0 : 2;
+  const ey = dy > 0 ? 1 : 3;
+  if (dx !== 0 && dy !== 0) return rockAt(map, cx + dx, cy) !== OPEN ? ex : ey;
+  if (dx !== 0) return ex;
+  if (dy !== 0) return ey;
+  return gridDir(Math.atan2(ny - y, nx - x));
+}
+
 /** The grid way (0 east, 1 south, 2 west, 3 north) nearest heading h. */
 export function gridDir(h: number): number {
   return ((Math.round(h / (Math.PI / 2)) % 4) + 4) & 3;
@@ -914,7 +949,12 @@ export function gridDir(h: number): number {
  * all four sides (it can't be: it stands in an open cell it walked into), it stays facing as it was.
  */
 export function handOnWall(map: WorldMap, x: number, y: number, dir: number, side: number): number {
-  for (const turn of [side, 0, -side, 2]) {
+  // Turn toward the hand only round a wall that is there: the cell behind on the hand side is solid.
+  // In open ground (no wall at hand, and none just behind it) turning hand-ward every cell would circle a 2×2 square.
+  const back = (dir + 2) & 3;
+  const hs = (dir + side) & 3;
+  const lost = rockAt(map, x + (DX[back] as number) + (DX[hs] as number), y + (DY[back] as number) + (DY[hs] as number)) === OPEN;
+  for (const turn of lost ? [0, side, -side, 2] : [side, 0, -side, 2]) {
     const d = (dir + turn) & 3;
     if (rockAt(map, x + (DX[d] as number), y + (DY[d] as number)) === OPEN) return d;
   }

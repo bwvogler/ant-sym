@@ -292,12 +292,74 @@ test("digging: rock is never dug (a tunnel meeting it turns aside), and a carrie
   }
 });
 
-test("a dying pellet carrier loses its pellet; food dropped as before", () => {
-  const c = new Colony(tunnel(), { antCount: 1, maxAnts: 1 }, mulberry32(6));
+test("a dying pellet carrier loses its pellet (no food appears); a dying food carrier drops its food", () => {
+  const c = new Colony(tunnel(), { antCount: 2, maxAnts: 2 }, mulberry32(6));
   c.pellet[0] = 1;
   c.kill(0);
   assert.equal(c.pellet[0], 0);
   assert.equal(c.map.foodLeft, 0, "no food appears");
+  c.x[1] = 10.5;
+  c.y[1] = 6.5;
+  c.carrying[1] = 1;
+  c.kill(1);
+  assert.equal(foodAt(c.map, 10, 6), 1, "the food lies where it died");
+});
+
+test("homing round soil starts with the wall at its hand: no circling a 2×2 of open ground (review of MR 7)", () => {
+  // The review's case (seed 1, colony 0, t ≈ 122 s), cell for cell round the ant (A): heading ≈ 125°,
+  // mostly south, its step clips the soil to its WEST. Facing was taken from the heading, so the wall
+  // wasn't at its hand and it turned hand-ward every cell, round and round four cells for 60+ s.
+  const pattern = ["sssssss", ".ss.sss", "ss.....", "sssA...", "ss.....", "ss.....", "sss...."];
+  const size = { w: 40, h: 40 };
+  const rock = new Uint8Array(size.w * size.h);
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++) {
+      const px = x - 20;
+      const py = y - 20;
+      const inPattern = px >= 0 && px < 7 && py >= 0 && py < 7;
+      const ch = inPattern ? pattern[py]![px]! : px < 0 && py >= 0 && py < 7 ? "s" : "."; // the soil runs on west; round it, open ground
+      rock[y * size.w + x] = ch === "s" ? SOIL : OPEN;
+    }
+  const nest = { x: 2.5, y: 5.5, r: 1.5 }; // where the real nest was from A: 21 west, 18 north
+  const map = worldFromArrays(size, [nest], { rock });
+  for (let seed = 1; seed <= 6; seed++) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+    c.x[0] = 23.05;
+    c.y[0] = 23.77;
+    c.heading[0] = 2.18;
+    c.mode[0] = 2;
+    let home = false;
+    for (let t = 0; t < 30 * 60 && !home; t++) {
+      c.tick(1 / 30);
+      home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
+    }
+    assert.ok(home, `seed ${seed}: round the soil and home within 60 s, ended at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
+  }
+});
+
+test("a homing ant in a tunnel takes the branch with the home scent", () => {
+  // A T: the ant comes down a tunnel from the north to a crossing tunnel; the nest's chamber is far east, scent laid only to the east.
+  const size = { w: 40, h: 14 };
+  const rock = new Uint8Array(size.w * size.h).fill(SOIL);
+  for (let x = 2; x <= 36; x++) rock[8 * size.w + x] = OPEN;
+  for (let y = 1; y < 8; y++) rock[y * size.w + 20] = OPEN;
+  for (let y = 6; y <= 10; y++) for (let x = 34; x <= 38; x++) rock[y * size.w + x] = OPEN;
+  const nest = { x: 36.5, y: 8.5, r: 1.5 };
+  const map = worldFromArrays(size, [nest], { rock });
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(8), () => "return");
+  for (let x = 21; x <= 33; x++) c.ph.deposit("home", x + 0.5, 8.5, 3 + (x - 21));
+  // Put it at the top of the north tunnel, heading south, with its home vector pointing west (it doesn't know better).
+  c.x[0] = 20.5;
+  c.y[0] = 2.5;
+  c.heading[0] = Math.PI / 2;
+  c.mode[0] = 2;
+  let minX = 99;
+  for (let t = 0; t < 30 * 4; t++) {
+    c.tick(1 / 30);
+    if ((c.y[0] as number) > 8) minX = Math.min(minX, c.x[0] as number);
+  }
+  assert.ok(minX > 19.9, `it never turned west at the junction (min x ${minX.toFixed(1)})`);
+  assert.ok((c.x[0] as number) > 24, `it went east along the scent, at x ${(c.x[0] as number).toFixed(1)}`);
 });
 
 test("tunnel shape rules: only a tunnel's end (or a wall with open ground behind) digs; new tunnels keep their distance; narrow cells are tunnels", () => {

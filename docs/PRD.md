@@ -507,9 +507,11 @@ The product owner asked for "seeds with less cavernous starts: they need to dig"
 
 | | First food stored | Food home at 600 s | Cells dug | Ants out > 120 s (mean / worst) | Tick |
 |---|---|---|---|---|---|
-| Underground | 11–121 s, median ~20 s | 203–1,375, mean ~680 | 1,198–2,244 (85–95 % on the mound) | 6–25 % / up to 53 % | 2.5–2.8 ms |
+| Underground | 13–235 s, median ~18 s | 15–1,618, mean ~690 | 964–2,432 (84–99 % on the mound) | 8–23 % / up to 65 % | 3.0–3.3 ms* |
 | Open, this MR | 7–13 s | 1,366–4,060, mean ~2,940 | 0 | 0.6–2.2 % / ≤ 10 % | 2.9–4.5 ms |
 | Open, before (MR 6) | 7–12 s | 1,255–4,228, mean ~2,980 | 0 | 1.2–3.8 % / ≤ 14 % | 3.0–4.3 ms |
+
+(*Five runs in parallel on four cores; the bench below is the fair timing. Underground rows are after the review fixes.)
 
 - Digging makes the start slower and the economy about a quarter of the surface's at 10 minutes.
 - The open map is unchanged within noise.
@@ -518,6 +520,17 @@ The product owner asked for "seeds with less cavernous starts: they need to dig"
 - **Known look:** tunnels run at right angles, because digging and tunnel walking follow the square grid's four directions. A follow-up MR looks at a meandering dig heading or a hex grid.
 
 **Bench** (`npm run colony-bench`, 1,200 + 1,200 ants, 60 sim-s, back to back with MR 6 on a busy container): 512×320 open 3.94 ms mean (MR 6: 4.28 ms), underground **2.90 ms** mean. Underground is cheaper because scent only spreads along tunnels (5 awake chunks vs 45).
+
+**Review** (agent, before the PR) found four bugs, all fixed with tests or the reviewer's repro scripts:
+- **Homing ants circled four open cells for up to 120 s.** Following a soil wall started with a facing taken from the heading, not from the cell edge the step crossed. With the wall not at its hand, the ant turned hand-ward at every cell. Seeds 1 and 2 had 66 and 73 such ants at 180 s.
+  - The facing now comes from the crossed edge (`crossedDir`), and `handOnWall` turns hand-ward only round a wall that is really there.
+  - Fixing it showed a second loop: a wall-follower handed over to the tunnel walker inside a scentless stub off a chamber. It now hands over only where there is home scent.
+  - The test rebuilds the review's 7×7 neighbourhood. It fails on the old code.
+- **A digger froze for good** when another ant opened a cell beside its face (the face glanced, but `digT` was kept).
+- **Stale target cells:** a newborn walked to its dead predecessor's tunnel cell, and a give-up walked back after its detour. Targets are now reset, and any target that isn't adjacent counts as stale.
+- **An explorer with food in sight behind soil stood still** (only under policies that keep it exploring). It now keeps its hand on the wall.
+
+Also from the review: the pellet colour no longer looks like the rival's ants, and there is a golden test that hashes `OPEN_WORLD` against MR 6's generator. After the fixes, the reviewer's stall scan finds no ant still for 30 s in 180 s of seed 1 (900 + 900 ants).
 
 **Checked in the browser:** tunnels grow out of both nests, pellet crumbs ride on carriers, mounds grow, and the toggle switches maps. Light, dark and phone layouts show no console errors.
 

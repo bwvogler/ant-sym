@@ -361,3 +361,24 @@ test("pheromone stays out of soil and spreads into a cell once it is dug", () =>
   assert.ok(ph.read("food", 6.5, 1.5) > 0.01, "the dug cell takes scent at once");
   assert.equal(ph.read("food", 7.5, 1.5), 0, "and the soil beyond it still none");
 });
+
+test("golden: OPEN_WORLD is the surface map from before digging (rock, food and nests hashed against MR 6's generator)", () => {
+  const fnv = (str: string) => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h;
+  };
+  const cases = [
+    { seed: 1, size: { w: 512, h: 320 }, want: [1638616079, 99905159, 2034486026, 23760] },
+    { seed: 3, size: SMALL, want: [499592708, 3355082296, 1584426184, 3348] },
+  ];
+  for (const { seed, size, want } of cases) {
+    const m = generateWorld(seed, { ...OPEN_WORLD, size });
+    const rock = Array.from(flat(m, m.rock, (n) => new Uint8Array(n))).join("");
+    const food = Array.from(flat(m, m.food, (n) => new Float32Array(n))).join(",");
+    assert.deepEqual([fnv(rock), fnv(food), fnv(JSON.stringify(m.nests)), m.foodTotal], want, `seed ${seed}`);
+  }
+});
