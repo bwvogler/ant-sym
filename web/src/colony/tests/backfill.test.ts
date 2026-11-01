@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BACKFILL, Colony, stub } from "../colony.ts";
-import { centreY, nx, ny } from "../hex.ts";
+import { CELL, cellOf, centreX, centreY, nx, ny } from "../hex.ts";
 import { mulberry32, OPEN, rockAt, SOIL, worldFromArrays, type WorldMap } from "../world.ts";
 import { nestAt, put } from "./hexmaps.ts";
 
@@ -98,39 +98,45 @@ test("a cell whose open neighbours are two separate runs (a passage) is never fi
   assert.equal(stub(map, 20, 6, 5), true, "the tunnel's end");
 });
 
-test("a carrier detours into a stale branch and fills it back from the tip, trip by trip; a live (scented) branch is never entered", () => {
-  const b1x = nx(12, 6, 5);
-  const b1y = ny(6, 5);
-  const b2x = nx(b1x, b1y, 5);
-  const b2y = ny(b1y, 5);
+test("a carrier detours into a stale branch, walks it to its end and fills it back from the tip, trip by trip; a live (scented) branch is never entered", () => {
+  // A branch of three cells off the tunnel at (12, 6), going north-east: b1, b2, b3 (its tip).
+  const b: [number, number][] = [];
+  let x = 12;
+  let y = 6;
+  for (let k = 0; k < 3; k++) {
+    const tx = nx(x, y, 5);
+    y = ny(y, 5);
+    x = tx;
+    b.push([x, y]);
+  }
+  const [b1, b2, b3] = b as [[number, number], [number, number], [number, number]];
   const saved = BACKFILL.enterStale;
   BACKFILL.enterStale = 1;
   try {
-    const map = build([
-      [b1x, b1y],
-      [b2x, b2y],
-    ]);
-    assert.equal(stub(map, b1x, b1y, 5), false, "the branch's first cell can't be filled while the branch goes on");
+    const map = build(b);
+    assert.equal(stub(map, b1[0], b1[1], 5), false, "the branch's cells can't be filled while it goes on");
+    assert.equal(stub(map, b2[0], b2[1], 5), false);
     const c = carrierOn(map, path);
-    run(c, 5);
-    assert.equal(rockAt(map, b2x, b2y), SOIL, "first trip: the branch's tip");
-    assert.equal(rockAt(map, b1x, b1y), OPEN);
-    start(c);
-    run(c, 5);
-    assert.equal(rockAt(map, b1x, b1y), SOIL, "second trip: the cell before it, back to the tunnel");
-    assert.equal(c.soilFilled, 2);
+    run(c, 6);
+    // Its tip is two cells in: only a carrier that walked on into the branch (#staleWay) is beside it.
+    assert.equal(rockAt(map, b3[0], b3[1]), SOIL, "first trip: the branch's tip");
+    assert.equal(rockAt(map, b2[0], b2[1]), OPEN);
+    for (let trip = 2; trip <= 3; trip++) {
+      start(c);
+      run(c, 6);
+    }
+    assert.equal(rockAt(map, b2[0], b2[1]), SOIL, "then the cell before it");
+    assert.equal(rockAt(map, b1[0], b1[1]), SOIL, "and back to the tunnel");
+    assert.equal(c.soilFilled, 3);
     // A branch with scent in it (an ant digging there laid it on the way in) is in use.
-    const live = build([
-      [b1x, b1y],
-      [b2x, b2y],
-    ]);
+    const live = build(b);
     const k = carrierOn(live, (_x, y) => (y === 6 ? 1 : 0.9));
     let entered = false;
     for (let t = 0; t < 30 * 5 && k.pellet[0] === 1; t++) {
       k.tick(1 / 30);
       if (k.y[0]! < centreY(6) - 0.6) entered = true;
     }
-    assert.equal(rockAt(live, b2x, b2y), OPEN, "live branch: not filled");
+    assert.equal(rockAt(live, b3[0], b3[1]), OPEN, "live branch: not filled");
     assert.ok(!entered, "and not entered");
   } finally {
     BACKFILL.enterStale = saved;
@@ -183,18 +189,53 @@ test("wall-following through ground being filled: a target cell filled meanwhile
     c.tick(1 / 30);
     assert.equal(c.byCell[0], 1, "by cell in a tunnel");
   }
-  // Grazing: on the edge of its cell, the straight way to the next cell crossing a corner of the solid cell beside it.
+  // No longer beside it: a follower pushed off its cell, its target two cells away across filled ground.
   {
-    // Rows 5 (odd) and 6: (13, 5) open with (12, 5) soil to its west; (13, 6) below-left open. (13, 6) is (13, 5)'s south-west neighbour.
+    const map = build();
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(8), () => "return");
+    put(c, 0, 12, 6);
+    c.mode[0] = 2;
+    c.tick(1 / 30);
+    put(c, 0, 12, 6);
+    c.wall[0] = 1;
+    c.byCell[0] = 1;
+    c.followT[0] = 1;
+    c.gx[0] = 14; // two cells east along the tunnel: not a neighbour
+    c.gy[0] = 6;
+    c.gdir[0] = 0;
+    c.tick(1 / 30);
+    assert.ok(Math.abs((c.gx[0] as number) - 12) <= 1 && Math.abs((c.gy[0] as number) - 6) <= 1, `re-decided from its own cell: target (${c.gx[0]}, ${c.gy[0]})`);
+  }
+  // Grazing: right on its cell's edge, so the straight way to the next cell crosses a corner of the solid cell beside it.
+  {
+    // (13, 5) open, its south-west neighbour (13, 6) the tunnel; its west neighbour (12, 5) soil.
     const map = build([[13, 5]]);
     assert.equal(nx(13, 5, 2), 13);
     assert.equal(ny(5, 2), 6);
+    // Find a start on (13, 5)'s edge from which a step towards (13, 6)'s centre lands in a solid cell.
+    const step = 7 / 30;
+    let sx = NaN;
+    let sy = NaN;
+    // Exactly on the edge it shares with its west neighbour (x = its centre − ½): off it, the straight way can't graze.
+    for (let k = -280; k <= 280 && Number.isNaN(sx); k++) {
+      const px = Math.fround(centreX(13, 5) - 0.5);
+      const py = Math.fround(centreY(5) + k / 1000);
+      cellOf(px, py);
+      if (CELL[0] !== 13 || CELL[1] !== 5) continue;
+      const h = Math.atan2(centreY(6) - py, centreX(13, 6) - px);
+      cellOf(Math.fround(px + Math.cos(h) * step), Math.fround(py + Math.sin(h) * step));
+      if (rockAt(map, CELL[0] as number, CELL[1] as number) !== OPEN) {
+        sx = px;
+        sy = py;
+      }
+    }
+    assert.ok(!Number.isNaN(sx), "a grazing start exists");
     const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(7), () => "return");
     put(c, 0, 13, 5);
     c.mode[0] = 2;
     c.tick(1 / 30);
-    c.x[0] = 13; // the west edge of (13, 5), whose centre is at x 13.5 (odd rows sit half a cell right)
-    c.y[0] = centreY(5) - 0.1;
+    c.x[0] = sx;
+    c.y[0] = sy;
     c.wall[0] = 1;
     c.byCell[0] = 1;
     c.followT[0] = 1;
@@ -204,7 +245,8 @@ test("wall-following through ground being filled: a target cell filled meanwhile
     let left = false;
     for (let k = 0; k < 30 * 3 && !left; k++) {
       c.tick(1 / 30);
-      left = c.y[0]! > centreY(5) + 0.45;
+      c.antCell(0);
+      left = CELL[0] !== 13 || CELL[1] !== 5;
     }
     assert.ok(left, "it got off the edge and on to the next cell");
   }

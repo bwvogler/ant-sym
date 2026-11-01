@@ -243,6 +243,7 @@ export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
 export function digCell(map: WorldMap, x: number, y: number): boolean {
   if (rockAt(map, x, y) !== SOIL) return false;
   map.rock.set(x, y, OPEN);
+  map.filledAt.set(x, y, -Infinity); // a pellet dug out again no longer smells of building
   map.dug++;
   return true;
 }

@@ -530,10 +530,6 @@ export class Colony {
         }
       }
       dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
-      if (mode === RETURN && this.pellet[i] && map.hasSoil) {
-        const stale = this.#staleWay(i, cx, cy, dir);
-        if (stale >= 0) dir = stale;
-      }
     } else {
       const side = this.hand[i] as number;
       const next = handOnWall(map, cx, cy, dir, side);
@@ -598,7 +594,7 @@ export class Colony {
    * home scent (outbound ants lay home scent, so a tip being dug carries it), no ant in it, and not by the nest.
    */
   #backfill(i: number, cx: number, cy: number): boolean {
-    const { map, nest } = this;
+    const { map } = this;
     const home = this.ph.fields.home;
     const food = this.ph.fields.food;
     for (let d = 0; d < 6; d++) {
@@ -607,7 +603,7 @@ export class Colony {
       if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, BACKFILL.maxOpen)) continue;
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
       if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
-      if (Math.hypot(centreX(tx, ty) - nest.x, centreY(ty) - nest.y) < nest.r + 2) continue;
+      if (this.#byANest(tx, ty)) continue;
       // The grids are a tick old: a nestmate that stepped in earlier this tick isn't in them (and walling it
       // in would bury it). Rare enough (every other test passed) to look at each ant.
       if (this.#occupied(tx, ty)) continue;
@@ -647,25 +643,38 @@ export class Colony {
   }
 
   /**
-   * A pellet carrier at a fork, on its way home, now and then takes the stalest way instead (the branch
-   * smelling far fainter than where it stands) and walks it to its end, where it fills the last cell
-   * (#backfill): unused branches are filled back from the tip, a cell per pellet, as leaf-cutting ants
-   * refill the excess space they dug (Pielström & Roces). Only early in the trip home (BACKFILL.staleSearch),
-   * so a carrier that finds nothing to fill still gets home. The way to take, or −1 to walk on as usual.
+   * A pellet carrier walking a stale branch (see #enterStale) goes on along it, by the stalest way ahead (never
+   * back), to its end, where it fills the last cell (#backfill, on arriving beside it): unused branches are
+   * filled back from the tip, a cell per pellet, as leaf-cutting ants refill the excess space they dug
+   * (Pielström & Roces). Only early in the trip home (BACKFILL.staleSearch), so a carrier that finds nothing to
+   * fill still gets home; at the branch's end with nothing filled (an ant in its last cell, say) it heads home.
+   * Decided here, not in #walkTunnel: a branch's first cells touch the tunnel it leaves, so they are no tunnel
+   * cells. True while it walks the branch (its target cell is gx, gy).
    */
-  #staleWay(i: number, cx: number, cy: number, dir: number): number {
+  #staleStep(i: number, step: number): boolean {
     const s = this.since[i] as number;
-    if (!this.#staleWalk[i]) return -1;
     if (s <= BACKFILL.after || s >= BACKFILL.staleSearch) {
       this.#staleWalk[i] = 0;
-      return -1;
+      return false;
     }
     const { map } = this;
+    const x = this.x[i] as number;
+    const y = this.y[i] as number;
+    this.antCell(i);
+    const hx = CELL[0] as number;
+    const hy = CELL[1] as number;
+    const gx = this.gx[i] as number;
+    const gy = this.gy[i] as number;
+    const live = gx !== NO_CELL && rockAt(map, gx, gy) === OPEN && hexDistance(gx, gy, hx, hy) <= 1;
+    if (live && Math.hypot(centreX(gx, gy) - x, centreY(gy) - y) > step) return true; // on its way to the next cell
+    const cx = live ? gx : hx;
+    const cy = live ? gy : hy;
     const f = this.ph.fields;
+    const ahead = this.gdir[i] as number;
     let way = -1;
     let wayV = Infinity;
     for (const turn of [0, 1, -1, 2, -2]) {
-      const d = (dir + turn + 6) % 6;
+      const d = (ahead + turn + 6) % 6;
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
       if (rockAt(map, tx, ty) !== OPEN) continue;
@@ -676,10 +685,14 @@ export class Colony {
       }
     }
     if (way < 0) {
-      this.#staleWalk[i] = 0; // the end of the branch with nothing to fill (an ant in it, say): home as usual
-      return -1;
+      this.#staleWalk[i] = 0;
+      this.gx[i] = NO_CELL;
+      return false;
     }
-    return way; // in a stale branch: on to its end
+    this.gdir[i] = way;
+    this.gx[i] = stepX(cx, cy, way);
+    this.gy[i] = stepY(cy, way);
+    return true;
   }
 
   /**
@@ -724,6 +737,12 @@ export class Colony {
     if (this.#looked[i] === packed) return false;
     this.#looked[i] = packed;
     return true;
+  }
+
+  /** Whether cell (x, y) is within a nest's radius + 2 (any colony's: a rival's chamber is no dead end to fill either). */
+  #byANest(x: number, y: number): boolean {
+    for (const n of this.map.nests ?? [this.nest]) if (Math.hypot(centreX(x, y) - n.x, centreY(y) - n.y) < n.r + 2) return true;
+    return false;
   }
 
   /** Whether any of this colony's ants stands in cell (x, y) now. */
@@ -822,6 +841,7 @@ export class Colony {
       // So does one carrying a soil pellet it dug, to drop on the mound.
       const carrying = this.carrying[i] === 1;
       const pellet = this.pellet[i] === 1;
+      if (!pellet) this.#staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
       let mode = this.mode[i] as number;
       const prevMode = mode;
       if (carrying || pellet) {
@@ -884,6 +904,8 @@ export class Colony {
           this.mx[i] = NaN;
         } else if (look && this.#enterStale(i, lx, ly)) {
           h = this.#towardTarget(i); // into a stale branch, to fill its end
+        } else if (this.#staleWalk[i] && this.#staleStep(i, p.speed * dt)) {
+          h = this.#towardTarget(i); // on along it
         } else if (side === 0 && !detouring && this.#walkTunnel(i, RETURN, p.speed * dt)) {
           h = this.#towardTarget(i); // in a tunnel: back the way it came (a wall it is already following, it keeps following)
         } else if (side === 0) {
@@ -935,15 +957,15 @@ export class Colony {
             // A target cell filled since (backfill), or no longer beside it (it was pushed off its cell), is decided
             // afresh too: steering for it would pin the ant against the filled ground between.
             this.antCell(i);
-            const reached =
-              this.gx[i] === NO_CELL ||
-              Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) <= p.speed * dt ||
-              rockAt(map, this.gx[i] as number, this.gy[i] as number) !== OPEN ||
-              hexDistance(this.gx[i] as number, this.gy[i] as number, CELL[0] as number, CELL[1] as number) > 1;
+            const lost =
+              this.gx[i] !== NO_CELL && (rockAt(map, this.gx[i] as number, this.gy[i] as number) !== OPEN || hexDistance(this.gx[i] as number, this.gy[i] as number, CELL[0] as number, CELL[1] as number) > 1);
+            const reached = this.gx[i] === NO_CELL || lost || Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) <= p.speed * dt;
             if (reached) {
               cellOf(x, y);
-              const cx = this.gx[i] === NO_CELL ? (CELL[0] as number) : (this.gx[i] as number);
-              const cy = this.gx[i] === NO_CELL ? (CELL[1] as number) : (this.gy[i] as number);
+              // A lost target: the next way is felt from the cell it is in (the wall's first cell stays its first).
+              const own = this.gx[i] === NO_CELL || lost;
+              const cx = own ? (CELL[0] as number) : (this.gx[i] as number);
+              const cy = own ? (CELL[1] as number) : (this.gy[i] as number);
               const ox = centreX(cx, cy);
               const oy = centreY(cy);
               const dist = Math.hypot(nest.x - ox, nest.y - oy);
@@ -1111,11 +1133,12 @@ export class Colony {
           }
           if (!this.byCell[i]) h -= (this.wall[i] as number) * (Math.PI / 2); // by touch: turn away from the wall, along it
           else if (wasFollowing) {
-            // Following by cell and blocked: it stands on its cell's edge, and the straight way to the next cell grazes
-            // the solid one beside it (every step lands there). Back to its own cell's centre, then on.
+            // Following by cell and blocked: it stands right on its cell's edge (a straight line from inside a cell to a
+            // neighbour's centre never leaves the two), so the way to the next cell grazes the solid one beside it and
+            // every step lands there. A quarter of the way back to its own cell's centre takes it off the edge.
             this.antCell(i);
-            h = Math.atan2(centreY(CELL[1] as number) - y, centreX(CELL[0] as number, CELL[1] as number) - x);
-            this.gx[i] = NO_CELL;
+            this.x[i] = x + (centreX(CELL[0] as number, CELL[1] as number) - x) * 0.25;
+            this.y[i] = y + (centreY(CELL[1] as number) - y) * 0.25;
           }
         } else {
           h += Math.PI / 2 + rng() * Math.PI;
@@ -1351,7 +1374,7 @@ export function moundRadius(pellets: number, nestR: number): number {
  * filled in the last pelletTau seconds or so. A carrier takes a stale way at a fork with chance enterStale,
  * until staleSearch seconds into its trip home.
  */
-export const BACKFILL = { after: 2.5, staleRatio: 0.5, enterStale: 0.3, staleSearch: 20, pelletTau: 30, pelletPull: 4, maxOpen: 5 };
+export const BACKFILL = { after: 2.5, staleRatio: 0.5, enterStale: 0.3, staleSearch: 20, pelletTau: 60, pelletPull: 6, maxOpen: 5 };
 
 /** A lone ant's chance to dig at a tunnel's end; each nestmate within two cells adds 1 / DIG_CROWD. */
 const DIG_ALONE = 0.1;
