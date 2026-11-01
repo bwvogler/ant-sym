@@ -1122,9 +1122,19 @@ export function handOnWall(map: WorldMap, x: number, y: number, dir: number, sid
   return dir;
 }
 
-/** How far the mound of `pellets` dropped soil reaches out from the nest's edge, in cells: it grows with the square root, like a ring of heaped earth. */
-export function moundWidth(pellets: number): number {
-  return 0.2 * Math.sqrt(pellets);
+/**
+ * How much more room dug soil takes loose than in place (its swell): sand 10–15 %, loam 20–30 %, clay
+ * 30–40 % in earthwork references; the sim's soil is unspecified, so 20 %.
+ */
+export const SWELL = 1.2;
+
+/**
+ * The outer radius (world units) of the mound of `pellets` dug cells heaped round a nest of radius
+ * `nestR`: excavated soil goes up and out and is dumped round the entrance (Tschinkel 2015), so the
+ * mound holds every pellet, loosened by SWELL. Its area is pellets × SWELL × a hex cell's area (√3/2).
+ */
+export function moundRadius(pellets: number, nestR: number): number {
+  return Math.sqrt(nestR * nestR + (Math.max(0, pellets) * SWELL * R) / Math.PI);
 }
 
 /** A lone ant's chance to dig at a tunnel's end; each nestmate within two cells adds 1 / DIG_CROWD. */

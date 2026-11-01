@@ -656,3 +656,19 @@ MR 8 (hexagons) kept the underground economy but more ants stayed out long: 20�
 - **Bench:** no change (3.7 ms underground, 5.4 ms open, back to back with MR 8). The browser holds ~60 fps at every zoom, with no console errors in light, dark or phone layouts.
 
 **Jev:** situations, legend and request are unchanged. Tokens are unchanged.
+
+## 17. Where the dug soil goes (MR 10–11, 2026-11-01)
+
+The product owner asked whether the earth ring was grounded, adding that "the soil has to actually go somewhere".
+
+**What the research says:**
+- **Florida harvester ants** (Tschinkel, Rink & Kwapich 2015, coloured sand): about **2.5 %** of excavated sand is redeposited below ground, mostly near the surface. The rest is carried up to a surface spoil disc, whose area tracks the nest's volume and depth (Tschinkel 2015, [PMC4368782](https://pmc.ncbi.nlm.nih.gov/articles/PMC4368782)). Sand moves up in stages, and some is worked into walls and floors.
+- **Leaf-cutting ants** (*Atta vollenweideri*; Pielström & Roces) put **most** excavated soil back inside the nest. Workers refill unused space with pellets, opportunistically.
+- **Swell** (earthwork references, e.g. Caterpillar's swell and load factors): dug soil takes more room loose than in place: sand 10–15 %, loam 20–30 %, clay 30–40 %.
+
+**MR 10: the mound holds the soil.** The old ring grew with √pellets: 2,000 dug cells drew a ring about 9 cells wide, holding a fraction of them. Now:
+- The mound's area is every pellet brought out × `SWELL` (1.2: the sim's soil is unspecified, so loam-like) × a hex cell's area (√3/2). It is a ring round the entrance: radius √(nest r² + area/π), from `moundRadius`.
+- It is drawn as a faint fill with an outline, since it sits on the surface above this slice; the tunnels under it still show.
+- The stats show "dug / mound" per colony, so the bookkeeping is visible.
+- At 4× speed after 40 s, about 2,300 cells dug make a mound about 29 units across from the nest. It looks big because that is how much soil there is.
+- No simulation numbers change.

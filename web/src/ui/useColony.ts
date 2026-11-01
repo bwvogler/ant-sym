@@ -42,6 +42,8 @@ export interface SideStats {
   stance: Stance;
   /** soil cells dug */
   dug: number;
+  /** pellets of it on the mound */
+  mound: number;
 }
 
 export interface ColonyStats {
@@ -59,7 +61,7 @@ export interface ColonyStats {
 }
 
 function side(c: Colony): SideStats {
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance, dug: c.soilDug };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance, dug: c.soilDug, mound: c.soilOut };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import { CountGrid } from "../battle.ts";
 import assert from "node:assert/strict";
-import { avoid, chooseDig, climb, Colony, decode, DIG_FACE, digChance, setTunnelDrift, diggable, encodeSituation, GLANCE, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, START_FACE, startable, trailLevel, tunnelEnd, turnToward, wallSide, type Situation } from "../colony.ts";
+import { avoid, chooseDig, climb, Colony, moundRadius, SWELL, decode, DIG_FACE, digChance, setTunnelDrift, diggable, encodeSituation, GLANCE, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, START_FACE, startable, trailLevel, tunnelEnd, turnToward, wallSide, type Situation } from "../colony.ts";
 import { foodIn, generateWorld, tunnelHeading, mulberry32, OPEN, OPEN_WORLD, ROCK, rockAt, setRock, SOIL, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, hexMap, nestAt, put } from "./hexmaps.ts";
 
@@ -520,4 +520,18 @@ test("homing out of a closed cavern whose way out is far round the wall: no leav
     for (; t < 30 * 90 && c.pellet[0] === 1; t++) c.tick(1 / 30);
     assert.equal(c.pellet[0], 0, `seed ${seed}: out of the cavern and home within 90 s`);
   }
+});
+
+test("the mound holds every pellet: its area is pellets × SWELL × a hex cell's area, round the nest", () => {
+  const cell = Math.sqrt(3) / 2;
+  assert.equal(moundRadius(0, 3), 3, "no soil out: just the nest");
+  let prev = 3;
+  for (const n of [1, 10, 250, 2000, 9000]) {
+    const r = moundRadius(n, 3);
+    const area = Math.PI * (r * r - 9);
+    assert.ok(Math.abs(area - n * SWELL * cell) < 1e-6 * Math.max(1, area), `${n} pellets: ring area ${area}`);
+    assert.ok(r > prev, "it grows with every pellet");
+    prev = r;
+  }
+  assert.ok(SWELL > 1 && SWELL < 1.5, "loose soil takes more room than in place, within earthwork ranges");
 });
