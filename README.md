@@ -43,6 +43,10 @@ spend and time caps from the real `usage.input_tokens` of every reply.
   attractor when it points at ink) and a "recognisable" noul.
 - **Overlays**: deficit heatmap, pheromone trails. **Local rule** brain for a free
   comparison with a greedy gradient walk.
+- **Colony** (the *Colony* tab, `#colony`): a procedural world of rock, food and one
+  nest that the ants forage on their own. They lay a trail to food and a trail home,
+  and switch between exploring, following and going home. No Jev yet, so it costs
+  nothing; it is the start of a Sim-Ant-style game (PRD §9).
 
 ## How it talks to Jev
 

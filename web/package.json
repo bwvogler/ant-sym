@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --test --test-timeout=20000 --test-force-exit server/tests/*.test.ts src/sim/tests/*.test.ts src/ui/tests/*.test.ts",
+    "test": "node --test --test-timeout=20000 --test-force-exit server/tests/*.test.ts src/sim/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 import Field from "./ui/Field.tsx";
 import JevBar from "./ui/JevBar.tsx";
 import JevPanel from "./ui/JevPanel.tsx";
+import Nav from "./ui/Nav.tsx";
 import Panel from "./ui/Panel.tsx";
 import { useEngine } from "./ui/useEngine.ts";
 import { useJev } from "./ui/useJev.ts";
@@ -23,8 +24,11 @@ export default function App() {
   const startBlocked = controls.brain !== "jev" ? "Switch Brain to Jev first" : blank ? "Type a word or upload a picture first" : null;
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
+          <Nav page="picture" />
+        </div>
         <p className="text-sm text-fg-3">
           ants that form the picture you type, one decision at a time
         </p>

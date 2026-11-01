@@ -229,3 +229,32 @@ Crowd, idle time, own heading and neighbours' headings are dropped. Jev's answer
 Then run a live formation from scatter and a morph with the `cached` brain, and add them to §8.5. The stand-in cannot show any steering lost by quantising (deficit magnitudes and crowd are gone from the key). If fidelity is low, add a fourth class for strong want (> 1.5) before anything else.
 
 `compass` stays the default until those live numbers are in.
+
+## 9. The colony (MR 2, 2026-10-31): a world the ants forage on their own
+
+This is the first step toward the Sim-Ant-style game: a procedural world, a nest and food, no Jev. The page is at `#colony`, beside the picture. The sim is pure TypeScript in `web/src/colony/`, tested with `node --test`.
+
+- **World** (`world.ts`):
+  - A seeded 160×100 map: rock from two octaves of value noise (~22 %).
+  - The nest sits on open ground joined to most of the map. A spot inside a rock blob, once cleared, made a sealed pocket, and seed 2 had no food it could reach.
+  - Six food patches, at least a quarter of the map away from the nest, placed only where the nest can walk to them.
+- **Pheromones** (`pheromone.ts`):
+  - Two channels, evaporating and spreading every tick; nothing spreads into rock.
+  - The *food* trail is laid by ants carrying food, so it leads to food. The *home* trail is laid by ants walking out, so it leads home.
+  - A deposit falls with the seconds since the ant left its source, so each trail rises toward that source.
+- **Ants** (`colony.ts`), in three behaviour modes, each steered for free every frame:
+  - *explore*: wander, and walk to food in sight.
+  - *follow*: climb the food trail with three sensors.
+  - *return*: climb the home trail, plus path integration toward the nest. Path integration pauses for a second after a bump, or a straight line home walks into the same rock forever.
+- **Mechanics, not choices**: picking food up, putting it down, and resting at the nest.
+- **The mode choice is the one decision.** It is a `Policy(situation) → mode`, asked only when an ant's situation changes, not every frame. The situation is: mode, carrying, tired (out more than 60 s without food), and the food and home trails, each none / faint / strong. That makes 108 situations in all.
+  - Today the policy is the local rule.
+  - *Tired → go home* breaks ant mills. Without it, ~770 of 800 ants circled trails to food that was gone, and nobody was left exploring.
+  - **This is the seam for MR 3.** A cached Jev policy answers at most 108 questions per doctrine, however many ants and however long the game runs. The panel shows mode choices per second (500–2,000) next to situations seen (~30 of 108 in a typical run).
+
+Measured (headless, 800 ants, 1/30 s steps): ~0.8 ms per tick. Over six seeds the colony brought home 49–86 % of the food in 3 sim-minutes (seed 1: 1,077 of 1,632 by 60 s).
+
+Known limits, left for later MRs:
+- There is no fungus input yet (painting pheromone and retuning come in MR 3).
+- There are no rivals or fights (MR 4).
+- Food does not regrow, so a long run ends with the map picked clean.
