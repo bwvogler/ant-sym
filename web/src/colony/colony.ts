@@ -1,6 +1,5 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
-import type { ChunkLayer } from "./chunks.ts";
-import { blocked, dropFood, rockAt, takeFood, UNREACHABLE, walkingDistance, type Nest, type WorldMap } from "./world.ts";
+import { blocked, dropFood, rockAt, takeFood, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -167,6 +166,15 @@ export class Colony {
   detour: Float32Array;
   /** recent bumps, fading over seconds: each bump in a row doubles the next detour */
   bumps: Float32Array;
+  /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
+  wall: Int8Array;
+  /** straight-line distance home (its own home vector) when it met the wall it is following */
+  hitDist: Float32Array;
+  /** seconds spent following the current wall */
+  followT: Float32Array;
+  /** where this homing trip first met rock (NaN until it does): with the nest it fixes the line the ant leaves walls on */
+  mx: Float32Array;
+  my: Float32Array;
   /** the situation each ant was last asked about, encoded; −1 = never */
   #asked: Int16Array;
   /** the question behind each ant's current mode: its situation (with the mode it had) when last asked; −1 = never */
@@ -189,8 +197,6 @@ export class Colony {
   /** which of the SITUATIONS the policy has been asked about: what a cached Jev policy would pay for */
   seen = new Uint8Array(SITUATIONS);
   #rng: () => number;
-  /** steps on foot from each cell to the nest: the way home that path integration plus memory of the ground gives a real ant */
-  readonly homeDist: ChunkLayer<Uint16Array>;
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   #s = new Float64Array(9);
 
@@ -203,7 +209,6 @@ export class Colony {
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
     this.ph = new Pheromones(map);
-    this.homeDist = walkingDistance(map, this.nest.x, this.nest.y, this.nest.r);
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -216,6 +221,11 @@ export class Colony {
     this.since = new Float32Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
+    this.wall = new Int8Array(n);
+    this.hitDist = new Float32Array(n);
+    this.followT = new Float32Array(n);
+    this.mx = new Float32Array(n).fill(NaN);
+    this.my = new Float32Array(n).fill(NaN);
     this.#asked = new Int16Array(n).fill(-1);
     this.#question = new Int16Array(n).fill(-1);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
@@ -234,6 +244,8 @@ export class Colony {
     this.since[i] = 0;
     this.detour[i] = 0;
     this.bumps[i] = 0;
+    this.wall[i] = 0;
+    this.mx[i] = NaN;
     this.#asked[i] = -1;
     this.#question[i] = -1;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
@@ -348,34 +360,25 @@ export class Colony {
     s[slot + 6] = f.alarm.get(cx, cy);
   }
 
-  /** Which way home is for ant i: toward the neighbouring cell nearest the nest on foot (diagonals only past two open corners); the straight line where the map has no answer. */
-  #homeBearing(i: number): number {
-    const x = this.x[i] as number;
-    const y = this.y[i] as number;
-    const cx = Math.floor(x);
-    const cy = Math.floor(y);
-    const d = this.homeDist;
-    const here = d.get(cx, cy);
-    if (here === 0) return Math.atan2(this.nest.y - y, this.nest.x - x);
-    // In a pocket the map can't reach (an ant can squeeze in diagonally between two rocks), the way
-    // out is the way in: the lowest neighbour, corner rule waived. Only if none, the straight line.
-    const pocket = here === UNREACHABLE;
-    let best = here;
-    let tx = cx;
-    let ty = cy;
-    for (let dy = -1; dy <= 1; dy++)
-      for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dy) continue;
-        if (!pocket && dx && dy && (d.get(cx + dx, cy) === UNREACHABLE || d.get(cx, cy + dy) === UNREACHABLE)) continue;
-        const v = d.get(cx + dx, cy + dy);
-        if (v < best) {
-          best = v;
-          tx = cx + dx;
-          ty = cy + dy;
-        }
-      }
-    if (best === UNREACHABLE) return Math.atan2(this.nest.y - y, this.nest.x - x);
-    return Math.atan2(ty + 0.5 - y, tx + 0.5 - x);
+  /**
+   * Whether ant i at (x, y) is back on its line home: the line from where this trip first met rock
+   * to the nest (Bug2's "m-line"). Leaving walls only there is what guarantees getting round: leaving
+   * anywhere nearer settles ants in the deepest bay facing the nest.
+   */
+  #onMLine(i: number, x: number, y: number): boolean {
+    const ax = this.mx[i] as number;
+    const ay = this.my[i] as number;
+    if (Number.isNaN(ax)) return true;
+    const dx = this.nest.x - ax;
+    const dy = this.nest.y - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) return true;
+    return Math.abs((x - ax) * dy - (y - ay) * dx) / len < M_LINE_WIDTH;
+  }
+
+  /** Touch: is there rock (or the map's edge) `d` cells from ant i's position along `angle`? */
+  #touch(x: number, y: number, angle: number, d: number): boolean {
+    return blocked(this.map, x + Math.cos(angle) * d, y + Math.sin(angle) * d);
   }
 
   /** The nearest cell holding enemies within ENEMY_RANGE of ant i, as a heading, or null. */
@@ -465,18 +468,55 @@ export class Colony {
       // Steer by mode.
       const noise = (rng() - 0.5) * 2 * dt;
       const detouring = (this.detour[i] as number) > 0;
+      if (mode !== RETURN) {
+        this.wall[i] = 0;
+        this.mx[i] = NaN;
+      }
       if (mode === RETURN) {
-        // Path integration: home is that way. Stronger when the home trail is faint. Off during
-        // a detour after a bump, when the ant wanders instead: a straight line home walks into
-        // the same rock forever (a rival nest behind a wall kept 447 ants circling, tired, until
-        // detours grew with repeated bumps).
-        // The way home is the walking-distance map's downhill, not a straight line: a straight
-        // line walks into the same wall forever (review reproduced games where every homing ant
-        // of a colony was stuck behind one). It holds through detours, since it already goes round.
-        // The home trail is only a hint now: climbing it at full rate let clusters of homing ants
-        // circle on their own trail, far from the nest, with the true way home out-voted.
-        h += climb(hl, hf, hr, p.turnRate * dt * 0.25) + noise * p.wander * 0.25;
-        h = turnToward(h, this.#homeBearing(i), p.turnRate * dt * 0.8);
+        // Homing uses only what an ant has: its home vector (path integration: real ants count steps
+        // against a sky compass), its antennae, and touch. A straight line home walks into the same
+        // wall forever (reviews reproduced games where every homing ant of a colony was stuck), so a
+        // blocked step starts wall-following by touch (the Bug2 rule, set up where the step is blocked
+        // below): keep the wall on one side until the ant is nearer home than where it met the wall
+        // and the way home is open.
+        const x = this.x[i] as number;
+        const y = this.y[i] as number;
+        const toNest = Math.atan2(nest.y - y, nest.x - x);
+        const side = this.wall[i] as number;
+        if (side === 0) {
+          // Free: the home vector, with the home trail as a hint only (climbing it at full rate let
+          // clusters of homing ants circle on their own trail). After giving up on a wall, wander a while.
+          if (detouring) h += noise * p.wander;
+          else {
+            h += climb(hl, hf, hr, p.turnRate * dt * 0.25) + noise * p.wander * 0.25;
+            h = turnToward(h, toNest, p.turnRate * dt * 0.8);
+          }
+        } else {
+          const t0 = this.followT[i] as number;
+          const t = t0 + dt;
+          this.followT[i] = t;
+          if (t0 < FOLLOW_FLIP && t >= FOLLOW_FLIP) {
+            // Probably the long way round (a big rock mass, or the map's edge): try the other side, same line home.
+            this.wall[i] = -side as -1 | 1;
+            h += Math.PI;
+          }
+          const dist = Math.hypot(nest.x - x, nest.y - y);
+          if (dist < (this.hitDist[i] as number) - 1 && this.#onMLine(i, x, y) && !this.#touch(x, y, toNest, 1.5)) {
+            this.wall[i] = 0; // back on its line home, nearer than where it met this wall, and the way is open
+            h = turnToward(h, toNest, p.turnRate * dt * 0.8);
+          } else if (t >= FOLLOW_GIVE_UP) {
+            // Not round after a long while: wander a good while, then try afresh.
+            this.wall[i] = 0;
+            this.mx[i] = NaN;
+            this.bumps[i] = 5;
+            this.detour[i] = 8 + 16 * rng();
+          } else {
+            // Keep the wall on its side (+1 = right: the ant turns left round it; angles grow clockwise, y down).
+            const sd = this.wall[i] as number;
+            if (this.#touch(x, y, h, 1)) h -= sd * p.turnRate * dt * 2; // wall ahead: turn away
+            else if (!this.#touch(x, y, h + sd * 0.9, 1.2)) h += sd * p.turnRate * dt; // the wall fell away: hug round the corner
+          }
+        }
       } else if (mode === FOLLOW) {
         h += climb(fl, ff, fr, p.turnRate * dt) + noise * p.wander * 0.25;
       } else if (mode === FIGHT) {
@@ -503,10 +543,28 @@ export class Colony {
       this.detour[i] = (this.detour[i] as number) - dt;
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
       if (blocked(map, nx, ny) || squeezes(map, this.x[i] as number, this.y[i] as number, nx, ny)) {
-        h += Math.PI / 2 + rng() * Math.PI;
-        // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
-        this.bumps[i] = Math.min(5, (this.bumps[i] as number) + 1);
-        this.detour[i] = Math.max(this.detour[i] as number, 0.5 * 2 ** Math.floor(this.bumps[i] as number) * (0.5 + rng()));
+        if (mode === RETURN && !detouring) {
+          // Homing: start (or keep) following this wall by touch instead of turning at random.
+          const x = this.x[i] as number;
+          const y = this.y[i] as number;
+          if (this.wall[i] === 0) {
+            const toNest = Math.atan2(nest.y - y, nest.x - x);
+            if (Number.isNaN(this.mx[i] as number)) {
+              // The first rock this trip: remember where, so the line from here to the nest is the way home it keeps returning to.
+              this.mx[i] = x;
+              this.my[i] = y;
+            }
+            this.wall[i] = wallSide(this.#touch(x, y, toNest - WALL_PROBE, 1.2), this.#touch(x, y, toNest + WALL_PROBE, 1.2), rng);
+            this.hitDist[i] = Math.hypot(nest.x - x, nest.y - y);
+            this.followT[i] = 0;
+          }
+          h -= (this.wall[i] as number) * (Math.PI / 2); // turn away from the wall, along it
+        } else {
+          h += Math.PI / 2 + rng() * Math.PI;
+          // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
+          this.bumps[i] = Math.min(5, (this.bumps[i] as number) + 1);
+          this.detour[i] = Math.max(this.detour[i] as number, 0.5 * 2 ** Math.floor(this.bumps[i] as number) * (0.5 + rng()));
+        }
       } else {
         this.x[i] = nx;
         this.y[i] = ny;
@@ -518,9 +576,13 @@ export class Colony {
       const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
       if (!carrying && mode !== FIGHT && takeFood(map, this.x[i] as number, this.y[i] as number)) {
         this.carrying[i] = 1;
+        this.wall[i] = 0;
+        this.mx[i] = NaN;
         this.since[i] = 0;
         h += Math.PI;
       } else if (atNest) {
+        this.wall[i] = 0;
+        this.mx[i] = NaN;
         if (carrying) {
           this.carrying[i] = 0;
           this.stored++;
@@ -564,6 +626,25 @@ export function encodeSituation(s: Situation): number {
 
 function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: Trail, enemy: number, stance: number): number {
   return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
+}
+
+/** Seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round). */
+export const FOLLOW_GIVE_UP = 120;
+/** Seconds of wall-following before trying the other side once (same line home). */
+export const FOLLOW_FLIP = 45;
+/** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
+const M_LINE_WIDTH = 0.6;
+/** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */
+const WALL_PROBE = Math.PI / 3;
+
+/**
+ * Which side to keep a newly met wall on, from touch probes left and right of the home vector:
+ * turn toward the open side, so the wall stays on the other (+1 = wall on the right). Both open or
+ * both blocked: either.
+ */
+export function wallSide(leftBlocked: boolean, rightBlocked: boolean, rng: () => number): -1 | 1 {
+  if (leftBlocked !== rightBlocked) return leftBlocked ? -1 : 1;
+  return rng() < 0.5 ? -1 : 1;
 }
 
 /**
