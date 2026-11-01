@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, MODES } from "../colony.ts";
 import { CONTACTS, DEFAULT_RULE, FUNGAL_SITUATIONS, GROUNDS, LOADS, STRAIN_DEFAULT, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../fungalPolicy.ts";
-import { fungalKey, fungusContext, offeredFor, packFungusRequest, readIntervention } from "../fungusBrain.ts";
+import { fungalKey, fungusContext, offeredFor, offeredIn, packFungusRequest, readIntervention, worthAsking } from "../fungusBrain.ts";
 import { DORMANT_SHOW, Fungus, INTERVENTIONS, LETHAL, STRAINS, intervention } from "../fungus.ts";
 import { Game } from "../game.ts";
 import { Recognition } from "../recognition.ts";
@@ -123,7 +123,7 @@ test("what the fungus senses, all of it local to its host: whose ground, and who
   assert.deepEqual(near, far);
 });
 
-test("groomed: a visible host among nestmates is groomed; one the policy keeps dormant shows a quarter and is not", () => {
+test("groomed: a host among nestmates is groomed whether or not it hides (judged at its strain's visibility); hiding only shows them less", () => {
   const map = arena();
   const groomed = (dormant: boolean) => {
     const c = placed(map, 0, 0, [[20, 6], [20, 6], [20, 6]]);
@@ -142,7 +142,8 @@ test("groomed: a visible host among nestmates is groomed; one the policy keeps d
     return decodeFungal(c.fungal[0] as number, "bloom").groomed;
   };
   assert.equal(groomed(false), true);
-  assert.equal(groomed(true), false, `dormant shows ${DORMANT_SHOW} of its visibility`);
+  // PR #7 review: judged at what a dormant host shows (a quarter), it read as ungroomed the step after it hid, woke, and hid again.
+  assert.equal(groomed(true), true, `dormant shows ${DORMANT_SHOW} of its visibility, but its groomers are still there`);
 });
 
 test("hiding protects a visible strain: Bloom hidden from its groomers keeps more of its load", () => {
@@ -174,13 +175,13 @@ test("cull: the host's odour is pushed past tolerance from its own nest, so its 
 
 test("the fungus lane's request: the aim, one choice per fungal situation among only what that host may be given; anything else is rejected", () => {
   const menu = new Set(INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)));
+  const offer = (strain: string) => offeredFor(strain, menu);
   const req = packFungusRequest(
     [
-      { id: "h0", situation: sit({ strain: "lockpick" }) },
-      { id: "h1", situation: sit({ strain: "bloom" }) },
+      { id: "h0", situation: sit({ strain: "lockpick" }), offered: offer("lockpick") },
+      { id: "h1", situation: sit({ strain: "bloom" }), offered: offer("bloom") },
     ],
     "Make them one.",
-    menu,
   );
   const state = req.state as { aim: string; hosts: Record<string, FungalSituation>; ants?: unknown; doctrine?: unknown };
   assert.equal(state.aim, "Make them one.");
@@ -191,11 +192,108 @@ test("the fungus lane's request: the aim, one choice per fungal situation among 
   assert.deepEqual(crit("h1"), ["dormant", "share", "roam"], "cull is Bloom's, but off the menu");
   assert.deepEqual(offeredFor("bloom", new Set([...menu, "cull"])), ["dormant", "share", "roam", "cull"]);
   const ans = (choice: string) => ({ h0_do: { type: "choice" as const, choice, confidence: 0.9 } });
-  assert.equal(readIntervention(ans("soothe"), "h0", sit({ strain: "lockpick" }), menu), "soothe");
-  assert.equal(readIntervention(ans("blend"), "h0", sit({ strain: "lockpick" }), menu), null, "Lockpick cannot blend");
-  assert.equal(readIntervention(ans("cull"), "h0", sit({ strain: "bloom" }), menu), null, "off the menu");
-  assert.equal(fungalKey(sit()), "garden|mid|explore|border|none|unseen");
-  assert.notEqual(fungusContext("a", menu), fungusContext("b", menu), "a new aim, a new cache");
-  assert.notEqual(fungusContext("a", menu), fungusContext("a", new Set([...menu, "cull"])), "a new menu, a new cache");
-  assert.equal(fungusContext("a", new Set(["soothe", "blend"])), fungusContext("a", new Set(["blend", "soothe"])), "the menu's order does not matter");
+  assert.equal(readIntervention(ans("soothe"), "h0", offer("lockpick")), "soothe");
+  assert.equal(readIntervention(ans("blend"), "h0", offer("lockpick")), null, "Lockpick cannot blend");
+  assert.equal(readIntervention(ans("cull"), "h0", offer("bloom")), null, "off the menu");
+  assert.equal(fungalKey(sit(), offer("garden")), "garden|mid|explore|border|none|unseen|dormant,blend,soothe,share");
+  assert.deepEqual(offeredIn(fungalKey(sit(), offer("garden"))), offer("garden"), "a key says what its question offered");
+  assert.deepEqual(offeredIn(fungalKey(sit(), [])), []);
+  assert.notEqual(fungusContext("a"), fungusContext("b"), "a new aim, a new cache");
+  // PR #7 review: the menu was in the context, so switching cull (Bloom's alone) dropped Garden's and Lockpick's answers.
+  const withCull = new Set([...menu, "cull"]);
+  assert.equal(fungalKey(sit(), offeredFor("garden", withCull)), fungalKey(sit(), offer("garden")), "cull does not touch Garden's questions");
+  assert.notEqual(fungalKey(sit({ strain: "bloom" }), offeredFor("bloom", withCull)), fungalKey(sit({ strain: "bloom" }), offer("bloom")), "but is a new question for Bloom");
+  assert.equal(worthAsking(offer("garden")), true);
+  assert.equal(worthAsking(["blend"]), false, "one thing on offer is no choice");
+  assert.equal(worthAsking([]), false);
+});
+
+// PR #7 review fixes.
+
+test("hiding holds: with hide on, a groomed host stays dormant instead of flipping between dormant and its default every step", () => {
+  const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 120, rivalAnts: 120 }, mulberry32(4));
+  g.fungus.configure({ hide: true, cull: false }, g.fungus.menu);
+  g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 3, 3, 0.4, ID("garden"));
+  const c = g.player;
+  const prev = new Int8Array(c.n).fill(-1);
+  let flips = 0;
+  let steps = 0;
+  let hostSteps = 0;
+  for (let t = 0; t < 30 * 10; t++) {
+    const stepped = g.fungus.due(1 / 30);
+    g.tick(1 / 30);
+    if (!stepped) continue;
+    steps++;
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i] || (c.fungal[i] as number) < 0) {
+        prev[i] = -1;
+        continue;
+      }
+      hostSteps++;
+      const e = c.expr[i] as number;
+      if ((prev[i] as number) >= 0 && prev[i] !== e) flips++;
+      prev[i] = e;
+    }
+  }
+  assert.ok(steps >= 90 && hostSteps > 1000, `${steps} steps, ${hostSteps} host-steps`);
+  // Before the fix ~70 % of host-steps flipped (16,657 in 200 steps); now ~6.5 %: a host changes when it walks in or out of its groomers.
+  assert.ok(flips < hostSteps * 0.1, `${flips} flips in ${hostSteps} host-steps`);
+});
+
+test("the gate: with the default and dormant off, a host runs the first thing still on; with nothing on it runs as-is and does not hide", () => {
+  const f = new Fungus(arena());
+  const garden = ID("garden");
+  f.configure(DEFAULT_RULE, ["soothe", "share", "roam"]); // Garden's blend and dormant off
+  assert.equal(f.choose(sit(), garden), intervention("soothe"), "not dormant: the player switched it off");
+  f.policy = () => "dormant";
+  assert.equal(f.choose(sit(), garden), intervention("soothe"));
+  f.configure(DEFAULT_RULE, ["roam"]); // nothing Garden allows
+  assert.equal(f.choose(sit(), garden), 0, "nothing on: as-is");
+  // As-is with dormant off does not hide: a nestmate sees the strain's full visibility (it is groomed as hard as if it showed).
+  const load = (menu: string[]) => {
+    const c = placed(arena(), 0, 0, [[20, 6], [20, 6], [20, 6]]);
+    c.load[0] = 0.8;
+    c.strain[0] = garden;
+    c.resist[1] = c.resist[2] = 1;
+    c.expr[0] = 0;
+    c.fungal[0] = 0;
+    const g = new Fungus(arena());
+    g.configure(DEFAULT_RULE, menu);
+    g.hosts = 1;
+    g.step([c], [occupancy(c, new CountGrid())], 0.5);
+    return c.load[0] as number;
+  };
+  assert.ok(load(["roam"]) < load(["dormant", "roam"]), "hiding is dormant's, and dormant is off");
+});
+
+test("cull bites from a high load, where the local rule culls: at 0.7 its own nestmates already take it for a stranger", () => {
+  for (const l of [0.7, 0.75, 1]) {
+    const map = arena();
+    const c = placed(map, 0, 0, [[20, 6], [20, 6], [20, 6]]);
+    const f = new Fungus(map);
+    f.express(c, 0, intervention("cull"), l);
+    const rec = new Recognition();
+    rec.step([c], 0.1);
+    rec.build([c]);
+    rec.look(c.odour[1] as number, rec.params.tolerance);
+    assert.ok(rec.around(20, 6, 40, 12) >= 1, `load ${l}: odour ${(c.odour[0] as number).toFixed(3)} is a stranger's`);
+  }
+});
+
+test("contact: a calmed stranger still smells strange (the fungus senses strangers, not allied)", () => {
+  for (const calm of [0, 0.8]) {
+    const map = arena();
+    const a = placed(map, 0, 0, [[20, 6]]);
+    const b = placed(map, 1, 1, [[20, 6]]);
+    b.calm[0] = calm;
+    const f = new Fungus(map);
+    f.paint([a], 20.5, 6.5, 0.6, 0, 0.5, ID("garden"));
+    const rec = new Recognition();
+    rec.build([a, b]);
+    f.step([a, b], [a, b].map((c) => occupancy(c, new CountGrid())), 0.1, rec);
+    assert.equal(decodeFungal(a.fungal[0] as number, "garden").contact, "strangers", `calm ${calm}`);
+    // A fight still counts it as calmed (what soothe is for).
+    rec.look(a.odour[0] as number, rec.params.tolerance);
+    assert.ok(Math.abs(rec.around(20, 6, 40, 12) - (1 - calm)) < 1e-6);
+  }
 });

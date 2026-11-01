@@ -2,7 +2,7 @@ import type { JevAnswer, JevProxyReply, JevRequest, JevResponse, RunCaps, RunSum
 import { localPolicy, localStance, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
-import { fungalKey, fungusContext, packFungusRequest, readIntervention } from "../colony/fungusBrain.ts";
+import { fungalKey, fungusContext, offeredFor, offeredIn, packFungusRequest, readIntervention, worthAsking } from "../colony/fungusBrain.ts";
 import { INTERVENTIONS, LETHAL, type Fungus } from "../colony/fungus.ts";
 import { PolicyCache } from "../sim/policyCache.ts";
 
@@ -53,7 +53,7 @@ export interface ColonyJevState {
   stancesCached: number;
   /** mode answers cached for each colony's doctrine */
   doctrineCached: number[];
-  /** this run: fungal situations sent to Jev; answers cached for the current aim and menu */
+  /** this run: fungal situations sent to Jev; answers cached for the current aim (under every menu asked) */
   fungusAsked: number;
   fungusCached: number;
   failures: number;
@@ -66,9 +66,12 @@ type Listener = (s: ColonyJevState) => void;
 interface Lane<S, A extends string> {
   name: "mode" | "stance" | "fungus";
   key: (s: S) => string;
-  pack: (items: { id: string; situation: S }[], words: string) => JevRequest;
-  read: (answers: Record<string, JevAnswer>, id: string, situation: S) => A | null;
+  pack: (items: { id: string; key: string; situation: S }[], words: string) => JevRequest;
+  /** the answer to item `id`, asked under `key`, or null when it is not one the question allowed */
+  read: (answers: Record<string, JevAnswer>, id: string, situation: S, key: string) => A | null;
   local: (s: S) => A;
+  /** whether a situation is worth asking at all (absent: always); one that is not gets the local rule, free */
+  asks?: (s: S) => boolean;
   contextOf: (words: string) => string;
   /** the words its requests carry: a colony's doctrine, or the fungus's aim */
   words: string;
@@ -81,7 +84,7 @@ function askKey(context: string, key: string): string {
   return `${context}\u0000${key}`;
 }
 
-function lane<S, A extends string>(spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "contextOf" | "words">): Lane<S, A> {
+function lane<S, A extends string>(spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "contextOf" | "words" | "asks">): Lane<S, A> {
   return { ...spec, context: spec.contextOf(spec.words), queue: new Map() };
 }
 
@@ -101,13 +104,16 @@ export class ColonyJev {
   #fungus: Fungus | null = null;
   /** the menu the fungus lane asks under: the attached fungus's, or every non-lethal intervention */
   #menu: Set<string> = new Set(INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)));
+  // What a host is offered (its strain's allowed ∩ the menu) is in each key, so a question is packed and its
+  // answer read and kept against what it offered when asked, whatever the menu is by the time it lands.
   #fungal = lane<FungalSituation, string>({
     name: "fungus",
-    key: fungalKey,
-    pack: (items, aim) => packFungusRequest(items, aim, this.#menu),
-    read: (a, id, s) => readIntervention(a, id, s, this.#menu),
+    key: (s) => fungalKey(s, offeredFor(s.strain, this.#menu)),
+    pack: (items, aim) => packFungusRequest(items.map((it) => ({ ...it, offered: offeredIn(it.key) })), aim),
+    read: (a, id, _s, key) => readIntervention(a, id, offeredIn(key)),
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
-    contextOf: (aim) => fungusContext(aim, this.#menu),
+    asks: (s) => worthAsking(offeredFor(s.strain, this.#menu)),
+    contextOf: fungusContext,
     words: "",
   });
   /** caches by context, shared by every lane asking under it */
@@ -168,7 +174,7 @@ export class ColonyJev {
   }
 
   #lookup<S, A extends string>(l: Lane<S, A>, s: S): A {
-    if (this.#state.phase !== "running") return l.local(s);
+    if (this.#state.phase !== "running" || (l.asks && !l.asks(s))) return l.local(s);
     const key = l.key(s);
     const hit = this.#cache(l).get(key);
     if (l.name === "mode") {
@@ -183,7 +189,7 @@ export class ColonyJev {
   /** Who decides, in lane l, situation s right now: Jev's cached answer, the local rule while Jev is asked, or the local rule. Counts and queues nothing. */
   #explain<S, A extends string>(l: Lane<S, A>, s: S): { answer: A; by: "jev" | "waiting" | "local" } {
     const local = l.local(s);
-    if (this.#state.phase !== "running") return { answer: local, by: "local" };
+    if (this.#state.phase !== "running" || (l.asks && !l.asks(s))) return { answer: local, by: "local" };
     const key = l.key(s);
     const hit = this.#cache(l).get(key);
     if (hit) return { answer: hit, by: "jev" };
@@ -229,12 +235,15 @@ export class ColonyJev {
     this.#recontext(this.#fungal, text);
   }
 
-  /** The player's menu: what the fungus may run. It is part of every fungus question, so it is part of the cache's context. */
+  /**
+   * The player's menu: what the fungus may run. What it offers a host is part of that host's question, so it is in
+   * the key (per strain: answers for a strain whose offer did not change still hold). Queued questions were keyed
+   * under the old menu: dropped, the hosts ask again. Questions in flight are read against what they offered.
+   */
   setMenu(menu: Set<string>): void {
     this.#menu = new Set(menu);
     if (this.#fungus) this.#fungus.menu = new Set(menu);
-    this.#fungal.context = "";
-    this.#recontext(this.#fungal, this.#fungal.words);
+    this.#fungal.queue.clear();
   }
 
   /** New words for a lane: its own cache (free if used before), and a fresh queue. Returns whether the context changed. */
@@ -393,6 +402,7 @@ export class ColonyJev {
       if (res.status === 409) {
         const run = (body as { run?: RunSummary }).run ?? null;
         this.#halt();
+        this.#aborter.abort(); // as Stop does: the run is over, so is everything still in flight in it
         this.#set({ phase: "stopped", run, lastError: `Jev stopped: ${(body as { error?: string }).error ?? "run over"}. Ants are on the local rule.` });
         return;
       }
@@ -409,7 +419,8 @@ export class ColonyJev {
       error = String(err);
     } finally {
       this.#inFlight--;
-      for (const it of items) this.#asking.delete(askKey(context, it.key));
+      // A new run (Start) cleared the in-flight set and may be asking these again: theirs, not this run's, to clear.
+      if (seq === this.#runSeq) for (const it of items) this.#asking.delete(askKey(context, it.key));
     }
     if (!reply || reply.status !== 200 || !reply.body || !("answers" in reply.body)) {
       // Not billed as a reply; everyone keeps the local rule and meets the situation again later.
@@ -421,7 +432,7 @@ export class ColonyJev {
     const cache = this.#cache(l, context);
     const answers = (reply.body as JevResponse).answers;
     for (const it of items) {
-      const a = l.read(answers, it.id, it.situation);
+      const a = l.read(answers, it.id, it.situation, it.key);
       if (a) cache.put(it.key, a);
     }
     this.#store?.save(context, cache.entries());

@@ -1,7 +1,7 @@
 import type { CountGrid } from "./battle.ts";
 import { CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import { MODES, type Colony, type Mode } from "./colony.ts";
-import { DEFAULT_RULE, STRAIN_DEFAULT, encodeFungal, loadLevel, localFungusRule, type FungalSituation, type FungusPolicy, type FungusRule, type Ground } from "./fungalPolicy.ts";
+import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, encodeFungal, loadLevel, localFungusRule, type FungalSituation, type FungusPolicy, type FungusRule, type Ground } from "./fungalPolicy.ts";
 import type { Recognition } from "./recognition.ts";
 import { rockAt, type WorldMap } from "./world.ts";
 
@@ -406,15 +406,18 @@ export class Fungus {
           const theirs = c.foreign ? c.foreign.fields.home.get(cx, cy) : 0;
           if (own > 0 && own >= p.borderRatio * theirs) ground = "home";
           else if (theirs > 0 && theirs >= p.borderRatio * own) ground = "foreign";
-          // Who touches it, in the 3×3 cells around: strangers (past tolerance, by odour), else ants of another
-          // colony it tolerates (allied: unification, felt where it happens), else its own colony's (kin), else none.
+          // Who touches it, in the 3×3 cells around: strangers (past tolerance, by odour alone: a calmed stranger
+          // still smells strange), else ants of another colony it tolerates (allied: unification, felt where it
+          // happens), else its own colony's (kin), else none.
           let contact: FungalSituation["contact"] = nb.ants - nb.own > 0.5 ? "allied" : nb.own - 1 > 0.5 ? "kin" : "none";
           if (rec) {
             rec.look(c.odour[i] as number, rec.params.tolerance);
-            if (rec.around(cx, cy, w, h) >= 0.5) contact = "strangers";
+            if (rec.around(cx, cy, w, h, 1, true) >= 0.5) contact = "strangers";
           }
-          // Groomed: its nestmates are taking load off it now, at what it shows now (a dormant host shows little).
-          const groomRate = p.grooming * (strain === s ? shows : ns.visibility) * Math.min(p.groomers, mates);
+          // Groomed: enough nestmates are around to groom it off, at what its strain shows. Judged at the strain's
+          // visibility, not at what the host shows now: a dormant host shows a quarter, and judging it by that would
+          // read it as ungroomed the step after it hid, wake it, and hide it again, every step.
+          const groomRate = p.grooming * ns.visibility * Math.min(p.groomers, mates);
           const sit: FungalSituation = {
             strain: ns.id,
             load: loadLevel(nl),
@@ -537,10 +540,14 @@ export class Fungus {
     return this.active && this.#clock + dt + 1e-9 >= this.params.interval;
   }
 
-  /** The share of ant i's load its nestmates can see: its strain's visibility, a quarter of it while the policy keeps it dormant. */
+  /**
+   * The share of ant i's load its nestmates can see: its strain's visibility, a quarter of it while the policy
+   * keeps it dormant. Hiding is the dormant intervention: with dormant off the menu a host that runs nothing
+   * (nothing its strain allows is on) does not hide.
+   */
   #shows(c: Colony, i: number, s: number): number {
     const v = (this.strains[s] as Strain).visibility;
-    return c.expr[i] === 0 && (c.fungal[i] as number) >= 0 ? v * DORMANT_SHOW : v;
+    return c.expr[i] === 0 && (c.fungal[i] as number) >= 0 && this.menu.has("dormant") ? v * DORMANT_SHOW : v;
   }
 
   /** The player's settings: the local rule's thresholds and the menu (§5.1, levers 4 and 5). */
@@ -562,7 +569,9 @@ export class Fungus {
   /**
    * The intervention (an index into INTERVENTIONS) a host of strain index `s` runs in situation `sit`: the
    * policy's choice if the strain allows it and the menu has it on; else the strain's own default if that is
-   * on; else dormant. So a strain can never run what it does not allow, whatever any policy answers.
+   * on; else the first thing that is on (in the table's order); else nothing (0, as-is, and no hiding unless
+   * dormant is on). So a host never runs what its strain does not allow or the menu has off, whatever any
+   * policy answers.
    */
   choose(sit: FungalSituation, s: number): number {
     const offered = this.offered(s);
@@ -570,7 +579,8 @@ export class Fungus {
     const answer = (this.policy ?? ((x: FungalSituation) => this.local(x)))(sit);
     const pick = answer === STRAIN_DEFAULT ? fallback : answer;
     if (offered.includes(pick)) return intervention(pick);
-    return offered.includes(fallback) ? intervention(fallback) : 0;
+    if (offered.includes(fallback)) return intervention(fallback);
+    return offered.length ? intervention(offered[0] as string) : 0;
   }
 
   /** Run intervention e in ant i of colony c at load l: its perception is the lerp from as-is to the levers by l. */
@@ -592,7 +602,9 @@ export class Fungus {
     c.layGain[i] = 1 + (v.lay - 1) * l;
     c.crossLay[i] = v.crossLay * l;
     c.quiet[i] = v.quiet * l;
-    c.estrange[i] = v.estrange * l;
+    // Cull is all or nothing in effect (an odour pushed half-way is still within tolerance of its nest's), so it
+    // takes full effect from a high load, where the local rule culls, instead of from a full one.
+    c.estrange[i] = v.estrange * Math.min(1, l / HIGH_LOAD);
   }
 
   /** How far the fungus is into colony c, and how far c has answered it. */

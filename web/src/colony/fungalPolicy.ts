@@ -43,8 +43,11 @@ export type FungusPolicy = (s: FungalSituation) => string;
 /** Situations per strain: 3 × 4 × 3 × 4 × 2 = 288. */
 export const FUNGAL_SITUATIONS = LOADS.length * MODES.length * GROUNDS.length * CONTACTS.length * 2;
 
+/** A load at or past this is "high": where the local rule culls, and where cull takes full effect (Fungus.express). */
+export const HIGH_LOAD = 0.7;
+
 export function loadLevel(l: number): Load {
-  return l >= 0.7 ? "high" : l >= 0.3 ? "mid" : "low";
+  return l >= HIGH_LOAD ? "high" : l >= 0.3 ? "mid" : "low";
 }
 
 /** The fungal situation without its strain, as one number (0 .. FUNGAL_SITUATIONS − 1): what a host keeps of what it was last asked. */

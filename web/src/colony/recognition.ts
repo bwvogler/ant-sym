@@ -108,10 +108,18 @@ export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: 0.35, nestDri
 export class Recognition {
   params: RecognitionParams;
   readonly bins: SumGrid[] = Array.from({ length: BINS }, () => new SumGrid());
+  /** every ant by odour band, each counted once whatever its calm: built only while some ant is calmed (else `bins` are the same) */
+  readonly #everyone: SumGrid[] = Array.from({ length: BINS }, () => new SumGrid());
+  /** whether `#everyone` holds this build's ants (some ant was calmed); otherwise read `bins` for it */
+  #calmed = false;
   /** bit b set: band b is a stranger to the odour last looked at, and holds someone */
   #mask = 0;
+  /** bit b set: band b is a stranger to the odour last looked at (held or not) */
+  #strange = 0;
   /** bit b set: band b holds someone, anywhere (most games use two bands: a check skips the rest) */
   #occupied = 0;
+  /** the same, counting every ant (calmed or not) */
+  #occupiedEveryone = 0;
   /** the odour and tolerance the mask was made for: consecutive ants mostly share them */
   #lookOdour = NaN;
   #lookTolerance = NaN;
@@ -126,21 +134,34 @@ export class Recognition {
   /** Rebuild the bands from every living ant. */
   build(colonies: readonly Colony[]): void {
     for (const g of this.bins) g.reset();
+    if (this.#calmed) for (const g of this.#everyone) g.reset();
+    let calmed = false;
+    for (const c of colonies) {
+      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (c.calm[i] as number) > 0) calmed = true;
+      if (calmed) break;
+    }
+    this.#calmed = calmed;
     let occupied = 0;
+    let everyone = 0;
     for (const c of colonies) {
       const { w, h } = c.map.size;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         const cx = Math.min(w - 1, Math.max(0, Math.floor(c.x[i] as number)));
         const cy = Math.min(h - 1, Math.max(0, Math.floor(c.y[i] as number)));
+        const b = binOf(c.odour[i] as number);
+        if (calmed) {
+          (this.#everyone[b] as SumGrid).add(cx, cy, 1);
+          everyone |= 1 << b;
+        }
         const weight = 1 - (c.calm[i] as number);
         if (weight <= 0) continue;
-        const b = binOf(c.odour[i] as number);
         (this.bins[b] as SumGrid).add(cx, cy, weight);
         occupied |= 1 << b;
       }
     }
     this.#occupied = occupied;
+    this.#occupiedEveryone = calmed ? everyone : occupied;
     this.#lookOdour = NaN; // the bands changed: the next look rebuilds its mask
   }
 
@@ -149,6 +170,7 @@ export class Recognition {
     if (odour === this.#lookOdour && tolerance === this.#lookTolerance) return;
     let m = 0;
     for (let b = 0; b < BINS; b++) if (Math.abs(binCentre(b) - odour) > tolerance + STRANGER_EPS) m |= 1 << b;
+    this.#strange = m;
     this.#mask = m & this.#occupied;
     this.#lookOdour = odour;
     this.#lookTolerance = tolerance;
@@ -166,12 +188,18 @@ export class Recognition {
     return false;
   }
 
-  /** Strangers (weighted) in the (2r+1)² cells around (cx, cy), clipped to w × h, to the odour last looked at. */
-  around(cx: number, cy: number, w: number, h: number, r = 1): number {
+  /**
+   * Strangers in the (2r+1)² cells around (cx, cy), clipped to w × h, to the odour last looked at: weighted by
+   * (1 − calm), as a fight counts them, or with `byOdour` each counted once, calmed or not (who smells
+   * different, which calming does not change: what the fungus senses as contact).
+   */
+  around(cx: number, cy: number, w: number, h: number, r = 1, byOdour = false): number {
+    const everyone = byOdour && this.#calmed;
+    const bins = everyone ? this.#everyone : this.bins;
     let s = 0;
-    for (let b = 0, m = this.#mask; m; b++, m >>= 1) {
+    for (let b = 0, m = everyone ? this.#strange & this.#occupiedEveryone : this.#mask; m; b++, m >>= 1) {
       if (!(m & 1)) continue;
-      const g = this.bins[b] as SumGrid;
+      const g = bins[b] as SumGrid;
       if (!g.any(cx - r, cy - r, cx + r, cy + r)) continue;
       for (let y = Math.max(0, cy - r); y <= Math.min(h - 1, cy + r); y++) for (let x = Math.max(0, cx - r); x <= Math.min(w - 1, cx + r); x++) s += g.get(x, y);
     }

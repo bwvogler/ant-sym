@@ -200,6 +200,9 @@ test("validateJevRequest fills the model, keeps assets, rejects junk", () => {
   assert.throws(() => validateJevRequest({ questions: { q: { type: "noul", instructions: "" } } }), /state is required/);
   assert.throws(() => validateJevRequest({ state: 1, questions: {} }), /non-empty/);
   assert.throws(() => validateJevRequest({ state: 1, questions: { q: { type: "rank" } } }), /no valid type/);
+  // PR #7 review: a fungus host with nothing on its menu was asked a choice among nothing, forever.
+  assert.throws(() => validateJevRequest({ state: 1, questions: { q: { type: "choice", instructions: "x", criteria: {} } } }), /no options/);
+  assert.equal(validateJevRequest({ state: 1, questions: { q: { type: "choice", instructions: "x", criteria: { a: "A" } } } }).model, "jev-latest");
 });
 
 test("the Vite plugin mounts every route through wrap(), sizes the pool from the environment, and closes it on restart", { timeout: 15_000 }, async () => {

@@ -3,7 +3,7 @@ import type { Colony, Situation } from "../colony/colony.ts";
 import { COLONY_NAMES } from "./names.ts";
 import { DOCTRINES, estimateTokens, packModeRequest } from "../colony/colonyBrain.ts";
 import type { FungalSituation } from "../colony/fungalPolicy.ts";
-import { AIMS, packFungusRequest } from "../colony/fungusBrain.ts";
+import { AIMS, offeredFor, packFungusRequest } from "../colony/fungusBrain.ts";
 import { INTERVENTIONS, type Fungus } from "../colony/fungus.ts";
 import { ColonyJev, type CacheStore, type ColonyJevState } from "./colonyJev.ts";
 
@@ -41,7 +41,7 @@ export const TOKENS_PER_SITUATION = Math.round(estimateTokens(packModeRequest(Ar
 /** The same for a fungal situation (legend + aim dominate, as for the ants). */
 const FUNGAL_SAMPLE: FungalSituation = { strain: "garden", load: "mid", host: "explore", ground: "border", contact: "kin", groomed: false };
 export const TOKENS_PER_FUNGAL_SITUATION = Math.round(
-  estimateTokens(packFungusRequest(Array.from({ length: 100 }, (_, n) => ({ id: `h${n}`, situation: FUNGAL_SAMPLE })), AIMS[0]!.text, new Set(INTERVENTIONS.map((v) => v.id)))) / 100,
+  estimateTokens(packFungusRequest(Array.from({ length: 100 }, (_, n) => ({ id: `h${n}`, situation: FUNGAL_SAMPLE, offered: offeredFor(FUNGAL_SAMPLE.strain, new Set(INTERVENTIONS.map((v) => v.id))) })), AIMS[0]!.text)) / 100,
 );
 
 export interface DoctrineChoice {

@@ -355,7 +355,7 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
   assert.equal(j.explainFungus(s).answer, "dormant");
 });
 
-test("the fungus lane: a new aim or a new menu is a new cache; stopping hands the fungus back to the local rule", async () => {
+test("the fungus lane: a new aim is a new cache, a new menu a new question; stopping hands the fungus back to the local rule", async () => {
   scriptAll("soothe");
   const store = memoryStore();
   const j = make(store);
@@ -374,8 +374,11 @@ test("the fungus lane: a new aim or a new menu is a new cache; stopping hands th
   assert.equal(j.state.fungusCached, 0, "nothing cached under the new aim yet");
   j.setAim("Calm every meeting.");
   assert.equal(j.state.fungusCached, before, "the old aim's answers are still there");
+  const asked = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  assert.equal(j.explainFungus(asked).by, "jev");
   j.setMenu(new Set(["dormant", "blend"]));
-  assert.equal(j.state.fungusCached, 0, "a new menu: a new cache");
+  assert.notEqual(j.explainFungus(asked).by, "jev", "a new offer for Garden: a new question");
+  assert.equal(j.state.fungusCached, before, "the old menu's answers are kept, for when it comes back");
   assert.equal(g.fungus.menu.has("soothe"), false, "and the fungus runs under it");
   await j.stop();
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
