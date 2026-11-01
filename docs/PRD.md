@@ -10,50 +10,57 @@ Tone is the spirit of the ant colony: self-coordination, local information, a pi
 
 ## 2. Decisions from the interview
 
+The table is the original interview, with later reversals marked *(now: …)*. The code is the reference for current numbers; §8 explains the picture-app changes, §9 on are the colony.
+
 | Topic | Decision | Why |
 |---|---|---|
 | Format | Web app. Vite + React + TypeScript + Tailwind v4, Canvas 2D for the field, a small Node proxy for the API key. | Moving a few thousand dots is trivial in a browser; the bottleneck is Jev round trips, not rendering. No heavier engine needed. WebGL points only if we ever want 20k+ ants. |
 | Agent model | **Packed requests.** ~100 ants share one `state`; each ant gets its own questions. | Jev evaluates every question in isolation against the shared state, so each ant still gets an independent decision and can genuinely see its neighbours. One state per request is the API's shape; there is no batch endpoint. Measured: 100 ants in ~0.5 s. |
-| Ant brain | Three questions per ant: **direction** (choice: 8 compass points + stay), **pace** (score: creep / walk / hurry), **settle** (noul: "this cell still needs ants, stay"). | Extra questions cost almost no latency. Settling is what makes the picture sharpen instead of jitter. |
-| Scale | 500 to 2,000 ants, default 1,000. | Enough density for letters and simple images at a 64×64 grid. |
-| Cadence | Each **unsettled** ant re-decides about every 2 s and coasts in between; settled ants ask again only when their cell's deficit changes. Scheduler takes the stalest ants every ~200 ms. | 1,000 ants → ≤5 requests of 100 per second at the start, decaying as ants settle. Measured headroom: 8 parallel requests of 100 ants in 0.65 s wall. Parallelism buys latency, not cost (see §8). |
-| Spend control | Explicit **Start / Stop**. Running cost from the real `usage.input_tokens` of every response × $0.042/M, never estimated. Three stop conditions, whichever first: **formed** (local grid error under threshold, confirmed by the overseer noul), **time cap** (default 3 min), **spend cap** (default $0.50). Caps editable. After a stop, ants idle on the local rule and Jev is not called. | A demo must never run away, and a formed picture should cost nothing to look at. Cost plan in §8. |
+| Ant brain | Three questions per ant: **direction** (choice: 8 compass points + stay), **pace** (score: creep / walk / hurry), **settle** (noul: "this cell still needs ants, stay"). *(Now: direction + settle only, ~296 tok/ant; pace was dropped in the bake-off, §8.1b–8.2.)* | Extra questions cost almost no latency. Settling is what makes the picture sharpen instead of jitter. |
+| Scale | 500 to 2,000 ants, default 1,000. | Enough density for letters and simple images at a 64×64 grid *(now 96×64, `DEFAULT_PARAMS.size`)*. |
+| Cadence | Each **unsettled** ant re-decides about every 2 s *(now: at least 1.5 s apart, `minAgeSeconds`, §8.6)* and coasts in between; settled ants ask again only when their cell's deficit changes. Scheduler takes the stalest ants every ~200 ms. | 1,000 ants → ≤5 requests of 100 per second at the start, decaying as ants settle. Measured headroom: 8 parallel requests of 100 ants in 0.65 s wall. Parallelism buys latency, not cost (see §8). |
+| Spend control | Explicit **Start / Stop**. Running cost from the real `usage.input_tokens` of every response × $0.042/M, never estimated. Three stop conditions, whichever first: **formed** (local grid error under threshold; *now the overseer noul is shown beside it and does not gate it, §8.2*), **time cap** (default 3 min), **spend cap** (default $0.50). Caps editable. After a stop, ants idle on the local rule and Jev is not called. | A demo must never run away, and a formed picture should cost nothing to look at. Cost plan in §8. |
 | Images (Jev) | **Overseer.** Every few seconds, send the current field and the target as two images; ask a `box` ("the region of current that most lacks ants vs target") and a `noul` ("current is a recognisable copy of target"). The box becomes an attractor hint in each ant's state; the noul drives a "formed" badge. | Showcases Jev's new image input without making the core loop depend on a feature TypeSafe calls "dreamer-ready, not production-ready". |
-| Shading | Target image → greyscale → downsample to a grid (64×64 default) → darkness per cell → normalised so Σ target = ant count. Density is tone. | Text and images are the same pipeline: text is rendered to an offscreen canvas first. |
+| Shading | Target image → greyscale → downsample to a grid (64×64 default, *now 96×64*) → darkness per cell → normalised so Σ target = ant count. Density is tone. | Text and images are the same pipeline: text is rendered to an offscreen canvas first. |
 | Baseline | A **local-rule** mode (greedy toward max neighbouring deficit, with noise) next to Jev mode. | A greedy rule would also form the picture; the demo should show the difference, not assert it. Also the fallback at the spend cap and under 429s. |
 | Look | **Ink on warm paper**: lingo-dojo palette. Light: ink ants on `#f6f4ef`; dark: pale ants on charcoal. One jade accent for the overseer box and selected things. Ants are 2 px oriented ticks. | More ants = darker reads naturally as a pen drawing. Reuses an existing, tested token scheme. |
 | Controls (v1) | Text input + image upload with live target-grid preview; ant count, sim speed, Jev/local toggle; Jev telemetry panel; overlays (deficit heatmap, overseer box, pheromone trails). | All chosen. |
 | End state | Overseer "formed" badge; **Scatter** button; **Morph** (type a new target while formed and ants walk to it). GIF recording deferred to a later milestone. | Scatter is the replay moment. Morph is cheap once the target is just a grid. |
 | Deployment | Local first (port **38500**, key from `JEV_API_KEY` in the shell), server written so it can be hosted later with per-visitor budgets. | Same shape as lingo-dojo / travel-guide. |
 | Process | Beads (prefix `ja`) + one PR per milestone with agent review before merge. | House convention. |
-| Repo | Public, `scalefreegan/jev-ants`, MIT. | Showcase piece. |
+| Repo | Public, `scalefreegan/jev-ants`, MIT *(now `bwvogler/ant-sym`)*. | Showcase piece. |
 
 ## 3. Architecture
 
 ```
-browser (Vite + React)                          node (Vite dev-server middleware, web/server/)
-┌──────────────────────────────────┐            ┌─────────────────────────────────┐
-│ sim/        pure TS, no DOM      │            │ api.ts    wrap(): same-origin   │
-│   grid.ts   target density grid  │  POST      │ jev.ts    pool of N parallel    │
-│   ants.ts   positions, headings  │  /api/jev  │           connections → TypeSafe│
-│   local.ts  greedy baseline      │ ─────────► │ budget.ts token/cost ledger     │
-│   pack.ts   ants → Jev request   │ ◄───────── │ overseer.ts images → box/noul   │
-│   apply.ts  answers → ant intent │  answers   └─────────────────────────────────┘
-│ ui/         React, Tailwind v4   │                        │ Bearer JEV_API_KEY
-│   Field.tsx canvas renderer      │                        ▼
-│   Panel.tsx controls/telemetry   │              https://api.typesafe.ai/v1/systemone
-└──────────────────────────────────┘
+browser (Vite + React)                               node (Vite dev-server middleware, web/server/)
+┌────────────────────────────────────────┐           ┌──────────────────────────────────┐
+│ sim/       picture: pure TS, no DOM    │           │ api.ts    wrap(): same-origin    │
+│   grid, ants, local, engine            │  POST     │ http.ts   JSON bodies, HttpError │
+│   jevBrain   ants → request → intent   │ /api/jev  │ jev.ts    node:https Agent pool  │
+│   policyCache situations, cache        │ ────────► │           of N → TypeSafe        │
+│   overseer   images → box / noul       │ ◄──────── │ ledger.ts tokens, $, caps, width │
+│   targets    text/image → grid (DOM)   │  answers  └──────────────────────────────────┘
+│ colony/    colony + fungus: pure TS    │                         │ Bearer JEV_API_KEY
+│   world, colony, pheromone, battle,    │                         ▼
+│   recognition, fungus, game, brains    │            https://api.typesafe.ai/v1/systemone
+│ ui/        React, canvas, Jev clients  │
+│   jevScheduler (picture), colonyJev    │   shared/jev.ts: wire types, price, caps,
+│   Field / ColonyField, panels, hooks   │                  in-flight width (both sides)
+└────────────────────────────────────────┘
 ```
 
 - **Sim loop** runs in the browser with `requestAnimationFrame`. Each tick: move ants by heading × pace, update the density grid, decay pheromone, redraw. Jev answers arrive asynchronously and update each ant's *intent* (heading, pace, settled); the tick loop never waits on the network.
 - **Scheduler**: every 200 ms, pick the ants whose last decision is oldest (and not settled, or settled but with a deficit that changed), pack them 100 per request, post. In-flight limit 5 (browsers allow 6 connections per host; one stays free so Stop reaches the server at once). The server retries 429/529 honouring `retry-after`; the browser treats a 429 "busy" from the proxy as "release these ants, try next cycle".
-- **Server** holds the key, forwards packed requests, counts `usage.input_tokens`, enforces the session cap, and runs the overseer (renders nothing itself; the browser sends two PNGs).
-- **Connection pool**: Node's `fetch` on one dispatcher serialised our requests (10 × 50 ants took 2.9 s stacked; separate connections took 0.65 s for 8 × 100). The server must use an undici `Agent` sized for the in-flight limit, and a test must pin that parallel requests overlap.
-- `sim/` is pure and covered by `node --test`; the renderer and React layer are thin.
+- **Server** holds the key, forwards packed requests, counts `usage.input_tokens` and enforces the caps. The overseer is the browser's (`sim/overseer.ts`, `ui/overseerImages.ts`): it renders two PNGs and posts them as one more request.
+- **Connection pool**: Node's `fetch` on one dispatcher serialised our requests (10 × 50 ants took 2.9 s stacked; separate connections took 0.65 s for 8 × 100). The server uses a `node:https` `Agent` sized for the in-flight limit (an undici `Agent` queued behind one warm socket too, `web/server/jev.ts`), and a test pins that parallel requests overlap.
+- `sim/` (but `targets.ts`) and `colony/` are pure and covered by `node --test`; the renderer and React layer are thin.
 
 ## 4. The Jev contract
 
 ### 4.1 Ant request (packed)
+
+The original shape, kept for the record. What is sent now is `packRequest` in `web/src/sim/jevBrain.ts`: a `legend` instead of `rules`, `room` / `idle` / `far` in each ant's state, and no pace question (§8.1b–8.2).
 
 ```jsonc
 {
@@ -94,7 +101,7 @@ Header `TypeSafe-Danger-Zone-Images: true`. Two PNGs (280–1568 px per side) in
     "done": { "type": "noul", "instructions": "`current` is a recognisable copy of `target`" } } }
 ```
 
-`box` returns normalised `{top,bottom,left,right}` in 0..1 and has no "not found"; `done` gates whether we trust it. Runs every ~3 s while not formed, every ~10 s once formed. Image tokens bill at the normal input rate.
+`box` returns normalised `{top,bottom,left,right}` in 0..1 and has no "not found"; `done` gates whether we trust it. Runs every 4 s (`overseerMs`; first planned as ~3 s, ~10 s once formed). Image tokens bill at the normal input rate.
 
 ## 5. Probe results (2026-10-25, real API, `scripts/probe.mjs`)
 
@@ -111,7 +118,7 @@ Header `TypeSafe-Danger-Zone-Images: true`. Two PNGs (280–1568 px per side) in
 - Output tokens are free. Price is $0.042 per million input tokens.
 - `GET /v1/models` lists `jev-latest` and `jev-preview` only.
 
-**Cost model.** tokens/s = ants × tokens-per-ant ÷ cadence. At 1,000 ants, 376 tok/ant, 2 s: 188k tok/s → $0.0079/s → **~$28/hour** at full tilt; ~$20/hour with the terser schema; roughly halves at 500 ants or a 4 s cadence. Settled ants are scheduled rarely, so a formed picture costs little to hold. The $1 default cap is about 2–3 minutes of forming at 1,000 ants. The telemetry panel shows all of this live.
+**Cost model.** tokens/s = ants × tokens-per-ant ÷ cadence. At 1,000 ants, 376 tok/ant, 2 s: 188k tok/s → $0.0079/s → **~$28/hour** at full tilt; ~$20/hour with the terser schema; roughly halves at 500 ants or a 4 s cadence. Settled ants are scheduled rarely, so a formed picture costs little to hold. The $1 cap planned here is about 2–3 minutes of forming at 1,000 ants (the default became $0.50, `DEFAULT_CAPS`). The telemetry panel shows all of this live.
 
 ## 6. Milestones
 
