@@ -7,6 +7,9 @@ import { Pheromones } from "../pheromone.ts";
 import { Recognition } from "../recognition.ts";
 import { mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 
+/** Every host runs its strain's default intervention. */
+const strainDefault = (sit: { strain: string }) => STRAINS.find((x) => x.id === sit.strain)!.expresses;
+
 // Emission (ja-t4d.4): the fungus changes what a host gives off. Louder or
 // quieter trail (C1), a carrier leaking its food trail into the other
 // colony's field (C2), and a fight that does not raise the alarm (C3).
@@ -113,6 +116,7 @@ test("the fungus writes what a host gives off: share is loud and leaks, soothe f
   c.strain[1] = lockpick;
   const f = new Fungus(map, { grooming: 0 });
   f.hosts = 2;
+  f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
   assert.equal(c.expr[0], intervention("share"));
   assert.ok(Math.abs((c.layGain[0] as number) - 1.5) < 1e-5);

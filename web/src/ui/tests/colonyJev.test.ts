@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { Colony, type Mode } from "../../colony/colony.ts";
 import { DOCTRINES, policyContext } from "../../colony/colonyBrain.ts";
 import { generateWorld, mulberry32 } from "../../colony/world.ts";
+import { Game } from "../../colony/game.ts";
+import { STRAINS, intervention } from "../../colony/fungus.ts";
+import { decodeFungal } from "../../colony/fungalPolicy.ts";
 import { ColonyJev, type CacheStore } from "../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
@@ -291,4 +294,92 @@ test("explain alone never asks Jev", async () => {
   j.explain({ mode: "explore", tired: true, foodTrail: "faint", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" });
   await tick(60); // several cycles
   assert.equal(sent.length, 0, "no /api/jev request");
+});
+
+// The fungus's lane (ja-t4d.5): its own questions, under the player's aim, never in an ant's request.
+
+/** Every request, whole; Jev answers modes "explore", stances "forage", and the fungus `fungal`. */
+function scriptAll(fungal: string) {
+  const reqs: (JevRequest & { state: Record<string, unknown> })[] = [];
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
+    const req = JSON.parse(String(init?.body)) as JevRequest & { state: Record<string, unknown> };
+    reqs.push(req);
+    const answers: Record<string, unknown> = {};
+    for (const q of Object.keys(req.questions)) answers[q] = { type: "choice", choice: q.endsWith("_do") ? fungal : q.endsWith("_stance") ? "forage" : "explore", confidence: 0.9 };
+    const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
+    return { ok: true, status: 200, json: async () => body } as Response;
+  }) as typeof fetch;
+  return reqs;
+}
+
+/** A small game with Garden painted on the player's nest. */
+function infectedGame() {
+  const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
+  g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 2, 3, 0.4, STRAINS.findIndex((s) => s.id === "garden"));
+  return g;
+}
+
+test("the fungus lane: fungal situations go to Jev under the aim, the answers are cached, and the hosts run them", async () => {
+  const reqs = scriptAll("dormant");
+  const j = make();
+  const g = infectedGame();
+  j.attach(g.player);
+  j.attachFungus(g.fungus);
+  j.setAim("Spread unseen.");
+  // Off: the local rule (Garden's default, blend).
+  for (let k = 0; k < 6; k++) g.tick(1 / 30);
+  assert.ok([...g.player.expr].some((e) => e === intervention("blend")), "off: Garden blends");
+  await j.start();
+  for (let round = 0; round < 6; round++) {
+    for (let k = 0; k < 6; k++) g.tick(1 / 30);
+    await tick(25);
+  }
+  const fungal = reqs.filter((r) => r.state.hosts);
+  assert.ok(fungal.length > 0, "the fungus asked");
+  for (const r of fungal) {
+    assert.equal(r.state.aim, "Spread unseen.");
+    assert.equal(r.state.ants, undefined);
+    assert.equal(r.state.doctrine, undefined, "the aim, not the colony's doctrine");
+  }
+  for (const r of reqs.filter((x) => x.state.ants)) {
+    assert.equal(r.state.aim, undefined, "an ant's request never carries the fungus's aim");
+    assert.equal(r.state.hosts, undefined);
+  }
+  assert.ok(j.state.fungusCached > 0 && j.state.fungusAsked > 0);
+  // Jev said dormant: every host runs dormant now.
+  for (let k = 0; k < 6; k++) g.tick(1 / 30);
+  for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && (g.player.load[i] as number) > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
+  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  assert.equal(j.explainFungus(s).by, "jev");
+  assert.equal(j.explainFungus(s).answer, "dormant");
+});
+
+test("the fungus lane: a new aim or a new menu is a new cache; stopping hands the fungus back to the local rule", async () => {
+  scriptAll("soothe");
+  const store = memoryStore();
+  const j = make(store);
+  const g = infectedGame();
+  j.attach(g.player);
+  j.attachFungus(g.fungus);
+  j.setAim("Calm every meeting.");
+  await j.start();
+  for (let round = 0; round < 5; round++) {
+    for (let k = 0; k < 6; k++) g.tick(1 / 30);
+    await tick(25);
+  }
+  const before = j.state.fungusCached;
+  assert.ok(before > 0);
+  j.setAim("Something else.");
+  assert.equal(j.state.fungusCached, 0, "nothing cached under the new aim yet");
+  j.setAim("Calm every meeting.");
+  assert.equal(j.state.fungusCached, before, "the old aim's answers are still there");
+  j.setMenu(new Set(["dormant", "blend"]));
+  assert.equal(j.state.fungusCached, 0, "a new menu: a new cache");
+  assert.equal(g.fungus.menu.has("soothe"), false, "and the fungus runs under it");
+  await j.stop();
+  for (let k = 0; k < 6; k++) g.tick(1 / 30);
+  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  assert.equal(j.explainFungus(s).by, "local");
+  assert.ok([...g.player.expr].some((e) => e === intervention("blend")), "stopped: the local rule again");
 });

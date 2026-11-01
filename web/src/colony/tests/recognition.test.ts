@@ -7,6 +7,9 @@ import { Game, QUIET } from "../game.ts";
 import { BINS, FUNGAL, MAX_MASK, Recognition, binCentre, binOf } from "../recognition.ts";
 import { generateWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 
+/** Every host runs its strain's default intervention. */
+const strainDefault = (sit: { strain: string }) => STRAINS.find((x) => x.id === sit.strain)!.expresses;
+
 // Recognition (ja-t4d.3): enemies are strangers by odour, not by colony; the
 // fungus calms (B1), widens a host's tolerance (B4) and gives it its own odour
 // (B3/B7); a colony full of hosts drifts toward that odour, and two colonies
@@ -164,6 +167,7 @@ test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, 
   c.strain[1] = garden;
   const f = new Fungus(map, { grooming: 0 });
   f.hosts = 2;
+  f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
   assert.equal(c.expr[0], intervention("soothe"));
   assert.ok(Math.abs((c.calm[0] as number) - 0.8) < 1e-5);

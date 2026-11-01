@@ -7,6 +7,9 @@ import { Fungus, INTERVENTIONS, STRAINS, intervention } from "../fungus.ts";
 import { Pheromones } from "../pheromone.ts";
 import { mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 
+/** Every host runs its strain's default intervention. */
+const strainDefault = (sit: { strain: string }) => STRAINS.find((x) => x.id === sit.strain)!.expresses;
+
 // The perception layer (ja-t4d.2): the fungus bends what a host senses, and
 // the host's own policy decides from that bent state. The policy is never
 // replaced, never told the ant is infected, and asked exactly the question a
@@ -153,6 +156,7 @@ test("the fungus writes a host's perception from its intervention and load; a cl
   c.strain[1] = lockpick;
   const f = new Fungus(map, { grooming: 0 });
   f.hosts = 2;
+  f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
 
   assert.equal(c.expr[0], intervention("share"), "Bloom's default: share");

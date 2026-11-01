@@ -188,7 +188,7 @@ export class Recognition {
     let masked = false;
     for (const c of colonies) {
       for (let i = 0; i < c.n; i++)
-        if (c.alive[i] && (c.mask[i] as number) > 0) {
+        if (c.alive[i] && ((c.mask[i] as number) > 0 || (c.estrange[i] as number) > 0)) {
           masked = true;
           break;
         }
@@ -223,7 +223,9 @@ export class Recognition {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         const f = Math.min(MAX_MASK, c.mask[i] as number);
-        const o = n0 + f * (FUNGAL - n0);
+        // The odour weapon (cull) pushes away from the nest's odour, toward the far side.
+        const away = (c.estrange[i] as number) * 0.5 * (n0 < FUNGAL ? 1 : n0 > FUNGAL ? -1 : 0);
+        const o = Math.min(1, Math.max(0, n0 + f * (FUNGAL - n0) + away));
         if (Math.abs(o - (c.odour[i] as number)) > 1e-7) moving = true;
         c.odour[i] = o;
       }

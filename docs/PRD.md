@@ -628,3 +628,58 @@ The levers work as built, but none decides a war on its own:
 They are tools for the fungus policy (`ja-t4d.5`) to use where they help, not traits to run in every host of a strain. Garden's shared odour (§16) is still what unifies.
 
 **Jev:** the request state and the situation are unchanged, so tokens per ant are unchanged. Quieter and leakier fronts make some games meet more situations (up to 141 → 258). At ~451 tokens per question that is ≈ 50k tokens, ≈ $0.002 per doctrine.
+
+## 18. The fungus policy, and the player's levers on it (fungus 1e, 2026-11-01)
+
+Bead `ja-t4d.5`; design in `docs/fungus-policy.md` §5. The fungus picks one intervention per host. It never picks what an ant does. The player never picks an intervention either: the player shapes the policy.
+
+- **The fungal situation** (`fungalPolicy.ts`): what the fungus in one host senses.
+  - its strain;
+  - load (low, mid or high);
+  - the host's activity (its mode; a carrier counts as returning);
+  - **ground**: home, border or foreign, by whose home scent is where it stands;
+  - **contact**: none, kin or strangers, from the recognition grid;
+  - whether it is being **groomed** right now;
+  - whether the colonies are **apart, close or one**. "One" is the game's own *unified*: within tolerance and a quiet minute.
+
+  That is 648 situations per strain. All of it is local to the host except the last, the one fact the fungus knows about itself as a whole. Each host keeps the situation it was last chosen in (`Colony.fungal`), and the follow card shows it with who chose.
+- **The gate** (`Fungus.choose`): whatever a policy answers, a host runs only what **its strain allows** and **the player's menu** has on. Otherwise it runs its strain's own default, or dormant.
+  - Lockpick allows dormant, soothe and roam.
+  - Bloom allows dormant, share, roam and cull.
+  - Garden allows dormant, blend, soothe and share.
+  - A test runs every strain × every menu × every answer: lethal needs both strain and menu.
+- **New intervention: cull (lethal).** It is an odour weapon: the host's odour is pushed half the scale away from its nest's, so its own colony and the rival both take it for a stranger. Only Bloom allows it, and the menu starts with it off.
+- **Dormant now means lying low:** a host the policy keeps dormant shows a quarter of its strain's visibility (`DORMANT_SHOW`), so its nestmates groom it far less. Hiding is a real move: Bloom hidden from its groomers keeps more load, and the colony primes less (tested).
+- **The player's levers** (§5.1), in the Fungus panel:
+  - the spore brush and strain (1a);
+  - **the menu**: what the fungus may do, with lethal in red;
+  - **the rule's settings**: *hide groomed hosts*, *cull high-load hosts fighting strangers*;
+  - **the aim**: the fungus's goal in the player's words, with three presets (Unite, Spread, Peace), read by Jev and never by the ants.
+- **The local rule** is free and the default: each strain's own default (Lockpick soothes, Bloom shares, Garden blends), except where the player's settings hide or cull.
+- **The Jev lane** (`fungusBrain.ts`, a third lane in `ui/colonyJev.ts`):
+  - one question per fungal situation, under the **aim** (not the doctrine);
+  - a `choice` among only what that host may be given, so Jev's answer is always runnable;
+  - cached per aim and menu;
+  - an answer outside the offer is not cached, and the local rule covers it.
+
+  The ant lanes are untouched. A test checks that ant requests never carry the aim or a host, and fungus requests never carry an ant or the doctrine.
+
+**What was tried and dropped: situational local rules.** Four rules were built and measured against each strain's default (Garden on both nests or one, Lockpick and Bloom on both, seeds 1–3, 6 sim-minutes):
+1. Share routes and roam away from home, soothe strangers. Garden unified 30–50 s later with two to four times the deaths: sharing walked hosts into the rival's ground while they still smelled different.
+2. Sequenced by how close the colonies are. Still later, because soothing a meeting takes a host off blend, so it brings less of the fungus's odour home.
+3. Blend everywhere until close, then the rest. Later again: the close phase stalled short of one odour.
+4. Blend until unified, then share and roam (shared work among kin). It unified exactly as always-blend did, by construction, but afterwards brought in 2–9 % *less* food.
+
+None beat the default, so the default rule is the default.
+
+Situational play is still what the per-host situation is for: the player's settings now, and Jev under an aim. Whether Jev finds placements that beat the defaults is the live measurement still to make.
+
+**Cost:** about **323 input tokens per fungal situation** (estimated from request size, as for the ants' 225). A 6-minute game meets 172–297 fungal situations: ≈ 56–96k tokens, **≈ $0.002–0.004 per aim**. One used before is free. Ant requests and tokens per ant are unchanged.
+
+**Tests** (17 new, 191 in all): situations encode and decode; the rule; the gate; what the fungus senses (ground, contact, groomed, the game's reading); dormant hiding; cull making a host a stranger to its own colony; the lane's request and reader; and the client's fungus lane against a scripted fetch (asked under the aim, cached, hosts switch to Jev's answers; a new aim or menu is a new cache; stopping hands back to the local rule).
+
+**The suite's timeout.** `--test-timeout` also bounds each test file as a whole. `game.test.ts` takes ~17 s alone and passed 20 s under the suite's parallel load as whole-game tests were added. It is now 60 s (a hang guard sized for files of whole games). The 1c commit's per-test timeouts in `game.test.ts` could not help and were reverted. Three full runs since: 191/191, ~23 s.
+
+**Checked in the browser** (light and dark): the policy block (menu, settings, aim) and the follow card, e.g. "the fungus senses: load high · host explore · ground home · contact none · unseen · colonies apart → blend, by the local rule". Phone width has no horizontal scroll, and there are no console errors.
+
+**Still to measure live:** the fungus lane against `api.typesafe.ai`, for real tokens per fungal situation and whether Jev under an aim places interventions better than the strains' defaults. The cloud session has no key.

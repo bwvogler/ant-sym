@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MODES, type Colony, type Mode, type Situation } from "../colony/colony.ts";
 import { INFECTED, INTERVENTIONS, STRAINS } from "../colony/fungus.ts";
+import { decodeFungal, type FungalSituation } from "../colony/fungalPolicy.ts";
 import { followedColony, type Followed } from "./follow.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
@@ -16,12 +17,13 @@ interface Props {
   colony: Colony;
   rival: Colony | null;
   explain: (s: Situation) => { mode: Mode; by: "jev" | "waiting" | "local" };
+  explainFungus: (s: FungalSituation) => { answer: string; by: "jev" | "waiting" | "local" };
   onClose: () => void;
 }
 
 const BY = { jev: "Jev's cached answer", waiting: "the local rule, while Jev is asked", local: "the local rule" } as const;
 
-export default function AntCard({ followed, colony, rival, explain, onClose }: Props) {
+export default function AntCard({ followed, colony, rival, explain, explainFungus, onClose }: Props) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 250);
@@ -66,27 +68,56 @@ export default function AntCard({ followed, colony, rival, explain, onClose }: P
       ) : (
         <p className="mt-2 text-xs text-fg-3">Not asked yet.</p>
       )}
-      <Fungal col={col} i={i} />
+      <Fungal col={col} i={i} explain={explainFungus} />
     </section>
   );
 }
 
 /** What the fungus is doing to ant i: strain, load, the intervention it runs, and each sense it bends. */
-function Fungal({ col, i }: { col: Colony; i: number }) {
+const FUNGUS_BY = { jev: "Jev's cached answer under your aim", waiting: "the local rule, while Jev is asked", local: "the local rule" } as const;
+
+function Fungal({ col, i, explain }: { col: Colony; i: number; explain: Props["explainFungus"] }) {
   const load = col.load[i] as number;
   const resist = col.resist[i] as number;
   if (load < INFECTED) return resist >= 0.05 ? <p className="mt-2 text-xs text-fg-3">Clean · resistance {resist.toFixed(2)} from grooming infected nestmates.</p> : null;
   const strain = STRAINS[col.strain[i] as number];
   const run = INTERVENTIONS[col.expr[i] as number];
   const bent = perceives(col, i);
+  const code = col.fungal[i] as number;
+  const sensed = code >= 0 && strain ? decodeFungal(code, strain.id) : null;
+  const by = sensed ? explain(sensed).by : null;
   return (
+    <>
+    {sensed && (
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="text-fg-3">the fungus senses:</span>
+        {(
+          [
+            ["load", sensed.load],
+            ["host", sensed.host],
+            ["ground", sensed.ground],
+            ["contact", sensed.contact],
+            [sensed.groomed ? "groomed" : "unseen", ""],
+            ["colonies", sensed.colonies],
+          ] as const
+        ).map(([k, v]) => (
+          <span key={k} className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2">
+            {k} {v}
+          </span>
+        ))}
+        <span className="text-fg-3">→</span>
+        <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-spore">{run?.name ?? "?"}</span>
+        <span className="text-fg-3">{by ? `by ${FUNGUS_BY[by]}` : ""}</span>
+      </div>
+    )}
     <p className="mt-2 text-xs text-fg-2">
       <span className="text-spore">
         {strain?.name ?? "fungus"} {Math.round(100 * load)}%
       </span>
       {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {(col.odour[i] as number).toFixed(2)} (its nest {col.nestOdour.toFixed(2)}) · runs <span className="font-mono">{run?.name ?? "?"}</span>
-      {bent.length ? <span className="text-fg-3"> — it perceives {bent.join(", ")}. The situation above is what it perceives; its own policy chose.</span> : <span className="text-fg-3"> — its senses are as they are.</span>}
+      {bent.length ? <span className="text-fg-3"> — it perceives {bent.join(", ")}. The ant's situation above is what it perceives; its own policy chose.</span> : <span className="text-fg-3"> — its senses are as they are.</span>}
     </p>
+    </>
   );
 }
 

@@ -1,6 +1,8 @@
 import type { CountGrid } from "./battle.ts";
 import { CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
-import type { Colony } from "./colony.ts";
+import { MODES, type Colony, type Mode } from "./colony.ts";
+import { DEFAULT_RULE, STRAIN_DEFAULT, encodeFungal, loadLevel, localFungusRule, type FungalSituation, type FungusPolicy, type FungusRule, type Ground, type Together } from "./fungalPolicy.ts";
+import type { Recognition } from "./recognition.ts";
 import { rockAt, type WorldMap } from "./world.ts";
 
 // The fungus, pure: the player. It has no body on the map of its own, only
@@ -16,8 +18,10 @@ import { rockAt, type WorldMap } from "./world.ts";
 // runs in it). An intervention is a bundle of levers on the host; the levers
 // so far bend what the host perceives (ja-t4d.2, docs/fungus-policy.md §2):
 // scent gains, smelling the rival's food trail, and its sense of time out.
-// The host's own policy then decides from that bent state. Until the fungus
-// policy lands (ja-t4d.5), a host runs its strain's default intervention.
+// The host's own policy then decides from that bent state. Which intervention
+// a host runs is the fungus policy's choice (fungalPolicy.ts): the local rule,
+// or Jev under the player's aim; gated by what the host's strain allows and
+// what the player's menu has on.
 //
 // One step reads only grids built from everyone's load before the step, and
 // each ant writes only its own load, so the order colonies are listed in is no
@@ -52,10 +56,12 @@ export interface Levers {
   crossLay: number;
   /** in a fight the host lays (1 − this) of the alarm (C3) */
   quiet: number;
+  /** pushes the host's odour this far (× 0.5) away from its nest's: its own colony takes it for a stranger (B6, the odour weapon) */
+  estrange: number;
 }
 
 /** The world as it is. */
-export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0 };
+export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0, estrange: 0 };
 
 /** One thing the fungus can run in a host: a bundle of levers (docs/fungus-policy.md §5.2). */
 export interface Intervention {
@@ -77,7 +83,11 @@ export const INTERVENTIONS: readonly Intervention[] = [
   { id: "share", name: "share", blurb: "its host smells the rival's food trail as its own and food scent strongly, lays a louder trail, and leaks its food trail to the rival", levers: { ...AS_IS, food: 1.5, foreignFood: 1, lay: 1.5, crossLay: 1 } },
   { id: "roam", name: "roam", blurb: "its host barely smells home and feels its time out slowly, so it ranges far", levers: { ...AS_IS, home: 0.35, clock: 2.5 } },
   { id: "blend", name: "blend", blurb: "its host carries the fungus's own odour, between the colonies', and tolerates the odours in between", levers: { ...AS_IS, mask: 0.6, tolerance: 0.15 } },
+  { id: "cull", name: "cull", blurb: "its host smells like nobody's: its own colony and the rival's both take it for a stranger (lethal)", levers: { ...AS_IS, estrange: 1 } },
 ];
+
+/** Interventions that kill their host: a strain must allow them, and the player's menu starts with them off. */
+export const LETHAL: ReadonlySet<string> = new Set(["cull"]);
 
 /** The index of an intervention by id. */
 export function intervention(id: string): number {
@@ -98,8 +108,10 @@ export interface Strain {
   decay: number;
   /** share of a host's load nestmates can see: what grooming removes, and what primes the groomers */
   visibility: number;
-  /** the intervention (an id in INTERVENTIONS) its hosts run until the fungus policy chooses (ja-t4d.5) */
+  /** the intervention (an id in INTERVENTIONS) a host runs when the policy's choice is not allowed or not on the menu */
   expresses: string;
+  /** the interventions this strain can run at all: the policy's action space for its hosts (§5.1, lever 2) */
+  allows: readonly string[];
 }
 
 /**
@@ -109,9 +121,9 @@ export interface Strain {
  * Garden after the leafcutter's cultivar, whose odour becomes the colony's (blends odours).
  */
 export const STRAINS: readonly Strain[] = [
-  { id: "lockpick", name: "Lockpick", blurb: "spreads slowly, hides, never clears on its own; its hosts barely smell alarm", transmission: 0.15, decay: 0, visibility: 0.1, expresses: "soothe" },
-  { id: "bloom", name: "Bloom", blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant; its hosts smell the rival's food trail as their own", transmission: 0.6, decay: 0.01, visibility: 0.8, expresses: "share" },
-  { id: "garden", name: "Garden", blurb: "spreads steadily and half-shows; its hosts carry its own odour, so colonies that grow it come to smell alike", transmission: 0.3, decay: 0, visibility: 0.3, expresses: "blend" },
+  { id: "lockpick", name: "Lockpick", blurb: "spreads slowly, hides, never clears on its own; its hosts barely smell alarm", transmission: 0.15, decay: 0, visibility: 0.1, expresses: "soothe", allows: ["dormant", "soothe", "roam"] },
+  { id: "bloom", name: "Bloom", blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant; its hosts smell the rival's food trail as their own", transmission: 0.6, decay: 0.01, visibility: 0.8, expresses: "share", allows: ["dormant", "share", "roam", "cull"] },
+  { id: "garden", name: "Garden", blurb: "spreads steadily and half-shows; its hosts carry its own odour, so colonies that grow it come to smell alike", transmission: 0.3, decay: 0, visibility: 0.3, expresses: "blend", allows: ["dormant", "blend", "soothe", "share"] },
 ];
 
 export interface FungusParams {
@@ -131,9 +143,16 @@ export interface FungusParams {
   clear: number;
   /** seconds between steps when the game advances the fungus (Game.tick) */
   interval: number;
+  /** a host counts as groomed when its nestmates take load off it at this rate per second or more */
+  groomedAt: number;
+  /** ground is home (or foreign) where that colony's home scent is at least this many times the other's; else border */
+  borderRatio: number;
 }
 
-export const DEFAULT_FUNGUS: FungusParams = { pickup: 0.3, sporeDecay: 0.03, maxSpores: 6, grooming: 0.12, groomers: 4, priming: 0.02, clear: 0.002, interval: 0.1 };
+export const DEFAULT_FUNGUS: FungusParams = { pickup: 0.3, sporeDecay: 0.03, maxSpores: 6, grooming: 0.12, groomers: 4, priming: 0.02, clear: 0.002, interval: 0.1, groomedAt: 0.05, borderRatio: 2 };
+
+/** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
+export const DORMANT_SHOW = 0.25;
 
 /** Load at or above which an ant counts as infected in the panel and the renderer. */
 export const INFECTED = 0.05;
@@ -235,6 +254,12 @@ export class Fungus {
   #taken: number[] = [];
   /** loaded ants after the last step or paint: zero (and no spores) means the step has nothing to do */
   hosts = 0;
+  /** the fungus policy: null for the local rule with `rule`; the Jev lane sets its own (ui/colonyJev.ts) */
+  policy: FungusPolicy | null = null;
+  /** the local rule's settings (the player's thresholds) */
+  rule: FungusRule = { ...DEFAULT_RULE };
+  /** the interventions the player has on (§5.1, lever 4): lethal ones start off */
+  menu: Set<string> = new Set(INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)));
   /** seconds owed since the last step (advance) */
   #clock = 0;
   /** what #gather read around the ant being stepped */
@@ -294,10 +319,11 @@ export class Fungus {
    * nestmates groom off and what it clears on its own; and resistance from grooming visible
    * nestmates. Then the ground's spores fade.
    */
-  step(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number): void {
+  step(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null = null, apart: Together | null = null): void {
     if (!this.active) return;
     const p = this.params;
     const { w, h } = this.map.size;
+    const together = apart ?? this.#together(colonies, rec);
     while (this.#visible.length < colonies.length) this.#visible.push(new LoadGrid());
 
     // Everyone's load before the step: what every ant reads.
@@ -313,7 +339,7 @@ export class Fungus {
         const cy = Math.min(h - 1, Math.max(0, Math.floor(c.y[i] as number)));
         const s = c.strain[i] as number;
         all.add(cx, cy, l, s);
-        vis.add(cx, cy, l * (this.strains[s] as Strain).visibility, s);
+        vis.add(cx, cy, l * this.#shows(c, i, s), s);
       }
     });
 
@@ -360,10 +386,11 @@ export class Fungus {
 
         // Grooming by nestmates around (at most p.groomers of them), and the host's own clearing.
         const mates = Math.max(0, nb.own - 1);
-        const loss = l > 0 ? (p.grooming * st.visibility * Math.min(p.groomers, mates) + st.decay) * l * dt : 0;
+        const shows = this.#shows(c, i, s);
+        const loss = l > 0 ? (p.grooming * shows * Math.min(p.groomers, mates) + st.decay) * l * dt : 0;
         // Priming: grooming visible nestmates leaves an ant resistant (its own visible load does not count).
         if (seen) {
-          const v = nb.visible - l * st.visibility;
+          const v = nb.visible - l * shows;
           if (v > NOTHING) c.resist[i] = Math.min(1, r + p.priming * Math.min(1, v / Math.max(1, mates)) * (1 - r) * dt);
         }
 
@@ -373,8 +400,35 @@ export class Fungus {
         c.strain[i] = nl > 0 ? strain : 0;
         if (nl > 0) {
           hosts++;
-          this.express(c, i, this.#expression(strain), nl);
-        } else if (l > 0) this.express(c, i, 0, 0);
+          // What the fungus in this host senses, and what its policy has it do there.
+          const ns = this.strains[strain] as Strain;
+          let ground: Ground = "border";
+          const own = c.ph.fields.home.get(cx, cy);
+          const theirs = c.foreign ? c.foreign.fields.home.get(cx, cy) : 0;
+          if (own > 0 && own >= p.borderRatio * theirs) ground = "home";
+          else if (theirs > 0 && theirs >= p.borderRatio * own) ground = "foreign";
+          let contact: FungalSituation["contact"] = nb.ants - 1 > 0.5 ? "kin" : "none";
+          if (rec) {
+            rec.look(c.odour[i] as number, rec.params.tolerance);
+            if (rec.around(cx, cy, w, h) >= 0.5) contact = "strangers";
+          }
+          // Groomed: its nestmates are taking load off it now, at what it shows now (a dormant host shows little).
+          const groomRate = p.grooming * (strain === s ? shows : ns.visibility) * Math.min(p.groomers, mates);
+          const sit: FungalSituation = {
+            strain: ns.id,
+            load: loadLevel(nl),
+            host: c.carrying[i] ? "return" : (MODES[c.mode[i] as number] as Mode),
+            ground,
+            contact,
+            groomed: groomRate >= p.groomedAt,
+            colonies: together,
+          };
+          c.fungal[i] = encodeFungal(sit);
+          this.express(c, i, this.choose(sit, strain), nl);
+        } else if (l > 0) {
+          this.express(c, i, 0, 0);
+          c.fungal[i] = -1;
+        }
       }
     });
 
@@ -469,12 +523,12 @@ export class Fungus {
    * pheromone channels use. Like them, the step that comes due covers all the time owed.
    * Returns whether it stepped (the caller passes occupancy grids current for this tick).
    */
-  advance(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number): boolean {
+  advance(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null = null, together: Together | null = null): boolean {
     this.#clock += dt;
     if (this.#clock + 1e-9 < this.params.interval) return false;
     const owed = this.#clock;
     this.#clock = 0;
-    this.step(colonies, grids, owed);
+    this.step(colonies, grids, owed, rec, together);
     return true;
   }
 
@@ -483,12 +537,49 @@ export class Fungus {
     return this.active && this.#clock + dt + 1e-9 >= this.params.interval;
   }
 
+  /** The share of ant i's load its nestmates can see: its strain's visibility, a quarter of it while the policy keeps it dormant. */
+  #shows(c: Colony, i: number, s: number): number {
+    const v = (this.strains[s] as Strain).visibility;
+    return c.expr[i] === 0 && (c.fungal[i] as number) >= 0 ? v * DORMANT_SHOW : v;
+  }
+
+  /** How far apart the two nests' odours are, by gap alone (the game passes its own reading, where "one" is unified). */
+  #together(colonies: readonly Colony[], rec: Recognition | null): Together {
+    const [a, b] = colonies;
+    if (!a || !b) return "apart";
+    const gap = Math.abs(a.nestOdour - b.nestOdour);
+    const tol = rec ? rec.params.tolerance : a.params.tolerance;
+    return gap <= tol ? "one" : gap <= 0.6 ? "close" : "apart";
+  }
+
+  /** The player's settings: the local rule's thresholds and the menu (§5.1, levers 4 and 5). */
+  configure(rule: FungusRule, menu: Iterable<string>): void {
+    this.rule = { ...rule };
+    this.menu = new Set(menu);
+  }
+
+  /** The local rule with the player's settings. */
+  local(s: FungalSituation): string {
+    return localFungusRule(this.rule)(s);
+  }
+
+  /** What a host of strain s may run: what the strain allows and the menu has on. */
+  offered(s: number): string[] {
+    return (this.strains[s] as Strain).allows.filter((id) => this.menu.has(id));
+  }
+
   /**
-   * The intervention a host of strain s runs. Until the fungus policy (ja-t4d.5) this is the strain's
-   * default; the policy replaces this one method.
+   * The intervention (an index into INTERVENTIONS) a host of strain index `s` runs in situation `sit`: the
+   * policy's choice if the strain allows it and the menu has it on; else the strain's own default if that is
+   * on; else dormant. So a strain can never run what it does not allow, whatever any policy answers.
    */
-  #expression(s: number): number {
-    return intervention((this.strains[s] as Strain).expresses);
+  choose(sit: FungalSituation, s: number): number {
+    const offered = this.offered(s);
+    const fallback = (this.strains[s] as Strain).expresses;
+    const answer = (this.policy ?? ((x: FungalSituation) => this.local(x)))(sit);
+    const pick = answer === STRAIN_DEFAULT ? fallback : answer;
+    if (offered.includes(pick)) return intervention(pick);
+    return offered.includes(fallback) ? intervention(fallback) : 0;
   }
 
   /** Run intervention e in ant i of colony c at load l: its perception is the lerp from as-is to the levers by l. */
@@ -510,6 +601,7 @@ export class Fungus {
     c.layGain[i] = 1 + (v.lay - 1) * l;
     c.crossLay[i] = v.crossLay * l;
     c.quiet[i] = v.quiet * l;
+    c.estrange[i] = v.estrange * l;
   }
 
   /** How far the fungus is into colony c, and how far c has answered it. */

@@ -21,9 +21,6 @@ function crowd(c: Colony, x: number, y: number, count: number): void {
   }
 }
 
-/** Whole games take ~9 s alone and more beside the suite's other whole-game files: their own timeout, so CPU contention cannot fail them. */
-const WHOLE_GAME = { timeout: 60_000 };
-
 const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
 const view = (s: Partial<StanceSituation>): StanceSituation => ({ stance: "forage", ants: "some", losses: "none", enemyNearNest: false, foodLeft: "plenty", larder: "low", ...s });
 
@@ -131,7 +128,7 @@ test("a fighting ant goes for the enemy it can see", () => {
   assert.ok((c.y[0] as number) > 6.8, `it turned south toward the enemy: y ${c.y[0]}`);
 });
 
-test("the game: both colonies forage and grow, they meet and fight, stances are chosen, and food is never made or lost", WHOLE_GAME, () => {
+test("the game: both colonies forage and grow, they meet and fight, stances are chosen, and food is never made or lost", () => {
   const map = generateWorld(1);
   const g = new Game(map, { antCount: 300, rivalAnts: 300 }, mulberry32(11));
   for (let k = 0; k < 30 * 150; k++) g.tick(1 / 30);
@@ -156,7 +153,7 @@ test("the outcome: a colony with no ants and too little food for one more is bea
   assert.equal(g.outcome(), "lost");
 });
 
-test("solo (no rival), the colony keeps foraging: no stance to choose, nobody turned into a fighter", WHOLE_GAME, () => {
+test("solo (no rival), the colony keeps foraging: no stance to choose, nobody turned into a fighter", () => {
   const map = generateWorld(1);
   const g = new Game(map, { antCount: 600, rival: false }, mulberry32(7919));
   for (let k = 0; k < 30 * 200; k++) g.tick(1 / 30);

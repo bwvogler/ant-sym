@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
-import { STRAINS, type Fungus } from "../colony/fungus.ts";
+import { INTERVENTIONS, LETHAL, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, type Outcome, type Unity } from "../colony/game.ts";
 import { generateWorld, mulberry32 } from "../colony/world.ts";
 
@@ -25,11 +25,16 @@ export interface ColonyControls {
   brush: Brush;
   /** which of the fungus's strains the spore brush paints (an index into STRAINS) */
   strain: number;
+  /** the fungus's menu: the interventions the player has on (§5.1, lever 4) */
+  menu: string[];
+  /** the local rule's settings: hide groomed hosts; cull high-load fighters among strangers */
+  hide: boolean;
+  cull: boolean;
   /** a rival colony at the map's second nest */
   rival: boolean;
 }
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, rival: true };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, menu: INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)), hide: false, cull: false, rival: true };
 
 /** Per paint event (a pointer move while dragging): radius in cells and the amount laid per cell. */
 const BRUSHES = { lure: { channel: "food", radius: 2, amount: 3 }, alarm: { channel: "alarm", radius: 3, amount: 12 } } as const;
@@ -87,6 +92,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     [controls.seed, controls.antCount, controls.rival, generation],
   );
   const colony = game.player;
+  // The player's policy settings outlive a game: apply them to every new one's fungus.
+  useEffect(() => {
+    game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
+  }, [game, controls.hide, controls.cull, controls.menu]);
   const [stats, setStats] = useState<ColonyStats | null>(null);
   const [fps, setFps] = useState(0);
   const frameListeners = useRef(new Set<() => void>());

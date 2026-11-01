@@ -10,7 +10,9 @@ import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
 import { STRAINS, useColony, type Brush, type SideStats } from "./ui/useColony.ts";
-import { TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
+import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
+import { AIMS } from "./colony/fungusBrain.ts";
+import { INTERVENTIONS, LETHAL } from "./colony/fungus.ts";
 
 // The colony page: a procedural world, your colony and a rival's, and the
 // fungus (you) that steers yours. The fungus paints scent (free: lure and
@@ -25,7 +27,7 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 
 export default function ColonyApp() {
   const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
-  const jev = useColonyJev(colony);
+  const jev = useColonyJev(colony, game.fungus, controls.menu);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
   // Keyed by a token per game rather than the game itself, so an old game is not kept alive by this state.
   const gameToken = useMemo(() => ({ game: game.map.seed }), [game]);
@@ -64,7 +66,7 @@ export default function ColonyApp() {
             />
           </div>
           {followed ? (
-            <AntCard followed={followed} colony={colony} rival={game.rival} explain={jev.explain} onClose={() => setFollowed(null)} />
+            <AntCard followed={followed} colony={colony} rival={game.rival} explain={jev.explain} explainFungus={jev.explainFungus} onClose={() => setFollowed(null)} />
           ) : (
             <p className="-mt-2 text-xs text-fg-3">
               {controls.brush === "none"
@@ -127,7 +129,7 @@ export default function ColonyApp() {
               <Stat label="avg $ / hour" value={perHour === null ? "—" : `$${perHour.toFixed(3)}`} />
               <Stat label="tokens" value={run ? run.inputTokens.toLocaleString() : "—"} />
               <Stat label="situations asked" value={String(jev.state.asked)} />
-              <Stat label="answers cached" value={`${jev.state.cached} · ${jev.state.stancesCached} stances`} />
+              <Stat label="answers cached" value={`${jev.state.cached} · ${jev.state.stancesCached} stances · ${jev.state.fungusCached} fungus`} />
               <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
               <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>{running ? "jev on" : jev.state.phase === "stopped" ? "stopped · local rule" : "local rule"}</span>
             </div>
@@ -241,6 +243,58 @@ export default function ColonyApp() {
                 <p className="mt-1 text-xs text-fg-3">One colony when the nests smell alike (within {TOLERANCE}) and nobody has died fighting for a minute. Ants are coloured by odour.</p>
               </div>
             )}
+
+            <div className="mt-4" aria-label="fungus policy">
+              <span>What the fungus may do</span>
+              <div className="mt-1 flex flex-wrap gap-1 text-xs">
+                {INTERVENTIONS.map((v) => {
+                  const on = controls.menu.includes(v.id);
+                  const lethal = LETHAL.has(v.id);
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      aria-pressed={on}
+                      className={`rounded-md border px-2 py-0.5 font-mono ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                      title={`${v.blurb}${lethal ? ". Only strains that allow it (Bloom) can run it." : ""}`}
+                      onClick={() => update({ menu: on ? controls.menu.filter((id) => id !== v.id) : [...controls.menu, v.id] })}
+                    >
+                      {v.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <label className="mt-2 flex items-center justify-between text-xs text-fg-2">
+                <span>Hide groomed hosts (dormant shows a quarter)</span>
+                <input type="checkbox" checked={controls.hide} onChange={(e) => update({ hide: e.target.checked })} />
+              </label>
+              <label className="mt-1 flex items-center justify-between text-xs text-fg-2">
+                <span>Cull high-load hosts fighting strangers</span>
+                <input type="checkbox" checked={controls.cull} onChange={(e) => update({ cull: e.target.checked })} />
+              </label>
+              <p className="mt-1 text-xs text-fg-3">
+                {running ? "Jev picks what the fungus does in each host, under your aim, from what that host's strain allows and the menu has on." : "The local rule: each strain does what it was bred for (Lockpick soothes, Bloom shares, Garden blends), within the menu and the settings above."}
+              </p>
+              <div className="mt-3 flex items-center justify-between">
+                <span>Aim</span>
+                <div className="flex overflow-hidden rounded-md border border-line text-sm">
+                  {AIMS.map((a) => (
+                    <button key={a.id} type="button" className={seg(jev.aim.id === a.id)} onClick={() => jev.setAim({ id: a.id, text: a.text })}>
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <textarea
+                className="mt-2 w-full resize-none rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-fg outline-none focus:border-accent"
+                rows={3}
+                value={jev.aim.text}
+                onChange={(e) => jev.draftAim({ id: "custom", text: e.target.value })}
+                onBlur={(e) => jev.setAim({ id: jev.aim.id, text: e.target.value })}
+                aria-label="aim"
+              />
+              <p className="mt-1 text-xs text-fg-3">The fungus's goal, in your words: Jev reads it (never the ants). ≈ {TOKENS_PER_FUNGAL_SITUATION} tokens per fungal situation asked.</p>
+            </div>
 
             <div className="mt-4 flex items-center justify-between">
               <span>Doctrine</span>

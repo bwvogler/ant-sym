@@ -212,6 +212,10 @@ export class Colony {
   crossLay: Float32Array;
   /** in a fight it lays (1 − this) of the alarm (C3): a quiet fight recruits fewer defenders */
   quiet: Float32Array;
+  /** how far (× 0.5) the fungus pushes its odour away from its nest's: past the tolerance, its own colony takes it for a stranger (B6) */
+  estrange: Float32Array;
+  /** the fungal situation (fungalPolicy.ts encodeFungal, without the strain) the fungus last chose for it in; −1 = none */
+  fungal: Int16Array;
   /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
   wall: Int8Array;
   /** straight-line distance home (its own home vector) when it met the wall it is following */
@@ -288,6 +292,8 @@ export class Colony {
     this.layGain = new Float32Array(n).fill(1);
     this.crossLay = new Float32Array(n);
     this.quiet = new Float32Array(n);
+    this.estrange = new Float32Array(n);
+    this.fungal = new Int16Array(n).fill(-1);
     this.wall = new Int8Array(n);
     this.hitDist = new Float32Array(n);
     this.followT = new Float32Array(n);
@@ -316,6 +322,7 @@ export class Colony {
     this.strain[i] = 0;
     this.resist[i] = 0;
     this.expr[i] = 0;
+    this.fungal[i] = -1;
     this.asIs(i);
     // A newborn smells of its colony as the colony smells now.
     this.odour[i] = this.nestOdour;
@@ -340,6 +347,7 @@ export class Colony {
     this.layGain[i] = 1;
     this.crossLay[i] = 0;
     this.quiet[i] = 0;
+    this.estrange[i] = 0;
   }
 
   /** Living ants. */
