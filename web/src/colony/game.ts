@@ -1,3 +1,4 @@
+import { CELL, centreX, centreY, R } from "./hex.ts";
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
 import type { WorldMap } from "./world.ts";
@@ -70,8 +71,9 @@ export class Game {
     this.colonies.forEach((c, j) => {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
-        const cx = Math.min(w - 1, Math.max(0, Math.floor(c.x[i] as number)));
-        const cy = Math.min(h - 1, Math.max(0, Math.floor(c.y[i] as number)));
+        c.antCell(i);
+        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         this.#enemy.forEach((e, k) => {
           if (k !== j) e.add(cx, cy);
         });
@@ -79,15 +81,16 @@ export class Game {
     });
   }
 
-  /** Enemies within `nestWatch` cells of colony k's nest. */
+  /** Enemies within `nestWatch` (world units) of colony k's nest. */
   enemiesNearNest(k: number): number {
     const c = this.colonies[k] as Colony;
     const e = this.#enemy[k] as CountGrid;
     const { w, h } = this.map.size;
     const r = this.params.nestWatch;
     let s = 0;
-    for (let y = Math.max(0, Math.floor(c.nest.y - r)); y <= Math.min(h - 1, Math.floor(c.nest.y + r)); y++)
-      for (let x = Math.max(0, Math.floor(c.nest.x - r)); x <= Math.min(w - 1, Math.floor(c.nest.x + r)); x++) s += e.get(x, y);
+    for (let y = Math.max(0, Math.floor((c.nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((c.nest.y + r) / R)); y++)
+      for (let x = Math.max(0, Math.floor(c.nest.x - r - 1)); x <= Math.min(w - 1, Math.ceil(c.nest.x + r)); x++)
+        if (Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) <= r) s += e.get(x, y);
     return s;
   }
 

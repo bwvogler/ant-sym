@@ -1,4 +1,5 @@
 import { SITUATIONS } from "./colony/colony.ts";
+import { worldExtent } from "./colony/world.ts";
 import { DOCTRINES } from "./colony/colonyBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useMemo, useState } from "react";
@@ -48,7 +49,7 @@ export default function ColonyApp() {
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="relative" style={{ aspectRatio: `${size.w} / ${size.h}` }}>
+          <div className="relative" style={{ aspectRatio: `${worldExtent(colony.map).w} / ${worldExtent(colony.map).h}` }}>
             <ColonyField
               colony={colony}
               rival={game.rival}

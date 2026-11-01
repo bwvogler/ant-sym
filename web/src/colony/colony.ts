@@ -1,5 +1,6 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
-import { blocked, dig, dropFood, OPEN, rockAt, SOIL, takeFood, type Nest, type WorldMap } from "./world.ts";
+import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
+import { blocked, digCell, dropFood, OPEN, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -165,6 +166,15 @@ export class Colony {
   pellet: Uint8Array;
   /** seconds of digging left at the soil face ahead; 0 = not digging */
   digT: Float32Array;
+  /** the heading the cell it is digging should carry on the tunnel at (NaN: none chosen; the face's own direction) */
+  digAim: Float32Array;
+  /** the cell each ant is in, and the position that was worked out for (a cache: cellOf costs more than a floor, and many steps ask) */
+  #cellX: Int32Array;
+  #cellY: Int32Array;
+  #cellAtX: Float32Array;
+  #cellAtY: Float32Array;
+  /** a cell where this free-walking ant last found no tunnel (packed y·65536 + x; −1 none): it needn't look again until it moves on */
+  #noTunnel: Int32Array;
   /** which hand it keeps on tunnel walls when it walks a tunnel (+1 right, −1 left), chosen afresh each trip out */
   hand: Int8Array;
   /** seconds left of keeping a hand on a chamber's wall, after touching soil; 0 = wandering freely */
@@ -240,6 +250,12 @@ export class Colony {
     this.pellet = new Uint8Array(n);
     this.digT = new Float32Array(n);
     this.hand = new Int8Array(n);
+    this.digAim = new Float32Array(n).fill(NaN);
+    this.#cellX = new Int32Array(n);
+    this.#cellY = new Int32Array(n);
+    this.#cellAtX = new Float32Array(n).fill(NaN);
+    this.#cellAtY = new Float32Array(n).fill(NaN);
+    this.#noTunnel = new Int32Array(n).fill(-1);
     this.hugT = new Float32Array(n);
     this.alive = new Uint8Array(n);
     this.gen = new Uint32Array(n);
@@ -272,6 +288,7 @@ export class Colony {
     this.carrying[i] = 0;
     this.pellet[i] = 0;
     this.digT[i] = 0;
+    this.digAim[i] = NaN;
     this.hand[i] = this.#rng() < 0.5 ? -1 : 1;
     this.hugT[i] = 0;
     this.since[i] = 0;
@@ -285,6 +302,22 @@ export class Colony {
     this.#question[i] = -1;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
     this.alive[i] = 1;
+  }
+
+  /** The cell ant i is in, into CELL (cached for its current position). */
+  antCell(i: number): void {
+    const x = this.x[i] as number;
+    const y = this.y[i] as number;
+    if (x !== this.#cellAtX[i] || y !== this.#cellAtY[i]) {
+      cellOf(x, y);
+      this.#cellX[i] = CELL[0] as number;
+      this.#cellY[i] = CELL[1] as number;
+      this.#cellAtX[i] = x;
+      this.#cellAtY[i] = y;
+      return;
+    }
+    CELL[0] = this.#cellX[i] as number;
+    CELL[1] = this.#cellY[i] as number;
   }
 
   /** Living ants. */
@@ -328,10 +361,12 @@ export class Colony {
   /** The fungus's brush: lay `amount` of a trail on every open cell within `radius` of (x, y). */
   paint(channel: Channel, x: number, y: number, radius: number, amount: number): void {
     const { size } = this.map;
-    for (let cy = Math.max(0, Math.floor(y - radius)); cy <= Math.min(size.h - 1, Math.floor(y + radius)); cy++)
-      for (let cx = Math.max(0, Math.floor(x - radius)); cx <= Math.min(size.w - 1, Math.floor(x + radius)); cx++) {
-        if (rockAt(this.map, cx, cy) || Math.hypot(cx + 0.5 - x, cy + 0.5 - y) > radius) continue;
-        this.ph.deposit(channel, cx + 0.5, cy + 0.5, amount);
+    for (let cy = Math.max(0, Math.floor((y - radius) / R - 1)); cy <= Math.min(size.h - 1, Math.ceil((y + radius) / R)); cy++)
+      for (let cx = Math.max(0, Math.floor(x - radius - 1)); cx <= Math.min(size.w - 1, Math.ceil(x + radius)); cx++) {
+        const px = centreX(cx, cy);
+        const py = centreY(cy);
+        if (rockAt(this.map, cx, cy) || Math.hypot(px - x, py - y) > radius) continue;
+        this.ph.deposit(channel, px, py, amount);
       }
   }
 
@@ -379,13 +414,10 @@ export class Colony {
     const sy = (this.y[i] as number) + dy * d;
     const s = this.#s;
     const { map, nest } = this;
-    if (sx < 0 || sy < 0 || sx >= map.size.w || sy >= map.size.h) {
-      s[slot] = s[slot + 3] = s[slot + 6] = -1;
-      return;
-    }
-    const cx = Math.floor(sx);
-    const cy = Math.floor(sy);
-    if (map.rock.get(cx, cy) !== OPEN) {
+    cellOf(sx, sy);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    if (rockAt(map, cx, cy) !== OPEN) {
       s[slot] = s[slot + 3] = s[slot + 6] = -1;
       return;
     }
@@ -433,27 +465,35 @@ export class Colony {
     const { map } = this;
     const x = this.x[i] as number;
     const y = this.y[i] as number;
+    this.antCell(i);
+    const hx = CELL[0] as number;
+    const hy = CELL[1] as number;
     // A target that isn't this cell or a neighbour is stale (from before a detour, say): decide afresh.
-    const fresh = this.gx[i] === NO_CELL || Math.abs((this.gx[i] as number) - Math.floor(x)) + Math.abs((this.gy[i] as number) - Math.floor(y)) > 1;
-    if (!fresh && Math.hypot((this.gx[i] as number) + 0.5 - x, (this.gy[i] as number) + 0.5 - y) > step) return true;
-    const cx = fresh ? Math.floor(x) : (this.gx[i] as number);
-    const cy = fresh ? Math.floor(y) : (this.gy[i] as number);
+    const fresh = this.gx[i] === NO_CELL || hexDistance(this.gx[i] as number, this.gy[i] as number, hx, hy) > 1;
+    if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
+    const hugging = mode === EXPLORE && (this.hugT[i] as number) > 0;
+    const packed = hy * 65536 + hx;
+    if (fresh && !hugging && this.#noTunnel[i] === packed) return false; // looked here already: open ground
+    const cx = fresh ? hx : (this.gx[i] as number);
+    const cy = fresh ? hy : (this.gy[i] as number);
     if (!tunnel(map, cx, cy)) {
-      if (mode === EXPLORE && (this.hugT[i] as number) > 0) return this.#hug(i, cx, cy, fresh);
+      if (hugging) return this.#hug(i, cx, cy, fresh);
       this.gx[i] = NO_CELL;
+      if (fresh) this.#noTunnel[i] = packed;
       return false;
     }
-    let dir = fresh ? gridDir(this.heading[i] as number) : (this.gdir[i] as number);
+    this.#noTunnel[i] = -1;
+    let dir = fresh ? dirOf(this.heading[i] as number) : (this.gdir[i] as number);
     if (mode === RETURN || mode === FOLLOW) {
       // The way ahead (not back, unless it's a dead end) with the most scent: home scent, laid by
       // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.
       const field = mode === RETURN ? this.ph.fields.home : this.ph.fields.food;
       let best = -1;
       let bestV = 0;
-      for (const turn of [0, 1, -1]) {
-        const d = (dir + turn) & 3;
-        const tx = cx + (DX[d] as number);
-        const ty = cy + (DY[d] as number);
+      for (const turn of [0, 1, -1, 2, -2]) {
+        const d = (dir + turn + 6) % 6;
+        const tx = stepX(cx, cy, d);
+        const ty = stepY(cy, d);
         if (rockAt(map, tx, ty) !== OPEN) continue;
         const v = field.get(tx, ty);
         if (v > bestV) {
@@ -465,29 +505,25 @@ export class Colony {
     } else {
       const side = this.hand[i] as number;
       const next = handOnWall(map, cx, cy, dir, side);
-      if (next === ((dir + 2) & 3) || rockAt(map, cx + (DX[next] as number), cy + (DY[next] as number)) !== OPEN) {
-        // A dead end: dig on, ahead or (now and then) to a side, wherever there's soil a tunnel may go through.
-        const ways = this.#rng() < FORK ? [dir + side, dir - side, dir] : [dir, dir + side, dir - side];
-        let dug = -1;
-        for (const w of ways) {
-          const d = w & 3;
-          const tx = cx + (DX[d] as number);
-          const ty = cy + (DY[d] as number);
-          if (rockAt(map, tx, ty) === SOIL && diggable(map, tx, ty, d)) {
-            dug = d;
-            break;
-          }
-        }
-        if (dug < 0 && rockAt(map, cx + (DX[next] as number), cy + (DY[next] as number)) !== OPEN) {
+      if (next === (dir + 3) % 6 || rockAt(map, stepX(cx, cy, next), stepY(cy, next)) !== OPEN) {
+        // A dead end: dig on. The tunnel carries a heading (the one its end was dug at), which drifts a
+        // little each cell: the end cell nearest that heading is dug, so tunnels wander at any angle
+        // rather than run straight along the grid. Now and then it forks, 60° to one side.
+        const run = tunnelHeading(map, cx, cy);
+        let aim = (Number.isNaN(run) ? (DIR_ANGLE[dir] as number) : run) + gauss(this.#rng) * TUNNEL_DRIFT;
+        if (this.#rng() < FORK) aim += (this.#rng() < 0.5 ? -1 : 1) * (Math.PI / 3);
+        const dug = chooseDig(map, cx, cy, aim, this.#rng());
+        if (dug < 0 && rockAt(map, stepX(cx, cy, next), stepY(cy, next)) !== OPEN) {
           this.gx[i] = NO_CELL; // walled in on every side (it can't be, having walked in): steer freely
           return false;
         }
+        if (dug >= 0) this.digAim[i] = aim;
         dir = dug < 0 ? next : dug;
       } else dir = next;
     }
     this.gdir[i] = dir;
-    this.gx[i] = cx + (DX[dir] as number);
-    this.gy[i] = cy + (DY[dir] as number);
+    this.gx[i] = stepX(cx, cy, dir);
+    this.gy[i] = stepY(cy, dir);
     return true;
   }
 
@@ -499,14 +535,16 @@ export class Colony {
     const { map } = this;
     const side = this.hand[i] as number;
     let dir = this.gdir[i] as number;
-    const wallDir = (dir + side) & 3;
-    const wx = cx + (DX[wallDir] as number);
-    const wy = cy + (DY[wallDir] as number);
-    if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && startable(map, wx, wy, wallDir)) dir = wallDir;
-    else dir = handOnWall(map, cx, cy, dir, side);
+    const wallDir = (dir + side + 6) % 6; // the wall cell ahead on the hand side
+    const wx = stepX(cx, cy, wallDir);
+    const wy = stepY(cy, wallDir);
+    if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && startable(map, wx, wy, wallDir)) {
+      dir = wallDir;
+      this.digAim[i] = DIR_ANGLE[wallDir] as number;
+    } else dir = handOnWall(map, cx, cy, dir, side);
     this.gdir[i] = dir;
-    this.gx[i] = cx + (DX[dir] as number);
-    this.gy[i] = cy + (DY[dir] as number);
+    this.gx[i] = stepX(cx, cy, dir);
+    this.gy[i] = stepY(cy, dir);
     return true;
   }
 
@@ -522,9 +560,9 @@ export class Colony {
   /** Whether any open neighbour of cell (x, y) holds home scent an ant would notice (FAINT or more). */
   #homeScentNear(x: number, y: number): boolean {
     const home = this.ph.fields.home;
-    for (let d = 0; d < 4; d++) {
-      const tx = x + (DX[d] as number);
-      const ty = y + (DY[d] as number);
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(x, y, d);
+      const ty = stepY(y, d);
       if (rockAt(this.map, tx, ty) === OPEN && home.get(tx, ty) >= FAINT) return true;
     }
     return false;
@@ -532,7 +570,7 @@ export class Colony {
 
   /** The heading from ant i to the centre of its target cell. */
   #towardTarget(i: number): number {
-    return Math.atan2((this.gy[i] as number) + 0.5 - (this.y[i] as number), (this.gx[i] as number) + 0.5 - (this.x[i] as number));
+    return Math.atan2(centreY(this.gy[i] as number) - (this.y[i] as number), centreX(this.gx[i] as number, this.gy[i] as number) - (this.x[i] as number));
   }
 
   /** Touch: is there rock (or the map's edge) `d` cells from ant i's position along `angle`? */
@@ -545,25 +583,19 @@ export class Colony {
     const g = this.enemies;
     if (!g) return null;
     const { w, h } = this.map.size;
-    const cx = Math.floor(this.x[i] as number);
-    const cy = Math.floor(this.y[i] as number);
-    if (!g.any(cx - ENEMY_RANGE, cy - ENEMY_RANGE, cx + ENEMY_RANGE, cy + ENEMY_RANGE)) return null;
-    let best = Infinity;
-    let heading: number | null = null;
-    for (let dy = -ENEMY_RANGE; dy <= ENEMY_RANGE; dy++) {
-      const y = cy + dy;
-      if (y < 0 || y >= h) continue;
-      for (let dx = -ENEMY_RANGE; dx <= ENEMY_RANGE; dx++) {
-        const x = cx + dx;
-        if (x < 0 || x >= w || !g.get(x, y)) continue;
-        const d = dx * dx + dy * dy;
-        if (d < best) {
-          best = d;
-          heading = Math.atan2(y + 0.5 - (this.y[i] as number), x + 0.5 - (this.x[i] as number));
-        }
-      }
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    if (!g.any(cx - ENEMY_RANGE - 1, cy - ENEMY_RANGE, cx + ENEMY_RANGE + 1, cy + ENEMY_RANGE)) return null;
+    // The hex disc round the ant, nearest cells first: the first cell holding enemies is the nearest.
+    const o = discOffsets(ENEMY_RANGE)[cy & 1] as Int16Array;
+    for (let k = 0; k < o.length; k += 2) {
+      const x = cx + (o[k] as number);
+      const y = cy + (o[k + 1] as number);
+      if (x < 0 || y < 0 || x >= w || y >= h || !g.get(x, y)) continue;
+      return Math.atan2(centreY(y) - (this.y[i] as number), centreX(x, y) - (this.x[i] as number));
     }
-    return heading;
+    return null;
   }
 
   /** Advance by dt seconds: ants decide (when their situation changed), steer, lay trail, move; then the fields evaporate and spread, and stored food becomes ants. */
@@ -667,7 +699,7 @@ export class Colony {
           if (t0 < FOLLOW_FLIP && t >= FOLLOW_FLIP) {
             // Probably the long way round (a big rock mass, or the map's edge): try the other side, same line home.
             this.wall[i] = -side as -1 | 1;
-            this.gdir[i] = ((this.gdir[i] as number) + 2) & 3;
+            this.gdir[i] = ((this.gdir[i] as number) + 3) % 6;
             this.gx[i] = NO_CELL; // decide afresh from here
           }
           if (!this.byCell[i]) {
@@ -686,22 +718,24 @@ export class Colony {
             }
           } else if (t >= FOLLOW_GIVE_UP) this.#giveUp(i);
           else {
-            // Soil, or a tunnel: cell by cell, a hand on the wall. At each cell's centre, feel right (for
-            // a wall on the right), ahead, left, behind, and take the first open way. In a tunnel this
+            // Soil, or a tunnel: cell by cell, a hand on the wall. At each cell's centre, feel round from
+            // the hand side to the other (six ways), and take the first open one. In a tunnel this
             // walks the tunnel (steering by touch can't, one cell wide); in a tree of tunnels it visits every branch.
-            const reached = this.gx[i] === NO_CELL || Math.hypot((this.gx[i] as number) + 0.5 - x, (this.gy[i] as number) + 0.5 - y) <= p.speed * dt;
+            const reached = this.gx[i] === NO_CELL || Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) <= p.speed * dt;
             if (reached) {
-              const cx = this.gx[i] === NO_CELL ? Math.floor(x) : (this.gx[i] as number);
-              const cy = this.gx[i] === NO_CELL ? Math.floor(y) : (this.gy[i] as number);
-              const dist = Math.hypot(nest.x - cx - 0.5, nest.y - cy - 0.5);
-              const ox = cx + 0.5;
-              const oy = cy + 0.5;
+              cellOf(x, y);
+              const cx = this.gx[i] === NO_CELL ? (CELL[0] as number) : (this.gx[i] as number);
+              const cy = this.gx[i] === NO_CELL ? (CELL[1] as number) : (this.gy[i] as number);
+              const ox = centreX(cx, cy);
+              const oy = centreY(cy);
+              const dist = Math.hypot(nest.x - ox, nest.y - oy);
               const open = !this.#touch(ox, oy, Math.atan2(nest.y - oy, nest.x - ox), 1.5);
+              cellOf(this.mx[i] as number, this.my[i] as number);
               const leave =
                 this.gx[i] !== NO_CELL &&
-                ((dist < (this.hitDist[i] as number) - 1 && this.#onMLine(i, ox, oy, Math.SQRT1_2) && open) ||
+                ((dist < (this.hitDist[i] as number) - 1 && this.#onMLine(i, ox, oy, SIDE) && open) ||
                   // round an island and back where it met it, with the way home open (it met the island turning, not heading home)
-                  (t > 2 && cx === Math.floor(this.mx[i] as number) && cy === Math.floor(this.my[i] as number) && open) ||
+                  (t > 2 && cx === CELL[0] && cy === CELL[1] && open) ||
                   (dist < NEST_SIGHT && this.#clearTo(ox, oy, nest.x, nest.y)));
               if (leave || (tunnel(map, cx, cy) && this.#homeScentNear(cx, cy))) {
                 // Back on its line home, nearer than where it met this wall, and the way is open; or the nest
@@ -712,11 +746,11 @@ export class Colony {
               } else {
                 const d = handOnWall(map, cx, cy, this.gdir[i] as number, this.wall[i] as number);
                 this.gdir[i] = d;
-                this.gx[i] = cx + (DX[d] as number);
-                this.gy[i] = cy + (DY[d] as number);
+                this.gx[i] = stepX(cx, cy, d);
+                this.gy[i] = stepY(cy, d);
               }
             }
-            if (this.wall[i] !== 0) h = Math.atan2((this.gy[i] as number) + 0.5 - y, (this.gx[i] as number) + 0.5 - x);
+            if (this.wall[i] !== 0) h = this.#towardTarget(i);
           }
         }
       } else if (mode === FOLLOW) {
@@ -742,7 +776,8 @@ export class Colony {
       // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none.
       if (!pellet) {
         const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt;
-        ph.deposit(carrying ? "food" : "home", this.x[i] as number, this.y[i] as number, laid);
+        this.antCell(i);
+        ph.depositCell(carrying ? "food" : "home", CELL[0] as number, CELL[1] as number, laid);
       }
 
       // Move; rock or the edge turns the ant back somewhere random.
@@ -750,21 +785,35 @@ export class Colony {
       const ny = (this.y[i] as number) + Math.sin(h) * p.speed * dt;
       this.detour[i] = (this.detour[i] as number) - dt;
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
-      let face = mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] === Math.floor(nx) && this.gy[i] === Math.floor(ny)) : NO_FACE;
-      if (face === START_FACE) face = digging || rng() < START ? DIG_FACE : GLANCE_X;
+      // The cell the step lands in: open ground (most steps) moves at once, with no more to check.
+      cellOf(nx, ny);
+      const lx = CELL[0] as number;
+      const ly = CELL[1] as number;
+      const landOpen = rockAt(map, lx, ly) === OPEN;
+      let face = !landOpen && mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] as number, this.gy[i] as number) : NO_FACE;
+      if (face === START_FACE) face = digging || rng() < START ? DIG_FACE : GLANCE;
       if (face !== NO_FACE) {
         // Digging: an explorer that meets soil head-on bites at it for DIG_TIME (1–2 s), then the cell
         // is open and the ant carries the pellet home. Any other touch of soil puts a hand on the wall.
-        if (face === GLANCE_X || face === GLANCE_Y) {
+        if (face === GLANCE) {
           this.digT[i] = 0; // a face that stopped being diggable (a neighbour dug beside it) is left
+          this.digAim[i] = NaN;
           this.hugT[i] = HUG_TIME;
-          this.gdir[i] = (crossedDir(map, this.x[i] as number, this.y[i] as number, nx, ny) - (this.hand[i] as number)) & 3;
+          // Facing along the wall, the soil it touched ahead on its hand side.
+          this.gdir[i] = (crossedDir(map, this.x[i] as number, this.y[i] as number, nx, ny) - (this.hand[i] as number) + 6) % 6;
           this.gx[i] = NO_CELL;
         } else if (!digging) this.digT[i] = DIG_TIME * (1 + rng());
         else {
           const left = (this.digT[i] as number) - dt;
           this.digT[i] = Math.max(0, left);
-          if (left <= 0 && dig(map, nx, ny)) {
+          cellOf(nx, ny);
+          const fx = CELL[0] as number;
+          const fy = CELL[1] as number;
+          if (left <= 0 && digCell(map, fx, fy)) {
+            // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
+            const aim = this.digAim[i] as number;
+            setTunnelHeading(map, fx, fy, Number.isNaN(aim) ? (DIR_ANGLE[crossedDir(map, this.x[i] as number, this.y[i] as number, nx, ny)] as number) + gauss(rng) * TUNNEL_DRIFT : aim);
+            this.digAim[i] = NaN;
             this.soilDug++;
             this.pellet[i] = 1;
             this.since[i] = 0;
@@ -774,7 +823,7 @@ export class Colony {
             h += Math.PI;
           }
         }
-      } else if (blocked(map, nx, ny) || squeezes(map, this.x[i] as number, this.y[i] as number, nx, ny)) {
+      } else if (!landOpen) {
         this.digT[i] = 0;
         if (mode === RETURN && !detouring) {
           // Homing: start (or keep) following this wall by touch instead of turning at random.
@@ -791,9 +840,13 @@ export class Colony {
             this.hitDist[i] = Math.hypot(nest.x - x, nest.y - y);
             this.followT[i] = 0;
             // Facing the wall it met, turned away from the side it keeps the wall on; the first cell decides the way on.
-            this.gdir[i] = (crossedDir(map, x, y, nx, ny) - (this.wall[i] as number)) & 3;
+            this.gdir[i] = (crossedDir(map, x, y, nx, ny) - (this.wall[i] as number) + 6) % 6;
             this.gx[i] = NO_CELL;
-            this.byCell[i] = rockAt(map, Math.floor(nx), Math.floor(ny)) === SOIL || tunnel(map, Math.floor(x), Math.floor(y)) ? 1 : 0;
+            cellOf(x, y);
+            const hx = CELL[0] as number;
+            const hy = CELL[1] as number;
+            cellOf(nx, ny);
+            this.byCell[i] = rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL || tunnel(map, hx, hy) ? 1 : 0;
           }
           if (!this.byCell[i]) h -= (this.wall[i] as number) * (Math.PI / 2); // by touch: turn away from the wall, along it
         } else {
@@ -806,15 +859,21 @@ export class Colony {
         }
       } else {
         this.digT[i] = 0; // the face it was digging opened (another ant dug it), or it turned off it
+        this.digAim[i] = NaN;
         this.x[i] = nx;
         this.y[i] = ny;
+        this.#cellX[i] = lx;
+        this.#cellY[i] = ly;
+        this.#cellAtX[i] = this.x[i] as number;
+        this.#cellAtY[i] = this.y[i] as number;
       }
 
       // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
       const ndx = (this.x[i] as number) - nest.x;
       const ndy = (this.y[i] as number) - nest.y;
       const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
-      if (!carrying && !pellet && mode !== FIGHT && takeFood(map, this.x[i] as number, this.y[i] as number)) {
+      this.antCell(i);
+      if (!carrying && !pellet && mode !== FIGHT && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
         this.wall[i] = 0;
         this.mx[i] = NaN;
@@ -897,86 +956,126 @@ export function wallSide(leftBlocked: boolean, rightBlocked: boolean, rng: () =>
 
 /** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
 const NO_CELL = -0x80000000;
-/** The four ways on the grid, as cell steps: east, south, west, north (angles grow clockwise, y down). */
-const DX = [1, 0, -1, 0];
-const DY = [0, 1, 0, -1];
+
+/** A standard normal draw (Box–Muller). */
+function gauss(rng: () => number): number {
+  return Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+}
+
+/** The signed difference a − b, wrapped into −π..π. */
+export function angleDiff(a: number, b: number): number {
+  let d = (a - b) % (2 * Math.PI);
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d < -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+/** Whether cell (x, y)'s neighbour the way `d` is open. */
+function openAt(map: WorldMap, x: number, y: number, d: number): boolean {
+  return rockAt(map, stepX(x, y, ((d % 6) + 6) % 6), stepY(y, ((d % 6) + 6) % 6)) === OPEN;
+}
 
 /**
- * Whether cell (x, y) is in a tunnel: one cell wide wherever it is, so not part of any 2×2 square of
- * open ground (a chamber's cells all are). Junctions and crossings of tunnels count; a chamber's edge doesn't.
+ * Which way to dig on from tunnel cell (x, y) toward heading `aim`: of the two ways either side of
+ * it, the far one with probability ∝ how near the heading is to it (`u` uniform in 0..1), so over
+ * many cells the tunnel runs at the heading itself, not along one of the six ways. If that cell can't
+ * be dug, the other; failing both, the diggable way nearest the heading; −1 if none.
+ */
+export function chooseDig(map: WorldMap, x: number, y: number, aim: number, u: number): number {
+  const a = (((aim / (Math.PI / 3)) % 6) + 6) % 6;
+  const lo = Math.floor(a) % 6;
+  const hi = (lo + 1) % 6;
+  const first = u < a - Math.floor(a) ? hi : lo;
+  let dug = -1;
+  let off = Infinity;
+  for (const d of [first, first === lo ? hi : lo, 0, 1, 2, 3, 4, 5]) {
+    const tx = stepX(x, y, d);
+    const ty = stepY(y, d);
+    if (rockAt(map, tx, ty) !== SOIL || !diggable(map, tx, ty, d)) continue;
+    if (d === hi || d === lo) return d;
+    const o = Math.abs(angleDiff(DIR_ANGLE[d] as number, aim));
+    if (o < off) {
+      off = o;
+      dug = d;
+    }
+  }
+  return dug;
+}
+
+/**
+ * Whether cell (x, y) is in a tunnel: one cell wide wherever it is, so no two of its neighbours next to
+ * each other are both open (three open cells round a corner are a chamber's, the hex grid's 2×2).
+ * Junctions and crossings of tunnels count; a chamber's edge doesn't.
  */
 export function narrow(map: WorldMap, x: number, y: number): boolean {
-  for (let k = 0; k < 4; k++) {
-    const ax = k & 1 ? 1 : -1;
-    const ay = k & 2 ? 1 : -1;
-    if (rockAt(map, x + ax, y) === OPEN && rockAt(map, x, y + ay) === OPEN && rockAt(map, x + ax, y + ay) === OPEN) return false;
+  let prev = openAt(map, x, y, 5);
+  for (let d = 0; d < 6; d++) {
+    const o = openAt(map, x, y, d);
+    if (o && prev) return false;
+    prev = o;
   }
   return true;
 }
 
-/** A cell of a dug tunnel: narrow, with soil on at least one of its four sides. (A gap between rocks on the open surface isn't one.) */
+/** A cell of a dug tunnel: narrow, with soil on at least one side. (A gap between rocks on the open surface isn't one.) */
 export function tunnel(map: WorldMap, x: number, y: number): boolean {
-  if (!narrow(map, x, y)) return false;
-  for (let d = 0; d < 4; d++) if (rockAt(map, x + (DX[d] as number), y + (DY[d] as number)) === SOIL) return true;
+  if (!map.hasSoil || !narrow(map, x, y)) return false;
+  for (let d = 0; d < 6; d++) if (rockAt(map, stepX(x, y, d), stepY(y, d)) === SOIL) return true;
   return false;
 }
 
 /**
- * The grid way (0 east, 1 south, 2 west, 3 north) of the solid a step from (x, y) to (nx, ny) ran into:
- * across the cell edge it crossed; crossing a corner, toward whichever of the two side cells is solid.
+ * The way (0–5) a step from world (x, y) to (px, py) crossed into the next cell: toward the solid it
+ * ran into. Not into a neighbour (no crossing): the way nearest the step's own direction.
  */
-export function crossedDir(map: WorldMap, x: number, y: number, nx: number, ny: number): number {
-  const cx = Math.floor(x);
-  const cy = Math.floor(y);
-  const dx = Math.floor(nx) - cx;
-  const dy = Math.floor(ny) - cy;
-  const ex = dx > 0 ? 0 : 2;
-  const ey = dy > 0 ? 1 : 3;
-  if (dx !== 0 && dy !== 0) return rockAt(map, cx + dx, cy) !== OPEN ? ex : ey;
-  if (dx !== 0) return ex;
-  if (dy !== 0) return ey;
-  return gridDir(Math.atan2(ny - y, nx - x));
-}
-
-/** The grid way (0 east, 1 south, 2 west, 3 north) nearest heading h. */
-export function gridDir(h: number): number {
-  return ((Math.round(h / (Math.PI / 2)) % 4) + 4) & 3;
+export function crossedDir(map: WorldMap, x: number, y: number, px: number, py: number): number {
+  cellOf(x, y);
+  const cx = CELL[0] as number;
+  const cy = CELL[1] as number;
+  cellOf(px, py);
+  const tx = CELL[0] as number;
+  const ty = CELL[1] as number;
+  for (let d = 0; d < 6; d++) if (stepX(cx, cy, d) === tx && stepY(cy, d) === ty) return d;
+  void map;
+  return dirOf(Math.atan2(py - y, px - x));
 }
 
 /**
  * The wall-follower's next way from cell (x, y), facing `dir`, keeping the wall on `side` (+1 right,
- * −1 left): the first open one of toward the wall, ahead, away from it, behind. Facing a dead end on
- * all four sides (it can't be: it stands in an open cell it walked into), it stays facing as it was.
+ * −1 left): the first open one going round from the hand side (120°, then 60°) through straight on
+ * to the other side, back last. It turns hand-ward only round a wall that is there (a solid cell on
+ * the hand side): in open ground, turning hand-ward every cell would circle three cells for ever.
  */
 export function handOnWall(map: WorldMap, x: number, y: number, dir: number, side: number): number {
-  // Turn toward the hand only round a wall that is there: the cell behind on the hand side is solid.
-  // In open ground (no wall at hand, and none just behind it) turning hand-ward every cell would circle a 2×2 square.
-  const back = (dir + 2) & 3;
-  const hs = (dir + side) & 3;
-  const lost = rockAt(map, x + (DX[back] as number) + (DX[hs] as number), y + (DY[back] as number) + (DY[hs] as number)) === OPEN;
-  for (const turn of lost ? [0, side, -side, 2] : [side, 0, -side, 2]) {
-    const d = (dir + turn) & 3;
-    if (rockAt(map, x + (DX[d] as number), y + (DY[d] as number)) === OPEN) return d;
+  const lost = openAt(map, x, y, dir + side) && openAt(map, x, y, dir + 2 * side);
+  const order = lost ? [0, -side, -2 * side, side, 2 * side, 3] : [2 * side, side, 0, -side, -2 * side, 3];
+  for (const turn of order) {
+    const d = (((dir + turn) % 6) + 6) % 6;
+    if (openAt(map, x, y, d)) return d;
   }
   return dir;
 }
 
 /** How far the mound of `pellets` dropped soil reaches out from the nest's edge, in cells: it grows with the square root, like a ring of heaped earth. */
 export function moundWidth(pellets: number): number {
-  return 0.3 * Math.sqrt(pellets);
+  return 0.2 * Math.sqrt(pellets);
 }
 
-/** At a dead end, the chance an ant digs to a side instead of straight on: how often tunnels fork. */
+/** At a dead end, the chance an ant digs 60° to a side instead of on along the tunnel's run: how often tunnels fork. */
 const FORK = 0.15;
+/** How much a tunnel's run drifts per cell dug (radians, standard deviation): the meander. 0 = tunnels run straight. */
+export let TUNNEL_DRIFT = 0.2;
+/** Set the drift (tests: 0 for straight tunnels). */
+export function setTunnelDrift(v: number): void {
+  TUNNEL_DRIFT = v;
+}
 
 /** Seconds an ant takes to dig one cell of soil open, at least (up to twice this, at random). */
 export const DIG_TIME = 1;
-/** An ant digs a face it meets within ~30° of head-on; a shallower touch slides it along the wall. */
-const HEAD_ON = Math.cos(Math.PI / 6);
 export const NO_FACE = 0;
 export const DIG_FACE = 1;
-export const GLANCE_X = 2;
-export const GLANCE_Y = 3;
+/** Soil touched at a slant: slide along it, a hand on the wall. */
+export const GLANCE = 2;
 /** A flat wall (a chamber's, or a tunnel's side) met head-on: where a new tunnel may start, now and then (START). */
 export const START_FACE = 4;
 /** The chance an explorer meeting a flat wall head-on starts a tunnel into it. */
@@ -987,72 +1086,79 @@ const START_HUG = 0.1;
 const HUG_TIME = 8;
 
 /**
- * What a step from (x, y) to (nx, ny) heading `h` does at soil: NO_FACE (it doesn't land in soil, or
- * crosses a cell corner), DIG_FACE (it meets a tunnel's end head-on, or the cell it is walking to:
- * dig it), START_FACE (it meets a flat wall head-on: a tunnel may start here), or GLANCE_X / GLANCE_Y
- * (it touches the soil at a slant across a vertical / horizontal cell edge: slide along it).
- * Only a tunnel's end is dug (see tunnelEnd), and only when met head-on: that is what makes tunnels
- * rather than caverns. Any other soil the ant slides along, like a tunnel wall.
+ * What a step from world (x, y) to (px, py) heading `h` does at soil: NO_FACE (it doesn't cross into
+ * soil), DIG_FACE (it meets a tunnel's end head-on, or the cell it is walking to (aimX, aimY): dig it),
+ * START_FACE (it meets a flat wall head-on: a tunnel may start here), or GLANCE (it touches the soil
+ * at a slant: slide along it). Head-on is crossing the edge the heading points at: every heading is
+ * within 30° of one of the six. Only a tunnel's end is dug (see tunnelEnd): that is what makes
+ * tunnels rather than caverns.
  */
-export function soilFace(map: WorldMap, x: number, y: number, nx: number, ny: number, h: number, aimed = false): number {
-  const tx = Math.floor(nx);
-  const ty = Math.floor(ny);
+export function soilFace(map: WorldMap, x: number, y: number, px: number, py: number, h: number, aimX = NO_CELL, aimY = 0): number {
+  cellOf(px, py);
+  const tx = CELL[0] as number;
+  const ty = CELL[1] as number;
   if (rockAt(map, tx, ty) !== SOIL) return NO_FACE;
-  const acrossX = tx !== Math.floor(x);
-  const acrossY = ty !== Math.floor(y);
-  if (acrossX === acrossY) return NO_FACE; // a corner (or no crossing at all): leave it to the solid check
-  const headOn = acrossX ? Math.abs(Math.cos(h)) >= HEAD_ON : Math.abs(Math.sin(h)) >= HEAD_ON;
-  const d = acrossX ? (nx > x ? 0 : 2) : ny > y ? 1 : 3;
+  cellOf(x, y);
+  const cx = CELL[0] as number;
+  const cy = CELL[1] as number;
+  let d = -1;
+  for (let k = 0; k < 6; k++) if (stepX(cx, cy, k) === tx && stepY(cy, k) === ty) d = k;
+  if (d < 0) return NO_FACE;
+  const headOn = dirOf(h) === d;
+  const aimed = aimX === tx && aimY === ty;
   if ((headOn || aimed) && diggable(map, tx, ty, d)) return DIG_FACE;
   if (aimed && startable(map, tx, ty, d)) return DIG_FACE;
   if (headOn && startable(map, tx, ty, d)) return START_FACE;
-  return acrossX ? GLANCE_X : GLANCE_Y;
+  return GLANCE;
 }
 
 /** Whether soil cell (x, y), entered going `d`, may be dug: a tunnel's end, or a wall with open ground straight beyond it (breaking through). */
 export function diggable(map: WorldMap, x: number, y: number, d: number): boolean {
-  return tunnelEnd(map, x, y) || rockAt(map, x + (DX[d] as number), y + (DY[d] as number)) === OPEN;
+  return tunnelEnd(map, x, y) || openAt(map, x, y, d);
 }
 
 /**
- * Whether a new tunnel may start into flat-wall cell (x, y), going `d`: no open ground within two
- * cells to either side of it, in its row or the next. New tunnels keep their distance from other
- * passages, so the ground isn't combed into parallel slots.
+ * Whether a new tunnel may start into wall cell (x, y), going `d`: no open ground within two steps
+ * of it except on the side it is dug from (the side its own open neighbours are on: the chamber).
+ * New tunnels keep their distance from other passages, so the ground isn't combed into parallel slots.
  */
 export function startable(map: WorldMap, x: number, y: number, d: number): boolean {
-  const px = DY[d] as number;
-  const py = -(DX[d] as number);
-  for (let a = 0; a <= 1; a++)
-    for (let b = -2; b <= 2; b++) {
-      if (b === 0) continue;
-      if (rockAt(map, x + a * (DX[d] as number) + b * px, y + a * (DY[d] as number) + b * py) === OPEN) return false;
+  const fx = centreX(x, y);
+  const fy = centreY(y);
+  // Which way the chamber lies: toward the face's open neighbours (or back the way it is dug from).
+  let nx = 0;
+  let ny = 0;
+  for (let k = 0; k < 6; k++)
+    if (openAt(map, x, y, k)) {
+      nx += Math.cos(DIR_ANGLE[k] as number);
+      ny += Math.sin(DIR_ANGLE[k] as number);
     }
+  if (Math.hypot(nx, ny) < 1e-6) {
+    nx = -Math.cos(DIR_ANGLE[d] as number);
+    ny = -Math.sin(DIR_ANGLE[d] as number);
+  }
+  const len = Math.hypot(nx, ny);
+  const o = discOffsets(2)[y & 1] as Int16Array;
+  for (let k = 2; k < o.length; k += 2) {
+    const ax = x + (o[k] as number);
+    const ay = y + (o[k + 1] as number);
+    if (rockAt(map, ax, ay) !== OPEN) continue;
+    if (((centreX(ax, ay) - fx) * nx + (centreY(ay) - fy) * ny) / len > 0.25) continue; // on the chamber's side
+    return false;
+  }
   return true;
 }
 
 /**
- * Whether soil cell (x, y) is a tunnel's end: at most 2 of its 8 neighbours open. The end of a
- * tunnel (1 open) and the corner beside it (2) are; a tunnel's side wall or a chamber's flat wall
- * (3) is not. So tunnels lengthen and branch but stay one or two cells wide.
+ * Whether soil cell (x, y) is a tunnel's end: just one of its six neighbours open (`most`). The cell
+ * past a tunnel's end is, and so is a fork's first cell beside it; a tunnel's side wall (two open,
+ * next to each other) or a chamber's wall is not. So tunnels lengthen and branch but stay one cell
+ * wide, turning at most 60° a cell.
  */
-export function tunnelEnd(map: WorldMap, x: number, y: number, most = 2): boolean {
+export function tunnelEnd(map: WorldMap, x: number, y: number, most = 1): boolean {
   let open = 0;
-  for (let dy = -1; dy <= 1; dy++)
-    for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && rockAt(map, x + dx, y + dy) === OPEN && ++open > most) return false;
+  for (let d = 0; d < 6; d++) if (openAt(map, x, y, d) && ++open > most) return false;
   return true;
-}
-
-/**
- * A step that crosses diagonally into the next cell between two solid cells: blocked, like rock.
- * Movement otherwise only checks where the step lands, so ants could slip through a rock corner
- * into pockets the walking-distance map (4-connected) can't reach, and sit there forever.
- */
-export function squeezes(map: WorldMap, x: number, y: number, nx: number, ny: number): boolean {
-  const cx = Math.floor(x);
-  const cy = Math.floor(y);
-  const tx = Math.floor(nx);
-  const ty = Math.floor(ny);
-  return tx !== cx && ty !== cy && rockAt(map, tx, cy) !== OPEN && rockAt(map, cx, ty) !== OPEN;
 }
 
 /** Turn toward the strongest of three sensors, at most `max` radians. */
