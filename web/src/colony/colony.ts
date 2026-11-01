@@ -488,7 +488,11 @@ export class Colony {
       return false;
     }
     // A target that isn't this cell or a neighbour is stale (from before a detour, say): decide afresh.
-    const fresh = this.gx[i] === NO_CELL || hexDistance(this.gx[i] as number, this.gy[i] as number, hx, hy) > 1;
+    // So is one that has been filled since (backfill), unless it is an explorer's face to dig.
+    const fresh =
+      this.gx[i] === NO_CELL ||
+      hexDistance(this.gx[i] as number, this.gy[i] as number, hx, hy) > 1 ||
+      (mode !== EXPLORE && rockAt(map, this.gx[i] as number, this.gy[i] as number) !== OPEN);
     if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
     const hugging = mode === EXPLORE && (this.hugT[i] as number) > 0;
     const packed = hy * 65536 + hx;
@@ -598,12 +602,26 @@ export class Colony {
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) >= FAINT || food.get(tx, ty) >= FAINT) continue;
       if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
       if (Math.hypot(centreX(tx, ty) - nest.x, centreY(ty) - nest.y) < nest.r + 2) continue;
+      // The grids are a tick old: a nestmate that stepped in earlier this tick isn't in them (and walling it
+      // in would bury it). Rare enough (every other test passed) to look at each ant.
+      if (this.#occupied(tx, ty)) continue;
       if (!fillCell(map, tx, ty)) continue;
+      // A fresh trip out from here. (Letting its trip clock run on instead, so it lays only faint home scent
+      // this deep, was measured worse: it soon tires and walks home empty. Seeds 3, 4, 6–8: 12 % less food home.)
       this.pellet[i] = 0;
       this.soilFilled++;
       this.since[i] = 0;
-      this.heading[i] = (this.heading[i] as number) + Math.PI;
       return true;
+    }
+    return false;
+  }
+
+  /** Whether any of this colony's ants stands in cell (x, y) now. */
+  #occupied(x: number, y: number): boolean {
+    for (let j = 0; j < this.n; j++) {
+      if (!this.alive[j]) continue;
+      this.antCell(j);
+      if (CELL[0] === x && CELL[1] === y) return true;
     }
     return false;
   }
@@ -747,6 +765,8 @@ export class Colony {
         const side = this.wall[i] as number;
         if (side === 0 && !detouring && this.#walkTunnel(i, RETURN, p.speed * dt)) {
           h = this.#towardTarget(i); // in a tunnel: back the way it came (a wall it is already following, it keeps following)
+        } else if (pellet && !this.pellet[i]) {
+          h += Math.PI; // backfilled a dead end beside it (see #walkTunnel): turned round, it is asked afresh next tick
         } else if (side === 0) {
           // Free: the home vector, with the home trail as a hint only (climbing it at full rate let
           // clusters of homing ants circle on their own trail). After giving up on a wall, wander a while.
@@ -879,7 +899,13 @@ export class Colony {
       cellOf(Math.fround(nx), Math.fround(ny)); // as stored (Float32), so the cached cell is the stored position's
       const lx = CELL[0] as number;
       const ly = CELL[1] as number;
-      const landOpen = rockAt(map, lx, ly) === OPEN;
+      let landOpen = rockAt(map, lx, ly) === OPEN;
+      if (!landOpen) {
+        // A step that stays in the ant's own cell moves even if that cell is solid: a cell filled round an
+        // ant (another colony's ant backfilling, its grids a tick old) must not bury it.
+        this.antCell(i);
+        if (CELL[0] === lx && CELL[1] === ly) landOpen = true;
+      }
       let face = !landOpen && mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] as number, this.gy[i] as number) : NO_FACE;
       if (face === START_FACE) face = digging || rng() < START ? DIG_FACE : GLANCE;
       if (face !== NO_FACE) {

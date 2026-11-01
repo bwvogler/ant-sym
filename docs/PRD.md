@@ -685,7 +685,12 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 - **What measuring showed:**
   - Without the 3 s wait, carriers refilled the cell they had just dug, on their first step home. Ants dug and filled in a loop, half of all dug soil "went back" (53 %), and the economy fell (≈ 940 food home, one seed with 29 % of ants out long).
   - With the wait, genuinely unused dead ends are rare, because ants walk their tunnels and home scent spreads into stubs. Backfill is **0.6 %** of dug soil, close to the Florida harvester ant's 2.5 % (Tschinkel, Rink & Kwapich 2015) and far from *Atta*'s majority.
-  - Seeds 1–5, 600 s: food home ~1,095 per colony (MR 10: ~1,060); ants out over 120 s 1.3–16.6 % (2.5–12.5 %); first-food median ~30 s.
-  - The livelock counter is 0 on seeds 1–4, and the stall scan finds nothing still over 18 s.
-  - Bench: 3.84 ms underground vs 3.76 ms for MR 10, run back to back; noise.
+  - Seeds 1–5, 600 s: food home ~1,120 per colony (MR 10: ~1,060); ants out over 120 s 1.5–13.6 % (2.5–12.5 %); first-food median ~28 s. The open map is unchanged, number for number.
+  - The stall scan finds nothing still over 11 s. The livelock counter (homing over 60 s with more than 15 wall leaves) reads 9, 0, 0, 0 on seeds 1–4; every flagged ant got home within 140 s, so these are slow trips, not livelocks. The counter swings by seed: 2 instead of 9 on seed 1 from a change that only acts at fills.
+  - Bench: 3.81 ms underground vs 3.67 ms for MR 10, run back to back. The open map, which never backfills, moved by the same 4 %, so it is noise.
+- **Review fixes:**
+  - **Burial.** The occupancy grids are a tick old, so a nestmate that stepped into a stub earlier in the same tick, or a rival that already moved, could be walled in. It then couldn't step anywhere: 7 such ants on seeds 3–6, one stuck 25 s. Now the filler checks its own colony's ants in the cell itself, and a step that stays inside the ant's own cell always moves, so an ant in a cell filled round it walks out. The burial scan finds none on seeds 3–6.
+  - **Turning round** after a fill never happened: the tick wrote its own heading back over it, and the carrier walked on to the nest. It now turns in the tick's heading.
+  - **A follower or homing ant whose next cell is filled** steered into it for good. A target that is no longer open is now decided afresh, except an explorer's face to dig.
+  - **Kept as it was:** the trip clock still restarts after a fill. Letting it run on, so the ant lays faint home scent from deep tunnels rather than a fresh peak, was measured worse: such ants soon tire and walk home empty, and seeds 3, 4 and 6–8 brought 12 % less food home.
 - **Not done:** an *Atta*-like colony would need a looser sense of "unused", for example scent fading over minutes rather than seconds, or pellets carrying their own building scent (Khuong et al.). Bead `ja-jmf` stays open for that.
