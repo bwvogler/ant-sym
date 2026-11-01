@@ -205,6 +205,13 @@ export class Colony {
   calm: Float32Array;
   /** the fungal share of its odour, 0..MAX_MASK (the fungus's): its odour is its nest's, that share of the way to the fungus's own */
   mask: Float32Array;
+  // What the ant gives off (docs/fungus-policy.md §4.C); the fungus writes them, 1 / 0 = as it is.
+  /** trail laid × this (C1) */
+  layGain: Float32Array;
+  /** carrying food, it also lays this share of its food trail into the other colony's food field (C2): it leaks where food is */
+  crossLay: Float32Array;
+  /** in a fight it lays (1 − this) of the alarm (C3): a quiet fight recruits fewer defenders */
+  quiet: Float32Array;
   /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
   wall: Int8Array;
   /** straight-line distance home (its own home vector) when it met the wall it is following */
@@ -280,6 +287,9 @@ export class Colony {
     this.tolerance = new Float32Array(n).fill(this.params.tolerance);
     this.calm = new Float32Array(n);
     this.mask = new Float32Array(n);
+    this.layGain = new Float32Array(n).fill(1);
+    this.crossLay = new Float32Array(n);
+    this.quiet = new Float32Array(n);
     this.wall = new Int8Array(n);
     this.hitDist = new Float32Array(n);
     this.followT = new Float32Array(n);
@@ -331,6 +341,9 @@ export class Colony {
     this.tolerance[i] = this.params.tolerance;
     this.calm[i] = 0;
     this.mask[i] = 0;
+    this.layGain[i] = 1;
+    this.crossLay[i] = 0;
+    this.quiet[i] = 0;
   }
 
   /** Living ants. */
@@ -640,9 +653,12 @@ export class Colony {
       // Every mode but fighting shies away from alarm.
       if (mode !== FIGHT) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * dt);
 
-      // Lay trail: walking out marks the way home, carrying food marks the way to it.
-      const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt;
+      // Lay trail: walking out marks the way home, carrying food marks the way to it. The fungus can make it louder
+      // or quieter, and have a carrier leak its food trail into the other colony's field (exact as-is: × 1, nothing leaked).
+      const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt * (this.layGain[i] as number);
       ph.deposit(carrying ? "food" : "home", this.x[i] as number, this.y[i] as number, laid);
+      const leak = this.crossLay[i] as number;
+      if (carrying && leak > 0 && this.foreign) this.foreign.deposit("food", this.x[i] as number, this.y[i] as number, laid * leak);
 
       // Move; rock or the edge turns the ant back somewhere random.
       const nx = (this.x[i] as number) + Math.cos(h) * p.speed * dt;

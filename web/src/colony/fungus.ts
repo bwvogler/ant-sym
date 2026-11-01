@@ -46,10 +46,16 @@ export interface Levers {
   tolerance: number;
   /** the fungal share of the host's odour, 0..MAX_MASK: the fungus's own odour, between the colonies' (B3/B7) */
   mask: number;
+  /** trail laid × this (C1) */
+  lay: number;
+  /** carrying food, the host also lays this share of its food trail into the other colony's field (C2) */
+  crossLay: number;
+  /** in a fight the host lays (1 − this) of the alarm (C3) */
+  quiet: number;
 }
 
 /** The world as it is. */
-export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0 };
+export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0 };
 
 /** One thing the fungus can run in a host: a bundle of levers (docs/fungus-policy.md §5.2). */
 export interface Intervention {
@@ -67,8 +73,8 @@ export interface Intervention {
  */
 export const INTERVENTIONS: readonly Intervention[] = [
   { id: "dormant", name: "dormant", blurb: "does nothing to its host", levers: AS_IS },
-  { id: "soothe", name: "soothe", blurb: "its host gives off a calming cue, tolerates strangers and barely smells alarm", levers: { ...AS_IS, alarm: 0.25, calm: 0.8, tolerance: 0.3 } },
-  { id: "share", name: "share", blurb: "its host smells the rival's food trail as its own, and food scent strongly", levers: { ...AS_IS, food: 1.5, foreignFood: 1 } },
+  { id: "soothe", name: "soothe", blurb: "its host gives off a calming cue, tolerates strangers, barely smells alarm and fights without raising it", levers: { ...AS_IS, alarm: 0.25, calm: 0.8, tolerance: 0.3, quiet: 0.9 } },
+  { id: "share", name: "share", blurb: "its host smells the rival's food trail as its own and food scent strongly, lays a louder trail, and leaks its food trail to the rival", levers: { ...AS_IS, food: 1.5, foreignFood: 1, lay: 1.5, crossLay: 1 } },
   { id: "roam", name: "roam", blurb: "its host barely smells home and feels its time out slowly, so it ranges far", levers: { ...AS_IS, home: 0.35, clock: 2.5 } },
   { id: "blend", name: "blend", blurb: "its host carries the fungus's own odour, between the colonies', and tolerates the odours in between", levers: { ...AS_IS, mask: 0.6, tolerance: 0.15 } },
 ];
@@ -501,6 +507,9 @@ export class Fungus {
     c.calm[i] = v.calm * l;
     c.tolerance[i] = c.params.tolerance + v.tolerance * l;
     c.mask[i] = v.mask * l;
+    c.layGain[i] = 1 + (v.lay - 1) * l;
+    c.crossLay[i] = v.crossLay * l;
+    c.quiet[i] = v.quiet * l;
   }
 
   /** How far the fungus is into colony c, and how far c has answered it. */
