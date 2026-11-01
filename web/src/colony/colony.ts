@@ -342,14 +342,17 @@ export class Colony {
     const cy = Math.floor(y);
     const d = this.homeDist;
     const here = d.get(cx, cy);
-    if (here === 0 || here === UNREACHABLE) return Math.atan2(this.nest.y - y, this.nest.x - x);
+    if (here === 0) return Math.atan2(this.nest.y - y, this.nest.x - x);
+    // In a pocket the map can't reach (an ant can squeeze in diagonally between two rocks), the way
+    // out is the way in: the lowest neighbour, corner rule waived. Only if none, the straight line.
+    const pocket = here === UNREACHABLE;
     let best = here;
     let tx = cx;
     let ty = cy;
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dy) continue;
-        if (dx && dy && (d.get(cx + dx, cy) === UNREACHABLE || d.get(cx, cy + dy) === UNREACHABLE)) continue;
+        if (!pocket && dx && dy && (d.get(cx + dx, cy) === UNREACHABLE || d.get(cx, cy + dy) === UNREACHABLE)) continue;
         const v = d.get(cx + dx, cy + dy);
         if (v < best) {
           best = v;
@@ -357,6 +360,7 @@ export class Colony {
           ty = cy + dy;
         }
       }
+    if (best === UNREACHABLE) return Math.atan2(this.nest.y - y, this.nest.x - x);
     return Math.atan2(ty + 0.5 - y, tx + 0.5 - x);
   }
 
@@ -482,7 +486,7 @@ export class Colony {
       const ny = (this.y[i] as number) + Math.sin(h) * p.speed * dt;
       this.detour[i] = (this.detour[i] as number) - dt;
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
-      if (blocked(map, nx, ny)) {
+      if (blocked(map, nx, ny) || squeezes(map, this.x[i] as number, this.y[i] as number, nx, ny)) {
         h += Math.PI / 2 + rng() * Math.PI;
         // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
         this.bumps[i] = Math.min(5, (this.bumps[i] as number) + 1);
@@ -522,6 +526,19 @@ export const SITUATIONS = MODES.length * 2 * TRAILS.length ** 3 * 2 * STANCES.le
 
 function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: Trail, enemy: number, stance: number): number {
   return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
+}
+
+/**
+ * A step that crosses diagonally into the next cell between two rock cells: blocked, like rock.
+ * Movement otherwise only checks where the step lands, so ants could slip through a rock corner
+ * into pockets the walking-distance map (4-connected) can't reach, and sit there forever.
+ */
+export function squeezes(map: WorldMap, x: number, y: number, nx: number, ny: number): boolean {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  const tx = Math.floor(nx);
+  const ty = Math.floor(ny);
+  return tx !== cx && ty !== cy && rockAt(map, tx, cy) === 1 && rockAt(map, cx, ty) === 1;
 }
 
 /** Turn toward the strongest of three sensors, at most `max` radians. */
