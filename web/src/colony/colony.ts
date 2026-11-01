@@ -1,6 +1,6 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
-import { blocked, digCell, dropFood, OPEN, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { blocked, digCell, dropFood, fillCell, OPEN, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -226,6 +226,9 @@ export class Colony {
   /** soil cells this colony dug open, and pellets of it dropped on the mound at the nest */
   soilDug = 0;
   soilOut = 0;
+  /** pellets dropped into unused dead ends on the way home (backfill), and pellets lost with ants that died carrying them */
+  soilFilled = 0;
+  soilLost = 0;
   /** ants lost, and a count of recent losses fading over ~30 s */
   losses = 0;
   recentLosses = 0;
@@ -350,6 +353,7 @@ export class Colony {
   kill(i: number): void {
     if (!this.alive[i]) return;
     if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
+    if (this.pellet[i]) this.soilLost++;
     this.alive[i] = 0;
     this.carrying[i] = 0;
     this.pellet[i] = 0;
@@ -478,6 +482,11 @@ export class Colony {
     this.antCell(i);
     const hx = CELL[0] as number;
     const hy = CELL[1] as number;
+    if (mode === RETURN && this.pellet[i] && map.hasSoil && (this.since[i] as number) > BACKFILL_AFTER && this.#backfill(i, hx, hy)) {
+      // Dropped its pellet in an unused dead end beside it: the trip is done, and it is asked afresh.
+      this.gx[i] = NO_CELL;
+      return false;
+    }
     // A target that isn't this cell or a neighbour is stale (from before a detour, say): decide afresh.
     const fresh = this.gx[i] === NO_CELL || hexDistance(this.gx[i] as number, this.gy[i] as number, hx, hy) > 1;
     if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
@@ -569,6 +578,34 @@ export class Colony {
     this.gx[i] = stepX(cx, cy, dir);
     this.gy[i] = stepY(cy, dir);
     return true;
+  }
+
+  /**
+   * Backfill: a pellet carrier at tunnel cell (cx, cy) drops its pellet into a neighbouring dead end that
+   * nobody uses, filling it back with soil, instead of hauling it all the way out. Leaf-cutting ants put
+   * most of their soil back inside this way, refilling unused space (Pielström & Roces); harvester ants
+   * very little (≈ 2.5 %, Tschinkel et al. 2015). Unused, to the ant's senses: no food there, no food or
+   * home scent (outbound ants lay home scent, so a tip being dug carries it), no ant in it, and not by the nest.
+   */
+  #backfill(i: number, cx: number, cy: number): boolean {
+    const { map, nest } = this;
+    const home = this.ph.fields.home;
+    const food = this.ph.fields.food;
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty)) continue;
+      if (map.food.get(tx, ty) > 0 || home.get(tx, ty) >= FAINT || food.get(tx, ty) >= FAINT) continue;
+      if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
+      if (Math.hypot(centreX(tx, ty) - nest.x, centreY(ty) - nest.y) < nest.r + 2) continue;
+      if (!fillCell(map, tx, ty)) continue;
+      this.pellet[i] = 0;
+      this.soilFilled++;
+      this.since[i] = 0;
+      this.heading[i] = (this.heading[i] as number) + Math.PI;
+      return true;
+    }
+    return false;
   }
 
   /** A wall-follower not round after FOLLOW_GIVE_UP: wander a good while, then try afresh. */
@@ -1137,6 +1174,9 @@ export function moundRadius(pellets: number, nestR: number): number {
   return Math.sqrt(nestR * nestR + (Math.max(0, pellets) * SWELL * R) / Math.PI);
 }
 
+/** Seconds into a trip home before a pellet carrier may backfill: not the cell it has just dug (the tunnel's live end). */
+const BACKFILL_AFTER = 3;
+
 /** A lone ant's chance to dig at a tunnel's end; each nestmate within two cells adds 1 / DIG_CROWD. */
 const DIG_ALONE = 0.1;
 const DIG_CROWD = 6;
@@ -1235,6 +1275,25 @@ export function startable(map: WorldMap, x: number, y: number, d: number): boole
     return false;
   }
   return true;
+}
+
+/**
+ * Whether open cell (x, y) is a stub: a dead end whose open neighbours (one or two) lie next to each
+ * other, so filling it can't cut any passage (on offset rows a one-cell stub off a straight tunnel
+ * touches two cells of it).
+ */
+export function stub(map: WorldMap, x: number, y: number): boolean {
+  let open = 0;
+  let runs = 0;
+  let prev = openAt(map, x, y, 5);
+  for (let d = 0; d < 6; d++) {
+    const o = openAt(map, x, y, d);
+    if (o) open++;
+    if (o && !prev) runs++;
+    prev = o;
+  }
+  if (open === 6) runs = 1;
+  return open >= 1 && open <= 2 && runs === 1;
 }
 
 /**

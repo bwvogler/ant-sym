@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import { CountGrid } from "../battle.ts";
+import { Game } from "../game.ts";
 import assert from "node:assert/strict";
 import { avoid, chooseDig, climb, Colony, moundRadius, SWELL, decode, DIG_FACE, digChance, setTunnelDrift, diggable, encodeSituation, GLANCE, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, START_FACE, startable, trailLevel, tunnelEnd, turnToward, wallSide, type Situation } from "../colony.ts";
 import { foodIn, generateWorld, tunnelHeading, mulberry32, OPEN, OPEN_WORLD, ROCK, rockAt, setRock, SOIL, worldFromArrays, type WorldMap } from "../world.ts";
@@ -534,4 +535,70 @@ test("the mound holds every pellet: its area is pellets × SWELL × a hex cell's
     prev = r;
   }
   assert.ok(SWELL > 1 && SWELL < 1.5, "loose soil takes more room than in place, within earthwork ranges");
+});
+
+test("backfill: a pellet carrier fills an unused dead end beside its way home, and goes back out; scented, food, occupied and nest-side dead ends are left", () => {
+  // A tunnel along row 6 from the nest's chamber (west) to x = 20, with a one-cell stub off it at (12, 5).
+  const build = () => {
+    const size = { w: 30, h: 12 };
+    const rock = new Uint8Array(size.w * size.h).fill(SOIL);
+    for (let x = 2; x <= 20; x++) rock[6 * size.w + x] = OPEN;
+    for (let y = 5; y <= 7; y++) for (let x = 2; x <= 4; x++) rock[y * size.w + x] = OPEN;
+    rock[5 * size.w + 12] = OPEN; // row 6 is even: (12, 5) is (12, 6)'s north-east neighbour, a dead end
+    return worldFromArrays(size, [nestAt(3, 6, 1.5)], { rock });
+  };
+  const run = (prep: (m: WorldMap, c: Colony) => void) => {
+    const m = build();
+    const c = new Colony(m, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(2), () => "return");
+    prep(m, c);
+    put(c, 0, 16, 6);
+    c.heading[0] = Math.PI;
+    c.mode[0] = 2;
+    c.pellet[0] = 1;
+    c.since[0] = 10; // well into its trip home (a carrier never fills the cell it has just dug)
+    for (let t = 0; t < 30 * 3 && c.pellet[0] === 1; t++) c.tick(1 / 30);
+    return { m, c };
+  };
+  const { m, c } = run(() => {});
+  assert.equal(rockAt(m, 12, 5), SOIL, "the stub is filled");
+  assert.equal(c.pellet[0], 0);
+  assert.equal(c.soilFilled, 1);
+  assert.equal(m.filled, 1);
+  assert.ok((c.x[0] as number) > at(5, 6).x, "it dropped it on the way, not at the nest");
+  // Left alone: home scent in it (being dug, or walked), food in it, an ant in it.
+  const scented = run((_, k) => k.ph.deposit("home", at(12, 5).x, at(12, 5).y, 1));
+  assert.equal(rockAt(scented.m, 12, 5), OPEN, "home scent: in use");
+  const food = run((mm) => mm.food.set(12, 5, 2));
+  assert.equal(rockAt(food.m, 12, 5), OPEN, "food in it");
+  const busy = run((_, k) => {
+    const g = new CountGrid();
+    g.add(12, 5);
+    k.friends = g;
+  });
+  assert.equal(rockAt(busy.m, 12, 5), OPEN, "an ant in it");
+  const nestSide = run((mm) => mm.rock.set(5, 5, OPEN)); // a stub at the nest chamber's edge, passed on the way in
+  assert.equal(rockAt(nestSide.m, 5, 5), OPEN, "by the nest");
+  // Fresh from digging: the cell it has just opened (the tunnel's live end) is never filled.
+  const m2 = build();
+  const d = new Colony(m2, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "explore");
+  put(d, 0, 18, 6);
+  d.heading[0] = 0;
+  for (let t = 0; t < 30 * 8 && d.soilDug === 0; t++) d.tick(1 / 30);
+  for (let t = 0; t < 30 * 2; t++) d.tick(1 / 30);
+  assert.ok(d.soilDug >= 1 && d.soilFilled === 0, `it dug ${d.soilDug} and filled ${d.soilFilled}: never its own new cell`);
+});
+
+test("soil is conserved underground: every dug cell is on the mound, back in a dead end, in an ant's jaws or lost with an ant", () => {
+  const map = generateWorld(2, { size: { w: 200, h: 160 }, nestGap: 80 });
+  const g = new Game(map, { antCount: 250, rivalAnts: 250 }, mulberry32(9));
+  for (let k = 0; k < 30 * 120; k++) g.tick(1 / 30);
+  let filled = 0;
+  for (const c of g.colonies) {
+    let carried = 0;
+    for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.pellet[i]! ? 1 : 0;
+    assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried + c.soilLost, "dug = mound + filled + carried + lost");
+    filled += c.soilFilled;
+  }
+  assert.ok(filled > 0, "some soil went back into dead ends");
+  assert.equal(map.filled, filled);
 });

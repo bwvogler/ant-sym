@@ -672,3 +672,20 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 - The stats show "dug / mound" per colony, so the bookkeeping is visible.
 - At 4× speed after 40 s, about 2,300 cells dug make a mound about 29 units across from the nest. It looks big because that is how much soil there is.
 - No simulation numbers change.
+
+**MR 11: backfilling unused dead ends** (bead `ja-jmf`).
+- **The rule:** a pellet carrier at least 3 s into its trip home drops its pellet into a neighbouring dead end that nobody uses, filling it back with soil, and then goes back out. This is opportunistic refilling of unused space, as in *Atta*.
+- **What counts as unused, by the ant's senses:**
+  - no food in it;
+  - no food or home scent (outbound ants lay home scent, so a tunnel being worked carries it);
+  - no ant of either colony in it;
+  - not within the nest's radius + 2.
+- **A dead end** is a cell whose one or two open neighbours lie next to each other (`stub`), so filling it can't cut a passage. On offset rows, a one-cell stub off a straight tunnel touches two cells of it.
+- **Bookkeeping:** cells dug = mound + filled + carried + lost with ants that died carrying. Tested over a two-minute underground game.
+- **What measuring showed:**
+  - Without the 3 s wait, carriers refilled the cell they had just dug, on their first step home. Ants dug and filled in a loop, half of all dug soil "went back" (53 %), and the economy fell (≈ 940 food home, one seed with 29 % of ants out long).
+  - With the wait, genuinely unused dead ends are rare, because ants walk their tunnels and home scent spreads into stubs. Backfill is **0.6 %** of dug soil, close to the Florida harvester ant's 2.5 % (Tschinkel, Rink & Kwapich 2015) and far from *Atta*'s majority.
+  - Seeds 1–5, 600 s: food home ~1,095 per colony (MR 10: ~1,060); ants out over 120 s 1.3–16.6 % (2.5–12.5 %); first-food median ~30 s.
+  - The livelock counter is 0 on seeds 1–4, and the stall scan finds nothing still over 18 s.
+  - Bench: 3.84 ms underground vs 3.76 ms for MR 10, run back to back; noise.
+- **Not done:** an *Atta*-like colony would need a looser sense of "unused", for example scent fading over minutes rather than seconds, or pellets carrying their own building scent (Khuong et al.). Bead `ja-jmf` stays open for that.
