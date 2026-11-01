@@ -53,14 +53,19 @@ test("the side world: sky above a ground line, a walkway along it from edge to e
   }
 });
 
-test("each nest: an entrance on the walkway, a shaft down to its chamber, and food on the ground and below it, none in the air", () => {
-  for (const seed of [1, 2, 3]) {
-    const map = generateSideWorld(seed, SMALL);
+test("each nest: its entrance an open hole in the ground line with the walkway beside it, a shaft down to its chamber, and food on the ground and below it, none in the air", () => {
+  for (const seed of [1, 2, 3, 4, 6, 7]) {
+    const map = seed <= 3 ? generateSideWorld(seed, SMALL) : generateSideWorld(seed); // 4, 6, 7 at full size: entrances once generated in the air
     assert.equal(map.nests.length, 2);
     for (const n of map.nests) {
       assert.ok(n.entrance, "an entrance");
       cellOf(n.entrance!.x, n.entrance!.y);
-      assert.ok(isSky(map, CELL[0] as number, CELL[1] as number) && rockAt(map, CELL[0] as number, CELL[1] as number) === OPEN, "on the walkway");
+      const ex = CELL[0] as number;
+      const ey = CELL[1] as number;
+      assert.ok(!isSky(map, ex, ey) && rockAt(map, ex, ey) === OPEN, `seed ${seed}: the hole is open ground`);
+      let beside = false;
+      for (let d = 0; d < 6; d++) beside ||= isSky(map, nx(ex, ey, d), ny(ey, d)) && rockAt(map, nx(ex, ey, d), ny(ey, d)) === OPEN;
+      assert.ok(beside, `seed ${seed}: the walkway beside it`);
       assert.ok(n.y > n.entrance!.y + 8, "the chamber is well below the ground line");
       const walk = reachable(map, n.x, n.y, "open");
       cellOf(n.entrance.x, n.entrance.y);
@@ -138,6 +143,30 @@ test("homing in the side view: a carrier on the ground walks to its entrance and
     assert.equal(c.soilOut, 1, `up the shaft and out (${(t / 30).toFixed(0)} s)`);
     assert.ok(Math.hypot(c.x[0]! - n.entrance!.x, c.y[0]! - n.entrance!.y) < 2, "at the entrance");
   }
+});
+
+test("foraging in the side view: carriers with a trail to follow walk to the hole, not past it, and soil is conserved", () => {
+  const map = generateSideWorld(4, { nestCount: 1 });
+  const g = new Game(map, { antCount: 400 }, mulberry32(11));
+  const c = g.player;
+  const pick = new Float32Array(c.n).fill(-1);
+  let long = 0;
+  for (let k = 0; k < 30 * 200; k++) {
+    g.tick(1 / 30);
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i]) continue;
+      if (c.carrying[i] && pick[i] < 0) pick[i] = k / 30;
+      if (!c.carrying[i]) pick[i] = -1;
+    }
+    if (k % 30 === 0) {
+      let carried = 0;
+      for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.pellet[i]! ? 1 : 0;
+      assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried + c.soilLost, "dug = mound + filled + carried + lost");
+    }
+  }
+  for (let i = 0; i < c.n; i++) if (c.alive[i] && pick[i] >= 0 && 200 - pick[i] > 60) long++;
+  assert.ok(c.stored > 40, `food home: ${c.stored}`);
+  assert.ok(long <= 1, `${long} ants carrying food for over a minute (they used to shuttle along the ground line past the hole)`);
 });
 
 test("the ground line's crust stays: explorers walking the surface dig only by their own entrance, and the ground line is never filled", () => {

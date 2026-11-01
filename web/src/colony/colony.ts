@@ -522,7 +522,13 @@ export class Colony {
     }
     this.#noTunnel[i] = -1;
     let dir = fresh ? dirOf(this.heading[i] as number) : (this.gdir[i] as number);
-    if (mode === RETURN || mode === FOLLOW) {
+    const ent = this.#entrance;
+    if (mode === RETURN && ent && isSky(map, cx, cy)) {
+      // On the ground line (side view), homing is to the hole: the way nearer it along the ground (home scent lies
+      // along the walkway both sides of the hole, so the most-scent rule below walks a carrier past it and on).
+      const best = this.#towardHole(cx, cy, true);
+      dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
+    } else if (mode === RETURN || mode === FOLLOW) {
       // The way ahead (not back, unless it's a dead end) with the most scent: home scent, laid by
       // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.
       const field = mode === RETURN ? this.ph.fields.home : this.ph.fields.food;
@@ -540,6 +546,23 @@ export class Colony {
         }
       }
       dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
+    } else if (mode === EXPLORE && ent && isSky(map, cx, cy)) {
+      // On the ground line (side view) an explorer walks on along the ground the way it is going, turning back only
+      // at its end. A hand on the wall (searching a tunnel's branches) turned explorers round at every step of the
+      // ground and kept them within a few dozen cells of the hole, short of the food lying farther out.
+      let best = -1;
+      for (const turn of [0, 1, -1, 2, -2]) {
+        const d = (dir + turn + 6) % 6;
+        const tx = stepX(cx, cy, d);
+        const ty = stepY(cy, d);
+        if (rockAt(map, tx, ty) === OPEN && isSky(map, tx, ty)) {
+          best = d;
+          break;
+        }
+      }
+      if (best < 0) best = rockAt(map, stepX(cx, cy, (dir + 3) % 6), stepY(cy, (dir + 3) % 6)) === OPEN ? (dir + 3) % 6 : handOnWall(map, cx, cy, dir, this.hand[i] as number);
+      dir = best;
+      this.digAim[i] = NaN;
     } else {
       const side = this.hand[i] as number;
       const next = handOnWall(map, cx, cy, dir, side);
@@ -614,7 +637,7 @@ export class Colony {
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
       if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
       if (this.#byANest(tx, ty)) continue;
-      if (this.#entrance && (isSky(map, tx, ty) || Math.hypot(centreX(tx, ty) - this.#entrance.x, centreY(ty) - this.#entrance.y) < ENTRANCE_ZONE)) continue; // the ground line and the hole stay open
+      if (this.#entrance && (isSky(map, tx, ty) || this.#byAnEntrance(tx, ty))) continue; // the ground line and the holes stay open
       // The grids are a tick old: a nestmate that stepped in earlier this tick isn't in them (and walling it
       // in would bury it). Rare enough (every other test passed) to look at each ant.
       if (this.#occupied(tx, ty)) continue;
@@ -795,6 +818,34 @@ export class Colony {
   /** Whether cell (x, y) is within a nest's radius + 2 (any colony's: a rival's chamber is no dead end to fill either). */
   #byANest(x: number, y: number): boolean {
     for (const n of this.map.nests ?? [this.nest]) if (Math.hypot(centreX(x, y) - n.x, centreY(y) - n.y) < n.r + 2) return true;
+    return false;
+  }
+
+  /**
+   * The side view: the way from cell (cx, cy) to an open neighbour nearer the hole (along the ground: by
+   * column, then straight-line distance; else by straight-line distance), or −1 if none is nearer.
+   */
+  #towardHole(cx: number, cy: number, alongGround: boolean): number {
+    const ent = this.#entrance as Nest;
+    const metric = (x: number, y: number) => (alongGround ? Math.abs(x - ent.x) * 1000 : 0) + Math.hypot(x - ent.x, y - ent.y);
+    let best = -1;
+    let bestD = metric(centreX(cx, cy), centreY(cy)) - 1e-6;
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (rockAt(this.map, tx, ty) !== OPEN) continue;
+      const m = metric(centreX(tx, ty), centreY(ty));
+      if (m < bestD) {
+        bestD = m;
+        best = d;
+      }
+    }
+    return best;
+  }
+
+  /** The side view: whether cell (x, y) is within ENTRANCE_ZONE of any nest's entrance (a rival's hole is no space to fill either). */
+  #byAnEntrance(x: number, y: number): boolean {
+    for (const n of this.map.nests ?? [this.nest]) if (n.entrance && Math.hypot(centreX(x, y) - n.entrance.x, centreY(y) - n.entrance.y) < ENTRANCE_ZONE) return true;
     return false;
   }
 
@@ -1247,7 +1298,8 @@ export class Colony {
         this.wall[i] = 0;
         this.mx[i] = NaN;
         this.since[i] = 0;
-        h += Math.PI;
+        // It doesn't turn back down: out on the ground, it is asked afresh (most explore it), and so the ground near
+        // the nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
       } else if (atNest && !(pellet && ent)) {
         this.wall[i] = 0;
         this.mx[i] = NaN;

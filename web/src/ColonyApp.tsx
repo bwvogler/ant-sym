@@ -9,7 +9,7 @@ import type { Followed } from "./ui/follow.ts";
 import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
-import { RIVAL_BY_DEFAULT, useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
+import { useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
 import { TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 
 // The colony page: a procedural world, your colony and a rival's, and the
@@ -168,7 +168,7 @@ export default function ColonyApp() {
                     key={g}
                     type="button"
                     className={seg(controls.ground === g)}
-                    onClick={() => update({ ground: g, rival: RIVAL_BY_DEFAULT[g] })}
+                    onClick={() => update({ ground: g })}
                     title={g === "side" ? "A cross-section: ants forage on the ground line, dig their nest below it and carry the soil up to a mound" : "The open surface from above: rock and walkable ground"}
                   >
                     {g === "side" ? "side view" : "from above"}
@@ -177,7 +177,7 @@ export default function ColonyApp() {
               </div>
             </div>
             <label className="mt-2 flex items-center justify-between text-sm text-fg-2">
-              <span title={controls.ground === "side" ? "In the side view both colonies forage along one ground line: expect a war" : undefined}>Rival colony</span>
+              <span>Rival colony</span>
               <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />
             </label>
           </section>

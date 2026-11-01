@@ -27,13 +27,7 @@ export interface ColonyControls {
 
 export type Ground = "side" | "open";
 
-/**
- * A rival by default from above only. In the side view both colonies forage along one ground line, and every
- * forager meets the other side's on it: measured, half of both colonies dead in minutes. The checkbox still adds one.
- */
-export const RIVAL_BY_DEFAULT: Record<Ground, boolean> = { side: false, open: true };
-
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", rival: RIVAL_BY_DEFAULT.side, ground: "side" };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", rival: true, ground: "side" };
 
 /** Per paint event (a pointer move while dragging): radius in cells and the amount laid per cell. */
 const BRUSHES = { lure: { channel: "food", radius: 2, amount: 3 }, alarm: { channel: "alarm", radius: 3, amount: 12 } } as const;

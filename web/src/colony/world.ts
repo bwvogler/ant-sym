@@ -30,7 +30,7 @@ export interface Nest {
   x: number;
   y: number;
   r: number;
-  /** the side view: where the nest's shaft comes up on the ground line (world units) */
+  /** the side view: the hole where the nest's shaft comes up through the ground line (world units) */
   entrance?: { x: number; y: number };
 }
 
@@ -613,19 +613,20 @@ export interface SideWorldOptions extends WorldOptions {
   relief: number;
   /** food piles on the ground (3–6 cells wide) per 64 columns, on average (patchesPerChunk is buried food, per chunk below ground) */
   surfacePatches: number;
+  /** food units per cell of a pile on the ground (seeds lie thick; foodPerCell is for pockets below ground) */
+  surfaceFoodPerCell: number;
   /** how far below the ground line a nest's chamber is dug, in rows */
   chamberDepth: number;
 }
 
 /**
  * The side view: a cross-section 768 columns wide, ground 64 rows down, mostly soil with stones, two nests
- * 340 columns apart. Wider than the top-down maps: the colonies share one ground line, and nearer than that
- * every forager meets the other side's on it (measured at 140 columns: half of both colonies dead in three minutes).
+ * 340 columns apart. Wider than the top-down maps: the colonies share one ground line, so each gets its own stretch of it.
  */
 export const SIDE_WORLD: SideWorldOptions = {
   size: { w: 768, h: 368 },
   rockiness: 0.1,
-  patchesPerChunk: 1.2,
+  patchesPerChunk: 0.8,
   foodPerCell: 12,
   nestCount: 2,
   nestGap: 340,
@@ -633,7 +634,8 @@ export const SIDE_WORLD: SideWorldOptions = {
   soil: 0.93,
   surface: 64,
   relief: 5,
-  surfacePatches: 3,
+  surfacePatches: 4,
+  surfaceFoodPerCell: 40,
   chamberDepth: 14,
 };
 
@@ -702,7 +704,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
         if (nearNest(centreX(x0, y0), centreY(y0), o.foodMinDist + wide)) continue;
         for (let x = x0; x < x0 + wide; x++) {
           const y = walkwayRow(map, x, ground[x] as number);
-          if (y >= 0) food.set(x, y, o.foodPerCell);
+          if (y >= 0) food.set(x, y, o.surfaceFoodPerCell);
         }
         break;
       }
@@ -775,7 +777,8 @@ function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, r
   }
   const cxw = centreX(x, y);
   const cyw = centreY(y);
-  const nest: Nest = { x: cxw, y: cyw, r: 3, entrance: { x: centreX(ex, g - 1), y: centreY(g - 1) } };
+  // The entrance is the hole itself, the shaft's top cell: always open (the cell above it can lose its footing and be sky).
+  const nest: Nest = { x: cxw, y: cyw, r: 3, entrance: { x: centreX(ex, g), y: centreY(g) } };
   disc(map, cxw, cyw, nest.r + 1.5, (fx, fy) => open(fx, fy));
   // The ground round the hole changed: re-derive the walkway there.
   for (let yy = g - 2; yy <= g + 1; yy++) for (let xx = ex - 2; xx <= ex + 2; xx++) if (inBounds(map, xx, yy)) updateSurface(map, xx, yy);
