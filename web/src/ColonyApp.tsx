@@ -1,9 +1,10 @@
 import { SITUATIONS } from "./colony/colony.ts";
 import { DOCTRINES } from "./colony/colonyBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import AntCard from "./ui/AntCard.tsx";
-import ColonyField, { type Followed } from "./ui/ColonyField.tsx";
+import ColonyField from "./ui/ColonyField.tsx";
+import type { Followed } from "./ui/follow.ts";
 import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
@@ -24,9 +25,11 @@ export default function ColonyApp() {
   const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
   const jev = useColonyJev(colony);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
-  const [follow, setFollow] = useState<{ game: typeof game; f: Followed } | null>(null);
-  const followed = follow && follow.game === game ? follow.f : null;
-  const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { game, f } : null), [game]);
+  // Keyed by a token per game rather than the game itself, so an old game is not kept alive by this state.
+  const gameToken = useMemo(() => ({ game: game.map.seed }), [game]);
+  const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
+  const followed = follow && follow.token === gameToken ? follow.f : null;
+  const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
   const { size } = colony.map;
   const share = stats && stats.foodTotal > 0 ? stats.stored / stats.foodTotal : 0;
   const running = jev.state.phase === "running";
@@ -60,7 +63,7 @@ export default function ColonyApp() {
           {followed ? (
             <AntCard followed={followed} colony={colony} rival={game.rival} explain={jev.explain} onClose={() => setFollowed(null)} />
           ) : (
-            <p className="-mt-2 text-xs text-fg-3">Drag to pan · wheel or pinch to zoom · arrow keys and +/− work too · click an ant to follow it.</p>
+            <p className="-mt-2 text-xs text-fg-3">Drag to pan · wheel or pinch to zoom · arrow keys and +/− work too · tap or click an ant to follow it.</p>
           )}
           <section className="rounded-lg border border-line bg-panel px-4 py-3" aria-label="colony stats">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">

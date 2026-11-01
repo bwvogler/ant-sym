@@ -60,6 +60,16 @@ export function zoomAt(c: Camera, view: Viewport, sx: number, sy: number, factor
   return { x: wx - (sx - view.w / 2) / zoom, y: wy - (sy - view.h / 2) / zoom, zoom };
 }
 
+/**
+ * Zoom by `factor` about screen (sx, sy), stopping at the limits: the factor is cut to what the
+ * zoom range allows *before* the centre is worked out, so zooming in at MAX_ZOOM (or out at the
+ * whole map) leaves the view where it is instead of sliding it toward the pointer.
+ */
+export function zoomBy(c: Camera, world: WorldSize, view: Viewport, sx: number, sy: number, factor: number): Camera {
+  const zoom = Math.max(fitZoom(world, view), Math.min(MAX_ZOOM, c.zoom * factor));
+  return clamp(zoomAt(c, view, sx, sy, zoom / c.zoom), world, view);
+}
+
 /** Move the view by a drag of (dx, dy) device pixels: the ground follows the pointer. */
 export function pan(c: Camera, dx: number, dy: number): Camera {
   return { x: c.x - dx / c.zoom, y: c.y - dy / c.zoom, zoom: c.zoom };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MODES, type Colony, type Mode, type Situation } from "../colony/colony.ts";
-import type { Followed } from "./ColonyField.tsx";
+import { followedColony, type Followed } from "./follow.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
 // when it last chose, and who made the choice: Jev's cached answer for
@@ -24,9 +24,9 @@ export default function AntCard({ followed, colony, rival, explain, onClose }: P
     const t = setInterval(() => setTick((n) => n + 1), 250);
     return () => clearInterval(t);
   }, []);
-  const col = followed.side === "you" ? colony : rival;
+  const col = followedColony(colony, rival, followed);
   const i = followed.i;
-  if (!col || !col.alive[i]) return null;
+  if (!col) return null;
   const mode = MODES[col.mode[i] as number] as Mode;
   const carrying = col.carrying[i] === 1;
   const since = col.since[i] as number;

@@ -1,7 +1,8 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef } from "react";
 import { CHUNK } from "../colony/chunks.ts";
 import type { Colony } from "../colony/colony.ts";
-import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomAt } from "./camera.ts";
+import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
+import { followedColony, type Followed } from "./follow.ts";
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -13,12 +14,6 @@ import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, 
 // come from the theme's CSS variables, so dark mode needs no code path of
 // its own. The canvas sits absolutely in its aspect-ratio box: in flow, its
 // own pixel height fed back into the box and stretched the map on a phone.
-
-/** An ant the camera follows: whose, and its slot. */
-export interface Followed {
-  side: "you" | "rival";
-  i: number;
-}
 
 interface Props {
   colony: Colony;
@@ -46,8 +41,8 @@ function rgb(hex: string): [number, number, number] {
 const HOME_RGB: [number, number, number] = [196, 110, 40];
 /** At or above this zoom (device px per cell) a brush paints its own radius; zoomed further out it widens to match. */
 const BRUSH_ZOOM = 6;
-/** A click that moved less than this (device px) is a click, not a drag. */
-const CLICK_SLOP = 5;
+/** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
+const CLICK_SLOP_PX = 8;
 /** A click picks the nearest ant within this many CSS px. */
 const PICK_PX = 14;
 
@@ -57,17 +52,20 @@ interface ChunkCanvas {
   img: ImageData;
 }
 
-type Gesture = { kind: "pan" | "paint" | "pinch" | "mini" | "none"; moved: number; button: number };
+/** The pointer gesture under way; `moved` is how far it has travelled (device px), (sx, sy) where it started. */
+type Gesture = { kind: "pan" | "paint" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
+const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
 export default function ColonyField({ colony, rival, onFrame, showFoodTrail, showHomeTrail, onPaint, followed, onFollow }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layers = useRef({ food: showFoodTrail, home: showHomeTrail });
   const cam = useRef<Camera | null>(null);
   const follow = useRef<Followed | null>(followed);
-  const paintRef = useRef(onPaint);
   const followCb = useRef(onFollow);
   /** whether the view is zoomed in past the whole map (the minimap shows, and takes clicks) */
   const zoomedIn = useRef(false);
+  /** the view shows the whole map: it stays fitted when the canvas is resized (a phone turned, the layout reflowing) */
+  const fitted = useRef(true);
   useEffect(() => {
     layers.current = { food: showFoodTrail, home: showHomeTrail };
   }, [showFoodTrail, showHomeTrail]);
@@ -75,11 +73,13 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     follow.current = followed;
   }, [followed]);
   useEffect(() => {
-    paintRef.current = onPaint;
     followCb.current = onFollow;
   }, [onPaint, onFollow]);
 
   const world = colony.map.size;
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef<Gesture>(NO_GESTURE);
+  const space = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -87,6 +87,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     // A new world starts zoomed out.
     cam.current = null;
     zoomedIn.current = false;
+    fitted.current = true;
     const ctx = canvas.getContext("2d")!;
     const { w: gw, h: gh } = colony.map.size;
     const chunks = new Map<string, ChunkCanvas>();
@@ -253,14 +254,14 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     const draw = () => {
       const v: Viewport = { w: canvas.width, h: canvas.height };
       const d = Math.min(2, window.devicePixelRatio || 1);
-      // Follow an ant: the camera centres on it; a dead ant ends the follow.
+      // Follow an ant: the camera centres on it; an ant that is gone (dead, or its slot reborn) ends the follow.
       const f = follow.current;
-      if (f) {
-        const col = f.side === "you" ? colony : rival;
-        if (!col || !col.alive[f.i]) followCb.current(null);
-        else if (cam.current) cam.current = { ...cam.current, x: col.x[f.i] as number, y: col.y[f.i] as number };
-      }
-      const c = clamp(cam.current ?? fit(colony.map.size, v), colony.map.size, v);
+      const fcol = f ? followedColony(colony, rival, f) : null;
+      if (f && !fcol) {
+        follow.current = null;
+        followCb.current(null);
+      } else if (f && fcol && cam.current) cam.current = { ...cam.current, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
+      const c = clamp(fitted.current || !cam.current ? fit(colony.map.size, v) : cam.current, colony.map.size, v);
       cam.current = c;
       zoomedIn.current = c.zoom > fitZoom(colony.map.size, v) * 1.05;
       ctx.fillStyle = theme.paper;
@@ -324,16 +325,13 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       }
 
       // The followed ant: a jade ring.
-      if (f) {
-        const col = f.side === "you" ? colony : rival;
-        if (col && col.alive[f.i]) {
-          const [x, y] = toScreen(c, v, col.x[f.i] as number, col.y[f.i] as number);
-          ctx.beginPath();
-          ctx.arc(x, y, Math.max(9 * d, c.zoom * 1.6), 0, Math.PI * 2);
-          ctx.strokeStyle = theme.accent;
-          ctx.lineWidth = 2 * d;
-          ctx.stroke();
-        }
+      if (f && fcol) {
+        const [x, y] = toScreen(c, v, fcol.x[f.i] as number, fcol.y[f.i] as number);
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(9 * d, c.zoom * 1.6), 0, Math.PI * 2);
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2 * d;
+        ctx.stroke();
       }
 
       // Zoomed in: the minimap, with the view's rectangle.
@@ -367,26 +365,30 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       const r = canvas.getBoundingClientRect();
       const k = canvas.width / r.width;
       const v: Viewport = { w: canvas.width, h: canvas.height };
-      const c = clamp(zoomAt(cam.current ?? fit(colony.map.size, v), v, (e.clientX - r.left) * k, (e.clientY - r.top) * k, Math.exp(-e.deltaY * 0.0015)), colony.map.size, v);
+      const c = zoomBy(cam.current ?? fit(colony.map.size, v), colony.map.size, v, (e.clientX - r.left) * k, (e.clientY - r.top) * k, Math.exp(-e.deltaY * 0.0015));
       cam.current = c;
       zoomedIn.current = c.zoom > fitZoom(colony.map.size, v) * 1.05;
+      fitted.current = c.zoom <= fitZoom(colony.map.size, v) * 1.0001;
     };
     canvas.addEventListener("wheel", wheel, { passive: false });
+    // Space held for a pan drag is let go when the window loses focus, or it would stick "down" (its keyup goes elsewhere).
+    const blur = () => {
+      space.current = false;
+    };
+    window.addEventListener("blur", blur);
     return () => {
       off();
       ro.disconnect();
       mq.removeEventListener("change", retheme);
       canvas.removeEventListener("wheel", wheel);
+      window.removeEventListener("blur", blur);
     };
   }, [colony, rival, onFrame, world]);
 
   // ——— input: one pointer drags (pan, or paint with a brush), two pinch; a click picks an ant; the minimap jumps ———
 
-  const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gesture = useRef<Gesture>({ kind: "none", moved: 0, button: 0 });
-  const space = useRef(false);
-
   const dpr = () => Math.min(2, window.devicePixelRatio || 1);
+  const slop = () => CLICK_SLOP_PX * dpr();
   const view = (): Viewport => ({ w: canvasRef.current?.width ?? 1, h: canvasRef.current?.height ?? 1 });
   const camera = (): Camera => {
     cam.current = clamp(cam.current ?? fit(world, view()), world, view());
@@ -394,7 +396,14 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
   };
   const setCamera = (c: Camera) => {
     cam.current = clamp(c, world, view());
-    zoomedIn.current = cam.current.zoom > fitZoom(world, view()) * 1.05;
+    const fz = fitZoom(world, view());
+    zoomedIn.current = cam.current.zoom > fz * 1.05;
+    fitted.current = cam.current.zoom <= fz * 1.0001;
+  };
+  /** Stop following now: the ref at once (a rAF draw must not re-centre on the ant first), the parent's state after. */
+  const unfollow = () => {
+    follow.current = null;
+    onFollow(null);
   };
   const devicePoint = (e: PointerEvent<HTMLCanvasElement>): [number, number] => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -408,7 +417,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
   };
   const jumpMini = (x: number, y: number) => {
     const r = minimapRect(world, view(), dpr());
-    if (follow.current) onFollow(null);
+    if (follow.current) unfollow();
     setCamera({ ...camera(), x: ((x - r.x) / r.w) * world.w, y: ((y - r.y) / r.h) * world.h });
   };
   const paintAt = (x: number, y: number) => {
@@ -433,7 +442,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         const dd = dx * dx + dy * dy;
         if (dd < bestD) {
           bestD = dd;
-          best = { side, i };
+          best = { side, i, gen: col.gen[i] as number };
         }
       }
     }
@@ -441,22 +450,24 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
   };
 
   const onDown = (e: PointerEvent<HTMLCanvasElement>) => {
+    if (e.button === 1) e.preventDefault(); // middle-drag pans; no autoscroll
     e.currentTarget.setPointerCapture(e.pointerId);
     e.currentTarget.focus({ preventScroll: true });
     const [x, y] = devicePoint(e);
     pointers.current.set(e.pointerId, { x, y });
     if (pointers.current.size === 2) {
-      gesture.current = { kind: "pinch", moved: CLICK_SLOP + 1, button: 0 };
+      gesture.current = { ...NO_GESTURE, kind: "pinch", moved: Infinity };
       return;
     }
     if (pointers.current.size > 2) return;
+    const start = { moved: 0, sx: x, sy: y };
     if (e.button === 0 && inMini(x, y)) {
-      gesture.current = { kind: "mini", moved: 0, button: 0 };
+      gesture.current = { ...NO_GESTURE, ...start, kind: "mini" };
       jumpMini(x, y);
     } else if (e.button === 0 && onPaint && !space.current) {
-      gesture.current = { kind: "paint", moved: 0, button: 0 };
+      gesture.current = { ...NO_GESTURE, ...start, kind: "paint" };
       paintAt(x, y);
-    } else gesture.current = { kind: "pan", moved: 0, button: e.button };
+    } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
   };
 
   const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
@@ -469,13 +480,15 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       for (const [id, p] of pointers.current) if (id !== e.pointerId) other = p;
       const before = Math.hypot(prev.x - other.x, prev.y - other.y);
       const after = Math.hypot(x - other.x, y - other.y);
-      const c = zoomAt(camera(), view(), (x + other.x) / 2, (y + other.y) / 2, before > 0 ? after / before : 1);
+      const c = zoomBy(camera(), world, view(), (x + other.x) / 2, (y + other.y) / 2, before > 0 ? after / before : 1);
       setCamera(pan(c, (x - prev.x) / 2, (y - prev.y) / 2));
     } else if (g.kind === "pan") {
+      const was = g.moved;
       g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
-      if (g.moved > CLICK_SLOP) {
-        if (follow.current) onFollow(null);
-        setCamera(pan(camera(), x - prev.x, y - prev.y));
+      if (g.moved > slop()) {
+        if (follow.current) unfollow();
+        // Crossing the slop, catch up from where the drag began, so the ground stays under the pointer.
+        setCamera(was <= slop() ? pan(camera(), x - g.sx, y - g.sy) : pan(camera(), x - prev.x, y - prev.y));
       }
     } else if (g.kind === "paint" && e.buttons & 1) paintAt(x, y);
     else if (g.kind === "mini" && e.buttons & 1) jumpMini(x, y);
@@ -486,12 +499,17 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     const g = gesture.current;
     const p = pointers.current.get(e.pointerId);
     pointers.current.delete(e.pointerId);
-    if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= CLICK_SLOP && p) onFollow(pick(p.x, p.y));
-    if (pointers.current.size === 0) gesture.current = { kind: "none", moved: 0, button: 0 };
-    else if (g.kind === "pinch") gesture.current = { kind: "pan", moved: CLICK_SLOP + 1, button: 0 };
+    if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
+      const f = pick(p.x, p.y);
+      follow.current = f;
+      onFollow(f);
+    }
+    if (pointers.current.size === 0) gesture.current = NO_GESTURE;
+    else if (g.kind === "pinch") gesture.current = { ...NO_GESTURE, kind: "pan", moved: Infinity }; // the finger left behind pans, never clicks
   };
 
   const onKey = (e: KeyboardEvent<HTMLCanvasElement>) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // browser and system shortcuts (Ctrl+0, Ctrl+S, …) pass through
     if (e.key === " ") {
       space.current = e.type === "keydown";
       e.preventDefault();
@@ -504,23 +522,23 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     const moves: Record<string, [number, number]> = { ArrowLeft: [step, 0], a: [step, 0], ArrowRight: [-step, 0], d: [-step, 0], ArrowUp: [0, step], w: [0, step], ArrowDown: [0, -step], s: [0, -step] };
     const m = moves[e.key];
     if (m) {
-      if (follow.current) onFollow(null);
+      if (follow.current) unfollow();
       setCamera(pan(c, m[0], m[1]));
-    } else if (e.key === "+" || e.key === "=") setCamera(zoomAt(c, v, v.w / 2, v.h / 2, 1.25));
-    else if (e.key === "-" || e.key === "_") setCamera(zoomAt(c, v, v.w / 2, v.h / 2, 0.8));
+    } else if (e.key === "+" || e.key === "=") setCamera(zoomBy(c, world, v, v.w / 2, v.h / 2, 1.25));
+    else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, world, v, v.w / 2, v.h / 2, 0.8));
     else if (e.key === "0" || e.key === "Home") showAll();
     else if (e.key === "n") goHome();
-    else if (e.key === "Escape") onFollow(null);
+    else if (e.key === "Escape") unfollow();
     else return;
     e.preventDefault();
   };
 
   const showAll = () => {
-    onFollow(null);
+    unfollow();
     setCamera(fit(world, view()));
   };
   const goHome = () => {
-    onFollow(null);
+    unfollow();
     setCamera({ x: colony.nest.x, y: colony.nest.y, zoom: Math.max(camera().zoom, 8 * dpr()) });
   };
 
@@ -538,6 +556,9 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         onPointerCancel={onUp}
         onKeyDown={onKey}
         onKeyUp={onKey}
+        onBlur={() => {
+          space.current = false;
+        }}
         onContextMenu={(e) => e.preventDefault()}
       />
       <div className="pointer-events-none absolute left-2 top-2 flex gap-1.5">

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clamp, fit, fitZoom, MAX_ZOOM, minimapRect, pan, toScreen, toWorld, visible, zoomAt } from "../camera.ts";
+import { clamp, fit, fitZoom, MAX_ZOOM, minimapRect, pan, toScreen, toWorld, visible, zoomAt, zoomBy } from "../camera.ts";
 
 const world = { w: 512, h: 320 };
 const view = { w: 1000, h: 500 };
@@ -55,4 +55,18 @@ test("the minimap sits in the bottom-right corner with the map's shape", () => {
   assert.ok(near(r.w / r.h, 512 / 320));
   assert.ok(r.x + r.w < view.w && r.y + r.h < view.h);
   assert.ok(r.x > view.w / 2 && r.y > view.h / 2);
+});
+
+test("zoomBy stops at the limits instead of panning (zooming in at MAX_ZOOM near an edge leaves the view put)", () => {
+  const atMax = clamp({ x: 256, y: 160, zoom: MAX_ZOOM }, world, view);
+  let c = atMax;
+  for (let k = 0; k < 10; k++) c = zoomBy(c, world, view, 990, 250, 1.2);
+  assert.deepEqual(c, atMax);
+  const whole = fit(world, view);
+  assert.deepEqual(zoomBy(whole, world, view, 10, 10, 0.5), clamp(whole, world, view), "zooming out of the whole map does nothing");
+  const mid = { x: 200, y: 100, zoom: 4 };
+  const [wx, wy] = toWorld(mid, view, 700, 200);
+  const z = zoomBy(mid, world, view, 700, 200, 1.5);
+  const [ax, ay] = toWorld(z, view, 700, 200);
+  assert.ok(near(ax, wx) && near(ay, wy), "inside the range it still keeps the point under the pointer");
 });

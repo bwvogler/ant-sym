@@ -158,6 +158,8 @@ export class Colony {
   mode: Uint8Array;
   carrying: Uint8Array;
   alive: Uint8Array;
+  /** bumped every time a slot gets a new ant, so (slot, gen) names one ant even after its slot is reused */
+  gen: Uint32Array;
   /** seconds since the ant was last at the nest or picked up food */
   since: Float32Array;
   /** seconds left of a detour after bumping into rock, when the pull toward the nest (or the raid) is off */
@@ -206,6 +208,7 @@ export class Colony {
     this.mode = new Uint8Array(n);
     this.carrying = new Uint8Array(n);
     this.alive = new Uint8Array(n);
+    this.gen = new Uint32Array(n);
     this.since = new Float32Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
@@ -229,6 +232,7 @@ export class Colony {
     this.bumps[i] = 0;
     this.#asked[i] = -1;
     this.#question[i] = -1;
+    this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
     this.alive[i] = 1;
   }
 
@@ -405,6 +409,7 @@ export class Colony {
         mode = RETURN;
         this.mode[i] = RETURN;
         this.#asked[i] = -1;
+        this.#question[i] = -1; // going home is not a choice; the next question comes once the food is down
       } else {
         const tired = (this.since[i] as number) > p.patience;
         const food = trailLevel(Math.max(fl, ff, fr));

@@ -413,4 +413,19 @@ The 512×320 map is now something to move around in, not a picture squeezed into
 
 **Checked in the browser:** fit, nest, wheel zoom, click-to-follow, drag-to-stop, minimap jump, painting while zoomed, and `0` for the whole map. A synthetic two-pointer pinch zooms about its midpoint. Light, dark and phone layouts show no console errors, and the page holds 60 fps.
 
+**Review** (agent, before merge) found five bugs. All are fixed, each with a test or a browser check:
+- **The followed ant could silently become a newborn.** A dead ant's slot is refilled at once, often within the same frame at 4× speed or under 30 fps. Ants now carry a per-slot generation (`Colony.gen`), and a follow is (side, slot, generation): `ui/follow.ts`.
+- **Wheel or pinch at `MAX_ZOOM` slid the view toward the pointer.** `zoomBy` now cuts the factor to the zoom range before it works out the centre.
+- **After a resize the view stopped fitting.** "Whole map" only stayed whole until the canvas changed size, so the minimap appeared uninvited. A fitted view now stays fitted.
+- **Ctrl/Cmd shortcuts were swallowed** while the field had focus.
+- **Space could stick "down"** after an alt-tab; it is now released on blur.
+
+Also from the review:
+- The tap slop is in CSS px (8 × DPR), so a finger tap still picks an ant.
+- A drag catches up from where it began.
+- Stopping a follow clears the ref at once, so a frame can't re-centre on the ant first.
+- A carrier's stale question is cleared.
+- Middle-drag no longer starts autoscroll.
+- The follow state no longer pins the previous game in memory.
+
 **Jev:** no change. `explain` makes no calls, and the request state is unchanged.
