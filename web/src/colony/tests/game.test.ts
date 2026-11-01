@@ -152,3 +152,12 @@ test("the outcome: a colony with no ants and too little food for one more is bea
   for (let i = 0; i < g.player.n; i++) g.player.kill(i);
   assert.equal(g.outcome(), "lost");
 });
+
+test("solo (no rival), the colony keeps foraging: no stance to choose, nobody turned into a fighter", () => {
+  const map = generateWorld(1);
+  const g = new Game(map, { antCount: 600, rival: false }, mulberry32(7919));
+  for (let k = 0; k < 30 * 200; k++) g.tick(1 / 30);
+  assert.equal(g.player.stance, "forage");
+  assert.equal(g.player.counts().fight, 0, "no fighters without an enemy");
+  assert.equal(g.strategyChoices, 0, "the strategist was never asked");
+});

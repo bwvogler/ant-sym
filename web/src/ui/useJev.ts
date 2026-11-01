@@ -55,6 +55,10 @@ export function useJev(engine: Engine, formed: boolean, targetVersion: number, b
     const off = scheduler.subscribe(setState);
     return () => {
       off();
+      // Leaving the page (the colony tab unmounts it): keep the answers the run paid for, and end
+      // the run on the server instead of leaving it open until its time cap.
+      if (scheduler.state.phase === "running") void scheduler.stop("user");
+      saveCache(scheduler.cache);
       scheduler.dispose();
     };
   }, [scheduler]);
