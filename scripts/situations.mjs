@@ -11,12 +11,14 @@ import { Engine } from "../web/src/sim/engine.ts";
 import { normalizeTarget } from "../web/src/sim/grid.ts";
 import { antState, applyDecision, packRequest, readDecision } from "../web/src/sim/jevBrain.ts";
 import { answersFor, canonicalState, PolicyCache, situationKey } from "../web/src/sim/policyCache.ts";
+import { mulberry32 } from "../web/src/colony/world.ts";
+import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const SIZE = { w: 96, h: 64 };
 const ANTS = 1000;
 const DT = 1 / 30;
 const CYCLE = 0.2; // scheduler interval, s
-const LATENCY = 0.4; // a Jev round trip, s (PRD §8.5: ~300–500 ms)
+const LATENCY = 0.4; // a Jev round trip, s (PRD §5: ~150–500 ms)
 const MIN_AGE = 1.5;
 const TOKENS_PER_ANT = 296; // measured, compass schema (PRD §8.1b)
 
@@ -128,7 +130,7 @@ function form(engine, schema, cache) {
 }
 
 function run(schema, words) {
-  const engine = new Engine({ size: SIZE, antCount: ANTS, brain: "jev" }, mulberry(7));
+  const engine = new Engine({ size: SIZE, antCount: ANTS, brain: "jev" }, mulberry32(7));
   engine.jevOwned.fill(1);
   const cache = new PolicyCache("offline");
   const rows = [];
@@ -140,18 +142,9 @@ function run(schema, words) {
   return { rows, situations: cache.size };
 }
 
-function mulberry(seed) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // Tokens per situation, from request size: the same states packed per ant (compass) and per situation (cached).
-const probe = new Engine({ size: SIZE, antCount: ANTS }, mulberry(3));
+const probe = new Engine({ size: SIZE, antCount: ANTS }, mulberry32(3));
 probe.setTarget(wordTarget("ANTS"));
 const states = Array.from({ length: 100 }, (_, i) => antState(probe, i));
 const antBytes = JSON.stringify(packRequest(states.map((s, i) => ({ id: `a${i}`, state: s })), "compass")).length;
@@ -159,7 +152,7 @@ const sitBytes = JSON.stringify(packRequest(states.map((s, i) => ({ id: `s${i}`,
 const tokensPerSituation = Math.round(TOKENS_PER_ANT * (sitBytes / antBytes));
 
 const words = process.argv.slice(2).length ? process.argv.slice(2) : ["ANTS", "JEV", "ANTS"];
-const usd = (tok) => `$${((tok * 0.042) / 1e6).toFixed(4)}`;
+const usd = (tok) => `$${(tok * USD_PER_INPUT_TOKEN).toFixed(4)}`;
 console.log(`grid ${SIZE.w}×${SIZE.h}, ${ANTS} ants, stand-in Jev, latency ${LATENCY}s; ~${tokensPerSituation} tok per situation (by request size, vs ${TOKENS_PER_ANT} measured per ant)\n`);
 for (const schema of ["compass", "cached"]) {
   const { rows, situations } = run(schema, words);
