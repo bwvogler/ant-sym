@@ -66,6 +66,8 @@ export class Pheromones {
   readonly #awake: Record<Channel, Set<number>>;
   /** seconds owed per channel since its last step (advance) */
   #clock: Record<Channel, number> = { food: 0, home: 0, alarm: 0 };
+  /** the head start phase() put on each clock, not yet stepped (time that did not pass) */
+  #head: Record<Channel, number> = { food: 0, home: 0, alarm: 0 };
   /** chunks a neighbour's edge spread scent into this step (they stay awake) */
   #fed = new Set<number>();
   /** spare chunk arrays for the double buffer */
@@ -120,16 +122,23 @@ export class Pheromones {
   advance(dt: number): void {
     for (const ch of CHANNELS) {
       this.#clock[ch] += dt;
-      if (this.#clock[ch] >= stepInterval(this.params[ch])) {
-        this.#stepChannel(ch, this.#clock[ch]);
+      // A hair of tolerance: five ticks of 1/30 s sum to just under 1/6 s in floating point, and
+      // without it a 1/6 s interval would wait a sixth tick.
+      if (this.#clock[ch] >= stepInterval(this.params[ch]) - 1e-9) {
+        // Step by the time that actually passed: the clock less any head start phase() gave it.
+        this.#stepChannel(ch, this.#clock[ch] - this.#head[ch]);
         this.#clock[ch] = 0;
+        this.#head[ch] = 0;
       }
     }
   }
 
-  /** Start each channel's clock part-way through its interval. */
+  /** Start each channel's clock part-way through its interval, so this colony's first steps come early (but are no longer). */
   phase(fraction: number): void {
-    for (const ch of CHANNELS) this.#clock[ch] = fraction * stepInterval(this.params[ch]);
+    for (const ch of CHANNELS) {
+      this.#clock[ch] = fraction * stepInterval(this.params[ch]);
+      this.#head[ch] = this.#clock[ch];
+    }
   }
 
   #stepChannel(ch: Channel, dt: number): void {

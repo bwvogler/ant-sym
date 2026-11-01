@@ -14,7 +14,7 @@ Ants that form the picture you type or upload, each ant steered by a Jev decisio
 ## Work tracking
 Beads: `bd ready` for unblocked work, `bd show <id>` for context, `bd close <id>` when done. Prefix `ja`. One PR per milestone, agent review before merge. File new work as beads, not TODO comments.
 
-The `ja` database syncs to this repo's `refs/dolt/data` (`bd dolt pull` / `bd dolt push`); it was started fresh on 2026-11-01, and issues before that stay in the original jev-ants tracker. bd 1.3.2 builds with `apt-get install -y libicu-dev && go install github.com/steveyegge/beads/cmd/bd@v1.3.2` (needs Go ≥ 1.26.5, fetched automatically). `AGENTS.md` carries the full beads workflow block.
+The `ja` database syncs to this repo's `refs/dolt/data` (`bd dolt pull` / `bd dolt push`); it was started fresh on 2026-11-01, and issues before that stay in the original jev-ants tracker. Until that ref has been pushed (cloud sessions can't push it: their git proxy only allows branches), the issues live in `.beads/issues.jsonl` (auto-exported): bootstrap with `bd init --prefix ja --from-jsonl`, and `bd dolt push` from a machine with normal GitHub access. bd 1.3.2 builds with `apt-get install -y libicu-dev && go install github.com/steveyegge/beads/cmd/bd@v1.3.2` (needs Go ≥ 1.26.5, fetched automatically). `AGENTS.md` carries the full beads workflow block.
 
 ## Build & test
 ```sh

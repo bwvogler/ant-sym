@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { CountGrid } from "../battle.ts";
 import { CHUNK, ChunkLayer, chunkKey, chunkOf } from "../chunks.ts";
 import { blocked, chunkRock, dropFood, escapes, flat, foodAt, generateWorld, heightAt, noiseAt, reachable, rockAt, rockCut, takeFood, worldFromArrays, type WorldMap } from "../world.ts";
 import { MAX_LEVEL, Pheromones, SLEEP, type ChannelParams, type Channel } from "../pheromone.ts";
@@ -229,4 +230,53 @@ test("asleep costs nothing: untouched chunks never wake, and faded ones go back 
   assert.equal(ph.awakeChunks(), 0, "faded below SLEEP: asleep again");
   assert.ok(ph.read("food", m.nest.x, m.nest.y) < SLEEP);
   assert.ok(ph.fields.food.count <= 9, `only the chunk and its neighbours were ever touched (${ph.fields.food.count})`);
+});
+
+test("advance steps each channel on its own clock: 1/6 s means every 5 ticks at 30 Hz, and a phased start never steps time that did not pass", () => {
+  const p = { evaporation: 0.12, diffusion: 0 }; // stepInterval: 0.02 / 0.12 = 1/6 s
+  const run = (phase: number) => {
+    const ph = new Pheromones(worldFromArrays({ w: 8, h: 8 }, [{ x: 1, y: 1, r: 1 }]), { food: p, home: p, alarm: p });
+    ph.phase(phase);
+    ph.deposit("food", 4.5, 4.5, 10);
+    for (let k = 0; k < 30; k++) ph.advance(1 / 30);
+    return ph.read("food", 4.5, 4.5);
+  };
+  assert.ok(Math.abs(run(0) - 10 * 0.98 ** 6) < 1e-4, `six steps of 2 % in one second: ${run(0)}`);
+  // Phased by half: first step after 3 ticks (0.1 s really passed), then every 5 ticks; 2 ticks left over.
+  assert.ok(Math.abs(run(0.5) - 10 * (1 - 0.12 * 0.1) * 0.98 ** 5) < 1e-4, `phased: ${run(0.5)}`);
+});
+
+test("CountGrid: counts with n, any() finds them by block, reset clears exactly what was touched", () => {
+  const g = new CountGrid();
+  g.add(5, 5);
+  g.add(5, 5, 2);
+  g.add(-3, 70);
+  assert.equal(g.get(5, 5), 3);
+  assert.equal(g.get(-3, 70), 1);
+  assert.ok(g.any(4, 4, 6, 6));
+  assert.ok(g.any(-4, 69, -2, 71), "negative coordinates");
+  assert.ok(!g.any(20, 20, 30, 30));
+  g.reset();
+  assert.equal(g.get(5, 5), 0);
+  assert.ok(!g.any(4, 4, 6, 6) && !g.any(-4, 69, -2, 71), "every block back to empty");
+});
+
+test("ChunkLayer: growing the table in every direction keeps what was written; drop forgets a chunk", () => {
+  const l = new ChunkLayer((n) => new Float32Array(n), 0);
+  const cells: [number, number, number][] = [[1, 1, 1], [700, 2, 2], [-650, -3, 3], [5, 900, 4], [-1, -1000, 5]];
+  for (const [x, y, v] of cells) l.set(x, y, v);
+  for (const [x, y, v] of cells) assert.equal(l.get(x, y), v, `(${x}, ${y}) survived the table growing`);
+  assert.equal(l.count, 5);
+  l.drop(700 >> 6, 2 >> 6);
+  assert.equal(l.get(700, 2), 0);
+  assert.equal(l.count, 4);
+  assert.equal(l.get(1, 1), 1);
+});
+
+test("chunkRock is exactly the height threshold, cell for cell", () => {
+  const cut = rockCut(0.22);
+  for (const [cx, cy] of [[0, 0], [3, -2], [-5, 7]] as const) {
+    const r = chunkRock(9, cx, cy, cut);
+    for (let ly = 0; ly < CHUNK; ly += 7) for (let lx = 0; lx < CHUNK; lx += 5) assert.equal(r[ly * CHUNK + lx], heightAt(9, cx * CHUNK + lx, cy * CHUNK + ly) > cut ? 1 : 0);
+  }
 });

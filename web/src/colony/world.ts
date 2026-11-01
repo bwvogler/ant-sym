@@ -379,7 +379,7 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
           const y = (cy << CHUNK_BITS) + r() * CHUNK;
           const radius = 2 + r() * 2;
           if (!inBounds(map, Math.floor(x), Math.floor(y)) || !reach[Math.floor(y) * size.w + Math.floor(x)]) continue;
-          if (nests.some((n) => Math.hypot(x - n.x, y - n.y) < o.foodMinDist)) continue;
+          if (nests.some((n) => Math.hypot(x - n.x, y - n.y) - radius - 1 < o.foodMinDist)) continue; // every cell of the patch, not just its centre
           disc(map, x, y, radius, (fx, fy) => {
             setRock(map, fx, fy, 0);
             food.set(fx, fy, o.foodPerCell);
