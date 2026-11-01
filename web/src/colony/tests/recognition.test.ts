@@ -5,7 +5,7 @@ import { Colony, localPolicy, type Situation } from "../colony.ts";
 import { Fungus, INTERVENTIONS, STRAINS, intervention } from "../fungus.ts";
 import { Game, QUIET } from "../game.ts";
 import { BINS, FUNGAL, MAX_MASK, Recognition, binCentre, binOf } from "../recognition.ts";
-import { generateWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
+import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../world.ts";
 
 // Recognition (ja-t4d.3): enemies are strangers by odour, not by colony; the
 // fungus calms (B1), widens a host's tolerance (B4) and gives it its own odour
@@ -229,7 +229,7 @@ const GAME = { timeout: 60_000 };
 /** Seed 2, 150 + 150 ants, Garden painted on the nests of `which` colonies, five sim-minutes. */
 function garden(which: "both" | "one"): Game {
   const strain = STRAINS.findIndex((s) => s.id === "garden");
-  const g = new Game(generateWorld(2, { size: { w: 160, h: 100 } }), { antCount: 150, rivalAnts: 150 }, mulberry32(13));
+  const g = new Game(generateWorld(2, { ...OPEN_WORLD, size: { w: 160, h: 100 } }), { antCount: 150, rivalAnts: 150 }, mulberry32(13));
   for (const c of which === "both" ? g.colonies : [g.player]) g.paintSpores(c.nest.x, c.nest.y, c.nest.r + 2, 3, 0.3, strain);
   for (let k = 0; k < 30 * 300; k++) g.tick(1 / 30);
   return g;

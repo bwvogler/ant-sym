@@ -1,8 +1,9 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef } from "react";
 import { CHUNK } from "../colony/chunks.ts";
-import type { Colony } from "../colony/colony.ts";
+import { type Colony, moundWidth } from "../colony/colony.ts";
 import { INFECTED, type Fungus } from "../colony/fungus.ts";
 import { BINS, binOf } from "../colony/recognition.ts";
+import { SOIL } from "../colony/world.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 
@@ -122,7 +123,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     const miniImg = miniCtx.createImageData(mini.width, mini.height);
     let miniAt = -Infinity;
 
-    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300"), spore: "#7a4fa0", sporeRgb: rgb("#7a4fa0") };
+    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300"), spore: "#7a4fa0", sporeRgb: rgb("#7a4fa0") };
     const retheme = () => {
       theme = {
         paper: cssVar("--paper"),
@@ -131,6 +132,8 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         warn: cssVar("--warn"),
         line: cssVar("--line-strong"),
         rock: rgb(cssVar("--line-strong")),
+        soil: rgb(cssVar("--soil")),
+        mound: cssVar("--mound"),
         trail: cssVar("--heat").split(/\s+/).map(Number),
         alarm: rgb(cssVar("--warn")),
         paperRgb: rgb(cssVar("--paper")),
@@ -159,7 +162,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     ro.observe(canvas);
     fitCanvas();
 
-    /** Paint chunk (cx, cy)'s cells into its canvas: rock, then the trails, then food over everything. */
+    /** Paint chunk (cx, cy)'s cells into its canvas: rock and soil, then the trails, then food over everything. */
     const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array) => {
       const fc = colony.map.food.chunk(cx, cy);
       const foodC = colony.ph.fields.food.chunk(cx, cy);
@@ -180,9 +183,10 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
             continue;
           }
           if (rc[i]) {
-            px[o] = theme.rock[0];
-            px[o + 1] = theme.rock[1];
-            px[o + 2] = theme.rock[2];
+            const solid = rc[i] === SOIL ? theme.soil : theme.rock;
+            px[o] = solid[0];
+            px[o + 1] = solid[1];
+            px[o + 2] = solid[2];
             px[o + 3] = 255;
             continue;
           }
@@ -231,13 +235,14 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
       c.ctx.putImageData(c.img, 0, 0);
     };
 
-    /** The minimap's picture: a 2×2 block is food if any cell is, rock if most are, else ground; ants as dots. */
+    /** The minimap's picture: a 2×2 block is food if any cell is, rock or soil if most are, else open ground; ants as dots. */
     const paintMini = () => {
       const px = miniImg.data;
       const food: [number, number, number] = rgb(theme.accent);
       for (let my = 0; my < mini.height; my++)
         for (let mx = 0; mx < mini.width; mx++) {
           let rocks = 0;
+          let soils = 0;
           let fv = 0;
           for (let dy = 0; dy < 2; dy++)
             for (let dx = 0; dx < 2; dx++) {
@@ -247,11 +252,13 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
                 rocks++;
                 continue;
               }
-              rocks += colony.map.rock.get(x, y);
+              const t = colony.map.rock.get(x, y);
+              if (t === SOIL) soils++;
+              else rocks += t;
               fv += colony.map.food.get(x, y);
             }
           const o = (my * mini.width + mx) * 4;
-          const c = fv > 0 ? food : rocks >= 2 ? theme.rock : theme.paperRgb;
+          const c = fv > 0 ? food : rocks >= 2 ? theme.rock : rocks + soils >= 2 ? theme.soil : theme.paperRgb;
           px[o] = c[0];
           px[o + 1] = c[1];
           px[o + 2] = c[2];
@@ -310,7 +317,8 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         }
 
       // Nests and ants in view, coloured by odour (recognition.ts): the player's colony starts in ink, the rival's in the
-      // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier.
+      // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier,
+      // an earth one at the head of an ant carrying soil. Round each nest, the mound of the soil it dug.
       const len = Math.max(3, Math.min(22, c.zoom * 0.9));
       const half = len / 2;
       const crumb = Math.max(1.5, len * 0.35);
@@ -318,6 +326,17 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
       for (const col of [rival, colony]) {
         if (!col) continue;
         const [nx, ny] = toScreen(c, v, col.nest.x, col.nest.y);
+        if (col.soilOut > 0) {
+          const inner = Math.max(4, col.nest.r * c.zoom);
+          const outer = inner + moundWidth(col.soilOut) * c.zoom;
+          ctx.beginPath();
+          ctx.arc(nx, ny, outer, 0, Math.PI * 2);
+          ctx.arc(nx, ny, inner, 0, Math.PI * 2, true);
+          ctx.fillStyle = theme.mound;
+          ctx.globalAlpha = 0.45;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
         ctx.beginPath();
         ctx.arc(nx, ny, Math.max(4, col.nest.r * c.zoom), 0, Math.PI * 2);
         ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
@@ -361,6 +380,12 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         ctx.fillStyle = theme.accent;
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || !col.carrying[i] || !inView(col.x[i] as number, col.y[i] as number)) continue;
+          const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
+          ctx.fillRect(x + Math.cos(col.heading[i] as number) * half - crumb / 2, y + Math.sin(col.heading[i] as number) * half - crumb / 2, crumb, crumb);
+        }
+        ctx.fillStyle = theme.mound;
+        for (let i = 0; i < col.n; i++) {
+          if (!col.alive[i] || !col.pellet[i] || !inView(col.x[i] as number, col.y[i] as number)) continue;
           const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
           ctx.fillRect(x + Math.cos(col.heading[i] as number) * half - crumb / 2, y + Math.sin(col.heading[i] as number) * half - crumb / 2, crumb, crumb);
         }

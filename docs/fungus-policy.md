@@ -281,7 +281,7 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 
 **Defer**: the shared garden and joint nest (W1, W2, W4), membership changes and alliances, reinforced thresholds (A7 with reinforcement), clock windows (D3, after MR 10), summiting (D4), and the per-host Jev fungus lane.
 
-**Status (2026-11-01).** 1a, 1b and 1c are built (PRD §14–16). As built, B3 is a *fungal share* of the host's odour (the fungus's own odour, 0.5, carried home by Garden hosts; B7-style). Contact blending as written above was tried first and moved nothing measurable: contacts with strangers are brief fights, and the nest's gestalt undoes them (PRD §16).
+**Status (2026-11-01).** 1a, 1b and 1c are built (PRD §15–17). As built, B3 is a *fungal share* of the host's odour (the fungus's own odour, 0.5, carried home by Garden hosts; B7-style). Contact blending as written above was tried first and moved nothing measurable: contacts with strangers are brief fights, and the nest's gestalt undoes them (PRD §17).
 
 **Overlap with the plan.**
 - MR 7 (`ja-2iq`) makes footprints readable across colonies and adds graded alarm. That is the groundwork for A3, A5 and A6, so it should land first.

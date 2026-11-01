@@ -77,7 +77,9 @@ test("an infected host smells the rival's food trail as its own and climbs it to
     c.foreign = rival;
     c.foreignFood[0] = smell;
     at(c, 10.5, 6.5);
-    for (let k = 0; k < 30 * 8 && !c.carrying[0]; k++) c.tick(1 / 30);
+    // 5 s: the trail takes a host there in ~3 s. Much longer and a healthy ant, turned back by the map's
+    // east edge, can wander onto the food by luck (it did at 7.5 s once the rng draws changed).
+    for (let k = 0; k < 30 * 5 && !c.carrying[0]; k++) c.tick(1 / 30);
     return c.carrying[0] === 1;
   };
   assert.equal(run(0), false, "healthy: the rival's trail means nothing to it, and it walks on east");
