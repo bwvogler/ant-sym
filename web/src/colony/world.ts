@@ -61,6 +61,8 @@ export interface WorldMap {
   hasSoil: boolean;
   /** the heading each dug cell was dug at (1–255 round the circle; 0 = not dug): the run of a tunnel, which the next digger carries on */
   digHeading: ChunkLayer<Uint8Array>;
+  /** when each cell was last filled back with soil (simulated seconds; −Infinity = never): fresh pellets smell, and draw more (see pelletScent) */
+  filledAt: ChunkLayer<Float32Array>;
 }
 
 export interface WorldOptions {
@@ -227,11 +229,12 @@ export function dig(map: WorldMap, x: number, y: number): boolean {
   return digCell(map, CELL[0] as number, CELL[1] as number);
 }
 
-/** Fill open integer cell (x, y) back with soil (a pellet dropped into a dead end); false if it isn't open ground on the map. */
-export function fillCell(map: WorldMap, x: number, y: number): boolean {
+/** Fill open integer cell (x, y) back with soil (a pellet dropped into a dead end) at time t; false if it isn't open ground on the map. */
+export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
   if (!inBounds(map, x, y) || rockAt(map, x, y) !== OPEN) return false;
   map.rock.set(x, y, SOIL);
   map.digHeading.set(x, y, 0);
+  map.filledAt.set(x, y, t);
   map.filled++;
   return true;
 }
@@ -240,12 +243,17 @@ export function fillCell(map: WorldMap, x: number, y: number): boolean {
 export function digCell(map: WorldMap, x: number, y: number): boolean {
   if (rockAt(map, x, y) !== SOIL) return false;
   map.rock.set(x, y, OPEN);
+  map.filledAt.set(x, y, -Infinity); // a pellet dug out again no longer smells of building
   map.dug++;
   return true;
 }
 
 function headingLayer(): ChunkLayer<Uint8Array> {
   return new ChunkLayer((n) => new Uint8Array(n), 0);
+}
+
+function filledLayer(): ChunkLayer<Float32Array> {
+  return new ChunkLayer((n) => new Float32Array(n).fill(-Infinity), -Infinity);
 }
 
 /** The heading integer cell (x, y) was dug at, in radians; NaN if it wasn't dug (a chamber, or never soil). */
@@ -332,7 +340,7 @@ export function worldFromArrays(size: WorldSize, nests: Nest[], opts: { rock?: A
     }
   let hasSoil = false;
   if (opts.rock) for (let i = 0; i < opts.rock.length && !hasSoil; i++) hasSoil = opts.rock[i] === SOIL;
-  return { size, seed: opts.seed ?? 0, rock, food, nest: nests[0]!, nests, foodTotal: total, foodLeft: total, dug: 0, filled: 0, hasSoil, digHeading: headingLayer() };
+  return { size, seed: opts.seed ?? 0, rock, food, nest: nests[0]!, nests, foodTotal: total, foodLeft: total, dug: 0, filled: 0, hasSoil, digHeading: headingLayer(), filledAt: filledLayer() };
 }
 
 /** A layer as a flat row-major array over the map (tests, the reachability oracle). */
@@ -443,7 +451,7 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
   const cut = rockCut(o.rockiness);
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
-  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: o.soil > 0, digHeading: headingLayer() };
+  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: o.soil > 0, digHeading: headingLayer(), filledAt: filledLayer() };
   // Placement plans through diggable ground (anywhere but rock): underground, the ants dig the rest.
   const dg: Through = "diggable";
   rock.forEach((cx, cy, r) => {
