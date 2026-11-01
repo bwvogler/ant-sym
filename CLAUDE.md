@@ -24,6 +24,8 @@ npm test                       # node --test
 node scripts/probe.mjs 20 100  # live-API probe: latency, tokens, burst
 ```
 
+The test script must not use `--test-force-exit`. On Node 22, combined with `--test-timeout`, it sometimes ends a test file early and drops its remaining tests without a failure; runs reported 216 or 224 tests, all green (2026-11-01). Schedulers are disposed in `afterEach`, so nothing keeps the process alive without it.
+
 Editing `web/server/*.ts` does **not** restart the running Vite (measured 2026-10-25: the old ledger kept serving after a branch switch). Restart `npm run dev` after server changes; `/api/health` shows the live run summary shape, so check it has the field you added.
 
 Worktrees: never symlink `web/node_modules` into a worktree. A symlink is not a directory, so it slips past the ignore rule and `git add -A` commits it; checking that commit out elsewhere replaces the real folder with the link (happened 2026-10-25). Run `npm --prefix web ci` in the worktree instead (the only lockfile is `web/package-lock.json`).
