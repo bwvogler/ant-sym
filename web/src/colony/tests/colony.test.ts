@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avoid, climb, Colony, decode, encodeSituation, localPolicy, SITUATIONS, squeezes, trailLevel, turnToward, type Situation } from "../colony.ts";
+import { avoid, climb, Colony, decode, encodeSituation, localPolicy, SITUATIONS, squeezes, trailLevel, turnToward, wallSide, type Situation } from "../colony.ts";
 import { foodAt, generateWorld, mulberry32, setRock, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field: the nest on the left, one food cell straight east of it. */
@@ -144,7 +144,7 @@ test("paint lays trail in a disc, never on rock; alarm turns ants away", () => {
   assert.ok((c.heading[0] as number) > 0.2, `turned away: heading ${c.heading[0]}`);
 });
 
-test("homing goes round a wall between the ant and its nest (the walking-distance map), where a straight line would push into it", () => {
+test("homing goes round a wall between the ant and its nest by touch (wall-following), where a straight line would push into it", () => {
   // A 60×30 field, the nest on the left, a wall from the top to y = 24 at x = 30, the ant on the right.
   const size = { w: 60, h: 30 };
   const rock = new Uint8Array(size.w * size.h);
@@ -162,8 +162,6 @@ test("homing goes round a wall between the ant and its nest (the walking-distanc
     home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
   }
   assert.ok(home, `the ant got home round the wall, ending at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
-  assert.equal(c.homeDist.get(8, 6), 0);
-  assert.ok(c.homeDist.get(50, 6) > 50, "the walking distance from behind the wall goes round it");
 });
 
 test("decode is encode's inverse over every situation; lastQuestion is what the ant was asked", () => {
@@ -205,4 +203,36 @@ test("ants can't slip diagonally between two rock cells into a pocket the walkin
       assert.ok(!(x >= 20 && x <= 23 && y >= 3 && y <= 6), `ant ${k} got into the room at (${x}, ${y})`);
     }
   }
+});
+
+test("homing climbs out of a cup whose floor faces the nest: follows the wall out of the mouth and round", () => {
+  // A cup opening east (floor x = 30, y 5–25; arms y = 5 and y = 25, x 30–45); the nest is west of
+  // it and the ant inside, so the home vector points straight into the floor.
+  const size = { w: 70, h: 30 };
+  const rock = new Uint8Array(size.w * size.h);
+  for (let y = 5; y <= 25; y++) rock[y * size.w + 30] = 1;
+  for (let x = 30; x <= 45; x++) for (const y of [5, 25]) rock[y * size.w + x] = 1;
+  const nest = { x: 8, y: 15, r: 2 };
+  const map = worldFromArrays(size, [nest], { rock });
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+    c.x[0] = 40;
+    c.y[0] = 15;
+    c.heading[0] = Math.PI;
+    c.mode[0] = 2;
+    let home = false;
+    for (let k = 0; k < 30 * 60 && !home; k++) {
+      c.tick(1 / 30);
+      home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
+    }
+    assert.ok(home, `seed ${seed}: out of the cup and home within 60 s, ending at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
+  }
+});
+
+test("wallSide: turn toward the open side, so the wall stays on the other", () => {
+  const coin = () => 0.9;
+  assert.equal(wallSide(true, false, coin), -1, "left blocked: turn right, wall on the left");
+  assert.equal(wallSide(false, true, coin), 1, "right blocked: turn left, wall on the right");
+  assert.ok([-1, 1].includes(wallSide(false, false, coin)));
+  assert.ok([-1, 1].includes(wallSide(true, true, () => 0.1)));
 });
