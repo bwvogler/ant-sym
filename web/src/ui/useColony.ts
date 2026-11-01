@@ -60,7 +60,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     let rateAt = { t: colony.time, decisions: colony.decisions };
     let rate = 0;
     const loop = (t: number) => {
-      const dt = Math.min(0.05, (t - last) / 1000);
+      // Clamped both ways: a first frame stamped before `last` would step the sim backwards (negative trail).
+      const dt = Math.max(0, Math.min(0.05, (t - last) / 1000));
       last = t;
       if (controls.playing) {
         const total = dt * controls.speed;
