@@ -234,6 +234,11 @@ export class Colony {
   hitDist: Float32Array;
   /** seconds spent following the current wall */
   followT: Float32Array;
+  /** seconds since a wall-following ant last touched rock (ahead, or on its wall side) */
+  untouched: Float32Array;
+  /** the nearest a homing ant has been to its nest this trip, and seconds since it last got 1 cell nearer */
+  bestD: Float32Array;
+  stallT: Float32Array;
   /** where this homing trip first met rock (NaN until it does): with the nest it fixes the line the ant leaves walls on */
   mx: Float32Array;
   my: Float32Array;
@@ -322,6 +327,9 @@ export class Colony {
     this.wall = new Int8Array(n);
     this.hitDist = new Float32Array(n);
     this.followT = new Float32Array(n);
+    this.untouched = new Float32Array(n);
+    this.bestD = new Float32Array(n).fill(Infinity);
+    this.stallT = new Float32Array(n);
     this.mx = new Float32Array(n).fill(NaN);
     this.my = new Float32Array(n).fill(NaN);
     this.gdir = new Uint8Array(n);
@@ -361,6 +369,9 @@ export class Colony {
     this.odour[i] = this.nestOdour;
     this.wall[i] = 0;
     this.mx[i] = NaN;
+    this.untouched[i] = 0;
+    this.bestD[i] = Infinity;
+    this.stallT[i] = 0;
     this.gx[i] = NO_CELL;
     this.byCell[i] = 0;
     this.#asked[i] = -1;
@@ -501,6 +512,20 @@ export class Colony {
   }
 
   /**
+   * Ant i starts a trip home (it picked up food, or its policy sent it home): a detour or a wall left
+   * over from foraging would otherwise switch its home vector off, and bumps would keep renewing it.
+   */
+  #homeAfresh(i: number): void {
+    this.detour[i] = 0;
+    this.bumps[i] = 0;
+    this.wall[i] = 0;
+    this.mx[i] = NaN;
+    this.untouched[i] = 0;
+    this.bestD[i] = Infinity;
+    this.stallT[i] = 0;
+  }
+
+  /**
    * Whether ant i at (x, y) is back on its line home: the line from where this trip first met rock
    * to the nest (Bug2's "m-line"). Leaving walls only there is what guarantees getting round: leaving
    * anywhere nearer settles ants in the deepest bay facing the nest.
@@ -550,15 +575,20 @@ export class Colony {
     if (mode === RETURN || mode === FOLLOW) {
       // The way ahead (not back, unless it's a dead end) with the most scent: home scent, laid by
       // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.
+      // Homing with no progress for TUNNEL_STALL seconds (scent can lead round a ring of tunnels for
+      // ever): the way that points most nearly home instead, by its home vector.
       const field = mode === RETURN ? this.ph.fields.home : this.ph.fields.food;
+      const byVector = mode === RETURN && (this.stallT[i] as number) > TUNNEL_STALL;
+      const hx = this.nest.x - (cx + 0.5);
+      const hy = this.nest.y - (cy + 0.5);
       let best = -1;
-      let bestV = 0;
+      let bestV = byVector ? -Infinity : 0;
       for (const turn of [0, 1, -1]) {
         const d = (dir + turn) & 3;
         const tx = cx + (DX[d] as number);
         const ty = cy + (DY[d] as number);
         if (rockAt(map, tx, ty) !== OPEN) continue;
-        const v = field.get(tx, ty);
+        const v = byVector ? (DX[d] as number) * hx + (DY[d] as number) * hy : field.get(tx, ty);
         if (v > bestV) {
           bestV = v;
           best = d;
@@ -725,6 +755,7 @@ export class Colony {
         if (before !== this.#asked[i]) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
+          if (mode === RETURN && this.mode[i] !== RETURN) this.#homeAfresh(i);
           this.mode[i] = mode;
           this.#asked[i] = encode(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
@@ -755,6 +786,16 @@ export class Colony {
         const y = this.y[i] as number;
         const toNest = Math.atan2(nest.y - y, nest.x - x);
         const side = this.wall[i] as number;
+        // Progress: no cell nearer home in TUNNEL_STALL seconds (a ring of tunnels its home scent leads round),
+        // and the tunnel walker picks branches by the home vector for a while (see #walkTunnel); then by scent again.
+        const near = Math.hypot(nest.x - x, nest.y - y);
+        if (near < (this.bestD[i] as number) - 1) {
+          this.bestD[i] = near;
+          this.stallT[i] = 0;
+        } else if ((this.stallT[i] = (this.stallT[i] as number) + dt) > TUNNEL_STALL + BY_VECTOR) {
+          this.bestD[i] = near;
+          this.stallT[i] = 0;
+        }
         if (side === 0 && !detouring && this.#walkTunnel(i, RETURN, p.speed * dt)) {
           h = this.#towardTarget(i); // in a tunnel: back the way it came (a wall it is already following, it keeps following)
         } else if (side === 0) {
@@ -786,8 +827,13 @@ export class Colony {
             else {
               // Keep the wall on its side (+1 = right: the ant turns left round it; angles grow clockwise, y down).
               const sd = this.wall[i] as number;
-              if (this.#touch(x, y, h, 1)) h -= sd * p.turnRate * dt * 2; // wall ahead: turn away
+              const ahead = this.#touch(x, y, h, 1);
+              if (ahead) h -= sd * p.turnRate * dt * 2; // wall ahead: turn away
               else if (!this.#touch(x, y, h + sd * 0.9, 1.2)) h += sd * p.turnRate * dt; // the wall fell away: hug round the corner
+              // Touching nothing, ahead or on the wall side (alarm or a thin rock tip threw it off): the hug
+              // would only circle in the open. Let go and walk the home vector; the line home is kept.
+              if (ahead || this.#touch(x, y, h + sd * (Math.PI / 2), 1.2)) this.untouched[i] = 0;
+              else if ((this.untouched[i] = (this.untouched[i] as number) + dt) > WALL_LOST) this.wall[i] = 0;
             }
           } else if (t >= FOLLOW_GIVE_UP) this.#giveUp(i);
           else {
@@ -808,12 +854,19 @@ export class Colony {
                   // round an island and back where it met it, with the way home open (it met the island turning, not heading home)
                   (t > 2 && cx === Math.floor(this.mx[i] as number) && cy === Math.floor(this.my[i] as number) && open) ||
                   (dist < NEST_SIGHT && this.#clearTo(ox, oy, nest.x, nest.y)));
-              if (leave || (tunnel(map, cx, cy) && this.#homeScentNear(cx, cy))) {
+              if (leave) {
                 // Back on its line home, nearer than where it met this wall, and the way is open; or the nest
-                // itself is in plain view; or into a tunnel with home scent to lead it (see #walkTunnel).
-                // A tunnel with none (a stub off a chamber) it keeps following the wall through.
+                // itself is in plain view.
                 this.wall[i] = 0;
                 h = turnToward(h, toNest, p.turnRate * dt * 0.8);
+              } else if (tunnel(map, cx, cy) && this.#homeScentNear(cx, cy)) {
+                // Into a tunnel with home scent to lead it: the tunnel walker takes it on from here (see
+                // #walkTunnel). Not the home vector: from a tunnel it can point into soil, and the blocked
+                // step would start a new wall at once, every tick, with the give-up clock at zero.
+                // A tunnel with no home scent (a stub off a chamber) it keeps following the wall through.
+                this.wall[i] = 0;
+                this.gx[i] = NO_CELL;
+                if (this.#walkTunnel(i, RETURN, p.speed * dt)) h = this.#towardTarget(i);
               } else {
                 const d = handOnWall(map, cx, cy, this.gdir[i] as number, this.wall[i] as number);
                 this.gdir[i] = d;
@@ -856,8 +909,10 @@ export class Colony {
       }
 
       // Move; rock or the edge turns the ant back somewhere random.
-      const nx = (this.x[i] as number) + Math.cos(h) * p.speed * dt;
-      const ny = (this.y[i] as number) + Math.sin(h) * p.speed * dt;
+      // Rounded to float32 first, as stored: checked in float64, 192.999996 is open ground, and stored as
+      // 193.0 it would land the ant inside the soil cell beyond, where every step is blocked.
+      const nx = Math.fround((this.x[i] as number) + Math.cos(h) * p.speed * dt);
+      const ny = Math.fround((this.y[i] as number) + Math.sin(h) * p.speed * dt);
       this.detour[i] = (this.detour[i] as number) - dt;
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
       let face = mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] === Math.floor(nx) && this.gy[i] === Math.floor(ny)) : NO_FACE;
@@ -878,15 +933,15 @@ export class Colony {
             this.soilDug++;
             this.pellet[i] = 1;
             this.since[i] = 0;
-            // A fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it.
-            this.detour[i] = 0;
-            this.bumps[i] = 0;
+            this.#homeAfresh(i); // a fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it
             h += Math.PI;
           }
         }
       } else if (blocked(map, nx, ny) || squeezes(map, this.x[i] as number, this.y[i] as number, nx, ny)) {
         this.digT[i] = 0;
-        if (mode === RETURN && !detouring) {
+        // Read afresh: a give-up earlier this tick has just started a wander, and must not start a new wall.
+        const wandering = (this.detour[i] as number) > 0;
+        if (mode === RETURN && !wandering) {
           // Homing: start (or keep) following this wall by touch instead of turning at random.
           const x = this.x[i] as number;
           const y = this.y[i] as number;
@@ -899,7 +954,9 @@ export class Colony {
             }
             this.wall[i] = wallSide(this.#touch(x, y, toNest - WALL_PROBE, 1.2), this.#touch(x, y, toNest + WALL_PROBE, 1.2), rng);
             this.hitDist[i] = Math.hypot(nest.x - x, nest.y - y);
-            this.followT[i] = 0;
+            // Back on a wall it lost touch with: the clock runs on, or let-go and re-bump would never give up.
+            if (!((this.untouched[i] as number) > WALL_LOST)) this.followT[i] = 0;
+            this.untouched[i] = 0;
             // Facing the wall it met, turned away from the side it keeps the wall on; the first cell decides the way on.
             this.gdir[i] = (crossedDir(map, x, y, nx, ny) - (this.wall[i] as number)) & 3;
             this.gx[i] = NO_CELL;
@@ -926,13 +983,15 @@ export class Colony {
       const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
       if (!carrying && !pellet && mode !== FIGHT && takeFood(map, this.x[i] as number, this.y[i] as number)) {
         this.carrying[i] = 1;
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
+        this.#homeAfresh(i);
         this.since[i] = 0;
         h += Math.PI;
       } else if (atNest) {
         this.wall[i] = 0;
         this.mx[i] = NaN;
+        this.untouched[i] = 0;
+        this.bestD[i] = Infinity;
+        this.stallT[i] = 0;
         if ((this.since[i] as number) > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
         if (carrying) {
           this.carrying[i] = 0;
@@ -988,6 +1047,11 @@ function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: T
 export const FOLLOW_GIVE_UP = 120;
 /** Seconds of wall-following before trying the other side once (same line home). */
 export const FOLLOW_FLIP = 45;
+/** Seconds a wall-following ant may touch no rock before it lets go of the wall (the hug would circle in the open). */
+export const WALL_LOST = 1.5;
+/** Seconds a homing ant may get no nearer home before tunnel branches are picked by its home vector, and for how long. */
+export const TUNNEL_STALL = 20;
+export const BY_VECTOR = 15;
 /** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
 const M_LINE_WIDTH = 0.6;
 /** A wall-follower this near the nest, with a clear way to it, sees (or smells) it and leaves the wall. */
@@ -1155,7 +1219,7 @@ export function tunnelEnd(map: WorldMap, x: number, y: number, most = 2): boolea
 /**
  * A step that crosses diagonally into the next cell between two solid cells: blocked, like rock.
  * Movement otherwise only checks where the step lands, so ants could slip through a rock corner
- * into pockets the walking-distance map (4-connected) can't reach, and sit there forever.
+ * into pockets they can't walk out of (4-connected), and sit there forever.
  */
 export function squeezes(map: WorldMap, x: number, y: number, nx: number, ny: number): boolean {
   const cx = Math.floor(x);

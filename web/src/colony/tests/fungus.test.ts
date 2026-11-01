@@ -4,7 +4,7 @@ import { CountGrid, occupancy } from "../battle.ts";
 import { Colony } from "../colony.ts";
 import { Fungus, INFECTED, STRAINS, type Strain } from "../fungus.ts";
 import { Game } from "../game.ts";
-import { generateWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
+import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../world.ts";
 
 // The fungus's first slice (ja-t4d.1): load, contact spread across colonies,
 // grooming and priming, and the spore brush. Ants stand still here (the
@@ -229,7 +229,7 @@ test("a newborn in a dead host's slot is clean and unprimed", () => {
 
 test("a game with no spores runs as before: the fungus stays idle and draws no random numbers", () => {
   const ticks = (paint: boolean): number[] => {
-    const g = new Game(generateWorld(4), { antCount: 200, rivalAnts: 200 }, mulberry32(77));
+    const g = new Game(generateWorld(4, OPEN_WORLD), { antCount: 200, rivalAnts: 200 }, mulberry32(77));
     if (paint) g.paintSpores(-50, -50, 2, 3, 0.3, BLOOM); // off the map: paints nothing, infects nobody
     for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
     return [g.player.stored, g.rival!.stored, g.player.losses, g.rival!.losses, g.player.x[0] as number];
@@ -240,7 +240,7 @@ test("a game with no spores runs as before: the fungus stays idle and draws no r
 
 test("in a real game, the dial shows: Lockpick holds its load unseen, Bloom is groomed down and leaves the colony resistant", () => {
   const after = (strain: number) => {
-    const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 300, rivalAnts: 300 }, mulberry32(5));
+    const g = new Game(generateWorld(1, { ...OPEN_WORLD, size: { w: 160, h: 100 } }), { antCount: 300, rivalAnts: 300 }, mulberry32(5));
     const nest = g.player.nest;
     g.paintSpores(nest.x, nest.y, nest.r + 2, 3, 0.3, strain);
     assert.ok(g.fungus.census(g.player).infected > 0);

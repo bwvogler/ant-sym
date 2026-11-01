@@ -321,7 +321,7 @@ The colony page is now a game: your colony and a rival's on one map, sharing its
 - **The outcome.** A colony with no ants and too little food for one more is beaten. The panel shows a banner.
 - **Jev.** The player's colony can play on Jev: one client, two cached lanes (ant modes and stances), one doctrine. The rival plays the local rule and the local strategist, for free.
 
-**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5–1.5 s on the first bump up to 8–24 s, and during a detour the ant wanders instead of homing. (Review found this is not enough on every map: a long wall can still trap homing ants; PR #5 replaces straight-line homing with a walking-distance map.)
+**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5–1.5 s on the first bump up to 8–24 s, and during a detour the ant wanders instead of homing. (Review found this is not enough on every map: a long wall can still trap homing ants; PR #5 replaces it with homing by the ant's own senses, §12.)
 
 **Measured headless** (600 + 600 ants, 1/30 s steps): ~1.8 ms per tick.
 - Seed 1: your colony wiped out the rival by ~200 s.
@@ -384,7 +384,9 @@ This is the first step of the lifetime-world plan. It builds on the research not
   - A blocked homing step starts wall-following. Two touch probes either side of the home vector pick the side to keep the wall on.
   - Following, the ant turns away from rock ahead and hugs round corners where the wall falls away.
   - It leaves the wall only when back on its **line home**: the line from where this trip first met rock to the nest. It must also be nearer home than where it met this wall, with the way home open by touch. Leaving anywhere nearer settled ants in the deepest bay facing the nest.
-  - After 45 s it tries the other side once. After 120 s it gives up and wanders 8–24 s, then tries afresh.
+  - After 45 s it tries the other side once. After 120 s it gives up and wanders 8–24 s, then tries afresh. A bump during that wander only turns it: it doesn't make the wander longer, or start a new wall.
+  - Touching no rock (ahead or on its wall side) for 1.5 s, it lets go of the wall and walks its home vector, keeping its line home. Alarm avoidance or a thin rock tip could throw it off the wall, and the corner hug then circled in the open until the 120 s give-up.
+  - A trip home starts afresh, when the ant picks up food or its policy sends it home: no detour or wall left over from foraging. A leftover detour switched the home vector off, and each bump renewed it.
 - **Hints and physics:**
   - The home trail is a hint, climbed at a quarter of the turn rate. At full rate, clusters circled on their own trail.
   - `squeezes()` stops ants slipping diagonally between two rocks.
@@ -392,8 +394,9 @@ This is the first step of the lifetime-world plan. It builds on the research not
   - Before (straight line): up to 100 %, and 18 of 20 colony-runs over 5 %.
   - With the map: 0 %.
   - Now: at most 7 % (seeds 2 and 10), with 16 of 20 runs at 5 % or below.
-  - Most of those are slow, not trapped: within the next 30 s about 40 % reach home and more get closer. Truly stalled ants are at most ~3 % of a colony (`ja-` bead filed).
+  - Most of those are slow, not trapped: within the next 30 s about 40 % reach home and more get closer. Truly stalled ants are at most ~3 % of a colony (`ja-ipu`).
   - Ticks are ~10 % slower (3.7 vs 3.3 ms mean), because wall-followers spread trails over more ground (59 vs 48 awake chunks).
+  - After the review fixes (trips home start afresh, lost walls let go, no new wall on give-up), same seeds, seeding as the UI (`mulberry32(seed × 7919)`): mean 3.1 % → 1.9 %, 18 of 20 runs at 5 % or below (17 before), worst 6.9 % → 8.0 % (seed 6's rival; one end-of-game snapshot per run is noisy: variants of the lost-wall rule put the worst run anywhere from 8 to 14 % on a different seed each time). Food stored 3.7 % lower over the 20 runs.
 
 **Measured** (`npm run colony-bench`: 1,200 + 1,200 ants, 60 sim-s, local rule, same container):
 
@@ -532,6 +535,12 @@ The product owner asked for "seeds with less cavernous starts: they need to dig"
 
 Also from the review: the pellet colour no longer looks like the rival's ants, and there is a golden test that hashes `OPEN_WORLD` against MR 6's generator. After the fixes, the reviewer's stall scan finds no ant still for 30 s in 180 s of seed 1 (900 + 900 ants).
 
+**Second review** (agent, after the PR was opened) found three more, all in underground homing, fixed with tests that fail on the old code:
+- **A permanent freeze.** A wall-follower handed over to a tunnel with home scent turned to its home vector; with the nest straight through soil, the step was blocked, a new wall started (give-up clock at 0), and it was handed over again, every tick. The handover now goes straight to the tunnel walker.
+- **Standing inside soil.** A step checked in float64 at 192.999996 was stored in float32 as 193.0, inside the soil cell, where every step is blocked. Steps are rounded to float32 before the check.
+- **Rings of tunnels without end.** The tunnel walker follows the most home scent and never turned back, so a ring with strong scent held an ant for up to 542 s. A homing ant that gets no cell nearer home for 20 s picks branches by its home vector for 15 s, then by scent again.
+- **Measured** (seeds 1–5, 600 s, 600 + 600 ants, underground, UI seeding): ants still (< 0.5 cell moved) for the last 30 s, away from the nest, 164 → 67 over the 10 colony-runs. The share out > 120 s is unchanged (16.5 % → 15.3 % mean): that is `ja-cwu`. Most of the remaining still ants shuttle between a dead-end stub and the tunnel beside it, where no tunnel leads toward home.
+
 **Checked in the browser:** tunnels grow out of both nests, pellet crumbs ride on carriers, mounds grow, and the toggle switches maps. Light, dark and phone layouts show no console errors.
 
 **Jev:** situations are unchanged (1,296). The legend now says explorers dig and that a soil carrier is never asked, and `COLONY_BRAIN_VERSION` is 3, so cached answers are re-asked once. The estimated request is ~235 tokens per situation (was ~225): about +10 tokens per question.
@@ -655,7 +664,7 @@ Bead `ja-t4d.3`; design in `docs/fungus-policy.md` §4.B. Who is an enemy is no 
 | 3 | no fungus | — | 237 / 231 | 1,739 / 493 | 319 |
 | 3 | Garden | 150 s | 8 / 11 | 2,315 / 1,076 | 122 |
 
-- Garden in **one** colony moves that colony's nest halfway (to 0.5) and no further, so the colonies stay apart (tested on seed 2). On a small map (160×100, seed 1) Garden crossed into the rival by contact on its own, and the colonies unified anyway.
+- Garden in **one** colony moves that colony's nest halfway (to 0.5) and no further. Whether the colonies unify then depends on whether Garden crosses into the other colony by contact: over seeds 1–6 it does on most (corrected in review of #7; the first measurement, seed 2 alone, suggested it stays put). The test now checks only what holds on every seed: each nest stops at the fungal odour.
 - Lockpick (soothe) alone calms but never unifies, because it does not touch odour.
 - Checked in the browser (light and dark): Garden swept over the map at 4× speed reaches **unified** in about 45 s of real time; both stances return to forage, with 0 fighting and food coming home. No console errors.
 

@@ -5,7 +5,7 @@ import { Colony, localPolicy, type Situation } from "../colony.ts";
 import { Fungus, INTERVENTIONS, STRAINS, intervention } from "../fungus.ts";
 import { Game, QUIET } from "../game.ts";
 import { BINS, FUNGAL, MAX_MASK, Recognition, binCentre, binOf } from "../recognition.ts";
-import { generateWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
+import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** Every host runs its strain's default intervention. */
 const strainDefault = (sit: { strain: string }) => STRAINS.find((x) => x.id === sit.strain)!.expresses;
@@ -156,6 +156,19 @@ test("a host is never a stranger to its own nest, at any share any intervention 
   for (const v of INTERVENTIONS) assert.ok(v.levers.mask >= 0 && v.levers.mask <= MAX_MASK, v.id);
 });
 
+test("judged as an ant judges it (by band centre, in float32), a host at full share is still no stranger to a healthy nestmate", () => {
+  const map = arena();
+  for (const n0 of [0, 1]) {
+    // A healthy ant and a host two cells apart; the host's odour MAX_MASK of the way to the fungus's.
+    const c = placed(map, n0, n0, [[10, 6], [12, 6]]);
+    c.odour[1] = n0 + MAX_MASK * (FUNGAL - n0);
+    const rec = new Recognition();
+    rec.build([c]);
+    rec.look(c.odour[0] as number, c.tolerance[0] as number);
+    assert.equal(rec.get(12, 6), 0, `nest ${n0}: host at ${c.odour[1]} (band ${binOf(c.odour[1] as number)}) seen as a stranger`);
+  }
+});
+
 test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, Garden blends", () => {
   const map = arena();
   const c = placed(map, 0, 0, [[10, 3], [10, 9]]);
@@ -220,7 +233,7 @@ const GAME = { timeout: 60_000 };
 /** Seed 2, 150 + 150 ants, Garden painted on the nests of `which` colonies, five sim-minutes. */
 function garden(which: "both" | "one"): Game {
   const strain = STRAINS.findIndex((s) => s.id === "garden");
-  const g = new Game(generateWorld(2, { size: { w: 160, h: 100 } }), { antCount: 150, rivalAnts: 150 }, mulberry32(13));
+  const g = new Game(generateWorld(2, { ...OPEN_WORLD, size: { w: 160, h: 100 } }), { antCount: 150, rivalAnts: 150 }, mulberry32(13));
   for (const c of which === "both" ? g.colonies : [g.player]) g.paintSpores(c.nest.x, c.nest.y, c.nest.r + 2, 3, 0.3, strain);
   for (let k = 0; k < 30 * 300; k++) g.tick(1 / 30);
   return g;
@@ -234,10 +247,10 @@ test("in a real game: Garden in both colonies brings them to one odour and the f
   assert.equal(g.outcome(), "unified");
 });
 
-test("in a real game: Garden in one colony, where it does not cross, moves that colony halfway and no further", GAME, () => {
+// Whether Garden painted on one colony crosses into the rival depends on the map (over seeds 1–6 it
+// reaches the rival's nest on every one, and unifies most), so this checks what holds on all of them.
+test("in a real game: Garden in one colony moves that colony halfway and no further; the rival, if it crosses, stops halfway too", GAME, () => {
   const g = garden("one");
-  assert.ok(g.rival!.nestOdour > 0.9, `it did not cross into the rival's nest on this seed: ${g.rival!.nestOdour.toFixed(2)}`);
   assert.ok(g.player.nestOdour > 0.2 && g.player.nestOdour <= 0.5, `the player's nest moved toward the fungal odour, no further: ${g.player.nestOdour.toFixed(2)}`);
-  assert.ok(g.unity().gap > 0.4, `gap ${g.unity().gap.toFixed(2)}`);
-  assert.notEqual(g.outcome(), "unified");
+  assert.ok(g.rival!.nestOdour >= 0.5, `the rival's nest stops at the fungal odour too: ${g.rival!.nestOdour.toFixed(2)}`);
 });
