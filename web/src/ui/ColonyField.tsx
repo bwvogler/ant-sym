@@ -259,7 +259,8 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
      */
     const paths = new Map<number, Path2D>();
     const drawHexes = (c: Camera, v: Viewport, rx0: number, rx1: number, ry0: number, ry1: number) => {
-      const bg = theme.soil;
+      // The background: soil underground (most cells), the paper on the open surface (no soil at all).
+      const bg = colony.map.hasSoil ? theme.soil : theme.paperRgb;
       const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
       ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
       const [ax, ay] = toScreen(c, v, 0, 0);

@@ -419,9 +419,12 @@ test("meander: tunnels from one start wander off in many directions, yet stay on
     for (const [x, y] of cells) angles.push(tunnelHeading(m, x, y));
   }
   assert.ok(narrowCells / total > 0.7, `tunnels stay one cell wide: ${((100 * narrowCells) / total).toFixed(0)} % of dug cells narrow (forks and break-ins aren't)`);
-  // Headings that aren't one of the six ways (more than 10° off every one): tunnels run at all angles.
-  const between = angles.filter((a) => Math.abs(((a / (Math.PI / 3)) % 1 + 1) % 1 - 0.5) < 0.5 - 10 / 60).length;
-  assert.ok(between / angles.length > 0.25, `${((100 * between) / angles.length).toFixed(0)} % of tunnel runs are between the six ways`);
+  // Headings well between the six ways (more than 20° off every one): a tunnel's run drifts and keeps
+  // drifting, cell after cell, so runs spread round the circle (a third of them would be, spread evenly).
+  // Fresh noise on a grid way each cell (σ 11°) would put only ~8 % there: the review of MR 8 caught
+  // exactly that (the heading was dropped before the dig).
+  const between = angles.filter((a) => Math.abs(((a / (Math.PI / 3)) % 1 + 1) % 1 - 0.5) < 0.5 - 20 / 60).length;
+  assert.ok(between / angles.length > 0.2, `${((100 * between) / angles.length).toFixed(0)} % of tunnel runs are well between the six ways`);
 
   setTunnelDrift(0);
   try {

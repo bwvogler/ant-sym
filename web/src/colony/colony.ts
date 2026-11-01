@@ -473,7 +473,10 @@ export class Colony {
     if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
     const hugging = mode === EXPLORE && (this.hugT[i] as number) > 0;
     const packed = hy * 65536 + hx;
-    if (fresh && !hugging && this.#noTunnel[i] === packed) return false; // looked here already: open ground
+    if (fresh && !hugging && this.#noTunnel[i] === packed) {
+      this.gx[i] = NO_CELL; // looked here already: open ground
+      return false;
+    }
     const cx = fresh ? hx : (this.gx[i] as number);
     const cy = fresh ? hy : (this.gy[i] as number);
     if (!tunnel(map, cx, cy)) {
@@ -517,9 +520,12 @@ export class Colony {
           this.gx[i] = NO_CELL; // walled in on every side (it can't be, having walked in): steer freely
           return false;
         }
-        if (dug >= 0) this.digAim[i] = aim;
+        this.digAim[i] = dug >= 0 ? aim : NaN;
         dir = dug < 0 ? next : dug;
-      } else dir = next;
+      } else {
+        dir = next;
+        this.digAim[i] = NaN; // walking on, not to a face
+      }
     }
     this.gdir[i] = dir;
     this.gx[i] = stepX(cx, cy, dir);
@@ -541,7 +547,10 @@ export class Colony {
     if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && startable(map, wx, wy, wallDir)) {
       dir = wallDir;
       this.digAim[i] = DIR_ANGLE[wallDir] as number;
-    } else dir = handOnWall(map, cx, cy, dir, side);
+    } else {
+      dir = handOnWall(map, cx, cy, dir, side);
+      this.digAim[i] = NaN;
+    }
     this.gdir[i] = dir;
     this.gx[i] = stepX(cx, cy, dir);
     this.gy[i] = stepY(cy, dir);
@@ -665,7 +674,10 @@ export class Colony {
       if (mode !== EXPLORE) this.digT[i] = 0;
       if (mode !== EXPLORE || pellet) this.hugT[i] = 0;
       else this.hugT[i] = Math.max(0, (this.hugT[i] as number) - dt);
-      if (mode !== prevMode) this.gx[i] = NO_CELL;
+      if (mode !== prevMode) {
+        this.gx[i] = NO_CELL;
+        this.digAim[i] = NaN;
+      }
       const digging = (this.digT[i] as number) > 0;
       if (mode !== RETURN) {
         this.wall[i] = 0;
@@ -786,7 +798,7 @@ export class Colony {
       this.detour[i] = (this.detour[i] as number) - dt;
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
       // The cell the step lands in: open ground (most steps) moves at once, with no more to check.
-      cellOf(nx, ny);
+      cellOf(Math.fround(nx), Math.fround(ny)); // as stored (Float32), so the cached cell is the stored position's
       const lx = CELL[0] as number;
       const ly = CELL[1] as number;
       const landOpen = rockAt(map, lx, ly) === OPEN;
@@ -858,8 +870,7 @@ export class Colony {
           if (mode !== RETURN) this.detour[i] = Math.max(this.detour[i] as number, 0.5 * 2 ** Math.floor(this.bumps[i] as number) * (0.5 + rng()));
         }
       } else {
-        this.digT[i] = 0; // the face it was digging opened (another ant dug it), or it turned off it
-        this.digAim[i] = NaN;
+        this.digT[i] = 0; // the face it was digging opened (another ant dug it), or it turned off it (its aim stays: it is walking up to the face)
         this.x[i] = nx;
         this.y[i] = ny;
         this.#cellX[i] = lx;
