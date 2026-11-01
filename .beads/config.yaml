@@ -67,3 +67,5 @@
 
 sync:
     remote: "git+ssh://git@github.com/bwvogler/ant-sym.git"
+export:
+    auto: true
