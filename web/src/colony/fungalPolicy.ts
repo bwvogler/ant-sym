@@ -12,20 +12,20 @@ import { MODES, type Mode } from "./colony.ts";
 //   load     — low / mid / high
 //   host     — what the ant is doing: its mode (a carrier counts as return)
 //   ground   — whose home scent is on the ground there: home, border, foreign
-//   contact  — who touches it: none, kin, or strangers (by odour)
+//   contact  — who touches it: none; kin (its own colony); allied (another
+//              colony's ants, within tolerance: unification, felt where it
+//              happens); or strangers (past tolerance, by odour)
 //   groomed  — whether its nestmates are grooming the fungus off it
-//   colonies — how far apart the two nests' odours are: apart, close, one
-// All of it local to the host, except `colonies`: the fungus is one organism
-// across both colonies, and that is the one thing it knows about itself.
+// All of it local to the host, like an ant's own senses: the fungus knows
+// nothing map-wide (no "how far apart are the nests"), and nothing here
+// assumes two colonies. Unity is the player's meter, not the fungus's sense.
 
 export const LOADS = ["low", "mid", "high"] as const;
 export type Load = (typeof LOADS)[number];
 export const GROUNDS = ["home", "border", "foreign"] as const;
 export type Ground = (typeof GROUNDS)[number];
-export const CONTACTS = ["none", "kin", "strangers"] as const;
+export const CONTACTS = ["none", "kin", "allied", "strangers"] as const;
 export type Contact = (typeof CONTACTS)[number];
-export const TOGETHER = ["apart", "close", "one"] as const;
-export type Together = (typeof TOGETHER)[number];
 
 export interface FungalSituation {
   /** the strain's id */
@@ -35,14 +35,13 @@ export interface FungalSituation {
   ground: Ground;
   contact: Contact;
   groomed: boolean;
-  colonies: Together;
 }
 
 /** An intervention's id, for the host the situation describes. */
 export type FungusPolicy = (s: FungalSituation) => string;
 
-/** Situations per strain: 3 × 4 × 3 × 3 × 2 × 3. */
-export const FUNGAL_SITUATIONS = LOADS.length * MODES.length * GROUNDS.length * CONTACTS.length * 2 * TOGETHER.length;
+/** Situations per strain: 3 × 4 × 3 × 4 × 2 = 288. */
+export const FUNGAL_SITUATIONS = LOADS.length * MODES.length * GROUNDS.length * CONTACTS.length * 2;
 
 export function loadLevel(l: number): Load {
   return l >= 0.7 ? "high" : l >= 0.3 ? "mid" : "low";
@@ -50,13 +49,11 @@ export function loadLevel(l: number): Load {
 
 /** The fungal situation without its strain, as one number (0 .. FUNGAL_SITUATIONS − 1): what a host keeps of what it was last asked. */
 export function encodeFungal(s: Omit<FungalSituation, "strain">): number {
-  return ((((LOADS.indexOf(s.load) * MODES.length + MODES.indexOf(s.host)) * GROUNDS.length + GROUNDS.indexOf(s.ground)) * CONTACTS.length + CONTACTS.indexOf(s.contact)) * 2 + (s.groomed ? 1 : 0)) * TOGETHER.length + TOGETHER.indexOf(s.colonies);
+  return (((LOADS.indexOf(s.load) * MODES.length + MODES.indexOf(s.host)) * GROUNDS.length + GROUNDS.indexOf(s.ground)) * CONTACTS.length + CONTACTS.indexOf(s.contact)) * 2 + (s.groomed ? 1 : 0);
 }
 
 export function decodeFungal(code: number, strain: string): FungalSituation {
   let c = code;
-  const colonies = TOGETHER[c % TOGETHER.length] as Together;
-  c = Math.floor(c / TOGETHER.length);
   const groomed = c % 2 === 1;
   c = Math.floor(c / 2);
   const contact = CONTACTS[c % CONTACTS.length] as Contact;
@@ -65,7 +62,7 @@ export function decodeFungal(code: number, strain: string): FungalSituation {
   c = Math.floor(c / GROUNDS.length);
   const host = MODES[c % MODES.length] as Mode;
   const load = LOADS[Math.floor(c / MODES.length)] as Load;
-  return { strain, load, host, ground, contact, groomed, colonies };
+  return { strain, load, host, ground, contact, groomed };
 }
 
 /** The local rule's settings: the player's thresholds on the free policy (§5.1, lever 5). */
@@ -91,7 +88,8 @@ export const STRAIN_DEFAULT = "default";
  *
  * Why so little (PRD §18): four situational rules were built and measured against each strain's default
  * (sharing routes and roaming away from home, soothing strangers, sequencing them by how close the
- * colonies are, and switching only once unified). None beat the default; most unified later and cost
+ * colonies are, and switching only once unified; the last two read a map-wide "how far apart are the
+ * nests", since removed: the fungus senses only what is local to its host). None beat the default; most unified later and cost
  * lives, because any intervention that takes a Garden host off blend before the colonies are one
  * brings less of the fungus's odour home, and after unification shared routes brought in no more
  * food. Situational play is what the per-host situation is for: the player's settings here, and Jev

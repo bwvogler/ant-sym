@@ -1,7 +1,7 @@
 import type { CountGrid } from "./battle.ts";
 import { CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import { MODES, type Colony, type Mode } from "./colony.ts";
-import { DEFAULT_RULE, STRAIN_DEFAULT, encodeFungal, loadLevel, localFungusRule, type FungalSituation, type FungusPolicy, type FungusRule, type Ground, type Together } from "./fungalPolicy.ts";
+import { DEFAULT_RULE, STRAIN_DEFAULT, encodeFungal, loadLevel, localFungusRule, type FungalSituation, type FungusPolicy, type FungusRule, type Ground } from "./fungalPolicy.ts";
 import type { Recognition } from "./recognition.ts";
 import { rockAt, type WorldMap } from "./world.ts";
 
@@ -319,11 +319,10 @@ export class Fungus {
    * nestmates groom off and what it clears on its own; and resistance from grooming visible
    * nestmates. Then the ground's spores fade.
    */
-  step(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null = null, apart: Together | null = null): void {
+  step(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null = null): void {
     if (!this.active) return;
     const p = this.params;
     const { w, h } = this.map.size;
-    const together = apart ?? this.#together(colonies, rec);
     while (this.#visible.length < colonies.length) this.#visible.push(new LoadGrid());
 
     // Everyone's load before the step: what every ant reads.
@@ -407,7 +406,9 @@ export class Fungus {
           const theirs = c.foreign ? c.foreign.fields.home.get(cx, cy) : 0;
           if (own > 0 && own >= p.borderRatio * theirs) ground = "home";
           else if (theirs > 0 && theirs >= p.borderRatio * own) ground = "foreign";
-          let contact: FungalSituation["contact"] = nb.ants - 1 > 0.5 ? "kin" : "none";
+          // Who touches it, in the 3×3 cells around: strangers (past tolerance, by odour), else ants of another
+          // colony it tolerates (allied: unification, felt where it happens), else its own colony's (kin), else none.
+          let contact: FungalSituation["contact"] = nb.ants - nb.own > 0.5 ? "allied" : nb.own - 1 > 0.5 ? "kin" : "none";
           if (rec) {
             rec.look(c.odour[i] as number, rec.params.tolerance);
             if (rec.around(cx, cy, w, h) >= 0.5) contact = "strangers";
@@ -421,7 +422,6 @@ export class Fungus {
             ground,
             contact,
             groomed: groomRate >= p.groomedAt,
-            colonies: together,
           };
           c.fungal[i] = encodeFungal(sit);
           this.express(c, i, this.choose(sit, strain), nl);
@@ -523,12 +523,12 @@ export class Fungus {
    * pheromone channels use. Like them, the step that comes due covers all the time owed.
    * Returns whether it stepped (the caller passes occupancy grids current for this tick).
    */
-  advance(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null = null, together: Together | null = null): boolean {
+  advance(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null = null): boolean {
     this.#clock += dt;
     if (this.#clock + 1e-9 < this.params.interval) return false;
     const owed = this.#clock;
     this.#clock = 0;
-    this.step(colonies, grids, owed, rec, together);
+    this.step(colonies, grids, owed, rec);
     return true;
   }
 
@@ -541,15 +541,6 @@ export class Fungus {
   #shows(c: Colony, i: number, s: number): number {
     const v = (this.strains[s] as Strain).visibility;
     return c.expr[i] === 0 && (c.fungal[i] as number) >= 0 ? v * DORMANT_SHOW : v;
-  }
-
-  /** How far apart the two nests' odours are, by gap alone (the game passes its own reading, where "one" is unified). */
-  #together(colonies: readonly Colony[], rec: Recognition | null): Together {
-    const [a, b] = colonies;
-    if (!a || !b) return "apart";
-    const gap = Math.abs(a.nestOdour - b.nestOdour);
-    const tol = rec ? rec.params.tolerance : a.params.tolerance;
-    return gap <= tol ? "one" : gap <= 0.6 ? "close" : "apart";
   }
 
   /** The player's settings: the local rule's thresholds and the menu (§5.1, levers 4 and 5). */

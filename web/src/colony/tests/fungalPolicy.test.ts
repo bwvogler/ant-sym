@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, MODES } from "../colony.ts";
-import { CONTACTS, DEFAULT_RULE, FUNGAL_SITUATIONS, GROUNDS, LOADS, STRAIN_DEFAULT, TOGETHER, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../fungalPolicy.ts";
+import { CONTACTS, DEFAULT_RULE, FUNGAL_SITUATIONS, GROUNDS, LOADS, STRAIN_DEFAULT, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../fungalPolicy.ts";
 import { fungalKey, fungusContext, offeredFor, packFungusRequest, readIntervention } from "../fungusBrain.ts";
 import { DORMANT_SHOW, Fungus, INTERVENTIONS, LETHAL, STRAINS, intervention } from "../fungus.ts";
 import { Game } from "../game.ts";
@@ -13,7 +13,7 @@ import { generateWorld, mulberry32, worldFromArrays, type WorldMap } from "../wo
 // fungus in that host senses; gated by the strain and the player's menu.
 
 const ID = (id: string) => STRAINS.findIndex((s) => s.id === id);
-const sit = (s: Partial<FungalSituation> = {}): FungalSituation => ({ strain: "garden", load: "mid", host: "explore", ground: "border", contact: "none", groomed: false, colonies: "apart", ...s });
+const sit = (s: Partial<FungalSituation> = {}): FungalSituation => ({ strain: "garden", load: "mid", host: "explore", ground: "border", contact: "none", groomed: false, ...s });
 
 function arena(): WorldMap {
   return worldFromArrays({ w: 40, h: 12 }, [{ x: 4, y: 6.5, r: 2 }, { x: 36, y: 6.5, r: 2 }]);
@@ -32,21 +32,20 @@ function placed(map: WorldMap, nest: number, odour: number, cells: [number, numb
   return c;
 }
 
-test("fungal situations: 648 per strain, and each encodes and decodes to itself", () => {
-  assert.equal(FUNGAL_SITUATIONS, 648);
+test("fungal situations: 288 per strain, and each encodes and decodes to itself", () => {
+  assert.equal(FUNGAL_SITUATIONS, 288);
   const seen = new Set<number>();
   for (const load of LOADS)
     for (const host of MODES)
       for (const ground of GROUNDS)
         for (const contact of CONTACTS)
-          for (const groomed of [false, true])
-            for (const colonies of TOGETHER) {
-              const s = sit({ load, host, ground, contact, groomed, colonies });
-              const code = encodeFungal(s);
-              assert.ok(code >= 0 && code < FUNGAL_SITUATIONS);
-              seen.add(code);
-              assert.deepEqual(decodeFungal(code, "garden"), s);
-            }
+          for (const groomed of [false, true]) {
+            const s = sit({ load, host, ground, contact, groomed });
+            const code = encodeFungal(s);
+            assert.ok(code >= 0 && code < FUNGAL_SITUATIONS);
+            seen.add(code);
+            assert.deepEqual(decodeFungal(code, "garden"), s);
+          }
   assert.equal(seen.size, FUNGAL_SITUATIONS);
 });
 
@@ -89,10 +88,10 @@ test("the gate: whatever a policy answers, a host runs only what its strain allo
   assert.equal(new Fungus(map).menu.has("cull"), false);
 });
 
-test("what the fungus senses: whose ground, who touches the host, whether it is groomed, how far apart the colonies are", () => {
+test("what the fungus senses, all of it local to its host: whose ground, and who touches it", () => {
   const map = arena();
-  const sense = (setup: (a: Colony, b: Colony, f: Fungus) => void, apart: "apart" | "close" | "one" | null = null) => {
-    const a = placed(map, 0, 0, [[20, 6]]);
+  const sense = (setup: (a: Colony, b: Colony, f: Fungus) => void) => {
+    const a = placed(map, 0, 0, [[20, 6], [3, 3]]);
     const b = placed(map, 1, 1, [[30, 2]]);
     a.foreign = b.ph;
     b.foreign = a.ph;
@@ -103,7 +102,7 @@ test("what the fungus senses: whose ground, who touches the host, whether it is 
     setup(a, b, f);
     const rec = new Recognition();
     rec.build([a, b]);
-    f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6, rec, apart);
+    f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6, rec);
     return decodeFungal(a.fungal[0] as number, "garden");
   };
   assert.equal(sense(() => {}).ground, "border", "nobody's scent");
@@ -112,11 +111,16 @@ test("what the fungus senses: whose ground, who touches the host, whether it is 
   assert.equal(sense((a, b) => (a.ph.fields.home.set(20, 6, 1), b.ph.fields.home.set(20, 6, 0.8))).ground, "border", "both: no-man's land");
   assert.equal(sense(() => {}).contact, "none");
   assert.equal(sense((_a, b) => ((b.x[0] = 21.5), (b.y[0] = 6.5))).contact, "strangers");
-  assert.equal(sense((_a, b) => ((b.x[0] = 21.5), (b.y[0] = 6.5), b.odour.fill(0.1))).contact, "kin", "a rival ant that smells like it");
+  assert.equal(sense((a) => ((a.x[1] = 20.5), (a.y[1] = 7.5))).contact, "kin", "a nestmate");
+  assert.equal(sense((_a, b) => ((b.x[0] = 21.5), (b.y[0] = 6.5), b.odour.fill(0.1))).contact, "allied", "another colony's ant that smells close enough to tolerate");
+  assert.equal(sense((a, b) => ((a.x[1] = 20.5), (a.y[1] = 7.5), (b.x[0] = 21.5), (b.y[0] = 6.5), b.odour.fill(0.1))).contact, "allied", "allied over kin");
+  assert.equal(sense((a, b) => ((a.x[1] = 20.5), (a.y[1] = 7.5), (b.x[0] = 21.5), (b.y[0] = 6.5))).contact, "strangers", "strangers over all");
   assert.equal(sense(() => {}).load, "high");
   assert.equal(sense(() => {}).host, "explore");
-  assert.equal(sense(() => {}).colonies, "apart", "nests at 0 and 1");
-  assert.equal(sense(() => {}, "one").colonies, "one", "the game's own reading wins");
+  // Nothing map-wide: where the nests' odours stand (the colonies' closeness) does not enter what the fungus senses.
+  const far = sense(() => {});
+  const near = sense((a, b) => ((a.nestOdour = 0.45), (b.nestOdour = 0.55)));
+  assert.deepEqual(near, far);
 });
 
 test("groomed: a visible host among nestmates is groomed; one the policy keeps dormant shows a quarter and is not", () => {
@@ -190,7 +194,7 @@ test("the fungus lane's request: the aim, one choice per fungal situation among 
   assert.equal(readIntervention(ans("soothe"), "h0", sit({ strain: "lockpick" }), menu), "soothe");
   assert.equal(readIntervention(ans("blend"), "h0", sit({ strain: "lockpick" }), menu), null, "Lockpick cannot blend");
   assert.equal(readIntervention(ans("cull"), "h0", sit({ strain: "bloom" }), menu), null, "off the menu");
-  assert.equal(fungalKey(sit()), "garden|mid|explore|border|none|unseen|apart");
+  assert.equal(fungalKey(sit()), "garden|mid|explore|border|none|unseen");
   assert.notEqual(fungusContext("a", menu), fungusContext("b", menu), "a new aim, a new cache");
   assert.notEqual(fungusContext("a", menu), fungusContext("a", new Set([...menu, "cull"])), "a new menu, a new cache");
   assert.equal(fungusContext("a", new Set(["soothe", "blend"])), fungusContext("a", new Set(["blend", "soothe"])), "the menu's order does not matter");

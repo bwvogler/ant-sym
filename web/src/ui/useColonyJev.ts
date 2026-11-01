@@ -37,7 +37,7 @@ const SAMPLE: Situation = { mode: "explore", tired: false, foodTrail: "faint", h
 export const TOKENS_PER_SITUATION = Math.round(estimateTokens(packModeRequest(Array.from({ length: 100 }, (_, n) => ({ id: `s${n}`, situation: SAMPLE })), DOCTRINES[0]!.text)) / 100);
 
 /** The same for a fungal situation (legend + aim dominate, as for the ants). */
-const FUNGAL_SAMPLE: FungalSituation = { strain: "garden", load: "mid", host: "explore", ground: "border", contact: "kin", groomed: false, colonies: "apart" };
+const FUNGAL_SAMPLE: FungalSituation = { strain: "garden", load: "mid", host: "explore", ground: "border", contact: "kin", groomed: false };
 export const TOKENS_PER_FUNGAL_SITUATION = Math.round(
   estimateTokens(packFungusRequest(Array.from({ length: 100 }, (_, n) => ({ id: `h${n}`, situation: FUNGAL_SAMPLE })), AIMS[0]!.text, new Set(INTERVENTIONS.map((v) => v.id)))) / 100,
 );

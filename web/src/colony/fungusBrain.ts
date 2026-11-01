@@ -11,14 +11,14 @@ import { INTERVENTIONS, STRAINS } from "./fungus.ts";
 // player's menu has on, so the answer is always something the fungus can do.
 
 /** Bump when the fungal situation, the legend or the question change: old cached answers no longer apply. */
-export const FUNGUS_BRAIN_VERSION = 1;
+export const FUNGUS_BRAIN_VERSION = 2;
 
 export const FUNGUS_LEGEND =
-  "You are a fungus living inside the ants of two rival colonies. You never decide what an ant does: each ant chooses for itself from what it senses. You choose what you do to the ant you are in, which changes what it senses, what it gives off and how others see it. Each key in `hosts` is one ant you live in, as you sense it from inside. strain is which of your strains it carries. load is how much of you is in it: low, mid or high. host is what the ant is doing: explore, follow (a food trail), return (home) or fight. ground is whose home scent is where it stands: home (its own colony's), border, or foreign (the other colony's). contact is who touches it: none, kin (ants that smell like it) or strangers (ants that smell different, whom ants fight). groomed means its nestmates are grooming you off it right now. colonies is how far apart the two colonies smell: apart, close, or one (unified: they smell alike and have stopped fighting). aim is what you want: follow it.";
+  "You are a fungus living inside the ants of rival colonies. You never decide what an ant does: each ant chooses for itself from what it senses. You choose what you do to the ant you are in, which changes what it senses, what it gives off and how others see it. Each key in `hosts` is one ant you live in, as you sense it from inside. strain is which of your strains it carries. load is how much of you is in it: low, mid or high. host is what the ant is doing: explore, follow (a food trail), return (home) or fight. ground is whose home scent is where it stands: home (its own colony's), border, or foreign (another colony's). contact is who touches it: none; kin (its own colony's ants); allied (another colony's ants that smell close enough to be tolerated: colonies coming together); or strangers (ants that smell different, whom ants fight). groomed means its nestmates are grooming you off it right now. aim is what you want: follow it.";
 
 /** The cache key for a fungal situation. */
 export function fungalKey(s: FungalSituation): string {
-  return `${s.strain}|${s.load}|${s.host}|${s.ground}|${s.contact}|${s.groomed ? "groomed" : "unseen"}|${s.colonies}`;
+  return `${s.strain}|${s.load}|${s.host}|${s.ground}|${s.contact}|${s.groomed ? "groomed" : "unseen"}`;
 }
 
 /** What a host of this strain may be given: what the strain allows and the menu has on, in the table's order. */

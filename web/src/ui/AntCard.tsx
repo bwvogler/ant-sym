@@ -98,7 +98,6 @@ function Fungal({ col, i, explain }: { col: Colony; i: number; explain: Props["e
             ["ground", sensed.ground],
             ["contact", sensed.contact],
             [sensed.groomed ? "groomed" : "unseen", ""],
-            ["colonies", sensed.colonies],
           ] as const
         ).map(([k, v]) => (
           <span key={k} className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2">

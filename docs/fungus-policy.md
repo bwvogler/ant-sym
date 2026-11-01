@@ -316,3 +316,38 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 - Parabiosis: https://link.springer.com/doi/10.1007/s00040-007-0914-0 · https://escholarship.org/uc/item/7c26m5s9 · https://pmc.ncbi.nlm.nih.gov/articles/PMC3579830
 - Pleometrosis: https://pmc.ncbi.nlm.nih.gov/articles/PMC7862224 · https://doi.org/10.3389/fevo.2022.768752
 - Response-threshold division of labour: https://pmc.ncbi.nlm.nih.gov/articles/PMC1688885 · https://link.springer.com/content/pdf/10.1007/s00265-012-1343-2.pdf · https://arxiv.org/pdf/2308.07122
+
+## 10. More colonies, and other species (planned with MR 8, `ja-8fd`)
+
+*Added 2026-11-01. The fungus policy no longer assumes two colonies: what the fungus senses is local to each host, and "allied" contact (another colony's ants within tolerance) replaces the map-wide "how far apart are the nests" reading (PRD §19). The rest of the game still assumes two. This is how it should stop.*
+
+**Where two colonies are still built in:**
+- odour is one number, with the colonies at its two ends and the fungus's own odour at 0.5. A third colony has nowhere to sit.
+- `Game.unity` compares the first and second colony only.
+- Each colony reads "the other" colony's trails (`Colony.foreign`) and raids "the other" nest (`raidTarget`).
+- The won/lost banners assume one rival (`ja-t4d.6` reframes the page in any case).
+
+**1. Odour becomes a point on a disc.**
+- Each colony starts on the rim, evenly spaced: two opposite, three in a triangle, and so on. The fungus's own odour sits at the centre.
+- The fungal share pulls every host toward the same centre, so N colonies can converge to one.
+- A host's distance from its own nest stays bounded by `MAX_MASK` × the radius, under any tolerance: a host is still never a stranger to its own colony.
+- The recognition bands become a small 2D lattice (e.g. 8 angles × 3 radii, or a hex grid). Measure tick time before and after, as for the 10 bands now.
+- A colony's base odour can also drift with diet and environment (B5), which is how supercolonies form in nature.
+
+**2. Unity becomes a graph.**
+- Two colonies are *allied* when their nests' odours are within tolerance. Connected groups of allies are supercolonies, as in Argentine ants: one supercolony across southern Europe, and lethal borders between supercolonies.
+- The meter tracks groups going from N to 1. *Unified* means one group and a quiet minute.
+- Partial outcomes become real: four colonies ending as two supercolonies at war.
+- This is MR 8's alliance id: allied colonies share an id, and raids and stances treat allies as kin. The rule from 1c that kin are not raided already generalises.
+- `foreign` and `raidTarget` become plural: an ant reads every colony's trails (or the strongest), and a raid targets the nearest *stranger* nest.
+
+**3. Species are a different kind of distance.**
+- Different species smell far more different than colonies of one species, and real ant fungi are often host-specific: *Pandora formicae* infects only *Formica*, and each *Ophiocordyceps* species targets its own ant species.
+- **Strains get a host range:** the species they can infect. Contact transmission and spore pickup skip hosts out of range. This fits "other organisms eventually": a strain is a trait set, and a host range is one more trait.
+- **Species carry an odour dimension the fungal share cannot erase.** Between species the goal is not one colony but **parabiosis**. *Crematogaster* and *Camponotus* share nests and trails while each keeps its own recognition, and the tolerance is selective. So:
+  - two colonies of one species can *merge* (one odour, one alliance);
+  - two species can *ally* (tolerance plus shared trails, each keeping its own odour).
+  - In the unity graph, an edge between species means peace and sharing, not one odour.
+- Interspecific trail reading is asymmetric (*Camponotus* follows *Crematogaster* trails, not the reverse), which suits the fungus's existing `foreignFood` lever.
+
+**4. The fungal situation needs no change for any of this.** `contact` already says kin, allied or strangers wherever the host is. A host range only changes who can be a host. If species matter to what the fungus should do, `strain` (whose allowed interventions can differ by host species) is where that goes, not a map-wide fact.

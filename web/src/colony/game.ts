@@ -1,6 +1,5 @@
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
-import type { Together } from "./fungalPolicy.ts";
 import { Fungus, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { WorldMap } from "./world.ts";
@@ -121,15 +120,6 @@ export class Game {
     return s;
   }
 
-  /** The fungus's one game-wide fact (fungalPolicy.ts): apart, close (nests within 0.6 in odour), or one (unified: within tolerance, and a quiet minute). */
-  #together(): Together {
-    const [a, b] = this.colonies;
-    if (!a || !b) return "apart";
-    const gap = Math.abs(a.nestOdour - b.nestOdour);
-    if (gap <= this.recognition.params.tolerance && this.time - this.#lastFightDeath >= QUIET) return "one";
-    return gap <= 0.6 ? "close" : "apart";
-  }
-
   /** How far the fungus has come toward one colony. With no rival there is nothing to unify. */
   unity(): Unity {
     const deathsPerMinute = this.#fightDeaths;
@@ -168,7 +158,7 @@ export class Game {
     }
     // After fights: the dead neither pass load on nor groom (the occupancy grids still count them as groomers for this one step).
     // The fungus steps every few ticks (fungus.ts advance); when it is idle its clock does not run.
-    if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null, this.#together());
+    if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null);
     if (this.time >= this.#nextStrategy) {
       this.#nextStrategy = this.time + this.params.strategyEvery;
       this.colonies.forEach((c, k) => {
