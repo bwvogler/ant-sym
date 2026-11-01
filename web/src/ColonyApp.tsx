@@ -9,7 +9,7 @@ import type { Followed } from "./ui/follow.ts";
 import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
-import { STRAINS, useColony, type Brush, type SideStats } from "./ui/useColony.ts";
+import { STRAINS, useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import { AIMS } from "./colony/fungusBrain.ts";
@@ -94,9 +94,9 @@ export default function ColonyApp() {
               <Stat label="situations seen" value={stats ? `${stats.situationsSeen} / ${SITUATIONS.toLocaleString()}` : "—"} />
             </div>
             {stats && (
-              <dl className="mt-3 grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-x-4 gap-y-1 border-t border-line pt-3 font-mono text-xs text-fg-2">
+              <dl className="mt-3 grid grid-cols-[auto_repeat(6,minmax(0,1fr))] gap-x-4 gap-y-1 border-t border-line pt-3 font-mono text-xs text-fg-2">
                 <dt className="text-fg-3" />
-                {["ants", "food home", "lost", "born", "stance"].map((h) => (
+                {["ants", "food home", "lost", "born", "dug", "stance"].map((h) => (
                   <dt key={h} className="text-[11px] uppercase tracking-wide text-fg-3">
                     {h}
                   </dt>
@@ -163,8 +163,18 @@ export default function ColonyApp() {
               </button>
             </div>
             <p className="mt-2 text-xs text-fg-3">
-              {size.w}×{size.h} cells of rock, ground and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food. Every 4 food stored is a new ant.
+              {size.w}×{size.h} cells of {controls.ground === "underground" ? "soil to dig, rock, a few chambers" : "rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food. Every 4 food stored is a new ant.
             </p>
+            <div className="mt-2 flex items-center justify-between text-sm text-fg-2">
+              <span>Ground</span>
+              <div className="flex overflow-hidden rounded-md border border-line text-sm">
+                {(["underground", "open"] as Ground[]).map((g) => (
+                  <button key={g} type="button" className={seg(controls.ground === g)} onClick={() => update({ ground: g })} title={g === "underground" ? "Mostly soil: ants dig tunnels to food and carry the soil home to a mound" : "The open surface: rock and walkable ground"}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="mt-2 flex items-center justify-between text-sm text-fg-2">
               <span>Two colonies</span>
               <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />
@@ -359,6 +369,7 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
       <dd className="tabular-nums">{s.stored.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.losses.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.births.toLocaleString()}</dd>
+      <dd className="tabular-nums">{s.dug.toLocaleString()}</dd>
       <dd>{s.stance}</dd>
     </>
   );

@@ -86,7 +86,7 @@ export const STRAIN_DEFAULT = "default";
  *   otherwise → the strain's own default (Lockpick soothes, Bloom shares, Garden blends)
  * What a strain cannot do, or the menu has switched off, falls back (Fungus.choose).
  *
- * Why so little (PRD §18): four situational rules were built and measured against each strain's default
+ * Why so little (PRD §19): four situational rules were built and measured against each strain's default
  * (sharing routes and roaming away from home, soothing strangers, sequencing them by how close the
  * colonies are, and switching only once unified; the last two read a map-wide "how far apart are the
  * nests", since removed: the fungus senses only what is local to its host). None beat the default; most unified later and cost

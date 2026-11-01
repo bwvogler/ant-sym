@@ -18,7 +18,7 @@ import type { Colony } from "./colony.ts";
 //   - (later) diet, and odour weapons.
 // Contact blending (a host relaxing toward the ants it touches) was tried
 // first and moved nothing: contacts with strangers are brief fights, and the
-// gestalt undoes them at home (PRD §16).
+// gestalt undoes them at home (PRD §17).
 // And the fungus can calm a host: a calming cue (Rickia's n-C23) lowers the
 // aggression the host both receives and gives, so it counts as (1 − calm) of
 // an enemy to others.

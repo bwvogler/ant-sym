@@ -463,7 +463,82 @@ Also from the review:
 
 **Jev:** no change. `explain` makes no calls, and the request state is unchanged.
 
-## 14. The player is the fungus: infection, spread and the spore brush (fungus 1a, 2026-11-01)
+## 14. Underground: the ants dig (MR 7, 2026-11-01)
+
+The product owner asked for "seeds with less cavernous starts: they need to dig". They chose mostly soil with ants digging tunnels, and soil handled the way real ants handle it.
+
+**What real ants do with soil** (looked up for this MR):
+- Excavated soil is carried out as pellets and dumped round the entrance, which is how nest mounds form ([Tschinkel 2015, PMC4368782](https://pmc.ncbi.nlm.nih.gov/articles/PMC4368782)).
+- Digging is self-limiting: the excavated volume follows colony size ([Rasse & Deneubourg 2001, doi 10.1023/A:1011163804217](https://doi.org/10.1023/A:1011163804217)).
+- Pellets carry a building pheromone that draws more digging and deposition nearby, which concentrates excavation into a few tunnels ([Khuong et al. 2016, PMC4747701](https://pmc.ncbi.nlm.nih.gov/articles/PMC4747701)).
+- Ants keep to walls (thigmotaxis), which is how they walk tunnels and find openings.
+
+**Terrain** (`world.ts`). Each cell of the terrain layer is `OPEN`, `ROCK` or `SOIL`. Both solids block ants and scent; only soil digs.
+- **Underground (the default):** ~12 % rock, ~69 % soil and ~19 % open ground in small chambers (a second hashed-noise lattice, ~10-cell blobs, position-pure like the height).
+- Food is denser and nearer than on the surface (2.5 patches per chunk, ≥ 16 cells from a nest), because every way to it has to be dug.
+- Placement plans through *diggable* ground (`reachable` / `escapes` with `through: "diggable"`), so every nest and food patch can be dug to and none is sealed behind rock. On foot, the nest's chamber reaches only a few hundred cells.
+- **`OPEN_WORLD`** is the old surface map, and it generates cell for cell as before (checked on seven seeds). The UI has a **Ground: underground / open** toggle.
+
+**Digging** (`colony.ts`). Digging is a mechanic, not a Jev choice, and it is triggered by touch:
+- **Digging a face.** An explorer carrying nothing that meets a tunnel's end digs it for 1–2 s. A tunnel's end is a soil cell with at most 2 of its 8 neighbours open, or one with open ground straight beyond it, so tunnels break through into chambers.
+  - The cell opens and the ant takes a **pellet**.
+  - It goes home like a food carrier: never asked, and laying no trail.
+  - At the nest it drops the pellet on the **mound** (`soilOut`, drawn as an earth ring growing with √pellets).
+  - A dying carrier loses its pellet.
+- **Tunnel shape:**
+  - Side walls of tunnels and flat chamber walls are never dug as faces, so tunnels stay one cell wide and don't widen into caverns.
+  - New tunnels start from chamber walls now and then (5 % of head-on contacts, 10 % per wall cell walked), never within two cells of another passage, so the ground isn't combed into parallel slots.
+  - At a dead end, 15 % of digs go sideways: a fork.
+- **Walking tunnels.** A cell is a tunnel when it is part of no 2×2 open square and touches soil. In a tunnel, ants move cell by cell, because steering by heading can't hold a one-cell passage:
+  - explorers keep a **hand on the wall**, so they visit every branch in turn and dig at the ends they reach;
+  - followers take the branch with the most food scent;
+  - homing ants take the branch with the most **home scent** (laid by ants walking out; strongest near the nest).
+  - An explorer that touches soil keeps its hand on the chamber wall for 8 s, which is how it finds tunnel mouths.
+- **Homing round soil.** Wall-following round soil is also by cell: Bug2's leave rules at each cell's centre, handing over to home scent on entering a tunnel. Two more leave rules:
+  - the nest in plain view within 8 cells;
+  - back round an island to where it met it, with the way home open.
+  
+  Round rock in open ground it stays by touch, as before.
+- **Two changes that also apply to the surface:**
+  - A homing ant on a detour no longer has every bump extend it. In a tunnel it bumps constantly and never tried for home again.
+  - A pellet carrier's trip starts with a clean slate.
+
+**Measured** (seeds 1–5, 600 sim-s, 600 + 600 ants, local rule; per colony):
+
+| | First food stored | Food home at 600 s | Cells dug | Ants out > 120 s (mean / worst) | Tick |
+|---|---|---|---|---|---|
+| Underground | 13–235 s, median ~18 s | 15–1,618, mean ~690 | 964–2,432 (84–99 % on the mound) | 8–23 % / up to 65 % | 3.0–3.3 ms* |
+| Open, this MR | 7–13 s | 1,366–4,060, mean ~2,940 | 0 | 0.6–2.2 % / ≤ 10 % | 2.9–4.5 ms |
+| Open, before (MR 6) | 7–12 s | 1,255–4,228, mean ~2,980 | 0 | 1.2–3.8 % / ≤ 14 % | 3.0–4.3 ms |
+
+(*Five runs in parallel on four cores; the bench below is the fair timing. Underground rows are after the review fixes.)
+
+- Digging makes the start slower and the economy about a quarter of the surface's at 10 minutes.
+- The open map is unchanged within noise.
+- Underground homing is the weak spot: carriers working round the dug-out areas near the nests stay out long (bead `ja-cwu`).
+- How this was tuned: unrestricted digging carved one huge cavern per nest. Tunnel-end-only digging with random wandering made dense mazes and almost no food. Thigmotaxis plus scent at branches is what made tunnels reach food.
+- **Known look:** tunnels run at right angles, because digging and tunnel walking follow the square grid's four directions. A follow-up MR looks at a meandering dig heading or a hex grid.
+
+**Bench** (`npm run colony-bench`, 1,200 + 1,200 ants, 60 sim-s, back to back with MR 6 on a busy container): 512×320 open 3.94 ms mean (MR 6: 4.28 ms), underground **2.90 ms** mean. Underground is cheaper because scent only spreads along tunnels (5 awake chunks vs 45).
+
+**Review** (agent, before the PR) found four bugs, all fixed with tests or the reviewer's repro scripts:
+- **Homing ants circled four open cells for up to 120 s.** Following a soil wall started with a facing taken from the heading, not from the cell edge the step crossed. With the wall not at its hand, the ant turned hand-ward at every cell. Seeds 1 and 2 had 66 and 73 such ants at 180 s.
+  - The facing now comes from the crossed edge (`crossedDir`), and `handOnWall` turns hand-ward only round a wall that is really there.
+  - Fixing it showed a second loop: a wall-follower handed over to the tunnel walker inside a scentless stub off a chamber. It now hands over only where there is home scent.
+  - The test rebuilds the review's 7×7 neighbourhood. It fails on the old code.
+- **A digger froze for good** when another ant opened a cell beside its face (the face glanced, but `digT` was kept).
+- **Stale target cells:** a newborn walked to its dead predecessor's tunnel cell, and a give-up walked back after its detour. Targets are now reset, and any target that isn't adjacent counts as stale.
+- **An explorer with food in sight behind soil stood still** (only under policies that keep it exploring). It now keeps its hand on the wall.
+
+Also from the review: the pellet colour no longer looks like the rival's ants, and there is a golden test that hashes `OPEN_WORLD` against MR 6's generator. After the fixes, the reviewer's stall scan finds no ant still for 30 s in 180 s of seed 1 (900 + 900 ants).
+
+**Checked in the browser:** tunnels grow out of both nests, pellet crumbs ride on carriers, mounds grow, and the toggle switches maps. Light, dark and phone layouts show no console errors.
+
+**Jev:** situations are unchanged (1,296). The legend now says explorers dig and that a soil carrier is never asked, and `COLONY_BRAIN_VERSION` is 3, so cached answers are re-asked once. The estimated request is ~235 tokens per situation (was ~225): about +10 tokens per question.
+
+**Beads:** density-regulated digging (`ja-wii`), pellet scent and backfill (`ja-jmf`), underground homing (`ja-cwu`), soil on the endless map (`ja-r84`).
+
+## 15. The player is the fungus: infection, spread and the spore brush (fungus 1a, 2026-11-01)
 
 The design is in `docs/fungus-policy.md`. The player is the fungus and nothing else. It never decides for an ant: each colony keeps its own policy, doctrine, situations and cache. The fungus acts on ants (what they perceive, give off and can do), and their own policy still chooses. This first slice (bead `ja-t4d.1`) gets the fungus *into* ants and lets it move. Nothing an infected ant does is different yet; the perception layer (`ja-t4d.2`) is next.
 
@@ -495,7 +570,7 @@ The first version stepped every tick and read each layer cell by cell: 7.15 ms m
 
 **Jev:** no change. Nothing here enters an ant's request; tokens per ant are unchanged.
 
-## 15. The perception layer: the fungus bends what a host senses (fungus 1b, 2026-11-01)
+## 16. The perception layer: the fungus bends what a host senses (fungus 1b, 2026-11-01)
 
 Bead `ja-t4d.2`; design in `docs/fungus-policy.md` §2. The fungus never decides for an ant. It bends the ant's **perceived state**, and the ant's own policy (the local rule, or Jev under its colony's doctrine) chooses from it, as it would for a healthy ant in the world the host perceives.
 
@@ -535,7 +610,7 @@ Bead `ja-t4d.2`; design in `docs/fungus-policy.md` §2. The fungus never decides
 
 **Jev:** the request state and the situation are unchanged, so tokens per ant are unchanged. Bent perception could make a colony meet situations it otherwise rarely would; measured, it doesn't add any: 99–209 situations met per colony in the runs above, against 109–209 without spores. Lockpick on seed 1 met fewer (103), because soothed ants rarely perceive alarm.
 
-## 16. Recognition: strangers by odour, and one colony at the end (fungus 1c, 2026-11-01)
+## 17. Recognition: strangers by odour, and one colony at the end (fungus 1c, 2026-11-01)
 
 Bead `ja-t4d.3`; design in `docs/fungus-policy.md` §4.B. Who is an enemy is no longer "an ant of another colony" but **an ant whose odour differs from mine by more than a tolerance**. Colony odour is a blend of cuticular hydrocarbons, and where it stops differing, aggression stops (Argentine-ant supercolonies). This gives the game its goal: **unify the colonies**.
 
@@ -588,7 +663,7 @@ Bead `ja-t4d.3`; design in `docs/fungus-policy.md` §4.B. Who is an enemy is no 
 
 **Jev:** the situation and the request are unchanged, so tokens per ant are unchanged. Peace also makes Jev **cheaper**: a unifying game meets fewer situations (122–178 against 275–319), because war situations stop arising.
 
-## 17. Emission: what a host gives off (fungus 1d, 2026-11-01)
+## 18. Emission: what a host gives off (fungus 1d, 2026-11-01)
 
 Bead `ja-t4d.4`; design in `docs/fungus-policy.md` §4.C. The fungus changes what a host lays. The host's choices stay its own.
 
@@ -625,11 +700,11 @@ The levers work as built, but none decides a war on its own:
 - Quiet fights halved the deaths on seed 1 and did little on the others. A colony that is not recruited also does not defend.
 - Leaking food trails moves food and contact around without settling who wins.
 
-They are tools for the fungus policy (`ja-t4d.5`) to use where they help, not traits to run in every host of a strain. Garden's shared odour (§16) is still what unifies.
+They are tools for the fungus policy (`ja-t4d.5`) to use where they help, not traits to run in every host of a strain. Garden's shared odour (§17) is still what unifies.
 
 **Jev:** the request state and the situation are unchanged, so tokens per ant are unchanged. Quieter and leakier fronts make some games meet more situations (up to 141 → 258). At ~451 tokens per question that is ≈ 50k tokens, ≈ $0.002 per doctrine.
 
-## 18. The fungus policy, and the player's levers on it (fungus 1e, 2026-11-01)
+## 19. The fungus policy, and the player's levers on it (fungus 1e, 2026-11-01)
 
 Bead `ja-t4d.5`; design in `docs/fungus-policy.md` §5. The fungus picks one intervention per host. It never picks what an ant does. The player never picks an intervention either: the player shapes the policy.
 
@@ -684,13 +759,13 @@ Situational play is still what the per-host situation is for: the player's setti
 
 **Still to measure live:** the fungus lane against `api.typesafe.ai`, for real tokens per fungal situation and whether Jev under an aim places interventions better than the strains' defaults. The cloud session has no key.
 
-## 19. The fungus senses only what is local, and assumes no number of colonies (2026-11-01)
+## 20. The fungus senses only what is local, and assumes no number of colonies (2026-11-01)
 
-From review of §18. The fungal situation had one map-wide field, `colonies` (apart / close / one: the gap between *the two* nests' odours). It broke two things:
+From review of §19. The fungal situation had one map-wide field, `colonies` (apart / close / one: the gap between *the two* nests' odours). It broke two things:
 - the game's premise of local information, which the stack had just enforced for homing;
 - any game with more than two colonies.
 
-The local rule had stopped using it (§18), so only Jev ever saw it.
+The local rule had stopped using it (§19), so only Jev ever saw it.
 
 - **Removed.** In its place `contact` gains a value, **allied**: the host is touching another colony's ants that it tolerates (within the healthy tolerance, by odour). That is unification as it is felt where it happens. Contact is now none / kin / allied / strangers, in that order of precedence from the bottom: strangers over allied over kin.
 - **288 fungal situations per strain** (was 648). The Jev lane's version is bumped (`FUNGUS_BRAIN_VERSION` 2), because old cached answers were keyed on the removed field. The legend no longer says "two".
@@ -703,9 +778,9 @@ What still assumes two colonies (odour on a line, the unity meter, `foreign` and
 - unity as a graph of alliances, where a supercolony is an alliance id;
 - species as a host range per strain, plus an odour dimension the fungus cannot erase, so that between species the goal is parabiosis, not a merge.
 
-## 20. No colony is the player's (ja-t4d.6, 2026-11-01)
+## 21. No colony is the player's (ja-t4d.6, 2026-11-01)
 
-The player is the fungus (§14). The page and the Jev client still framed the first colony as the player's: "you" against "rival", a won/lost banner, Jev steering only the first colony while the second always ran the local rule, and the doctrine as the player's words for "your" ants.
+The player is the fungus (§15). The page and the Jev client still framed the first colony as the player's: "you" against "rival", a won/lost banner, Jev steering only the first colony while the second always ran the local rule, and the doctrine as the player's words for "your" ants.
 
 - **Names by colour.** The colonies are **Ink** and **Amber** (`ui/names.ts`), after how they are drawn, in the panel's tables, the follow card, the banner and the nest buttons ("Ink nest", "Amber nest"; `n` cycles the nests). `Game.player` / `Game.rival` and the follow type's `"you" | "rival"` stay as identifiers for the first and second colony, documented as such: the stack's tests and scripts use them.
 - **The outcome is the fungus's.** **unified** (one colony) is its win. **fallen** (either colony gone: hosts lost, and no one left to unite them with) is its loss. Won/lost are gone. `Game.fallen()` names the colony; the stack's outcome test is updated to say so.
@@ -720,3 +795,20 @@ The player is the fungus (§14). The page and the Jev client still framed the fi
 **Checked in the browser** (light and dark): no "your colony" anywhere; Ink and Amber in every table; per-colony doctrines; following an Amber ant ("Ant #71 · the Amber colony"); the nest buttons. Phone width has no horizontal scroll, and there are no console errors.
 
 **Jev:** tokens per ant are unchanged. The second colony now asks Jev too: with the same doctrine it adds nothing (shared cache); with its own, one more doctrine's situations.
+
+## 22. After the underground world (#8): what still holds (2026-11-01)
+
+§15–21 were measured on the open surface, before #8 made worlds start mostly in soil. Merged onto `main` and re-measured: Garden painted on both nests, seeds 1–3, 300 + 300 ants, 10 sim-minutes.
+
+| World | Seed | No fungus: lost | Garden: unified at | Garden: lost | Infected |
+|---|---|---|---|---|---|
+| open | 1 | 492 / 501 | 195 s | 15 / 14 | 100 / 100 % |
+| open | 2 | 506 / 499 | 159 s | 37 / 31 | 100 / 100 % |
+| open | 3 | 374 / 379 | 171 s | 8 / 9 | 100 / 100 % |
+| underground | 1 | 0 / 0 | 104 s | 0 / 0 | 100 / 94 % |
+| underground | 2 | 0 / 0 | 107 s | 0 / 0 | 100 / 100 % |
+| underground | 3 | 0 / 0 | 107 s | 0 / 0 | 100 / 77 % |
+
+- **On the open surface the result holds.** Garden unifies the colonies in about 3 minutes, and fight deaths fall from 374–506 per colony to 8–37.
+- **Underground, unity is vacuous for now.** In 10 minutes the two colonies never meet (no deaths even without the fungus). Garden still reaches "unified" at ~105 s, because the nests' odours converge and the minute is "quiet" with nobody in contact. Unity ("smell alike, nobody has died fighting for a minute") does not ask that the colonies have met. Filed: unified should also need allied contact, ants of both colonies meeting within tolerance (`ja-i0f`).
+- **Every test passes on the new default world.** One test was fragile and is fixed: `perception.test.ts`, where a healthy ant given 8 s on a 40-wide map reached the edge, bounced at random and (with #8's movement) stumbled onto the food. It now runs 4 s, the time the infected ant needs and before the healthy one can reach the edge.

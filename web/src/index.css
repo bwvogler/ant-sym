@@ -36,6 +36,8 @@
   --err-soft: #fde9e7;
   --heat: 31 111 92; /* rgb triplet for the deficit heatmap */
   --spore: #7a4fa0; /* the fungus: spores on the ground, infected ants */
+  --soil: #e3d5bf; /* the colony's undug ground */
+  --mound: #6e6250; /* dug soil: the mound at a nest, a pellet in an ant's jaws (greyer than the rival's tone) */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -61,6 +63,8 @@
     --err-soft: #3d1a17;
     --heat: 95 184 157;
     --spore: #c39be3;
+    --soil: #2f2a22;
+    --mound: #a39a8a;
   }
 }
 

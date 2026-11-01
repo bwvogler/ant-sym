@@ -2,7 +2,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, type Mode, type Situation } from "../../colony/colony.ts";
 import { DOCTRINES, policyContext } from "../../colony/colonyBrain.ts";
-import { generateWorld, mulberry32 } from "../../colony/world.ts";
+import { generateWorld, mulberry32, OPEN_WORLD } from "../../colony/world.ts";
 import { Game } from "../../colony/game.ts";
 import { STRAINS, intervention } from "../../colony/fungus.ts";
 import { decodeFungal } from "../../colony/fungalPolicy.ts";
@@ -59,7 +59,7 @@ afterEach(() => {
 });
 
 function colony(n = 60) {
-  return new Colony(generateWorld(1), { antCount: n }, mulberry32(9));
+  return new Colony(generateWorld(1, OPEN_WORLD), { antCount: n }, mulberry32(9));
 }
 
 /** Run the colony for k ticks (the policy is asked inside tick). */

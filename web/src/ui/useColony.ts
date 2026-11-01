@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
 import { INTERVENTIONS, LETHAL, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, type Outcome, type Unity } from "../colony/game.ts";
-import { generateWorld, mulberry32 } from "../colony/world.ts";
+import { generateWorld, mulberry32, OPEN_WORLD } from "../colony/world.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
 // loop, like useEngine for the picture: React state carries only what the
@@ -32,9 +32,13 @@ export interface ColonyControls {
   cull: boolean;
   /** a rival colony at the map's second nest */
   rival: boolean;
+  /** underground (mostly soil: the ants dig their tunnels) or the open surface */
+  ground: Ground;
 }
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, menu: INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)), hide: false, cull: false, rival: true };
+export type Ground = "underground" | "open";
+
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, menu: INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)), hide: false, cull: false, rival: true, ground: "underground" };
 
 /** Per paint event (a pointer move while dragging): radius in cells and the amount laid per cell. */
 const BRUSHES = { lure: { channel: "food", radius: 2, amount: 3 }, alarm: { channel: "alarm", radius: 3, amount: 12 } } as const;
@@ -55,6 +59,8 @@ export interface SideStats {
   infected: number;
   /** mean resistance (immune priming) over living ants */
   resist: number;
+  /** soil cells dug */
+  dug: number;
 }
 
 export interface ColonyStats {
@@ -95,7 +101,7 @@ function seenTogether(colonies: readonly Colony[]): number {
 
 function side(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
@@ -106,8 +112,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   // Bumped by Restart: the same seed again, from scratch.
   const [generation, setGeneration] = useState(0);
   const game = useMemo(
-    () => new Game(generateWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival }, mulberry32(controls.seed * 7919 + generation)),
-    [controls.seed, controls.antCount, controls.rival, generation],
+    () => new Game(generateWorld(controls.seed, controls.ground === "open" ? OPEN_WORLD : {}), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival }, mulberry32(controls.seed * 7919 + generation)),
+    [controls.seed, controls.antCount, controls.rival, controls.ground, generation],
   );
   const colony = game.player;
   // The player's policy settings outlive a game: apply them to every new one's fungus.

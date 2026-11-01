@@ -281,7 +281,7 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 
 **Defer**: the shared garden and joint nest (W1, W2, W4), membership changes and alliances, reinforced thresholds (A7 with reinforcement), clock windows (D3, after MR 10), summiting (D4), and the per-host Jev fungus lane.
 
-**Status (2026-11-01).** 1a–1e are built (PRD §14–18). The local rule is each strain's default plus the player's settings: four situational rules were measured and none beat it (PRD §18). As built, B3 is a *fungal share* of the host's odour (the fungus's own odour, 0.5, carried home by Garden hosts; B7-style). Contact blending as written above was tried first and moved nothing measurable: contacts with strangers are brief fights, and the nest's gestalt undoes them (PRD §16).
+**Status (2026-11-01).** 1a–1e are built (PRD §15–19). The local rule is each strain's default plus the player's settings: four situational rules were measured and none beat it (PRD §19). As built, B3 is a *fungal share* of the host's odour (the fungus's own odour, 0.5, carried home by Garden hosts; B7-style). Contact blending as written above was tried first and moved nothing measurable: contacts with strangers are brief fights, and the nest's gestalt undoes them (PRD §17).
 
 **Overlap with the plan.**
 - MR 7 (`ja-2iq`) makes footprints readable across colonies and adds graded alarm. That is the groundwork for A3, A5 and A6, so it should land first.
@@ -319,7 +319,7 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 
 ## 10. More colonies, and other species (planned with MR 8, `ja-8fd`)
 
-*Added 2026-11-01. The fungus policy no longer assumes two colonies: what the fungus senses is local to each host, and "allied" contact (another colony's ants within tolerance) replaces the map-wide "how far apart are the nests" reading (PRD §19). The rest of the game still assumes two. This is how it should stop.*
+*Added 2026-11-01. The fungus policy no longer assumes two colonies: what the fungus senses is local to each host, and "allied" contact (another colony's ants within tolerance) replaces the map-wide "how far apart are the nests" reading (PRD §20). The rest of the game still assumes two. This is how it should stop.*
 
 **Where two colonies are still built in:**
 - odour is one number, with the colonies at its two ends and the fungus's own odour at 0.5. A third colony has nowhere to sit.
