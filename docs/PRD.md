@@ -693,4 +693,51 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   - **Turning round** after a fill never happened: the tick wrote its own heading back over it, and the carrier walked on to the nest. It now turns in the tick's heading.
   - **A follower or homing ant whose next cell is filled** steered into it for good. A target that is no longer open is now decided afresh, except an explorer's face to dig.
   - **Kept as it was:** the trip clock still restarts after a fill. Letting it run on, so the ant lays faint home scent from deep tunnels rather than a fresh peak, was measured worse: such ants soon tire and walk home empty, and seeds 3, 4 and 6–8 brought 12 % less food home.
-- **Not done:** an *Atta*-like colony would need a looser sense of "unused", for example scent fading over minutes rather than seconds, or pellets carrying their own building scent (Khuong et al.). Bead `ja-jmf` stays open for that.
+- **Not done here:** an *Atta*-like colony needs a looser sense of "unused". That is MR 12, below.
+
+**MR 12: leaf-cutter backfill** (bead `ja-jmf`, closed).
+- **Why:** the owner wanted most of the soil to go back. In *Atta vollenweideri*, workers excavate space in excess and refill part of it with removed soil, depositing pellets inside the nest (Pielström & Roces 2013), and fresh pellets attract more work. In *Lasius niger*, a decaying building pheromone on pellets concentrates further deposits (Khuong et al. 2016).
+- **What stopped MR 11 filling more** (instrumented):
+  - two-thirds of pellet carriers' steps never reached the check, because the ants were wall-following or detouring, not walking a tunnel;
+  - 98 % of checks found no one-cell dead end beside them, and most dead ends that existed had a digger in them.
+
+  The scent threshold was not the limit: loosening it alone reached only 8.7 %.
+- **The rules now:**
+  - **Where:** every pellet carrier looks round each cell it enters, after 2.5 s of its trip home.
+  - **Unused is judged against the path.** A neighbour counts as unused when its home + food scent is under half the scent where the carrier stands (or under `FAINT`), but never above the carrier's own: a cell as busy as its own is in use.
+  - **Fillable means one unbroken run.** A cell can be filled when its open neighbours (1–5 of them) form one unbroken run: a dead end, the edge of a chamber, the side of a wide tunnel. In digital topology this is a *simple* cell, so filling it never changes how the ground is connected and no passage is ever cut. A cell of a one-wide tunnel (two runs) is never fillable.
+  - **Fresh pellets draw more.** `map.filledAt` records when each cell was filled. The "pellet scent" of a cell is exp(−age / 30 s) from the freshest fill beside it, and it raises the threshold up to 5×, so fills cluster and whole branches close.
+  - **Stale branches.** At a cell where a neighbour smells far staler than the path, a carrier turns in 30 % of the time (only in the first 20 s of its trip). It walks the branch to its end and fills the last cell, so branches shrink from the tip, a cell per pellet. Forks are never tunnel cells on hexes, so this is decided on arrival, not in the tunnel walk.
+  - **Unchanged guards:** no food in the cell, no ant of either colony (grids plus a direct look at nestmates), not within the nest's radius + 2.
+  - **Tuning** is in `BACKFILL`, mutable for sweeps and tests.
+- **Tuning sweep** (seeds 1–4, 300 s unless noted):
+
+  | setting | share refilled | notes |
+  |---|---|---|
+  | one-cell dead ends only, any threshold | ≤ 8.7 % | |
+  | one-run cells, threshold 0.5× | 45 % | |
+  | the same without pellet scent | 18 % | pellet scent does most of the work |
+  | the same without detours | 41 % | |
+  | wait 1–1.5 s instead of 3 | 68–74 % | food home −30 %: carriers fill space others then re-dig |
+  | wait 2.5 s (chosen) | 56–59 % at 600 s | |
+- **Measured** (seeds 1–5, 600 s, 600 + 600 ants, underground):
+
+  | | MR 11 | MR 12 |
+  |---|---|---|
+  | dug soil refilled | 0.6 % | **54.8 %** (the *Atta* end; *Pogonomyrmex* 2.5 %) |
+  | cells dug per colony | ~3,500 | ~6,900 (leaf-cutter churn: space dug, refilled, dug again) |
+  | food home per colony | ~1,120 | ~1,030 (−8 %; seed noise is about ±7 %) |
+  | first-food median | ~28 s | ~36 s |
+  | ants out over 120 s | 1.5–13.6 % | 0.6–2.1 % |
+  | homing trip median | ~5 s | ~3.2 s (carriers drop pellets early) |
+  | livelock counter (seeds 1–4) | 9, 0, 0, 0 | 0, 2, 0, 0 |
+  | homing over 60 s (seeds 1–4) | 85–232 | 13–68 |
+  | burial scan (seeds 3–6) | | 0 |
+  | stall scan, max still | | 13–18 s |
+
+  - The open map is unchanged, number for number.
+  - Bench: 3.78–3.92 ms vs 3.74–3.84 ms for MR 11, back to back; noise.
+- **Movement fixes needed once the ground keeps changing round the ants** (the stall scan found ants still for 30–45 s; each fix has a test):
+  - **Filled target.** A cell-by-cell wall-follower whose target is filled, or no longer beside it, decides afresh. The tunnel walk already did.
+  - **Tunnel round a by-touch follower.** A follower going by touch (rock in open ground) that finds itself in a tunnel switches to by-cell; steering by touch spins on the spot in a one-cell passage.
+  - **Edge graze.** A by-cell follower whose step is blocked (it stood on its cell's edge, and the straight way to the next cell grazed the solid cell beside it) heads back to its own cell's centre first.
