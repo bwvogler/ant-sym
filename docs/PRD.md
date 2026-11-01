@@ -793,3 +793,13 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 
 - **The open map** is unchanged on seeds 1–5.
 - **Bench** (60 s, 1,200 ants per colony): side view 1.9 ms per tick with one colony and 4.6 ms with two, against 3.7 ms for the 512 × 320 top-down underground map.
+
+**MR 14: the mound above ground.**
+- **Pellets become cells.** A pellet dropped at the hole adds to the colony's spoil. Each whole cell of it, ⌊pellets × `SWELL`⌋ counted exactly (summing 1.2 in floats drifts), is heaped as a **loose-soil cell**. Loose soil is SOIL marked in `map.loose`, drawn in `--spoil`, walkable, and never dug again.
+- **A sandpile.** `heapMound` drops a cell in a column some way off the hole, and it slides to the lower neighbouring column while one is a row or more lower. At most one row per column is about 41°, the angle of repose of damp soil (dry sand ≈ 34°).
+  - Near the hole, a column holds at most a row per column of distance, so the inner side slopes down into the hole at the same angle: a funnel crater, the hole open at its bottom.
+  - Food on a buried cell is lifted on top. The trail scent on it rides up onto the new walkway cell.
+- **A disc, not a cone.** Pellets are dropped anywhere out to a reach that grows with the mound (3 + cells ÷ 6 columns each side), so it spreads as a low disc about three rows high, its area tracking the nest's volume (Tschinkel 2015).
+  - **Dropped right by the hole:** the mound grew as a steep cone 30–40 rows high that every forager had to climb, and food home fell by half.
+  - **At six rows:** food home fell by a third.
+- **Measured** (seeds 1–5, 600 s, one colony): food home 571–1,032 (MR 13: 448–1,511), first food 9–12 s, 65–74 % of dug soil refilled. Mound cells are exactly ⌊pellets out × 1.2⌋, and soil stays conserved.

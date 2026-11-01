@@ -117,7 +117,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     const miniImg = miniCtx.createImageData(mini.width, mini.height);
     let miniAt = -Infinity;
 
-    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), sky: rgb("#e4edf1"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300") };
+    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), sky: rgb("#e4edf1"), spoil: rgb("#c8b28c"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300") };
     const retheme = () => {
       theme = {
         paper: cssVar("--paper"),
@@ -128,6 +128,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         rock: rgb(cssVar("--line-strong")),
         soil: rgb(cssVar("--soil")),
         sky: rgb(cssVar("--sky")),
+        spoil: rgb(cssVar("--spoil")),
         mound: cssVar("--mound"),
         trail: cssVar("--heat").split(/\s+/).map(Number),
         alarm: rgb(cssVar("--warn")),
@@ -158,6 +159,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     /** Paint chunk (cx, cy)'s cells into its canvas: rock and soil, then the trails, then food over everything. */
     const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array) => {
       const fc = colony.map.food.chunk(cx, cy);
+      const lc = colony.map.loose?.chunk(cx, cy);
       const foodC = colony.ph.fields.food.chunk(cx, cy);
       const homeC = colony.ph.fields.home.chunk(cx, cy);
       const alarmC = colony.ph.fields.alarm.chunk(cx, cy);
@@ -175,7 +177,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
             continue;
           }
           if (rc[i]) {
-            const solid = rc[i] === SOIL ? theme.soil : rc[i] === AIR ? theme.sky : theme.rock;
+            const solid = rc[i] === SOIL ? (lc && lc[i] ? theme.spoil : theme.soil) : rc[i] === AIR ? theme.sky : theme.rock;
             px[o] = solid[0];
             px[o + 1] = solid[1];
             px[o + 2] = solid[2];
@@ -231,7 +233,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
           const t = off ? 1 : colony.map.rock.get(x, y);
           const fv = off ? 0 : colony.map.food.get(x, y);
           const o = (my * mini.width + mx) * 4;
-          const c = fv > 0 ? food : t === SOIL ? theme.soil : t === AIR ? theme.sky : t ? theme.rock : theme.paperRgb;
+          const c = fv > 0 ? food : t === SOIL ? (!off && colony.map.loose?.get(x, y) ? theme.spoil : theme.soil) : t === AIR ? theme.sky : t ? theme.rock : theme.paperRgb;
           px[o] = c[0];
           px[o + 1] = c[1];
           px[o + 2] = c[2];

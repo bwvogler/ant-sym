@@ -73,6 +73,8 @@ export interface WorldMap {
    * later the mound); the rest is AIR (solid, never dug, drawn as sky). updateSurface keeps it so as ground changes.
    */
   sky?: ChunkLayer<Uint8Array>;
+  /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
+  loose?: ChunkLayer<Uint8Array>;
 }
 
 export interface WorldOptions {
@@ -659,7 +661,8 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   const cut = rockCut(o.rockiness);
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
-  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: filledLayer(), sky };
+  const loose = new ChunkLayer((n) => new Uint8Array(n), 0);
+  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: filledLayer(), sky, loose };
   const ground = new Int32Array(size.w);
   for (let x = 0; x < size.w; x++) ground[x] = Math.max(2, Math.min(size.h - 8, groundRow(seed, o, x)));
   for (let y = 0; y < size.h; y++)
@@ -783,4 +786,58 @@ function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, r
   // The ground round the hole changed: re-derive the walkway there.
   for (let yy = g - 2; yy <= g + 1; yy++) for (let xx = ex - 2; xx <= ex + 2; xx++) if (inBounds(map, xx, yy)) updateSurface(map, xx, yy);
   return nest;
+}
+
+/** The top of the ground in column x (side view): the first row from the top that isn't sky, or the map's height. */
+export function groundTop(map: WorldMap, x: number): number {
+  const sky = map.sky;
+  if (!sky) return 0;
+  for (let y = 0; y < map.size.h; y++) if (sky.get(x, y) !== 1) return y;
+  return map.size.h;
+}
+
+/**
+ * Heap one cell of loose soil on the mound by the entrance in column `ex` (side view), as a sandpile: it lands
+ * two to four columns off the hole on `side` (−1 west, +1 east) and slides downhill (to the lower neighbouring
+ * column, outward on a tie) while one is a row or more lower. At most one row per column is about 41°, the
+ * angle of repose of damp soil (dry sand ≈ 34°). Near the hole a column holds no more than a row per column of
+ * distance from it, so the inner side slopes down into the hole at the same angle: a ring with a funnel-shaped
+ * crater, the hole open at its bottom. Food on the cell it buries is lifted on top.
+ * Returns the cell heaped, or null if there is no room (the sky's top, the map's edge).
+ */
+export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number): [number, number] | null {
+  if (!map.sky || !map.loose) return null;
+  const hole = groundTop(map, ex);
+  // Room in column c: on the map, not the hole's column, and below the funnel's slope up from the hole.
+  const ok = (c: number) => c >= 0 && c < map.size.w && c !== ex && hole - groundTop(map, c) < Math.abs(c - ex) - 1;
+  // Landing beyond the map's edge lands at the edge; then out from the funnel if it is inside it, else back in.
+  let x = Math.max(0, Math.min(map.size.w - 1, ex + side * (2 + land)));
+  while (x >= 0 && x < map.size.w && !ok(x)) x += side;
+  if (x < 0 || x >= map.size.w) {
+    x = Math.max(0, Math.min(map.size.w - 1, x));
+    while (x !== ex && !ok(x)) x -= side;
+    if (x === ex) return null;
+  }
+  for (let guard = 0; guard < map.size.w; guard++) {
+    const here = groundTop(map, x);
+    const out = x + side;
+    const back = x - side;
+    const dOut = ok(out) ? groundTop(map, out) - here : -Infinity;
+    const dBack = ok(back) ? groundTop(map, back) - here : -Infinity;
+    if (dOut >= 1 && dOut >= dBack) x = out;
+    else if (dBack >= 1) x = back;
+    else break;
+  }
+  const y = groundTop(map, x) - 1;
+  if (y < 1) return null;
+  const f = map.food.get(x, y);
+  if (f > 0) {
+    map.food.set(x, y, 0);
+    map.food.set(x, y - 1, map.food.get(x, y - 1) + f);
+  }
+  map.rock.set(x, y, SOIL);
+  map.sky.set(x, y, 0);
+  map.loose.set(x, y, 1);
+  updateSurface(map, x, y);
+  return [x, y];
 }

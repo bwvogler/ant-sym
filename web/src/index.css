@@ -38,6 +38,7 @@
   --soil: #e3d5bf; /* the colony's undug ground */
   --mound: #6e6250; /* dug soil: the mound at a nest, a pellet in an ant's jaws (greyer than the rival's tone) */
   --sky: #e4edf1; /* the side view: above the ground line */
+  --spoil: #c8b28c; /* the side view: loose soil heaped on the mound, darker than the undug ground */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -65,6 +66,7 @@
     --soil: #3b3429;
     --mound: #a39a8a;
     --sky: #1b2226;
+    --spoil: #5c4f3c;
   }
 }
 

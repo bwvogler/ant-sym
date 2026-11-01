@@ -1,6 +1,6 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
-import { AIR, blocked, digCell, dropFood, fillCell, isSky, OPEN, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { AIR, blocked, digCell, dropFood, fillCell, heapMound, isSky, OPEN, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -183,6 +183,12 @@ export class Colony {
   #goalKind: Uint8Array;
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
   #entrance: Nest | null = null;
+  /** the side view: the entrance's column, where the mound's crater is */
+  #entranceCol = 0;
+  /** the side view: cells of mound heaped so far, or tried (no room at the sky's top): ⌊pellets out × SWELL⌋ once caught up */
+  #heaped = 0;
+  /** the side view: cells of loose soil heaped on the mound */
+  moundCells = 0;
   /** the point the current ant is homing to (see #goal): the m-line runs to it */
   #goalX = 0;
   #goalY = 0;
@@ -257,7 +263,11 @@ export class Colony {
     this.params = { ...DEFAULT_COLONY, ...params };
     if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
     this.nest = map.nests?.[this.params.nest] ?? map.nest;
-    if (map.sky && this.nest.entrance) this.#entrance = { x: this.nest.entrance.x, y: this.nest.entrance.y, r: ENTRANCE_R };
+    if (map.sky && this.nest.entrance) {
+      this.#entrance = { x: this.nest.entrance.x, y: this.nest.entrance.y, r: ENTRANCE_R };
+      cellOf(this.nest.entrance.x, this.nest.entrance.y);
+      this.#entranceCol = CELL[0] as number;
+    }
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
@@ -801,6 +811,7 @@ export class Colony {
   #crust(x: number, y: number): boolean {
     const ent = this.#entrance;
     if (!ent) return false;
+    if (this.map.loose?.get(x, y) === 1) return true; // the mound: soil they brought out, not dug again
     if (Math.hypot(centreX(x, y) - ent.x, centreY(y) - ent.y) < ENTRANCE_ZONE) return false;
     for (let d = 0; d < 6; d++) if (isSky(this.map, stepX(x, y, d), stepY(y, d))) return true;
     return false;
@@ -1292,9 +1303,27 @@ export class Colony {
         this.since[i] = 0;
         h += Math.PI;
       } else if (pellet && atEntrance) {
-        // Up and out: the soil goes on the mound round the hole (Tschinkel 2015).
+        // Up and out: the soil goes on the mound round the hole (Tschinkel 2015), loosened (SWELL): every whole
+        // cell's worth is heaped, either side of the hole.
         this.pellet[i] = 0;
         this.soilOut++;
+        const due = Math.floor(this.soilOut * SWELL + 1e-9); // counted, not summed: 1.2 added five times isn't 6 in floats
+        while (this.#heaped < due) {
+          this.#heaped++;
+          // Dropped anywhere out to a reach that grows with the mound, so it spreads as a low disc (its area tracks the
+          // nest's volume, Tschinkel 2015) rather than piling into a cone every forager has to climb.
+          const reach = 3 + this.#heaped / (2 * MOUND_HEIGHT);
+          const cell = heapMound(map, this.#entranceCol, rng() < 0.5 ? -1 : 1, Math.floor(rng() * reach));
+          if (cell) {
+            this.moundCells++;
+            // The trail lying on the walkway cell just buried rides up onto the new one above it: otherwise every pellet
+            // heaped cuts the trails by the entrance, three times a second, and foragers lose their way in and out.
+            for (const ch of ["food", "home"] as const) {
+              const v = ph.fields[ch].get(cell[0], cell[1]);
+              if (v > 0) ph.depositCell(ch, cell[0], cell[1] - 1, v);
+            }
+          }
+        }
         this.wall[i] = 0;
         this.mx[i] = NaN;
         this.since[i] = 0;
@@ -1498,6 +1527,8 @@ export function moundRadius(pellets: number, nestR: number): number {
 }
 
 
+/** The side view: about how high (rows) the spoil disc stands as it spreads: a steep cone halved the food brought home, six rows cost a third. */
+const MOUND_HEIGHT = 3;
 /** The side view: how near its entrance (world units) an ant counts as at it, to drop a pellet. */
 const ENTRANCE_R = 1.5;
 /** The side view: how near its entrance an ant on the ground line may dig (and how much ground round the hole stays unfilled). */
