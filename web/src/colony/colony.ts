@@ -175,6 +175,11 @@ export class Colony {
   #cellAtY: Float32Array;
   /** a cell where this free-walking ant last found no tunnel (packed y·65536 + x; −1 none): it needn't look again until it moves on */
   #noTunnel: Int32Array;
+  /** the first cell of the wall being followed by cell: back there, it has been all the way round */
+  loopX: Int32Array;
+  loopY: Int32Array;
+  /** releases from a soil wall this trip that made no progress home (see NO_GAIN) */
+  #noGain: Uint8Array;
   /** which hand it keeps on tunnel walls when it walks a tunnel (+1 right, −1 left), chosen afresh each trip out */
   hand: Int8Array;
   /** seconds left of keeping a hand on a chamber's wall, after touching soil; 0 = wandering freely */
@@ -258,6 +263,9 @@ export class Colony {
     this.#cellAtX = new Float32Array(n).fill(NaN);
     this.#cellAtY = new Float32Array(n).fill(NaN);
     this.#noTunnel = new Int32Array(n).fill(-1);
+    this.#noGain = new Uint8Array(n);
+    this.loopX = new Int32Array(n).fill(NO_CELL);
+    this.loopY = new Int32Array(n);
     this.hugT = new Float32Array(n);
     this.alive = new Uint8Array(n);
     this.gen = new Uint32Array(n);
@@ -748,24 +756,47 @@ export class Colony {
               const oy = centreY(cy);
               const dist = Math.hypot(nest.x - ox, nest.y - oy);
               const open = !this.#touch(ox, oy, Math.atan2(nest.y - oy, nest.x - ox), 1.5);
+              if (this.gx[i] === NO_CELL) {
+                // The first cell of this wall: coming back to it means it has been all the way round.
+                this.loopX[i] = cx;
+                this.loopY[i] = cy;
+              }
+              const looped = t > 2 && this.gx[i] !== NO_CELL && cx === this.loopX[i] && cy === this.loopY[i];
               cellOf(this.mx[i] as number, this.my[i] as number);
-              const leave =
-                this.gx[i] !== NO_CELL &&
-                ((dist < (this.hitDist[i] as number) - 1 && this.#onMLine(i, ox, oy, SIDE) && open) ||
-                  // round an island and back where it met it, with the way home open (it met the island turning, not heading home)
-                  (t > 2 && cx === CELL[0] && cy === CELL[1] && open) ||
-                  // in dug ground: the way home open two cells on, and no farther than where it met this wall, or
-                  // after 3 s of following whatever the distance (a hand on the wall in a dug-out cavern drifts
-                  // from speck to speck, farther from home than where it started; a speck needn't be walked round)
-                  ((t > 3 || (t > 1 && dist <= (this.hitDist[i] as number))) && open && !this.#touch(ox, oy, Math.atan2(nest.y - oy, nest.x - ox), 2)) ||
-                  (dist < NEST_SIGHT && this.#clearTo(ox, oy, nest.x, nest.y)));
-              if (leave || (tunnel(map, cx, cy) && this.#homeScentNear(cx, cy))) {
+              const hit = this.hitDist[i] as number;
+              const open2 = open && !this.#touch(ox, oy, Math.atan2(nest.y - oy, nest.x - ox), 2);
+              // Back on its line home, nearer than the nearest it has been on this trip, with the way open.
+              const onLine = dist < hit - 1 && this.#onMLine(i, ox, oy, SIDE) && open;
+              // Round an island and back where it met it, with the way home open (it met it turning, not heading home).
+              const island = t > 2 && cx === CELL[0] && cy === CELL[1] && open;
+              // In dug ground, the way home open two cells on and some way nearer than its best this trip.
+              const nearer = t > 1 && dist < hit - 0.5 && open2;
+              // Or, a few times a trip, after 3 s of following wherever the way home is open: a hand on the wall
+              // in a dug-out cavern drifts from speck to speck farther from home, and a speck needn't be walked
+              // round. Only a few: a release that makes no progress could leave and meet the same wall for ever.
+              const anywhere = t > 3 && (this.#noGain[i] as number) < NO_GAIN && open2;
+              const sight = dist < NEST_SIGHT && this.#clearTo(ox, oy, nest.x, nest.y);
+              const leave = this.gx[i] !== NO_CELL && (onLine || island || nearer || anywhere || sight);
+              // Into a tunnel with home scent: the scent leads from here (counted like a release: it may lead
+              // back to this same wall, so after a few that gain nothing, only progress lets it go).
+              const scent = !leave && (dist < hit - 0.5 || (this.#noGain[i] as number) < NO_GAIN) && tunnel(map, cx, cy) && this.#homeScentNear(cx, cy);
+              if (looped && !leave && !scent && this.byCell[i]) {
+                // All the way round this wall (a speck of soil) and nowhere on it nearer home: it can't be the
+                // way. Give up on it now (wander a while, then try afresh) rather than after FOLLOW_GIVE_UP.
+                this.#giveUp(i);
+              } else if (leave || scent) {
+                // Progress is kept for the whole trip: the next wall it meets is judged against the nearest it has been.
+                if (dist < hit - 0.5) this.#noGain[i] = 0;
+                else if (!onLine && !island && !nearer && !sight) this.#noGain[i] = (this.#noGain[i] as number) + 1;
+                this.hitDist[i] = Math.min(hit, dist);
+              }
+              if (leave || scent) {
                 // Back on its line home, nearer than where it met this wall, and the way is open; or the nest
                 // itself is in plain view; or into a tunnel with home scent to lead it (see #walkTunnel).
                 // A tunnel with none (a stub off a chamber) it keeps following the wall through.
                 this.wall[i] = 0;
                 h = turnToward(h, toNest, p.turnRate * dt * 0.8);
-              } else {
+              } else if (this.wall[i] !== 0) {
                 const d = handOnWall(map, cx, cy, this.gdir[i] as number, this.wall[i] as number);
                 this.gdir[i] = d;
                 this.gx[i] = stepX(cx, cy, d);
@@ -855,7 +886,9 @@ export class Colony {
             const toNest = Math.atan2(nest.y - y, nest.x - x);
             cellOf(nx, ny);
             const soilWall = rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL;
-            if (Number.isNaN(this.mx[i] as number) || soilWall) {
+            const newTrip = Number.isNaN(this.mx[i] as number);
+            if (newTrip) this.#noGain[i] = 0;
+            if (newTrip || soilWall) {
               // The first rock this trip: remember where, so the line from here to the nest is the way home it
               // keeps returning to. Soil walls re-anchor it at every wall: in dug ground the ant meets speck
               // after speck, and heading home from wherever it left the last one it is rarely back on the
@@ -864,7 +897,10 @@ export class Colony {
               this.my[i] = y;
             }
             this.wall[i] = wallSide(this.#touch(x, y, toNest - WALL_PROBE, 1.2), this.#touch(x, y, toNest + WALL_PROBE, 1.2), rng);
-            this.hitDist[i] = Math.hypot(nest.x - x, nest.y - y);
+            // Round soil, the distance to beat is the nearest it has been this trip (re-anchoring the line at
+            // every wall must not forget progress, or it could leave a wall and meet it again for ever).
+            const d = Math.hypot(nest.x - x, nest.y - y);
+            this.hitDist[i] = soilWall && !newTrip ? Math.min(this.hitDist[i] as number, d) : d;
             this.followT[i] = 0;
             // Facing the wall it met, turned away from the side it keeps the wall on; the first cell decides the way on.
             this.gdir[i] = (crossedDir(map, x, y, nx, ny) - (this.wall[i] as number) + 6) % 6;
@@ -964,6 +1000,8 @@ export const FOLLOW_GIVE_UP = 120;
 export const FOLLOW_FLIP = 45;
 /** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
 const M_LINE_WIDTH = 0.6;
+/** Releases from a soil wall a trip may make without getting any nearer home, before only progress counts. */
+const NO_GAIN = 3;
 /** A wall-follower this near the nest, with a clear way to it, sees (or smells) it and leaves the wall. */
 const NEST_SIGHT = 8;
 /** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */

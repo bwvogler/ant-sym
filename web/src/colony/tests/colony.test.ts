@@ -488,3 +488,36 @@ test("homing across a dug-out cavern dotted with soil specks: every carrier gets
   // trip's first wall, and a hand on the wall drifts from speck to speck farther from home).
   assert.equal(late, 0, `${late} of 10 carriers took over 15 s to cross the cavern`);
 });
+
+test("homing out of a closed cavern whose way out is far round the wall: no leave-and-bump livelock (review of MR 9)", () => {
+  // A 20 × 12 cavern in soil under the surface, the nest above its left part, the way out at its
+  // bottom-right corner (down, right, then up a long tunnel). Releasing from a wall wherever the way
+  // home is open, with no memory of progress, had carriers leave a side wall, walk into the ceiling
+  // and start again for ever (12 of 12 stuck for 300 s).
+  const CW = 20;
+  const CH = 12;
+  const w = CW + 16;
+  const h = CH + 18;
+  const g: string[][] = Array.from({ length: h }, () => Array(w).fill("s"));
+  for (let y = 0; y < 3; y++) for (let x = 0; x < w; x++) g[y]![x] = ".";
+  const x0 = 4;
+  const y0 = 8;
+  for (let y = y0; y < y0 + CH; y++) for (let x = x0; x < x0 + CW; x++) g[y]![x] = ".";
+  const ex = x0 + CW - 1;
+  const by = y0 + CH;
+  for (let y = by; y < by + 3; y++) g[y]![ex] = ".";
+  for (let x = ex; x <= w - 4; x++) g[by + 2]![x] = ".";
+  for (let y = 2; y <= by + 2; y++) g[y]![w - 4] = ".";
+  g[1]![x0 + 4] = "N";
+  const map = hexMap(g.map((r) => r.join("")), { r: 1.2 });
+  for (let seed = 1; seed <= 8; seed++) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+    put(c, 0, x0 + 2 + (seed % (CW - 4)), y0 + 2 + ((seed * 5) % (CH - 4)));
+    c.heading[0] = -Math.PI / 2;
+    c.mode[0] = 2;
+    c.pellet[0] = 1;
+    let t = 0;
+    for (; t < 30 * 90 && c.pellet[0] === 1; t++) c.tick(1 / 30);
+    assert.equal(c.pellet[0], 0, `seed ${seed}: out of the cavern and home within 90 s`);
+  }
+});
