@@ -2,6 +2,7 @@ import { type KeyboardEvent, type PointerEvent, useEffect, useRef } from "react"
 import { CHUNK } from "../colony/chunks.ts";
 import type { Colony } from "../colony/colony.ts";
 import { INFECTED, type Fungus } from "../colony/fungus.ts";
+import { BINS, binOf } from "../colony/recognition.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 
@@ -38,6 +39,12 @@ function cssVar(name: string): string {
 function rgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : [128, 128, 128];
+}
+
+/** The colour of an odour: the player's colony's ink at 0, the rival's warn tone at 1, mixed between. */
+function odourColour(ink: [number, number, number], warn: [number, number, number], t: number): string {
+  const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * t);
+  return `rgb(${m(0)}, ${m(1)}, ${m(2)})`;
 }
 
 /** The warm tone the picture heatmap uses for "too many": here, the way home. */
@@ -302,34 +309,41 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
           ctx.drawImage(cc.canvas, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
         }
 
-      // Nests and ants in view: the player's in ink, the rival's in the warn tone; a jade crumb at the head of a carrier.
+      // Nests and ants in view, coloured by odour (recognition.ts): the player's colony starts in ink, the rival's in the
+      // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier.
       const len = Math.max(3, Math.min(22, c.zoom * 0.9));
       const half = len / 2;
       const crumb = Math.max(1.5, len * 0.35);
       const inView = (wx: number, wy: number) => wx >= vis.x0 - 2 && wx <= vis.x1 + 2 && wy >= vis.y0 - 2 && wy <= vis.y1 + 2;
-      for (const [col, tone] of [[rival, theme.warn], [colony, theme.ink]] as const) {
+      for (const col of [rival, colony]) {
         if (!col) continue;
         const [nx, ny] = toScreen(c, v, col.nest.x, col.nest.y);
         ctx.beginPath();
         ctx.arc(nx, ny, Math.max(4, col.nest.r * c.zoom), 0, Math.PI * 2);
-        ctx.strokeStyle = tone;
+        ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
         ctx.lineWidth = 2;
         ctx.globalAlpha = 0.7;
         ctx.stroke();
         ctx.lineCap = "round";
-        ctx.beginPath();
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || !inView(col.x[i] as number, col.y[i] as number)) continue;
-          const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
-          const hc = Math.cos(col.heading[i] as number) * half;
-          const hs = Math.sin(col.heading[i] as number) * half;
-          ctx.moveTo(x - hc, y - hs);
-          ctx.lineTo(x + hc, y + hs);
-        }
-        ctx.strokeStyle = tone;
         ctx.lineWidth = Math.max(1, len * 0.3);
         ctx.globalAlpha = 0.85;
-        ctx.stroke();
+        // One stroke per odour band (most frames: one band per colony).
+        let bands = 0;
+        for (let i = 0; i < col.n; i++) if (col.alive[i]) bands |= 1 << binOf(col.odour[i] as number);
+        for (let b = 0; b < BINS; b++) {
+          if (!(bands & (1 << b))) continue;
+          ctx.beginPath();
+          for (let i = 0; i < col.n; i++) {
+            if (!col.alive[i] || binOf(col.odour[i] as number) !== b || !inView(col.x[i] as number, col.y[i] as number)) continue;
+            const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
+            const hc = Math.cos(col.heading[i] as number) * half;
+            const hs = Math.sin(col.heading[i] as number) * half;
+            ctx.moveTo(x - hc, y - hs);
+            ctx.lineTo(x + hc, y + hs);
+          }
+          ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, b / (BINS - 1));
+          ctx.stroke();
+        }
         ctx.globalAlpha = 1;
         // Infected ants: a spore-coloured dot on the body, fainter for a light load.
         const dot = Math.max(1.5, len * 0.45);

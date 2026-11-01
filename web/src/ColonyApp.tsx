@@ -1,4 +1,5 @@
 import { SITUATIONS } from "./colony/colony.ts";
+import { DEFAULT_RECOGNITION } from "./colony/recognition.ts";
 import { DOCTRINES } from "./colony/colonyBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useMemo, useState } from "react";
@@ -100,8 +101,8 @@ export default function ColonyApp() {
               </dl>
             )}
             {stats && stats.outcome !== "playing" && (
-              <p className={`mt-3 rounded-md px-3 py-1.5 text-sm ${stats.outcome === "won" ? "bg-accent-soft text-accent" : "bg-err-soft text-err"}`}>
-                {stats.outcome === "won" ? "The rival colony is gone. Your ants hold the map." : "Your colony is gone: no ants left and no food to raise more. Restart or try a new world."}
+              <p className={`mt-3 rounded-md px-3 py-1.5 text-sm ${stats.outcome === "lost" ? "bg-err-soft text-err" : "bg-accent-soft text-accent"}`}>
+                {OUTCOME[stats.outcome]}
               </p>
             )}
           </section>
@@ -227,6 +228,19 @@ export default function ColonyApp() {
                 <dd className="col-span-2 text-right text-fg-2">{stats.sporeCells.toLocaleString()} cells</dd>
               </dl>
             )}
+            {stats?.rival && (
+              <div className="mt-3" aria-label="unity">
+                <div className="flex items-baseline justify-between">
+                  <span>Unity</span>
+                  <span className="font-mono text-sm tabular-nums text-fg">{Math.round(100 * stats.unity.score)}%</span>
+                </div>
+                <Bar value={stats.unity.score} />
+                <p className="mt-1 font-mono text-xs text-fg-3">
+                  nests {stats.unity.gap.toFixed(2)} apart in odour · {stats.unity.deathsPerMinute.toFixed(0)} fight deaths/min · quiet {Math.min(999, Math.floor(stats.unity.quiet))} s · {Math.round(100 * stats.unity.mixing)}% mixed
+                </p>
+                <p className="mt-1 text-xs text-fg-3">One colony when the nests smell alike (within {TOLERANCE}) and nobody has died fighting for a minute. Ants are coloured by odour.</p>
+              </div>
+            )}
 
             <div className="mt-4 flex items-center justify-between">
               <span>Doctrine</span>
@@ -281,6 +295,14 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
     </>
   );
 }
+
+const OUTCOME = {
+  won: "The rival colony is gone. Your ants hold the map.",
+  lost: "Your colony is gone: no ants left and no food to raise more. Restart or try a new world.",
+  unified: "One colony: the two nests smell alike and nobody has died fighting for a minute. The fungus has unified them.",
+} as const;
+
+const TOLERANCE = DEFAULT_RECOGNITION.tolerance;
 
 const BRUSH_TITLES: Record<Brush, string> = {
   none: "Stop painting",

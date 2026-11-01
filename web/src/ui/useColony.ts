@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
 import { STRAINS, type Fungus } from "../colony/fungus.ts";
-import { Game, type Outcome } from "../colony/game.ts";
+import { Game, type Outcome, type Unity } from "../colony/game.ts";
 import { generateWorld, mulberry32 } from "../colony/world.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
@@ -66,6 +66,8 @@ export interface ColonyStats {
   outcome: Outcome;
   /** cells of ground holding spores */
   sporeCells: number;
+  /** how far the fungus has come toward one colony */
+  unity: Unity;
 }
 
 function side(c: Colony, fungus: Fungus): SideStats {
@@ -123,6 +125,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           rival: game.rival ? side(game.rival, game.fungus) : null,
           outcome: game.outcome(),
           sporeCells: game.fungus.sporeCells,
+          unity: game.unity(),
         });
         lastStats = t;
       }

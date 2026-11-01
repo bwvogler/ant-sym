@@ -40,10 +40,16 @@ export interface Levers {
   foreignFood: number;
   /** the host's sense of time out: tired after patience × this (A10) */
   clock: number;
+  /** the calming cue the host gives off, 0..1: lowers the aggression it receives and gives (B1, Rickia's n-C23) */
+  calm: number;
+  /** added to the host's tolerance: it perceives fewer ants as strangers (B4) */
+  tolerance: number;
+  /** the fungal share of the host's odour, 0..MAX_MASK: the fungus's own odour, between the colonies' (B3/B7) */
+  mask: number;
 }
 
 /** The world as it is. */
-export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1 };
+export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0 };
 
 /** One thing the fungus can run in a host: a bundle of levers (docs/fungus-policy.md §5.2). */
 export interface Intervention {
@@ -61,9 +67,10 @@ export interface Intervention {
  */
 export const INTERVENTIONS: readonly Intervention[] = [
   { id: "dormant", name: "dormant", blurb: "does nothing to its host", levers: AS_IS },
-  { id: "soothe", name: "soothe", blurb: "its host barely smells alarm", levers: { ...AS_IS, alarm: 0.25 } },
+  { id: "soothe", name: "soothe", blurb: "its host gives off a calming cue, tolerates strangers and barely smells alarm", levers: { ...AS_IS, alarm: 0.25, calm: 0.8, tolerance: 0.3 } },
   { id: "share", name: "share", blurb: "its host smells the rival's food trail as its own, and food scent strongly", levers: { ...AS_IS, food: 1.5, foreignFood: 1 } },
   { id: "roam", name: "roam", blurb: "its host barely smells home and feels its time out slowly, so it ranges far", levers: { ...AS_IS, home: 0.35, clock: 2.5 } },
+  { id: "blend", name: "blend", blurb: "its host carries the fungus's own odour, between the colonies', and tolerates the odours in between", levers: { ...AS_IS, mask: 0.6, tolerance: 0.15 } },
 ];
 
 /** The index of an intervention by id. */
@@ -90,13 +97,15 @@ export interface Strain {
 }
 
 /**
- * Two strains to start, from the two ends of the stealth-against-potency dial (§6):
- * Lockpick after *Rickia wasmannii* (non-lethal, colony-wide, barely groomed),
- * Bloom after *Metarhizium* (spreads fast, visible, groomed off, immunises the groomers).
+ * Strains from the two ends of the stealth-against-potency dial (§6), and one between:
+ * Lockpick after *Rickia wasmannii* (non-lethal, colony-wide, barely groomed; calms),
+ * Bloom after *Metarhizium* (spreads fast, visible, groomed off, immunises the groomers),
+ * Garden after the leafcutter's cultivar, whose odour becomes the colony's (blends odours).
  */
 export const STRAINS: readonly Strain[] = [
   { id: "lockpick", name: "Lockpick", blurb: "spreads slowly, hides, never clears on its own; its hosts barely smell alarm", transmission: 0.15, decay: 0, visibility: 0.1, expresses: "soothe" },
   { id: "bloom", name: "Bloom", blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant; its hosts smell the rival's food trail as their own", transmission: 0.6, decay: 0.01, visibility: 0.8, expresses: "share" },
+  { id: "garden", name: "Garden", blurb: "spreads steadily and half-shows; its hosts carry its own odour, so colonies that grow it come to smell alike", transmission: 0.3, decay: 0, visibility: 0.3, expresses: "blend" },
 ];
 
 export interface FungusParams {
@@ -480,7 +489,7 @@ export class Fungus {
   express(c: Colony, i: number, e: number, l: number): void {
     c.expr[i] = e;
     if (e === 0 || l <= 0) {
-      c.perceiveAsIs(i);
+      c.asIs(i);
       return;
     }
     const v = (INTERVENTIONS[e] as Intervention).levers;
@@ -489,6 +498,9 @@ export class Fungus {
     c.gainAlarm[i] = 1 + (v.alarm - 1) * l;
     c.foreignFood[i] = v.foreignFood * l;
     c.clock[i] = 1 + (v.clock - 1) * l;
+    c.calm[i] = v.calm * l;
+    c.tolerance[i] = c.params.tolerance + v.tolerance * l;
+    c.mask[i] = v.mask * l;
   }
 
   /** How far the fungus is into colony c, and how far c has answered it. */

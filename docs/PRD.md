@@ -534,3 +534,56 @@ Bead `ja-t4d.2`; design in `docs/fungus-policy.md` §2. The fungus never decides
 - Every ant loaded: 4.57 ms mean (4.27 before), the difference being reads of the rival's field.
 
 **Jev:** the request state and the situation are unchanged, so tokens per ant are unchanged. Bent perception could make a colony meet situations it otherwise rarely would; measured, it doesn't add any: 99–209 situations met per colony in the runs above, against 109–209 without spores. Lockpick on seed 1 met fewer (103), because soothed ants rarely perceive alarm.
+
+## 16. Recognition: strangers by odour, and one colony at the end (fungus 1c, 2026-11-01)
+
+Bead `ja-t4d.3`; design in `docs/fungus-policy.md` §4.B. Who is an enemy is no longer "an ant of another colony" but **an ant whose odour differs from mine by more than a tolerance**. Colony odour is a blend of cuticular hydrocarbons, and where it stops differing, aggression stops (Argentine-ant supercolonies). This gives the game its goal: **unify the colonies**.
+
+- **Odour** (`recognition.ts`). Every ant carries an odour in 0..1 (the colonies start at 0 and 1). An ant smells of its nest: the nest's odour (the gestalt) drifts toward the mean odour of the ants at it, and newborns take it.
+- **Strangers by odour band.** Ants are binned into 10 odour bands (one chunked float grid each, replacing the per-colony enemy grids). `look(odour, tolerance)` picks the bands that are strangers. Every query skips empty bands, and consecutive ants reuse the mask, so a game with two pure colonies reads one band. Strangerhood is judged by band centre (within 0.05).
+- **Fights** (`battle.ts`): the strangers around an ant, judged at the healthy tolerance τ₀ = 0.35.
+  - A **calming cue** counts on both sides: a calm neighbour is (1 − calm) of an enemy, and a calm ant takes (1 − calm) of the hazard. This is *Rickia*'s n‑C23, which lowers the aggression a host receives and gives.
+  - A calmed encounter (under half an enemy) raises no alarm.
+  - Allies are still the ant's own colony around it.
+- **Perceived strangers** (`#enemyHeading`, the situation's `enemy`, and the charge) use the ant's own odour and **its own tolerance**, which the fungus can widen (B4). A calm ant does not charge.
+- **The strategist**: strangers near the nest are judged against the nest's odour. A colony whose nest smells like ours is no rival, so the strategist forages instead of raiding kin. Found in the browser: after unification, raiders swarmed the other nest with nobody there to fight.
+- **New levers and interventions** (`fungus.ts`):
+  - *soothe* adds calm 0.8 and tolerance +0.3.
+  - *blend* gives a host a **fungal share** of up to `MAX_MASK` = 0.6 of the fungus's own odour (0.5, between the colonies'), plus tolerance +0.15.
+  - A third strain, **Garden**, runs *blend*. It is after the leafcutter's cultivar, whose odour becomes the colony's (*Acromyrmex*).
+  - A host's odour is its nest's, that share of the way to 0.5, so it is never more than 0.3 from its nest's: **a host is never a stranger to its own colony** (tested).
+- **Unity** (`Game.unity`):
+  - the nests' odour gap;
+  - fight deaths per minute (a 60 s fading count);
+  - seconds since the last fight death;
+  - mixing (the share of ants within tolerance of the other nest's odour);
+  - a score: how far the nests have come together × how long it has been quiet.
+- **Unified** is a new outcome, beside won and lost: the nests are within τ₀ and nobody has died fighting for 60 s.
+- **The page**:
+  - a unity meter in the Fungus panel;
+  - the unified banner;
+  - **ants coloured by odour**: ink for the player's colony, the warn tone for the rival's, mixed between. As the fungus works, both colonies visibly meet in the middle colour.
+  - The follow card gives the ant's odour, its nest's, and the calm, tolerance and fungal share the fungus gives it.
+
+**What was tried first and dropped.** Contact blending: a host relaxing toward the odour of the ants it touches, with a gestalt pull at the nest. Measured over 10 sim-minutes, it moved the nests' odours by less than 0.04. Contacts with strangers are brief fights, and the gestalt undoes them at home. Instrumenting the run also showed that the war is driven by the strategist's raids, which calm alone cannot stop. What unifies colonies is a **shared fungus with an odour of its own** carried home, which is the leafcutter's case.
+
+**No fungus, no change.** With every ant at its colony's odour and nobody calm, the strangers around an ant are exactly the other colony's ants. A test runs six fights both ways (by colony, by odour) and gets the same deaths, ant for ant. The bench gets the same food stored as before 1c on both maps.
+
+**Measured** (seeds 1–3, 300 + 300 ants, Garden painted on both nests at the start, 6 sim-minutes; one run each):
+
+| Seed | | Unified at | Lost (you / rival) | Food home | Ant situations met |
+|---|---|---|---|---|---|
+| 1 | no fungus | — | 317 / 303 | 2,263 / 1,804 | 296 |
+| 1 | Garden | 178 s | 11 / 21 | 2,135 / 2,163 | 163 |
+| 2 | no fungus | — | 379 / 361 | 1,890 / 1,131 | 275 |
+| 2 | Garden | 185 s | 31 / 40 | 1,868 / 1,310 | 178 |
+| 3 | no fungus | — | 237 / 231 | 1,739 / 493 | 319 |
+| 3 | Garden | 150 s | 8 / 11 | 2,315 / 1,076 | 122 |
+
+- Garden in **one** colony moves that colony's nest halfway (to 0.5) and no further, so the colonies stay apart (tested on seed 2). On a small map (160×100, seed 1) Garden crossed into the rival by contact on its own, and the colonies unified anyway.
+- Lockpick (soothe) alone calms but never unifies, because it does not touch odour.
+- Checked in the browser (light and dark): Garden swept over the map at 4× speed reaches **unified** in about 45 s of real time; both stances return to forage, with 0 fighting and food coming home. No console errors.
+
+**Cost per tick** (`npm run colony-bench`, 1,200 + 1,200 ants, 60 sim-s, 512×320): no spores 3.79 ms mean (3.56 before 1c), with the same food stored; every ant loaded 4.38 ms.
+
+**Jev:** the situation and the request are unchanged, so tokens per ant are unchanged. Peace also makes Jev **cheaper**: a unifying game meets fewer situations (122–178 against 275–319), because war situations stop arising.

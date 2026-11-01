@@ -240,7 +240,7 @@ test("a game with no spores runs as before: the fungus stays idle and draws no r
 
 test("in a real game, the dial shows: Lockpick holds its load unseen, Bloom is groomed down and leaves the colony resistant", () => {
   const after = (strain: number) => {
-    const g = new Game(generateWorld(1), { antCount: 300, rivalAnts: 300 }, mulberry32(5));
+    const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 300, rivalAnts: 300 }, mulberry32(5));
     const nest = g.player.nest;
     g.paintSpores(nest.x, nest.y, nest.r + 2, 3, 0.3, strain);
     assert.ok(g.fungus.census(g.player).infected > 0);

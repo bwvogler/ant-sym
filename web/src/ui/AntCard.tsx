@@ -84,7 +84,7 @@ function Fungal({ col, i }: { col: Colony; i: number }) {
       <span className="text-spore">
         {strain?.name ?? "fungus"} {Math.round(100 * load)}%
       </span>
-      {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · runs <span className="font-mono">{run?.name ?? "?"}</span>
+      {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {(col.odour[i] as number).toFixed(2)} (its nest {col.nestOdour.toFixed(2)}) · runs <span className="font-mono">{run?.name ?? "?"}</span>
       {bent.length ? <span className="text-fg-3"> — it perceives {bent.join(", ")}. The situation above is what it perceives; its own policy chose.</span> : <span className="text-fg-3"> — its senses are as they are.</span>}
     </p>
   );
@@ -103,6 +103,12 @@ function perceives(col: Colony, i: number): string[] {
   if (foreign >= 0.05) out.push(`the rival's food trail as its own ×${foreign.toFixed(2)}`);
   const clock = col.clock[i] as number;
   if (Math.abs(clock - 1) >= 0.05) out.push(`its time out ×${(1 / clock).toFixed(2)}`);
+  const wider = (col.tolerance[i] as number) - col.params.tolerance;
+  if (wider >= 0.02) out.push(`strangers only past ${(col.tolerance[i] as number).toFixed(2)} of odour (not ${col.params.tolerance.toFixed(2)})`);
+  const calm = col.calm[i] as number;
+  if (calm >= 0.05) out.push(`and gives off a calming cue (${calm.toFixed(2)})`);
+  const mask = col.mask[i] as number;
+  if (mask >= 0.02) out.push(`and carries ${Math.round(100 * mask)}% of the fungus's own odour`);
   return out;
 }
 
