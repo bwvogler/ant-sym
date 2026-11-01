@@ -115,7 +115,9 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       }
       const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy));
       // A calmed encounter (under half an enemy) does not raise the alarm; with no fungus every enemy is whole.
-      if (enemies >= 0.5) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt);
+      // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
+      const loud = 1 - (c.quiet[i] as number);
+      if (enemies >= 0.5 && loud > 0) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
     }
   });

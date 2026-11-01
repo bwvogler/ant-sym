@@ -587,3 +587,44 @@ Bead `ja-t4d.3`; design in `docs/fungus-policy.md` §4.B. Who is an enemy is no 
 **Cost per tick** (`npm run colony-bench`, 1,200 + 1,200 ants, 60 sim-s, 512×320): no spores 3.79 ms mean (3.56 before 1c), with the same food stored; every ant loaded 4.38 ms.
 
 **Jev:** the situation and the request are unchanged, so tokens per ant are unchanged. Peace also makes Jev **cheaper**: a unifying game meets fewer situations (122–178 against 275–319), because war situations stop arising.
+
+## 17. Emission: what a host gives off (fungus 1d, 2026-11-01)
+
+Bead `ja-t4d.4`; design in `docs/fungus-policy.md` §4.C. The fungus changes what a host lays. The host's choices stay its own.
+
+- **Deposit gain (C1):** trail laid × `Colony.layGain`, home and food alike.
+- **Cross-laying (C2):** a carrier also lays `crossLay` of its food trail into the *other* colony's food field. It leaks where food is, and the rival's ants follow it like their own trail.
+- **Silent fights (C3):** in a fight, a host lays (1 − `quiet`) of the alarm, so a skirmish need not recruit the colony.
+- **In the menu** (§5.2):
+  - *soothe* gains quiet 0.9;
+  - *share* gains trail ×1.5 and a full leak of its food trail to the rival.
+  - Each is lerped by load, like every lever.
+- **As-is is exact:** a gain of 1 and no leak, so with no fungus the bench stores the same food as before (1,561 / 1,591 at 512×320) and the tick is unchanged (3.61 ms mean).
+- **The follow card** names these too, e.g. "lays its trail ×1.50, leaks 100% of its food trail to the rival".
+
+**Tests** (`emission.test.ts`, 5):
+- a gain of 0 lays nothing and 2 lays exactly twice;
+- a leaking carrier gives the rival as much food trail as its own, along its path;
+- in a fixed skirmish with idle defending nestmates, a loud host lays alarm and recruits defenders, while a silent one lays none and recruits nobody;
+- the fungus writes the levers and a cleared host is as it was;
+- every lever stays in range.
+
+**What it does to a game.** Before and after 1d, same seeds and same start (each strain painted on both nests, 300 + 300 ants, 6 sim-minutes):
+
+| Strain | Seed | Lost before → after | Food home before → after | Situations met before → after |
+|---|---|---|---|---|
+| Lockpick (soothe) | 1 | 273/196 → **128/114** | 1,797/1,688 → 1,550/1,572 | 238 → 175 |
+| | 2 | 315/215 → 350/281 | 1,896/1,297 → 1,949/1,311 | 256 → 320 |
+| | 3 | 205/260 → 231/235 | 1,482/643 → 1,558/617 | 141 → 258 |
+| Bloom (share) | 1 | 325/273 → 315/260 | 2,043/1,875 → 2,079/1,863 | 294 → 416 |
+| | 2 | 414/373 → 398/312 | 1,814/1,145 → 2,025/1,207 | 287 → 281 |
+| | 3 | 252/272 → 255/292 | 1,773/455 → 1,664/416 | 331 → 319 |
+| Garden (blend) | 1–3 | unchanged (blend has no emission lever) | | |
+
+The levers work as built, but none decides a war on its own:
+- Quiet fights halved the deaths on seed 1 and did little on the others. A colony that is not recruited also does not defend.
+- Leaking food trails moves food and contact around without settling who wins.
+
+They are tools for the fungus policy (`ja-t4d.5`) to use where they help, not traits to run in every host of a strain. Garden's shared odour (§16) is still what unifies.
+
+**Jev:** the request state and the situation are unchanged, so tokens per ant are unchanged. Quieter and leakier fronts make some games meet more situations (up to 141 → 258). At ~451 tokens per question that is ≈ 50k tokens, ≈ $0.002 per doctrine.

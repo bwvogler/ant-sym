@@ -109,6 +109,12 @@ function perceives(col: Colony, i: number): string[] {
   if (calm >= 0.05) out.push(`and gives off a calming cue (${calm.toFixed(2)})`);
   const mask = col.mask[i] as number;
   if (mask >= 0.02) out.push(`and carries ${Math.round(100 * mask)}% of the fungus's own odour`);
+  const lay = col.layGain[i] as number;
+  if (Math.abs(lay - 1) >= 0.05) out.push(`and lays its trail ×${lay.toFixed(2)}`);
+  const leak = col.crossLay[i] as number;
+  if (leak >= 0.05) out.push(`and leaks ${Math.round(100 * leak)}% of its food trail to the rival`);
+  const quiet = col.quiet[i] as number;
+  if (quiet >= 0.05) out.push(`and fights raising ${Math.round(100 * (1 - quiet))}% of the alarm`);
   return out;
 }
 
