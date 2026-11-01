@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, localPolicy, localStance, type Situation, type StanceSituation } from "../colony.ts";
 import { Game } from "../game.ts";
-import { foodAt, generateWorld, mulberry32, reachable, worldFromArrays, type WorldMap } from "../world.ts";
+import { foodAt, generateWorld, mulberry32, OPEN_WORLD, reachable, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field with two nests, no food. */
 function arena(): WorldMap {
@@ -26,7 +26,7 @@ const view = (s: Partial<StanceSituation>): StanceSituation => ({ stance: "forag
 
 test("generateWorld: two nests, a walk apart, joined on foot, with food away from both", () => {
   for (let seed = 1; seed <= 15; seed++) {
-    const m = generateWorld(seed);
+    const m = generateWorld(seed, OPEN_WORLD);
     assert.equal(m.nests.length, 2);
     assert.equal(m.nest, m.nests[0]);
     const [a, b] = m.nests as [WorldMap["nest"], WorldMap["nest"]];
@@ -129,7 +129,7 @@ test("a fighting ant goes for the enemy it can see", () => {
 });
 
 test("the game: both colonies forage and grow, they meet and fight, stances are chosen, and food is never made or lost", () => {
-  const map = generateWorld(1);
+  const map = generateWorld(1, OPEN_WORLD);
   const g = new Game(map, { antCount: 300, rivalAnts: 300 }, mulberry32(11));
   for (let k = 0; k < 30 * 150; k++) g.tick(1 / 30);
   const [you, rival] = g.colonies as [Colony, Colony];
@@ -144,7 +144,7 @@ test("the game: both colonies forage and grow, they meet and fight, stances are 
 });
 
 test("the outcome: a colony with no ants and too little food for one more is beaten", () => {
-  const g = new Game(generateWorld(2), { antCount: 10, rivalAnts: 10 }, mulberry32(5));
+  const g = new Game(generateWorld(2, OPEN_WORLD), { antCount: 10, rivalAnts: 10 }, mulberry32(5));
   for (let i = 0; i < g.rival!.n; i++) g.rival!.kill(i);
   assert.equal(g.outcome(), "won");
   g.rival!.larder = 4;
@@ -154,7 +154,7 @@ test("the outcome: a colony with no ants and too little food for one more is bea
 });
 
 test("solo (no rival), the colony keeps foraging: no stance to choose, nobody turned into a fighter", () => {
-  const map = generateWorld(1);
+  const map = generateWorld(1, OPEN_WORLD);
   const g = new Game(map, { antCount: 600, rival: false }, mulberry32(7919));
   for (let k = 0; k < 30 * 200; k++) g.tick(1 / 30);
   assert.equal(g.player.stance, "forage");
