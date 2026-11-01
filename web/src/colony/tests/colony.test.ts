@@ -222,6 +222,24 @@ test("a wall-following ant that touches no rock lets go of the wall and walks ho
   assert.ok(Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < d0 - 5, "and walked toward home");
 });
 
+test("back on a wall it lost touch with, the give-up clock runs on: let-go and re-bump can't loop forever", () => {
+  const { map } = walled();
+  for (const lost of [false, true]) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(2), () => "return");
+    c.x[0] = 29.9;
+    c.y[0] = 10;
+    c.heading[0] = 0; // into the wall
+    c.mode[0] = 2;
+    c.mx[0] = 29.9;
+    c.my[0] = 10;
+    c.followT[0] = 100;
+    c.untouched[0] = lost ? WALL_LOST + 0.1 : 0;
+    c.tick(1 / 30);
+    assert.equal(c.wall[0] !== 0, true, "took up the wall");
+    assert.equal((c.followT[0] as number) >= 100, lost, lost ? "lost it: the clock ran on" : "a new wall: the clock restarts");
+  }
+});
+
 test("giving up on a wall on a blocked step wanders: it doesn't start a new wall at once", () => {
   const { map } = walled();
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(2), () => "return");

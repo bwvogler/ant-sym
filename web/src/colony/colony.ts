@@ -314,6 +314,7 @@ export class Colony {
     this.odour[i] = this.nestOdour;
     this.wall[i] = 0;
     this.mx[i] = NaN;
+    this.untouched[i] = 0;
     this.#asked[i] = -1;
     this.#question[i] = -1;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
@@ -454,6 +455,7 @@ export class Colony {
     this.bumps[i] = 0;
     this.wall[i] = 0;
     this.mx[i] = NaN;
+    this.untouched[i] = 0;
   }
 
   /**
@@ -663,7 +665,8 @@ export class Colony {
             }
             this.wall[i] = wallSide(this.#touch(x, y, toNest - WALL_PROBE, 1.2), this.#touch(x, y, toNest + WALL_PROBE, 1.2), rng);
             this.hitDist[i] = Math.hypot(nest.x - x, nest.y - y);
-            this.followT[i] = 0;
+            // Back on a wall it lost touch with: the clock runs on, or let-go and re-bump would never give up.
+            if (!((this.untouched[i] as number) > WALL_LOST)) this.followT[i] = 0;
             this.untouched[i] = 0;
           }
           h -= (this.wall[i] as number) * (Math.PI / 2); // turn away from the wall, along it
@@ -693,6 +696,7 @@ export class Colony {
       } else if (atNest) {
         this.wall[i] = 0;
         this.mx[i] = NaN;
+        this.untouched[i] = 0;
         if (carrying) {
           this.carrying[i] = 0;
           this.stored++;
