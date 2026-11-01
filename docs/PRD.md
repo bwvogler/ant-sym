@@ -864,3 +864,16 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 
   - Food home roughly doubles: carriers walking soil out search the ground, and drop their pellet as foragers.
   - The open map is unchanged.
+
+## 19. Home is a nest, not a point (design, 2026-11-01)
+
+The owner asked where "home" really is for an ant, whether it is the queen, and whether ants build spaces with jobs. In the side view, home is still one pre-dug chamber that every ant steers to by an exact vector through solid soil.
+
+The research and the design are in [`docs/nest-and-home.md`](nest-and-home.md), not built yet:
+- **Outside,** home is the hole: a step-counting vector that drifts, corrected by landmarks and the entrance's smell, and reset in the shaft.
+- **Inside,** ants go by **gravity**, memory and **chemical road signs** on the floor. Each chamber has its own smell.
+- **The queen's scent** says where she is, not where home is.
+- **Real nests** are shafts and chambers with jobs: royal, brood, store (deep), reception (top) and midden, with workers zoned by age.
+- **Losing the only queen dooms a colony**, without ending it at once: no new workers, then a slow decline. So *orphaned* becomes a state, and *fallen* stays "no workers left".
+
+Slices 0–9 are beads under the epic, starting with merging the fungus milestone (`main`, PR #7) into this stack.
