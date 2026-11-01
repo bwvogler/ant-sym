@@ -62,6 +62,11 @@ export function validateJevRequest(raw: unknown): JevRequest {
     if (!q || typeof q !== "object" || !["noul", "choice", "score", "box"].includes((q as { type: string }).type)) {
       throw new HttpError(400, `question ${name} has no valid type`);
     }
+    // A choice among nothing has no answer: billed every time, never cached, and upstream may fail the whole batch on it.
+    const c = (q as { type: string; criteria?: unknown }).criteria;
+    if ((q as { type: string }).type === "choice" && (!c || typeof c !== "object" || Object.keys(c).length === 0)) {
+      throw new HttpError(400, `question ${name} is a choice with no options`);
+    }
   }
   return {
     model: typeof r.model === "string" && r.model ? r.model : DEFAULT_JEV_MODEL,

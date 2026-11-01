@@ -64,7 +64,12 @@ export interface CellCounts {
   get(x: number, y: number): number;
   /** whether any cell in the rectangle x0..x1 × y0..y1 (inclusive) may hold a count: a cheap early out */
   any(x0: number, y0: number, x1: number, y1: number): boolean;
+  /** count, from now on, what is a stranger to this odour at this tolerance (recognition.ts); absent: everything counts */
+  look?(odour: number, tolerance: number): void;
 }
+
+/** A cell holds an enemy an ant reacts to when its (calm-weighted) strangers reach this. */
+const ENEMY = 0.5;
 
 /**
  * The local rule. An enemy close by: fight it. Tired: go home. Raiding:
@@ -136,9 +141,13 @@ export interface ColonyParams {
   patience: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
+  /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
+  odour: number;
+  /** odours further apart than this are strangers, as a healthy ant perceives it */
+  tolerance: number;
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5 };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, odour: 0, tolerance: 0.35 };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -178,12 +187,58 @@ export class Colony {
   detour: Float32Array;
   /** recent bumps, fading over seconds: each bump in a row doubles the next detour */
   bumps: Float32Array;
+  /** fungal load, 0..1 (fungus.ts): the fungus inside the ant; it never touches the ant's choices directly */
+  load: Float32Array;
+  /** which strain (an index into the fungus's strains) the load is; meaningful only where load > 0 */
+  strain: Uint8Array;
+  /** immune priming from grooming visible nestmates, 0..1: scales down every load the ant takes */
+  resist: Float32Array;
+  /** the intervention the fungus runs in this ant (an index into fungus.ts INTERVENTIONS; 0 = dormant) */
+  expr: Uint8Array;
+  // What the ant perceives (docs/fungus-policy.md §2): gains on the scent that is there, 1 = as it is.
+  // The fungus writes them (fungus.ts); the ant cannot tell. Its situation and its steering both read
+  // the bent sensors, and its own policy still decides. Seen food, the nest and rock are never bent.
+  /** food scent × this */
+  gainFood: Float32Array;
+  /** home scent × this */
+  gainHome: Float32Array;
+  /** alarm × this */
+  gainAlarm: Float32Array;
+  /** the other colony's food trail, × this, smelled as food scent (0 = not at all) */
+  foreignFood: Float32Array;
+  /** the ant's sense of time out: it is tired after patience × this */
+  clock: Float32Array;
+  // Recognition (recognition.ts): who is a stranger is a matter of odour, not of colony.
+  /** the ant's odour, 0..1: a blend of cuticular hydrocarbons; strangers are ants whose odour differs by more than a tolerance */
+  odour: Float32Array;
+  /** how far apart an odour must be for this ant to perceive a stranger (params.tolerance, widened by the fungus) */
+  tolerance: Float32Array;
+  /** the calming cue the ant gives off, 0..1 (the fungus's): it counts as (1 − calm) of an enemy, and charges at (1 − calm) of the pace */
+  calm: Float32Array;
+  /** the fungal share of its odour, 0..MAX_MASK (the fungus's): its odour is its nest's, that share of the way to the fungus's own */
+  mask: Float32Array;
+  // What the ant gives off (docs/fungus-policy.md §4.C); the fungus writes them, 1 / 0 = as it is.
+  /** trail laid × this (C1) */
+  layGain: Float32Array;
+  /** carrying food, it also lays this share of its food trail into the other colony's food field (C2): it leaks where food is */
+  crossLay: Float32Array;
+  /** in a fight it lays (1 − this) of the alarm (C3): a quiet fight recruits fewer defenders */
+  quiet: Float32Array;
+  /** how far (× 0.5) the fungus pushes its odour away from its nest's: past the tolerance, its own colony takes it for a stranger (B6) */
+  estrange: Float32Array;
+  /** the fungal situation (fungalPolicy.ts encodeFungal, without the strain) the fungus last chose for it in; −1 = none */
+  fungal: Int16Array;
   /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
   wall: Int8Array;
   /** straight-line distance home (its own home vector) when it met the wall it is following */
   hitDist: Float32Array;
   /** seconds spent following the current wall */
   followT: Float32Array;
+  /** seconds since a wall-following ant last touched rock (ahead, or on its wall side) */
+  untouched: Float32Array;
+  /** the nearest a homing ant has been to its nest this trip, and seconds since it last got 1 cell nearer */
+  bestD: Float32Array;
+  stallT: Float32Array;
   /** where this homing trip first met rock (NaN until it does): with the nest it fixes the line the ant leaves walls on */
   mx: Float32Array;
   my: Float32Array;
@@ -199,6 +254,10 @@ export class Colony {
   #question: Int16Array;
   /** enemy ants per cell, kept by the game each tick; null when there is no rival */
   enemies: CellCounts | null = null;
+  /** the colony's odour: the nest's gestalt, which ants at the nest relax toward and newborns take */
+  nestOdour: number;
+  /** the other colony's scent, for ants whose perception reads it (set by the game; null with no rival) */
+  foreign: Pheromones | null = null;
   /** where raiders go: the rival's nest */
   raidTarget: Nest | null = null;
   time = 0;
@@ -246,9 +305,31 @@ export class Colony {
     this.since = new Float32Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
+    this.load = new Float32Array(n);
+    this.strain = new Uint8Array(n);
+    this.resist = new Float32Array(n);
+    this.expr = new Uint8Array(n);
+    this.gainFood = new Float32Array(n).fill(1);
+    this.gainHome = new Float32Array(n).fill(1);
+    this.gainAlarm = new Float32Array(n).fill(1);
+    this.foreignFood = new Float32Array(n);
+    this.clock = new Float32Array(n).fill(1);
+    this.nestOdour = this.params.odour;
+    this.odour = new Float32Array(n).fill(this.params.odour);
+    this.tolerance = new Float32Array(n).fill(this.params.tolerance);
+    this.calm = new Float32Array(n);
+    this.mask = new Float32Array(n);
+    this.layGain = new Float32Array(n).fill(1);
+    this.crossLay = new Float32Array(n);
+    this.quiet = new Float32Array(n);
+    this.estrange = new Float32Array(n);
+    this.fungal = new Int16Array(n).fill(-1);
     this.wall = new Int8Array(n);
     this.hitDist = new Float32Array(n);
     this.followT = new Float32Array(n);
+    this.untouched = new Float32Array(n);
+    this.bestD = new Float32Array(n).fill(Infinity);
+    this.stallT = new Float32Array(n);
     this.mx = new Float32Array(n).fill(NaN);
     this.my = new Float32Array(n).fill(NaN);
     this.gdir = new Uint8Array(n);
@@ -277,14 +358,42 @@ export class Colony {
     this.since[i] = 0;
     this.detour[i] = 0;
     this.bumps[i] = 0;
+    // A newborn is clean and unprimed.
+    this.load[i] = 0;
+    this.strain[i] = 0;
+    this.resist[i] = 0;
+    this.expr[i] = 0;
+    this.fungal[i] = -1;
+    this.asIs(i);
+    // A newborn smells of its colony as the colony smells now.
+    this.odour[i] = this.nestOdour;
     this.wall[i] = 0;
     this.mx[i] = NaN;
+    this.untouched[i] = 0;
+    this.bestD[i] = Infinity;
+    this.stallT[i] = 0;
     this.gx[i] = NO_CELL;
     this.byCell[i] = 0;
     this.#asked[i] = -1;
     this.#question[i] = -1;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
     this.alive[i] = 1;
+  }
+
+  /** Ant i as a healthy ant: it perceives the world as it is, gives off no calming cue, and smells of its nest alone (from the next odour step). */
+  asIs(i: number): void {
+    this.gainFood[i] = 1;
+    this.gainHome[i] = 1;
+    this.gainAlarm[i] = 1;
+    this.foreignFood[i] = 0;
+    this.clock[i] = 1;
+    this.tolerance[i] = this.params.tolerance;
+    this.calm[i] = 0;
+    this.mask[i] = 0;
+    this.layGain[i] = 1;
+    this.crossLay[i] = 0;
+    this.quiet[i] = 0;
+    this.estrange[i] = 0;
   }
 
   /** Living ants. */
@@ -389,12 +498,31 @@ export class Colony {
       s[slot] = s[slot + 3] = s[slot + 6] = -1;
       return;
     }
+    // Scent is read through the ant's perception (gains of 1 and no foreign reading: as it is, exactly).
     const f = this.ph.fields;
-    s[slot] = map.food.get(cx, cy) > 0 ? SEEN : f.food.get(cx, cy);
+    if (map.food.get(cx, cy) > 0) s[slot] = SEEN;
+    else {
+      const wf = this.foreignFood[i] as number;
+      s[slot] = f.food.get(cx, cy) * (this.gainFood[i] as number) + (wf > 0 && this.foreign ? wf * this.foreign.fields.food.get(cx, cy) : 0);
+    }
     const ndx = sx - nest.x;
     const ndy = sy - nest.y;
-    s[slot + 3] = ndx * ndx + ndy * ndy < nest.r * nest.r ? SEEN : f.home.get(cx, cy);
-    s[slot + 6] = f.alarm.get(cx, cy);
+    s[slot + 3] = ndx * ndx + ndy * ndy < nest.r * nest.r ? SEEN : f.home.get(cx, cy) * (this.gainHome[i] as number);
+    s[slot + 6] = f.alarm.get(cx, cy) * (this.gainAlarm[i] as number);
+  }
+
+  /**
+   * Ant i starts a trip home (it picked up food, or its policy sent it home): a detour or a wall left
+   * over from foraging would otherwise switch its home vector off, and bumps would keep renewing it.
+   */
+  #homeAfresh(i: number): void {
+    this.detour[i] = 0;
+    this.bumps[i] = 0;
+    this.wall[i] = 0;
+    this.mx[i] = NaN;
+    this.untouched[i] = 0;
+    this.bestD[i] = Infinity;
+    this.stallT[i] = 0;
   }
 
   /**
@@ -447,15 +575,20 @@ export class Colony {
     if (mode === RETURN || mode === FOLLOW) {
       // The way ahead (not back, unless it's a dead end) with the most scent: home scent, laid by
       // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.
+      // Homing with no progress for TUNNEL_STALL seconds (scent can lead round a ring of tunnels for
+      // ever): the way that points most nearly home instead, by its home vector.
       const field = mode === RETURN ? this.ph.fields.home : this.ph.fields.food;
+      const byVector = mode === RETURN && (this.stallT[i] as number) > TUNNEL_STALL;
+      const hx = this.nest.x - (cx + 0.5);
+      const hy = this.nest.y - (cy + 0.5);
       let best = -1;
-      let bestV = 0;
+      let bestV = byVector ? -Infinity : 0;
       for (const turn of [0, 1, -1]) {
         const d = (dir + turn) & 3;
         const tx = cx + (DX[d] as number);
         const ty = cy + (DY[d] as number);
         if (rockAt(map, tx, ty) !== OPEN) continue;
-        const v = field.get(tx, ty);
+        const v = byVector ? (DX[d] as number) * hx + (DY[d] as number) * hy : field.get(tx, ty);
         if (v > bestV) {
           bestV = v;
           best = d;
@@ -544,6 +677,8 @@ export class Colony {
   #enemyHeading(i: number): number | null {
     const g = this.enemies;
     if (!g) return null;
+    // Strangers to this ant, as it perceives them: its own odour, its own tolerance.
+    g.look?.(this.odour[i] as number, this.tolerance[i] as number);
     const { w, h } = this.map.size;
     const cx = Math.floor(this.x[i] as number);
     const cy = Math.floor(this.y[i] as number);
@@ -555,7 +690,7 @@ export class Colony {
       if (y < 0 || y >= h) continue;
       for (let dx = -ENEMY_RANGE; dx <= ENEMY_RANGE; dx++) {
         const x = cx + dx;
-        if (x < 0 || x >= w || !g.get(x, y)) continue;
+        if (x < 0 || x >= w || g.get(x, y) < ENEMY) continue;
         const d = dx * dx + dy * dy;
         if (d < best) {
           best = d;
@@ -610,7 +745,7 @@ export class Colony {
         this.#asked[i] = -1;
         this.#question[i] = -1; // going home is not a choice; the next question comes once the food is down
       } else {
-        const tired = (this.since[i] as number) > p.patience;
+        const tired = (this.since[i] as number) > p.patience * (this.clock[i] as number);
         const food = trailLevel(Math.max(fl, ff, fr));
         const home = trailLevel(Math.max(hl, hf, hr));
         const alarm = trailLevel(Math.max(al, af, ar));
@@ -620,6 +755,7 @@ export class Colony {
         if (before !== this.#asked[i]) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
+          if (mode === RETURN && this.mode[i] !== RETURN) this.#homeAfresh(i);
           this.mode[i] = mode;
           this.#asked[i] = encode(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
@@ -650,6 +786,16 @@ export class Colony {
         const y = this.y[i] as number;
         const toNest = Math.atan2(nest.y - y, nest.x - x);
         const side = this.wall[i] as number;
+        // Progress: no cell nearer home in TUNNEL_STALL seconds (a ring of tunnels its home scent leads round),
+        // and the tunnel walker picks branches by the home vector for a while (see #walkTunnel); then by scent again.
+        const near = Math.hypot(nest.x - x, nest.y - y);
+        if (near < (this.bestD[i] as number) - 1) {
+          this.bestD[i] = near;
+          this.stallT[i] = 0;
+        } else if ((this.stallT[i] = (this.stallT[i] as number) + dt) > TUNNEL_STALL + BY_VECTOR) {
+          this.bestD[i] = near;
+          this.stallT[i] = 0;
+        }
         if (side === 0 && !detouring && this.#walkTunnel(i, RETURN, p.speed * dt)) {
           h = this.#towardTarget(i); // in a tunnel: back the way it came (a wall it is already following, it keeps following)
         } else if (side === 0) {
@@ -681,8 +827,13 @@ export class Colony {
             else {
               // Keep the wall on its side (+1 = right: the ant turns left round it; angles grow clockwise, y down).
               const sd = this.wall[i] as number;
-              if (this.#touch(x, y, h, 1)) h -= sd * p.turnRate * dt * 2; // wall ahead: turn away
+              const ahead = this.#touch(x, y, h, 1);
+              if (ahead) h -= sd * p.turnRate * dt * 2; // wall ahead: turn away
               else if (!this.#touch(x, y, h + sd * 0.9, 1.2)) h += sd * p.turnRate * dt; // the wall fell away: hug round the corner
+              // Touching nothing, ahead or on the wall side (alarm or a thin rock tip threw it off): the hug
+              // would only circle in the open. Let go and walk the home vector; the line home is kept.
+              if (ahead || this.#touch(x, y, h + sd * (Math.PI / 2), 1.2)) this.untouched[i] = 0;
+              else if ((this.untouched[i] = (this.untouched[i] as number) + dt) > WALL_LOST) this.wall[i] = 0;
             }
           } else if (t >= FOLLOW_GIVE_UP) this.#giveUp(i);
           else {
@@ -703,12 +854,19 @@ export class Colony {
                   // round an island and back where it met it, with the way home open (it met the island turning, not heading home)
                   (t > 2 && cx === Math.floor(this.mx[i] as number) && cy === Math.floor(this.my[i] as number) && open) ||
                   (dist < NEST_SIGHT && this.#clearTo(ox, oy, nest.x, nest.y)));
-              if (leave || (tunnel(map, cx, cy) && this.#homeScentNear(cx, cy))) {
+              if (leave) {
                 // Back on its line home, nearer than where it met this wall, and the way is open; or the nest
-                // itself is in plain view; or into a tunnel with home scent to lead it (see #walkTunnel).
-                // A tunnel with none (a stub off a chamber) it keeps following the wall through.
+                // itself is in plain view.
                 this.wall[i] = 0;
                 h = turnToward(h, toNest, p.turnRate * dt * 0.8);
+              } else if (tunnel(map, cx, cy) && this.#homeScentNear(cx, cy)) {
+                // Into a tunnel with home scent to lead it: the tunnel walker takes it on from here (see
+                // #walkTunnel). Not the home vector: from a tunnel it can point into soil, and the blocked
+                // step would start a new wall at once, every tick, with the give-up clock at zero.
+                // A tunnel with no home scent (a stub off a chamber) it keeps following the wall through.
+                this.wall[i] = 0;
+                this.gx[i] = NO_CELL;
+                if (this.#walkTunnel(i, RETURN, p.speed * dt)) h = this.#towardTarget(i);
               } else {
                 const d = handOnWall(map, cx, cy, this.gdir[i] as number, this.wall[i] as number);
                 this.gdir[i] = d;
@@ -723,7 +881,8 @@ export class Colony {
         if (!digging && this.#walkTunnel(i, FOLLOW, p.speed * dt)) h = this.#towardTarget(i);
         else h += climb(fl, ff, fr, p.turnRate * dt) + noise * p.wander * 0.25;
       } else if (mode === FIGHT) {
-        if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2);
+        // A calm ant (the fungus's cue) does not charge.
+        if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - (this.calm[i] as number)));
         else if (Math.max(al, af, ar) >= FAINT) h += climb(al, af, ar, p.turnRate * dt);
         else if (this.stance === "raid" && this.raidTarget && !detouring) {
           const t = this.raidTarget;
@@ -740,14 +899,20 @@ export class Colony {
       if (mode !== FIGHT && !digging) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * dt);
 
       // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none.
+      // The fungus can make it louder or quieter, and have a food carrier leak its food trail into the other colony's
+      // field (exact as-is: × 1, nothing leaked).
       if (!pellet) {
-        const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt;
+        const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt * (this.layGain[i] as number);
         ph.deposit(carrying ? "food" : "home", this.x[i] as number, this.y[i] as number, laid);
+        const leak = this.crossLay[i] as number;
+        if (carrying && leak > 0 && this.foreign) this.foreign.deposit("food", this.x[i] as number, this.y[i] as number, laid * leak);
       }
 
       // Move; rock or the edge turns the ant back somewhere random.
-      const nx = (this.x[i] as number) + Math.cos(h) * p.speed * dt;
-      const ny = (this.y[i] as number) + Math.sin(h) * p.speed * dt;
+      // Rounded to float32 first, as stored: checked in float64, 192.999996 is open ground, and stored as
+      // 193.0 it would land the ant inside the soil cell beyond, where every step is blocked.
+      const nx = Math.fround((this.x[i] as number) + Math.cos(h) * p.speed * dt);
+      const ny = Math.fround((this.y[i] as number) + Math.sin(h) * p.speed * dt);
       this.detour[i] = (this.detour[i] as number) - dt;
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
       let face = mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] === Math.floor(nx) && this.gy[i] === Math.floor(ny)) : NO_FACE;
@@ -768,15 +933,15 @@ export class Colony {
             this.soilDug++;
             this.pellet[i] = 1;
             this.since[i] = 0;
-            // A fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it.
-            this.detour[i] = 0;
-            this.bumps[i] = 0;
+            this.#homeAfresh(i); // a fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it
             h += Math.PI;
           }
         }
       } else if (blocked(map, nx, ny) || squeezes(map, this.x[i] as number, this.y[i] as number, nx, ny)) {
         this.digT[i] = 0;
-        if (mode === RETURN && !detouring) {
+        // Read afresh: a give-up earlier this tick has just started a wander, and must not start a new wall.
+        const wandering = (this.detour[i] as number) > 0;
+        if (mode === RETURN && !wandering) {
           // Homing: start (or keep) following this wall by touch instead of turning at random.
           const x = this.x[i] as number;
           const y = this.y[i] as number;
@@ -789,7 +954,9 @@ export class Colony {
             }
             this.wall[i] = wallSide(this.#touch(x, y, toNest - WALL_PROBE, 1.2), this.#touch(x, y, toNest + WALL_PROBE, 1.2), rng);
             this.hitDist[i] = Math.hypot(nest.x - x, nest.y - y);
-            this.followT[i] = 0;
+            // Back on a wall it lost touch with: the clock runs on, or let-go and re-bump would never give up.
+            if (!((this.untouched[i] as number) > WALL_LOST)) this.followT[i] = 0;
+            this.untouched[i] = 0;
             // Facing the wall it met, turned away from the side it keeps the wall on; the first cell decides the way on.
             this.gdir[i] = (crossedDir(map, x, y, nx, ny) - (this.wall[i] as number)) & 3;
             this.gx[i] = NO_CELL;
@@ -816,13 +983,15 @@ export class Colony {
       const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
       if (!carrying && !pellet && mode !== FIGHT && takeFood(map, this.x[i] as number, this.y[i] as number)) {
         this.carrying[i] = 1;
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
+        this.#homeAfresh(i);
         this.since[i] = 0;
         h += Math.PI;
       } else if (atNest) {
         this.wall[i] = 0;
         this.mx[i] = NaN;
+        this.untouched[i] = 0;
+        this.bestD[i] = Infinity;
+        this.stallT[i] = 0;
         if ((this.since[i] as number) > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
         if (carrying) {
           this.carrying[i] = 0;
@@ -878,6 +1047,11 @@ function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: T
 export const FOLLOW_GIVE_UP = 120;
 /** Seconds of wall-following before trying the other side once (same line home). */
 export const FOLLOW_FLIP = 45;
+/** Seconds a wall-following ant may touch no rock before it lets go of the wall (the hug would circle in the open). */
+export const WALL_LOST = 1.5;
+/** Seconds a homing ant may get no nearer home before tunnel branches are picked by its home vector, and for how long. */
+export const TUNNEL_STALL = 20;
+export const BY_VECTOR = 15;
 /** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
 const M_LINE_WIDTH = 0.6;
 /** A wall-follower this near the nest, with a clear way to it, sees (or smells) it and leaves the wall. */
@@ -1045,7 +1219,7 @@ export function tunnelEnd(map: WorldMap, x: number, y: number, most = 2): boolea
 /**
  * A step that crosses diagonally into the next cell between two solid cells: blocked, like rock.
  * Movement otherwise only checks where the step lands, so ants could slip through a rock corner
- * into pockets the walking-distance map (4-connected) can't reach, and sit there forever.
+ * into pockets they can't walk out of (4-connected), and sit there forever.
  */
 export function squeezes(map: WorldMap, x: number, y: number, nx: number, ny: number): boolean {
   const cx = Math.floor(x);

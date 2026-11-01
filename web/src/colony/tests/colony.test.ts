@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avoid, climb, Colony, decode, DIG_FACE, diggable, encodeSituation, GLANCE_X, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, squeezes, START_FACE, startable, trailLevel, tunnelEnd, turnToward, wallSide, type Situation } from "../colony.ts";
+import { avoid, climb, Colony, decode, DIG_FACE, diggable, encodeSituation, FOLLOW_GIVE_UP, GLANCE_X, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, squeezes, START_FACE, startable, trailLevel, tunnelEnd, turnToward, WALL_LOST, wallSide, type Situation } from "../colony.ts";
 import { foodAt, generateWorld, mulberry32, OPEN, OPEN_WORLD, ROCK, rockAt, setRock, SOIL, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field: the nest on the left, one food cell straight east of it. */
@@ -164,6 +164,97 @@ test("homing goes round a wall between the ant and its nest by touch (wall-follo
   assert.ok(home, `the ant got home round the wall, ending at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
 });
 
+/** The wall test's field: 60×30, the nest on the left, a wall from the top to y = 24 at x = 30. */
+function walled(): { map: WorldMap; nest: { x: number; y: number; r: number } } {
+  const size = { w: 60, h: 30 };
+  const rock = new Uint8Array(size.w * size.h);
+  for (let y = 0; y < 25; y++) rock[y * size.w + 30] = 1;
+  const nest = { x: 8, y: 6, r: 2 };
+  return { map: worldFromArrays(size, [nest], { rock }), nest };
+}
+
+test("a detour left over from foraging doesn't switch homing off: sent home, the ant goes round the wall", () => {
+  const { map, nest } = walled();
+  for (let seed = 1; seed <= 8; seed++) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+    c.x[0] = 31.5;
+    c.y[0] = 6;
+    c.heading[0] = Math.PI;
+    c.mode[0] = 0; // exploring, just after a run of bumps against the wall
+    c.detour[0] = 3;
+    c.bumps[0] = 4;
+    let home = false;
+    for (let k = 0; k < 30 * 40 && !home; k++) {
+      c.tick(1 / 30);
+      home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
+    }
+    assert.ok(home, `seed ${seed}: home within 40 s, ending at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
+  }
+});
+
+test("picking up food starts the trip home afresh: no detour or bumps carried over", () => {
+  const c = new Colony(corridor(), { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "explore");
+  c.x[0] = 14.5;
+  c.y[0] = 6.5;
+  c.detour[0] = 5;
+  c.bumps[0] = 4;
+  c.tick(1 / 30);
+  assert.equal(c.carrying[0], 1);
+  assert.equal(c.detour[0], 0);
+  assert.equal(c.bumps[0], 0);
+});
+
+test("a wall-following ant that touches no rock lets go of the wall and walks home, instead of circling", () => {
+  const { map, nest } = walled();
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(4), () => "return");
+  c.x[0] = 45; // open ground, right of the wall
+  c.y[0] = 27;
+  c.heading[0] = 0;
+  c.mode[0] = 2;
+  c.wall[0] = 1; // as if alarm had pushed it off the rock it was following
+  c.mx[0] = 45; // its line home runs from (45, 5): far off it, so only losing the wall can free it
+  c.my[0] = 5;
+  c.hitDist[0] = 1000;
+  const d0 = Math.hypot(45 - nest.x, 27 - nest.y);
+  for (let k = 0; k < Math.ceil((WALL_LOST + 0.5) * 30); k++) c.tick(1 / 30);
+  assert.equal(c.wall[0], 0, "let go of the wall");
+  for (let k = 0; k < 3 * 30; k++) c.tick(1 / 30);
+  assert.ok(Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < d0 - 5, "and walked toward home");
+});
+
+test("back on a wall it lost touch with, the give-up clock runs on: let-go and re-bump can't loop forever", () => {
+  const { map } = walled();
+  for (const lost of [false, true]) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(2), () => "return");
+    c.x[0] = 29.9;
+    c.y[0] = 10;
+    c.heading[0] = 0; // into the wall
+    c.mode[0] = 2;
+    c.mx[0] = 29.9;
+    c.my[0] = 10;
+    c.followT[0] = 100;
+    c.untouched[0] = lost ? WALL_LOST + 0.1 : 0;
+    c.tick(1 / 30);
+    assert.equal(c.wall[0] !== 0, true, "took up the wall");
+    assert.equal((c.followT[0] as number) >= 100, lost, lost ? "lost it: the clock ran on" : "a new wall: the clock restarts");
+  }
+});
+
+test("giving up on a wall on a blocked step wanders: it doesn't start a new wall at once", () => {
+  const { map } = walled();
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(2), () => "return");
+  c.x[0] = 29.9;
+  c.y[0] = 10;
+  c.heading[0] = 0; // into the wall
+  c.mode[0] = 2;
+  c.wall[0] = 1;
+  c.followT[0] = FOLLOW_GIVE_UP - 0.001;
+  c.hitDist[0] = 0;
+  c.tick(1 / 30);
+  assert.equal(c.wall[0], 0);
+  assert.ok((c.detour[0] as number) > 0, "wandering");
+});
+
 test("decode is encode's inverse over every situation; lastQuestion is what the ant was asked", () => {
   for (let code = 0; code < SITUATIONS; code++) assert.equal(encodeSituation(decode(code)), code);
   const map = corridor(0);
@@ -178,7 +269,7 @@ test("decode is encode's inverse over every situation; lastQuestion is what the 
   assert.equal(c.mode[0], 1, "and the answer it gave is the ant's mode");
 });
 
-test("ants can't slip diagonally between two rock cells into a pocket the walking map can't reach", () => {
+test("ants can't slip diagonally between two rock cells into a pocket it can't get out of", () => {
   // A 4×4 room (x 20–23, y 3–6) walled all round; it touches the outside only at the diagonal
   // corner between room cell (23, 6) and outside cell (24, 7).
   const size = { w: 40, h: 12 };
@@ -360,6 +451,102 @@ test("a homing ant in a tunnel takes the branch with the home scent", () => {
   }
   assert.ok(minX > 19.9, `it never turned west at the junction (min x ${minX.toFixed(1)})`);
   assert.ok((c.x[0] as number) > 24, `it went east along the scent, at x ${(c.x[0] as number).toFixed(1)}`);
+});
+
+test("a wall-follower handed to a tunnel with home scent walks the tunnel, even with its nest straight through soil (review of #8)", () => {
+  // The review's freeze (seed 1, rival ant #91): an E–W tunnel with home scent either side, the nest due
+  // south through soil. Handed over, it turned to its home vector, bumped the soil, started a new wall
+  // (give-up clock at 0) and was handed over again, every tick, for 300+ s.
+  const size = { w: 40, h: 30 };
+  const rock = new Uint8Array(size.w * size.h).fill(SOIL);
+  for (let x = 5; x <= 35; x++) rock[10 * size.w + x] = OPEN;
+  for (let y = 11; y <= 25; y++) rock[y * size.w + 35] = OPEN; // the way round to the nest
+  for (let y = 24; y <= 27; y++) for (let x = 18; x <= 35; x++) rock[y * size.w + x] = OPEN;
+  const nest = { x: 20.5, y: 25.5, r: 1.5 };
+  const map = worldFromArrays(size, [nest], { rock });
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "return");
+  for (let x = 5; x <= 35; x++) c.ph.deposit("home", x + 0.5, 10.5, 2 + x / 10);
+  c.x[0] = 20.2; // near the cell's south edge, as in the review: a step south crosses into the soil
+  c.y[0] = 10.88;
+  c.heading[0] = Math.PI / 2;
+  c.mode[0] = 2;
+  c.wall[0] = -1;
+  c.byCell[0] = 1;
+  c.followT[0] = 1;
+  c.hitDist[0] = 0; // not nearer than where it met the wall: no leaving by its line home
+  c.mx[0] = 5.5;
+  c.my[0] = 10.5;
+  for (let t = 0; t < 30 * 2; t++) c.tick(1 / 30);
+  assert.ok(Math.abs((c.x[0] as number) - 20.5) > 3, `it walks the tunnel, at (${(c.x[0] as number).toFixed(2)}, ${(c.y[0] as number).toFixed(2)})`);
+});
+
+test("a step that rounds (float32) onto a soil cell's edge is blocked: the ant never stands inside soil (review of #8)", () => {
+  // Open ground above y = 10, soil below; the nest due south, so a homing ant heads straight at the soil.
+  const size = { w: 12, h: 40 };
+  const rock = new Uint8Array(size.w * size.h);
+  for (let y = 10; y < 30; y++) for (let x = 0; x < size.w; x++) rock[y * size.w + x] = SOIL;
+  const map = worldFromArrays(size, [{ x: 5.5, y: 34.5, r: 1.5 }], { rock });
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, wander: 0 }, mulberry32(1), () => "return");
+  const dy = 1 * c.params.speed * (1 / 30);
+  // A float32 y whose step lands just short of 10 in float64, and on 10.0 once stored.
+  let y = Math.fround(10 - dy);
+  const f32 = new Float32Array(1);
+  for (let k = 0; k < 64 && !(y + dy < 10 && Math.fround(y + dy) === 10); k++) {
+    f32[0] = y;
+    const u = new Uint32Array(f32.buffer);
+    u[0] = (u[0] as number) + 1; // the next float32 up
+    y = f32[0] as number;
+  }
+  assert.ok(y + dy < 10 && Math.fround(y + dy) === 10, "found the rounding case");
+  c.x[0] = 5.5;
+  c.y[0] = y;
+  c.heading[0] = Math.PI / 2;
+  c.mode[0] = 2;
+  c.tick(1 / 30);
+  assert.equal(rockAt(map, Math.floor(c.x[0] as number), Math.floor(c.y[0] as number)), OPEN, `at (${c.x[0]}, ${c.y[0]})`);
+});
+
+test("a homing ant led round a ring of tunnels by home scent gets out and home (review of #8)", () => {
+  // A one-cell ring (x 20–26, y 14–20) with strong home scent all round, and a tunnel north from (23, 14)
+  // to the nest's chamber with fainter scent: by scent alone the ant takes the ring at the junction for ever.
+  const size = { w: 40, h: 26 };
+  const rock = new Uint8Array(size.w * size.h).fill(SOIL);
+  const open = (x: number, y: number) => (rock[y * size.w + x] = OPEN);
+  for (let x = 20; x <= 26; x++) {
+    open(x, 14);
+    open(x, 20);
+  }
+  for (let y = 14; y <= 20; y++) {
+    open(20, y);
+    open(26, y);
+  }
+  for (let y = 5; y < 14; y++) open(23, y);
+  for (let y = 2; y <= 4; y++) for (let x = 22; x <= 24; x++) open(x, y);
+  const nest = { x: 23.5, y: 3.5, r: 1.5 };
+  const map = worldFromArrays(size, [nest], { rock });
+  for (let seed = 1; seed <= 3; seed++) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+    const lay = (x: number, y: number, v: number) => c.ph.deposit("home", x + 0.5, y + 0.5, v);
+    for (let x = 20; x <= 26; x++) {
+      lay(x, 14, 40);
+      lay(x, 20, 40);
+    }
+    for (let y = 15; y < 20; y++) {
+      lay(20, y, 40);
+      lay(26, y, 40);
+    }
+    for (let y = 5; y < 14; y++) lay(23, y, 4);
+    c.x[0] = 20.5;
+    c.y[0] = 17.5;
+    c.heading[0] = -Math.PI / 2; // north, up the ring's west side
+    c.mode[0] = 2;
+    let home = false;
+    for (let t = 0; t < 30 * 90 && !home; t++) {
+      c.tick(1 / 30);
+      home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
+    }
+    assert.ok(home, `seed ${seed}: out of the ring and home within 90 s, at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
+  }
 });
 
 test("tunnel shape rules: only a tunnel's end (or a wall with open ground behind) digs; new tunnels keep their distance; narrow cells are tunnels", () => {

@@ -1,8 +1,11 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, type Mode } from "../../colony/colony.ts";
+import { Colony, type Mode, type Situation } from "../../colony/colony.ts";
 import { DOCTRINES, policyContext } from "../../colony/colonyBrain.ts";
 import { generateWorld, mulberry32, OPEN_WORLD } from "../../colony/world.ts";
+import { Game } from "../../colony/game.ts";
+import { STRAINS, intervention } from "../../colony/fungus.ts";
+import { decodeFungal } from "../../colony/fungalPolicy.ts";
 import { ColonyJev, type CacheStore } from "../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
@@ -291,4 +294,187 @@ test("explain alone never asks Jev", async () => {
   j.explain({ mode: "explore", tired: true, foodTrail: "faint", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" });
   await tick(60); // several cycles
   assert.equal(sent.length, 0, "no /api/jev request");
+});
+
+// The fungus's lane (ja-t4d.5): its own questions, under the player's aim, never in an ant's request.
+
+/** Every request, whole; Jev answers modes "explore", stances "forage", and the fungus `fungal`. */
+function scriptAll(fungal: string) {
+  const reqs: (JevRequest & { state: Record<string, unknown> })[] = [];
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
+    const req = JSON.parse(String(init?.body)) as JevRequest & { state: Record<string, unknown> };
+    reqs.push(req);
+    const answers: Record<string, unknown> = {};
+    for (const q of Object.keys(req.questions)) answers[q] = { type: "choice", choice: q.endsWith("_do") ? fungal : q.endsWith("_stance") ? "forage" : "explore", confidence: 0.9 };
+    const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
+    return { ok: true, status: 200, json: async () => body } as Response;
+  }) as typeof fetch;
+  return reqs;
+}
+
+/** A small game with Garden painted on the player's nest. */
+function infectedGame() {
+  const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
+  g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 2, 3, 0.4, STRAINS.findIndex((s) => s.id === "garden"));
+  return g;
+}
+
+test("the fungus lane: fungal situations go to Jev under the aim, the answers are cached, and the hosts run them", async () => {
+  const reqs = scriptAll("dormant");
+  const j = make();
+  const g = infectedGame();
+  j.attach(g.player);
+  j.attachFungus(g.fungus);
+  j.setAim("Spread unseen.");
+  // Off: the local rule (Garden's default, blend).
+  for (let k = 0; k < 6; k++) g.tick(1 / 30);
+  assert.ok([...g.player.expr].some((e) => e === intervention("blend")), "off: Garden blends");
+  await j.start();
+  for (let round = 0; round < 6; round++) {
+    for (let k = 0; k < 6; k++) g.tick(1 / 30);
+    await tick(25);
+  }
+  const fungal = reqs.filter((r) => r.state.hosts);
+  assert.ok(fungal.length > 0, "the fungus asked");
+  for (const r of fungal) {
+    assert.equal(r.state.aim, "Spread unseen.");
+    assert.equal(r.state.ants, undefined);
+    assert.equal(r.state.doctrine, undefined, "the aim, not the colony's doctrine");
+  }
+  for (const r of reqs.filter((x) => x.state.ants)) {
+    assert.equal(r.state.aim, undefined, "an ant's request never carries the fungus's aim");
+    assert.equal(r.state.hosts, undefined);
+  }
+  assert.ok(j.state.fungusCached > 0 && j.state.fungusAsked > 0);
+  // Jev said dormant: every host runs dormant now.
+  for (let k = 0; k < 6; k++) g.tick(1 / 30);
+  for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && (g.player.load[i] as number) > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
+  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  assert.equal(j.explainFungus(s).by, "jev");
+  assert.equal(j.explainFungus(s).answer, "dormant");
+});
+
+test("the fungus lane: a new aim is a new cache, a new menu a new question; stopping hands the fungus back to the local rule", async () => {
+  scriptAll("soothe");
+  const store = memoryStore();
+  const j = make(store);
+  const g = infectedGame();
+  j.attach(g.player);
+  j.attachFungus(g.fungus);
+  j.setAim("Calm every meeting.");
+  await j.start();
+  for (let round = 0; round < 5; round++) {
+    for (let k = 0; k < 6; k++) g.tick(1 / 30);
+    await tick(25);
+  }
+  const before = j.state.fungusCached;
+  assert.ok(before > 0);
+  j.setAim("Something else.");
+  assert.equal(j.state.fungusCached, 0, "nothing cached under the new aim yet");
+  j.setAim("Calm every meeting.");
+  assert.equal(j.state.fungusCached, before, "the old aim's answers are still there");
+  const asked = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  assert.equal(j.explainFungus(asked).by, "jev");
+  j.setMenu(new Set(["dormant", "blend"]));
+  assert.notEqual(j.explainFungus(asked).by, "jev", "a new offer for Garden: a new question");
+  assert.equal(j.state.fungusCached, before, "the old menu's answers are kept, for when it comes back");
+  assert.equal(g.fungus.menu.has("soothe"), false, "and the fungus runs under it");
+  await j.stop();
+  for (let k = 0; k < 6; k++) g.tick(1 / 30);
+  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  assert.equal(j.explainFungus(s).by, "local");
+  assert.ok([...g.player.expr].some((e) => e === intervention("blend")), "stopped: the local rule again");
+});
+
+// Every colony on equal footing (ja-t4d.6): the player is the fungus, so Jev drives each colony under its own doctrine.
+
+/** Every request, whole; modes are answered by doctrine: `answer(doctrine)`. A request can be held until `release()`. */
+function scriptByDoctrine(answer: (doctrine: string) => string) {
+  const reqs: (JevRequest & { state: Record<string, unknown> })[] = [];
+  let held: (() => void) | null = null;
+  let holding = false;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
+    const req = JSON.parse(String(init?.body)) as JevRequest & { state: Record<string, unknown> };
+    reqs.push(req);
+    if (holding) await new Promise<void>((r) => (held = r));
+    const answers: Record<string, unknown> = {};
+    for (const q of Object.keys(req.questions)) answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : answer(String(req.state.doctrine)), confidence: 0.9 };
+    const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
+    return { ok: true, status: 200, json: async () => body } as Response;
+  }) as typeof fetch;
+  return { reqs, hold: () => void (holding = true), release: () => ((holding = false), held?.()) };
+}
+
+function twoColonies(n = 40) {
+  const map = generateWorld(1);
+  return [new Colony(map, { antCount: n, nest: 0 }, mulberry32(9)), new Colony(map, { antCount: n, nest: 1 }, mulberry32(10))];
+}
+
+const modeRequests = (reqs: (JevRequest & { state: Record<string, unknown> })[]) => reqs.filter((r) => r.state.ants);
+
+test("both colonies on one doctrine: each situation is asked once for both, and both colonies' ants take the answer", async () => {
+  const { reqs } = scriptByDoctrine(() => "return");
+  const j = make();
+  const [a, b] = twoColonies();
+  j.setDoctrineFor(0, "Same.");
+  j.setDoctrineFor(1, "Same.");
+  j.attachColonies([a!, b!]);
+  await j.start();
+  for (let round = 0; round < 5; round++) {
+    run(a!, 3);
+    run(b!, 3);
+    await tick(25);
+  }
+  const keys = modeRequests(reqs).flatMap((r) => Object.values(r.state.ants as Record<string, unknown>).map((s) => JSON.stringify(s)));
+  assert.ok(keys.length > 0);
+  assert.equal(new Set(keys).size, keys.length, "no situation asked twice, though two colonies met it");
+  for (const r of modeRequests(reqs)) assert.equal(r.state.doctrine, "Same.");
+  run(a!, 2);
+  run(b!, 2);
+  for (const c of [a!, b!]) for (let i = 0; i < c.n; i++) if (c.alive[i] && !c.carrying[i]) assert.equal(c.mode[i], 2, "Jev said return");
+});
+
+test("each colony its own doctrine: its questions carry its own words, its own cache, and explain names who decided for either colony", async () => {
+  const { reqs } = scriptByDoctrine((d) => (d === "Ink's way." ? "explore" : "return"));
+  const j = make();
+  const [a, b] = twoColonies();
+  j.setDoctrineFor(0, "Ink's way.");
+  j.setDoctrineFor(1, "Amber's way.");
+  j.attachColonies([a!, b!]);
+  await j.start();
+  for (let round = 0; round < 5; round++) {
+    run(a!, 3);
+    run(b!, 3);
+    await tick(25);
+  }
+  const doctrines = new Set(modeRequests(reqs).map((r) => r.state.doctrine));
+  assert.deepEqual([...doctrines].sort(), ["Amber's way.", "Ink's way."]);
+  assert.equal(j.state.doctrineCached.length, 2);
+  assert.ok(j.state.doctrineCached[0]! > 0 && j.state.doctrineCached[1]! > 0);
+  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  run(a!, 1);
+  run(b!, 1);
+  const ea = j.explain(s, 0);
+  const eb = j.explain(s, 1);
+  if (ea.by === "jev") assert.equal(ea.mode, "explore");
+  if (eb.by === "jev") assert.equal(eb.mode, "return", "the second colony is on Jev too, under its own doctrine");
+  assert.ok(ea.by === "jev" || eb.by === "jev", "at least this common situation was met and answered");
+});
+
+test("explain says 'waiting' while the question is in flight", async () => {
+  const { hold, release } = scriptByDoctrine(() => "return");
+  const j = make();
+  const [a] = twoColonies(5);
+  j.attachColonies([a!]);
+  await j.start();
+  hold();
+  const s: Situation = { mode: "explore", tired: true, foodTrail: "faint", homeTrail: "strong", alarm: "faint", enemy: "none", stance: "forage" };
+  j.policy(s); // queued
+  await tick(30); // sent, and held in flight
+  assert.equal(j.explain(s, 0).by, "waiting");
+  release();
+  await tick(30);
+  assert.equal(j.explain(s, 0).by, "jev");
 });
