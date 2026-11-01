@@ -1,15 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { occupancy, resolveFights } from "../battle.ts";
+import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, localPolicy, localStance, type Situation, type StanceSituation } from "../colony.ts";
 import { Game } from "../game.ts";
-import { generateWorld, mulberry32, reachable, type WorldMap } from "../world.ts";
+import { foodAt, generateWorld, mulberry32, reachable, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field with two nests, no food. */
 function arena(): WorldMap {
   const size = { w: 40, h: 12 };
   const nests = [{ x: 4, y: 6, r: 2 }, { x: 36, y: 6, r: 2 }];
-  return { size, seed: 0, rock: new Uint8Array(size.w * size.h), food: new Float32Array(size.w * size.h), nest: nests[0]!, nests, foodTotal: 0 };
+  return worldFromArrays(size, nests);
 }
 
 /** Put `count` living ants of colony c in cell (x, y), and kill the rest. */
@@ -24,14 +24,15 @@ function crowd(c: Colony, x: number, y: number, count: number): void {
 const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
 const view = (s: Partial<StanceSituation>): StanceSituation => ({ stance: "forage", ants: "some", losses: "none", enemyNearNest: false, foodLeft: "plenty", larder: "low", ...s });
 
-test("generateWorld: two nests, far apart, joined on foot, with food away from both", () => {
+test("generateWorld: two nests, a walk apart, joined on foot, with food away from both", () => {
   for (let seed = 1; seed <= 15; seed++) {
     const m = generateWorld(seed);
     assert.equal(m.nests.length, 2);
     assert.equal(m.nest, m.nests[0]);
     const [a, b] = m.nests as [WorldMap["nest"], WorldMap["nest"]];
-    assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > Math.min(m.size.w, m.size.h) * 0.6, `seed ${seed}: nests too close`);
-    const reach = reachable(m.size, m.rock, a.x, a.y);
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    assert.ok(d >= 0.7 * 140 && d < 260, `seed ${seed}: nests ${d.toFixed(0)} cells apart`);
+    const reach = reachable(m, a.x, a.y);
     assert.equal(reach[Math.floor(b.y) * m.size.w + Math.floor(b.x)], 1, `seed ${seed}: the rival nest cannot be walked to`);
   }
 });
@@ -65,7 +66,7 @@ test("fights: equal numbers trade; the bigger crowd loses fewer; fighters lay al
     const b = new Colony(m, { antCount: 20, maxAnts: 20, nest: 1 }, mulberry32(round + 1000));
     crowd(a, 20, 6, 10);
     crowd(b, 20, 6, 10);
-    const grids = [occupancy(a, new Uint16Array(480)), occupancy(b, new Uint16Array(480))];
+    const grids = [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())];
     const [da, db] = resolveFights([a, b], grids, 0.2, mulberry32(round + 7));
     evenA += da!;
     evenB += db!;
@@ -75,7 +76,7 @@ test("fights: equal numbers trade; the bigger crowd loses fewer; fighters lay al
     const big = new Colony(m, { antCount: 20, maxAnts: 20, nest: 1 }, mulberry32(round + 3));
     crowd(small, 20, 6, 4);
     crowd(big, 20, 6, 16);
-    const g2 = [occupancy(small, new Uint16Array(480)), occupancy(big, new Uint16Array(480))];
+    const g2 = [occupancy(small, new CountGrid()), occupancy(big, new CountGrid())];
     const [ds, dbig] = resolveFights([small, big], g2, 0.2, mulberry32(round + 9));
     smallLost += ds! / 4;
     bigLost += dbig! / 16;
@@ -91,7 +92,7 @@ test("no enemy within a cell: no fight", () => {
   const b = new Colony(m, { antCount: 5, maxAnts: 5, nest: 1 }, mulberry32(2));
   crowd(a, 5, 6, 5);
   crowd(b, 30, 6, 5);
-  const deaths = resolveFights([a, b], [occupancy(a, new Uint16Array(480)), occupancy(b, new Uint16Array(480))], 1, () => 0);
+  const deaths = resolveFights([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1, () => 0);
   assert.deepEqual(deaths, [0, 0]);
 });
 
@@ -102,7 +103,8 @@ test("kill drops carried food where the ant falls; the larder becomes ants in fr
   c.x[0] = 10.5;
   c.y[0] = 3.5;
   c.kill(0);
-  assert.equal(m.food[3 * 40 + 10], 1);
+  assert.equal(foodAt(m, 10, 3), 1);
+  assert.equal(m.foodLeft, 1, "the map counts the dropped food");
   assert.equal(c.population, 2);
   assert.equal(c.losses, 1);
   c.larder = 13;
@@ -116,8 +118,8 @@ test("kill drops carried food where the ant falls; the larder becomes ants in fr
 test("a fighting ant goes for the enemy it can see", () => {
   const m = arena();
   const c = new Colony(m, { antCount: 1, maxAnts: 1, wander: 0, deposit: 0 }, mulberry32(4), () => "fight");
-  const enemies = new Uint16Array(480);
-  enemies[8 * 40 + 20] = 3; // two cells south of the ant
+  const enemies = new CountGrid();
+  enemies.add(20, 8, 3); // two cells south of the ant
   c.enemies = enemies;
   c.x[0] = 20.5;
   c.y[0] = 6.5;
