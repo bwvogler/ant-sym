@@ -6,7 +6,8 @@
 
 - **The fungus never decides for an ant.** Each colony keeps its own policy (the local rule, or Jev under the colony's doctrine), its own cache and its own 1,296 situations. The fungus decides **what it does to the ant**: what the ant perceives, what it gives off, and what happens to its body. The ant then makes its own choice from a **perceived state** the fungus has bent.
 - **This is how real manipulators work.** *Rickia wasmannii*, a fungus that spreads through whole *Myrmica* colonies without killing, changes one alkane on the cuticle, and strangers stop being attacked. A leafcutter's fungus garden **feeds the colony's odour**. Argentine-ant supercolonies show what happens when recognition odours stop differing: no aggression across thousands of kilometres. *Ophiocordyceps* blunts foraging and communication, shifts the daily rhythm and, at the end, takes over the jaw muscles. None of them hand the ant a new rule; they change its senses, its smell and its body.
-- **The fungus policy chooses among interventions.** Each is a bundle of levers with a biological basis: **perception** (channel gains, recognition tolerance, thresholds, the clock), **emission** (cuticular odour, trail and alarm deposits), **body** (speed, rhythm, summiting) and **spread** (sporulation, visibility). §4 catalogues ~35 levers; §5 groups them into a short menu the policy picks from.
+- **The fungus policy chooses among interventions.** Each is a bundle of levers with a biological basis: **perception** (channel gains, recognition tolerance, thresholds, the clock), **emission** (cuticular odour, trail and alarm deposits), **body** (speed, rhythm, summiting) and **spread** (sporulation, visibility). §4 catalogues ~35 levers; §5.2 groups them into a short menu the policy picks from.
+- **The player is only the fungus, and shapes the policy — never an ant, never a host's intervention directly.** Five levers (§5.1): the **spore brush** (where the fungus is, and which strain), the **strain** (which interventions and caps exist at all — the home of "other organisms, eventually"), the **aim** (the policy's goal in the player's words), the **menu** (options on/off), and **thresholds** (free tuning of the local rule). The fungus may kill, but only in strains whose traits allow it.
 - **Jev's place is the fungus's own lane.** The fungus has its own situation (load, host activity, where the host is, who is near, grooming pressure, how far apart the colonies are) and its own **aim**: the player's words for what the fungus wants. The aim only ever appears in the fungus lane's requests, never in an ant's. Ant requests and caches don't change. An ant in a bent perceived state still lands on one of the 1,296 situations the colony already knows.
 - **Counterplay comes from social immunity.** Grooming clears spores, a heavy load gets an ant rejected, and sick ants keep away from the nest. The result is a **stealth against potency** dial.
 
@@ -167,14 +168,39 @@ These levers have direct physical basis. They are not decisions: the host's poli
 |---|---|---|---|---|---|
 | W1 | **Shared garden.** ⭐ The fungus grows a garden at a spot between the nests: a nest-like site with its own odour. Hosts whose home template (A11) has drifted toward it deliver food there. It pays food back to both larders in proportion to deliveries, and **pulls everyone who tends it toward one odour** (B3). The leafcutter biology becomes the win mechanic: one fungus, one colony odour. | *Acromyrmex* gardens as a recognition source; faecal imprint | `Nest`-like site in `world.ts`; drop-off; odour pull | **C**, **R** | M–L |
 | W2 | **Garden scent and flavoured food.** The garden emits a scent that hosts perceive as food; the fungus can flavour a patch (B5). It steers *what* both colonies gather, not where any one ant goes. | Fungus-to-forager feedback (hypothesis) | per-patch attraction; scent source | C | M |
-| W3 | **Spore brush.** The player's direct tool: spray spores (a choice of the §5 interventions) onto ground, beside the *lure* and *alarm* brushes in `useColony.ts:29`. | — | brush | — | S |
+| W3 | **Spore brush.** The player's hand on the map (§5.1). It inoculates: it raises infection `load` on the ground and on the ants in the stroke, with the **strain** currently loaded. It does **not** pick interventions — the policy does. See §5.1. | — | brush | — | S |
 | W4 | **Joint nest** (later). With enough mixed hosts at the garden, a new colony buds there, belonging to neither founder. In MR 10 terms, a daughter colony with two mothers. | Pleometrosis | new `Colony` at the garden | **R** | L |
 
 ---
 
 ## 5. The fungus policy
 
-**What it decides.** For each host, which **intervention** the fungus inside it runs. An intervention is a preset bundle of levers from §4, so the choice is a small `choice` question, and the levers' numbers live in code where they can be tuned and tested.
+**The player is the fungus, and nothing else.** No colony, no side, no ant to command. The player never picks an ant's mode, and never picks a host's intervention directly. The player shapes **the policy** that picks interventions, and places the fungus in space. The policy does the rest, host by host. §5.1 is the set of levers the player has on it; §5.2 is the policy itself.
+
+**What the policy decides.** For each host, which **intervention** the fungus inside it runs. An intervention is a preset bundle of levers from §4, so the choice is a small `choice` question, and the levers' numbers live in code where they can be tuned and tested.
+
+### 5.1 The player's levers on the policy
+
+Five ways to modify the policy, coarse to fine. The player lives here; this is the game's control surface.
+
+1. **The spore brush — where, and which strain.** The fungus has no body on the field except through hosts and the ground, so the brush is the player's one physical act. A stroke raises infection `load` on the ground and on the ants it covers, seeding spread from there; load then passes by contact (S1). It does not choose an intervention — it chooses **where the fungus is** and **which strain** is there. Painting near a border seeds blending where the colonies meet; painting into a nest spreads inside one colony; painting a line between nests lays the first thread of a shared network (C5). It replaces nothing the policy does; it decides what the policy has to work with, and where.
+   - *Secondary brushes, later:* grow a garden (W1), lay mycelium (C5), or clear the fungus back out of a region (an undo, and a way to answer a colony's grooming by retreating).
+
+2. **The strain — the fungus's traits (what the policy may do at all).** A strain is the loadout the brush paints: it sets the **action space** the policy chooses from, not the choice. It carries:
+   - **which interventions exist** in this strain (a *Rickia*-like strain has no `sporulate` and no lethal levers; a *Cordyceps*-like strain has `summit`);
+   - **caps** on each lever: maximum potency, maximum visibility (S2), transmission rate (S1), whether it may kill;
+   - a **cost budget**, so a strain that spreads fast and hides well cannot also override hard — the stealth-against-potency dial (§6) is set per strain.
+   This is where "other organisms, eventually" lives: a strain is one trait set; a nematode, a fluke, a bacterium or a parabiotic partner is another, with its own levers and its own situation fields. The policy and the engine don't change; the trait set does. The player assembling or unlocking strains is the meta-layer (overlaps MR 13 `ja-azo`, "unlockable fungus powers").
+
+3. **The aim — the policy's goal, in the player's words.** Natural language, the fungus's analogue of a colony's doctrine: *"Unite the two colonies without killing either,"* or *"Thin the warlike ants and fold the rest into one nest."* It rides only in the fungus Jev lane's request state (§5.2), never in an ant's. Changing it re-asks only the fungal situations the game meets, and caches are kept per aim, so an aim used before is free (exactly as colony doctrines work today, `policyContext`).
+
+4. **The intervention menu — turning the policy's options on and off.** Above the strain's hard caps, the player can disable or bias single interventions for a run: forbid every lethal lever for a pacifist game, or weight `blend` so the policy reaches for it first. This edits the policy's action space directly, and is the bridge between a vague aim and exact behaviour. With Jev it enters the aim/legend; with the local rule it is a mask on the rule's output.
+
+5. **The local rule's thresholds — fine tuning without Jev.** The free local fungus rule (§5.2) has a few numbers: how much grooming pressure flips a host to `dormant`, how close a stranger triggers `soothe`, the load at which `summit` is allowed. Sliders on these let a player tune the policy with no spend, and they are the baseline the Jev policy is measured against.
+
+**So: the player paints strains to decide where and what kind; sets an aim and a menu to decide what the policy is trying to do; and tunes thresholds for the free version. The policy turns all of that into one intervention per host per situation.**
+
+### 5.2 The policy itself
 
 **A starting menu** (six interventions):
 
@@ -186,8 +212,9 @@ These levers have direct physical basis. They are not decisions: the host's poli
 | **blend** | B3 contact blending ↑, B5 diet, A11 template drift, B7 mask at high load | when contact is calm and the colonies are still apart |
 | **share** | A3 rival-trail reading, C2 cross-laying, A1 food gain ↑ | foragers on shared ground: shared routes and food |
 | **roam** | A9 noise, A10 longer clock, A2 home gain ↓, S5 exile | to push hosts out to the frontier, where the colonies meet |
+| **cull** (lethal; strain-gated) | B6 odour weapon, D4 summit | thin a colony's most warlike ants, or raise a spore beacon — costs the host |
 
-Specialization comes from **where** the fungus runs which intervention, together with the thresholds (A7): a colony whose foragers carry *share* and whose border carries *soothe* sorts itself into haulers and peacekeepers. Lethal levers (B6 odour weapon, D4 summit) can be a seventh choice if the design allows a fungus that kills (§9).
+`cull` exists only in strains whose traits allow killing (§5.1 lever 2); a *Rickia*-like strain omits it and the policy never offers it. Specialization comes from **where** the fungus runs which intervention, together with the thresholds (A7): a colony whose foragers carry *share* and whose border carries *soothe* sorts itself into haulers and peacekeepers.
 
 **The fungus's own situation.** This is what the fungus in one host can sense. It is coarse, so it caches like the ant situations:
 
@@ -259,12 +286,14 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 - MR 8 (`ja-8fd`) brings N colonies and alliance ids.
 - MR 13 (`ja-azo`) lists "fungus powers" (propaganda, decoy food, spore wall); W3 and the interventions fit there or replace it.
 
-## 9. Open questions for the design
+## 9. Decisions (2026-11-01)
 
-1. **Is the player still a colony, or only the fungus?** "Unify" reads best if the player is the fungus with no side. Then both colonies run their own policies.
-2. **What counts as a win: merged colonies (one alliance), or lasting peace with exchange?** A merge is a clean ending; peace with exchange suits a lifetime world (MR 10).
-3. **May the fungus kill?** *Rickia* never kills, while summiting (D4) and the odour weapon (B6) cost ants. A strictly non-lethal fungus is a distinctive tone.
-4. **Who picks interventions:** the player directly (brush per intervention), the fungus policy (local rule or Jev under the player's aim), or both, with the brush seeding and the policy expressing?
+1. **The player is only the fungus.** No colony, no side. Both colonies run their own policies (local rule or Jev under their own doctrine). The player acts solely through §5.1.
+2. **Other organisms, eventually.** The fungus is organism #1. A strain is a trait set (§5.1 lever 2), and a later organism — nematode, fluke, bacterium, a parabiotic partner — is another trait set with its own levers and situation fields. The perceived-state architecture (§2) and the two-policy split must stay general enough that adding one touches a trait table, not the engine.
+3. **The fungus may kill.** Lethal levers (`cull`: B6 odour weapon, D4 summit) are allowed, but strain-gated: a strain only offers them if its traits permit killing, so a non-lethal game is a strain choice, not a code path.
+4. **The policy picks interventions; the player modifies the policy.** Not a brush-per-intervention. The player's levers are the five in §5.1 — brush (where + strain), strain (what's possible), aim (the goal), menu (options on/off), thresholds (free tuning). The policy (local rule or Jev) turns them into one intervention per host.
+
+**Still open:** the win condition — merged colonies (one alliance) versus lasting peace with exchange (§1). Leaning toward the unity meter as a score and "merged + no deaths for 60 s" as the clean ending, with the merge itself a consequence of perception (§4.B), not a fungus action. Revisit alongside MR 10's lifetime world, where nothing ends.
 
 ## Sources
 
