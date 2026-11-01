@@ -1,6 +1,6 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
-import { blocked, digCell, dropFood, fillCell, OPEN, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { AIR, blocked, digCell, dropFood, fillCell, isSky, OPEN, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -179,6 +179,13 @@ export class Colony {
   #staleWalk: Uint8Array;
   /** the cell (packed y·65536 + x) where this pellet carrier last looked for space to fill: once a cell is enough */
   #looked: Int32Array;
+  /** the side view: what each homing ant is heading for (0 the chamber, 1 the entrance); a change drops the wall it was following */
+  #goalKind: Uint8Array;
+  /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
+  #entrance: Nest | null = null;
+  /** the point the current ant is homing to (see #goal): the m-line runs to it */
+  #goalX = 0;
+  #goalY = 0;
   /** the first cell of the wall being followed by cell: back there, it has been all the way round */
   loopX: Int32Array;
   loopY: Int32Array;
@@ -250,6 +257,7 @@ export class Colony {
     this.params = { ...DEFAULT_COLONY, ...params };
     if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
     this.nest = map.nests?.[this.params.nest] ?? map.nest;
+    if (map.sky && this.nest.entrance) this.#entrance = { x: this.nest.entrance.x, y: this.nest.entrance.y, r: ENTRANCE_R };
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
@@ -272,6 +280,7 @@ export class Colony {
     this.#noTunnel = new Int32Array(n).fill(-1);
     this.#staleWalk = new Uint8Array(n);
     this.#looked = new Int32Array(n).fill(-1);
+    this.#goalKind = new Uint8Array(n);
     this.#noGain = new Uint8Array(n);
     this.loopX = new Int32Array(n).fill(NO_CELL);
     this.loopY = new Int32Array(n);
@@ -459,8 +468,8 @@ export class Colony {
     const ax = this.mx[i] as number;
     const ay = this.my[i] as number;
     if (Number.isNaN(ax)) return true;
-    const dx = this.nest.x - ax;
-    const dy = this.nest.y - ay;
+    const dx = this.#goalX - ax;
+    const dy = this.#goalY - ay;
     const len = Math.hypot(dx, dy);
     if (len < 1e-6) return true;
     return Math.abs((x - ax) * dy - (y - ay) * dx) / len < width;
@@ -494,7 +503,8 @@ export class Colony {
     const fresh =
       this.gx[i] === NO_CELL ||
       hexDistance(this.gx[i] as number, this.gy[i] as number, hx, hy) > 1 ||
-      (mode !== EXPLORE && rockAt(map, this.gx[i] as number, this.gy[i] as number) !== OPEN);
+      (mode !== EXPLORE && rockAt(map, this.gx[i] as number, this.gy[i] as number) !== OPEN) ||
+      rockAt(map, this.gx[i] as number, this.gy[i] as number) === AIR; // sky (the ground under a walkway dug away) is no face to dig
     if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
     const hugging = mode === EXPLORE && (this.hugT[i] as number) > 0;
     const packed = hy * 65536 + hx;
@@ -512,7 +522,13 @@ export class Colony {
     }
     this.#noTunnel[i] = -1;
     let dir = fresh ? dirOf(this.heading[i] as number) : (this.gdir[i] as number);
-    if (mode === RETURN || mode === FOLLOW) {
+    const ent = this.#entrance;
+    if (mode === RETURN && ent && isSky(map, cx, cy)) {
+      // On the ground line (side view), homing is to the hole: the way nearer it along the ground (home scent lies
+      // along the walkway both sides of the hole, so the most-scent rule below walks a carrier past it and on).
+      const best = this.#towardHole(cx, cy, true);
+      dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
+    } else if (mode === RETURN || mode === FOLLOW) {
       // The way ahead (not back, unless it's a dead end) with the most scent: home scent, laid by
       // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.
       const field = mode === RETURN ? this.ph.fields.home : this.ph.fields.food;
@@ -530,6 +546,23 @@ export class Colony {
         }
       }
       dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
+    } else if (mode === EXPLORE && ent && isSky(map, cx, cy)) {
+      // On the ground line (side view) an explorer walks on along the ground the way it is going, turning back only
+      // at its end. A hand on the wall (searching a tunnel's branches) turned explorers round at every step of the
+      // ground and kept them within a few dozen cells of the hole, short of the food lying farther out.
+      let best = -1;
+      for (const turn of [0, 1, -1, 2, -2]) {
+        const d = (dir + turn + 6) % 6;
+        const tx = stepX(cx, cy, d);
+        const ty = stepY(cy, d);
+        if (rockAt(map, tx, ty) === OPEN && isSky(map, tx, ty)) {
+          best = d;
+          break;
+        }
+      }
+      if (best < 0) best = rockAt(map, stepX(cx, cy, (dir + 3) % 6), stepY(cy, (dir + 3) % 6)) === OPEN ? (dir + 3) % 6 : handOnWall(map, cx, cy, dir, this.hand[i] as number);
+      dir = best;
+      this.digAim[i] = NaN;
     } else {
       const side = this.hand[i] as number;
       const next = handOnWall(map, cx, cy, dir, side);
@@ -540,7 +573,7 @@ export class Colony {
         const run = tunnelHeading(map, cx, cy);
         let aim = (Number.isNaN(run) ? (DIR_ANGLE[dir] as number) : run) + gauss(this.#rng) * TUNNEL_DRIFT;
         if (this.#rng() < FORK) aim += (this.#rng() < 0.5 ? -1 : 1) * (Math.PI / 3);
-        let dug = chooseDig(map, cx, cy, aim, this.#rng());
+        let dug = this.#mayDig(cx, cy) ? chooseDig(map, cx, cy, aim, this.#rng()) : -1;
         // Digging is social: the more nestmates round it, the likelier an ant is to dig (and, as the nest
         // grows roomy and they spread out, the less). That is how real colonies stop excavating once
         // they have room (Rasse & Deneubourg 2001); a lone ant at a far tunnel's end still digs now and then.
@@ -573,7 +606,7 @@ export class Colony {
     const wallDir = (dir + side + 6) % 6; // the wall cell ahead on the hand side
     const wx = stepX(cx, cy, wallDir);
     const wy = stepY(cy, wallDir);
-    if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && startable(map, wx, wy, wallDir)) {
+    if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && this.#mayDig(cx, cy) && startable(map, wx, wy, wallDir)) {
       dir = wallDir;
       this.digAim[i] = DIR_ANGLE[wallDir] as number;
     } else {
@@ -604,6 +637,7 @@ export class Colony {
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
       if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
       if (this.#byANest(tx, ty)) continue;
+      if (this.#entrance && (isSky(map, tx, ty) || this.#byAnEntrance(tx, ty))) continue; // the ground line and the holes stay open
       // The grids are a tick old: a nestmate that stepped in earlier this tick isn't in them (and walling it
       // in would bury it). Rare enough (every other test passed) to look at each ant.
       if (this.#occupied(tx, ty)) continue;
@@ -730,6 +764,48 @@ export class Colony {
     return true;
   }
 
+  /** The nest ant i homes to now (see tick): the chamber, or in the side view the entrance (pellet carriers, ants on the ground line). */
+  #goal(i: number, pellet: boolean): Nest {
+    const ent = this.#entrance;
+    if (!ent) return this.nest;
+    let kind = 1;
+    if (!pellet) {
+      this.antCell(i);
+      kind = isSky(this.map, CELL[0] as number, CELL[1] as number) ? 1 : 0;
+    }
+    if (kind !== this.#goalKind[i]) {
+      // A new goal: the wall it was following, and its line home, were for the other one.
+      this.#goalKind[i] = kind;
+      this.wall[i] = 0;
+      this.mx[i] = NaN;
+      this.gx[i] = NO_CELL;
+    }
+    return kind ? ent : this.nest;
+  }
+
+  /**
+   * Whether an ant at cell (cx, cy) may dig from there: always underground; on the ground line (side view)
+   * only by its own entrance, or explorers walking the surface would pock the ground with holes everywhere.
+   */
+  #mayDig(cx: number, cy: number): boolean {
+    const ent = this.#entrance;
+    if (!ent || !isSky(this.map, cx, cy)) return true;
+    return Math.hypot(centreX(cx, cy) - ent.x, centreY(cy) - ent.y) < ENTRANCE_ZONE;
+  }
+
+  /**
+   * The side view: whether soil cell (x, y) is the ground line's crust (it touches the sky) away from the
+   * entrance. Ants leave it: digging it would undermine the walkway or hole the ground everywhere; the hole
+   * they keep is their entrance.
+   */
+  #crust(x: number, y: number): boolean {
+    const ent = this.#entrance;
+    if (!ent) return false;
+    if (Math.hypot(centreX(x, y) - ent.x, centreY(y) - ent.y) < ENTRANCE_ZONE) return false;
+    for (let d = 0; d < 6; d++) if (isSky(this.map, stepX(x, y, d), stepY(y, d))) return true;
+    return false;
+  }
+
   /** Whether ant i is in a cell it hasn't looked round yet (leaves its cell in CELL). */
   #enteredCell(i: number): boolean {
     this.antCell(i);
@@ -742,6 +818,34 @@ export class Colony {
   /** Whether cell (x, y) is within a nest's radius + 2 (any colony's: a rival's chamber is no dead end to fill either). */
   #byANest(x: number, y: number): boolean {
     for (const n of this.map.nests ?? [this.nest]) if (Math.hypot(centreX(x, y) - n.x, centreY(y) - n.y) < n.r + 2) return true;
+    return false;
+  }
+
+  /**
+   * The side view: the way from cell (cx, cy) to an open neighbour nearer the hole (along the ground: by
+   * column, then straight-line distance; else by straight-line distance), or −1 if none is nearer.
+   */
+  #towardHole(cx: number, cy: number, alongGround: boolean): number {
+    const ent = this.#entrance as Nest;
+    const metric = (x: number, y: number) => (alongGround ? Math.abs(x - ent.x) * 1000 : 0) + Math.hypot(x - ent.x, y - ent.y);
+    let best = -1;
+    let bestD = metric(centreX(cx, cy), centreY(cy)) - 1e-6;
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (rockAt(this.map, tx, ty) !== OPEN) continue;
+      const m = metric(centreX(tx, ty), centreY(ty));
+      if (m < bestD) {
+        bestD = m;
+        best = d;
+      }
+    }
+    return best;
+  }
+
+  /** The side view: whether cell (x, y) is within ENTRANCE_ZONE of any nest's entrance (a rival's hole is no space to fill either). */
+  #byAnEntrance(x: number, y: number): boolean {
+    for (const n of this.map.nests ?? [this.nest]) if (n.entrance && Math.hypot(centreX(x, y) - n.entrance.x, centreY(y) - n.entrance.y) < ENTRANCE_ZONE) return true;
     return false;
   }
 
@@ -809,7 +913,8 @@ export class Colony {
   tick(dt: number): void {
     const p = this.params;
     const rng = this.#rng;
-    const { map, ph, nest } = this;
+    const { map, ph } = this;
+    const home = this.nest;
     const a = p.sensorAngle;
     const ca = Math.cos(a);
     const sa = Math.sin(a);
@@ -842,6 +947,11 @@ export class Colony {
       const carrying = this.carrying[i] === 1;
       const pellet = this.pellet[i] === 1;
       if (!pellet) this.#staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
+      // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
+      // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
+      const nest = this.#goal(i, pellet);
+      this.#goalX = nest.x;
+      this.#goalY = nest.y;
       let mode = this.mode[i] as number;
       const prevMode = mode;
       if (carrying || pellet) {
@@ -1065,6 +1175,10 @@ export class Colony {
       }
       let face = !landOpen && mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] as number, this.gy[i] as number) : NO_FACE;
       if (face === START_FACE) face = digging || rng() < START ? DIG_FACE : GLANCE;
+      if (face === DIG_FACE && map.sky) {
+        this.antCell(i);
+        if (!this.#mayDig(CELL[0] as number, CELL[1] as number)) face = GLANCE;
+      }
       if (face !== NO_FACE) {
         // Digging: an explorer that meets soil head-on bites at it for DIG_TIME (1–2 s), then the cell
         // is open and the ant carries the pellet home. Any other touch of soil puts a hand on the wall.
@@ -1082,7 +1196,13 @@ export class Colony {
           cellOf(nx, ny);
           const fx = CELL[0] as number;
           const fy = CELL[1] as number;
-          if (left <= 0 && digCell(map, fx, fy)) {
+          if (left <= 0 && this.#crust(fx, fy)) {
+            // The side view: the ground line's crust is left (see #crust); it turns along it instead.
+            this.digT[i] = 0;
+            this.digAim[i] = NaN;
+            this.hugT[i] = HUG_TIME;
+            this.gx[i] = NO_CELL;
+          } else if (left <= 0 && digCell(map, fx, fy)) {
             // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
             const aim = this.digAim[i] as number;
             setTunnelHeading(map, fx, fy, Number.isNaN(aim) ? (DIR_ANGLE[crossedDir(map, this.x[i] as number, this.y[i] as number, nx, ny)] as number) + gauss(rng) * TUNNEL_DRIFT : aim);
@@ -1159,9 +1279,11 @@ export class Colony {
       }
 
       // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
-      const ndx = (this.x[i] as number) - nest.x;
-      const ndy = (this.y[i] as number) - nest.y;
-      const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
+      const ndx = (this.x[i] as number) - home.x;
+      const ndy = (this.y[i] as number) - home.y;
+      const atNest = ndx * ndx + ndy * ndy < home.r * home.r;
+      const ent = this.#entrance;
+      const atEntrance = ent !== null && Math.hypot((this.x[i] as number) - ent.x, (this.y[i] as number) - ent.y) < ent.r;
       this.antCell(i);
       if (!carrying && !pellet && mode !== FIGHT && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
@@ -1169,7 +1291,16 @@ export class Colony {
         this.mx[i] = NaN;
         this.since[i] = 0;
         h += Math.PI;
-      } else if (atNest) {
+      } else if (pellet && atEntrance) {
+        // Up and out: the soil goes on the mound round the hole (Tschinkel 2015).
+        this.pellet[i] = 0;
+        this.soilOut++;
+        this.wall[i] = 0;
+        this.mx[i] = NaN;
+        this.since[i] = 0;
+        // It doesn't turn back down: out on the ground, it is asked afresh (most explore it), and so the ground near
+        // the nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
+      } else if (atNest && !(pellet && ent)) {
         this.wall[i] = 0;
         this.mx[i] = NaN;
         if ((this.since[i] as number) > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
@@ -1178,7 +1309,7 @@ export class Colony {
           this.stored++;
           this.larder++;
           h += Math.PI;
-        } else if (pellet) {
+        } else if (pellet && !ent) {
           // The soil goes on the mound: real ants dump it round the entrance, which is how mounds grow.
           this.pellet[i] = 0;
           this.soilOut++;
@@ -1366,6 +1497,11 @@ export function moundRadius(pellets: number, nestR: number): number {
   return Math.sqrt(nestR * nestR + (Math.max(0, pellets) * SWELL * R) / Math.PI);
 }
 
+
+/** The side view: how near its entrance (world units) an ant counts as at it, to drop a pellet. */
+const ENTRANCE_R = 1.5;
+/** The side view: how near its entrance an ant on the ground line may dig (and how much ground round the hole stays unfilled). */
+const ENTRANCE_ZONE = 4;
 
 /**
  * Backfill tuning (mutable, for sweeps and tests). A pellet carrier may fill only `after` seconds into its trip

@@ -2,7 +2,7 @@ import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef } fro
 import { CHUNK } from "../colony/chunks.ts";
 import { type Colony, moundRadius } from "../colony/colony.ts";
 import { CELL, cellOf, R, SIDE } from "../colony/hex.ts";
-import { SOIL, worldExtent } from "../colony/world.ts";
+import { AIR, SOIL, worldExtent } from "../colony/world.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 
@@ -117,7 +117,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     const miniImg = miniCtx.createImageData(mini.width, mini.height);
     let miniAt = -Infinity;
 
-    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300") };
+    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), sky: rgb("#e4edf1"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300") };
     const retheme = () => {
       theme = {
         paper: cssVar("--paper"),
@@ -127,6 +127,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         line: cssVar("--line-strong"),
         rock: rgb(cssVar("--line-strong")),
         soil: rgb(cssVar("--soil")),
+        sky: rgb(cssVar("--sky")),
         mound: cssVar("--mound"),
         trail: cssVar("--heat").split(/\s+/).map(Number),
         alarm: rgb(cssVar("--warn")),
@@ -174,7 +175,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
             continue;
           }
           if (rc[i]) {
-            const solid = rc[i] === SOIL ? theme.soil : theme.rock;
+            const solid = rc[i] === SOIL ? theme.soil : rc[i] === AIR ? theme.sky : theme.rock;
             px[o] = solid[0];
             px[o + 1] = solid[1];
             px[o + 2] = solid[2];
@@ -230,7 +231,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
           const t = off ? 1 : colony.map.rock.get(x, y);
           const fv = off ? 0 : colony.map.food.get(x, y);
           const o = (my * mini.width + mx) * 4;
-          const c = fv > 0 ? food : t === SOIL ? theme.soil : t ? theme.rock : theme.paperRgb;
+          const c = fv > 0 ? food : t === SOIL ? theme.soil : t === AIR ? theme.sky : t ? theme.rock : theme.paperRgb;
           px[o] = c[0];
           px[o + 1] = c[1];
           px[o + 2] = c[2];
@@ -371,7 +372,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       for (const [col, tone] of [[rival, theme.warn], [colony, theme.ink]] as const) {
         if (!col) continue;
         const [nx, ny] = toScreen(c, v, col.nest.x, col.nest.y);
-        if (col.soilOut > 0) {
+        if (col.soilOut > 0 && !col.nest.entrance) {
           // The mound is on the surface, above this slice: every pellet brought out, heaped round the
           // entrance (its area holds them all, loosened by SWELL). A faint fill and an outline, so the
           // tunnels under it still show.
@@ -397,6 +398,13 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         ctx.lineWidth = 2;
         ctx.globalAlpha = 0.7;
         ctx.stroke();
+        if (col.nest.entrance) {
+          // The side view: the entrance, a small ring on the ground line where the shaft comes up.
+          const [ex, ey] = toScreen(c, v, col.nest.entrance.x, col.nest.entrance.y);
+          ctx.beginPath();
+          ctx.arc(ex, ey, Math.max(3, 1.5 * c.zoom), 0, Math.PI * 2);
+          ctx.stroke();
+        }
         ctx.lineCap = "round";
         ctx.beginPath();
         for (let i = 0; i < col.n; i++) {
@@ -643,7 +651,11 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
   };
   const goHome = () => {
     unfollow();
-    setCamera({ x: colony.nest.x, y: colony.nest.y, zoom: Math.max(camera().zoom, 8 * dpr()) });
+    // The side view: between the entrance and the chamber, so both the ground line and the nest are in view.
+    const e = colony.nest.entrance;
+    const hx = e ? (e.x + colony.nest.x) / 2 : colony.nest.x;
+    const hy = e ? (e.y + colony.nest.y) / 2 : colony.nest.y;
+    setCamera({ x: hx, y: hy, zoom: Math.max(camera().zoom, 8 * dpr()) });
   };
 
   const button = "pointer-events-auto rounded-md border border-line bg-panel/90 px-2 py-1 text-xs text-fg-2 shadow-sm hover:bg-raised";

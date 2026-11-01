@@ -50,7 +50,8 @@ export class Game {
       if (map.hasSoil) c.friends = this.#grids[k] as CountGrid;
       if (this.colonies.length > 1) {
         c.enemies = this.#enemy[k] as CountGrid;
-        c.raidTarget = this.colonies[1 - k]!.nest;
+        const other = this.colonies[1 - k]!.nest;
+        c.raidTarget = other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other; // side view: in at their hole
       }
     });
     this.#refresh();
@@ -92,6 +93,12 @@ export class Game {
     for (let y = Math.max(0, Math.floor((c.nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((c.nest.y + r) / R)); y++)
       for (let x = Math.max(0, Math.floor(c.nest.x - r - 1)); x <= Math.min(w - 1, Math.ceil(c.nest.x + r)); x++)
         if (Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) <= r) s += e.get(x, y);
+    // The side view: the entrance too (it is above the chamber, out of that watch), unless the two overlap.
+    const en = c.nest.entrance;
+    if (en && Math.hypot(en.x - c.nest.x, en.y - c.nest.y) > r)
+      for (let y = Math.max(0, Math.floor((en.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((en.y + r) / R)); y++)
+        for (let x = Math.max(0, Math.floor(en.x - r - 1)); x <= Math.min(w - 1, Math.ceil(en.x + r)); x++)
+          if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) > r) s += e.get(x, y);
     return s;
   }
 

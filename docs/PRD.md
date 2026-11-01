@@ -750,3 +750,46 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   - the edge-graze recentre set a heading that the next tick overwrote: it is now the position nudge above, and its test starts exactly on an edge (the old one started in the soil cell next door);
   - re-dug cells no longer smell of fresh pellets;
   - fills keep clear of every nest, not only the carrier's own.
+
+## 18. The side view: a cross-section
+
+**MR 13** (owner's request, 2026-11-01): "I'm not seeing it deposit above ground because we don't see above ground — or is this not a cross section?"
+- **Before:** the colony view was a top-down slice at one depth, and the mound was only a ring overlay.
+- **Now:** the app opens on a **side view**: sky, a ground line, and the nest dug below it.
+- **The Ground toggle** is "side view / from above". "From above" is the open surface map, unchanged number for number. The top-down underground map stays in the code as the tests' and bench's digging test bed.
+
+**The model** (`generateSideWorld`, `SIDE_WORLD`):
+- **Size:** 768 × 368 cells, with the ground line about 64 rows down (gentle noise, ±5 rows), leaving sky room for the mound (MR 14).
+- **Below ground:** soil with stones (rock), more stones deeper. A few cavities, only more than 8 rows down.
+- **Air is a terrain value (`AIR`):** solid to ants and scent like rock, never dug, drawn in `--sky`.
+- **The walkway** is the air cells touching solid ground. They are stored as OPEN, so ants walk the ground line and its overhangs with every existing rule, and scent lies only on the walkway and in tunnels (the sky costs nothing to step).
+- **`map.sky`** marks cells above ground. `updateSurface` re-derives walkway and air whenever a cell is dug or filled.
+- **Nests.** Each nest is a chamber (radius 3) 14 rows down, joined by a steep zigzag shaft to its **entrance**, the hole where the shaft meets the ground line (always open ground, with the walkway beside it). The rival's entrance is 340 columns along.
+- **Food.** Piles 3–6 cells wide lie on the walkway (seeds and bits, as harvester ants forage): about three per 64 columns, at least 16 from an entrance. Pockets lie in the soil at least 10 rows down. Everything is reachable, walking or digging.
+
+**Ants:**
+- **Where homing heads.** A homing ant heads for the chamber when underground. Pellet carriers, and any ant on the walkway, head for the **entrance**, the hole itself: path integration home is to the hole, not through the ground. A change of goal drops the wall being followed.
+- **On the walkway, homing is along the ground to the hole.** At each cell it takes the way nearer the hole by column. The tunnel walk's most-home-scent rule walked carriers past the hole: home scent lies along the walkway on both sides of it, so at 300 s a third of the colony was shuttling along the ground line with food (agent review of MR 13).
+- **On the walkway, explorers walk on** the way they are going, turning back only at the map's edge. A hand on the wall turned them round at every step in the ground and kept them within about 30 columns of the hole, short of the food farther out.
+- **Food and pellets.** Food is stored in the chamber. Pellets are dropped at the hole (`soilOut`, physical in MR 14). A carrier that drops one goes on out onto the ground and is asked afresh, so the ground near the nest is searched.
+- **The crust.** Soil touching the sky is dug only within 4 of the entrance, and ants on the walkway start no tunnels elsewhere. Otherwise surface explorers holed the ground everywhere, and a hollow dug just under the ground line left walkway cells hanging in the air.
+- **Backfill** never fills a sky cell, or within 4 of any nest's entrance.
+- **Defence and raids.** Enemies round the entrance count as near the nest (the chamber's watch doesn't reach it). Raids aim at the rival's entrance.
+- **Food balance:** piles on the ground hold 40 units a cell (seeds lie thick), four per 64 columns; pockets below 0.8 per chunk. About a quarter of the food is on the ground. At first it was 6 %, and colonies whose nearest piles were 30 columns out barely grew.
+
+**Two colonies by default, as from above.**
+- The first version shared the ground line badly: carriers walking past their hole met the rival's foragers all along it, and at a 140-column gap half of both colonies were dead in three minutes.
+- With homing to the hole they coexist: 615–900 ants each at 600 s, at the default gap of 340 on the 768-wide map.
+
+**Measured** (seeds 1–5, 600 s, 600 ants per colony):
+
+| | side view, one colony | side view, two colonies |
+|---|---|---|
+| first food | 8–11 s (food on the ground) | 8–11 s |
+| food home | 448–1,511 | 63–1,349 per colony |
+| ants alive at 600 s | 712–900 | 615–900 per colony |
+| dug soil refilled | 65–74 % | 63–70 % |
+| ants out over 120 s | 0–0.2 % | 0.1–4.9 % |
+
+- **The open map** is unchanged on seeds 1–5.
+- **Bench** (60 s, 1,200 ants per colony): side view 1.9 ms per tick with one colony and 4.6 ms with two, against 3.7 ms for the 512 × 320 top-down underground map.
