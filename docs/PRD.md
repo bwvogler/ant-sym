@@ -314,13 +314,14 @@ The colony page is now a game: your colony and a rival's on one map, sharing its
   - A dying carrier drops its food on the spot, so food is conserved; a test pins it.
 - **A fourth mode, fight.** The ant goes for enemies within two cells, else up its colony's alarm trail, else (when raiding) toward the rival's nest.
 - **Stance**, the strategist's choice: forage, defend or raid. Every 5 s each colony picks one from a coarse view of itself: ants against its cap, recent losses, enemies near its nest, food left on the map, and the larder.
-  - It is cached per view and doctrine, like the ant modes: 108 views.
+  - It is cached per view and doctrine, like the ant modes: 324 views (the current stance is part of the view; review corrected an earlier "108").
+  - With no living rival (the rival turned off, or beaten) there is no stance to choose: the colony forages and the strategist asks nothing. Found in review: solo, the local strategist picked "raid" once food ran low, and the colony's explorers became fighters with no target.
   - The stance is part of every ant's situation, so a change re-asks the ants on its own.
   - The ant situation is now mode × tired × food × home × alarm × enemy × stance = 1,296 possible. A real game meets a few hundred.
 - **The outcome.** A colony with no ants and too little food for one more is beaten. The panel shows a banner.
 - **Jev.** The player's colony can play on Jev: one client, two cached lanes (ant modes and stances), one doctrine. The rival plays the local rule and the local strategist, for free.
 
-**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5 s up to ~16 s, and during a detour the ant wanders instead of homing.
+**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5–1.5 s on the first bump up to 8–24 s, and during a detour the ant wanders instead of homing. (Review found this is not enough on every map: a long wall can still trap homing ants; PR #5 replaces straight-line homing with a walking-distance map.)
 
 **Measured headless** (600 + 600 ants, 1/30 s steps): ~1.8 ms per tick.
 - Seed 1: your colony wiped out the rival by ~200 s.
@@ -361,16 +362,22 @@ This is the first step of the lifetime-world plan. It builds on the research not
 - **Placement.**
   - The player's nest must pass `escapes()`: a bounded search shows it can walk 48 cells away, so it is not in a sealed pocket. This works on a map of any size. On a finite map the whole-map `reachable()` still checks the result, and tests use it as the oracle.
   - Rival nests aim for **140 cells** from the nearest nest (at least 70 % of that): neighbours a walk apart, not opposite corners.
-  - Food is placed **chunk by chunk**, each chunk's patches from its own seed: 1.5 patches per chunk, at least 24 cells from any nest. That gives ~21–24k food on the default map.
+  - Food is placed **chunk by chunk**, each chunk's patches from its own seed: 1.5 patches per chunk. Every food cell is at least 24 cells from any nest (the patch's edge is checked, not just its centre). Over seeds 1–40 that gives 17.6–24.1k food on the default map, median ~20.8k.
 - **Food accounting.** All changes go through `takeFood` / `dropFood`, which keep `map.foodLeft` as a running count; the full-map scan is gone.
 - **Sparse pheromones** (`pheromone.ts`).
   - Only *awake* chunks are stepped. A chunk wakes when scent is laid in it or a neighbour's facing edge holds some. It sleeps, zeroed, when everything in it is below `SLEEP` (1e-4, far under `FAINT` = 0.05) and no neighbour is feeding it.
   - Review caught a gap that the "no neighbour feeding it" condition now closes: a chunk woken by a faint edge got less than `SLEEP` and was zeroed again every step, so faint scent never crossed a chunk border.
   - The step is double-buffered like the dense one, so a chunk reads only the old values of its neighbours. Two tests pin sparse against dense to within 1e-4: one across chunk borders and a ragged map edge, and one with a steady source 8 cells from a border.
   - Levels below 1e-6 are flushed to zero so faded ground takes a cheap path. Flushing at `SLEEP` itself stalled faint trail fronts (7× too little five cells past a trail's end), so the flush threshold sits far lower.
-- **Per-channel step rates.** `advance(dt)` steps each channel only when its own interval has passed: at most 5 % spread or 2 % evaporation per step. That is ~6 Hz for food and home, ~16 Hz for alarm, instead of every 30 Hz tick. Colonies' clocks are offset, so they don't step on the same tick. `step(dt)` stays exact, for tests.
+- **Per-channel step rates.** `advance(dt)` steps each channel only when its own interval has passed: at most 5 % spread or 2 % evaporation per step. At 30 Hz ticks that is 6 Hz for food and home (every 5th tick) and 15 Hz for alarm (every 2nd), instead of every tick. Colonies' clocks are offset, so they don't step on the same tick; an offset clock's first step covers only the time that really passed. `step(dt)` stays exact, for tests. Review found the comparison off by a float hair (five ticks of 1/30 s sum to just under 1/6 s, so food and home stepped every 6th tick); it now has a 1e-9 tolerance and a test.
 - **Counts without scanning.** Occupancy and enemy grids are `CountGrid`s, built from the ants. A reset clears only the cells that were touched. 8×8 block sums let `#enemyHeading` and `resolveFights` skip ants with no enemy nearby.
 - **Sensors.** All three channels are read at once at each sensor position. The two side sensors come from one `cos`/`sin` pair by angle addition, and the hot paths use squared distances instead of `Math.hypot`.
+
+**Homing by walking distance** (from the reviews of PRs #2 and #4).
+- **The problem:** homing was a straight line to the nest plus home-trail climbing. On many maps it trapped ants behind long walls, sometimes every homing ant of a colony, freezing the game. #4's doubling detours did not fix it.
+- **The fix:** each colony now computes, once, a walking-distance map from its nest (`walkingDistance`: a 4-connected breadth-first search, `Colony.homeDist`). A homing ant turns toward its neighbouring cell nearest home on foot; diagonals are allowed only past two open corners. This is what path integration plus memory of the ground gives a real ant.
+- **The home trail is now a hint:** it is climbed at a quarter of the turn rate. At full rate, clusters of homing ants circled on their own trail, out-voting the way home.
+- **Measured:** seeds 1–10 at 600 s with the UI defaults (600 + 600 ants), counting ants out more than 120 s. Before: up to 100 % of a colony on seed 3, and 18 of 20 colony-runs over 5 %. After: 0 % in all 20. Food stored rose on every seed (seed 3's rival: 301 → 2,747). Tick time is unchanged.
 
 **Measured** (`npm run colony-bench`: 1,200 + 1,200 ants, 60 sim-s, local rule, same container):
 

@@ -187,6 +187,85 @@ test("the strategist's stance goes through its own cached lane", async () => {
   assert.equal(stances.length, 1, "asked once");
 });
 
+/** A promise you resolve by hand, to hold a reply in flight. */
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  const promise = new Promise<T>((r) => (resolve = r));
+  return { promise, resolve };
+}
+
+const SIT = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" } as const;
+
+test("a late Stop reply does not overwrite a run started again in the meantime", async () => {
+  const slowStop = deferred<void>();
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    const action = (JSON.parse(String(init?.body ?? "{}")) as { action?: string }).action;
+    if (String(url).startsWith("/api/run") && action === "stop") await slowStop.promise;
+    return { ok: true, status: 200, json: async () => RUN } as Response;
+  }) as typeof fetch;
+  const j = make();
+  j.attach(colony());
+  await j.start();
+  const stopping = j.stop();
+  await j.start(); // pressed Start again before the stop reply came back
+  slowStop.resolve();
+  await stopping;
+  assert.equal(j.state.phase, "running");
+});
+
+test("busy after a doctrine switch does not re-ask what the current doctrine has cached; in-flight questions are per doctrine", async () => {
+  const [a, b] = [DOCTRINES[0]!.text, DOCTRINES[1]!.text];
+  const held = deferred<void>();
+  const sent: string[] = [];
+  scriptFetch(async (req) => {
+    const doctrine = (req.state as { doctrine: string }).doctrine;
+    sent.push(doctrine === a ? "A" : "B");
+    if (doctrine === b && sent.filter((d) => d === "B").length === 1) {
+      await held.promise;
+      return { status: 429, body: { error: "busy", run: RUN } };
+    }
+    return answerAll("follow")(req);
+  });
+  const j = make();
+  j.setDoctrine(a);
+  j.attach(colony());
+  await j.start();
+  j.policy(SIT);
+  await tick(30);
+  assert.deepEqual(sent, ["A"], "A answered it");
+  j.setDoctrine(b);
+  j.policy(SIT); // asked under B; held in flight
+  await tick(30);
+  j.setDoctrine(a); // back to A, which has it cached
+  assert.equal(j.policy(SIT), "follow", "A's cached answer");
+  held.resolve(); // B's request comes back busy
+  await tick(60);
+  assert.deepEqual(sent, ["A", "B"], "nothing re-asked: B is not current, and A has it");
+
+  // In flight under one doctrine is still unasked under another.
+  const held2 = deferred<void>();
+  const sent2: string[] = [];
+  scriptFetch(async (req) => {
+    const doctrine = (req.state as { doctrine: string }).doctrine;
+    sent2.push(doctrine === a ? "A" : "B");
+    if (doctrine === a) await held2.promise;
+    return answerAll("return")(req);
+  });
+  const j2 = make();
+  j2.setDoctrine(a);
+  j2.attach(colony());
+  await j2.start();
+  const s2 = { ...SIT, alarm: "faint" } as const;
+  j2.policy(s2); // A: in flight, held
+  await tick(30);
+  j2.setDoctrine(b);
+  j2.policy(s2); // must be queued for B, not skipped as "already asking"
+  await tick(30);
+  assert.deepEqual(sent2, ["A", "B"]);
+  held2.resolve();
+  await tick(30);
+});
+
 test("explain says who decides a situation, without counting or queuing it", async () => {
   scriptFetch(answerAll("return"));
   const j = make();

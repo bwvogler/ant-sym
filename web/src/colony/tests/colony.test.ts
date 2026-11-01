@@ -144,6 +144,28 @@ test("paint lays trail in a disc, never on rock; alarm turns ants away", () => {
   assert.ok((c.heading[0] as number) > 0.2, `turned away: heading ${c.heading[0]}`);
 });
 
+test("homing goes round a wall between the ant and its nest (the walking-distance map), where a straight line would push into it", () => {
+  // A 60×30 field, the nest on the left, a wall from the top to y = 24 at x = 30, the ant on the right.
+  const size = { w: 60, h: 30 };
+  const rock = new Uint8Array(size.w * size.h);
+  for (let y = 0; y < 25; y++) rock[y * size.w + 30] = 1;
+  const nest = { x: 8, y: 6, r: 2 };
+  const map = worldFromArrays(size, [nest], { rock });
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(5), () => "return");
+  c.x[0] = 50;
+  c.y[0] = 6;
+  c.heading[0] = Math.PI; // facing the wall and the nest beyond it
+  c.mode[0] = 2;
+  let home = false;
+  for (let k = 0; k < 30 * 30 && !home; k++) {
+    c.tick(1 / 30);
+    home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
+  }
+  assert.ok(home, `the ant got home round the wall, ending at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
+  assert.equal(c.homeDist.get(8, 6), 0);
+  assert.ok(c.homeDist.get(50, 6) > 50, "the walking distance from behind the wall goes round it");
+});
+
 test("decode is encode's inverse over every situation; lastQuestion is what the ant was asked", () => {
   for (let code = 0; code < SITUATIONS; code++) assert.equal(encodeSituation(decode(code)), code);
   const map = corridor(0);
