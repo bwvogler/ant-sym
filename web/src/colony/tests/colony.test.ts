@@ -1,6 +1,7 @@
 import { test } from "node:test";
+import { CountGrid } from "../battle.ts";
 import assert from "node:assert/strict";
-import { avoid, chooseDig, climb, Colony, decode, DIG_FACE, setTunnelDrift, diggable, encodeSituation, GLANCE, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, START_FACE, startable, trailLevel, tunnelEnd, turnToward, wallSide, type Situation } from "../colony.ts";
+import { avoid, chooseDig, climb, Colony, decode, DIG_FACE, digChance, setTunnelDrift, diggable, encodeSituation, GLANCE, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, START_FACE, startable, trailLevel, tunnelEnd, turnToward, wallSide, type Situation } from "../colony.ts";
 import { foodIn, generateWorld, tunnelHeading, mulberry32, OPEN, OPEN_WORLD, ROCK, rockAt, setRock, SOIL, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, hexMap, nestAt, put } from "./hexmaps.ts";
 
@@ -371,6 +372,12 @@ test("handOnWall on hexes: round from the hand side to the other, back last; str
   assert.equal(handOnWall(end, 2, 2, 0, 1), 3, "a dead end: back");
   const open = worldFromArrays({ w: 5, h: 5 }, [nestAt(2, 2, 0.5)]);
   assert.equal(handOnWall(open, 2, 2, 0, 1), 0, "open ground, no wall at hand: straight on (never circling)");
+  // Facing west with the left hand on soil (south-west), the way on west open and the sharp turn back
+  // south-east open too: on, not the sharp turn (three open cells meeting at a corner spun carriers round, MR 9).
+  const corner = field([[1, 2], [3, 2], [2, 3]]);
+  assert.equal(handOnWall(corner, 2, 2, 3, -1), 3, "straight on past a corner, not round it");
+  const hairpin = field([[3, 2], [2, 3]]);
+  assert.equal(handOnWall(hairpin, 2, 2, 3, -1), 1, "the sharp turn when it is the only way but back");
 });
 
 test("chooseDig dithers between the two ways either side of a heading, in proportion, so a tunnel runs at the heading on average", () => {
@@ -433,8 +440,51 @@ test("meander: tunnels from one start wander off in many directions, yet stay on
       const a = tunnelHeading(m, x, y) / (Math.PI / 3);
       return Math.abs(a - Math.round(a)) * 60;
     });
-    assert.ok(cells.length > 15 && off.every((o) => o < 2), `no drift: every run is one of the six ways (worst ${Math.max(...off).toFixed(1)}°)`);
+    // (Headings are kept in 255 steps: each fork's 60° rounds by up to 0.7°, so a few forks on, a run is within ~2°.)
+    assert.ok(cells.length > 15 && off.every((o) => o < 4), `no drift: every run is one of the six ways (worst ${Math.max(...off).toFixed(1)}°)`);
   } finally {
     setTunnelDrift(0.2);
   }
+});
+
+test("digChance: a lone ant digs now and then; each nestmate within two cells adds to it, up to always", () => {
+  const g = new CountGrid();
+  g.add(10, 10); // the ant itself
+  assert.ok(Math.abs(digChance(g, 10, 10) - 0.1) < 1e-9, "alone: 0.1");
+  g.add(11, 10, 3); // three nestmates next to it
+  assert.ok(Math.abs(digChance(g, 10, 10) - 0.6) < 1e-9, "three near: 0.1 + 3/6");
+  g.add(10, 12, 9); // two rows down: still within two steps
+  assert.equal(digChance(g, 10, 10), 1);
+  const far = new CountGrid();
+  far.add(10, 10);
+  far.add(14, 10, 20); // four cells away: not counted
+  assert.ok(Math.abs(digChance(far, 10, 10) - 0.1) < 1e-9);
+});
+
+test("homing across a dug-out cavern dotted with soil specks: every carrier gets across, leaving each speck where the way home is open", () => {
+  // A cavern 46 × 30 inside soil, with two-cell specks of soil left in a scatter (as digging leaves
+  // them round a nest), the nest at its west end; carriers start at the east end.
+  const size = { w: 50, h: 34 };
+  const rock = new Uint8Array(size.w * size.h).fill(SOIL);
+  for (let y = 2; y < 32; y++) for (let x = 2; x < 48; x++) rock[y * size.w + x] = OPEN;
+  for (let y = 4; y < 30; y += 3) for (let x = 8 + (y % 2) * 2; x < 44; x += 4) rock[y * size.w + x] = rock[y * size.w + x + 1] = SOIL;
+  const nest = nestAt(4, 17, 1.5);
+  const map = worldFromArrays(size, [nest], { rock });
+  let late = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+    put(c, 0, 45, 4 + ((seed * 7) % 26));
+    c.heading[0] = Math.PI;
+    c.mode[0] = 2;
+    c.pellet[0] = 1;
+    let t = 0;
+    for (; t < 30 * 40; t++) {
+      c.tick(1 / 30);
+      if (c.pellet[0] === 0) break;
+    }
+    if (t >= 30 * 15) late++; // 41 world units at 7 a second is under 6 s in a straight line
+  }
+  // On MR 8's code 7 of these 10 circled one speck for the whole 40 s (the line home was anchored at the
+  // trip's first wall, and a hand on the wall drifts from speck to speck farther from home).
+  assert.equal(late, 0, `${late} of 10 carriers took over 15 s to cross the cavern`);
 });
