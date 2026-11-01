@@ -211,6 +211,8 @@ export class Colony {
   hitDist: Float32Array;
   /** seconds spent following the current wall */
   followT: Float32Array;
+  /** seconds since a wall-following ant last touched rock (ahead, or on its wall side) */
+  untouched: Float32Array;
   /** where this homing trip first met rock (NaN until it does): with the nest it fixes the line the ant leaves walls on */
   mx: Float32Array;
   my: Float32Array;
@@ -281,6 +283,7 @@ export class Colony {
     this.wall = new Int8Array(n);
     this.hitDist = new Float32Array(n);
     this.followT = new Float32Array(n);
+    this.untouched = new Float32Array(n);
     this.mx = new Float32Array(n).fill(NaN);
     this.my = new Float32Array(n).fill(NaN);
     this.#asked = new Int16Array(n).fill(-1);
@@ -443,6 +446,17 @@ export class Colony {
   }
 
   /**
+   * Ant i starts a trip home (it picked up food, or its policy sent it home): a detour or a wall left
+   * over from foraging would otherwise switch its home vector off, and bumps would keep renewing it.
+   */
+  #homeAfresh(i: number): void {
+    this.detour[i] = 0;
+    this.bumps[i] = 0;
+    this.wall[i] = 0;
+    this.mx[i] = NaN;
+  }
+
+  /**
    * Whether ant i at (x, y) is back on its line home: the line from where this trip first met rock
    * to the nest (Bug2's "m-line"). Leaving walls only there is what guarantees getting round: leaving
    * anywhere nearer settles ants in the deepest bay facing the nest.
@@ -542,6 +556,7 @@ export class Colony {
         if (before !== this.#asked[i]) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
+          if (mode === RETURN && this.mode[i] !== RETURN) this.#homeAfresh(i);
           this.mode[i] = mode;
           this.#asked[i] = encode(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
@@ -597,8 +612,13 @@ export class Colony {
           } else {
             // Keep the wall on its side (+1 = right: the ant turns left round it; angles grow clockwise, y down).
             const sd = this.wall[i] as number;
-            if (this.#touch(x, y, h, 1)) h -= sd * p.turnRate * dt * 2; // wall ahead: turn away
+            const ahead = this.#touch(x, y, h, 1);
+            if (ahead) h -= sd * p.turnRate * dt * 2; // wall ahead: turn away
             else if (!this.#touch(x, y, h + sd * 0.9, 1.2)) h += sd * p.turnRate * dt; // the wall fell away: hug round the corner
+            // Touching nothing, ahead or on the wall side (alarm or a thin rock tip threw it off): the hug
+            // would only circle in the open. Let go and walk the home vector; the line home is kept.
+            if (ahead || this.#touch(x, y, h + sd * (Math.PI / 2), 1.2)) this.untouched[i] = 0;
+            else if ((this.untouched[i] = (this.untouched[i] as number) + dt) > WALL_LOST) this.wall[i] = 0;
           }
         }
       } else if (mode === FOLLOW) {
@@ -628,7 +648,9 @@ export class Colony {
       this.detour[i] = (this.detour[i] as number) - dt;
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
       if (blocked(map, nx, ny) || squeezes(map, this.x[i] as number, this.y[i] as number, nx, ny)) {
-        if (mode === RETURN && !detouring) {
+        // Read afresh: a give-up earlier this tick has just started a wander, and must not start a new wall.
+        const wandering = (this.detour[i] as number) > 0;
+        if (mode === RETURN && !wandering) {
           // Homing: start (or keep) following this wall by touch instead of turning at random.
           const x = this.x[i] as number;
           const y = this.y[i] as number;
@@ -642,8 +664,12 @@ export class Colony {
             this.wall[i] = wallSide(this.#touch(x, y, toNest - WALL_PROBE, 1.2), this.#touch(x, y, toNest + WALL_PROBE, 1.2), rng);
             this.hitDist[i] = Math.hypot(nest.x - x, nest.y - y);
             this.followT[i] = 0;
+            this.untouched[i] = 0;
           }
           h -= (this.wall[i] as number) * (Math.PI / 2); // turn away from the wall, along it
+        } else if (mode === RETURN) {
+          // Homing, wandering after giving up on a wall: turn, but don't make the wander longer.
+          h += Math.PI / 2 + rng() * Math.PI;
         } else {
           h += Math.PI / 2 + rng() * Math.PI;
           // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
@@ -661,8 +687,7 @@ export class Colony {
       const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
       if (!carrying && mode !== FIGHT && takeFood(map, this.x[i] as number, this.y[i] as number)) {
         this.carrying[i] = 1;
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
+        this.#homeAfresh(i);
         this.since[i] = 0;
         h += Math.PI;
       } else if (atNest) {
@@ -717,6 +742,8 @@ function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: T
 export const FOLLOW_GIVE_UP = 120;
 /** Seconds of wall-following before trying the other side once (same line home). */
 export const FOLLOW_FLIP = 45;
+/** Seconds a wall-following ant may touch no rock before it lets go of the wall (the hug would circle in the open). */
+export const WALL_LOST = 1.5;
 /** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
 const M_LINE_WIDTH = 0.6;
 /** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */
@@ -735,7 +762,7 @@ export function wallSide(leftBlocked: boolean, rightBlocked: boolean, rng: () =>
 /**
  * A step that crosses diagonally into the next cell between two rock cells: blocked, like rock.
  * Movement otherwise only checks where the step lands, so ants could slip through a rock corner
- * into pockets the walking-distance map (4-connected) can't reach, and sit there forever.
+ * into pockets they can't walk out of (4-connected), and sit there forever.
  */
 export function squeezes(map: WorldMap, x: number, y: number, nx: number, ny: number): boolean {
   const cx = Math.floor(x);

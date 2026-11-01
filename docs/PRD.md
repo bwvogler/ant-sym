@@ -321,7 +321,7 @@ The colony page is now a game: your colony and a rival's on one map, sharing its
 - **The outcome.** A colony with no ants and too little food for one more is beaten. The panel shows a banner.
 - **Jev.** The player's colony can play on Jev: one client, two cached lanes (ant modes and stances), one doctrine. The rival plays the local rule and the local strategist, for free.
 
-**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5–1.5 s on the first bump up to 8–24 s, and during a detour the ant wanders instead of homing. (Review found this is not enough on every map: a long wall can still trap homing ants; PR #5 replaces straight-line homing with a walking-distance map.)
+**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5–1.5 s on the first bump up to 8–24 s, and during a detour the ant wanders instead of homing. (Review found this is not enough on every map: a long wall can still trap homing ants; PR #5 replaces it with homing by the ant's own senses, §12.)
 
 **Measured headless** (600 + 600 ants, 1/30 s steps): ~1.8 ms per tick.
 - Seed 1: your colony wiped out the rival by ~200 s.
@@ -384,7 +384,9 @@ This is the first step of the lifetime-world plan. It builds on the research not
   - A blocked homing step starts wall-following. Two touch probes either side of the home vector pick the side to keep the wall on.
   - Following, the ant turns away from rock ahead and hugs round corners where the wall falls away.
   - It leaves the wall only when back on its **line home**: the line from where this trip first met rock to the nest. It must also be nearer home than where it met this wall, with the way home open by touch. Leaving anywhere nearer settled ants in the deepest bay facing the nest.
-  - After 45 s it tries the other side once. After 120 s it gives up and wanders 8–24 s, then tries afresh.
+  - After 45 s it tries the other side once. After 120 s it gives up and wanders 8–24 s, then tries afresh. A bump during that wander only turns it: it doesn't make the wander longer, or start a new wall.
+  - Touching no rock (ahead or on its wall side) for 1.5 s, it lets go of the wall and walks its home vector, keeping its line home. Alarm avoidance or a thin rock tip could throw it off the wall, and the corner hug then circled in the open until the 120 s give-up.
+  - A trip home starts afresh, when the ant picks up food or its policy sends it home: no detour or wall left over from foraging. A leftover detour switched the home vector off, and each bump renewed it.
 - **Hints and physics:**
   - The home trail is a hint, climbed at a quarter of the turn rate. At full rate, clusters circled on their own trail.
   - `squeezes()` stops ants slipping diagonally between two rocks.
@@ -392,7 +394,7 @@ This is the first step of the lifetime-world plan. It builds on the research not
   - Before (straight line): up to 100 %, and 18 of 20 colony-runs over 5 %.
   - With the map: 0 %.
   - Now: at most 7 % (seeds 2 and 10), with 16 of 20 runs at 5 % or below.
-  - Most of those are slow, not trapped: within the next 30 s about 40 % reach home and more get closer. Truly stalled ants are at most ~3 % of a colony (`ja-` bead filed).
+  - Most of those are slow, not trapped: within the next 30 s about 40 % reach home and more get closer. Truly stalled ants are at most ~3 % of a colony (`ja-ipu`).
   - Ticks are ~10 % slower (3.7 vs 3.3 ms mean), because wall-followers spread trails over more ground (59 vs 48 awake chunks).
 
 **Measured** (`npm run colony-bench`: 1,200 + 1,200 ants, 60 sim-s, local rule, same container):

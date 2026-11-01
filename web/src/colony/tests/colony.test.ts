@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avoid, climb, Colony, decode, encodeSituation, localPolicy, SITUATIONS, squeezes, trailLevel, turnToward, wallSide, type Situation } from "../colony.ts";
+import { avoid, climb, Colony, decode, encodeSituation, FOLLOW_GIVE_UP, localPolicy, SITUATIONS, squeezes, trailLevel, turnToward, WALL_LOST, wallSide, type Situation } from "../colony.ts";
 import { foodAt, generateWorld, mulberry32, setRock, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field: the nest on the left, one food cell straight east of it. */
@@ -164,6 +164,79 @@ test("homing goes round a wall between the ant and its nest by touch (wall-follo
   assert.ok(home, `the ant got home round the wall, ending at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
 });
 
+/** The wall test's field: 60×30, the nest on the left, a wall from the top to y = 24 at x = 30. */
+function walled(): { map: WorldMap; nest: { x: number; y: number; r: number } } {
+  const size = { w: 60, h: 30 };
+  const rock = new Uint8Array(size.w * size.h);
+  for (let y = 0; y < 25; y++) rock[y * size.w + 30] = 1;
+  const nest = { x: 8, y: 6, r: 2 };
+  return { map: worldFromArrays(size, [nest], { rock }), nest };
+}
+
+test("a detour left over from foraging doesn't switch homing off: sent home, the ant goes round the wall", () => {
+  const { map, nest } = walled();
+  for (let seed = 1; seed <= 8; seed++) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+    c.x[0] = 31.5;
+    c.y[0] = 6;
+    c.heading[0] = Math.PI;
+    c.mode[0] = 0; // exploring, just after a run of bumps against the wall
+    c.detour[0] = 3;
+    c.bumps[0] = 4;
+    let home = false;
+    for (let k = 0; k < 30 * 40 && !home; k++) {
+      c.tick(1 / 30);
+      home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
+    }
+    assert.ok(home, `seed ${seed}: home within 40 s, ending at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
+  }
+});
+
+test("picking up food starts the trip home afresh: no detour or bumps carried over", () => {
+  const c = new Colony(corridor(), { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "explore");
+  c.x[0] = 14.5;
+  c.y[0] = 6.5;
+  c.detour[0] = 5;
+  c.bumps[0] = 4;
+  c.tick(1 / 30);
+  assert.equal(c.carrying[0], 1);
+  assert.equal(c.detour[0], 0);
+  assert.equal(c.bumps[0], 0);
+});
+
+test("a wall-following ant that touches no rock lets go of the wall and walks home, instead of circling", () => {
+  const { map, nest } = walled();
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(4), () => "return");
+  c.x[0] = 45; // open ground, right of the wall
+  c.y[0] = 27;
+  c.heading[0] = 0;
+  c.mode[0] = 2;
+  c.wall[0] = 1; // as if alarm had pushed it off the rock it was following
+  c.mx[0] = 45; // its line home runs from (45, 5): far off it, so only losing the wall can free it
+  c.my[0] = 5;
+  c.hitDist[0] = 1000;
+  const d0 = Math.hypot(45 - nest.x, 27 - nest.y);
+  for (let k = 0; k < Math.ceil((WALL_LOST + 0.5) * 30); k++) c.tick(1 / 30);
+  assert.equal(c.wall[0], 0, "let go of the wall");
+  for (let k = 0; k < 3 * 30; k++) c.tick(1 / 30);
+  assert.ok(Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < d0 - 5, "and walked toward home");
+});
+
+test("giving up on a wall on a blocked step wanders: it doesn't start a new wall at once", () => {
+  const { map } = walled();
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(2), () => "return");
+  c.x[0] = 29.9;
+  c.y[0] = 10;
+  c.heading[0] = 0; // into the wall
+  c.mode[0] = 2;
+  c.wall[0] = 1;
+  c.followT[0] = FOLLOW_GIVE_UP - 0.001;
+  c.hitDist[0] = 0;
+  c.tick(1 / 30);
+  assert.equal(c.wall[0], 0);
+  assert.ok((c.detour[0] as number) > 0, "wandering");
+});
+
 test("decode is encode's inverse over every situation; lastQuestion is what the ant was asked", () => {
   for (let code = 0; code < SITUATIONS; code++) assert.equal(encodeSituation(decode(code)), code);
   const map = corridor(0);
@@ -178,7 +251,7 @@ test("decode is encode's inverse over every situation; lastQuestion is what the 
   assert.equal(c.mode[0], 1, "and the answer it gave is the ant's mode");
 });
 
-test("ants can't slip diagonally between two rock cells into a pocket the walking map can't reach", () => {
+test("ants can't slip diagonally between two rock cells into a pocket it can't get out of", () => {
   // A 4×4 room (x 20–23, y 3–6) walled all round; it touches the outside only at the diagonal
   // corner between room cell (23, 6) and outside cell (24, 7).
   const size = { w: 40, h: 12 };
