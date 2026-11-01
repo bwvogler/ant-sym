@@ -87,16 +87,19 @@ export default function ColonyApp() {
               <Stat label="situations seen" value={stats ? `${stats.situationsSeen} / ${SITUATIONS.toLocaleString()}` : "—"} />
             </div>
             {stats && (
-              <dl className="mt-3 grid grid-cols-[auto_repeat(6,minmax(0,1fr))] gap-x-4 gap-y-1 border-t border-line pt-3 font-mono text-xs text-fg-2">
-                <dt className="text-fg-3" />
-                {["ants", "food home", "lost", "born", "dug / mound / filled", "stance"].map((h) => (
-                  <dt key={h} className="text-[11px] uppercase tracking-wide text-fg-3">
-                    {h}
-                  </dt>
-                ))}
-                <SideRow name="you" tone="text-fg" s={stats.you} />
-                {stats.rival && <SideRow name="rival" tone="text-warn" s={stats.rival} />}
-              </dl>
+              // One line per cell: on a phone the table scrolls sideways in its card rather than wrapping "963 / 871 / 1" over three lines.
+              <div className="mt-3 overflow-x-auto border-t border-line pt-3">
+                <dl className="grid w-max min-w-full grid-cols-[repeat(7,auto)] gap-x-4 gap-y-1 whitespace-nowrap font-mono text-xs text-fg-2">
+                  <dt className="text-fg-3" />
+                  {["ants", "food home", "lost", "born", "dug / mound / filled", "stance"].map((h) => (
+                    <dt key={h} className="text-[11px] uppercase tracking-wide text-fg-3">
+                      {h}
+                    </dt>
+                  ))}
+                  <SideRow name="you" tone="text-fg" s={stats.you} />
+                  {stats.rival && <SideRow name="rival" tone="text-warn" s={stats.rival} />}
+                </dl>
+              </div>
             )}
             {stats && stats.outcome !== "playing" && (
               <p className={`mt-3 rounded-md px-3 py-1.5 text-sm ${stats.outcome === "won" ? "bg-accent-soft text-accent" : "bg-err-soft text-err"}`}>
