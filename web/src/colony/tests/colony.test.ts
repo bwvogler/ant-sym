@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { climb, Colony, localPolicy, SITUATIONS, trailLevel, turnToward, type Situation } from "../colony.ts";
+import { avoid, climb, Colony, localPolicy, SITUATIONS, trailLevel, turnToward, type Situation } from "../colony.ts";
 import { generateWorld, mulberry32, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field: the nest on the left, one food cell straight east of it. */
@@ -11,10 +11,9 @@ function corridor(food = 3): WorldMap {
   return { size, seed: 0, rock: new Uint8Array(size.w * size.h), food: f, nest: { x: 6, y: 6.5, r: 2 }, foodTotal: food };
 }
 
-const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", carrying: false, tired: false, foodTrail: "none", homeTrail: "none", ...s });
+const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", ...s });
 
-test("localPolicy: carrying or tired goes home; a strong food trail is followed; none means explore; faint keeps the mode", () => {
-  assert.equal(localPolicy(sit({ carrying: true, foodTrail: "strong" })), "return");
+test("localPolicy: tired goes home; a strong food trail is followed; none means explore; faint keeps the mode", () => {
   assert.equal(localPolicy(sit({ tired: true, foodTrail: "strong" })), "return");
   assert.equal(localPolicy(sit({ foodTrail: "strong" })), "follow");
   assert.equal(localPolicy(sit({ mode: "follow", foodTrail: "none" })), "explore");
@@ -23,7 +22,11 @@ test("localPolicy: carrying or tired goes home; a strong food trail is followed;
   assert.equal(localPolicy(sit({ mode: "return", foodTrail: "faint" })), "follow", "just dropped its food: back out along the trail");
 });
 
-test("trailLevel, climb, turnToward", () => {
+test("trailLevel, climb, avoid, turnToward", () => {
+  assert.equal(avoid(0, 0.01, 0, 0.3), 0, "no alarm smelled: no turn");
+  assert.equal(avoid(5, 2, 1, 0.3), 0.3, "alarm on the left: turn right");
+  assert.equal(avoid(1, 2, 5, 0.3), -0.3, "alarm on the right: turn left");
+  assert.equal(avoid(3, 0, 3, 0.3), 0, "clear ahead: hold course");
   assert.deepEqual([0, 0.05, 0.99, 1, 30].map(trailLevel), ["none", "faint", "faint", "strong", "strong"]);
   assert.equal(climb(1, 2, 1, 0.3), 0, "the front is best: hold course");
   assert.equal(climb(3, 2, 1, 0.3), -0.3);
@@ -64,7 +67,7 @@ test("the policy is asked only when an ant's situation changes, and its answer i
   assert.equal(c.mode[0], 1, "follow");
   assert.equal(c.decisions, 1);
   assert.equal(c.situationsSeen, 1);
-  assert.ok(SITUATIONS === 108);
+  assert.equal(SITUATIONS, 162);
 });
 
 test("a policy answering nonsense falls back to the plain rule instead of breaking the ant", () => {
@@ -82,4 +85,59 @@ test("the colony forages on the local rule alone: food comes home within a minut
   assert.equal(Math.round(before - c.foodLeft), c.stored + c.carrying.reduce((a, v) => a + v, 0), "food is neither made nor lost");
   assert.ok(c.ph.total("food") > 0 && c.ph.total("home") > 0, "both trails were laid");
   assert.ok(c.situationsSeen <= SITUATIONS);
+});
+
+test("a carrying ant is never asked: it goes home, and is asked afresh once it puts the food down", () => {
+  const map = corridor(3);
+  const asked: Situation[] = [];
+  const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(4), (s) => {
+    asked.push(s);
+    return "explore";
+  });
+  c.x[0] = 10;
+  c.y[0] = 6.5;
+  c.heading[0] = 0;
+  let askedWhileCarrying = 0;
+  for (let k = 0; k < 30 * 20 && c.stored === 0; k++) {
+    const before = asked.length;
+    const carrying = c.carrying[0] === 1;
+    c.tick(1 / 30);
+    if (carrying && c.carrying[0] === 1 && asked.length > before) askedWhileCarrying++;
+  }
+  assert.equal(c.stored, 1);
+  assert.equal(askedWhileCarrying, 0);
+  const n = asked.length;
+  c.tick(1 / 30);
+  assert.ok(asked.length > n, "put down: asked again");
+});
+
+test("reconsider makes every ant ask again on its next tick", () => {
+  let calls = 0;
+  const c = new Colony(corridor(0), { antCount: 5, deposit: 0, wander: 0 }, mulberry32(5), () => {
+    calls++;
+    return "explore";
+  });
+  c.tick(1 / 30);
+  const first = calls;
+  c.tick(1 / 30);
+  assert.equal(calls, first, "nothing changed: nobody asked");
+  c.reconsider();
+  c.tick(1 / 30);
+  assert.equal(calls, first + 5);
+});
+
+test("paint lays trail in a disc, never on rock; alarm turns ants away", () => {
+  const map = corridor(0);
+  map.rock[6 * 40 + 22] = 1;
+  const c = new Colony(map, { antCount: 1, wander: 0, deposit: 0 }, mulberry32(6), () => "explore");
+  c.paint("alarm", 20.5, 6.5, 2, 5);
+  assert.equal(c.ph.read("alarm", 20.5, 6.5), 5);
+  assert.equal(c.ph.read("alarm", 22.5, 6.5), 0, "the rock cell got nothing");
+  assert.equal(c.ph.read("alarm", 20.5, 9.5), 0, "outside the radius");
+  // An ant walking east, the alarm patch ahead and a little to its left: it veers right (south, +y).
+  c.x[0] = 16;
+  c.y[0] = 7.5;
+  c.heading[0] = 0;
+  for (let k = 0; k < 10; k++) c.tick(1 / 30);
+  assert.ok((c.heading[0] as number) > 0.2, `turned away: heading ${c.heading[0]}`);
 });

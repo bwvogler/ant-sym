@@ -11,6 +11,7 @@
     "typecheck": "npm --prefix web exec tsc -- -b",
     "probe": "node scripts/probe.mjs",
     "situations": "node scripts/situations.mjs",
-    "cacheprobe": "node scripts/cacheprobe.mjs"
+    "cacheprobe": "node scripts/cacheprobe.mjs",
+    "colony-cost": "node scripts/colony-cost.mjs"
   }
 }

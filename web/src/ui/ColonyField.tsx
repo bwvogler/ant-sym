@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { type PointerEvent, useEffect, useRef } from "react";
 import type { Colony } from "../colony/colony.ts";
 
 // The colony's ground, drawn like the picture field: one canvas at device
@@ -15,6 +15,8 @@ interface Props {
   onFrame: (fn: () => void) => () => void;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
+  /** a brush is chosen: dragging on the field paints at (x, y) in cells */
+  onPaint: ((x: number, y: number) => void) | null;
 }
 
 function cssVar(name: string): string {
@@ -29,7 +31,7 @@ function rgb(hex: string): [number, number, number] {
 /** The warm tone the picture heatmap uses for "too many": here, the way home. */
 const HOME_RGB: [number, number, number] = [196, 110, 40];
 
-export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTrail }: Props) {
+export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTrail, onPaint }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layers = useRef({ food: showFoodTrail, home: showHomeTrail });
   useEffect(() => {
@@ -47,9 +49,9 @@ export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTr
     const gridCtx = grid.getContext("2d")!;
     const img = gridCtx.createImageData(gw, gh);
 
-    let theme = { paper: "", ink: "", accent: "", rock: rgb("#c9c2b5"), trail: [31, 111, 92] };
+    let theme = { paper: "", ink: "", accent: "", rock: rgb("#c9c2b5"), trail: [31, 111, 92], alarm: rgb("#8a5300") };
     const retheme = () => {
-      theme = { paper: cssVar("--paper"), ink: cssVar("--ink"), accent: cssVar("--accent"), rock: rgb(cssVar("--line-strong")), trail: cssVar("--heat").split(/\s+/).map(Number) };
+      theme = { paper: cssVar("--paper"), ink: cssVar("--ink"), accent: cssVar("--accent"), rock: rgb(cssVar("--line-strong")), trail: cssVar("--heat").split(/\s+/).map(Number), alarm: rgb(cssVar("--warn")) };
     };
     retheme();
     const mq = matchMedia("(prefers-color-scheme: dark)");
@@ -82,6 +84,7 @@ export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTr
       const { rock, food } = colony.map;
       const foodField = colony.ph.fields.food;
       const homeField = colony.ph.fields.home;
+      const alarmField = colony.ph.fields.alarm;
       const [fr, fg, fb] = accentRgb();
       const px = img.data;
       for (let i = 0; i < rock.length; i++) {
@@ -98,6 +101,15 @@ export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTr
           px[o + 1] = fg;
           px[o + 2] = fb;
           px[o + 3] = 120 + Math.min(135, (food[i] as number) * 12);
+          continue;
+        }
+        // Alarm is always shown: the player painted it, and it fades in seconds.
+        const al = Math.min(1, (alarmField[i] as number) / 6);
+        if (al > 0.03) {
+          px[o] = theme.alarm[0];
+          px[o + 1] = theme.alarm[1];
+          px[o + 2] = theme.alarm[2];
+          px[o + 3] = Math.round(40 + al * 150);
           continue;
         }
         const f = layers.current.food ? Math.min(1, (foodField[i] as number) / 4) : 0;
@@ -165,5 +177,24 @@ export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTr
     };
   }, [colony, onFrame]);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full rounded-lg border border-line" aria-label="colony field" />;
+  const paintAt = (e: PointerEvent<HTMLCanvasElement>) => {
+    if (!onPaint) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    onPaint(((e.clientX - r.left) / r.width) * colony.map.size.w, ((e.clientY - r.top) / r.height) * colony.map.size.h);
+  };
+  return (
+    <canvas
+      ref={canvasRef}
+      className={`absolute inset-0 block h-full w-full touch-none rounded-lg border border-line ${onPaint ? "cursor-crosshair" : ""}`}
+      aria-label="colony field"
+      onPointerDown={(e) => {
+        if (!onPaint) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        paintAt(e);
+      }}
+      onPointerMove={(e) => {
+        if (e.buttons & 1) paintAt(e);
+      }}
+    />
+  );
 }
