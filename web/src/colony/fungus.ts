@@ -13,13 +13,65 @@ import { rockAt, type WorldMap } from "./world.ts";
 //
 // Every ant carries `load` (0..1), `strain` (which trait set infected it),
 // `resist` (immune priming, 0..1) and `expr` (the intervention the fungus
-// runs in it; all dormant until the fungus policy lands, ja-t4d.5).
+// runs in it). An intervention is a bundle of levers on the host; the levers
+// so far bend what the host perceives (ja-t4d.2, docs/fungus-policy.md §2):
+// scent gains, smelling the rival's food trail, and its sense of time out.
+// The host's own policy then decides from that bent state. Until the fungus
+// policy lands (ja-t4d.5), a host runs its strain's default intervention.
 //
 // One step reads only grids built from everyone's load before the step, and
 // each ant writes only its own load, so the order colonies are listed in is no
 // edge (compare ja-slv). Spores taken from the ground are pooled and taken
 // after everyone has read the cell. Nothing here draws a random number, so a
 // game with no spores painted runs exactly as it did before.
+
+/**
+ * What an intervention does to a host at full load; a host at load l gets the lerp from "as it is" by l.
+ * Each lever is one of Colony's perception arrays.
+ */
+export interface Levers {
+  /** food scent gain (A1) */
+  food: number;
+  /** home scent gain (A2) */
+  home: number;
+  /** alarm gain (A4) */
+  alarm: number;
+  /** the rival's food trail smelled as food scent, × this (A3) */
+  foreignFood: number;
+  /** the host's sense of time out: tired after patience × this (A10) */
+  clock: number;
+}
+
+/** The world as it is. */
+export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1 };
+
+/** One thing the fungus can run in a host: a bundle of levers (docs/fungus-policy.md §5.2). */
+export interface Intervention {
+  id: string;
+  name: string;
+  /** what it does, for the panel and the follow card */
+  blurb: string;
+  levers: Levers;
+}
+
+/**
+ * The interventions the levers so far can express. Index 0 is dormant (a host's `expr` starts there).
+ * Later slices extend the levers (recognition, emission, body) and add the rest of §5.2's menu
+ * (sporulate, blend, cull); new ones are appended so a host's index keeps its meaning.
+ */
+export const INTERVENTIONS: readonly Intervention[] = [
+  { id: "dormant", name: "dormant", blurb: "does nothing to its host", levers: AS_IS },
+  { id: "soothe", name: "soothe", blurb: "its host barely smells alarm", levers: { ...AS_IS, alarm: 0.25 } },
+  { id: "share", name: "share", blurb: "its host smells the rival's food trail as its own, and food scent strongly", levers: { ...AS_IS, food: 1.5, foreignFood: 1 } },
+  { id: "roam", name: "roam", blurb: "its host barely smells home and feels its time out slowly, so it ranges far", levers: { ...AS_IS, home: 0.35, clock: 2.5 } },
+];
+
+/** The index of an intervention by id. */
+export function intervention(id: string): number {
+  const k = INTERVENTIONS.findIndex((v) => v.id === id);
+  if (k < 0) throw new Error(`no intervention "${id}"`);
+  return k;
+}
 
 /** A strain: one trait set of the fungus. The brush paints with one; later organisms are other trait sets (§5.1). */
 export interface Strain {
@@ -33,6 +85,8 @@ export interface Strain {
   decay: number;
   /** share of a host's load nestmates can see: what grooming removes, and what primes the groomers */
   visibility: number;
+  /** the intervention (an id in INTERVENTIONS) its hosts run until the fungus policy chooses (ja-t4d.5) */
+  expresses: string;
 }
 
 /**
@@ -41,8 +95,8 @@ export interface Strain {
  * Bloom after *Metarhizium* (spreads fast, visible, groomed off, immunises the groomers).
  */
 export const STRAINS: readonly Strain[] = [
-  { id: "lockpick", name: "Lockpick", blurb: "spreads slowly, hides, never clears on its own", transmission: 0.15, decay: 0, visibility: 0.1 },
-  { id: "bloom", name: "Bloom", blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant", transmission: 0.6, decay: 0.01, visibility: 0.8 },
+  { id: "lockpick", name: "Lockpick", blurb: "spreads slowly, hides, never clears on its own; its hosts barely smell alarm", transmission: 0.15, decay: 0, visibility: 0.1, expresses: "soothe" },
+  { id: "bloom", name: "Bloom", blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant; its hosts smell the rival's food trail as their own", transmission: 0.6, decay: 0.01, visibility: 0.8, expresses: "share" },
 ];
 
 export interface FungusParams {
@@ -302,7 +356,10 @@ export class Fungus {
         if (nl < p.clear) nl = 0;
         c.load[i] = nl;
         c.strain[i] = nl > 0 ? strain : 0;
-        if (nl > 0) hosts++;
+        if (nl > 0) {
+          hosts++;
+          this.express(c, i, this.#expression(strain), nl);
+        } else if (l > 0) this.express(c, i, 0, 0);
       }
     });
 
@@ -409,6 +466,29 @@ export class Fungus {
   /** Whether the next advance by dt would step: a caller can skip building grids it would not use. */
   due(dt: number): boolean {
     return this.active && this.#clock + dt + 1e-9 >= this.params.interval;
+  }
+
+  /**
+   * The intervention a host of strain s runs. Until the fungus policy (ja-t4d.5) this is the strain's
+   * default; the policy replaces this one method.
+   */
+  #expression(s: number): number {
+    return intervention((this.strains[s] as Strain).expresses);
+  }
+
+  /** Run intervention e in ant i of colony c at load l: its perception is the lerp from as-is to the levers by l. */
+  express(c: Colony, i: number, e: number, l: number): void {
+    c.expr[i] = e;
+    if (e === 0 || l <= 0) {
+      c.perceiveAsIs(i);
+      return;
+    }
+    const v = (INTERVENTIONS[e] as Intervention).levers;
+    c.gainFood[i] = 1 + (v.food - 1) * l;
+    c.gainHome[i] = 1 + (v.home - 1) * l;
+    c.gainAlarm[i] = 1 + (v.alarm - 1) * l;
+    c.foreignFood[i] = v.foreignFood * l;
+    c.clock[i] = 1 + (v.clock - 1) * l;
   }
 
   /** How far the fungus is into colony c, and how far c has answered it. */

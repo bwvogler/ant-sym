@@ -173,14 +173,29 @@ export class Colony {
   strain: Uint8Array;
   /** immune priming from grooming visible nestmates, 0..1: scales down every load the ant takes */
   resist: Float32Array;
-  /** the intervention the fungus runs in this ant (docs/fungus-policy.md §5.2); 0 = dormant, the only one until the fungus policy lands */
+  /** the intervention the fungus runs in this ant (an index into fungus.ts INTERVENTIONS; 0 = dormant) */
   expr: Uint8Array;
+  // What the ant perceives (docs/fungus-policy.md §2): gains on the scent that is there, 1 = as it is.
+  // The fungus writes them (fungus.ts); the ant cannot tell. Its situation and its steering both read
+  // the bent sensors, and its own policy still decides. Seen food, the nest and rock are never bent.
+  /** food scent × this */
+  gainFood: Float32Array;
+  /** home scent × this */
+  gainHome: Float32Array;
+  /** alarm × this */
+  gainAlarm: Float32Array;
+  /** the other colony's food trail, × this, smelled as food scent (0 = not at all) */
+  foreignFood: Float32Array;
+  /** the ant's sense of time out: it is tired after patience × this */
+  clock: Float32Array;
   /** the situation each ant was last asked about, encoded; −1 = never */
   #asked: Int16Array;
   /** the question behind each ant's current mode: its situation (with the mode it had) when last asked; −1 = never */
   #question: Int16Array;
   /** enemy ants per cell, kept by the game each tick; null when there is no rival */
   enemies: CellCounts | null = null;
+  /** the other colony's scent, for ants whose perception reads it (set by the game; null with no rival) */
+  foreign: Pheromones | null = null;
   /** where raiders go: the rival's nest */
   raidTarget: Nest | null = null;
   time = 0;
@@ -228,6 +243,11 @@ export class Colony {
     this.strain = new Uint8Array(n);
     this.resist = new Float32Array(n);
     this.expr = new Uint8Array(n);
+    this.gainFood = new Float32Array(n).fill(1);
+    this.gainHome = new Float32Array(n).fill(1);
+    this.gainAlarm = new Float32Array(n).fill(1);
+    this.foreignFood = new Float32Array(n);
+    this.clock = new Float32Array(n).fill(1);
     this.#asked = new Int16Array(n).fill(-1);
     this.#question = new Int16Array(n).fill(-1);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
@@ -251,10 +271,20 @@ export class Colony {
     this.strain[i] = 0;
     this.resist[i] = 0;
     this.expr[i] = 0;
+    this.perceiveAsIs(i);
     this.#asked[i] = -1;
     this.#question[i] = -1;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
     this.alive[i] = 1;
+  }
+
+  /** Ant i perceives the world as it is: no fungus bending its senses. */
+  perceiveAsIs(i: number): void {
+    this.gainFood[i] = 1;
+    this.gainHome[i] = 1;
+    this.gainAlarm[i] = 1;
+    this.foreignFood[i] = 0;
+    this.clock[i] = 1;
   }
 
   /** Living ants. */
@@ -357,12 +387,17 @@ export class Colony {
       s[slot] = s[slot + 3] = s[slot + 6] = -1;
       return;
     }
+    // Scent is read through the ant's perception (gains of 1 and no foreign reading: as it is, exactly).
     const f = this.ph.fields;
-    s[slot] = map.food.get(cx, cy) > 0 ? SEEN : f.food.get(cx, cy);
+    if (map.food.get(cx, cy) > 0) s[slot] = SEEN;
+    else {
+      const wf = this.foreignFood[i] as number;
+      s[slot] = f.food.get(cx, cy) * (this.gainFood[i] as number) + (wf > 0 && this.foreign ? wf * this.foreign.fields.food.get(cx, cy) : 0);
+    }
     const ndx = sx - nest.x;
     const ndy = sy - nest.y;
-    s[slot + 3] = ndx * ndx + ndy * ndy < nest.r * nest.r ? SEEN : f.home.get(cx, cy);
-    s[slot + 6] = f.alarm.get(cx, cy);
+    s[slot + 3] = ndx * ndx + ndy * ndy < nest.r * nest.r ? SEEN : f.home.get(cx, cy) * (this.gainHome[i] as number);
+    s[slot + 6] = f.alarm.get(cx, cy) * (this.gainAlarm[i] as number);
   }
 
   /** Which way home is for ant i: toward the neighbouring cell nearest the nest on foot (diagonals only past two open corners); the straight line where the map has no answer. */
@@ -462,7 +497,7 @@ export class Colony {
         this.#asked[i] = -1;
         this.#question[i] = -1; // going home is not a choice; the next question comes once the food is down
       } else {
-        const tired = (this.since[i] as number) > p.patience;
+        const tired = (this.since[i] as number) > p.patience * (this.clock[i] as number);
         const food = trailLevel(Math.max(fl, ff, fr));
         const home = trailLevel(Math.max(hl, hf, hr));
         const alarm = trailLevel(Math.max(al, af, ar));

@@ -478,3 +478,43 @@ The first version stepped every tick and read each layer cell by cell: 7.15 ms m
 **Checked in the browser:** the spore brush and strain picker, the infection panel (infected share and mean resistance per colony, spore cells), spores drawn on the ground and infected ants marked in the new `--spore` tone. Light, dark and phone (390 px, no horizontal scroll) layouts, with no console errors.
 
 **Jev:** no change. Nothing here enters an ant's request; tokens per ant are unchanged.
+
+## 15. The perception layer: the fungus bends what a host senses (fungus 1b, 2026-11-01)
+
+Bead `ja-t4d.2`; design in `docs/fungus-policy.md` §2. The fungus never decides for an ant. It bends the ant's **perceived state**, and the ant's own policy (the local rule, or Jev under its colony's doctrine) chooses from it, as it would for a healthy ant in the world the host perceives.
+
+- **Perception arrays on `Colony`**: food, home and alarm gains; how strongly the ant smells the *other* colony's food trail as its own food scent; and its sense of time out (tired after patience × it). They default to the world as it is, and a newborn starts there.
+- **Applied in `#sense`, so steering and the situation agree.** Both read the same three sensors, so an ant never decides by one world and walks in another. Only scent is bent: seen food, the nest and rock/edge (−1) read as they are. With neutral values the reads are exact (`x × 1`, and the rival's field is not read at all), so healthy colonies run bit for bit as before.
+- **The rival's trails.** `Game` hands each colony the other's `Pheromones` (`Colony.foreign`, as it already hands over the enemy grid). Only a host whose perception reads it ever looks.
+- **Interventions** (`fungus.ts`): a bundle of levers per intervention, lerped from "as it is" by the host's load. So far:
+  - *dormant*: nothing.
+  - *soothe*: alarm ×0.25.
+  - *share*: food scent ×1.5, and the rival's food trail smelled as its own.
+  - *roam*: home scent ×0.35, time out felt 2.5× slower.
+  - Later slices add recognition, emission and body levers and the rest of the menu.
+- **Until the fungus policy lands** (`ja-t4d.5`), a host runs its strain's default (Lockpick *soothe*, Bloom *share*). This is one method, `#expression`, which the policy replaces.
+- **The follow card** says what the fungus runs in the followed ant and which senses it bends, e.g. "Bloom 76 % · runs share — it perceives food scent ×1.38, the rival's food trail as its own ×0.76". The situation chips above it are what the ant perceived.
+
+**The test that matters:** an infected ant on a faint food trail it smells ×3, a strong home trail it smells ×0.1, and alarm it smells ×0 is asked the same `Situation`, the same cache key and a byte-identical Jev request as a healthy ant on a strong food trail and a faint home trail with no alarm. And it makes the same choice. Seven tests in all (`perception.test.ts`), 162 in the suite.
+
+**What it does to a game** (seeds 1–3, 300 + 300 ants, the player's nest painted at the start, 3 sim-minutes; one run each, so read the direction, not the digits):
+
+| Seed | Strain | Food home (you / rival) | Lost (you / rival) | Rival infected |
+|---|---|---|---|---|
+| 1 | none | 1,167 / 1,390 | 48 / 66 | — |
+| 1 | Lockpick (soothe) | 1,259 / 1,448 | 50 / 41 | 0 % |
+| 1 | Bloom (share) | 1,248 / 1,487 | **208 / 200** | 100 % |
+| 2 | none | 1,633 / 924 | 255 / 201 | — |
+| 2 | Lockpick | 1,420 / 929 | 186 / 164 | 1 % |
+| 2 | Bloom | 1,286 / 899 | 203 / 183 | 100 % |
+| 3 | none | 1,438 / 893 | 87 / 64 | — |
+| 3 | Lockpick | 1,423 / 1,058 | 108 / 100 | 0 % |
+| 3 | Bloom | 1,453 / 1,074 | 72 / 59 | 67 % |
+
+*Share* walks hosts along the rival's trails into its ground. That carries the fungus into the rival colony, but contact without recognition is war: on seed 1, losses quadrupled. This is failure mode 1 in the design doc. Perception alone pulls colonies together; recognition (`ja-t4d.3`: pacify, blending odour) is what turns contact into collaboration, and it is next. *Soothe* stays inside its colony (Lockpick barely spreads by contact), and its effect on losses is mixed.
+
+**Cost per tick** (`npm run colony-bench`, 1,200 + 1,200 ants, 60 sim-s, 512×320):
+- No spores: 3.57 ms mean, with identical food stored (1,650 / 1,657).
+- Every ant loaded: 4.57 ms mean (4.27 before), the difference being reads of the rival's field.
+
+**Jev:** the request state and the situation are unchanged, so tokens per ant are unchanged. Bent perception could make a colony meet situations it otherwise rarely would; measured, it doesn't add any: 99–209 situations met per colony in the runs above, against 109–209 without spores. Lockpick on seed 1 met fewer (103), because soothed ants rarely perceive alarm.

@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { MODES, type Colony, type Mode, type Situation } from "../colony/colony.ts";
+import { INFECTED, INTERVENTIONS, STRAINS } from "../colony/fungus.ts";
 import { followedColony, type Followed } from "./follow.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
 // when it last chose, and who made the choice: Jev's cached answer for
 // that situation under the doctrine, the local rule while Jev has not
-// answered yet, or the local rule. Read from the colony's arrays four
-// times a second; the field keeps the camera on the ant.
+// answered yet, or the local rule. If the fungus is in it, what the fungus
+// runs there and how it bends the ant's senses: the situation shown is the
+// one the ant perceives. Read from the colony's arrays four times a second;
+// the field keeps the camera on the ant.
 
 interface Props {
   followed: Followed;
@@ -63,8 +66,44 @@ export default function AntCard({ followed, colony, rival, explain, onClose }: P
       ) : (
         <p className="mt-2 text-xs text-fg-3">Not asked yet.</p>
       )}
+      <Fungal col={col} i={i} />
     </section>
   );
+}
+
+/** What the fungus is doing to ant i: strain, load, the intervention it runs, and each sense it bends. */
+function Fungal({ col, i }: { col: Colony; i: number }) {
+  const load = col.load[i] as number;
+  const resist = col.resist[i] as number;
+  if (load < INFECTED) return resist >= 0.05 ? <p className="mt-2 text-xs text-fg-3">Clean · resistance {resist.toFixed(2)} from grooming infected nestmates.</p> : null;
+  const strain = STRAINS[col.strain[i] as number];
+  const run = INTERVENTIONS[col.expr[i] as number];
+  const bent = perceives(col, i);
+  return (
+    <p className="mt-2 text-xs text-fg-2">
+      <span className="text-spore">
+        {strain?.name ?? "fungus"} {Math.round(100 * load)}%
+      </span>
+      {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · runs <span className="font-mono">{run?.name ?? "?"}</span>
+      {bent.length ? <span className="text-fg-3"> — it perceives {bent.join(", ")}. The situation above is what it perceives; its own policy chose.</span> : <span className="text-fg-3"> — its senses are as they are.</span>}
+    </p>
+  );
+}
+
+/** The senses the fungus bends in ant i, in words. */
+function perceives(col: Colony, i: number): string[] {
+  const out: string[] = [];
+  const gain = (name: string, v: number) => {
+    if (Math.abs(v - 1) >= 0.05) out.push(`${name} ×${v.toFixed(2)}`);
+  };
+  gain("food scent", col.gainFood[i] as number);
+  gain("home scent", col.gainHome[i] as number);
+  gain("alarm", col.gainAlarm[i] as number);
+  const foreign = col.foreignFood[i] as number;
+  if (foreign >= 0.05) out.push(`the rival's food trail as its own ×${foreign.toFixed(2)}`);
+  const clock = col.clock[i] as number;
+  if (Math.abs(clock - 1) >= 0.05) out.push(`its time out ×${(1 / clock).toFixed(2)}`);
+  return out;
 }
 
 function chips(s: Situation): [string, string][] {

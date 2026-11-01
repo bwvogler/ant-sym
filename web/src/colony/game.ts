@@ -56,6 +56,8 @@ export class Game {
       if (this.colonies.length > 1) {
         c.enemies = this.#enemy[k] as CountGrid;
         c.raidTarget = this.colonies[1 - k]!.nest;
+        // Only ants whose perception the fungus has bent read it (Colony.foreignFood).
+        c.foreign = this.colonies[1 - k]!.ph;
       }
     });
     this.#refresh();
