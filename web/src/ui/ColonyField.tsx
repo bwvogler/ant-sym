@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef } from "react";
 import { CHUNK } from "../colony/chunks.ts";
-import { type Colony, moundWidth } from "../colony/colony.ts";
+import { type Colony, moundRadius } from "../colony/colony.ts";
 import { CELL, cellOf, R, SIDE } from "../colony/hex.ts";
 import { SOIL, worldExtent } from "../colony/world.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
@@ -372,14 +372,23 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         if (!col) continue;
         const [nx, ny] = toScreen(c, v, col.nest.x, col.nest.y);
         if (col.soilOut > 0) {
+          // The mound is on the surface, above this slice: every pellet brought out, heaped round the
+          // entrance (its area holds them all, loosened by SWELL). A faint fill and an outline, so the
+          // tunnels under it still show.
           const inner = Math.max(4, col.nest.r * c.zoom);
-          const outer = inner + moundWidth(col.soilOut) * c.zoom;
+          const outer = Math.max(inner, moundRadius(col.soilOut, col.nest.r) * c.zoom);
           ctx.beginPath();
           ctx.arc(nx, ny, outer, 0, Math.PI * 2);
           ctx.arc(nx, ny, inner, 0, Math.PI * 2, true);
           ctx.fillStyle = theme.mound;
-          ctx.globalAlpha = 0.3;
+          ctx.globalAlpha = 0.12;
           ctx.fill();
+          ctx.globalAlpha = 0.8;
+          ctx.beginPath();
+          ctx.arc(nx, ny, outer, 0, Math.PI * 2);
+          ctx.strokeStyle = theme.mound;
+          ctx.lineWidth = Math.max(1, d * 1.2);
+          ctx.stroke();
           ctx.globalAlpha = 1;
         }
         ctx.beginPath();

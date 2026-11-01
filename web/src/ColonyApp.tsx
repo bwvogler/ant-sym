@@ -89,7 +89,7 @@ export default function ColonyApp() {
             {stats && (
               <dl className="mt-3 grid grid-cols-[auto_repeat(6,minmax(0,1fr))] gap-x-4 gap-y-1 border-t border-line pt-3 font-mono text-xs text-fg-2">
                 <dt className="text-fg-3" />
-                {["ants", "food home", "lost", "born", "dug", "stance"].map((h) => (
+                {["ants", "food home", "lost", "born", "dug / mound", "stance"].map((h) => (
                   <dt key={h} className="text-[11px] uppercase tracking-wide text-fg-3">
                     {h}
                   </dt>
@@ -260,7 +260,9 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
       <dd className="tabular-nums">{s.stored.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.losses.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.births.toLocaleString()}</dd>
-      <dd className="tabular-nums">{s.dug.toLocaleString()}</dd>
+      <dd className="tabular-nums" title="soil cells dug / pellets of it on the mound">
+        {s.dug.toLocaleString()} / {s.mound.toLocaleString()}
+      </dd>
       <dd>{s.stance}</dd>
     </>
   );
