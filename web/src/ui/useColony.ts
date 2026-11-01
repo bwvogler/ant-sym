@@ -66,13 +66,31 @@ export interface ColonyStats {
   /** policy mode choices per second, over the last second */
   choicesPerSecond: number;
   situationsSeen: number;
-  you: SideStats;
-  rival: SideStats | null;
+  /** every colony's line: Game.colonies order (Ink, then Amber; ui/names.ts) */
+  sides: SideStats[];
+  /** the colony that is gone, by index, or −1 */
+  fallen: number;
   outcome: Outcome;
   /** cells of ground holding spores */
   sporeCells: number;
   /** how far the fungus has come toward one colony */
   unity: Unity;
+}
+
+/** Ants in each mode, over every colony. */
+function sumCounts(colonies: readonly Colony[]): Record<Mode, number> {
+  const out = { explore: 0, follow: 0, return: 0, fight: 0 } as Record<Mode, number>;
+  for (const c of colonies) for (const [m, n] of Object.entries(c.counts()) as [Mode, number][]) out[m] += n;
+  return out;
+}
+
+/** Situations any colony has been asked in: what one shared doctrine would pay for (the caches are shared by context). */
+function seenTogether(colonies: readonly Colony[]): number {
+  let n = 0;
+  const first = colonies[0];
+  if (!first) return 0;
+  for (let k = 0; k < first.seen.length; k++) if (colonies.some((c) => c.seen[k])) n++;
+  return n;
 }
 
 function side(c: Colony, fungus: Fungus): SideStats {
@@ -106,7 +124,9 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     let lastStats = 0;
     let frames = 0;
     let fpsAt = last;
-    let rateAt = { t: colony.time, decisions: colony.decisions };
+    // The summary is the whole map's: every colony's (no colony is the player's).
+    const decisions = () => game.colonies.reduce((n, c) => n + c.decisions, 0);
+    let rateAt = { t: colony.time, decisions: decisions() };
     let rate = 0;
     const loop = (t: number) => {
       // Clamped both ways: a first frame stamped before `last` would step the sim backwards (negative trail).
@@ -118,20 +138,20 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         for (let k = 0; k < steps; k++) game.tick(total / steps);
       }
       if (colony.time - rateAt.t >= 1) {
-        rate = (colony.decisions - rateAt.decisions) / (colony.time - rateAt.t);
-        rateAt = { t: colony.time, decisions: colony.decisions };
+        rate = (decisions() - rateAt.decisions) / (colony.time - rateAt.t);
+        rateAt = { t: colony.time, decisions: decisions() };
       }
       if (t - lastStats > 150) {
         setStats({
           time: colony.time,
-          stored: colony.stored,
+          stored: game.colonies.reduce((n, c) => n + c.stored, 0),
           foodTotal: colony.map.foodTotal,
           foodLeft: colony.foodLeft,
-          counts: colony.counts(),
+          counts: sumCounts(game.colonies),
           choicesPerSecond: rate,
-          situationsSeen: colony.situationsSeen,
-          you: side(colony, game.fungus),
-          rival: game.rival ? side(game.rival, game.fungus) : null,
+          situationsSeen: seenTogether(game.colonies),
+          sides: game.colonies.map((c) => side(c, game.fungus)),
+          fallen: game.fallen(),
           outcome: game.outcome(),
           sporeCells: game.fungus.sporeCells,
           unity: game.unity(),

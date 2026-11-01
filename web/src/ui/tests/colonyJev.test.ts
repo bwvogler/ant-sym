@@ -1,6 +1,6 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, type Mode } from "../../colony/colony.ts";
+import { Colony, type Mode, type Situation } from "../../colony/colony.ts";
 import { DOCTRINES, policyContext } from "../../colony/colonyBrain.ts";
 import { generateWorld, mulberry32 } from "../../colony/world.ts";
 import { Game } from "../../colony/game.ts";
@@ -382,4 +382,96 @@ test("the fungus lane: a new aim or a new menu is a new cache; stopping hands th
   const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
   assert.equal(j.explainFungus(s).by, "local");
   assert.ok([...g.player.expr].some((e) => e === intervention("blend")), "stopped: the local rule again");
+});
+
+// Every colony on equal footing (ja-t4d.6): the player is the fungus, so Jev drives each colony under its own doctrine.
+
+/** Every request, whole; modes are answered by doctrine: `answer(doctrine)`. A request can be held until `release()`. */
+function scriptByDoctrine(answer: (doctrine: string) => string) {
+  const reqs: (JevRequest & { state: Record<string, unknown> })[] = [];
+  let held: (() => void) | null = null;
+  let holding = false;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
+    const req = JSON.parse(String(init?.body)) as JevRequest & { state: Record<string, unknown> };
+    reqs.push(req);
+    if (holding) await new Promise<void>((r) => (held = r));
+    const answers: Record<string, unknown> = {};
+    for (const q of Object.keys(req.questions)) answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : answer(String(req.state.doctrine)), confidence: 0.9 };
+    const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
+    return { ok: true, status: 200, json: async () => body } as Response;
+  }) as typeof fetch;
+  return { reqs, hold: () => void (holding = true), release: () => ((holding = false), held?.()) };
+}
+
+function twoColonies(n = 40) {
+  const map = generateWorld(1);
+  return [new Colony(map, { antCount: n, nest: 0 }, mulberry32(9)), new Colony(map, { antCount: n, nest: 1 }, mulberry32(10))];
+}
+
+const modeRequests = (reqs: (JevRequest & { state: Record<string, unknown> })[]) => reqs.filter((r) => r.state.ants);
+
+test("both colonies on one doctrine: each situation is asked once for both, and both colonies' ants take the answer", async () => {
+  const { reqs } = scriptByDoctrine(() => "return");
+  const j = make();
+  const [a, b] = twoColonies();
+  j.setDoctrineFor(0, "Same.");
+  j.setDoctrineFor(1, "Same.");
+  j.attachColonies([a!, b!]);
+  await j.start();
+  for (let round = 0; round < 5; round++) {
+    run(a!, 3);
+    run(b!, 3);
+    await tick(25);
+  }
+  const keys = modeRequests(reqs).flatMap((r) => Object.values(r.state.ants as Record<string, unknown>).map((s) => JSON.stringify(s)));
+  assert.ok(keys.length > 0);
+  assert.equal(new Set(keys).size, keys.length, "no situation asked twice, though two colonies met it");
+  for (const r of modeRequests(reqs)) assert.equal(r.state.doctrine, "Same.");
+  run(a!, 2);
+  run(b!, 2);
+  for (const c of [a!, b!]) for (let i = 0; i < c.n; i++) if (c.alive[i] && !c.carrying[i]) assert.equal(c.mode[i], 2, "Jev said return");
+});
+
+test("each colony its own doctrine: its questions carry its own words, its own cache, and explain names who decided for either colony", async () => {
+  const { reqs } = scriptByDoctrine((d) => (d === "Ink's way." ? "explore" : "return"));
+  const j = make();
+  const [a, b] = twoColonies();
+  j.setDoctrineFor(0, "Ink's way.");
+  j.setDoctrineFor(1, "Amber's way.");
+  j.attachColonies([a!, b!]);
+  await j.start();
+  for (let round = 0; round < 5; round++) {
+    run(a!, 3);
+    run(b!, 3);
+    await tick(25);
+  }
+  const doctrines = new Set(modeRequests(reqs).map((r) => r.state.doctrine));
+  assert.deepEqual([...doctrines].sort(), ["Amber's way.", "Ink's way."]);
+  assert.equal(j.state.doctrineCached.length, 2);
+  assert.ok(j.state.doctrineCached[0]! > 0 && j.state.doctrineCached[1]! > 0);
+  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  run(a!, 1);
+  run(b!, 1);
+  const ea = j.explain(s, 0);
+  const eb = j.explain(s, 1);
+  if (ea.by === "jev") assert.equal(ea.mode, "explore");
+  if (eb.by === "jev") assert.equal(eb.mode, "return", "the second colony is on Jev too, under its own doctrine");
+  assert.ok(ea.by === "jev" || eb.by === "jev", "at least this common situation was met and answered");
+});
+
+test("explain says 'waiting' while the question is in flight", async () => {
+  const { hold, release } = scriptByDoctrine(() => "return");
+  const j = make();
+  const [a] = twoColonies(5);
+  j.attachColonies([a!]);
+  await j.start();
+  hold();
+  const s: Situation = { mode: "explore", tired: true, foodTrail: "faint", homeTrail: "strong", alarm: "faint", enemy: "none", stance: "forage" };
+  j.policy(s); // queued
+  await tick(30); // sent, and held in flight
+  assert.equal(j.explain(s, 0).by, "waiting");
+  release();
+  await tick(30);
+  assert.equal(j.explain(s, 0).by, "jev");
 });

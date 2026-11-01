@@ -10,24 +10,27 @@ import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
 import { STRAINS, useColony, type Brush, type SideStats } from "./ui/useColony.ts";
+import { colonyName, colonyTone } from "./ui/names.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import { AIMS } from "./colony/fungusBrain.ts";
 import { INTERVENTIONS, LETHAL } from "./colony/fungus.ts";
 
-// The colony page: a procedural world, your colony and a rival's, and the
-// fungus (you) that steers yours. The fungus paints scent (free: lure and
-// alarm brushes), inoculates ants of either colony with spores (free: the
-// spore brush, docs/fungus-policy.md) and sets the colony's doctrine; with Jev on, each ant's
-// mode and the colony's stance are Jev's answers for their situation under
-// that doctrine, asked once per situation and cached, so the spend follows
-// new situations and retunes, not ants or time. The rival plays the local
-// rule. Food makes ants; fights kill them; a colony with neither is beaten.
+// The colony page: a procedural world, two rival colonies (Ink and Amber,
+// named for how they are drawn), and the fungus: the player, and nobody's
+// side (docs/fungus-policy.md). The fungus paints scent (lure, alarm),
+// inoculates ants of either colony (spores), and shapes its own policy (the
+// menu, the rule's settings, its aim). Each colony has a doctrine, its nature:
+// a scenario setting, not the player's lever. With Jev on, every ant's mode
+// and every colony's stance are Jev's answers for their situation under that
+// colony's doctrine, and the fungus's interventions under the aim, each asked
+// once per situation and cached. The fungus's goal is one colony (unified);
+// a colony that falls is its loss.
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 
 export default function ColonyApp() {
   const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
-  const jev = useColonyJev(colony, game.fungus, controls.menu);
+  const jev = useColonyJev(game.colonies, game.fungus, controls.menu);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
   // Keyed by a token per game rather than the game itself, so an old game is not kept alive by this state.
   const gameToken = useMemo(() => ({ game: game.map.seed }), [game]);
@@ -98,13 +101,14 @@ export default function ColonyApp() {
                     {h}
                   </dt>
                 ))}
-                <SideRow name="you" tone="text-fg" s={stats.you} />
-                {stats.rival && <SideRow name="rival" tone="text-warn" s={stats.rival} />}
+                {stats.sides.map((s, k) => (
+                  <SideRow key={k} name={colonyName(k)} tone={colonyTone(k)} s={s} />
+                ))}
               </dl>
             )}
             {stats && stats.outcome !== "playing" && (
-              <p className={`mt-3 rounded-md px-3 py-1.5 text-sm ${stats.outcome === "lost" ? "bg-err-soft text-err" : "bg-accent-soft text-accent"}`}>
-                {OUTCOME[stats.outcome]}
+              <p className={`mt-3 rounded-md px-3 py-1.5 text-sm ${stats.outcome === "fallen" ? "bg-err-soft text-err" : "bg-accent-soft text-accent"}`}>
+                {stats.outcome === "fallen" ? fallenText(stats.fallen) : "One colony: the two nests smell alike and nobody has died fighting for a minute. The fungus has unified them."}
               </p>
             )}
           </section>
@@ -115,7 +119,7 @@ export default function ColonyApp() {
                   Stop Jev
                 </button>
               ) : (
-                <button type="button" className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={jev.start} title="Jev picks each ant's mode, once per situation under the doctrine">
+                <button type="button" className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={jev.start} title="Jev picks every colony's ant modes and stances under that colony's doctrine, and what the fungus does under your aim: each once per situation, cached">
                   Start Jev
                 </button>
               )}
@@ -162,13 +166,13 @@ export default function ColonyApp() {
               {size.w}×{size.h} cells of rock, ground and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food. Every 4 food stored is a new ant.
             </p>
             <label className="mt-2 flex items-center justify-between text-sm text-fg-2">
-              <span>Rival colony</span>
+              <span>Two colonies</span>
               <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />
             </label>
           </section>
 
           <section className="rounded-lg border border-line bg-panel p-4">
-            <Slider label="Ants" value={controls.antCount} min={100} max={2000} step={50} format={(v) => String(v)} onChange={(v) => update({ antCount: v })} />
+            <Slider label="Ants per colony" value={controls.antCount} min={100} max={2000} step={50} format={(v) => String(v)} onChange={(v) => update({ antCount: v })} />
             <Slider label="Speed" value={controls.speed} min={0.25} max={4} step={0.25} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => update({ speed: v })} />
             <div className="mt-3 flex items-center justify-between">
               <span className="text-sm text-fg-2">Trails</span>
@@ -224,13 +228,14 @@ export default function ColonyApp() {
                 <dt />
                 <dt className="text-right text-[11px] uppercase tracking-wide text-fg-3">infected</dt>
                 <dt className="text-right text-[11px] uppercase tracking-wide text-fg-3">resistance</dt>
-                <Infection name="you" tone="text-fg" s={stats.you} />
-                {stats.rival && <Infection name="rival" tone="text-warn" s={stats.rival} />}
+                {stats.sides.map((s, k) => (
+                  <Infection key={k} name={colonyName(k)} tone={colonyTone(k)} s={s} />
+                ))}
                 <dt className="text-fg-3">spores</dt>
                 <dd className="col-span-2 text-right text-fg-2">{stats.sporeCells.toLocaleString()} cells</dd>
               </dl>
             )}
-            {stats?.rival && (
+            {stats && stats.sides.length > 1 && (
               <div className="mt-3" aria-label="unity">
                 <div className="flex items-baseline justify-between">
                   <span>Unity</span>
@@ -296,26 +301,35 @@ export default function ColonyApp() {
               <p className="mt-1 text-xs text-fg-3">The fungus's goal, in your words: Jev reads it (never the ants). ≈ {TOKENS_PER_FUNGAL_SITUATION} tokens per fungal situation asked.</p>
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <span>Doctrine</span>
-              <div className="flex overflow-hidden rounded-md border border-line text-sm">
-                {DOCTRINES.map((d) => (
-                  <button key={d.id} type="button" className={seg(jev.doctrine.id === d.id)} onClick={() => jev.setDoctrine({ id: d.id, text: d.text })}>
-                    {d.name}
-                  </button>
-                ))}
+          </section>
+
+          <section className="rounded-lg border border-line bg-panel p-4 text-sm text-fg-2" aria-label="colonies">
+            <h2 className="text-xs font-medium uppercase tracking-wide text-fg-3">Colonies</h2>
+            <p className="mt-1 text-xs text-fg-3">Each colony's nature: the doctrine its ants follow when Jev is on. Not yours to steer: you are the fungus. A scenario setting.</p>
+            {jev.doctrines.slice(0, stats ? stats.sides.length : 1).map((d, k) => (
+              <div key={k} className="mt-3">
+                <div className="flex items-center justify-between">
+                  <span className={colonyTone(k)}>{colonyName(k)}</span>
+                  <div className="flex overflow-hidden rounded-md border border-line text-sm">
+                    {DOCTRINES.map((p) => (
+                      <button key={p.id} type="button" className={seg(d.id === p.id)} onClick={() => jev.setDoctrine(k, { id: p.id, text: p.text })}>
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <textarea
+                  className="mt-2 w-full resize-none rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-fg outline-none focus:border-accent"
+                  rows={3}
+                  value={d.text}
+                  onChange={(e) => jev.draftDoctrine(k, { id: "custom", text: e.target.value })}
+                  onBlur={(e) => jev.setDoctrine(k, { id: d.id, text: e.target.value })}
+                  aria-label={`${colonyName(k)} doctrine`}
+                />
               </div>
-            </div>
-            <textarea
-              className="mt-2 w-full resize-none rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-fg outline-none focus:border-accent"
-              rows={4}
-              value={jev.doctrine.text}
-              onChange={(e) => jev.draftDoctrine({ id: "custom", text: e.target.value })}
-              onBlur={(e) => jev.setDoctrine({ id: jev.doctrine.id, text: e.target.value })}
-              aria-label="doctrine"
-            />
+            ))}
             <p className="mt-1 text-xs text-fg-3">
-              The ants' rules, in your words. A new doctrine re-asks the situations the colony meets: about {stats ? stats.situationsSeen : "—"} so far, ≈ {retune.toLocaleString()} tokens ≈ {usd(retune * USD_PER_INPUT_TOKEN)}. One used before is free.
+              A new doctrine re-asks the situations a colony meets: about {stats ? stats.situationsSeen : "—"} so far, ≈ {retune.toLocaleString()} tokens ≈ {usd(retune * USD_PER_INPUT_TOKEN)}. Colonies with the same doctrine share every answer; one used before is free.
             </p>
           </section>
 
@@ -350,11 +364,10 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
   );
 }
 
-const OUTCOME = {
-  won: "The rival colony is gone. Your ants hold the map.",
-  lost: "Your colony is gone: no ants left and no food to raise more. Restart or try a new world.",
-  unified: "One colony: the two nests smell alike and nobody has died fighting for a minute. The fungus has unified them.",
-} as const;
+/** A colony is gone: the fungus's loss, whichever colony it was. */
+function fallenText(k: number): string {
+  return `The ${colonyName(k)} colony is gone: no ants left and no food to raise more. There is no one left to unite it with. Restart or try a new world.`;
+}
 
 const TOLERANCE = DEFAULT_RECOGNITION.tolerance;
 

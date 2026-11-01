@@ -4,8 +4,10 @@ import { Fungus, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { WorldMap } from "./world.ts";
 
-// The game, pure: the player's colony and (optionally) a rival on one map,
-// sharing its food. Each tick: the colonies move (each seeing the other's
+// The game, pure: two colonies (or one, solo) on one map, sharing its food.
+// The player is neither: the player is the fungus (fungus.ts). `player` and
+// `rival` are the first and second colony, named for history (the stack's
+// tests and scripts use them); the page calls them by colour, Ink and Amber. Each tick: the colonies move (each seeing the other's
 // ants through an enemy grid), then fights are resolved, then — every few
 // seconds — each colony's strategist picks its stance from a coarse view of
 // itself. A colony with no ants and too little food for one more is beaten.
@@ -31,7 +33,12 @@ export interface GameParams {
 
 export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {} };
 
-export type Outcome = "playing" | "won" | "lost" | "unified";
+/**
+ * The fungus's game: unified (one colony: the goal), fallen (a colony is gone: the fungus has lost hosts it
+ * could have unified, and there is no one left to unify it with), or playing. A colony's win over the other
+ * is no win for the fungus.
+ */
+export type Outcome = "playing" | "unified" | "fallen";
 
 /** How far the fungus has come toward one colony (docs/fungus-policy.md §1). */
 export interface Unity {
@@ -93,10 +100,12 @@ export class Game {
     this.#refresh();
   }
 
+  /** The first colony (Ink on the page). Not the player's: the player is the fungus. */
   get player(): Colony {
     return this.colonies[0] as Colony;
   }
 
+  /** The second colony (Amber on the page), or null solo. */
   get rival(): Colony | null {
     return this.colonies[1] ?? null;
   }
@@ -188,10 +197,13 @@ export class Game {
     return c.population === 0 && c.larder < c.params.foodPerAnt;
   }
 
+  /** The first colony that is beaten, by index, or −1. */
+  fallen(): number {
+    return this.colonies.findIndex((c) => Game.beaten(c));
+  }
+
   outcome(): Outcome {
-    if (Game.beaten(this.player)) return "lost";
-    const r = this.rival;
-    if (r && Game.beaten(r)) return "won";
-    return r && this.unity().unified ? "unified" : "playing";
+    if (this.fallen() >= 0) return "fallen";
+    return this.rival && this.unity().unified ? "unified" : "playing";
   }
 }

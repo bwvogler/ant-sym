@@ -5,6 +5,7 @@ import { INFECTED, type Fungus } from "../colony/fungus.ts";
 import { BINS, binOf } from "../colony/recognition.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
+import { colonyName } from "./names.ts";
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -41,7 +42,7 @@ function rgb(hex: string): [number, number, number] {
   return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : [128, 128, 128];
 }
 
-/** The colour of an odour: the player's colony's ink at 0, the rival's warn tone at 1, mixed between. */
+/** The colour of an odour: the first colony's ink at 0, the second's warn tone at 1, mixed between. */
 function odourColour(ink: [number, number, number], warn: [number, number, number], t: number): string {
   const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * t);
   return `rgb(${m(0)}, ${m(1)}, ${m(2)})`;
@@ -71,6 +72,8 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
   const layers = useRef({ food: showFoodTrail, home: showHomeTrail });
   const cam = useRef<Camera | null>(null);
   const follow = useRef<Followed | null>(followed);
+  /** the nest `n` went to last: it cycles through the colonies' nests */
+  const nestTurn = useRef(0);
   const followCb = useRef(onFollow);
   /** whether the view is zoomed in past the whole map (the minimap shows, and takes clicks) */
   const zoomedIn = useRef(false);
@@ -309,7 +312,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
           ctx.drawImage(cc.canvas, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
         }
 
-      // Nests and ants in view, coloured by odour (recognition.ts): the player's colony starts in ink, the rival's in the
+      // Nests and ants in view, coloured by odour (recognition.ts): the first colony (Ink) starts in ink, the second (Amber) in the
       // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier.
       const len = Math.max(3, Math.min(22, c.zoom * 0.9));
       const half = len / 2;
@@ -571,7 +574,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     } else if (e.key === "+" || e.key === "=") setCamera(zoomBy(c, world, v, v.w / 2, v.h / 2, 1.25));
     else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, world, v, v.w / 2, v.h / 2, 0.8));
     else if (e.key === "0" || e.key === "Home") showAll();
-    else if (key === "n") goHome();
+    else if (key === "n") goNest(rival ? (nestTurn.current + 1) % 2 : 0);
     else if (e.key === "Escape") unfollow();
     else return;
     e.preventDefault();
@@ -581,9 +584,12 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     unfollow();
     setCamera(fit(world, view()));
   };
-  const goHome = () => {
+  /** Centre on colony k's nest (n cycles through them). */
+  const goNest = (k: number) => {
+    const col = k === 1 && rival ? rival : colony;
+    nestTurn.current = k;
     unfollow();
-    setCamera({ x: colony.nest.x, y: colony.nest.y, zoom: Math.max(camera().zoom, 8 * dpr()) });
+    setCamera({ x: col.nest.x, y: col.nest.y, zoom: Math.max(camera().zoom, 8 * dpr()) });
   };
 
   const button = "pointer-events-auto rounded-md border border-line bg-panel/90 px-2 py-1 text-xs text-fg-2 shadow-sm hover:bg-raised";
@@ -594,7 +600,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         tabIndex={0}
         className={`absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent ${onPaint ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
         role="application"
-        aria-label="colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n for your nest; click an ant to follow it"
+        aria-label="colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it"
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
@@ -610,9 +616,14 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         <button type="button" className={button} onClick={showAll} title="Show the whole map (0)">
           Whole map
         </button>
-        <button type="button" className={button} onClick={goHome} title="Go to your nest (n)">
-          Your nest
+        <button type="button" className={button} onClick={() => goNest(0)} title="Go to the Ink colony's nest (n cycles nests)">
+          {colonyName(0)} nest
         </button>
+        {rival && (
+          <button type="button" className={button} onClick={() => goNest(1)} title="Go to the Amber colony's nest (n cycles nests)">
+            {colonyName(1)} nest
+          </button>
+        )}
       </div>
     </>
   );
