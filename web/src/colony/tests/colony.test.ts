@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avoid, climb, Colony, localPolicy, SITUATIONS, trailLevel, turnToward, type Situation } from "../colony.ts";
+import { avoid, climb, Colony, decode, encodeSituation, localPolicy, SITUATIONS, trailLevel, turnToward, type Situation } from "../colony.ts";
 import { foodAt, generateWorld, mulberry32, setRock, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field: the nest on the left, one food cell straight east of it. */
@@ -142,4 +142,18 @@ test("paint lays trail in a disc, never on rock; alarm turns ants away", () => {
   c.heading[0] = 0;
   for (let k = 0; k < 10; k++) c.tick(1 / 30);
   assert.ok((c.heading[0] as number) > 0.2, `turned away: heading ${c.heading[0]}`);
+});
+
+test("decode is encode's inverse over every situation; lastQuestion is what the ant was asked", () => {
+  for (let code = 0; code < SITUATIONS; code++) assert.equal(encodeSituation(decode(code)), code);
+  const map = corridor(0);
+  const asked: Situation[] = [];
+  const c = new Colony(map, { antCount: 1, wander: 0, deposit: 0 }, mulberry32(3), (s) => {
+    asked.push(s);
+    return "follow";
+  });
+  assert.equal(c.lastQuestion(0), null, "not asked yet");
+  c.tick(1 / 30);
+  assert.deepEqual(c.lastQuestion(0), asked.at(-1), "the situation the policy saw");
+  assert.equal(c.mode[0], 1, "and the answer it gave is the ant's mode");
 });

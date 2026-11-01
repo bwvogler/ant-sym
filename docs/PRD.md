@@ -382,3 +382,35 @@ This is the first step of the lifetime-world plan. It builds on the research not
 The browser holds 60 fps at 512×320 in headless Chromium, with no console errors in light, dark or phone layouts. The renderer walks the map chunk by chunk, but still fits the whole map to the canvas; MR 6 adds the camera.
 
 **Jev:** no change. Situations don't depend on the map: 1,296 possible, 248 met in a 4-minute `colony-cost` run (600 + 600 ants), at ~451 tokens per question. That run cost ≈ $0.009, ≈ $0.13/hour while retuning every 0.8 minutes, against the ≤ $0.25/h target. The request state is unchanged, so tokens/ant are unchanged.
+
+## 13. Camera, minimap and following an ant (MR 6, 2026-11-01)
+
+The 512×320 map is now something to move around in, not a picture squeezed into a box.
+
+- **Camera** (`ui/camera.ts`, pure, tested).
+  - The camera is a centre in cells and a zoom in device pixels per cell.
+  - Zoom runs from "the whole map" to `MAX_ZOOM` (28 px a cell). The view never leaves the map; an axis the map doesn't fill stays centred.
+  - `zoomAt` keeps the point under the cursor fixed, and `pan` moves the ground with the pointer. Tests pin both, plus the screen ↔ world inverses.
+- **Input** (`ColonyField.tsx`).
+  - **Pointer:** drag to pan (or right-drag, or space + drag while a brush is on), wheel to zoom about the pointer, two-finger pinch.
+  - **Keyboard** (focus the field first): arrows or WASD to move, +/− to zoom, `0` for the whole map, `n` for your nest, Esc to stop following.
+  - There are "Whole map" and "Your nest" buttons on the field.
+  - Brushes paint in world coordinates, and widen when zoomed out (×1 at ≥ 6 px a cell, up to ×6), so a stroke stays a stroke on screen.
+- **Rendering.**
+  - Only the chunks in view are painted, each into its own 64×64 canvas and drawn onto whole pixels, so chunks meet without seams.
+  - Only the ants in view are drawn. Cells past a ragged map edge are transparent.
+- **Minimap.**
+  - Zoomed in, a corner inset shows the whole map: ground, food, both colonies' ants, and the view's rectangle. It is redrawn twice a second.
+  - Click or drag on it to jump.
+- **Following an ant.**
+  - Click an ant (yours or the rival's) to follow it: the camera tracks it, with a jade ring around it.
+  - The card under the field shows:
+    - its mode, whether it is carrying, and how long it has been out;
+    - the situation it was in when it last chose (`Colony.lastQuestion`, decoded from the situation index);
+    - who made the choice: **Jev's cached answer**, **the local rule while Jev is asked**, or **the local rule**. This comes from `ColonyJev.explain`, which neither counts a hit nor queues anything.
+  - Panning, the minimap, `0`, `n` or Esc stops following, and so does the ant dying.
+  - This is the Jev showcase at the scale of one ant.
+
+**Checked in the browser:** fit, nest, wheel zoom, click-to-follow, drag-to-stop, minimap jump, painting while zoomed, and `0` for the whole map. A synthetic two-pointer pinch zooms about its midpoint. Light, dark and phone layouts show no console errors, and the page holds 60 fps.
+
+**Jev:** no change. `explain` makes no calls, and the request state is unchanged.

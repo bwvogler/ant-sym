@@ -186,3 +186,20 @@ test("the strategist's stance goes through its own cached lane", async () => {
   await tick(30);
   assert.equal(stances.length, 1, "asked once");
 });
+
+test("explain says who decides a situation, without counting or queuing it", async () => {
+  scriptFetch(answerAll("return"));
+  const j = make();
+  const c = colony();
+  j.attach(c);
+  const s = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" } as const;
+  assert.deepEqual(j.explain(s), { mode: "explore", by: "local" }, "off: the local rule");
+  await j.start();
+  const before = { hits: j.state.hits, misses: j.state.misses };
+  assert.equal(j.explain(s).by, "local", "running, never met: the local rule, and nothing queued");
+  assert.deepEqual({ hits: j.state.hits, misses: j.state.misses }, before, "explaining counts nothing");
+  j.policy(s); // the colony meets it: queued for Jev
+  assert.equal(j.explain(s).by, "waiting");
+  await tick(60);
+  assert.deepEqual(j.explain(s), { mode: "return", by: "jev" }, "answered: Jev's cached answer");
+});

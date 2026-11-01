@@ -64,5 +64,7 @@ export function useColonyJev(colony: Colony) {
   const start = useCallback(() => void jev.start(), [jev]);
   const stop = useCallback(() => void jev.stop(), [jev]);
 
-  return { state, start, stop, doctrine, setDoctrine, draftDoctrine: setDoctrineState };
+  const explain = useCallback((s: Situation) => jev.explain(s), [jev]);
+
+  return { state, start, stop, doctrine, setDoctrine, draftDoctrine: setDoctrineState, explain };
 }
