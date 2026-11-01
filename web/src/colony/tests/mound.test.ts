@@ -1,6 +1,6 @@
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { SWELL } from "../colony.ts";
+import { BACKFILL, Colony, SWELL } from "../colony.ts";
 import { Game } from "../game.ts";
 import { CELL, cellOf } from "../hex.ts";
 import { generateSideWorld, groundTop, heapMound, isSky, mulberry32, OPEN, reachable, rockAt, SOIL } from "../world.ts";
@@ -48,40 +48,74 @@ test("a sandpile round the hole: slopes of at most a row per column (≈41°), a
   assert.equal(food, 5, "the food on the walkway was lifted on top, not buried");
 });
 
-test("in a game, every pellet brought out is on the mound (× SWELL), loose soil is never dug again, and the way in stays open", () => {
+test("in a game: soil is carried out and dropped along the ground, loose soil is spread and taken down to backfill, every pellet is accounted for, nobody is buried, the way in stays open", () => {
   const map = generateSideWorld(2, { size: { w: 320, h: 200 }, nestCount: 1 });
   const g = new Game(map, { antCount: 300 }, mulberry32(7));
-  let seen = 0;
-  const c0 = g.player;
-  const solidT = new Float32Array(c0.n);
+  const c = g.player;
+  const solidT = new Float32Array(c.n);
   let maxSolid = 0;
   for (let k = 0; k < 30 * 200; k++) {
     g.tick(1 / 30);
     // Nobody is buried: an ant in a cell spoil was heaped on climbs out at once.
-    for (let i = 0; i < c0.n; i++) {
-      if (!c0.alive[i]) continue;
-      c0.antCell(i);
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i]) continue;
+      c.antCell(i);
       solidT[i] = rockAt(map, CELL[0] as number, CELL[1] as number) === OPEN ? 0 : solidT[i]! + 1 / 30;
       maxSolid = Math.max(maxSolid, solidT[i]!);
     }
     if (k % 300 === 0) {
       let loose = 0;
       for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
-      assert.equal(loose, g.player.moundCells, "every heaped cell is still there: loose soil isn't dug");
-      seen = loose;
+      const carried = c.carriedPellets();
+      assert.equal(loose, c.moundCells, "the mound on the map is the colony's count");
+      assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried.dug + c.soilLost, "dug = brought out + filled + carried + lost");
+      assert.equal(c.loosePicked, c.looseDropped + c.looseFilled + carried.loose + c.looseLost, "loose picked up = dropped again + filled + carried + lost");
+      assert.equal(c.moundCells, Math.floor(c.soilOut * SWELL + 1e-9) - c.moundLost - c.loosePicked + c.looseDropped, "the mound = soil brought out × SWELL, less what was taken off it, plus what was put back");
     }
   }
-  const c = g.player;
-  assert.ok(c.soilOut > 50 && seen > 50, `${c.soilOut} pellets out, ${seen} cells heaped`);
-  assert.equal(c.moundCells, Math.floor(c.soilOut * SWELL + 1e-9), "the mound holds every pellet, loosened by SWELL");
+  assert.ok(c.soilOut > 50, `${c.soilOut} pellets brought out`);
   assert.equal(c.moundLost, 0);
+  assert.ok(c.looseDropped > 0 && c.looseFilled > 0, `loose soil spread (${c.looseDropped}) and taken down to backfill (${c.looseFilled})`);
   assert.ok(maxSolid < 0.5, `longest any ant stood in solid ground: ${maxSolid.toFixed(2)} s`);
-  let carried = 0;
-  for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.pellet[i]! ? 1 : 0;
-  assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried + c.soilLost, "dug = mound + filled + carried + lost");
   const walk = reachable(map, c.nest.x, c.nest.y, "open");
-  cellOf(c.nest.entrance!.x, c.nest.entrance!.y);
-  assert.equal(walk[(CELL[1] as number) * map.size.w + (CELL[0] as number)], 1, "the chamber is still joined to the entrance");
+  let toSky = false;
+  for (let y = 0; y < map.size.h && !toSky; y++) for (let x = 0; x < map.size.w && !toSky; x++) toSky = walk[y * map.size.w + x] === 1 && isSky(map, x, y);
+  assert.ok(toSky, "the chamber still reaches the ground line");
+});
+
+test("a pellet is carried out along the ground and dropped where the carrier stands, not by the hole", () => {
+  // No scent in this one-ant world (deposit 0): every branch would look unused, so no detours to fill them.
+  const saved = BACKFILL.enterStale;
+  BACKFILL.enterStale = 0;
+  after(() => {
+    BACKFILL.enterStale = saved;
+  });
+  const map = generateSideWorld(1, { ...SMALL });
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(9), () => "return");
+  cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
+  const ex = CELL[0] as number;
+  const drops: { at: number; cells: number[] }[] = [];
+  for (let trip = 0; trip < 12; trip++) {
+    c.x[0] = map.nest.x;
+    c.y[0] = map.nest.y;
+    c.pellet[0] = 1;
+    c.mode[0] = 2;
+    c.soilDug++; // as if it dug it
+    const before = new Set<number>();
+    for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (map.loose!.get(x, y)) before.add(y * map.size.w + x);
+    let at = -1;
+    for (let t = 0; t < 30 * 60 && c.pellet[0] === 1; t++) {
+      c.tick(1 / 30);
+      c.antCell(0);
+      at = CELL[0] as number;
+    }
+    assert.equal(c.pellet[0], 0, `trip ${trip}: dropped`);
+    const cells: number[] = [];
+    for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (map.loose!.get(x, y) && !before.has(y * map.size.w + x)) cells.push(x);
+    drops.push({ at, cells });
+  }
+  for (const d of drops) for (const x of d.cells) assert.ok(Math.abs(x - d.at) <= 4, `heaped in column ${x}, dropped at ${d.at}: where it stood (and slid a little)`);
+  assert.ok(drops.some((d) => Math.abs(d.at - ex) >= 4), "carried away from the hole");
 });
 
 test("one colony's mound never buries another's hole: every hole keeps its funnel, however far the spoil spreads", () => {

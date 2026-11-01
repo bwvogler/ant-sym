@@ -824,3 +824,34 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 
   - Mound cells are exactly ⌊pellets out × 1.2⌋, and soil is conserved.
   - The open map is unchanged.
+
+**MR 15: the mound is carried and loose** (owner, 2026-11-01): "Why is the mound not movable? They should be pellets that are actually easier for ants to move… right now ants can touch the mound from below and it just grows somewhere." Both were true. A pellet "dropped" at the hole was put in a random column up to 90 away, and loose soil could never be dug. The owner chose for ants to both spread the mound and take it down to backfill.
+- **Carried out.** A pellet carrier comes up through the hole and walks out along the ground, away from the hole on a random side. It drops the pellet where it stands, once it is a chosen distance out. That distance grows with the mound (√ of a uniform draw over a reach of 3 + cells ÷ 6, at most 90).
+  - The cell lands on that spot and slides only to the angle of repose. The mound grows where you see ants drop soil.
+  - Funnels: every hole's funnel still holds.
+  - Give-up: a carrier that can't get onto the ground within 15 s drops the pellet anyway, heaped on top of its column clear of the crater.
+- **Loose.** Mound soil (`map.loose`) is no crust. Dug from below, it comes up in a quarter of packed soil's time (`LOOSE_DIG`). The pellet is a *moved* one: it doesn't count as dug, and it goes back out like any other.
+  - **Settling:** taken from inside the heap, the column settles a cell, so it is the column's top that goes, never a hole under hanging spoil.
+- **Spread.** An explorer on the ground beside a steep flank of the mound (the next column out a row lower, at the angle of repose) picks a pellet off it, 1 % a cell. It carries it about 6–18 columns farther out and drops it, so the mound spreads and smooths itself as ants rework their spoil.
+  - On the ground line, mound soil is picked up only by these rules, not dug at head-on: explorers chewed the mound and carried it to the hole and out again.
+- **Backfill from the mound.** Beside the mound anywhere, an explorer takes a pellet down into the nest to refill unused space, 0.5 % a cell (leaf-cutting ants refill excess space with soil, Pielström & Roces).
+  - It homes like an ant without a load and backfills by the usual rules.
+  - If it finds nowhere by the chamber, it carries the pellet back out.
+- **Bookkeeping**, tested every few seconds:
+  - **Dug soil:** dug = brought out + filled + dug pellets carried + lost.
+  - **Loose soil:** picked up = dropped again + filled + carried + lost.
+  - **The mound:** the mound on the map = ⌊brought out × 1.2⌋ − unplaced − picked up + dropped again.
+  - The "filled" stat counts both kinds of pellet.
+- **Ants on moving ground:** an ant whose cell becomes solid climbs out (up its column if every neighbour is solid). One left in the sky, the mound taken from under it, drops to the ground. Longest any ant spends in solid ground: 0.1 s.
+- **The crust now holds round the hole too.** Digging round it once hollowed the ground under the walkway above the hole. That walkway cell fell to sky, and the colony's carriers piled up in the hole with no way out onto the ground (seed 2).
+- **Measured** (seeds 1–5, 600 s, 600 ants per colony):
+
+  | | one colony | two colonies |
+  |---|---|---|
+  | food home | 1,412–2,075 (MR 14: 420–978) | 1,265–1,470 per colony (MR 14: 512–773) |
+  | ants alive at 600 s | 900 (the cap) | 900 and 900 |
+  | dug soil refilled | 62–67 % | 59–71 % |
+  | loose pellets moved | 900–2,400 a colony, ~25 % of them into backfill | |
+
+  - Food home roughly doubles: carriers walking soil out search the ground, and drop their pellet as foragers.
+  - The open map is unchanged.

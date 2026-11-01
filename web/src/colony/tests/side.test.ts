@@ -141,7 +141,9 @@ test("homing in the side view: a carrier on the ground walks to its entrance and
     let t = 0;
     for (; t < 30 * 60 && c.pellet[0] === 1; t++) c.tick(1 / 30);
     assert.equal(c.soilOut, 1, `up the shaft and out (${(t / 30).toFixed(0)} s)`);
-    assert.ok(Math.hypot(c.x[0]! - n.entrance!.x, c.y[0]! - n.entrance!.y) < 2, "at the entrance");
+    c.tick(1 / 30); // the pellet is heaped where it stands: it climbs on top of it
+    c.antCell(0);
+    assert.ok(isSky(map, CELL[0] as number, CELL[1] as number), "dropped out on the ground (MR 15: carried out along it, not dropped at the hole)");
   }
 });
 
@@ -167,9 +169,7 @@ test("foraging in the side view: carriers on the ground make for the hole, never
         }
         lastD[i] = onGround ? d : -1;
       }
-      let carried = 0;
-      for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.pellet[i]! ? 1 : 0;
-      assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried + c.soilLost, "dug = mound + filled + carried + lost");
+      assert.equal(c.soilDug, c.soilOut + c.soilFilled + c.carriedPellets().dug + c.soilLost, "dug = mound + filled + carried + lost");
     }
   }
   assert.ok(c.stored > 40, `food home: ${c.stored}`);
