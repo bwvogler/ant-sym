@@ -49,6 +49,9 @@ export function useColonyJev(colony: Colony) {
     jev.setDoctrine(DOCTRINES[0]!.text);
     return () => {
       off();
+      // Leaving the page: end the run on the server rather than leaving it open until its time cap
+      // (answers are already saved as they arrive).
+      if (jev.state.phase === "running") void jev.stop();
       jev.dispose();
     };
   }, [jev]);
