@@ -865,5 +865,14 @@ export function takeLoose(map: WorldMap, x: number, y: number): boolean {
   map.rock.set(x, y, OPEN);
   map.sky.set(x, y, 1);
   updateSurface(map, x, y);
+  // Food on top of the cell taken, left in the sky, comes down with it.
+  const above = ny(y, 4);
+  for (const ax of [nx(x, y, 4), nx(x, y, 5)]) {
+    const f = map.food.get(ax, above);
+    if (f > 0 && rockAt(map, ax, above) !== OPEN && rockAt(map, x, y) === OPEN) {
+      map.food.set(ax, above, 0);
+      map.food.set(x, y, map.food.get(x, y) + f);
+    }
+  }
   return true;
 }

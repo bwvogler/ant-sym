@@ -2,7 +2,7 @@ import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { BACKFILL, Colony, SWELL } from "../colony.ts";
 import { Game } from "../game.ts";
-import { CELL, cellOf } from "../hex.ts";
+import { CELL, cellOf, nx, ny } from "../hex.ts";
 import { generateSideWorld, groundTop, heapMound, isSky, mulberry32, OPEN, reachable, rockAt, SOIL } from "../world.ts";
 
 // The mound above ground (MR 14): pellets brought out become loose soil heaped as a sandpile round the hole.
@@ -76,11 +76,56 @@ test("in a game: soil is carried out and dropped along the ground, loose soil is
   assert.ok(c.soilOut > 50, `${c.soilOut} pellets brought out`);
   assert.equal(c.moundLost, 0);
   assert.ok(c.looseDropped > 0 && c.looseFilled > 0, `loose soil spread (${c.looseDropped}) and taken down to backfill (${c.looseFilled})`);
-  assert.ok(maxSolid < 0.5, `longest any ant stood in solid ground: ${maxSolid.toFixed(2)} s`);
+  assert.ok(maxSolid < 0.2, `longest any ant stood in solid ground: ${maxSolid.toFixed(2)} s`);
+  // The way in: the chamber reaches the hole, and the hole the ground line.
   const walk = reachable(map, c.nest.x, c.nest.y, "open");
-  let toSky = false;
-  for (let y = 0; y < map.size.h && !toSky; y++) for (let x = 0; x < map.size.w && !toSky; x++) toSky = walk[y * map.size.w + x] === 1 && isSky(map, x, y);
-  assert.ok(toSky, "the chamber still reaches the ground line");
+  cellOf(c.nest.entrance!.x, c.nest.entrance!.y);
+  const hx = CELL[0] as number;
+  const hy = CELL[1] as number;
+  assert.equal(walk[hy * map.size.w + hx], 1, "the chamber reaches the hole");
+  let out = false;
+  for (let d = 0; d < 6; d++) out ||= isSky(map, nx(hx, hy, d), ny(hy, d)) && rockAt(map, nx(hx, hy, d), ny(hy, d)) === OPEN;
+  assert.ok(out, "the hole opens onto the ground line");
+  // The crust holds: no open ground under the ground line beside the walkway, away from the hole (no new holes).
+  let holes = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = 0; x < map.size.w; x++) {
+      if (rockAt(map, x, y) !== OPEN || isSky(map, x, y) || Math.abs(x - hx) <= 4) continue;
+      for (let d = 0; d < 6; d++) if (isSky(map, nx(x, y, d), ny(y, d)) && rockAt(map, nx(x, y, d), ny(y, d)) === OPEN) holes++;
+    }
+  assert.equal(holes, 0, "no holes from the tunnels onto the ground line but the entrance");
+});
+
+test("two colonies: each picks up the other's spoil too, and the books still balance (the mound on the map is the sum of both colonies')", () => {
+  const map = generateSideWorld(4, { size: { w: 360, h: 180 }, nestGap: 160 });
+  const g = new Game(map, { antCount: 250, rivalAnts: 250 }, mulberry32(4));
+  for (let k = 0; k < 30 * 160; k++) {
+    g.tick(1 / 30);
+    if (k % 450 !== 0) continue;
+    let loose = 0;
+    for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
+    let mound = 0;
+    for (const c of g.colonies) {
+      const carried = c.carriedPellets();
+      mound += c.moundCells;
+      assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried.dug + c.soilLost, "dug = brought out + filled + carried + lost");
+      assert.equal(c.loosePicked, c.looseDropped + c.looseFilled + carried.loose + c.looseLost, "loose picked up = dropped + filled + carried + lost");
+    }
+    assert.equal(mound, loose, "both colonies' mound counts add up to the loose soil on the map");
+  }
+  assert.ok(g.colonies.every((c) => c.soilOut > 20), "both brought soil out");
+  // No new holes onto the ground line, away from both entrances (spoil picked off a blanket over dug ground opened them).
+  const holeCols = map.nests.map((n) => {
+    cellOf(n.entrance!.x, n.entrance!.y);
+    return CELL[0] as number;
+  });
+  let holes = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = 0; x < map.size.w; x++) {
+      if (rockAt(map, x, y) !== OPEN || isSky(map, x, y) || holeCols.some((h) => Math.abs(x - h) <= 4)) continue;
+      for (let d = 0; d < 6; d++) if (isSky(map, nx(x, y, d), ny(y, d)) && rockAt(map, nx(x, y, d), ny(y, d)) === OPEN) holes++;
+    }
+  assert.equal(holes, 0, "no holes onto the ground line but the entrances");
 });
 
 test("a pellet is carried out along the ground and dropped where the carrier stands, not by the hole", () => {

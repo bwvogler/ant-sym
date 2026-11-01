@@ -573,7 +573,7 @@ export class Colony {
     const packed = hy * 65536 + hx;
     // Homing on the ground line (side view) goes cell by cell to the hole wherever the walkway is, one cell
     // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
-    const carryingOut = mode === RETURN && this.#entrance !== null && !Number.isNaN(this.#spoilTo[i] as number);
+    const carryingOut = mode === RETURN && this.pellet[i] === 1 && this.#entrance !== null && !Number.isNaN(this.#spoilTo[i] as number);
     const groundHome = carryingOut || (mode === RETURN && this.#entrance !== null && isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number)));
     if (fresh && !hugging && !groundHome && this.#noTunnel[i] === packed) {
       this.gx[i] = NO_CELL; // looked here already: open ground
@@ -723,6 +723,7 @@ export class Colony {
       else this.soilFilled++;
       this.#loosePellet[i] = 0;
       this.#fillIntent[i] = 0;
+      this.#spoilTo[i] = NaN;
       this.since[i] = 0;
       this.#staleWalk[i] = 0;
       return true;
@@ -861,13 +862,11 @@ export class Colony {
   }
 
   /**
-   * Whether an ant at cell (cx, cy) may dig from there: always underground; on the ground line (side view)
-   * only by its own entrance, or explorers walking the surface would pock the ground with holes everywhere.
+   * Whether an ant at cell (cx, cy) may dig from there: underground, yes; on the ground line (side view), no: the
+   * hole is the way in (and every face there is crust: see #crust), or explorers would pock the ground with holes.
    */
   #mayDig(cx: number, cy: number): boolean {
-    const ent = this.#entrance;
-    if (!ent || !isSky(this.map, cx, cy)) return true;
-    return Math.hypot(centreX(cx, cy) - ent.x, centreY(cy) - ent.y) < ENTRANCE_ZONE;
+    return !this.#entrance || !isSky(this.map, cx, cy);
   }
 
   /**
@@ -881,7 +880,13 @@ export class Colony {
     if (this.map.loose?.get(x, y) === 1) return false; // the mound: loose pellets, picked up anywhere (see LOOSE_DIG)
     // Round the hole too: it is their way in already, and digging round it once hollowed the ground under the walkway
     // above the hole, which fell to sky and left the hole with no way out onto the ground.
-    for (let d = 0; d < 6; d++) if (isSky(this.map, stepX(x, y, d), stepY(y, d))) return true;
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(x, y, d);
+      const ty = stepY(y, d);
+      // The ground under the mound is crust too: dug out under a blanket of spoil, the next pellet picked off the
+      // top opened a new hole into the tunnels, away from every entrance (agent review of MR 15).
+      if (isSky(this.map, tx, ty) || this.map.loose?.get(tx, ty) === 1) return true;
+    }
     return false;
   }
 
@@ -1230,7 +1235,8 @@ export class Colony {
           }
         }
         const side = this.wall[i] as number;
-        const look = pellet && map.hasSoil && (this.since[i] as number) > BACKFILL.after && this.#enteredCell(i);
+        // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
+        const look = pellet && map.hasSoil && Number.isNaN(this.#spoilTo[i] as number) && (this.since[i] as number) > BACKFILL.after && this.#enteredCell(i);
         const lx = CELL[0] as number;
         const ly = CELL[1] as number;
         if (look && this.#backfill(i, lx, ly)) {
@@ -1548,6 +1554,7 @@ export class Colony {
         this.#spoilTo[i] = 2 + reach * Math.sqrt(rng());
         this.#spoilSide[i] = rng() < 0.5 ? -1 : 1;
         this.#spoilT[i] = 0;
+        this.#staleWalk[i] = 0;
         this.wall[i] = 0;
         this.mx[i] = NaN;
         this.gx[i] = NO_CELL;

@@ -843,15 +843,24 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   - **The mound:** the mound on the map = ⌊brought out × 1.2⌋ − unplaced − picked up + dropped again.
   - The "filled" stat counts both kinds of pellet.
 - **Ants on moving ground:** an ant whose cell becomes solid climbs out (up its column if every neighbour is solid). One left in the sky, the mound taken from under it, drops to the ground. Longest any ant spends in solid ground: 0.1 s.
-- **The crust now holds round the hole too.** Digging round it once hollowed the ground under the walkway above the hole. That walkway cell fell to sky, and the colony's carriers piled up in the hole with no way out onto the ground (seed 2).
+- **The crust now holds round the hole and under the mound.**
+  - Digging round the hole once hollowed the ground under the walkway above it. That cell fell to sky, and the carriers piled up in the hole with no way out onto the ground (seed 2).
+  - Ground under the mound counts as crust too. Dug out under a blanket of spoil, the next pellet picked off the top opened a new hole into the tunnels, away from every entrance (agent review).
+  - Ants on the ground line never dig: the hole is the way in.
+- **Agent review fixes:**
+  - the carry-out state is cleared when a carrier backfills (it leaked into later trips), and carry-out needs a pellet in jaws;
+  - carriers on their way out don't look for space to fill;
+  - food on top of a pellet picked up comes down with it, never left in the sky;
+  - the tests check that the chamber reaches the hole and the hole the ground line, that no new holes open, and that the mound books balance when two colonies pick up each other's spoil.
 - **Measured** (seeds 1–5, 600 s, 600 ants per colony):
 
   | | one colony | two colonies |
   |---|---|---|
-  | food home | 1,412–2,075 (MR 14: 420–978) | 1,265–1,470 per colony (MR 14: 512–773) |
+  | food home | 1,267–1,881 (MR 14: 420–978) | 1,276–1,435 per colony (MR 14: 512–773) |
   | ants alive at 600 s | 900 (the cap) | 900 and 900 |
-  | dug soil refilled | 62–67 % | 59–71 % |
-  | loose pellets moved | 900–2,400 a colony, ~25 % of them into backfill | |
+  | dug soil refilled (with loose fills) | 63–78 % | 66–71 % |
+  | loose pellets picked up | 555–1,220 a colony, ~25 % of them into backfill | 404–1,044 |
+  | longest in solid ground | 0.1 s | 0.07 s |
 
   - Food home roughly doubles: carriers walking soil out search the ground, and drop their pellet as foragers.
   - The open map is unchanged.
