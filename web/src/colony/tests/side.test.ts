@@ -145,28 +145,36 @@ test("homing in the side view: a carrier on the ground walks to its entrance and
   }
 });
 
-test("foraging in the side view: carriers with a trail to follow walk to the hole, not past it, and soil is conserved", () => {
+test("foraging in the side view: carriers on the ground make for the hole, never away from it (no shuttling past it), and soil is conserved", () => {
   const map = generateSideWorld(4, { nestCount: 1 });
   const g = new Game(map, { antCount: 400 }, mulberry32(11));
   const c = g.player;
-  const pick = new Float32Array(c.n).fill(-1);
-  let long = 0;
+  const e = c.nest.entrance!;
+  const lastD = new Float32Array(c.n).fill(-1);
+  let samples = 0;
+  let away = 0;
   for (let k = 0; k < 30 * 200; k++) {
     g.tick(1 / 30);
-    for (let i = 0; i < c.n; i++) {
-      if (!c.alive[i]) continue;
-      if (c.carrying[i] && pick[i] < 0) pick[i] = k / 30;
-      if (!c.carrying[i]) pick[i] = -1;
-    }
-    if (k % 30 === 0) {
+    if (k % 60 === 0) {
+      // Every 2 s: a carrier on the ground should be nearer the hole (along the ground) than 2 s ago.
+      for (let i = 0; i < c.n; i++) {
+        c.antCell(i);
+        const onGround = c.alive[i] && c.carrying[i] && isSky(map, CELL[0] as number, CELL[1] as number);
+        const d = Math.abs(c.x[i]! - e.x);
+        if (onGround && lastD[i]! >= 0) {
+          samples++;
+          if (d > lastD[i]! + 2) away++;
+        }
+        lastD[i] = onGround ? d : -1;
+      }
       let carried = 0;
       for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.pellet[i]! ? 1 : 0;
       assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried + c.soilLost, "dug = mound + filled + carried + lost");
     }
   }
-  for (let i = 0; i < c.n; i++) if (c.alive[i] && pick[i] >= 0 && 200 - pick[i] > 60) long++;
   assert.ok(c.stored > 40, `food home: ${c.stored}`);
-  assert.ok(long <= 1, `${long} ants carrying food for over a minute (they used to shuttle along the ground line past the hole)`);
+  assert.ok(samples > 50, `${samples} samples of carriers on the ground`);
+  assert.ok(away <= samples * 0.03, `${away} of ${samples} times a carrier on the ground had moved away from the hole (they used to shuttle past it)`);
 });
 
 test("the ground line's crust stays: explorers walking the surface dig only by their own entrance, and the ground line is never filled", () => {

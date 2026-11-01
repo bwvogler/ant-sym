@@ -802,14 +802,23 @@ export function groundTop(map: WorldMap, x: number): number {
  * column, outward on a tie) while one is a row or more lower. At most one row per column is about 41°, the
  * angle of repose of damp soil (dry sand ≈ 34°). Near the hole a column holds no more than a row per column of
  * distance from it, so the inner side slopes down into the hole at the same angle: a ring with a funnel-shaped
- * crater, the hole open at its bottom. Food on the cell it buries is lifted on top.
- * Returns the cell heaped, or null if there is no room (the sky's top, the map's edge).
+ * crater, the hole open at its bottom. Every hole in `holes` (all nests' entrance columns; its own by default)
+ * keeps its funnel, so one colony's mound never buries another's way in. Food on the cell it buries is lifted on top.
+ * Returns the cell heaped, or null if there is no room on that side (the sky's top, the map's edge).
  */
-export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number): [number, number] | null {
+export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number, holes: readonly number[] = [ex]): [number, number] | null {
   if (!map.sky || !map.loose) return null;
-  const hole = groundTop(map, ex);
-  // Room in column c: on the map, not the hole's column, and below the funnel's slope up from the hole.
-  const ok = (c: number) => c >= 0 && c < map.size.w && c !== ex && hole - groundTop(map, c) < Math.abs(c - ex) - 1;
+  const tops = holes.map((h) => groundTop(map, h));
+  // Room in column c: on the map, no hole's column, and below every funnel's slope up from its hole.
+  const ok = (c: number) => {
+    if (c < 0 || c >= map.size.w) return false;
+    const top = groundTop(map, c);
+    for (let k = 0; k < holes.length; k++) {
+      const h = holes[k] as number;
+      if (c === h || (tops[k] as number) - top >= Math.abs(c - h) - 1) return false;
+    }
+    return true;
+  };
   // Landing beyond the map's edge lands at the edge; then out from the funnel if it is inside it, else back in.
   let x = Math.max(0, Math.min(map.size.w - 1, ex + side * (2 + land)));
   while (x >= 0 && x < map.size.w && !ok(x)) x += side;

@@ -185,6 +185,10 @@ export class Colony {
   #entrance: Nest | null = null;
   /** the side view: the entrance's column, where the mound's crater is */
   #entranceCol = 0;
+  /** the side view: every nest's entrance column (no mound buries a hole, the rival's included) */
+  #holes: number[] = [];
+  /** the side view: cells of soil brought out that found no room on the mound (the sky's top on both sides; never seen in play) */
+  moundLost = 0;
   /** the side view: cells of mound heaped so far, or tried (no room at the sky's top): ⌊pellets out × SWELL⌋ once caught up */
   #heaped = 0;
   /** the side view: cells of loose soil heaped on the mound */
@@ -267,6 +271,11 @@ export class Colony {
       this.#entrance = { x: this.nest.entrance.x, y: this.nest.entrance.y, r: ENTRANCE_R };
       cellOf(this.nest.entrance.x, this.nest.entrance.y);
       this.#entranceCol = CELL[0] as number;
+      for (const n of map.nests ?? [this.nest])
+        if (n.entrance) {
+          cellOf(n.entrance.x, n.entrance.y);
+          this.#holes.push(CELL[0] as number);
+        }
     }
     this.policy = policy;
     this.stancePolicy = stancePolicy;
@@ -518,13 +527,16 @@ export class Colony {
     if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
     const hugging = mode === EXPLORE && (this.hugT[i] as number) > 0;
     const packed = hy * 65536 + hx;
-    if (fresh && !hugging && this.#noTunnel[i] === packed) {
+    // Homing on the ground line (side view) goes cell by cell to the hole wherever the walkway is, one cell
+    // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
+    const groundHome = mode === RETURN && this.#entrance !== null && isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number));
+    if (fresh && !hugging && !groundHome && this.#noTunnel[i] === packed) {
       this.gx[i] = NO_CELL; // looked here already: open ground
       return false;
     }
     const cx = fresh ? hx : (this.gx[i] as number);
     const cy = fresh ? hy : (this.gy[i] as number);
-    if (!tunnel(map, cx, cy)) {
+    if (!groundHome && !tunnel(map, cx, cy)) {
       if (hugging) return this.#hug(i, cx, cy, fresh);
       this.gx[i] = NO_CELL;
       if (fresh) this.#noTunnel[i] = packed;
@@ -817,6 +829,28 @@ export class Colony {
     return false;
   }
 
+  /**
+   * The side view: an ant whose cell has become solid (spoil heaped on it, or round it by the other colony) climbs
+   * out to an open neighbour, upward first. Six heaps round an ant, three a second by the hole, could otherwise
+   * wall it in for good (agent review of MR 14: ants buried for the rest of the run).
+   */
+  #unbury(i: number): void {
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    if (rockAt(this.map, cx, cy) === OPEN) return;
+    for (const d of [4, 5, 3, 0, 2, 1]) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (rockAt(this.map, tx, ty) !== OPEN) continue;
+      this.x[i] = centreX(tx, ty);
+      this.y[i] = centreY(ty);
+      this.gx[i] = NO_CELL;
+      this.digT[i] = 0;
+      return;
+    }
+  }
+
   /** Whether ant i is in a cell it hasn't looked round yet (leaves its cell in CELL). */
   #enteredCell(i: number): boolean {
     this.antCell(i);
@@ -933,6 +967,7 @@ export class Colony {
     this.recentLosses *= Math.exp(-dt / 30);
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
+      if (map.sky) this.#unbury(i);
       let h = this.heading[i] as number;
       // Three sensors (left, front, right), each read on every channel at once.
       const sn = this.#s;
@@ -1013,6 +1048,15 @@ export class Colony {
         const x = this.x[i] as number;
         const y = this.y[i] as number;
         const toNest = Math.atan2(nest.y - y, nest.x - x);
+        if (this.#entrance && (this.wall[i] !== 0 || detouring)) {
+          // On the ground line it homes cell by cell (see #walkTunnel): no walls to follow, no detour to wander (an
+          // explorer's detour, run up bumping round, used to carry on once it had food, and walk it away from the hole).
+          this.antCell(i);
+          if (isSky(map, CELL[0] as number, CELL[1] as number)) {
+            this.wall[i] = 0;
+            this.detour[i] = 0;
+          }
+        }
         const side = this.wall[i] as number;
         const look = pellet && map.hasSoil && (this.since[i] as number) > BACKFILL.after && this.#enteredCell(i);
         const lx = CELL[0] as number;
@@ -1027,7 +1071,7 @@ export class Colony {
           h = this.#towardTarget(i); // into a stale branch, to fill its end
         } else if (this.#staleWalk[i] && this.#staleStep(i, p.speed * dt)) {
           h = this.#towardTarget(i); // on along it
-        } else if (side === 0 && !detouring && this.#walkTunnel(i, RETURN, p.speed * dt)) {
+        } else if (side === 0 && !(detouring && (this.detour[i] as number) > 0) && this.#walkTunnel(i, RETURN, p.speed * dt)) {
           h = this.#towardTarget(i); // in a tunnel: back the way it came (a wall it is already following, it keeps following)
         } else if (side === 0) {
           // Free: the home vector, with the home trail as a hint only (climbing it at full rate let
@@ -1312,17 +1356,22 @@ export class Colony {
           this.#heaped++;
           // Dropped anywhere out to a reach that grows with the mound, so it spreads as a low disc (its area tracks the
           // nest's volume, Tschinkel 2015) rather than piling into a cone every forager has to climb.
-          const reach = 3 + this.#heaped / (2 * MOUND_HEIGHT);
-          const cell = heapMound(map, this.#entranceCol, rng() < 0.5 ? -1 : 1, Math.floor(rng() * reach));
+          // Out to a reach that grows with the mound (to MOUND_REACH), more of it farther out (√ of a uniform draw): uniform
+          // drops piled up by the hole, every drop since the first landing there.
+          const reach = Math.min(MOUND_REACH, 3 + this.#heaped / (2 * MOUND_HEIGHT));
+          const land = Math.floor(reach * Math.sqrt(rng()));
+          const side = rng() < 0.5 ? -1 : 1;
+          const cell = heapMound(map, this.#entranceCol, side, land, this.#holes) ?? heapMound(map, this.#entranceCol, side === 1 ? -1 : 1, land, this.#holes);
           if (cell) {
             this.moundCells++;
             // The trail lying on the walkway cell just buried rides up onto the new one above it: otherwise every pellet
             // heaped cuts the trails by the entrance, three times a second, and foragers lose their way in and out.
             for (const ch of ["food", "home"] as const) {
               const v = ph.fields[ch].get(cell[0], cell[1]);
-              if (v > 0) ph.depositCell(ch, cell[0], cell[1] - 1, v);
+              const above = ph.fields[ch].get(cell[0], cell[1] - 1);
+              if (v > above) ph.depositCell(ch, cell[0], cell[1] - 1, v - above);
             }
-          }
+          } else this.moundLost++;
         }
         this.wall[i] = 0;
         this.mx[i] = NaN;
@@ -1529,6 +1578,8 @@ export function moundRadius(pellets: number, nestR: number): number {
 
 /** The side view: about how high (rows) the spoil disc stands as it spreads: a steep cone halved the food brought home, six rows cost a third. */
 const MOUND_HEIGHT = 3;
+/** The side view: the farthest (columns) a pellet is carried from the hole; past it the disc grows higher, not wider. */
+const MOUND_REACH = 90;
 /** The side view: how near its entrance (world units) an ant counts as at it, to drop a pellet. */
 const ENTRANCE_R = 1.5;
 /** The side view: how near its entrance an ant on the ground line may dig (and how much ground round the hole stays unfilled). */

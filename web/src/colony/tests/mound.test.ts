@@ -52,8 +52,18 @@ test("in a game, every pellet brought out is on the mound (× SWELL), loose soil
   const map = generateSideWorld(2, { size: { w: 320, h: 200 }, nestCount: 1 });
   const g = new Game(map, { antCount: 300 }, mulberry32(7));
   let seen = 0;
+  const c0 = g.player;
+  const solidT = new Float32Array(c0.n);
+  let maxSolid = 0;
   for (let k = 0; k < 30 * 200; k++) {
     g.tick(1 / 30);
+    // Nobody is buried: an ant in a cell spoil was heaped on climbs out at once.
+    for (let i = 0; i < c0.n; i++) {
+      if (!c0.alive[i]) continue;
+      c0.antCell(i);
+      solidT[i] = rockAt(map, CELL[0] as number, CELL[1] as number) === OPEN ? 0 : solidT[i]! + 1 / 30;
+      maxSolid = Math.max(maxSolid, solidT[i]!);
+    }
     if (k % 300 === 0) {
       let loose = 0;
       for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
@@ -64,10 +74,33 @@ test("in a game, every pellet brought out is on the mound (× SWELL), loose soil
   const c = g.player;
   assert.ok(c.soilOut > 50 && seen > 50, `${c.soilOut} pellets out, ${seen} cells heaped`);
   assert.equal(c.moundCells, Math.floor(c.soilOut * SWELL + 1e-9), "the mound holds every pellet, loosened by SWELL");
+  assert.equal(c.moundLost, 0);
+  assert.ok(maxSolid < 0.5, `longest any ant stood in solid ground: ${maxSolid.toFixed(2)} s`);
   let carried = 0;
   for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.pellet[i]! ? 1 : 0;
   assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried + c.soilLost, "dug = mound + filled + carried + lost");
   const walk = reachable(map, c.nest.x, c.nest.y, "open");
   cellOf(c.nest.entrance!.x, c.nest.entrance!.y);
   assert.equal(walk[(CELL[1] as number) * map.size.w + (CELL[0] as number)], 1, "the chamber is still joined to the entrance");
+});
+
+test("one colony's mound never buries another's hole: every hole keeps its funnel, however far the spoil spreads", () => {
+  const map = generateSideWorld(3, { size: { w: 320, h: 160 }, surface: 70, relief: 0, nestCount: 2, nestGap: 110 });
+  const holes = map.nests.map((n) => {
+    cellOf(n.entrance!.x, n.entrance!.y);
+    return CELL[0] as number;
+  });
+  const [a, b] = holes as [number, number];
+  cellOf(map.nests[1]!.entrance!.x, map.nests[1]!.entrance!.y);
+  const by = CELL[1] as number;
+  const topB = groundTop(map, b);
+  const rng = mulberry32(4);
+  for (let k = 0; k < 4000; k++) heapMound(map, a, b > a ? 1 : -1, Math.floor(rng() * 150), holes);
+  assert.equal(groundTop(map, b), topB, "the other hole's column is never heaped");
+  assert.equal(rockAt(map, b, by), OPEN, "its hole is open");
+  for (const d of [1, 2]) assert.ok(groundTop(map, b) - groundTop(map, b + d) < d && groundTop(map, b) - groundTop(map, b - d) < d, `its funnel holds ${d} out`);
+  const walk = reachable(map, map.nests[1]!.x, map.nests[1]!.y, "open");
+  let toSky = false;
+  for (let y = 0; y < map.size.h && !toSky; y++) for (let x = 0; x < map.size.w && !toSky; x++) toSky = walk[y * map.size.w + x] === 1 && isSky(map, x, y);
+  assert.ok(toSky, "its chamber still reaches the ground line");
 });
