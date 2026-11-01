@@ -7,7 +7,7 @@ import AntCard from "./ui/AntCard.tsx";
 import ColonyField from "./ui/ColonyField.tsx";
 import type { Followed } from "./ui/follow.ts";
 import Nav from "./ui/Nav.tsx";
-import { Bar, Slider } from "./ui/Panel.tsx";
+import { Bar, NEAR_CAP, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
 import { STRAINS, useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
@@ -115,7 +115,7 @@ export default function ColonyApp() {
           <section className="rounded-lg border border-line bg-panel px-4 py-3" aria-label="colony jev">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               {running ? (
-                <button type="button" className="rounded-md bg-err px-4 py-2 text-sm font-medium text-white hover:opacity-90" onClick={jev.stop}>
+                <button type="button" className="rounded-md bg-err px-4 py-2 text-sm font-medium text-err-ink hover:opacity-90" onClick={jev.stop}>
                   Stop Jev
                 </button>
               ) : (
@@ -128,7 +128,7 @@ export default function ColonyApp() {
                   <span className="font-mono text-2xl font-semibold tabular-nums text-fg">{run ? usd(run.usd) : "$0.0000"}</span>
                   <span className="text-xs text-fg-3">{run ? `of $${run.caps.capUsd.toFixed(2)}` : "this run"}</span>
                 </div>
-                <Bar value={run && run.caps.capUsd > 0 ? Math.min(1, run.usd / run.caps.capUsd) : 0} />
+                <Bar value={run && run.caps.capUsd > 0 ? Math.min(1, run.usd / run.caps.capUsd) : 0} warnAt={NEAR_CAP} />
               </div>
               <Stat label="avg $ / hour" value={perHour === null ? "—" : `$${perHour.toFixed(3)}`} />
               <Stat label="tokens" value={run ? run.inputTokens.toLocaleString() : "—"} />

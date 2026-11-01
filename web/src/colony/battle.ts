@@ -1,5 +1,5 @@
-import { ChunkLayer } from "./chunks.ts";
-import type { Colony } from "./colony.ts";
+import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
+import { ENEMY, type Colony } from "./colony.ts";
 import type { Recognition } from "./recognition.ts";
 import type { WorldSize } from "./world.ts";
 
@@ -67,8 +67,6 @@ export class CountGrid {
   }
 }
 
-const BLOCK_BITS = 3;
-
 /** Ants per cell, one grid per colony. */
 export function occupancy(colony: Colony, out: CountGrid): CountGrid {
   out.reset();
@@ -117,7 +115,7 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       // A calmed encounter (under half an enemy) does not raise the alarm; with no fungus every enemy is whole.
       // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
       const loud = 1 - (c.quiet[i] as number);
-      if (enemies >= 0.5 && loud > 0) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
+      if (enemies >= ENEMY && loud > 0) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
     }
   });

@@ -1,4 +1,5 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
+import { TOLERANCE } from "./recognition.ts";
 import { blocked, dig, dropFood, OPEN, rockAt, SOIL, takeFood, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
@@ -69,7 +70,7 @@ export interface CellCounts {
 }
 
 /** A cell holds an enemy an ant reacts to when its (calm-weighted) strangers reach this. */
-const ENEMY = 0.5;
+export const ENEMY = 0.5;
 
 /**
  * The local rule. An enemy close by: fight it. Tired: go home. Raiding:
@@ -147,7 +148,7 @@ export interface ColonyParams {
   tolerance: number;
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, odour: 0, tolerance: 0.35 };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;

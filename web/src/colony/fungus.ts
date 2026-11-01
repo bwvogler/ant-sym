@@ -1,5 +1,5 @@
 import type { CountGrid } from "./battle.ts";
-import { CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
+import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import { MODES, type Colony, type Mode } from "./colony.ts";
 import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, encodeFungal, loadLevel, localFungusRule, type FungalSituation, type FungusPolicy, type FungusRule, type Ground } from "./fungalPolicy.ts";
 import type { Recognition } from "./recognition.ts";
@@ -166,7 +166,6 @@ const NOTHING = 1e-6;
 /** Ground spores below this are gone. */
 const SPORE_GONE = 1e-3;
 
-const BLOCK_BITS = 3;
 /** The last local coordinate in a chunk. */
 const EDGE = CHUNK - 1;
 /** Offsets of the 3×3 cells around a cell, inside one chunk's array. */

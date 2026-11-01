@@ -1,4 +1,4 @@
-import { ChunkLayer } from "./chunks.ts";
+import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
 
 // Recognition, pure (ja-t4d.3, docs/fungus-policy.md §4.B). Who is an enemy
@@ -51,8 +51,6 @@ export function binCentre(b: number): number {
  */
 export const STRANGER_EPS = 1e-6;
 
-const BLOCK_BITS = 3;
-
 /** A float per cell, summed, over a map of any size: touched cells only are cleared, 8×8 block sums rule out empty neighbourhoods. */
 export class SumGrid {
   readonly layer = new ChunkLayer((n) => new Float32Array(n), 0);
@@ -98,7 +96,10 @@ export interface RecognitionParams {
   interval: number;
 }
 
-export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: 0.35, nestDrift: 0.03, interval: 0.1 };
+/** How far an odour may sit from an ant's own before it is a stranger. Tied to MAX_MASK, FUNGAL and BINS (above); colonies built alone use it too. */
+export const TOLERANCE = 0.35;
+
+export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: TOLERANCE, nestDrift: 0.03, interval: 0.1 };
 
 /**
  * Every colony's ants, by odour band, each counted as (1 − calm) of an enemy. `look(odour, tolerance)`

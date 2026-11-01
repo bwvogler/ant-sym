@@ -371,8 +371,10 @@ export class ColonyJev {
       this.#cooldown--;
       return;
     }
+    // Never past the server's own limit (JEV_IN_FLIGHT): a call over it would only come back 429 busy.
+    const width = Math.min(this.opts.inFlight, this.#state.run?.maxInFlight ?? this.opts.inFlight);
     for (const l of this.#lanes()) {
-      while (this.#inFlight < this.opts.inFlight && l.queue.size > 0) {
+      while (this.#inFlight < width && l.queue.size > 0) {
         const batch: [string, unknown][] = [];
         for (const [k, s] of l.queue) {
           if (batch.length >= this.opts.batch) break;
