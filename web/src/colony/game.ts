@@ -47,6 +47,7 @@ export class Game {
     this.#grids = this.colonies.map(() => new CountGrid());
     this.#enemy = this.colonies.map(() => new CountGrid());
     this.colonies.forEach((c, k) => {
+      if (map.hasSoil) c.friends = this.#grids[k] as CountGrid;
       if (this.colonies.length > 1) {
         c.enemies = this.#enemy[k] as CountGrid;
         c.raidTarget = this.colonies[1 - k]!.nest;
@@ -97,6 +98,7 @@ export class Game {
   tick(dt: number): void {
     this.time += dt;
     for (const c of this.colonies) c.tick(dt);
+    if (this.colonies.length === 1 && this.map.hasSoil) occupancy(this.player, this.#grids[0] as CountGrid);
     if (this.colonies.length > 1) {
       this.#refresh();
       resolveFights(this.colonies, this.#grids, dt, this.#rng, this.params.fight);

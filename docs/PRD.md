@@ -606,3 +606,53 @@ The product owner asked why the tunnels are all right angles. On the square grid
 - This misses the plan's 15 % target, but it is well inside a frame at normal speed. Bead `ja-9uy`.
 
 **Jev:** situations, legend and request are unchanged. The tokens per question and per ant are unchanged.
+
+## 16. Getting home through dug ground (MR 9, 2026-11-01)
+
+MR 8 (hexagons) kept the underground economy but more ants stayed out long: 20–27 % out over 120 s (MR 7: 8–23 %). The reviewer's stall scan (900 + 900 ants, seed 1, 180 s) found 151 ants that hadn't moved 2 cells in over 30 s. Traces found three faults in wall-following round soil:
+
+1. **Spinning round three cells** (151 → 22 → 0 stalled ants):
+   - The hand-on-wall rule took a sharp 120° turn toward the hand first.
+   - On hexes that turn always leads into a cell touching the one the ant came from. Three open cells meeting at a corner, each with soil beyond, made it go round and round.
+   - It now comes last, before only going back. One-cell tunnels never need it, because the tunnel rules forbid such triangles.
+2. **A line home anchored too far back:**
+   - Bug2's line home ran from the trip's *first* wall.
+   - In dug ground the ant meets speck after speck of soil, and heading home from wherever it left the last one it is rarely back on that line, so it circled a speck until it gave up.
+   - Soil walls now re-anchor the line at every wall. Rock walls on the open surface keep the old rule, so the open map is unchanged (identical numbers).
+3. **Leaving a speck, without livelock:**
+   - A soil wall is now also left where the way home is open for two cells: after 1 s if half a cell nearer home than the nearest it has been on this trip, or after 3 s wherever, but only three times a trip without progress. A hand on the wall in a cavern drifts from speck to speck farther from home, so a distance rule alone never fired.
+   - **Progress is kept for the whole trip.** The distance to beat is the trip's best, lowered at every release and kept across walls. Handing over to home scent in a tunnel counts as a release too.
+   - Coming back to the first cell of a soil wall means the ant has been all the way round. It leaves if the way home is open; otherwise it gives up on that wall now (wanders 8–24 s, then tries afresh) instead of after 120 s.
+   - **Caught by the review, before the PR:** re-anchoring reset progress. Carriers left a wall, bumped the same spot and re-anchored, cycling over ~3 cells every 1–2 s; the stall scan (within 2 cells) missed them. In closed caverns with a far exit, 12 of 12 were stuck for 300 s.
+   - Now:
+     - "homing over 60 s with more than 15 releases and no wandering" counts 0, 0, 1 and 2 on seeds 1–4 (was 20, 4, 75, 12);
+     - closed caverns all get home (26–28 s mean);
+     - the stall scan finds nothing still over 8 s.
+
+**Digging is social.** Rasse & Deneubourg (2001): workers dig more where nestmates crowd, so digging falls off as the nest grows roomy and they spread out.
+- At a tunnel's end, an ant digs with chance 0.1 + (nestmates within two cells) / 6, capped at 1 (`digChance`).
+- The game keeps each colony's own ant counts per cell underground (it already counted them for fights).
+- This stays within the senses: the ant feels the ants round it.
+
+**What didn't work, and why it isn't here:**
+- **Counting open ground round a face before digging:** stopped tunnels short of food pockets and chambers, and foraging collapsed (≈ 70 food home).
+- **Facing home at every bump:** touch probes 1 and 1.5 cells out step over thin walls, so ants bumped in a loop (50–70 % out long).
+- **A colony-wide digging budget:** worked, but it isn't something an ant can sense; the nestmate rule does as well.
+
+**Measured** (seeds 1–5, 600 sim-s, 600 + 600 ants, per colony):
+
+| Underground | Out > 120 s, mean | Worst | Food home, mean | First food, median | Cells dug |
+|---|---|---|---|---|---|
+| MR 9 | **2.5–12.5 %** (mean ~5 %) | ≤ 28 % | **~1,060** | ~30 s | 1.7–5.0k |
+| MR 8 (hexes) | 20–27 % | ≤ 44 % | ~670 | ~36 s | 1.8–3.8k |
+| MR 7 (squares) | 8–23 % | ≤ 65 % | ~690 | ~18 s | 1.0–2.4k |
+
+- **Stall scan:** 0 ants still for 30 s (MR 8: 151). The longest still is 8 s. The scan flags only ants within 2 cells, so the review added a check on homing trips: median 4.8–6.4 s, p95 22–73 s over seeds 1–4 (MR 8: p95 112–144 s).
+- **Speckled cavern test:** ten carriers cross a 41-unit cavern dotted with two-cell specks in 5.6–8.4 s; it's under 6 s in a straight line. On MR 8's code 7 of 10 circled one speck for the whole 40 s.
+- **Open map:** identical to MR 8.
+- **Not met:**
+  - Cells dug did not drop. The nestmate rule shifts where ants dig more than how much; it gates digging on at a tunnel's end, but not new tunnels from chamber walls (bead `ja-wii`).
+  - The first-food median is ~30 s, against a ~25 s target. Seeds 1 and 2 put the player's food far from its nest (173 s there); the rival on the same maps is under 30 s.
+- **Bench:** no change (3.7 ms underground, 5.4 ms open, back to back with MR 8). The browser holds ~60 fps at every zoom, with no console errors in light, dark or phone layouts.
+
+**Jev:** situations, legend and request are unchanged. Tokens are unchanged.
