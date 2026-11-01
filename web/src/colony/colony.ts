@@ -421,7 +421,7 @@ export class Colony {
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
       if (blocked(map, nx, ny)) {
         h += Math.PI / 2 + rng() * Math.PI;
-        // Each bump soon after another doubles the detour: 0.5 s, 1 s, 2 s … up to ~16 s.
+        // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
         this.bumps[i] = Math.min(5, (this.bumps[i] as number) + 1);
         this.detour[i] = Math.max(this.detour[i] as number, 0.5 * 2 ** Math.floor(this.bumps[i] as number) * (0.5 + rng()));
       } else {
