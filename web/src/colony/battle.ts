@@ -1,8 +1,9 @@
 import { ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
+import { CELL, discOffsets } from "./hex.ts";
 import type { WorldSize } from "./world.ts";
 
-// Fights, pure. An ant with enemies in the 3×3 cells around it is in a fight:
+// Fights, pure. An ant with enemies in its own cell or the six around it is in a fight:
 // it lays alarm in its own colony's field (so allies smell it and, by stance
 // or doctrine, come or keep away) and may die. Its chance of dying in dt is
 // Lanchester-like: rate × dt × enemies around ÷ allies around, so equal
@@ -67,17 +68,21 @@ export function occupancy(colony: Colony, out: CountGrid): CountGrid {
   const { w, h } = colony.map.size;
   for (let i = 0; i < colony.n; i++) {
     if (!colony.alive[i]) continue;
-    const cx = Math.min(w - 1, Math.max(0, Math.floor(colony.x[i] as number)));
-    const cy = Math.min(h - 1, Math.max(0, Math.floor(colony.y[i] as number)));
-    out.add(cx, cy);
+    colony.antCell(i);
+    out.add(Math.min(w - 1, Math.max(0, CELL[0] as number)), Math.min(h - 1, Math.max(0, CELL[1] as number)));
   }
   return out;
 }
 
-/** Sum of a grid over the (2r+1)² cells around (cx, cy), clipped to the map. */
+/** Sum of a grid over the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to the map. */
 export function around(grid: CountGrid, size: WorldSize, cx: number, cy: number, r = 1): number {
   let s = 0;
-  for (let y = Math.max(0, cy - r); y <= Math.min(size.h - 1, cy + r); y++) for (let x = Math.max(0, cx - r); x <= Math.min(size.w - 1, cx + r); x++) s += grid.get(x, y);
+  const o = discOffsets(r)[cy & 1] as Int16Array;
+  for (let k = 0; k < o.length; k += 2) {
+    const x = cx + (o[k] as number);
+    const y = cy + (o[k + 1] as number);
+    if (x >= 0 && y >= 0 && x < size.w && y < size.h) s += grid.get(x, y);
+  }
   return s;
 }
 
@@ -88,8 +93,9 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
     const size = c.map.size;
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i]) continue;
-      const cx = Math.min(size.w - 1, Math.max(0, Math.floor(c.x[i] as number)));
-      const cy = Math.min(size.h - 1, Math.max(0, Math.floor(c.y[i] as number)));
+      c.antCell(i);
+      const cx = Math.min(size.w - 1, Math.max(0, CELL[0] as number));
+      const cy = Math.min(size.h - 1, Math.max(0, CELL[1] as number));
       let enemies = 0;
       for (let j = 0; j < grids.length; j++) {
         const g = grids[j] as CountGrid;

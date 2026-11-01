@@ -1,7 +1,8 @@
-import { type KeyboardEvent, type PointerEvent, useEffect, useRef } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef } from "react";
 import { CHUNK } from "../colony/chunks.ts";
 import { type Colony, moundWidth } from "../colony/colony.ts";
-import { SOIL } from "../colony/world.ts";
+import { CELL, cellOf, R, SIDE } from "../colony/hex.ts";
+import { SOIL, worldExtent } from "../colony/world.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 
@@ -39,6 +40,8 @@ function rgb(hex: string): [number, number, number] {
 }
 
 /** The warm tone the picture heatmap uses for "too many": here, the way home. */
+/** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
+const HEX_ZOOM = 12;
 const HOME_RGB: [number, number, number] = [196, 110, 40];
 /** At or above this zoom (device px per cell) a brush paints its own radius; zoomed further out it widens to match. */
 const BRUSH_ZOOM = 6;
@@ -77,7 +80,8 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     followCb.current = onFollow;
   }, [onPaint, onFollow]);
 
-  const world = colony.map.size;
+  // The map's size in world units (hexagon rows are R apart): what the camera fits and clamps to.
+  const world = useMemo(() => worldExtent(colony.map), [colony]);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture>(NO_GESTURE);
   const space = useRef(false);
@@ -105,10 +109,10 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       }
       return c;
     };
-    // The minimap's picture of the whole map (2 cells a pixel), redrawn twice a second: ground, food, ants.
+    // The minimap's picture of the whole map (2 world units a pixel), redrawn twice a second: ground, food, ants.
     const mini = document.createElement("canvas");
-    mini.width = Math.ceil(gw / 2);
-    mini.height = Math.ceil(gh / 2);
+    mini.width = Math.ceil(world.w / 2);
+    mini.height = Math.ceil(world.h / 2);
     const miniCtx = mini.getContext("2d")!;
     const miniImg = miniCtx.createImageData(mini.width, mini.height);
     let miniAt = -Infinity;
@@ -213,30 +217,20 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       c.ctx.putImageData(c.img, 0, 0);
     };
 
-    /** The minimap's picture: a 2×2 block is food if any cell is, rock or soil if most are, else open ground; ants as dots. */
+    /** The minimap's picture: each pixel the cell under its centre (food, rock, soil or open ground); ants as dots. */
     const paintMini = () => {
       const px = miniImg.data;
       const food: [number, number, number] = rgb(theme.accent);
       for (let my = 0; my < mini.height; my++)
         for (let mx = 0; mx < mini.width; mx++) {
-          let rocks = 0;
-          let soils = 0;
-          let fv = 0;
-          for (let dy = 0; dy < 2; dy++)
-            for (let dx = 0; dx < 2; dx++) {
-              const x = mx * 2 + dx;
-              const y = my * 2 + dy;
-              if (x >= gw || y >= gh) {
-                rocks++;
-                continue;
-              }
-              const t = colony.map.rock.get(x, y);
-              if (t === SOIL) soils++;
-              else rocks += t;
-              fv += colony.map.food.get(x, y);
-            }
+          cellOf(mx * 2 + 1, my * 2 + 1);
+          const x = CELL[0] as number;
+          const y = CELL[1] as number;
+          const off = x < 0 || y < 0 || x >= gw || y >= gh;
+          const t = off ? 1 : colony.map.rock.get(x, y);
+          const fv = off ? 0 : colony.map.food.get(x, y);
           const o = (my * mini.width + mx) * 4;
-          const c = fv > 0 ? food : rocks >= 2 ? theme.rock : rocks + soils >= 2 ? theme.soil : theme.paperRgb;
+          const c = fv > 0 ? food : t === SOIL ? theme.soil : t ? theme.rock : theme.paperRgb;
           px[o] = c[0];
           px[o + 1] = c[1];
           px[o + 2] = c[2];
@@ -258,6 +252,69 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       miniCtx.putImageData(miniImg, 0, 0);
     };
 
+    /**
+     * Up close: the cells in view as true hexagons. Each cell's colour is its pixel in its chunk's colour
+     * buffer (painted this frame), laid over the paper; soil (the commonest, underground) is the
+     * background, and the rest are batched into one path per colour, so a frame is a few dozen fills.
+     */
+    const paths = new Map<number, Path2D>();
+    const drawHexes = (c: Camera, v: Viewport, rx0: number, rx1: number, ry0: number, ry1: number) => {
+      // The background: soil underground (most cells), the paper on the open surface (no soil at all).
+      const bg = colony.map.hasSoil ? theme.soil : theme.paperRgb;
+      const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
+      ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
+      const [ax, ay] = toScreen(c, v, 0, 0);
+      const [bx, by] = toScreen(c, v, world.w, world.h);
+      ctx.fillRect(ax, ay, bx - ax, by - ay);
+      paths.clear();
+      const k = SIDE * c.zoom * 1.04; // a hair over, so neighbours meet without seams
+      const [c0, c1, c2, c3, c4, c5] = [0, 1, 2, 3, 4, 5].map((j) => Math.cos(Math.PI / 6 + (j * Math.PI) / 3) * k) as [number, number, number, number, number, number];
+      const [s0, s1, s2, s3, s4, s5] = [0, 1, 2, 3, 4, 5].map((j) => Math.sin(Math.PI / 6 + (j * Math.PI) / 3) * k) as [number, number, number, number, number, number];
+      const pr = theme.paperRgb;
+      const ox = v.w / 2 - c.x * c.zoom;
+      const oy = v.h / 2 - c.y * c.zoom;
+      for (let y = ry0; y <= ry1; y++) {
+        const cy = y >> 6;
+        const ly = y & 63;
+        const sy = (y + 0.5) * R * c.zoom + oy;
+        const shift = 0.5 + 0.5 * (y & 1);
+        let chunkX = -1;
+        let data: Uint8ClampedArray | null = null;
+        for (let x = rx0; x <= rx1; x++) {
+          if (x >> 6 !== chunkX) {
+            chunkX = x >> 6;
+            data = chunks.get(`${chunkX},${cy}`)?.img.data ?? null;
+          }
+          if (!data) continue;
+          const o = ((ly << 6) | (x & 63)) * 4;
+          // The cell over the paper, its alpha in 16 steps (so trails batch into few colours).
+          const a = Math.round(((data[o + 3] as number) / 255) * 15) / 15;
+          const r = Math.round((data[o] as number) * a + (pr[0] as number) * (1 - a));
+          const g = Math.round((data[o + 1] as number) * a + (pr[1] as number) * (1 - a));
+          const b = Math.round((data[o + 2] as number) * a + (pr[2] as number) * (1 - a));
+          const key = (r << 16) | (g << 8) | b;
+          if (key === bgKey) continue;
+          let path = paths.get(key);
+          if (!path) {
+            path = new Path2D();
+            paths.set(key, path);
+          }
+          const sx = (x + shift) * c.zoom + ox;
+          path.moveTo(sx + c0, sy + s0);
+          path.lineTo(sx + c1, sy + s1);
+          path.lineTo(sx + c2, sy + s2);
+          path.lineTo(sx + c3, sy + s3);
+          path.lineTo(sx + c4, sy + s4);
+          path.lineTo(sx + c5, sy + s5);
+          path.closePath();
+        }
+      }
+      for (const [key, path] of paths) {
+        ctx.fillStyle = `rgb(${key >> 16},${(key >> 8) & 255},${key & 255})`;
+        ctx.fill(path);
+      }
+    };
+
     const draw = () => {
       const v: Viewport = { w: canvas.width, h: canvas.height };
       const d = Math.min(2, window.devicePixelRatio || 1);
@@ -268,31 +325,42 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         follow.current = null;
         followCb.current(null);
       } else if (f && fcol && cam.current) cam.current = { ...cam.current, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
-      const c = clamp(fitted.current || !cam.current ? fit(colony.map.size, v) : cam.current, colony.map.size, v);
+      const c = clamp(fitted.current || !cam.current ? fit(world, v) : cam.current, world, v);
       cam.current = c;
-      zoomedIn.current = c.zoom > fitZoom(colony.map.size, v) * 1.05;
+      zoomedIn.current = c.zoom > fitZoom(world, v) * 1.05;
       ctx.fillStyle = theme.paper;
       ctx.fillRect(0, 0, v.w, v.h);
       ctx.imageSmoothingEnabled = false;
 
-      // The chunks in view, each scaled onto whole pixels so neighbours meet without seams.
+      // The rows of hexagons in view, and the chunks they fall in. Every chunk in view is painted
+      // into its 64×64 colour buffer (one pixel a cell); then drawn as bricks or as hexagons.
       const vis = visible(c, v);
-      const cx0 = Math.max(0, Math.floor(vis.x0 / CHUNK));
-      const cy0 = Math.max(0, Math.floor(vis.y0 / CHUNK));
-      const cx1 = Math.min(Math.ceil(gw / CHUNK) - 1, Math.floor(vis.x1 / CHUNK));
-      const cy1 = Math.min(Math.ceil(gh / CHUNK) - 1, Math.floor(vis.y1 / CHUNK));
-      for (let cy = cy0; cy <= cy1; cy++)
-        for (let cx = cx0; cx <= cx1; cx++) {
+      const ry0 = Math.max(0, Math.floor(vis.y0 / R) - 1);
+      const ry1 = Math.min(gh - 1, Math.ceil(vis.y1 / R) + 1);
+      const rx0 = Math.max(0, Math.floor(vis.x0) - 1);
+      const rx1 = Math.min(gw - 1, Math.ceil(vis.x1) + 1);
+      const hexes = c.zoom >= HEX_ZOOM * d;
+      for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
+        for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
           const rc = colony.map.rock.chunk(cx, cy);
           if (!rc) continue;
           const cc = chunkCanvas(cx, cy);
           paintChunk(cx, cy, cc, rc);
-          const [ax, ay] = toScreen(c, v, cx * CHUNK, cy * CHUNK);
-          const [bx, by] = toScreen(c, v, (cx + 1) * CHUNK, (cy + 1) * CHUNK);
-          const dx = Math.round(ax);
-          const dy = Math.round(ay);
-          ctx.drawImage(cc.canvas, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
+          if (hexes) continue;
+          // Zoomed out: bricks. Each row of the chunk is a strip one cell high (R), odd rows shifted
+          // half a cell right: the same six neighbours as hexagons, and a few draws per chunk.
+          const ly0 = Math.max(0, ry0 - cy * CHUNK);
+          const ly1 = Math.min(CHUNK - 1, ry1 - cy * CHUNK);
+          for (let ly = ly0; ly <= ly1; ly++) {
+            const y = cy * CHUNK + ly;
+            const [ax, ay] = toScreen(c, v, cx * CHUNK + 0.5 * (y & 1), y * R);
+            const [bx, by] = toScreen(c, v, (cx + 1) * CHUNK + 0.5 * (y & 1), (y + 1) * R);
+            const dx = Math.round(ax);
+            const dy = Math.round(ay);
+            ctx.drawImage(cc.canvas, 0, ly, CHUNK, 1, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
+          }
         }
+      if (hexes) drawHexes(c, v, rx0, rx1, ry0, ry1);
 
       // Nests and ants in view: the player's in ink, the rival's in the warn tone; a jade crumb at the head of a
       // carrier, an earth one at the head of an ant carrying soil. Round each nest, the mound of the soil it dug.
@@ -310,7 +378,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
           ctx.arc(nx, ny, outer, 0, Math.PI * 2);
           ctx.arc(nx, ny, inner, 0, Math.PI * 2, true);
           ctx.fillStyle = theme.mound;
-          ctx.globalAlpha = 0.45;
+          ctx.globalAlpha = 0.3;
           ctx.fill();
           ctx.globalAlpha = 1;
         }
@@ -360,25 +428,25 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       }
 
       // Zoomed in: the minimap, with the view's rectangle.
-      if (c.zoom > fitZoom(colony.map.size, v) * 1.05) {
+      if (c.zoom > fitZoom(world, v) * 1.05) {
         const now = performance.now();
         if (now - miniAt > 500) {
           paintMini();
           miniAt = now;
         }
-        const r = minimapRect(colony.map.size, v, d);
+        const r = minimapRect(world, v, d);
         ctx.globalAlpha = 0.92;
         ctx.drawImage(mini, r.x, r.y, r.w, r.h);
         ctx.globalAlpha = 1;
         ctx.strokeStyle = theme.line;
         ctx.lineWidth = d;
         ctx.strokeRect(r.x, r.y, r.w, r.h);
-        const s = r.w / gw;
+        const s = r.w / world.w;
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 1.5 * d;
         const x0 = Math.max(0, vis.x0);
         const y0 = Math.max(0, vis.y0);
-        ctx.strokeRect(r.x + x0 * s, r.y + y0 * s, (Math.min(gw, vis.x1) - x0) * s, (Math.min(gh, vis.y1) - y0) * s);
+        ctx.strokeRect(r.x + x0 * s, r.y + y0 * s, (Math.min(world.w, vis.x1) - x0) * s, (Math.min(world.h, vis.y1) - y0) * s);
       }
     };
     const off = onFrame(draw);
@@ -390,10 +458,10 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       const r = canvas.getBoundingClientRect();
       const k = canvas.width / r.width;
       const v: Viewport = { w: canvas.width, h: canvas.height };
-      const c = zoomBy(cam.current ?? fit(colony.map.size, v), colony.map.size, v, (e.clientX - r.left) * k, (e.clientY - r.top) * k, Math.exp(-e.deltaY * 0.0015));
+      const c = zoomBy(cam.current ?? fit(world, v), world, v, (e.clientX - r.left) * k, (e.clientY - r.top) * k, Math.exp(-e.deltaY * 0.0015));
       cam.current = c;
-      zoomedIn.current = c.zoom > fitZoom(colony.map.size, v) * 1.05;
-      fitted.current = c.zoom <= fitZoom(colony.map.size, v) * 1.0001;
+      zoomedIn.current = c.zoom > fitZoom(world, v) * 1.05;
+      fitted.current = c.zoom <= fitZoom(world, v) * 1.0001;
     };
     canvas.addEventListener("wheel", wheel, { passive: false });
     // Space held for a pan drag is let go when the window loses focus, or it would stick "down" (its keyup goes elsewhere).

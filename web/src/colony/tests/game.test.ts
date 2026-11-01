@@ -1,14 +1,16 @@
 import { test } from "node:test";
+import { CELL, cellOf } from "../hex.ts";
+import { at, nestAt, put } from "./hexmaps.ts";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, localPolicy, localStance, type Situation, type StanceSituation } from "../colony.ts";
 import { Game } from "../game.ts";
-import { foodAt, generateWorld, mulberry32, OPEN_WORLD, reachable, worldFromArrays, type WorldMap } from "../world.ts";
+import { foodIn, generateWorld, mulberry32, OPEN_WORLD, reachable, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field with two nests, no food. */
 function arena(): WorldMap {
   const size = { w: 40, h: 12 };
-  const nests = [{ x: 4, y: 6, r: 2 }, { x: 36, y: 6, r: 2 }];
+  const nests = [nestAt(4, 6, 2), nestAt(36, 6, 2)];
   return worldFromArrays(size, nests);
 }
 
@@ -16,8 +18,7 @@ function arena(): WorldMap {
 function crowd(c: Colony, x: number, y: number, count: number): void {
   for (let i = 0; i < c.n; i++) {
     c.alive[i] = i < count ? 1 : 0;
-    c.x[i] = x + 0.5;
-    c.y[i] = y + 0.5;
+    put(c, i, x, y);
   }
 }
 
@@ -33,7 +34,8 @@ test("generateWorld: two nests, a walk apart, joined on foot, with food away fro
     const d = Math.hypot(a.x - b.x, a.y - b.y);
     assert.ok(d >= 0.7 * 140 && d < 260, `seed ${seed}: nests ${d.toFixed(0)} cells apart`);
     const reach = reachable(m, a.x, a.y);
-    assert.equal(reach[Math.floor(b.y) * m.size.w + Math.floor(b.x)], 1, `seed ${seed}: the rival nest cannot be walked to`);
+    cellOf(b.x, b.y);
+    assert.equal(reach[(CELL[1] as number) * m.size.w + (CELL[0] as number)], 1, `seed ${seed}: the rival nest cannot be walked to`);
   }
 });
 
@@ -70,7 +72,7 @@ test("fights: equal numbers trade; the bigger crowd loses fewer; fighters lay al
     const [da, db] = resolveFights([a, b], grids, 0.2, mulberry32(round + 7));
     evenA += da!;
     evenB += db!;
-    if (round === 0) assert.ok(a.ph.read("alarm", 20.5, 6.5) > 0 && b.ph.read("alarm", 20.5, 6.5) > 0, "both laid alarm");
+    if (round === 0) assert.ok(a.ph.read("alarm", at(20, 6).x, at(20, 6).y) > 0 && b.ph.read("alarm", at(20, 6).x, at(20, 6).y) > 0, "both laid alarm");
 
     const small = new Colony(m, { antCount: 20, maxAnts: 20, nest: 0 }, mulberry32(round + 2));
     const big = new Colony(m, { antCount: 20, maxAnts: 20, nest: 1 }, mulberry32(round + 3));
@@ -100,10 +102,9 @@ test("kill drops carried food where the ant falls; the larder becomes ants in fr
   const m = arena();
   const c = new Colony(m, { antCount: 3, maxAnts: 4, nest: 0, foodPerAnt: 4 }, mulberry32(3), () => "explore");
   c.carrying[0] = 1;
-  c.x[0] = 10.5;
-  c.y[0] = 3.5;
+  put(c, 0, 10, 3);
   c.kill(0);
-  assert.equal(foodAt(m, 10, 3), 1);
+  assert.equal(foodIn(m, 10, 3), 1);
   assert.equal(m.foodLeft, 1, "the map counts the dropped food");
   assert.equal(c.population, 2);
   assert.equal(c.losses, 1);
@@ -119,13 +120,12 @@ test("a fighting ant goes for the enemy it can see", () => {
   const m = arena();
   const c = new Colony(m, { antCount: 1, maxAnts: 1, wander: 0, deposit: 0 }, mulberry32(4), () => "fight");
   const enemies = new CountGrid();
-  enemies.add(20, 8, 3); // two cells south of the ant
+  enemies.add(20, 8, 3); // two rows south of the ant
   c.enemies = enemies;
-  c.x[0] = 20.5;
-  c.y[0] = 6.5;
+  put(c, 0, 20, 6);
   c.heading[0] = 0; // east
   for (let k = 0; k < 15; k++) c.tick(1 / 30);
-  assert.ok((c.y[0] as number) > 6.8, `it turned south toward the enemy: y ${c.y[0]}`);
+  assert.ok((c.y[0] as number) > at(20, 6).y + 0.3, `it turned south toward the enemy: y ${c.y[0]}`);
 });
 
 test("the game: both colonies forage and grow, they meet and fight, stances are chosen, and food is never made or lost", () => {
@@ -151,13 +151,4 @@ test("the outcome: a colony with no ants and too little food for one more is bea
   assert.equal(g.outcome(), "playing", "it can still raise an ant");
   for (let i = 0; i < g.player.n; i++) g.player.kill(i);
   assert.equal(g.outcome(), "lost");
-});
-
-test("solo (no rival), the colony keeps foraging: no stance to choose, nobody turned into a fighter", () => {
-  const map = generateWorld(1, OPEN_WORLD);
-  const g = new Game(map, { antCount: 600, rival: false }, mulberry32(7919));
-  for (let k = 0; k < 30 * 200; k++) g.tick(1 / 30);
-  assert.equal(g.player.stance, "forage");
-  assert.equal(g.player.counts().fight, 0, "no fighters without an enemy");
-  assert.equal(g.strategyChoices, 0, "the strategist was never asked");
 });

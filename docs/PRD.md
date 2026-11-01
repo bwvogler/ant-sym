@@ -537,3 +537,72 @@ Also from the review: the pellet colour no longer looks like the rival's ants, a
 **Jev:** situations are unchanged (1,296). The legend now says explorers dig and that a soil carrier is never asked, and `COLONY_BRAIN_VERSION` is 3, so cached answers are re-asked once. The estimated request is ~235 tokens per situation (was ~225): about +10 tokens per question.
 
 **Beads:** density-regulated digging (`ja-wii`), pellet scent and backfill (`ja-jmf`), underground homing (`ja-cwu`), soil on the endless map (`ja-r84`).
+
+## 15. Hexagons, and tunnels that meander (MR 8, 2026-11-01)
+
+The product owner asked why the tunnels are all right angles. On the square grid, digging went through cell edges only, ants in tunnels walked four ways, and dead ends forked at 90°. The owner chose a **hex grid plus a meander**, with **true hexagons drawn up close**.
+
+**The grid** (`hex.ts`, after Red Blob Games' hex guide).
+- **Layout:** pointy-top hexagons in odd-r offset rows. A cell is still (column, row) in the 64×64 chunks. 64 is even, so a row's parity is the same in a chunk as on the map, and `chunks.ts` is unchanged.
+- **World units:** neighbouring centres are 1 apart and rows R = √3/2 apart. Speeds, sensor distance and radii keep their meaning.
+- **Lookups:** `cellOf` uses cube rounding into a shared scratch, so it allocates nothing. It costs about the same as a floor (36 vs 34 ns).
+- **Map size:** 512 × 368 cells, which keeps the old aspect (about 512 × 319 world units).
+- **What hexes buy:** all six neighbours share an edge. `squeezes()` (the diagonal-corner rule) is gone, and so are the edge/corner cases in digging and wall-following.
+- **Terrain** is sampled at hexagon centres. Rock and soil cuts are calibrated as before.
+- **`OPEN_WORLD`** keeps its make-up (~22 % rock), but it is a new map: the "cell for cell as MR 6" property can't survive a change of grid. The golden test now pins the hex generator.
+
+**Scent** spreads toward the mean of the six neighbours.
+- On unit spacing the hex mean less the centre is ≈ ¼∇², the same as the square grid's four-neighbour mean, so the parameters mean the same; scent just spreads round instead of in diamonds.
+- With odd rows shifted right, a chunk's top-left corner also touches the chunk diagonally up-left, and its bottom-right corner the chunk diagonally down-right. Those two corners wake the diagonal chunks.
+- The sparse step still matches a dense hex reference within 1e-4: across borders, both diagonal corners and the ragged edge.
+
+**Tunnel rules on six neighbours:**
+- **A tunnel cell** has no two neighbours next to each other both open (an open triangle is the hex grid's 2×2).
+- **A tunnel's end** is a soil cell with one open neighbour. Tunnels lengthen and fork, turning at most 60° a cell, and stay one cell wide.
+- **A new tunnel** from a chamber wall needs no open ground within two steps, except on the chamber's side. The chamber's side is judged from the face's own open neighbours.
+- **Hand on the wall** goes round six ways, hand side first.
+
+**The meander.** A tunnel's direction belongs to the tunnel, not the digger.
+- Each dug cell stores the heading it was dug at (`map.digHeading`, 255 steps round the circle).
+- The next digger at the end reads it, adds a small drift (σ 0.2 rad a cell), and digs one of the two ways either side of it, in proportion to how near each is (`chooseDig`). So a tunnel runs at its heading on average, at any angle.
+- Forks take ±60° plus noise. New tunnels start along the face.
+- The review caught that the heading was dropped on the ant's last step to the face, so the drift never added up along a tunnel; the test passed on noise. Fixed. The test now needs more than 20 % of runs to sit 20°+ off every way. Fresh noise per cell gives about 8 %, and it measured 9 % before the fix.
+
+**Drawing** (`ColonyField.tsx`).
+- **Zoomed out:** each chunk's 64×64 colour buffer is drawn as 64 row strips, odd rows shifted half a cell. These bricks have the same six neighbours and cost a few draw calls.
+- **From 12 CSS px per cell:** the cells in view are drawn as true hexagons, composited over the paper and batched into one path per colour, with soil (or paper, on the surface) as background.
+- At 8 CSS px per cell the hexagon pass ran at 11–15 fps in headless Chromium (software canvas). At 12 px everything holds about 60 fps: fit 53–58, nest view (bricks) 61, close (hexagons) 60, phone 58. No console errors in light, dark or phone layouts.
+- The minimap samples one cell per pixel. Dark-mode soil is a shade lighter so tunnels read.
+
+**Measured** (seeds 1–5, 600 sim-s, 600 + 600 ants, local rule, per colony; five runs in parallel):
+
+| | First food stored | Food home at 600 s | Cells dug | Out > 120 s, mean / worst |
+|---|---|---|---|---|
+| Underground, hexes | 9–272 s (median ~36 s) | 22–1,389, mean ~670 | 1,802–3,792 | 20–27 % / ≤ 44 % |
+| Underground, MR 7 | 13–235 s (median ~18 s) | 15–1,618, mean ~690 | 964–2,432 | 8–23 % / ≤ 65 % |
+| Open, hexes | 7–12 s | 1,793–5,044, mean ~3,600 | 0 | 0.5–2.5 % / ≤ 16 % |
+| Open, MR 7 | 7–13 s | 1,366–4,060, mean ~2,940 | 0 | 0.6–2.2 % / ≤ 10 % |
+
+- **Same economy underground** (about 680 food home per colony), with more digging.
+- **Slower starts on some seeds:** on seeds 1 and 2 the player's colony took 3–4 minutes.
+- **More ants out long:** the ground round each nest gets hollowed into a large cavern with specks of soil left. Carriers spend long stretches following walls round them, and a homing ant takes the home-scent branch choice only in strict one-cell tunnels.
+- **Tried, no clear gain** (bead `ja-dy9`):
+  - scent walking in any dug cell beside soil: seed 1 better, seed 2 worse;
+  - fewer tunnel starts from chamber walls: digging unchanged.
+  
+  Filed as a bead.
+- The open map holds more food (the map is 15 % taller in rows, with more chunks of patches).
+
+**Bench** (`npm run colony-bench`, 1,200 + 1,200 ants, 60 sim-s, run back to back with MR 7 twice):
+
+| | MR 7 | Hexes |
+|---|---|---|
+| Underground, mean tick | 2.99–3.09 ms | 3.68–3.81 ms (+23 %) |
+| Open, mean tick | 3.88–3.95 ms | 5.11–5.31 ms (+33 %) |
+
+- The cost is spread out: the six-neighbour scent stencil, hex windows for fights and enemies, and tunnel checks.
+- Caching each ant's cell by position, and skipping tunnel checks on a map without soil, took off about a fifth.
+- The open run also has more ants alive and more chunks awake (54 vs 45), so it isn't quite like for like.
+- This misses the plan's 15 % target, but it is well inside a frame at normal speed. Bead `ja-9uy`.
+
+**Jev:** situations, legend and request are unchanged. The tokens per question and per ant are unchanged.
