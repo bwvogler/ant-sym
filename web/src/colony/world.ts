@@ -806,7 +806,7 @@ export function groundTop(map: WorldMap, x: number): number {
  * keeps its funnel, so one colony's mound never buries another's way in. Food on the cell it buries is lifted on top.
  * Returns the cell heaped, or null if there is no room on that side (the sky's top, the map's edge).
  */
-export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number, holes: readonly number[] = [ex]): [number, number] | null {
+export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number, holes: readonly number[] = [ex], from?: number): [number, number] | null {
   if (!map.sky || !map.loose) return null;
   const tops = holes.map((h) => groundTop(map, h));
   // Room in column c: on the map, no hole's column, and below every funnel's slope up from its hole.
@@ -820,7 +820,8 @@ export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number,
     return true;
   };
   // Landing beyond the map's edge lands at the edge; then out from the funnel if it is inside it, else back in.
-  let x = Math.max(0, Math.min(map.size.w - 1, ex + side * (2 + land)));
+  // `from`: the column it is dropped in (by an ant standing there); else `land` columns past the crater's rim.
+  let x = Math.max(0, Math.min(map.size.w - 1, from ?? ex + side * (2 + land)));
   while (x >= 0 && x < map.size.w && !ok(x)) x += side;
   if (x < 0 || x >= map.size.w) {
     x = Math.max(0, Math.min(map.size.w - 1, x));
@@ -849,4 +850,29 @@ export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number,
   map.loose.set(x, y, 1);
   updateSurface(map, x, y);
   return [x, y];
+}
+
+/**
+ * The side view: take a pellet of loose soil at cell (x, y) off the mound (an ant picks one up). Loose soil settles:
+ * taken from inside the heap, the column drops a cell, so it is the column's top that goes (above ground again,
+ * walkway or sky), never a hole under hanging spoil.
+ */
+export function takeLoose(map: WorldMap, x: number, y: number): boolean {
+  if (!map.sky || !map.loose || map.loose.get(x, y) !== 1 || rockAt(map, x, y) !== SOIL) return false;
+  const top = groundTop(map, x);
+  if (top < y && map.loose.get(x, top) === 1 && rockAt(map, x, top) === SOIL) y = top;
+  map.loose.set(x, y, 0);
+  map.rock.set(x, y, OPEN);
+  map.sky.set(x, y, 1);
+  updateSurface(map, x, y);
+  // Food on top of the cell taken, left in the sky, comes down with it.
+  const above = ny(y, 4);
+  for (const ax of [nx(x, y, 4), nx(x, y, 5)]) {
+    const f = map.food.get(ax, above);
+    if (f > 0 && rockAt(map, ax, above) !== OPEN && rockAt(map, x, y) === OPEN) {
+      map.food.set(ax, above, 0);
+      map.food.set(x, y, map.food.get(x, y) + f);
+    }
+  }
+  return true;
 }

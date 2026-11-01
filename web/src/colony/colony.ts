@@ -1,6 +1,6 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
-import { AIR, blocked, digCell, dropFood, fillCell, heapMound, isSky, OPEN, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, OPEN, takeLoose, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -183,12 +183,29 @@ export class Colony {
   #goalKind: Uint8Array;
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
   #entrance: Nest | null = null;
-  /** the side view: the entrance's column, where the mound's crater is */
+  /** the side view: the entrance's column, where the mound's crater is, and its row (the hole's cell) */
   #entranceCol = 0;
+  #entranceRow = 0;
   /** the side view: every nest's entrance column (no mound buries a hole, the rival's included) */
   #holes: number[] = [];
   /** the side view: cells of soil brought out that found no room on the mound (the sky's top on both sides; never seen in play) */
   moundLost = 0;
+  /**
+   * The side view: a pellet carrier carrying its pellet out along the ground: it drops it once it is this many
+   * columns from the hole (NaN: not carrying one out), on side #spoilSide, having walked #spoilT seconds.
+   */
+  #spoilTo: Float32Array;
+  #spoilSide: Int8Array;
+  #spoilT: Float32Array;
+  /** the side view: 1 if the pellet carried is loose soil off the mound (moved, not dug: it isn't counted in soilDug) */
+  #loosePellet: Uint8Array;
+  /** the side view: 1 if that loose pellet is being taken down into the nest to backfill (else it is spread farther out) */
+  #fillIntent: Uint8Array;
+  /** the side view: loose pellets picked up off the mound, dropped on it again, put into unused space underground, and lost with ants that died */
+  loosePicked = 0;
+  looseDropped = 0;
+  looseFilled = 0;
+  looseLost = 0;
   /** the side view: cells of mound heaped so far, or tried (no room at the sky's top): ⌊pellets out × SWELL⌋ once caught up */
   #heaped = 0;
   /** the side view: cells of loose soil heaped on the mound */
@@ -271,6 +288,7 @@ export class Colony {
       this.#entrance = { x: this.nest.entrance.x, y: this.nest.entrance.y, r: ENTRANCE_R };
       cellOf(this.nest.entrance.x, this.nest.entrance.y);
       this.#entranceCol = CELL[0] as number;
+      this.#entranceRow = CELL[1] as number;
       for (const n of map.nests ?? [this.nest])
         if (n.entrance) {
           cellOf(n.entrance.x, n.entrance.y);
@@ -300,6 +318,11 @@ export class Colony {
     this.#staleWalk = new Uint8Array(n);
     this.#looked = new Int32Array(n).fill(-1);
     this.#goalKind = new Uint8Array(n);
+    this.#spoilTo = new Float32Array(n).fill(NaN);
+    this.#spoilSide = new Int8Array(n);
+    this.#spoilT = new Float32Array(n);
+    this.#loosePellet = new Uint8Array(n);
+    this.#fillIntent = new Uint8Array(n);
     this.#noGain = new Uint8Array(n);
     this.loopX = new Int32Array(n).fill(NO_CELL);
     this.loopY = new Int32Array(n);
@@ -335,6 +358,9 @@ export class Colony {
     this.carrying[i] = 0;
     this.pellet[i] = 0;
     this.#staleWalk[i] = 0;
+    this.#spoilTo[i] = NaN;
+    this.#loosePellet[i] = 0;
+    this.#fillIntent[i] = 0;
     this.digT[i] = 0;
     this.digAim[i] = NaN;
     this.hand[i] = this.#rng() < 0.5 ? -1 : 1;
@@ -388,13 +414,31 @@ export class Colony {
   kill(i: number): void {
     if (!this.alive[i]) return;
     if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
-    if (this.pellet[i]) this.soilLost++;
+    if (this.pellet[i]) {
+      if (this.#loosePellet[i]) this.looseLost++;
+      else this.soilLost++;
+    }
+    this.#spoilTo[i] = NaN;
+    this.#loosePellet[i] = 0;
+    this.#fillIntent[i] = 0;
     this.alive[i] = 0;
     this.carrying[i] = 0;
     this.pellet[i] = 0;
     this.digT[i] = 0;
     this.losses++;
     this.recentLosses++;
+  }
+
+  /** Pellets in jaws now: dug ones (on their way out, or to fill) and loose ones off the mound (side view). */
+  carriedPellets(): { dug: number; loose: number } {
+    let dug = 0;
+    let loose = 0;
+    for (let i = 0; i < this.n; i++)
+      if (this.alive[i] && this.pellet[i]) {
+        if (this.#loosePellet[i]) loose++;
+        else dug++;
+      }
+    return { dug, loose };
   }
 
   /** Food left on the map. */
@@ -529,7 +573,8 @@ export class Colony {
     const packed = hy * 65536 + hx;
     // Homing on the ground line (side view) goes cell by cell to the hole wherever the walkway is, one cell
     // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
-    const groundHome = mode === RETURN && this.#entrance !== null && isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number));
+    const carryingOut = mode === RETURN && this.pellet[i] === 1 && this.#entrance !== null && !Number.isNaN(this.#spoilTo[i] as number);
+    const groundHome = carryingOut || (mode === RETURN && this.#entrance !== null && isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number)));
     if (fresh && !hugging && !groundHome && this.#noTunnel[i] === packed) {
       this.gx[i] = NO_CELL; // looked here already: open ground
       return false;
@@ -545,7 +590,14 @@ export class Colony {
     this.#noTunnel[i] = -1;
     let dir = fresh ? dirOf(this.heading[i] as number) : (this.gdir[i] as number);
     const ent = this.#entrance;
-    if (mode === RETURN && ent && isSky(map, cx, cy)) {
+    if (carryingOut) {
+      // Carrying a pellet out (side view): up to the hole if it is still in the shaft, then on along the ground away
+      // from it to where it drops it (away from the hole from inside the shaft is down it).
+      const inShaft = !isSky(map, cx, cy) && !(cx === this.#entranceCol && cy === this.#entranceRow);
+      const best = inShaft ? this.#towardHole(cx, cy, false) : this.#awayFromHole(cx, cy, this.#spoilSide[i] as number);
+      if (best < 0) this.#spoilTo[i] = 0; // the map's edge, or nowhere farther: it drops it here
+      dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
+    } else if (mode === RETURN && ent && isSky(map, cx, cy)) {
       // On the ground line (side view), homing is to the hole: the way nearer it along the ground (home scent lies
       // along the walkway both sides of the hole, so the most-scent rule below walks a carrier past it and on).
       const best = this.#towardHole(cx, cy, true);
@@ -667,7 +719,11 @@ export class Colony {
       // A fresh trip out from here. (Letting its trip clock run on instead, so it lays only faint home scent
       // this deep, was measured worse: it soon tires and walks home empty. Seeds 3, 4, 6–8: 12 % less food home.)
       this.pellet[i] = 0;
-      this.soilFilled++;
+      if (this.#loosePellet[i]) this.looseFilled++;
+      else this.soilFilled++;
+      this.#loosePellet[i] = 0;
+      this.#fillIntent[i] = 0;
+      this.#spoilTo[i] = NaN;
       this.since[i] = 0;
       this.#staleWalk[i] = 0;
       return true;
@@ -791,7 +847,7 @@ export class Colony {
     const ent = this.#entrance;
     if (!ent) return this.nest;
     let kind = 1;
-    if (!pellet) {
+    if (!pellet || this.#fillIntent[i]) {
       this.antCell(i);
       kind = isSky(this.map, CELL[0] as number, CELL[1] as number) ? 1 : 0;
     }
@@ -806,32 +862,37 @@ export class Colony {
   }
 
   /**
-   * Whether an ant at cell (cx, cy) may dig from there: always underground; on the ground line (side view)
-   * only by its own entrance, or explorers walking the surface would pock the ground with holes everywhere.
+   * Whether an ant at cell (cx, cy) may dig from there: underground, yes; on the ground line (side view), no: the
+   * hole is the way in (and every face there is crust: see #crust), or explorers would pock the ground with holes.
    */
   #mayDig(cx: number, cy: number): boolean {
-    const ent = this.#entrance;
-    if (!ent || !isSky(this.map, cx, cy)) return true;
-    return Math.hypot(centreX(cx, cy) - ent.x, centreY(cy) - ent.y) < ENTRANCE_ZONE;
+    return !this.#entrance || !isSky(this.map, cx, cy);
   }
 
   /**
-   * The side view: whether soil cell (x, y) is the ground line's crust (it touches the sky) away from the
-   * entrance. Ants leave it: digging it would undermine the walkway or hole the ground everywhere; the hole
-   * they keep is their entrance.
+   * The side view: whether soil cell (x, y) is the ground line's crust (it touches the sky). Ants leave it: digging
+   * it would undermine the walkway or hole the ground everywhere; the hole they keep is their entrance. Loose soil
+   * (the mound) is no crust.
    */
   #crust(x: number, y: number): boolean {
     const ent = this.#entrance;
     if (!ent) return false;
-    if (this.map.loose?.get(x, y) === 1) return true; // the mound: soil they brought out, not dug again
-    if (Math.hypot(centreX(x, y) - ent.x, centreY(y) - ent.y) < ENTRANCE_ZONE) return false;
-    for (let d = 0; d < 6; d++) if (isSky(this.map, stepX(x, y, d), stepY(y, d))) return true;
+    if (this.map.loose?.get(x, y) === 1) return false; // the mound: loose pellets, picked up anywhere (see LOOSE_DIG)
+    // Round the hole too: it is their way in already, and digging round it once hollowed the ground under the walkway
+    // above the hole, which fell to sky and left the hole with no way out onto the ground.
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(x, y, d);
+      const ty = stepY(y, d);
+      // The ground under the mound is crust too: dug out under a blanket of spoil, the next pellet picked off the
+      // top opened a new hole into the tunnels, away from every entrance (agent review of MR 15).
+      if (isSky(this.map, tx, ty) || this.map.loose?.get(tx, ty) === 1) return true;
+    }
     return false;
   }
 
   /**
    * The side view: an ant whose cell has become solid (spoil heaped on it, or round it by the other colony) climbs
-   * out to an open neighbour, upward first. Six heaps round an ant, three a second by the hole, could otherwise
+   * out to an open neighbour, upward first; one left in the sky (the spoil under it picked up) drops to the ground. Six heaps round an ant, three a second by the hole, could otherwise
    * wall it in for good (agent review of MR 14: ants buried for the rest of the run).
    */
   #unbury(i: number): void {
@@ -848,6 +909,15 @@ export class Colony {
       this.gx[i] = NO_CELL;
       this.digT[i] = 0;
       return;
+    }
+    // Buried deeper (several heaps in one tick), or left in the air (the mound taken from under it): up or down its
+    // column to the ground line.
+    const top = groundTop(this.map, cx) - 1;
+    if (top >= 0 && top !== cy && rockAt(this.map, cx, top) === OPEN) {
+      this.x[i] = centreX(cx, top);
+      this.y[i] = centreY(top);
+      this.gx[i] = NO_CELL;
+      this.digT[i] = 0;
     }
   }
 
@@ -886,6 +956,113 @@ export class Colony {
       }
     }
     return best;
+  }
+
+  /** The side view: the way from cell (cx, cy) to an open neighbour farther from the hole on `side`, on the ground if it can, or −1. */
+  #awayFromHole(cx: number, cy: number, side: number): number {
+    const ex = (this.#entrance as Nest).x;
+    let best = -1;
+    let bestV = side * (centreX(cx, cy) - ex) + 1e-6;
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (rockAt(this.map, tx, ty) !== OPEN) continue;
+      const v = side * (centreX(tx, ty) - ex) + (isSky(this.map, tx, ty) ? 0.25 : 0); // up out of the hole onto the ground first
+      if (v > bestV) {
+        bestV = v;
+        best = d;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * The side view: drop ant i's pellet on the ground where it stands, in column `col`: heaped there and slid
+   * downhill to the angle of repose. A dug pellet is the soil brought out (soilOut), every whole cell of it
+   * (× SWELL) heaped; a loose one, moved, is one cell back on the mound.
+   */
+  #dropOut(i: number, col: number): void {
+    const { map, ph } = this;
+    const side = (this.#spoilSide[i] || 1) as -1 | 1;
+    const heap = (): void => {
+      const cell = heapMound(map, this.#entranceCol, side, 0, this.#holes, col) ?? heapMound(map, this.#entranceCol, side === 1 ? -1 : 1, 0, this.#holes, col);
+      if (!cell) {
+        this.moundLost++;
+        return;
+      }
+      this.moundCells++;
+      // The trail lying on the walkway cell just buried rides up onto the new one above it, so heaps don't cut trails.
+      for (const ch of ["food", "home"] as const) {
+        const v = ph.fields[ch].get(cell[0], cell[1]);
+        const above = ph.fields[ch].get(cell[0], cell[1] - 1);
+        if (v > above) ph.depositCell(ch, cell[0], cell[1] - 1, v - above);
+      }
+    };
+    if (this.#loosePellet[i]) {
+      this.looseDropped++;
+      heap();
+    } else {
+      this.soilOut++;
+      const due = Math.floor(this.soilOut * SWELL + 1e-9); // counted, not summed: 1.2 added five times isn't 6 in floats
+      while (this.#heaped < due) {
+        this.#heaped++;
+        heap();
+      }
+    }
+    this.pellet[i] = 0;
+    this.#loosePellet[i] = 0;
+    this.#fillIntent[i] = 0;
+    this.#spoilTo[i] = NaN;
+    this.since[i] = 0;
+  }
+
+  /**
+   * The side view: an explorer on the ground beside loose soil now and then picks up a pellet of it (it comes up
+   * easily). From a steep flank (LOOSE_SPREAD_PICK a cell) it carries it a little farther out and drops it again, so
+   * the mound spreads and smooths itself as ants rework their spoil; from anywhere on it (LOOSE_FILL_PICK) it takes
+   * it down into the nest to refill unused space, as leaf-cutting ants refill excess space (Pielström & Roces).
+   * True if it picked one up.
+   */
+  #pickLoose(i: number, cx: number, cy: number): boolean {
+    const { map } = this;
+    if (!map.loose) return false;
+    const u = this.#rng();
+    if (u >= LOOSE_SPREAD_PICK + LOOSE_FILL_PICK) return false;
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (map.loose.get(tx, ty) !== 1 || groundTop(map, tx) !== ty) continue; // only off the top: the mound's surface
+      if (this.#byAnEntrance(tx, ty)) continue;
+      // Spread from a slope standing at its angle of repose (the next column out a row lower): the steep flanks.
+      const out = tx >= this.#entranceCol ? 1 : -1;
+      const steep = groundTop(map, tx + out) - ty >= 1;
+      const fill = u < LOOSE_FILL_PICK;
+      if (!fill && !steep) continue;
+      if (!takeLoose(map, tx, ty)) continue;
+      this.#takeUpLoose(i, tx, fill);
+      return true;
+    }
+    return false;
+  }
+
+  /** Ant i takes up a loose pellet from column `col` (off the mound's top, or dug from it): down to fill, or spreading it farther out. */
+  #takeUpLoose(i: number, col: number, fill = false): void {
+    this.pellet[i] = 1;
+    this.#loosePellet[i] = 1;
+    this.loosePicked++;
+    this.moundCells--;
+    this.since[i] = 0;
+    this.wall[i] = 0;
+    this.mx[i] = NaN;
+    this.gx[i] = NO_CELL;
+    const out = col >= this.#entranceCol ? 1 : -1;
+    if (fill) {
+      this.#fillIntent[i] = 1;
+    } else {
+      this.#spoilSide[i] = out;
+      this.#spoilTo[i] = Math.abs(col - this.#entranceCol) + LOOSE_SPREAD * (0.5 + this.#rng());
+      this.#spoilT[i] = 0;
+    }
   }
 
   /** The side view: whether cell (x, y) is within ENTRANCE_ZONE of any nest's entrance (a rival's hole is no space to fill either). */
@@ -1058,7 +1235,8 @@ export class Colony {
           }
         }
         const side = this.wall[i] as number;
-        const look = pellet && map.hasSoil && (this.since[i] as number) > BACKFILL.after && this.#enteredCell(i);
+        // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
+        const look = pellet && map.hasSoil && Number.isNaN(this.#spoilTo[i] as number) && (this.since[i] as number) > BACKFILL.after && this.#enteredCell(i);
         const lx = CELL[0] as number;
         const ly = CELL[1] as number;
         if (look && this.#backfill(i, lx, ly)) {
@@ -1067,7 +1245,7 @@ export class Colony {
           this.gx[i] = NO_CELL;
           this.wall[i] = 0;
           this.mx[i] = NaN;
-        } else if (look && this.#enterStale(i, lx, ly)) {
+        } else if (look && Number.isNaN(this.#spoilTo[i] as number) && this.#enterStale(i, lx, ly)) {
           h = this.#towardTarget(i); // into a stale branch, to fill its end
         } else if (this.#staleWalk[i] && this.#staleStep(i, p.speed * dt)) {
           h = this.#towardTarget(i); // on along it
@@ -1231,8 +1409,12 @@ export class Colony {
       let face = !landOpen && mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] as number, this.gy[i] as number) : NO_FACE;
       if (face === START_FACE) face = digging || rng() < START ? DIG_FACE : GLANCE;
       if (face === DIG_FACE && map.sky) {
+        cellOf(nx, ny);
+        const looseFace = map.loose?.get(CELL[0] as number, CELL[1] as number) === 1;
         this.antCell(i);
-        if (!this.#mayDig(CELL[0] as number, CELL[1] as number)) face = GLANCE;
+        // Loose soil faced from the ground line is picked up only by the rules of #pickLoose (spreading, backfill), not
+        // dug at head-on: explorers chewed the mound and carried it to the hole and out again. From below, it digs quickly.
+        if (looseFace ? isSky(map, CELL[0] as number, CELL[1] as number) : !this.#mayDig(CELL[0] as number, CELL[1] as number)) face = GLANCE;
       }
       if (face !== NO_FACE) {
         // Digging: an explorer that meets soil head-on bites at it for DIG_TIME (1–2 s), then the cell
@@ -1244,7 +1426,10 @@ export class Colony {
           // Facing along the wall, the soil it touched ahead on its hand side.
           this.gdir[i] = (crossedDir(map, this.x[i] as number, this.y[i] as number, nx, ny) - (this.hand[i] as number) + 6) % 6;
           this.gx[i] = NO_CELL;
-        } else if (!digging) this.digT[i] = DIG_TIME * (1 + rng());
+        } else if (!digging) {
+          cellOf(nx, ny);
+          this.digT[i] = DIG_TIME * (1 + rng()) * (map.loose?.get(CELL[0] as number, CELL[1] as number) === 1 ? LOOSE_DIG : 1);
+        }
         else {
           const left = (this.digT[i] as number) - dt;
           this.digT[i] = Math.max(0, left);
@@ -1257,6 +1442,13 @@ export class Colony {
             this.digAim[i] = NaN;
             this.hugT[i] = HUG_TIME;
             this.gx[i] = NO_CELL;
+          } else if (left <= 0 && map.loose?.get(fx, fy) === 1 && takeLoose(map, fx, fy)) {
+            // Loose soil off the mound: a moved pellet, not dug ground. It goes back out like any other (to the hole, then out).
+            this.digAim[i] = NaN;
+            this.#takeUpLoose(i, fx);
+            this.#fillIntent[i] = 0;
+            this.#spoilTo[i] = NaN;
+            h += Math.PI;
           } else if (left <= 0 && digCell(map, fx, fy)) {
             // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
             const aim = this.digAim[i] as number;
@@ -1346,38 +1538,33 @@ export class Colony {
         this.mx[i] = NaN;
         this.since[i] = 0;
         h += Math.PI;
-      } else if (pellet && atEntrance) {
-        // Up and out: the soil goes on the mound round the hole (Tschinkel 2015), loosened (SWELL): every whole
-        // cell's worth is heaped, either side of the hole.
-        this.pellet[i] = 0;
-        this.soilOut++;
-        const due = Math.floor(this.soilOut * SWELL + 1e-9); // counted, not summed: 1.2 added five times isn't 6 in floats
-        while (this.#heaped < due) {
-          this.#heaped++;
-          // Dropped anywhere out to a reach that grows with the mound, so it spreads as a low disc (its area tracks the
-          // nest's volume, Tschinkel 2015) rather than piling into a cone every forager has to climb.
-          // Out to a reach that grows with the mound (to MOUND_REACH), more of it farther out (√ of a uniform draw): uniform
-          // drops piled up by the hole, every drop since the first landing there.
-          const reach = Math.min(MOUND_REACH, 3 + this.#heaped / (2 * MOUND_HEIGHT));
-          const land = Math.floor(reach * Math.sqrt(rng()));
-          const side = rng() < 0.5 ? -1 : 1;
-          const cell = heapMound(map, this.#entranceCol, side, land, this.#holes) ?? heapMound(map, this.#entranceCol, side === 1 ? -1 : 1, land, this.#holes);
-          if (cell) {
-            this.moundCells++;
-            // The trail lying on the walkway cell just buried rides up onto the new one above it: otherwise every pellet
-            // heaped cuts the trails by the entrance, three times a second, and foragers lose their way in and out.
-            for (const ch of ["food", "home"] as const) {
-              const v = ph.fields[ch].get(cell[0], cell[1]);
-              const above = ph.fields[ch].get(cell[0], cell[1] - 1);
-              if (v > above) ph.depositCell(ch, cell[0], cell[1] - 1, v - above);
-            }
-          } else this.moundLost++;
-        }
+      } else if (pellet && ent && !Number.isNaN(this.#spoilTo[i] as number)) {
+        // Carrying a pellet out along the ground (side view): dropped where it stands once far enough out (or stuck).
+        this.#spoilT[i] = (this.#spoilT[i] as number) + dt;
+        const col = CELL[0] as number;
+        const onGround = isSky(map, col, CELL[1] as number);
+        if ((onGround && (this.#spoilSide[i] as number) * (col - this.#entranceCol) >= (this.#spoilTo[i] as number)) || (this.#spoilT[i] as number) > SPOIL_GIVE_UP) this.#dropOut(i, col);
+        // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
+        // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
+      } else if (pellet && atEntrance && !this.#fillIntent[i]) {
+        // Up and out of the hole: it carries the pellet on out along the ground to drop it, farther as the mound grows
+        // (MOUND_REACH at most; more of them farther out, √ of a uniform draw), so the mound spreads as a disc, its area
+        // tracking the nest's volume (Tschinkel 2015), where you see them drop it.
+        const reach = Math.min(MOUND_REACH, 3 + this.#heaped / (2 * MOUND_HEIGHT));
+        this.#spoilTo[i] = 2 + reach * Math.sqrt(rng());
+        this.#spoilSide[i] = rng() < 0.5 ? -1 : 1;
+        this.#spoilT[i] = 0;
+        this.#staleWalk[i] = 0;
         this.wall[i] = 0;
         this.mx[i] = NaN;
-        this.since[i] = 0;
-        // It doesn't turn back down: out on the ground, it is asked afresh (most explore it), and so the ground near
-        // the nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
+        this.gx[i] = NO_CELL;
+      } else if (pellet && this.#fillIntent[i] && atNest) {
+        // A loose pellet taken down to fill unused space, and none found on the way: it carries it back out.
+        this.#fillIntent[i] = 0;
+        this.wall[i] = 0;
+        this.mx[i] = NaN;
+      } else if (ent && !carrying && !pellet && mode === EXPLORE && isSky(map, CELL[0] as number, CELL[1] as number) && this.#enteredCell(i) && this.#pickLoose(i, CELL[0] as number, CELL[1] as number)) {
+        // Picked up a loose pellet off the mound (see #pickLoose).
       } else if (atNest && !(pellet && ent)) {
         this.wall[i] = 0;
         this.mx[i] = NaN;
@@ -1580,6 +1767,16 @@ export function moundRadius(pellets: number, nestR: number): number {
 const MOUND_HEIGHT = 3;
 /** The side view: the farthest (columns) a pellet is carried from the hole; past it the disc grows higher, not wider. */
 const MOUND_REACH = 90;
+/** The side view: seconds a carrier walks a pellet out before it drops it wherever it is (heaped on top of its column, clear of the crater). */
+const SPOIL_GIVE_UP = 15;
+/** The side view: an explorer on the ground beside a steep flank of the mound picks a pellet off it to spread, with this chance a cell. */
+const LOOSE_SPREAD_PICK = 0.01;
+/** The side view: an explorer on the ground beside the mound takes a pellet of it down to backfill, with this chance a cell. */
+const LOOSE_FILL_PICK = 0.005;
+/** The side view: how much farther out (columns, on average) a loose pellet is spread. */
+const LOOSE_SPREAD = 12;
+/** The side view: loose soil digs in this share of packed soil's time (it is loose pellets, not soil in place). */
+const LOOSE_DIG = 0.25;
 /** The side view: how near its entrance (world units) an ant counts as at it, to drop a pellet. */
 const ENTRANCE_R = 1.5;
 /** The side view: how near its entrance an ant on the ground line may dig (and how much ground round the hole stays unfilled). */

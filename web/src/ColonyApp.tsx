@@ -269,7 +269,7 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
       <dd className="tabular-nums">{s.stored.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.losses.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.births.toLocaleString()}</dd>
-      <dd className="tabular-nums" title="soil cells dug / pellets of it on the mound / pellets put back into unused dead ends">
+      <dd className="tabular-nums" title="soil cells dug / pellets of it brought out to the mound / pellets put back into unused space underground (side view: loose mound pellets too)">
         {s.dug.toLocaleString()} / {s.mound.toLocaleString()} / {s.filled.toLocaleString()}
       </dd>
       <dd>{s.stance}</dd>

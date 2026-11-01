@@ -44,7 +44,7 @@ export interface SideStats {
   dug: number;
   /** pellets of it on the mound */
   mound: number;
-  /** pellets of it put back into unused dead ends */
+  /** pellets put back into unused space underground (dug ones, and in the side view loose ones off the mound) */
   filled: number;
 }
 
@@ -63,7 +63,7 @@ export interface ColonyStats {
 }
 
 function side(c: Colony): SideStats {
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled + c.looseFilled };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
