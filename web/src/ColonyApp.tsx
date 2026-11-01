@@ -9,7 +9,7 @@ import type { Followed } from "./ui/follow.ts";
 import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
-import { useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
+import { RIVAL_BY_DEFAULT, useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
 import { TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 
 // The colony page: a procedural world, your colony and a rival's, and the
@@ -158,20 +158,26 @@ export default function ColonyApp() {
               </button>
             </div>
             <p className="mt-2 text-xs text-fg-3">
-              {size.w}×{size.h} cells of {controls.ground === "underground" ? "soil to dig, rock, a few chambers" : "rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food. Every 4 food stored is a new ant.
+              {size.w}×{size.h} cells {controls.ground === "side" ? "seen from the side: sky, the ground line, soil and stones to dig," : "seen from above: rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food. Every 4 food stored is a new ant.
             </p>
             <div className="mt-2 flex items-center justify-between text-sm text-fg-2">
               <span>Ground</span>
               <div className="flex overflow-hidden rounded-md border border-line text-sm">
-                {(["underground", "open"] as Ground[]).map((g) => (
-                  <button key={g} type="button" className={seg(controls.ground === g)} onClick={() => update({ ground: g })} title={g === "underground" ? "Mostly soil: ants dig tunnels to food and carry the soil home to a mound" : "The open surface: rock and walkable ground"}>
-                    {g}
+                {(["side", "open"] as Ground[]).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    className={seg(controls.ground === g)}
+                    onClick={() => update({ ground: g, rival: RIVAL_BY_DEFAULT[g] })}
+                    title={g === "side" ? "A cross-section: ants forage on the ground line, dig their nest below it and carry the soil up to a mound" : "The open surface from above: rock and walkable ground"}
+                  >
+                    {g === "side" ? "side view" : "from above"}
                   </button>
                 ))}
               </div>
             </div>
             <label className="mt-2 flex items-center justify-between text-sm text-fg-2">
-              <span>Rival colony</span>
+              <span title={controls.ground === "side" ? "In the side view both colonies forage along one ground line: expect a war" : undefined}>Rival colony</span>
               <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />
             </label>
           </section>

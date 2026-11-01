@@ -3,11 +3,12 @@
 // and 90th-percentile milliseconds per tick after a warm-up, plus the ants
 // alive at the end. Ants spread out over the run, so the late ticks (more
 // trail laid, more chunks awake) are the honest ones. Each size runs twice:
-// underground (the default: soil the ants dig) and the open surface.
+// underground (soil the ants dig, seen from above) and the open surface; then
+// the side view (the app's default: a cross-section) at its own size, one colony and two.
 //
 // Usage: node scripts/colony-bench.mjs [ants per colony=1200] [sim seconds=60] [seed=1]
 import { Game } from "../web/src/colony/game.ts";
-import { generateWorld, mulberry32, OPEN_WORLD } from "../web/src/colony/world.ts";
+import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, SIDE_WORLD } from "../web/src/colony/world.ts";
 
 const [ants = 1200, seconds = 60, seed = 1] = process.argv.slice(2).map(Number);
 const DT = 1 / 30;
@@ -16,9 +17,10 @@ const SIZES = [
   { w: 512, h: 320 },
 ];
 
-for (const [size, ground] of SIZES.flatMap((s) => [[s, "underground"], [s, "open"]])) {
+const RUNS = [...SIZES.flatMap((s) => [[s, "underground"], [s, "open"]]), [SIDE_WORLD.size, "side, one colony"], [SIDE_WORLD.size, "side, two"]];
+for (const [size, ground] of RUNS) {
   const t0 = performance.now();
-  const map = generateWorld(seed, ground === "open" ? { ...OPEN_WORLD, size } : { size });
+  const map = ground.startsWith("side") ? generateSideWorld(seed, ground === "side, two" ? {} : { nestCount: 1 }) : generateWorld(seed, ground === "open" ? { ...OPEN_WORLD, size } : { size });
   const gen = performance.now() - t0;
   const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 31 + 7));
   const steps = Math.round(seconds / DT);

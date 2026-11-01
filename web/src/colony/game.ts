@@ -50,7 +50,8 @@ export class Game {
       if (map.hasSoil) c.friends = this.#grids[k] as CountGrid;
       if (this.colonies.length > 1) {
         c.enemies = this.#enemy[k] as CountGrid;
-        c.raidTarget = this.colonies[1 - k]!.nest;
+        const other = this.colonies[1 - k]!.nest;
+        c.raidTarget = other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other; // side view: in at their hole
       }
     });
     this.#refresh();

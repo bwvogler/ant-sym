@@ -25,18 +25,22 @@ export interface WorldSize {
   h: number;
 }
 
-/** A nest: its centre and radius, in world units. */
+/** A nest: its centre and radius, in world units. In the side view, its chamber; `entrance` is the hole in the ground above it. */
 export interface Nest {
   x: number;
   y: number;
   r: number;
+  /** the side view: where the nest's shaft comes up on the ground line (world units) */
+  entrance?: { x: number; y: number };
 }
 
 /** What a cell of the terrain (`WorldMap.rock`) holds. */
 export const OPEN = 0;
 export const ROCK = 1;
 export const SOIL = 2;
-export type Terrain = typeof OPEN | typeof ROCK | typeof SOIL;
+/** The side view's sky: solid to ants and scent like rock, never dug (see WorldMap.sky) */
+export const AIR = 3;
+export type Terrain = typeof OPEN | typeof ROCK | typeof SOIL | typeof AIR;
 
 export interface WorldMap {
   size: WorldSize;
@@ -63,6 +67,12 @@ export interface WorldMap {
   digHeading: ChunkLayer<Uint8Array>;
   /** when each cell was last filled back with soil (simulated seconds; −Infinity = never): fresh pellets smell, and draw more (see pelletScent) */
   filledAt: ChunkLayer<Float32Array>;
+  /**
+   * The side view (a cross-section): 1 for cells above the ground, 0 below; absent for the top-down maps. A
+   * cell above ground touching solid ground is the walkway (OPEN: ants walk the ground line, its overhangs,
+   * later the mound); the rest is AIR (solid, never dug, drawn as sky). updateSurface keeps it so as ground changes.
+   */
+  sky?: ChunkLayer<Uint8Array>;
 }
 
 export interface WorldOptions {
@@ -236,6 +246,10 @@ export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
   map.digHeading.set(x, y, 0);
   map.filledAt.set(x, y, t);
   map.filled++;
+  if (map.sky) {
+    map.sky.set(x, y, 0); // ground now (a pellet on the mound, in the side view)
+    updateSurface(map, x, y);
+  }
   return true;
 }
 
@@ -245,7 +259,43 @@ export function digCell(map: WorldMap, x: number, y: number): boolean {
   map.rock.set(x, y, OPEN);
   map.filledAt.set(x, y, -Infinity); // a pellet dug out again no longer smells of building
   map.dug++;
+  if (map.sky) updateSurface(map, x, y);
   return true;
+}
+
+/** Whether integer cell (x, y) is above the ground in the side view (the walkway or sky). */
+export function isSky(map: WorldMap, x: number, y: number): boolean {
+  return map.sky !== undefined && inBounds(map, x, y) && map.sky.get(x, y) === 1;
+}
+
+/** Whether cell (x, y) has solid ground (soil or rock, on the map) beside it: what keeps a walkway cell walkable. */
+function grounded(map: WorldMap, x: number, y: number): boolean {
+  for (let d = 0; d < 6; d++) {
+    const ax = nx(x, y, d);
+    const ay = ny(y, d);
+    if (!inBounds(map, ax, ay)) continue;
+    const t = map.rock.get(ax, ay);
+    if (t === SOIL || t === ROCK) return true;
+  }
+  return false;
+}
+
+/**
+ * The side view: after cell (x, y) changed (dug, filled, a pellet put on the mound), re-derive the cells
+ * above ground round it: those touching solid ground are the walkway (OPEN), the rest AIR. A walkway cell
+ * whose ground is dug away from under it becomes sky (an ant there walks out: see the own-cell step in colony.ts).
+ */
+export function updateSurface(map: WorldMap, x: number, y: number): void {
+  const sky = map.sky;
+  if (!sky) return;
+  for (let d = -1; d < 6; d++) {
+    const ax = d < 0 ? x : nx(x, y, d);
+    const ay = d < 0 ? y : ny(y, d);
+    if (!inBounds(map, ax, ay) || sky.get(ax, ay) !== 1) continue;
+    const t = map.rock.get(ax, ay);
+    if (t !== OPEN && t !== AIR) continue;
+    map.rock.set(ax, ay, grounded(map, ax, ay) ? OPEN : AIR);
+  }
 }
 
 function headingLayer(): ChunkLayer<Uint8Array> {
@@ -356,7 +406,7 @@ export type Through = "open" | "diggable";
 
 function passable(map: WorldMap, x: number, y: number, through: Through): boolean {
   const t = rockAt(map, x, y);
-  return through === "open" ? t === OPEN : t !== ROCK;
+  return through === "open" ? t === OPEN : t === OPEN || t === SOIL;
 }
 
 /** Cells reachable from world (x, y) through the six neighbours (walking through open ground, or digging through soil too), as a flat array over the map: the whole-map oracle. */
@@ -553,4 +603,181 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
   map.foodTotal = total;
   map.foodLeft = total;
   return map;
+}
+
+/** Side-view options: a cross-section, sky above a ground line `surface` rows down, `relief` rows of rise and fall. */
+export interface SideWorldOptions extends WorldOptions {
+  /** the ground line's mean row (rows of sky above it: room for the mound) */
+  surface: number;
+  /** how far the ground line rises and falls, in rows either way */
+  relief: number;
+  /** food piles on the ground (3–6 cells wide) per 64 columns, on average (patchesPerChunk is buried food, per chunk below ground) */
+  surfacePatches: number;
+  /** how far below the ground line a nest's chamber is dug, in rows */
+  chamberDepth: number;
+}
+
+/**
+ * The side view: a cross-section 768 columns wide, ground 64 rows down, mostly soil with stones, two nests
+ * 340 columns apart. Wider than the top-down maps: the colonies share one ground line, and nearer than that
+ * every forager meets the other side's on it (measured at 140 columns: half of both colonies dead in three minutes).
+ */
+export const SIDE_WORLD: SideWorldOptions = {
+  size: { w: 768, h: 368 },
+  rockiness: 0.1,
+  patchesPerChunk: 1.2,
+  foodPerCell: 12,
+  nestCount: 2,
+  nestGap: 340,
+  foodMinDist: 16,
+  soil: 0.93,
+  surface: 64,
+  relief: 5,
+  surfacePatches: 3,
+  chamberDepth: 14,
+};
+
+/** The ground line's row at column x: gentle rise and fall (value noise over ~40 columns, rough over ~9). */
+export function groundRow(seed: number, o: { surface: number; relief: number }, x: number): number {
+  const n = 0.75 * noiseAt(seed, 6, x, 0, 40) + 0.25 * noiseAt(seed, 7, x, 0, 9);
+  return Math.round(o.surface + (n - 0.5) * 2 * o.relief);
+}
+
+/**
+ * A side-view world from a seed: sky above a ground line, soil below with stones (rock) and a few cavities
+ * deeper down, each nest a chamber `chamberDepth` rows down joined to its entrance on the ground line by a
+ * slanting shaft, food in piles on the ground and in pockets below it. The rest (tunnels, chambers) the ants dig.
+ */
+export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> = {}): WorldMap {
+  const o = { ...SIDE_WORLD, ...opts };
+  const { size } = o;
+  const rng = mulberry32(seed ^ 0x51de);
+  const { rock, food } = blankLayers(size);
+  const sky = new ChunkLayer((n) => new Uint8Array(n), 0);
+  const cut = rockCut(o.rockiness);
+  const scut = soilCut(o.soil);
+  const ext = extent(size.w, size.h);
+  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: filledLayer(), sky };
+  const ground = new Int32Array(size.w);
+  for (let x = 0; x < size.w; x++) ground[x] = Math.max(2, Math.min(size.h - 8, groundRow(seed, o, x)));
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++) {
+      const g = ground[x] as number;
+      if (y < g) {
+        sky.set(x, y, 1);
+        rock.set(x, y, AIR);
+        continue;
+      }
+      const depth = y - g;
+      const wx = centreX(x, y);
+      const wy = centreY(y);
+      // Stones from a few rows down, more of them deeper; cavities only well below the ground line.
+      const stone = depth > 3 && heightAt(seed, wx, wy) + 0.06 * Math.min(1, depth / 200) > cut;
+      rock.set(x, y, stone ? ROCK : depth > 8 && chamberAt(seed, wx, wy) >= scut ? OPEN : SOIL);
+    }
+  // The walkway: sky cells touching the ground.
+  for (let y = 0; y < size.h; y++) for (let x = 0; x < size.w; x++) if (sky.get(x, y) === 1 && grounded(map, x, y)) rock.set(x, y, OPEN);
+
+  // Nests: the player's entrance in the left middle, each rival `nestGap` columns on along the ground.
+  const nests: Nest[] = [];
+  let ex = Math.round(size.w * (0.3 + 0.15 * rng()));
+  for (let k = 0; k < o.nestCount; k++) {
+    if (k > 0) ex = Math.min(size.w - 24, ex + o.nestGap);
+    nests.push(digNest(map, ground, ex, o.chamberDepth, rng));
+  }
+  map.nest = nests[0] as Nest;
+  map.nests = nests;
+  const nearNest = (x: number, y: number, d: number) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || Math.hypot(x - n.entrance!.x, y - n.entrance!.y) < d);
+
+  // Food on the ground: piles 3–6 cells wide on the walkway, per 64 columns (seeds and bits, as harvester ants forage).
+  for (let cx = 0; cx < Math.ceil(size.w / CHUNK); cx++) {
+    const r = mulberry32(hash4(seed, 78, cx, 0));
+    const count = Math.floor(o.surfacePatches) + (r() < o.surfacePatches % 1 ? 1 : 0);
+    for (let p = 0; p < count; p++) {
+      for (let tries = 0; tries < 12; tries++) {
+        const x0 = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
+        const wide = 3 + Math.floor(r() * 4);
+        if (x0 + wide >= size.w - 1) continue;
+        const y0 = (ground[x0] as number) - 1;
+        if (nearNest(centreX(x0, y0), centreY(y0), o.foodMinDist + wide)) continue;
+        for (let x = x0; x < x0 + wide; x++) {
+          const y = walkwayRow(map, x, ground[x] as number);
+          if (y >= 0) food.set(x, y, o.foodPerCell);
+        }
+        break;
+      }
+    }
+  }
+  // Food below ground: pockets in the soil, chunk by chunk, at least ten rows down.
+  for (let cy = 0; cy < Math.ceil(size.h / CHUNK); cy++)
+    for (let cx = 0; cx < Math.ceil(size.w / CHUNK); cx++) {
+      const r = mulberry32(hash4(seed, 77, cx, cy));
+      const count = Math.floor(o.patchesPerChunk) + (r() < o.patchesPerChunk % 1 ? 1 : 0);
+      for (let p = 0; p < count; p++) {
+        for (let tries = 0; tries < 12; tries++) {
+          const row = (cy << CHUNK_BITS) + Math.floor(r() * CHUNK);
+          const col = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
+          if (col >= size.w || row >= size.h - 3 || row < (ground[col] as number) + 10) continue;
+          const x = centreX(col, row);
+          const y = centreY(row);
+          const radius = 2 + r() * 2;
+          if (nearNest(x, y, o.foodMinDist + radius + 1)) continue;
+          disc(map, x, y, radius, (fx, fy) => {
+            if (fy < (ground[fx] as number) + 4) return;
+            setRock(map, fx, fy, 0);
+            food.set(fx, fy, o.foodPerCell);
+          });
+          break;
+        }
+      }
+    }
+  // Only food the player's ants can reach, walking or digging (the walkway and the soil are one ground).
+  const reach = reachable(map, map.nest.x, map.nest.y, "diggable");
+  let total = 0;
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++) {
+      const v = food.get(x, y);
+      if (!v) continue;
+      if (!reach[y * size.w + x]) food.set(x, y, 0);
+      else total += v;
+    }
+  map.foodTotal = total;
+  map.foodLeft = total;
+  return map;
+}
+
+/** The walkway cell of column x (the sky cell just above the ground line `g`), or −1 if it isn't walkable. */
+function walkwayRow(map: WorldMap, x: number, g: number): number {
+  for (let y = g - 1; y >= Math.max(0, g - 3); y--) if (map.sky?.get(x, y) === 1 && map.rock.get(x, y) === OPEN) return y;
+  return -1;
+}
+
+/**
+ * Dig a nest into the side view at column ex: a shaft from the ground line slanting down (alternating
+ * south-east and south-west steps, mostly one way: about 60° below level) to a round chamber `depth` rows down.
+ */
+function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, rng: () => number): Nest {
+  const g = ground[ex] as number;
+  const way = rng() < 0.5 ? 1 : 2; // SE or SW, the shaft's slant
+  let x = ex;
+  let y = g;
+  const open = (cx: number, cy: number) => {
+    if (!inBounds(map, cx, cy)) return;
+    map.rock.set(cx, cy, OPEN);
+    map.sky?.set(cx, cy, 0);
+  };
+  open(x, y);
+  for (let k = 0; k < depth; k++) {
+    const d = k % 3 === 2 ? 3 - way : way; // two steps the shaft's way, one back: steep, not straight down a column
+    x = nx(x, y, d);
+    y = ny(y, d);
+    open(x, y);
+  }
+  const cxw = centreX(x, y);
+  const cyw = centreY(y);
+  const nest: Nest = { x: cxw, y: cyw, r: 3, entrance: { x: centreX(ex, g - 1), y: centreY(g - 1) } };
+  disc(map, cxw, cyw, nest.r + 1.5, (fx, fy) => open(fx, fy));
+  // The ground round the hole changed: re-derive the walkway there.
+  for (let yy = g - 2; yy <= g + 1; yy++) for (let xx = ex - 2; xx <= ex + 2; xx++) if (inBounds(map, xx, yy)) updateSurface(map, xx, yy);
+  return nest;
 }
