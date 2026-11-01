@@ -35,6 +35,8 @@
   --err: #b42318;
   --err-soft: #fde9e7;
   --heat: 31 111 92; /* rgb triplet for the deficit heatmap */
+  --soil: #e3d5bf; /* the colony's undug ground */
+  --mound: #a07c50; /* dug soil: the mound at a nest, a pellet in an ant's jaws */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -59,6 +61,8 @@
     --err: #f28b82;
     --err-soft: #3d1a17;
     --heat: 95 184 157;
+    --soil: #2f2a22;
+    --mound: #b08a5c;
   }
 }
 
