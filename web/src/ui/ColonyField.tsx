@@ -505,7 +505,8 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       onFollow(f);
     }
     if (pointers.current.size === 0) gesture.current = NO_GESTURE;
-    else if (g.kind === "pinch") gesture.current = { ...NO_GESTURE, kind: "pan", moved: Infinity }; // the finger left behind pans, never clicks
+    // A pinch stays a pinch while two fingers are down (a third lifted); the last finger left pans, and never clicks.
+    else if (g.kind === "pinch" && pointers.current.size === 1) gesture.current = { ...NO_GESTURE, kind: "pan", moved: Infinity };
   };
 
   const onKey = (e: KeyboardEvent<HTMLCanvasElement>) => {
@@ -520,14 +521,15 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     const c = camera();
     const step = Math.min(v.w, v.h) * 0.15;
     const moves: Record<string, [number, number]> = { ArrowLeft: [step, 0], a: [step, 0], ArrowRight: [-step, 0], d: [-step, 0], ArrowUp: [0, step], w: [0, step], ArrowDown: [0, -step], s: [0, -step] };
-    const m = moves[e.key];
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key; // Shift or Caps Lock still moves
+    const m = moves[key];
     if (m) {
       if (follow.current) unfollow();
       setCamera(pan(c, m[0], m[1]));
     } else if (e.key === "+" || e.key === "=") setCamera(zoomBy(c, world, v, v.w / 2, v.h / 2, 1.25));
     else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, world, v, v.w / 2, v.h / 2, 0.8));
     else if (e.key === "0" || e.key === "Home") showAll();
-    else if (e.key === "n") goHome();
+    else if (key === "n") goHome();
     else if (e.key === "Escape") unfollow();
     else return;
     e.preventDefault();
@@ -548,8 +550,9 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        className={`absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:border-accent ${onPaint ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
-        aria-label="colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, click an ant to follow it"
+        className={`absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent ${onPaint ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
+        role="application"
+        aria-label="colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n for your nest; click an ant to follow it"
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}

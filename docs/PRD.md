@@ -435,4 +435,14 @@ Also from the review:
 - Middle-drag no longer starts autoscroll.
 - The follow state no longer pins the previous game in memory.
 
+**Second review** (fresh agent, whole stack): no confirmed bugs.
+- **Fixed from its suggestions:**
+  - A third finger lifted during a pinch now keeps the pinch, instead of turning the other two into a double-speed pan.
+  - Letter shortcuts work with Shift or Caps Lock.
+  - With a brush on, the hint says how to pan and follow.
+  - The field has `role="application"`, a fuller label and a visible focus ring.
+  - A test pins that `explain` alone sends no request.
+- **By design:** a pinch while following zooms about the followed ant.
+- **Filed as beads:** keyboard access to following and to the minimap, the card's "by …" while paused, tap slop by net rather than total movement, and moving the gesture logic into a tested pure module.
+
 **Jev:** no change. `explain` makes no calls, and the request state is unchanged.

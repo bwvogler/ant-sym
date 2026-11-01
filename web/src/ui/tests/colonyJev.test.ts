@@ -282,3 +282,13 @@ test("explain says who decides a situation, without counting or queuing it", asy
   await tick(60);
   assert.deepEqual(j.explain(s), { mode: "return", by: "jev" }, "answered: Jev's cached answer");
 });
+
+test("explain alone never asks Jev", async () => {
+  const sent = scriptFetch(answerAll("follow"));
+  const j = make();
+  j.attach(colony());
+  await j.start();
+  j.explain({ mode: "explore", tired: true, foodTrail: "faint", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" });
+  await tick(60); // several cycles
+  assert.equal(sent.length, 0, "no /api/jev request");
+});
