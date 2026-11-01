@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef } from "react";
 import { CHUNK } from "../colony/chunks.ts";
 import type { Colony } from "../colony/colony.ts";
+import { INFECTED, type Fungus } from "../colony/fungus.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 
@@ -19,6 +20,8 @@ interface Props {
   colony: Colony;
   /** the rival colony, drawn in the warn tone, or null */
   rival: Colony | null;
+  /** the fungus: spores drawn on the ground, infected ants marked */
+  fungus: Fungus;
   onFrame: (fn: () => void) => () => void;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
@@ -56,7 +59,7 @@ interface ChunkCanvas {
 type Gesture = { kind: "pan" | "paint" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
-export default function ColonyField({ colony, rival, onFrame, showFoodTrail, showHomeTrail, onPaint, followed, onFollow }: Props) {
+export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTrail, showHomeTrail, onPaint, followed, onFollow }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layers = useRef({ food: showFoodTrail, home: showHomeTrail });
   const cam = useRef<Camera | null>(null);
@@ -112,7 +115,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
     const miniImg = miniCtx.createImageData(mini.width, mini.height);
     let miniAt = -Infinity;
 
-    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300") };
+    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300"), spore: "#7a4fa0", sporeRgb: rgb("#7a4fa0") };
     const retheme = () => {
       theme = {
         paper: cssVar("--paper"),
@@ -126,6 +129,8 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         paperRgb: rgb(cssVar("--paper")),
         inkRgb: rgb(cssVar("--ink")),
         warnRgb: rgb(cssVar("--warn")),
+        spore: cssVar("--spore"),
+        sporeRgb: rgb(cssVar("--spore")),
       };
       miniAt = -Infinity;
     };
@@ -153,6 +158,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       const foodC = colony.ph.fields.food.chunk(cx, cy);
       const homeC = colony.ph.fields.home.chunk(cx, cy);
       const alarmC = colony.ph.fields.alarm.chunk(cx, cy);
+      const sporeC = fungus.spores.chunk(cx, cy);
       const [fr, fg, fb] = rgb(theme.accent);
       const show = layers.current;
       const px = c.img.data;
@@ -188,6 +194,15 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
             px[o + 1] = theme.alarm[1];
             px[o + 2] = theme.alarm[2];
             px[o + 3] = Math.round(40 + al * 150);
+            continue;
+          }
+          // Spores: the fungus's own mark on the ground, under food and alarm, over the trails.
+          const sp = sporeC ? Math.min(1, (sporeC[i] as number) / 3) : 0;
+          if (sp > 0.02) {
+            px[o] = theme.sporeRgb[0];
+            px[o + 1] = theme.sporeRgb[1];
+            px[o + 2] = theme.sporeRgb[2];
+            px[o + 3] = Math.round(35 + sp * 130);
             continue;
           }
           const f = show.food && foodC ? Math.min(1, (foodC[i] as number) / 4) : 0;
@@ -316,6 +331,19 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
         ctx.globalAlpha = 0.85;
         ctx.stroke();
         ctx.globalAlpha = 1;
+        // Infected ants: a spore-coloured dot on the body, fainter for a light load.
+        const dot = Math.max(1.5, len * 0.45);
+        ctx.fillStyle = theme.spore;
+        for (const [lo, hi, alpha] of [[INFECTED, 0.5, 0.55], [0.5, 2, 1]] as const) {
+          ctx.globalAlpha = alpha;
+          for (let i = 0; i < col.n; i++) {
+            const l = col.load[i] as number;
+            if (!col.alive[i] || l < lo || l >= hi || !inView(col.x[i] as number, col.y[i] as number)) continue;
+            const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
+            ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot);
+          }
+        }
+        ctx.globalAlpha = 1;
         ctx.fillStyle = theme.accent;
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || !col.carrying[i] || !inView(col.x[i] as number, col.y[i] as number)) continue;
@@ -383,7 +411,7 @@ export default function ColonyField({ colony, rival, onFrame, showFoodTrail, sho
       canvas.removeEventListener("wheel", wheel);
       window.removeEventListener("blur", blur);
     };
-  }, [colony, rival, onFrame, world]);
+  }, [colony, rival, fungus, onFrame, world]);
 
   // ——— input: one pointer drags (pan, or paint with a brush), two pinch; a click picks an ant; the minimap jumps ———
 

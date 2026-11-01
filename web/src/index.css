@@ -35,6 +35,7 @@
   --err: #b42318;
   --err-soft: #fde9e7;
   --heat: 31 111 92; /* rgb triplet for the deficit heatmap */
+  --spore: #7a4fa0; /* the fungus: spores on the ground, infected ants */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -59,6 +60,7 @@
     --err: #f28b82;
     --err-soft: #3d1a17;
     --heat: 95 184 157;
+    --spore: #c39be3;
   }
 }
 
@@ -81,6 +83,7 @@
   --color-warn-soft: var(--warn-soft);
   --color-err: var(--err);
   --color-err-soft: var(--err-soft);
+  --color-spore: var(--spore);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }

@@ -167,6 +167,14 @@ export class Colony {
   detour: Float32Array;
   /** recent bumps, fading over seconds: each bump in a row doubles the next detour */
   bumps: Float32Array;
+  /** fungal load, 0..1 (fungus.ts): the fungus inside the ant; it never touches the ant's choices directly */
+  load: Float32Array;
+  /** which strain (an index into the fungus's strains) the load is; meaningful only where load > 0 */
+  strain: Uint8Array;
+  /** immune priming from grooming visible nestmates, 0..1: scales down every load the ant takes */
+  resist: Float32Array;
+  /** the intervention the fungus runs in this ant (docs/fungus-policy.md §5.2); 0 = dormant, the only one until the fungus policy lands */
+  expr: Uint8Array;
   /** the situation each ant was last asked about, encoded; −1 = never */
   #asked: Int16Array;
   /** the question behind each ant's current mode: its situation (with the mode it had) when last asked; −1 = never */
@@ -216,6 +224,10 @@ export class Colony {
     this.since = new Float32Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
+    this.load = new Float32Array(n);
+    this.strain = new Uint8Array(n);
+    this.resist = new Float32Array(n);
+    this.expr = new Uint8Array(n);
     this.#asked = new Int16Array(n).fill(-1);
     this.#question = new Int16Array(n).fill(-1);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
@@ -234,6 +246,11 @@ export class Colony {
     this.since[i] = 0;
     this.detour[i] = 0;
     this.bumps[i] = 0;
+    // A newborn is clean and unprimed.
+    this.load[i] = 0;
+    this.strain[i] = 0;
+    this.resist[i] = 0;
+    this.expr[i] = 0;
     this.#asked[i] = -1;
     this.#question[i] = -1;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;

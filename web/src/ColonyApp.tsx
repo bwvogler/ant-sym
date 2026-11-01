@@ -8,12 +8,13 @@ import type { Followed } from "./ui/follow.ts";
 import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
-import { useColony, type Brush, type SideStats } from "./ui/useColony.ts";
+import { STRAINS, useColony, type Brush, type SideStats } from "./ui/useColony.ts";
 import { TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 
 // The colony page: a procedural world, your colony and a rival's, and the
 // fungus (you) that steers yours. The fungus paints scent (free: lure and
-// alarm brushes) and sets the colony's doctrine; with Jev on, each ant's
+// alarm brushes), inoculates ants of either colony with spores (free: the
+// spore brush, docs/fungus-policy.md) and sets the colony's doctrine; with Jev on, each ant's
 // mode and the colony's stance are Jev's answers for their situation under
 // that doctrine, asked once per situation and cached, so the spend follows
 // new situations and retunes, not ants or time. The rival plays the local
@@ -52,6 +53,7 @@ export default function ColonyApp() {
             <ColonyField
               colony={colony}
               rival={game.rival}
+              fungus={game.fungus}
               onFrame={onFrame}
               showFoodTrail={controls.showFoodTrail}
               showHomeTrail={controls.showHomeTrail}
@@ -191,14 +193,40 @@ export default function ColonyApp() {
             <div className="mt-3 flex items-center justify-between">
               <span>Brush</span>
               <div className="flex overflow-hidden rounded-md border border-line text-sm">
-                {(["none", "lure", "alarm"] as Brush[]).map((b) => (
-                  <button key={b} type="button" className={seg(controls.brush === b)} onClick={() => update({ brush: b })} title={b === "lure" ? "Paint food scent: ants follow it" : b === "alarm" ? "Paint alarm: ants shy away; a doctrine can send them home" : "Stop painting"}>
+                {(["none", "lure", "alarm", "spores"] as Brush[]).map((b) => (
+                  <button key={b} type="button" className={seg(controls.brush === b)} onClick={() => update({ brush: b })} title={BRUSH_TITLES[b]}>
                     {b}
                   </button>
                 ))}
               </div>
             </div>
             <p className="mt-1 text-xs text-fg-3">{controls.brush === "none" ? "Pick a brush, then drag on the field. Painting is free." : "Drag on the field to paint. Free."}</p>
+            {controls.brush === "spores" && (
+              <>
+                <div className="mt-3 flex items-center justify-between">
+                  <span>Strain</span>
+                  <div className="flex overflow-hidden rounded-md border border-line text-sm">
+                    {STRAINS.map((st, k) => (
+                      <button key={st.id} type="button" className={seg(controls.strain === k)} onClick={() => update({ strain: k })} title={st.blurb}>
+                        {st.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-fg-3">{STRAINS[controls.strain]?.name}: {STRAINS[controls.strain]?.blurb}.</p>
+              </>
+            )}
+            {stats && (
+              <dl className="mt-3 grid grid-cols-[auto_1fr_1fr] gap-x-4 gap-y-0.5 font-mono text-xs" aria-label="infection">
+                <dt />
+                <dt className="text-right text-[11px] uppercase tracking-wide text-fg-3">infected</dt>
+                <dt className="text-right text-[11px] uppercase tracking-wide text-fg-3">resistance</dt>
+                <Infection name="you" tone="text-fg" s={stats.you} />
+                {stats.rival && <Infection name="rival" tone="text-warn" s={stats.rival} />}
+                <dt className="text-fg-3">spores</dt>
+                <dd className="col-span-2 text-right text-fg-2">{stats.sporeCells.toLocaleString()} cells</dd>
+              </dl>
+            )}
 
             <div className="mt-4 flex items-center justify-between">
               <span>Doctrine</span>
@@ -250,6 +278,23 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
       <dd className="tabular-nums">{s.losses.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.births.toLocaleString()}</dd>
       <dd>{s.stance}</dd>
+    </>
+  );
+}
+
+const BRUSH_TITLES: Record<Brush, string> = {
+  none: "Stop painting",
+  lure: "Paint food scent: ants follow it",
+  alarm: "Paint alarm: ants shy away; a doctrine can send them home",
+  spores: "Inoculate: spores on the ground and a dose of the strain into the ants there, of either colony",
+};
+
+function Infection({ name, tone, s }: { name: string; tone: string; s: SideStats }) {
+  return (
+    <>
+      <dt className={tone}>{name}</dt>
+      <dd className="text-right tabular-nums text-spore">{Math.round(100 * s.infected)}%</dd>
+      <dd className="text-right tabular-nums text-fg-2">{s.resist.toFixed(2)}</dd>
     </>
   );
 }
