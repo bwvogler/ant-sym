@@ -1,5 +1,6 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
-import { blocked, dropFood, rockAt, takeFood, type Nest, type WorldMap } from "./world.ts";
+import type { ChunkLayer } from "./chunks.ts";
+import { blocked, dropFood, rockAt, takeFood, UNREACHABLE, walkingDistance, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -188,6 +189,8 @@ export class Colony {
   /** which of the SITUATIONS the policy has been asked about: what a cached Jev policy would pay for */
   seen = new Uint8Array(SITUATIONS);
   #rng: () => number;
+  /** steps on foot from each cell to the nest: the way home that path integration plus memory of the ground gives a real ant */
+  readonly homeDist: ChunkLayer<Uint16Array>;
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   #s = new Float64Array(9);
 
@@ -200,6 +203,7 @@ export class Colony {
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
     this.ph = new Pheromones(map);
+    this.homeDist = walkingDistance(map, this.nest.x, this.nest.y, this.nest.r);
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -344,6 +348,36 @@ export class Colony {
     s[slot + 6] = f.alarm.get(cx, cy);
   }
 
+  /** Which way home is for ant i: toward the neighbouring cell nearest the nest on foot (diagonals only past two open corners); the straight line where the map has no answer. */
+  #homeBearing(i: number): number {
+    const x = this.x[i] as number;
+    const y = this.y[i] as number;
+    const cx = Math.floor(x);
+    const cy = Math.floor(y);
+    const d = this.homeDist;
+    const here = d.get(cx, cy);
+    if (here === 0) return Math.atan2(this.nest.y - y, this.nest.x - x);
+    // In a pocket the map can't reach (an ant can squeeze in diagonally between two rocks), the way
+    // out is the way in: the lowest neighbour, corner rule waived. Only if none, the straight line.
+    const pocket = here === UNREACHABLE;
+    let best = here;
+    let tx = cx;
+    let ty = cy;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        if (!pocket && dx && dy && (d.get(cx + dx, cy) === UNREACHABLE || d.get(cx, cy + dy) === UNREACHABLE)) continue;
+        const v = d.get(cx + dx, cy + dy);
+        if (v < best) {
+          best = v;
+          tx = cx + dx;
+          ty = cy + dy;
+        }
+      }
+    if (best === UNREACHABLE) return Math.atan2(this.nest.y - y, this.nest.x - x);
+    return Math.atan2(ty + 0.5 - y, tx + 0.5 - x);
+  }
+
   /** The nearest cell holding enemies within ENEMY_RANGE of ant i, as a heading, or null. */
   #enemyHeading(i: number): number | null {
     const g = this.enemies;
@@ -428,8 +462,6 @@ export class Colony {
           this.decisions++;
         }
       }
-      const home = trailLevel(Math.max(hl, hf, hr));
-
       // Steer by mode.
       const noise = (rng() - 0.5) * 2 * dt;
       const detouring = (this.detour[i] as number) > 0;
@@ -438,11 +470,13 @@ export class Colony {
         // a detour after a bump, when the ant wanders instead: a straight line home walks into
         // the same rock forever (a rival nest behind a wall kept 447 ants circling, tired, until
         // detours grew with repeated bumps).
-        h += climb(hl, hf, hr, p.turnRate * dt) + noise * p.wander * (detouring ? 1 : 0.25);
-        if (!detouring) {
-          const toNest = Math.atan2(nest.y - (this.y[i] as number), nest.x - (this.x[i] as number));
-          h = turnToward(h, toNest, p.turnRate * dt * (home === "strong" ? 0.15 : 0.5));
-        }
+        // The way home is the walking-distance map's downhill, not a straight line: a straight
+        // line walks into the same wall forever (review reproduced games where every homing ant
+        // of a colony was stuck behind one). It holds through detours, since it already goes round.
+        // The home trail is only a hint now: climbing it at full rate let clusters of homing ants
+        // circle on their own trail, far from the nest, with the true way home out-voted.
+        h += climb(hl, hf, hr, p.turnRate * dt * 0.25) + noise * p.wander * 0.25;
+        h = turnToward(h, this.#homeBearing(i), p.turnRate * dt * 0.8);
       } else if (mode === FOLLOW) {
         h += climb(fl, ff, fr, p.turnRate * dt) + noise * p.wander * 0.25;
       } else if (mode === FIGHT) {
@@ -468,9 +502,9 @@ export class Colony {
       const ny = (this.y[i] as number) + Math.sin(h) * p.speed * dt;
       this.detour[i] = (this.detour[i] as number) - dt;
       this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
-      if (blocked(map, nx, ny)) {
+      if (blocked(map, nx, ny) || squeezes(map, this.x[i] as number, this.y[i] as number, nx, ny)) {
         h += Math.PI / 2 + rng() * Math.PI;
-        // Each bump soon after another doubles the detour: 0.5 s, 1 s, 2 s … up to ~16 s.
+        // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
         this.bumps[i] = Math.min(5, (this.bumps[i] as number) + 1);
         this.detour[i] = Math.max(this.detour[i] as number, 0.5 * 2 ** Math.floor(this.bumps[i] as number) * (0.5 + rng()));
       } else {
@@ -530,6 +564,19 @@ export function encodeSituation(s: Situation): number {
 
 function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: Trail, enemy: number, stance: number): number {
   return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
+}
+
+/**
+ * A step that crosses diagonally into the next cell between two rock cells: blocked, like rock.
+ * Movement otherwise only checks where the step lands, so ants could slip through a rock corner
+ * into pockets the walking-distance map (4-connected) can't reach, and sit there forever.
+ */
+export function squeezes(map: WorldMap, x: number, y: number, nx: number, ny: number): boolean {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  const tx = Math.floor(nx);
+  const ty = Math.floor(ny);
+  return tx !== cx && ty !== cy && rockAt(map, tx, cy) === 1 && rockAt(map, cx, ty) === 1;
 }
 
 /** Turn toward the strongest of three sensors, at most `max` radians. */

@@ -63,7 +63,11 @@ export default function ColonyApp() {
           {followed ? (
             <AntCard followed={followed} colony={colony} rival={game.rival} explain={jev.explain} onClose={() => setFollowed(null)} />
           ) : (
-            <p className="-mt-2 text-xs text-fg-3">Drag to pan · wheel or pinch to zoom · arrow keys and +/− work too · tap or click an ant to follow it.</p>
+            <p className="-mt-2 text-xs text-fg-3">
+              {controls.brush === "none"
+                ? "Drag to pan · wheel or pinch to zoom · arrow keys and +/− work too · tap or click an ant to follow it."
+                : "Dragging paints with the brush · pinch or wheel to zoom · space+drag or right-drag pans · set the brush to “none” to follow an ant."}
+            </p>
           )}
           <section className="rounded-lg border border-line bg-panel px-4 py-3" aria-label="colony stats">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">

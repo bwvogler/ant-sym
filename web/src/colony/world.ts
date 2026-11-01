@@ -292,6 +292,41 @@ export function escapes(map: WorldMap, x: number, y: number, radius: number): bo
   return false;
 }
 
+/** Distance value for a cell from which the target cannot be walked to. */
+export const UNREACHABLE = 0xffff;
+
+/**
+ * Steps on foot (4-connected) from every open cell to the nearest cell within `r` of (x, y):
+ * the way home around rock, which a straight line to the nest is not. One breadth-first search
+ * over the map; UNREACHABLE where the target can't be walked to.
+ */
+export function walkingDistance(map: WorldMap, x: number, y: number, r: number): ChunkLayer<Uint16Array> {
+  const { w, h } = map.size;
+  const dist = new ChunkLayer((n) => new Uint16Array(n), UNREACHABLE);
+  const queue = new Int32Array(w * h);
+  let head = 0;
+  let tail = 0;
+  disc(map, x, y, Math.max(r, 0.5), (cx, cy) => {
+    if (rockAt(map, cx, cy) || dist.get(cx, cy) === 0) return;
+    dist.set(cx, cy, 0);
+    queue[tail++] = cy * w + cx;
+  });
+  while (head < tail) {
+    const c = queue[head++] as number;
+    const cx = c % w;
+    const cy = (c - cx) / w;
+    const d = dist.get(cx, cy) + 1;
+    for (const [dx, dy] of STEPS) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      if (rockAt(map, nx, ny) || dist.get(nx, ny) !== UNREACHABLE) continue;
+      dist.set(nx, ny, Math.min(d, UNREACHABLE - 1));
+      queue[tail++] = ny * w + nx;
+    }
+  }
+  return dist;
+}
+
 /** Visit every cell within `r` of (cx, cy) on the map. */
 function disc(map: WorldMap, cx: number, cy: number, r: number, fn: (x: number, y: number) => void): void {
   for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(map.size.h - 1, Math.ceil(cy + r)); y++)
@@ -379,7 +414,7 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
           const y = (cy << CHUNK_BITS) + r() * CHUNK;
           const radius = 2 + r() * 2;
           if (!inBounds(map, Math.floor(x), Math.floor(y)) || !reach[Math.floor(y) * size.w + Math.floor(x)]) continue;
-          if (nests.some((n) => Math.hypot(x - n.x, y - n.y) < o.foodMinDist)) continue;
+          if (nests.some((n) => Math.hypot(x - n.x, y - n.y) - radius - 1 < o.foodMinDist)) continue; // every cell of the patch, not just its centre
           disc(map, x, y, radius, (fx, fy) => {
             setRock(map, fx, fy, 0);
             food.set(fx, fy, o.foodPerCell);

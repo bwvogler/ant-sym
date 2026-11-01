@@ -101,6 +101,12 @@ export class Game {
     if (this.time >= this.#nextStrategy) {
       this.#nextStrategy = this.time + this.params.strategyEvery;
       this.colonies.forEach((c, k) => {
+        // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
+        // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
+        if (!this.colonies.some((o, j) => j !== k && !Game.beaten(o))) {
+          c.stance = "forage";
+          return;
+        }
         // A stance is part of every ant's situation: a change re-asks the ants by itself.
         c.stance = c.stancePolicy(c.stanceSituation(this.enemiesNearNest(k) > 0));
         this.strategyChoices++;

@@ -64,6 +64,11 @@ interface Lane<S, A extends string> {
   asking: Set<string>;
 }
 
+/** In-flight questions are per doctrine: a situation asked under one doctrine is still unasked under another. */
+function askKey(context: string, key: string): string {
+  return `${context}\u0000${key}`;
+}
+
 function lane<S, A extends string>(spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "contextOf">): Lane<S, A> {
   return { ...spec, context: spec.contextOf(""), caches: new Map(), queue: new Map(), asking: new Set() };
 }
@@ -125,7 +130,7 @@ export class ColonyJev {
       else this.#state.misses++;
     }
     if (hit) return hit;
-    if (!l.asking.has(key)) l.queue.set(key, s);
+    if (!l.asking.has(askKey(l.context, key))) l.queue.set(key, s);
     return l.local(s);
   }
 
@@ -195,11 +200,14 @@ export class ColonyJev {
   async stop(): Promise<void> {
     this.#halt();
     this.#aborter.abort();
+    // If Start is pressed again before this reply lands, the reply belongs to the old run: ignore it.
+    const seq = this.#runSeq;
     try {
       const res = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) });
-      this.#set({ phase: "stopped", run: (await res.json()) as RunSummary });
+      const run = (await res.json()) as RunSummary;
+      if (seq === this.#runSeq) this.#set({ phase: "stopped", run });
     } catch (e) {
-      this.#set({ phase: "stopped", lastError: String(e) });
+      if (seq === this.#runSeq) this.#set({ phase: "stopped", lastError: String(e) });
     }
   }
 
@@ -237,7 +245,7 @@ export class ColonyJev {
         const batch = [...l.queue.entries()].slice(0, this.opts.batch);
         for (const [k] of batch) {
           l.queue.delete(k);
-          l.asking.add(k);
+          l.asking.add(askKey(l.context, k));
         }
         void this.#ask(l, batch);
       }
@@ -263,7 +271,8 @@ export class ColonyJev {
         return;
       }
       if (res.status === 429 && (body as { error?: string }).error === "busy") {
-        if (seq === this.#runSeq) for (const it of items) l.queue.set(it.key, it.situation); // ask again next cycle
+        // Ask again next cycle, but only for the doctrine it was asked under and only what that doctrine hasn't cached since.
+        if (seq === this.#runSeq && context === l.context) for (const it of items) if (!this.#cache(l).get(it.key)) l.queue.set(it.key, it.situation);
         this.#set({ [counted]: this.#state[counted] - items.length, run: (body as { run?: RunSummary }).run ?? this.#state.run });
         return;
       }
@@ -274,7 +283,7 @@ export class ColonyJev {
       error = String(err);
     } finally {
       this.#inFlight--;
-      for (const it of items) l.asking.delete(it.key);
+      for (const it of items) l.asking.delete(askKey(context, it.key));
     }
     if (!reply || reply.status !== 200 || !reply.body || !("answers" in reply.body)) {
       // Not billed as a reply; the colony keeps the local rule and meets the situation again later.
