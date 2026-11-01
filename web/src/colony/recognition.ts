@@ -43,6 +43,14 @@ export function binCentre(b: number): number {
   return (b + 0.5) / BINS;
 }
 
+/**
+ * Strangers are further apart than tolerance + this. A host at full share sits exactly MAX_MASK × 0.5
+ * from its nest, and band centres add up to 1 / 2·BINS more: 0.3 + 0.05 = 0.35, the tolerance itself.
+ * Float32 odours and tolerances (and 1 − 0.65 in float64) land a hair either side of that, so without
+ * this a host could be a stranger to its own nestmates.
+ */
+export const STRANGER_EPS = 1e-6;
+
 const BLOCK_BITS = 3;
 
 /** A float per cell, summed, over a map of any size: touched cells only are cleared, 8×8 block sums rule out empty neighbourhoods. */
@@ -140,7 +148,7 @@ export class Recognition {
   look(odour: number, tolerance: number): void {
     if (odour === this.#lookOdour && tolerance === this.#lookTolerance) return;
     let m = 0;
-    for (let b = 0; b < BINS; b++) if (Math.abs(binCentre(b) - odour) > tolerance) m |= 1 << b;
+    for (let b = 0; b < BINS; b++) if (Math.abs(binCentre(b) - odour) > tolerance + STRANGER_EPS) m |= 1 << b;
     this.#mask = m & this.#occupied;
     this.#lookOdour = odour;
     this.#lookTolerance = tolerance;

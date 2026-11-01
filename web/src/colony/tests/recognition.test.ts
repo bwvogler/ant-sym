@@ -153,6 +153,19 @@ test("a host is never a stranger to its own nest, at any share any intervention 
   for (const v of INTERVENTIONS) assert.ok(v.levers.mask >= 0 && v.levers.mask <= MAX_MASK, v.id);
 });
 
+test("judged as an ant judges it (by band centre, in float32), a host at full share is still no stranger to a healthy nestmate", () => {
+  const map = arena();
+  for (const n0 of [0, 1]) {
+    // A healthy ant and a host two cells apart; the host's odour MAX_MASK of the way to the fungus's.
+    const c = placed(map, n0, n0, [[10, 6], [12, 6]]);
+    c.odour[1] = n0 + MAX_MASK * (FUNGAL - n0);
+    const rec = new Recognition();
+    rec.build([c]);
+    rec.look(c.odour[0] as number, c.tolerance[0] as number);
+    assert.equal(rec.get(12, 6), 0, `nest ${n0}: host at ${c.odour[1]} (band ${binOf(c.odour[1] as number)}) seen as a stranger`);
+  }
+});
+
 test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, Garden blends", () => {
   const map = arena();
   const c = placed(map, 0, 0, [[10, 3], [10, 9]]);
