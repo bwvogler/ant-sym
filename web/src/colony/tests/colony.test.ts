@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avoid, climb, Colony, localPolicy, SITUATIONS, squeezes, trailLevel, turnToward, wallSide, type Situation } from "../colony.ts";
+import { avoid, climb, Colony, decode, encodeSituation, localPolicy, SITUATIONS, squeezes, trailLevel, turnToward, wallSide, type Situation } from "../colony.ts";
 import { foodAt, generateWorld, mulberry32, setRock, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field: the nest on the left, one food cell straight east of it. */
@@ -162,6 +162,20 @@ test("homing goes round a wall between the ant and its nest by touch (wall-follo
     home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
   }
   assert.ok(home, `the ant got home round the wall, ending at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
+});
+
+test("decode is encode's inverse over every situation; lastQuestion is what the ant was asked", () => {
+  for (let code = 0; code < SITUATIONS; code++) assert.equal(encodeSituation(decode(code)), code);
+  const map = corridor(0);
+  const asked: Situation[] = [];
+  const c = new Colony(map, { antCount: 1, wander: 0, deposit: 0 }, mulberry32(3), (s) => {
+    asked.push(s);
+    return "follow";
+  });
+  assert.equal(c.lastQuestion(0), null, "not asked yet");
+  c.tick(1 / 30);
+  assert.deepEqual(c.lastQuestion(0), asked.at(-1), "the situation the policy saw");
+  assert.equal(c.mode[0], 1, "and the answer it gave is the ant's mode");
 });
 
 test("ants can't slip diagonally between two rock cells into a pocket the walking map can't reach", () => {

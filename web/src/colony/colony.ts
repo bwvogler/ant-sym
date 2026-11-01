@@ -158,6 +158,8 @@ export class Colony {
   mode: Uint8Array;
   carrying: Uint8Array;
   alive: Uint8Array;
+  /** bumped every time a slot gets a new ant, so (slot, gen) names one ant even after its slot is reused */
+  gen: Uint32Array;
   /** seconds since the ant was last at the nest or picked up food */
   since: Float32Array;
   /** seconds left of a detour after bumping into rock, when the pull toward the nest (or the raid) is off */
@@ -175,6 +177,8 @@ export class Colony {
   my: Float32Array;
   /** the situation each ant was last asked about, encoded; −1 = never */
   #asked: Int16Array;
+  /** the question behind each ant's current mode: its situation (with the mode it had) when last asked; −1 = never */
+  #question: Int16Array;
   /** enemy ants per cell, kept by the game each tick; null when there is no rival */
   enemies: CellCounts | null = null;
   /** where raiders go: the rival's nest */
@@ -213,6 +217,7 @@ export class Colony {
     this.mode = new Uint8Array(n);
     this.carrying = new Uint8Array(n);
     this.alive = new Uint8Array(n);
+    this.gen = new Uint32Array(n);
     this.since = new Float32Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
@@ -222,6 +227,7 @@ export class Colony {
     this.mx = new Float32Array(n).fill(NaN);
     this.my = new Float32Array(n).fill(NaN);
     this.#asked = new Int16Array(n).fill(-1);
+    this.#question = new Int16Array(n).fill(-1);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
     for (let k = 0; k < this.params.antCount; k++) this.#place(k);
@@ -241,6 +247,8 @@ export class Colony {
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.#asked[i] = -1;
+    this.#question[i] = -1;
+    this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
     this.alive[i] = 1;
   }
 
@@ -288,6 +296,12 @@ export class Colony {
         if (rockAt(this.map, cx, cy) || Math.hypot(cx + 0.5 - x, cy + 0.5 - y) > radius) continue;
         this.ph.deposit(channel, cx + 0.5, cy + 0.5, amount);
       }
+  }
+
+  /** The situation ant i was in when its policy last chose its mode, or null if it never chose (a carrier going home is not asked). */
+  lastQuestion(i: number): Situation | null {
+    const q = this.#question[i] as number;
+    return this.alive[i] && q >= 0 ? decode(q) : null;
   }
 
   /** Distinct situations the policy has been asked about. */
@@ -432,6 +446,7 @@ export class Colony {
         mode = RETURN;
         this.mode[i] = RETURN;
         this.#asked[i] = -1;
+        this.#question[i] = -1; // going home is not a choice; the next question comes once the food is down
       } else {
         const tired = (this.since[i] as number) > p.patience;
         const food = trailLevel(Math.max(fl, ff, fr));
@@ -446,6 +461,7 @@ export class Colony {
           this.mode[i] = mode;
           this.#asked[i] = encode(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
+          this.#question[i] = before;
           this.decisions++;
         }
       }
@@ -585,6 +601,28 @@ export class Colony {
 
 /** Every situation a mode choice can be asked in: mode × tired × food × home × alarm × enemy × stance = 4 × 2 × 3 × 3 × 3 × 2 × 3 = 1,296. */
 export const SITUATIONS = MODES.length * 2 * TRAILS.length ** 3 * 2 * STANCES.length;
+
+/** A situation from its index in SITUATIONS: the inverse of encode. */
+export function decode(code: number): Situation {
+  let c = code;
+  const stance = STANCES[c % 3] as Stance;
+  c = Math.floor(c / 3);
+  const enemy = c % 2 ? "near" : "none";
+  c = Math.floor(c / 2);
+  const alarm = TRAILS[c % 3] as Trail;
+  c = Math.floor(c / 3);
+  const homeTrail = TRAILS[c % 3] as Trail;
+  c = Math.floor(c / 3);
+  const foodTrail = TRAILS[c % 3] as Trail;
+  c = Math.floor(c / 3);
+  const tired = c % 2 === 1;
+  const mode = MODES[Math.floor(c / 2)] as Mode;
+  return { mode, tired, foodTrail, homeTrail, alarm, enemy, stance };
+}
+
+export function encodeSituation(s: Situation): number {
+  return encode(MODES.indexOf(s.mode), s.tired, s.foodTrail, s.homeTrail, s.alarm, s.enemy === "near" ? 1 : 0, STANCES.indexOf(s.stance));
+}
 
 function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: Trail, enemy: number, stance: number): number {
   return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;

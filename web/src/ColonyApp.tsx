@@ -1,7 +1,10 @@
 import { SITUATIONS } from "./colony/colony.ts";
 import { DOCTRINES } from "./colony/colonyBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
+import { useCallback, useMemo, useState } from "react";
+import AntCard from "./ui/AntCard.tsx";
 import ColonyField from "./ui/ColonyField.tsx";
+import type { Followed } from "./ui/follow.ts";
 import Nav from "./ui/Nav.tsx";
 import { Bar, Slider } from "./ui/Panel.tsx";
 import { seg } from "./ui/styles.ts";
@@ -21,6 +24,12 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 export default function ColonyApp() {
   const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
   const jev = useColonyJev(colony);
+  // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
+  // Keyed by a token per game rather than the game itself, so an old game is not kept alive by this state.
+  const gameToken = useMemo(() => ({ game: game.map.seed }), [game]);
+  const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
+  const followed = follow && follow.token === gameToken ? follow.f : null;
+  const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
   const { size } = colony.map;
   const share = stats && stats.foodTotal > 0 ? stats.stored / stats.foodTotal : 0;
   const running = jev.state.phase === "running";
@@ -40,8 +49,26 @@ export default function ColonyApp() {
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="relative" style={{ aspectRatio: `${size.w} / ${size.h}` }}>
-            <ColonyField colony={colony} rival={game.rival} onFrame={onFrame} showFoodTrail={controls.showFoodTrail} showHomeTrail={controls.showHomeTrail} onPaint={controls.brush === "none" ? null : paint} />
+            <ColonyField
+              colony={colony}
+              rival={game.rival}
+              onFrame={onFrame}
+              showFoodTrail={controls.showFoodTrail}
+              showHomeTrail={controls.showHomeTrail}
+              onPaint={controls.brush === "none" ? null : paint}
+              followed={followed}
+              onFollow={setFollowed}
+            />
           </div>
+          {followed ? (
+            <AntCard followed={followed} colony={colony} rival={game.rival} explain={jev.explain} onClose={() => setFollowed(null)} />
+          ) : (
+            <p className="-mt-2 text-xs text-fg-3">
+              {controls.brush === "none"
+                ? "Drag to pan · wheel or pinch to zoom · arrow keys and +/− work too · tap or click an ant to follow it."
+                : "Dragging paints with the brush · pinch or wheel to zoom · space+drag or right-drag pans · set the brush to “none” to follow an ant."}
+            </p>
+          )}
           <section className="rounded-lg border border-line bg-panel px-4 py-3" aria-label="colony stats">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <div className="min-w-[10rem]">

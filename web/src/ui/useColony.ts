@@ -128,11 +128,12 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const update = useCallback((patch: Partial<ColonyControls>) => setControls((c) => ({ ...c, ...patch })), []);
   const restart = useCallback(() => setGeneration((g) => g + 1), []);
   const newWorld = useCallback(() => setControls((c) => ({ ...c, seed: 1 + Math.floor(Math.random() * 99_999) })), []);
+  /** Paint at (x, y) in cells; `scale` widens the brush (the field passes more when zoomed out, so a stroke stays a stroke on screen). */
   const paint = useCallback(
-    (x: number, y: number) => {
+    (x: number, y: number, scale = 1) => {
       if (controls.brush === "none") return;
       const b = BRUSHES[controls.brush];
-      colony.paint(b.channel, x, y, b.radius, b.amount);
+      colony.paint(b.channel, x, y, b.radius * scale, b.amount);
     },
     [colony, controls.brush],
   );

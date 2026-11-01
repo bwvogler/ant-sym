@@ -134,6 +134,18 @@ export class ColonyJev {
     return l.local(s);
   }
 
+  /**
+   * Who decides an ant in situation `s` right now, without counting a hit or queuing anything (the
+   * follow card): Jev's cached answer, the local rule while the question waits for Jev, or the local rule.
+   */
+  explain(s: Situation): { mode: Mode; by: "jev" | "waiting" | "local" } {
+    if (this.#state.phase !== "running") return { mode: localPolicy(s), by: "local" };
+    const key = situationKey(s);
+    const hit = this.#cache(this.#modes).get(key);
+    if (hit) return { mode: hit, by: "jev" };
+    return { mode: localPolicy(s), by: this.#modes.queue.has(key) || this.#modes.asking.has(key) ? "waiting" : "local" };
+  }
+
   /** The ants' policy: Jev's cached answer while a run is on, else the local rule (queuing what Jev has not answered). */
   readonly policy: Policy = (s) => this.#lookup(this.#modes, s);
   /** The strategist's policy, the same way. */

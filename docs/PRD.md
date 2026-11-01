@@ -405,3 +405,60 @@ This is the first step of the lifetime-world plan. It builds on the research not
 The browser holds 60 fps at 512×320 in headless Chromium, with no console errors in light, dark or phone layouts. The renderer walks the map chunk by chunk, but still fits the whole map to the canvas; MR 6 adds the camera.
 
 **Jev:** no change. Situations don't depend on the map: 1,296 possible, 248 met in a 4-minute `colony-cost` run (600 + 600 ants), at ~451 tokens per question. That run cost ≈ $0.009, ≈ $0.13/hour while retuning every 0.8 minutes, against the ≤ $0.25/h target. The request state is unchanged, so tokens/ant are unchanged.
+
+## 13. Camera, minimap and following an ant (MR 6, 2026-11-01)
+
+The 512×320 map is now something to move around in, not a picture squeezed into a box.
+
+- **Camera** (`ui/camera.ts`, pure, tested).
+  - The camera is a centre in cells and a zoom in device pixels per cell.
+  - Zoom runs from "the whole map" to `MAX_ZOOM` (28 px a cell). The view never leaves the map; an axis the map doesn't fill stays centred.
+  - `zoomAt` keeps the point under the cursor fixed, and `pan` moves the ground with the pointer. Tests pin both, plus the screen ↔ world inverses.
+- **Input** (`ColonyField.tsx`).
+  - **Pointer:** drag to pan (or right-drag, or space + drag while a brush is on), wheel to zoom about the pointer, two-finger pinch.
+  - **Keyboard** (focus the field first): arrows or WASD to move, +/− to zoom, `0` for the whole map, `n` for your nest, Esc to stop following.
+  - There are "Whole map" and "Your nest" buttons on the field.
+  - Brushes paint in world coordinates, and widen when zoomed out (×1 at ≥ 6 px a cell, up to ×6), so a stroke stays a stroke on screen.
+- **Rendering.**
+  - Only the chunks in view are painted, each into its own 64×64 canvas and drawn onto whole pixels, so chunks meet without seams.
+  - Only the ants in view are drawn. Cells past a ragged map edge are transparent.
+- **Minimap.**
+  - Zoomed in, a corner inset shows the whole map: ground, food, both colonies' ants, and the view's rectangle. It is redrawn twice a second.
+  - Click or drag on it to jump.
+- **Following an ant.**
+  - Click an ant (yours or the rival's) to follow it: the camera tracks it, with a jade ring around it.
+  - The card under the field shows:
+    - its mode, whether it is carrying, and how long it has been out;
+    - the situation it was in when it last chose (`Colony.lastQuestion`, decoded from the situation index);
+    - who made the choice: **Jev's cached answer**, **the local rule while Jev is asked**, or **the local rule**. This comes from `ColonyJev.explain`, which neither counts a hit nor queues anything.
+  - Panning, the minimap, `0`, `n` or Esc stops following, and so does the ant dying.
+  - This is the Jev showcase at the scale of one ant.
+
+**Checked in the browser:** fit, nest, wheel zoom, click-to-follow, drag-to-stop, minimap jump, painting while zoomed, and `0` for the whole map. A synthetic two-pointer pinch zooms about its midpoint. Light, dark and phone layouts show no console errors, and the page holds 60 fps.
+
+**Review** (agent, before merge) found five bugs. All are fixed, each with a test or a browser check:
+- **The followed ant could silently become a newborn.** A dead ant's slot is refilled at once, often within the same frame at 4× speed or under 30 fps. Ants now carry a per-slot generation (`Colony.gen`), and a follow is (side, slot, generation): `ui/follow.ts`.
+- **Wheel or pinch at `MAX_ZOOM` slid the view toward the pointer.** `zoomBy` now cuts the factor to the zoom range before it works out the centre.
+- **After a resize the view stopped fitting.** "Whole map" only stayed whole until the canvas changed size, so the minimap appeared uninvited. A fitted view now stays fitted.
+- **Ctrl/Cmd shortcuts were swallowed** while the field had focus.
+- **Space could stick "down"** after an alt-tab; it is now released on blur.
+
+Also from the review:
+- The tap slop is in CSS px (8 × DPR), so a finger tap still picks an ant.
+- A drag catches up from where it began.
+- Stopping a follow clears the ref at once, so a frame can't re-centre on the ant first.
+- A carrier's stale question is cleared.
+- Middle-drag no longer starts autoscroll.
+- The follow state no longer pins the previous game in memory.
+
+**Second review** (fresh agent, whole stack): no confirmed bugs.
+- **Fixed from its suggestions:**
+  - A third finger lifted during a pinch now keeps the pinch, instead of turning the other two into a double-speed pan.
+  - Letter shortcuts work with Shift or Caps Lock.
+  - With a brush on, the hint says how to pan and follow.
+  - The field has `role="application"`, a fuller label and a visible focus ring.
+  - A test pins that `explain` alone sends no request.
+- **By design:** a pinch while following zooms about the followed ant.
+- **Filed as beads:** keyboard access to following and to the minimap, the card's "by …" while paused, tap slop by net rather than total movement, and moving the gesture logic into a tested pure module.
+
+**Jev:** no change. `explain` makes no calls, and the request state is unchanged.
