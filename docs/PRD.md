@@ -373,11 +373,27 @@ This is the first step of the lifetime-world plan. It builds on the research not
 - **Counts without scanning.** Occupancy and enemy grids are `CountGrid`s, built from the ants. A reset clears only the cells that were touched. 8×8 block sums let `#enemyHeading` and `resolveFights` skip ants with no enemy nearby.
 - **Sensors.** All three channels are read at once at each sensor position. The two side sensors come from one `cos`/`sin` pair by angle addition, and the hot paths use squared distances instead of `Math.hypot`.
 
-**Homing by walking distance** (from the reviews of PRs #2 and #4).
+**Homing by the ant's own senses** (from the reviews of PRs #2 and #4; reworked at the product owner's request).
 - **The problem:** homing was a straight line to the nest plus home-trail climbing. On many maps it trapped ants behind long walls, sometimes every homing ant of a colony, freezing the game. #4's doubling detours did not fix it.
-- **The fix:** each colony now computes, once, a walking-distance map from its nest (`walkingDistance`: a 4-connected breadth-first search, `Colony.homeDist`). A homing ant turns toward its neighbouring cell nearest home on foot; diagonals are allowed only past two open corners. This is what path integration plus memory of the ground gives a real ant.
-- **The home trail is now a hint:** it is climbed at a quarter of the turn rate. At full rate, clusters of homing ants circled on their own trail, out-voting the way home.
-- **Measured:** seeds 1–10 at 600 s with the UI defaults (600 + 600 ants), counting ants out more than 120 s. Before: up to 100 % of a colony on seed 3, and 18 of 20 colony-runs over 5 %. After: 0 % in all 20. Food stored rose on every seed (seed 3's rival: 301 → 2,747). Tick time is unchanged.
+- **First fix, replaced:** a whole-map walking-distance map. It reached 0 % stuck, but it gave every ant knowledge of the map. That breaks this game's premise (§1: local information), so it is gone.
+- **What an ant uses now:** only what it has:
+  - its **home vector** (path integration: real ants count steps against a sky compass);
+  - its **antennae**;
+  - **touch**.
+- **Wall-following by touch (the Bug2 rule):**
+  - A blocked homing step starts wall-following. Two touch probes either side of the home vector pick the side to keep the wall on.
+  - Following, the ant turns away from rock ahead and hugs round corners where the wall falls away.
+  - It leaves the wall only when back on its **line home**: the line from where this trip first met rock to the nest. It must also be nearer home than where it met this wall, with the way home open by touch. Leaving anywhere nearer settled ants in the deepest bay facing the nest.
+  - After 45 s it tries the other side once. After 120 s it gives up and wanders 8–24 s, then tries afresh.
+- **Hints and physics:**
+  - The home trail is a hint, climbed at a quarter of the turn rate. At full rate, clusters circled on their own trail.
+  - `squeezes()` stops ants slipping diagonally between two rocks.
+- **Measured:** seeds 1–10 at 600 s with the UI defaults (600 + 600 ants), each colony's share of ants out more than 120 s.
+  - Before (straight line): up to 100 %, and 18 of 20 colony-runs over 5 %.
+  - With the map: 0 %.
+  - Now: at most 7 % (seeds 2 and 10), with 16 of 20 runs at 5 % or below.
+  - Most of those are slow, not trapped: within the next 30 s about 40 % reach home and more get closer. Truly stalled ants are at most ~3 % of a colony (`ja-` bead filed).
+  - Ticks are ~10 % slower (3.7 vs 3.3 ms mean), because wall-followers spread trails over more ground (59 vs 48 awake chunks).
 
 **Measured** (`npm run colony-bench`: 1,200 + 1,200 ants, 60 sim-s, local rule, same container):
 
