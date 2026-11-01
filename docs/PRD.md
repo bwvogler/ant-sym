@@ -373,6 +373,12 @@ This is the first step of the lifetime-world plan. It builds on the research not
 - **Counts without scanning.** Occupancy and enemy grids are `CountGrid`s, built from the ants. A reset clears only the cells that were touched. 8×8 block sums let `#enemyHeading` and `resolveFights` skip ants with no enemy nearby.
 - **Sensors.** All three channels are read at once at each sensor position. The two side sensors come from one `cos`/`sin` pair by angle addition, and the hot paths use squared distances instead of `Math.hypot`.
 
+**Homing by walking distance** (from the reviews of PRs #2 and #4).
+- **The problem:** homing was a straight line to the nest plus home-trail climbing. On many maps it trapped ants behind long walls, sometimes every homing ant of a colony, freezing the game. #4's doubling detours did not fix it.
+- **The fix:** each colony now computes, once, a walking-distance map from its nest (`walkingDistance`: a 4-connected breadth-first search, `Colony.homeDist`). A homing ant turns toward its neighbouring cell nearest home on foot; diagonals are allowed only past two open corners. This is what path integration plus memory of the ground gives a real ant.
+- **The home trail is now a hint:** it is climbed at a quarter of the turn rate. At full rate, clusters of homing ants circled on their own trail, out-voting the way home.
+- **Measured:** seeds 1–10 at 600 s with the UI defaults (600 + 600 ants), counting ants out more than 120 s. Before: up to 100 % of a colony on seed 3, and 18 of 20 colony-runs over 5 %. After: 0 % in all 20. Food stored rose on every seed (seed 3's rival: 301 → 2,747). Tick time is unchanged.
+
 **Measured** (`npm run colony-bench`: 1,200 + 1,200 ants, 60 sim-s, local rule, same container):
 
 | Map | Before (dense) | After (chunked) |

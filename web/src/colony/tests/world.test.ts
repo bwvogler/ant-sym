@@ -67,7 +67,7 @@ test("generateWorld at the default size: a nest on main ground, food it can walk
     let joined = 0;
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
-        const i = y * w + x;
+        const i: number = y * w + x;
         if (foodAt(m, x, y) > 0) assert.equal(reach[i], 1, `seed ${seed}: food at (${x}, ${y}) cannot be reached`);
         if (!rockAt(m, x, y)) open++;
         joined += reach[i]!;
@@ -177,7 +177,7 @@ test("the sparse step matches the dense one, across chunk borders and a ragged m
   const rock = flat(m, m.rock, (n) => new Uint8Array(n));
   const params = { evaporation: 0.05, diffusion: 0.8 };
   const ph = new Pheromones(m, { food: params, home: params, alarm: params });
-  let dense = new Float32Array(w * h);
+  let dense: Float32Array = new Float32Array(w * h);
   const lay = (x: number, y: number, v: number) => {
     if (rock[y * w + x]) return;
     ph.deposit("food", x + 0.5, y + 0.5, v);
@@ -203,7 +203,7 @@ test("faint scent crosses chunk borders as the dense step says (a steady source 
   const rock = new Uint8Array(size.w * size.h);
   const params = { evaporation: 0.06, diffusion: 0.3 };
   const ph = new Pheromones(m, { food: params, home: params, alarm: params });
-  let dense = new Float32Array(size.w * size.h);
+  let dense: Float32Array = new Float32Array(size.w * size.h);
   for (let s = 0; s < 600; s++) {
     ph.deposit("food", 56.5, 32.5, 1);
     dense[32 * size.w + 56] = Math.min(MAX_LEVEL, dense[32 * size.w + 56]! + 1);
