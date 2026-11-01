@@ -12,6 +12,8 @@ import type { Colony } from "../colony/colony.ts";
 
 interface Props {
   colony: Colony;
+  /** the rival colony, drawn in the warn tone, or null */
+  rival: Colony | null;
   onFrame: (fn: () => void) => () => void;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
@@ -31,7 +33,7 @@ function rgb(hex: string): [number, number, number] {
 /** The warm tone the picture heatmap uses for "too many": here, the way home. */
 const HOME_RGB: [number, number, number] = [196, 110, 40];
 
-export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTrail, onPaint }: Props) {
+export default function ColonyField({ colony, rival, onFrame, showFoodTrail, showHomeTrail, onPaint }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layers = useRef({ food: showFoodTrail, home: showHomeTrail });
   useEffect(() => {
@@ -49,9 +51,9 @@ export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTr
     const gridCtx = grid.getContext("2d")!;
     const img = gridCtx.createImageData(gw, gh);
 
-    let theme = { paper: "", ink: "", accent: "", rock: rgb("#c9c2b5"), trail: [31, 111, 92], alarm: rgb("#8a5300") };
+    let theme = { paper: "", ink: "", accent: "", warn: "", rock: rgb("#c9c2b5"), trail: [31, 111, 92], alarm: rgb("#8a5300") };
     const retheme = () => {
-      theme = { paper: cssVar("--paper"), ink: cssVar("--ink"), accent: cssVar("--accent"), rock: rgb(cssVar("--line-strong")), trail: cssVar("--heat").split(/\s+/).map(Number), alarm: rgb(cssVar("--warn")) };
+      theme = { paper: cssVar("--paper"), ink: cssVar("--ink"), accent: cssVar("--accent"), warn: cssVar("--warn"), rock: rgb(cssVar("--line-strong")), trail: cssVar("--heat").split(/\s+/).map(Number), alarm: rgb(cssVar("--warn")) };
     };
     retheme();
     const mq = matchMedia("(prefers-color-scheme: dark)");
@@ -131,41 +133,41 @@ export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTr
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(grid, 0, 0, W, H);
 
-      // The nest.
-      const { nest } = colony.map;
-      ctx.beginPath();
-      ctx.arc(nest.x * sx, nest.y * sy, nest.r * Math.min(sx, sy), 0, Math.PI * 2);
-      ctx.strokeStyle = theme.ink;
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.7;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      // Ants: ink ticks along their heading; a crumb at the head of a carrier.
+      // Nests and ants: the player's in ink, the rival's in the warn tone; a jade crumb at the head of a carrier.
       const len = Math.max(3, Math.min(sx, sy) * 0.9);
       const half = len / 2;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      for (let i = 0; i < colony.n; i++) {
-        const x = (colony.x[i] as number) * sx;
-        const y = (colony.y[i] as number) * sy;
-        const c = Math.cos(colony.heading[i] as number) * half;
-        const s = Math.sin(colony.heading[i] as number) * half;
-        ctx.moveTo(x - c, y - s);
-        ctx.lineTo(x + c, y + s);
-      }
-      ctx.strokeStyle = theme.ink;
-      ctx.lineWidth = Math.max(1, len * 0.3);
-      ctx.globalAlpha = 0.85;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = theme.accent;
       const crumb = Math.max(1.5, len * 0.35);
-      for (let i = 0; i < colony.n; i++) {
-        if (!colony.carrying[i]) continue;
-        const x = (colony.x[i] as number) * sx + Math.cos(colony.heading[i] as number) * half;
-        const y = (colony.y[i] as number) * sy + Math.sin(colony.heading[i] as number) * half;
-        ctx.fillRect(x - crumb / 2, y - crumb / 2, crumb, crumb);
+      for (const [col, tone] of [[rival, theme.warn], [colony, theme.ink]] as const) {
+        if (!col) continue;
+        ctx.beginPath();
+        ctx.arc(col.nest.x * sx, col.nest.y * sy, col.nest.r * Math.min(sx, sy), 0, Math.PI * 2);
+        ctx.strokeStyle = tone;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.7;
+        ctx.stroke();
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        for (let i = 0; i < col.n; i++) {
+          if (!col.alive[i]) continue;
+          const x = (col.x[i] as number) * sx;
+          const y = (col.y[i] as number) * sy;
+          const c = Math.cos(col.heading[i] as number) * half;
+          const s = Math.sin(col.heading[i] as number) * half;
+          ctx.moveTo(x - c, y - s);
+          ctx.lineTo(x + c, y + s);
+        }
+        ctx.strokeStyle = tone;
+        ctx.lineWidth = Math.max(1, len * 0.3);
+        ctx.globalAlpha = 0.85;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = theme.accent;
+        for (let i = 0; i < col.n; i++) {
+          if (!col.alive[i] || !col.carrying[i]) continue;
+          const x = (col.x[i] as number) * sx + Math.cos(col.heading[i] as number) * half;
+          const y = (col.y[i] as number) * sy + Math.sin(col.heading[i] as number) * half;
+          ctx.fillRect(x - crumb / 2, y - crumb / 2, crumb, crumb);
+        }
       }
     };
     const off = onFrame(draw);
@@ -175,7 +177,7 @@ export default function ColonyField({ colony, onFrame, showFoodTrail, showHomeTr
       ro.disconnect();
       mq.removeEventListener("change", retheme);
     };
-  }, [colony, onFrame]);
+  }, [colony, rival, onFrame]);
 
   const paintAt = (e: PointerEvent<HTMLCanvasElement>) => {
     if (!onPaint) return;

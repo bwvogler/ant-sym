@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Colony, Mode, Situation } from "../colony/colony.ts";
+import type { Colony, Situation } from "../colony/colony.ts";
 import { DOCTRINES, estimateTokens, packModeRequest } from "../colony/colonyBrain.ts";
 import { ColonyJev, type CacheStore, type ColonyJevState } from "./colonyJev.ts";
 
@@ -15,7 +15,7 @@ const localStore: CacheStore = {
     try {
       const raw = localStorage.getItem(STORE_PREFIX + context);
       const entries = raw ? (JSON.parse(raw) as unknown) : [];
-      return Array.isArray(entries) ? entries.filter((e): e is [string, Mode] => Array.isArray(e) && typeof e[0] === "string" && typeof e[1] === "string") : [];
+      return Array.isArray(entries) ? entries.filter((e): e is [string, string] => Array.isArray(e) && typeof e[0] === "string" && typeof e[1] === "string") : [];
     } catch {
       return []; // storage blocked or unreadable: start cold
     }
@@ -30,7 +30,7 @@ const localStore: CacheStore = {
 };
 
 /** Estimated input tokens per situation, from the size of a full request (the ledger counts the real ones). */
-const SAMPLE: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none" };
+const SAMPLE: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
 export const TOKENS_PER_SITUATION = Math.round(estimateTokens(packModeRequest(Array.from({ length: 100 }, (_, n) => ({ id: `s${n}`, situation: SAMPLE })), DOCTRINES[0]!.text)) / 100);
 
 export interface DoctrineChoice {

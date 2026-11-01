@@ -300,3 +300,50 @@ That is about 63k tokens, **≈ $0.016 per hour** retuning every 2 minutes, agai
 - 92 % of mode choices were served from the cache.
 
 **Still to measure live:** a colony run against `api.typesafe.ai` for real tokens per question, and whether Jev follows each doctrine (e.g. Cautious sends ants home on alarm).
+
+## 11. A rival colony, fights, growth and the strategist (MR 4, 2026-10-31)
+
+The colony page is now a game: your colony and a rival's on one map, sharing its food.
+
+- **World.** `generateWorld` adds a rival nest. Out of 400 spots the player's ants can walk to, it takes the farthest. Food patches keep a quarter of the map's size away from both nests, so maps differ from MR 2–3 for the same seed.
+- **Growth.** Every 4 food stored is a new ant, born in a free slot of a fixed capacity (1.5× the starting count). Food beyond the cap waits in the larder.
+- **Fights** (`battle.ts`).
+  - An ant with enemies in the 3×3 cells around it dies with probability 1 − e^(−1.5 · dt · enemies ÷ allies). That is Lanchester-like: equal numbers trade, the bigger crowd wins.
+  - Deaths are decided for everyone before anyone is removed.
+  - A fighting ant lays alarm in its own colony's field, which brings defenders and drives foragers away.
+  - A dying carrier drops its food on the spot, so food is conserved; a test pins it.
+- **A fourth mode, fight.** The ant goes for enemies within two cells, else up its colony's alarm trail, else (when raiding) toward the rival's nest.
+- **Stance**, the strategist's choice: forage, defend or raid. Every 5 s each colony picks one from a coarse view of itself: ants against its cap, recent losses, enemies near its nest, food left on the map, and the larder.
+  - It is cached per view and doctrine, like the ant modes: 324 views (the current stance is part of the view; review corrected an earlier "108").
+  - With no living rival (the rival turned off, or beaten) there is no stance to choose: the colony forages and the strategist asks nothing. Found in review: solo, the local strategist picked "raid" once food ran low, and the colony's explorers became fighters with no target.
+  - The stance is part of every ant's situation, so a change re-asks the ants on its own.
+  - The ant situation is now mode × tired × food × home × alarm × enemy × stance = 1,296 possible. A real game meets a few hundred.
+- **The outcome.** A colony with no ants and too little food for one more is beaten. The panel shows a banner.
+- **Jev.** The player's colony can play on Jev: one client, two cached lanes (ant modes and stances), one doctrine. The rival plays the local rule and the local strategist, for free.
+
+**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5–1.5 s on the first bump up to 8–24 s, and during a detour the ant wanders instead of homing. (Review found this is not enough on every map: a long wall can still trap homing ants; PR #5 replaces straight-line homing with a walking-distance map.)
+
+**Measured headless** (600 + 600 ants, 1/30 s steps): ~1.8 ms per tick.
+- Seed 1: your colony wiped out the rival by ~200 s.
+- Seed 2: an even war.
+- Seed 3: your colony out-foraged the rival and kept raiding.
+
+**Cost, offline** (`npm run colony-cost`: 10 sim-minutes, 5 doctrines with the first repeated last, alarm painted every ~20 s, stand-in Jev = local rule):
+
+| Doctrine | Ant situations | Stance views | Requests | Tokens | Cost |
+|---|---|---|---|---|---|
+| Forage | 267 | 7 | 105 | ~116k | $0.0049 |
+| Cautious | 322 | 5 | 125 | ~138k | $0.0058 |
+| Warlike | 150 | 1 | 70 | ~70k | $0.0030 |
+| Custom | 54 | 2 | 33 | ~29k | $0.0012 |
+| Forage again | 2 | 2 | 3 | ~2k | $0.0001 |
+
+That is about 355k tokens per session, **≈ $0.09 per hour** retuning every 2 minutes, against the ≤ $0.25/h target. War meets far more situations than foraging (459 vs ~60), and tokens per question rise to ~440. Steady state stays near zero, and returning to an old doctrine stays free.
+
+**Browser check** with Jev stubbed:
+- 212 ant situations and 5 stance views were asked in 45 s.
+- 98 % of mode choices came from the cache.
+- The rival's raids and your colony's raid stance were visible.
+- Light, dark and phone layouts all worked, with no console errors.
+
+**Still to measure live:** real tokens per question, and whether Jev's stances follow each doctrine (Warlike raids, Cautious defends).

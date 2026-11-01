@@ -1,16 +1,18 @@
-import type { JevProxyReply, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
-import { localPolicy, type Colony, type Mode, type Policy, type Situation } from "../colony/colony.ts";
-import { packModeRequest, policyContext, readMode, situationKey } from "../colony/colonyBrain.ts";
+import type { JevAnswer, JevProxyReply, JevRequest, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
+import { localPolicy, localStance, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
+import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { PolicyCache } from "../sim/policyCache.ts";
 
-// The colony's Jev client: the counterpart of JevScheduler for the mode
-// choice. The colony needs an answer at once, so the policy it is given is
-// synchronous: a cached answer for this doctrine if there is one, otherwise
-// the local rule for now while the situation is queued. Every interval the
-// queue goes to Jev, at most `batch` situations a request; each answer is
-// cached and every ant reconsiders, so Jev's choice takes over within a
-// tick. Same proxy, same ledger, same caps as the picture: a 409 ends the
-// run and the colony carries on with the local rule.
+// The colony's Jev client: the counterpart of JevScheduler for the player's
+// colony. Two choices go to Jev, each on its own lane with its own cache per
+// doctrine: an ant's mode (per situation) and the colony's stance (per
+// coarse view, from the strategist). The colony needs an answer at once, so
+// both policies it is given are synchronous: a cached answer for this
+// doctrine if there is one, otherwise the local rule for now while the
+// situation is queued. Every interval the queues go to Jev, at most `batch`
+// situations a request; each answer is cached and every ant reconsiders, so
+// Jev's choice takes over within a tick. Same proxy, same ledger, same caps
+// as the picture: a 409 ends the run and the colony carries on locally.
 
 export interface ColonyJevOptions {
   batch: number;
@@ -25,37 +27,59 @@ export const COLONY_CAPS: RunCaps = { capUsd: 0.1, capSeconds: 1800 };
 
 /** Where cached answers outlive the page; injectable so tests need no localStorage. */
 export interface CacheStore {
-  load(context: string): [string, Mode][];
-  save(context: string, entries: [string, Mode][]): void;
+  load(context: string): [string, string][];
+  save(context: string, entries: [string, string][]): void;
 }
 
 export interface ColonyJevState {
   phase: "off" | "running" | "stopped";
   run: RunSummary | null;
-  /** this run: situations sent to Jev, requests sent */
+  /** this run: situations sent to Jev (ant modes and stances), requests sent */
   asked: number;
+  stancesAsked: number;
   requests: number;
   /** this run: mode choices answered from the cache, and by the local rule while a situation was unanswered */
   hits: number;
   misses: number;
   /** answers cached for the current doctrine */
   cached: number;
+  stancesCached: number;
   failures: number;
   lastError: string | null;
 }
 
 type Listener = (s: ColonyJevState) => void;
 
+/** One kind of question: how to key, pack and read it, the local fallback, and its caches per doctrine. */
+interface Lane<S, A extends string> {
+  name: "mode" | "stance";
+  key: (s: S) => string;
+  pack: (items: { id: string; situation: S }[], doctrine: string) => JevRequest;
+  read: (answers: Record<string, JevAnswer>, id: string) => A | null;
+  local: (s: S) => A;
+  contextOf: (doctrine: string) => string;
+  context: string;
+  caches: Map<string, PolicyCache<A>>;
+  queue: Map<string, S>;
+  asking: Set<string>;
+}
+
+/** In-flight questions are per doctrine: a situation asked under one doctrine is still unasked under another. */
+function askKey(context: string, key: string): string {
+  return `${context}\u0000${key}`;
+}
+
+function lane<S, A extends string>(spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "contextOf">): Lane<S, A> {
+  return { ...spec, context: spec.contextOf(""), caches: new Map(), queue: new Map(), asking: new Set() };
+}
+
 export class ColonyJev {
   opts: ColonyJevOptions;
   #colony: Colony | null = null;
   #doctrine = "";
-  #context = policyContext("");
-  #caches = new Map<string, PolicyCache<Mode>>();
   #store: CacheStore | null;
-  /** situations waiting to be asked (key → situation), and those with a call open */
-  #queue = new Map<string, Situation>();
-  #asking = new Set<string>();
+  #modes = lane<Situation, Mode>({ name: "mode", key: situationKey, pack: packModeRequest, read: readMode, local: localPolicy, contextOf: policyContext });
+  #stances = lane<StanceSituation, Stance>({ name: "stance", key: stanceKey, pack: packStanceRequest, read: readStance, local: localStance, contextOf: stanceContext });
   #inFlight = 0;
   #timer: ReturnType<typeof setInterval> | null = null;
   #aborter = new AbortController();
@@ -63,7 +87,7 @@ export class ColonyJev {
   /** cycles to sit out after a failed call, so a broken upstream is not hammered */
   #cooldown = 0;
   #listeners = new Set<Listener>();
-  #state: ColonyJevState = { phase: "off", run: null, asked: 0, requests: 0, hits: 0, misses: 0, cached: 0, failures: 0, lastError: null };
+  #state: ColonyJevState = { phase: "off", run: null, asked: 0, stancesAsked: 0, requests: 0, hits: 0, misses: 0, cached: 0, stancesCached: 0, failures: 0, lastError: null };
 
   constructor(opts: Partial<ColonyJevOptions> = {}, store: CacheStore | null = null) {
     this.opts = { ...DEFAULT_COLONY_JEV, ...opts };
@@ -88,49 +112,54 @@ export class ColonyJev {
     for (const fn of this.#listeners) fn(this.#state);
   }
 
-  #cache(): PolicyCache<Mode> {
-    let c = this.#caches.get(this.#context);
+  #cache<S, A extends string>(l: Lane<S, A>, context = l.context): PolicyCache<A> {
+    let c = l.caches.get(context);
     if (!c) {
-      c = new PolicyCache<Mode>(this.#context, this.#store?.load(this.#context) ?? []);
-      this.#caches.set(this.#context, c);
+      c = new PolicyCache<A>(context, (this.#store?.load(context) ?? []) as [string, A][]);
+      l.caches.set(context, c);
     }
     return c;
   }
 
-  /** The policy the colony calls: Jev's cached answer while a run is on, else the local rule (queuing what Jev has not answered). */
-  readonly policy: Policy = (s) => {
-    if (this.#state.phase !== "running") return localPolicy(s);
-    const key = situationKey(s);
-    const hit = this.#cache().get(key);
-    if (hit) {
-      this.#state.hits++;
-      return hit;
+  #lookup<S, A extends string>(l: Lane<S, A>, s: S): A {
+    if (this.#state.phase !== "running") return l.local(s);
+    const key = l.key(s);
+    const hit = this.#cache(l).get(key);
+    if (l === (this.#modes as unknown)) {
+      if (hit) this.#state.hits++;
+      else this.#state.misses++;
     }
-    this.#state.misses++;
-    if (!this.#asking.has(this.#askKey(this.#context, key))) this.#queue.set(key, s);
-    return localPolicy(s);
-  };
-
-  /** In-flight questions are per doctrine: a situation asked under one doctrine is still unasked under another. */
-  #askKey(context: string, key: string): string {
-    return `${context}\u0000${key}`;
+    if (hit) return hit;
+    if (!l.asking.has(askKey(l.context, key))) l.queue.set(key, s);
+    return l.local(s);
   }
 
-  /** Drive this colony (a new world or ant count is a new colony; the cache carries over: situations do not depend on the map). */
+  /** The ants' policy: Jev's cached answer while a run is on, else the local rule (queuing what Jev has not answered). */
+  readonly policy: Policy = (s) => this.#lookup(this.#modes, s);
+  /** The strategist's policy, the same way. */
+  readonly stancePolicy: StancePolicy = (s) => this.#lookup(this.#stances, s);
+
+  /** Drive this colony (a new world or ant count is a new colony; the caches carry over: situations do not depend on the map). */
   attach(colony: Colony): void {
     this.#colony = colony;
     colony.policy = this.policy;
+    colony.stancePolicy = this.stancePolicy;
     colony.reconsider();
   }
 
-  /** A new doctrine: its own cache (free if it was used before), and every ant reconsiders under it. */
+  /** A new doctrine: its own caches (free if it was used before), and every ant reconsiders under it. */
   setDoctrine(text: string): void {
-    const context = policyContext(text);
     this.#doctrine = text;
-    if (context === this.#context) return;
-    this.#context = context;
-    this.#queue.clear();
-    this.#set({ cached: this.#cache().size });
+    let changed = false;
+    for (const l of [this.#modes, this.#stances] as Lane<unknown, string>[]) {
+      const context = l.contextOf(text);
+      if (context === l.context) continue;
+      l.context = context;
+      l.queue.clear();
+      changed = true;
+    }
+    if (!changed) return;
+    this.#set({ cached: this.#cache(this.#modes).size, stancesCached: this.#cache(this.#stances).size });
     this.#colony?.reconsider();
   }
 
@@ -149,10 +178,9 @@ export class ColonyJev {
     }
     this.#runSeq++;
     this.#aborter = new AbortController();
-    this.#queue.clear();
-    this.#asking.clear();
+    this.#clearQueues();
     this.#cooldown = 0;
-    this.#set({ phase: "running", run, asked: 0, requests: 0, hits: 0, misses: 0, failures: 0, lastError: null, cached: this.#cache().size });
+    this.#set({ phase: "running", run, asked: 0, stancesAsked: 0, requests: 0, hits: 0, misses: 0, failures: 0, lastError: null, cached: this.#cache(this.#modes).size, stancesCached: this.#cache(this.#stances).size });
     this.#colony?.reconsider();
     if (this.#timer === null) this.#timer = setInterval(() => this.#cycle(), this.opts.intervalMs);
   }
@@ -177,13 +205,19 @@ export class ColonyJev {
     this.#listeners.clear();
   }
 
+  #clearQueues(): void {
+    for (const l of [this.#modes, this.#stances] as Lane<unknown, string>[]) {
+      l.queue.clear();
+      l.asking.clear();
+    }
+  }
+
   #halt(): void {
     if (this.#timer !== null) {
       clearInterval(this.#timer);
       this.#timer = null;
     }
-    this.#queue.clear();
-    this.#asking.clear();
+    this.#clearQueues();
     if (this.#state.phase === "running") this.#set({ phase: "stopped" });
     this.#colony?.reconsider(); // back to the local rule at once
   }
@@ -194,26 +228,29 @@ export class ColonyJev {
       this.#cooldown--;
       return;
     }
-    while (this.#inFlight < this.opts.inFlight && this.#queue.size > 0) {
-      const batch = [...this.#queue.entries()].slice(0, this.opts.batch);
-      for (const [k] of batch) {
-        this.#queue.delete(k);
-        this.#asking.add(this.#askKey(this.#context, k));
+    for (const l of [this.#stances, this.#modes] as Lane<unknown, string>[]) {
+      while (this.#inFlight < this.opts.inFlight && l.queue.size > 0) {
+        const batch = [...l.queue.entries()].slice(0, this.opts.batch);
+        for (const [k] of batch) {
+          l.queue.delete(k);
+          l.asking.add(askKey(l.context, k));
+        }
+        void this.#ask(l, batch);
       }
-      void this.#ask(batch);
     }
   }
 
-  async #ask(batch: [string, Situation][]): Promise<void> {
+  async #ask<S, A extends string>(l: Lane<S, A>, batch: [string, S][]): Promise<void> {
     const seq = this.#runSeq;
-    const context = this.#context;
-    const items = batch.map(([key, situation], n) => ({ id: `s${n}`, key, situation }));
+    const context = l.context;
+    const items = batch.map(([key, situation], n) => ({ id: `${l.name === "mode" ? "s" : "c"}${n}`, key, situation }));
+    const counted = l.name === "mode" ? "asked" : "stancesAsked";
     this.#inFlight++;
-    this.#set({ asked: this.#state.asked + items.length, requests: this.#state.requests + 1 });
+    this.#set({ [counted]: this.#state[counted] + items.length, requests: this.#state.requests + 1 });
     let reply: JevProxyReply | null = null;
     let error: string | null = null;
     try {
-      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(packModeRequest(items, this.#doctrine)), signal: this.#aborter.signal });
+      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(l.pack(items, this.#doctrine)), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
       if (res.status === 409) {
         const run = (body as { run?: RunSummary }).run ?? null;
@@ -223,8 +260,8 @@ export class ColonyJev {
       }
       if (res.status === 429 && (body as { error?: string }).error === "busy") {
         // Ask again next cycle, but only for the doctrine it was asked under and only what that doctrine hasn't cached since.
-        if (seq === this.#runSeq && context === this.#context) for (const it of items) if (!this.#cache().get(it.key)) this.#queue.set(it.key, it.situation);
-        this.#set({ asked: this.#state.asked - items.length, run: (body as { run?: RunSummary }).run ?? this.#state.run });
+        if (seq === this.#runSeq && context === l.context) for (const it of items) if (!this.#cache(l).get(it.key)) l.queue.set(it.key, it.situation);
+        this.#set({ [counted]: this.#state[counted] - items.length, run: (body as { run?: RunSummary }).run ?? this.#state.run });
         return;
       }
       if (!res.ok) error = (body as { error: string }).error ?? `HTTP ${res.status}`;
@@ -234,23 +271,23 @@ export class ColonyJev {
       error = String(err);
     } finally {
       this.#inFlight--;
-      for (const it of items) this.#asking.delete(this.#askKey(context, it.key));
+      for (const it of items) l.asking.delete(askKey(context, it.key));
     }
     if (!reply || reply.status !== 200 || !reply.body || !("answers" in reply.body)) {
-      // Not billed as a reply; the ants keep the local rule and meet the situation again later.
+      // Not billed as a reply; the colony keeps the local rule and meets the situation again later.
       this.#cooldown = 5;
       this.#set({ failures: this.#state.failures + 1, lastError: error ?? `jev answered ${reply?.status ?? "?"}`, run: reply?.run ?? this.#state.run });
       return;
     }
     // A billed answer is kept under the doctrine it was asked under, whichever run or doctrine is current now.
-    const cache = this.#caches.get(context) ?? this.#cache();
+    const cache = this.#cache(l, context);
     const answers = (reply.body as JevResponse).answers;
     for (const it of items) {
-      const mode = readMode(answers, it.id);
-      if (mode) cache.put(it.key, mode);
+      const a = l.read(answers, it.id);
+      if (a) cache.put(it.key, a);
     }
     this.#store?.save(context, cache.entries());
-    this.#set({ run: reply.run, cached: this.#cache().size, lastError: null });
-    if (seq === this.#runSeq && context === this.#context) this.#colony?.reconsider();
+    this.#set({ run: reply.run, cached: this.#cache(this.#modes).size, stancesCached: this.#cache(this.#stances).size, lastError: null });
+    if (seq === this.#runSeq && context === l.context) this.#colony?.reconsider();
   }
 }

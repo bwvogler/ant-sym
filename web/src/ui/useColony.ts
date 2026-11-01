@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Colony, type Mode } from "../colony/colony.ts";
+import type { Colony, Mode, Stance } from "../colony/colony.ts";
+import { Game, type Outcome } from "../colony/game.ts";
 import { generateWorld, mulberry32 } from "../colony/world.ts";
 
-// Owns the one Colony and its animation loop, like useEngine for the
-// picture: React state carries only what the panel shows, the renderer reads
-// the colony's typed arrays every frame. A new seed or ant count is a new
-// colony on a fresh map (food that was carried home stays carried home).
+// Owns the one Game (the player's colony and the rival) and its animation
+// loop, like useEngine for the picture: React state carries only what the
+// panel shows, the renderer reads the colonies' typed arrays every frame. A
+// new seed, ant count or rival setting is a new game on a fresh map.
 
 /** The fungus's brushes: lure paints food scent (ants follow it), alarm paints alarm (ants shy away, a doctrine can send them home). */
 export type Brush = "none" | "lure" | "alarm";
@@ -18,12 +19,24 @@ export interface ColonyControls {
   showFoodTrail: boolean;
   showHomeTrail: boolean;
   brush: Brush;
+  /** a rival colony at the map's second nest */
+  rival: boolean;
 }
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 800, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none" };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", rival: true };
 
 /** Per paint event (a pointer move while dragging): radius in cells and the amount laid per cell. */
 const BRUSHES = { lure: { channel: "food", radius: 2, amount: 3 }, alarm: { channel: "alarm", radius: 3, amount: 12 } } as const;
+
+/** One colony's line in the panel. */
+export interface SideStats {
+  population: number;
+  cap: number;
+  stored: number;
+  losses: number;
+  births: number;
+  stance: Stance;
+}
 
 export interface ColonyStats {
   time: number;
@@ -34,6 +47,13 @@ export interface ColonyStats {
   /** policy mode choices per second, over the last second */
   choicesPerSecond: number;
   situationsSeen: number;
+  you: SideStats;
+  rival: SideStats | null;
+  outcome: Outcome;
+}
+
+function side(c: Colony): SideStats {
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
@@ -43,10 +63,11 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const [controls, setControls] = useState<ColonyControls>(initial);
   // Bumped by Restart: the same seed again, from scratch.
   const [generation, setGeneration] = useState(0);
-  const colony = useMemo(
-    () => new Colony(generateWorld(controls.seed), { antCount: controls.antCount }, mulberry32(controls.seed * 7919 + generation)),
-    [controls.seed, controls.antCount, generation],
+  const game = useMemo(
+    () => new Game(generateWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival }, mulberry32(controls.seed * 7919 + generation)),
+    [controls.seed, controls.antCount, controls.rival, generation],
   );
+  const colony = game.player;
   const [stats, setStats] = useState<ColonyStats | null>(null);
   const [fps, setFps] = useState(0);
   const frameListeners = useRef(new Set<() => void>());
@@ -66,14 +87,25 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       if (controls.playing) {
         const total = dt * controls.speed;
         const steps = Math.max(1, Math.ceil(total / MAX_STEP));
-        for (let k = 0; k < steps; k++) colony.tick(total / steps);
+        for (let k = 0; k < steps; k++) game.tick(total / steps);
       }
       if (colony.time - rateAt.t >= 1) {
         rate = (colony.decisions - rateAt.decisions) / (colony.time - rateAt.t);
         rateAt = { t: colony.time, decisions: colony.decisions };
       }
       if (t - lastStats > 150) {
-        setStats({ time: colony.time, stored: colony.stored, foodTotal: colony.map.foodTotal, foodLeft: colony.foodLeft, counts: colony.counts(), choicesPerSecond: rate, situationsSeen: colony.situationsSeen });
+        setStats({
+          time: colony.time,
+          stored: colony.stored,
+          foodTotal: colony.map.foodTotal,
+          foodLeft: colony.foodLeft,
+          counts: colony.counts(),
+          choicesPerSecond: rate,
+          situationsSeen: colony.situationsSeen,
+          you: side(colony),
+          rival: game.rival ? side(game.rival) : null,
+          outcome: game.outcome(),
+        });
         lastStats = t;
       }
       frames++;
@@ -87,7 +119,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [colony, controls.playing, controls.speed]);
+  }, [game, colony, controls.playing, controls.speed]);
 
   const onFrame = useCallback((fn: () => void) => {
     frameListeners.current.add(fn);
@@ -105,5 +137,5 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     [colony, controls.brush],
   );
 
-  return { colony, controls, update, stats, fps, onFrame, restart, newWorld, paint };
+  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint };
 }

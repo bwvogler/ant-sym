@@ -1,24 +1,33 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
-import { blocked, type WorldMap } from "./world.ts";
+import { blocked, type Nest, type WorldMap } from "./world.ts";
 
-// The colony, pure. Ants are structure-of-arrays like the picture sim. Each
-// ant is in one behaviour mode and steers by that mode every frame for free:
+// A colony, pure. Ants are structure-of-arrays like the picture sim, with a
+// fixed capacity and an `alive` flag: ants die in fights and are born from
+// stored food. Each ant is in one behaviour mode and steers by that mode
+// every frame for free:
 //   explore — wander, lay home trail, walk to food it can see
 //   follow  — climb the food trail, lay home trail
 //   return  — go home: climb the home trail (and its own sense of where the
 //             nest is: real ants path-integrate); carrying, lay food trail
+//   fight   — go for enemies in sight, else up the colony's alarm trail,
+//             else (raiding) toward the rival's nest
 // Picking food up, carrying it home and putting it down are mechanics, not
-// choices; so is shying away from alarm. Which mode to be in is the one
-// choice, asked only when a non-carrying ant's situation changes (a trail
-// appeared or faded, it got tired, it put its food down), never every frame.
-// That choice is a `Policy`: the local rule, or Jev cached per situation
-// (colonyBrain.ts, ui/colonyJev.ts).
+// choices; so is shying away from alarm (unless fighting). Which mode to be
+// in is the one choice, asked only when a non-carrying ant's situation
+// changes, never every frame. That choice is a `Policy`: the local rule, or
+// Jev cached per situation (colonyBrain.ts, ui/colonyJev.ts). Above the
+// ants, the colony's stance (forage, defend, raid) is the strategist's
+// choice, made every few seconds from a coarse view of the colony (game.ts).
 
-export const MODES = ["explore", "follow", "return"] as const;
+export const MODES = ["explore", "follow", "return", "fight"] as const;
 export type Mode = (typeof MODES)[number];
 const EXPLORE = 0;
 const FOLLOW = 1;
 const RETURN = 2;
+const FIGHT = 3;
+
+export const STANCES = ["forage", "defend", "raid"] as const;
+export type Stance = (typeof STANCES)[number];
 
 export const TRAILS = ["none", "faint", "strong"] as const;
 export type Trail = (typeof TRAILS)[number];
@@ -38,27 +47,66 @@ export interface Situation {
   foodTrail: Trail;
   homeTrail: Trail;
   alarm: Trail;
+  /** an ant of another colony within two cells */
+  enemy: "none" | "near";
+  /** what the colony as a whole is doing (the strategist's choice) */
+  stance: Stance;
 }
 
 export type Policy = (s: Situation) => Mode;
 
 /**
- * The local rule. Tired: go home. A strong food trail: follow it. No food
- * trail at all: explore. A faint one keeps what the ant was doing, except an
- * ant that just dropped its food heads back out along it. Alarm is left to
- * steering (every mode shies away from it); a doctrine can make it more.
- * Going home tired breaks ant mills: without it, followers circled trails to
- * food that was gone until the trail faded and nobody was left exploring.
+ * The local rule. An enemy close by: fight it. Tired: go home. Raiding:
+ * explorers (and fighters) go raiding, followers keep foraging. Defending:
+ * alarm calls fighters. A fight that is over sends the ant home. Otherwise
+ * forage: a strong food trail is followed, none means explore, a faint one
+ * keeps what the ant was doing (an ant that just dropped its food heads back
+ * out along it). Going home tired breaks ant mills: without it, followers
+ * circled trails to food that was gone until nobody was left exploring.
  */
 export const localPolicy: Policy = (s) => {
+  if (s.enemy === "near") return "fight";
   if (s.tired) return "return";
+  if (s.stance === "raid" && (s.mode === "explore" || s.mode === "fight")) return "fight";
+  if (s.stance === "defend" && s.alarm !== "none") return "fight";
+  if (s.mode === "fight") return "return";
   if (s.foodTrail === "strong") return "follow";
   if (s.foodTrail === "none") return "explore";
   return s.mode === "return" ? "follow" : s.mode;
 };
 
+/** The strategist's coarse view of its own colony: few values, so a stance can be cached per view too. */
+export interface StanceSituation {
+  stance: Stance;
+  /** living ants against the colony's cap */
+  ants: "few" | "some" | "many";
+  /** ants lost lately (a 30 s fading count) */
+  losses: "none" | "some" | "heavy";
+  enemyNearNest: boolean;
+  /** share of the map's food still out there */
+  foodLeft: "plenty" | "some" | "scarce";
+  /** food stored but not yet turned into ants (the colony is at its cap) */
+  larder: "low" | "full";
+}
+
+export type StancePolicy = (s: StanceSituation) => Stance;
+
+/** The local strategist: defend a nest under attack; raid when food runs out or the colony is full and fed; else forage. */
+export const localStance: StancePolicy = (s) => {
+  if (s.enemyNearNest && s.losses !== "none") return "defend";
+  if (s.foodLeft === "scarce" && s.ants !== "few") return "raid";
+  if (s.larder === "full" && s.ants === "many") return "raid";
+  return "forage";
+};
+
 export interface ColonyParams {
   antCount: number;
+  /** most living ants the colony can have; food beyond it waits in the larder */
+  maxAnts: number;
+  /** stored food per new ant */
+  foodPerAnt: number;
+  /** which of the map's nests is home */
+  nest: number;
   /** cells per second */
   speed: number;
   /** how far ahead the three sensors sit, cells */
@@ -79,16 +127,22 @@ export interface ColonyParams {
   alarmAvoid: number;
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5 };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5 };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
+/** Cells around an ant it checks for enemies (a square of side 2 × ENEMY_RANGE + 1). */
+const ENEMY_RANGE = 2;
 
 export class Colony {
   readonly map: WorldMap;
   readonly ph: Pheromones;
+  readonly nest: Nest;
   params: ColonyParams;
   policy: Policy;
+  stancePolicy: StancePolicy;
+  stance: Stance = "forage";
+  /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
   y: Float32Array;
@@ -96,44 +150,100 @@ export class Colony {
   /** index into MODES */
   mode: Uint8Array;
   carrying: Uint8Array;
+  alive: Uint8Array;
   /** seconds since the ant was last at the nest or picked up food */
   since: Float32Array;
-  /** seconds left of a detour after bumping into rock, when the pull toward the nest is off */
+  /** seconds left of a detour after bumping into rock, when the pull toward the nest (or the raid) is off */
   detour: Float32Array;
+  /** recent bumps, fading over seconds: each bump in a row doubles the next detour */
+  bumps: Float32Array;
   /** the situation each ant was last asked about, encoded; −1 = never */
   #asked: Int16Array;
+  /** enemy ants per cell, kept by the game each tick; null when there is no rival */
+  enemies: Uint16Array | null = null;
+  /** where raiders go: the rival's nest */
+  raidTarget: Nest | null = null;
   time = 0;
   /** food units brought home */
   stored = 0;
+  /** stored food not yet turned into ants */
+  larder = 0;
+  /** ants lost, and a count of recent losses fading over ~30 s */
+  losses = 0;
+  recentLosses = 0;
+  births = 0;
   /** mode choices made by the policy */
   decisions = 0;
   /** which of the SITUATIONS the policy has been asked about: what a cached Jev policy would pay for */
   seen = new Uint8Array(SITUATIONS);
   #rng: () => number;
 
-  constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy) {
+  constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
     this.map = map;
     this.params = { ...DEFAULT_COLONY, ...params };
+    if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
+    this.nest = map.nests?.[this.params.nest] ?? map.nest;
     this.policy = policy;
+    this.stancePolicy = stancePolicy;
     this.#rng = rng;
     this.ph = new Pheromones(map.size);
-    const n = this.params.antCount;
+    const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
     this.y = new Float32Array(n);
     this.heading = new Float32Array(n);
     this.mode = new Uint8Array(n);
     this.carrying = new Uint8Array(n);
+    this.alive = new Uint8Array(n);
     this.since = new Float32Array(n);
     this.detour = new Float32Array(n);
+    this.bumps = new Float32Array(n);
     this.#asked = new Int16Array(n).fill(-1);
-    for (let i = 0; i < n; i++) {
-      const a = rng() * Math.PI * 2;
-      const r = rng() * map.nest.r * 0.8;
-      this.x[i] = map.nest.x + Math.cos(a) * r;
-      this.y[i] = map.nest.y + Math.sin(a) * r;
-      this.heading[i] = a;
+    for (let k = 0; k < this.params.antCount; k++) this.#place(k);
+  }
+
+  #place(i: number): void {
+    const a = this.#rng() * Math.PI * 2;
+    const r = this.#rng() * this.nest.r * 0.8;
+    this.x[i] = this.nest.x + Math.cos(a) * r;
+    this.y[i] = this.nest.y + Math.sin(a) * r;
+    this.heading[i] = a;
+    this.mode[i] = EXPLORE;
+    this.carrying[i] = 0;
+    this.since[i] = 0;
+    this.detour[i] = 0;
+    this.bumps[i] = 0;
+    this.#asked[i] = -1;
+    this.alive[i] = 1;
+  }
+
+  /** Living ants. */
+  get population(): number {
+    let s = 0;
+    for (const v of this.alive) s += v;
+    return s;
+  }
+
+  /** A new ant at the nest, in the first free slot; false when the colony is at its cap. */
+  spawn(): boolean {
+    const i = this.alive.indexOf(0);
+    if (i < 0) return false;
+    this.#place(i);
+    this.births++;
+    return true;
+  }
+
+  /** Ant i dies where it stands; food it carried drops on that cell. */
+  kill(i: number): void {
+    if (!this.alive[i]) return;
+    if (this.carrying[i]) {
+      const c = Math.floor(this.y[i] as number) * this.map.size.w + Math.floor(this.x[i] as number);
+      this.map.food[c] = (this.map.food[c] as number) + 1;
     }
+    this.alive[i] = 0;
+    this.carrying[i] = 0;
+    this.losses++;
+    this.recentLosses++;
   }
 
   /** Food left on the map. */
@@ -165,11 +275,25 @@ export class Colony {
     return s;
   }
 
-  /** Ants in each mode. */
+  /** Living ants in each mode. */
   counts(): Record<Mode, number> {
-    const c = { explore: 0, follow: 0, return: 0 };
-    for (let i = 0; i < this.n; i++) c[MODES[this.mode[i] as number] as Mode]++;
+    const c = { explore: 0, follow: 0, return: 0, fight: 0 };
+    for (let i = 0; i < this.n; i++) if (this.alive[i]) c[MODES[this.mode[i] as number] as Mode]++;
     return c;
+  }
+
+  /** The strategist's view of this colony. `enemyNearNest` comes from the game, which sees both colonies. */
+  stanceSituation(enemyNearNest: boolean): StanceSituation {
+    const pop = this.population / this.params.maxAnts;
+    const left = this.map.foodTotal > 0 ? this.foodLeft / this.map.foodTotal : 0;
+    return {
+      stance: this.stance,
+      ants: pop < 0.4 ? "few" : pop < 0.8 ? "some" : "many",
+      losses: this.recentLosses < 1 ? "none" : this.recentLosses < 10 ? "some" : "heavy",
+      enemyNearNest,
+      foodLeft: left > 0.5 ? "plenty" : left > 0.15 ? "some" : "scarce",
+      larder: this.larder >= 2 * this.params.foodPerAnt ? "full" : "low",
+    };
   }
 
   /** What one sensor reads: the trail, the edge or rock as −1, and food (or the nest, homing) as SEEN. */
@@ -179,18 +303,45 @@ export class Colony {
     const sy = (this.y[i] as number) + Math.sin(angle) * d;
     if (blocked(this.map, sx, sy)) return -1;
     if (channel === "food" && (this.map.food[Math.floor(sy) * this.map.size.w + Math.floor(sx)] as number) > 0) return SEEN;
-    if (channel === "home" && Math.hypot(sx - this.map.nest.x, sy - this.map.nest.y) < this.map.nest.r) return SEEN;
+    if (channel === "home" && Math.hypot(sx - this.nest.x, sy - this.nest.y) < this.nest.r) return SEEN;
     return this.ph.read(channel, sx, sy);
   }
 
-  /** Advance by dt seconds: ants decide (when their situation changed), steer, lay trail, move; then the fields evaporate and spread. */
+  /** The nearest cell holding enemies within ENEMY_RANGE of ant i, as a heading, or null. */
+  #enemyHeading(i: number): number | null {
+    const g = this.enemies;
+    if (!g) return null;
+    const { w, h } = this.map.size;
+    const cx = Math.floor(this.x[i] as number);
+    const cy = Math.floor(this.y[i] as number);
+    let best = Infinity;
+    let heading: number | null = null;
+    for (let dy = -ENEMY_RANGE; dy <= ENEMY_RANGE; dy++) {
+      const y = cy + dy;
+      if (y < 0 || y >= h) continue;
+      for (let dx = -ENEMY_RANGE; dx <= ENEMY_RANGE; dx++) {
+        const x = cx + dx;
+        if (x < 0 || x >= w || !g[y * w + x]) continue;
+        const d = dx * dx + dy * dy;
+        if (d < best) {
+          best = d;
+          heading = Math.atan2(y + 0.5 - (this.y[i] as number), x + 0.5 - (this.x[i] as number));
+        }
+      }
+    }
+    return heading;
+  }
+
+  /** Advance by dt seconds: ants decide (when their situation changed), steer, lay trail, move; then the fields evaporate and spread, and stored food becomes ants. */
   tick(dt: number): void {
     const p = this.params;
     const rng = this.#rng;
-    const { map, ph } = this;
+    const { map, ph, nest } = this;
     const a = p.sensorAngle;
     this.time += dt;
+    this.recentLosses *= Math.exp(-dt / 30);
     for (let i = 0; i < this.n; i++) {
+      if (!this.alive[i]) continue;
       let h = this.heading[i] as number;
       const fl = this.#sense(i, h - a, "food");
       const ff = this.#sense(i, h, "food");
@@ -201,6 +352,7 @@ export class Colony {
       const al = this.#sense(i, h - a, "alarm");
       const af = this.#sense(i, h, "alarm");
       const ar = this.#sense(i, h + a, "alarm");
+      const toEnemy = this.#enemyHeading(i);
 
       // The mode choice, only when the situation changed since the ant was last asked.
       // A carrying ant goes home: a mechanic, never asked (and asked afresh once it puts the food down).
@@ -215,12 +367,14 @@ export class Colony {
         const food = trailLevel(Math.max(fl, ff, fr));
         const home = trailLevel(Math.max(hl, hf, hr));
         const alarm = trailLevel(Math.max(al, af, ar));
-        const before = encode(mode, tired, food, home, alarm);
+        const enemy = toEnemy === null ? 0 : 1;
+        const stance = STANCES.indexOf(this.stance);
+        const before = encode(mode, tired, food, home, alarm, enemy, stance);
         if (before !== this.#asked[i]) {
-          mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm }));
+          mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
           this.mode[i] = mode;
-          this.#asked[i] = encode(mode, tired, food, home, alarm);
+          this.#asked[i] = encode(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
           this.decisions++;
         }
@@ -229,22 +383,32 @@ export class Colony {
 
       // Steer by mode.
       const noise = (rng() - 0.5) * 2 * dt;
+      const detouring = (this.detour[i] as number) > 0;
       if (mode === RETURN) {
-        h += climb(hl, hf, hr, p.turnRate * dt) + noise * p.wander * 0.25;
-        // Path integration: home is that way. Stronger when the home trail is faint; off
-        // for a moment after a bump, or a straight line home walks into the same rock forever.
-        if ((this.detour[i] as number) <= 0) {
-          const toNest = Math.atan2(map.nest.y - (this.y[i] as number), map.nest.x - (this.x[i] as number));
+        // Path integration: home is that way. Stronger when the home trail is faint. Off during
+        // a detour after a bump, when the ant wanders instead: a straight line home walks into
+        // the same rock forever (a rival nest behind a wall kept 447 ants circling, tired, until
+        // detours grew with repeated bumps).
+        h += climb(hl, hf, hr, p.turnRate * dt) + noise * p.wander * (detouring ? 1 : 0.25);
+        if (!detouring) {
+          const toNest = Math.atan2(nest.y - (this.y[i] as number), nest.x - (this.x[i] as number));
           h = turnToward(h, toNest, p.turnRate * dt * (home === "strong" ? 0.15 : 0.5));
         }
       } else if (mode === FOLLOW) {
         h += climb(fl, ff, fr, p.turnRate * dt) + noise * p.wander * 0.25;
+      } else if (mode === FIGHT) {
+        if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2);
+        else if (Math.max(al, af, ar) >= FAINT) h += climb(al, af, ar, p.turnRate * dt);
+        else if (this.stance === "raid" && this.raidTarget && !detouring) {
+          const t = this.raidTarget;
+          h = turnToward(h, Math.atan2(t.y - (this.y[i] as number), t.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
+        } else h += noise * p.wander;
       } else {
         const seen = Math.max(fl, ff, fr) >= SEEN;
         h += seen ? climb(fl, ff, fr, p.turnRate * dt) : noise * p.wander;
       }
-      // Every mode shies away from alarm.
-      h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * dt);
+      // Every mode but fighting shies away from alarm.
+      if (mode !== FIGHT) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * dt);
 
       // Lay trail: walking out marks the way home, carrying food marks the way to it.
       const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt;
@@ -254,18 +418,21 @@ export class Colony {
       const nx = (this.x[i] as number) + Math.cos(h) * p.speed * dt;
       const ny = (this.y[i] as number) + Math.sin(h) * p.speed * dt;
       this.detour[i] = (this.detour[i] as number) - dt;
+      this.bumps[i] = Math.max(0, (this.bumps[i] as number) - dt / 4);
       if (blocked(map, nx, ny)) {
         h += Math.PI / 2 + rng() * Math.PI;
-        this.detour[i] = 0.5 + rng();
+        // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
+        this.bumps[i] = Math.min(5, (this.bumps[i] as number) + 1);
+        this.detour[i] = Math.max(this.detour[i] as number, 0.5 * 2 ** Math.floor(this.bumps[i] as number) * (0.5 + rng()));
       } else {
         this.x[i] = nx;
         this.y[i] = ny;
       }
 
-      // Mechanics: pick up food where there is some, put it down at the nest; the nest rests a tired ant.
+      // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
       const c = Math.floor(this.y[i] as number) * map.size.w + Math.floor(this.x[i] as number);
-      const atNest = Math.hypot((this.x[i] as number) - map.nest.x, (this.y[i] as number) - map.nest.y) < map.nest.r;
-      if (!carrying && (map.food[c] as number) > 0) {
+      const atNest = Math.hypot((this.x[i] as number) - nest.x, (this.y[i] as number) - nest.y) < nest.r;
+      if (!carrying && mode !== FIGHT && (map.food[c] as number) > 0) {
         map.food[c] = Math.max(0, (map.food[c] as number) - 1);
         this.carrying[i] = 1;
         this.since[i] = 0;
@@ -274,6 +441,7 @@ export class Colony {
         if (carrying) {
           this.carrying[i] = 0;
           this.stored++;
+          this.larder++;
           h += Math.PI;
         }
         this.since[i] = 0;
@@ -281,14 +449,22 @@ export class Colony {
       this.heading[i] = h;
     }
     ph.step(dt, map.rock);
+    // Growth: the larder turns into ants while there is room.
+    while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
   }
 }
 
-/** Every situation a mode choice can be asked in: mode × tired × food × home × alarm = 3 × 2 × 3 × 3 × 3 = 162. */
-export const SITUATIONS = MODES.length * 2 * TRAILS.length ** 3;
+/** Every situation a mode choice can be asked in: mode × tired × food × home × alarm × enemy × stance = 4 × 2 × 3 × 3 × 3 × 2 × 3 = 1,296. */
+export const SITUATIONS = MODES.length * 2 * TRAILS.length ** 3 * 2 * STANCES.length;
 
-function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: Trail): number {
-  return (((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm);
+function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: Trail, enemy: number, stance: number): number {
+  return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
+}
+
+/** Turn toward the strongest of three sensors, at most `max` radians. */
+export function climb(left: number, front: number, right: number, max: number): number {
+  if (front >= left && front >= right) return 0;
+  return left > right ? -max : max;
 }
 
 /** Turn toward the weakest of three alarm sensors, at most `max` radians; nothing when no sensor smells alarm. */
@@ -296,12 +472,6 @@ export function avoid(left: number, front: number, right: number, max: number): 
   if (Math.max(left, front, right) < FAINT) return 0;
   if (front <= left && front <= right) return 0;
   return left < right ? -max : max;
-}
-
-/** Turn toward the strongest of three sensors, at most `max` radians. */
-export function climb(left: number, front: number, right: number, max: number): number {
-  if (front >= left && front >= right) return 0;
-  return left > right ? -max : max;
 }
 
 /** Turn `h` toward `target` by at most `max` radians, the short way round. */
