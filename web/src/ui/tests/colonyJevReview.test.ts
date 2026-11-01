@@ -8,7 +8,7 @@ import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
 // PR #7 review: the fungus lane's menu, and a 409 with questions still in flight.
 
-const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReason: null, elapsedSeconds: 0, caps: { capUsd: 0.1, capSeconds: 1800 }, requests: 0, inFlight: 0, inputTokens: 0, usd: 0, sessionInputTokens: 0, sessionUsd: 0, aborted: 0, medianMs: null, p90Ms: null, statuses: {}, remainingUsd: 0.1, remainingSeconds: 1800 };
+const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReason: null, elapsedSeconds: 0, caps: { capUsd: 0.1, capSeconds: 1800 }, requests: 0, inFlight: 0, maxInFlight: 5, inputTokens: 0, usd: 0, sessionInputTokens: 0, sessionUsd: 0, aborted: 0, medianMs: null, p90Ms: null, statuses: {}, remainingUsd: 0.1, remainingSeconds: 1800 };
 type Req = JevRequest & { state: Record<string, unknown> };
 const realFetch = globalThis.fetch;
 const live = new Set<ColonyJev>();

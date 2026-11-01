@@ -255,7 +255,7 @@ test("the Vite plugin mounts every route through wrap(), sizes the pool from the
   assert.notEqual(three.client, null);
   assert.equal(three.inFlight, 3);
   three.client?.destroy();
-  assert.equal(buildServices({ JEV_IN_FLIGHT: "40" }).inFlight, 6, "never past the browser's connection count");
+  assert.equal(buildServices({ JEV_IN_FLIGHT: "40" }).inFlight, DEFAULT_IN_FLIGHT, "never past five: the browser's sixth connection is Stop's");
   assert.equal(buildServices({ JEV_IN_FLIGHT: "junk" }).inFlight, DEFAULT_IN_FLIGHT);
   assert.equal(buildServices({ JEV_IN_FLIGHT: "-3" }).inFlight, 1, "never below one");
   assert.equal(buildServices({ JEV_IN_FLIGHT: "0" }).inFlight, DEFAULT_IN_FLIGHT);

@@ -1,4 +1,4 @@
-import { DEFAULT_CAPS, USD_PER_INPUT_TOKEN, type RunCaps, type RunSummary, type StopReason } from "../shared/jev.ts";
+import { DEFAULT_CAPS, DEFAULT_IN_FLIGHT, USD_PER_INPUT_TOKEN, type RunCaps, type RunSummary, type StopReason } from "../shared/jev.ts";
 
 // The spend ledger: one run at a time, real tokens only. The browser decides
 // *when* to stop for "formed"; the server enforces the spend and time caps so
@@ -93,7 +93,7 @@ export class Ledger {
   readonly #timer: Timer;
 
   constructor(opts: LedgerOptions = {}) {
-    this.#maxInFlight = opts.maxInFlight ?? 5;
+    this.#maxInFlight = opts.maxInFlight ?? DEFAULT_IN_FLIGHT;
     this.#reserveTokens = opts.reserveTokens ?? RESERVE_TOKENS;
     this.#timer = opts.timer ?? realTimer;
   }
@@ -227,6 +227,7 @@ export class Ledger {
       caps: { ...this.#caps },
       requests: this.#requests,
       inFlight: this.#inFlight,
+      maxInFlight: this.#maxInFlight,
       inputTokens: this.#inputTokens,
       usd: this.usd,
       sessionInputTokens: this.#sessionTokens,

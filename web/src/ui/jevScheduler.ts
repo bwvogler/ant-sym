@@ -1,10 +1,11 @@
 import type { JevProxyReply, JevRequest, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
+import { compass } from "../sim/ants.ts";
 import type { Engine } from "../sim/engine.ts";
 import { antState, applyDecision, calibration, packRequest, POLICY_CONTEXT, readDecision, type AntState, type Neutral, type Schema } from "../sim/jevBrain.ts";
 import { answersFor, canonicalState, PolicyCache, readSituation, situationKey, type CachedAnswer, type Transform } from "../sim/policyCache.ts";
 import { boxArea, boxCentre, boxInkShare, buildOverseerRequest, readOverseer, type Box } from "../sim/overseer.ts";
 import { overseerImages } from "./overseerImages.ts";
-import type { JevAnswer } from "../../shared/jev.ts";
+import { DEFAULT_IN_FLIGHT, type JevAnswer } from "../../shared/jev.ts";
 
 // Drives the Jev brain against the proxy. Every `intervalMs` it takes the
 // stalest due ants that are at least `minAgeSeconds` past their last
@@ -39,8 +40,8 @@ export interface SchedulerOptions {
   renderImages: (target: Float32Array, occupancy: Uint16Array, size: { w: number; h: number }) => Promise<{ target: string; current: string }>;
 }
 
-// inFlight 5: browsers allow 6 connections per host, and Stop needs one to reach the server at once.
-export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: 5, intervalMs: 200, minAgeSeconds: 1.5, sample: false, overseer: true, overseerMs: 4000, renderImages: overseerImages };
+// inFlight: see DEFAULT_IN_FLIGHT. The server's own limit (JEV_IN_FLIGHT) caps it further once a run starts.
+export const DEFAULT_SCHEDULER: SchedulerOptions = { schema: "compass", batch: 100, inFlight: DEFAULT_IN_FLIGHT, intervalMs: 200, minAgeSeconds: 1.5, sample: false, overseer: true, overseerMs: 4000, renderImages: overseerImages };
 
 export interface OverseerState {
   box: Box | null;
@@ -311,6 +312,11 @@ export class JevScheduler {
     }
   }
 
+  /** Calls this client may keep open: its own setting, never past the server's (JEV_IN_FLIGHT); a call over it would only come back 429 busy. */
+  #width(): number {
+    return Math.min(this.opts.inFlight, this.#state.run?.maxInFlight ?? this.opts.inFlight);
+  }
+
   async #cycle(): Promise<void> {
     if (this.#state.phase !== "running") return;
     this.#resizePending();
@@ -318,7 +324,7 @@ export class JevScheduler {
     if (e.params.brain !== "jev") return;
     if (this.opts.schema === "cached") return this.#cycleCached();
     const minAge = this.opts.minAgeSeconds;
-    const free = this.opts.inFlight - this.#inFlight;
+    const free = this.#width() - this.#inFlight;
     if (free <= 0) return;
     const due = e.dueAnts().filter((i) => !this.#pending[i] && e.time - (e.world.decidedAt[i] as number) >= minAge);
     if (due.length === 0) return;
@@ -413,7 +419,7 @@ export class JevScheduler {
         if (!sample) {
           const own: Record<string, JevAnswer> = {};
           for (const [k, v] of Object.entries(answers)) if (k.startsWith(`${a.id}_`)) own[k] = v;
-          sample = { id: a.id, state: a.state, answers: own, decision: { heading: d.heading === null ? null : compassOf(d.heading), settle: d.settle, strength: d.strength, pSettle: d.pSettle } };
+          sample = { id: a.id, state: a.state, answers: own, decision: { heading: d.heading === null ? null : compass(d.heading), settle: d.settle, strength: d.strength, pSettle: d.pSettle } };
         }
       }
     } catch (err) {
@@ -432,7 +438,7 @@ export class JevScheduler {
     const e = this.#engine;
     const minAge = this.opts.minAgeSeconds;
     // How many new situations this cycle can send: the free connections' worth of batches.
-    const room = Math.max(0, this.opts.inFlight - this.#inFlight) * this.opts.batch;
+    const room = Math.max(0, this.#width() - this.#inFlight) * this.opts.batch;
     const ask: string[] = [];
     const asking = new Set<string>();
     let hits = 0;
@@ -481,7 +487,7 @@ export class JevScheduler {
       return null;
     }
     applyDecision(e, i, d, state);
-    return { id, state, answers, situation: key, decision: { heading: d.heading === null ? null : compassOf(d.heading), settle: d.settle, strength: d.strength, pSettle: d.pSettle } };
+    return { id, state, answers, situation: key, decision: { heading: d.heading === null ? null : compass(d.heading), settle: d.settle, strength: d.strength, pSettle: d.pSettle } };
   }
 
   /** Ask Jev about new situations, one dir + settle pair each, and decide for every ant parked on them. */
@@ -550,8 +556,3 @@ function isAbort(err: unknown): boolean {
   return (err as { name?: string } | null)?.name === "AbortError";
 }
 
-function compassOf(h: number): string {
-  const names = ["E", "SE", "S", "SW", "W", "NW", "N", "NE"];
-  const k = Math.round((((h % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8;
-  return names[k] as string;
-}

@@ -92,7 +92,7 @@ export interface Services {
 export function buildServices(env: NodeJS.ProcessEnv): Services & { inFlight: number } {
   const apiKey = env.JEV_API_KEY ?? "";
   const asked = Number(env.JEV_IN_FLIGHT);
-  const inFlight = Number.isFinite(asked) && asked !== 0 ? Math.max(1, Math.min(6, Math.trunc(asked))) : DEFAULT_IN_FLIGHT;
+  const inFlight = Number.isFinite(asked) && asked !== 0 ? Math.max(1, Math.min(DEFAULT_IN_FLIGHT, Math.trunc(asked))) : DEFAULT_IN_FLIGHT;
   const client = apiKey ? new JevClient({ apiKey, maxSockets: inFlight }) : null;
   return { client, ledger: new Ledger({ maxInFlight: inFlight }), now: () => Date.now(), inFlight };
 }

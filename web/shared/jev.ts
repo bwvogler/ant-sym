@@ -57,6 +57,8 @@ export interface RunSummary {
   caps: RunCaps;
   requests: number;
   inFlight: number;
+  /** The most calls the server lets run at once (JEV_IN_FLIGHT, default DEFAULT_IN_FLIGHT). The browser never keeps more open. */
+  maxInFlight: number;
   inputTokens: number;
   /** Real cost: Σ usage.input_tokens × $0.042 / 1e6. Never an estimate; see `aborted` for what it cannot include. */
   usd: number;
@@ -73,6 +75,14 @@ export interface RunSummary {
   remainingSeconds: number;
 }
 
+/**
+ * Browsers open at most 6 HTTP/1.1 connections per host. Five in flight
+ * leaves one for /api/run, so Stop reaches the server at once instead of
+ * queueing behind the calls it is meant to cut off (measured: 6 open, Stop
+ * waited 3.8 s and every call was billed; 5 open, 5 ms). Also the most
+ * JEV_IN_FLIGHT may ask for.
+ */
+export const DEFAULT_IN_FLIGHT = 5;
 export const USD_PER_INPUT_TOKEN = 0.042 / 1_000_000;
 export const DEFAULT_CAPS: RunCaps = { capUsd: 0.5, capSeconds: 180 };
 export const DEFAULT_JEV_MODEL = "jev-latest";
