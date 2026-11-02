@@ -1,6 +1,6 @@
 import http from "node:http";
 import https from "node:https";
-import type { JevRequest } from "../shared/jev.ts";
+import { DEFAULT_IN_FLIGHT, type JevRequest } from "../shared/jev.ts";
 
 // The one place that talks to TypeSafe. Deliberately on node:http(s) with an
 // explicit Agent rather than global fetch: undici opens parallel connections
@@ -53,13 +53,7 @@ export class JevAbortError extends Error {
 }
 
 export const DEFAULT_BASE_URL = "https://api.typesafe.ai";
-/**
- * Browsers open at most 6 HTTP/1.1 connections per host. Five in flight
- * leaves one for /api/run, so Stop reaches the server at once instead of
- * queueing behind the calls it is meant to cut off (measured: 6 open, Stop
- * waited 3.8 s and every call was billed; 5 open, 5 ms).
- */
-export const DEFAULT_IN_FLIGHT = 5;
+export { DEFAULT_IN_FLIGHT };
 export const DEFAULT_ABORT_GRACE_MS = 1500;
 const RETRYABLE = new Set([429, 529]);
 

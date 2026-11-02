@@ -200,6 +200,9 @@ test("validateJevRequest fills the model, keeps assets, rejects junk", () => {
   assert.throws(() => validateJevRequest({ questions: { q: { type: "noul", instructions: "" } } }), /state is required/);
   assert.throws(() => validateJevRequest({ state: 1, questions: {} }), /non-empty/);
   assert.throws(() => validateJevRequest({ state: 1, questions: { q: { type: "rank" } } }), /no valid type/);
+  // PR #7 review: a fungus host with nothing on its menu was asked a choice among nothing, forever.
+  assert.throws(() => validateJevRequest({ state: 1, questions: { q: { type: "choice", instructions: "x", criteria: {} } } }), /no options/);
+  assert.equal(validateJevRequest({ state: 1, questions: { q: { type: "choice", instructions: "x", criteria: { a: "A" } } } }).model, "jev-latest");
 });
 
 test("the Vite plugin mounts every route through wrap(), sizes the pool from the environment, and closes it on restart", { timeout: 15_000 }, async () => {
@@ -252,7 +255,7 @@ test("the Vite plugin mounts every route through wrap(), sizes the pool from the
   assert.notEqual(three.client, null);
   assert.equal(three.inFlight, 3);
   three.client?.destroy();
-  assert.equal(buildServices({ JEV_IN_FLIGHT: "40" }).inFlight, 6, "never past the browser's connection count");
+  assert.equal(buildServices({ JEV_IN_FLIGHT: "40" }).inFlight, DEFAULT_IN_FLIGHT, "never past five: the browser's sixth connection is Stop's");
   assert.equal(buildServices({ JEV_IN_FLIGHT: "junk" }).inFlight, DEFAULT_IN_FLIGHT);
   assert.equal(buildServices({ JEV_IN_FLIGHT: "-3" }).inFlight, 1, "never below one");
   assert.equal(buildServices({ JEV_IN_FLIGHT: "0" }).inFlight, DEFAULT_IN_FLIGHT);

@@ -304,11 +304,4 @@ export class Pheromones {
     });
     return s;
   }
-
-  clear(): void {
-    for (const ch of CHANNELS) {
-      this.fields[ch].clear();
-      this.#awake[ch].clear();
-    }
-  }
 }

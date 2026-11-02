@@ -1,6 +1,6 @@
 # Home is a nest, not a point
 
-*Design note, 2026-11-01. It builds on the side view (PRD §18, MR 13–15). This note is design only: the slices at the end are filed as beads, and nothing here is built yet.*
+*Design note, 2026-11-01. It builds on the side view (PRD §27, MR 13–15). This note is design only: the slices at the end are filed as beads, and nothing here is built yet.*
 
 The owner asked: *where is the "home" signal for ants? Is it a queen thing? Are there structures or specialised spaces? We tested the home as a disc, but that isn't realistic underground, and the ant-farm view breaks it.*
 
