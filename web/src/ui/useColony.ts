@@ -5,7 +5,7 @@ import { Game, type Outcome, type Unity } from "../colony/game.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD } from "../colony/world.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
-// loop, like useEngine for the picture: React state carries only what the
+// loop: React state carries only what the
 // panel shows, the renderer reads the colonies' typed arrays every frame. A
 // new seed, ant count or rival setting is a new game on a fresh map.
 

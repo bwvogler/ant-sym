@@ -6,7 +6,7 @@ import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDista
 import { TOLERANCE } from "./recognition.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
-// A colony, pure. Ants are structure-of-arrays like the picture sim, with a
+// A colony, pure. Ants are structure-of-arrays, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
 // stored food. Each ant is in one behaviour mode and steers by that mode
 // every frame for free:

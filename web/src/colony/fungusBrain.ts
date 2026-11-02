@@ -1,5 +1,5 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
-import { hash } from "../sim/policyCache.ts";
+import { hash } from "./policyCache.ts";
 import type { FungalSituation } from "./fungalPolicy.ts";
 import { INTERVENTIONS, STRAINS } from "./fungus.ts";
 
