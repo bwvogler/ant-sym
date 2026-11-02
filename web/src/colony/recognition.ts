@@ -192,7 +192,7 @@ export class Recognition {
   }
 
   /**
-   * Strangers in the cells within r hex steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to w × h, to the odour last looked at: weighted by
+   * Strangers in the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to w × h, to the odour last looked at: weighted by
    * (1 − calm), as a fight counts them, or with `byOdour` each counted once, calmed or not (who smells
    * different, which calming does not change: what the fungus senses as contact).
    */
