@@ -54,8 +54,10 @@ test("in a game: soil is carried out and dropped along the ground, loose soil is
   const c = g.player;
   const solidT = new Float32Array(c.n);
   let maxSolid = 0;
-  // 300 s, not 200: nothing dug in the last BACKFILL.young (200 s) is filled, so loose soil taken down first finds room after that.
-  for (let k = 0; k < 30 * 300; k++) {
+  // 500 s: nothing dug in the last BACKFILL.young (200 s) is filled, so loose soil taken down first finds room after that,
+  // and only slowly: by 300 s this game had put back 8 loose pellets on #17 and none on the nest stack (whose tunnel walker
+  // steers stalled carriers to the entrance), by 500 s 45 and 35 (games 7–9 at 500 s: 12–48 on #17, 2–43 here).
+  for (let k = 0; k < 30 * 500; k++) {
     g.tick(1 / 30);
     // Nobody is buried: an ant in a cell spoil was heaped on climbs out at once.
     for (let i = 0; i < c.n; i++) {
@@ -68,10 +70,10 @@ test("in a game: soil is carried out and dropped along the ground, loose soil is
       let loose = 0;
       for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
       const carried = c.carriedPellets();
-      assert.equal(loose, c.moundCells, "the mound on the map is the colony's count");
+      assert.equal(loose, map.moundCells, "the mound on the map is its count");
       assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried.dug + c.soilLost, "dug = brought out + filled + carried + lost");
       assert.equal(c.loosePicked, c.looseDropped + c.looseFilled + carried.loose + c.looseLost, "loose picked up = dropped again + filled + carried + lost");
-      assert.equal(c.moundCells, Math.floor(c.soilOut * SWELL + 1e-9) - c.moundLost - c.loosePicked + c.looseDropped, "the mound = soil brought out × SWELL, less what was taken off it, plus what was put back");
+      assert.equal(map.moundCells, Math.floor(c.soilOut * SWELL + 1e-9) - c.moundLost - c.loosePicked + c.looseDropped, "the mound = soil brought out × SWELL, less what was taken off it, plus what was put back");
     }
   }
   assert.ok(c.soilOut > 50, `${c.soilOut} pellets brought out`);
@@ -105,14 +107,17 @@ test("two colonies: each picks up the other's spoil too, and the books still bal
     if (k % 450 !== 0) continue;
     let loose = 0;
     for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
+    // The mound is both colonies' (each picks up the other's spoil): only the total is a count of cells (review of MR 15:
+    // one colony's own count went negative). It is each colony's soil brought out × SWELL, less what it took off, plus what it put back.
     let mound = 0;
     for (const c of g.colonies) {
       const carried = c.carriedPellets();
-      mound += c.moundCells;
+      mound += Math.floor(c.soilOut * SWELL + 1e-9) - c.moundLost - c.loosePicked + c.looseDropped;
       assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried.dug + c.soilLost, "dug = brought out + filled + carried + lost");
       assert.equal(c.loosePicked, c.looseDropped + c.looseFilled + carried.loose + c.looseLost, "loose picked up = dropped + filled + carried + lost");
     }
-    assert.equal(mound, loose, "both colonies' mound counts add up to the loose soil on the map");
+    assert.equal(mound, loose, "both colonies' soil out, less what they took off and plus what they put back, is the loose soil on the map");
+    assert.equal(map.moundCells, loose, "the map's count is the loose soil on it");
   }
   assert.ok(g.colonies.every((c) => c.soilOut > 20), "both brought soil out");
   // No new holes onto the ground line, away from both entrances (spoil picked off a blanket over dug ground opened them).

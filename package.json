@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "npm --prefix web run dev",
     "test": "npm --prefix web test",
+    "test:slow": "npm --prefix web run test:slow",
     "lint": "npm --prefix web run lint",
     "typecheck": "npm --prefix web run typecheck",
     "colony-bench": "node scripts/colony-bench.mjs",
