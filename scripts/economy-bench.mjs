@@ -16,10 +16,11 @@
 // jaws + larder + Σ brood (1 + fed) + 4 × births stays at the food the map started with.
 // A run is deterministic: the same arguments give the same numbers.
 //
-// Usage: node scripts/economy-bench.mjs [seeds=1-2] [seconds=3600] [ants per colony=600] [colonies=2] [every=600] [root=this repo] [small=0]
+// Usage: node scripts/economy-bench.mjs [seeds=1-2] [seconds=3600] [ants per colony=600] [colonies=2] [every=600] [root=this repo] [small=0] [food=1]
 //   seeds: a list and/or ranges (1-6, or 1,3,5). root: another checkout to measure (its web/src/colony is imported), so
 //   the same harness measures before and after a change. small=1: the tests' small map (256 × 160, ground 40 rows down);
-//   or a size and ground row as W×H×ROW (e.g. 192x128x32).
+//   or a size and ground row as W×H×ROW (e.g. 192x128x32). food: every cell's food × this (the economy test's small map
+//   has 0.3 of it, about the food per ant of the full game).
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,6 +35,7 @@ const colonies = Number(args[3] ?? 2);
 const every = Number(args[4] ?? 600);
 const root = resolve(args[5] ?? resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const sizeArg = args[6] ?? "0";
+const foodScale = Number(args[7] ?? 1);
 const small = sizeArg === "1" ? { size: { w: 256, h: 160 }, nestGap: 120, surface: 40 } : sizeArg.includes("x") ? (([w, h, surface]) => ({ size: { w, h }, nestGap: Math.round(w / 2), surface }))(sizeArg.split("x").map(Number)) : null;
 const { Game } = await import(`${root}/web/src/colony/game.ts`);
 const W = await import(`${root}/web/src/colony/world.ts`);
@@ -44,6 +46,7 @@ const FOLLOW = 1;
 console.log(`economy-bench: seeds ${seeds.join(",")}, ${seconds} s, ${ants} ants × ${colonies}, ${small ? `map ${small.size.w}×${small.size.h}, ground row ${small.surface}` : "app map"}, root ${root}`);
 for (const seed of seeds) {
   const map = W.generateSideWorld(seed, { ...(small ?? {}), nestCount: colonies });
+  if (foodScale !== 1) scaleFood(map, foodScale);
   const g = new Game(map, { antCount: ants, rivalAnts: ants, rival: colonies > 1 }, W.mulberry32(seed * 7919));
   const cs = g.colonies;
   const ch = map.chambers; // none before nest slice 2: older checkouts are measured too
@@ -140,4 +143,19 @@ for (const seed of seeds) {
     samples = 0;
   }
   console.log(`seed ${seed}: ${((performance.now() - t0) / steps).toFixed(2)} ms a tick`);
+}
+
+/** Every cell's food × k (and the map's totals with it). */
+function scaleFood(map, k) {
+  let total = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = 0; x < map.size.w; x++) {
+      const v = map.food.get(x, y);
+      if (v > 0) {
+        map.food.set(x, y, v * k);
+        total += v * k;
+      }
+    }
+  map.foodTotal = total;
+  map.foodLeft = total;
 }

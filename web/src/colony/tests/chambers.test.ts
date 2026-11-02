@@ -170,16 +170,17 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
     if (mean(gaps.slice(half)) > mean(gaps.slice(0, half))) trends++;
     halves.push(`game ${seed}: ${mean(gaps.slice(0, half)).toFixed(1)} vs ${mean(gaps.slice(half)).toFixed(1)}`);
   }
-  // KNOWN REGRESSION from #14's backfill guards (young / hold / besideRefill, merged through #17), to be fixed in F2,
-  // which must restore the floor bound to ×2 (and stacked chambers to at least 3 in every game).
-  // With age zoning only the middle-aged dig, so floor depends even more on refills than on slice 5. At 240 s, all ants
-  // middle-aged, worlds 1–4, nine games (world 2 games 4–8, worlds 1, 3, 4 game 4, world 3 game 5):
+  // #14's backfill guards (young / hold / besideRefill, merged through #17) cut floor growth here. In the F2 fix-up (PRD
+  // §41) it came back: with the homing fix-up F1 merged in, pellet carriers get out of the nest sooner, and diggers widen
+  // more; soil put back under a chamber cell now stays. At 240 s, all ants middle-aged, worlds 1–4, nine games (world 2
+  // games 4–8, worlds 1, 3, 4 game 4, world 3 game 5; `node scripts/floor-bench.mjs`):
   //   nest 6 before #14 (71658ee)   floor ×2.4–3.4, mean 2.96; stacked 3–5, none under 3
-  //   nest 6 merged with #14         floor ×1.1–2.4, mean 1.91; stacked 1–8, 3 of 9 under 3
-  // Slice 5 alone (no zoning), for comparison: ×2.3–3.2, mean 2.83, before #14; ×1.8–3.4, mean 2.33, after.
-  // So the floor check is the mean over the three games, at least ×1.6, and stacked chambers a mean of at least 3.
-  const meanGrowth = growth.reduce((a, b) => a + b, 0) / growth.length;
-  assert.ok(meanGrowth >= 1.6, `floor growth, mean over three games ${meanGrowth.toFixed(2)}× (${growth.map((x) => x.toFixed(2)).join(", ")})`);
+  //   nest 9 with #14 (99eed4b)      floor ×1.1–2.4, mean 1.90; stacked 1–8, 3 of 9 under 3
+  //   F2, merged with F1 and F3      floor ×2.06–2.94, mean 2.43; stacked 2–8, mean 4.9, 1 of 9 under 3 (world 2 game 4,
+  //                                  this test's first game: 2, 4, 5 here)
+  // So floor grows at least ×2 in every game again, as before #14. Stacked chambers keep the mean bound over the three
+  // games (3.7 on them); at least 3 in every game, as before #14, fails in that one game of nine.
+  for (const [k, x] of growth.entries()) assert.ok(x >= 2, `game ${4 + k}: floor growth ×${x.toFixed(2)} (${growth.map((v) => v.toFixed(2)).join(", ")})`);
   const meanStacked = stacked.reduce((a, b) => a + b, 0) / stacked.length;
   assert.ok(meanStacked >= 3, `stacked chambers, mean over three games ${meanStacked.toFixed(1)} (${stacked.join(", ")})`);
   assert.ok(trends >= 2, `the spacing rule shows: gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`);
@@ -192,7 +193,11 @@ test("two crowded colonies on several maps: no chamber touches another, of eithe
   for (const world of [1, 2]) {
     const map = generateSideWorld(world, { ...SMALL, nestCount: 2 });
     const g = new Game(map, { antCount: 200, rivalAnts: 200 }, mulberry32(world + 10));
-    for (const c of g.colonies) for (let i = 0; i < c.n; i++) ((c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN), (c.lifespan[i] = Infinity));
+    for (const c of g.colonies)
+      for (let i = 0; i < c.n; i++) {
+        c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
+        c.lifespan[i] = Infinity;
+      }
     for (let k = 0; k < 30 * 200; k++) {
       g.tick(1 / 30);
       if (k % 600) continue;

@@ -106,7 +106,11 @@ test("food beyond the queen's stock in the royal chamber is carried on to hungry
   const map = generateSideWorld(2, SMALL);
   const { b: room, cell } = broodChamber(map);
   const c = new Colony(map, { antCount: 12, maxAnts: 16, deposit: 0 }, mulberry32(5), () => "explore");
-  for (let i = 0; i < c.n; i++) ((c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN), (c.lifespan[i] = Infinity)); // diggers and carriers
+  // Diggers and carriers.
+  for (let i = 0; i < c.n; i++) {
+    c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
+    c.lifespan[i] = Infinity;
+  }
   c.killQueen(); // no eggs: just the one larva
   const larva = c.brood.add(cell[0], cell[1], room.id);
   room.brood++;

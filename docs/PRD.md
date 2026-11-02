@@ -1198,14 +1198,16 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 
   - Mound cells are exactly ⌊pellets out × 1.2⌋, and soil is conserved.
   - The open map is unchanged.
+  - **One colony regressed against MR 13** (noted in the review of #16 and #17, added by the F2 fix-up, §41): food home 448–1,511 (mean 871) → 420–978 (mean 701). MR 15 below more than recovered it.
 
 **MR 15: the mound is carried and loose** (owner, 2026-11-01): "Why is the mound not movable? They should be pellets that are actually easier for ants to move… right now ants can touch the mound from below and it just grows somewhere." Both were true. A pellet "dropped" at the hole was put in a random column up to 90 away, and loose soil could never be dug. The owner chose for ants to both spread the mound and take it down to backfill.
 - **Carried out.** A pellet carrier comes up through the hole and walks out along the ground, away from the hole on a random side. It drops the pellet where it stands, once it is a chosen distance out. That distance grows with the mound (√ of a uniform draw over a reach of 3 + cells ÷ 6, at most 90).
   - The cell lands on that spot and slides only to the angle of repose. The mound grows where you see ants drop soil.
   - Funnels: every hole's funnel still holds.
   - Give-up: a carrier that can't get onto the ground within 15 s drops the pellet anyway, heaped on top of its column clear of the crater.
-- **Loose.** Mound soil (`map.loose`) is no crust. Dug from below, it comes up in a quarter of packed soil's time (`LOOSE_DIG`). The pellet is a *moved* one: it doesn't count as dug, and it goes back out like any other.
-  - **Settling:** taken from inside the heap, the column settles a cell, so it is the column's top that goes, never a hole under hanging spoil.
+- **Loose.** Mound soil (`map.loose`) is no crust. ~~Dug from below, it comes up in a quarter of packed soil's time (`LOOSE_DIG`).~~ The pellet is a *moved* one: it doesn't count as dug, and it goes back out like any other.
+  - ~~**Settling:** taken from inside the heap, the column settles a cell, so it is the column's top that goes, never a hole under hanging spoil.~~
+  - Both struck rules never ran (review of #17: zero times in 300 s on seeds 1–5): the ground under the mound is crust, so no tunnel reaches loose soil from below, and pellets are only ever picked off a column's top. The F2 fix-up (§41) removed them: loose soil is never dug, and `takeLoose` takes only the top.
 - **Spread.** An explorer on the ground beside a steep flank of the mound (the next column out a row lower, at the angle of repose) picks a pellet off it, 1 % a cell. It carries it about 6–18 columns farther out and drops it, so the mound spreads and smooths itself as ants rework their spoil.
   - On the ground line, mound soil is picked up only by these rules, not dug at head-on: explorers chewed the mound and carried it to the hole and out again.
 - **Backfill from the mound.** Beside the mound anywhere, an explorer takes a pellet down into the nest to refill unused space, 0.5 % a cell (leaf-cutting ants refill excess space with soil, Pielström & Roces).
@@ -1397,7 +1399,7 @@ The side view's nest is no longer one pre-dug disc. The ants dig chambers off it
 - **Roomy,** every other kind of digging happens at `ROOMY_DIG` (15 %) of its rate: tunnel ends, starts off walls, faces met head-on. A 30-ant colony in the founding chamber dug 3–7 cells in two minutes, against about 78 without chambers.
   - **Floor building is exempt from #14's youth guard** (since #17's second merge, 2026-11-02). Nothing dug in the last 200 s is filled back (`BACKFILL.young`), but a tunnel dug down out of a chamber takes its floor with it until it is filled, so with the guard the floor barely grew in a 240 s game: 1.0–2.3× its start (worlds 1–4, games 4–6; 2.4–3.7× before #14). Filling the ground a floor stands on (`#floorGround`: a cell directly under a chamber cell, or beside one on its floor row) is construction, not spare soil put away, so it may be filled at once: 2.1–3.1× at 240 s, and the crowded-nest test is back to 240 s. `hold` (refilled soil isn't dug again for 600 s) and `besideRefill` still apply everywhere; exempting floor ground from `besideRefill` too added little (2.4–3.3×).
     - Refills in 240 s: 21–47 floor-ground cells and 7–174 others (without the exemption, 0–18 and 5–186).
-    - Do floor fills cycle? Over 1,200 s (games 4 and 5 of world 2, game 4 of world 4), 35–49 % of floor-ground fills were dug out again once `hold` ran out (32 of 92, 37 of 75, 28 of 62), against 5–17 % of other fills (47 of 716, 24 of 469, 73 of 418). Without the exemption: 0 % and 65 % of a few dozen floor fills, 1 % and 30 % of other fills (two games). **Floor fills cycle:** once `hold` runs out (600 s), they are dug out again at 2–7× the rate of other fills. Not fixed here; left for the F2 fix-up. Floor at 1,200 s is 2.9–4.1×.
+    - Do floor fills cycle? Over 1,200 s (games 4 and 5 of world 2, game 4 of world 4), 35–49 % of floor-ground fills were dug out again once `hold` ran out (32 of 92, 37 of 75, 28 of 62), against 5–17 % of other fills (47 of 716, 24 of 469, 73 of 418). Without the exemption: 0 % and 65 % of a few dozen floor fills, 1 % and 30 % of other fills (two games). **Floor fills cycle:** once `hold` runs out (600 s), they are dug out again at 2–7× the rate of other fills. Not fixed here; left for the F2 fix-up. Floor at 1,200 s is 2.9–4.1×. **Fixed in F2 (§41):** soil put back under a chamber cell stays for good.
     - The crowded-nest test runs three games and asks for the depth trend (deeper chambers further apart) in at least 2 of them, every other check in each: the trend is one nest's handful of stacked chambers and fails in about 1 game in 6–9.
   - Since #17 was merged in (2026-11-02), a Y fork's second arm, left for the next digger to pass, is another kind of digging; it is damped the same way. Undamped, it raised the roomy colony's dig ratio (roomy ÷ no chambers, over 30 games on nest 5) from 0.34 before the merge to 0.38 (one game, world 2 game 8, to 1.00: as much as with no chambers); damped it is 0.35 (that game 0.33).
 
@@ -1410,12 +1412,12 @@ The side view's nest is no longer one pre-dug disc. The ants dig chambers off it
 | Cells dug, all colonies | 43,422 | 31,116 (−28 %) |
 | Floor per ant underground | none | held at about 0.1 (crowded 24–64 % of the time) |
 | Chambers per colony at 600 s | 1 (given) | 8–18 |
-| Out over 120 s, mean / worst | 1.45 % / 11 % | 1.45 % / 11 % |
+| Out over 120 s, mean / worst | 1.45 % / 11 % | 1.45 % / 11 % (wrong: see the correction below) |
 | Food home | 16,705 | 15,676 (−6 %) |
 
 Food home is down because less digging reaches less of the food underground. Pellet carriers climbing out of wide chambers by straight line and Bug2 can still wander (filed as a follow-up).
 
-**Depth profile** (Tschinkel; per 10-row band below the ground):
+**Depth profile** (Tschinkel; per 10-row band below the ground). These are **imposed by rule, not emergent** (review of #21): the gap is `#chamberRoom`'s spacing, 4 + 0.15 × depth rows, and "largest near the top" is `WIDEN_DEPTH`'s falloff. The crowded-nest test checks that the rule shows in the nest the ants dig, nothing more:
 - **Gap to the chamber above in the same stack** grows with depth on 11 of 12 colonies (one is nearly flat at 9–11): about 4–10 rows at 10–20 deep, 5–13 at 20–30, 7–14 at 30–40, and 10–32 below 40.
 - **Size:** chambers are largest 10–30 rows down (mean 13–50 cells) and small below 30 (1–24 cells).
 - **The topmost 10 rows** hold smaller chambers than the next band: none start in the top 8 rows, and the crust and mound are there.
@@ -1502,7 +1504,7 @@ The cost figures above come from a scratch script on the side view: `scripts/col
 
 In the side view, workers come from brood, not from a counter (docs/nest-and-home.md §3.4, "Queen loss"). The top-down maps keep the larder → ants rule and have no queen.
 
-**The queen** lies on the royal chamber's floor.
+**The queen** lies on the royal chamber's floor. (Until the F2 fix-up she was placed a row below the chamber's centre, rows above its floor: review of #23. She is now on its bottom row, in the cell nearest its centre.)
 - **Laying:** she lays an egg at most every `LAY_INTERVAL` (0.5 s). She lays only while the larder holds, beyond what the brood already laid will be fed, a whole worker's food, and while there is room under the cap. Without that reserve, eggs laid into an empty larder starved as larvae.
 - **Her pheromone** is the royal mark, strongest where she lies.
 - **She can be killed** by strangers at her side (rate `QUEEN_FIGHT` per stranger: a raid that reaches the royal chamber), or by `killQueen()` (the fungus's, slice 8).
@@ -1514,7 +1516,7 @@ In the side view, workers come from brood, not from a counter (docs/nest-and-hom
 - A worker still costs 4 food (`foodPerAnt`) and arrives about a minute after its egg.
 - **Nurses:** an idle ant in the royal chamber picks up an egg near it and takes it to the brood chamber holding the least brood, steering by the homing machinery and the brood mark. With no brood chamber yet, brood stays with the queen. Each chamber counts the brood lying in it, so slice 2's brood pull works.
 
-**Ageing.** Workers have a lifespan of `LIFESPAN` (1,800 s), 0.7–1.3× it each. The founding workers start between newborn and half a lifespan old, so none dies of age in a 10-minute game. Old age doesn't count as a loss for the strategist.
+**Ageing.** Workers have a lifespan of `LIFESPAN` (1,800 s; **3,600 s since the F2 fix-up, §41**), 0.7–1.3× it each. The founding workers start between newborn and half a lifespan old, so none dies of age in a 10-minute game. Old age doesn't count as a loss for the strategist.
 
 **Orphaned.** With the queen dead there are no new eggs, brood in progress still hatches, and the workers age out.
 - On seed 1, alone, with the queen killed at 300 s: 900 workers at 600 s, 842 at 900 s, 458 at 1,500 s, 136 at 2,100 s, none at 2,700 s. Then the colony is fallen.
@@ -1618,7 +1620,7 @@ After the fixes (seeds 1–3): food home 8,032 for the six colonies; 1.0 porter 
 
 **Jev cost:** unchanged. Foragers are still asked by place and trail; the inside work is a local rule.
 
-**Open: #14's backfill guards widen this slice's floor spread** (since #17's second merge, 2026-11-02). With the floor-ground exemption from nest 2, the founding floor grows ×1.8–3.4 in 240 s (mean 2.33, worlds 1–4, nine games), against ×2.3–3.2 (mean 2.83) before #14; only switching all three guards off restores it. Likely the porters and food lying in chambers change how many ants dig and refill. The crowded-nest test asks for the mean over its three games to be at least ×2. The porter / backfill interaction is to be looked at in F2.
+**Open: #14's backfill guards widen this slice's floor spread** (since #17's second merge, 2026-11-02). With the floor-ground exemption from nest 2, the founding floor grows ×1.8–3.4 in 240 s (mean 2.33, worlds 1–4, nine games), against ×2.3–3.2 (mean 2.83) before #14; only switching all three guards off restores it. Likely the porters and food lying in chambers change how many ants dig and refill. The crowded-nest test asks for the mean over its three games to be at least ×2. The porter / backfill interaction is to be looked at in F2. **Resolved in F2 (§41):** not the porters; #14's youth guard made a crowded nest's diggers haul every pellet of its widening out to the mound.
 
 ## 35. Who works where goes by age (nest slice 6, ja-5kj, 2026-11-02)
 
@@ -1680,7 +1682,7 @@ Fewer ants dig, since only the middle-aged do, so chambers and floor grow more s
 
 **Jev cost:** unchanged.
 
-**Open: a known regression from #14's backfill guards, to be fixed in F2** (since #17's second merge, 2026-11-02). With only the middle-aged digging, floor depends even more on refills than on slice 5. In 240 s with every ant middle-aged, the founding floor grows ×1.1–2.4 (mean 1.91, worlds 1–4, nine games) against ×2.4–3.4 (mean 2.96) before #14, and 3 of 9 games have fewer than 3 stacked chambers (none before). The crowded-nest test asks for a mean floor growth of at least ×1.6 and a mean of at least 3 stacked chambers over its three games; F2 must restore the floor bound to ×2.
+**Open: a known regression from #14's backfill guards, to be fixed in F2** (since #17's second merge, 2026-11-02). With only the middle-aged digging, floor depends even more on refills than on slice 5. In 240 s with every ant middle-aged, the founding floor grows ×1.1–2.4 (mean 1.91, worlds 1–4, nine games) against ×2.4–3.4 (mean 2.96) before #14, and 3 of 9 games have fewer than 3 stacked chambers (none before). The crowded-nest test asks for a mean floor growth of at least ×1.6 and a mean of at least 3 stacked chambers over its three games; F2 must restore the floor bound to ×2. **Restored in F2 (§41):** ×2 in every game.
 
 ## 36. The midden: the dead carried out, and a boundary (nest slice 7, ja-li6, 2026-11-02)
 

@@ -722,7 +722,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
   const loose = new ChunkLayer((n) => new Uint8Array(n), 0);
-  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer(), sky, loose, chambers: new Chambers() };
+  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer(), sky, loose, moundCells: 0, chambers: new Chambers() };
   const ground = new Int32Array(size.w);
   for (let x = 0; x < size.w; x++) ground[x] = Math.max(2, Math.min(size.h - 8, groundRow(seed, o, x)));
   for (let y = 0; y < size.h; y++)

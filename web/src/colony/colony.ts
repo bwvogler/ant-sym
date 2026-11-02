@@ -610,7 +610,10 @@ export class Colony {
     for (let x = royal.x0; x <= royal.x1; x++) {
       if (ch.at(x, y) !== royal.id) continue;
       const d = Math.abs(centreX(x, y) - this.nest.x);
-      if (d < bestD) ((bestD = d), (best = { x: centreX(x, y), y: centreY(y) }));
+      if (d < bestD) {
+        bestD = d;
+        best = { x: centreX(x, y), y: centreY(y) };
+      }
     }
     return best;
   }
@@ -1424,10 +1427,9 @@ export class Colony {
    * - it holds no food and no ant of either colony, and is not by any nest;
    * - it is not the cell this carrier dug its pellet from (that would undo its own dig), nor any cell dug in the
    *   last BACKFILL.young seconds: fresh digging is where the colony is going (tunnels toward food), not excess
-   *   space. Leaf-cutters refill older galleries they no longer use (Pielström & Roces). Except round the colony's
-   *   chambers (#byOwnChamber), where it is building: the ground a chamber's floor stands on (filling a tunnel dug
-   *   down out of a chamber builds its floor back; put back under a chamber cell, it stays: see builtFloor), and the
-   *   dead ends beside them, where the soil dug widening a chamber is put away near it rather than hauled out.
+   *   space. Leaf-cutters refill older galleries they no longer use (Pielström & Roces). Except the ground a
+   *   chamber's floor stands on (see floorGround): filling a tunnel dug down out of a chamber builds its floor
+   *   back, which is construction, not spare soil put away. Put back under a chamber cell, it stays (see builtFloor).
    */
   #backfill(i: number, cx: number, cy: number): boolean {
     const { map } = this;
@@ -1437,7 +1439,7 @@ export class Colony {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
       if (ty * 65536 + tx === this.#lastDug[i]) continue; // the cell it just dug: not straight back in
-      if (this.time - map.dugAt.get(tx, ty) < backfill.young && !floorGround(map, tx, ty) && !this.#byOwnChamber(tx, ty)) continue; // dug lately: the live frontier, not excess
+      if (this.time - map.dugAt.get(tx, ty) < backfill.young && !floorGround(map, tx, ty)) continue; // dug lately: the live frontier, not excess
       if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, backfill.maxOpen)) continue;
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
       this.enemies?.look?.(this.odour[i] as number, -1); // any ant of another colony, stranger or not (a tolerance below 0 counts every band)
@@ -1456,24 +1458,6 @@ export class Colony {
       this.#clearPellet(i);
       this.since[i] = 0;
       return true;
-    }
-    return false;
-  }
-
-  /**
-   * Whether cell (x, y) is within CHAMBER_WORKS cells of one of this colony's chambers: where the nest is being built.
-   * Soil put back there may be soil dug lately (#backfill): with BACKFILL.young everywhere, a crowded nest's diggers
-   * hauled every pellet of their widening up to the mound, and the founding floor grew ×1.1–2.4 in 240 s against
-   * ×2.4–3.4 before #14 (its guards merged into the nest: PRD §35). The live frontier the guard protects (tunnels
-   * toward food) lies away from the chambers.
-   */
-  #byOwnChamber(x: number, y: number): boolean {
-    const ch = this.map.chambers;
-    if (!ch) return false;
-    const o = discOffsets(CHAMBER_WORKS)[y & 1] as Int16Array;
-    for (let k = 0; k < o.length; k += 2) {
-      const id = ch.at(x + (o[k] as number), y + (o[k + 1] as number));
-      if (id >= 0 && ch.list[id]!.colony === this.params.nest) return true;
     }
     return false;
   }
@@ -1829,7 +1813,11 @@ export class Colony {
         for (let x = c.x0; x <= c.x1; x++) {
           if (ch.at(x, y) !== id) continue;
           const d = (x - mx) ** 2 + (y - my) ** 2;
-          if (d < best) ((best = d), (g.x = centreX(x, y)), (g.y = centreY(y)));
+          if (d < best) {
+            best = d;
+            g.x = centreX(x, y);
+            g.y = centreY(y);
+          }
         }
       this.#goalCells.set(id, g);
     }
@@ -1884,7 +1872,10 @@ export class Colony {
     let most = 0;
     for (const [id, w] of this.#want) {
       const d = w - ch.list[id]!.food - (this.#enRouteTo.get(id) ?? 0);
-      if (d > most && id !== from) ((most = d), (to = id));
+      if (d > most && id !== from) {
+        most = d;
+        to = id;
+      }
     }
     return to;
   }
@@ -2011,10 +2002,20 @@ export class Colony {
     // what porters are already taking there (worked out once a tick).
     let to = this.#wanted(here);
     // Nothing wanted: reception's food (and the royal chamber's beyond her stock) goes down to a store (the least
-    // stocked), as harvesters keep their seeds deep.
+    // stocked, counting what porters are already taking there), as harvesters keep their seeds deep. Counted by what
+    // lay there alone, a store nobody reached stayed least stocked and drew every porter: 41 at once held food over
+    // 120 s, all for one single-cell store (F1's runs, PRD §40).
     if (to < 0 && c.role !== "store") {
+      this.#portView();
       let least = Infinity;
-      for (const s of ch.list) if (s.colony === this.params.nest && s.role === "store" && s.cells > 0 && s.food < least) ((least = s.food), (to = s.id));
+      for (const s of ch.list) {
+        if (s.colony !== this.params.nest || s.role !== "store" || s.cells === 0) continue;
+        const stock = s.food + (this.#enRouteTo.get(s.id) ?? 0);
+        if (stock < least) {
+          least = stock;
+          to = s.id;
+        }
+      }
     }
     if (to < 0 || to === here) return false;
     this.#stock(c, -1);
@@ -3526,8 +3527,6 @@ export const CHAMBER_MIN_DEPTH = 8;
 const CHAMBER_GAP = 4;
 const CHAMBER_GAP_GROWTH = 0.15;
 const CHAMBER_SPREAD = 10;
-/** Cells round a colony's chambers where soil dug lately may be put back (#byOwnChamber): the nest's building site. */
-const CHAMBER_WORKS = 2;
 /** A roomy nest digs this share as often as before (tunnels at dead ends, starts off walls, head-on). */
 export const ROOMY_DIG = 0.15;
 /** Cells a homing ant follows the ground's surface round spoil before trying the other hand (then twice as far each time: see flipDue). */
