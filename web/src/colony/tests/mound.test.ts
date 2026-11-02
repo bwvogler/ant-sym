@@ -1,6 +1,6 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { BACKFILL, Colony, SWELL } from "../colony.ts";
+import { Colony, SWELL, tuneBackfill } from "../colony.ts";
 import { Game } from "../game.ts";
 import { CELL, cellOf, nx, ny } from "../hex.ts";
 import { generateSideWorld, groundTop, heapMound, isSky, mulberry32, OPEN, reachable, rockAt, SOIL } from "../world.ts";
@@ -54,7 +54,10 @@ test("in a game: soil is carried out and dropped along the ground, loose soil is
   const c = g.player;
   const solidT = new Float32Array(c.n);
   let maxSolid = 0;
-  for (let k = 0; k < 30 * 200; k++) {
+  // 500 s: nothing dug in the last BACKFILL.young (200 s) is filled, so loose soil taken down first finds room after that,
+  // and only slowly: by 300 s this game had put back 8 loose pellets on #17 and none on the nest stack (whose tunnel walker
+  // steers stalled carriers to the entrance), by 500 s 45 and 35 (games 7–9 at 500 s: 12–48 on #17, 2–43 here).
+  for (let k = 0; k < 30 * 500; k++) {
     g.tick(1 / 30);
     // Nobody is buried: an ant in a cell spoil was heaped on climbs out at once.
     for (let i = 0; i < c.n; i++) {
@@ -130,11 +133,7 @@ test("two colonies: each picks up the other's spoil too, and the books still bal
 
 test("a pellet is carried out along the ground and dropped where the carrier stands, not by the hole", () => {
   // No scent in this one-ant world (deposit 0): every branch would look unused, so no detours to fill them.
-  const saved = BACKFILL.enterStale;
-  BACKFILL.enterStale = 0;
-  after(() => {
-    BACKFILL.enterStale = saved;
-  });
+  after(tuneBackfill({ enterStale: 0 }));
   const map = generateSideWorld(1, { ...SMALL });
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(9), () => "return");
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);

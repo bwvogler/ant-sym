@@ -29,7 +29,9 @@ test("underground: both colonies dig tunnels out of their chambers, soil goes on
     let carried = 0;
     for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.pellet[i]! ? 1 : 0;
     assert.equal(c.soilOut + c.soilFilled + carried + c.soilLost, c.soilDug, "every pellet is on the mound, back underground, carried or lost");
-    assert.ok(c.soilOut > 0 && c.soilFilled > 0, `${c.soilOut} on the mound, ${c.soilFilled} put back, of ${c.soilDug}`);
+    // Most goes back underground (leaf-cutter backfill), but carriers still reach the mound: a floor, since conservation
+    // alone counts pellets carried, and carriers that never got home would pass it (0.80–0.82 here, 2026-11-02).
+    assert.ok(c.soilOut > 0.25 * c.soilDug && c.soilFilled > 0, `${c.soilOut} on the mound, ${c.soilFilled} put back, of ${c.soilDug}`);
   }
   assert.equal(map.dug, you.soilDug + rival.soilDug, "the map counts every dug cell");
   assert.ok(you.stored + rival.stored > 0, "tunnels reached food");
