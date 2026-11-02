@@ -373,22 +373,23 @@ test("a homing ant on the walkway cell above the hole, its step to the hole graz
   assert.ok(t < 30, `off that cell in ${(t / 30).toFixed(2)} s`);
 });
 
-test("whole games: hardly a forager holds its food over 120 s (seeds 2 and 4, 600 + 600 ants, 450 s; #16's guard, restored)", { timeout: 600_000 }, () => {
+test("whole games: hardly a forager holds its food over 120 s (seeds 4 and 6, 600 + 600 ants, 600 s; #16's guard, restored)", { timeout: 900_000 }, () => {
   // #16 dropped "at most 1 ant carrying food for over a minute", the guard that would have caught #17's pit and #20's
   // lost carriers (a vector off by more than the search's 80 cells: on the ground at the map's edge, or searching for good).
-  // Measured (PRD §39): foragers holding food over 120 s, the most at any 10-s sample from 120 s, per colony.
-  //   Before these fixes (af964b1), by 450 s: seed 2: 3 / 0, seed 4: 0 / 6 (seeds 3 and 5: 1 and 3 in their worse colony);
-  //   by 600 s: seed 2: 8 / 1, seed 4: 0 / 13. After: at most 1 in any colony of seeds 1–6 over 600 s.
-  // Lost carriers pile up late (before, seeds 2–5: none over 120 s until 300 s, at most 2 by 360 s) and only with 600
-  // ants a colony (at 300 + 300 the base peaked at 0–4 by 450 s), hence the size and length. The seeds were chosen to
-  // separate before from after: of seeds 2–5, the two where the base passes the bound earliest (400 s and 410 s).
-  // Porters (food moved between chambers, nest slice 5) are not counted: their long trips are an open item (PRD §39).
+  // Measured (PRD §39): foragers holding food over 120 s, the most at any 10-s sample from 120 s, per colony, by 600 s.
+  //   Before these fixes (nest 9 at 99eed4b): seed 4: 4 / 0, seed 6: 0 / 3; seeds 1, 2, 3, 5: 2, 0, 1, 2 at most.
+  //   After: seed 4: 1 / 1, seed 6: 0 / 1; at most 2 in any colony of seeds 1–6 (seed 2: 0 / 2).
+  // Lost carriers pile up late (before: none over 2 until 510 s) and only with 600 ants a colony, hence the size and
+  // length: about 3 minutes. The seeds were chosen to separate before from after: of seeds 1–6, the only two where the
+  // base passes the bound. (On nest 9 before #14's backfill fixes, af964b1, the base had 3–13 by 450–600 s on seeds 2–5;
+  // with the backfill fixes, fewer held food that long.) Porters (food moved between chambers, nest slice 5) are not
+  // counted: their long trips are an open item (PRD §39).
   let worst = 0;
   const peaks: string[] = [];
-  for (const seed of [2, 4]) {
+  for (const seed of [4, 6]) {
     const g = new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600 }, mulberry32(seed * 7919));
     const peak = g.colonies.map(() => 0);
-    for (let k = 1; k <= 30 * 450; k++) {
+    for (let k = 1; k <= 30 * 600; k++) {
       g.tick(1 / 30);
       if (k % 300 !== 0 || k < 30 * 120) continue;
       g.colonies.forEach((c, ci) => {

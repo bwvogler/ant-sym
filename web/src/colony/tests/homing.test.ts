@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, HOLE_SIGHT } from "../colony.ts";
 import { Game } from "../game.ts";
-import { CELL, cellOf, centreX, centreY, nx, ny } from "../hex.ts";
+import { CELL, cellOf, centreX, centreY, NE, nx, ny } from "../hex.ts";
 import { generateSideWorld, generateWorld, groundTop, isSky, mulberry32, OPEN, rockAt, SOIL, updateSurface, type WorldMap } from "../world.ts";
 
 // Nest slice 1 (docs/nest-and-home.md §3.1): in the side view an ant knows where home is only by its own drifting
@@ -28,11 +28,21 @@ test("the surface vector: its error grows with the way out, starts afresh coming
   const ex = CELL[0] as number;
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(5), () => "explore");
   // Out of the hole onto the ground (a newborn is underground): the surface vector starts at zero, with this trip's drift.
-  onWalkway(c, ex + 3);
+  // In the hole first, then onto the walkway cell beside it: only its own hole starts the vector afresh (§39), so it
+  // has to come up there, not be put down on the ground from the chamber.
+  const ey = CELL[1] as number;
+  c.x[0] = centreX(ex, ey);
+  c.y[0] = centreY(ey);
+  c.tick(1 / 30);
+  c.x[0] = centreX(nx(ex, ey, NE), ny(ey, NE));
+  c.y[0] = centreY(ny(ey, NE));
   c.heading[0] = 0;
   c.tick(1 / 30);
   assert.ok((c.odoSurf[0] as number) < 0.5, `fresh: ${c.odoSurf[0]}`);
   assert.notEqual(c.driftSurf[0], 0, "a drift drawn for the trip");
+  // On along the ground, away from the hole (from its rim an explorer may turn back in).
+  onWalkway(c, ex + 3);
+  c.heading[0] = 0;
   for (let k = 0; k < 30 * 4; k++) c.tick(1 / 30);
   const out = c.odoSurf[0] as number;
   assert.ok(out > 10 && out <= c.params.speed * 4 + 1, `the way out counted: ${out.toFixed(1)}`);
@@ -103,11 +113,13 @@ test("top-down maps keep no vector: homing there is exact, whatever the odometer
   // ...and even set to a vector 60 cells off (as in the side view after a long trip), a carrier with a clear way home walks
   // straight there: the belief is the nest itself. (Before the review of #20 this test only checked the odometers, which
   // nothing on these maps writes.)
-  const n = map.nest;
-  const lone = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "return");
+  // On the same map without soil: there, soil closes round the nest within 7–11 units in every direction.
+  const open = generateWorld(1, { soil: 0 });
+  const n = open.nest;
+  const lone = new Colony(open, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "return");
   const d = 15;
   const a = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => (k * Math.PI) / 4).find((a) => {
-    for (let s = 0; s <= d; s += 0.25) if (rockAt(map, ...cellAt(n.x + Math.cos(a) * s, n.y + Math.sin(a) * s)) !== OPEN) return false;
+    for (let s = 0; s <= d; s += 0.25) if (rockAt(open, ...cellAt(n.x + Math.cos(a) * s, n.y + Math.sin(a) * s)) !== OPEN) return false;
     return true;
   });
   assert.ok(a !== undefined, "a clear way to the nest");
