@@ -67,7 +67,8 @@ export function useEngine(initial: Controls = DEFAULT_CONTROLS) {
     let frames = 0;
     let fpsAt = last;
     const loop = (t: number) => {
-      const dt = Math.min(0.05, (t - last) / 1000);
+      // Clamped both ways, as in useColony: a first frame stamped before `last` would step backwards.
+      const dt = Math.max(0, Math.min(0.05, (t - last) / 1000));
       last = t;
       if (controls.playing) {
         const s = engine.tick(dt);

@@ -11,6 +11,8 @@ export const CHUNK_BITS = 6;
 export const CHUNK = 1 << CHUNK_BITS;
 export const CHUNK_CELLS = CHUNK * CHUNK;
 const MASK = CHUNK - 1;
+/** The sparse per-cell sum grids (ants, strangers, spore load) keep a flag per 8×8 block, so an empty neighbourhood is skipped at once. */
+export const BLOCK_BITS = 3;
 const OFFSET = 1 << 15;
 
 export type Cells = Uint8Array | Uint16Array | Float32Array;
