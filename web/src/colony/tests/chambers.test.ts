@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Chambers } from "../chambers.ts";
-import { Colony, FLOOR_PER_ANT, ROOMY_DIG } from "../colony.ts";
+import { Colony, FLOOR_PER_ANT, LIFESPAN, MIDDLE, ROOMY_DIG, YOUNG } from "../colony.ts";
 import { Game } from "../game.ts";
 import { nx, ny } from "../hex.ts";
 import { digCell, fillCell, generateSideWorld, groundTop, mulberry32, OPEN, rockAt, SOIL } from "../world.ts";
@@ -48,6 +48,11 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   const g = new Game(map, { antCount: 400, rival: false }, mulberry32(4));
   const ch = map.chambers!;
   const floor0 = ch.floorOf[0]!;
+  // Every ant middle-aged, a digger: this is about how chambers are dug, not who digs (slice 6 zones digging by age).
+  for (let i = 0; i < g.player.n; i++) {
+    g.player.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
+    g.player.lifespan[i] = Infinity;
+  }
   for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
   const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
   assert.ok(mine.length >= 3, `${mine.length} chambers`);

@@ -1553,3 +1553,47 @@ The pipeline keeps the queen and brood fed and puts the surplus into stores. Rec
 After the fixes (seeds 1–3): food home 8,032 for the six colonies; 1.0 porter trips per food; 269–304 births a colony; out over 120 s 0.5–1.0 %, except seed 3 at 4.2 %.
 
 **Jev cost:** unchanged. Foragers are still asked by place and trail; the inside work is a local rule.
+
+## 35. Who works where goes by age (nest slice 6, ja-5kj, 2026-11-02)
+
+In the side view with a queen, each worker's age band sets where it is and what it does (Tschinkel, J. Insect Sci. 4:21; docs/nest-and-home.md §3.5). The bands are shares of the mean lifespan: young under `YOUNG` (0.15), middle-aged under `MIDDLE` (0.35), old beyond. On the top-down maps every ant is old, which changes nothing.
+
+**What each band does:**
+- **Young ants** nurse: only they carry eggs from the queen to brood chambers. They keep with the queen and brood, following the royal and brood marks in tunnels and drifting toward the queen in open chambers. They never go out.
+- **Middle-aged ants** dig and carry inside: only they dig, and they port food and take in stray brood. They go out only while foragers are short (fewer than `FORAGERS`, 30 %, of the colony out).
+- **Old ants** forage. Underground they head up and out: climbing to the hole in tunnels, and toward it in open chambers. Before this, old ants that no longer dug wandered the nest's tunnels, and one colony had only 20–60 of 900 out.
+
+**Enforcement.** An ant not to go out that steps up out of the hole is put back and turned round. Food and pellet carriers are exempt.
+
+**Zoning is not in the Jev situation.** The ants asked out on the ground are foragers anyway.
+
+**Measured** (side view, 600 + 600 ants, 600 s, seeds 1–3; sampled every 10 s from 120 s; depth in rows below the ground):
+
+| Seed | Young: share, depth, out | Middle: share, depth, out | Old: share, depth, out |
+|---|---|---|---|
+| 1 | 20 %, 14.1, 0 % | 29 %, 12.8, 14 % | 51 %, 8.0, 26 % |
+| 2 | 20 %, 14.2, 0 % | 28 %, 12.5, 15 % | 52 %, 7.6, 38 % |
+| 3 | 20 %, 15.0, 0 % | 29 %, 14.1, 15 % | 51 %, 9.8, 35 % |
+
+The young sit deepest and never go out; the old are nearest the surface and do most of the foraging.
+
+| | Slice 5 | Slice 6 |
+|---|---|---|
+| Food home, six colonies | 8,032 | 7,736 (−4 %) |
+| Births | 269–304 | 295–300 |
+| Out over 120 s | 0.5–4.2 % | 0.6–1.1 % |
+
+Fewer ants dig, since only the middle-aged do, so chambers and floor grow more slowly.
+
+**Tick time:** the first cut asked for the colony's population, which counts every slot, once per ant per tick (+57 %). It now uses the tick's own counts, and two colonies are at 6.74 ms against 6.8 ms on slice 5.
+
+**Tests:** `zoning.test.ts`:
+- bands on both views;
+- the young never go out, the old do, and the middle-aged only up to about `FORAGERS`;
+- the young sit deeper than the old, and only the middle-aged dig.
+
+`chambers.test.ts`'s crowded nest makes every ant a digger: it tests how chambers are dug, not who digs.
+
+**Not built:** castes (`ja-jhd`) build on these bands.
+
+**Jev cost:** unchanged.
