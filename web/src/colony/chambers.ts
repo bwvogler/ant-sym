@@ -27,6 +27,8 @@ export interface Chamber {
   role: Role;
   /** brood lying in it (slice 4): digging is drawn to it */
   brood: number;
+  /** food lying in it (slice 5): the colony's larder is the food in its chambers */
+  food: number;
   /** sums of its cells' x and y (its centre is these over cells) */
   sumX: number;
   sumY: number;
@@ -51,7 +53,7 @@ export class Chambers {
 
   /** A new chamber for `colony`, its floor on row `floorRow` (no cells yet: claim them). */
   add(colony: number, floorRow: number, role: Role = "none"): Chamber {
-    const c: Chamber = { id: this.list.length, colony, floorRow, x0: Infinity, x1: -Infinity, cells: 0, floor: 0, role, brood: 0, sumX: 0, sumY: 0 };
+    const c: Chamber = { id: this.list.length, colony, floorRow, x0: Infinity, x1: -Infinity, cells: 0, floor: 0, role, brood: 0, food: 0, sumX: 0, sumY: 0 };
     this.list.push(c);
     while (this.floorOf.length <= colony) this.floorOf.push(0);
     return c;

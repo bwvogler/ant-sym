@@ -252,6 +252,12 @@ export class Colony {
   #holdT: Float32Array;
   /** workers that died of age */
   diedOld = 0;
+  // Food flow (nest slice 5; with a queen): food lies in chambers; foragers bring it to reception, porters carry it on.
+  /** the chamber an ant carrying food is taking it to (−1: a forager, to reception or the royal chamber), and 1 if it is a porter's move inside the nest */
+  #portTo: Int16Array;
+  #porter: Uint8Array;
+  /** porters' trips (food moved between chambers) */
+  portTrips = 0;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
   #belief: Nest = { x: 0, y: 0, r: 0 };
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
@@ -460,6 +466,8 @@ export class Colony {
     this.#holdsBrood = new Uint8Array(n);
     this.#holdT = new Float32Array(n);
     this.#broodTo = new Int16Array(n).fill(-1);
+    this.#portTo = new Int16Array(n).fill(-1);
+    this.#porter = new Uint8Array(n);
     // The queen lies on the royal chamber's floor (the founding chamber's centre, a little down).
     if (this.#entrance && map.chambers) this.queen = { alive: true, x: this.nest.x, y: this.nest.y + 1 };
     this.#spoilTo = new Float32Array(n).fill(NaN);
@@ -563,6 +571,8 @@ export class Colony {
     this.#holdsBrood[i] = 0;
     this.#broodTo[i] = -1;
     this.#holdT[i] = 0;
+    this.#portTo[i] = -1;
+    this.#porter[i] = 0;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
@@ -1311,7 +1321,138 @@ export class Colony {
 
   /** Where ant i heads when it homes into the nest (the chamber it reads its road signs for): a nurse with brood, a brood chamber; else royal, the queen's (slice 5: carriers to reception). */
   #destMark(i: number): Mark {
-    return this.#holdsBrood[i] ? "brood" : "royal";
+    if (this.#holdsBrood[i]) return "brood";
+    if (this.carrying[i] && this.queen) {
+      const role = this.map.chambers?.list[this.#foodTo(i)]?.role;
+      if (role && role !== "none") return role;
+    }
+    return "royal";
+  }
+
+  /** The chamber ant i, carrying food, takes it to: a porter's chosen one; a forager's, reception (or royal until there is one). */
+  #foodTo(i: number): number {
+    const to = this.#portTo[i] as number;
+    if (to >= 0) return to;
+    const ch = this.map.chambers!;
+    let royal = -1;
+    for (const c of ch.list) {
+      if (c.colony !== this.params.nest || c.cells === 0) continue;
+      if (c.role === "reception") return c.id;
+      if (c.role === "royal") royal = c.id;
+    }
+    return royal;
+  }
+
+  /** Scratch: chamber `id`'s centre as a goal (the colony's nest if it has none). */
+  #chamberNest: Nest = { x: 0, y: 0, r: 1.5 };
+  #chamberGoal(id: number): Nest {
+    const c = this.map.chambers?.list[id];
+    if (!c || c.cells === 0) return this.nest;
+    this.#chamberNest.x = centreX(Math.round(c.sumX / c.cells), Math.round(c.sumY / c.cells));
+    this.#chamberNest.y = centreY(Math.round(c.sumY / c.cells));
+    return this.#chamberNest;
+  }
+
+  /** Food wanted per chamber, and food on its way to each (porters carrying it there): for #port, worked out once a tick. */
+  #want = new Map<number, number>();
+  #enRouteTo = new Map<number, number>();
+  #portViewAt = -1;
+  #portView(): void {
+    if (this.#portViewAt === this.time) return;
+    this.#portViewAt = this.time;
+    const want = this.#want;
+    const en = this.#enRouteTo;
+    want.clear();
+    en.clear();
+    for (const b of this.brood.items) if (b.held < 0 && b.chamber >= 0 && b.stage !== PUPA) want.set(b.chamber, (want.get(b.chamber) ?? 0) + LARVA_FOOD - b.fed);
+    if (this.queen?.alive) for (const r of this.map.chambers!.list) if (r.colony === this.params.nest && r.role === "royal") want.set(r.id, (want.get(r.id) ?? 0) + QUEEN_STOCK);
+    for (let i = 0; i < this.n; i++) {
+      const to = this.#portTo[i] as number;
+      if (to >= 0 && this.alive[i] && this.carrying[i]) en.set(to, (en.get(to) ?? 0) + 1);
+    }
+  }
+
+  /** Put `n` food at home: in the royal chamber (with a queen: food lies in chambers), else in the larder. */
+  feed(n: number): void {
+    const ch = this.map.chambers;
+    const royal = this.queen && ch ? ch.list.find((c) => c.colony === this.params.nest && c.role === "royal") : undefined;
+    if (royal) this.#stock(royal, n);
+    else this.larder += n;
+  }
+
+  /** Food into (or, negative, out of) chamber `c`: the larder is the food in the colony's chambers. */
+  #stock(c: { food: number }, d: number): void {
+    c.food += d;
+    this.larder += d;
+  }
+
+  /**
+   * Food flow inside the nest (slice 5): a carrier in the chamber it takes its food to puts it down there; an idle ant
+   * in reception with food there takes some down to a store (the royal chamber, until there is one); an idle ant in a
+   * store takes some to the chamber whose brood is shortest of food (the royal one counts the queen's next egg).
+   */
+  #port(i: number, dt: number): boolean {
+    const ch = this.map.chambers!;
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    let here = ch.at(cx, cy);
+    if (this.carrying[i]) {
+      if (here < 0 || here !== this.#foodTo(i)) return false;
+      const c = ch.list[here]!;
+      this.carrying[i] = 0;
+      this.#stock(c, 1);
+      if (this.#porter[i]) this.portTrips++;
+      else this.stored++;
+      this.#portTo[i] = -1;
+      this.#porter[i] = 0;
+      this.mode[i] = EXPLORE;
+      this.#asked[i] = -1;
+      this.#question[i] = -1;
+      this.since[i] = 0;
+      return true; // put down: it turns back (the tick turns it: its heading is written after)
+    }
+    if (this.mode[i] !== EXPLORE || this.pellet[i] || this.#holdsBrood[i] || isSky(this.map, cx, cy) || this.#rng() > PORT_RATE * dt) return false;
+    // Food it can reach: in the reception or store it stands in, or one within two cells (a chamber a cell wide is
+    // passed by more often than stood in).
+    const stocked = (id: number) => {
+      const k = id >= 0 ? ch.list[id]! : undefined;
+      return k !== undefined && k.colony === this.params.nest && (k.role === "reception" || k.role === "store") && k.food >= 1;
+    };
+    if (!stocked(here)) {
+      here = -1;
+      const o = discOffsets(2)[cy & 1] as Int16Array;
+      for (let k = 2; k < o.length && here < 0; k += 2) {
+        const id = ch.at(cx + (o[k] as number), cy + (o[k + 1] as number));
+        if (stocked(id)) here = id;
+      }
+      if (here < 0) return false;
+    }
+    const c = ch.list[here]!;
+    // Where food is wanted: each chamber's brood's unmet needs (and the queen's next eggs), less what lies there and
+    // what porters are already taking there (worked out once a tick).
+    this.#portView();
+    let to = -1;
+    let most = 0;
+    for (const [id, w] of this.#want) {
+      const d = w - ch.list[id]!.food - (this.#enRouteTo.get(id) ?? 0);
+      if (d > most && id !== here) ((most = d), (to = id));
+    }
+    // Nothing wanted: reception's food goes down to a store (the least stocked), as harvesters keep their seeds deep.
+    if (to < 0 && c.role === "reception") {
+      let least = Infinity;
+      for (const s of ch.list) if (s.colony === this.params.nest && s.role === "store" && s.cells > 0 && s.food < least) ((least = s.food), (to = s.id));
+    }
+    if (to < 0 || to === here) return false;
+    this.#stock(c, -1);
+    this.carrying[i] = 1;
+    this.#porter[i] = 1;
+    this.#portTo[i] = to;
+    this.#enRouteTo.set(to, (this.#enRouteTo.get(to) ?? 0) + 1);
+    this.mode[i] = RETURN;
+    this.#homeAfresh(i);
+    this.gx[i] = NO_CELL;
+    return false;
   }
 
   /** Scratch: the chamber a nurse takes brood to, as a goal (its centre). */
@@ -1439,11 +1580,12 @@ export class Colony {
       for (const b of this.brood.items) if (b.stage !== PUPA) owed += LARVA_FOOD - b.fed;
       while (q.alive && this.#layT >= LAY_INTERVAL) {
         this.#layT -= LAY_INTERVAL;
-        if (this.larder < owed + EGG_FOOD + LARVA_FOOD || this.population + this.brood.size >= p.maxAnts) {
+        const royalC = ch.list[ch.at(qx, qy)];
+        if (this.larder < owed + EGG_FOOD + LARVA_FOOD || this.population + this.brood.size >= p.maxAnts || !royalC || royalC.food < EGG_FOOD) {
           this.#layT = 0;
           break;
         }
-        this.larder -= EGG_FOOD;
+        this.#stock(royalC, -EGG_FOOD); // she eats from what lies in her chamber
         owed += LARVA_FOOD;
         const at = ch.at(qx, qy);
         this.brood.add(qx, qy, at);
@@ -1457,12 +1599,13 @@ export class Colony {
         b.stage = LARVA;
         b.t = 0;
       } else if (b.stage === LARVA) {
-        if (b.held < 0 && b.fed < LARVA_FOOD && this.larder > 0) {
-          // Fed by the nurses round it (the colony's own ants within two cells), from the larder.
+        const pantry = b.chamber >= 0 ? ch.list[b.chamber] : undefined;
+        if (b.held < 0 && b.fed < LARVA_FOOD && pantry && pantry.food > 0) {
+          // Fed by the nurses round it (the colony's own ants within two cells), from the food lying in its chamber.
           const nurses = this.friends ? this.#around(this.friends, b.x, b.y) : 2;
-          const take = Math.min(this.larder, LARVA_FOOD - b.fed, FEED_RATE * Math.min(1, nurses / 2) * dt);
+          const take = Math.min(pantry.food, LARVA_FOOD - b.fed, FEED_RATE * Math.min(1, nurses / 2) * dt);
           b.fed += take;
-          this.larder -= take;
+          this.#stock(pantry, -take);
         }
         if (b.fed >= LARVA_FOOD - 1e-9 && b.t >= T_LARVA) {
           b.stage = PUPA;
@@ -1917,6 +2060,9 @@ export class Colony {
       let goal = this.#goal(i, pellet);
       // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant.
       if (nursing && goal === this.nest) goal = this.#broodGoal(i);
+      // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
+      // its food to (a forager: reception, or the royal chamber until there is one).
+      else if (carrying && this.queen && goal === this.nest) goal = this.#chamberGoal(this.#foodTo(i));
       let nest = goal;
       const x0 = this.x[i] as number;
       const y0 = this.y[i] as number;
@@ -2351,7 +2497,7 @@ export class Colony {
         this.bestD[i] = Infinity;
         this.stallT[i] = 0;
         if ((this.since[i] as number) > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
-        if (carrying) {
+        if (carrying && !this.queen) {
           this.carrying[i] = 0;
           this.stored++;
           this.larder++;
@@ -2379,7 +2525,10 @@ export class Colony {
         // Read on the floor where it stands (a road sign is under its antennae; the sensors ahead are often in soil in a tunnel).
         if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
         if (this.map.chambers) this.#layMark(i, dt);
-        if (this.queen) this.#nurse(i, dt);
+        if (this.queen) {
+          this.#nurse(i, dt);
+          if (this.#port(i, dt)) h += Math.PI;
+        }
       }
       this.heading[i] = h;
     }
@@ -2457,6 +2606,10 @@ export const T_PUPA = 20;
 const LAY_INTERVAL = 0.5;
 /** Food a larva takes per second with two nurses or more by it. */
 const FEED_RATE = 0.5;
+/** Chance per second an idle ant in reception or a store, with food there, carries a unit on (see #port). */
+const PORT_RATE = 3;
+/** Food the royal chamber is kept stocked with for the queen (a few eggs' worth, and the larvae lying with her). */
+const QUEEN_STOCK = 8;
 /** Chance per second an idle ant in the royal chamber picks up an egg near it to take to a brood chamber. */
 const PICK_BROOD = 0.5;
 /** Seconds a nurse holds brood before it puts it down wherever it is. */

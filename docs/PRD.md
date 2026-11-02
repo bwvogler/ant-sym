@@ -1499,3 +1499,44 @@ In the side view, workers come from brood, not from a counter (docs/nest-and-hom
 After the fixes (seeds 1–3, 600 s): every colony reaches 900 workers with 300 births, food home is 1,276–1,353, and 0.4–1.0 % are out over 120 s.
 
 **Jev cost:** unchanged. The ants' situation is the same; the brood is not in it.
+
+## 34. Food flow: in at reception, kept in stores, carried to brood and queen (nest slice 5, ja-f2j, 2026-11-02)
+
+With a queen (the side view), food lies in chambers. The larder is the food in the colony's chambers, kept in step as food comes and goes (docs/nest-and-home.md §3.6). The top-down maps keep the scalar larder.
+
+**Foragers** take their food underground to the **reception** chamber (Tschinkel & Kwapich: harvesters drop seeds only in the top chambers), or to the royal chamber until a reception is dug. They steer by the reception's mark and put the food down on arriving: that is "food home" (`stored`).
+
+**Porters.** An idle ant in reception or a store, or within two cells of one, with food there, takes a unit (`PORT_RATE` 3 a second). It takes it to whichever chamber wants food most: a brood chamber's larvae's unmet needs, or the royal chamber, kept stocked with `QUEEN_STOCK` (8) for her eggs, less what lies there and what porters already carry there. With nothing wanted, reception's food goes down to the least stocked store.
+- **The first cut** let only ants standing in a chamber carry. The reception on seed 1 was a single cell; 1,850 food piled up in it, the royal chamber stayed empty, and the queen laid almost nothing (2–47 births).
+- **Also fixed while building:** a carrier that put its food down was turned round, but the tick wrote its old heading back. It walked on into the nest's tunnels and dug at their ends; a roomy nest dug 41–60 cells against 16–25.
+
+**The queen** lays from the food in her chamber. **A larva** is fed from the food in its own chamber.
+
+**Measured** (side view, 600 + 600 ants, 600 s, seeds 1–3):
+
+| | Slice 4 | Slice 5 |
+|---|---|---|
+| Food home, all six colonies | 7,842 | 7,969 |
+| Porter trips per food | none | 1.3 |
+| Workers at 600 s | 900 every colony | 897–900, but seed 2's first colony 813 (213 births; it brought in 1,002 food) |
+| Out over 120 s | 0.4–1.0 % | 0.8–1.6 % |
+
+**Where colony 0's food lies at 600 s:**
+- seed 1: reception 149, store 76, royal 8;
+- seed 2: store 24, royal 25;
+- seed 3: reception 121, store 57, royal 8.
+
+The pipeline keeps the queen and brood fed and puts the surplus into stores. Reception holds what has just come in.
+
+**Tick time** (back to back with slice 4): two colonies 6.8 ms against 6.6 ms (+3–5 %); one colony 3.6 ms against 3.3 ms (+10 %). What each chamber wants, and what is already on its way, is worked out once a tick, not per porter.
+
+**Rendering:** food lying in a chamber is drawn as seeds along its floor, up to 40 a chamber.
+
+**Tests:** `food.test.ts` covers:
+- the larder is always the food in the chambers;
+- porters move it, and brood is raised;
+- a forager puts its food down in reception, or in the royal chamber without one.
+
+`colony.feed(n)` puts food at home for tests: in the royal chamber with a queen, else in the larder.
+
+**Jev cost:** unchanged. Foragers are still asked by place and trail; the inside work is a local rule.

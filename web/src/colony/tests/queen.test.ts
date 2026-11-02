@@ -28,7 +28,7 @@ test("the side view's colony has a queen; the top-down maps keep the larder, wit
 test("queen to worker: she lays while there is food; an egg becomes a larva, is fed, pupates, and a worker is born where the pupa lay", () => {
   const map = bare(2);
   const c = new Colony(map, { antCount: 20, maxAnts: 30 }, mulberry32(2), () => "explore");
-  c.larder = 8; // two workers' worth
+  c.feed(8); // two workers' worth
   let firstBirth = -1;
   const stages = new Set<number>();
   let pupae: string[] = [];
@@ -73,7 +73,7 @@ test("nurses take eggs from the queen to a brood chamber", () => {
     ch.claim(brood.id, x + k, ry - 1, (a, b) => rockAt(map, a, b) === OPEN);
   }
   const c = new Colony(map, { antCount: 40, maxAnts: 80 }, mulberry32(3), () => "explore");
-  c.larder = 20;
+  c.feed(20);
   for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
   const inBrood = c.brood.items.filter((b) => b.held < 0 && b.chamber === brood.id).length;
   // Every chamber counts exactly what lies in it (the royal one too: a pick-up takes it off its count).
@@ -85,13 +85,13 @@ test("nurses take eggs from the queen to a brood chamber", () => {
 test("orphaned: the queen dies, no egg is laid after, brood in progress still hatches, and the workers age out", () => {
   const map = bare(2);
   const c = new Colony(map, { antCount: 20, maxAnts: 80 }, mulberry32(4), () => "explore");
-  c.larder = 40;
+  c.feed(40);
   for (let k = 0; k < 30 * 20; k++) c.tick(1 / 30);
   const laid = c.brood.size;
   assert.ok(laid > 0, "eggs before");
   c.killQueen();
   assert.ok(c.orphaned);
-  c.larder += 40; // food enough for ten more eggs: only her death keeps them from being laid
+  c.feed(40); // food enough for ten more eggs: only her death keeps them from being laid
   const bornBefore = c.births;
   for (let i = 0; i < c.n; i++) c.lifespan[i] = c.age[i]! + 200 + i; // all age out within ~4 minutes
   const before = new Set(c.brood.items);
@@ -138,7 +138,7 @@ test("strangers at her side kill the queen; a side-view colony with no workers a
 test("the strategist reads the larder as full only for food the brood won't eat, at the cap (a growing colony went raiding)", () => {
   const map = bare(2);
   const c = new Colony(map, { antCount: 20, maxAnts: 30 }, mulberry32(6));
-  c.larder = 20;
+  c.feed(20);
   assert.equal(c.stanceSituation(false).larder, "low", "growing (room for more): its food is for brood");
   for (let i = 20; i < 30; i++) c.spawn();
   assert.equal(c.population, 30);
@@ -156,7 +156,7 @@ test("a larva is fed before it pupates: with no food for it, it stays a larva", 
   b.t = 1000;
   for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
   assert.equal(b.stage, LARVA, "unfed");
-  c.larder += 3;
+  c.feed(3);
   for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
   assert.notEqual(b.stage, LARVA, "fed, it pupated");
 });

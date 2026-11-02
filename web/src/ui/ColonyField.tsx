@@ -460,6 +460,24 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
           ctx.fillStyle = BROOD_RGB[b.stage] as string;
           ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
         }
+        // Nest slice 5: food lying in this colony's chambers, as seeds along each floor (up to 40 drawn a chamber).
+        if (col.map.chambers) {
+          ctx.fillStyle = theme.accent;
+          for (const ch of col.map.chambers.list) {
+            if (ch.colony !== col.params.nest || ch.food < 1 || ch.cells === 0) continue;
+            const span = ch.x1 - ch.x0 + 1;
+            const shown = Math.min(40, Math.floor(ch.food));
+            for (let k = 0; k < shown; k++) {
+              const fx = ch.x0 + ((k * 7) % span);
+              const fy = ch.floorRow - (Math.floor((k * 7) / span) % 2);
+              const wx = centreX(fx, fy);
+              const wy = centreY(fy);
+              if (!inView(wx, wy)) continue;
+              const [x, y] = toScreen(c, v, wx, wy);
+              ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
+            }
+          }
+        }
         if (col.queen && inView(col.queen.x, col.queen.y)) {
           const [x, y] = toScreen(c, v, col.queen.x, col.queen.y);
           const qr = Math.max(3, len * 0.9);
