@@ -61,6 +61,8 @@ export interface SideStats {
   resist: number;
   /** soil cells dug */
   dug: number;
+  /** pellets of it on the mound */
+  mound: number;
 }
 
 export interface ColonyStats {
@@ -101,7 +103,7 @@ function seenTogether(colonies: readonly Colony[]): number {
 
 function side(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
