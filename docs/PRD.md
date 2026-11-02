@@ -1258,21 +1258,35 @@ The side view no longer gives ants an exact vector home through the soil (docs/n
 - **Underground,** a self-referenced memory of the chamber starts afresh in the chamber.
 
 **Local cues snap the believed goal to the real one:**
-- the hole within `HOLE_SIGHT` (6, seen and smelled);
+- the hole within `HOLE_SIGHT` (6) across the ground, and twice that up or down: the mound's rim stands rows above the hole in its crater, and the entrance's smell rises;
 - the chamber in clear view within `NEST_SIGHT`.
 
-**Search.** An ant that reaches its believed hole and finds nothing searches in loops either side, each 1.6× wider (Wehner's systematic search).
+**Search.** An ant that reaches its believed hole's column and finds nothing searches in loops either side, each 1.6× wider (Wehner's systematic search). It searches only there; blocked anywhere else, it goes round (Bug2 below).
 
 **Road signs.** Underground, standing on a strong nest trail fades the memory's error (time constant `ROAD_SIGN`, 2 s). It is read on the floor under the ant, since the sensors ahead are often in soil in a tunnel. Without this, diggers that had walked 300–700 cells underground were tens of cells off, and stuck. In slice 3 the chamber marks take this role.
 
 **Pellet carriers climb.** They head up and out without a vector: up the shaft is the hole. Steering them by a drifted vector had them surfacing off target and dropping spoil beside the hole.
 
-**Bug2 on the ground.** With the hole in sight but no open cell nearer it, a homing ant keeps a hand on the surface until it is nearer than where it got stuck.
-- It starts with the hand that climbs.
+**Bug2 on the ground.** With no open cell nearer the hole it heads for, a homing ant keeps a hand on the surface until it is nearer than where it got stuck.
+- It picks its hand by feeling ahead along the surface both ways (`GROUND_LOOK`, 16 cells) and taking the side that gets nearer sooner. In a gully between two heaps, one side leads over toward the hole and the other along the far heap and away.
 - After `GROUND_FLIP` (24) cells it turns back with the other hand.
+- If the hole it heads for changes (it comes into sight), the follow starts afresh.
 - Before this, the ground walk only stepped to nearer cells and rocked between two cells in a pit by the mound. That trapped 318 ants of one colony on slice 0 (seed 3) and 647 on an early cut of this slice.
 
-**Measured** (side view, 600 + 600 ants, 600 s, seeds 1–6; ants out over 120 s sampled every 10 s from 120 s, mean / worst sample per colony; food home both colonies):
+**Agent review.** The review found that the first cut searched at any dead end on the ground, not only at the believed hole. The offset grew a step per decision (3, −4.8, 7.7 … 50), and blocked ants walked 50–80 cells off. My rewrite of side.test.ts hid this by measuring against a target that included the search offset.
+
+Fixed:
+- The search is gated on the believed column. Bug2 now handles every other obstacle, with the look-ahead hand above.
+- The crater counts as in sight.
+- A leftover search is cleared when a trip home starts.
+
+On the reviewed code, 243 of 8,280 homing samples whose vector was within 3 cells were searching (seed 5). Now none are, and a test checks it.
+
+side.test.ts measures against the real hole again, with two bounds:
+- in sight of the hole (sampled every ⅓ s), a carrier never moves away: ≤ 1 %, and 0 is measured;
+- overall, ≤ 10 %. 7.8 % is measured: three quarters of it is drift and search, the rest going round heaps. With an exact vector it was 0.
+
+**Measured, before the review fixes** (side view, 600 + 600 ants, 600 s, seeds 1–6; ants out over 120 s sampled every 10 s from 120 s, mean / worst sample per colony; food home both colonies):
 
 | Seed | Slice 0: out > 120 s | food home | Slice 1: out > 120 s | food home |
 |---|---|---|---|---|
@@ -1285,6 +1299,8 @@ The side view no longer gives ants an exact vector home through the soil (docs/n
 | mean | 3.1 % (worst 56 %) | 15,960 | 1.3 % (worst 12 %) | 16,775 |
 
 Homing with error is a little slower where it was already easy (seeds 1–2), but no colony jams any more, and food home is up 5 %.
+
+**After the review fixes** (same runs): out over 120 s is 1.2 / 1.7 / 1.0 / 2.7 / 1.8 / 0.3 % on seeds 1–6, a mean of 1.45 % (worst sample 11 %). Food home is 2841 / 2733 / 2820 / 2724 / 2722 / 2865, a total of 16,705 against slice 0's 15,960.
 
 **Tick time** (`colony-bench 1200 60 1`, run back to back with slice 0):
 

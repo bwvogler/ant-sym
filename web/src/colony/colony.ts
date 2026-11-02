@@ -209,6 +209,8 @@ export class Colony {
   #groundMin: Float64Array;
   /** cells walked on that surface (each GROUND_FLIP, the other hand) */
   #groundT: Uint16Array;
+  /** the hole x (#holeX) groundMin was measured against */
+  #groundRef: Float64Array;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
   #belief: Nest = { x: 0, y: 0, r: 0 };
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
@@ -406,6 +408,7 @@ export class Colony {
     this.#under = new Uint8Array(n);
     this.#groundMin = new Float64Array(n).fill(NaN); // float64: compared with the metric itself (float32 rounding let the ant "beat" it on the cell it was set at)
     this.#groundT = new Uint16Array(n);
+    this.#groundRef = new Float64Array(n).fill(NaN);
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -543,6 +546,8 @@ export class Colony {
    * otherwise switch its homing off, and its progress clock starts again (main's review of #8, carried onto hexes).
    */
   #homeAfresh(i: number): void {
+    this.search[i] = 0; // a search left over from the last trip home
+    this.#groundMin[i] = NaN;
     this.detour[i] = 0;
     this.bumps[i] = 0;
     this.wall[i] = 0;
@@ -762,27 +767,31 @@ export class Colony {
     } else if (mode === RETURN && ent && isSky(map, cx, cy)) {
       // On the ground line (side view), homing is to the hole: the way nearer it along the ground (home scent lies
       // along the walkway both sides of the hole, so the most-scent rule below walks a carrier past it and on).
+      // A surface it was following round toward one hole (believed, or the real one once in sight) says nothing about
+      // the other: start afresh if the target changed.
+      if (this.#groundRef[i] !== this.#holeX) this.#groundMin[i] = NaN;
       const min = this.#groundMin[i] as number;
       let best = this.#towardHole(cx, cy, true, min);
       if (best >= 0) this.#groundMin[i] = NaN;
-      else if (Number.isNaN(min) && this.#holeX !== ent.x) {
-        // Where it believed the hole was, and no hole in sight: search to either side, farther each time.
+      else if (Number.isNaN(min) && this.#holeX !== ent.x && Math.abs(centreX(cx, cy) - this.#holeX) < 1) {
+        // At the column where it believed the hole was, and no hole in sight: search to either side, farther each time.
+        // (Only there: blocked anywhere else, it goes round the obstacle below, or every blocked step would widen the search.)
         this.#searchOn(i);
         this.#holeX = this.#believe(i, ent).x;
         best = this.#towardHole(cx, cy, true);
       } else if (Number.isNaN(min)) {
-        // The hole in sight but no open way nearer it (spoil heaped between, a pit beside the mound): Bug2 on the
-        // ground, a hand on the surface until it is somewhere nearer the hole than here. Rocking between the nearest
-        // cell and a step away kept whole colonies in such a pit.
+        // No open way nearer the hole it heads for (spoil heaped between, a pit beside the mound, a step in the ground):
+        // Bug2 on the ground, a hand on the surface until it is somewhere nearer that hole than here. Rocking between
+        // the nearest cell and a step away kept whole colonies in such a pit.
         this.#groundMin[i] = this.#holeMetric(cx, cy);
+        this.#groundRef[i] = this.#holeX;
         this.#groundT[i] = 0;
-        // The hand whose first step climbs (up the spoil's face, not off along the ground below it); level, the nearer.
-        const a = handOnWall(map, cx, cy, dir, 1);
-        const b = handOnWall(map, cx, cy, dir, -1);
-        const ya = stepY(cy, a);
-        const yb = stepY(cy, b);
-        const up = ya !== yb ? ya < yb : this.#holeMetric(stepX(cx, cy, a), ya) <= this.#holeMetric(stepX(cx, cy, b), yb);
-        this.hand[i] = up ? -1 : 1; // handOnWall below takes −hand
+        // Which hand: feel ahead along the surface both ways (a gully between two heaps: one side leads over toward the
+        // hole, the other along the far heap and away) and take the one that gets nearer than here sooner.
+        const m = this.#groundMin[i] as number;
+        const ka = this.#groundLook(cx, cy, dir, 1, m);
+        const kb = this.#groundLook(cx, cy, dir, -1, m);
+        if (ka !== kb) this.hand[i] = ka < kb ? -1 : 1; // handOnWall below takes −hand
       } else if ((this.#groundT[i] = (this.#groundT[i] as number) + 1) % GROUND_FLIP === 0) {
         // The long way round: the other hand, and turned back.
         this.hand[i] = -(this.hand[i] as number);
@@ -1096,8 +1105,9 @@ export class Colony {
     const x = this.x[i] as number;
     const y = this.y[i] as number;
     const toHole = goal === this.#entrance;
-    const d = Math.hypot(x - goal.x, y - goal.y);
-    if (toHole ? d < HOLE_SIGHT : d < NEST_SIGHT && this.#clearTo(x, y, goal.x, goal.y)) return goal;
+    // The hole: across the ground, and up out of its crater (the mound's rim stands rows above it; the entrance's smell rises).
+    const sees = toHole ? Math.abs(x - goal.x) < HOLE_SIGHT && Math.abs(y - goal.y) < 2 * HOLE_SIGHT : Math.hypot(x - goal.x, y - goal.y) < NEST_SIGHT && this.#clearTo(x, y, goal.x, goal.y);
+    if (sees) return goal;
     const under = this.#under[i] === 1;
     const off = under ? (this.driftNest[i] as number) * (this.odoNest[i] as number) : (this.driftSurf[i] as number) * (this.odoSurf[i] as number);
     const b = this.#belief;
@@ -1211,6 +1221,21 @@ export class Colony {
       }
     }
     return best;
+  }
+
+  /** Steps a hand-on-wall walk (`side`) from (cx, cy), facing `dir`, takes on the side view's ground to a cell nearer the hole than `min` (Infinity if not within GROUND_LOOK). */
+  #groundLook(cx: number, cy: number, dir: number, side: number, min: number): number {
+    let x = cx;
+    let y = cy;
+    let d = dir;
+    for (let k = 1; k <= GROUND_LOOK; k++) {
+      d = handOnWall(this.map, x, y, d, side);
+      x = stepX(x, y, d);
+      y = stepY(y, d);
+      if (rockAt(this.map, x, y) !== OPEN || !isSky(this.map, x, y)) return Infinity;
+      if (this.#holeMetric(x, y) < min - 1e-6) return k;
+    }
+    return Infinity;
   }
 
   /** The along-the-ground distance to the hole (see #towardHole) from cell (cx, cy). */
@@ -1931,12 +1956,14 @@ const NO_GAIN = 3;
 const NEST_SIGHT = 8;
 /** Path integration's drift (σ, per unit walked): the error is ~10 % of the distance walked (Wehner 2006; docs/nest-and-home.md §1). */
 export const PI_DRIFT = 0.1;
-/** Within this (world units) of the hole an ant on the ground sees it, and smells the entrance's odour: its vector no longer matters. */
+/** Within this (world units) across the ground of the hole (and twice it up or down: the crater) an ant sees it and smells the entrance: its vector no longer matters. */
 export const HOLE_SIGHT = 6;
 /** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one this much wider, to at most SEARCH_MAX. */
 const SEARCH_START = 3;
 /** Cells a homing ant follows the ground's surface round spoil before trying the other hand. */
 const GROUND_FLIP = 24;
+/** Cells an ant feels ahead along the surface, each way, to choose which hand to follow it with. */
+const GROUND_LOOK = 16;
 /** Seconds on a strong nest trail for the in-nest memory's error to fall to 1/e. */
 const ROAD_SIGN = 2;
 const SEARCH_GROW = 1.6;

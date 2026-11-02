@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, HOLE_SIGHT } from "../colony.ts";
+import { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { generateSideWorld, generateWorld, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../world.ts";
 
@@ -55,17 +56,20 @@ test("a carrier whose vector is 12 cells off walks to where it believes the hole
   c.carrying[0] = 1;
   c.mode[0] = 2;
   let nearBelief = Infinity;
+  let searched = 0;
   let t = 0;
   for (; t < 30 * 60 && c.stored === 0; t++) {
     c.tick(1 / 30);
     if (c.search[0] === 0) nearBelief = Math.min(nearBelief, Math.abs((c.x[0] as number) - (ent.x + 12)));
+    searched = Math.max(searched, Math.abs(c.search[0] as number));
   }
   assert.ok(12 > HOLE_SIGHT);
   assert.ok(nearBelief < 1.5, `it went where it believed the hole was (${nearBelief.toFixed(2)} off)`);
+  assert.ok(searched > 0, "found nothing there, and searched");
   assert.equal(c.stored, 1, `then searched and got home (${(t / 30).toFixed(0)} s)`);
 });
 
-test("road signs: underground, a strong nest trail fades the in-nest memory's error; elsewhere it stays", () => {
+test("road signs: underground, a strong nest trail underfoot fades the in-nest memory's error; with none it stays", () => {
   const map = generateSideWorld(2, SMALL);
   const n = map.nest;
   const run = (scent: number) => {
@@ -90,9 +94,29 @@ test("road signs: underground, a strong nest trail fades the in-nest memory's er
   assert.ok(run(0) > 99, `no trail: ${run(0).toFixed(1)}`);
 });
 
-test("top-down maps keep exact homing: no vector is kept", () => {
+test("top-down maps keep no vector (homing there stays exact: colony.test.ts's homing tests, unchanged)", () => {
   const map = generateWorld(1);
   const c = new Colony(map, { antCount: 200 }, mulberry32(2));
   for (let k = 0; k < 30 * 20; k++) c.tick(1 / 30);
   for (let i = 0; i < c.n; i++) assert.equal(c.odoSurf[i]! + c.odoNest[i]!, 0);
+});
+
+test("a homing ant whose vector is nearly right never searches: blocked anywhere but at its believed hole, it goes round (review of slice 1)", () => {
+  // The first cut searched at any dead end on the ground: the offset grew a step per decision (3, −4.8, 7.7, … 50) and
+  // sent ants 50–80 cells off. An ant whose vector is within 3 cells reaches its believed hole in sight of the real one.
+  const g = new Game(generateSideWorld(5, { size: { w: 384, h: 200 }, nestCount: 1 }), { antCount: 300 }, mulberry32(5));
+  const c = g.player;
+  let samples = 0;
+  let searching = 0;
+  for (let t = 0; t < 30 * 60; t++) {
+    g.tick(1 / 30);
+    if (t % 30 === 0)
+      for (let i = 0; i < c.n; i++)
+        if (c.alive[i] && c.mode[i] === 2 && Math.abs(c.driftSurf[i]! * c.odoSurf[i]!) < 3) {
+          samples++;
+          if (c.search[i] !== 0) searching++;
+        }
+  }
+  assert.ok(samples > 1000, `${samples} samples`);
+  assert.equal(searching, 0, `${searching} of ${samples} were searching`);
 });

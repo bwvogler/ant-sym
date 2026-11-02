@@ -147,39 +147,55 @@ test("homing in the side view: a carrier on the ground walks to its entrance and
   }
 });
 
-test("foraging in the side view: carriers on the ground make for where they believe the hole is, never away from it (no shuttling past it), and soil is conserved", () => {
+test("foraging in the side view: carriers on the ground in sight of the hole make for it, never away (no shuttling past it); farther out rarely away (their vector drifts); soil is conserved", () => {
   const map = generateSideWorld(4, { nestCount: 1 });
   const g = new Game(map, { antCount: 400 }, mulberry32(11));
   const c = g.player;
   const e = c.nest.entrance!;
   const lastD = new Float32Array(c.n).fill(-1);
-  const lastSearch = new Float32Array(c.n);
   let samples = 0;
   let away = 0;
+  let nearSamples = 0;
+  let nearAway = 0;
+  const nearD = new Float32Array(c.n).fill(-1);
   for (let k = 0; k < 30 * 200; k++) {
     g.tick(1 / 30);
+    if (k % 10 === 0) {
+      // Every 1/3 s: a carrier on the ground in sight of the hole (nest slice 1: its vector no longer matters) gets nearer.
+      for (let i = 0; i < c.n; i++) {
+        c.antCell(i);
+        const d = Math.abs(c.x[i]! - e.x);
+        const inSight = c.alive[i] && c.carrying[i] && isSky(map, CELL[0] as number, CELL[1] as number) && d < HOLE_SIGHT && Math.abs(c.y[i]! - e.y) < 2 * HOLE_SIGHT;
+        if (inSight && nearD[i]! >= 0) {
+          nearSamples++;
+          if (d > nearD[i]! + 1) nearAway++;
+        }
+        nearD[i] = inSight ? d : -1;
+      }
+    }
     if (k % 60 === 0) {
-      // Every 2 s: a carrier on the ground should be nearer (along the ground) than 2 s ago to where it believes the hole
-      // is: its drifting vector's estimate and its search offset (nest slice 1), or the hole itself once in sight.
+      // Every 2 s: a carrier on the ground should be nearer the hole (along the ground) than 2 s ago.
       for (let i = 0; i < c.n; i++) {
         c.antCell(i);
         const onGround = c.alive[i] && c.carrying[i] && isSky(map, CELL[0] as number, CELL[1] as number);
-        const near = Math.hypot(c.x[i]! - e.x, c.y[i]! - e.y) < HOLE_SIGHT;
-        const believed = near ? e.x : e.x + c.driftSurf[i]! * c.odoSurf[i]! + c.search[i]!;
-        const d = Math.abs(c.x[i]! - believed);
-        if (onGround && lastD[i]! >= 0 && c.search[i] === lastSearch[i]) {
+        const d = Math.abs(c.x[i]! - e.x);
+        if (onGround && lastD[i]! >= 0) {
           samples++;
           if (d > lastD[i]! + 2) away++;
         }
         lastD[i] = onGround ? d : -1;
-        lastSearch[i] = c.search[i]!;
       }
       assert.equal(c.soilDug, c.soilOut + c.soilFilled + c.carriedPellets().dug + c.soilLost, "dug = mound + filled + carried + lost");
     }
   }
   assert.ok(c.stored > 40, `food home: ${c.stored}`);
   assert.ok(samples > 50, `${samples} samples of carriers on the ground`);
-  assert.ok(away <= samples * 0.03, `${away} of ${samples} times a carrier on the ground had moved away from where it believed the hole was (they used to shuttle past it)`);
+  // Near the hole (in sight of it, or nearly), never away: carriers used to shuttle past it.
+  assert.ok(nearSamples > 50 && nearAway <= nearSamples * 0.01, `${nearAway} of ${nearSamples} times a carrier in sight of the hole had moved away from it (they used to shuttle past it)`);
+  // Anywhere, rarely: a drifted vector (nest slice 1) can put the hole behind a carrier, which walks there first, then
+  // searches; going round a heap on the ground can mean a few steps away first. (Measured 7.8 %: three quarters of it
+  // drift and search, the rest going round heaps. With an exact vector, before slice 1, it was 0.)
+  assert.ok(away <= samples * 0.1, `${away} of ${samples} times a carrier on the ground had moved away from the hole`);
 });
 
 test("the ground line's crust stays: explorers walking the surface dig only by their own entrance, and the ground line is never filled", () => {
