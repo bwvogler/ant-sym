@@ -1,7 +1,7 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, LARVA_FOOD, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
-import { LARVA, PUPA } from "./brood.ts";
+import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
+import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { WorldMap } from "./world.ts";
@@ -221,7 +221,7 @@ export class Game {
    * only from brood: no workers and no pupa or fully fed larva left (eggs and hungry larvae need nurses), whatever the queen or the larder.
    */
   static beaten(c: Colony): boolean {
-    if (c.queen) return c.population === 0 && !c.brood.items.some((b) => b.stage === PUPA || (b.stage === LARVA && b.fed >= LARVA_FOOD - 1e-9));
+    if (c.queen) return c.population === 0 && !c.brood.items.some((b) => b.stage === PUPA || (b.stage === LARVA && isFed(b)));
     return c.population === 0 && c.larder < c.params.foodPerAnt;
   }
 

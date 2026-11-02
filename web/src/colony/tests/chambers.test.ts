@@ -47,6 +47,10 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   // Three games. Every check holds in each, except the depth trend (last), which must hold in at least 2 of 3: it is one
   // nest's handful of stacked chambers, and fails in about 1 game in 6–9 (1 of 9 on nest 4, worlds 1–4, games 4–8; 0 of 9
   // before #14's backfill guards; about 1 in 6 in earlier measurements, on either side of #17's merge).
+  // The depth trend is not an emergent result: it is imposed. A new chamber may start only CHAMBER_GAP + 0.15 × depth rows
+  // from another (#chamberRoom), so the gap to the one above grows with depth by rule, as Tschinkel measured in real nests.
+  // What this checks is that the rule takes effect in the nest the ants dig (chambers widen after they start, so it could
+  // be undone), not that the profile arises of itself (review of slice 2).
   let trends = 0;
   const halves: string[] = [];
   const growth: number[] = [];
@@ -77,7 +81,7 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
       }
     // Every chamber cell is open: backfill never fills one.
     for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `game ${seed}: chamber cell (${x}, ${y}) filled`);
-    // Tschinkel: the gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth.
+    // The gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth: the imposed rule.
     const gaps = mine
       .map((b) => {
         let gap = Infinity;
@@ -104,7 +108,7 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   assert.ok(meanGrowth >= 1.6, `floor growth, mean over three games ${meanGrowth.toFixed(2)}× (${growth.map((x) => x.toFixed(2)).join(", ")})`);
   const meanStacked = stacked.reduce((a, b) => a + b, 0) / stacked.length;
   assert.ok(meanStacked >= 3, `stacked chambers, mean over three games ${meanStacked.toFixed(1)} (${stacked.join(", ")})`);
-  assert.ok(trends >= 2, `gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`);
+  assert.ok(trends >= 2, `the spacing rule shows: gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`);
 });
 
 test("a roomy nest barely digs (ja-wii): the same few ants dig far less when their chambers have floor enough", () => {

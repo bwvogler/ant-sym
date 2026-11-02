@@ -76,6 +76,12 @@ export interface WorldMap {
   sky?: ChunkLayer<Uint8Array>;
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
   loose?: ChunkLayer<Uint8Array>;
+  /**
+   * The side view: cells of loose soil on the map (heapMound adds one, takeLoose takes one). The mound is every colony's:
+   * ants pick up whichever spoil they meet, so only this total is a count of cells (a colony's own count went negative
+   * when it took more of a rival's spoil than of its own: review of MR 15).
+   */
+  moundCells?: number;
   /** the side view: the nests' chambers (nest slice 2): which cells are chambers, and each chamber's floor */
   chambers?: Chambers;
   /** when each cell was last dug open by an ant (simulated seconds; −Infinity = never): fresh digging is the live frontier, not filled back (BACKFILL.young) */
@@ -84,9 +90,15 @@ export interface WorldMap {
   forks?: Map<number, Fork>;
 }
 
-/** Whether integer cell (x, y) is open ground (for Chambers' floor counts). */
-function openCell(map: WorldMap): (x: number, y: number) => boolean {
-  return (x, y) => inBounds(map, x, y) && rockAt(map, x, y) === OPEN;
+/** Whether integer cell (x, y) is open ground (for Chambers' floor counts), one function per map (made once, not per dig). */
+const openCells = new WeakMap<WorldMap, (x: number, y: number) => boolean>();
+export function openCell(map: WorldMap): (x: number, y: number) => boolean {
+  let f = openCells.get(map);
+  if (!f) {
+    f = (x, y) => inBounds(map, x, y) && rockAt(map, x, y) === OPEN;
+    openCells.set(map, f);
+  }
+  return f;
 }
 
 export interface WorldOptions {
@@ -903,20 +915,20 @@ export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number,
   map.rock.set(x, y, SOIL);
   map.sky.set(x, y, 0);
   map.loose.set(x, y, 1);
+  map.moundCells = (map.moundCells ?? 0) + 1;
   updateSurface(map, x, y);
   return [x, y];
 }
 
 /**
- * The side view: take a pellet of loose soil at cell (x, y) off the mound (an ant picks one up). Loose soil settles:
- * taken from inside the heap, the column drops a cell, so it is the column's top that goes (above ground again,
- * walkway or sky), never a hole under hanging spoil.
+ * The side view: take a pellet of loose soil at cell (x, y) off the mound's top (an ant picks one up), so it is the
+ * column's top that goes (above ground again, walkway or sky), never a hole under hanging spoil. False if (x, y) isn't
+ * loose soil at its column's top. (Taking from inside the heap, the column settled a cell; nothing ever did: review of MR 15.)
  */
 export function takeLoose(map: WorldMap, x: number, y: number): boolean {
-  if (!map.sky || !map.loose || map.loose.get(x, y) !== 1 || rockAt(map, x, y) !== SOIL) return false;
-  const top = groundTop(map, x);
-  if (top < y && map.loose.get(x, top) === 1 && rockAt(map, x, top) === SOIL) y = top;
+  if (!map.sky || !map.loose || map.loose.get(x, y) !== 1 || rockAt(map, x, y) !== SOIL || groundTop(map, x) !== y) return false;
   map.loose.set(x, y, 0);
+  map.moundCells = (map.moundCells ?? 0) - 1;
   map.rock.set(x, y, OPEN);
   map.sky.set(x, y, 1);
   updateSurface(map, x, y);

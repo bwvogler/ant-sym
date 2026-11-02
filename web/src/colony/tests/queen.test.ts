@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { EGG, LARVA, PUPA } from "../brood.ts";
 import { Colony, T_EGG, T_LARVA, T_PUPA } from "../colony.ts";
 import { Game } from "../game.ts";
-import { cellOf, CELL, centreX, centreY } from "../hex.ts";
+import { cellOf, CELL, centreX } from "../hex.ts";
 import { digCell, generateSideWorld, generateWorld, mulberry32, OPEN, rockAt } from "../world.ts";
 
 // Nest slice 4 (docs/nest-and-home.md §3.4): the queen lays, brood grows from egg to larva (fed) to pupa, workers are
@@ -136,8 +136,6 @@ test("strangers at her side kill the queen; a side-view colony with no workers a
   assert.ok(Game.beaten(a));
   a.brood.add(1, 1, -1).stage = PUPA;
   assert.ok(!Game.beaten(a), "a pupa will still hatch");
-  void centreX;
-  void centreY;
 });
 
 test("the strategist reads the larder as full only for food the brood won't eat, at the cap (a growing colony went raiding)", () => {
