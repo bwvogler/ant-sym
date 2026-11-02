@@ -91,6 +91,7 @@ export class Game {
     this.#grids = this.colonies.map(() => new CountGrid());
     this.fungus = new Fungus(map, this.params.fungus);
     this.colonies.forEach((c, k) => {
+      if (map.hasSoil) c.friends = this.#grids[k] as CountGrid;
       if (this.colonies.length > 1) {
         c.enemies = this.recognition;
         c.raidTarget = this.colonies[1 - k]!.nest;
@@ -157,6 +158,7 @@ export class Game {
     for (const c of this.colonies) c.tick(dt);
     const fungal = this.fungus.due(dt);
     if (this.colonies.length > 1 || fungal) this.#refresh();
+    else if (this.map.hasSoil) occupancy(this.player, this.#grids[0] as CountGrid); // solo underground: nestmates round a digger
     this.#fightDeaths *= Math.exp(-dt / QUIET);
     if (this.colonies.length > 1) {
       const died = resolveFights(this.colonies, this.#grids, dt, this.#rng, this.params.fight, this.recognition).reduce((x, y) => x + y, 0);
