@@ -22,6 +22,8 @@ npm install && npm --prefix web install
 npm run dev                    # http://localhost:38500
 npm test                       # node --test
 node scripts/probe.mjs 20 100  # live-API probe: latency, tokens, burst
+npm run exp -- all --seeds 1-10   # offline behaviour assays (web/src/colony/experiment.ts); --policy cache:<file> replays Jev
+node scripts/colony-live.mjs all --budget 0.10   # live: Jev vs the local rule per lane, saves replayable caches
 ```
 
 Editing `web/server/*.ts` does **not** restart the running Vite (measured 2026-10-25: the old ledger kept serving after a branch switch). Restart `npm run dev` after server changes; `/api/health` shows the live run summary shape, so check it has the field you added.

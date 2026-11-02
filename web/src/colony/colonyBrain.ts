@@ -1,7 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "../sim/policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
-import type { Touch } from "./responses.ts";
+import { localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -163,6 +163,35 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
 /** What a cached response was asked under (hook, legend, wording, doctrine). */
 export function responseContext(hook: ResponseHook, doctrine: string): string {
   return `${hook}-v${COLONY_BRAIN_VERSION}-${hash(RESPONSE_LEGEND + JSON.stringify(responseQuestion(hook, "s0")) + doctrine.trim())}`;
+}
+
+/** What a response hook answers: the same type as the hook in responses.ts. */
+export type ResponseAnswer = boolean | Mode | Trail;
+const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
+
+/** A response from a reply, or null when it is missing or not one of the hook's answers (the local response covers it). A noul is yes above ½. */
+export function readResponse(hook: ResponseHook, answers: Record<string, JevAnswer>, id: string): ResponseAnswer | null {
+  const a = answers[`${id}_${hook}`];
+  if (!a) return null;
+  if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
+  if (a.type !== "choice") return null;
+  if (hook === "carry") return (MODES as readonly string[]).includes(a.choice) ? (a.choice as Mode) : null;
+  return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
+}
+
+/** Cached response answers per hook, keyed by touchKey: what scripts/colony-live.mjs saves and the experiments replay. */
+export type ResponseCache = Partial<Record<ResponseHook, Record<string, ResponseAnswer>>>;
+
+/** Responses that answer from a cache, and from `base` for any situation (or hook) the cache lacks. */
+export function responsesFromAnswers(cache: ResponseCache, base: Responses = localResponses): Responses {
+  const over: Partial<Responses> = {};
+  for (const hook of RESPONSE_HOOKS) {
+    const table = cache[hook];
+    if (!table) continue;
+    const local = base[hook] as (t: Touch) => ResponseAnswer;
+    (over as Record<ResponseHook, (t: Touch) => ResponseAnswer>)[hook] = (t) => table[touchKey(t)] ?? local(t);
+  }
+  return responses({ ...base, ...over });
 }
 
 /**

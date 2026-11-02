@@ -540,6 +540,8 @@ Every MR follows the same loop:
 | A6 open | — | exchange 0.80 (0.47–1.45) | Control. |
 | G game | 4/10 | peak share out over 120 s 0.08 (0.03–0.14); food home 17 % you, 14 % rival; nobody beaten in 600 s; 2.4 ms/tick | The peak counts every ant out over 120 s at any sample, far explorers included, so it reads higher than ja-ipu's figure. The 7 % mark needs a stall-specific measure (an ant that isn't getting anywhere) before it can gate. The player out-forages the rival on most seeds (ja-t6u, ja-slv). |
 
+> **A1 depends on the arena's shape.** Another session's run of the same plan used a 60×40 bridge with 6-cell-wide branches (36 vs ~68 cells to the food). On today's ants it passed: short share 0.87 median, 0.82 worst, 10 of 10 seeds. That is the same code that fails 0.67 above. Before tuning trail parameters against A1, settle which arena stands for Goss et al. (ja-dez).
+
 ### 14.3 Response hooks (MR 1)
 
 `colony/responses.ts` turns the small fixed mechanics into an ant's **responses**. Each is a function of a small situation `Touch` (mode × carrying × at nest × enemy near × stance, 96 values):
@@ -567,3 +569,59 @@ Every MR follows the same loop:
 | trail | 64 | ~21k | $0.0009 |
 
   - That is ~400 tokens per question, as for modes. The ant situation schema and the mode lane are unchanged, so tokens per ant decision are unchanged.
+
+### 14.4 Live check and replay (2026-11-02)
+
+Only one cloud session has `JEV_API_KEY` and `api.typesafe.ai` allowed, so it ran the live check for MR 1 (ja-8ab):
+- `scripts/colony-live.mjs` runs one offline game (seed 1, 600 + 600 ants, 300 s, alarm painted about every 20 s). It collects every distinct situation of each lane (mode, stance, and the `get`/`carry`/`drop`/`trail` responses by `touchKey`) and asks Jev each one per doctrine, in requests of up to 100 questions, under a hard budget.
+- It saves the answers as `experiments/out/jev-cache-<doctrine>.json`. `npm run exp -- <assays> --policy cache:<file>` replays them offline for free. An assay that sets its own brains (A6's raiders) keeps them.
+
+**Spent: 197k input tokens, $0.0083** of a $0.10 cap.
+
+| Lane | Asked | Est. tok/q | Real tok/q | Agrees with local: Forage | Cautious | Warlike |
+|---|---|---|---|---|---|---|
+| mode | 294 | 223 | 193 | 61 % | 39 % | 60 % |
+| stance | 10 | 232 | 212 | 60 % | 60 % | 70 % |
+| get | 9 | 143 | 127 | 89 % | 89 % | 67 % |
+| carry | 8 | 249 | 224 | 75 % | 100 % | 25 % |
+| drop | 2 | 269 | 295 | 100 % | 100 % | 100 % |
+| trail | 19 | 187 | 169 | 26 % | 32 % | 21 % |
+
+- **Real tokens are 0.86–1.10× `estimateTokens`.** The estimate runs high on full requests and low on the smallest ones.
+- **Jev follows the doctrines.** This answers §10–11's "still to measure live":
+  - **Cautious** sends ants home on alarm in 71 of 78 situations (no enemy, not defending). Forage does in 35 and Warlike in 12; the local rule never does.
+  - **Warlike** turns all 11 raid-stance explorers into fighters (Forage and Cautious: 0), has carriers drop everything to fight when an enemy is near (`carry: fight`), and goes home tired in only 25 of 76 situations (Forage and Cautious: 76 of 76).
+- **Jev doesn't see why trails matter.** It tells explorers to lay nothing (`trail: none`, 14 of 19 views under Forage and Warlike, 11 under Cautious).
+
+**Replay over the arena assays** (seeds 1–10, medians; pass counts in brackets). The local column reproduces §14.2 exactly, so the merge changed no behaviour.
+
+| Assay | Metric | Local | Forage cache | Cautious cache | Warlike cache |
+|---|---|---|---|---|---|
+| A1 bridge | short share | 0.67 (0/10) | 0.59 (0/10) | 0.55 (0/10) | 0.53 (0/10) |
+| | food home | 516 | 320 | 476 | 180 |
+| A2a twin | majority share | 0.53 (0/10) | 0.52 (0/10) | 0.59 (2/10) | 0.53 (0/10) |
+| | food home | 4,726 | 626 | 342 | 274 |
+| A3 deplete | s to clear | 44 (10/10) | 3.5 (10/10) | 5 (3/10) | 3 (7/10) |
+| | following at +60 s | 0.00 | 0.00 | 0.30 | 0.00 |
+| A4 alarm | scatter | 0.00 (10/10) | 0.00 (6/10) | 0.00 (4/10) | 0.26 (6/10) |
+| | s to recover | 21 | 39 | 17 | 10.5 |
+| A5 regulate | out before food | 0.97 (0/10) | 0.97 (0/10) | 0.22 (0/10) | 0.47 (0/10) |
+| | out after | 0.91 | 0.26 | 0.00 | 0.34 |
+| A6 pass / open | exchange | 0.96 / 0.80 | unchanged (A6 sets its own brains) | | |
+
+**Why foraging collapses under Jev: ja-qnx, confirmed live.** An ablation on A2a twin (seeds 1–3, 120 s; local 1,885 / 1,816 / 1,883 food home):
+
+| Replayed | Food home |
+|---|---|
+| Forage's mode answers alone | 150 / 98 / 197 |
+| the same, minus the 11 answers "a fresh returner on strong home scent: return" | 1,873 / 1,717 / 1,895 |
+| `trail` alone | 1,884 / 1,825 / 1,868 |
+| `get` + `carry` + `drop` | unchanged |
+
+- A returning ant that reaches home is still in `return` mode. With a strong home scent ahead it is asked "return?", Jev says yes (11 of 11 under Forage and Cautious, 7 of 11 under Warlike), and the ant parks at the nest.
+- The mode situation can't tell the ant is already home. Another session's branch added `atNest` to it, and Jev still answered "return" there in 10 situations. **The fix needs a mechanic or new wording, not just a field.** Two candidates:
+  - an ant told to return while already home heads back out;
+  - "return" at the nest means resting, which needs MR 5's activation to end the rest.
+- Here the trail lane alone did nothing in 120 s. In the 60×40 bridge, Jev's `trail: none` halved food home. Turn the trail lane on only once the legend says the colony finds food and home through these scents (MR 3).
+
+The live check and replay for each later MR use the same command: `node scripts/colony-live.mjs <lanes> --budget 0.10`, then `npm run exp -- … --policy cache:experiments/out/jev-cache-<doctrine>.json`.

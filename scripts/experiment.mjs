@@ -4,11 +4,20 @@
 //
 // Usage: node scripts/experiment.mjs <assay ...|all> [--seeds 1-10] [--seconds N]
 //          [--set colony.deposit=2,4,8] [--set game.fight.rate=1,2] [--json out.json]
+//          [--policy cache:<file>]
 //
 // --set takes a dotted path under colony / rival / game and a comma list of
 // values; several --set flags run their cross product. Pheromone channels are
 // colony.channels.<food|home|alarm>.<evaporation|diffusion>.
-import { writeFileSync } from "node:fs";
+//
+// --policy cache:<file> replays Jev's cached answers for the player's colony
+// ({ modes: { situationKey: mode }, stances: { stanceKey: stance }, responses:
+// { hook: { touchKey: answer } } }, as scripts/colony-live.mjs saves them):
+// free, offline, over every seed. Anything the cache lacks falls back to the
+// local rule; an assay that sets its own brains (A6's raiders) keeps them.
+import { readFileSync, writeFileSync } from "node:fs";
+import { localPolicy, localStance } from "../web/src/colony/colony.ts";
+import { responsesFromAnswers, situationKey, stanceKey } from "../web/src/colony/colonyBrain.ts";
 import { ASSAYS, runAssay } from "../web/src/colony/experiment.ts";
 
 const args = process.argv.slice(2);
@@ -16,18 +25,34 @@ const ids = [];
 let seeds = range("1-10");
 let seconds;
 let json;
+let brains = {};
 const sets = [];
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
   if (a === "--seeds") seeds = range(args[++k]);
   else if (a === "--seconds") seconds = Number(args[++k]);
   else if (a === "--json") json = args[++k];
+  else if (a === "--policy") brains = loadPolicy(args[++k]);
   else if (a === "--set") {
     const [path, values] = args[++k].split("=");
     sets.push({ path, values: values.split(",").map(parse) });
   } else ids.push(a);
 }
 const chosen = ids.length === 0 || ids.includes("all") ? ASSAYS : ids.map((id) => ASSAYS.find((x) => x.id === id) ?? fail(`no assay "${id}" (have: ${ASSAYS.map((x) => x.id).join(", ")})`));
+
+/** The player's brains from `local` (the default) or `cache:<file>`. */
+function loadPolicy(spec) {
+  if (spec === "local") return {};
+  if (!spec.startsWith("cache:")) fail(`--policy ${spec}: local or cache:<file>`);
+  const cache = JSON.parse(readFileSync(spec.slice(6), "utf8"));
+  const modes = cache.modes ?? {};
+  const stances = cache.stances ?? {};
+  return {
+    policy: (s) => modes[situationKey(s)] ?? localPolicy(s),
+    stance: (s) => stances[stanceKey(s)] ?? localStance(s),
+    responses: responsesFromAnswers(cache.responses ?? {}),
+  };
+}
 
 function fail(msg) {
   console.error(msg);
@@ -75,7 +100,7 @@ const all = [];
 for (const assay of chosen) {
   console.log(`\n## ${assay.title}\n\nTarget: ${assay.target}. Seeds ${seeds[0]}–${seeds.at(-1)}, ${seconds ?? assay.seconds} s.\n`);
   for (const { label, o } of combos()) {
-    const runs = seeds.map((seed) => runAssay(assay, seed, o, seconds));
+    const runs = seeds.map((seed) => runAssay(assay, seed, { ...o, ...brains }, seconds));
     all.push({ assay: assay.id, label, overrides: o, runs });
     const keys = Object.keys(runs[0].metrics).filter((k) => k !== "pass");
     const passes = runs.filter((r) => r.metrics.pass === 1).length;
