@@ -54,6 +54,8 @@ function odourColour(ink: [number, number, number], warn: [number, number, numbe
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
 const HEX_ZOOM = 12;
 const HOME_RGB: [number, number, number] = [196, 110, 40];
+/** Chamber washes by role (nest slice 3), faint enough to read in both themes: the queen's violet, brood rose, store gold, reception teal, midden grey. */
+const ROLE_RGB: Record<string, [number, number, number]> = { royal: [128, 84, 176], brood: [196, 96, 120], store: [196, 156, 48], reception: [48, 150, 150], midden: [120, 120, 110] };
 /** At or above this zoom (device px per cell) a brush paints its own radius; zoomed further out it widens to match. */
 const BRUSH_ZOOM = 6;
 /** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
@@ -180,7 +182,8 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
       const homeC = colony.ph.fields.home.chunk(cx, cy);
       const alarmC = colony.ph.fields.alarm.chunk(cx, cy);
       const sporeC = fungus.spores.chunk(cx, cy);
-      const chamberC = colony.map.chambers?.cell.chunk(cx, cy); // nest slice 2: dug chambers, a faint wash
+      const chambers = colony.map.chambers;
+      const chamberC = chambers?.cell.chunk(cx, cy); // nest slice 2: dug chambers, a faint wash; slice 3: tinted by role
       const [fr, fg, fb] = rgb(theme.accent);
       const show = layers.current;
       const px = c.img.data;
@@ -242,10 +245,12 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
             px[o + 2] = HOME_RGB[2];
             px[o + 3] = Math.round(h * 90);
           } else if (chamberC && chamberC[i]) {
-            px[o] = theme.chamber[0];
-            px[o + 1] = theme.chamber[1];
-            px[o + 2] = theme.chamber[2];
-            px[o + 3] = 55;
+            const role = chambers!.list[(chamberC[i] as number) - 1]?.role ?? "none";
+            const tint = ROLE_RGB[role] ?? theme.chamber;
+            px[o] = tint[0];
+            px[o + 1] = tint[1];
+            px[o + 2] = tint[2];
+            px[o + 3] = role === "none" ? 55 : 70;
           } else px[o + 3] = 0;
         }
       }

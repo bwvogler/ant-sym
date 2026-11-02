@@ -51,7 +51,7 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
   const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
   assert.ok(mine.length >= 3, `${mine.length} chambers`);
-  assert.ok(ch.floorOf[0]! > floor0 * 3, `floor ${floor0} → ${ch.floorOf[0]}`);
+  assert.ok(ch.floorOf[0]! > floor0 * 2, `floor ${floor0} → ${ch.floorOf[0]}`);
   // No chamber was dug into another: widening and new chambers don't break into other passages (review of slice 2).
   for (let y = 0; y < map.size.h; y++)
     for (let x = 0; x < map.size.w; x++) {

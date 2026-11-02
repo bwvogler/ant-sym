@@ -1373,3 +1373,49 @@ Food home is down because less digging reaches less of the food underground. Pel
 4. New chambers kept their spacing only from the colony's own chambers; now from every colony's.
 
 **Jev cost:** unchanged.
+
+## 32. Chamber roles, road signs, and asking an ant where it is (nest slice 3, ja-4n4 with ja-qnx, 2026-11-02)
+
+The nest's chambers have jobs, its floors carry road signs, and an ant inside the nest is asked by where it is (docs/nest-and-home.md §3.3).
+
+**Roles.** A chamber takes its role when it is started:
+- The founding chamber is **royal**.
+- The colony's first chamber more than 4 rows above the royal one is **reception**.
+- Any more than 2 rows below the royal one is a **store**.
+- The rest are **brood**.
+- Midden is for slice 7.
+
+Over seeds 1–3, each colony has its royal and reception chambers, 4–7 brood and 4–6 store chambers.
+
+**Road signs** are five mark channels in the colony's pheromones (`MARKS`: royal, brood, store, reception, midden).
+- Underground, an ant lays the mark of the last chamber it was in. The mark is fainter the longer it has been away (`MARK_DEPOSIT` 4 per second, falling to 1/e after `MARK_DECAY` 30 s), the way walking out lays home trail. So every tunnel smells of what lies back along it, and each junction carries the signs of each branch (Heyman et al. 2017).
+- Marks fade slowly (1 % a second) and don't spread. Spreading them kept twice the chunks awake and cost about 10 % of a tick.
+- On the ground and on the top-down maps they are never laid and stay asleep.
+- **Homing in a tunnel** goes by the mark of where it is going (`SIGN_WEIGHT` 4 × the home trail). For now that is royal; slice 5 sends food carriers to reception.
+- **A strong mark underfoot** corrects the in-nest memory, as the home trail does (slice 1).
+
+**The situation.** Underground in the side view, `homeTrail` no longer reads the home trail. It says where the ant is: `tunnel`, or a chamber of its colony by role. On the ground, and on the top-down maps, it is the home trail's level as before.
+- An ant that has just put food down in the royal chamber is now asked "in the royal chamber". Before, it was asked "home trail strong", the same question as an ant on the walkway by the hole, so a cached "return" could park it at home for good (`ja-qnx`). Jev's answer for "royal" sends it out.
+- The legend says what the places mean and that an ant inside the nest is home. `COLONY_BRAIN_VERSION` is 4.
+- `SITUATIONS` is 3,888 (home: 3 trail levels or 6 places).
+
+**Jev cost.**
+- **Per situation:** about 237 input tokens on the ground, 238 in the nest, against about 235 before, from `estimateTokens` on 100 situations to a request. The legend is a little longer.
+- **Distinct situations a game asks** (both colonies, one doctrine; seeds 1–3, 600 s): 209–242, of them 128–159 in the nest. Slice 2 asked 88–91.
+- Situations are cached per doctrine, so a game's questions cost about 55k input tokens once, against 21k: about $0.002 at $0.042/M. No live run: there is no API key in the cloud.
+
+**Measured** (side view, 600 + 600 ants, 600 s, seeds 1–3, against slice 2's §31 runs):
+
+| Seed | Slice 2: out > 120 s | food home | Slice 3: out > 120 s | food home |
+|---|---|---|---|---|
+| 1 | 2.2 % | 2800 | 2.0 % | 2538 |
+| 2 | 1.2 % | 2348 | 1.0 % | 2747 |
+| 3 | 1.3 % | 2668 | 1.8 % | 2810 |
+
+**Tick time** (back to back): side view two colonies 6.35 ms against 5.90 ms (+8 %); one colony about the same.
+
+**Rendering:** chambers are washed by role: the queen's violet, brood rose, store gold, reception teal, midden grey.
+
+**Tests:** `marks.test.ts`:
+- every chamber gets a role, and the royal mark is strongest in the royal chamber;
+- an ant home with food is asked "royal", and on the ground the home trail level.
