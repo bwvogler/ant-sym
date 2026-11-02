@@ -649,14 +649,15 @@ export class Colony {
         const run = tunnelHeading(map, cx, cy);
         let aim = (Number.isNaN(run) ? (DIR_ANGLE[dir] as number) : run) + gauss(this.#rng) * TUNNEL_DRIFT;
         // A fork is a Y: this arm 60° to one side, the other 60° to the other, dug by the next digger to pass.
-        let other = NaN;
+        let forkSide = 0;
         if (this.#rng() < FORK) {
-          const s = this.#rng() < 0.5 ? -1 : 1;
-          aim += s * (Math.PI / 3);
-          other = aim - s * ((2 * Math.PI) / 3);
+          forkSide = this.#rng() < 0.5 ? -1 : 1;
+          aim += forkSide * (Math.PI / 3);
         }
         const dug = chooseDig(map, cx, cy, aim, this.#rng());
-        if (dug >= 0 && !Number.isNaN(other)) markFork(map, cx, cy, other);
+        // The other arm two ways round from the way actually dug, on the other side: never next to it, so both
+        // stay a tunnel's end (taken from the aim, a dithered dig put the two arms side by side about 1 fork in 8).
+        if (dug >= 0 && forkSide !== 0) markFork(map, cx, cy, DIR_ANGLE[(dug - 2 * forkSide + 12) % 6] as number);
         if (dug < 0 && rockAt(map, stepX(cx, cy, next), stepY(cy, next)) !== OPEN) {
           this.gx[i] = NO_CELL; // walled in on every side (it can't be, having walked in): steer freely
           return false;
