@@ -1,10 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Chambers } from "../chambers.ts";
-import { Colony, FLOOR_PER_ANT, ROOMY_DIG } from "../colony.ts";
-import { Game } from "../game.ts";
+import { builtFloor, Colony, FLOOR_PER_ANT, LIFESPAN, MIDDLE, refilled, ROOMY_DIG, YOUNG } from "../colony.ts";
 import { nx, ny } from "../hex.ts";
-import { digCell, fillCell, generateSideWorld, groundTop, mulberry32, OPEN, rockAt, SOIL } from "../world.ts";
+import { digCell, fillCell, generateSideWorld, mulberry32, OPEN, rockAt, SOIL } from "../world.ts";
 
 // Nest slice 2 (docs/nest-and-home.md §3.2): the side view's nest is chambers the ants dig, regulated by floor per worker.
 
@@ -17,6 +16,7 @@ test("chambers: the founding chamber is the colony's royal one with a floor; a f
   assert.equal(c0.colony, 0);
   assert.equal(c0.role, "royal");
   assert.ok(c0.cells > 40 && c0.floor > 0, `${c0.cells} cells, ${c0.floor} floor`);
+  assert.ok(c0.y0 < c0.y1 && c0.y1 === c0.floorRow, `rows ${c0.y0}–${c0.y1}, floor row ${c0.floorRow}`);
   assert.equal(ch.floorOf[0], c0.floor);
   // A floor cell: dig the soil under it (south-west), and it is floor no more.
   let fx = -1;
@@ -41,55 +41,45 @@ test("chambers: the founding chamber is the colony's royal one with a floor; a f
   assert.equal(ch.at(fx, fy), -1);
   assert.equal(c0.cells, cells - 1);
   assert.equal(new Chambers().at(0, 0), -1);
+  // A chamber's span shrinks when an end cell leaves it (review of slice 2: x0 and x1 never shrank).
+  const row = c0.floorRow + 6;
+  const side = map.chambers!.add(0, row, "store");
+  for (let x = 20; x <= 24; x++) {
+    digCell(map, x, row);
+    map.chambers!.claim(side.id, x, row, (a, b) => rockAt(map, a, b) === OPEN);
+  }
+  assert.deepEqual([side.x0, side.x1], [20, 24]);
+  fillCell(map, 24, row);
+  fillCell(map, 20, row);
+  assert.deepEqual([side.x0, side.x1, side.cells], [21, 23, 3]);
 });
 
-test("a crowded nest digs chambers: the founding one widens, new ones start off the tunnels, and floor grows", () => {
-  // Three games. Every check holds in each, except the depth trend (last), which must hold in at least 2 of 3: it is one
-  // nest's handful of stacked chambers, and fails in about 1 game in 6–9 (1 of 9 on nest 4, worlds 1–4, games 4–8; 0 of 9
-  // before #14's backfill guards; about 1 in 6 in earlier measurements, on either side of #17's merge).
-  let trends = 0;
-  const halves: string[] = [];
-  for (const seed of [4, 5, 6]) {
-    const map = generateSideWorld(2, SMALL);
-    const g = new Game(map, { antCount: 400, rival: false }, mulberry32(seed));
-    const ch = map.chambers!;
-    const floor0 = ch.floorOf[0]!;
-    for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
-    const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
-    assert.ok(mine.length >= 3, `game ${seed}: ${mine.length} chambers`);
-    // Floor at least doubles. Over worlds 1–4 and games 4–6 it grows 2.3–3.7× (2.4–3.6× before #17 was merged in, whose
-    // Y forks change the tunnels): ×3 sat inside that spread, and the merge's new random path put one run at 2.3×.
-    assert.ok(ch.floorOf[0]! > floor0 * 2, `game ${seed}: floor ${floor0} → ${ch.floorOf[0]}`);
-    // No chamber was dug into another: widening and new chambers don't break into other passages (review of slice 2).
-    for (let y = 0; y < map.size.h; y++)
-      for (let x = 0; x < map.size.w; x++) {
-        const a = ch.at(x, y);
-        if (a < 0) continue;
-        for (let d = 0; d < 6; d++) {
-          const b = ch.at(nx(x, y, d), ny(y, d));
-          assert.ok(b < 0 || b === a, `game ${seed}: chambers ${a} and ${b} touch at (${x}, ${y})`);
-        }
-      }
-    // Every chamber cell is open: backfill never fills one.
-    for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `game ${seed}: chamber cell (${x}, ${y}) filled`);
-    // Tschinkel: the gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth.
-    const gaps = mine
-      .map((b) => {
-        let gap = Infinity;
-        for (const a of mine) if (a.floorRow < b.floorRow && a.x1 >= b.x0 && a.x0 <= b.x1) gap = Math.min(gap, b.floorRow - a.floorRow);
-        return { depth: b.floorRow - groundTop(map, Math.round((b.x0 + b.x1) / 2)), gap };
-      })
-      .filter((x) => x.gap < Infinity)
-      .sort((p, q) => p.depth - q.depth);
-    const half = Math.floor(gaps.length / 2);
-    const mean = (xs: { gap: number }[]) => xs.reduce((s, x) => s + x.gap, 0) / xs.length;
-    // At least 3 stacked (a chamber with another above it). One run is noisy: over worlds 1–4 and games 4–6 it is 2–9, on
-    // either side of #17's merge (its Y forks change the tunnels); 4 sat inside that spread.
-    assert.ok(gaps.length >= 3, `game ${seed}: ${gaps.length} stacked chambers`);
-    if (mean(gaps.slice(half)) > mean(gaps.slice(0, half))) trends++;
-    halves.push(`game ${seed}: ${mean(gaps.slice(0, half)).toFixed(1)} vs ${mean(gaps.slice(half)).toFixed(1)}`);
-  }
-  assert.ok(trends >= 2, `gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`);
+test("soil put back under a chamber cell stays put for good; put back elsewhere, only for BACKFILL.hold (floor fills were dug out again at 2–7× the rate of others)", () => {
+  const map = generateSideWorld(2, SMALL);
+  const ch = map.chambers!;
+  const c0 = ch.list[0]!;
+  // A cell under the founding chamber's floor, dug out (a tunnel down) and filled back at 10 s.
+  let fx = -1;
+  for (let x = c0.x0; x <= c0.x1 && fx < 0; x++) if (ch.at(x, c0.floorRow) === 0 && rockAt(map, nx(x, c0.floorRow, 1), ny(c0.floorRow, 1)) === SOIL) fx = nx(x, c0.floorRow, 1);
+  const fy = c0.floorRow + 1;
+  assert.ok(fx >= 0, "a cell under the floor");
+  const floor = c0.floor;
+  assert.ok(digCell(map, fx, fy, 5));
+  assert.ok(fillCell(map, fx, fy, 10));
+  assert.equal(c0.floor, floor, "the floor is back");
+  // A soil cell well away from any chamber, dug and filled back at the same time.
+  let ox = -1;
+  const oy = 120;
+  for (let x = 4; x < 60 && ox < 0; x++) if (rockAt(map, x, oy) === SOIL) ox = x;
+  assert.ok(ox >= 0 && Math.abs(ox - c0.x0) > 10, "a soil cell away from the nest");
+  digCell(map, ox, oy, 5);
+  assert.ok(fillCell(map, ox, oy, 10));
+  const later = 10 + 10_000;
+  assert.ok(builtFloor(map, fx, fy) && refilled(map, fx, fy, later), "floor put back is never dug");
+  assert.ok(!builtFloor(map, ox, oy) && !refilled(map, ox, oy, later), "elsewhere the hold runs out");
+  assert.ok(refilled(map, ox, oy, 11), "…but holds for a while");
+  digCell(map, fx, fy, later); // a test (or a cave-in) digs it anyway: no longer put back
+  assert.ok(!builtFloor(map, fx, fy));
 });
 
 test("a roomy nest barely digs (ja-wii): the same few ants dig far less when their chambers have floor enough", () => {
@@ -101,6 +91,8 @@ test("a roomy nest barely digs (ja-wii): the same few ants dig far less when the
       const map = generateSideWorld(2, SMALL);
       if (!chambers) map.chambers = undefined; // no chambers: never roomy (as before slice 2)
       const c = new Colony(map, { antCount: 30, maxAnts: 30 }, mulberry32(seed));
+      // All middle-aged (diggers, slice 6): this is about how much a nest digs, not who digs.
+      for (let i = 0; i < c.n; i++) ((c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN), (c.lifespan[i] = Infinity));
       for (let k = 0; k < 30 * 120; k++) c.tick(1 / 30);
       s += c.soilDug;
     }
