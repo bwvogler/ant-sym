@@ -5,34 +5,14 @@ import { DOCTRINES, estimateTokens, packModeRequest } from "../colony/colonyBrai
 import type { FungalSituation } from "../colony/fungalPolicy.ts";
 import { AIMS, offeredFor, packFungusRequest } from "../colony/fungusBrain.ts";
 import { INTERVENTIONS, type Fungus } from "../colony/fungus.ts";
-import { ColonyJev, type CacheStore, type ColonyJevState } from "./colonyJev.ts";
+import { browserCache } from "./cacheStore.ts";
+import { ColonyJev, type ColonyJevState } from "./colonyJev.ts";
 
 // React face of the colonies' Jev client: one client for the page's life
 // (the colonies change with the world, the caches do not), its state mirrored
 // into React, each colony's doctrine (its nature: a scenario setting, not the
 // player's lever) and the fungus's aim (the player's). Cached answers live in
-// localStorage under their context.
-
-const STORE_PREFIX = "jev-ants:colony-policy:";
-
-const localStore: CacheStore = {
-  load(context) {
-    try {
-      const raw = localStorage.getItem(STORE_PREFIX + context);
-      const entries = raw ? (JSON.parse(raw) as unknown) : [];
-      return Array.isArray(entries) ? entries.filter((e): e is [string, string] => Array.isArray(e) && typeof e[0] === "string" && typeof e[1] === "string") : [];
-    } catch {
-      return []; // storage blocked or unreadable: start cold
-    }
-  },
-  save(context, entries) {
-    try {
-      localStorage.setItem(STORE_PREFIX + context, JSON.stringify(entries));
-    } catch {
-      // storage blocked or full: the cache still lives for this page load
-    }
-  },
-};
+// localStorage under their context (cacheStore.ts).
 
 /** Estimated input tokens per situation, from the size of a full request (the ledger counts the real ones). */
 const SAMPLE: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
@@ -54,7 +34,7 @@ export interface DoctrineChoice {
 const FIRST_DOCTRINES: DoctrineChoice[] = COLONY_NAMES.map(() => ({ id: DOCTRINES[0]!.id, text: DOCTRINES[0]!.text }));
 
 export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: readonly string[]) {
-  const jev = useMemo(() => new ColonyJev({}, localStore), []);
+  const jev = useMemo(() => new ColonyJev({}, browserCache), []);
   const [state, setState] = useState<ColonyJevState>(jev.state);
   const [doctrines, setDoctrinesState] = useState<DoctrineChoice[]>(FIRST_DOCTRINES);
   const [aim, setAimState] = useState<DoctrineChoice>({ id: AIMS[0]!.id, text: AIMS[0]!.text });

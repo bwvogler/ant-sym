@@ -368,3 +368,30 @@ test("cached: a 409 halts and releases every parked ant", async () => {
   assert.equal(st.pending, 0);
   assert.equal(parked(e), 0);
 });
+
+test("dispose while Start is on the wire: no run opens, nothing is asked, and the server's run is stopped (ja-7tf)", async () => {
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  const actions: string[] = [];
+  let jev = 0;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).startsWith("/api/run")) {
+      const action = init?.body ? (JSON.parse(String(init.body)) as { action?: string }).action : "status";
+      actions.push(String(action));
+      if (action === "start") await held;
+      return { ok: true, status: 200, json: async () => RUN } as Response;
+    }
+    jev++;
+    return { ok: false, status: 503, json: async () => ({ error: "unused" }) } as Response;
+  }) as typeof fetch;
+  const e = world();
+  const s = make(e, { intervalMs: 10 });
+  const started = s.start({ capUsd: 0.1 });
+  s.dispose();
+  release();
+  await started;
+  await tick(60);
+  assert.notEqual(s.state.phase, "running");
+  assert.equal(jev, 0, "no Jev call from a disposed scheduler");
+  assert.deepEqual(actions, ["start", "stop"], "the run Start opened is closed");
+});

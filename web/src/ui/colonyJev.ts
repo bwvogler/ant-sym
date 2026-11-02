@@ -1,5 +1,5 @@
 import type { JevAnswer, JevProxyReply, JevRequest, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
-import { localPolicy, localStance, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
+import { localPolicy, localStance, MODES, STANCES, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
 import { fungalKey, fungusContext, offeredFor, offeredIn, packFungusRequest, readIntervention, worthAsking } from "../colony/fungusBrain.ts";
@@ -62,9 +62,23 @@ export interface ColonyJevState {
 
 type Listener = (s: ColonyJevState) => void;
 
+type LaneName = "mode" | "stance" | "fungus";
+
+/**
+ * Whether `answer` is one a lane's question could have given for `key`: a mode, a stance, or an intervention the
+ * host was offered. Answers loaded from storage are checked with it (ja-ue6): any string used to be accepted, and a
+ * bad one became a permanent hit (a stance outside STANCES would corrupt the situation index).
+ */
+export function validAnswer(lane: LaneName, key: string, answer: unknown): boolean {
+  if (typeof answer !== "string") return false;
+  if (lane === "mode") return (MODES as readonly string[]).includes(answer);
+  if (lane === "stance") return (STANCES as readonly string[]).includes(answer);
+  return offeredIn(key).includes(answer);
+}
+
 /** One stream of questions: how to key, pack and read them, the local fallback, and the words they are asked under. */
 interface Lane<S, A extends string> {
-  name: "mode" | "stance" | "fungus";
+  name: LaneName;
   key: (s: S) => string;
   pack: (items: { id: string; key: string; situation: S }[], words: string) => JevRequest;
   /** the answer to item `id`, asked under `key`, or null when it is not one the question allowed */
@@ -126,6 +140,10 @@ export class ColonyJev {
   #runSeq = 0;
   /** cycles to sit out after a failed call, so a broken upstream is not hammered */
   #cooldown = 0;
+  /** set by dispose: a Start reply landing afterwards must not open a run on a client nobody shows (ja-7tf) */
+  #disposed = false;
+  /** where the next cycle starts in the lanes, so no lane waits behind the others' long queues (ja-ytc) */
+  #nextLane = 0;
   #listeners = new Set<Listener>();
   #state: ColonyJevState = { phase: "off", run: null, asked: 0, stancesAsked: 0, requests: 0, hits: 0, misses: 0, cached: 0, stancesCached: 0, doctrineCached: [], fungusAsked: 0, fungusCached: 0, failures: 0, lastError: null };
 
@@ -156,7 +174,8 @@ export class ColonyJev {
   #cache<S, A extends string>(l: Lane<S, A>, context = l.context): PolicyCache<A> {
     let c = this.#caches.get(context);
     if (!c) {
-      c = new PolicyCache<string>(context, this.#store?.load(context) ?? []);
+      // Stored answers are kept only if this lane's question could have given them.
+      c = new PolicyCache<string>(context, (this.#store?.load(context) ?? []).filter(([key, a]) => validAnswer(l.name, key, a)));
       this.#caches.set(context, c);
     }
     return c as unknown as PolicyCache<A>;
@@ -291,14 +310,18 @@ export class ColonyJev {
     this.setDoctrineFor(0, text);
   }
 
-  /** A new doctrine for colony k: its own caches (free if used before, by either colony), and its ants reconsider under it. */
+  /**
+   * A new doctrine for colony k: its own caches (free if used before, by either colony), and its ants reconsider under
+   * it. A colony that has no doctrine of its own follows the first colony's, now as well as at the next game (ja-6yj).
+   */
   setDoctrineFor(k: number, text: string): void {
     this.#doctrines[k] = text;
-    const d = this.#driven[k];
-    if (!d) return;
-    const a = this.#recontext(d.modes, text);
-    const b = this.#recontext(d.stances, text);
-    if (a || b) d.colony.reconsider();
+    this.#driven.forEach((d, j) => {
+      if (j !== k && !(k === 0 && this.#doctrines[j] === undefined)) return;
+      const a = this.#recontext(d.modes, text);
+      const b = this.#recontext(d.stances, text);
+      if (a || b) d.colony.reconsider();
+    });
   }
 
   async start(caps: Partial<RunCaps> = COLONY_CAPS): Promise<void> {
@@ -312,6 +335,11 @@ export class ColonyJev {
       }
     } catch (e) {
       this.#set({ lastError: `start failed: ${String(e)}` });
+      return;
+    }
+    if (this.#disposed) {
+      // The page went away while Start was on the wire: close the run it opened, start no timers (ja-7tf).
+      void fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) }).catch(() => {});
       return;
     }
     this.#runSeq++;
@@ -338,6 +366,7 @@ export class ColonyJev {
   }
 
   dispose(): void {
+    this.#disposed = true;
     this.#halt();
     this.#aborter.abort();
     this.#listeners.clear();
@@ -377,8 +406,16 @@ export class ColonyJev {
     }
     // Never past the server's own limit (JEV_IN_FLIGHT): a call over it would only come back 429 busy.
     const width = Math.min(this.opts.inFlight, this.#state.run?.maxInFlight ?? this.opts.inFlight);
-    for (const l of this.#lanes()) {
-      while (this.#inFlight < width && l.queue.size > 0) {
+    // One batch per lane per pass, starting one lane further on each cycle: a lane with a long queue (the modes, early
+    // in a game) no longer holds every slot while the fungus and the other colonies wait (ja-ytc).
+    const lanes = this.#lanes();
+    const first = this.#nextLane++ % lanes.length;
+    for (let moved = true; moved && this.#inFlight < width; ) {
+      moved = false;
+      for (let j = 0; j < lanes.length && this.#inFlight < width; j++) {
+        const l = lanes[(first + j) % lanes.length] as Lane<unknown, string>;
+        if (l.queue.size === 0) continue;
+        moved = true; // every pass takes something out of a non-empty queue, so this ends
         const batch: [string, unknown][] = [];
         for (const [k, s] of l.queue) {
           if (batch.length >= this.opts.batch) break;
@@ -413,8 +450,11 @@ export class ColonyJev {
         return;
       }
       if (res.status === 429 && (body as { error?: string }).error === "busy") {
-        // Ask again next cycle, but only for the context it was asked under and only what that context hasn't cached since.
-        if (seq === this.#runSeq && context === l.context) for (const it of items) if (!this.#cache(l).get(it.key)) l.queue.set(it.key, it.situation);
+        // Ask again next cycle, under the context it was asked under, for what that context hasn't cached since. Into
+        // every current lane asking under that context, not only the one that sent it: that lane may be gone (a new
+        // game) or have moved to another doctrine, and other colonies' lanes skipped these while they were in flight (ja-1u2).
+        if (seq === this.#runSeq)
+          for (const m of this.#lanes()) if (m.name === l.name && m.context === context) for (const it of items) if (!this.#cache(m, context).get(it.key)) m.queue.set(it.key, it.situation);
         this.#set({ [counted]: this.#state[counted] - items.length, run: (body as { run?: RunSummary }).run ?? this.#state.run });
         return;
       }

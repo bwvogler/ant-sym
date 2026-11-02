@@ -113,6 +113,8 @@ export class JevScheduler {
   #aborter = new AbortController();
   /** Bumps on every start, so a look that began in an old run cannot steer the new one. */
   #runSeq = 0;
+  /** set by dispose: a Start reply landing afterwards must not open a run on a scheduler nobody shows (ja-7tf) */
+  #disposed = false;
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
   #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, stoppedFor: null, sessionUsd: 0, sessionTokens: 0, cache: { hits: 0, waited: 0, asked: 0, situations: 0 } };
@@ -169,6 +171,11 @@ export class JevScheduler {
       }
     } catch (e) {
       this.#set({ lastError: `start failed: ${String(e)}` });
+      return;
+    }
+    if (this.#disposed) {
+      // The page went away while Start was on the wire: close the run it opened, start no timers (ja-7tf).
+      void fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) }).catch(() => {});
       return;
     }
     this.#runSeq++;
@@ -255,6 +262,7 @@ export class JevScheduler {
   }
 
   dispose(): void {
+    this.#disposed = true;
     this.#halt();
     this.#aborter.abort();
     this.#listeners.clear();
