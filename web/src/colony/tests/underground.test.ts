@@ -2,14 +2,27 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Colony } from "../colony.ts";
 import { Game } from "../game.ts";
-import { generateWorld, mulberry32 } from "../world.ts";
+import { generateWorld, mulberry32, OPEN, rockAt } from "../world.ts";
+import { CELL, cellOf } from "../hex.ts";
 
 // The underground world end to end, in its own file: node --test's timeout covers a whole file, and the game file is near it.
 
 test("underground: both colonies dig tunnels out of their chambers, soil goes on the mounds, food is reached, and food is never made or lost", () => {
   const map = generateWorld(3, { size: { w: 256, h: 192 }, nestGap: 100 });
   const g = new Game(map, { antCount: 300, rivalAnts: 300 }, mulberry32(21));
-  for (let k = 0; k < 30 * 200; k++) g.tick(1 / 30);
+  // No ant ever stands inside soil or rock: its stored (float32) position's cell is open, every tick. (Main's
+  // square-grid test of a step rounding onto a soil cell's edge, review of #8, kept as an invariant on hexes.)
+  let inSolid = 0;
+  for (let k = 0; k < 30 * 200; k++) {
+    g.tick(1 / 30);
+    for (const c of g.colonies)
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i]) continue;
+        cellOf(c.x[i] as number, c.y[i] as number);
+        if (rockAt(map, CELL[0] as number, CELL[1] as number) !== OPEN) inSolid++;
+      }
+  }
+  assert.equal(inSolid, 0, "ant-ticks inside a solid cell");
   const [you, rival] = g.colonies as [Colony, Colony];
   for (const c of g.colonies) {
     assert.ok(c.soilDug > 150, `dug ${c.soilDug}`);
