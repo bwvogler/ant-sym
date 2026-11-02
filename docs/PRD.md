@@ -1320,3 +1320,50 @@ The cost is a cell lookup and a scent read per ant per tick, and the belief is c
 - side.test.ts's "never away from the hole" now reads "never away from where it believes the hole is" (searching aside).
 
 **Jev cost:** unchanged. `down` is a sense in the sim, but not yet in the situation; slice 3 decides that.
+
+## 31. Ants dig the nest's chambers, as much as they need (nest slice 2, ja-60r with ja-wii, 2026-11-02)
+
+The side view's nest is no longer one pre-dug disc. The ants dig chambers off its tunnels, as many as the colony's crowding asks for (docs/nest-and-home.md §3.2).
+
+**Chambers** (`chambers.ts`, pure). Each chamber knows its cells, its floor, its colony, its role and its brood (slice 4 fills brood in).
+- The founding disc is chamber 0 and is royal.
+- Floor is a chamber cell with ground under it to stand on. At first floor needed ground under both of a cell's lower neighbours. Every tunnel dug down out of a chamber then took two floor cells with it, and the founding chamber's floor wore away to nothing.
+- Backfill never fills a chamber cell.
+
+**Crowding regulates digging.** A colony is crowded while its chambers' floor is less than `FLOOR_PER_ANT` (0.1) per ant underground.
+- **Crowded,** explorers widen their chamber along its floor, 2 rows high. Widening is likelier near the top, where traffic is (`WIDEN_DEPTH` 30), and brood pulls it (`BROOD_PULL`, from slice 4).
+- **Crowded,** explorers in tunnels also start new chambers sideways, likelier near the top (`exp(−depth / 40)`).
+  - None start in the top 8 rows. One started 5 rows down beside the shaft trapped a whole colony's pellet carriers.
+  - None start within `4 + 0.15 × depth` rows of a chamber in the same stack.
+- **Roomy,** every other kind of digging happens at `ROOMY_DIG` (15 %) of its rate: tunnel ends, starts off walls, faces met head-on. A 30-ant colony in the founding chamber dug 3–7 cells in two minutes, against about 78 without chambers.
+
+**Gravity, again.** A homing ant inside the hole goes down and never steps back up onto the ground. The walkway's home scent is stronger than the shaft's, the ground walk sends it back to the hole, and the goal flipping between hole and chamber restarted its stall clock. On seed 3 this rocked 146 ants of one colony in the hole for minutes. With the fix, seed 3 is at 1 % out over 120 s.
+
+**Measured** (side view, 600 + 600 ants, 600 s, seeds 1–6; the slice 1 numbers are from §30):
+
+| | Slice 1 | Slice 2 |
+|---|---|---|
+| Cells dug, all colonies | 43,422 | 28,744 (−34 %) |
+| Floor per ant underground | none | held at 0.08–0.15 (crowded 22–43 % of the time) |
+| Chambers per colony at 600 s | 1 (given) | 9–16 |
+| Out over 120 s, mean / worst | 1.45 % / 11 % | 1.7 % / 11 % |
+| Food home | 16,705 | 15,481 (−7 %) |
+
+Food home is down because less digging reaches less of the food underground. Seed 6's first colony is 5.6 % out, most of them pellet carriers climbing out of wide chambers by straight line and Bug2 (filed as a follow-up).
+
+**Depth profile** (Tschinkel; per 10-row band below the ground):
+- **Gap to the chamber above in the same stack** grows with depth on all 12 colonies: about 4–7 rows at 10–20 deep, 6–14 at 20–30, 10–17 at 30–40, and 13–34 below 40.
+- **Size:** chambers are largest 10–30 rows down (mean 23–61 cells) and small below 30 (2–14 cells).
+- **The topmost 10 rows** hold smaller chambers than the next band: none start in the top 8 rows, and the crust and mound are there.
+
+**Tick time** (back to back with slice 1): side view one colony 2.85 ms against 2.71 ms; two colonies 5.77 ms against 5.34 ms (+5–8 %).
+
+**Rendering:** chamber cells are a faint mound-coloured wash; slice 3 tints them by role.
+
+**Tests:** `chambers.test.ts` covers:
+- bookkeeping;
+- a crowded nest digging chambers, with floor growing and gaps growing with depth;
+- a roomy nest barely digging;
+- `homing.test.ts`: gravity in the hole.
+
+**Jev cost:** unchanged.

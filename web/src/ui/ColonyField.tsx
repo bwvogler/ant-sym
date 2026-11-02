@@ -130,7 +130,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     const miniImg = miniCtx.createImageData(mini.width, mini.height);
     let miniAt = -Infinity;
 
-    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), sky: rgb("#e4edf1"), spoil: rgb("#c8b28c"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300"), spore: "#7a4fa0", sporeRgb: rgb("#7a4fa0") };
+    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), sky: rgb("#e4edf1"), spoil: rgb("#c8b28c"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300"), spore: "#7a4fa0", sporeRgb: rgb("#7a4fa0"), chamber: rgb("#a39a8a") };
     const retheme = () => {
       theme = {
         paper: cssVar("--paper"),
@@ -150,6 +150,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         warnRgb: rgb(cssVar("--warn")),
         spore: cssVar("--spore"),
         sporeRgb: rgb(cssVar("--spore")),
+        chamber: rgb(cssVar("--mound")),
       };
       miniAt = -Infinity;
     };
@@ -179,6 +180,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
       const homeC = colony.ph.fields.home.chunk(cx, cy);
       const alarmC = colony.ph.fields.alarm.chunk(cx, cy);
       const sporeC = fungus.spores.chunk(cx, cy);
+      const chamberC = colony.map.chambers?.cell.chunk(cx, cy); // nest slice 2: dug chambers, a faint wash
       const [fr, fg, fb] = rgb(theme.accent);
       const show = layers.current;
       const px = c.img.data;
@@ -239,6 +241,11 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
             px[o + 1] = HOME_RGB[1];
             px[o + 2] = HOME_RGB[2];
             px[o + 3] = Math.round(h * 90);
+          } else if (chamberC && chamberC[i]) {
+            px[o] = theme.chamber[0];
+            px[o + 1] = theme.chamber[1];
+            px[o + 2] = theme.chamber[2];
+            px[o + 3] = 55;
           } else px[o + 3] = 0;
         }
       }
