@@ -10,50 +10,57 @@ Tone is the spirit of the ant colony: self-coordination, local information, a pi
 
 ## 2. Decisions from the interview
 
+The table is the original interview, with later reversals marked *(now: …)*. The code is the reference for current numbers; §8 explains the picture-app changes, §9 on are the colony.
+
 | Topic | Decision | Why |
 |---|---|---|
 | Format | Web app. Vite + React + TypeScript + Tailwind v4, Canvas 2D for the field, a small Node proxy for the API key. | Moving a few thousand dots is trivial in a browser; the bottleneck is Jev round trips, not rendering. No heavier engine needed. WebGL points only if we ever want 20k+ ants. |
 | Agent model | **Packed requests.** ~100 ants share one `state`; each ant gets its own questions. | Jev evaluates every question in isolation against the shared state, so each ant still gets an independent decision and can genuinely see its neighbours. One state per request is the API's shape; there is no batch endpoint. Measured: 100 ants in ~0.5 s. |
-| Ant brain | Three questions per ant: **direction** (choice: 8 compass points + stay), **pace** (score: creep / walk / hurry), **settle** (noul: "this cell still needs ants, stay"). | Extra questions cost almost no latency. Settling is what makes the picture sharpen instead of jitter. |
-| Scale | 500 to 2,000 ants, default 1,000. | Enough density for letters and simple images at a 64×64 grid. |
-| Cadence | Each **unsettled** ant re-decides about every 2 s and coasts in between; settled ants ask again only when their cell's deficit changes. Scheduler takes the stalest ants every ~200 ms. | 1,000 ants → ≤5 requests of 100 per second at the start, decaying as ants settle. Measured headroom: 8 parallel requests of 100 ants in 0.65 s wall. Parallelism buys latency, not cost (see §8). |
-| Spend control | Explicit **Start / Stop**. Running cost from the real `usage.input_tokens` of every response × $0.042/M, never estimated. Three stop conditions, whichever first: **formed** (local grid error under threshold, confirmed by the overseer noul), **time cap** (default 3 min), **spend cap** (default $0.50). Caps editable. After a stop, ants idle on the local rule and Jev is not called. | A demo must never run away, and a formed picture should cost nothing to look at. Cost plan in §8. |
+| Ant brain | Three questions per ant: **direction** (choice: 8 compass points + stay), **pace** (score: creep / walk / hurry), **settle** (noul: "this cell still needs ants, stay"). *(Now: direction + settle only, ~296 tok/ant; pace was dropped in the bake-off, §8.1b–8.2.)* | Extra questions cost almost no latency. Settling is what makes the picture sharpen instead of jitter. |
+| Scale | 500 to 2,000 ants, default 1,000. | Enough density for letters and simple images at a 64×64 grid *(now 96×64, `DEFAULT_PARAMS.size`)*. |
+| Cadence | Each **unsettled** ant re-decides about every 2 s *(now: at least 1.5 s apart, `minAgeSeconds`, §8.6)* and coasts in between; settled ants ask again only when their cell's deficit changes. Scheduler takes the stalest ants every ~200 ms. | 1,000 ants → ≤5 requests of 100 per second at the start, decaying as ants settle. Measured headroom: 8 parallel requests of 100 ants in 0.65 s wall. Parallelism buys latency, not cost (see §8). |
+| Spend control | Explicit **Start / Stop**. Running cost from the real `usage.input_tokens` of every response × $0.042/M, never estimated. Three stop conditions, whichever first: **formed** (local grid error under threshold; *now the overseer noul is shown beside it and does not gate it, §8.2*), **time cap** (default 3 min), **spend cap** (default $0.50). Caps editable. After a stop, ants idle on the local rule and Jev is not called. | A demo must never run away, and a formed picture should cost nothing to look at. Cost plan in §8. |
 | Images (Jev) | **Overseer.** Every few seconds, send the current field and the target as two images; ask a `box` ("the region of current that most lacks ants vs target") and a `noul` ("current is a recognisable copy of target"). The box becomes an attractor hint in each ant's state; the noul drives a "formed" badge. | Showcases Jev's new image input without making the core loop depend on a feature TypeSafe calls "dreamer-ready, not production-ready". |
-| Shading | Target image → greyscale → downsample to a grid (64×64 default) → darkness per cell → normalised so Σ target = ant count. Density is tone. | Text and images are the same pipeline: text is rendered to an offscreen canvas first. |
+| Shading | Target image → greyscale → downsample to a grid (64×64 default, *now 96×64*) → darkness per cell → normalised so Σ target = ant count. Density is tone. | Text and images are the same pipeline: text is rendered to an offscreen canvas first. |
 | Baseline | A **local-rule** mode (greedy toward max neighbouring deficit, with noise) next to Jev mode. | A greedy rule would also form the picture; the demo should show the difference, not assert it. Also the fallback at the spend cap and under 429s. |
 | Look | **Ink on warm paper**: lingo-dojo palette. Light: ink ants on `#f6f4ef`; dark: pale ants on charcoal. One jade accent for the overseer box and selected things. Ants are 2 px oriented ticks. | More ants = darker reads naturally as a pen drawing. Reuses an existing, tested token scheme. |
 | Controls (v1) | Text input + image upload with live target-grid preview; ant count, sim speed, Jev/local toggle; Jev telemetry panel; overlays (deficit heatmap, overseer box, pheromone trails). | All chosen. |
 | End state | Overseer "formed" badge; **Scatter** button; **Morph** (type a new target while formed and ants walk to it). GIF recording deferred to a later milestone. | Scatter is the replay moment. Morph is cheap once the target is just a grid. |
 | Deployment | Local first (port **38500**, key from `JEV_API_KEY` in the shell), server written so it can be hosted later with per-visitor budgets. | Same shape as lingo-dojo / travel-guide. |
 | Process | Beads (prefix `ja`) + one PR per milestone with agent review before merge. | House convention. |
-| Repo | Public, `scalefreegan/jev-ants`, MIT. | Showcase piece. |
+| Repo | Public, `scalefreegan/jev-ants`, MIT *(now `bwvogler/ant-sym`)*. | Showcase piece. |
 
 ## 3. Architecture
 
 ```
-browser (Vite + React)                          node (Vite dev-server middleware, web/server/)
-┌──────────────────────────────────┐            ┌─────────────────────────────────┐
-│ sim/        pure TS, no DOM      │            │ api.ts    wrap(): same-origin   │
-│   grid.ts   target density grid  │  POST      │ jev.ts    pool of N parallel    │
-│   ants.ts   positions, headings  │  /api/jev  │           connections → TypeSafe│
-│   local.ts  greedy baseline      │ ─────────► │ budget.ts token/cost ledger     │
-│   pack.ts   ants → Jev request   │ ◄───────── │ overseer.ts images → box/noul   │
-│   apply.ts  answers → ant intent │  answers   └─────────────────────────────────┘
-│ ui/         React, Tailwind v4   │                        │ Bearer JEV_API_KEY
-│   Field.tsx canvas renderer      │                        ▼
-│   Panel.tsx controls/telemetry   │              https://api.typesafe.ai/v1/systemone
-└──────────────────────────────────┘
+browser (Vite + React)                               node (Vite dev-server middleware, web/server/)
+┌────────────────────────────────────────┐           ┌──────────────────────────────────┐
+│ sim/       picture: pure TS, no DOM    │           │ api.ts    wrap(): same-origin    │
+│   grid, ants, local, engine            │  POST     │ http.ts   JSON bodies, HttpError │
+│   jevBrain   ants → request → intent   │ /api/jev  │ jev.ts    node:https Agent pool  │
+│   policyCache situations, cache        │ ────────► │           of N → TypeSafe        │
+│   overseer   images → box / noul       │ ◄──────── │ ledger.ts tokens, $, caps, width │
+│   targets    text/image → grid (DOM)   │  answers  └──────────────────────────────────┘
+│ colony/    colony + fungus: pure TS    │                         │ Bearer JEV_API_KEY
+│   world, colony, pheromone, battle,    │                         ▼
+│   recognition, fungus, game, brains    │            https://api.typesafe.ai/v1/systemone
+│ ui/        React, canvas, Jev clients  │
+│   jevScheduler (picture), colonyJev    │   shared/jev.ts: wire types, price, caps,
+│   Field / ColonyField, panels, hooks   │                  in-flight width (both sides)
+└────────────────────────────────────────┘
 ```
 
 - **Sim loop** runs in the browser with `requestAnimationFrame`. Each tick: move ants by heading × pace, update the density grid, decay pheromone, redraw. Jev answers arrive asynchronously and update each ant's *intent* (heading, pace, settled); the tick loop never waits on the network.
 - **Scheduler**: every 200 ms, pick the ants whose last decision is oldest (and not settled, or settled but with a deficit that changed), pack them 100 per request, post. In-flight limit 5 (browsers allow 6 connections per host; one stays free so Stop reaches the server at once). The server retries 429/529 honouring `retry-after`; the browser treats a 429 "busy" from the proxy as "release these ants, try next cycle".
-- **Server** holds the key, forwards packed requests, counts `usage.input_tokens`, enforces the session cap, and runs the overseer (renders nothing itself; the browser sends two PNGs).
-- **Connection pool**: Node's `fetch` on one dispatcher serialised our requests (10 × 50 ants took 2.9 s stacked; separate connections took 0.65 s for 8 × 100). The server must use an undici `Agent` sized for the in-flight limit, and a test must pin that parallel requests overlap.
-- `sim/` is pure and covered by `node --test`; the renderer and React layer are thin.
+- **Server** holds the key, forwards packed requests, counts `usage.input_tokens` and enforces the caps. The overseer is the browser's (`sim/overseer.ts`, `ui/overseerImages.ts`): it renders two PNGs and posts them as one more request.
+- **Connection pool**: Node's `fetch` on one dispatcher serialised our requests (10 × 50 ants took 2.9 s stacked; separate connections took 0.65 s for 8 × 100). The server uses a `node:https` `Agent` sized for the in-flight limit (an undici `Agent` queued behind one warm socket too, `web/server/jev.ts`), and a test pins that parallel requests overlap.
+- `sim/` (but `targets.ts`) and `colony/` are pure and covered by `node --test`; the renderer and React layer are thin.
 
 ## 4. The Jev contract
 
 ### 4.1 Ant request (packed)
+
+The original shape, kept for the record. What is sent now is `packRequest` in `web/src/sim/jevBrain.ts`: a `legend` instead of `rules`, `room` / `idle` / `far` in each ant's state, and no pace question (§8.1b–8.2).
 
 ```jsonc
 {
@@ -94,7 +101,7 @@ Header `TypeSafe-Danger-Zone-Images: true`. Two PNGs (280–1568 px per side) in
     "done": { "type": "noul", "instructions": "`current` is a recognisable copy of `target`" } } }
 ```
 
-`box` returns normalised `{top,bottom,left,right}` in 0..1 and has no "not found"; `done` gates whether we trust it. Runs every ~3 s while not formed, every ~10 s once formed. Image tokens bill at the normal input rate.
+`box` returns normalised `{top,bottom,left,right}` in 0..1 and has no "not found"; `done` gates whether we trust it. Runs every 4 s (`overseerMs`; first planned as ~3 s, ~10 s once formed). Image tokens bill at the normal input rate.
 
 ## 5. Probe results (2026-10-25, real API, `scripts/probe.mjs`)
 
@@ -111,7 +118,7 @@ Header `TypeSafe-Danger-Zone-Images: true`. Two PNGs (280–1568 px per side) in
 - Output tokens are free. Price is $0.042 per million input tokens.
 - `GET /v1/models` lists `jev-latest` and `jev-preview` only.
 
-**Cost model.** tokens/s = ants × tokens-per-ant ÷ cadence. At 1,000 ants, 376 tok/ant, 2 s: 188k tok/s → $0.0079/s → **~$28/hour** at full tilt; ~$20/hour with the terser schema; roughly halves at 500 ants or a 4 s cadence. Settled ants are scheduled rarely, so a formed picture costs little to hold. The $1 default cap is about 2–3 minutes of forming at 1,000 ants. The telemetry panel shows all of this live.
+**Cost model.** tokens/s = ants × tokens-per-ant ÷ cadence. At 1,000 ants, 376 tok/ant, 2 s: 188k tok/s → $0.0079/s → **~$28/hour** at full tilt; ~$20/hour with the terser schema; roughly halves at 500 ants or a 4 s cadence. Settled ants are scheduled rarely, so a formed picture costs little to hold. The $1 cap planned here is about 2–3 minutes of forming at 1,000 ants (the default became $0.50, `DEFAULT_CAPS`). The telemetry panel shows all of this live.
 
 ## 6. Milestones
 
@@ -321,7 +328,7 @@ The colony page is now a game: your colony and a rival's on one map, sharing its
 - **The outcome.** A colony with no ants and too little food for one more is beaten. The panel shows a banner.
 - **Jev.** The player's colony can play on Jev: one client, two cached lanes (ant modes and stances), one doctrine. The rival plays the local rule and the local strategist, for free.
 
-**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5–1.5 s on the first bump up to 8–24 s, and during a detour the ant wanders instead of homing. (Review found this is not enough on every map: a long wall can still trap homing ants; PR #5 replaces straight-line homing with a walking-distance map.)
+**A navigation fix found on the way.** On seed 3 the rival's nest sat behind a wall. Tired ants homing in a straight line bumped the wall, took a 1 s detour and bumped it again, while nobody walked out to lay a fresh home trail: 447 of 450 ants stuck. Detours now double with each bump in a row, from 0.5–1.5 s on the first bump up to 8–24 s, and during a detour the ant wanders instead of homing. (Review found this is not enough on every map: a long wall can still trap homing ants; PR #5 replaces it with homing by the ant's own senses, §12.)
 
 **Measured headless** (600 + 600 ants, 1/30 s steps): ~1.8 ms per tick.
 - Seed 1: your colony wiped out the rival by ~200 s.
@@ -384,7 +391,9 @@ This is the first step of the lifetime-world plan. It builds on the research not
   - A blocked homing step starts wall-following. Two touch probes either side of the home vector pick the side to keep the wall on.
   - Following, the ant turns away from rock ahead and hugs round corners where the wall falls away.
   - It leaves the wall only when back on its **line home**: the line from where this trip first met rock to the nest. It must also be nearer home than where it met this wall, with the way home open by touch. Leaving anywhere nearer settled ants in the deepest bay facing the nest.
-  - After 45 s it tries the other side once. After 120 s it gives up and wanders 8–24 s, then tries afresh.
+  - After 45 s it tries the other side once. After 120 s it gives up and wanders 8–24 s, then tries afresh. A bump during that wander only turns it: it doesn't make the wander longer, or start a new wall.
+  - Touching no rock (ahead or on its wall side) for 1.5 s, it lets go of the wall and walks its home vector, keeping its line home. Alarm avoidance or a thin rock tip could throw it off the wall, and the corner hug then circled in the open until the 120 s give-up.
+  - A trip home starts afresh, when the ant picks up food or its policy sends it home: no detour or wall left over from foraging. A leftover detour switched the home vector off, and each bump renewed it.
 - **Hints and physics:**
   - The home trail is a hint, climbed at a quarter of the turn rate. At full rate, clusters circled on their own trail.
   - `squeezes()` stops ants slipping diagonally between two rocks.
@@ -392,8 +401,9 @@ This is the first step of the lifetime-world plan. It builds on the research not
   - Before (straight line): up to 100 %, and 18 of 20 colony-runs over 5 %.
   - With the map: 0 %.
   - Now: at most 7 % (seeds 2 and 10), with 16 of 20 runs at 5 % or below.
-  - Most of those are slow, not trapped: within the next 30 s about 40 % reach home and more get closer. Truly stalled ants are at most ~3 % of a colony (`ja-` bead filed).
+  - Most of those are slow, not trapped: within the next 30 s about 40 % reach home and more get closer. Truly stalled ants are at most ~3 % of a colony (`ja-ipu`).
   - Ticks are ~10 % slower (3.7 vs 3.3 ms mean), because wall-followers spread trails over more ground (59 vs 48 awake chunks).
+  - After the review fixes (trips home start afresh, lost walls let go, no new wall on give-up), same seeds, seeding as the UI (`mulberry32(seed × 7919)`): mean 3.1 % → 1.9 %, 18 of 20 runs at 5 % or below (17 before), worst 6.9 % → 8.0 % (seed 6's rival; one end-of-game snapshot per run is noisy: variants of the lost-wall rule put the worst run anywhere from 8 to 14 % on a different seed each time). Food stored 3.7 % lower over the 20 runs.
 
 **Measured** (`npm run colony-bench`: 1,200 + 1,200 ants, 60 sim-s, local rule, same container):
 
@@ -532,13 +542,313 @@ The product owner asked for "seeds with less cavernous starts: they need to dig"
 
 Also from the review: the pellet colour no longer looks like the rival's ants, and there is a golden test that hashes `OPEN_WORLD` against MR 6's generator. After the fixes, the reviewer's stall scan finds no ant still for 30 s in 180 s of seed 1 (900 + 900 ants).
 
+**Second review** (agent, after the PR was opened) found three more, all in underground homing, fixed with tests that fail on the old code:
+- **A permanent freeze.** A wall-follower handed over to a tunnel with home scent turned to its home vector; with the nest straight through soil, the step was blocked, a new wall started (give-up clock at 0), and it was handed over again, every tick. The handover now goes straight to the tunnel walker.
+- **Standing inside soil.** A step checked in float64 at 192.999996 was stored in float32 as 193.0, inside the soil cell, where every step is blocked. Steps are rounded to float32 before the check.
+- **Rings of tunnels without end.** The tunnel walker follows the most home scent and never turned back, so a ring with strong scent held an ant for up to 542 s. A homing ant that gets no cell nearer home for 20 s picks branches by its home vector for 15 s, then by scent again.
+- **Measured** (seeds 1–5, 600 s, 600 + 600 ants, underground, UI seeding): ants still (< 0.5 cell moved) for the last 30 s, away from the nest, 164 → 67 over the 10 colony-runs. The share out > 120 s is unchanged (16.5 % → 15.3 % mean): that is `ja-cwu`. Most of the remaining still ants shuttle between a dead-end stub and the tunnel beside it, where no tunnel leads toward home.
+
 **Checked in the browser:** tunnels grow out of both nests, pellet crumbs ride on carriers, mounds grow, and the toggle switches maps. Light, dark and phone layouts show no console errors.
 
 **Jev:** situations are unchanged (1,296). The legend now says explorers dig and that a soil carrier is never asked, and `COLONY_BRAIN_VERSION` is 3, so cached answers are re-asked once. The estimated request is ~235 tokens per situation (was ~225): about +10 tokens per question.
 
 **Beads:** density-regulated digging (`ja-wii`), pellet scent and backfill (`ja-jmf`), underground homing (`ja-cwu`), soil on the endless map (`ja-r84`).
 
-## 15. Hexagons, and tunnels that meander (MR 8, 2026-11-01)
+## 15. The player is the fungus: infection, spread and the spore brush (fungus 1a, 2026-11-01)
+
+The design is in `docs/fungus-policy.md`. The player is the fungus and nothing else. It never decides for an ant: each colony keeps its own policy, doctrine, situations and cache. The fungus acts on ants (what they perceive, give off and can do), and their own policy still chooses. This first slice (bead `ja-t4d.1`) gets the fungus *into* ants and lets it move. Nothing an infected ant does is different yet; the perception layer (`ja-t4d.2`) is next.
+
+- **Per-ant state** (`colony.ts`): `load` (0..1), `strain` (which trait set infected it), `resist` (immune priming, 0..1) and `expr` (the intervention the fungus runs in it; all dormant until the fungus policy, `ja-t4d.5`). A newborn is clean and unprimed.
+- **Strains** (`fungus.ts`): two trait sets, from the two ends of the stealth-against-potency dial.
+  - **Lockpick**, after *Rickia wasmannii*: transmission 0.15/s, never clears on its own, 10 % visible.
+  - **Bloom**, after *Metarhizium*: transmission 0.6/s, clears 1 %/s, 80 % visible.
+- **Contact transmission, across colonies.** A host gains load at the strain's rate × the load-weighted share of the ants around it (3×3 cells, every colony, not counting itself) that carry it. It is frequency-dependent, so a crowded nest is not an instant epidemic. A clean ant takes the strain of the most loaded cell around it; a host keeps its first strain.
+- **Grooming and priming** (the colony's answer; Konrad et al. 2012). Up to 4 nestmates around a host groom off 0.12/s each of its *visible* load. Grooming visible nestmates leaves an ant resistant, and resistance scales down every load it takes. Bloom is groomed off and immunises the colony; Lockpick hides.
+- **The spore brush** (a third free brush beside lure and alarm): spores on the open ground under the stroke, and a dose of the chosen strain into every ant there, *of either colony*. Ants walking onto spores pick up load and take some away; untouched spores fade (3 %/s).
+- **Order-independent.** One step reads only grids built from everyone's load before it, each ant writes only its own load, and spores taken are pooled and taken after every ant has read its cell. A test swaps the colony order and gets the same loads (compare `ja-slv`, where the order of colony ticks decides contested food).
+- **No spores, no change.** The fungus draws no random numbers and does nothing while idle; a test pins that a game with no spores runs tick for tick as before.
+
+**Cost per tick.** The fungus steps every 0.1 s (a load moves at most ~6 % per step, the budget the pheromone channels use), and each ant's 3×3 reads take one chunk-array fetch per layer where the 3×3 lies inside one chunk (~94 % of cells), against the clipped slow path elsewhere; a test pins that the two agree across a chunk border. Measured with the new worst-case option of `npm run colony-bench` (Bloom painted over both nests, so every ant of both colonies is loaded; 1,200 + 1,200 ants, 60 sim-s):
+
+| Map | No spores | Every ant loaded |
+|---|---|---|
+| 160×100 | 3.09 ms mean, 3.63 p90 | 3.76 ms mean, 5.00 p90 |
+| 512×320 | 3.62 ms mean, 4.93 p90 | 4.27 ms mean, 6.10 p90 |
+
+The first version stepped every tick and read each layer cell by cell: 7.15 ms mean at 512×320.
+
+**Measured dynamics** (seeds 1–2, 300 + 300 ants, the nest painted at the start):
+- Lockpick settles at a mean load of ~0.65 and the colony's resistance creeps to ~0.15 by 3 minutes.
+- Bloom peaks, then is groomed down to ~0.2 while resistance climbs to ~0.33.
+- On seed 2, Bloom crossed into the rival colony by contact: 11 rival ants infected at 30 s, all 345 by 3 minutes.
+
+**Checked in the browser:** the spore brush and strain picker, the infection panel (infected share and mean resistance per colony, spore cells), spores drawn on the ground and infected ants marked in the new `--spore` tone. Light, dark and phone (390 px, no horizontal scroll) layouts, with no console errors.
+
+**Jev:** no change. Nothing here enters an ant's request; tokens per ant are unchanged.
+
+## 16. The perception layer: the fungus bends what a host senses (fungus 1b, 2026-11-01)
+
+Bead `ja-t4d.2`; design in `docs/fungus-policy.md` §2. The fungus never decides for an ant. It bends the ant's **perceived state**, and the ant's own policy (the local rule, or Jev under its colony's doctrine) chooses from it, as it would for a healthy ant in the world the host perceives.
+
+- **Perception arrays on `Colony`**: food, home and alarm gains; how strongly the ant smells the *other* colony's food trail as its own food scent; and its sense of time out (tired after patience × it). They default to the world as it is, and a newborn starts there.
+- **Applied in `#sense`, so steering and the situation agree.** Both read the same three sensors, so an ant never decides by one world and walks in another. Only scent is bent: seen food, the nest and rock/edge (−1) read as they are. With neutral values the reads are exact (`x × 1`, and the rival's field is not read at all), so healthy colonies run bit for bit as before.
+- **The rival's trails.** `Game` hands each colony the other's `Pheromones` (`Colony.foreign`, as it already hands over the enemy grid). Only a host whose perception reads it ever looks.
+- **Interventions** (`fungus.ts`): a bundle of levers per intervention, lerped from "as it is" by the host's load. So far:
+  - *dormant*: nothing.
+  - *soothe*: alarm ×0.25.
+  - *share*: food scent ×1.5, and the rival's food trail smelled as its own.
+  - *roam*: home scent ×0.35, time out felt 2.5× slower.
+  - Later slices add recognition, emission and body levers and the rest of the menu.
+- **Until the fungus policy lands** (`ja-t4d.5`), a host runs its strain's default (Lockpick *soothe*, Bloom *share*). This is one method, `#expression`, which the policy replaces.
+- **The follow card** says what the fungus runs in the followed ant and which senses it bends, e.g. "Bloom 76 % · runs share — it perceives food scent ×1.38, the rival's food trail as its own ×0.76". The situation chips above it are what the ant perceived.
+
+**The test that matters:** an infected ant on a faint food trail it smells ×3, a strong home trail it smells ×0.1, and alarm it smells ×0 is asked the same `Situation`, the same cache key and a byte-identical Jev request as a healthy ant on a strong food trail and a faint home trail with no alarm. And it makes the same choice. Seven tests in all (`perception.test.ts`), 162 in the suite.
+
+**What it does to a game** (seeds 1–3, 300 + 300 ants, the player's nest painted at the start, 3 sim-minutes; one run each, so read the direction, not the digits):
+
+| Seed | Strain | Food home (you / rival) | Lost (you / rival) | Rival infected |
+|---|---|---|---|---|
+| 1 | none | 1,167 / 1,390 | 48 / 66 | — |
+| 1 | Lockpick (soothe) | 1,259 / 1,448 | 50 / 41 | 0 % |
+| 1 | Bloom (share) | 1,248 / 1,487 | **208 / 200** | 100 % |
+| 2 | none | 1,633 / 924 | 255 / 201 | — |
+| 2 | Lockpick | 1,420 / 929 | 186 / 164 | 1 % |
+| 2 | Bloom | 1,286 / 899 | 203 / 183 | 100 % |
+| 3 | none | 1,438 / 893 | 87 / 64 | — |
+| 3 | Lockpick | 1,423 / 1,058 | 108 / 100 | 0 % |
+| 3 | Bloom | 1,453 / 1,074 | 72 / 59 | 67 % |
+
+*Share* walks hosts along the rival's trails into its ground. That carries the fungus into the rival colony, but contact without recognition is war: on seed 1, losses quadrupled. This is failure mode 1 in the design doc. Perception alone pulls colonies together; recognition (`ja-t4d.3`: pacify, blending odour) is what turns contact into collaboration, and it is next. *Soothe* stays inside its colony (Lockpick barely spreads by contact), and its effect on losses is mixed.
+
+**Cost per tick** (`npm run colony-bench`, 1,200 + 1,200 ants, 60 sim-s, 512×320):
+- No spores: 3.57 ms mean, with identical food stored (1,650 / 1,657).
+- Every ant loaded: 4.57 ms mean (4.27 before), the difference being reads of the rival's field.
+
+**Jev:** the request state and the situation are unchanged, so tokens per ant are unchanged. Bent perception could make a colony meet situations it otherwise rarely would; measured, it doesn't add any: 99–209 situations met per colony in the runs above, against 109–209 without spores. Lockpick on seed 1 met fewer (103), because soothed ants rarely perceive alarm.
+
+## 17. Recognition: strangers by odour, and one colony at the end (fungus 1c, 2026-11-01)
+
+Bead `ja-t4d.3`; design in `docs/fungus-policy.md` §4.B. Who is an enemy is no longer "an ant of another colony" but **an ant whose odour differs from mine by more than a tolerance**. Colony odour is a blend of cuticular hydrocarbons, and where it stops differing, aggression stops (Argentine-ant supercolonies). This gives the game its goal: **unify the colonies**.
+
+- **Odour** (`recognition.ts`). Every ant carries an odour in 0..1 (the colonies start at 0 and 1). An ant smells of its nest: the nest's odour (the gestalt) drifts toward the mean odour of the ants at it, and newborns take it.
+- **Strangers by odour band.** Ants are binned into 10 odour bands (one chunked float grid each, replacing the per-colony enemy grids). `look(odour, tolerance)` picks the bands that are strangers. Every query skips empty bands, and consecutive ants reuse the mask, so a game with two pure colonies reads one band. Strangerhood is judged by band centre (within 0.05).
+- **Fights** (`battle.ts`): the strangers around an ant, judged at the healthy tolerance τ₀ = 0.35.
+  - A **calming cue** counts on both sides: a calm neighbour is (1 − calm) of an enemy, and a calm ant takes (1 − calm) of the hazard. This is *Rickia*'s n‑C23, which lowers the aggression a host receives and gives.
+  - A calmed encounter (under half an enemy) raises no alarm.
+  - Allies are still the ant's own colony around it.
+- **Perceived strangers** (`#enemyHeading`, the situation's `enemy`, and the charge) use the ant's own odour and **its own tolerance**, which the fungus can widen (B4). A calm ant does not charge.
+- **The strategist**: strangers near the nest are judged against the nest's odour. A colony whose nest smells like ours is no rival, so the strategist forages instead of raiding kin. Found in the browser: after unification, raiders swarmed the other nest with nobody there to fight.
+- **New levers and interventions** (`fungus.ts`):
+  - *soothe* adds calm 0.8 and tolerance +0.3.
+  - *blend* gives a host a **fungal share** of up to `MAX_MASK` = 0.6 of the fungus's own odour (0.5, between the colonies'), plus tolerance +0.15.
+  - A third strain, **Garden**, runs *blend*. It is after the leafcutter's cultivar, whose odour becomes the colony's (*Acromyrmex*).
+  - A host's odour is its nest's, that share of the way to 0.5, so it is never more than 0.3 from its nest's: **a host is never a stranger to its own colony** (tested).
+- **Unity** (`Game.unity`):
+  - the nests' odour gap;
+  - fight deaths per minute (a 60 s fading count);
+  - seconds since the last fight death;
+  - mixing (the share of ants within tolerance of the other nest's odour);
+  - a score: how far the nests have come together × how long it has been quiet.
+- **Unified** is a new outcome, beside won and lost: the nests are within τ₀ and nobody has died fighting for 60 s.
+- **The page**:
+  - a unity meter in the Fungus panel;
+  - the unified banner;
+  - **ants coloured by odour**: ink for the player's colony, the warn tone for the rival's, mixed between. As the fungus works, both colonies visibly meet in the middle colour.
+  - The follow card gives the ant's odour, its nest's, and the calm, tolerance and fungal share the fungus gives it.
+
+**What was tried first and dropped.** Contact blending: a host relaxing toward the odour of the ants it touches, with a gestalt pull at the nest. Measured over 10 sim-minutes, it moved the nests' odours by less than 0.04. Contacts with strangers are brief fights, and the gestalt undoes them at home. Instrumenting the run also showed that the war is driven by the strategist's raids, which calm alone cannot stop. What unifies colonies is a **shared fungus with an odour of its own** carried home, which is the leafcutter's case.
+
+**No fungus, no change.** With every ant at its colony's odour and nobody calm, the strangers around an ant are exactly the other colony's ants. A test runs six fights both ways (by colony, by odour) and gets the same deaths, ant for ant. The bench gets the same food stored as before 1c on both maps.
+
+**Measured** (seeds 1–3, 300 + 300 ants, Garden painted on both nests at the start, 6 sim-minutes; one run each):
+
+| Seed | | Unified at | Lost (you / rival) | Food home | Ant situations met |
+|---|---|---|---|---|---|
+| 1 | no fungus | — | 317 / 303 | 2,263 / 1,804 | 296 |
+| 1 | Garden | 178 s | 11 / 21 | 2,135 / 2,163 | 163 |
+| 2 | no fungus | — | 379 / 361 | 1,890 / 1,131 | 275 |
+| 2 | Garden | 185 s | 31 / 40 | 1,868 / 1,310 | 178 |
+| 3 | no fungus | — | 237 / 231 | 1,739 / 493 | 319 |
+| 3 | Garden | 150 s | 8 / 11 | 2,315 / 1,076 | 122 |
+
+- Garden in **one** colony moves that colony's nest halfway (to 0.5) and no further. Whether the colonies unify then depends on whether Garden crosses into the other colony by contact: over seeds 1–6 it does on most (corrected in review of #7; the first measurement, seed 2 alone, suggested it stays put). The test now checks only what holds on every seed: each nest stops at the fungal odour.
+- Lockpick (soothe) alone calms but never unifies, because it does not touch odour.
+- Checked in the browser (light and dark): Garden swept over the map at 4× speed reaches **unified** in about 45 s of real time; both stances return to forage, with 0 fighting and food coming home. No console errors.
+
+**Cost per tick** (`npm run colony-bench`, 1,200 + 1,200 ants, 60 sim-s, 512×320): no spores 3.79 ms mean (3.56 before 1c), with the same food stored; every ant loaded 4.38 ms.
+
+**Jev:** the situation and the request are unchanged, so tokens per ant are unchanged. Peace also makes Jev **cheaper**: a unifying game meets fewer situations (122–178 against 275–319), because war situations stop arising.
+
+## 18. Emission: what a host gives off (fungus 1d, 2026-11-01)
+
+Bead `ja-t4d.4`; design in `docs/fungus-policy.md` §4.C. The fungus changes what a host lays. The host's choices stay its own.
+
+- **Deposit gain (C1):** trail laid × `Colony.layGain`, home and food alike.
+- **Cross-laying (C2):** a carrier also lays `crossLay` of its food trail into the *other* colony's food field. It leaks where food is, and the rival's ants follow it like their own trail.
+- **Silent fights (C3):** in a fight, a host lays (1 − `quiet`) of the alarm, so a skirmish need not recruit the colony.
+- **In the menu** (§5.2):
+  - *soothe* gains quiet 0.9;
+  - *share* gains trail ×1.5 and a full leak of its food trail to the rival.
+  - Each is lerped by load, like every lever.
+- **As-is is exact:** a gain of 1 and no leak, so with no fungus the bench stores the same food as before (1,561 / 1,591 at 512×320) and the tick is unchanged (3.61 ms mean).
+- **The follow card** names these too, e.g. "lays its trail ×1.50, leaks 100% of its food trail to the rival".
+
+**Tests** (`emission.test.ts`, 5):
+- a gain of 0 lays nothing and 2 lays exactly twice;
+- a leaking carrier gives the rival as much food trail as its own, along its path;
+- in a fixed skirmish with idle defending nestmates, a loud host lays alarm and recruits defenders, while a silent one lays none and recruits nobody;
+- the fungus writes the levers and a cleared host is as it was;
+- every lever stays in range.
+
+**What it does to a game.** Before and after 1d, same seeds and same start (each strain painted on both nests, 300 + 300 ants, 6 sim-minutes):
+
+| Strain | Seed | Lost before → after | Food home before → after | Situations met before → after |
+|---|---|---|---|---|
+| Lockpick (soothe) | 1 | 273/196 → **128/114** | 1,797/1,688 → 1,550/1,572 | 238 → 175 |
+| | 2 | 315/215 → 350/281 | 1,896/1,297 → 1,949/1,311 | 256 → 320 |
+| | 3 | 205/260 → 231/235 | 1,482/643 → 1,558/617 | 141 → 258 |
+| Bloom (share) | 1 | 325/273 → 315/260 | 2,043/1,875 → 2,079/1,863 | 294 → 416 |
+| | 2 | 414/373 → 398/312 | 1,814/1,145 → 2,025/1,207 | 287 → 281 |
+| | 3 | 252/272 → 255/292 | 1,773/455 → 1,664/416 | 331 → 319 |
+| Garden (blend) | 1–3 | unchanged (blend has no emission lever) | | |
+
+The levers work as built, but none decides a war on its own:
+- Quiet fights halved the deaths on seed 1 and did little on the others. A colony that is not recruited also does not defend.
+- Leaking food trails moves food and contact around without settling who wins.
+
+They are tools for the fungus policy (`ja-t4d.5`) to use where they help, not traits to run in every host of a strain. Garden's shared odour (§17) is still what unifies.
+
+**Jev:** the request state and the situation are unchanged, so tokens per ant are unchanged. Quieter and leakier fronts make some games meet more situations (up to 141 → 258). At ~451 tokens per question that is ≈ 50k tokens, ≈ $0.002 per doctrine.
+
+## 19. The fungus policy, and the player's levers on it (fungus 1e, 2026-11-01)
+
+Bead `ja-t4d.5`; design in `docs/fungus-policy.md` §5. The fungus picks one intervention per host. It never picks what an ant does. The player never picks an intervention either: the player shapes the policy.
+
+- **The fungal situation** (`fungalPolicy.ts`): what the fungus in one host senses.
+  - its strain;
+  - load (low, mid or high);
+  - the host's activity (its mode; a carrier counts as returning);
+  - **ground**: home, border or foreign, by whose home scent is where it stands;
+  - **contact**: none, kin or strangers, from the recognition grid;
+  - whether it is being **groomed** right now;
+  - whether the colonies are **apart, close or one**. "One" is the game's own *unified*: within tolerance and a quiet minute.
+
+  That is 648 situations per strain. All of it is local to the host except the last, the one fact the fungus knows about itself as a whole. Each host keeps the situation it was last chosen in (`Colony.fungal`), and the follow card shows it with who chose.
+- **The gate** (`Fungus.choose`): whatever a policy answers, a host runs only what **its strain allows** and **the player's menu** has on. Otherwise it runs its strain's own default, else the first thing still on, else nothing (as-is; it hides only if dormant is on; §23).
+  - Lockpick allows dormant, soothe and roam.
+  - Bloom allows dormant, share, roam and cull.
+  - Garden allows dormant, blend, soothe and share.
+  - A test runs every strain × every menu × every answer: lethal needs both strain and menu.
+- **New intervention: cull (lethal).** It is an odour weapon: the host's odour is pushed half the scale away from its nest's, so its own colony and the rival both take it for a stranger. Only Bloom allows it, and the menu starts with it off.
+- **Dormant now means lying low:** a host the policy keeps dormant shows a quarter of its strain's visibility (`DORMANT_SHOW`), so its nestmates groom it far less. Hiding is a real move: Bloom hidden from its groomers keeps more load, and the colony primes less (tested).
+- **The player's levers** (§5.1), in the Fungus panel:
+  - the spore brush and strain (1a);
+  - **the menu**: what the fungus may do, with lethal in red;
+  - **the rule's settings**: *hide groomed hosts*, *cull high-load hosts fighting strangers*;
+  - **the aim**: the fungus's goal in the player's words, with three presets (Unite, Spread, Peace), read by Jev and never by the ants.
+- **The local rule** is free and the default: each strain's own default (Lockpick soothes, Bloom shares, Garden blends), except where the player's settings hide or cull.
+- **The Jev lane** (`fungusBrain.ts`, a third lane in `ui/colonyJev.ts`):
+  - one question per fungal situation, under the **aim** (not the doctrine);
+  - a `choice` among only what that host may be given, so Jev's answer is always runnable;
+  - cached per aim, with what each host was offered in its key (§23);
+  - an answer outside the offer is not cached, and the local rule covers it.
+
+  The ant lanes are untouched. A test checks that ant requests never carry the aim or a host, and fungus requests never carry an ant or the doctrine.
+
+**What was tried and dropped: situational local rules.** Four rules were built and measured against each strain's default (Garden on both nests or one, Lockpick and Bloom on both, seeds 1–3, 6 sim-minutes):
+1. Share routes and roam away from home, soothe strangers. Garden unified 30–50 s later with two to four times the deaths: sharing walked hosts into the rival's ground while they still smelled different.
+2. Sequenced by how close the colonies are. Still later, because soothing a meeting takes a host off blend, so it brings less of the fungus's odour home.
+3. Blend everywhere until close, then the rest. Later again: the close phase stalled short of one odour.
+4. Blend until unified, then share and roam (shared work among kin). It unified exactly as always-blend did, by construction, but afterwards brought in 2–9 % *less* food.
+
+None beat the default, so the default rule is the default.
+
+Situational play is still what the per-host situation is for: the player's settings now, and Jev under an aim. Whether Jev finds placements that beat the defaults is the live measurement still to make.
+
+**Cost:** about **323 input tokens per fungal situation** (estimated from request size, as for the ants' 225). A 6-minute game meets 172–297 fungal situations: ≈ 56–96k tokens, **≈ $0.002–0.004 per aim**. One used before is free. Ant requests and tokens per ant are unchanged.
+
+**Tests** (17 new, 191 in all): situations encode and decode; the rule; the gate; what the fungus senses (ground, contact, groomed, the game's reading); dormant hiding; cull making a host a stranger to its own colony; the lane's request and reader; and the client's fungus lane against a scripted fetch (asked under the aim, cached, hosts switch to Jev's answers; a new aim or menu is a new cache; stopping hands back to the local rule).
+
+**The suite's timeout.** `--test-timeout` also bounds each test file as a whole. `game.test.ts` takes ~17 s alone and passed 20 s under the suite's parallel load as whole-game tests were added. It is now 60 s (a hang guard sized for files of whole games). The 1c commit's per-test timeouts in `game.test.ts` could not help and were reverted. Three full runs since: 191/191, ~23 s.
+
+**Checked in the browser** (light and dark): the policy block (menu, settings, aim) and the follow card, e.g. "the fungus senses: load high · host explore · ground home · contact none · unseen · colonies apart → blend, by the local rule". Phone width has no horizontal scroll, and there are no console errors.
+
+**Still to measure live:** the fungus lane against `api.typesafe.ai`, for real tokens per fungal situation and whether Jev under an aim places interventions better than the strains' defaults. The cloud session has no key.
+
+## 20. The fungus senses only what is local, and assumes no number of colonies (2026-11-01)
+
+From review of §19. The fungal situation had one map-wide field, `colonies` (apart / close / one: the gap between *the two* nests' odours). It broke two things:
+- the game's premise of local information, which the stack had just enforced for homing;
+- any game with more than two colonies.
+
+The local rule had stopped using it (§19), so only Jev ever saw it.
+
+- **Removed.** In its place `contact` gains a value, **allied**: the host is touching another colony's ants that it tolerates (within the healthy tolerance, by odour). That is unification as it is felt where it happens. Contact is now none / kin / allied / strangers, in that order of precedence from the bottom: strangers over allied over kin.
+- **288 fungal situations per strain** (was 648). The Jev lane's version is bumped (`FUNGUS_BRAIN_VERSION` 2), because old cached answers were keyed on the removed field. The legend no longer says "two".
+- **A test pins locality:** moving the nests' odours (a map-wide fact) leaves what the fungus senses unchanged.
+- **No change in play.** Garden on both nests (seeds 1–3, 300 + 300) unifies at 178 / 185 / 150 s with the same deaths as before, because the local rule never read the field.
+- **Cheaper.** About 314 tokens per fungal situation. A 6-minute Garden game meets 154–190 (was 221–297), and three strains together 192–260: **≈ $0.002–0.0034 per aim**.
+
+What still assumes two colonies (odour on a line, the unity meter, `foreign` and `raidTarget`, the won/lost banner) and how it should stop is in `docs/fungus-policy.md` §10, filed onto MR 8 (`ja-8fd`):
+- odour on a disc with the fungus's odour at its centre;
+- unity as a graph of alliances, where a supercolony is an alliance id;
+- species as a host range per strain, plus an odour dimension the fungus cannot erase, so that between species the goal is parabiosis, not a merge.
+
+## 21. No colony is the player's (ja-t4d.6, 2026-11-01)
+
+The player is the fungus (§15). The page and the Jev client still framed the first colony as the player's: "you" against "rival", a won/lost banner, Jev steering only the first colony while the second always ran the local rule, and the doctrine as the player's words for "your" ants.
+
+- **Names by colour.** The colonies are **Ink** and **Amber** (`ui/names.ts`), after how they are drawn, in the panel's tables, the follow card, the banner and the nest buttons ("Ink nest", "Amber nest"; `n` cycles the nests). `Game.player` / `Game.rival` and the follow type's `"you" | "rival"` stay as identifiers for the first and second colony, documented as such: the stack's tests and scripts use them.
+- **The outcome is the fungus's.** **unified** (one colony) is its win. **fallen** (either colony gone: hosts lost, and no one left to unite them with) is its loss. Won/lost are gone. `Game.fallen()` names the colony; the stack's outcome test is updated to say so.
+- **Every colony on equal footing.**
+  - Each colony has a doctrine, now its *nature*: a scenario setting in a new Colonies section, not the player's lever. The player's lever is the fungus's aim.
+  - With Jev on, the client drives **every** colony's ants and strategist under that colony's own doctrine, plus the fungus under the aim (`ColonyJev.attachColonies`, `setDoctrineFor`).
+  - Caches and in-flight questions are kept by context, across colonies: situations depend on neither the colony nor the map. So two colonies with the same doctrine share every answer, and a question in flight for one is not asked again for the other (tested).
+  - Both colonies start foraging: one doctrine, no extra spend. A second doctrine costs one more doctrine's situations (§11: ~$0.005–0.01).
+- **Fixed on the way:** the follow card's `explain` checked in-flight questions by the bare key, though they are stored by context and key. So an ant whose question was in flight read "by the local rule" instead of "waiting". It now reads "waiting" (tested).
+- **The summary line** (food home, ants by mode, mode choices, situations seen) is the whole map's, summed over every colony.
+
+**Checked in the browser** (light and dark): no "your colony" anywhere; Ink and Amber in every table; per-colony doctrines; following an Amber ant ("Ant #71 · the Amber colony"); the nest buttons. Phone width has no horizontal scroll, and there are no console errors.
+
+**Jev:** tokens per ant are unchanged. The second colony now asks Jev too: with the same doctrine it adds nothing (shared cache); with its own, one more doctrine's situations.
+
+## 22. After the underground world (#8): what still holds (2026-11-01)
+
+§15–21 were measured on the open surface, before #8 made worlds start mostly in soil. Merged onto `main` and re-measured: Garden painted on both nests, seeds 1–3, 300 + 300 ants, 10 sim-minutes.
+
+| World | Seed | No fungus: lost | Garden: unified at | Garden: lost | Infected |
+|---|---|---|---|---|---|
+| open | 1 | 492 / 501 | 195 s | 15 / 14 | 100 / 100 % |
+| open | 2 | 506 / 499 | 159 s | 37 / 31 | 100 / 100 % |
+| open | 3 | 374 / 379 | 171 s | 8 / 9 | 100 / 100 % |
+| underground | 1 | 0 / 0 | 104 s | 0 / 0 | 100 / 94 % |
+| underground | 2 | 0 / 0 | 107 s | 0 / 0 | 100 / 100 % |
+| underground | 3 | 0 / 0 | 107 s | 0 / 0 | 100 / 77 % |
+
+- **On the open surface the result holds.** Garden unifies the colonies in about 3 minutes, and fight deaths fall from 374–506 per colony to 8–37.
+- **Underground, unity is vacuous for now.** In 10 minutes the two colonies never meet (no deaths even without the fungus). Garden still reaches "unified" at ~105 s, because the nests' odours converge and the minute is "quiet" with nobody in contact. Unity ("smell alike, nobody has died fighting for a minute") does not ask that the colonies have met. Filed: unified should also need allied contact, ants of both colonies meeting within tolerance (`ja-i0f`).
+- **Every test passes on the new default world.** One test was fragile and is fixed: `perception.test.ts`, where a healthy ant given 8 s on a 40-wide map reached the edge, bounced at random and (with #8's movement) stumbled onto the food. It now runs 4 s, the time the infected ant needs and before the healthy one can reach the edge.
+
+## 23. Agent review of the fungus policy (PR #7, 2026-11-01)
+
+An agent reviewed 1e, local sensing, the multi-colony client and the reframe, and confirmed 8 bugs, each with a repro. All are fixed and each has a test that fails without its fix. Results at the default settings are unchanged: the bench's stored food, digging and infection with Garden painted are identical before and after, so §22 stands.
+
+1. **"Hide groomed hosts" flipped hosts every step.** `groomed` was judged at what the host showed now, so a host that hid read as ungroomed the next step, woke, showed, and hid again: about 70 % of host-steps flipped. Groomed now means enough nestmates are around to groom it, judged at the strain's visibility; hiding shows them less but does not send them away. Now ~6.5 % of host-steps change, as hosts walk in and out of their groomers.
+2. **A strain with nothing on the menu asked Jev an empty choice forever**, billed each time and never cached. A host is asked only when it has a real choice (two or more things on offer), and the server now rejects a `choice` with no options.
+3. **A menu change while a question was in flight threw away the paid answer.** What a host was offered is now in its question's key, so an answer is packed, read and kept against what it was offered.
+4. **The gate fell back to dormant (and hid) with dormant switched off.** It now falls back to the strain's default, else the first thing still on, else nothing; a host hides only if dormant is on.
+5. **Cull did nothing between loads 0.7 and 0.8**, though the rule culls from 0.7: a half-pushed odour was still within tolerance of its nest's. Cull now takes full effect from a high load (`HIGH_LOAD`).
+6. **A soothed stranger was sensed as "allied".** Contact counted strangers weighted by calm, as fights do. The fungus now counts them by odour alone; fights still weight by calm.
+7. **After a 409, Start re-asked questions still in flight.** A 409 now cancels what is in flight, as Stop does, and an old run's reply no longer clears the new run's in-flight set.
+8. **Toggling an intervention dropped every strain's cached answers**, because the menu was in the context. The context is now the aim, the legend and the wording (including the interventions' blurbs, which it missed). The key holds what that strain was offered, so switching cull, Bloom's alone, keeps Garden's and Lockpick's answers.
+
+`FUNGUS_BRAIN_VERSION` is 3: the legend now explains groomed and calmed strangers, and keys and contexts changed. Answers cached under v2 are not reused. The longer legend moves the estimate from ≈ 314 to ≈ 315 tokens per fungal situation; ant requests and tokens per ant are untouched.
+
+Unconfirmed points the review raised, filed rather than fixed: lane starvation (the fungus lane is filled last each cycle); a 429 re-queue lost after a doctrine switch; colony k without its own doctrine following colony 0's only at the next game; `Fungus.configure` alone not telling Jev the menu; cull's push depending on which side of 0.5 the nest's odour has drifted to.
+
+*§24–28 were §15–19 on the side-view stack (MR 8–15 and the nest design); they were renumbered when `main` (the fungus, §15–23) was merged in (nest slice 0, ja-6nm).*
+
+## 24. Hexagons, and tunnels that meander (MR 8, 2026-11-01)
 
 The product owner asked why the tunnels are all right angles. On the square grid, digging went through cell edges only, ants in tunnels walked four ways, and dead ends forked at 90°. The owner chose a **hex grid plus a meander**, with **true hexagons drawn up close**.
 
@@ -607,7 +917,7 @@ The product owner asked why the tunnels are all right angles. On the square grid
 
 **Jev:** situations, legend and request are unchanged. The tokens per question and per ant are unchanged.
 
-## 16. Getting home through dug ground (MR 9, 2026-11-01)
+## 25. Getting home through dug ground (MR 9, 2026-11-01)
 
 MR 8 (hexagons) kept the underground economy but more ants stayed out long: 20–27 % out over 120 s (MR 7: 8–23 %). The reviewer's stall scan (900 + 900 ants, seed 1, 180 s) found 151 ants that hadn't moved 2 cells in over 30 s. Traces found three faults in wall-following round soil:
 
@@ -657,7 +967,7 @@ MR 8 (hexagons) kept the underground economy but more ants stayed out long: 20�
 
 **Jev:** situations, legend and request are unchanged. Tokens are unchanged.
 
-## 17. Where the dug soil goes (MR 10–11, 2026-11-01)
+## 26. Where the dug soil goes (MR 10–11, 2026-11-01)
 
 The product owner asked whether the earth ring was grounded, adding that "the soil has to actually go somewhere".
 
@@ -751,7 +1061,7 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   - re-dug cells no longer smell of fresh pellets;
   - fills keep clear of every nest, not only the carrier's own.
 
-## 18. The side view: a cross-section
+## 27. The side view: a cross-section
 
 **MR 13** (owner's request, 2026-11-01): "I'm not seeing it deposit above ground because we don't see above ground — or is this not a cross section?"
 - **Before:** the colony view was a top-down slice at one depth, and the mound was only a ring overlay.
@@ -865,7 +1175,7 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   - Food home roughly doubles: carriers walking soil out search the ground, and drop their pellet as foragers.
   - The open map is unchanged.
 
-## 19. Home is a nest, not a point (design, 2026-11-01)
+## 28. Home is a nest, not a point (design, 2026-11-01)
 
 The owner asked where "home" really is for an ant, whether it is the queen, and whether ants build spaces with jobs. In the side view, home is still one pre-dug chamber that every ant steers to by an exact vector through solid soil.
 
@@ -877,3 +1187,62 @@ The research and the design are in [`docs/nest-and-home.md`](nest-and-home.md), 
 - **Losing the only queen dooms a colony**, without ending it at once: no new workers, then a slow decline. So *orphaned* becomes a state, and *fallen* stays "no workers left".
 
 Slices 0–9 are beads under the epic, starting with merging the fungus milestone (`main`, PR #7) into this stack.
+
+## 29. The fungus on hexes: `main` merged into the side view (nest slice 0, ja-6nm, 2026-11-02)
+
+The fungus milestone (§15–23, PR #7) and the maintenance review (#13) were built on square cells; the side-view stack (§24–27) rewrote the colony on hexes. This merge puts them together. The sections were renumbered (see the note above §24).
+
+**How it was merged.** `colony.ts` keeps the stack's hex movement and homing. Main's fungus hooks were ported onto it:
+- the per-ant fungus arrays and `asIs`;
+- the perception gains in `#sense`;
+- `look` and the `ENEMY` threshold in enemy sensing;
+- the fungal clock on tiredness, and calm on charging;
+- `layGain`, and the food leak into the rival's field.
+
+Two of main's homing fixes apply on hexes too and were ported:
+- **A trip home starts afresh**, whether the ant picked up food or its policy sent it home: no detour or bumps carried over.
+- **No progress for `TUNNEL_STALL` (20 s):** the tunnel walker picks branches by the home vector for `BY_VECTOR` (15 s), then goes back to scent. Without this, homing carriers can circle a ring of scented tunnels for ever.
+
+The agent review of this merge found that the first cut had dropped both, and reproduced the ring trap on hexes (6 of 6 seeds). Each now has a test that fails without it.
+
+Main's "lost wall" fix (`WALL_LOST`) is not carried over. On hexes a wall-follower walks the wall cell by cell with a hand on it, so it can't drift off into the open.
+
+**Grid code moved to hexes** (`hex.ts`):
+
+| Where | Change |
+|---|---|
+| `Recognition.build` | bins each ant by its hex cell |
+| `Recognition.around` | the cell and its neighbours within `r` hex steps (was a (2r+1)² square) |
+| `Fungus.step`, `#gather` | an ant's cell, and its six neighbours (was the 3×3 square) |
+| `Fungus.paint` | the brush is a disc of hex centres |
+| `Game.enemiesNearNest` | the hex disc round the chamber, and the entrance as well |
+
+Backfill now asks Recognition for every ant of another colony (`look` at tolerance −1), so it won't wall one in, stranger or not. Tests that placed ants at square-cell centres (`x + 0.5, y + 0.5`) place them at hex centres instead (`centreX`, `centreY`).
+
+**Measured** (`scripts/colony-bench.mjs 1200 60 1`, merged vs the stack's tip mr15):
+- **Fungus hooks alone:** before the two homing fixes, the side view was identical to mr15 ant for ant (one colony 497 stored; two 448 / 439).
+- **With the fixes:** the side view stores 482 (one colony) and 462 / 500 (two).
+- **Tick time:** unchanged within noise, side view two colonies 5.15 ms against 5.23 ms.
+- **Tests:** all 253 pass.
+
+**Homing on the side view** (600 + 600 ants, 600 s; ants out over 120 s, sampled every 10 s from 120 s, mean and worst sample per colony):
+
+| Seed | mr15 (= merge without the fixes): out > 120 s | food home | With the fixes: out > 120 s | food home |
+|---|---|---|---|---|
+| 1 | 17.2 % (worst 75 %) | 1345 / 1126 | 0.4 % (worst 4 %) | 1437 / 1395 |
+| 2 | 0.1 % (1 %) | 1258 / 1481 | 0.1 % (1 %) | 1236 / 1415 |
+| 3 | 18.0 % (59 %) | 1003 / 1352 | 10.6 % (56 %) | 1209 / 1421 |
+
+Rings of scented tunnels were most of the stuck share in `ja-dy9`.
+
+**§22 rerun on the side view** (Garden painted 4× on each chamber, 300 + 300 ants, 10 sim-minutes):
+
+| World | Seed | No fungus: lost | Garden: unified at | Garden: lost | Infected | Ants at 10 min |
+|---|---|---|---|---|---|---|
+| side | 1 | 0 / 0 | 112 s | 0 / 0 | 100 / 100 % | 450 / 450 |
+| side | 2 | 0 / 0 | 112 s | 0 / 0 | 100 / 100 % | 450 / 450 |
+| side | 3 | 0 / 0 | 108 s | 0 / 0 | 100 / 98 % | 450 / 450 |
+
+As underground in §22, the colonies never meet in ten minutes, so "unified" is reached without a meeting (`ja-i0f`). This table is the baseline that nest slice 8 (the fungus on the new home) is measured against.
+
+**Jev cost:** unchanged. The colony situation is the stack's (`TOKENS_PER_SITUATION` ≈ 235), and the fungus lane is main's.

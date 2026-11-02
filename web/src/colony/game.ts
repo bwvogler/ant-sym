@@ -1,13 +1,22 @@
-import { CELL, centreX, centreY, R } from "./hex.ts";
+import { centreX, centreY, R } from "./hex.ts";
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
+import { Fungus, type FungusParams } from "./fungus.ts";
+import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { WorldMap } from "./world.ts";
 
-// The game, pure: the player's colony and (optionally) a rival on one map,
-// sharing its food. Each tick: the colonies move (each seeing the other's
+// The game, pure: two colonies (or one, solo) on one map, sharing its food.
+// The player is neither: the player is the fungus (fungus.ts). `player` and
+// `rival` are the first and second colony, named for history (the stack's
+// tests and scripts use them); the page calls them by colour, Ink and Amber. Each tick: the colonies move (each seeing the other's
 // ants through an enemy grid), then fights are resolved, then — every few
 // seconds — each colony's strategist picks its stance from a coarse view of
 // itself. A colony with no ants and too little food for one more is beaten.
+// The fungus (the player, fungus.ts) spans every colony, like fights do: after
+// fights, load spreads by contact across colonies and is groomed off within them.
+// Who fights whom is recognition (recognition.ts): strangers by odour, not by
+// colony. When the two nests come to smell alike and nobody has died fighting
+// for a minute, the colonies are unified: the fungus's goal.
 
 export interface GameParams {
   antCount: number;
@@ -19,21 +28,53 @@ export interface GameParams {
   /** cells around a nest where an enemy counts as "near the nest" */
   nestWatch: number;
   fight: FightParams;
+  fungus: Partial<FungusParams>;
+  recognition: Partial<RecognitionParams>;
 }
 
-export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT };
+export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {} };
 
-export type Outcome = "playing" | "won" | "lost";
+/**
+ * The fungus's game: unified (one colony: the goal), fallen (a colony is gone: the fungus has lost hosts it
+ * could have unified, and there is no one left to unify it with), or playing. A colony's win over the other
+ * is no win for the fungus.
+ */
+export type Outcome = "playing" | "unified" | "fallen";
+
+/** How far the fungus has come toward one colony (docs/fungus-policy.md §1). */
+export interface Unity {
+  /** distance between the two nests' odours: 1 at the start, under the tolerance when they smell alike */
+  gap: number;
+  /** fight deaths over about the last minute (a count fading over 60 s) */
+  deathsPerMinute: number;
+  /** seconds since the last fight death */
+  quiet: number;
+  /** share of living ants, both colonies, within the tolerance of the other nest's odour */
+  mixing: number;
+  /** 0..1: how far the nests have come to smell alike, × how long it has been quiet (a minute is whole) */
+  score: number;
+  /** the nests smell alike and nobody has died fighting for a minute */
+  unified: boolean;
+}
+
+/** Seconds without a fight death that unity asks for. */
+export const QUIET = 60;
 
 export class Game {
   readonly map: WorldMap;
   readonly colonies: Colony[];
+  /** the player: spores on the ground and load in the ants of every colony */
+  readonly fungus: Fungus;
+  /** who is a stranger to whom, by odour: the enemy view every ant and every fight reads */
+  readonly recognition: Recognition;
   params: GameParams;
   time = 0;
   /** stance choices made by strategists */
   strategyChoices = 0;
   #grids: CountGrid[];
-  #enemy: CountGrid[];
+  /** fight deaths, fading over ~60 s, and when the last one was */
+  #fightDeaths = 0;
+  #lastFightDeath = 0;
   #nextStrategy = 0;
   #rng: () => number;
 
@@ -41,81 +82,112 @@ export class Game {
     this.map = map;
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
-    const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
+    this.recognition = new Recognition(this.params.recognition);
+    const tolerance = this.recognition.params.tolerance;
+    // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
+    const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
     this.colonies = [mine];
-    if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1 }, rng));
+    if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1, odour: 1, tolerance }, rng));
     this.#grids = this.colonies.map(() => new CountGrid());
-    this.#enemy = this.colonies.map(() => new CountGrid());
+    this.fungus = new Fungus(map, this.params.fungus);
     this.colonies.forEach((c, k) => {
       if (map.hasSoil) c.friends = this.#grids[k] as CountGrid;
       if (this.colonies.length > 1) {
-        c.enemies = this.#enemy[k] as CountGrid;
+        c.enemies = this.recognition;
         const other = this.colonies[1 - k]!.nest;
         c.raidTarget = other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other; // side view: in at their hole
+        // Only ants whose perception the fungus has bent read it (Colony.foreignFood).
+        c.foreign = this.colonies[1 - k]!.ph;
       }
     });
     this.#refresh();
   }
 
+  /** The first colony (Ink on the page). Not the player's: the player is the fungus. */
   get player(): Colony {
     return this.colonies[0] as Colony;
   }
 
+  /** The second colony (Amber on the page), or null solo. */
   get rival(): Colony | null {
     return this.colonies[1] ?? null;
   }
 
-  /** Occupancy per colony, and for each colony the sum of everyone else's: built from the ants, never by scanning the map. */
+  /** Occupancy per colony, and every ant by odour band: built from the ants, never by scanning the map. */
   #refresh(): void {
     this.colonies.forEach((c, k) => occupancy(c, this.#grids[k] as CountGrid));
-    for (const e of this.#enemy) e.reset();
-    const { w, h } = this.map.size;
-    this.colonies.forEach((c, j) => {
-      for (let i = 0; i < c.n; i++) {
-        if (!c.alive[i]) continue;
-        c.antCell(i);
-        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
-        const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
-        this.#enemy.forEach((e, k) => {
-          if (k !== j) e.add(cx, cy);
-        });
-      }
-    });
+    if (this.colonies.length > 1) this.recognition.build(this.colonies);
   }
 
-  /** Enemies within `nestWatch` (world units) of colony k's nest. */
+  /** Strangers (to the nest's odour, at the healthy tolerance) within `nestWatch` (world units) of colony k's nest, and of its entrance in the side view. */
   enemiesNearNest(k: number): number {
     const c = this.colonies[k] as Colony;
-    const e = this.#enemy[k] as CountGrid;
+    const rec = this.recognition;
+    rec.look(c.nestOdour, rec.params.tolerance);
     const { w, h } = this.map.size;
     const r = this.params.nestWatch;
     let s = 0;
     for (let y = Math.max(0, Math.floor((c.nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((c.nest.y + r) / R)); y++)
       for (let x = Math.max(0, Math.floor(c.nest.x - r - 1)); x <= Math.min(w - 1, Math.ceil(c.nest.x + r)); x++)
-        if (Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) <= r) s += e.get(x, y);
+        if (Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) <= r) s += rec.get(x, y);
     // The side view: the entrance too (it is above the chamber, out of that watch), unless the two overlap.
     const en = c.nest.entrance;
     if (en && Math.hypot(en.x - c.nest.x, en.y - c.nest.y) > r)
       for (let y = Math.max(0, Math.floor((en.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((en.y + r) / R)); y++)
         for (let x = Math.max(0, Math.floor(en.x - r - 1)); x <= Math.min(w - 1, Math.ceil(en.x + r)); x++)
-          if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) > r) s += e.get(x, y);
+          if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) > r) s += rec.get(x, y);
     return s;
+  }
+
+  /** How far the fungus has come toward one colony. With no rival there is nothing to unify. */
+  unity(): Unity {
+    const deathsPerMinute = this.#fightDeaths;
+    const quiet = this.time - this.#lastFightDeath;
+    const [a, b] = this.colonies;
+    if (!a || !b) return { gap: 0, deathsPerMinute, quiet, mixing: 0, score: 0, unified: false };
+    const tol = this.recognition.params.tolerance;
+    const gap = Math.abs(a.nestOdour - b.nestOdour);
+    let near = 0;
+    let living = 0;
+    for (const [c, other] of [[a, b], [b, a]] as const)
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i]) continue;
+        living++;
+        if (Math.abs((c.odour[i] as number) - other.nestOdour) <= tol) near++;
+      }
+    const recognition = Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
+    const unified = gap <= tol && quiet >= QUIET && !Game.beaten(a) && !Game.beaten(b);
+    return { gap, deathsPerMinute, quiet, mixing: living ? near / living : 0, score: recognition * Math.min(1, quiet / QUIET), unified };
   }
 
   tick(dt: number): void {
     this.time += dt;
     for (const c of this.colonies) c.tick(dt);
-    if (this.colonies.length === 1 && this.map.hasSoil) occupancy(this.player, this.#grids[0] as CountGrid);
+    const fungal = this.fungus.due(dt);
+    // Occupancy is needed every tick with a rival (fights, recognition), underground (crowded digging, backfill), or when the fungus steps.
+    if (this.colonies.length > 1 || fungal || this.map.hasSoil) this.#refresh();
+    this.#fightDeaths *= Math.exp(-dt / QUIET);
     if (this.colonies.length > 1) {
-      this.#refresh();
-      resolveFights(this.colonies, this.#grids, dt, this.#rng, this.params.fight);
+      const died = resolveFights(this.colonies, this.#grids, dt, this.#rng, this.params.fight, this.recognition).reduce((x, y) => x + y, 0);
+      if (died > 0) {
+        this.#fightDeaths += died;
+        this.#lastFightDeath = this.time;
+      }
+      // Odours: the gestalt at each nest, and blending where the fungus runs it.
+      this.recognition.advance(this.colonies, dt);
     }
+    // After fights: the dead neither pass load on nor groom (the occupancy grids still count them as groomers for this one step).
+    // The fungus steps every few ticks (fungus.ts advance); when it is idle its clock does not run.
+    if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null);
     if (this.time >= this.#nextStrategy) {
       this.#nextStrategy = this.time + this.params.strategyEvery;
       this.colonies.forEach((c, k) => {
         // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
         // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
-        if (!this.colonies.some((o, j) => j !== k && !Game.beaten(o))) {
+        // A colony whose nest smells like ours is no rival either: kin are not raided (after unification,
+        // raiders swarmed the other nest with nobody there to fight).
+        const tol = this.recognition.params.tolerance;
+        if (!this.colonies.some((o, j) => j !== k && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
           c.stance = "forage";
           return;
         }
@@ -126,14 +198,23 @@ export class Game {
     }
   }
 
+  /** The spore brush: spores on the ground within `radius` of (x, y), and a dose of load into every ant there, of any colony. */
+  paintSpores(x: number, y: number, radius: number, spores: number, dose: number, strain: number): void {
+    this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain);
+  }
+
   /** Beaten: no ants left and too little food in the larder for one more. */
   static beaten(c: Colony): boolean {
     return c.population === 0 && c.larder < c.params.foodPerAnt;
   }
 
+  /** The first colony that is beaten, by index, or −1. */
+  fallen(): number {
+    return this.colonies.findIndex((c) => Game.beaten(c));
+  }
+
   outcome(): Outcome {
-    if (Game.beaten(this.player)) return "lost";
-    const r = this.rival;
-    return r && Game.beaten(r) ? "won" : "playing";
+    if (this.fallen() >= 0) return "fallen";
+    return this.rival && this.unity().unified ? "unified" : "playing";
   }
 }
