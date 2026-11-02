@@ -1,4 +1,4 @@
-import { type Channel, type Mark, MARKS, Pheromones } from "./pheromone.ts";
+import { type Channel, type ChannelParams, DEFAULT_CHANNELS, type Mark, MARKS, Pheromones } from "./pheromone.ts";
 import { Brood, EGG, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
@@ -177,14 +177,23 @@ export interface ColonyParams {
   odour: number;
   /** odours further apart than this are strangers, as a healthy ant perceives it */
   tolerance: number;
+  /** cells round an ant it checks for enemies (the hex disc of this radius) */
+  enemyRange: number;
+  /** evaporation and spread of the colony's pheromone channels, per channel and field; those left out keep their defaults */
+  channels: Partial<Record<Channel, Partial<ChannelParams>>>;
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: {} };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
-/** Cells around an ant it checks for enemies (the hex disc of radius ENEMY_RANGE). */
-const ENEMY_RANGE = 2;
+
+/** Every channel's params: the defaults, with `over` merged in per channel and per field. */
+export function channelParams(over: Partial<Record<Channel, Partial<ChannelParams>>> = {}): Record<Channel, ChannelParams> {
+  const out = { ...DEFAULT_CHANNELS };
+  for (const [ch, p] of Object.entries(over) as [Channel, Partial<ChannelParams>][]) out[ch] = { ...DEFAULT_CHANNELS[ch], ...p };
+  return out;
+}
 
 export class Colony {
   readonly map: WorldMap;
@@ -498,7 +507,7 @@ export class Colony {
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
-    this.ph = new Pheromones(map);
+    this.ph = new Pheromones(map, channelParams(this.params.channels));
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -2724,7 +2733,7 @@ export class Colony {
     return blocked(this.map, x + Math.cos(angle) * d, y + Math.sin(angle) * d);
   }
 
-  /** The nearest cell holding enemies within ENEMY_RANGE of ant i, as a heading, or null. */
+  /** The nearest cell holding enemies within enemyRange of ant i, as a heading, or null. */
   #enemyHeading(i: number): number | null {
     const g = this.enemies;
     if (!g) return null;
@@ -2734,6 +2743,7 @@ export class Colony {
     this.antCell(i);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
+    const ENEMY_RANGE = this.params.enemyRange;
     if (!g.any(cx - ENEMY_RANGE - 1, cy - ENEMY_RANGE, cx + ENEMY_RANGE + 1, cy + ENEMY_RANGE)) return null;
     // The hex disc round the ant: the nearest cell (by distance, not ring order) holding enough strangers to react to.
     const o = discOffsets(ENEMY_RANGE)[cy & 1] as Int16Array;

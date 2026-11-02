@@ -9,13 +9,13 @@
 // (colonyBrain.estimateTokens); the ledger counts the real ones live.
 //
 // --side plays the side view (the nest, its chambers and in-nest situations: PRD §32), as the app sets it up
-// (generateSideWorld(seed), Game with mulberry32(seed * 7919)); without it, the top-down map (generateWorld) with
+// (generateSideWorld(seed), Game with gameRng(seed), as the page builds it); without it, the top-down map (generateWorld) with
 // the rng this script always used, so earlier figures reproduce.
 //
 // Usage: node scripts/colony-cost.mjs [--side] [minutes=10] [ants=600] [seed=1]
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
 import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
-import { Game } from "../web/src/colony/game.ts";
+import { Game, gameRng } from "../web/src/colony/game.ts";
 import { generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
@@ -67,7 +67,7 @@ function lane(key, pack, contextOf, local) {
 }
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
-const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(side ? seed * 7919 : seed + 7), { policy: modes.policy, stance: stances.policy });
+const game = new Game(map, { antCount: ants, rivalAnts: ants }, side ? gameRng(seed) : mulberry32(seed + 7), { policy: modes.policy, stance: stances.policy });
 const colony = game.player;
 const flush = () => {
   modes.flush();

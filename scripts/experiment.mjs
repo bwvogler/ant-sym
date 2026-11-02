@@ -1,0 +1,143 @@
+// Offline, no key, no spend: run behaviour assays (web/src/colony/experiment.ts)
+// over seeds and parameter values, and print each metric's median and range
+// across seeds, with how many seeds passed the assay's mark. Runs (one per
+// assay, combination and seed) go to a pool of worker threads.
+//
+// Usage: node scripts/experiment.mjs <assay ...|all> [--seeds 1-10] [--seconds N]
+//          [--set colony.deposit=2,4,8] [--set game.fight.rate=1,2] [--json out.json] [--jobs N]
+//
+// --set takes a dotted path under colony / rival / game and a comma list of
+// values; several --set flags run their cross product. Pheromone channels are
+// colony.channels.<food|home|alarm>.<evaporation|diffusion>.
+import { writeFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
+import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
+
+if (isMainThread) await main();
+else await work();
+
+function fail(msg) {
+  console.error(msg);
+  process.exit(1);
+}
+
+function range(s) {
+  return s.split(",").flatMap((part) => {
+    const [a, b] = part.split("-").map(Number);
+    return b === undefined ? [a] : Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  });
+}
+
+function parse(v) {
+  if (v === "true" || v === "false") return v === "true";
+  const n = Number(v);
+  return Number.isNaN(n) ? v : n;
+}
+
+/** Every combination of the --set values, as override objects ({} when there are none). */
+function combos(sets) {
+  let out = [{ label: "default", o: {} }];
+  for (const { path, values } of sets)
+    out = out.flatMap((c) =>
+      values.map((v) => {
+        const o = structuredClone(c.o);
+        const keys = path.split(".");
+        let at = o;
+        for (const key of keys.slice(0, -1)) at = at[key] ??= {};
+        at[keys.at(-1)] = v;
+        return { label: c.label === "default" ? `${path}=${v}` : `${c.label} ${path}=${v}`, o };
+      }),
+    );
+  return out;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const ids = [];
+  let seeds = range("1-10");
+  let seconds;
+  let json;
+  let jobs = availableParallelism();
+  const sets = [];
+  for (let k = 0; k < args.length; k++) {
+    const a = args[k];
+    if (a === "--seeds") seeds = range(args[++k]);
+    else if (a === "--seconds") seconds = Number(args[++k]);
+    else if (a === "--json") json = args[++k];
+    else if (a === "--jobs") jobs = Number(args[++k]);
+    else if (a === "--set") {
+      const [path, values] = args[++k].split("=");
+      sets.push({ path, values: values.split(",").map(parse) });
+    } else if (a.startsWith("--")) fail(`unknown option ${a}`);
+    else ids.push(a);
+  }
+  const { ASSAYS } = await import("../web/src/colony/experiment.ts");
+  const chosen = ids.length === 0 || ids.includes("all") ? ASSAYS : ids.map((id) => ASSAYS.find((x) => x.id === id) ?? fail(`no assay "${id}" (have: ${ASSAYS.map((x) => x.id).join(", ")})`));
+  const cs = combos(sets);
+
+  // One job per assay, combination and seed; the longest assays first, so the pool ends together.
+  const secondsOf = (id) => ASSAYS.find((x) => x.id === id).seconds;
+  const queue = [];
+  for (const assay of chosen) for (const [ci, c] of cs.entries()) for (const seed of seeds) queue.push({ id: assay.id, ci, o: c.o, seed, seconds });
+  queue.sort((a, b) => secondsOf(b.id) - secondsOf(a.id));
+  const results = new Map(); // `${id}|${ci}` → runs
+  const t0 = performance.now();
+  let done = 0;
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(jobs, queue.length)) }, async () => {
+      for (let job = queue.shift(); job; job = queue.shift()) {
+        const run = await inWorker(job);
+        const key = `${job.id}|${job.ci}`;
+        if (!results.has(key)) results.set(key, []);
+        results.get(key).push(run);
+        done++;
+        process.stderr.write(`\r${done} runs, ${((performance.now() - t0) / 1000).toFixed(0)} s`);
+      }
+    }),
+  );
+  process.stderr.write("\n");
+
+  const median = (a) => {
+    const s = [...a].sort((x, y) => x - y);
+    const m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  const fmt = (v) => (Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+  const all = [];
+  for (const assay of chosen) {
+    console.log(`\n## ${assay.title}\n\nTarget: ${assay.target}. Seeds ${seeds[0]}–${seeds.at(-1)}, ${seconds ?? assay.seconds} s.\n`);
+    for (const [ci, { label, o }] of cs.entries()) {
+      const runs = (results.get(`${assay.id}|${ci}`) ?? []).sort((a, b) => a.seed - b.seed);
+      all.push({ assay: assay.id, label, overrides: o, runs });
+      const keys = Object.keys(runs[0].metrics).filter((k) => k !== "pass");
+      const passes = runs.filter((r) => r.metrics.pass === 1).length;
+      const hasPass = runs.some((r) => "pass" in r.metrics);
+      console.log(`**${label}**${hasPass ? ` — pass ${passes}/${runs.length}` : ""}\n`);
+      console.log("| metric | median | min | max |\n|---|---|---|---|");
+      for (const k of keys) {
+        const v = runs.map((r) => r.metrics[k]).filter((x) => x !== undefined && x !== null && !Number.isNaN(x));
+        if (v.length === 0) console.log(`| ${k} | – | – | – |`);
+        else console.log(`| ${k} | ${fmt(median(v))} | ${fmt(Math.min(...v))} | ${fmt(Math.max(...v))} |`);
+      }
+      const ms = runs.map((r) => r.msPerTick);
+      console.log(`| ms/tick | ${fmt(median(ms))} | ${fmt(Math.min(...ms))} | ${fmt(Math.max(...ms))} |\n`);
+    }
+  }
+  console.error(`${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`);
+  if (json) writeFileSync(json, JSON.stringify(all, null, 1));
+}
+
+function inWorker(job) {
+  return new Promise((resolve, reject) => {
+    const w = new Worker(new URL(import.meta.url), { workerData: job });
+    w.once("message", resolve);
+    w.once("error", reject);
+    w.once("exit", (code) => code && reject(new Error(`worker exited with ${code}`)));
+  });
+}
+
+async function work() {
+  const { id, o, seed, seconds } = workerData;
+  const { ASSAYS, runAssay } = await import("../web/src/colony/experiment.ts");
+  parentPort.postMessage(runAssay(ASSAYS.find((x) => x.id === id), seed, o, seconds));
+}
