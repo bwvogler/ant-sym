@@ -1,4 +1,4 @@
-import { type Channel, Pheromones } from "./pheromone.ts";
+import { type Channel, type ChannelParams, DEFAULT_CHANNELS, Pheromones } from "./pheromone.ts";
 import { blocked, dropFood, rockAt, takeFood, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
@@ -132,14 +132,58 @@ export interface ColonyParams {
   patience: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
+  /** what a sensor reads for a food cell it sees (or the nest, for a homing ant): above any trail, so sight beats scent */
+  seen: number;
+  /** cells around an ant it checks for enemies (a square of side 2 × enemyRange + 1) */
+  enemyRange: number;
+  /** seconds of wall-following before giving up on this wall for a while */
+  followGiveUp: number;
+  /** seconds of wall-following before trying the other side once */
+  followFlip: number;
+  /** evaporation and spread of each of the colony's pheromone channels */
+  channels: Record<Channel, ChannelParams>;
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5 };
+/** Seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round). */
+export const FOLLOW_GIVE_UP = 120;
+/** Seconds of wall-following before trying the other side once (same line home). */
+export const FOLLOW_FLIP = 45;
 
-/** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
-const SEEN = 100;
-/** Cells around an ant it checks for enemies (a square of side 2 × ENEMY_RANGE + 1). */
-const ENEMY_RANGE = 2;
+export const DEFAULT_COLONY: ColonyParams = {
+  antCount: 800,
+  maxAnts: 1200,
+  foodPerAnt: 4,
+  nest: 0,
+  speed: 7,
+  sensorDistance: 3,
+  sensorAngle: 0.6,
+  turnRate: 6,
+  wander: 4,
+  deposit: 4,
+  depositDecay: 20,
+  patience: 60,
+  alarmAvoid: 1.5,
+  seen: 100,
+  enemyRange: 2,
+  followGiveUp: FOLLOW_GIVE_UP,
+  followFlip: FOLLOW_FLIP,
+  channels: DEFAULT_CHANNELS,
+};
+
+/** Params with defaults filled in; `channels` merges per channel and per field, so `{ channels: { food: { evaporation: 0.1 } } }` keeps the rest. */
+export function colonyParams(params: Partial<Omit<ColonyParams, "channels">> & { channels?: Partial<Record<Channel, Partial<ChannelParams>>> } = {}): ColonyParams {
+  const p: ColonyParams = { ...DEFAULT_COLONY, ...params, channels: DEFAULT_CHANNELS };
+  if (params.channels) {
+    const c = { ...DEFAULT_CHANNELS };
+    for (const k of Object.keys(params.channels) as Channel[]) c[k] = { ...DEFAULT_CHANNELS[k], ...params.channels[k] };
+    p.channels = c;
+  }
+  if (params.maxAnts === undefined) p.maxAnts = Math.max(p.antCount, Math.round(p.antCount * 1.5));
+  return p;
+}
+
+/** What `new Colony` and `new Game` take: any params, channels merged field by field. */
+export type ColonyOptions = Parameters<typeof colonyParams>[0];
 
 export class Colony {
   readonly map: WorldMap;
@@ -200,15 +244,14 @@ export class Colony {
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   #s = new Float64Array(9);
 
-  constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
+  constructor(map: WorldMap, params: ColonyOptions = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
     this.map = map;
-    this.params = { ...DEFAULT_COLONY, ...params };
-    if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
+    this.params = colonyParams(params);
     this.nest = map.nests?.[this.params.nest] ?? map.nest;
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
-    this.ph = new Pheromones(map);
+    this.ph = new Pheromones(map, this.params.channels);
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -342,6 +385,7 @@ export class Colony {
     const sy = (this.y[i] as number) + dy * d;
     const s = this.#s;
     const { map, nest } = this;
+    const SEEN = this.params.seen;
     if (sx < 0 || sy < 0 || sx >= map.size.w || sy >= map.size.h) {
       s[slot] = s[slot + 3] = s[slot + 6] = -1;
       return;
@@ -381,10 +425,11 @@ export class Colony {
     return blocked(this.map, x + Math.cos(angle) * d, y + Math.sin(angle) * d);
   }
 
-  /** The nearest cell holding enemies within ENEMY_RANGE of ant i, as a heading, or null. */
+  /** The nearest cell holding enemies within enemyRange of ant i, as a heading, or null. */
   #enemyHeading(i: number): number | null {
     const g = this.enemies;
     if (!g) return null;
+    const ENEMY_RANGE = this.params.enemyRange;
     const { w, h } = this.map.size;
     const cx = Math.floor(this.x[i] as number);
     const cy = Math.floor(this.y[i] as number);
@@ -495,7 +540,7 @@ export class Colony {
           const t0 = this.followT[i] as number;
           const t = t0 + dt;
           this.followT[i] = t;
-          if (t0 < FOLLOW_FLIP && t >= FOLLOW_FLIP) {
+          if (t0 < p.followFlip && t >= p.followFlip) {
             // Probably the long way round (a big rock mass, or the map's edge): try the other side, same line home.
             this.wall[i] = -side as -1 | 1;
             h += Math.PI;
@@ -504,7 +549,7 @@ export class Colony {
           if (dist < (this.hitDist[i] as number) - 1 && this.#onMLine(i, x, y) && !this.#touch(x, y, toNest, 1.5)) {
             this.wall[i] = 0; // back on its line home, nearer than where it met this wall, and the way is open
             h = turnToward(h, toNest, p.turnRate * dt * 0.8);
-          } else if (t >= FOLLOW_GIVE_UP) {
+          } else if (t >= p.followGiveUp) {
             // Not round after a long while: wander a good while, then try afresh.
             this.wall[i] = 0;
             this.mx[i] = NaN;
@@ -527,7 +572,7 @@ export class Colony {
           h = turnToward(h, Math.atan2(t.y - (this.y[i] as number), t.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
         } else h += noise * p.wander;
       } else {
-        const seen = Math.max(fl, ff, fr) >= SEEN;
+        const seen = Math.max(fl, ff, fr) >= p.seen;
         h += seen ? climb(fl, ff, fr, p.turnRate * dt) : noise * p.wander;
       }
       // Every mode but fighting shies away from alarm.
@@ -628,10 +673,6 @@ function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: T
   return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
 }
 
-/** Seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round). */
-export const FOLLOW_GIVE_UP = 120;
-/** Seconds of wall-following before trying the other side once (same line home). */
-export const FOLLOW_FLIP = 45;
 /** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
 const M_LINE_WIDTH = 0.6;
 /** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */

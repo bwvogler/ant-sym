@@ -1,5 +1,5 @@
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
+import { Colony, localPolicy, localStance, type ColonyOptions, type Policy, type StancePolicy } from "./colony.ts";
 import type { WorldMap } from "./world.ts";
 
 // The game, pure: the player's colony and (optionally) a rival on one map,
@@ -24,6 +24,13 @@ export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts:
 
 export type Outcome = "playing" | "won" | "lost";
 
+/** One side's brain and params: what `new Game` takes for the player and for the rival. */
+export interface Side {
+  policy?: Policy;
+  stance?: StancePolicy;
+  colony?: ColonyOptions;
+}
+
 export class Game {
   readonly map: WorldMap;
   readonly colonies: Colony[];
@@ -36,13 +43,13 @@ export class Game {
   #nextStrategy = 0;
   #rng: () => number;
 
-  constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: { policy?: Policy; stance?: StancePolicy; colony?: Partial<ColonyParams> } = {}) {
+  constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Side = {}, rival: Side = {}) {
     this.map = map;
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
     const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
     this.colonies = [mine];
-    if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1 }, rng));
+    if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1, ...rival.colony }, rng, rival.policy ?? localPolicy, rival.stance ?? localStance));
     this.#grids = this.colonies.map(() => new CountGrid());
     this.#enemy = this.colonies.map(() => new CountGrid());
     this.colonies.forEach((c, k) => {

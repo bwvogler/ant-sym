@@ -11,15 +11,14 @@
 // Usage: node scripts/colony-cost.mjs [minutes=10] [ants=800] [seed=1]
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
 import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
-import { Game } from "../web/src/colony/game.ts";
-import { generateWorld, mulberry32 } from "../web/src/colony/world.ts";
+import { newGame } from "../web/src/colony/experiment.ts";
+import { mulberry32 } from "../web/src/colony/world.ts";
 
 const [minutes = 10, ants = 600, seed = 1] = process.argv.slice(2).map(Number);
 const USD = 0.042 / 1e6;
 const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
-const map = generateWorld(seed);
 let doctrine = DOCTRINES[0].text;
 let tokens = 0;
 let requests = 0;
@@ -57,7 +56,8 @@ function lane(key, pack, contextOf, local) {
 }
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
-const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed + 7), { policy: modes.policy, stance: stances.policy });
+const game = newGame({ seed, game: { antCount: ants, rivalAnts: ants }, player: { policy: modes.policy, stance: stances.policy } });
+const map = game.map;
 const colony = game.player;
 const flush = () => {
   modes.flush();

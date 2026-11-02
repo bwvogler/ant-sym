@@ -254,6 +254,8 @@ This is the first step toward the Sim-Ant-style game: a procedural world, a nest
 
 Measured (headless, 800 ants, 1/30 s steps): ~0.8 ms per tick. Over six seeds the colony brought home 49–86 % of the food in 3 sim-minutes (seed 1: 1,077 of 1,632 by 60 s).
 
+> **These numbers don't reproduce** (ja-jdu): they predate the rival nest and the chunked map, and the ants' rng was not recorded. From §14 on, every number states its seeding: `experiment.newGame(spec)` builds the map with `generateWorld(seed)` and the ants' rng with `mulberry32(seed × 7919 + generation)`. The colony page, the scripts and the tests all build games that way, so a seed is the same game everywhere.
+
 Known limits, left for later MRs:
 - There is no fungus input yet (painting pheromone and retuning come in MR 3).
 - There are no rivals or fights (MR 4).
@@ -462,3 +464,73 @@ Also from the review:
 - **Filed as beads:** keyboard access to following and to the minimap, the card's "by …" while paused, tap slop by net rather than total movement, and moving the gesture logic into a tested pure module.
 
 **Jev:** no change. `explain` makes no calls, and the request state is unchanged.
+
+## 14. The experiment harness and the Phase 0 baseline (2026-11-02)
+
+The plan (epic ja-68l): replace the colony's hard-coded behaviours with responses to what each ant senses, one behaviour per phase, and tune each against **assays** whose targets come from published ant behaviour. Phase 0 builds the harness and measures today's code; every later phase compares against this table.
+
+**Harness** (`web/src/colony/experiment.ts`, pure):
+- `newGame(spec)` is the one place seeding is defined (see the note under §9). The page (`useColony`), `colony-cost`, `colony-bench`, the assays and the tests use it.
+- `runGame(spec)` runs a game headless: seed, world options or a hand-built arena, game params, player and rival params and brains, seconds, dt, scripted events (paint, add food, clear food, any call), named regions to count traffic in, and an optional held stance. It returns a time series (per colony: population, stored, births, losses, decisions, modes, carriers, ants out, departures, stuck ants, ants and entries per region) and a summary (food home, stuck share, ms per tick).
+- Now tunable: the rival's colony params and brains (`new Game(…, player, rival)`), each pheromone channel's evaporation and spread (`colony.channels.food.evaporation`, merged field by field), and `seen`, `enemyRange`, `followGiveUp`, `followFlip` as colony params with today's values.
+
+**Assays** (`web/src/colony/assays.ts`). Arenas are built with `worldFromArrays`; solo arenas use 150 ants and food that never runs out.
+
+| | Assay | Source | Target (per seed, and ≥ 80 % of seeds) |
+|---|---|---|---|
+| A1 | double bridge: branches 36 vs ~68 cells to one food | Goss et al. 1989 | ≥ 80 % of branch crossings on the short branch over the second half |
+| A2 | rich vs poor source, together and poor-first | Beckers et al. 1990, 1993 (*L. niger*) | together, ≥ 65 % of food from the rich source; poor first, ≥ 50 % still from the poor one after the rich appears |
+| A3 | a source that empties at 120 s | Pharaoh's ants' no-entry mark (Robinson et al. 2005) | followers on the dead trail < 25 % of before within 60 s; ≤ 10 % still following at the end |
+| A4 | a blot of alarm on a busy trail | Bossert & Wilson 1963; ant-communication.md §2 | faint alarm reaches 3–10 cells, fades in 10–40 s; foraging, ants near it ≤ 50 %; defending, ≥ 150 % |
+| A5 | no food for 150 s, then food | Gordon 2002; Pinter-Wollman et al. 2013 | ants out without food ≤ 50 % of with; departures follow successful returns (r ≥ 0.5) |
+| A6 | musters set face to face: 60 v 60, 80 v 40 open, 80 v 40 through a 2-cell pass | Plowes & Adams 2005; Lymbery et al. 2023 | even fights trade within 1.5×; outnumbered in the open, defenders trade < 1:1; in the pass ≥ 1:1 and ≥ 1.5× better |
+| A7 | the whole game, UI defaults (600 + 600 ants, 512×320, 600 s) | ja-ipu | stuck share (out > 120 s; colonies under 20 ants not counted) not above this baseline |
+| G | the same runs | ja-t6u; colony-bench | informational: food home, who leads, ms per tick |
+| A8 | nest flow | — | defined with Phase 2 (nest rooms) |
+
+**Sweeps** (`npm run exp -- <all|a1,a3,…> --seeds 1-10 [--short] [--set colony.deposit=2,4,8 …] [--policy cache:<file>]`): the cross product of every `--set` over the seeds, in worker threads. It prints a markdown table (median and worst seed per metric, the share of seeds that pass, the verdict) and writes JSON to `experiments/out/` (gitignored).
+
+**Baseline: today's code, seeds 1–10** (`npm run exp -- all --seeds 1-10`, 421 s on the 4-core cloud container):
+
+| Assay | Metric | Median | Worst seed | Seeds pass | Verdict |
+|---|---|---|---|---|---|
+| A1 double bridge | short-branch share | 0.87 | 0.82 | 100 % | **pass** |
+| | food home | 2,069 | 1,544 | | |
+| A2 rich vs poor (pending: Phase 3) | rich share, together | 0.49 | 0.31 | 0 % | fail |
+| | poor share after rich added | 1.00 | 1.00 | | |
+| A3 depletion | s to leave the dead trail | 74 | 75 | 0 % | fail |
+| | share still following at end | 0.00 | 0.00 | | |
+| | followers on the trail before | 57 | 56 | | |
+| A4 alarm | reach after 1 s (cells) | 4.7 | 4.7 | 0 % | fail |
+| | s until below faint | 19 | 19 | | |
+| | near ÷ before, foraging | 0.55 | 0.62 | | |
+| | near ÷ before, defending | 1.54 | 1.23 | | |
+| A5 regulation (pending: Phase 5) | out without food ÷ with | 1.02 | 1.02 | 0 % | fail |
+| | r(returns, departures) | 0.92 | 0.84 | | |
+| A6 combat (pending: Phase 4) | even fight: larger ÷ smaller loss | 1.49 | 2.22 | 0 % | fail |
+| | 2:1 open: attackers lost ÷ defenders lost | 0.49 | 0.75 | | |
+| | 2:1 pass: attackers lost ÷ defenders lost | 0.53 | 0.28 | | |
+| A7 homing | stuck share at end | 0.044 | 0.069 | 100 % | baseline |
+| | largest stuck share | 0.08 | 0.14 | | |
+| G game | player food home (share of map) | 0.17 | 0.07 | | info |
+| | rival food home | 0.14 | 0.06 | | |
+| | player lead (+1 / 0 / −1) | +1 | −1 | | |
+| | ms per tick (4 runs in parallel) | 6.6 | 9.7 | | |
+
+What it says:
+- **A1 passes as is.** Path integration sends carriers home the straight way, so the food trail they lay is on the short branch from the first trips.
+- **A2: both patches are the same food**, so "rich" wins half the time by chance. Once a trail exists, a source added later gets nothing (1.00), which is *L. niger*'s lock-in, but only because nobody explores.
+- **A3: a dead trail holds its followers for ~74 s,** against a 60 s target. The *tired* rule prevents mills (0 % following at the end), but only after 60 s of patience.
+- **A4: the field is right** (4.7 cells, 19 s, inside the biology's range), but the behaviour is borderline: foragers thin to 55 % (target ≤ 50 %), defenders gather to 154 % on the median seed but only 123 % on the worst.
+- **A5: every ant is always out** (ratio 1.02); departures track returns only because every returner turns straight round.
+- **A6: Lanchester holds in the open** (outnumbered 2:1, defenders lose about twice what they kill), but **a narrow pass doesn't help the defenders** (0.53): ants stack in one cell and the 3×3 count ignores rock. Even fights are noisy at 60 v 60 (1.49 median, 2.22 worst).
+- **A7 is the regression bar**: worst 6.9 %, median 4.4 % of a colony out > 120 s at 600 s. This matches ja-ipu.
+- **G:** the player led on 6 seeds and the rival on 3 (1 even), consistent with ja-t6u. ms per tick is inflated by four runs sharing four cores; `colony-bench` is the speed reference.
+
+**Speed.** `npm run colony-bench` on the cloud container gives 3.5–3.6 ms/tick (512×320, 600 + 600 ants) on both the old code and the new: Phase 0 costs nothing measurable. This machine is about 2× slower than the one behind the 1.8 ms in §11, so compare against the same machine.
+
+**The gate** (`web/src/colony/tests/assays.test.ts`, part of `npm test`): short versions (2–3 seeds, 15–240 s) of what passes today. That covers A1, A4's reach and fade, A6's open-field Lanchester, and A7 on a 160×100 map. A2, A3, A5, A4's behaviour and A6's pass are `todo` tests, each naming the phase meant to turn it into a test.
+
+**The golden test** (`web/src/colony/tests/golden.test.ts`) recorded three seeded games on the code before Phase 0: a war on a small map with fights, a solo colony with alarm painted, and a war on the default map. It checks every 10 s that stored, births, losses, decisions, population and a bit-exact hash of every ant's position and heading are unchanged. Phase 0 passes it, so moving the constants into params changed nothing. `npm test`'s per-file timeout is now 60 s: `game.test.ts` alone takes ~25 s on the cloud container and already timed out at 20 s before this change.
+
+**Jev:** no change in Phase 0, and the request state is unchanged.

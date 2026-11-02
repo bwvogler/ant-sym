@@ -13,6 +13,7 @@
     "probe": "node scripts/probe.mjs",
     "situations": "node scripts/situations.mjs",
     "cacheprobe": "node scripts/cacheprobe.mjs",
-    "colony-cost": "node scripts/colony-cost.mjs"
+    "colony-cost": "node scripts/colony-cost.mjs",
+    "exp": "node scripts/experiment.mjs"
   }
 }
