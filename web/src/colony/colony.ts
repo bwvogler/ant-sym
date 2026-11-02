@@ -238,6 +238,11 @@ export class Colony {
   #groundMin: Float64Array;
   /** cells walked on that surface (at each flipDue, the other hand) */
   #groundT: Uint16Array;
+  /** the side view: steps to this colony's hole through its tunnels, per cell (see #outField), the cells it reached, and the ground's version and time it was built at */
+  #outDist: Int32Array | null = null;
+  #outCells: number[] = [];
+  #outVersion = -1;
+  #outAt = -Infinity;
   /** the hole x (#holeX) groundMin was measured against */
   #groundRef: Float64Array;
   // Chambers (nest slice 2): the side view's nest is dug, not given.
@@ -289,6 +294,10 @@ export class Colony {
   /** Whether ant i carries a corpse (drawn as one, not as soil). */
   carriesCorpse(i: number): boolean {
     return this.#corpse[i] === 1;
+  }
+  /** Whether ant i carries food between chambers (a porter), not home from outside (a forager). */
+  porting(i: number): boolean {
+    return this.#porter[i] === 1;
   }
   /** 1 while an ant carries a corpse (moved like a soil pellet: up and out, along the ground) */
   #corpse: Uint8Array;
@@ -624,6 +633,7 @@ export class Colony {
     this.driftNest[i] = 0;
     this.search[i] = 0;
     this.#under[i] = 1;
+    this.#goalKind[i] = 0; // born underground: home is the chamber
     this.#groundMin[i] = NaN;
     this.#chamberCell[i] = -1;
     this.#lastRole[i] = 0; // born in the royal chamber: it lays royal once it has been there a tick
@@ -815,10 +825,81 @@ export class Colony {
     return best;
   }
 
-  /** The way from cell (cx, cy) to an open neighbour nearer the hole (straight up toward it), or −1. */
+  /**
+   * The way from cell (cx, cy) up and out of the nest: one step nearer this colony's hole along the tunnels (#outField), or
+   * −1 at the hole. Greedy steps by straight-line distance to the hole (the first cut) parked old foragers at tunnel tips
+   * that lay nearer the hole than anything round them, for good: they don't dig (review of #25). A cell the field doesn't
+   * reach (dug since it was built, or not joined to the hole) steps straight toward the hole as before.
+   */
   #climbOut(cx: number, cy: number): number {
+    const f = this.#outField();
+    const { w, h } = this.map.size;
+    const here = cx >= 0 && cy >= 0 && cx < w && cy < h ? (f[cy * w + cx] as number) : -1;
+    if (here === 0) return -1;
+    if (here > 0)
+      for (const d of UP_FIRST) {
+        const tx = stepX(cx, cy, d);
+        const ty = stepY(cy, d);
+        if (tx >= 0 && ty >= 0 && tx < w && ty < h && f[ty * w + tx] === here - 1 && rockAt(this.map, tx, ty) === OPEN) return d;
+      }
     this.#holeX = (this.#entrance as Nest).x;
     return this.#towardHole(cx, cy, false);
+  }
+
+  /**
+   * The side view: steps from each open cell underground to this colony's hole through the tunnels (−1: not joined to it).
+   * Cached for the colony, and rebuilt when the ground has changed (cells dug or filled), at most every OUT_FIELD_EVERY
+   * seconds: a breadth-first walk over the nest's own tunnels, a few thousand cells.
+   */
+  #outField(): Int32Array {
+    const map = this.map;
+    const version = map.dug + map.filled;
+    const have = this.#outDist;
+    if (have && (this.#outVersion === version || this.time - this.#outAt < OUT_FIELD_EVERY)) return have;
+    const { w, h } = map.size;
+    const dist = have ?? new Int32Array(w * h).fill(-1);
+    this.#outDist = dist;
+    const cells = this.#outCells;
+    for (const k of cells) dist[k] = -1;
+    cells.length = 0;
+    const start = this.#entranceRow * w + this.#entranceCol;
+    dist[start] = 0;
+    cells.push(start);
+    for (let q = 0; q < cells.length; q++) {
+      const k = cells[q] as number;
+      const x = k % w;
+      const y = (k - x) / w;
+      const d = (dist[k] as number) + 1;
+      for (let dir = 0; dir < 6; dir++) {
+        const tx = stepX(x, y, dir);
+        const ty = stepY(y, dir);
+        if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+        const t = ty * w + tx;
+        if ((dist[t] as number) >= 0 || rockAt(map, tx, ty) !== OPEN || isSky(map, tx, ty)) continue;
+        dist[t] = d;
+        cells.push(t);
+      }
+    }
+    this.#outVersion = version;
+    this.#outAt = this.time;
+    return dist;
+  }
+
+  /** The way from cell (cx, cy), underground away from its own nest (in at another's hole), up toward the ground: onto it if it can, else the open neighbour highest up; −1 if none is higher. */
+  #upOut(cx: number, cy: number): number {
+    let best = -1;
+    let bestY = centreY(cy) - 1e-6;
+    for (const d of UP_FIRST) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (rockAt(this.map, tx, ty) !== OPEN) continue;
+      if (isSky(this.map, tx, ty)) return d;
+      if (centreY(ty) < bestY) {
+        bestY = centreY(ty);
+        best = d;
+      }
+    }
+    return best;
   }
 
   /** Whether ant i is an inside worker now: underground, carrying nothing, not allowed out (zoned by age). */
@@ -1048,7 +1129,9 @@ export class Colony {
     // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
     const raiding = mode === FIGHT && this.#entrance !== null && this.stance === "raid" && this.raidTarget !== null;
     const onSky = isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number));
-    const groundHome = carryingOut || ((mode === RETURN || raiding) && this.#entrance !== null && onSky);
+    // Homing underground with the hole still its goal: in at another hole than its own (see #goal). It climbs back out.
+    const climbing = mode === RETURN && this.#entrance !== null && !onSky && this.#goalKind[i] === 1 && this.pellet[i] === 0;
+    const groundHome = carryingOut || climbing || ((mode === RETURN || raiding) && this.#entrance !== null && onSky);
     if (fresh && !hugging && !groundHome && this.#noTunnel[i] === packed) {
       this.gx[i] = NO_CELL; // looked here already: open ground
       return false;
@@ -1092,6 +1175,9 @@ export class Colony {
       }
       dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
       this.digAim[i] = NaN;
+    } else if (climbing) {
+      const up = this.#upOut(cx, cy);
+      dir = up >= 0 ? up : handOnWall(map, cx, cy, dir, -(this.hand[i] as number));
     } else if (mode === RETURN && ent && isSky(map, cx, cy)) {
       // On the ground line (side view), homing is to the hole: the way nearer it along the ground (home scent lies
       // along the walkway both sides of the hole, so the most-scent rule below walks a carrier past it and on).
@@ -1127,7 +1213,7 @@ export class Colony {
         this.hand[i] = -(this.hand[i] as number);
         dir = (dir + 3) % 6;
       }
-      dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
+      dir = best < 0 ? this.#groundHand(cx, cy, dir, -(this.hand[i] as number)) : best;
     } else if (mode === RETURN || mode === FOLLOW) {
       // The way ahead (not back, unless it's a dead end) with the most scent: home scent, laid by
       // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.
@@ -1500,14 +1586,18 @@ export class Colony {
 
   /**
    * Path integration (the side view): the step from (x0, y0) is added to the odometer it walked it under. Coming up out
-   * of the hole starts the surface vector afresh (it points to the hole); in the chamber, the in-nest memory starts
+   * of its own hole starts the surface vector afresh (it points to the hole); in the chamber, the in-nest memory starts
    * afresh. Each fresh start draws that trip's drift.
    */
   #integrate(i: number, x0: number, y0: number, atNest: boolean): void {
     this.antCell(i);
     const under = !isSky(this.map, CELL[0] as number, CELL[1] as number);
     const step = Math.hypot((this.x[i] as number) - x0, (this.y[i] as number) - y0);
-    if (!under && this.#under[i]) {
+    // Only its own hole is where the vector points: up out of another (the rival's, say), its error stands (review of
+    // #20: surfacing anywhere made the belief exactly its own hole).
+    const ownHole = !under && this.#under[i] === 1 && this.#atOwnHole(x0, y0);
+    this.antCell(i); // CELL is the ant's own again (the caller reads it)
+    if (ownHole) {
       this.odoSurf[i] = 0;
       this.driftSurf[i] = gauss(this.#rng) * PI_DRIFT;
       this.search[i] = 0;
@@ -1527,6 +1617,18 @@ export class Colony {
     }
   }
 
+  /** The side view: whether cell (cx, cy) is in this colony's nest: open ground underground joined to its hole (see #outField). */
+  #ownTunnels(cx: number, cy: number): boolean {
+    const { w, h } = this.map.size;
+    return cx >= 0 && cy >= 0 && cx < w && cy < h && (this.#outField()[cy * w + cx] as number) >= 0;
+  }
+
+  /** The side view: whether world point (x, y) is at this colony's hole (its cell, or one beside it). */
+  #atOwnHole(x: number, y: number): boolean {
+    cellOf(x, y);
+    return hexDistance(CELL[0] as number, CELL[1] as number, this.#entranceCol, this.#entranceRow) <= 1;
+  }
+
   /** The nest ant i homes to now (see tick): the chamber, or in the side view the entrance (pellet carriers, ants on the ground line). */
   #goal(i: number, pellet: boolean): Nest {
     const ent = this.#entrance;
@@ -1534,7 +1636,12 @@ export class Colony {
     let kind = 1;
     if (!pellet || this.#fillIntent[i]) {
       this.antCell(i);
-      kind = isSky(this.map, CELL[0] as number, CELL[1] as number) ? 1 : 0;
+      // Off the ground line it heads for the chamber, but only once in its own nest (in at its own hole, or anywhere in the
+      // tunnels joined to it): in at another hole (the rival's), the chamber 340 columns away through soil was no way home
+      // (review of #15: a carrier trapped in the rival's shaft for 300 s). There it keeps heading for its hole, and climbs out.
+      const cx = CELL[0] as number;
+      const cy = CELL[1] as number;
+      if (!isSky(this.map, cx, cy)) kind = this.#goalKind[i] === 1 && !this.#ownTunnels(cx, cy) ? 1 : 0;
     }
     if (kind !== this.#goalKind[i]) {
       // A new goal: the wall it was following, and its line home, were for the other one.
@@ -1566,18 +1673,32 @@ export class Colony {
     const under = this.#under[i] === 1;
     const off = under ? (this.driftNest[i] as number) * (this.odoNest[i] as number) : (this.driftSurf[i] as number) * (this.odoSurf[i] as number);
     const b = this.#belief;
-    b.x = goal.x + off + (this.search[i] as number);
+    // Never past the ground's ends: a belief off the map left a carrier at the map's edge for good, never reaching the
+    // column where it would have searched (review of #20: 473 samples in six games had it off the map). The search is
+    // centred on the end it can reach.
+    const lo = EDGE;
+    const hi = this.map.size.w - EDGE;
+    b.x = Math.max(lo, Math.min(hi, Math.max(lo, Math.min(hi, goal.x + off)) + (this.search[i] as number)));
     b.y = goal.y;
     b.r = goal.r;
     return b;
   }
 
-  /** Ant i got to where it believed its goal was and found nothing: it searches, in loops of growing size to either side (Wehner's systematic search). */
+  /**
+   * Ant i got to where it believed its goal was and found nothing: it searches, in loops of growing size to either side
+   * (Wehner's systematic search). The loops keep widening for as long as it searches (Müller & Wehner 1994: centred on
+   * where the vector ran out, they grow without limit in time), up to the whole ground; capped at 80 cells, a carrier
+   * whose vector was off by more than about 86 never found its hole (review of #20).
+   */
   #searchOn(i: number): void {
     const s = this.search[i] as number;
-    this.search[i] = s === 0 ? SEARCH_START * (this.#rng() < 0.5 ? -1 : 1) : Math.max(-SEARCH_MAX, Math.min(SEARCH_MAX, -s * SEARCH_GROW));
+    const most = this.map.size.w;
+    this.search[i] = s === 0 ? SEARCH_START * (this.#rng() < 0.5 ? -1 : 1) : Math.max(-most, Math.min(most, -s * SEARCH_GROW));
     this.wall[i] = 0;
     this.mx[i] = NaN;
+    // Progress is judged toward the goal it now believes in.
+    this.bestD[i] = Infinity;
+    this.stallT[i] = 0;
   }
 
   /** The situation's home field for ant i: the home trail ahead (sensor readings hl, hf, hr), or, underground in the side view, where it is. */
@@ -2237,15 +2358,16 @@ export class Colony {
    * column, then straight-line distance; else by straight-line distance), or −1 if none is nearer.
    */
   #towardHole(cx: number, cy: number, alongGround: boolean, below = NaN, hy = (this.#entrance as Nest).y): number {
-    const hx = this.#holeX; // where the ant believes the hole is (see #believe)
-    const metric = (x: number, y: number) => (alongGround ? Math.abs(x - hx) * 1000 : 0) + Math.hypot(x - hx, y - hy);
     let best = -1;
-    let bestD = (Number.isNaN(below) ? metric(centreX(cx, cy), centreY(cy)) : below) - 1e-6;
+    let bestD = (Number.isNaN(below) ? this.#holeMetric(cx, cy, alongGround, hy) : below) - 1e-6;
     for (let d = 0; d < 6; d++) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
       if (rockAt(this.map, tx, ty) !== OPEN) continue;
-      const m = metric(centreX(tx, ty), centreY(ty));
+      // Along the ground, off it only into the hole it heads for: in at another (the rival's, nearer by column on the way
+      // past), a carrier was trapped in that shaft (review of #15).
+      if (alongGround && !isSky(this.map, tx, ty) && !this.#targetHole(tx, ty, hy)) continue;
+      const m = this.#holeMetric(tx, ty, alongGround, hy);
       if (m < bestD) {
         bestD = m;
         best = d;
@@ -2260,7 +2382,7 @@ export class Colony {
     let y = cy;
     let d = dir;
     for (let k = 1; k <= GROUND_LOOK; k++) {
-      d = handOnWall(this.map, x, y, d, side);
+      d = this.#groundHand(x, y, d, side);
       x = stepX(x, y, d);
       y = stepY(y, d);
       if (rockAt(this.map, x, y) !== OPEN || !isSky(this.map, x, y)) return Infinity;
@@ -2269,10 +2391,32 @@ export class Colony {
     return Infinity;
   }
 
-  /** The along-the-ground distance to the hole (see #towardHole) from cell (cx, cy). */
-  #holeMetric(cx: number, cy: number): number {
+  /** The distance to the hole (#holeX, row y `hy`) from cell (cx, cy) that #towardHole steps by: along the ground, by column first, then straight-line distance; else straight-line distance. */
+  #holeMetric(cx: number, cy: number, alongGround = true, hy = (this.#entrance as Nest).y): number {
     const x = centreX(cx, cy);
-    return Math.abs(x - this.#holeX) * 1000 + Math.hypot(x - this.#holeX, centreY(cy) - (this.#entrance as Nest).y);
+    return (alongGround ? Math.abs(x - this.#holeX) * 1000 : 0) + Math.hypot(x - this.#holeX, centreY(cy) - hy);
+  }
+
+  /** Whether cell (x, y) is the hole being headed for (#holeX, row y `hy`): the one cell off the ground line a walk along it may take. */
+  #targetHole(x: number, y: number, hy: number): boolean {
+    return Math.abs(centreX(x, y) - this.#holeX) < 0.5 && Math.abs(centreY(y) - hy) < 0.5;
+  }
+
+  /** handOnWall on the ground line: over the walkway (sky cells) and into the hole it heads for, never into another (see #towardHole). */
+  #groundHand(cx: number, cy: number, dir: number, side: number): number {
+    const hy = (this.#entrance as Nest).y;
+    const ok = (d: number) => {
+      const k = ((d % 6) + 6) % 6;
+      const tx = stepX(cx, cy, k);
+      const ty = stepY(cy, k);
+      return rockAt(this.map, tx, ty) === OPEN && (isSky(this.map, tx, ty) || this.#targetHole(tx, ty, hy));
+    };
+    const lost = ok(dir + side) && ok(dir + 2 * side);
+    for (const turn of lost ? [0, -side, -2 * side, side, 2 * side, 3] : [side, 0, -side, -2 * side, 2 * side, 3]) {
+      const d = (((dir + turn) % 6) + 6) % 6;
+      if (ok(d)) return d;
+    }
+    return dir;
   }
 
   /** The side view: the way from cell (cx, cy) to an open neighbour farther from the hole on `side`, on the ground if it can, or −1. */
@@ -2919,7 +3063,6 @@ export class Colony {
           // Homing: start (or keep) following this wall by touch instead of turning at random.
           const x = this.x[i] as number;
           const y = this.y[i] as number;
-          const wasFollowing = this.wall[i] !== 0;
           if (this.wall[i] === 0) {
             const toNest = Math.atan2(nest.y - y, nest.x - x);
             // Underground, every wall (soil, or rock in dug ground) is followed cell by cell, and re-anchors the
@@ -2954,10 +3097,14 @@ export class Colony {
             this.byCell[i] = cellWall || tunnel(map, hx, hy) ? 1 : 0;
           }
           if (!this.byCell[i]) h -= (this.wall[i] as number) * (Math.PI / 2); // by touch: turn away from the wall, along it
-          else if (wasFollowing) {
-            // Following by cell and blocked: it stands right on its cell's edge (a straight line from inside a cell to a
-            // neighbour's centre never leaves the two), so the way to the next cell grazes the solid one beside it and
-            // every step lands there. A quarter of the way back to its own cell's centre takes it off the edge.
+          else {
+            // By cell and blocked: it stands right on its cell's edge (a straight line from inside a cell to a neighbour's
+            // centre never leaves the two), so the way to the next cell grazes the solid one beside it and every step lands
+            // there. A quarter of the way back to its own cell's centre takes it off the edge. Not only when it was already
+            // following a wall (the first rule): where the wall is let go of before the next step (every tick
+            // on the ground line; a release into scent in a tunnel), the ant was blocked the same way every tick, for good
+            // (review of #17: about 20 homing ants frozen in the walkway cell above the hole; 21 at one cell in a tunnel on
+            // seed 3 with the fixes of PRD §40, before this).
             this.antCell(i);
             this.x[i] = x + (centreX(CELL[0] as number, CELL[1] as number) - x) * 0.25;
             this.y[i] = y + (centreY(CELL[1] as number) - y) * 0.25;
@@ -3167,7 +3314,7 @@ const NEST_SIGHT = 8;
 export const PI_DRIFT = 0.1;
 /** Within this (world units) across the ground of the hole (and twice it up or down: the crater) an ant sees it and smells the entrance: its vector no longer matters. */
 export const HOLE_SIGHT = 6;
-/** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one this much wider, to at most SEARCH_MAX. */
+/** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one SEARCH_GROW times wider, to at most the map's width. */
 const SEARCH_START = 3;
 // Zoning by age (nest slice 6): see band, #mayGoOut, #digs.
 /** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
@@ -3261,12 +3408,17 @@ function flipDue(t: number): boolean {
   const k = t / GROUND_FLIP + 1;
   return (k & (k - 1)) === 0;
 }
+/** The ways from a cell, upward ones first (NW, NE), then level, then down: gravity breaks ties when climbing out. */
+const UP_FIRST = [4, 5, 0, 3, 1, 2] as const;
+/** Seconds between rebuilds of the way-out field (#outField) while the ground keeps changing; a cell dug since steps straight toward the hole meanwhile. */
+const OUT_FIELD_EVERY = 0.5;
 /** Cells an ant feels ahead along the surface, each way, to choose which hand to follow it with. */
 const GROUND_LOOK = 16;
 /** Seconds on a strong nest trail for the in-nest memory's error to fall to 1/e. */
 const ROAD_SIGN = 2;
 const SEARCH_GROW = 1.6;
-const SEARCH_MAX = 80;
+/** A believed hole is never nearer the map's side than this (world units): the walkway's end columns' centres are within 1 of it, so an ant there counts as at its belief. */
+const EDGE = 0.75;
 /** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */
 const WALL_PROBE = Math.PI / 3;
 

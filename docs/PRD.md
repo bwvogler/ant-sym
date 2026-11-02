@@ -1139,7 +1139,7 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 - **The walkway** is the air cells touching solid ground. They are stored as OPEN, so ants walk the ground line and its overhangs with every existing rule, and scent lies only on the walkway and in tunnels (the sky costs nothing to step).
 - **`map.sky`** marks cells above ground. `updateSurface` re-derives walkway and air whenever a cell is dug or filled.
 - **Nests.** Each nest is a chamber (radius 3) 14 rows down, joined by a steep zigzag shaft to its **entrance**, the hole where the shaft meets the ground line (always open ground, with the walkway beside it). The rival's entrance is 340 columns along.
-- **Food.** Piles 3–6 cells wide lie on the walkway (seeds and bits, as harvester ants forage): about three per 64 columns, at least 16 from an entrance. Pockets lie in the soil at least 10 rows down. Everything is reachable, walking or digging.
+- **Food.** Piles 3–6 cells wide lie on the walkway (seeds and bits, as harvester ants forage): four per 64 columns (`surfacePatches`), at least 16 from an entrance. Pockets lie in the soil, centred at least 10 rows down; their cells are at least 4 rows down. Food the player's ants couldn't reach by digging is dropped, and every pile on the ground can be walked to (§39).
 
 **Ants:**
 - **Where homing heads.** A homing ant heads for the chamber when underground. Pellet carriers, and any ant on the walkway, head for the **entrance**, the hole itself: path integration home is to the hole, not through the ground. A change of goal drops the wall being followed.
@@ -1373,8 +1373,10 @@ The cost is a cell lookup and a scent read per ant per tick, and the belief is c
   - the vector's error grows with the way out, starts afresh, and is fixed on the way home;
   - a carrier 12 cells off walks to its belief, searches, and gets home;
   - road signs fade the error;
-  - top-down maps keep no vector.
-- side.test.ts's "never away from the hole" now reads "never away from where it believes the hole is" (searching aside).
+  - top-down maps keep no vector;
+  - a homing ant whose vector is within 3 cells never searches (the review fix below).
+  §40 adds tests for Bug2's other side, errors of 90 and 150 cells and a belief past the map's edge, and the vector's reset at the ant's own hole only.
+- side.test.ts's "never away from the hole" measures against the real hole, with the two bounds below (the review reverted a first rewrite that measured against the believed hole).
 
 **Jev cost:** unchanged. `down` is a sense in the sim, but not yet in the situation; slice 3 decides that. (Slice 3 left it out: see §32 and docs/nest-and-home.md §5.)
 
@@ -1979,3 +1981,128 @@ Full suite: 300 of 300 (`node --test --test-concurrency=2 --test-timeout=600000`
 - `ja-yif.4`: the battle dead are never collected past `MIDDEN_NEAR`.
 - `ja-yif.5`: during a raid the young follow the royal mark up the shaft (no stays, but ~9 % of samples near the hole on the test map).
 - `ja-8fd.3`: the rest of N colonies: `Game` builds two, `unity()` reads two nests, and `foreign` (Bloom's share, cross-laying) is one colony.
+
+## 40. Fix-up F1: ground homing and the side world's generation (2026-11-02)
+
+Held findings from the reviews of #15, #17, #20 and #25, fixed together on top of nest slice 9 (#28), then merged with nest 9 carrying #14's backfill fixes (99eed4b); the numbers below say which. Every new test fails with its fix reverted (each was mutation-checked that way).
+
+**Closes:** #20 B1 (checked: already fixed by doubling Bug2's legs, now tested), #20 B2, #20 S1, #20 S3 / #16's dropped guard, #20's four nits, #25 S8, and from #15 / #17: the walkway through a hole cell, the carrier trapped in a rival's hole, the freeze above the hole, the golden test for `generateSideWorld`, the circular food test, and §27's pile count.
+
+### Measuring: `scripts/side-bench.mjs`
+
+Several earlier PR numbers couldn't be reproduced because their scripts were never committed. This one is. It runs the app's own setup (`generateSideWorld(seed)`, and `Game` with `mulberry32(seed * 7919)`) headless on the local rule, and reports per colony:
+- food home, births, ants alive;
+- ants out over 120 s (every 10 s from 120 s: mean share and worst sample);
+- **foragers holding food over 120 s** (at the end, and the most at any sample), and the longest hold; porters (§34) are counted apart;
+- ant-seconds of ants that haven't left their cell for 20 s or more: on the ground; underground exploring (the dead-end tips of #25); the rest underground;
+- ants still for 20 s by a hole, and ants still for 60 s, at the end.
+
+It takes a `root`, so one harness measures any checkout: `node scripts/side-bench.mjs 1-6 600 600 2 [root]`.
+
+### The fixes
+
+**Bug2 on the ground tries the other side (#20 B1).** Commit 744dff3 already made each leg twice the last (24, 48, 96 … cells), so a turn back passes where the walk began and tries the far side. The new test walls a carrier's way home with a pillar 20 rows tall, too far round to feel (`GROUND_LOOK`), so it keeps the hand it had: one hand climbs it, the other walks away along the flat ground first. With equal legs that one turns again at the pillar's foot for good; now both get home.
+
+**Far-off vectors (#20 B2).** A carrier whose vector was off by more than about 86 cells never got home: the search kept within `SEARCH_MAX` (80) of the believed hole, and a believed hole past the map's edge was never reached, so the search never started. Now:
+- the belief is clamped to the ground's ends (`EDGE`), and the search is centred on the end the ant can reach;
+- the search keeps widening, 1.6× a loop, up to the map's width.
+
+Which is faithful to *Cataglyphis*: drift stays per unit of path walked (σ = 0.1 × odometer), and the search is unbounded. The home vector's error grows with the path walked out, winding or not, and the search's spread grows with it (Merkle, Knaden & Wehner 2006: ants that had walked farther searched wider); the systematic search itself has no limit in time, loops widening round where the vector ran out for as long as the ant searches (Wehner & Srinivasan 1981; Müller & Wehner 1994). A cap at 80 cells has no counterpart; scaling drift by distance from home instead would make a long winding trip as exact as a straight one, which it isn't.
+
+Not done: moving the search on after a Bug2 cycle without progress. With the walkway running edge to edge (below) and Bug2's legs doubling, a follow on the ground always ends nearer its belief; the cases measured at the edge were an off-map belief, which the clamp fixes. Moving the search on mid-follow would cut the long legs short, so an ant could never get round an obstacle that needs one.
+
+A lone carrier on seed 2: one ant (`Colony` alone on `generateSideWorld(2)`), put down on the walkway carrying food, its surface vector off by the given cells (`driftSurf × odoSurf`); up to 600 s.
+
+| Vector off by (cells) | Starts (columns from its hole) | Before | After | Search's widest loop after (cells) |
+|---|---|---|---|---|
+| 30 | 10 | 31 s | 31 s | 50 |
+| 60 | 10 | 80 s | 80 s | 129 |
+| 80 | 10 | 63 s | 63 s | 81 |
+| 90 | 10 | not home in 600 s | 129 s | 206 |
+| 120 | 10 | not home | 99 s | 129 |
+| 150 | 10 | not home | 208 s | 330 |
+| 400 (belief past the map's east end) | 10 | 189 s | 264 s | 528 |
+| −90 | −10 | not home | 128 s | 206 |
+| −150 | −10 | not home | 199 s | 330 |
+| 460 (past the east end) | 410 | 106 s | 234 s | 768 |
+| 500 (past the east end) | 434 | 109 s | 230 s | 768 |
+| −369 (at the west end) | −320 | 194 s | 116 s | 330 |
+
+The same before and after #14's backfill fixes were merged. Seed 2 has two nests: this ant's hole is at column 329 of 768, the rival's 340 columns east. Before, every error from 90 to 150 cells was never home: the search stayed within 80 cells of the believed hole. The three beliefs past the east end got home before only by luck: at 400 the carrier went down the rival's hole and up again, which reset its vector to exact (#20 S1, fixed here: its search dropped from 50 to 0 as it passed column 340); at 460 and 500 it never searched, and turned back from the map's end on its own after about 45 s. After the fix they search from the end they can reach, and loops widening 1.6× a time need nine or ten loops to come back 400 cells: 230–264 s. That is the price of an unbounded search started at the wrong end of the map, and it is still home.
+
+**Only its own hole resets the surface vector (#20 S1).** `#integrate` reset the vector on surfacing anywhere: up out of the rival's hole, the belief was exactly its own hole. Now only at its own hole.
+
+**The rival's hole (#15).** Two parts:
+- **Off the ground line it heads for the chamber only once in its own nest:** in at its own hole, or in tunnels joined to it (the way-out field below). In at another hole it keeps heading for its own and climbs straight back out. The trap no longer reproduced as reported (on the base a carrier put down the rival's shaft got out after about 10 s, when its stall turned it), but it climbs out at once now: 0.2–0.9 s.
+- **Walking along the ground it never steps into another hole:** `#towardHole` and Bug2's hand (`#groundHand`) take only walkway cells and the hole it heads for. With a pellet heaped on the rival's rim (the mound may hold a row there), the hole was the only step nearer home by column, and a carrier went in and out of it for 59 s.
+
+**The walkway through a hole cell (#15).** Digging a shaft's top cell took the footing from the walkway cell above the hole's rim where the ground stepped down a row beside it: that cell fell to sky, and the walkway ran on only through the hole, which explorers never step onto. 30 of 100 seeds; the continuity test ran only at small size on seeds 1–3, where it never happened. `digNest` now puts a cell of soil (crust, never dug) under that walkway cell. 0 of 300 seeds break; the continuity test runs at full size over seeds 1–30.
+
+**The freeze above the hole (#17).** A homing ant at the bottom corner of the walkway cell above the hole had its straight step to the hole's centre land in the soil beside it. The blocked step started a wall, the ground line dropped the wall next tick, and the nudge back to the cell's centre only ran for an ant already following a wall: the same blocked step every tick, for good. The nudge now runs on every blocked step by cell. On the bench (600 + 600 ants, 600 s, seeds 1–6), ants still for 20 s or more on the ground by a hole at the end: 1 before (seed 1), 0 after; alone (600 ants, one colony) seeds 2 and 6 had 3 and 1 before. A cut of these fixes without this one froze 21 ants at one tunnel cell on seed 3 (the same blocked step, its wall let go into scent every tick); the same change cures it.
+
+**Dead-end tips (#25 S8).** `#climbOut` stepped greedily toward the hole in a straight line; a tunnel tip just under the ground near the hole is nearer than anything round it, and old foragers (who don't dig) parked there. Now they step by path: a breadth-first field of steps to the colony's hole through its own tunnels (`#outField`), cached per colony and rebuilt when the ground changed (`map.dug + map.filled`), at most every 0.5 s. A cell it doesn't reach steps straight toward the hole as before. Raiders leaving their own nest (#26) use the same `#climbOut`; the midden test's raiders still reach the rival's side (getting in under its hole fails after the merge: see Open).
+
+**Nits (#20).** `#towardHole` uses `#holeMetric`; `#searchOn` resets `bestD` and `stallT`; §30's test text is current; the top-down "keeps no vector" test now gives a carrier a 60-cell vector error and checks it still walks straight home (it fails if `#believe` uses the vector there). It runs on `generateWorld(1, { soil: 0 })`: on the default map soil closes round the nest within 7–11 units, so a first version never found a clear way. The surface-vector test's ant now comes up out of its own hole before walking out: put down on the ground straight from the chamber, it keeps its vector (S1).
+
+**Generation tests (#15).**
+- **Golden:** terrain, sky, food, nests and food total of full-size seeds 1–3 are hashed and pinned, like the top-down golden test.
+- **Food:** "all food reachable, walking or digging" couldn't fail: the generator drops food it can't reach by digging. The test now walks the map with its own breadth-first search, through open cells only, and checks every pile on the ground can be walked to from the chamber, and that every pocket cell is open and at least 4 rows under the ground line. Neither is ensured by the generator.
+- **§27** said three piles per 64 columns; the code has four.
+
+### Measured
+
+**The whole-game guard (#16's, restored).** The last test in `side.test.ts`: seeds 4 and 6, 600 + 600 ants, 600 s; at every 10-s sample from 120 s, at most 2 foragers in a colony holding food over 120 s. Porters are not counted (below). It takes about 3 minutes, so it has its own 15-minute timeout. The seeds were chosen to separate before from after, not to pass: of seeds 1–6, they are the only two where the code before these fixes passes the bound. Lost carriers pile up late, and only with 600 ants a colony, hence the size and length. Most foragers holding food over 120 s at any sample by 600 s, per colony (c0 / c1), from `scripts/side-bench.mjs`:
+
+| Seed | Before (nest 9, 99eed4b) | After (this branch) |
+|---|---|---|
+| 1 | 0 / 2 | 1 / 1 |
+| 2 | 0 / 0 | 0 / 2 |
+| 3 | 0 / 1 | 0 / 0 |
+| **4** | **4** / 0 | 1 / 1 |
+| 5 | 2 / 1 | 0 / 0 |
+| **6** | 0 / **3** | 0 / 1 |
+
+Before, none passed 2 until 510 s. The guard fails on 99eed4b ("seed 4: 4 / 0; seed 6: 0 / 3") and passes after (1 / 1 and 0 / 1).
+
+The fixes were first measured on nest 9 before #14's backfill fixes were merged up the chain (af964b1). There the lost carriers were plainer: 6–13 in the worse colony by 600 s on each of seeds 1–6 (seed 4: 0 / 13; seed 2: 8 / 1), and at most 1 after. The backfill fixes slowed the colonies' growth (births 3,827 → 2,479 over the six games), fewer foragers held food that long, and the guard was set again on the merged code.
+
+**Six games, before and after** (`node scripts/side-bench.mjs 1-6 600 600 2`, with the root set to each checkout; 600 + 600 ants, 600 s). Per seed, both colonies: food home and births summed; foragers and porters holding food over 120 s, the most in a colony at any sample; ants out over 120 s, the worst sample's share in either colony; ant-seconds still for 20 s underground (tips and the rest).
+
+| Seed | Food home | Births | Foragers > 120 s | Porters > 120 s | Out > 120 s, worst | Still underground (ant-s) |
+|---|---|---|---|---|---|---|
+| 1 | 3,892 → 3,808 | 458 → 173 | 2 → 1 | 2 → 0 | 8.5 → 4.5 % | 2,245 → 0 |
+| 2 | 2,931 → 4,384 | 158 → 513 | 0 → 2 | 1 → 1 | 11.8 → 1.4 % | 3,482 → 793 |
+| 3 | 3,353 → 3,641 | 545 → 286 | 1 → 0 | 9 → 7 | 4.2 → 5.2 % | 970 → 37 |
+| 4 | 3,921 → 4,479 | 369 → 602 | 4 → 1 | 8 → 4 | 11.0 → 6.0 % | 100 → 31 |
+| 5 | 4,089 → 4,445 | 641 → 632 | 2 → 0 | 3 → 3 | 10.8 → 4.2 % | 4,893 → 269 |
+| 6 | 3,684 → 3,864 | 308 → 89 | 3 → 1 | 4 → 0 | 6.3 → 1.4 % | 1,981 → 0 |
+| **All** | **21,870 → 24,621** | **2,479 → 2,295** | **4 → 2** | **9 → 7** | **11.8 → 6.0 %** | **13,671 → 1,130** |
+
+- Before is nest 9 at 99eed4b; after is this branch with it merged.
+- Still on the ground 20 s or more: 49 → 137 ant-seconds; by a hole at the end, and still for 60 s anywhere: 0 → 0.
+- Births swing most from seed to seed. #14's backfill guards' floor regression (§35's open item, for F2) sits under both.
+- Before the merge (af964b1 → this branch's first cut, same harness):
+  - food home 22,445 → 26,378; births 3,827 → 4,177;
+  - foragers over 120 s, most in a colony: 13 → 1, and 41 → 0 at the end over the twelve colonies;
+  - still underground 42,758 → 6,467 ant-seconds; still on the ground 498 → 84; by a hole at the end 1 → 0.
+
+### Open, for the next fix-up
+
+- **Two tests fail after the merge with nest 9's backfill fixes.** Both pass on 99eed4b and on this branch before the merge, and neither failing path is code this fix-up changed:
+  - homing.test.ts, "a homing ant whose vector is nearly right never searches": 6 of 3,582 samples searching. They are carriers underground, 1.3–1.6 units from a one-cell reception chamber. A bend hides it, so the straight line to it fails `#clearTo`, and with the chamber out of view they walk to their belief (0.4–0.7 off) and start a search (`nest !== goal && … < 1` in the free homing step). The rule predates this fix-up; the one-cell reception in a bend is new to this game.
+  - midden.test.ts, "raiders leave their own nest and go in at the rival's hole": 0 raiders get under the rival's hole (at least 3 asked). Nine stand at the step down five columns east of it, then walk east, away from it, with a stale target cell.
+  - Undoing this fix-up's blocked-step nudge (above) makes both pass, but the nudge runs only for homing ants, never raiders, so that looks like a different game, not a cause. Lifting the ground walk's no-other-hole rule doesn't help the raid test.
+  - Both need a look at the mechanism before any change. A tuned nudge that happens to pass them would be fitting the trajectory.
+
+- **Porters (food flow, §34) on trips they never finish.**
+  - Seed 2, colony 1: porters circle a brood chamber about 24 columns away that they never reach.
+  - Before the merge, seed 5, colony 1: from 510 s, 41 porters at once held food over 120 s (44 at the worst sample). All were taking it to one store, a single cell 20–31 steps away through tunnels the breadth-first walk finds open, wandering 10–20 columns off it.
+  - Reception's food goes to the least-stocked store, and that choice ignores porters already on their way (`#enRouteTo` counts only for wanted chambers). A store nobody reaches stays least stocked and draws every porter.
+  - Porters don't use `#climbOut` or the ground-line rules this slice changed. On the merged code the worst porter sample is 7 after and 9 before.
+- **Pellet carriers led round by the way-out field.**
+  - Before the merge, seed 4, colony 0: up to 97 pellet carriers held their pellet over 120 s, from 180 s to about 450 s. They sat underground 2–4 columns from the hole, in a side tunnel whose field ran 23 steps round to it, and moved cell every second without getting out.
+  - With `#climbOut`'s field off (straight steps toward the hole, as before), that game had none. The trajectories differ, so this suggests the cause but doesn't prove it.
+  - On the merged code the worst share of ants out over 120 s is 6.0 % after (11.8 % before).
+  - Pellet carriers may want the old straight step, or to dig, where the field's way is much longer than the straight distance.
+
+**Jev cost:** unchanged. No situation, legend or question changed.
