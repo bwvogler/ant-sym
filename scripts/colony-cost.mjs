@@ -12,7 +12,7 @@
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
 import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
 import { Game } from "../web/src/colony/game.ts";
-import { generateWorld, mulberry32 } from "../web/src/colony/world.ts";
+import { generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const [minutes = 10, ants = 600, seed = 1] = process.argv.slice(2).map(Number);
@@ -21,6 +21,7 @@ const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
 const map = generateWorld(seed);
+const extent = worldExtent(map);
 let doctrine = DOCTRINES[0].text;
 let tokens = 0;
 let requests = 0;
@@ -85,7 +86,7 @@ for (const d of plan) {
       next = t + BATCH_EVERY;
     }
     // The fungus paints a blot of alarm somewhere every ~20 s.
-    if (rng() < DT / 20) colony.paint("alarm", rng() * map.size.w, rng() * map.size.h, 3, 12);
+    if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12); // world units: rows are R apart
   }
   flush();
   phases.push({ name: d.name, newSituations: modes.seen(policyContext(doctrine)) - before.modes, newStances: stances.seen(stanceContext(doctrine)) - before.stances, tokens: tokens - before.tokens, requests: requests - before.requests });

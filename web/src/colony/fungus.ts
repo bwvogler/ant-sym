@@ -3,8 +3,8 @@ import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import { MODES, type Colony, type Mode } from "./colony.ts";
 import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, encodeFungal, loadLevel, localFungusRule, type FungalSituation, type FungusPolicy, type FungusRule, type Ground } from "./fungalPolicy.ts";
 import type { Recognition } from "./recognition.ts";
-import { CELL, centreX, centreY, discOffsets, R } from "./hex.ts";
-import { OPEN, rockAt, type WorldMap } from "./world.ts";
+import { CELL, discOffsets } from "./hex.ts";
+import { disc, rockAt, type WorldMap } from "./world.ts";
 
 // The fungus, pure: the player. It has no body on the map of its own, only
 // spores on the ground and load inside ants (docs/fungus-policy.md). This
@@ -182,16 +182,13 @@ const SPORE_GONE = 1e-3;
 
 /** The last local coordinate in a chunk. */
 const EDGE = CHUNK - 1;
-/**
- * Offsets of a hex cell and its six neighbours inside one chunk's array, for an even row ([0]) and an odd row ([1])
- * (hex.ts: odd rows sit half a cell right; 64 is even, so a row's parity is the same in a chunk as on the map).
- */
+/** A cell and its six hex neighbours as offsets into a chunk's flat array, for an even row ([0]) and an odd row ([1]): chunks are 64 wide, so a row's parity in its chunk is its parity on the map. */
 const AROUND = [0, 1].map((parity) => {
   const o = discOffsets(1)[parity] as Int16Array;
   const out: number[] = [];
   for (let k = 0; k < o.length; k += 2) out.push((o[k + 1] as number) * CHUNK + (o[k] as number));
   return out;
-}) as [number[], number[]];
+});
 
 /**
  * Load per cell, summed over the ants in it, with the strain of the most loaded ant there.
@@ -316,18 +313,15 @@ export class Fungus {
    * carrying another strain keeps it (first in holds the host); the dose still adds load.
    */
   paint(colonies: readonly Colony[], x: number, y: number, radius: number, spores: number, dose: number, strain: number): void {
-    const { w, h } = this.map.size;
+    const { w } = this.map.size;
     const s = Math.max(0, Math.min(this.strains.length - 1, Math.floor(strain)));
     const r2 = radius * radius;
-    for (let cy = Math.max(0, Math.floor((y - radius) / R - 1)); cy <= Math.min(h - 1, Math.ceil((y + radius) / R)); cy++)
-      for (let cx = Math.max(0, Math.floor(x - radius - 1)); cx <= Math.min(w - 1, Math.ceil(x + radius)); cx++) {
-        const dx = centreX(cx, cy) - x;
-        const dy = centreY(cy) - y;
-        if (dx * dx + dy * dy > r2 || rockAt(this.map, cx, cy) !== OPEN) continue;
-        this.spores.set(cx, cy, Math.min(this.params.maxSpores, this.spores.get(cx, cy) + spores));
-        this.sporeStrain.set(cx, cy, s);
-        this.#sporeCells.add(cy * w + cx);
-      }
+    disc(this.map, x, y, radius, (cx, cy) => {
+      if (rockAt(this.map, cx, cy)) return;
+      this.spores.set(cx, cy, Math.min(this.params.maxSpores, this.spores.get(cx, cy) + spores));
+      this.sporeStrain.set(cx, cy, s);
+      this.#sporeCells.add(cy * w + cx);
+    });
     for (const c of colonies)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
@@ -496,7 +490,7 @@ export class Fungus {
   /**
    * The cell (cx, cy) and its six neighbours, read in one pass: everyone's load and its most loaded cell
    * (when `load`), colony k's visible load (when `visible`), ants of every colony, and colony
-   * k's own. Where the 3×3 lies inside one chunk (~94 % of cells) each layer's chunk array is
+   * k's own. Where they lie inside one chunk (~94 % of cells) each layer's chunk array is
    * fetched once and indexed; cells past a ragged map edge inside a chunk are never written,
    * so they read 0 like the clipped slow path.
    */
@@ -540,10 +534,10 @@ export class Fungus {
     }
     const { w, h } = this.map.size;
     let top = 0;
-    const ring = discOffsets(1)[cy & 1] as Int16Array;
-    for (let q = 0; q < ring.length; q += 2) {
-      const x = cx + (ring[q] as number);
-      const y = cy + (ring[q + 1] as number);
+    const o = discOffsets(1)[cy & 1] as Int16Array;
+    for (let q = 0; q < o.length; q += 2) {
+      const x = cx + (o[q] as number);
+      const y = cy + (o[q + 1] as number);
       if (x < 0 || y < 0 || x >= w || y >= h) continue;
       for (let j = 0; j < grids.length; j++) {
         const n = (grids[j] as CountGrid).get(x, y);
