@@ -5,7 +5,7 @@ import { Colony } from "../colony.ts";
 import { Fungus, INFECTED, STRAINS, type Strain } from "../fungus.ts";
 import { Game } from "../game.ts";
 import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../world.ts";
-import { centreX, centreY } from "../hex.ts";
+import { at, put } from "./hexmaps.ts";
 
 // The fungus's first slice (ja-t4d.1): load, contact spread across colonies,
 // grooming and priming, and the spore brush. Ants stand still here (the
@@ -26,8 +26,7 @@ function placed(map: WorldMap, nest: number, cells: [number, number][]): Colony 
     const cell = cells[i];
     c.alive[i] = cell ? 1 : 0;
     if (cell) {
-      c.x[i] = centreX(cell[0], cell[1]);
-      c.y[i] = centreY(cell[1]);
+      put(c, i, cell[0], cell[1]);
     }
   }
   return c;
@@ -157,12 +156,12 @@ test("the order colonies are listed in is no edge", () => {
   };
   const [a1, b1] = setup();
   const f1 = new Fungus(map);
-  f1.paint([], 21, 6.5, 1, 3, 0, BLOOM);
+  f1.paint([], at(21, 6).x, at(21, 6).y, 1, 3, 0, BLOOM);
   f1.hosts = 2;
   run(f1, [a1, b1], 2);
   const [a2, b2] = setup();
   const f2 = new Fungus(map);
-  f2.paint([], 21, 6.5, 1, 3, 0, BLOOM);
+  f2.paint([], at(21, 6).x, at(21, 6).y, 1, 3, 0, BLOOM);
   f2.hosts = 2;
   // Same colonies, listed the other way round (the grids follow the list).
   run(f2, [b2, a2], 2);
@@ -178,7 +177,7 @@ test("spore brush: spores on open ground in the stroke, a dose into every ant th
   const mine = placed(map, 0, [[20, 6], [30, 6]]);
   const theirs = placed(map, 1, [[21, 6]]);
   const f = new Fungus(map);
-  f.paint([mine, theirs], centreX(20, 6), centreY(6), 2, 2, 0.3, LOCKPICK);
+  f.paint([mine, theirs], at(20, 6).x, at(20, 6).y, 2, 2, 0.3, LOCKPICK);
   assert.equal(f.spores.get(20, 6), 2);
   assert.equal(f.spores.get(22, 6), 0, "rock takes no spores");
   assert.equal(f.spores.get(25, 6), 0, "outside the stroke");
@@ -190,7 +189,7 @@ test("spore brush: spores on open ground in the stroke, a dose into every ant th
   assert.ok(f.active);
 
   // A host keeps its first strain; another strain's dose still adds load.
-  f.paint([mine, theirs], centreX(20, 6), centreY(6), 0.5, 0, 0.2, BLOOM);
+  f.paint([mine, theirs], at(20, 6).x, at(20, 6).y, 0.5, 0, 0.2, BLOOM);
   assert.equal(mine.strain[0], LOCKPICK);
   assert.ok(Math.abs((mine.load[0] as number) - 0.5) < 1e-6);
 });
@@ -198,8 +197,8 @@ test("spore brush: spores on open ground in the stroke, a dose into every ant th
 test("spores on the ground: an ant walking onto them picks up load and takes some away; untouched spores fade", () => {
   const map = arena();
   const f = new Fungus(map);
-  f.paint([], centreX(15, 6), centreY(6), 0.5, 4, 0, BLOOM);
-  f.paint([], centreX(30, 6), centreY(6), 0.5, 4, 0, BLOOM);
+  f.paint([], at(15, 6).x, at(15, 6).y, 0.5, 4, 0, BLOOM);
+  f.paint([], at(30, 6).x, at(30, 6).y, 0.5, 4, 0, BLOOM);
   const c = placed(map, 0, [[15, 6]]);
   run(f, [c], 1);
   assert.ok((c.load[0] as number) > INFECTED, `picked up: ${c.load[0]}`);
@@ -208,7 +207,7 @@ test("spores on the ground: an ant walking onto them picks up load and takes som
   const left = f.spores.get(30, 6);
   assert.ok(left < 4 && left > 3.5, `a second of sun: ${left}`);
   const fresh = new Fungus(map, { sporeDecay: 1 });
-  fresh.paint([], centreX(30, 6), centreY(6), 0.5, 4, 0, BLOOM);
+  fresh.paint([], at(30, 6).x, at(30, 6).y, 0.5, 4, 0, BLOOM);
   run(fresh, [], 10);
   assert.equal(fresh.sporeCells, 0, "faded away and forgotten");
   assert.equal(fresh.active, false);

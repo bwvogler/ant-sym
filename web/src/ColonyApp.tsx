@@ -1,6 +1,6 @@
 import { SITUATIONS } from "./colony/colony.ts";
-import { DEFAULT_RECOGNITION } from "./colony/recognition.ts";
 import { worldExtent } from "./colony/world.ts";
+import { DEFAULT_RECOGNITION } from "./colony/recognition.ts";
 import { DOCTRINES } from "./colony/colonyBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useMemo, useState } from "react";
