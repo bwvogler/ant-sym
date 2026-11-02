@@ -373,14 +373,20 @@ test("a homing ant on the walkway cell above the hole, its step to the hole graz
   assert.ok(t < 30, `off that cell in ${(t / 30).toFixed(2)} s`);
 });
 
-test("whole games: hardly a food carrier holds its food over 120 s (four seeds, 300 + 300 ants, 450 s; #16's guard, restored)", () => {
+test("whole games: hardly a forager holds its food over 120 s (seeds 2 and 4, 600 + 600 ants, 450 s; #16's guard, restored)", { timeout: 600_000 }, () => {
   // #16 dropped "at most 1 ant carrying food for over a minute", the guard that would have caught #17's pit and #20's
   // lost carriers (a vector off by more than the search's 80 cells: on the ground at the map's edge, or searching for good).
-  // The bound is from measurements (PRD §39): BOUND_NOTE.
+  // Measured (PRD §39): foragers holding food over 120 s, the most at any 10-s sample from 120 s, per colony.
+  //   Before these fixes (af964b1), by 450 s: seed 2: 3 / 0, seed 4: 0 / 6 (seeds 3 and 5: 1 and 3 in their worse colony);
+  //   by 600 s: seed 2: 8 / 1, seed 4: 0 / 13. After: at most 1 in any colony of seeds 1–6 over 600 s.
+  // Lost carriers pile up late (before, seeds 2–5: none over 120 s until 300 s, at most 2 by 360 s) and only with 600
+  // ants a colony (at 300 + 300 the base peaked at 0–4 by 450 s), hence the size and length. The seeds were chosen to
+  // separate before from after: of seeds 2–5, the two where the base passes the bound earliest (400 s and 410 s).
+  // Porters (food moved between chambers, nest slice 5) are not counted: their long trips are an open item (PRD §39).
   let worst = 0;
   const peaks: string[] = [];
-  for (const seed of [2, 3, 4, 5]) {
-    const g = new Game(generateSideWorld(seed), { antCount: 300, rivalAnts: 300 }, mulberry32(seed * 7919));
+  for (const seed of [2, 4]) {
+    const g = new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600 }, mulberry32(seed * 7919));
     const peak = g.colonies.map(() => 0);
     for (let k = 1; k <= 30 * 450; k++) {
       g.tick(1 / 30);
@@ -394,5 +400,5 @@ test("whole games: hardly a food carrier holds its food over 120 s (four seeds, 
     peaks.push(`seed ${seed}: ${peak.join(" / ")}`);
     worst = Math.max(worst, ...peak);
   }
-  assert.ok(worst <= 3, `carriers holding food over 120 s, most at any 10-s sample per colony: ${peaks.join("; ")}`);
+  assert.ok(worst <= 2, `foragers holding food over 120 s, most at any 10-s sample per colony: ${peaks.join("; ")}`);
 });
