@@ -63,7 +63,7 @@ export interface SideStats {
   dug: number;
   /** pellets of it on the mound */
   mound: number;
-  /** pellets of it put back into unused dead ends */
+  /** pellets of it put back underground, into unused space beside the tunnels (backfill) */
   filled: number;
 }
 

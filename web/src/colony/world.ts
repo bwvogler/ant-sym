@@ -75,6 +75,8 @@ export interface WorldMap {
   sky?: ChunkLayer<Uint8Array>;
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
   loose?: ChunkLayer<Uint8Array>;
+  /** when each cell was last dug open by an ant (simulated seconds; −Infinity = never): fresh digging is the live frontier, not filled back (BACKFILL.young) */
+  dugAt: ChunkLayer<Float32Array>;
   /** forks begun but not finished: a tunnel's end cell → its second arm (the way to dig, and the heading the arm carries on), which the next digger to pass digs */
   forks?: Map<number, Fork>;
 }
@@ -257,11 +259,12 @@ export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
   return true;
 }
 
-/** Dig integer cell (x, y) open; false if it isn't soil. */
-export function digCell(map: WorldMap, x: number, y: number): boolean {
+/** Dig integer cell (x, y) open at time t (−Infinity: not by an ant, so not a fresh dig); false if it isn't soil. */
+export function digCell(map: WorldMap, x: number, y: number, t = -Infinity): boolean {
   if (rockAt(map, x, y) !== SOIL) return false;
   map.rock.set(x, y, OPEN);
   map.filledAt.set(x, y, -Infinity); // a pellet dug out again no longer smells of building
+  map.dugAt.set(x, y, t);
   map.dug++;
   if (map.sky) updateSurface(map, x, y);
   return true;
@@ -306,7 +309,8 @@ function headingLayer(): ChunkLayer<Uint8Array> {
   return new ChunkLayer((n) => new Uint8Array(n), 0);
 }
 
-function filledLayer(): ChunkLayer<Float32Array> {
+/** A layer of times (simulated seconds), −Infinity = never. */
+function timeLayer(): ChunkLayer<Float32Array> {
   return new ChunkLayer((n) => new Float32Array(n).fill(-Infinity), -Infinity);
 }
 
@@ -423,7 +427,7 @@ export function worldFromArrays(size: WorldSize, nests: Nest[], opts: { rock?: A
     }
   let hasSoil = false;
   if (opts.rock) for (let i = 0; i < opts.rock.length && !hasSoil; i++) hasSoil = opts.rock[i] === SOIL;
-  return { size, seed: opts.seed ?? 0, rock, food, nest: nests[0]!, nests, foodTotal: total, foodLeft: total, dug: 0, filled: 0, hasSoil, digHeading: headingLayer(), filledAt: filledLayer() };
+  return { size, seed: opts.seed ?? 0, rock, food, nest: nests[0]!, nests, foodTotal: total, foodLeft: total, dug: 0, filled: 0, hasSoil, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer() };
 }
 
 /** A layer as a flat row-major array over the map (tests, the reachability oracle). */
@@ -534,7 +538,7 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
   const cut = rockCut(o.rockiness);
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
-  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: o.soil > 0, digHeading: headingLayer(), filledAt: filledLayer() };
+  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: o.soil > 0, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer() };
   // Placement plans through diggable ground (anywhere but rock): underground, the ants dig the rest.
   const dg: Through = "diggable";
   rock.forEach((cx, cy, r) => {
@@ -693,7 +697,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
   const loose = new ChunkLayer((n) => new Uint8Array(n), 0);
-  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: filledLayer(), sky, loose };
+  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer(), sky, loose };
   const ground = new Int32Array(size.w);
   for (let x = 0; x < size.w; x++) ground[x] = Math.max(2, Math.min(size.h - 8, groundRow(seed, o, x)));
   for (let y = 0; y < size.h; y++)

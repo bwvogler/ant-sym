@@ -1049,9 +1049,11 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   - **Unused is judged against the path.** A neighbour counts as unused when its home + food scent is under half the scent where the carrier stands (or under `FAINT`), but never above the carrier's own: a cell as busy as its own is in use.
   - **Fillable means one unbroken run.** A cell can be filled when its open neighbours (1–5 of them) form one unbroken run: a dead end, the edge of a chamber, the side of a wide tunnel. In digital topology this is a *simple* cell, so filling it never changes how the ground is connected and no passage is ever cut. A cell of a one-wide tunnel (two runs) is never fillable.
   - **Fresh pellets draw more.** `map.filledAt` records when each cell was filled, and is cleared when it is dug out again. The "pellet scent" of a cell is exp(−age / 60 s) from the freshest fill beside it, and it raises the threshold up to 7×, so fills cluster and whole branches close.
-  - **Stale branches.** At a cell where a neighbour smells far staler than the path, a carrier turns in 30 % of the time (only in the first 20 s of its trip). It walks on by the stalest way ahead to the branch's end and fills the last cell, so branches shrink from the tip, a cell per pellet; at an end with nothing to fill it heads home. A branch's mouth and first cells touch the tunnel it leaves, so they are never tunnel cells on hexes: this is decided in the tick on arrival, not in the tunnel walk.
+  - **Stale branches.** At a cell where a neighbour smells far staler than the path (than both this cell and the one it came from, and never back the way it came), a carrier turns in 30 % of the time (only in the first 20 s of its trip). It walks on by the stalest way ahead to the branch's end and fills the last cell, so branches shrink from the tip, a cell per pellet; at an end with nothing to fill it heads home. A branch's mouth and first cells touch the tunnel it leaves, so they are never tunnel cells on hexes: this is decided in the tick on arrival, not in the tunnel walk.
   - **Unchanged guards:** no food in the cell, no ant of either colony (grids plus a direct look at nestmates), not within the nest's radius + 2.
-  - **Tuning** is in `BACKFILL`, mutable for sweeps and tests.
+  - **Put back stays put** (review of MR 12, below). A cell filled less than 600 s ago (`BACKFILL.hold`) is never dug: `chooseDig` skips it, `soilFace` only glances off it, and a dead end beside one is left rather than dug on. An explorer whose next cell is filled decides afresh, unless that cell is a face it chose to dig.
+  - **Fresh digging is the frontier, not excess.** `map.dugAt` records when an ant dug each cell; a cell dug in the last 200 s (`BACKFILL.young`) is never filled, and a carrier never fills the cell its own pellet came from.
+  - **Tuning** is in `BACKFILL`, frozen. Tests and sweeps change it only through `tuneBackfill`, which returns the function that restores it.
 - **Tuning sweep** (seeds 1–4, 300 s unless noted):
 
   | setting | share refilled | notes |
@@ -1063,13 +1065,13 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   | wait 1–1.5 s instead of 3 | 68–74 % | food home −30 %: carriers fill space others then re-dig |
   | wait 2.5 s, pellet scent 30 s ×5 | 48 % at 600 s | after the review fixes below |
   | wait 2.2 s | 52 % at 600 s | food home −17 % |
-  | wait 2.5 s, pellet scent 60 s ×7 (chosen) | 53 % at 600 s | food home −12 % |
-- **Measured** (seeds 1–5, 600 s, 600 + 600 ants, underground):
+  | wait 2.5 s, pellet scent 60 s ×7 (first cut) | 53 % at 600 s | food home −12 %; but see the review: most of it was the same cells cycling |
+- **Measured, first cut** (seeds 1–5, 600 s, 600 + 600 ants, underground). The refill share and cells dug in this table are superseded by the review below: most fills were dug out again.
 
-  | | MR 11 | MR 12 |
+  | | MR 11 | MR 12, first cut |
   |---|---|---|
-  | dug soil refilled | 0.6 % | **53.3 %** (the *Atta* end; *Pogonomyrmex* 2.5 %) |
-  | cells dug per colony | ~3,500 | ~6,200 (leaf-cutter churn: space dug, refilled, dug again) |
+  | dug soil refilled | 0.6 % | 53.3 %, but 31–46 % of all digs re-dug filled cells (see the review) |
+  | cells dug per colony | ~3,500 | ~6,200 (the same cells dug, filled, dug again) |
   | food home per colony | ~1,120 | ~990 (−12 %; seed noise is about ±7 %) |
   | first-food median | ~28 s | ~31 s |
   | ants out over 120 s | 1.5–13.6 % | 0.7–1.7 % |
@@ -1092,6 +1094,34 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   - the edge-graze recentre set a heading that the next tick overwrote: it is now the position nudge above, and its test starts exactly on an edge (the old one started in the soil cell next door);
   - re-dug cells no longer smell of fresh pellets;
   - fills keep clear of every nest, not only the carrier's own.
+- **Review of MR 12: put-back soil was dug straight out again.** Counting every dig and fill (a hook on the map, no sampling; seeds 1–5, 600 s, 600 + 600 ants, `generateWorld(seed)`, game seed `seed × 31 + 7`), 38–46 % of all digs re-dug a filled cell, mostly within a minute of the fill. The "53 % refilled" was mostly the same cells cycling. Causes and fixes (each fix has a test that fails without it, checked by reverting it):
+  - **Filling a branch from its tip leaves a new dead end**, and dead ends are where explorers dig: on along the tunnel's run, straight into the fill. Now a cell filled in the last `hold` (600 s) is never dug, and a dead end beside one is left.
+  - **An explorer kept a filled target** (`#walkTunnel` exempted explorers from "a filled target is decided afresh"), stepped into the fresh soil and dug it back. Now only a face it chose to dig is kept.
+  - **Carriers refilled the cell they had just dug** (the 2.5 s wait is a time guard, not a cell guard): 2.9 % of fills. Each ant now keeps the cell it last dug, and never fills it.
+  - **Stale turn-ins reversed carriers**: 40 % went straight back the way they came, because home scent falls away from the nest along any path, so the cell behind always smells fainter than here. Now the way it came (the cell it looked from last, else the cell behind its heading) is never a candidate, and a branch must smell stale against that cell too, not only against here: a side way nobody walks, not the path's own far end. Straight reversals: 1.1 % (the residue is the counter's own idea of "the cell before"). About 57 % of turn-ins still lead away from the nest, as side branches off an outward tunnel do.
+  - **With re-digging stopped, the colony stopped growing.** The fills ate the tunnels' live ends (a lone digger's tip smells stale against a busy path), and nothing dug them out again: net excavation fell to ~1,000 cells per colony and food home to ~620 (−37 %). Re-digging had been what kept the frontier moving. Hence the youth guard: a cell dug in the last `young` seconds is not filled.
+
+  | setting (seeds 1–5, 600 s) | re-digs of filled cells, share of digs | dug soil filled | net dug (dug − filled) per colony | food home per colony |
+  |---|---|---|---|---|
+  | MR 11 (`main`) | 0.3–0.6 % | 0.6 % | 3,698 | 1,080 |
+  | MR 12, first cut | 38–46 % | 56.5 % | 2,997 | 984 |
+  | hold only (600 s; leave dead ends by fills) | 0 % | 62.7 % | 974 | 619 |
+  | the same, digging on round fills | 0 % | 58.5 % | 1,062 | 492 |
+  | the same, hold 300 s | 9–12 % | 61.5 % | 1,199 | 690 |
+  | hold, no stale turn-ins | 0 % | 55.0 % | 1,111 | 606 |
+  | hold, pellet scent ×3 | 0 % | 57.4 % | 1,058 | 641 |
+  | hold, never fill a tunnel's tip | 0 % | 48.1 % | 1,094 | 421 |
+  | hold, youth 120 s | 0 % | 30.2 % | 2,564 | 774 |
+  | **hold, youth 200 s (chosen)** | **0 %** | **27.2 %** | **2,613** | **942** |
+  | hold, youth 300 s | 0 % | 20.9 % | 2,967 | 947 |
+
+  - **What the first cut really put back.** Its fills minus the fills dug out again come to about 23 % of the cells it dug for the first time. The chosen rules put back 27 % with nothing dug out again within the run, at the same food (942 vs 984, −4 %; −13 % against MR 11, whose colonies haul every pellet out). So this is a leaf-cutter colony that keeps about a quarter of its spoil underground, not the half the first cut claimed; *Atta* refills part of what it digs (Pielström & Roces), *Pogonomyrmex* 2.5 %.
+  - **Mound share:** at least 0.54 of dug soil reaches the mound per colony on these seeds (first cut 0.32); the underground test's floor is back, at more than 0.25 of soil dug.
+  - Carriers filling their own dig: 0 of ~9,750 fills (first cut 1,140 of 38,866).
+  - **Longer games** (seeds 1–2, 1,200 s): once fills pass the 600 s hold, explorers may dig them again, and 0.7–4.6 % of all digs did, every one of a fill over 600 s old. A permanent hold gave 0 % but less food on both seeds (1,688 and 2,296 vs 1,789 and 2,564, both colonies together): old refilled ground is ground like any other.
+  - **Food home**, rule by rule, is in the table: the youth guard is what keeps it (hold alone −37 %, with youth 200 s −4 % against the first cut).
+  - Bench and the movement scans (stalls, livelocks, burial) were not re-run for the review fixes; conservation (dug = mound + filled + carried + lost) held on every run above, and the underground test's "no ant in a solid cell" invariant passes.
+
 
 ## 27. The side view: a cross-section
 
