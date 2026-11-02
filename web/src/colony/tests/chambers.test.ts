@@ -89,6 +89,8 @@ test("a roomy nest barely digs (ja-wii): the same few ants dig far less when the
     const map = generateSideWorld(2, SMALL);
     if (!chambers) map.chambers = undefined; // no chambers: never roomy (as before slice 2)
     const c = new Colony(map, { antCount: 30, maxAnts: 30 }, mulberry32(6));
+    // All middle-aged (diggers, slice 6): this is about how much a nest digs, not who digs.
+    for (let i = 0; i < c.n; i++) ((c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN), (c.lifespan[i] = Infinity));
     for (let k = 0; k < 30 * 120; k++) c.tick(1 / 30);
     return c.soilDug;
   };
