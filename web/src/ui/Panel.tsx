@@ -123,15 +123,24 @@ function TargetPreview({ engine, version }: { engine: Engine; version: number })
     const t = engine.target;
     let max = 0;
     for (let i = 0; i < t.length; i++) max = Math.max(max, t[i] as number);
-    for (let i = 0; i < t.length; i++) {
-      const v = max > 0 ? (t[i] as number) / max : 0;
-      const o = i * 4;
-      img.data[o] = 30;
-      img.data[o + 1] = 28;
-      img.data[o + 2] = 24;
-      img.data[o + 3] = Math.round(255 * v);
-    }
-    ctx.putImageData(img, 0, 0);
+    const draw = () => {
+      // The theme's ink, so the preview flips with dark mode like the field does.
+      const hex = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim().replace("#", "");
+      const [r, g, b] = [0, 2, 4].map((k) => parseInt(hex.slice(k, k + 2), 16) || 0);
+      for (let i = 0; i < t.length; i++) {
+        const v = max > 0 ? (t[i] as number) / max : 0;
+        const o = i * 4;
+        img.data[o] = r as number;
+        img.data[o + 1] = g as number;
+        img.data[o + 2] = b as number;
+        img.data[o + 3] = Math.round(255 * v);
+      }
+      ctx.putImageData(img, 0, 0);
+    };
+    draw();
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", draw);
+    return () => mq.removeEventListener("change", draw);
   }, [engine, version]);
   return <canvas ref={ref} className="mt-3 w-full rounded border border-line bg-paper [image-rendering:pixelated]" style={{ aspectRatio: `${engine.params.size.w} / ${engine.params.size.h}` }} aria-label="target preview" />;
 }
@@ -149,10 +158,14 @@ export function Slider({ label, value, min, max, step, format, onChange, disable
   );
 }
 
-export function Bar({ value }: { value: number }) {
+/** A spend or time bar turns warn past this share of its cap (both pages). */
+export const NEAR_CAP = 0.85;
+
+/** A share bar, 0..1. `warnAt`: turn warn past this share (spend and time against a cap). */
+export function Bar({ value, warnAt, thin = false }: { value: number; warnAt?: number; thin?: boolean }) {
   return (
-    <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-raised">
-      <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${Math.round(value * 100)}%` }} />
+    <div className={`${thin ? "mt-1 h-1" : "mt-2 h-1.5"} w-full overflow-hidden rounded bg-raised`}>
+      <div className={`h-full ${warnAt !== undefined && value > warnAt ? "bg-warn" : "bg-accent"} transition-[width] duration-300`} style={{ width: `${Math.round(value * 100)}%` }} />
     </div>
   );
 }
