@@ -534,3 +534,80 @@ What it says:
 **The golden test** (`web/src/colony/tests/golden.test.ts`) recorded three seeded games on the code before Phase 0: a war on a small map with fights, a solo colony with alarm painted, and a war on the default map. It checks every 10 s that stored, births, losses, decisions, population and a bit-exact hash of every ant's position and heading are unchanged. Phase 0 passes it, so moving the constants into params changed nothing. `npm test`'s per-file timeout is now 60 s: `game.test.ts` alone takes ~25 s on the cloud container and already timed out at 20 s before this change.
 
 **Jev:** no change in Phase 0, and the request state is unchanged.
+
+## 15. Phase 1: response hooks, with no behaviour change (2026-11-02)
+
+Every hard-coded mechanic in the ant tick is now a call to a **response hook** (`web/src/colony/responses.ts`). Each hook is a pure function of a small `AntView` of the ant: its mode, what it carries (`none | food | soil | egg`), whether it is at its nest, whether it is tired, the three trails ahead, a nearby enemy, and the colony's stance. `localResponses` is the rule the colony always had:
+
+| Hook | Fires when | Local rule |
+|---|---|---|
+| `onFood` | standing on food, carrying nothing | take it, unless fighting |
+| `onCarry` | it just picked something up | `return` (the carrier keeps this mode; it is not asked the mode policy) |
+| `atSite` | carrying, at the nest | drop it |
+| `mark` | every step | carrying food: food trail; otherwise home trail |
+| `onContact` | enemies in the 3×3 cells around it | fight (`flee` and `drop` exist for Phase 4) |
+| `raiseAlarm` | fighting | normal (×1 the fight's alarm rate; `none` ×0, `strong` ×2) |
+| `alarmGain` | it smells alarm | fighters ignore it; everyone else flees it (`approach` climbs it) |
+
+- **No behaviour change, checked two ways.**
+  - The golden test (§14) passes bit for bit: every ant's position and heading, and the decision counts too.
+  - The 10-minute `colony-cost` game plays out identically before and after: 4,181 food home, 742 lost, 529,423 mode choices.
+- **`atNest` is in the mode situation** (situations 1,296 → 2,592) and in every hook's view. An ant is asked with `atNest` as it is whenever its situation changes; crossing the nest's edge alone does not re-ask it (see "rejected" below).
+- **Experiments can script responses**: `withResponses({ onFood: () => false })`, per side in `runGame` (`player.responses`, `rival.responses`), or from Jev's cached answers (`responsesFromAnswers`).
+
+**Every hook is a possible Jev lane** (`colonyBrain.HOOK_LANES`). Each lane is one small choice question, keyed by just the view fields that hook reads, with its own legend, packer, reader and per-doctrine context. `COLONY_BRAIN_VERSION` is 3. The client does not ask the hook lanes yet: `colony-cost` costs them, and `colony-live` asks them.
+
+**Cost, offline** (`npm run colony-cost`, 600 + 600 ants, 10 min, 5 doctrines):
+
+| | Phase 0 | Phase 1 |
+|---|---|---|
+| Tokens per mode situation (100-situation request) | 219 | 226 (+3 %: the `atNest` field) |
+| A one-situation request | 764 | 790 (the legend's new sentence) |
+| Distinct situations met | 382 | 408 (`atNest` splits some) |
+| Session (mode + stance lanes) | ~427k tok, $0.108/h | ~465k tok, $0.117/h |
+| Hook lanes, if asked | — | ~106k tok more (~$0.03/h): alarmGain 61 views, onContact 45, onFood 42, mark 35, raiseAlarm 25, onCarry 11, atSite 7 |
+
+**Live check** (`node scripts/colony-live.mjs all --budget 0.10`). One offline game (seed 1, 600 + 600 ants, 300 s, alarm painted) met 357 mode situations, 10 stance views and 74 hook views. Each was asked of Jev once per doctrine, in requests of up to 100 questions. **Spent: 261k input tokens, $0.011.**
+
+| Lane | Asked | Estimated tok/q | Real tok/q | Agrees with local: Forage | Cautious | Warlike |
+|---|---|---|---|---|---|---|
+| mode | 357 | 231 | 202 | 61 % | 36 % | 63 % |
+| stance | 10 | 232 | 212 | 60 % | 60 % | 70 % |
+| onFood | 16 | 163 | 150 | 81 % | 69 % | 69 % |
+| onCarry | 4 | 275 | 268 | 100 % | 100 % | 50 % |
+| atSite | 2 | 336 | 346 | 100 % | 100 % | 50 % |
+| mark | 8 | 206 | 188 | 12 % | 12 % | 12 % |
+| onContact | 16 | 178 | 163 | 100 % | 25 % | 100 % |
+| raiseAlarm | 8 | 187 | 175 | 25 % | 0 % | 0 % |
+| alarmGain | 20 | 175 | 164 | 55 % | 80 % | 0 % |
+
+- **Real tokens are 0.87–1.03× the estimate** (`estimateTokens`, from request size): the estimate is slightly high for full requests and right for small ones.
+- **Jev follows the doctrines.** This answers §10–11's "still to measure live":
+  - **Cautious** sends ants home on alarm in 91 of 95 situations (no enemy, not defending). Forage does in 40 and Warlike in 13; the local rule never does.
+  - Cautious ants flee a contact (12 of 16) and never raid (0 of 17 raid-stance explorers sent to fight).
+  - **Warlike** sends all 17 raid-stance explorers to fight (Forage: 2), climbs alarm instead of fleeing it (`approach`, 15 of 20 views), and stops treating *tired* as "go home" (31 of 84; Forage and Cautious: 84 of 84).
+- **Jev does not understand the trails.** It tells explorers to lay no trail (`mark: none`, 5 of 8 views, every doctrine) and fighters to lay no alarm. The legend says what each scent leads to, but not that the colony only finds home and food through them.
+- **Replay** (`npm run exp -- a1,… --policy cache:experiments/out/jev-cache-<doctrine>.json`): situations missing from the cache fall back to the local rule. Foraging collapses: A1's food home drops from 2,069 to 342 (Forage), 74 (Cautious) and 265 (Warlike). An ablation on A1 (short, seeds 1–3; local rule 817 / 951 / 869) found two causes:
+  - **The mark lane alone** halves it (414 / 586 / 369): no home trail.
+  - **The mode lane alone** cuts it to 345 / 317 / 321. Almost all of that is **ja-qnx, confirmed live**. In 10 situations at the nest (e.g. `return|fresh|nest|strong|strong|…` and `follow|fresh|nest|…`), Forage's answer is "return", which parks the ant at home. With those 10 answers dropped, food home is 838 / 954 / 828, as good as the local rule. **So `atNest` in the situation does not fix ja-qnx by itself.** It stays open, with two candidate fixes: a mechanic (an ant told to return while already home heads back out), or wording that makes "return" at the nest mean resting, which needs Phase 5's activation to end the rest.
+
+**Rejected: re-asking at the nest's edge ("Phase 1b").** Making `atNest` a re-ask trigger left every arena assay identical: no ant there ends a fight, and that is the only rule that answers differently on a re-ask. But it moved the whole-game homing assay the wrong way over seeds 1–10:
+
+| A7 stuck share | Phase 0 / 1 | 1b |
+|---|---|---|
+| median seed | 0.044 | 0.057 |
+| worst seed | 0.069 | 0.147 |
+| seeds ≤ 7 % | 10 of 10 | 7 of 10 |
+
+By the plan's rule (worst seed, not best mean), it is out. Since Jev answers "return" at the nest anyway, re-asking there would not have fixed ja-qnx either.
+
+**Tests:** `responses.test.ts` covers each hook's local rule and that scripting it changes the colony:
+- ants that ignore food store none;
+- carriers keep onCarry's mode and are not asked;
+- ants that keep their load store nothing;
+- ants that mark nothing leave no trail;
+- `approach` draws ants to alarm;
+- quiet fighters lay no alarm, and `strong` lays twice `normal`;
+- `flee` turns ants home; drop-and-run leaves the load.
+
+It also covers `viewOf`, the hook lanes (keys, packers, readers, contexts), and that a cache of the local rule's own answers plays like the local rule. Two colony-client tests now allow for ants walking into a new (atNest) situation between ticks.
