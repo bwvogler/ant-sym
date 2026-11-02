@@ -73,8 +73,8 @@ export interface WorldMap {
    * later the mound); the rest is AIR (solid, never dug, drawn as sky). updateSurface keeps it so as ground changes.
    */
   sky?: ChunkLayer<Uint8Array>;
-  /** forks begun but not finished: a tunnel's end cell → the heading of its second arm, which the next digger to pass digs */
-  forks?: Map<number, number>;
+  /** forks begun but not finished: a tunnel's end cell → its second arm (the way to dig, and the heading the arm carries on), which the next digger to pass digs */
+  forks?: Map<number, Fork>;
 }
 
 export interface WorldOptions {
@@ -319,22 +319,28 @@ export function tunnelHeading(map: WorldMap, x: number, y: number): number {
 
 const forkKey = (x: number, y: number): number => (y + 32768) * 131072 + (x + 32768);
 
+/** A fork's undug arm: the way from the fork's cell to dig (0–5), and the heading the new tunnel carries on. */
+export interface Fork {
+  dir: number;
+  aim: number;
+}
+
 /**
- * A fork begun at cell (x, y): one arm dug, the other (at heading `aim`) left for the next digger to pass.
+ * A fork begun at cell (x, y): one arm dug, the other (way `dir`, carrying heading `aim`) left for the next digger to pass.
  * On hexes a fork has to be a Y: both arms 60° off the tunnel's run, never one straight on, because the
  * cell straight on touches a 60° arm and so is no longer a tunnel's end (it would never be dug).
  */
-export function markFork(map: WorldMap, x: number, y: number, aim: number): void {
-  (map.forks ??= new Map()).set(forkKey(x, y), aim);
+export function markFork(map: WorldMap, x: number, y: number, dir: number, aim: number): void {
+  (map.forks ??= new Map()).set(forkKey(x, y), { dir, aim });
 }
 
-/** The heading of a fork's undug arm at cell (x, y), taken (forgotten) as it is read; NaN if none. */
-export function takeFork(map: WorldMap, x: number, y: number): number {
+/** A fork's undug arm at cell (x, y), taken (forgotten) as it is read; null if none. */
+export function takeFork(map: WorldMap, x: number, y: number): Fork | null {
   const k = forkKey(x, y);
-  const aim = map.forks?.get(k);
-  if (aim === undefined) return NaN;
+  const f = map.forks?.get(k);
+  if (f === undefined) return null;
   map.forks!.delete(k);
-  return aim;
+  return f;
 }
 
 /** Remember the heading integer cell (x, y) was dug at. */
