@@ -8,7 +8,7 @@ import { DORMANT_SHOW, Fungus, INTERVENTIONS, LETHAL, STRAINS, intervention } fr
 import { Game } from "../game.ts";
 import { Recognition } from "../recognition.ts";
 import { generateWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
-import { centreX, centreY } from "../hex.ts";
+import { at, put } from "./hexmaps.ts";
 
 // The fungus policy (ja-t4d.5): one intervention per host, from what the
 // fungus in that host senses; gated by the strain and the player's menu.
@@ -26,8 +26,7 @@ function placed(map: WorldMap, nest: number, odour: number, cells: [number, numb
     const cell = cells[i];
     c.alive[i] = cell ? 1 : 0;
     if (cell) {
-      c.x[i] = centreX(cell[0], cell[1]);
-      c.y[i] = centreY(cell[1]);
+      put(c, i, cell[0], cell[1]);
     }
   }
   return c;
@@ -111,11 +110,11 @@ test("what the fungus senses, all of it local to its host: whose ground, and who
   assert.equal(sense((_a, b) => b.ph.fields.home.set(20, 6, 1)).ground, "foreign");
   assert.equal(sense((a, b) => (a.ph.fields.home.set(20, 6, 1), b.ph.fields.home.set(20, 6, 0.8))).ground, "border", "both: no-man's land");
   assert.equal(sense(() => {}).contact, "none");
-  assert.equal(sense((_a, b) => ((b.x[0] = centreX(21, 6)), (b.y[0] = centreY(6)))).contact, "strangers");
-  assert.equal(sense((a) => ((a.x[1] = centreX(20, 7)), (a.y[1] = centreY(7)))).contact, "kin", "a nestmate");
-  assert.equal(sense((_a, b) => ((b.x[0] = centreX(21, 6)), (b.y[0] = centreY(6)), b.odour.fill(0.1))).contact, "allied", "another colony's ant that smells close enough to tolerate");
-  assert.equal(sense((a, b) => ((a.x[1] = centreX(20, 7)), (a.y[1] = centreY(7)), (b.x[0] = centreX(21, 6)), (b.y[0] = centreY(6)), b.odour.fill(0.1))).contact, "allied", "allied over kin");
-  assert.equal(sense((a, b) => ((a.x[1] = centreX(20, 7)), (a.y[1] = centreY(7)), (b.x[0] = centreX(21, 6)), (b.y[0] = centreY(6)))).contact, "strangers", "strangers over all");
+  assert.equal(sense((_a, b) => ((b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y))).contact, "strangers");
+  assert.equal(sense((a) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y))).contact, "kin", "a nestmate");
+  assert.equal(sense((_a, b) => ((b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y), b.odour.fill(0.1))).contact, "allied", "another colony's ant that smells close enough to tolerate");
+  assert.equal(sense((a, b) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y), (b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y), b.odour.fill(0.1))).contact, "allied", "allied over kin");
+  assert.equal(sense((a, b) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y), (b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y))).contact, "strangers", "strangers over all");
   assert.equal(sense(() => {}).load, "high");
   assert.equal(sense(() => {}).host, "explore");
   // Nothing map-wide: where the nests' odours stand (the colonies' closeness) does not enter what the fungus senses.
@@ -288,7 +287,7 @@ test("contact: a calmed stranger still smells strange (the fungus senses strange
     const b = placed(map, 1, 1, [[20, 6]]);
     b.calm[0] = calm;
     const f = new Fungus(map);
-    f.paint([a], centreX(20, 6), centreY(6), 0.6, 0, 0.5, ID("garden"));
+    f.paint([a], at(20, 6).x, at(20, 6).y, 0.6, 0, 0.5, ID("garden"));
     const rec = new Recognition();
     rec.build([a, b]);
     f.step([a, b], [a, b].map((c) => occupancy(c, new CountGrid())), 0.1, rec);
