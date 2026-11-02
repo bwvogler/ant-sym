@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, FORAGERS, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
+import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
 import { Game } from "../game.ts";
 import { CELL } from "../hex.ts";
 import { generateSideWorld, generateWorld, groundTop, isSky, mulberry32 } from "../world.ts";
@@ -27,7 +27,7 @@ test("bands: on the top-down maps every ant is old; in the side view by age", ()
   assert.deepEqual([c.band(0), c.band(1), c.band(2)], [0, 1, 2]);
 });
 
-test("the young never go out, the old do; the middle-aged go out only while foragers are short", () => {
+test("the young never go out; the old do, more than the middle-aged (the old climb out to forage)", () => {
   const outShare = (share: number) => {
     const map = generateSideWorld(2, SMALL);
     const g = new Game(map, { antCount: 120, rival: false }, mulberry32(3));
@@ -52,7 +52,7 @@ test("the young never go out, the old do; the middle-aged go out only while fora
   const old = outShare(MIDDLE + 0.1);
   assert.equal(young, 0, "the young stay in");
   assert.ok(old > 0.1, `the old forage: ${(old * 100).toFixed(0)} % out`);
-  assert.ok(middle > 0 && middle <= FORAGERS + 0.1, `the middle-aged go out, but only up to about FORAGERS: ${(middle * 100).toFixed(0)} %`);
+  assert.ok(middle > 0 && middle < old, `the middle-aged go out less than the old: ${(middle * 100).toFixed(0)} % vs ${(old * 100).toFixed(0)} %`);
 });
 
 test("the young sit deeper than the old, and only the middle-aged dig", () => {
@@ -83,4 +83,16 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
     count[b]!++;
   }
   assert.ok(depth[0]! / count[0]! > depth[2]! / count[2]!, `young ${(depth[0]! / count[0]!).toFixed(1)} rows deep, old ${(depth[2]! / count[2]!).toFixed(1)}`);
+  // …and with the queen: of the ants underground, the young nearer her than the middle-aged (they keep to the royal and
+  // brood marks; inside anyway, they'd otherwise wander the nest like anyone).
+  const near = [0, 0, 0];
+  const inside = [0, 0, 0];
+  for (let i = 0; i < c.n; i++) {
+    if (!c.alive[i]) continue;
+    c.antCell(i);
+    if (isSky(map, CELL[0] as number, CELL[1] as number)) continue;
+    near[c.band(i)]! += Math.hypot(c.x[i]! - c.queen!.x, c.y[i]! - c.queen!.y);
+    inside[c.band(i)]!++;
+  }
+  assert.ok(near[0]! / inside[0]! < near[1]! / inside[1]!, `from the queen, underground: young ${(near[0]! / inside[0]!).toFixed(1)}, middle-aged ${(near[1]! / inside[1]!).toFixed(1)}`);
 });

@@ -1560,10 +1560,14 @@ In the side view with a queen, each worker's age band sets where it is and what 
 
 **What each band does:**
 - **Young ants** nurse: only they carry eggs from the queen to brood chambers. They keep with the queen and brood, following the royal and brood marks in tunnels and drifting toward the queen in open chambers. They never go out.
-- **Middle-aged ants** dig and carry inside: only they dig, and they port food and take in stray brood. They go out only while foragers are short (fewer than `FORAGERS`, 30 %, of the colony out).
+- **Middle-aged ants** dig and carry inside: only they dig, and they port food and take in stray brood. They may go out; they are not pushed to.
 - **Old ants** forage. Underground they head up and out: climbing to the hole in tunnels, and toward it in open chambers. Before this, old ants that no longer dug wandered the nest's tunnels, and one colony had only 20–60 of 900 out.
 
-**Enforcement.** An ant not to go out that steps up out of the hole is put back and turned round. Food and pellet carriers are exempt.
+**Enforcement.** Only the young are kept in.
+- An inside worker underground doesn't follow a food trail (it leads out): it explores.
+- Its walk turns back down at the top of the shaft.
+- If it does step up out of the hole, it is put back, pointed down the shaft at its deepest open cell.
+- Food and pellet carriers are exempt.
 
 **Zoning is not in the Jev situation.** The ants asked out on the ground are foragers anyway.
 
@@ -1571,26 +1575,38 @@ In the side view with a queen, each worker's age band sets where it is and what 
 
 | Seed | Young: share, depth, out | Middle: share, depth, out | Old: share, depth, out |
 |---|---|---|---|
-| 1 | 20 %, 14.1, 0 % | 29 %, 12.8, 14 % | 51 %, 8.0, 26 % |
-| 2 | 20 %, 14.2, 0 % | 28 %, 12.5, 15 % | 52 %, 7.6, 38 % |
-| 3 | 20 %, 15.0, 0 % | 29 %, 14.1, 15 % | 51 %, 9.8, 35 % |
+| 1 | 20 %, 21.1, 0 % | 29 %, 8.9, 43 % | 51 %, 6.3, 54 % |
+| 2 | 19 %, 19.0, 0 % | 27 %, 12.6, 15 % | 54 %, 8.6, 31 % |
+| 3 | 17 %, 17.5, 0 % | 29 %, 12.6, 17 % | 53 %, 7.7, 27 % |
 
 The young sit deepest and never go out; the old are nearest the surface and do most of the foraging.
 
 | | Slice 5 | Slice 6 |
 |---|---|---|
-| Food home, six colonies | 8,032 | 7,736 (−4 %) |
-| Births | 269–304 | 295–300 |
-| Out over 120 s | 0.5–4.2 % | 0.6–1.1 % |
+| Food home, six colonies | 8,032 | 7,794 (−3 %) |
+| Births | 269–304 | 288–303, one colony 211 |
+| Out over 120 s | 0.5–4.2 % | 0.4–0.8 % |
+| Cells dug | about 2,500 a colony | 1,050–1,860 (only the middle-aged dig) |
 
 Fewer ants dig, since only the middle-aged do, so chambers and floor grow more slowly.
 
 **Tick time:** the first cut asked for the colony's population, which counts every slot, once per ant per tick (+57 %). It now uses the tick's own counts, and two colonies are at 6.74 ms against 6.8 ms on slice 5.
 
+**Agent review.** The review found ants pinned at the hole by the first cut's hard rule.
+- **The first cut also kept the middle-aged in unless foragers were short.** Put back and turned round in the hole, which is no tunnel cell, ants steered at random into the sky again for up to 45 s. Free ants spent 10–20 % of their time at the hole against 2–6 % before, and food home at 300 s fell 15–25 %.
+- **Inside workers.** Following food trails up the shaft brought them there, and so did walking it.
+- **Fixes:**
+  - only the young are kept in;
+  - inside workers don't follow food trails out, and turn back at the top of the shaft;
+  - a put-back points down the shaft;
+  - middle-aged raiders go out, and the young don't;
+  - a stale chamber aim no longer lets a non-digger dig.
+- **Tests:** the young-to-queen pull was untested; the test now compares young and middle-aged underground, and fails without the pull.
+
 **Tests:** `zoning.test.ts`:
 - bands on both views;
-- the young never go out, the old do, and the middle-aged only up to about `FORAGERS`;
-- the young sit deeper than the old, and only the middle-aged dig.
+- the young never go out, and the old go out more than the middle-aged;
+- the young sit deeper than the old and nearer the queen than the middle-aged underground, and only the middle-aged dig.
 
 `chambers.test.ts`'s crowded nest makes every ant a digger: it tests how chambers are dug, not who digs.
 

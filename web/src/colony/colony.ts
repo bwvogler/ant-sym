@@ -231,8 +231,8 @@ export class Colony {
   #chamberFor: Int16Array;
   /** ants underground last tick (the side view): with the chambers' floor, how crowded the nest is */
   inNest = 0;
-  /** ants out on the ground last tick (the side view): foragers, against FORAGERS of the colony */
-  #outside = 0;
+  /** ants out on the ground last tick (the side view) */
+  outside = 0;
   // Floor marks (nest slice 3): the role of the last chamber each ant was in (MARKS index + 1; 0 none), and seconds since.
   #lastRole: Uint8Array;
   #sinceRole: Float32Array;
@@ -682,12 +682,11 @@ export class Colony {
     return a < YOUNG ? 0 : a < MIDDLE ? 1 : 2;
   }
 
-  /** Whether ant i may go out onto the ground: the old forage; the middle-aged too while foragers are short (fewer than FORAGERS of the colony out); the young never. */
+  /** Whether ant i may go out onto the ground: the young never (they nurse); the rest may. */
   #mayGoOut(i: number): boolean {
-    const b = this.band(i);
-    if (b === 2) return true;
-    if (b === 0) return false;
-    return this.#outside < FORAGERS * (this.inNest + this.#outside); // last tick's counts (population counts every slot)
+    // The young never; the rest may (the middle-aged dig and carry inside, the old climb out to forage: #outbound). A hard
+    // limit on the middle-aged (out only while foragers were short) kept a crowd of them at the hole being put back.
+    return this.band(i) !== 0;
   }
 
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
@@ -716,6 +715,11 @@ export class Colony {
   #climbOut(cx: number, cy: number): number {
     this.#holeX = (this.#entrance as Nest).x;
     return this.#towardHole(cx, cy, false);
+  }
+
+  /** Whether ant i is an inside worker now: underground, carrying nothing, not allowed out (zoned by age). */
+  #staysIn(i: number): boolean {
+    return this.queen !== null && this.#under[i] === 1 && !this.carrying[i] && !this.pellet[i] && !this.#mayGoOut(i);
   }
 
   /** Whether ant i digs: in the side view with a queen, the middle-aged (the young nurse, the old forage); elsewhere, any explorer. */
@@ -1021,7 +1025,9 @@ export class Colony {
       this.digAim[i] = NaN;
     } else {
       const side = this.hand[i] as number;
-      const next = handOnWall(map, cx, cy, dir, side);
+      let next = handOnWall(map, cx, cy, dir, side);
+      // An inside worker at the top of the shaft turns back down rather than step out onto the ground (zoned by age).
+      if (this.#staysIn(i) && isSky(map, stepX(cx, cy, next), stepY(cy, next)) && rockAt(map, stepX(cx, cy, (dir + 3) % 6), stepY(cy, (dir + 3) % 6)) === OPEN) next = (dir + 3) % 6;
       const chamberHere = mode === EXPLORE && this.#entrance && this.#mayDig(cx, cy) && this.#digs(i) && this.crowded() ? (map.chambers?.at(cx, cy) ?? -1) : -1;
       // In a chamber still narrow enough to walk like a tunnel (a new one, a cell or two): widen it along its floor.
       const widen = chamberHere >= 0 && this.#rng() < WIDEN ? this.#widenWay(cx, cy, dir) : -1;
@@ -2363,6 +2369,10 @@ export class Colony {
             if (this.wall[i] !== 0) h = this.#towardTarget(i);
           }
         }
+      } else if (mode === FOLLOW && this.#staysIn(i)) {
+        // An inside worker (zoned by age) doesn't follow a food trail: it leads out, where it may not go. It explores.
+        if (this.#walkTunnel(i, EXPLORE, p.speed * dt)) h = this.#towardTarget(i);
+        else h += noise * p.wander;
       } else if (mode === FOLLOW) {
         if (!digging && this.#walkTunnel(i, FOLLOW, p.speed * dt)) h = this.#towardTarget(i);
         else h += climb(fl, ff, fr, p.turnRate * dt) + noise * p.wander * 0.25;
@@ -2423,7 +2433,7 @@ export class Colony {
       // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say.
       if (face !== NO_FACE && this.#chamberCell[i] >= 0 && mode === EXPLORE && !carrying && !pellet) {
         cellOf(nx, ny);
-        if (this.#chamberCell[i] === (CELL[1] as number) * 65536 + (CELL[0] as number) && rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL) face = DIG_FACE;
+        if (this.#chamberCell[i] === (CELL[1] as number) * 65536 + (CELL[0] as number) && rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL && this.#digs(i)) face = DIG_FACE;
       }
       if (face === DIG_FACE && map.sky) {
         cellOf(nx, ny);
@@ -2617,10 +2627,31 @@ export class Colony {
         if (this.queen && this.#under[i] && !carrying && !pellet && !this.#mayGoOut(i)) {
           this.antCell(i);
           if (isSky(map, CELL[0] as number, CELL[1] as number)) {
+            // Back, and pointed down the shaft (its deepest open neighbour underground), the walker aimed at that cell: only
+            // turning it round left it in the hole, which is no tunnel, steering at random into the sky again and again
+            // (review of slice 6: ants pinned there up to 45 s, a tenth to a fifth of their time).
             this.x[i] = x0;
             this.y[i] = y0;
-            h += Math.PI;
-            this.gx[i] = NO_CELL;
+            cellOf(x0, y0);
+            const bx = CELL[0] as number;
+            const by = CELL[1] as number;
+            let down = -1;
+            let deepest = -Infinity;
+            for (let d = 0; d < 6; d++) {
+              const tx = stepX(bx, by, d);
+              const ty = stepY(by, d);
+              if (rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty) && centreY(ty) > deepest) ((deepest = centreY(ty)), (down = d));
+            }
+            if (down >= 0) {
+              h = DIR_ANGLE[down] as number;
+              this.gdir[i] = down;
+              this.gx[i] = stepX(bx, by, down);
+              this.gy[i] = stepY(by, down);
+            } else {
+              h += Math.PI;
+              this.gx[i] = NO_CELL;
+            }
+            this.#cellAtX[i] = NaN; // its cell is worked out afresh
           }
         }
         this.#integrate(i, x0, y0, atNest);
@@ -2641,7 +2672,7 @@ export class Colony {
       let out = 0;
       for (let k = 0; k < this.n; k++) if (this.alive[k]) this.#under[k] ? under++ : out++;
       this.inNest = under;
-      this.#outside = out;
+      this.outside = out;
     }
     ph.advance(dt);
     // Growth: in the side view, the queen and brood (#nestLife); elsewhere the larder turns into ants while there is room.
@@ -2702,8 +2733,6 @@ const SEARCH_START = 3;
 /** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
 export const YOUNG = 0.15;
 export const MIDDLE = 0.35;
-/** The share of a colony out foraging below which the middle-aged go out too (foragers short). */
-export const FORAGERS = 0.3;
 /** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
 export const REST = 10;
 // The queen and brood (nest slice 4): see #nestLife, #nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
