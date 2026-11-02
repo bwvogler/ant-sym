@@ -34,7 +34,8 @@ export BD_NON_INTERACTIVE=1
 
 GITDIR="$(git rev-parse --absolute-git-dir)"
 STATE="$GITDIR/beads-sync"
-DB=".beads/embeddeddolt/ja"
+DBROOT=".beads/embeddeddolt"   # bd bootstrap treats any non-empty one as an existing database
+DB="$DBROOT/ja"
 REPO_STATE="$DB/.dolt/repo_state.json"
 MANIFEST="$DB/.dolt/noms/manifest"
 # The Dolt remote URL is sync.remote from .beads/config.yaml (git+ssh://…; the cloud
@@ -80,22 +81,59 @@ retry() {
   done
 }
 
+# Clone the shared history: mirror the branch into a local bare repo's refs/dolt/data
+# (where bootstrap looks; Dolt also needs one branch there).
+bootstrap_from_branch() {
+  local M="$STATE/mirror.git"
+  rm -rf "$M" && git init -q --bare "$M"
+  retry git -C "$M" fetch -q "$(git remote get-url origin)" "+$REF:refs/dolt/data" || {
+    echo "beads-sync: could not fetch $REF"; return 1; }
+  git -C "$M" update-ref refs/heads/main refs/dolt/data
+  bootstrap "git+file://$M" || { echo "beads-sync: bootstrap from $BRANCH failed"; return 1; }
+  rm -rf "$M"
+  [ -f "$REPO_STATE" ] || { echo "beads-sync: bootstrap left no database at $DB"; return 1; }
+}
+
+# The local database has its own history (made by bd init or a JSONL import, not cloned
+# from the branch), so it can never merge with the shared one. Adopt the shared one and
+# replay the local issues on top: bd import upserts, skipping rows older than the shared copy.
+adopt() {
+  local ts backup aside
+  ts="$(date +%s)"; backup="$STATE/local-$ts.jsonl"; aside="$STATE/embeddeddolt.local.$ts"
+  echo "beads-sync: this database's history is separate from $BRANCH; adopting $BRANCH and replaying local issues on top"
+  bd export --include-memories -o "$backup" || {
+    echo "beads-sync: could not export the local database; left it as it is"; return 1; }
+  mv "$DBROOT" "$aside"
+  if ! bootstrap_from_branch; then
+    rm -rf "$DBROOT"; mv "$aside" "$DBROOT"; echo "beads-sync: restored the local database"; return 1
+  fi
+  set_ref
+  bd import "$backup" 2>&1 | grep -v -i permissions | tail -3
+  bd dolt push 2>&1 | tail -1   # publish whatever the replay changed; a no-op otherwise
+  echo "beads-sync: the old database is at $aside and its export at $backup"
+}
+
+# Pull with retries; adopt the shared history when the local one is unrelated.
+pull_or_adopt() {
+  local out n=0
+  while :; do
+    out="$(bd dolt pull 2>&1)" && { printf '%s\n' "$out" | tail -1; return 0; }
+    case "$out" in *"no common ancestor"*) adopt; return $?;; esac
+    n=$((n + 1))
+    [ "$n" -ge 4 ] && { printf '%s\n' "$out"; return 1; }
+    sleep $((2 ** n))
+  done
+}
+
 case "$cmd" in
 start|seed)
   remote_sha="$(retry git ls-remote origin "$REF" | cut -f1)"
   if [ ! -f "$REPO_STATE" ]; then
+    # Leftovers without a Dolt repo in them make bd bootstrap report "already exists".
+    [ -d "$DBROOT" ] && mv "$DBROOT" "$STATE/embeddeddolt.empty.$(date +%s)"
     if [ -n "$remote_sha" ]; then
-      # Clone the shared history: mirror the branch into a local bare repo's
-      # refs/dolt/data (where bootstrap looks; Dolt also needs one branch there).
-      M="$STATE/mirror.git"
-      rm -rf "$M" && git init -q --bare "$M"
-      retry git -C "$M" fetch -q "$(git remote get-url origin)" "+$REF:refs/dolt/data" || {
-        echo "beads-sync: could not fetch $REF"; exit 0; }
-      git -C "$M" update-ref refs/heads/main refs/dolt/data
-      bootstrap "git+file://$M" || { echo "beads-sync: bootstrap from $BRANCH failed"; exit 0; }
-      rm -rf "$M"
+      bootstrap_from_branch || exit 0
     else
-      # No shared history yet: start from the git-tracked JSONL; the push below seeds the branch.
       bootstrap || { echo "beads-sync: bootstrap from .beads/issues.jsonl failed"; exit 0; }
     fi
   fi
@@ -105,16 +143,9 @@ start|seed)
     retry bd dolt push || echo "beads-sync: seeding $BRANCH failed"
   elif [ -z "$remote_sha" ]; then
     echo "beads-sync: $BRANCH does not exist on origin; working locally. Run scripts/beads-sync.sh seed to create it."
-  elif [ "$cmd" = seed ]; then
-    echo "beads-sync: $BRANCH already exists; not seeding. Pulled instead."
-    retry bd dolt pull
-  elif ! retry bd dolt pull; then
-    cat <<EOF
-beads-sync: bd dolt pull failed. If it reports divergent histories, this database was
-created separately from the shared one on $BRANCH. To adopt the shared one (issues only
-in the local database are lost unless you re-file them):
-  mv $DB $STATE/ja.local.\$(date +%s) && scripts/beads-sync.sh start
-EOF
+  else
+    [ "$cmd" = seed ] && echo "beads-sync: $BRANCH already exists; not seeding. Pulling instead."
+    pull_or_adopt || echo "beads-sync: bd dolt pull from $BRANCH failed"
   fi
   stamp
   ;;
@@ -131,7 +162,7 @@ push)
   set_ref || exit 1
   for _ in 1 2 3 4; do
     if bd dolt push; then stamp; exit 0; fi
-    bd dolt pull || sleep 2
+    pull_or_adopt || sleep 2
   done
   echo "beads-sync: bd dolt push to $BRANCH failed; run scripts/beads-sync.sh push to retry"
   exit 1
