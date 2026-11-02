@@ -1,5 +1,5 @@
-import { type Channel, Pheromones } from "./pheromone.ts";
-import { CHAMBER_HEIGHT } from "./chambers.ts";
+import { type Channel, type Mark, MARKS, Pheromones } from "./pheromone.ts";
+import { CHAMBER_HEIGHT, type Role } from "./chambers.ts";
 import { TOLERANCE } from "./recognition.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, OPEN, takeLoose, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
@@ -46,13 +46,25 @@ export function trailLevel(v: number): Trail {
   return v >= STRONG ? "strong" : v >= FAINT ? "faint" : "none";
 }
 
+/**
+ * Where an ant is in its nest (nest slice 3): in a tunnel, or in one of its colony's chambers by that chamber's role
+ * (the floor's smell tells it, Heyman et al. 2017). The side view's underground; on the ground, and on the top-down
+ * maps, the home trail's level stands in its place.
+ */
+export const PLACES = ["tunnel", ...MARKS] as const;
+export type Place = (typeof PLACES)[number];
+/** The situation's home field: the home trail ahead (on the ground), or where in the nest the ant is. */
+export const HOMES = [...TRAILS, ...PLACES] as const;
+export type Home = (typeof HOMES)[number];
+
 /** What a mode choice may depend on: few values, so an answer can be cached per situation. Carrying ants are never asked: they go home. */
 export interface Situation {
   mode: Mode;
   /** out longer than the colony's patience without finding food */
   tired: boolean;
   foodTrail: Trail;
-  homeTrail: Trail;
+  /** on the ground: the home trail ahead; inside the nest (side view): where it is, a tunnel or a chamber's role */
+  homeTrail: Home;
   alarm: Trail;
   /** an ant of another colony within two cells */
   enemy: "none" | "near";
@@ -218,6 +230,11 @@ export class Colony {
   #chamberFor: Int16Array;
   /** ants underground last tick (the side view): with the chambers' floor, how crowded the nest is */
   inNest = 0;
+  // Floor marks (nest slice 3): the role of the last chamber each ant was in (MARKS index + 1; 0 none), and seconds since.
+  #lastRole: Uint8Array;
+  #sinceRole: Float32Array;
+  /** seconds an ant has rested at home in "return" (see REST) */
+  #restT: Float32Array;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
   #belief: Nest = { x: 0, y: 0, r: 0 };
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
@@ -418,6 +435,9 @@ export class Colony {
     this.#groundRef = new Float64Array(n).fill(NaN);
     this.#chamberCell = new Int32Array(n).fill(-1);
     this.#chamberFor = new Int16Array(n);
+    this.#lastRole = new Uint8Array(n);
+    this.#sinceRole = new Float32Array(n);
+    this.#restT = new Float32Array(n);
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -509,6 +529,9 @@ export class Colony {
     this.#under[i] = 1;
     this.#groundMin[i] = NaN;
     this.#chamberCell[i] = -1;
+    this.#lastRole[i] = 0; // born in the royal chamber: it lays royal once it has been there a tick
+    this.#sinceRole[i] = 0;
+    this.#restT[i] = 0;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
@@ -813,6 +836,10 @@ export class Colony {
       // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.
       // Homing with no progress for TUNNEL_STALL seconds: the way that points most nearly home, by its home vector.
       const field = mode === RETURN ? this.ph.fields.home : this.ph.fields.food;
+      // Underground in the side view, homing follows the road signs of where it is going (its chamber's mark); the home
+      // trail only where there are none.
+      const signs = mode === RETURN && this.#entrance && !isSky(map, cx, cy) ? this.ph.fields[this.#destMark(i)] : null;
+      const signGain = SIGN_WEIGHT * (this.gainHome[i] as number); // the fungus's home lever bends road signs as it does the home trail
       const byVector = mode === RETURN && (this.stallT[i] as number) > TUNNEL_STALL;
       const hx = this.#goalX - centreX(cx, cy);
       const hy = this.#goalY - centreY(cy);
@@ -823,7 +850,7 @@ export class Colony {
         const tx = stepX(cx, cy, d);
         const ty = stepY(cy, d);
         if (rockAt(map, tx, ty) !== OPEN) continue;
-        const v = byVector ? Math.cos(DIR_ANGLE[d] as number) * hx + Math.sin(DIR_ANGLE[d] as number) * hy : field.get(tx, ty);
+        const v = byVector ? Math.cos(DIR_ANGLE[d] as number) * hx + Math.sin(DIR_ANGLE[d] as number) * hy : (signs ? signs.get(tx, ty) * signGain : 0) + field.get(tx, ty);
         if (v > bestV) {
           bestV = v;
           best = d;
@@ -934,7 +961,7 @@ export class Colony {
     let id = (this.#chamberFor[i] as number) - 1;
     if (id < 0) {
       if (!this.#chamberRoom(x, y, y - groundTop(this.map, x))) return; // another was started near it meanwhile: a tunnel stub
-      id = ch.add(this.params.nest, y).id;
+      id = ch.add(this.params.nest, y, this.#roleFor(x, y)).id;
     }
     ch.claim(id, x, y, open);
   }
@@ -1175,6 +1202,66 @@ export class Colony {
     this.search[i] = s === 0 ? SEARCH_START * (this.#rng() < 0.5 ? -1 : 1) : Math.max(-SEARCH_MAX, Math.min(SEARCH_MAX, -s * SEARCH_GROW));
     this.wall[i] = 0;
     this.mx[i] = NaN;
+  }
+
+  /** The situation's home field for ant i: the home trail ahead (sensor readings hl, hf, hr), or, underground in the side view, where it is. */
+  #homeField(i: number, hl: number, hf: number, hr: number): Home {
+    if (this.#entrance) {
+      this.antCell(i);
+      const cx = CELL[0] as number;
+      const cy = CELL[1] as number;
+      if (!isSky(this.map, cx, cy)) return this.#placeAt(cx, cy) ?? "tunnel";
+    }
+    return trailLevel(Math.max(hl, hf, hr));
+  }
+
+  /** The role of this colony's chamber at cell (x, y) (a role-less or another colony's chamber reads as tunnel), or null if in none. */
+  #placeAt(x: number, y: number): Mark | null {
+    const ch = this.map.chambers;
+    const id = ch ? ch.at(x, y) : -1;
+    if (id < 0) return null;
+    const c = ch!.list[id]!;
+    return c.colony === this.params.nest && c.role !== "none" ? c.role : null;
+  }
+
+  /**
+   * Floor marks (nest slice 3): underground, ant i lays the mark of the last chamber it was in, fainter the longer since
+   * (as walking out lays home trail), so every tunnel smells of what lies back along it: road signs at each junction.
+   */
+  #layMark(i: number, dt: number): void {
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    if (isSky(this.map, cx, cy)) {
+      this.#lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
+      return;
+    }
+    const role = this.#placeAt(cx, cy);
+    if (role) {
+      this.#lastRole[i] = MARKS.indexOf(role) + 1;
+      this.#sinceRole[i] = 0;
+    } else this.#sinceRole[i] = (this.#sinceRole[i] as number) + dt;
+    const r = this.#lastRole[i] as number;
+    if (r === 0) return;
+    const laid = this.params.deposit * Math.exp(-(this.#sinceRole[i] as number) / MARK_DECAY) * dt * (this.layGain[i] as number);
+    if (laid > 1e-4) this.ph.depositCell(MARKS[r - 1] as Mark, cx, cy, laid);
+  }
+
+  /** Where ant i heads when it homes into the nest (the chamber it reads its road signs for): royal, the queen's, for now (slice 5: carriers to reception). */
+  #destMark(_i: number): Mark {
+    return "royal";
+  }
+
+  /** The role a new chamber at (x, y) takes: the colony's first one well above the royal chamber is reception; below it, store; else brood. */
+  #roleFor(x: number, y: number): Role {
+    const ch = this.map.chambers!;
+    const mine = ch.list.filter((c) => c.colony === this.params.nest && c.cells > 0);
+    const royal = mine.find((c) => c.role === "royal");
+    if (!royal) return "brood";
+    if (y < royal.floorRow - RECEPTION_ABOVE && !mine.some((c) => c.role === "reception")) return "reception";
+    if (y > royal.floorRow + STORE_BELOW) return "store";
+    void x;
+    return "brood";
   }
 
   /**
@@ -1609,7 +1696,7 @@ export class Colony {
       } else {
         const tired = (this.since[i] as number) > p.patience * (this.clock[i] as number);
         const food = trailLevel(Math.max(fl, ff, fr));
-        const home = trailLevel(Math.max(hl, hf, hr));
+        const home = this.#homeField(i, hl, hf, hr);
         const alarm = trailLevel(Math.max(al, af, ar));
         const enemy = toEnemy === null ? 0 : 1;
         const stance = STANCES.indexOf(this.stance);
@@ -2042,13 +2129,22 @@ export class Colony {
           h += Math.PI;
         }
         this.since[i] = 0;
+        // Home and resting in "return" (its policy said so, or a cached answer did: ja-qnx): after REST seconds it is
+        // rested, and asked afresh as an explorer. Going home is done once home; nothing else sends a rested ant out.
+        if (mode === RETURN && !carrying && !pellet && (this.#restT[i] = (this.#restT[i] as number) + dt) > REST) {
+          this.mode[i] = EXPLORE;
+          this.#asked[i] = -1;
+          this.#restT[i] = 0;
+        }
       } else this.since[i] = (this.since[i] as number) + dt;
+      if (!atNest) this.#restT[i] = 0;
       if (ent) {
         this.#integrate(i, x0, y0, atNest);
         // Road signs: underground, a strong nest trail where it stands tells it where it is, and its memory's error fades
         // (Heyman et al. 2017; slice 3 gives each chamber its own mark). Outside, the hole's sight and smell do it (#believe).
         // Read on the floor where it stands (a road sign is under its antennae; the sensors ahead are often in soil in a tunnel).
-        if (this.#under[i] && ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
+        if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
+        if (this.map.chambers) this.#layMark(i, dt);
       }
       this.heading[i] = h;
     }
@@ -2063,8 +2159,8 @@ export class Colony {
   }
 }
 
-/** Every situation a mode choice can be asked in: mode × tired × food × home × alarm × enemy × stance = 4 × 2 × 3 × 3 × 3 × 2 × 3 = 1,296. */
-export const SITUATIONS = MODES.length * 2 * TRAILS.length ** 3 * 2 * STANCES.length;
+/** Every situation a mode choice can be asked in: mode × tired × food × home × alarm × enemy × stance = 4 × 2 × 3 × 9 × 3 × 2 × 3 = 3,888 (home: 3 trail levels or 6 places in the nest). */
+export const SITUATIONS = MODES.length * 2 * TRAILS.length * HOMES.length * TRAILS.length * 2 * STANCES.length;
 
 /** A situation from its index in SITUATIONS: the inverse of encode. */
 export function decode(code: number): Situation {
@@ -2075,8 +2171,8 @@ export function decode(code: number): Situation {
   c = Math.floor(c / 2);
   const alarm = TRAILS[c % 3] as Trail;
   c = Math.floor(c / 3);
-  const homeTrail = TRAILS[c % 3] as Trail;
-  c = Math.floor(c / 3);
+  const homeTrail = HOMES[c % HOMES.length] as Home;
+  c = Math.floor(c / HOMES.length);
   const foodTrail = TRAILS[c % 3] as Trail;
   c = Math.floor(c / 3);
   const tired = c % 2 === 1;
@@ -2088,8 +2184,8 @@ export function encodeSituation(s: Situation): number {
   return encode(MODES.indexOf(s.mode), s.tired, s.foodTrail, s.homeTrail, s.alarm, s.enemy === "near" ? 1 : 0, STANCES.indexOf(s.stance));
 }
 
-function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: Trail, enemy: number, stance: number): number {
-  return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
+function encode(mode: number, tired: boolean, food: Trail, home: Home, alarm: Trail, enemy: number, stance: number): number {
+  return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * HOMES.length + HOMES.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
 }
 
 /** Seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round). */
@@ -2111,6 +2207,16 @@ export const PI_DRIFT = 0.1;
 export const HOLE_SIGHT = 6;
 /** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one this much wider, to at most SEARCH_MAX. */
 const SEARCH_START = 3;
+/** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
+export const REST = 10;
+// Floor marks (nest slice 3): see #layMark, #destMark, #roleFor.
+/** Marks are laid at the colony's trail deposit per second just out of a chamber, falling to 1/e after MARK_DECAY seconds away from it. */
+const MARK_DECAY = 30;
+/** How much more a homing ant in a tunnel goes by its destination's mark than by the home trail. */
+const SIGN_WEIGHT = 4;
+/** A new chamber this many rows above the royal one may be the reception (the colony's first); this many below, a store. */
+const RECEPTION_ABOVE = 4;
+const STORE_BELOW = 2;
 // Chambers (nest slice 2): see crowded(), #widenWay, #newChamberWay.
 /** Floor cells a nest keeps per ant underground: below it the nest is crowded and digs (Odontomachus ~2 cm² per worker, at the sim's scale). */
 export const FLOOR_PER_ANT = 0.1;

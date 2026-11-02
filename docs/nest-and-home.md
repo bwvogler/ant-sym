@@ -86,7 +86,7 @@ The side view keeps its entrance, shaft, walkway and mound. The founding chamber
    - **drawn to brood:** a chamber grows where brood lies.
 
    The depth profile should come out top-heavy, with gaps between chambers growing with depth. That is the check against Tschinkel.
-3. **Roles and road signs.**
+3. **Roles and road signs.** *Built in slice 3 (PRD §32).*
    - Each chamber has a role:
      - **royal:** the queen and eggs; the founding chamber;
      - **brood:** larvae and pupae;
