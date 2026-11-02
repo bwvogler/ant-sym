@@ -8,7 +8,8 @@ import { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { CountGrid, occupancy } from "../battle.ts";
 import { MARKS } from "../pheromone.ts";
-import { generateSideWorld, generateWorld, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../world.ts";
+import { MAX_MASK, Recognition } from "../recognition.ts";
+import { digCell, generateSideWorld, generateWorld, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../world.ts";
 
 // Nest slice 8 (docs/nest-and-home.md §4): the fungus on the new home. Its ground is the nest's places; it can blunt
 // or swap a host's floor marks (muddle); a lethal strain-gated crown kills the queen and brood; a Bloom host's corpse
@@ -36,11 +37,47 @@ test("the fungus's ground in the side view: its own chamber, its own tunnels, th
   place(3, map.nests[1]!.x, map.nests[1]!.y); // the rival's chamber
   place(4, map.nests[1]!.entrance!.x, map.nests[1]!.entrance!.y + 2); // the rival's shaft (review of slice 8: read as its own tunnel)
   b.x[0] = map.nests[1]!.x + 50; // far away
-  for (let i = 0; i < 5; i++) ((a.load[i] = 0.5), (a.strain[i] = GARDEN));
+  // Each nest's shaft smells of its colony (whose tunnel it is: review of #27, by the scent there, not the nearest hole).
+  for (const [c, n] of [[a, 0], [b, 1]] as const) {
+    cellOf(map.nests[n]!.entrance!.x, map.nests[n]!.entrance!.y + 2);
+    c.ph.depositCell("home", CELL[0] as number, CELL[1] as number, 5);
+  }
+  for (let i = 0; i < 5; i++) {
+    a.load[i] = 0.5;
+    a.strain[i] = GARDEN;
+  }
   const f = new Fungus(map, { grooming: 0 });
   f.hosts = 5;
   f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6);
   assert.deepEqual([0, 1, 2, 3, 4].map((i) => decodeFungal(a.fungal[i]!, "garden").ground), ["home", "tunnel", "border", "foreign", "foreign"]);
+});
+
+test("whose tunnel a host is in is the scent where it stands: any number of colonies, not the nearest hole", () => {
+  // Review of #27: tunnel ownership compared the host's column with every nest's hole (map-wide, and wrong for a nest's
+  // tunnels that reach nearer another's hole, or for several holes per colony).
+  const map = generateSideWorld(2, { ...SMALL, nestCount: 3, nestGap: 70 });
+  const cols = map.nests.map((n) => (cellOf(n.entrance!.x, n.entrance!.y), CELL[0] as number));
+  const [a, b, c] = [0, 1, 2].map((k) => new Colony(map, { antCount: 1, maxAnts: 1, nest: k }, mulberry32(10 + k))) as [Colony, Colony, Colony];
+  // A tunnel of a's, dug 70 % of the way toward b's hole, 4 rows under the ground: nearer b's hole than a's.
+  const x = Math.round(cols[0]! + 0.7 * (cols[1]! - cols[0]!));
+  const y = walkway(map, x) + 5;
+  digCell(map, x, y);
+  a.ph.depositCell("home", x, y, 5);
+  for (const k of [a, b, c]) {
+    k.x[0] = centreX(x, y);
+    k.y[0] = centreY(y);
+    k.load[0] = 0.5;
+    k.strain[0] = GARDEN;
+  }
+  const ground = () => {
+    const f = new Fungus(map, { grooming: 0 });
+    f.hosts = 3;
+    f.step([a, b, c], [a, b, c].map((k) => occupancy(k, new CountGrid())), 1e-6);
+    return [a, b, c].map((k) => decodeFungal(k.fungal[0]!, "garden").ground);
+  };
+  assert.deepEqual(ground(), ["tunnel", "foreign", "foreign"], "a's tunnel: a's own, a stranger's to b and to a third colony");
+  b.ph.depositCell("home", x, y, 20); // b's ants have walked it far more since
+  assert.deepEqual(ground(), ["foreign", "tunnel", "foreign"]);
 });
 
 test("muddle: a host misreads its floor marks: in a brood chamber it is asked as in a store; blunted, it can't tell", () => {
@@ -92,35 +129,57 @@ test("crown (lethal, Bloom's, off by default): a host by the queen kills her and
   assert.ok(INTERVENTIONS.some((v) => v.id === "muddle") && !LETHAL.has("muddle"));
 });
 
+test("crown below a high load: a lightly loaded host by the queen kills her too, in minutes", () => {
+  // Review of #27: crown acted only from a high load (0.7), which grooming takes Bloom's hosts below within seconds; in a
+  // game no queen died. A host at 0.2 (what the UI brush doses, a little more) kills her at a fifth of the rate.
+  const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
+  const c = new Colony(map, { antCount: 1, maxAnts: 2 }, mulberry32(4), () => "explore");
+  const f = new Fungus(map);
+  f.express(c, 0, intervention("crown"), 0.2);
+  let t = 0;
+  for (; t < 900 && !c.orphaned; t += 1 / 30) {
+    c.x[0] = c.queen!.x;
+    c.y[0] = c.queen!.y;
+    c.tick(1 / 30);
+  }
+  assert.ok(c.orphaned, "the queen is dead");
+  assert.ok(t > 5, `not at once: ${t.toFixed(0)} s`);
+});
+
 test("on the midden a Bloom host's corpse sporulates; a Garden host's doesn't", () => {
   const spores = (strain: number) => {
     const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
     const g = new Game(map, { antCount: 60, rival: false }, mulberry32(5));
     const c = g.player;
-    const k = { x: 0, y: 0, held: -1, midden: true, died: 0, load: 0.8, strain, spored: false };
+    const k = { x: 0, y: 0, held: -1, died: 0, load: 0.8, strain };
     cellOf(map.nest.entrance!.x + 12, map.nest.entrance!.y);
     k.x = CELL[0] as number;
     k.y = walkway(map, k.x);
-    c.corpses.push(k);
-    g.tick(1 / 30);
-    assert.ok(k.spored, "looked at once");
+    assert.ok(c.onBury, "the game hears of each burial");
+    c.onBury!(k); // as #dropOut does when an undertaker puts it on the midden
     return g.fungus.spores.get(k.x, k.y);
   };
   assert.ok(spores(BLOOM) > 0, "Bloom");
   assert.equal(spores(GARDEN), 0, "Garden");
 });
 
-test("crown takes hold only from a high load; muddle and crown are offered only where there is a nest", () => {
+test("crown grows with a host's load; muddle and crown are offered only where there is a nest", () => {
   const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
   const c = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(4));
   const f = new Fungus(map);
-  f.express(c, 0, intervention("crown"), 0.5); // "mid"
-  assert.equal(c.regicide[0], 0, "not from a mid load (review: it acted from 0.35)");
+  // Review of #27: from a high load only, grooming took every host below it within seconds and no queen died in a game.
+  // Now it is the spores a host passes on as it tends her: a lighter host is likelier to fail, not unable.
+  f.express(c, 0, intervention("crown"), 0.2);
+  assert.ok(Math.abs(c.regicide[0]! - 0.2) < 1e-6, "a low load crowns at a fifth of the rate");
   f.express(c, 0, intervention("crown"), 0.75);
-  assert.equal(c.regicide[0], 1);
+  assert.ok(Math.abs(c.regicide[0]! - 0.75) < 1e-6);
+  f.express(c, 0, intervention("share"), 0.75);
+  assert.equal(c.regicide[0], 0, "only crown kills");
   assert.ok(f.menu.has("muddle"));
   f.menu = new Set([...f.menu, "crown"]);
   assert.ok(f.menu.has("crown"));
+  f.menu.add("cull"); // a copy (review of #27: adding to the live set skipped the NEST_ONLY filter)
+  assert.ok(!f.menu.has("cull"), "the menu getter hands out a copy");
   const top = new Fungus(generateWorld(2));
   assert.ok(!top.menu.has("muddle"), "the top-down maps have no chambers to muddle");
   top.configure({ hide: false, cull: false }, ["dormant", "muddle", "crown", "cull"]);
@@ -167,4 +226,47 @@ test("a host's corpse keeps its load and strain; a muddled ant reads no road sig
   const muddled = run(0.3);
   assert.ok(clear < 9.5, `the sign is read: ${clear.toFixed(2)}`);
   assert.ok(muddled > clear + 0.3, `muddled, it fades less: ${muddled.toFixed(2)} vs ${clear.toFixed(2)}`);
+});
+
+test("the nest's odour drifts toward hosts in its royal chamber, wherever in it they stand, and not toward hosts elsewhere", () => {
+  // Review of #27: recognition's royal-chamber rule (nest slice 8) had no test; reverting it to the old disc passed.
+  const drift = (where: "royal" | "brood" | "disc") => {
+    const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
+    const ch = map.chambers!;
+    const royal = ch.list.find((k) => k.role === "royal")!;
+    const open = (x: number, y: number) => rockAt(map, x, y) === OPEN;
+    cellOf(map.nest.x, map.nest.y);
+    const [nx0, ny0] = [CELL[0] as number, CELL[1] as number];
+    // Cells along the royal chamber's floor row, 8–11 columns east of the nest's centre: past the old disc (r 3).
+    const cells: [number, number][] = [];
+    const row = royal.floorRow;
+    for (let x = nx0 + 8; x <= nx0 + 11; x++) {
+      digCell(map, x, row);
+      cells.push([x, row]);
+    }
+    if (where === "royal") for (const [x, y] of cells) ch.claim(royal.id, x, y, open);
+    else if (where === "brood") {
+      const brood = ch.add(0, row, "brood");
+      for (const [x, y] of cells) ch.claim(brood.id, x, y, open);
+    } else {
+      // In the old disc, but out of the royal chamber (a cave-in took those cells out of it).
+      cells.length = 0;
+      for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, -1]] as const) {
+        ch.release(nx0 + dx, ny0 + dy);
+        cells.push([nx0 + dx, ny0 + dy]);
+      }
+    }
+    const c = new Colony(map, { antCount: cells.length, maxAnts: cells.length }, mulberry32(8), () => "explore");
+    cells.forEach(([x, y], i) => {
+      c.x[i] = centreX(x, y);
+      c.y[i] = centreY(y);
+      c.mask[i] = MAX_MASK;
+    });
+    const rec = new Recognition();
+    for (let k = 0; k < 600; k++) rec.step([c], 0.1);
+    return c.nestOdour;
+  };
+  assert.ok(drift("royal") > 0.2, `hosts in the royal chamber, outside the old disc: ${drift("royal").toFixed(3)}`);
+  assert.equal(drift("brood"), 0, "hosts in a brood chamber leave the nest's odour be");
+  assert.equal(drift("disc"), 0, "hosts in the old disc, out of the royal chamber, too");
 });

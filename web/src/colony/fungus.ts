@@ -159,7 +159,7 @@ export interface FungusParams {
   interval: number;
   /** a host counts as groomed when its nestmates take load off it at this rate per second or more */
   groomedAt: number;
-  /** ground is home (or foreign) where that colony's home scent is at least this many times the other's; else border */
+  /** ground is home (or foreign) where a colony's home scent is at least this many times the strongest other's (or another's than its own); else border. In the side view, the same test says whose tunnel a host is in. */
   borderRatio: number;
 }
 
@@ -278,8 +278,9 @@ export class Fungus {
   rule: FungusRule = { ...DEFAULT_RULE };
   /** the interventions the player has on (§5.1, lever 4): lethal ones start off; the nest's (NEST_ONLY) only where there is a nest */
   #menu: Set<string> = new Set(INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)));
+  /** A copy: adding to it changes nothing (review of #27: adding "crown" to the live set skipped the NEST_ONLY filter). Set it to change the menu. */
   get menu(): Set<string> {
-    return this.#menu;
+    return new Set(this.#menu);
   }
   set menu(menu: Iterable<string>) {
     // On the top-down maps there are no chambers or queen: muddle and crown would do nothing (review of nest slice 8).
@@ -428,14 +429,20 @@ export class Fungus {
           const ns = this.strains[strain] as Strain;
           let ground: Ground = "border";
           const ch = this.map.chambers;
+          // Whose scent is on the host's cell: its own colony's home scent against the strongest of any other colony's
+          // (any number of colonies; local, like everything the fungus senses: PRD §20).
+          const own = c.ph.fields.home.get(cx, cy);
+          let theirs = 0;
+          for (const o of colonies) if (o !== c) theirs = Math.max(theirs, o.ph.fields.home.get(cx, cy));
+          if (c.foreign) theirs = Math.max(theirs, c.foreign.fields.home.get(cx, cy)); // (a colony stepped alone with a rival's scent set)
           if (ch && this.map.sky) {
-            // The side view (nest slice 8): its own chamber, its own nest's tunnels, the open ground, another's chamber.
+            // The side view (nest slice 8): its own chamber, its own nest's tunnels, the open ground, another's chamber
+            // or tunnels. A chamber is its colony's; a tunnel is whose scent it carries (review of #27: the nearest hole,
+            // map-wide knowledge, which nest-and-home's polydomy would break; an unscented tunnel is its own).
             const at = ch.at(cx, cy);
             if (at >= 0) ground = ch.list[at]!.colony === c.params.nest ? "home" : "foreign";
-            else if (this.map.sky.get(cx, cy) !== 1) ground = this.#nearestHole(cx) === c.params.nest ? "tunnel" : "foreign"; // review: a rival's shaft read as its own
+            else if (this.map.sky.get(cx, cy) !== 1) ground = own >= p.borderRatio * theirs ? "tunnel" : theirs >= p.borderRatio * own ? "foreign" : "border";
           } else {
-            const own = c.ph.fields.home.get(cx, cy);
-            const theirs = c.foreign ? c.foreign.fields.home.get(cx, cy) : 0;
             if (own > 0 && own >= p.borderRatio * theirs) ground = "home";
             else if (theirs > 0 && theirs >= p.borderRatio * own) ground = "foreign";
           }
@@ -584,7 +591,7 @@ export class Fungus {
    */
   #shows(c: Colony, i: number, s: number): number {
     const v = (this.strains[s] as Strain).visibility;
-    return c.expr[i] === 0 && (c.fungal[i] as number) >= 0 && this.menu.has("dormant") ? v * DORMANT_SHOW : v;
+    return c.expr[i] === 0 && (c.fungal[i] as number) >= 0 && this.#menu.has("dormant") ? v * DORMANT_SHOW : v;
   }
 
   /** The player's settings: the local rule's thresholds and the menu (§5.1, levers 4 and 5). */
@@ -598,26 +605,9 @@ export class Fungus {
     return localFungusRule(this.rule)(s);
   }
 
-  /** The nest whose hole is nearest column x (underground: whose tunnels these are). */
-  #nearestHole(x: number): number {
-    // Each hole's column, once (cellOf writes the shared CELL, which the step is reading).
-    this.#holeCols ??= this.map.nests.map((n) => (n.entrance ? Math.round(n.entrance.x) : NaN));
-    let best = -1;
-    let d = Infinity;
-    this.#holeCols.forEach((hx, k) => {
-      const dk = Math.abs(hx - x);
-      if (dk < d) {
-        d = dk;
-        best = k;
-      }
-    });
-    return best;
-  }
-  #holeCols: number[] | null = null;
-
   /** What a host of strain s may run: what the strain allows and the menu has on. */
   offered(s: number): string[] {
-    return (this.strains[s] as Strain).allows.filter((id) => this.menu.has(id));
+    return (this.strains[s] as Strain).allows.filter((id) => this.#menu.has(id));
   }
 
   /**
@@ -661,8 +651,9 @@ export class Fungus {
     c.estrange[i] = v.estrange * Math.min(1, l / HIGH_LOAD);
     c.gainMarks[i] = 1 + (v.marks - 1) * l;
     c.swapMarks[i] = v.swap * l;
-    // Regicide, like cull, is all or nothing: from a high load.
-    c.regicide[i] = l >= HIGH_LOAD ? v.regicide : 0; // from a high load only (review: min(1, l / HIGH) acted from 0.35)
+    // Regicide grows with the load, like the perception levers: the spores a host passes to the queen and brood it tends
+    // (review of #27: from a high load only, grooming took every host below it within seconds, and no queen died).
+    c.regicide[i] = v.regicide * l;
   }
 
   /** How far the fungus is into colony c, and how far c has answered it. */

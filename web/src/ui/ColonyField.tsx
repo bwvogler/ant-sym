@@ -50,13 +50,13 @@ function odourColour(ink: [number, number, number], warn: [number, number, numbe
   return `rgb(${m(0)}, ${m(1)}, ${m(2)})`;
 }
 
-/** The warm tone the picture heatmap uses for "too many": here, the way home. */
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
 const HEX_ZOOM = 12;
+/** The warm tone the picture heatmap uses for "too many": here, the way home. */
 const HOME_RGB: [number, number, number] = [196, 110, 40];
-/** Chamber washes by role (nest slice 3), faint enough to read in both themes: the queen's violet, brood rose, store gold, reception teal, midden grey. */
 /** Brood by stage (egg, larva, pupa): pale to tan, legible on the chamber washes in both themes. */
 const BROOD_RGB = ["#f2eee2", "#e8cf8a", "#b88a4a"];
+/** Chamber washes by role (nest slice 3), faint enough to read in both themes: the queen's violet, brood rose, store gold, reception teal, midden grey. */
 const ROLE_RGB: Record<string, [number, number, number]> = { royal: [128, 84, 176], brood: [196, 96, 120], store: [196, 156, 48], reception: [48, 150, 150], midden: [120, 120, 110] };
 /** At or above this zoom (device px per cell) a brush paints its own radius; zoomed further out it widens to match. */
 const BRUSH_ZOOM = 6;
@@ -492,6 +492,20 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
           ctx.lineTo(x + bd, y + bd);
           ctx.moveTo(x + bd, y - bd);
           ctx.lineTo(x - bd, y + bd);
+        }
+        // The midden keeps a count per cell: one cross a cell, larger the more lie there.
+        for (const [key, n] of col.midden) {
+          const mx = key % 65536;
+          const my = Math.floor(key / 65536);
+          const wx = centreX(mx, my);
+          const wy = centreY(my);
+          if (!inView(wx, wy)) continue;
+          const [x, y] = toScreen(c, v, wx, wy);
+          const s = bd * Math.min(3, 1 + Math.log2(n) / 3);
+          ctx.moveTo(x - s, y - s);
+          ctx.lineTo(x + s, y + s);
+          ctx.moveTo(x + s, y - s);
+          ctx.lineTo(x - s, y + s);
         }
         ctx.stroke();
         if (col.queen && inView(col.queen.x, col.queen.y)) {

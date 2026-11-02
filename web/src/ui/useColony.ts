@@ -66,10 +66,12 @@ export interface SideStats {
   resist: number;
   /** soil cells dug */
   dug: number;
-  /** pellets of it on the mound */
+  /** pellets of it brought out to the mound */
   mound: number;
-  /** pellets put back into unused space underground (dug ones, and in the side view loose ones off the mound) */
+  /** pellets of it put back into unused space underground: dug = mound + filled + pellets in jaws + pellets lost with ants that died */
   filled: number;
+  /** the side view: loose pellets taken off the mound and put back underground (soil already counted on the mound, moved again) */
+  refilled: number;
 }
 
 export interface ColonyStats {
@@ -110,7 +112,7 @@ function seenTogether(colonies: readonly Colony[]): number {
 
 function side(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled + c.looseFilled };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */

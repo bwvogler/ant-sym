@@ -69,10 +69,15 @@ export function readIntervention(answers: Record<string, JevAnswer>, id: string,
   return offered.includes(a.choice) ? a.choice : null;
 }
 
-/** What a cached answer was asked under: a different aim, legend, intervention wording or question wording is a different cache (the menu is in each key). */
-export function fungusContext(aim: string): string {
+/**
+ * What a cached answer was asked under: a different aim, legend, intervention wording or question wording is a different
+ * cache (the menu is in each key). So is the view: `home` is one of the host's own chambers in the side view and
+ * home-scented ground on a top-down map, so the same situation is a different place (review of #27: Garden's answers
+ * crossed views). The top-down maps keep the context they had.
+ */
+export function fungusContext(aim: string, view: "top" | "side" = "top"): string {
   const blurbs = INTERVENTIONS.map((v) => `${v.id}:${v.name}:${v.blurb}`).join("\n");
-  return `fungus-v${FUNGUS_BRAIN_VERSION}-${hash(FUNGUS_LEGEND + JSON.stringify(interventionQuestion("h0", ["x"])) + blurbs + "\u0000" + aim.trim())}`;
+  return `fungus-v${FUNGUS_BRAIN_VERSION}${view === "side" ? "-side" : ""}-${hash(FUNGUS_LEGEND + JSON.stringify(interventionQuestion("h0", ["x"])) + blurbs + "\u0000" + aim.trim())}`;
 }
 
 /** Aims to start from: the player's words for what the fungus wants. */
