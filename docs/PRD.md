@@ -1671,3 +1671,65 @@ All are fixed above. Measuring the fixes showed that 15 s give-ups left corpses 
 **Not built:** a deep midden chamber (*Atta cephalotes*). The `midden` role exists, but no chamber is given it.
 
 **Jev cost:** unchanged.
+
+## 37. The fungus on the new home (nest slice 8, ja-iox, 2026-11-02)
+
+The nest gives the fungus new levers (docs/nest-and-home.md §4). Everything here is side view only. The top-down maps keep the home-field ground.
+
+**Ground.** A host's ground is now where it stands in the nest:
+- `home`: one of its own colony's chambers;
+- `tunnel`: its own nest's tunnels and shafts;
+- `border`: the open ground;
+- `foreign`: another colony's chamber.
+
+This replaces the home-field ratio. It makes 4 × 4 × 3 × 4 × 2 = 384 situations per strain, up from 288. I left out a chamber role per ground value: it would multiply situations by five, and the in-nest field (§32) already tells the ants.
+
+**Two new interventions:**
+- **`muddle`** (Lockpick; not lethal). The host smells its floor marks at 0.3 of their strength, so at full load it can't tell which chamber it is in and follows road signs weakly. It also swaps brood and store, both in the situation it is asked in and in the signs it follows home. This is the nest's "roam".
+- **`crown`** (Bloom; lethal, off the menu by default, like cull). From a high load, a host by the queen kills her, and a host by a brood item kills it, each with chance `CROWN_RATE` (0.05) a second. The queen's death orphans the colony (§33). The first cut killed at once; spores painted on the royal chamber then orphaned the colony in its first second.
+
+**The midden.** An infected corpse carries its load and strain. Put on the midden by a strain that sporulates (Bloom, `sporulates`), it puts spores on the ground there (`MIDDEN_SPORES` 3). Other strains die with their host: carrying them out is hygiene.
+
+**Nest odour** still drifts toward the ants in the nest's disc. In the side view that disc is the founding chamber, which is the royal one (§32), so no change was needed.
+
+**`FUNGUS_BRAIN_VERSION`** is 4. The legend says what each ground is.
+
+**Measured.** The §22 rerun is against §29's baseline: Garden painted 4× on each chamber, 300 + 300 ants, 10 sim-minutes.
+
+| World | Seed | No fungus: lost | Garden: unified at | Garden: lost | Infected | Ants at 10 min |
+|---|---|---|---|---|---|---|
+| side | 1 | 21 / 31 | 108 s | 0 / 0 | 100 / 91 % | 450 / 401 |
+| side | 2 | 35 / 37 | 103 s | 0 / 0 | 92 / 98 % | 433 / 450 |
+| side | 3 | 51 / 72 | 103 s | 0 / 0 | 68 / 66 % | 450 / 450 |
+
+- Garden still unifies, at the same times (103–108 s against 108–112 s), with no deaths.
+- Without the fungus the colonies now lose 21–72 ants each, where §29 lost none: raids reach the other nest since slice 7 (§36). So Garden's peace is now worth something.
+
+**Crown and muddle in a game.** Neither is chosen by the local rule, only by Jev, so a scripted policy stands in. Colony 1 is painted 4× at its hole; 300 + 300 ants; 10 minutes.
+
+| Seed | Bloom, share: births / ants left | Bloom, crown at high load at home: orphaned at / brood killed / births / ants left | Lockpick: soothe / muddle, food home |
+|---|---|---|---|
+| 1 | 168 / 424 | 17 s / 15 / 1 / 195 | 939 / 1,103 |
+| 2 | 183 / 437 | 23 s / 18 / 3 / 270 | 1,102 / 1,400 |
+| 3 | 187 / 433 | 12 s / 5 / 1 / 236 | 1,781 / 1,760 |
+
+- **Crown is decisive and quick.** A new colony is one chamber, so hosts by the queen are many from the start. An orphaned colony dwindles: 195–270 ants at ten minutes against ~430. Filed: whether crown should wait for something, such as a host's time at high load or the queen's guards.
+- **Muddle shows no cost in food** (within seed noise). A likely reason, not yet measured: foragers home by the vector and the hole outside, and inside the home trail backs up the blunted signs.
+
+**Bench** (side view, 1,200 + 1,200 ants): 7.3 ms a tick, against 7.0 ms.
+
+**Tests:** `fungusHome.test.ts`:
+- the four grounds;
+- muddle, blunted and swapped;
+- crown kills the queen and brood, not at once, and it is lethal, Bloom's, and off the menu;
+- a Bloom corpse on the midden sporulates and a Garden one doesn't.
+
+`fungalPolicy.test.ts`: 384 situations, and what each strain is offered.
+
+**Jev cost.** Fungus lane, tokens per fungal situation with every intervention on the menu (`estimateTokens`):
+- Lockpick: 232 → 276;
+- Bloom: 297 → 343 (crown included; it is off by default);
+- Garden: 315, unchanged.
+
+The legend's longer `ground` line is shared across a request's hosts, so it costs little per host. The colony lane is unchanged at 237.
+

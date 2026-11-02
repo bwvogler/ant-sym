@@ -254,6 +254,8 @@ export class Colony {
   #holdT: Float32Array;
   /** workers that died of age */
   diedOld = 0;
+  /** brood killed by the fungus's crown */
+  broodKilled = 0;
   // Food flow (nest slice 5; with a queen): food lies in chambers; foragers bring it to reception, porters carry it on.
   /** the chamber an ant carrying food is taking it to (−1: a forager, to reception or the royal chamber), and 1 if it is a porter's move inside the nest */
   #portTo: Int16Array;
@@ -264,7 +266,7 @@ export class Colony {
   #inJaws = 0;
   // The midden (nest slice 7): corpses lie where workers die until an undertaker carries them out to the midden.
   /** the colony's dead: where each lies (a cell), who carries it (−1 none), and whether it is on the midden; died: when */
-  readonly corpses: { x: number; y: number; held: number; midden: boolean; died: number }[] = [];
+  readonly corpses: { x: number; y: number; held: number; midden: boolean; died: number; load: number; strain: number; spored: boolean }[] = [];
   /** Whether ant i carries a corpse (drawn as one, not as soil). */
   carriesCorpse(i: number): boolean {
     return this.#corpse[i] === 1;
@@ -371,6 +373,13 @@ export class Colony {
   estrange: Float32Array;
   /** the fungal situation (fungalPolicy.ts encodeFungal, without the strain) the fungus last chose for it in; −1 = none */
   fungal: Int16Array;
+  // What the fungus bends inside the nest (nest slice 8; the fungus writes them, 1 / 0 = as it is).
+  /** the nest's floor marks smelled × this: road signs, and the chamber it is in */
+  gainMarks: Float32Array;
+  /** 0..1: past ½, brood smells like store and store like brood */
+  swapMarks: Float32Array;
+  /** 0..1: past ½, it kills the queen and brood it touches (lethal, the fungus's crown) */
+  regicide: Float32Array;
   /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
   wall: Int8Array;
   /** straight-line distance home (its own home vector) when it met the wall it is following */
@@ -523,6 +532,9 @@ export class Colony {
     this.quiet = new Float32Array(n);
     this.estrange = new Float32Array(n);
     this.fungal = new Int16Array(n).fill(-1);
+    this.gainMarks = new Float32Array(n).fill(1);
+    this.swapMarks = new Float32Array(n);
+    this.regicide = new Float32Array(n);
     this.wall = new Int8Array(n);
     this.hitDist = new Float32Array(n);
     this.followT = new Float32Array(n);
@@ -632,6 +644,9 @@ export class Colony {
     this.crossLay[i] = 0;
     this.quiet[i] = 0;
     this.estrange[i] = 0;
+    this.gainMarks[i] = 1;
+    this.swapMarks[i] = 0;
+    this.regicide[i] = 0;
   }
 
   /**
@@ -795,7 +810,7 @@ export class Colony {
       else this.soilLost++;
     }
     // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7).
-    if (this.queen) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, midden: false, died: this.time });
+    if (this.queen) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, midden: false, died: this.time, load: this.load[i] as number, strain: this.strain[i] as number, spored: false });
     this.#spoilTo[i] = NaN;
     this.#loosePellet[i] = 0;
     this.#fillIntent[i] = 0;
@@ -1048,7 +1063,7 @@ export class Colony {
       // Underground in the side view, homing follows the road signs of where it is going (its chamber's mark); the home
       // trail only where there are none.
       const signs = mode === RETURN && this.#entrance && !isSky(map, cx, cy) ? this.ph.fields[this.#destMark(i)] : null;
-      const signGain = SIGN_WEIGHT * (this.gainHome[i] as number); // the fungus's home lever bends road signs as it does the home trail
+      const signGain = SIGN_WEIGHT * (this.gainHome[i] as number) * (this.gainMarks[i] as number); // the fungus's home and marks levers bend road signs
       const byVector = mode === RETURN && (this.stallT[i] as number) > TUNNEL_STALL;
       const hx = this.#goalX - centreX(cx, cy);
       const hy = this.#goalY - centreY(cy);
@@ -1430,9 +1445,17 @@ export class Colony {
       this.antCell(i);
       const cx = CELL[0] as number;
       const cy = CELL[1] as number;
-      if (!isSky(this.map, cx, cy)) return this.#placeAt(cx, cy) ?? "tunnel";
+      if (!isSky(this.map, cx, cy)) return this.#perceivedPlace(i, this.#placeAt(cx, cy)) ?? "tunnel";
     }
     return trailLevel(Math.max(hl, hf, hr));
+  }
+
+  /** A chamber's role as ant i smells it (nest slice 8): the fungus can blunt its floor marks (it can't tell) or swap brood and store. */
+  #perceivedPlace(i: number, role: Mark | null): Mark | null {
+    if (!role) return null;
+    if ((this.gainMarks[i] as number) < 0.5) return null;
+    if ((this.swapMarks[i] as number) >= 0.5) return role === "brood" ? "store" : role === "store" ? "brood" : role;
+    return role;
   }
 
   /** The role of this colony's chamber at cell (x, y) (a role-less or another colony's chamber reads as tunnel), or null if in none. */
@@ -1469,6 +1492,13 @@ export class Colony {
 
   /** Where ant i heads when it homes into the nest (the chamber it reads its road signs for): a nurse with brood, a brood chamber; else royal, the queen's (slice 5: carriers to reception). */
   #destMark(i: number): Mark {
+    const m = this.#trueDestMark(i);
+    // The fungus can swap brood and store (nest slice 8): it follows the other one's signs.
+    if ((this.swapMarks[i] as number) >= 0.5) return m === "brood" ? "store" : m === "store" ? "brood" : m;
+    return m;
+  }
+
+  #trueDestMark(i: number): Mark {
     if (this.#holdsBrood[i]) return "brood";
     if (this.carrying[i] && this.queen) {
       const role = this.map.chambers?.list[this.#foodTo(i)]?.role;
@@ -1786,6 +1816,32 @@ export class Colony {
         for (let k = 0; k < o.length; k += 2) strangers += g.get(qx + (o[k] as number), qy + (o[k + 1] as number));
         if (strangers >= ENEMY && this.#rng() < 1 - Math.exp(-QUEEN_FIGHT * strangers * dt)) q.alive = false;
       }
+    }
+    // The fungus's crown (nest slice 8, lethal): a host running it kills the queen and the brood it touches, each at
+    // CROWN_RATE a second (at once, spores painted on the royal chamber orphaned the colony in its first second).
+    const crown = 1 - Math.exp(-CROWN_RATE * dt);
+    for (let i = 0; i < this.n; i++) {
+      if (!this.alive[i] || (this.regicide[i] as number) < 0.5) continue;
+      this.antCell(i);
+      const hx = CELL[0] as number;
+      const hy = CELL[1] as number;
+      if (q.alive) {
+        cellOf(q.x, q.y);
+        if (hexDistance(hx, hy, CELL[0] as number, CELL[1] as number) <= 1 && this.#rng() < crown) q.alive = false;
+      }
+      for (let k = this.brood.items.length - 1; k >= 0; k--) {
+        const b = this.brood.items[k] as BroodItem;
+        if (b.held < 0 && hexDistance(hx, hy, b.x, b.y) <= 1 && this.#rng() < crown) {
+          if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
+          this.brood.items.splice(k, 1);
+          this.broodKilled++;
+        }
+      }
+    }
+    if (q.alive) {
+      cellOf(q.x, q.y);
+      const qx = CELL[0] as number;
+      const qy = CELL[1] as number;
       this.#layT += dt;
       // She lays only while the larder holds, beyond what the brood already laid will be fed, a whole worker's food:
       // eggs laid into an empty larder starve as larvae.
@@ -2813,7 +2869,7 @@ export class Colony {
         // Road signs: underground, a strong nest trail where it stands tells it where it is, and its memory's error fades
         // (Heyman et al. 2017; slice 3 gives each chamber its own mark). Outside, the hole's sight and smell do it (#believe).
         // Read on the floor where it stands (a road sign is under its antennae; the sensors ahead are often in soil in a tunnel).
-        if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
+        if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) * (this.gainMarks[i] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
         if (this.map.chambers) this.#layMark(i, dt);
         if (this.queen) {
           this.#nurse(i, dt);
@@ -2904,6 +2960,8 @@ export const T_LARVA = 20;
 export const T_PUPA = 20;
 /** At most one egg this often (seconds), while there is food and room. */
 const LAY_INTERVAL = 0.5;
+/** The fungus's crown (nest slice 8): the chance a second that a host by the queen, or by a brood item, kills it. */
+export const CROWN_RATE = 0.05;
 /** Food a larva takes per second with two nurses or more by it. */
 const FEED_RATE = 0.5;
 // The midden (nest slice 7): see #undertake, #dropOut, #middenSmell.

@@ -118,7 +118,7 @@ When the queen dies, the colony is **orphaned**:
 
 The fungus milestone (PR #7, on `main`) is not yet on this stack. Slice 0 below merges it.
 
-Then the nest gives the fungus new levers, each with a basis:
+Then the nest gives the fungus new levers, each with a basis. *Built in slice 8 (PRD §37).*
 - **Chamber marks are perception** (§16's gains, per channel). A host misreads a *brood* mark as *store*, or loses the *royal* mark. The nest equivalent of "roam".
 - **Ground** becomes a host's place in the nest:
   - **chamber role**, own colony's;

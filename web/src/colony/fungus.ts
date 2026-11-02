@@ -59,10 +59,16 @@ export interface Levers {
   quiet: number;
   /** pushes the host's odour this far (× 0.5) away from its nest's: its own colony takes it for a stranger (B6, the odour weapon) */
   estrange: number;
+  /** the nest's floor marks smelled × this (nest slice 8: road signs, and which chamber it is in) */
+  marks: number;
+  /** 1: brood smells like store and store like brood (nest slice 8) */
+  swap: number;
+  /** 1: the host kills the queen and the brood it touches (nest slice 8: lethal) */
+  regicide: number;
 }
 
 /** The world as it is. */
-export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0, estrange: 0 };
+export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0, estrange: 0, marks: 1, swap: 0, regicide: 0 };
 
 /** One thing the fungus can run in a host: a bundle of levers (docs/fungus-policy.md §5.2). */
 export interface Intervention {
@@ -85,10 +91,12 @@ export const INTERVENTIONS: readonly Intervention[] = [
   { id: "roam", name: "roam", blurb: "its host barely smells home and feels its time out slowly, so it ranges far", levers: { ...AS_IS, home: 0.35, clock: 2.5 } },
   { id: "blend", name: "blend", blurb: "its host carries the fungus's own odour, between the colonies', and tolerates the odours in between", levers: { ...AS_IS, mask: 0.6, tolerance: 0.15 } },
   { id: "cull", name: "cull", blurb: "its host smells like nobody's: its own colony and the rival's both take it for a stranger (lethal)", levers: { ...AS_IS, estrange: 1 } },
+  { id: "muddle", name: "muddle", blurb: "its host misreads its nest: brood smells like store; it gets lost inside", levers: { ...AS_IS, marks: 0.3, swap: 1 } },
+  { id: "crown", name: "crown", blurb: "its host kills the queen and brood it touches: the colony is orphaned (lethal)", levers: { ...AS_IS, regicide: 1 } },
 ];
 
 /** Interventions that kill their host: a strain must allow them, and the player's menu starts with them off. */
-export const LETHAL: ReadonlySet<string> = new Set(["cull"]);
+export const LETHAL: ReadonlySet<string> = new Set(["cull", "crown"]);
 
 /** The index of an intervention by id. */
 export function intervention(id: string): number {
@@ -113,6 +121,8 @@ export interface Strain {
   expresses: string;
   /** the interventions this strain can run at all: the policy's action space for its hosts (§5.1, lever 2) */
   allows: readonly string[];
+  /** a host's corpse on the midden sporulates: spores on the ground there (Metarhizium on cadavers; nest slice 8) */
+  sporulates?: boolean;
 }
 
 /**
@@ -122,8 +132,8 @@ export interface Strain {
  * Garden after the leafcutter's cultivar, whose odour becomes the colony's (blends odours).
  */
 export const STRAINS: readonly Strain[] = [
-  { id: "lockpick", name: "Lockpick", blurb: "spreads slowly, hides, never clears on its own; its hosts barely smell alarm", transmission: 0.15, decay: 0, visibility: 0.1, expresses: "soothe", allows: ["dormant", "soothe", "roam"] },
-  { id: "bloom", name: "Bloom", blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant; its hosts smell the rival's food trail as their own", transmission: 0.6, decay: 0.01, visibility: 0.8, expresses: "share", allows: ["dormant", "share", "roam", "cull"] },
+  { id: "lockpick", name: "Lockpick", blurb: "spreads slowly, hides, never clears on its own; its hosts barely smell alarm", transmission: 0.15, decay: 0, visibility: 0.1, expresses: "soothe", allows: ["dormant", "soothe", "roam", "muddle"] },
+  { id: "bloom", name: "Bloom", blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant; its hosts smell the rival's food trail as their own", transmission: 0.6, decay: 0.01, visibility: 0.8, expresses: "share", allows: ["dormant", "share", "roam", "cull", "crown"], sporulates: true },
   { id: "garden", name: "Garden", blurb: "spreads steadily and half-shows; its hosts carry its own odour, so colonies that grow it come to smell alike", transmission: 0.3, decay: 0, visibility: 0.3, expresses: "blend", allows: ["dormant", "blend", "soothe", "share"] },
 ];
 
@@ -412,10 +422,18 @@ export class Fungus {
           // What the fungus in this host senses, and what its policy has it do there.
           const ns = this.strains[strain] as Strain;
           let ground: Ground = "border";
-          const own = c.ph.fields.home.get(cx, cy);
-          const theirs = c.foreign ? c.foreign.fields.home.get(cx, cy) : 0;
-          if (own > 0 && own >= p.borderRatio * theirs) ground = "home";
-          else if (theirs > 0 && theirs >= p.borderRatio * own) ground = "foreign";
+          const ch = this.map.chambers;
+          if (ch && this.map.sky) {
+            // The side view (nest slice 8): its own chamber, its own nest's tunnels, the open ground, another's chamber.
+            const at = ch.at(cx, cy);
+            if (at >= 0) ground = ch.list[at]!.colony === c.params.nest ? "home" : "foreign";
+            else if (this.map.sky.get(cx, cy) !== 1) ground = "tunnel";
+          } else {
+            const own = c.ph.fields.home.get(cx, cy);
+            const theirs = c.foreign ? c.foreign.fields.home.get(cx, cy) : 0;
+            if (own > 0 && own >= p.borderRatio * theirs) ground = "home";
+            else if (theirs > 0 && theirs >= p.borderRatio * own) ground = "foreign";
+          }
           // Who touches it, in its cell and the six around: strangers (past tolerance, by odour alone: a calmed stranger
           // still smells strange), else ants of another colony it tolerates (allied: unification, felt where it
           // happens), else its own colony's (kin), else none.
@@ -619,6 +637,10 @@ export class Fungus {
     // Cull is all or nothing in effect (an odour pushed half-way is still within tolerance of its nest's), so it
     // takes full effect from a high load, where the local rule culls, instead of from a full one.
     c.estrange[i] = v.estrange * Math.min(1, l / HIGH_LOAD);
+    c.gainMarks[i] = 1 + (v.marks - 1) * l;
+    c.swapMarks[i] = v.swap * l;
+    // Regicide, like cull, is all or nothing: from a high load.
+    c.regicide[i] = v.regicide * Math.min(1, l / HIGH_LOAD);
   }
 
   /** How far the fungus is into colony c, and how far c has answered it. */

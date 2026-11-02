@@ -11,7 +11,9 @@ import { MODES, type Mode } from "./colony.ts";
 //   strain   — which strain the host carries (it decides what is offered)
 //   load     — low / mid / high
 //   host     — what the ant is doing: its mode (a carrier counts as return)
-//   ground   — whose home scent is on the ground there: home, border, foreign
+//   ground   — whose ground it stands on: home, border, foreign (by home scent; in the side view, nest slice 8:
+//              home is its own colony's chamber, tunnel its own nest's tunnels, border the open ground, foreign
+//              another colony's chamber)
 //   contact  — who touches it: none; kin (its own colony); allied (another
 //              colony's ants, within tolerance: unification, felt where it
 //              happens); or strangers (past tolerance, by odour)
@@ -22,7 +24,7 @@ import { MODES, type Mode } from "./colony.ts";
 
 export const LOADS = ["low", "mid", "high"] as const;
 export type Load = (typeof LOADS)[number];
-export const GROUNDS = ["home", "border", "foreign"] as const;
+export const GROUNDS = ["home", "border", "foreign", "tunnel"] as const;
 export type Ground = (typeof GROUNDS)[number];
 export const CONTACTS = ["none", "kin", "allied", "strangers"] as const;
 export type Contact = (typeof CONTACTS)[number];
@@ -40,7 +42,7 @@ export interface FungalSituation {
 /** An intervention's id, for the host the situation describes. */
 export type FungusPolicy = (s: FungalSituation) => string;
 
-/** Situations per strain: 3 × 4 × 3 × 4 × 2 = 288. */
+/** Situations per strain: 3 × 4 × 4 × 4 × 2 = 384. */
 export const FUNGAL_SITUATIONS = LOADS.length * MODES.length * GROUNDS.length * CONTACTS.length * 2;
 
 /** A load at or past this is "high": where the local rule culls, and where cull takes full effect (Fungus.express). */

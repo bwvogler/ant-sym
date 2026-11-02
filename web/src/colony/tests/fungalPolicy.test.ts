@@ -33,8 +33,8 @@ function placed(map: WorldMap, nest: number, odour: number, cells: [number, numb
   return c;
 }
 
-test("fungal situations: 288 per strain, and each encodes and decodes to itself", () => {
-  assert.equal(FUNGAL_SITUATIONS, 288);
+test("fungal situations: 384 per strain (ground: home, border, foreign, tunnel), and each encodes and decodes to itself", () => {
+  assert.equal(FUNGAL_SITUATIONS, 384);
   const seen = new Set<number>();
   for (const load of LOADS)
     for (const host of MODES)
@@ -189,9 +189,10 @@ test("the fungus lane's request: the aim, one choice per fungal situation among 
   assert.equal(state.ants, undefined, "no ant in the fungus's request");
   assert.equal(state.doctrine, undefined, "and no colony doctrine");
   const crit = (id: string) => Object.keys((req.questions[`${id}_do`] as { criteria: Record<string, string> }).criteria);
-  assert.deepEqual(crit("h0"), ["dormant", "soothe", "roam"]);
+  assert.deepEqual(crit("h0"), ["dormant", "soothe", "roam", "muddle"]);
   assert.deepEqual(crit("h1"), ["dormant", "share", "roam"], "cull is Bloom's, but off the menu");
   assert.deepEqual(offeredFor("bloom", new Set([...menu, "cull"])), ["dormant", "share", "roam", "cull"]);
+  assert.deepEqual(offeredFor("bloom", new Set([...menu, "cull", "crown"])), ["dormant", "share", "roam", "cull", "crown"], "crown is Bloom's too, lethal, off the menu by default");
   const ans = (choice: string) => ({ h0_do: { type: "choice" as const, choice, confidence: 0.9 } });
   assert.equal(readIntervention(ans("soothe"), "h0", offer("lockpick")), "soothe");
   assert.equal(readIntervention(ans("blend"), "h0", offer("lockpick")), null, "Lockpick cannot blend");

@@ -2,7 +2,7 @@ import { centreX, centreY, R } from "./hex.ts";
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, LARVA_FOOD, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
 import { LARVA, PUPA } from "./brood.ts";
-import { Fungus, type FungusParams } from "./fungus.ts";
+import { Fungus, INFECTED, STRAINS, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { WorldMap } from "./world.ts";
 
@@ -57,6 +57,9 @@ export interface Unity {
   /** the nests smell alike and nobody has died fighting for a minute */
   unified: boolean;
 }
+
+/** Spores a sporulating host's corpse puts on the midden cell. */
+const MIDDEN_SPORES = 3;
 
 /** Seconds without a fight death that unity asks for. */
 export const QUIET = 60;
@@ -180,6 +183,14 @@ export class Game {
     }
     // After fights: the dead neither pass load on nor groom (the occupancy grids still count them as groomers for this one step).
     // The fungus steps every few ticks (fungus.ts advance); when it is idle its clock does not run.
+    // The midden (nest slices 7–8): an infected corpse put there by a strain that sporulates (Bloom) puts spores on the
+    // ground there; other strains die with their host.
+    for (const c of this.colonies)
+      for (const k of c.corpses) {
+        if (!k.midden || k.spored) continue;
+        k.spored = true;
+        if (k.load >= INFECTED && STRAINS[k.strain]?.sporulates) this.fungus.paint([], centreX(k.x, k.y), centreY(k.y), 0.6, MIDDEN_SPORES, 0, k.strain);
+      }
     if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null);
     if (this.time >= this.#nextStrategy) {
       this.#nextStrategy = this.time + this.params.strategyEvery;
