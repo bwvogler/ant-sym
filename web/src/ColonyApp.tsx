@@ -167,7 +167,8 @@ export default function ColonyApp() {
               </button>
             </div>
             <p className="mt-2 text-xs text-fg-3">
-              {size.w}×{size.h} cells {controls.ground === "side" ? "seen from the side: sky, the ground line, soil and stones to dig," : "seen from above: rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food. Every 4 food stored is a new ant.
+              {size.w}×{size.h} cells {controls.ground === "side" ? "seen from the side: sky, the ground line, soil and stones to dig," : "seen from above: rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food.{" "}
+              {controls.ground === "side" ? "The queen lays eggs while there is food; larvae fed by nurses become new ants." : "Every 4 food stored is a new ant."}
             </p>
             <div className="mt-2 flex items-center justify-between text-sm text-fg-2">
               <span>Ground</span>
