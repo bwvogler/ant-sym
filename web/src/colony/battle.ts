@@ -1,6 +1,7 @@
-import { ChunkLayer } from "./chunks.ts";
-import type { Colony } from "./colony.ts";
+import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
+import { ENEMY, type Colony } from "./colony.ts";
 import { CELL, discOffsets } from "./hex.ts";
+import type { Recognition } from "./recognition.ts";
 import type { WorldSize } from "./world.ts";
 
 // Fights, pure. An ant with enemies in its own cell or the six around it is in a fight:
@@ -9,6 +10,13 @@ import type { WorldSize } from "./world.ts";
 // Lanchester-like: rate × dt × enemies around ÷ allies around, so equal
 // numbers trade and the bigger crowd wins. Deaths are decided for everyone
 // before anyone is removed, so the order colonies are listed in is no edge.
+//
+// With a Recognition (the game always passes one), enemies are strangers by
+// odour, judged at the healthy tolerance: an ant whose odour has drifted can
+// be fought by its own colony, and two colonies that have come to smell
+// alike stop fighting. A calming cue counts against both sides: a calm
+// neighbour is (1 − calm) of an enemy, and a calm ant takes (1 − calm) of the
+// hazard. Allies are still the ant's own colony around it.
 
 export interface FightParams {
   /** deaths per second for an ant facing as many enemies as allies */
@@ -60,8 +68,6 @@ export class CountGrid {
   }
 }
 
-const BLOCK_BITS = 3;
-
 /** Ants per cell, one grid per colony. */
 export function occupancy(colony: Colony, out: CountGrid): CountGrid {
   out.reset();
@@ -86,8 +92,11 @@ export function around(grid: CountGrid, size: WorldSize, cx: number, cy: number,
   return s;
 }
 
-/** Resolve one dt of fighting between colonies; `grids[k]` is colony k's occupancy. Returns the deaths per colony. */
-export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT): number[] {
+/**
+ * Resolve one dt of fighting between colonies; `grids[k]` is colony k's occupancy. With `rec` (built this
+ * tick), enemies are strangers by odour; without it, every ant of another colony. Returns the deaths per colony.
+ */
+export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT, rec: Recognition | null = null): number[] {
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
     const size = c.map.size;
@@ -97,13 +106,22 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       const cx = Math.min(size.w - 1, Math.max(0, CELL[0] as number));
       const cy = Math.min(size.h - 1, Math.max(0, CELL[1] as number));
       let enemies = 0;
-      for (let j = 0; j < grids.length; j++) {
-        const g = grids[j] as CountGrid;
-        if (j !== k && g.any(cx - 1, cy - 1, cx + 1, cy + 1)) enemies += around(g, size, cx, cy);
+      if (rec) {
+        rec.look(c.odour[i] as number, rec.params.tolerance);
+        enemies = rec.around(cx, cy, size.w, size.h) * (1 - (c.calm[i] as number));
+        if (enemies < 1e-6) continue;
+      } else {
+        for (let j = 0; j < grids.length; j++) {
+          const g = grids[j] as CountGrid;
+          if (j !== k && g.any(cx - 1, cy - 1, cx + 1, cy + 1)) enemies += around(g, size, cx, cy);
+        }
+        if (enemies === 0) continue;
       }
-      if (enemies === 0) continue;
       const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy));
-      c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt);
+      // A calmed encounter (under half an enemy) does not raise the alarm; with no fungus every enemy is whole.
+      // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
+      const loud = 1 - (c.quiet[i] as number);
+      if (enemies >= ENEMY && loud > 0) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
     }
   });
