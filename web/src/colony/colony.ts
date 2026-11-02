@@ -1,5 +1,6 @@
-import { type Channel, Pheromones } from "./pheromone.ts";
-import { blocked, dropFood, rockAt, takeFood, type Nest, type WorldMap } from "./world.ts";
+import { type Channel, type ChannelParams, DEFAULT_CHANNELS, Pheromones } from "./pheromone.ts";
+import { localResponses, type Responses, type Touch } from "./responses.ts";
+import { blocked, dropFood, foodAt, rockAt, takeFood, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -11,9 +12,10 @@ import { blocked, dropFood, rockAt, takeFood, type Nest, type WorldMap } from ".
 //             nest is: real ants path-integrate); carrying, lay food trail
 //   fight   — go for enemies in sight, else up the colony's alarm trail,
 //             else (raiding) toward the rival's nest
-// Picking food up, carrying it home and putting it down are mechanics, not
-// choices; so is shying away from alarm (unless fighting). Which mode to be
-// in is the one choice, asked only when a non-carrying ant's situation
+// Picking food up, what to do while carrying, putting it down, which trail
+// to lay and how hard to shy from alarm are the ant's small responses
+// (responses.ts; the local ones are the old fixed mechanics). Which mode to be
+// in is the big choice, asked only when a non-carrying ant's situation
 // changes, never every frame. That choice is a `Policy`: the local rule, or
 // Jev cached per situation (colonyBrain.ts, ui/colonyJev.ts). Above the
 // ants, the colony's stance (forage, defend, raid) is the strategist's
@@ -132,14 +134,23 @@ export interface ColonyParams {
   patience: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
+  /** cells around an ant it checks for enemies (a square of side 2 × enemyRange + 1) */
+  enemyRange: number;
+  /** seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round) */
+  followGiveUp: number;
+  /** seconds of wall-following before trying the other side of the wall */
+  followFlip: number;
+  /** evaporation and spread of each pheromone channel */
+  channels: Record<Channel, ChannelParams>;
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5 };
+/** What a colony is built from: any params, and any part of any channel's. */
+export type ColonyOptions = Partial<Omit<ColonyParams, "channels">> & { channels?: Partial<Record<Channel, Partial<ChannelParams>>> };
+
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, enemyRange: 2, followGiveUp: 120, followFlip: 45, channels: DEFAULT_CHANNELS };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
-/** Cells around an ant it checks for enemies (a square of side 2 × ENEMY_RANGE + 1). */
-const ENEMY_RANGE = 2;
 
 export class Colony {
   readonly map: WorldMap;
@@ -148,6 +159,8 @@ export class Colony {
   params: ColonyParams;
   policy: Policy;
   stancePolicy: StancePolicy;
+  /** the ant's small responses (pick up, carry, drop, mark, shy from alarm, raise it) */
+  responses: Responses = localResponses;
   stance: Stance = "forage";
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
@@ -197,18 +210,22 @@ export class Colony {
   /** which of the SITUATIONS the policy has been asked about: what a cached Jev policy would pay for */
   seen = new Uint8Array(SITUATIONS);
   #rng: () => number;
+  /** the situation handed to a response: one object, refilled for every call */
+  #t: Touch = { mode: "explore", carrying: "none", atNest: false, enemy: false, stance: "forage" };
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   #s = new Float64Array(9);
 
-  constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
+  constructor(map: WorldMap, params: ColonyOptions = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
     this.map = map;
-    this.params = { ...DEFAULT_COLONY, ...params };
+    const channels = { ...DEFAULT_COLONY.channels };
+    for (const [ch, cp] of Object.entries(params.channels ?? {}) as [Channel, Partial<ChannelParams>][]) channels[ch] = { ...channels[ch], ...cp };
+    this.params = { ...DEFAULT_COLONY, ...params, channels };
     if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
     this.nest = map.nests?.[this.params.nest] ?? map.nest;
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
-    this.ph = new Pheromones(map);
+    this.ph = new Pheromones(map, channels);
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -250,6 +267,19 @@ export class Colony {
     this.#question[i] = -1;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
     this.alive[i] = 1;
+  }
+
+  /** Ant i's situation for a response, in the shared Touch object (read it, don't keep it). */
+  touch(i: number, enemy: boolean): Touch {
+    const t = this.#t;
+    const dx = (this.x[i] as number) - this.nest.x;
+    const dy = (this.y[i] as number) - this.nest.y;
+    t.mode = MODES[this.mode[i] as number] as Mode;
+    t.carrying = this.carrying[i] ? "food" : "none";
+    t.atNest = dx * dx + dy * dy < this.nest.r * this.nest.r;
+    t.enemy = enemy;
+    t.stance = this.stance;
+    return t;
   }
 
   /** Living ants. */
@@ -381,10 +411,11 @@ export class Colony {
     return blocked(this.map, x + Math.cos(angle) * d, y + Math.sin(angle) * d);
   }
 
-  /** The nearest cell holding enemies within ENEMY_RANGE of ant i, as a heading, or null. */
+  /** The nearest cell holding enemies within params.enemyRange of ant i, as a heading, or null. */
   #enemyHeading(i: number): number | null {
     const g = this.enemies;
     if (!g) return null;
+    const ENEMY_RANGE = this.params.enemyRange;
     const { w, h } = this.map.size;
     const cx = Math.floor(this.x[i] as number);
     const cy = Math.floor(this.y[i] as number);
@@ -439,14 +470,17 @@ export class Colony {
       const toEnemy = this.#enemyHeading(i);
 
       // The mode choice, only when the situation changed since the ant was last asked.
-      // A carrying ant goes home: a mechanic, never asked (and asked afresh once it puts the food down).
+      // A carrying ant is not asked: its carry response says what to do (the local one: go home),
+      // and it is asked afresh once it puts the food down.
       const carrying = this.carrying[i] === 1;
+      const R = this.responses;
       let mode = this.mode[i] as number;
       if (carrying) {
-        mode = RETURN;
-        this.mode[i] = RETURN;
+        mode = MODES.indexOf(R.carry(this.touch(i, toEnemy !== null)));
+        if (mode < 0) mode = RETURN;
+        this.mode[i] = mode;
         this.#asked[i] = -1;
-        this.#question[i] = -1; // going home is not a choice; the next question comes once the food is down
+        this.#question[i] = -1; // carrying is not the mode policy's choice; the next question comes once the food is down
       } else {
         const tired = (this.since[i] as number) > p.patience;
         const food = trailLevel(Math.max(fl, ff, fr));
@@ -495,7 +529,7 @@ export class Colony {
           const t0 = this.followT[i] as number;
           const t = t0 + dt;
           this.followT[i] = t;
-          if (t0 < FOLLOW_FLIP && t >= FOLLOW_FLIP) {
+          if (t0 < p.followFlip && t >= p.followFlip) {
             // Probably the long way round (a big rock mass, or the map's edge): try the other side, same line home.
             this.wall[i] = -side as -1 | 1;
             h += Math.PI;
@@ -504,7 +538,7 @@ export class Colony {
           if (dist < (this.hitDist[i] as number) - 1 && this.#onMLine(i, x, y) && !this.#touch(x, y, toNest, 1.5)) {
             this.wall[i] = 0; // back on its line home, nearer than where it met this wall, and the way is open
             h = turnToward(h, toNest, p.turnRate * dt * 0.8);
-          } else if (t >= FOLLOW_GIVE_UP) {
+          } else if (t >= p.followGiveUp) {
             // Not round after a long while: wander a good while, then try afresh.
             this.wall[i] = 0;
             this.mx[i] = NaN;
@@ -530,12 +564,17 @@ export class Colony {
         const seen = Math.max(fl, ff, fr) >= SEEN;
         h += seen ? climb(fl, ff, fr, p.turnRate * dt) : noise * p.wander;
       }
-      // Every mode but fighting shies away from alarm.
-      if (mode !== FIGHT) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * dt);
+      // Shy away from alarm (the local response: every mode but fighting, fully).
+      const t = this.touch(i, toEnemy !== null);
+      const gain = R.alarmGain(t);
+      if (gain) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
 
-      // Lay trail: walking out marks the way home, carrying food marks the way to it.
-      const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt;
-      ph.deposit(carrying ? "food" : "home", this.x[i] as number, this.y[i] as number, laid);
+      // Lay trail (the local response: walking out marks the way home, carrying food marks the way to it).
+      const trail = R.trail(t);
+      if (trail !== "none") {
+        const laid = p.deposit * R.trailRate(t) * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt;
+        ph.deposit(trail, this.x[i] as number, this.y[i] as number, laid);
+      }
 
       // Move; rock or the edge turns the ant back somewhere random.
       const nx = (this.x[i] as number) + Math.cos(h) * p.speed * dt;
@@ -570,11 +609,12 @@ export class Colony {
         this.y[i] = ny;
       }
 
-      // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
+      // Pick up food where there is some if the get response says so (the local one: unless fighting);
+      // at the nest, put the load down if the drop response says so (the local one: always). The nest rests a tired ant.
       const ndx = (this.x[i] as number) - nest.x;
       const ndy = (this.y[i] as number) - nest.y;
       const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
-      if (!carrying && mode !== FIGHT && takeFood(map, this.x[i] as number, this.y[i] as number)) {
+      if (!carrying && foodAt(map, this.x[i] as number, this.y[i] as number) > 0 && R.get(this.touch(i, toEnemy !== null)) && takeFood(map, this.x[i] as number, this.y[i] as number)) {
         this.carrying[i] = 1;
         this.wall[i] = 0;
         this.mx[i] = NaN;
@@ -583,7 +623,7 @@ export class Colony {
       } else if (atNest) {
         this.wall[i] = 0;
         this.mx[i] = NaN;
-        if (carrying) {
+        if (carrying && R.drop(this.touch(i, toEnemy !== null))) {
           this.carrying[i] = 0;
           this.stored++;
           this.larder++;
@@ -628,10 +668,6 @@ function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: T
   return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
 }
 
-/** Seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round). */
-export const FOLLOW_GIVE_UP = 120;
-/** Seconds of wall-following before trying the other side once (same line home). */
-export const FOLLOW_FLIP = 45;
 /** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
 const M_LINE_WIDTH = 0.6;
 /** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */

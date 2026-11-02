@@ -7,10 +7,14 @@
 // before at the end, and paint alarm now and then. The rival plays the local
 // rule (free). Tokens per question are estimated from request size
 // (colonyBrain.estimateTokens); the ledger counts the real ones live.
+// The ant's small responses (get, carry, drop, trail: responses.ts) are
+// costed the same way, as if each were its own Jev lane; they are not asked
+// live yet, so they are reported apart from the session total.
 //
 // Usage: node scripts/colony-cost.mjs [minutes=10] [ants=800] [seed=1]
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
-import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
+import { DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
+import { localResponses, responses, touchKey } from "../web/src/colony/responses.ts";
 import { Game } from "../web/src/colony/game.ts";
 import { generateWorld, mulberry32 } from "../web/src/colony/world.ts";
 
@@ -34,10 +38,11 @@ function lane(key, pack, contextOf, local) {
     asked,
     policy: (s) => {
       const k = key(s);
-      if (!asked.get(contextOf(doctrine))?.has(k)) queue.set(k, s);
+      if (!asked.get(contextOf(doctrine))?.has(k)) queue.set(k, { ...s }); // a copy: responses share one Touch object
       return local(s); // the stand-in's answer, and what the colony does until Jev answers
     },
-    flush() {
+    tokens: 0,
+    flush(counted = true) {
       const context = contextOf(doctrine);
       const set = asked.get(context) ?? new Set();
       asked.set(context, set);
@@ -45,9 +50,13 @@ function lane(key, pack, contextOf, local) {
       queue.clear();
       for (let b = 0; b < items.length; b += 100) {
         const chunk = items.slice(b, b + 100);
-        tokens += estimateTokens(pack(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
-        requests++;
-        questions += chunk.length;
+        const tok = estimateTokens(pack(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
+        this.tokens += tok;
+        if (counted) {
+          tokens += tok;
+          requests++;
+          questions += chunk.length;
+        }
         for (const [k] of chunk) set.add(k);
       }
     },
@@ -57,11 +66,17 @@ function lane(key, pack, contextOf, local) {
 }
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
-const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed + 7), { policy: modes.policy, stance: stances.policy });
+const hooks = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, lane(touchKey, (items, d) => packResponseRequest(h, items, d), (d) => responseContext(h, d), localResponses[h])]));
+const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed + 7), {
+  policy: modes.policy,
+  stance: stances.policy,
+  responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
+});
 const colony = game.player;
 const flush = () => {
   modes.flush();
   stances.flush();
+  for (const h of RESPONSE_HOOKS) hooks[h].flush(false);
 };
 
 // The session: a doctrine for each slice of time, the first one again at the end (should be free).
@@ -74,6 +89,7 @@ for (const d of plan) {
   doctrine = d.text;
   modes.clear();
   stances.clear();
+  for (const h of RESPONSE_HOOKS) hooks[h].clear();
   colony.reconsider();
   const before = { tokens, requests, modes: modes.seen(policyContext(doctrine)), stances: stances.seen(stanceContext(doctrine)) };
   const end = t + slice;
@@ -98,3 +114,8 @@ console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situa
 for (const p of phases) console.log(`  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`);
 console.log(`\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${Math.round(tokens / Math.max(1, questions))} tok per question, ${Math.round(colony.decisions / Math.max(1, questions))} mode choices per question)`);
 console.log(`≈ ${usd((tokens * 60) / minutes)} per hour at this pace of retuning (one every ${(slice / 60).toFixed(1)} min); target ≤ $0.25/h`);
+console.log(`\nresponse lanes, if each were asked like the modes (not live yet; not in the total above):`);
+for (const h of RESPONSE_HOOKS) {
+  const seen = plan.reduce((n, d, k) => n + (plan.findIndex((x) => x.text === d.text) === k ? hooks[h].seen(responseContext(h, d.text)) : 0), 0);
+  console.log(`  ${h.padEnd(6)} ${String(seen).padStart(3)} situations over the doctrines · ~${hooks[h].tokens.toLocaleString().padStart(6)} tok ≈ ${usd(hooks[h].tokens)}`);
+}

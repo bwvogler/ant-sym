@@ -462,3 +462,108 @@ Also from the review:
 - **Filed as beads:** keyboard access to following and to the minimap, the card's "by …" while paused, tap slop by net rather than total movement, and moving the gesture logic into a tested pure module.
 
 **Jev:** no change. `explain` makes no calls, and the request state is unchanged.
+
+## 14. Behaviours as responses, tuned by assays (behaviour MR 0–1, 2026-11-02)
+
+**Why.** An ant chooses only its mode. Everything else was fixed:
+- carrying food always goes home
+- touching food picks it up, and reaching the nest puts it down
+- every ant always lays trail
+- every ant next to an enemy fights and raises alarm
+- a reflex steers ants away from alarm
+- "tired" is a timer
+- food in the larder turns into ants instantly
+- a strategist that reads the whole map commands the stance
+- raiders steer to the rival nest's coordinates
+
+The plan is to make each of these a response to what the ant senses, keeping today's rule as the default. Each one gets tuned until the colony behaves like real ants. **Biological realism first**: the pass marks come from studies of real ants, or are design marks where no study gives a number. **Sweeps are offline.** Each later MR adds one capped live Jev check (≤ $0.10) through `scripts/colony-live.mjs` (ja-8ab).
+
+Milestones (beads):
+| MR | Bead | What |
+|---|---|---|
+| 0 | ja-eyk | harness |
+| 1 | ja-h0c | response hooks |
+| 2 | ja-mz7 | get/drop and nest rooms |
+| 3 | ja-3ml | trail marking |
+| 4 | ja-902 | contact and graded alarm |
+| 5 | ja-um8 | a stance that emerges |
+| 6 | ja-6df | roles and age |
+| — | ja-ge7 | the fungus palette and brush, after these |
+
+Every MR follows the same loop:
+1. State the hypothesis.
+2. Pick the assay that tests it.
+3. Run one-parameter sweeps over seeds 1–10.
+4. Run a small grid on the two or three most sensitive parameters.
+5. Choose values by assay pass and the worst seed, not the best mean.
+6. Confirm on held-out seeds 11–20.
+7. Pin a short assay in the tests.
+8. Run the live check.
+9. Record the table here.
+
+### 14.1 The harness (MR 0)
+
+- **`colony/experiment.ts`** (pure).
+  - `runGame(spec)` runs a game headless. It takes a seed, a map (generated, or a hand-built `Arena`), game, colony and rival params, either side's policy and responses, scripted events (paint, add food, any call), and probes. It returns standard numbers per side plus each probe's numbers.
+  - `gameRng(seed, generation)` is now the one seeding scheme. The page uses it too, so a number measured offline reproduces on the page with the same seed (ja-jdu, for new numbers; §9's old figures stay as measured).
+- **Tunable params**, all at their old values:
+  - the rival's colony params, policy, strategist and responses (`Sides`)
+  - pheromone channel params (`ColonyParams.channels`)
+  - `enemyRange`, `followGiveUp` and `followFlip`
+- **Assays**, each a small arena with one question:
+
+| Assay | Question | Pass mark |
+|---|---|---|
+| A1 `bridge` | double bridge (short branch ~64 cells, long ~102) | ≥ 80 % of branch traffic on the short one (Goss et al. 1989: almost all ants in most trials) |
+| A2a `twin` | two equal sources at equal distance | the busier takes ≥ 70 % (design mark; Beckers et al. 1990: the colony concentrates on one) |
+| A3 `deplete` | a patch runs out | crowd there < 20 % of its peak within 60 s (design mark; no ant mills) |
+| A4 `alarm` | alarm brush on a busy trail | crowd ≤ 50 % in the next 10 s, back to ≥ 50 % within 60 s (design marks) |
+| A5 `regulate` | no food for 120 s, then food | share outside before ≤ ½ share outside after (Gordon; Pinter-Wollman et al. 2013: returning foragers set the outgoing rate) |
+| A6 `pass` / `open` | 200 raiders vs 200 defenders, through a 2-cell gap or in the open | report only, until terrain-limited combat (MR 4); narrow passes should favour defenders (Lymbery et al. 2023) |
+| G `game` | the real game, 600 + 600 ants, 600 s | no colony with > 7 % of its ants out over 120 s (A7, ja-ipu's measure) |
+
+- **`npm run exp -- <assay|all> --seeds 1-10 [--seconds N] [--set colony.deposit=2,4,8] [--json out.json]`**. Each `--set` takes a dotted path under `colony`, `rival` or `game` (channels: `colony.channels.food.evaporation`). Several `--set` flags run their cross product. It prints each metric's median, min and max over the seeds, and the pass count.
+- **In `npm test`:**
+  - `tests/assays.test.ts` runs the passing assays (A3, A4) on two seeds as a gate. A1, A2a and A5 run as `todo`: they report but don't fail, and their pass mark is the goal of MR 3 and MR 5.
+  - `tests/golden.test.ts` pins the exact state of two games after 30 s, so a refactor can't change behaviour by accident.
+
+### 14.2 Baseline (today's ants, seeds 1–10)
+
+| Assay | Pass | Median (min–max) | Reading |
+|---|---|---|---|
+| A1 bridge | 0/10 | short share 0.67 (0.64–0.70); 516 food home | Traffic leans to the short branch only as much as walking distance does. Trails don't amplify the first ants' choice. Explorers in the corridors stay out long (31 % out over 120 s), which is maze wandering, not homing stalls. |
+| A2a twin | 0/10 | majority 0.53 (0.51–0.57) | No symmetry breaking. Every carrier lays the same trail, so both sources keep the same pull. |
+| A3 deplete | 10/10 | gone 44 s (28–56) after the last food; 0 % following at +60 s | Trail evaporation plus "tired → home" clear the dead trail. |
+| A4 alarm | 10/10 | scatter 0.00; back after 21 s (20–25) | The avoidance reflex empties the spot at once; the alarm fades in ~20 s. |
+| A5 regulate | 0/10 | outside 0.97 before food, 0.91 after | There is no regulation at all: every ant is out all the time. |
+| A6 pass | — | exchange 0.96 (0.69–1.16) | A 2-cell pass gives defenders no edge. |
+| A6 open | — | exchange 0.80 (0.47–1.45) | Control. |
+| G game | 4/10 | peak share out over 120 s 0.08 (0.03–0.14); food home 17 % you, 14 % rival; nobody beaten in 600 s; 2.4 ms/tick | The peak counts every ant out over 120 s at any sample, far explorers included, so it reads higher than ja-ipu's figure. The 7 % mark needs a stall-specific measure (an ant that isn't getting anywhere) before it can gate. The player out-forages the rival on most seeds (ja-t6u, ja-slv). |
+
+### 14.3 Response hooks (MR 1)
+
+`colony/responses.ts` turns the small fixed mechanics into an ant's **responses**. Each is a function of a small situation `Touch` (mode × carrying × at nest × enemy near × stance, 96 values):
+
+| Hook | Question | Local default (the old mechanic) |
+|---|---|---|
+| `get` | touching food with empty jaws: take one? | yes, unless fighting |
+| `carry` | carrying: which mode? | `return` |
+| `drop` | carrying, at a place to put it down (the nest for now): put it down? | yes |
+| `trail` | which trail to lay this step | food when carrying, else home |
+| `trailRate` | how much (× `deposit`) | 1 |
+| `alarmGain` | how hard to shy from alarm (× `alarmAvoid`) | 0 fighting, else 1 |
+| `raiseAlarm` | alarm laid in a fight (× the fight's `alarm`) | 1 |
+
+- `localResponses` reproduces the old behaviour exactly. The golden test passes unchanged, and `colony-bench` shows the same stored counts and tick time: median ~2.5 ms for 1,200 + 1,200 ants, before and after.
+- Experiments swap hooks with `responses({ … })` per side (`Sides.responses`, `Sides.rivalResponses`).
+- **Jev.** `get`, `carry`, `drop` and `trail` each have a question packer (`colonyBrain.packResponseRequest`, a shared `RESPONSE_LEGEND`, and a cache context per hook and doctrine). They are **not asked live yet**; each behaviour MR turns its lane on after its assays. The rates stay local tuning knobs.
+  - `npm run colony-cost` now also estimates each response lane as if it were live. Seed 1, 600 + 600 ants, 5 sim-minutes, 4 distinct doctrines:
+
+| Lane | Situations | Tokens | Cost |
+|---|---|---|---|
+| get | 28 | ~11k | $0.0005 |
+| carry | 26 | ~12k | $0.0005 |
+| drop | 7 | ~3k | $0.0001 |
+| trail | 64 | ~21k | $0.0009 |
+
+  - That is ~400 tokens per question, as for modes. The ant situation schema and the mode lane are unchanged, so tokens per ant decision are unchanged.

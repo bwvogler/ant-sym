@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
-import { Game, type Outcome } from "../colony/game.ts";
-import { generateWorld, mulberry32 } from "../colony/world.ts";
+import { Game, gameRng, type Outcome } from "../colony/game.ts";
+import { generateWorld } from "../colony/world.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
 // loop, like useEngine for the picture: React state carries only what the
@@ -64,7 +64,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   // Bumped by Restart: the same seed again, from scratch.
   const [generation, setGeneration] = useState(0);
   const game = useMemo(
-    () => new Game(generateWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival }, mulberry32(controls.seed * 7919 + generation)),
+    () => new Game(generateWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival }, gameRng(controls.seed, generation)),
     [controls.seed, controls.antCount, controls.rival, generation],
   );
   const colony = game.player;

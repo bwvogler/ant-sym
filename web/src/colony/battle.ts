@@ -3,7 +3,7 @@ import type { Colony } from "./colony.ts";
 import type { WorldSize } from "./world.ts";
 
 // Fights, pure. An ant with enemies in the 3×3 cells around it is in a fight:
-// it lays alarm in its own colony's field (so allies smell it and, by stance
+// it lays alarm in its own colony's field (as loud as its raiseAlarm response says) (so allies smell it and, by stance
 // or doctrine, come or keep away) and may die. Its chance of dying in dt is
 // Lanchester-like: rate × dt × enemies around ÷ allies around, so equal
 // numbers trade and the bigger crowd wins. Deaths are decided for everyone
@@ -97,7 +97,8 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       }
       if (enemies === 0) continue;
       const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy));
-      c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt);
+      const raise = c.responses.raiseAlarm(c.touch(i, true));
+      if (raise) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * raise * dt);
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
     }
   });
