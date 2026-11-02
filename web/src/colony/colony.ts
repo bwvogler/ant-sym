@@ -931,8 +931,9 @@ export class Colony {
         // Passing a fork's undug arm: dig it (if it is still a tunnel's end), else walk on.
         const fork = takeFork(map, cx, cy);
         let fd = fork ? fork.dir : -1;
-        // Social, like any dig: a passer-by who won't dig now leaves the fork for the next.
-        if (fork && this.friends && this.#rng() > digChance(this.friends, cx, cy)) {
+        // Social, like any dig, and rare in a roomy nest (ROOMY_DIG, as at a tunnel's end): a passer-by who won't dig
+        // now leaves the fork for the next.
+        if (fork && ((this.friends && this.#rng() > digChance(this.friends, cx, cy)) || (!this.crowded() && this.#rng() > ROOMY_DIG))) {
           markFork(map, cx, cy, fork.dir, fork.aim);
           fd = -1;
         }
