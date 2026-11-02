@@ -242,7 +242,10 @@ export class ColonyJev {
    */
   setMenu(menu: Set<string>): void {
     this.#menu = new Set(menu);
-    if (this.#fungus) this.#fungus.menu = new Set(menu);
+    if (this.#fungus) {
+      this.#fungus.menu = menu;
+      this.#menu = new Set(this.#fungus.menu); // the fungus drops what its map can't run (NEST_ONLY on top-down maps)
+    }
     this.#fungal.queue.clear();
   }
 

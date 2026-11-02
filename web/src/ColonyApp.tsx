@@ -379,8 +379,8 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
       <dd className="tabular-nums">{s.stored.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.losses.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.births.toLocaleString()}</dd>
-      <dd className={`tabular-nums ${s.queen === "lost" ? "text-err" : ""}`} title="the queen, and brood: eggs / larvae / pupae (side view). A colony whose queen is lost is orphaned: no more eggs; its workers age out.">
-        {s.queen === null ? "–" : `${s.queen === "lost" ? "orphaned" : "queen"} · ${s.brood.join(" / ")}`}
+      <dd className={`tabular-nums ${s.queen === "lost" ? "text-err" : ""}`} title="the queen, and brood: eggs / larvae / pupae (side view). A colony whose queen is lost is orphaned: no more eggs; its workers age out. Brood killed by the fungus's crown is counted after a †.">
+        {s.queen === null ? "–" : `${s.queen === "lost" ? "orphaned" : "queen"} · ${s.brood.join(" / ")}${s.broodKilled ? ` † ${s.broodKilled}` : ""}`}
       </dd>
       <dd className="tabular-nums" title="soil cells dug / pellets of it brought out to the mound / pellets put back into unused space underground (side view: loose mound pellets too)">
         {s.dug.toLocaleString()} / {s.mound.toLocaleString()} / {s.filled.toLocaleString()}

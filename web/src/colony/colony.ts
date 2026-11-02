@@ -1821,7 +1821,7 @@ export class Colony {
     // CROWN_RATE a second (at once, spores painted on the royal chamber orphaned the colony in its first second).
     const crown = 1 - Math.exp(-CROWN_RATE * dt);
     for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i] || (this.regicide[i] as number) < 0.5) continue;
+      if (!this.alive[i] || (this.regicide[i] as number) < 0.5 || !this.#under[i]) continue; // the queen and brood are underground
       this.antCell(i);
       const hx = CELL[0] as number;
       const hy = CELL[1] as number;

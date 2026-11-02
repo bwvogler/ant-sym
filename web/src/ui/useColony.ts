@@ -57,6 +57,8 @@ export interface SideStats {
   /** nest slice 4 (the side view): the queen ("lost": orphaned), and brood as eggs / larvae / pupae; null on the top-down maps */
   queen: "alive" | "lost" | null;
   brood: [number, number, number];
+  /** brood killed by the fungus's crown (nest slice 8) */
+  broodKilled: number;
   stance: Stance;
   /** share of living ants carrying the fungus */
   infected: number;
@@ -108,7 +110,7 @@ function seenTogether(colonies: readonly Colony[]): number {
 
 function side(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, brood: c.brood.counts(), stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled + c.looseFilled };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled + c.looseFilled };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */

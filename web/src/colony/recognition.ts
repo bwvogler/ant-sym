@@ -1,6 +1,6 @@
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
-import { CELL, discOffsets } from "./hex.ts";
+import { CELL, cellOf, discOffsets } from "./hex.ts";
 
 // Recognition, pure (ja-t4d.3, docs/fungus-policy.md §4.B). Who is an enemy
 // is no longer "an ant of another colony" but "an ant whose odour differs
@@ -247,11 +247,21 @@ export class Recognition {
       const r2 = nest.r * nest.r;
       let at = 0;
       let sum = 0;
+      // In the side view with a queen, the ants in the colony's royal chambers (nest slice 8: the founding disc, r 3,
+      // held few of them once the royal chamber had widened); else the ants within the nest's disc.
+      const ch = c.queen ? c.map.chambers : null;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
-        const dx = (c.x[i] as number) - nest.x;
-        const dy = (c.y[i] as number) - nest.y;
-        if (dx * dx + dy * dy >= r2) continue;
+        if (ch) {
+          cellOf(c.x[i] as number, c.y[i] as number);
+          const k = ch.at(CELL[0] as number, CELL[1] as number);
+          const room = k >= 0 ? ch.list[k] : undefined;
+          if (!room || room.role !== "royal" || room.colony !== c.params.nest) continue;
+        } else {
+          const dx = (c.x[i] as number) - nest.x;
+          const dy = (c.y[i] as number) - nest.y;
+          if (dx * dx + dy * dy >= r2) continue;
+        }
         at++;
         sum += c.odour[i] as number;
       }

@@ -7,7 +7,8 @@ import { Fungus, INTERVENTIONS, intervention, LETHAL, STRAINS } from "../fungus.
 import { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { CountGrid, occupancy } from "../battle.ts";
-import { generateSideWorld, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../world.ts";
+import { MARKS } from "../pheromone.ts";
+import { generateSideWorld, generateWorld, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../world.ts";
 
 // Nest slice 8 (docs/nest-and-home.md §4): the fungus on the new home. Its ground is the nest's places; it can blunt
 // or swap a host's floor marks (muddle); a lethal strain-gated crown kills the queen and brood; a Bloom host's corpse
@@ -24,7 +25,7 @@ function walkway(map: WorldMap, x: number): number {
 
 test("the fungus's ground in the side view: its own chamber, its own tunnels, the open ground, another's chamber", () => {
   const map = generateSideWorld(2, SMALL);
-  const a = new Colony(map, { antCount: 4, maxAnts: 4, nest: 0 }, mulberry32(1));
+  const a = new Colony(map, { antCount: 5, maxAnts: 5, nest: 0 }, mulberry32(1));
   const b = new Colony(map, { antCount: 1, maxAnts: 1, nest: 1 }, mulberry32(2));
   const place = (i: number, x: number, y: number) => ((a.x[i] = x), (a.y[i] = y));
   place(0, map.nests[0]!.x, map.nests[0]!.y); // own chamber
@@ -33,12 +34,13 @@ test("the fungus's ground in the side view: its own chamber, its own tunnels, th
   const sx = (CELL[0] as number) + 20;
   place(2, centreX(sx, walkway(map, sx)), centreY(walkway(map, sx))); // the open ground
   place(3, map.nests[1]!.x, map.nests[1]!.y); // the rival's chamber
+  place(4, map.nests[1]!.entrance!.x, map.nests[1]!.entrance!.y + 2); // the rival's shaft (review of slice 8: read as its own tunnel)
   b.x[0] = map.nests[1]!.x + 50; // far away
-  for (let i = 0; i < 4; i++) ((a.load[i] = 0.5), (a.strain[i] = GARDEN));
+  for (let i = 0; i < 5; i++) ((a.load[i] = 0.5), (a.strain[i] = GARDEN));
   const f = new Fungus(map, { grooming: 0 });
-  f.hosts = 4;
+  f.hosts = 5;
   f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6);
-  assert.deepEqual([0, 1, 2, 3].map((i) => decodeFungal(a.fungal[i]!, "garden").ground), ["home", "tunnel", "border", "foreign"]);
+  assert.deepEqual([0, 1, 2, 3, 4].map((i) => decodeFungal(a.fungal[i]!, "garden").ground), ["home", "tunnel", "border", "foreign", "foreign"]);
 });
 
 test("muddle: a host misreads its floor marks: in a brood chamber it is asked as in a store; blunted, it can't tell", () => {
@@ -106,4 +108,63 @@ test("on the midden a Bloom host's corpse sporulates; a Garden host's doesn't", 
   };
   assert.ok(spores(BLOOM) > 0, "Bloom");
   assert.equal(spores(GARDEN), 0, "Garden");
+});
+
+test("crown takes hold only from a high load; muddle and crown are offered only where there is a nest", () => {
+  const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
+  const c = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(4));
+  const f = new Fungus(map);
+  f.express(c, 0, intervention("crown"), 0.5); // "mid"
+  assert.equal(c.regicide[0], 0, "not from a mid load (review: it acted from 0.35)");
+  f.express(c, 0, intervention("crown"), 0.75);
+  assert.equal(c.regicide[0], 1);
+  assert.ok(f.menu.has("muddle"));
+  f.menu = new Set([...f.menu, "crown"]);
+  assert.ok(f.menu.has("crown"));
+  const top = new Fungus(generateWorld(2));
+  assert.ok(!top.menu.has("muddle"), "the top-down maps have no chambers to muddle");
+  top.configure({ hide: false, cull: false }, ["dormant", "muddle", "crown", "cull"]);
+  assert.deepEqual([...top.menu].sort(), ["cull", "dormant"]);
+  assert.deepEqual(top.offered(BLOOM), ["dormant", "cull"]);
+});
+
+test("a host's corpse keeps its load and strain; a muddled ant reads no road sign", () => {
+  const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
+  const c = new Colony(map, { antCount: 2, maxAnts: 2 }, mulberry32(6), () => "explore");
+  c.load[1] = 0.8;
+  c.strain[1] = BLOOM;
+  c.kill(1);
+  const k = c.corpses.at(-1)!;
+  assert.ok(Math.abs(k.load - 0.8) < 1e-6 && k.strain === BLOOM, "kill() records them (the midden's spores read them)");
+  // Road signs: underground on a strong mark of where it is going, a homing ant's vector error fades; muddled (marks × 0.3), it doesn't.
+  const run = (marks: number) => {
+    const d = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(7), () => "return");
+    // in the shaft, not a chamber (arriving in one resets the vector)
+    const sx = map.nest.entrance!.x;
+    const sy = map.nest.entrance!.y + 3;
+    cellOf(sx, sy);
+    const [mx, my] = [CELL[0] as number, CELL[1] as number];
+    // the marks of wherever it heads for, on its cell and the rows by it (it steps a row a tick before it reads)
+    const sign = () => {
+      for (const m of MARKS) for (let dy = -2; dy <= 2; dy++) for (let dx = -1; dx <= 1; dx++) d.ph.fields[m].set(mx + dx, my + dy, 2); // strong (≥ 1), but not × 0.3
+    };
+    d.x[0] = sx;
+    d.y[0] = sy;
+    d.mode[0] = 2;
+    d.gainMarks[0] = marks;
+    d.tick(1 / 30);
+    d.odoNest[0] = 10;
+    for (let t = 0; t < 30; t++) {
+      d.x[0] = sx;
+      d.y[0] = sy;
+      d.ph.fields.home.clear(); // the marks alone: no home trail to read either
+      sign();
+      d.tick(1 / 30);
+    }
+    return d.odoNest[0]!;
+  };
+  const clear = run(1);
+  const muddled = run(0.3);
+  assert.ok(clear < 9.5, `the sign is read: ${clear.toFixed(2)}`);
+  assert.ok(muddled > clear + 0.3, `muddled, it fades less: ${muddled.toFixed(2)} vs ${clear.toFixed(2)}`);
 });

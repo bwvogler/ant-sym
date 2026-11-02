@@ -1680,17 +1680,19 @@ The nest gives the fungus new levers (docs/nest-and-home.md §4). Everything her
 - `home`: one of its own colony's chambers;
 - `tunnel`: its own nest's tunnels and shafts;
 - `border`: the open ground;
-- `foreign`: another colony's chamber.
+- `foreign`: another colony's chamber or tunnels (which nest a tunnel is is told by the nearest hole).
 
 This replaces the home-field ratio. It makes 4 × 4 × 3 × 4 × 2 = 384 situations per strain, up from 288. I left out a chamber role per ground value: it would multiply situations by five, and the in-nest field (§32) already tells the ants.
 
 **Two new interventions:**
 - **`muddle`** (Lockpick; not lethal). The host smells its floor marks at 0.3 of their strength, so at full load it can't tell which chamber it is in and follows road signs weakly. It also swaps brood and store, both in the situation it is asked in and in the signs it follows home. This is the nest's "roam".
-- **`crown`** (Bloom; lethal, off the menu by default, like cull). From a high load, a host by the queen kills her, and a host by a brood item kills it, each with chance `CROWN_RATE` (0.05) a second. The queen's death orphans the colony (§33). The first cut killed at once; spores painted on the royal chamber then orphaned the colony in its first second.
+- **`crown`** (Bloom; lethal, off the menu by default, like cull). From a high load only (≥ `HIGH_LOAD` 0.7), a host by the queen kills her, and a host by a brood item kills it, each with chance `CROWN_RATE` (0.05) a second. The queen's death orphans the colony (§33). The first cut killed at once; spores painted on the royal chamber then orphaned the colony in its first second.
 
 **The midden.** An infected corpse carries its load and strain. Put on the midden by a strain that sporulates (Bloom, `sporulates`), it puts spores on the ground there (`MIDDEN_SPORES` 3). Other strains die with their host: carrying them out is hygiene.
 
-**Nest odour** still drifts toward the ants in the nest's disc. In the side view that disc is the founding chamber, which is the royal one (§32), so no change was needed.
+**Nest odour** (recognition) drifts toward the ants in the colony's royal chambers in the side view, as §4 asks. The first cut kept the nest's disc (r 3), which held few of them once the royal chamber had widened to 9–12 columns.
+
+**Only where there is a nest.** `muddle` and `crown` (`NEST_ONLY`) are dropped from the menu on the top-down maps, where there are no chambers or queen: `Fungus.menu` filters them, and the Jev lane reads its menu back from the fungus.
 
 **`FUNGUS_BRAIN_VERSION`** is 4. The legend says what each ground is.
 
@@ -1699,10 +1701,10 @@ This replaces the home-field ratio. It makes 4 × 4 × 3 × 4 × 2 = 384 situati
 | World | Seed | No fungus: lost | Garden: unified at | Garden: lost | Infected | Ants at 10 min |
 |---|---|---|---|---|---|---|
 | side | 1 | 21 / 31 | 108 s | 0 / 0 | 100 / 91 % | 450 / 401 |
-| side | 2 | 35 / 37 | 103 s | 0 / 0 | 92 / 98 % | 433 / 450 |
-| side | 3 | 51 / 72 | 103 s | 0 / 0 | 68 / 66 % | 450 / 450 |
+| side | 2 | 35 / 37 | 104 s | 0 / 0 | 92 / 98 % | 433 / 450 |
+| side | 3 | 51 / 72 | 104 s | 0 / 0 | 68 / 66 % | 450 / 450 |
 
-- Garden still unifies, at the same times (103–108 s against 108–112 s), with no deaths.
+- Garden still unifies, at the same times (104–108 s against 108–112 s), with no deaths.
 - Without the fungus the colonies now lose 21–72 ants each, where §29 lost none: raids reach the other nest since slice 7 (§36). So Garden's peace is now worth something.
 
 **Crown and muddle in a game.** Neither is chosen by the local rule, only by Jev, so a scripted policy stands in. Colony 1 is painted 4× at its hole; 300 + 300 ants; 10 minutes.
@@ -1719,14 +1721,30 @@ This replaces the home-field ratio. It makes 4 × 4 × 3 × 4 × 2 = 384 situati
 **Bench** (side view, 1,200 + 1,200 ants): 7.3 ms a tick, against 7.0 ms.
 
 **Tests:** `fungusHome.test.ts`:
-- the four grounds;
-- muddle, blunted and swapped;
-- crown kills the queen and brood, not at once, and it is lethal, Bloom's, and off the menu;
+- the four grounds, including a host in the rival's shaft (foreign);
+- muddle, blunted and swapped in the situation; blunted, a road sign of strength 2 is not read (the vector's error doesn't fade);
+- crown kills the queen and brood, not at once, only from a high load, and it is lethal, Bloom's, and off the menu;
+- muddle and crown are not on a top-down map's menu, even when asked for;
+- `kill()` records a host's load and strain on its corpse;
 - a Bloom corpse on the midden sporulates and a Garden one doesn't.
+
+The tests for the rival's shaft, the high-load threshold and the unread road sign each fail without their fix.
 
 `fungalPolicy.test.ts`: 384 situations, and what each strain is offered.
 
-**Jev cost.** Fungus lane, tokens per fungal situation with every intervention on the menu (`estimateTokens`):
+**Review fixes.** An agent review found:
+- a host in the rival's tunnels read `tunnel` (its own);
+- crown acted from load 0.35, not a high one;
+- muddle was offered on the top-down maps, where it does nothing;
+- the ant card and stats didn't show the new levers or the brood crown killed (now: "its nest's floor marks ×0.30", "brood as store", "kills the queen and brood it touches", and "† n" after the brood counts);
+- three tests would have passed with the feature broken;
+- the nest odour's disc missed most of the royal chamber;
+- `game.ts` read the global strain list, not the fungus's;
+- the crown loop scanned brood for hosts on the surface.
+
+All are fixed. Unity moved by one second; the crown runs are unchanged (the scripted policy only crowned at high load).
+
+**Jev cost.** Fungus lane, tokens per fungal situation with every intervention on the menu (`estimateTokens`, side view; on the top-down maps Lockpick stays at 232):
 - Lockpick: 232 → 276;
 - Bloom: 297 → 343 (crown included; it is off by default);
 - Garden: 315, unchanged.

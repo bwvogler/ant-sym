@@ -2,7 +2,7 @@ import { centreX, centreY, R } from "./hex.ts";
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, LARVA_FOOD, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
 import { LARVA, PUPA } from "./brood.ts";
-import { Fungus, INFECTED, STRAINS, type FungusParams } from "./fungus.ts";
+import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { WorldMap } from "./world.ts";
 
@@ -189,7 +189,7 @@ export class Game {
       for (const k of c.corpses) {
         if (!k.midden || k.spored) continue;
         k.spored = true;
-        if (k.load >= INFECTED && STRAINS[k.strain]?.sporulates) this.fungus.paint([], centreX(k.x, k.y), centreY(k.y), 0.6, MIDDEN_SPORES, 0, k.strain);
+        if (k.load >= INFECTED && this.fungus.strains[k.strain]?.sporulates) this.fungus.paint([], centreX(k.x, k.y), centreY(k.y), 0.6, MIDDEN_SPORES, 0, k.strain);
       }
     if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null);
     if (this.time >= this.#nextStrategy) {

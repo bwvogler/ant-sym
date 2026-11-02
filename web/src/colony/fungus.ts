@@ -95,6 +95,9 @@ export const INTERVENTIONS: readonly Intervention[] = [
   { id: "crown", name: "crown", blurb: "its host kills the queen and brood it touches: the colony is orphaned (lethal)", levers: { ...AS_IS, regicide: 1 } },
 ];
 
+/** Interventions that act on the nest (its chambers' marks, its queen): offered only in the side view. */
+export const NEST_ONLY: ReadonlySet<string> = new Set(["muddle", "crown"]);
+
 /** Interventions that kill their host: a strain must allow them, and the player's menu starts with them off. */
 export const LETHAL: ReadonlySet<string> = new Set(["cull", "crown"]);
 
@@ -276,8 +279,15 @@ export class Fungus {
   policy: FungusPolicy | null = null;
   /** the local rule's settings (the player's thresholds) */
   rule: FungusRule = { ...DEFAULT_RULE };
-  /** the interventions the player has on (§5.1, lever 4): lethal ones start off */
-  menu: Set<string> = new Set(INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)));
+  /** the interventions the player has on (§5.1, lever 4): lethal ones start off; the nest's (NEST_ONLY) only where there is a nest */
+  #menu: Set<string> = new Set(INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)));
+  get menu(): Set<string> {
+    return this.#menu;
+  }
+  set menu(menu: Iterable<string>) {
+    // On the top-down maps there are no chambers or queen: muddle and crown would do nothing (review of nest slice 8).
+    this.#menu = new Set([...menu].filter((id) => this.map.sky || !NEST_ONLY.has(id)));
+  }
   /** seconds owed since the last step (advance) */
   #clock = 0;
   /** what #gather read around the ant being stepped */
@@ -287,6 +297,7 @@ export class Fungus {
     this.map = map;
     this.params = { ...DEFAULT_FUNGUS, ...params };
     this.strains = strains;
+    this.menu = this.#menu; // through the setter: the nest's interventions only where there is a nest
   }
 
   /** Whether there is anything for a step to do: spores on the ground or load in any ant. */
@@ -427,7 +438,7 @@ export class Fungus {
             // The side view (nest slice 8): its own chamber, its own nest's tunnels, the open ground, another's chamber.
             const at = ch.at(cx, cy);
             if (at >= 0) ground = ch.list[at]!.colony === c.params.nest ? "home" : "foreign";
-            else if (this.map.sky.get(cx, cy) !== 1) ground = "tunnel";
+            else if (this.map.sky.get(cx, cy) !== 1) ground = this.#nearestHole(cx) === c.params.nest ? "tunnel" : "foreign"; // review: a rival's shaft read as its own
           } else {
             const own = c.ph.fields.home.get(cx, cy);
             const theirs = c.foreign ? c.foreign.fields.home.get(cx, cy) : 0;
@@ -585,13 +596,30 @@ export class Fungus {
   /** The player's settings: the local rule's thresholds and the menu (§5.1, levers 4 and 5). */
   configure(rule: FungusRule, menu: Iterable<string>): void {
     this.rule = { ...rule };
-    this.menu = new Set(menu);
+    this.menu = menu;
   }
 
   /** The local rule with the player's settings. */
   local(s: FungalSituation): string {
     return localFungusRule(this.rule)(s);
   }
+
+  /** The nest whose hole is nearest column x (underground: whose tunnels these are). */
+  #nearestHole(x: number): number {
+    // Each hole's column, once (cellOf writes the shared CELL, which the step is reading).
+    this.#holeCols ??= this.map.nests.map((n) => (n.entrance ? Math.round(n.entrance.x) : NaN));
+    let best = -1;
+    let d = Infinity;
+    this.#holeCols.forEach((hx, k) => {
+      const dk = Math.abs(hx - x);
+      if (dk < d) {
+        d = dk;
+        best = k;
+      }
+    });
+    return best;
+  }
+  #holeCols: number[] | null = null;
 
   /** What a host of strain s may run: what the strain allows and the menu has on. */
   offered(s: number): string[] {
@@ -640,7 +668,7 @@ export class Fungus {
     c.gainMarks[i] = 1 + (v.marks - 1) * l;
     c.swapMarks[i] = v.swap * l;
     // Regicide, like cull, is all or nothing: from a high load.
-    c.regicide[i] = v.regicide * Math.min(1, l / HIGH_LOAD);
+    c.regicide[i] = l >= HIGH_LOAD ? v.regicide : 0; // from a high load only (review: min(1, l / HIGH) acted from 0.35)
   }
 
   /** How far the fungus is into colony c, and how far c has answered it. */
