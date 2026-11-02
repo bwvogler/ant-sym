@@ -112,7 +112,7 @@ When the queen dies, the colony is **orphaned**:
 
 *Fallen* stays "no workers left". *Orphaned* is shown as a state (a banner and the stats), not an ending. Several queens, adopting queens and pleometrosis are per-species options (MR 8 species framework, `ja-8fd`; queens and lineage, `ja-1vg`).
 
-**A path to unification (speculative, to design in MR 8):** in some multi-queen species, workers can join or adopt from a neighbour. An orphaned colony merging into a neighbour it tolerates (same odour, via Garden) is a unification route grounded in biology. It is also a hard, lethal, strain-gated fungus play: infect the queen.
+**A path to unification** (*designed in slice 9: docs/queens-and-merging.md, PRD §38*)**:** in some multi-queen species, workers can join or adopt from a neighbour. An orphaned colony merging into a neighbour it tolerates (same odour, via Garden) is a unification route grounded in biology. It is also a hard, lethal, strain-gated fungus play: infect the queen.
 
 ## 4. What the fungus touches
 

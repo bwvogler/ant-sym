@@ -1751,3 +1751,17 @@ All are fixed. Unity moved by one second; the crown runs are unchanged (the scri
 
 The legend's longer `ground` line is shared across a request's hosts, so it costs little per host. The colony lane is unchanged at 237.
 
+## 38. Several queens, adoption, orphans merging: a design note (nest slice 9, ja-wjw, 2026-11-02)
+
+Docs only: `docs/queens-and-merging.md`. It designs, for MR 8 and MR 10:
+- **queens as a list**, with a per-species trait (one or several; the fire ant's polygyne form is a per-colony flag, after Ross & Keller 1998);
+- **queen adoption** within odour tolerance, once nuptial flights exist;
+- **orphans merging into a tolerated neighbour**, after army ants (Kronauer et al. 2010): an orphaned colony's workers defect when they meet a colony they tolerate, and a merged colony counts as unified, not fallen. With Bloom's crown and Garden this is the "infect the queen" unification play of docs/nest-and-home.md;
+- **worker-laid males**, in the lifetime layer.
+
+No situation changes for the ants or the fungus; the strategist might gain `orphaned` (negligible cost; measure with `npm run colony-cost` when built).
+
+Follow-ups: `ja-8fd.1`, `ja-8fd.2`, `ja-1vg.1`, `ja-1vg.2`.
+
+**Jev cost:** unchanged (no code).
+
