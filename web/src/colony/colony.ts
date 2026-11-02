@@ -657,7 +657,8 @@ export class Colony {
         const dug = chooseDig(map, cx, cy, aim, this.#rng());
         // The other arm two ways round from the way actually dug, on the other side: never next to it, so both
         // stay a tunnel's end (taken from the aim, a dithered dig put the two arms side by side about 1 fork in 8).
-        if (dug >= 0 && forkSide !== 0) markFork(map, cx, cy, DIR_ANGLE[(dug - 2 * forkSide + 12) % 6] as number);
+        // It carries on at the mirrored heading, drift and all, so its run wanders like any tunnel's.
+        if (dug >= 0 && forkSide !== 0) markFork(map, cx, cy, (dug - 2 * forkSide + 12) % 6, aim - forkSide * ((2 * Math.PI) / 3));
         if (dug < 0 && rockAt(map, stepX(cx, cy, next), stepY(cy, next)) !== OPEN) {
           this.gx[i] = NO_CELL; // walled in on every side (it can't be, having walked in): steer freely
           return false;
@@ -667,10 +668,10 @@ export class Colony {
       } else {
         // Passing a fork's undug arm: dig it (if it is still a tunnel's end), else walk on.
         const fork = takeFork(map, cx, cy);
-        const fd = Number.isNaN(fork) ? -1 : dirOf(fork);
-        if (fd >= 0 && rockAt(map, stepX(cx, cy, fd), stepY(cy, fd)) === SOIL && tunnelEnd(map, stepX(cx, cy, fd), stepY(cy, fd))) {
+        const fd = fork ? fork.dir : -1;
+        if (fork && rockAt(map, stepX(cx, cy, fd), stepY(cy, fd)) === SOIL && tunnelEnd(map, stepX(cx, cy, fd), stepY(cy, fd))) {
           dir = fd;
-          this.digAim[i] = fork;
+          this.digAim[i] = fork.aim;
         } else {
           dir = next;
           this.digAim[i] = NaN; // walking on, not to a face
