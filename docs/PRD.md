@@ -1396,7 +1396,7 @@ The side view's nest is no longer one pre-dug disc. The ants dig chambers off it
 - **Crowded,** explorers in tunnels also start new chambers sideways, likelier near the top (`exp(−depth / 40)`).
   - None start in the top 8 rows. One started 5 rows down beside the shaft trapped a whole colony's pellet carriers.
   - None start within `4 + 0.15 × depth` rows of a chamber in the same stack.
-- **Roomy,** every other kind of digging happens at `ROOMY_DIG` (15 %) of its rate: tunnel ends, starts off walls, faces met head-on. A 30-ant colony in the founding chamber dug 3–7 cells in two minutes, against about 78 without chambers.
+- **Roomy,** every other kind of digging happens at `ROOMY_DIG` (15 %) of its rate: tunnel ends, starts off walls, faces met head-on. A 30-ant colony in the founding chamber dug 3–7 cells in two minutes, against about 78 without chambers (from before the review fix: corrected under the table below).
   - **Floor building is exempt from #14's youth guard** (since #17's second merge, 2026-11-02). Nothing dug in the last 200 s is filled back (`BACKFILL.young`), but a tunnel dug down out of a chamber takes its floor with it until it is filled, so with the guard the floor barely grew in a 240 s game: 1.0–2.3× its start (worlds 1–4, games 4–6; 2.4–3.7× before #14). Filling the ground a floor stands on (`#floorGround`: a cell directly under a chamber cell, or beside one on its floor row) is construction, not spare soil put away, so it may be filled at once: 2.1–3.1× at 240 s, and the crowded-nest test is back to 240 s. `hold` (refilled soil isn't dug again for 600 s) and `besideRefill` still apply everywhere; exempting floor ground from `besideRefill` too added little (2.4–3.3×).
     - Refills in 240 s: 21–47 floor-ground cells and 7–174 others (without the exemption, 0–18 and 5–186).
     - Do floor fills cycle? Over 1,200 s (games 4 and 5 of world 2, game 4 of world 4), 35–49 % of floor-ground fills were dug out again once `hold` ran out (32 of 92, 37 of 75, 28 of 62), against 5–17 % of other fills (47 of 716, 24 of 469, 73 of 418). Without the exemption: 0 % and 65 % of a few dozen floor fills, 1 % and 30 % of other fills (two games). **Floor fills cycle:** once `hold` runs out (600 s), they are dug out again at 2–7× the rate of other fills. Not fixed here; left for the F2 fix-up. Floor at 1,200 s is 2.9–4.1×. **Fixed in F2 (§41):** soil put back under a chamber cell stays for good.
@@ -1416,6 +1416,18 @@ The side view's nest is no longer one pre-dug disc. The ants dig chambers off it
 | Food home | 16,705 | 15,676 (−6 %) |
 
 Food home is down because less digging reaches less of the food underground. Pellet carriers climbing out of wide chambers by straight line and Bug2 can still wander (filed as a follow-up).
+
+**Corrected (F2, §41; review of #21 item 3).** The table's "out over 120 s" is identical to two decimals while digging fell, and the 30-ant figure below was from before the review fix. Re-measured with `scripts/economy-bench.mjs` on the PR heads as they now stand (#20 at 22180ae, #21 at 9c1969e, both since merged with #14's backfill fixes; seeds 1–6, 600 + 600 ants, 600 s):
+
+| | Slice 1 (#20) | Slice 2 (#21) |
+|---|---|---|
+| Cells dug, all colonies | 19,083 | 18,803 (−1.5 %) |
+| Chambers per colony at 600 s | 1 (given) | 14–24 |
+| Out over 120 s, mean / worst | 0.86 % / 9.0 % | 2.53 % / 23.7 % |
+| Food home | 18,667 | 18,598 |
+
+- With #14's backfill merged in, both slices dig far less than the table above (most pellets now go back underground), and the chambers no longer cut digging. The reviewer's run of the PR as it was: out over 120 s 1.85 % / 11.6 % → 1.41 % / 11.3 %.
+- The roomy nest (`scripts/roomy-bench.mjs`, games 6–9): on #21's head 30 ants dig 12–21 cells in two minutes against 47–84 without chambers (ratio 0.14–0.33, 0.24 summed); the reviewer measured 13–25 against 74–83. On F2's branch, 11–51 against the same (0.13–1.09 by game, 0.45 summed; the test asks under 0.5 summed).
 
 **Depth profile** (Tschinkel; per 10-row band below the ground). These are **imposed by rule, not emergent** (review of #21): the gap is `#chamberRoom`'s spacing, 4 + 0.15 × depth rows, and "largest near the top" is `WIDEN_DEPTH`'s falloff. The crowded-nest test checks that the rule shows in the nest the ants dig, nothing more:
 - **Gap to the chamber above in the same stack** grows with depth on 11 of 12 colonies (one is nearly flat at 9–11): about 4–10 rows at 10–20 deep, 5–13 at 20–30, 7–14 at 30–40, and 10–32 below 40.
@@ -2141,15 +2153,29 @@ Three committed harnesses, each with a `root` argument so one script measures an
 
 **Measured** (app map, 600 ants a colony, to 3,600 s; seeds 1–2; before → after):
 
-ECONOMY_TABLE
+| | Seed 1 | Seed 2 |
+|---|---|---|
+| **One colony:** workers at 600 s | 767 → 900 (the cap) | 622 → 900 |
+| workers at 3,600 s | 203 → 878 | 0 → 810 |
+| births by 3,600 s; died of age | 497, 894 → 924, 646 | 24, 624 → 858, 648 |
+| food home by 3,600 s; its rate over the last 600 s | 3,869, 0.16 / s → 4,542, 0.71 / s | 2,694, 0.00 → 3,656, 0.46 |
+| food lying in the nest at 3,600 s; larvae waiting | 1,700; 54 → 773; 6 | 2,532; 32 → 92; 53 |
+| **Two colonies** (colony 0 / 1): workers at 600 s | 868 / 666 → 846 / 627 | 694 / 659 → 712 / 837 |
+| workers at 3,600 s | 20 / 0 → 842 / 0 | 0 / 0 → 0 / 652 |
+| births by 3,600 s | 452 / 200 → 1,115 / 397 | 117 / 80 → 416 / 907 |
+| lost in fights by 3,600 s | 564 / 684 → 563 / 997 | 9 / 8 → 1,016 / 529 |
+| food home by 3,600 s | 3,753 / 1,888 → 4,487 / 1,613 | 2,348 / 2,330 → 1,731 / 3,846 |
 
-**The long-run test** (`economy.test.ts`). The full game takes about 10 minutes to run an hour, too slow for the suite. The test runs the tests' small map (256 × 160) with one colony of 110 ants (165 at most) and 0.3 of the map's food, about the full game's food per ant (2,190 for 110 founders; 27,840 for 1,200 there). It asserts that most founders died of age (at least 0.6 × 110), births at least matched those deaths, no more than 5 larvae at once waited over a minute with food enough lying in the nest, and the colony holds its size (at least 110 at 3,600 s). On this branch: 162 workers, 177 born, 125 dead of age. With `LIFESPAN` 1,800 s: 20 workers (it fails). With the old food flow: 134, but 28 larvae waited unfed beside enough food (it fails). On nest 9 the same game is dead by 3,000 s. About a minute to run.
+- Before, every colony with a queen that no fight destroyed died of old age, with its food lying in the nest (one colony, seed 2: 2,532 food and 32 waiting larvae, no worker left). After, every such colony holds 650–890 workers at 3,600 s.
+- On both seeds' two-colony games one colony is destroyed in fights by 1,800 s (about 1,000 lost), the other survives the hour. See Open.
+
+**The long-run test** (`economy.test.ts`). The full game takes about 10 minutes to run an hour, too slow for the suite. The test runs the tests' small map (256 × 160) with one colony of 110 ants (165 at most) and 0.3 of the map's food, about the full game's food per ant (2,190 for 110 founders; 27,840 for 1,200 there). It asserts that most founders died of age (at least 0.6 × 110), births at least matched those deaths, no more than 5 larvae at once waited over two minutes unfed with food enough lying in the nest, and the colony holds its size (at least 110 at 3,600 s). On this branch: 152 workers, 167 born, 125 dead of age, and no larva waited two minutes until the last minute (2, with the larder down to 33). With `LIFESPAN` 1,800 s: 20 workers (it fails). With the old food flow: 130, and from 2,940 s up to 30 larvae unfed for over two minutes beside 117–200 food (it fails). On nest 9 the same game is dead by 3,000 s. About a minute to run.
 
 **Food conservation is tested** (`food.test.ts`): map food + food in jaws + larder + Σ brood (1 + fed) + 4 × births equals the map's food, every 5 s of a two-colony game, to 10⁻⁶ (it fails with an egg charged twice). The bench checks the same on every run: drift at most 2.5 × 10⁻⁹ over an hour.
 
 ### Food scent underground (#24 item 1)
 
-Mean ants following food scent underground at 600 s, both colonies: FOLLOW_ROW. The rest are ants following foragers' trails up the shaft to food outside, which is what the trail is for.
+Mean ants following food scent underground at 600 s, both colonies: seed 1, 144.8 / 126.8 before → 25.2 / 37.8 after; seed 2, 119.6 / 141.1 → 56.4 / 14.0 (colony 0 / 1). The rest are ants following foragers' trails up the shaft to food outside, which is what the trail is for.
 
 ### Chambers (#21)
 
@@ -2157,7 +2183,7 @@ Mean ants following food scent underground at 600 s, both colonies: FOLLOW_ROW. 
 - **No chamber cell less than `CHAMBER_MIN_DEPTH` (8) rows under the ground**, every widened cell, measured from the ground as dug (under the mound's loose soil: `#soilTop`), not the mound's top. The new two-colony test (two small worlds, 200 + 200 diggers, 200 s) checks both; it fails with the depth rule reverted (a cell 7 rows down at 80 s). It does not fail with the join re-check reverted: no join happened in eight small two-colony worlds over 400 s, nor on the app map's seeds 5 and 1 over 600 s. Bead `ja-jn2`.
 - **The depth profile is imposed, not emergent** (item 4): §31 and the test now say so.
 - **Nits:** `#chamberFace` and `#chamberSpot` hold the face checks once; the crowded-builder predicate is computed once; `openCell` is one function per map; a chamber's span shrinks when an end cell leaves it (`y0`/`y1` are kept for that).
-- **§31's numbers, re-measured** (item 3): SECTION31
+- **§31's numbers, re-measured** (item 3): see the correction under §31's table.
 
 ### Backfill and chambers (#14 merged into the nest)
 
@@ -2169,7 +2195,7 @@ Mean ants following food scent underground at 600 s, both colonies: FOLLOW_ROW. 
 ### The mound (#17, #16)
 
 - **`LOOSE_DIG` removed** (item 4): it never ran, as the ground under the mound is crust. Loose soil is never dug; `takeLoose` takes only a column's top (its settling branch never ran either).
-- **Loose pellets taken down to backfill mostly come back** (item 5): ROUNDTRIP. The causes are #14's youth guard (nothing dug in the last 200 s is filled), and the shaft and chamber smelling busy. Two fixes were tried and dropped: restarting the carrier's trip clock at the hole (95 %) and a stale walk out from the chamber (91 %). Documented as the rule the owner asked for, with its cost; bead `ja-lft`.
+- **Loose pellets taken down to backfill mostly come back** (item 5): 92–97 % of them at 600 s (one colony, seeds 1–2: 791 of 861 and 1,002 of 1,043 carried back; two colonies: 92–97 % in each of the four), and 99 % over an hour (11,449 of 11,603 and 13,509 of 13,663), against the review's 60–90 %. The causes are #14's youth guard (nothing dug in the last 200 s is filled), and the shaft and chamber smelling busy. Two fixes were tried and dropped: restarting the carrier's trip clock at the hole (95 %) and a stale walk out from the chamber (91 %). Documented as the rule the owner asked for, with its cost; bead `ja-lft`.
 - **One pellet state** (maintainability): what a pellet is and where it goes is one per-ant value (`#soil`: dug, loose going out, loose going down to fill), and `#clearPellet` puts the pellet and all its state down at once, in every place that did it by hand.
 - **The mound is counted on the map** (`map.moundCells`): ants pick up any colony's spoil, so a colony's own count went negative. The tests check each colony's flows (soil out × `SWELL` − taken off + put back) sum to it.
 - **The UI's "dug / mound / filled" adds up:** filled is dug soil put back, so dug = mound + filled + in jaws + lost; loose pellets put back underground show after a "+".
@@ -2188,8 +2214,8 @@ New or changed, each failing with its fix reverted (mutation-checked): the recep
 
 ### Open
 
-- `ja-p0k`: forage the pockets. `ja-lft`: loose-fill round trips. `ja-jn2`: a direct test for the join re-check. `ja-stk`: three stacked chambers in every crowded game.
-- Two colonies: TWOCOL
+- `ja-p0k`: forage the pockets. `ja-lft`: loose-fill round trips. `ja-jn2`: a direct test for the join re-check. `ja-stk`: three stacked chambers in every crowded game. `ja-war`: one of two colonies falls in fights.
+- Two colonies: on seeds 1 and 2 one colony is destroyed in fights by 1,800 s (997 and 1,016 lost), while the other holds 842 and 652 workers to 3,600 s. Fights and raids are F3's (§39); what the economy changes is that colonies now reach their cap with food to spare, which the strategist reads as a full larder (raid). Bead `ja-war`.
 - The `HOLD_MAX` paths (a nurse's and now a porter's) still have no test.
 
 **Jev cost:** unchanged. No situation, legend or question changed.

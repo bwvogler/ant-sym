@@ -3714,8 +3714,8 @@ const SPOIL_GIVE_UP = 15;
 const LOOSE_SPREAD_PICK = 0.01;
 /**
  * The side view: an explorer on the ground beside the mound takes a pellet of it down to backfill, with this chance a cell.
- * Most such trips find nowhere to fill and carry the pellet back out: 92–97 % on the app's map (PRD §41; the review of
- * MR 15 saw 60–90 %), since nothing dug in the last BACKFILL.young is filled and the shaft and chamber smell busy. Kept as
+ * Most such trips find nowhere to fill and carry the pellet back out: 92–97 % at 600 s and 99 % over an hour on the app's
+ * map (PRD §41; the review of MR 15 saw 60–90 %), since nothing dug in the last BACKFILL.young is filled and the shaft and chamber smell busy. Kept as
  * the owner asked for it (spoil taken down to backfill); see bead ja-lft.
  */
 const LOOSE_FILL_PICK = 0.005;
