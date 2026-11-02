@@ -233,6 +233,8 @@ export class Colony {
   // Floor marks (nest slice 3): the role of the last chamber each ant was in (MARKS index + 1; 0 none), and seconds since.
   #lastRole: Uint8Array;
   #sinceRole: Float32Array;
+  /** seconds an ant has rested at home in "return" (see REST) */
+  #restT: Float32Array;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
   #belief: Nest = { x: 0, y: 0, r: 0 };
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
@@ -435,6 +437,7 @@ export class Colony {
     this.#chamberFor = new Int16Array(n);
     this.#lastRole = new Uint8Array(n);
     this.#sinceRole = new Float32Array(n);
+    this.#restT = new Float32Array(n);
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -528,6 +531,7 @@ export class Colony {
     this.#chamberCell[i] = -1;
     this.#lastRole[i] = 0; // born in the royal chamber: it lays royal once it has been there a tick
     this.#sinceRole[i] = 0;
+    this.#restT[i] = 0;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
@@ -835,6 +839,7 @@ export class Colony {
       // Underground in the side view, homing follows the road signs of where it is going (its chamber's mark); the home
       // trail only where there are none.
       const signs = mode === RETURN && this.#entrance && !isSky(map, cx, cy) ? this.ph.fields[this.#destMark(i)] : null;
+      const signGain = SIGN_WEIGHT * (this.gainHome[i] as number); // the fungus's home lever bends road signs as it does the home trail
       const byVector = mode === RETURN && (this.stallT[i] as number) > TUNNEL_STALL;
       const hx = this.#goalX - centreX(cx, cy);
       const hy = this.#goalY - centreY(cy);
@@ -845,7 +850,7 @@ export class Colony {
         const tx = stepX(cx, cy, d);
         const ty = stepY(cy, d);
         if (rockAt(map, tx, ty) !== OPEN) continue;
-        const v = byVector ? Math.cos(DIR_ANGLE[d] as number) * hx + Math.sin(DIR_ANGLE[d] as number) * hy : (signs ? signs.get(tx, ty) * SIGN_WEIGHT : 0) + field.get(tx, ty);
+        const v = byVector ? Math.cos(DIR_ANGLE[d] as number) * hx + Math.sin(DIR_ANGLE[d] as number) * hy : (signs ? signs.get(tx, ty) * signGain : 0) + field.get(tx, ty);
         if (v > bestV) {
           bestV = v;
           best = d;
@@ -1238,7 +1243,7 @@ export class Colony {
     } else this.#sinceRole[i] = (this.#sinceRole[i] as number) + dt;
     const r = this.#lastRole[i] as number;
     if (r === 0) return;
-    const laid = MARK_DEPOSIT * Math.exp(-(this.#sinceRole[i] as number) / MARK_DECAY) * dt * (this.layGain[i] as number);
+    const laid = this.params.deposit * Math.exp(-(this.#sinceRole[i] as number) / MARK_DECAY) * dt * (this.layGain[i] as number);
     if (laid > 1e-4) this.ph.depositCell(MARKS[r - 1] as Mark, cx, cy, laid);
   }
 
@@ -2124,13 +2129,21 @@ export class Colony {
           h += Math.PI;
         }
         this.since[i] = 0;
+        // Home and resting in "return" (its policy said so, or a cached answer did: ja-qnx): after REST seconds it is
+        // rested, and asked afresh as an explorer. Going home is done once home; nothing else sends a rested ant out.
+        if (mode === RETURN && !carrying && !pellet && (this.#restT[i] = (this.#restT[i] as number) + dt) > REST) {
+          this.mode[i] = EXPLORE;
+          this.#asked[i] = -1;
+          this.#restT[i] = 0;
+        }
       } else this.since[i] = (this.since[i] as number) + dt;
+      if (!atNest) this.#restT[i] = 0;
       if (ent) {
         this.#integrate(i, x0, y0, atNest);
         // Road signs: underground, a strong nest trail where it stands tells it where it is, and its memory's error fades
         // (Heyman et al. 2017; slice 3 gives each chamber its own mark). Outside, the hole's sight and smell do it (#believe).
         // Read on the floor where it stands (a road sign is under its antennae; the sensors ahead are often in soil in a tunnel).
-        if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
+        if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
         if (this.map.chambers) this.#layMark(i, dt);
       }
       this.heading[i] = h;
@@ -2194,9 +2207,10 @@ export const PI_DRIFT = 0.1;
 export const HOLE_SIGHT = 6;
 /** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one this much wider, to at most SEARCH_MAX. */
 const SEARCH_START = 3;
+/** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
+export const REST = 10;
 // Floor marks (nest slice 3): see #layMark, #destMark, #roleFor.
-/** Mark laid per second by an ant just out of a chamber, falling to 1/e after MARK_DECAY seconds away from it. */
-const MARK_DEPOSIT = 4;
+/** Marks are laid at the colony's trail deposit per second just out of a chamber, falling to 1/e after MARK_DECAY seconds away from it. */
 const MARK_DECAY = 30;
 /** How much more a homing ant in a tunnel goes by its destination's mark than by the home trail. */
 const SIGN_WEIGHT = 4;

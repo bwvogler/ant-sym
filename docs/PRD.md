@@ -1395,7 +1395,7 @@ Over seeds 1–3, each colony has its royal and reception chambers, 4–7 brood 
 - **A strong mark underfoot** corrects the in-nest memory, as the home trail does (slice 1).
 
 **The situation.** Underground in the side view, `homeTrail` no longer reads the home trail. It says where the ant is: `tunnel`, or a chamber of its colony by role. On the ground, and on the top-down maps, it is the home trail's level as before.
-- An ant that has just put food down in the royal chamber is now asked "in the royal chamber". Before, it was asked "home trail strong", the same question as an ant on the walkway by the hole, so a cached "return" could park it at home for good (`ja-qnx`). Jev's answer for "royal" sends it out.
+- An ant that has just put food down in the royal chamber is now asked "in the royal chamber". Before, it was asked "home trail strong", the same question as an ant on the walkway by the hole.
 - The legend says what the places mean and that an ant inside the nest is home. `COLONY_BRAIN_VERSION` is 4.
 - `SITUATIONS` is 3,888 (home: 3 trail levels or 6 places).
 
@@ -1416,6 +1416,20 @@ Over seeds 1–3, each colony has its royal and reception chambers, 4–7 brood 
 
 **Rendering:** chambers are washed by role: the queen's violet, brood rose, store gold, reception teal, midden grey.
 
+**Agent review.** The review found that `ja-qnx` was only moved, not fixed:
+- In the side view, one cached "return" for "royal" would park every ant just home, since its time out resets at the nest and nothing re-asks it.
+- On the top-down maps nothing changed. The reviewer measured 798 of 1,200 ants parked by a policy answering "return" to returning ants.
+
+The fix is a mechanic in both views: an ant resting at home in "return" for `REST` (10 s), carrying nothing, is set to explore and asked afresh. Under the local rule nobody rests that long, so the top-down bench is unchanged (open 160×100: 2889 / 455). With the stubborn policy, the parked ants went from 300 of 300 (the test fails without the fix) to about a third of the colony resting at any moment, and food still comes home.
+
+Also fixed:
+- road signs are read through the fungus's home gain, like the home trail;
+- marks are laid at the colony's trail `deposit`;
+- the strategist keeps its own cache version (`STANCE_BRAIN_VERSION` 3), so its cached stances aren't thrown away.
+
+The cost figures above come from a scratch script on the side view: `scripts/colony-cost.mjs` uses the top-down map, which meets no in-nest situation.
+
 **Tests:** `marks.test.ts`:
 - every chamber gets a role, and the royal mark is strongest in the royal chamber;
-- an ant home with food is asked "royal", and on the ground the home trail level.
+- an ant home with food is asked "royal", and on the ground the home trail level;
+- a policy that always answers "return" to a returning ant no longer parks the colony, on either view.
