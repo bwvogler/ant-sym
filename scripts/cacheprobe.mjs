@@ -9,6 +9,7 @@ import { Engine } from "../web/src/sim/engine.ts";
 import { normalizeTarget } from "../web/src/sim/grid.ts";
 import { antState, packRequest } from "../web/src/sim/jevBrain.ts";
 import { answersFor, canonicalState, readSituation, situationKey } from "../web/src/sim/policyCache.ts";
+import { JevClient } from "../web/server/jev.ts";
 
 const DRY = process.argv.includes("--dry");
 const KEY = process.env.JEV_API_KEY;
@@ -17,7 +18,6 @@ if (!KEY && !DRY) {
   process.exit(1);
 }
 const N = Number(process.argv.slice(2).find((a) => /^\d+$/.test(a)) ?? 100);
-const URL_ = "https://api.typesafe.ai/v1/systemone";
 
 // A mid-formation field: a ring target, the ants part-way in (the local rule for a few seconds).
 const SIZE = { w: 96, h: 64 };
@@ -40,15 +40,17 @@ const perSit = { model: "jev-latest", ...packRequest([...sits].map(([key, id]) =
 console.log(`${ants.length} ants → ${sits.size} distinct situations; request bytes: per ant ${JSON.stringify(perAnt).length}, per situation ${JSON.stringify(perSit).length}`);
 if (DRY) process.exit(0);
 
+// The server's client, not global fetch: fetch queues the three parallel asks behind one socket and stacks their ms.
+const client = new JevClient({ apiKey: KEY });
 async function ask(body) {
-  const t0 = performance.now();
-  const r = await fetch(URL_, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${KEY}` }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => null);
+  const r = await client.ask(body);
+  const j = r.body;
   if (r.status !== 200 || !j?.answers) throw new Error(`status ${r.status}: ${JSON.stringify(j).slice(0, 300)}`);
-  return { answers: j.answers, tokens: j.usage?.input_tokens ?? 0, ms: Math.round(performance.now() - t0) };
+  return { answers: j.answers, tokens: r.inputTokens, ms: r.ms };
 }
 
 const [a1, a2, b] = await Promise.all([ask(perSit), ask(perSit), ask(perAnt)]);
+client.destroy();
 
 // 1. determinism
 let same = 0;

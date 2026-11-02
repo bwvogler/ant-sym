@@ -1,4 +1,7 @@
 // Schema bake-off (bead ja-54g): cost × steering accuracy on the live API.
+// A frozen experiment: its six schemas are the ones PRD §8.1b compares, not the
+// app's (scripts/probe.mjs measures what the app sends). Calls run one at a
+// time, so plain fetch is fine here.
 // Synthetic ant states with a known best direction and a known settle answer,
 // packed 100 per request, one request per candidate schema per batch. Prints
 // a markdown table: tokens/ant, direction accuracy (exact and within 45°),
