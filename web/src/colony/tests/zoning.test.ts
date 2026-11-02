@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
 import { Game } from "../game.ts";
-import { CELL } from "../hex.ts";
-import { generateSideWorld, generateWorld, groundTop, isSky, mulberry32 } from "../world.ts";
+import { CELL, cellOf, centreX, centreY } from "../hex.ts";
+import { digCell, generateSideWorld, generateWorld, groundTop, isSky, mulberry32, OPEN, rockAt } from "../world.ts";
 
 // Nest slice 6 (docs/nest-and-home.md §3.5, Tschinkel): who works where goes by age. The young nurse, deep with the
 // queen and brood, and never go out; the middle-aged dig and carry inside; the old forage.
@@ -95,4 +95,36 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
     inside[c.band(i)]!++;
   }
   assert.ok(near[0]! / inside[0]! < near[1]! / inside[1]!, `from the queen, underground: young ${(near[0]! / inside[0]!).toFixed(1)}, middle-aged ${(near[1]! / inside[1]!).toFixed(1)}`);
+});
+
+test("an old forager in a dead-end tunnel whose tip lies just under the ground by the hole goes back down and out by the shaft (review of #25)", () => {
+  // Stepping straight toward the hole, the tip is nearer it than anything round it: old ants don't dig, so the first cut
+  // parked them there until their mode changed. They climb out by the way through the tunnels (#climbOut).
+  const map = generateSideWorld(2, SMALL);
+  const n = map.nest;
+  cellOf(n.entrance!.x, n.entrance!.y);
+  const ex = CELL[0] as number;
+  const ey = CELL[1] as number;
+  cellOf(n.x, n.y);
+  const cy = CELL[1] as number;
+  // A branch east out of the chamber's upper side, then straight up, its tip two rows under the ground line beside the hole.
+  const tipX = ex + 4;
+  let x = CELL[0] as number;
+  while (rockAt(map, x, cy - 3) === OPEN) x++;
+  for (; x <= tipX; x++) digCell(map, x, cy - 3);
+  for (let y = cy - 3; y >= ey + 2; y--) digCell(map, tipX, y);
+  assert.ok(!isSky(map, tipX, ey + 1) && rockAt(map, tipX, ey + 1) !== OPEN, "a dead end under the crust");
+  const c = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(4), () => "explore");
+  aged(c, MIDDLE + 0.2);
+  c.x[0] = centreX(tipX, ey + 5);
+  c.y[0] = centreY(ey + 5);
+  c.heading[0] = -Math.PI / 2;
+  let out = -1;
+  for (let k = 0; k < 30 * 60 && out < 0; k++) {
+    c.tick(1 / 30);
+    c.antCell(0);
+    if (isSky(map, CELL[0] as number, CELL[1] as number)) out = k / 30;
+  }
+  assert.equal(c.mode[0], 0, "still exploring (a forager on its way out)");
+  assert.ok(out >= 0, "out on the ground within a minute");
 });
