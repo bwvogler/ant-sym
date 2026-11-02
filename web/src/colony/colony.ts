@@ -3712,7 +3712,12 @@ export const MIDDEN_AT = MOUND_REACH + MIDDEN_PAST;
 const SPOIL_GIVE_UP = 15;
 /** The side view: an explorer on the ground beside a steep flank of the mound picks a pellet off it to spread, with this chance a cell. */
 const LOOSE_SPREAD_PICK = 0.01;
-/** The side view: an explorer on the ground beside the mound takes a pellet of it down to backfill, with this chance a cell. */
+/**
+ * The side view: an explorer on the ground beside the mound takes a pellet of it down to backfill, with this chance a cell.
+ * Most such trips find nowhere to fill and carry the pellet back out: 92–97 % on the app's map (PRD §41; the review of
+ * MR 15 saw 60–90 %), since nothing dug in the last BACKFILL.young is filled and the shaft and chamber smell busy. Kept as
+ * the owner asked for it (spoil taken down to backfill); see bead ja-lft.
+ */
 const LOOSE_FILL_PICK = 0.005;
 /** The side view: how much farther out (columns, on average) a loose pellet is spread. */
 const LOOSE_SPREAD = 12;

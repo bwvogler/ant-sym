@@ -2108,3 +2108,88 @@ The fixes were first measured on nest 9 before #14's backfill fixes were merged 
   - Pellet carriers may want the old straight step, or to dig, where the field's way is much longer than the straight distance.
 
 **Jev cost:** unchanged. No situation, legend or question changed.
+
+## 41. Fix-up F2: the nest's economy, its chambers, the mound and backfill (2026-11-02)
+
+Held findings from the reviews of #23 (queen and brood), #24 (food flow), #21 (dug chambers), #16 / #17 (the mound) and #22 (cost), and the regressions #14's backfill guards brought into the nest stack, fixed together on top of nest 9 (#28), then merged with the raids / fungus fix-up (F3, §39) and the homing fix-up (F1, §40) under it. The numbers below are on the merged code unless they say otherwise; "before" is nest 9 at 99eed4b. Owner's decision: more than two colonies is coming, so nothing here assumes two.
+
+**Closes:** #23's blocker, its three should-fix items and nits (queen placement, dead code, `BROOD_RGB`, the test leftovers); #24 items 1–2, its two code nits, and F1's circling porters (§40, open item); #21 items 1–4 and its four nits; #17 items 4 and 5 (5 documented, not fixed), its three maintainability notes, and #16's undocumented regression (§27); #14's floor regressions in the nest (§31, §34, §35's open items), except stacked chambers in every game. #22's cost: no situation, legend or question changed, so no new figure (F3 added `colony-cost.mjs --side`).
+
+### Measuring
+
+Three committed harnesses, each with a `root` argument so one script measures any checkout, all on the app's own setup (`generateSideWorld(seed)`, `Game` with `mulberry32(seed * 7919)`):
+- `scripts/economy-bench.mjs`: the long run. Per colony at each checkpoint: workers alive, births, deaths of age, fight losses, food home and its rate, the larder, brood, the queen, floor growth, chambers, ants out over 120 s, ants following food scent underground, porter trips, foragers who handed food on, soil dug / filled / out, loose pellets taken down and carried back. Map-wide: food left on the ground and below it; every fill and dig counted by a hook on the map (floor-ground fills and the rest, and how many of each were dug out again); food conservation every 10 s. Options for the tests' small map or any size, and for scaling the map's food.
+- `scripts/floor-bench.mjs`: the crowded-nest test's games, nine by default (world 2 games 4–8; worlds 1, 3, 4 game 4; world 3 game 5, as the merge agent measured), with floor growth, stacked chambers, the depth trend, touching chambers and fills.
+- `scripts/roomy-bench.mjs`: the roomy-nest test's games, one by one.
+
+### The economy (#23's blocker)
+
+**Why colonies died.** The review blamed age: `LIFESPAN` 1,800 s, founders up to half a lifespan old, births short of deaths. Measuring found a bigger cause first: **food piled up in a one- or two-cell reception while the larvae starved** (#24 item 2, and the colonies' death). On nest 9, seed 2, two colonies at 1,200 s: reception (1 cell; 2 cells) held 1,332 and 1,631 food, every other chamber 0, 81 and 50 larvae waited unfed, and 0–2 idle ants stood near reception to carry it on. Births were 111 and 80 by 1,200 s, with 2,000 food home; both colonies were dead at 3,600 s with 1,674 and 1,902 food in their larders.
+
+**Food flow, fixed:**
+- **A reception is a chamber of at least `RECEPTION_MIN` (4) cells.** Until it has that many, foragers take food to the royal chamber.
+- **Porters draw from the royal chamber too**, food beyond the queen's stock (`QUEEN_STOCK`). The royal chamber is where the young and idle are.
+- **A forager finding food already waiting at reception** (the porters aren't keeping up) carries its own on to the chamber that wants it most, as a porter (`handedOn`). Foragers drop seeds in the top chambers (Tschinkel & Kwapich); a backlog there is the case it handles.
+- **Porters lay no food trail** (#24 item 1). They still lay their chamber's mark, like any ant inside.
+- **A porter by a chamber of its target's role that wants food puts it down there.** Road signs are by role, so the brood mark led to the nearest brood chamber, not the chosen one (F1's porters circling a chamber 24 columns away). After `HOLD_MAX` (30 s) carrying, it puts it down in whichever of its chambers it is by, or takes it to the royal chamber; never on a tunnel's floor.
+- **The least-stocked store counts porters on their way** (F1's 41 porters at once taking food to one single-cell store).
+- A porter's goal is the chamber's cell nearest its centre, not its mean position, which can lie in the soil.
+
+**A worker lives an hour** (`LIFESPAN` 3,600 s, 0.7–1.3× it each; the age bands stay shares of it). Why: with the food flow fixed, a one-colony game brings home 0.5–1.2 food a second late in the hour (table below). At a 30-minute life, a colony at its cap of 900 must bring home 2 a second (900 / 1,800 × 4) to replace its workers; at an hour, 1. So an hour is about the longest life the measured economy can replace. It is a game-scale choice, not a measurement: harvester ant workers live about a year (Gordon), the colony's season; the side view compresses a worker's life to an hour of play. The founders still start up to half a lifespan old, so none dies in a 10-minute game and about 85 % die within the hour, which the long-run test needs to show the turnover.
+
+**Not done: foraging the pockets.** Three quarters of the side map's food is in underground pockets (20,760 of 27,840 on seed 1), and none of it comes home in an hour: tunnels stop 6–15 cells short of the nearest pockets by 600 s, and a roomy nest barely digs. Once the ground's piles thin out, the colony lives on its larder. Bead `ja-p0k`.
+
+**Measured** (app map, 600 ants a colony, to 3,600 s; seeds 1–2; before → after):
+
+ECONOMY_TABLE
+
+**The long-run test** (`economy.test.ts`). The full game takes about 10 minutes to run an hour, too slow for the suite. The test runs the tests' small map (256 × 160) with one colony of 110 ants (165 at most) and 0.3 of the map's food, about the full game's food per ant (2,190 for 110 founders; 27,840 for 1,200 there). It asserts that most founders died of age (at least 0.6 × 110), births at least matched those deaths, no more than 5 larvae at once waited over a minute with food enough lying in the nest, and the colony holds its size (at least 110 at 3,600 s). On this branch: 162 workers, 177 born, 125 dead of age. With `LIFESPAN` 1,800 s: 20 workers (it fails). With the old food flow: 134, but 28 larvae waited unfed beside enough food (it fails). On nest 9 the same game is dead by 3,000 s. About a minute to run.
+
+**Food conservation is tested** (`food.test.ts`): map food + food in jaws + larder + Σ brood (1 + fed) + 4 × births equals the map's food, every 5 s of a two-colony game, to 10⁻⁶ (it fails with an egg charged twice). The bench checks the same on every run: drift at most 2.5 × 10⁻⁹ over an hour.
+
+### Food scent underground (#24 item 1)
+
+Mean ants following food scent underground at 600 s, both colonies: FOLLOW_ROW. The rest are ants following foragers' trails up the shaft to food outside, which is what the trail is for.
+
+### Chambers (#21)
+
+- **Chambers never join.** A chamber face is judged again when it is dug (`#chamberDug`): if it would touch another chamber, lie outside its chamber's two rows, or lie too near the ground, it stays a plain tunnel. A face an ant was walking up to is forgotten when its mode changes and in `#homeAfresh`. A stale face is dug only while the nest is crowded.
+- **No chamber cell less than `CHAMBER_MIN_DEPTH` (8) rows under the ground**, every widened cell, measured from the ground as dug (under the mound's loose soil: `#soilTop`), not the mound's top. The new two-colony test (two small worlds, 200 + 200 diggers, 200 s) checks both; it fails with the depth rule reverted (a cell 7 rows down at 80 s). It does not fail with the join re-check reverted: no join happened in eight small two-colony worlds over 400 s, nor on the app map's seeds 5 and 1 over 600 s. Bead `ja-jn2`.
+- **The depth profile is imposed, not emergent** (item 4): §31 and the test now say so.
+- **Nits:** `#chamberFace` and `#chamberSpot` hold the face checks once; the crowded-builder predicate is computed once; `openCell` is one function per map; a chamber's span shrinks when an end cell leaves it (`y0`/`y1` are kept for that).
+- **§31's numbers, re-measured** (item 3): SECTION31
+
+### Backfill and chambers (#14 merged into the nest)
+
+- **Soil put back under a chamber cell stays** (`builtFloor`, part of `refilled`): it is never dug again, however long ago it was filled. Over 1,200 s (world 2 games 4 and 5, world 4 game 4), floor-ground fills dug out again: before, 4 of 32, 0 of 21, 7 of 15 (11 of 68, 16 %) against 10 of 459 other fills (2 %); after, 1 of 42, 0 of 28, 1 of 28 (2 of 98, 2 %) against 44 of 861 other fills (5 %). The two left are cells beside a chamber on its floor row, which aren't kept: that is where chambers widen. Floor at 1,200 s: ×1.56–2.50 before, ×2.75–3.13 after.
+- **Floor growth is back** (§34, §35): in the crowded-nest test's nine games at 240 s, ×2.06–2.94 (mean 2.43) against ×1.13–2.38 (mean 1.90) before and ×2.4–3.4 (mean 2.96) before #14; stacked chambers 2–8 (mean 4.9; 1 of 9 under 3) against 1–8 (3 of 9 under 3). What brought it back is mostly F1's homing fix-up merged in: pellet carriers leave the nest by the tunnels' way out and get back to digging sooner. The porters were not the cause §34 suspected.
+- **A construction zone, tried and dropped.** Letting soil dug lately be put back within 2 cells of the colony's chambers (exempt from `BACKFILL.young`), so a crowded nest's diggers put their widening's soil away near it: floor ×2.06–3.19 (mean 2.65) but stacked chambers mean 3.9, against 4.9 without. Bead `ja-stk`.
+- **The crowded-nest test's bounds:** floor at least ×2 in every one of its three games (restored, as before #14; it was a mean of ×1.6); stacked chambers a mean of at least 3 over its games (kept: at least 3 in every game, as before #14, fails in world 2 game 4, the test's first game, with 2). On nest 9 the per-game floor bound fails (world 2 game 4: ×1.13). The greater bounds a first pass relaxed (floor over ×3, at least 4 stacked) aren't met: mean ×2.43, and 2 stacked in one game.
+
+### The mound (#17, #16)
+
+- **`LOOSE_DIG` removed** (item 4): it never ran, as the ground under the mound is crust. Loose soil is never dug; `takeLoose` takes only a column's top (its settling branch never ran either).
+- **Loose pellets taken down to backfill mostly come back** (item 5): ROUNDTRIP. The causes are #14's youth guard (nothing dug in the last 200 s is filled), and the shaft and chamber smelling busy. Two fixes were tried and dropped: restarting the carrier's trip clock at the hole (95 %) and a stale walk out from the chamber (91 %). Documented as the rule the owner asked for, with its cost; bead `ja-lft`.
+- **One pellet state** (maintainability): what a pellet is and where it goes is one per-ant value (`#soil`: dug, loose going out, loose going down to fill), and `#clearPellet` puts the pellet and all its state down at once, in every place that did it by hand.
+- **The mound is counted on the map** (`map.moundCells`): ants pick up any colony's spoil, so a colony's own count went negative. The tests check each colony's flows (soil out × `SWELL` − taken off + put back) sum to it.
+- **The UI's "dug / mound / filled" adds up:** filled is dug soil put back, so dug = mound + filled + in jaws + lost; loose pellets put back underground show after a "+".
+- **#16's one-colony regression** is now in §27.
+
+### #23's and #24's smaller items
+
+- `#broodGoal` is gone (`#chamberGoal`); the owed-food loop is `Brood.owed()`; `isFed(b)` and `LARVA_FOOD` live in `brood.ts`; `STAGE_NAMES` and `Brood.remove` are gone.
+- The queen lies on the royal chamber's floor (tested on four maps, both colonies).
+- `#port` guards a colony with no chamber to take food to; `feed()` throws rather than drift the larder from the chambers.
+- `BROOD_RGB` and `HOME_RGB`'s comments are back over their constants; `queen.test.ts`'s leftovers are gone.
+
+### Tests
+
+New or changed, each failing with its fix reverted (mutation-checked): the reception minimum, the hand-off, porters drawing from the royal chamber, porters laying no food trail, food conservation, `builtFloor`, a chamber's span shrinking, the queen on her floor, the two-colony depth rule, and the long-run test (two ways, above). The crowded-nest floor bound fails on nest 9. The mound tests read the map's count.
+
+### Open
+
+- `ja-p0k`: forage the pockets. `ja-lft`: loose-fill round trips. `ja-jn2`: a direct test for the join re-check. `ja-stk`: three stacked chambers in every crowded game.
+- Two colonies: TWOCOL
+- The `HOLD_MAX` paths (a nurse's and now a porter's) still have no test.
+
+**Jev cost:** unchanged. No situation, legend or question changed.
