@@ -32,8 +32,8 @@ function placed(map: WorldMap, nest: number, odour: number, cells: [number, numb
   return c;
 }
 
-test("fungal situations: 288 per strain, and each encodes and decodes to itself", () => {
-  assert.equal(FUNGAL_SITUATIONS, 288);
+test("fungal situations: 384 per strain (ground: home, border, foreign, tunnel), and each encodes and decodes to itself", () => {
+  assert.equal(FUNGAL_SITUATIONS, 384);
   const seen = new Set<number>();
   for (const load of LOADS)
     for (const host of MODES)
@@ -188,9 +188,10 @@ test("the fungus lane's request: the aim, one choice per fungal situation among 
   assert.equal(state.ants, undefined, "no ant in the fungus's request");
   assert.equal(state.doctrine, undefined, "and no colony doctrine");
   const crit = (id: string) => Object.keys((req.questions[`${id}_do`] as { criteria: Record<string, string> }).criteria);
-  assert.deepEqual(crit("h0"), ["dormant", "soothe", "roam"]);
+  assert.deepEqual(crit("h0"), ["dormant", "soothe", "roam", "muddle"]);
   assert.deepEqual(crit("h1"), ["dormant", "share", "roam"], "cull is Bloom's, but off the menu");
   assert.deepEqual(offeredFor("bloom", new Set([...menu, "cull"])), ["dormant", "share", "roam", "cull"]);
+  assert.deepEqual(offeredFor("bloom", new Set([...menu, "cull", "crown"])), ["dormant", "share", "roam", "cull", "crown"], "crown is Bloom's too, lethal, off the menu by default");
   const ans = (choice: string) => ({ h0_do: { type: "choice" as const, choice, confidence: 0.9 } });
   assert.equal(readIntervention(ans("soothe"), "h0", offer("lockpick")), "soothe");
   assert.equal(readIntervention(ans("blend"), "h0", offer("lockpick")), null, "Lockpick cannot blend");
@@ -199,6 +200,9 @@ test("the fungus lane's request: the aim, one choice per fungal situation among 
   assert.deepEqual(offeredIn(fungalKey(sit(), offer("garden"))), offer("garden"), "a key says what its question offered");
   assert.deepEqual(offeredIn(fungalKey(sit(), [])), []);
   assert.notEqual(fungusContext("a"), fungusContext("b"), "a new aim, a new cache");
+  // Review of #27: "home" is a chamber in the side view and home-scented ground from above: each view its own cache.
+  assert.notEqual(fungusContext("a", "side"), fungusContext("a"), "the side view, its own cache");
+  assert.equal(fungusContext("a", "top"), fungusContext("a"), "the top-down maps keep theirs");
   // PR #7 review: the menu was in the context, so switching cull (Bloom's alone) dropped Garden's and Lockpick's answers.
   const withCull = new Set([...menu, "cull"]);
   assert.equal(fungalKey(sit(), offeredFor("garden", withCull)), fungalKey(sit(), offer("garden")), "cull does not touch Garden's questions");

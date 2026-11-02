@@ -1,10 +1,10 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef } from "react";
 import { CHUNK } from "../colony/chunks.ts";
 import { type Colony, moundRadius } from "../colony/colony.ts";
-import { CELL, cellOf, R, SIDE } from "../colony/hex.ts";
+import { CELL, cellOf, centreX, centreY, R, SIDE } from "../colony/hex.ts";
 import { INFECTED, type Fungus } from "../colony/fungus.ts";
 import { BINS, binOf } from "../colony/recognition.ts";
-import { SOIL, worldExtent } from "../colony/world.ts";
+import { AIR, SOIL, worldExtent } from "../colony/world.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { colonyName } from "./names.ts";
@@ -50,10 +50,14 @@ function odourColour(ink: [number, number, number], warn: [number, number, numbe
   return `rgb(${m(0)}, ${m(1)}, ${m(2)})`;
 }
 
-/** The warm tone the picture heatmap uses for "too many": here, the way home. */
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
 const HEX_ZOOM = 12;
+/** The warm tone the picture heatmap uses for "too many": here, the way home. */
 const HOME_RGB: [number, number, number] = [196, 110, 40];
+/** Brood by stage (egg, larva, pupa): pale to tan, legible on the chamber washes in both themes. */
+const BROOD_RGB = ["#f2eee2", "#e8cf8a", "#b88a4a"];
+/** Chamber washes by role (nest slice 3), faint enough to read in both themes: the queen's violet, brood rose, store gold, reception teal, midden grey. */
+const ROLE_RGB: Record<string, [number, number, number]> = { royal: [128, 84, 176], brood: [196, 96, 120], store: [196, 156, 48], reception: [48, 150, 150], midden: [120, 120, 110] };
 /** At or above this zoom (device px per cell) a brush paints its own radius; zoomed further out it widens to match. */
 const BRUSH_ZOOM = 6;
 /** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
@@ -130,7 +134,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     const miniImg = miniCtx.createImageData(mini.width, mini.height);
     let miniAt = -Infinity;
 
-    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300"), spore: "#7a4fa0", sporeRgb: rgb("#7a4fa0") };
+    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), sky: rgb("#e4edf1"), spoil: rgb("#c8b28c"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300"), spore: "#7a4fa0", sporeRgb: rgb("#7a4fa0"), chamber: rgb("#a39a8a") };
     const retheme = () => {
       theme = {
         paper: cssVar("--paper"),
@@ -140,6 +144,8 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         line: cssVar("--line-strong"),
         rock: rgb(cssVar("--line-strong")),
         soil: rgb(cssVar("--soil")),
+        sky: rgb(cssVar("--sky")),
+        spoil: rgb(cssVar("--spoil")),
         mound: cssVar("--mound"),
         trail: cssVar("--heat").split(/\s+/).map(Number),
         alarm: rgb(cssVar("--warn")),
@@ -148,6 +154,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         warnRgb: rgb(cssVar("--warn")),
         spore: cssVar("--spore"),
         sporeRgb: rgb(cssVar("--spore")),
+        chamber: rgb(cssVar("--mound")),
       };
       miniAt = -Infinity;
     };
@@ -172,10 +179,13 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     /** Paint chunk (cx, cy)'s cells into its canvas: rock and soil, then the trails, then food over everything. */
     const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array) => {
       const fc = colony.map.food.chunk(cx, cy);
+      const lc = colony.map.loose?.chunk(cx, cy);
       const foodC = colony.ph.fields.food.chunk(cx, cy);
       const homeC = colony.ph.fields.home.chunk(cx, cy);
       const alarmC = colony.ph.fields.alarm.chunk(cx, cy);
       const sporeC = fungus.spores.chunk(cx, cy);
+      const chambers = colony.map.chambers;
+      const chamberC = chambers?.cell.chunk(cx, cy); // nest slice 2: dug chambers, a faint wash; slice 3: tinted by role
       const [fr, fg, fb] = rgb(theme.accent);
       const show = layers.current;
       const px = c.img.data;
@@ -190,7 +200,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
             continue;
           }
           if (rc[i]) {
-            const solid = rc[i] === SOIL ? theme.soil : theme.rock;
+            const solid = rc[i] === SOIL ? (lc && lc[i] ? theme.spoil : theme.soil) : rc[i] === AIR ? theme.sky : theme.rock;
             px[o] = solid[0];
             px[o + 1] = solid[1];
             px[o + 2] = solid[2];
@@ -236,6 +246,13 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
             px[o + 1] = HOME_RGB[1];
             px[o + 2] = HOME_RGB[2];
             px[o + 3] = Math.round(h * 90);
+          } else if (chamberC && chamberC[i]) {
+            const role = chambers!.list[(chamberC[i] as number) - 1]?.role ?? "none";
+            const tint = ROLE_RGB[role] ?? theme.chamber;
+            px[o] = tint[0];
+            px[o + 1] = tint[1];
+            px[o + 2] = tint[2];
+            px[o + 3] = role === "none" ? 55 : 70;
           } else px[o + 3] = 0;
         }
       }
@@ -255,7 +272,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
           const t = off ? 1 : colony.map.rock.get(x, y);
           const fv = off ? 0 : colony.map.food.get(x, y);
           const o = (my * mini.width + mx) * 4;
-          const c = fv > 0 ? food : t === SOIL ? theme.soil : t ? theme.rock : theme.paperRgb;
+          const c = fv > 0 ? food : t === SOIL ? (!off && colony.map.loose?.get(x, y) ? theme.spoil : theme.soil) : t === AIR ? theme.sky : t ? theme.rock : theme.paperRgb;
           px[o] = c[0];
           px[o + 1] = c[1];
           px[o + 2] = c[2];
@@ -397,7 +414,7 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
       for (const col of [rival, colony]) {
         if (!col) continue;
         const [nx, ny] = toScreen(c, v, col.nest.x, col.nest.y);
-        if (col.soilOut > 0) {
+        if (col.soilOut > 0 && !col.nest.entrance) {
           // The mound is on the surface, above this slice: every pellet brought out, heaped round the
           // entrance (its area holds them all, loosened by SWELL). A faint fill and an outline, so the
           // tunnels under it still show.
@@ -423,6 +440,95 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         ctx.lineWidth = 2;
         ctx.globalAlpha = 0.7;
         ctx.stroke();
+        if (col.nest.entrance) {
+          // The side view: the entrance, a small ring on the ground line where the shaft comes up.
+          const [ex, ey] = toScreen(c, v, col.nest.entrance.x, col.nest.entrance.y);
+          ctx.beginPath();
+          ctx.arc(ex, ey, Math.max(3, 1.5 * c.zoom), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        // Nest slice 4: the brood where it lies (eggs pale, larvae cream, pupae tan) and the queen, larger, in her colony's
+        // colour (dead: hollow, and crossed out).
+        const bd = Math.max(1.5, len * 0.4);
+        for (const b of col.brood.items) {
+          if (b.held >= 0) continue;
+          const wx = centreX(b.x, b.y);
+          const wy = centreY(b.y);
+          if (!inView(wx, wy)) continue;
+          const [x, y] = toScreen(c, v, wx, wy);
+          ctx.fillStyle = BROOD_RGB[b.stage] as string;
+          ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
+        }
+        // Nest slice 5: food lying in this colony's chambers, as seeds along each floor (up to 40 drawn a chamber).
+        if (col.map.chambers) {
+          ctx.fillStyle = theme.accent;
+          for (const ch of col.map.chambers.list) {
+            if (ch.colony !== col.params.nest || ch.food < 1 || ch.cells === 0) continue;
+            const span = ch.x1 - ch.x0 + 1;
+            const shown = Math.min(40, Math.floor(ch.food));
+            for (let k = 0; k < shown; k++) {
+              const fx = ch.x0 + (k % span);
+              const fy = ch.floorRow - (Math.floor(k / span) % 2);
+              const wx = centreX(fx, fy);
+              const wy = centreY(fy);
+              if (!inView(wx, wy)) continue;
+              const [x, y] = toScreen(c, v, wx, wy);
+              ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
+            }
+          }
+        }
+        // Nest slice 7: the dead, where they lie or on the midden (a grey cross each).
+        ctx.strokeStyle = theme.mound;
+        ctx.lineWidth = Math.max(1, d * 0.8);
+        ctx.beginPath();
+        for (const k of col.corpses) {
+          if (k.held >= 0) continue;
+          const wx = centreX(k.x, k.y);
+          const wy = centreY(k.y);
+          if (!inView(wx, wy)) continue;
+          const [x, y] = toScreen(c, v, wx, wy);
+          ctx.moveTo(x - bd, y - bd);
+          ctx.lineTo(x + bd, y + bd);
+          ctx.moveTo(x + bd, y - bd);
+          ctx.lineTo(x - bd, y + bd);
+        }
+        // The midden keeps a count per cell: one cross a cell, larger the more lie there.
+        for (const [key, n] of col.midden) {
+          const mx = key % 65536;
+          const my = Math.floor(key / 65536);
+          const wx = centreX(mx, my);
+          const wy = centreY(my);
+          if (!inView(wx, wy)) continue;
+          const [x, y] = toScreen(c, v, wx, wy);
+          const s = bd * Math.min(3, 1 + Math.log2(n) / 3);
+          ctx.moveTo(x - s, y - s);
+          ctx.lineTo(x + s, y + s);
+          ctx.moveTo(x + s, y - s);
+          ctx.lineTo(x - s, y + s);
+        }
+        ctx.stroke();
+        if (col.queen && inView(col.queen.x, col.queen.y)) {
+          const [x, y] = toScreen(c, v, col.queen.x, col.queen.y);
+          const qr = Math.max(3, len * 0.9);
+          ctx.beginPath();
+          ctx.ellipse(x, y, qr * 1.4, qr * 0.8, 0, 0, Math.PI * 2);
+          const qc = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+          ctx.lineWidth = Math.max(1, d);
+          if (col.queen.alive) {
+            ctx.fillStyle = qc;
+            ctx.fill();
+          } else {
+            ctx.strokeStyle = qc;
+            ctx.globalAlpha = 0.6;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x - qr * 1.4, y - qr);
+            ctx.lineTo(x + qr * 1.4, y + qr);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+        }
         ctx.lineCap = "round";
         ctx.lineWidth = Math.max(1, len * 0.3);
         ctx.globalAlpha = 0.85;
@@ -464,11 +570,24 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
           ctx.fillRect(x + Math.cos(col.heading[i] as number) * half - crumb / 2, y + Math.sin(col.heading[i] as number) * half - crumb / 2, crumb, crumb);
         }
         ctx.fillStyle = theme.mound;
+        ctx.strokeStyle = theme.mound;
+        ctx.lineWidth = Math.max(1, d * 0.8);
+        ctx.beginPath();
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || !col.pellet[i] || !inView(col.x[i] as number, col.y[i] as number)) continue;
           const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
-          ctx.fillRect(x + Math.cos(col.heading[i] as number) * half - crumb / 2, y + Math.sin(col.heading[i] as number) * half - crumb / 2, crumb, crumb);
+          const px = x + Math.cos(col.heading[i] as number) * half;
+          const py = y + Math.sin(col.heading[i] as number) * half;
+          if (col.carriesCorpse(i)) {
+            // A corpse in the jaws: the dead's grey cross, half size (slice 7 review: it was drawn as a soil crumb).
+            const h = crumb * 0.75;
+            ctx.moveTo(px - h, py - h);
+            ctx.lineTo(px + h, py + h);
+            ctx.moveTo(px + h, py - h);
+            ctx.lineTo(px - h, py + h);
+          } else ctx.fillRect(px - crumb / 2, py - crumb / 2, crumb, crumb);
         }
+        ctx.stroke();
       }
 
       // The followed ant: a jade ring.
@@ -691,7 +810,11 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     const col = k === 1 && rival ? rival : colony;
     nestTurn.current = k;
     unfollow();
-    setCamera({ x: col.nest.x, y: col.nest.y, zoom: Math.max(camera().zoom, 8 * dpr()) });
+    // The side view: between the entrance and the chamber, so both the ground line and the nest are in view.
+    const e = col.nest.entrance;
+    const hx = e ? (e.x + col.nest.x) / 2 : col.nest.x;
+    const hy = e ? (e.y + col.nest.y) / 2 : col.nest.y;
+    setCamera({ x: hx, y: hy, zoom: Math.max(camera().zoom, 8 * dpr()) });
   };
 
   const button = "pointer-events-auto rounded-md border border-line bg-panel/90 px-2 py-1 text-xs text-fg-2 shadow-sm hover:bg-raised";

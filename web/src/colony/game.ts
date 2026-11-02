@@ -1,7 +1,8 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
-import { Fungus, type FungusParams } from "./fungus.ts";
+import { isFed, LARVA, PUPA } from "./brood.ts";
+import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { WorldMap } from "./world.ts";
 
@@ -57,8 +58,31 @@ export interface Unity {
   unified: boolean;
 }
 
+/** Spores a sporulating host's corpse puts on the midden cell. */
+const MIDDEN_SPORES = 3;
+
 /** Seconds without a fight death that unity asks for. */
 export const QUIET = 60;
+
+/**
+ * The colony c would raid, of any number: the nearest (hole to hole, or nest to nest on a top-down map) that is not
+ * beaten and does not smell like kin (nest odours more than `tolerance` apart); null if there is none.
+ */
+export function nearestRival(c: Colony, colonies: readonly Colony[], tolerance: number): Colony | null {
+  const at = c.nest.entrance ?? c.nest;
+  let target: Colony | null = null;
+  let best = Infinity;
+  for (const o of colonies) {
+    if (o === c || Game.beaten(o) || Math.abs(o.nestOdour - c.nestOdour) <= tolerance) continue;
+    const e = o.nest.entrance ?? o.nest;
+    const d = Math.hypot(e.x - at.x, e.y - at.y);
+    if (d < best) {
+      best = d;
+      target = o;
+    }
+  }
+  return target;
+}
 
 export class Game {
   readonly map: WorldMap;
@@ -92,14 +116,35 @@ export class Game {
     this.fungus = new Fungus(map, this.params.fungus);
     this.colonies.forEach((c, k) => {
       if (map.hasSoil) c.friends = this.#grids[k] as CountGrid;
+      // Undertakers put the dead on the midden: a host of a strain that sporulates (Bloom) puts spores on the ground there;
+      // other strains die with their host (nest slices 7–8).
+      c.onBury = (d) => {
+        if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates) this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain);
+      };
       if (this.colonies.length > 1) {
         c.enemies = this.recognition;
-        c.raidTarget = this.colonies[1 - k]!.nest;
-        // Only ants whose perception the fungus has bent read it (Colony.foreignFood).
-        c.foreign = this.colonies[1 - k]!.ph;
+        c.others = this.colonies.filter((o) => o !== c).map((o) => o.nest);
+        this.#aimRaids(k);
       }
     });
     this.#refresh();
+  }
+
+  /**
+   * Point colony k's raids at the nearest colony that is still its rival (not beaten, not kin by odour), of however many
+   * there are; none left, the last target stays (its stance is forage then). In the side view raiders go in at that
+   * nest's hole, then down to its chamber, and shy from its midden.
+   */
+  #aimRaids(k: number): void {
+    const c = this.colonies[k] as Colony;
+    const target = nearestRival(c, this.colonies, this.recognition.params.tolerance);
+    if (!target) return;
+    const other = target.nest;
+    c.raidTarget = other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other; // side view: in at their hole
+    c.raidNest = other.entrance ? other : null; // and then down to their chamber
+    c.raidMarks = target.ph;
+    // Only ants whose perception the fungus has bent read it (Colony.foreignFood): the colony they'd raid, the nearest rival.
+    c.foreign = target.ph;
   }
 
   /** The first colony (Ink on the page). Not the player's: the player is the fungus. */
@@ -118,7 +163,7 @@ export class Game {
     if (this.colonies.length > 1) this.recognition.build(this.colonies);
   }
 
-  /** Strangers (to the nest's odour, at the healthy tolerance) within `nestWatch` cells of colony k's nest. */
+  /** Strangers (to the nest's odour, at the healthy tolerance) within `nestWatch` (world units) of colony k's nest, and of its entrance in the side view. */
   enemiesNearNest(k: number): number {
     const c = this.colonies[k] as Colony;
     const rec = this.recognition;
@@ -129,6 +174,12 @@ export class Game {
     for (let y = Math.max(0, Math.floor((c.nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((c.nest.y + r) / R)); y++)
       for (let x = Math.max(0, Math.floor(c.nest.x - r - 1)); x <= Math.min(w - 1, Math.ceil(c.nest.x + r)); x++)
         if (Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) <= r) s += rec.get(x, y);
+    // The side view: the entrance too (it is above the chamber, out of that watch), unless the two overlap.
+    const en = c.nest.entrance;
+    if (en && Math.hypot(en.x - c.nest.x, en.y - c.nest.y) > r)
+      for (let y = Math.max(0, Math.floor((en.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((en.y + r) / R)); y++)
+        for (let x = Math.max(0, Math.floor(en.x - r - 1)); x <= Math.min(w - 1, Math.ceil(en.x + r)); x++)
+          if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) > r) s += rec.get(x, y);
     return s;
   }
 
@@ -157,8 +208,8 @@ export class Game {
     this.time += dt;
     for (const c of this.colonies) c.tick(dt);
     const fungal = this.fungus.due(dt);
-    if (this.colonies.length > 1 || fungal) this.#refresh();
-    else if (this.map.hasSoil) occupancy(this.player, this.#grids[0] as CountGrid); // solo underground: nestmates round a digger
+    // Occupancy is needed every tick with a rival (fights, recognition), underground (crowded digging, backfill), or when the fungus steps.
+    if (this.colonies.length > 1 || fungal || this.map.hasSoil) this.#refresh();
     this.#fightDeaths *= Math.exp(-dt / QUIET);
     if (this.colonies.length > 1) {
       const died = resolveFights(this.colonies, this.#grids, dt, this.#rng, this.params.fight, this.recognition).reduce((x, y) => x + y, 0);
@@ -171,6 +222,7 @@ export class Game {
     }
     // After fights: the dead neither pass load on nor groom (the occupancy grids still count them as groomers for this one step).
     // The fungus steps every few ticks (fungus.ts advance); when it is idle its clock does not run.
+    // The midden's spores (nest slices 7–8) are laid as each corpse is buried: see onBury in the constructor.
     if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null);
     if (this.time >= this.#nextStrategy) {
       this.#nextStrategy = this.time + this.params.strategyEvery;
@@ -184,6 +236,8 @@ export class Game {
           c.stance = "forage";
           return;
         }
+        // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
+        this.#aimRaids(k);
         // A stance is part of every ant's situation: a change re-asks the ants by itself.
         c.stance = c.stancePolicy(c.stanceSituation(this.enemiesNearNest(k) > 0));
         this.strategyChoices++;
@@ -196,8 +250,12 @@ export class Game {
     this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain);
   }
 
-  /** Beaten: no ants left and too little food in the larder for one more. */
+  /**
+   * Beaten: no ants left and too little food in the larder for one more. In the side view (nest slice 4) ants come
+   * only from brood: no workers and no pupa or fully fed larva left (eggs and hungry larvae need nurses), whatever the queen or the larder.
+   */
   static beaten(c: Colony): boolean {
+    if (c.queen) return c.population === 0 && !c.brood.items.some((b) => b.stage === PUPA || (b.stage === LARVA && isFed(b)));
     return c.population === 0 && c.larder < c.params.foodPerAnt;
   }
 

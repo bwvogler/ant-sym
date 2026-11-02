@@ -14,7 +14,7 @@ import { STRAINS, useColony, type Brush, type Ground, type SideStats } from "./u
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import { AIMS } from "./colony/fungusBrain.ts";
-import { INTERVENTIONS, LETHAL } from "./colony/fungus.ts";
+import { INTERVENTIONS, LETHAL, NEST_ONLY } from "./colony/fungus.ts";
 
 // The colony page: a procedural world, two rival colonies (Ink and Amber,
 // named for how they are drawn), and the fungus: the player, and nobody's
@@ -97,9 +97,9 @@ export default function ColonyApp() {
             {stats && (
               // One line per cell: on a phone the table scrolls sideways in its card rather than wrapping "963 / 871 / 1" over three lines.
               <div className="mt-3 overflow-x-auto border-t border-line pt-3">
-                <dl className="grid w-max min-w-full grid-cols-[repeat(7,auto)] gap-x-4 gap-y-1 whitespace-nowrap font-mono text-xs text-fg-2">
+                <dl className="grid w-max min-w-full grid-cols-[repeat(8,auto)] gap-x-4 gap-y-1 whitespace-nowrap font-mono text-xs text-fg-2">
                   <dt className="text-fg-3" />
-                  {["ants", "food home", "lost", "born", "dug / mound / filled", "stance"].map((h) => (
+                  {["ants", "food home", "lost", "born", "queen · brood", "dug / mound / filled", "stance"].map((h) => (
                     <dt key={h} className="text-[11px] uppercase tracking-wide text-fg-3">
                       {h}
                     </dt>
@@ -167,14 +167,21 @@ export default function ColonyApp() {
               </button>
             </div>
             <p className="mt-2 text-xs text-fg-3">
-              {size.w}×{size.h} cells of {controls.ground === "underground" ? "soil to dig, rock, a few chambers" : "rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food. Every 4 food stored is a new ant.
+              {size.w}×{size.h} cells {controls.ground === "side" ? "seen from the side: sky, the ground line, soil and stones to dig," : "seen from above: rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food.{" "}
+              {controls.ground === "side" ? "The queen lays eggs while there is food; larvae fed by nurses become new ants." : "Every 4 food stored is a new ant."}
             </p>
             <div className="mt-2 flex items-center justify-between text-sm text-fg-2">
               <span>Ground</span>
               <div className="flex overflow-hidden rounded-md border border-line text-sm">
-                {(["underground", "open"] as Ground[]).map((g) => (
-                  <button key={g} type="button" className={seg(controls.ground === g)} onClick={() => update({ ground: g })} title={g === "underground" ? "Mostly soil: ants dig tunnels to food and carry the soil home to a mound" : "The open surface: rock and walkable ground"}>
-                    {g}
+                {(["side", "open"] as Ground[]).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    className={seg(controls.ground === g)}
+                    onClick={() => update({ ground: g })}
+                    title={g === "side" ? "A cross-section: ants forage on the ground line, dig their nest below it and carry the soil up to a mound" : "The open surface from above: rock and walkable ground"}
+                  >
+                    {g === "side" ? "side view" : "from above"}
                   </button>
                 ))}
               </div>
@@ -266,7 +273,8 @@ export default function ColonyApp() {
             <div className="mt-4" aria-label="fungus policy">
               <span>What the fungus may do</span>
               <div className="mt-1 flex flex-wrap gap-1 text-xs">
-                {INTERVENTIONS.map((v) => {
+                {/* the nest's interventions (muddle, crown) only where there is a nest: the fungus drops them on top-down maps */}
+                {INTERVENTIONS.filter((v) => game.map.sky || !NEST_ONLY.has(v.id)).map((v) => {
                   const on = controls.menu.includes(v.id);
                   const lethal = LETHAL.has(v.id);
                   return (
@@ -373,8 +381,12 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
       <dd className="tabular-nums">{s.stored.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.losses.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.births.toLocaleString()}</dd>
-      <dd className="tabular-nums" title="soil cells dug / pellets of it on the mound / pellets put back underground, into unused space beside the tunnels">
+      <dd className={`tabular-nums ${s.queen === "lost" ? "text-err" : ""}`} title="the queen, and brood: eggs / larvae / pupae (side view). A colony whose queen is lost is orphaned: no more eggs; its workers age out. Brood killed by the fungus's crown is counted after a †.">
+        {s.queen === null ? "–" : `${s.queen === "lost" ? "orphaned" : "queen"} · ${s.brood.join(" / ")}${s.broodKilled ? ` † ${s.broodKilled}` : ""}`}
+      </dd>
+      <dd className="tabular-nums" title="soil cells dug / pellets of it brought out to the mound / pellets of it put back into unused space underground: dug = mound + filled, less pellets in jaws or lost with ants that died. After a +: pellets taken off the mound and put back underground (side view), soil the mound count already holds.">
         {s.dug.toLocaleString()} / {s.mound.toLocaleString()} / {s.filled.toLocaleString()}
+        {s.refilled > 0 ? ` +${s.refilled.toLocaleString()}` : ""}
       </dd>
       <dd>{s.stance}</dd>
     </>

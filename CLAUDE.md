@@ -9,7 +9,7 @@ Ants that form the picture you type or upload, each ant steered by a Jev decisio
 - `JEV_API_KEY` comes from the shell environment. Never read it in the browser, never commit it, never log it.
 - `web/src/sim/` (picture) and `web/src/colony/` (colony, fungus) are pure TypeScript with no DOM; `node --test` covers them directly. The one exception is `sim/targets.ts` (rasterises text and images in the browser). The canvas renderer and React are thin layers over them.
 - Jev requests go through the server's connection pool. A single Node `fetch` dispatcher serialises parallel requests (measured: 10 × 50 ants stacked to 2.9 s; separate connections 0.65 s). Keep the test that proves overlap.
-- Spend is real, at $0.042/M input tokens (`USD_PER_INPUT_TOKEN`). Picture: ~296 tokens per ant decision (compass schema, PRD §8.1b). Colony: tokens per question (~450–560 as asked live, `npm run colony-cost`); fungus lane ~315 per fungal situation (PRD §19). Every change to a state schema, legend or question changes the hourly cost; note the new figure for that lane in the PR.
+- Spend is real, at $0.042/M input tokens (`USD_PER_INPUT_TOKEN`). Picture: ~296 tokens per ant decision (compass schema, PRD §8.1b). Colony: tokens per question (~450–560 as asked live, `npm run colony-cost`; the side view, `-- --side`, ~589 estimated, ~$0.11/h, PRD §39); fungus lane 276–343 per fungal situation at 100 to a request (Bloom with every intervention 343), ~530–570 per question as a game asks them, 44–81 situations a 5-minute game (`node scripts/fungus-cost.mjs`, PRD §37, §39). Every change to a state schema, legend or question changes the hourly cost; note the new figure for that lane in the PR.
 
 ## Work tracking
 Beads: `bd ready` for unblocked work, `bd show <id>` for context, `bd close <id>` when done. Prefix `ja`. One PR per milestone, agent review before merge. File new work as beads, not TODO comments.
@@ -20,7 +20,8 @@ The `ja` database syncs through the **`beads-dolt` branch**, not `refs/dolt/data
 ```sh
 npm --prefix web install
 npm run dev                    # http://localhost:38500
-npm test                       # node --test
+npm test                       # node --test, 60 s per file
+npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
 node scripts/probe.mjs 20 100  # live-API probe: latency, tokens, burst
 ```
 
