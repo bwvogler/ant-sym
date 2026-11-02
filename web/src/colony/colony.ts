@@ -248,6 +248,8 @@ export class Colony {
   /** 1 while an ant carries brood (a nurse), and the chamber it is taking it to */
   #holdsBrood: Uint8Array;
   #broodTo: Int16Array;
+  /** seconds a nurse has held its brood */
+  #holdT: Float32Array;
   /** workers that died of age */
   diedOld = 0;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
@@ -456,6 +458,7 @@ export class Colony {
     this.age = new Float32Array(n);
     this.lifespan = new Float32Array(n).fill(Infinity);
     this.#holdsBrood = new Uint8Array(n);
+    this.#holdT = new Float32Array(n);
     this.#broodTo = new Int16Array(n).fill(-1);
     // The queen lies on the royal chamber's floor (the founding chamber's centre, a little down).
     if (this.#entrance && map.chambers) this.queen = { alive: true, x: this.nest.x, y: this.nest.y + 1 };
@@ -559,6 +562,7 @@ export class Colony {
     this.lifespan[i] = this.queen ? LIFESPAN * (0.7 + 0.6 * this.#rng()) : Infinity;
     this.#holdsBrood[i] = 0;
     this.#broodTo[i] = -1;
+    this.#holdT[i] = 0;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
@@ -643,7 +647,7 @@ export class Colony {
    */
   #spare(): number {
     if (!this.queen) return this.larder;
-    if (this.population + this.brood.size < this.params.maxAnts) return 0;
+    if (!this.orphaned && this.population + this.brood.size < this.params.maxAnts) return 0; // orphaned, it will never grow: its food is spare
     let owed = 0;
     for (const b of this.brood.items) if (b.stage !== PUPA) owed += LARVA_FOOD - b.fed;
     return this.larder - owed;
@@ -1048,6 +1052,7 @@ export class Colony {
       this.enemies?.look?.(this.odour[i] as number, -1); // any ant of another colony, stranger or not (a tolerance below 0 counts every band)
       if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
       if (this.#byANest(tx, ty)) continue;
+      if (this.brood.items.some((b) => b.held < 0 && b.x === tx && b.y === ty)) continue; // brood lies there (a nurse died carrying it)
       if (this.#entrance && (isSky(map, tx, ty) || this.#byAnEntrance(tx, ty))) continue; // the ground line and the holes stay open
       // The grids are a tick old: a nestmate that stepped in earlier this tick isn't in them (and walling it
       // in would bury it). Rare enough (every other test passed) to look at each ant.
@@ -1334,7 +1339,21 @@ export class Colony {
           b.x = cx;
           b.y = cy;
         }
-      if (ch.at(cx, cy) === this.#broodTo[i]) this.#dropBrood(i);
+      // In its chamber, or beside it (a chamber a cell or two wide can be passed by), it puts the brood down there;
+      // holding it too long (lost round a ring of tunnels: review of slice 4), wherever it is (a held larva goes unfed).
+      const to = this.#broodTo[i] as number;
+      if (ch.at(cx, cy) === to) this.#dropBrood(i);
+      else {
+        for (let d = 0; d < 6; d++) {
+          const ax = stepX(cx, cy, d);
+          const ay = stepY(cy, d);
+          if (ch.at(ax, ay) === to) {
+            this.#dropBrood(i, ax, ay);
+            return;
+          }
+        }
+        if ((this.#holdT[i] = (this.#holdT[i] as number) + dt) > HOLD_MAX) this.#dropBrood(i);
+      }
       return;
     }
     if (this.mode[i] !== EXPLORE || this.carrying[i] || this.pellet[i] || this.#placeAt(cx, cy) !== "royal" || this.#rng() > PICK_BROOD * dt) return;
@@ -1353,6 +1372,7 @@ export class Colony {
         b.chamber = -1;
         this.#holdsBrood[i] = 1;
         this.#broodTo[i] = to;
+        this.#holdT[i] = 0;
         this.#homeAfresh(i);
         this.gx[i] = NO_CELL;
         return;
@@ -1360,11 +1380,11 @@ export class Colony {
   }
 
   /** Ant i puts down the brood it holds where it stands (in the chamber it was taking it to, or wherever it died). */
-  #dropBrood(i: number): void {
+  #dropBrood(i: number, atX = NaN, atY = NaN): void {
     const ch = this.map.chambers;
     this.antCell(i);
-    const cx = CELL[0] as number;
-    const cy = CELL[1] as number;
+    const cx = Number.isNaN(atX) ? (CELL[0] as number) : atX;
+    const cy = Number.isNaN(atY) ? (CELL[1] as number) : atY;
     for (const b of this.brood.items)
       if (b.held === i) {
         b.held = -1;
@@ -1375,6 +1395,7 @@ export class Colony {
       }
     this.#holdsBrood[i] = 0;
     this.#broodTo[i] = -1;
+    this.#holdT[i] = 0;
     this.mode[i] = EXPLORE;
     this.#asked[i] = -1;
     this.#question[i] = -1;
@@ -1893,7 +1914,9 @@ export class Colony {
       if (!pellet) this.#staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
       // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
       // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
-      const goal = nursing ? this.#broodGoal(i) : this.#goal(i, pellet);
+      let goal = this.#goal(i, pellet);
+      // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant.
+      if (nursing && goal === this.nest) goal = this.#broodGoal(i);
       let nest = goal;
       const x0 = this.x[i] as number;
       const y0 = this.y[i] as number;
@@ -2425,7 +2448,7 @@ export const REST = 10;
 // The queen and brood (nest slice 4): see #nestLife, #nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
 /** Food in an egg, and fed to a larva before it pupates. */
 const EGG_FOOD = 1;
-const LARVA_FOOD = 3;
+export const LARVA_FOOD = 3;
 /** Seconds as an egg; at least this long as a larva (and fed); as a pupa. */
 export const T_EGG = 15;
 export const T_LARVA = 20;
@@ -2436,6 +2459,8 @@ const LAY_INTERVAL = 0.5;
 const FEED_RATE = 0.5;
 /** Chance per second an idle ant in the royal chamber picks up an egg near it to take to a brood chamber. */
 const PICK_BROOD = 0.5;
+/** Seconds a nurse holds brood before it puts it down wherever it is. */
+const HOLD_MAX = 30;
 /** A worker's mean lifespan, seconds (each 0.7–1.3× it): an orphaned colony dwindles as its workers age out. */
 export const LIFESPAN = 1800;
 /** The queen's royal mark per second; her death rate per stranger at her side. */

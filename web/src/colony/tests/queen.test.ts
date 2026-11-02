@@ -31,11 +31,24 @@ test("queen to worker: she lays while there is food; an egg becomes a larva, is 
   c.larder = 8; // two workers' worth
   let firstBirth = -1;
   const stages = new Set<number>();
+  let pupae: string[] = [];
+  let bornAtPupa = 0;
   for (let k = 0; k < 30 * 120 && c.births < 2; k++) {
+    const before = c.births;
+    const wasAlive = Array.from(c.alive);
     c.tick(1 / 30);
+    if (c.births > before)
+      for (let i = 0; i < c.n; i++)
+        if (c.alive[i] && !wasAlive[i]) {
+          // Born where a pupa lay (its cell's centre), not somewhere in the founding chamber.
+          cellOf(c.x[i] as number, c.y[i] as number);
+          if (pupae.includes(`${CELL[0]},${CELL[1]}`) && c.x[i] === centreX(CELL[0] as number, CELL[1] as number)) bornAtPupa++;
+        }
+    pupae = c.brood.items.filter((b) => b.stage === PUPA).map((b) => `${b.x},${b.y}`);
     for (const b of c.brood.items) stages.add(b.stage);
     if (c.births > 0 && firstBirth < 0) firstBirth = c.time;
   }
+  assert.equal(bornAtPupa, c.births, "each worker born on its pupa's cell");
   assert.ok(stages.has(EGG) && stages.has(LARVA) && stages.has(PUPA), `stages seen ${[...stages]}`);
   assert.equal(c.births, 2, "two workers from eight food");
   assert.ok(firstBirth >= T_EGG + T_LARVA + T_PUPA - 1, `no worker sooner than egg + larva + pupa: ${firstBirth.toFixed(1)} s`);
@@ -63,27 +76,31 @@ test("nurses take eggs from the queen to a brood chamber", () => {
   c.larder = 20;
   for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
   const inBrood = c.brood.items.filter((b) => b.held < 0 && b.chamber === brood.id).length;
+  // Every chamber counts exactly what lies in it (the royal one too: a pick-up takes it off its count).
+  for (const ch2 of ch.list) assert.equal(ch2.brood, c.brood.items.filter((b) => b.held < 0 && b.chamber === ch2.id).length, `chamber ${ch2.id} (${ch2.role})`);
   assert.ok(inBrood > 0, `brood in the brood chamber: ${inBrood}; royal holds ${royal.brood}`);
   assert.ok(brood.brood === inBrood, "the chamber counts what lies in it");
 });
 
 test("orphaned: the queen dies, no egg is laid after, brood in progress still hatches, and the workers age out", () => {
   const map = bare(2);
-  const c = new Colony(map, { antCount: 20, maxAnts: 30 }, mulberry32(4), () => "explore");
+  const c = new Colony(map, { antCount: 20, maxAnts: 80 }, mulberry32(4), () => "explore");
   c.larder = 40;
   for (let k = 0; k < 30 * 20; k++) c.tick(1 / 30);
   const laid = c.brood.size;
   assert.ok(laid > 0, "eggs before");
   c.killQueen();
   assert.ok(c.orphaned);
+  c.larder += 40; // food enough for ten more eggs: only her death keeps them from being laid
   const bornBefore = c.births;
   for (let i = 0; i < c.n; i++) c.lifespan[i] = c.age[i]! + 200 + i; // all age out within ~4 minutes
-  let maxBrood = 0;
+  const before = new Set(c.brood.items);
+  let laidAfter = 0;
   for (let k = 0; k < 30 * 300; k++) {
     c.tick(1 / 30);
-    maxBrood = Math.max(maxBrood, c.brood.size);
+    for (const b of c.brood.items) if (!before.has(b)) laidAfter++;
   }
-  assert.ok(maxBrood <= laid, "no egg laid after");
+  assert.equal(laidAfter, 0, "no egg laid after (room and food for more: only her death stops them)");
   assert.ok(c.births > bornBefore, "brood in progress hatched");
   assert.equal(c.population, c.births - bornBefore, "every worker from before aged out; only those hatched since are left");
   assert.ok(c.diedOld >= 20);
@@ -128,3 +145,19 @@ test("the strategist reads the larder as full only for food the brood won't eat,
   assert.equal(c.stanceSituation(false).larder, "full", "at the cap with nothing owed: spare food");
   assert.equal(new Colony(generateWorld(1), { antCount: 10 }, mulberry32(1)).stanceSituation(false).larder, "low");
 });
+
+test("a larva is fed before it pupates: with no food for it, it stays a larva", () => {
+  const map = bare(2);
+  const c = new Colony(map, { antCount: 20, maxAnts: 30 }, mulberry32(7), () => "explore");
+  c.killQueen(); // no eggs: just the one larva
+  cellOf(c.queen!.x, c.queen!.y);
+  const b = c.brood.add(CELL[0] as number, CELL[1] as number, map.chambers!.at(CELL[0] as number, CELL[1] as number));
+  b.stage = LARVA;
+  b.t = 1000;
+  for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
+  assert.equal(b.stage, LARVA, "unfed");
+  c.larder += 3;
+  for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
+  assert.notEqual(b.stage, LARVA, "fed, it pupated");
+});
+

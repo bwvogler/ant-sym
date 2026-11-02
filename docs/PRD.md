@@ -1483,4 +1483,19 @@ In the side view, workers come from brood, not from a counter (docs/nest-and-hom
 - strangers kill the queen, and the side-view beaten rule;
 - the strategist's larder.
 
+**Agent review.** Food is conserved to 2 × 10⁻¹¹ (larder + brood food + 4 × births = stored), chamber brood counts never drift, and the top-down maps are identical ant for ant. The review found:
+1. **A nurse lost round a ring of tunnels**, passing a cell or two from a three-cell brood chamber, held an egg for 193 s. The egg became a larva in its jaws and went unfed, and once on the ground the nurse homed straight through the soil. Fixed:
+   - a nurse next to its target chamber puts the brood down in it;
+   - after `HOLD_MAX` (30 s) a nurse puts the brood down wherever it is;
+   - on the ground line a nurse heads for the hole first, like any homing ant.
+
+   A game-level test didn't reproduce the 193 s case, so it was dropped. No test covers the timeout.
+2. **The orphan test was vacuous:** the colony was at its cap, so the queen couldn't have laid anyway. The test now gives room and food, and fails if laying isn't gated on her being alive.
+3. **Unchecked test claims** now have checks: born on the pupa's cell; an unfed larva stays a larva; every chamber's brood count matches what lies in it.
+4. **An orphaned colony's spare food** always read "low", since it never reaches the cap. Orphaned, food beyond what the brood will eat is spare.
+5. **Beaten** now also waits for fully fed larvae, which pupate without nurses.
+6. **Backfill** never fills a cell with brood on it.
+
+After the fixes (seeds 1–3, 600 s): every colony reaches 900 workers with 300 births, food home is 1,276–1,353, and 0.4–1.0 % are out over 120 s.
+
 **Jev cost:** unchanged. The ants' situation is the same; the brood is not in it.
