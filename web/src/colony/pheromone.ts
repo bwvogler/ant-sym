@@ -22,8 +22,15 @@ import type { WorldMap } from "./world.ts";
 // shifted right, a chunk's top-left corner also touches the chunk diagonally
 // up-left, and its bottom-right corner the chunk diagonally down-right.
 
-export type Channel = "food" | "home" | "alarm";
-export const CHANNELS: Channel[] = ["food", "home", "alarm"];
+export type Channel = "food" | "home" | "alarm" | Mark;
+/**
+ * The nest's road signs (nest slice 3, docs/nest-and-home.md §3.3): each chamber's role, laid on the floor by ants that
+ * have been in it, fading the farther they have walked, so each leads back to its kind of chamber (Heyman et al. 2017).
+ * Only the side view lays them; elsewhere they stay asleep and cost nothing.
+ */
+export type Mark = "royal" | "brood" | "store" | "reception" | "midden";
+export const MARKS: Mark[] = ["royal", "brood", "store", "reception", "midden"];
+export const CHANNELS: Channel[] = ["food", "home", "alarm", ...MARKS];
 
 export interface ChannelParams {
   /** share lost per second */
@@ -36,7 +43,18 @@ export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
   food: { evaporation: 0.06, diffusion: 0.3 },
   home: { evaporation: 0.02, diffusion: 0.3 },
   alarm: { evaporation: 0.25, diffusion: 0.8 },
+  // Floor marks keep: slow to fade, not spreading (a sign on the floor, not a cloud; spreading them cost 10 % of a tick).
+  royal: { evaporation: 0.01, diffusion: 0 },
+  brood: { evaporation: 0.01, diffusion: 0 },
+  store: { evaporation: 0.01, diffusion: 0 },
+  reception: { evaporation: 0.01, diffusion: 0 },
+  midden: { evaporation: 0.01, diffusion: 0 },
 };
+
+/** A record with one entry per channel. */
+function perChannel<T>(make: (ch: Channel) => T): Record<Channel, T> {
+  return Object.fromEntries(CHANNELS.map((ch) => [ch, make(ch)])) as Record<Channel, T>;
+}
 
 /** No cell holds more than this, so a crowded trail does not drown the gradient. */
 export const MAX_LEVEL = 20;
@@ -73,9 +91,9 @@ export class Pheromones {
   params: Record<Channel, ChannelParams>;
   readonly #awake: Record<Channel, Set<number>>;
   /** seconds owed per channel since its last step (advance) */
-  #clock: Record<Channel, number> = { food: 0, home: 0, alarm: 0 };
+  #clock: Record<Channel, number> = perChannel(() => 0);
   /** the head start phase() put on each clock, not yet stepped (time that did not pass) */
-  #head: Record<Channel, number> = { food: 0, home: 0, alarm: 0 };
+  #head: Record<Channel, number> = perChannel(() => 0);
   /** chunks a neighbour's edge spread scent into this step (they stay awake) */
   #fed = new Set<number>();
   /** spare chunk arrays for the double buffer */
@@ -84,12 +102,12 @@ export class Pheromones {
   #nbRock: (Uint8Array | undefined)[] = new Array(9);
   #nbField: (Float32Array | undefined)[] = new Array(9);
 
-  constructor(map: WorldMap, params: Record<Channel, ChannelParams> = DEFAULT_CHANNELS) {
+  /** `params`: per channel; channels left out keep their defaults. */
+  constructor(map: WorldMap, params: Partial<Record<Channel, ChannelParams>> = DEFAULT_CHANNELS) {
     this.map = map;
-    this.params = params;
-    const layer = () => new ChunkLayer((n) => new Float32Array(n), 0);
-    this.fields = { food: layer(), home: layer(), alarm: layer() };
-    this.#awake = { food: new Set(), home: new Set(), alarm: new Set() };
+    this.params = { ...DEFAULT_CHANNELS, ...params };
+    this.fields = perChannel(() => new ChunkLayer((n) => new Float32Array(n), 0));
+    this.#awake = perChannel(() => new Set<number>());
   }
 
   /** Add to the cell under world (x, y). */
