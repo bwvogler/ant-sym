@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Chambers } from "../chambers.ts";
-import { Colony, FLOOR_PER_ANT } from "../colony.ts";
+import { Colony, FLOOR_PER_ANT, ROOMY_DIG } from "../colony.ts";
 import { Game } from "../game.ts";
+import { nx, ny } from "../hex.ts";
 import { digCell, fillCell, generateSideWorld, groundTop, mulberry32, OPEN, rockAt, SOIL } from "../world.ts";
 
 // Nest slice 2 (docs/nest-and-home.md §3.2): the side view's nest is chambers the ants dig, regulated by floor per worker.
@@ -51,6 +52,16 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
   assert.ok(mine.length >= 3, `${mine.length} chambers`);
   assert.ok(ch.floorOf[0]! > floor0 * 3, `floor ${floor0} → ${ch.floorOf[0]}`);
+  // No chamber was dug into another: widening and new chambers don't break into other passages (review of slice 2).
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = 0; x < map.size.w; x++) {
+      const a = ch.at(x, y);
+      if (a < 0) continue;
+      for (let d = 0; d < 6; d++) {
+        const b = ch.at(nx(x, y, d), ny(y, d));
+        assert.ok(b < 0 || b === a, `chambers ${a} and ${b} touch at (${x}, ${y})`);
+      }
+    }
   // Every chamber cell is open: backfill never fills one.
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `chamber cell (${x}, ${y}) filled`);
   // Tschinkel: the gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth.
@@ -80,4 +91,6 @@ test("a roomy nest barely digs (ja-wii): the same few ants dig far less when the
   const before = dug(false);
   assert.ok(30 * FLOOR_PER_ANT < 6, "30 ants want less floor than the founding chamber has: roomy");
   assert.ok(roomy < before * 0.5, `roomy ${roomy} vs ${before}`);
+  // …but at about ROOMY_DIG, not its square (an aimed face was gated twice: review of slice 2).
+  assert.ok(roomy > before * ROOMY_DIG, `roomy ${roomy} vs ${before}: damped too hard`);
 });

@@ -120,29 +120,3 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
   assert.ok(samples > 1000, `${samples} samples`);
   assert.equal(searching, 0, `${searching} of ${samples} were searching`);
 });
-
-test("gravity: a homing ant in the hole goes down the shaft, though the walkway smells more of home", () => {
-  const map = generateSideWorld(2, SMALL);
-  cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const ex = CELL[0] as number;
-  const ey = CELL[1] as number;
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(7), () => "return");
-  // The walkway either side of the hole reeks of home scent (outbound ants lay it there); the shaft has a little.
-  for (let x = ex - 8; x <= ex + 8; x++) {
-    const y = walkway(map, x);
-    if (y >= 0) c.ph.depositCell("home", x, y, 15);
-  }
-  for (let y = ey; y <= ey + 10; y++) for (let x = ex - 4; x <= ex + 4; x++) if (rockAt(map, x, y) === OPEN && !isSky(map, x, y)) c.ph.depositCell("home", x, y, 3);
-  c.x[0] = centreX(ex, ey);
-  c.y[0] = centreY(ey);
-  c.mode[0] = 2;
-  c.since[0] = 200; // tired: homing to the chamber
-  let up = 0;
-  for (let k = 0; k < 30 * 4; k++) {
-    c.tick(1 / 30);
-    c.antCell(0);
-    if (isSky(map, CELL[0] as number, CELL[1] as number)) up++;
-  }
-  assert.ok(up < 15, `back up on the ground ${up} of 120 ticks`);
-  assert.ok((c.y[0] as number) > map.nest.entrance!.y + 2, "on its way down the shaft");
-});

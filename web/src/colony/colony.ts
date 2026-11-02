@@ -823,9 +823,6 @@ export class Colony {
         const tx = stepX(cx, cy, d);
         const ty = stepY(cy, d);
         if (rockAt(map, tx, ty) !== OPEN) continue;
-        // Gravity: homing in from the hole, it goes down, never back up onto the ground (the walkway's home scent is
-        // stronger than the shaft's, and the ground walk sends it back to the hole: whole colonies rocked there).
-        if (mode === RETURN && this.#entrance && isSky(map, tx, ty) && !isSky(map, cx, cy)) continue;
         const v = byVector ? Math.cos(DIR_ANGLE[d] as number) * hx + Math.sin(DIR_ANGLE[d] as number) * hy : field.get(tx, ty);
         if (v > bestV) {
           bestV = v;
@@ -1211,6 +1208,7 @@ export class Colony {
       const ty = stepY(cy, d);
       if (ty > c.floorRow || ty <= c.floorRow - CHAMBER_HEIGHT) continue;
       if (rockAt(this.map, tx, ty) !== SOIL || this.map.loose?.get(tx, ty) === 1 || this.#crust(tx, ty)) continue;
+      if (this.#joinsChamber(tx, ty, id)) continue;
       return d;
     }
     return -1;
@@ -1231,17 +1229,31 @@ export class Colony {
     for (const d of [first, 3 - first]) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (rockAt(this.map, tx, ty) === SOIL && this.map.loose?.get(tx, ty) !== 1 && !this.#crust(tx, ty)) return d;
+      if (rockAt(this.map, tx, ty) === SOIL && this.map.loose?.get(tx, ty) !== 1 && !this.#crust(tx, ty) && !this.#joinsChamber(tx, ty, -1)) return d;
     }
     return -1;
   }
 
-  /** Whether a new chamber may start at row cy near column cx: no chamber of this colony within the gap for that depth. */
+  /**
+   * Whether digging soil cell (x, y) open for chamber `own` (−1: a new one) would join it to another chamber, this
+   * colony's or another's. The tunnel rules' spacing check (startable) is bypassed for chamber faces; opening onto a
+   * tunnel is fine (a junction), but two chambers dug into one another lose their roles and their floors run together.
+   */
+  #joinsChamber(x: number, y: number, own: number): boolean {
+    const ch = this.map.chambers!;
+    for (let d = 0; d < 6; d++) {
+      const id = ch.at(stepX(x, y, d), stepY(y, d));
+      if (id >= 0 && id !== own) return true;
+    }
+    return false;
+  }
+
+  /** Whether a new chamber may start at row cy near column cx: no chamber (of any colony) within the gap for that depth. */
   #chamberRoom(cx: number, cy: number, depth: number): boolean {
     const ch = this.map.chambers!;
     const gap = CHAMBER_GAP + depth * CHAMBER_GAP_GROWTH;
     for (const c of ch.list) {
-      if (c.colony !== this.params.nest || c.cells === 0) continue;
+      if (c.cells === 0) continue; // any colony's: a chamber is not started inside or against another nest's
       if (Math.abs(c.floorRow - cy) < gap && cx >= c.x0 - CHAMBER_SPREAD && cx <= c.x1 + CHAMBER_SPREAD) return false;
     }
     return true;
@@ -1847,7 +1859,7 @@ export class Colony {
       if (face === START_FACE) face = digging || rng() < START * (this.crowded() ? 1 : ROOMY_DIG) ? DIG_FACE : GLANCE;
       // A roomy nest (ja-wii): a tunnel's end met head-on is dug only now and then; turned along the wall otherwise, so the
       // next tick doesn't simply try again.
-      else if (face === DIG_FACE && !digging && map.chambers && !this.crowded() && rng() > ROOMY_DIG) face = GLANCE;
+      else if (face === DIG_FACE && !digging && Number.isNaN(this.digAim[i] as number) && map.chambers && !this.crowded() && rng() > ROOMY_DIG) face = GLANCE; // (an aimed face passed ROOMY_DIG when it was chosen)
       // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say.
       if (face !== NO_FACE && this.#chamberCell[i] >= 0 && mode === EXPLORE && !carrying && !pellet) {
         cellOf(nx, ny);
