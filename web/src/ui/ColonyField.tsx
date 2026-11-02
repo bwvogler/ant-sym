@@ -468,8 +468,8 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
             const span = ch.x1 - ch.x0 + 1;
             const shown = Math.min(40, Math.floor(ch.food));
             for (let k = 0; k < shown; k++) {
-              const fx = ch.x0 + ((k * 7) % span);
-              const fy = ch.floorRow - (Math.floor((k * 7) / span) % 2);
+              const fx = ch.x0 + (k % span);
+              const fy = ch.floorRow - (Math.floor(k / span) % 2);
               const wx = centreX(fx, fy);
               const wy = centreY(fy);
               if (!inView(wx, wy)) continue;

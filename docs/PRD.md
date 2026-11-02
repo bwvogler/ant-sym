@@ -1539,4 +1539,17 @@ The pipeline keeps the queen and brood fed and puts the surplus into stores. Rec
 
 `colony.feed(n)` puts food at home for tests: in the royal chamber with a queen, else in the larder.
 
+**Agent review.** The review checked food conservation (to 9 × 10⁻¹²) and the larder against the chambers' food (to 2 × 10⁻¹²), and found the top-down maps identical. It found:
+1. **Stray larvae starved.** Brood put down outside a chamber (a nurse timed out, or died) was never fed and never moved. Each stray held back laying (3 food owed for ever) and took a slot under the cap. On seed 2, colony 0 had a 472-second-old stray larva at 500 s and 184 births against 286 before this slice. Now any idle ant underground takes stray brood in from within two cells, to a brood chamber, or to the queen without one.
+2. **Porters put food down only standing in their target,** and stores one or two cells wide took up to 259 s to hit. Porters now also put food down from a cell beside the target. Foragers don't: put down beside their chamber, they were explorers in a tunnel and dug at its ends, and a roomy nest dug two to three times as much. Food in porters' jaws now counts toward the queen's reserve and the strategist's spare food.
+3. **A porter that died dropped its food on the tunnel floor,** where a forager would bring it "home" a second time. It now goes into the chamber the porter was taking it to.
+4. **Wants counted brood lying in another colony's chamber.** Now only the colony's own chambers.
+5. **Seeds drawn in one column** for some chamber widths.
+6. **Tests:** they now also check:
+   - no chamber's food goes negative;
+   - a larva eats only its own chamber's food;
+   - a stray larva is taken in and raised. This one fails on the reviewed code.
+
+After the fixes (seeds 1–3): food home 8,032 for the six colonies; 1.0 porter trips per food; 269–304 births a colony; out over 120 s 0.5–1.0 %, except seed 3 at 4.2 %.
+
 **Jev cost:** unchanged. Foragers are still asked by place and trail; the inside work is a local rule.
