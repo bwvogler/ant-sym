@@ -201,7 +201,7 @@ export class Colony {
   #noTunnel: Int32Array;
   /** 1 while a pellet carrier is walking a stale branch to fill its end (see BACKFILL.enterStale) */
   #staleWalk: Uint8Array;
-  /** the cell (packed y·65536 + x) where this pellet carrier last looked for space to fill: once a cell is enough */
+  /** the cell (packed y·65536 + x) where this pellet carrier last looked for space to fill, this trip: once a cell is enough */
   #looked: Int32Array;
   /** the side view: what each homing ant is heading for (0 the chamber, 1 the entrance); a change drops the wall it was following */
   #goalKind: Uint8Array;
@@ -309,6 +309,10 @@ export class Colony {
   #goalY = 0;
   /** the side view: where the ant being stepped believes the hole is, across the ground (see #believe, #towardHole) */
   #holeX = 0;
+  /** the cell it looked from before that (packed; −1 none): the way it came, which is never a stale branch */
+  #cameFrom: Int32Array;
+  /** the cell (packed) this ant last dug: its pellet never goes straight back in there */
+  #lastDug: Int32Array;
   /** the first cell of the wall being followed by cell: back there, it has been all the way round */
   loopX: Int32Array;
   loopY: Int32Array;
@@ -412,7 +416,7 @@ export class Colony {
   /** soil cells this colony dug open, and pellets of it dropped on the mound at the nest */
   soilDug = 0;
   soilOut = 0;
-  /** pellets dropped into unused dead ends on the way home (backfill), and pellets lost with ants that died carrying them */
+  /** pellets put back into unused space on the way home (backfill), and pellets lost with ants that died carrying them */
   soilFilled = 0;
   soilLost = 0;
   /** ants lost, and a count of recent losses fading over ~30 s */
@@ -495,6 +499,8 @@ export class Colony {
     this.#spoilT = new Float32Array(n);
     this.#loosePellet = new Uint8Array(n);
     this.#fillIntent = new Uint8Array(n);
+    this.#cameFrom = new Int32Array(n).fill(-1);
+    this.#lastDug = new Int32Array(n).fill(-1);
     this.#noGain = new Uint8Array(n);
     this.loopX = new Int32Array(n).fill(NO_CELL);
     this.loopY = new Int32Array(n);
@@ -557,6 +563,9 @@ export class Colony {
     this.#spoilTo[i] = NaN;
     this.#loosePellet[i] = 0;
     this.#fillIntent[i] = 0;
+    this.#looked[i] = -1;
+    this.#cameFrom[i] = -1;
+    this.#lastDug[i] = -1;
     this.digT[i] = 0;
     this.digAim[i] = NaN;
     this.hand[i] = this.#rng() < 0.5 ? -1 : 1;
@@ -952,11 +961,14 @@ export class Colony {
     const hx = CELL[0] as number;
     const hy = CELL[1] as number;
     // A target that isn't this cell or a neighbour is stale (from before a detour, say): decide afresh.
-    // So is one that has been filled since (backfill), unless it is an explorer's face to dig.
+    // So is one that has been filled since (backfill), unless it is an explorer's face to dig: a cell it
+    // chose to dig (digAim set), not one it was walking to, and not one put back moments ago (see refilled).
+    // Kept, a walkway filled in front of an explorer was dug straight back out (the review of MR 12).
     const fresh =
       this.gx[i] === NO_CELL ||
       hexDistance(this.gx[i] as number, this.gy[i] as number, hx, hy) > 1 ||
-      (mode !== EXPLORE && rockAt(map, this.gx[i] as number, this.gy[i] as number) !== OPEN) ||
+      (rockAt(map, this.gx[i] as number, this.gy[i] as number) !== OPEN &&
+        (mode !== EXPLORE || Number.isNaN(this.digAim[i] as number) || refilled(map, this.gx[i] as number, this.gy[i] as number, this.time))) ||
       rockAt(map, this.gx[i] as number, this.gy[i] as number) === AIR; // sky (the ground under a walkway dug away) is no face to dig
     if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
     const hugging = mode === EXPLORE && (this.hugT[i] as number) > 0;
@@ -1129,7 +1141,9 @@ export class Colony {
           forkSide = this.#rng() < 0.5 ? -1 : 1;
           aim += forkSide * (Math.PI / 3);
         }
-        let dug = this.#mayDig(cx, cy) && this.#digs(i) ? chooseDig(map, cx, cy, aim, this.#rng()) : -1;
+        // A dead end the colony is filling back (a cell beside it put back moments ago) is left, not dug
+        // on: filling a branch from its tip leaves a new dead end, and digging there undid the fill.
+        let dug = !this.#mayDig(cx, cy) || !this.#digs(i) || besideRefill(map, cx, cy, this.time) ? -1 : chooseDig(map, cx, cy, aim, this.#rng(), this.time);
         // Digging is social: the more nestmates round it, the likelier an ant is to dig (and, as the nest
         // grows roomy and they spread out, the less). That is how real colonies stop excavating once
         // they have room (Rasse & Deneubourg 2001); a lone ant at a far tunnel's end still digs now and then.
@@ -1191,7 +1205,7 @@ export class Colony {
       dir = widen;
       this.digAim[i] = DIR_ANGLE[widen] as number;
       this.#aimChamber(i, stepX(cx, cy, widen), stepY(cy, widen), here + 1);
-    } else if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && (crowded || this.#rng() < ROOMY_DIG) && this.#mayDig(cx, cy) && this.#digs(i) && startable(map, wx, wy, wallDir)) {
+    } else if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && (crowded || this.#rng() < ROOMY_DIG) && this.#mayDig(cx, cy) && this.#digs(i) && startable(map, wx, wy, wallDir) && !refilled(map, wx, wy, this.time)) {
       dir = wallDir;
       this.digAim[i] = DIR_ANGLE[wallDir] as number;
     } else {
@@ -1223,11 +1237,35 @@ export class Colony {
   }
 
   /**
-   * Backfill: a pellet carrier at tunnel cell (cx, cy) drops its pellet into a neighbouring dead end that
-   * nobody uses, filling it back with soil, instead of hauling it all the way out. Leaf-cutting ants put
-   * most of their soil back inside this way, refilling unused space (Pielström & Roces); harvester ants
-   * very little (≈ 2.5 %, Tschinkel et al. 2015). Unused, to the ant's senses: no food there, no food or
-   * home scent (outbound ants lay home scent, so a tip being dug carries it), no ant in it, and not by the nest.
+   * The side view: whether cell (x, y) is ground a chamber's floor stands on: directly under a chamber cell, or beside
+   * one on that chamber's floor row (a tunnel dug down, or out at floor level, from a chamber). Open, it takes floor
+   * from the chamber; filled back, it gives it back (see #backfill).
+   */
+  #floorGround(x: number, y: number): boolean {
+    const ch = this.map.chambers;
+    if (!ch) return false;
+    if (ch.at(stepX(x, y, 4), stepY(y, 4)) >= 0 || ch.at(stepX(x, y, 5), stepY(y, 5)) >= 0) return true;
+    for (const d of [0, 3]) {
+      const id = ch.at(stepX(x, y, d), stepY(y, d));
+      if (id >= 0 && ch.list[id]!.floorRow === y) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Backfill: a pellet carrier at cell (cx, cy) drops its pellet into a neighbouring cell that nobody
+   * uses, filling it back with soil, instead of hauling it all the way out. Leaf-cutting ants put most of
+   * their soil back inside this way, refilling unused space (Pielström & Roces); harvester ants very
+   * little (≈ 2.5 %, Tschinkel et al. 2015). A cell may be filled when:
+   * - its open neighbours form one unbroken run (stub with BACKFILL.maxOpen), so no passage is cut;
+   * - it smells unused against the path: its home + food scent is under #staleBelow (judged from where
+   *   the carrier stands, raised next to fresh pellets);
+   * - it holds no food and no ant of either colony, and is not by any nest;
+   * - it is not the cell this carrier dug its pellet from (that would undo its own dig), nor any cell dug in the
+   *   last BACKFILL.young seconds: fresh digging is where the colony is going (tunnels toward food), not excess
+   *   space. Leaf-cutters refill older galleries they no longer use (Pielström & Roces). Except the ground a
+   *   chamber's floor stands on (see #floorGround): filling a tunnel dug down out of a chamber builds its floor
+   *   back, which is construction, not spare soil put away. BACKFILL.hold still applies: floor fills stay put.
    */
   #backfill(i: number, cx: number, cy: number): boolean {
     const { map } = this;
@@ -1236,7 +1274,9 @@ export class Colony {
     for (let d = 0; d < 6; d++) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, BACKFILL.maxOpen)) continue;
+      if (ty * 65536 + tx === this.#lastDug[i]) continue; // the cell it just dug: not straight back in
+      if (this.time - map.dugAt.get(tx, ty) < backfill.young && !this.#floorGround(tx, ty)) continue; // dug lately: the live frontier, not excess
+      if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, backfill.maxOpen)) continue;
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
       this.enemies?.look?.(this.odour[i] as number, -1); // any ant of another colony, stranger or not (a tolerance below 0 counts every band)
       if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
@@ -1272,9 +1312,9 @@ export class Colony {
   #staleBelow(cx: number, cy: number, tx: number, ty: number): number {
     const f = this.ph.fields;
     const here = f.home.get(cx, cy) + f.food.get(cx, cy);
-    const base = Math.max(FAINT, BACKFILL.staleRatio * here);
+    const base = Math.max(FAINT, backfill.staleRatio * here);
     // Never above the scent where it stands: a cell as busy as its own is in use, fresh pellets or not.
-    return Math.min(base * (1 + BACKFILL.pelletPull * this.#pelletScent(tx, ty)), Math.max(base, here));
+    return Math.min(base * (1 + backfill.pelletPull * this.#pelletScent(tx, ty)), Math.max(base, here));
   }
 
   /** The smell of fresh pellets at cell (x, y): from the freshest fill among it and its neighbours, fading over BACKFILL.pelletTau seconds. */
@@ -1282,7 +1322,7 @@ export class Colony {
     const at = this.map.filledAt;
     let t = at.get(x, y);
     for (let d = 0; d < 6; d++) t = Math.max(t, at.get(stepX(x, y, d), stepY(y, d)));
-    return t === -Infinity ? 0 : Math.exp(-(this.time - t) / BACKFILL.pelletTau);
+    return t === -Infinity ? 0 : Math.exp(-(this.time - t) / backfill.pelletTau);
   }
 
   /**
@@ -1296,7 +1336,7 @@ export class Colony {
    */
   #staleStep(i: number, step: number): boolean {
     const s = this.since[i] as number;
-    if (s <= BACKFILL.after || s >= BACKFILL.staleSearch) {
+    if (s <= backfill.after || s >= backfill.staleSearch) {
       this.#staleWalk[i] = 0;
       return false;
     }
@@ -1340,21 +1380,35 @@ export class Colony {
 
   /**
    * At a cell it has just entered, a pellet carrier that sees a far staler way than where it stands (a branch
-   * nobody walks) now and then turns into it (BACKFILL.enterStale), to fill its end (see #staleWay). Forks
+   * nobody walks) now and then turns into it (BACKFILL.enterStale), to fill its end (see #staleStep). Forks
    * are never tunnel cells on hexes (the branch's mouth sits beside the way on), so this is looked at on
    * arrival, not in #walkTunnel. True if it turned in: its target cell (gx, gy) is the branch's first cell.
+   *
+   * Never back the way it came: home scent falls away from the nest along every path, so the cell behind
+   * always smells fainter than here, and judged against here alone it passed for a stale branch (40 % of
+   * turn-ins were straight reversals, MR 12's review). A branch must smell stale against the way it came
+   * too: only then is it a side way nobody walks, not just the path's own far end.
    */
   #enterStale(i: number, cx: number, cy: number): boolean {
     const s = this.since[i] as number;
-    if (this.#staleWalk[i] || s >= BACKFILL.staleSearch) return false;
+    if (this.#staleWalk[i] || s >= backfill.staleSearch) return false;
     const { map } = this;
     const f = this.ph.fields;
+    // The way it came: the cell it looked from last, if that is beside it; else the way behind its heading.
+    const from = this.#cameFrom[i] as number;
+    let bx = from & 0xffff;
+    let by = from >> 16;
+    if (from < 0 || hexDistance(bx, by, cx, cy) !== 1) {
+      const back = dirOf((this.heading[i] as number) + Math.PI);
+      bx = stepX(cx, cy, back);
+      by = stepY(cy, back);
+    }
     let way = -1;
     let wayV = Infinity;
     for (let d = 0; d < 6; d++) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (rockAt(map, tx, ty) !== OPEN) continue;
+      if ((tx === bx && ty === by) || rockAt(map, tx, ty) !== OPEN) continue;
       const v = f.home.get(tx, ty) + f.food.get(tx, ty);
       if (v < wayV) {
         wayV = v;
@@ -1364,7 +1418,9 @@ export class Colony {
     if (way < 0) return false;
     const tx = stepX(cx, cy, way);
     const ty = stepY(cy, way);
-    if (wayV >= this.#staleBelow(cx, cy, tx, ty) || this.#rng() >= BACKFILL.enterStale) return false;
+    if (wayV >= this.#staleBelow(cx, cy, tx, ty)) return false;
+    if (rockAt(map, bx, by) === OPEN && wayV >= this.#staleBelow(bx, by, tx, ty)) return false; // no staler than the path behind
+    if (this.#rng() >= backfill.enterStale) return false;
     this.#staleWalk[i] = 1;
     this.gdir[i] = way;
     this.gx[i] = tx;
@@ -2024,11 +2080,12 @@ export class Colony {
     }
   }
 
-  /** Whether ant i is in a cell it hasn't looked round yet (leaves its cell in CELL). */
+  /** Whether ant i is in a cell it hasn't looked round yet this trip (leaves its cell in CELL; the cell it looked from before goes in #cameFrom). */
   #enteredCell(i: number): boolean {
     this.antCell(i);
     const packed = (CELL[1] as number) * 65536 + (CELL[0] as number);
     if (this.#looked[i] === packed) return false;
+    this.#cameFrom[i] = this.#looked[i] as number;
     this.#looked[i] = packed;
     return true;
   }
@@ -2413,7 +2470,7 @@ export class Colony {
         }
         const side = this.wall[i] as number;
         // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
-        const look = pellet && !this.#corpse[i] && map.hasSoil && Number.isNaN(this.#spoilTo[i] as number) && (this.since[i] as number) > BACKFILL.after && this.#enteredCell(i);
+        const look = pellet && !this.#corpse[i] && map.hasSoil && Number.isNaN(this.#spoilTo[i] as number) && (this.since[i] as number) > backfill.after && this.#enteredCell(i);
         const lx = CELL[0] as number;
         const ly = CELL[1] as number;
         if (look && this.#backfill(i, lx, ly)) {
@@ -2628,17 +2685,18 @@ export class Colony {
         this.antCell(i);
         if (CELL[0] === lx && CELL[1] === ly) landOpen = true;
       }
-      let face = !landOpen && mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] as number, this.gy[i] as number) : NO_FACE;
+      let face = !landOpen && mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] as number, this.gy[i] as number, this.time) : NO_FACE;
       if (face === START_FACE) face = digging || (this.#digs(i) && rng() < START * (this.crowded() ? 1 : ROOMY_DIG)) ? DIG_FACE : GLANCE;
       // Zoned by age (slice 6): only the middle-aged dig; others meeting a face turn along it.
       else if (face === DIG_FACE && !digging && !this.#digs(i)) face = GLANCE;
       // A roomy nest (ja-wii): a tunnel's end met head-on is dug only now and then; turned along the wall otherwise, so the
       // next tick doesn't simply try again.
       else if (face === DIG_FACE && !digging && Number.isNaN(this.digAim[i] as number) && map.chambers && !this.crowded() && rng() > ROOMY_DIG) face = GLANCE; // (an aimed face passed ROOMY_DIG when it was chosen)
-      // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say.
+      // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say,
+      // but not soil put back moments ago (see refilled: #17's hold on refilled cells).
       if (face !== NO_FACE && this.#chamberCell[i] >= 0 && mode === EXPLORE && !carrying && !pellet) {
         cellOf(nx, ny);
-        if (this.#chamberCell[i] === (CELL[1] as number) * 65536 + (CELL[0] as number) && rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL && this.#digs(i)) face = DIG_FACE;
+        if (this.#chamberCell[i] === (CELL[1] as number) * 65536 + (CELL[0] as number) && rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL && this.#digs(i) && !refilled(map, CELL[0] as number, CELL[1] as number, this.time)) face = DIG_FACE;
       }
       if (face === DIG_FACE && map.sky) {
         cellOf(nx, ny);
@@ -2681,7 +2739,7 @@ export class Colony {
             this.#fillIntent[i] = 0;
             this.#spoilTo[i] = NaN;
             h += Math.PI;
-          } else if (left <= 0 && digCell(map, fx, fy)) {
+          } else if (left <= 0 && digCell(map, fx, fy, this.time)) {
             // A chamber face: the cell joins its chamber (or founds a new one, if there is still room for one there).
             if (this.#chamberCell[i] === fy * 65536 + fx && map.chambers) this.#chamberDug(i, fx, fy);
             this.#chamberCell[i] = -1;
@@ -2692,6 +2750,9 @@ export class Colony {
             this.soilDug++;
             this.pellet[i] = 1;
             this.since[i] = 0;
+            this.#lastDug[i] = fy * 65536 + fx;
+            this.#looked[i] = -1; // a new trip home: every cell on it is looked round afresh
+            this.#cameFrom[i] = -1;
             this.#homeAfresh(i); // a fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it
             h += Math.PI;
           }
@@ -3080,9 +3141,10 @@ function openAt(map: WorldMap, x: number, y: number, d: number): boolean {
  * Which way to dig on from tunnel cell (x, y) toward heading `aim`: of the two ways either side of
  * it, the far one with probability ∝ how near the heading is to it (`u` uniform in 0..1), so over
  * many cells the tunnel runs at the heading itself, not along one of the six ways. If that cell can't
- * be dug, the other; failing both, the diggable way nearest the heading; −1 if none.
+ * be dug, the other; failing both, the diggable way nearest the heading; −1 if none. A cell filled
+ * back less than BACKFILL.hold seconds before `now` is never dug (see refilled).
  */
-export function chooseDig(map: WorldMap, x: number, y: number, aim: number, u: number): number {
+export function chooseDig(map: WorldMap, x: number, y: number, aim: number, u: number, now = Infinity): number {
   const a = (((aim / (Math.PI / 3)) % 6) + 6) % 6;
   const lo = Math.floor(a) % 6;
   const hi = (lo + 1) % 6;
@@ -3092,7 +3154,7 @@ export function chooseDig(map: WorldMap, x: number, y: number, aim: number, u: n
   for (const d of [first, first === lo ? hi : lo, 0, 1, 2, 3, 4, 5]) {
     const tx = stepX(x, y, d);
     const ty = stepY(y, d);
-    if (rockAt(map, tx, ty) !== SOIL || !diggable(map, tx, ty, d)) continue;
+    if (rockAt(map, tx, ty) !== SOIL || !diggable(map, tx, ty, d) || refilled(map, tx, ty, now)) continue;
     if (d === hi || d === lo) return d;
     const o = Math.abs(angleDiff(DIR_ANGLE[d] as number, aim));
     if (o < off) {
@@ -3175,6 +3237,21 @@ export function moundRadius(pellets: number, nestR: number): number {
   return Math.sqrt(nestR * nestR + (Math.max(0, pellets) * SWELL * R) / Math.PI);
 }
 
+/**
+ * Backfill tuning (frozen; tests and sweeps change it only through tuneBackfill). A pellet carrier may fill only
+ * `after` seconds into its trip home, and never the cell it dug. A side passage counts as unused when its scent is
+ * under staleRatio × the scent where the carrier stands (or FAINT), raised up to (1 + pelletPull)× next to pellets
+ * filled in the last pelletTau seconds or so. A carrier takes a stale way at a fork with chance enterStale, until
+ * staleSearch seconds into its trip home. A filled cell is not dug again for `hold` seconds (see refilled), and a cell
+ * dug in the last `young` seconds is not filled.
+ */
+export const BACKFILL = Object.freeze({ after: 2.5, staleRatio: 0.5, enterStale: 0.3, staleSearch: 20, pelletTau: 60, pelletPull: 6, maxOpen: 5, hold: 600, young: 200 } as const);
+
+/** The backfill tuning as a type, each number free to vary (tuneBackfill). */
+export type BackfillTuning = { readonly [K in keyof typeof BACKFILL]: number };
+
+/** The tuning in force: BACKFILL, unless a test or sweep has called tuneBackfill. */
+let backfill: BackfillTuning = BACKFILL;
 
 /** The side view: about how high (rows) the spoil disc stands as it spreads: a steep cone halved the food brought home, six rows cost a third. */
 const MOUND_HEIGHT = 3;
@@ -3198,13 +3275,15 @@ const ENTRANCE_R = 1.5;
 const ENTRANCE_ZONE = 4;
 
 /**
- * Backfill tuning (mutable, for sweeps and tests). A pellet carrier may fill only `after` seconds into its trip
- * home (not the cell it has just dug: the tunnel's live end). A side passage counts as unused when its scent is under
- * staleRatio × the scent where the carrier stands (or FAINT), raised up to (1 + pelletPull)× next to pellets
- * filled in the last pelletTau seconds or so. A carrier takes a stale way at a fork with chance enterStale,
- * until staleSearch seconds into its trip home.
+ * Tests and sweeps only: run with some backfill tuning changed (frozen like BACKFILL). Returns the function
+ * that puts BACKFILL back; call it in a finally block.
  */
-export const BACKFILL = { after: 2.5, staleRatio: 0.5, enterStale: 0.3, staleSearch: 20, pelletTau: 60, pelletPull: 6, maxOpen: 5 };
+export function tuneBackfill(over: Partial<BackfillTuning>): () => void {
+  backfill = Object.freeze({ ...backfill, ...over });
+  return () => {
+    backfill = BACKFILL;
+  };
+}
 
 /** A lone ant's chance to dig at a tunnel's end; each nestmate within two cells adds 1 / DIG_CROWD. */
 const DIG_ALONE = 0.1;
@@ -3248,13 +3327,15 @@ const HUG_TIME = 8;
  * START_FACE (it meets a flat wall head-on: a tunnel may start here), or GLANCE (it touches the soil
  * at a slant: slide along it). Head-on is crossing the edge the heading points at: every heading is
  * within 30° of one of the six. Only a tunnel's end is dug (see tunnelEnd): that is what makes
- * tunnels rather than caverns.
+ * tunnels rather than caverns. Soil put back less than BACKFILL.hold seconds before `now` is only
+ * ever glanced off (see refilled).
  */
-export function soilFace(map: WorldMap, x: number, y: number, px: number, py: number, h: number, aimX = NO_CELL, aimY = 0): number {
+export function soilFace(map: WorldMap, x: number, y: number, px: number, py: number, h: number, aimX = NO_CELL, aimY = 0, now = Infinity): number {
   cellOf(px, py);
   const tx = CELL[0] as number;
   const ty = CELL[1] as number;
   if (rockAt(map, tx, ty) !== SOIL) return NO_FACE;
+  if (refilled(map, tx, ty, now)) return GLANCE;
   cellOf(x, y);
   const cx = CELL[0] as number;
   const cy = CELL[1] as number;
@@ -3267,6 +3348,21 @@ export function soilFace(map: WorldMap, x: number, y: number, px: number, py: nu
   if (aimed && startable(map, tx, ty, d)) return DIG_FACE;
   if (headOn && startable(map, tx, ty, d)) return START_FACE;
   return GLANCE;
+}
+
+/**
+ * Whether cell (x, y) was filled back with soil less than BACKFILL.hold seconds before `now` (the
+ * default, Infinity: long after any fill). Such soil is left alone: a pellet put back is not dug out
+ * again for a good while. Without this, 38–46 % of all digs re-dug filled cells (MR 12's review).
+ */
+export function refilled(map: WorldMap, x: number, y: number, now = Infinity): boolean {
+  return now - map.filledAt.get(x, y) < backfill.hold;
+}
+
+/** Whether any neighbour of cell (x, y) was filled back less than BACKFILL.hold seconds before `now` (see refilled). */
+export function besideRefill(map: WorldMap, x: number, y: number, now = Infinity): boolean {
+  for (let d = 0; d < 6; d++) if (refilled(map, stepX(x, y, d), stepY(y, d), now)) return true;
+  return false;
 }
 
 /** Whether soil cell (x, y), entered going `d`, may be dug: a tunnel's end, or a wall with open ground straight beyond it (breaking through). */
