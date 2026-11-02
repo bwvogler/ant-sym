@@ -71,7 +71,7 @@ test("the policy is asked only when an ant's situation changes, and its answer i
   assert.equal(c.mode[0], 1, "follow");
   assert.equal(c.decisions, 1);
   assert.equal(c.situationsSeen, 1);
-  assert.equal(SITUATIONS, 1296);
+  assert.equal(SITUATIONS, 3888); // home: 3 trail levels or 6 places in the nest (nest slice 3)
 });
 
 test("a policy answering nonsense falls back to the plain rule instead of breaking the ant", () => {

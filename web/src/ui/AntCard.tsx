@@ -146,6 +146,11 @@ function perceives(col: Colony, i: number): string[] {
   if (Math.abs(lay - 1) >= 0.05) out.push(`and lays its trail ×${lay.toFixed(2)}`);
   const leak = col.crossLay[i] as number;
   if (leak >= 0.05) out.push(`and leaks ${Math.round(100 * leak)}% of its food trail to the other colony`);
+  const marks = col.gainMarks[i] as number;
+  if (Math.abs(marks - 1) >= 0.05) out.push(`its nest's floor marks ×${marks.toFixed(2)}`);
+  if ((col.swapMarks[i] as number) >= 0.5) out.push("brood as store and store as brood");
+  const regicide = col.regicide[i] as number;
+  if (regicide >= 0.02) out.push(`and kills the queen and brood it touches (×${regicide.toFixed(2)})`);
   const quiet = col.quiet[i] as number;
   if (quiet >= 0.05) out.push(`and fights raising ${Math.round(100 * (1 - quiet))}% of the alarm`);
   return out;
