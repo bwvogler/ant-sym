@@ -1213,7 +1213,7 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 
 The owner asked where "home" really is for an ant, whether it is the queen, and whether ants build spaces with jobs. In the side view, home is still one pre-dug chamber that every ant steers to by an exact vector through solid soil.
 
-The research and the design are in [`docs/nest-and-home.md`](nest-and-home.md), not built yet:
+The research and the design are in [`docs/nest-and-home.md`](nest-and-home.md), built since by nest slices 0–9 (§29–§38) and the fix-up in §39:
 - **Outside,** home is the hole: a step-counting vector that drifts, corrected by landmarks and the entrance's smell, and reset in the shaft.
 - **Inside,** ants go by **gravity**, memory and **chemical road signs** on the floor. Each chamber has its own smell.
 - **The queen's scent** says where she is, not where home is.
@@ -1346,7 +1346,7 @@ The cost is a cell lookup and a scent read per ant per tick, and the belief is c
   - top-down maps keep no vector.
 - side.test.ts's "never away from the hole" now reads "never away from where it believes the hole is" (searching aside).
 
-**Jev cost:** unchanged. `down` is a sense in the sim, but not yet in the situation; slice 3 decides that.
+**Jev cost:** unchanged. `down` is a sense in the sim, but not yet in the situation; slice 3 decides that. (Slice 3 left it out: see §32 and docs/nest-and-home.md §5.)
 
 ## 31. Ants dig the nest's chambers, as much as they need (nest slice 2, ja-60r with ja-wii, 2026-11-02)
 
@@ -1417,12 +1417,12 @@ Over seeds 1–3, each colony has its royal and reception chambers, 4–7 brood 
 
 **Road signs** are five mark channels in the colony's pheromones (`MARKS`: royal, brood, store, reception, midden).
 - Underground, an ant lays the mark of the last chamber it was in. The mark is fainter the longer it has been away (`MARK_DEPOSIT` 4 per second, falling to 1/e after `MARK_DECAY` 30 s), the way walking out lays home trail. So every tunnel smells of what lies back along it, and each junction carries the signs of each branch (Heyman et al. 2017).
-- Marks fade slowly (1 % a second) and don't spread. Spreading them kept twice the chunks awake and cost about 10 % of a tick.
+- Marks fade slowly (1 % a second) and don't spread. Spreading them kept twice the chunks awake and cost 14 % of a tick (6.73 against 5.90 ms, side view, two colonies, as the slice's PR measured).
 - On the ground and on the top-down maps they are never laid and stay asleep.
 - **Homing in a tunnel** goes by the mark of where it is going (`SIGN_WEIGHT` 4 × the home trail). For now that is royal; slice 5 sends food carriers to reception.
 - **A strong mark underfoot** corrects the in-nest memory, as the home trail does (slice 1).
 
-**The situation.** Underground in the side view, `homeTrail` no longer reads the home trail. It says where the ant is: `tunnel`, or a chamber of its colony by role. On the ground, and on the top-down maps, it is the home trail's level as before.
+**The situation.** Underground in the side view, `homeTrail` no longer reads the home trail. It says where the ant is: `tunnel`, or a chamber of its colony by role. On the ground, and on the top-down maps, it is the home trail's level as before. The design's `down` field (docs/nest-and-home.md §5) is not in it: gravity steers every ant underground already, and no choice turns on it.
 - An ant that has just put food down in the royal chamber is now asked "in the royal chamber". Before, it was asked "home trail strong", the same question as an ant on the walkway by the hole.
 - The legend says what the places mean and that an ant inside the nest is home. `COLONY_BRAIN_VERSION` is 4.
 - `SITUATIONS` is 3,888 (home: 3 trail levels or 6 places).
@@ -1455,7 +1455,7 @@ Also fixed:
 - marks are laid at the colony's trail `deposit`;
 - the strategist keeps its own cache version (`STANCE_BRAIN_VERSION` 3), so its cached stances aren't thrown away.
 
-The cost figures above come from a scratch script on the side view: `scripts/colony-cost.mjs` uses the top-down map, which meets no in-nest situation.
+The cost figures above come from a scratch script on the side view: `scripts/colony-cost.mjs` used the top-down map, which meets no in-nest situation. It has `--side` since §39: on the side view (600 + 600 ants, 5 minutes, five doctrines), the colony lane asks 113 distinct situations at ~589 tokens per question, ~222k tokens a game, about **$0.11 an hour** at a doctrine a minute (#22's review measured 568 tokens per question and $0.114 an hour at #24's head): about twice the top-down lane, under the $0.25/h target.
 
 **Tests:** `marks.test.ts`:
 - every chamber gets a role, and the royal mark is strongest in the royal chamber;
@@ -1652,17 +1652,17 @@ In the side view with a queen, a worker that dies leaves a corpse where it fell.
 - A corpse carrier moves like a soil pellet carrier: up the shaft and along the ground. It gives up after `CORPSE_GIVE_UP` (60 s) rather than a pellet's 15 s. A corpse put down short of the midden lies there, unmarked, until another ant takes it on.
 - Corpse carriers are kept out of the soil accounting (dug = mound + filled + carried + lost holds), out of backfill, and out of soil losses.
 - A carrier that dies drops its corpse where it falls.
-- A corpse off the midden rots after `CORPSE_ROT` (15 min). The midden's corpses stay.
+- A corpse off the midden rots after `CORPSE_ROT` (15 min). The midden's corpses stay (since §39 as a count per cell, not a list).
 
-**Where the midden lies.** It is `MIDDEN_AT` columns from the hole: `MOUND_REACH` + `MIDDEN_PAST` = 93, past the mound's largest reach, so the mound never grows over it. If the nests are close, it is nearer: at most 40 % of the way to the rival's hole. It is on the side toward the rival, so the two middens lie between the colonies, east of the hole when alone.
+**Where the midden lies.** It is `MIDDEN_AT` columns from the hole: `MOUND_REACH` + `MIDDEN_PAST` = 93, past the mound's largest reach, so the mound never grows over it. If the nests are close, it is nearer: at most 40 % of the way to the neighbour's hole. It is on the side toward the nearest other colony (of any number, since §39), so two neighbours' middens lie between them, east of the hole when alone.
 
-**The midden's mark** is the fifth mark channel, `midden`. It is laid where a corpse is put on the midden (`MIDDEN_MARK` 20), and a little every second while corpses lie there.
+**The midden's mark** is the fifth mark channel, `midden`. It is laid where a corpse is put on the midden (`MIDDEN_MARK` 20), and a little every second while corpses lie there. Since §39 each is spread over the column and 3 either side, tapering.
 
 **Raids in the side view.** Before this slice, raiders could not get there at all. They steered straight at the rival's hole: through soil from inside their own nest, and off the bumpy walkway on the ground.
 - A raider underground in its own nest climbs out by its hole, from chambers too, and never detours.
 - On the ground it walks cell by cell to the rival's hole, as homing ants walk to their own.
 - In at the rival's hole, it goes down toward the rival's chamber (the game gives each colony the rival's nest).
-- About to step onto the rival's midden, it turns back with chance 1 − exp(−mark / `MIDDEN_SCALE` 5).
+- About to step onto the rival's midden, it turns back with chance 1 − exp(−mark / `MIDDEN_SCALE` 5). As first built this was a wall, not a deterrent: the mark saturates, so 98 % turned back at every step and no raider ever got into a nest with a midden. Since §39 the chance falls with the raiders around it.
 
 **Measured** (side view, 600 + 600 ants; 100 of colony 0's workers killed underground at 60 s; colony 1 set to raid from 300 s; "erased" clears colony 0's midden mark every tick):
 
@@ -1673,10 +1673,11 @@ In the side view with a queen, a worker that dies leaves a corpse where it fell.
 | 3 | 44 / 78 / 98 / 100 | 2.4 / 11.4 | 7.5 / 20.5 | 375 / 256 vs 722 / 590 |
 
 - **The dead are cleared** within two to four minutes, with the midden 93 columns out.
-- **The midden is a boundary.** Where raids carry across (seeds 1 and 3), the rival's midden keeps raiders off the hole: 2 rather than 11–54 within 20 columns. On seed 2 the raid is fought out between the nests, with or without it. On seed 3, half the deaths.
+- **The midden was a wall.** On seeds 1 and 3 the rival's midden kept raiders off the hole: 2 rather than 11–54 within 20 columns. On seed 2 the raid is fought out between the nests, with or without it. On seed 3, half the deaths. No raider got into the rival's nest in any run, midden or not (§39 has why, and the fix).
 - **Raids are bloody now.** A raid reaches the other nest, and both sides lose hundreds. The strategist's raid choice now has a real cost; a follow-up bead covers tuning it.
 
-**Food home** (seeds 1–3, 600 s, six colonies): 9,845 against slice 6's 7,794, with raids now fought on the ground. Births 186–349; out over 120 s 0.4–0.8 %. Bench (side view, 1,200 + 1,200 ants): 7.0 ms a tick.
+**Food home** (seeds 1–3, 600 s, six colonies): 9,845 against slice 6's 7,794 (+26 %), with raids now fought on the ground. Births 186–349; out over 120 s 0.4–0.8 %. Bench (side view, 1,200 + 1,200 ants): 7.0 ms a tick.
+- **The gain is not the midden's.** It comes from where raiders are while the colony raids. On slice 6 a raiding colony's fighters steered at the rival through soil from inside their own nest (398 of 418 underground in the review's run) and did nothing; on this slice they leave and fight on the ground. §39 measures it in a natural game.
 
 **Rendering:** the dead are drawn as small grey crosses, where they lie and in an undertaker's jaws.
 
@@ -1694,9 +1695,11 @@ In the side view with a queen, a worker that dies leaves a corpse where it fell.
 - corpses beyond 20 columns were never collected, and a raiding colony buried nothing;
 - a dying carrier's corpse and the carried-corpse drawing were untested or wrong.
 
-All are fixed above. Measuring the fixes showed that 15 s give-ups left corpses short of the far midden on hilly ground (seed 2: 6 of 100 buried), hence `CORPSE_GIVE_UP` and the wider `MIDDEN_NEAR`.
+All are fixed above but one: the raiding colony still buried nothing. Its dead lay more than `MIDDEN_NEAR` out, and those in its own nest went uncollected, since raid stance made every middle-aged explorer a fighter (§39). Measuring the fixes showed that 15 s give-ups left corpses short of the far midden on hilly ground (seed 2: 6 of 100 buried), hence `CORPSE_GIVE_UP` and the wider `MIDDEN_NEAR`.
 
 **Not built:** a deep midden chamber (*Atta cephalotes*). The `midden` role exists, but no chamber is given it.
+
+**Uncollected: the battle dead.** Corpses more than `MIDDEN_NEAR` (100) columns from a colony's hole are never carried: a raid's dead lie where they fell until they rot (`CORPSE_ROT`, 15 min). In the review's runs, 165 (seed 1) and 395 (seed 3) of colony 0's dead lay 40–100 columns toward the rival, its ants there being fighters; in a natural game (seed 3, 300 ants, 400 s) colony 0 buried 1 of 88. Undertakers who fight, and a wider reach, are follow-ups (§39).
 
 **Jev cost:** unchanged.
 
@@ -1708,19 +1711,23 @@ The nest gives the fungus new levers (docs/nest-and-home.md §4). Everything her
 - `home`: one of its own colony's chambers;
 - `tunnel`: its own nest's tunnels and shafts;
 - `border`: the open ground;
-- `foreign`: another colony's chamber or tunnels (which nest a tunnel is is told by the nearest hole).
+- `foreign`: another colony's chamber or tunnels (whose tunnel it is: at first the nearest hole; since §39 the home scent where the host stands, own against any other colony's, with `borderRatio`, and `border` where neither is clearly stronger).
 
-This replaces the home-field ratio. It makes 4 × 4 × 3 × 4 × 2 = 384 situations per strain, up from 288. I left out a chamber role per ground value: it would multiply situations by five, and the in-nest field (§32) already tells the ants.
+This replaces the home-field ratio. It makes 3 × 4 × 4 × 4 × 2 = 384 situations per strain (load × host × ground × contact × groomed), up from 288. I left out a chamber role per ground value: it would multiply situations by five, and the in-nest field (§32) already tells the ants.
 
 **Two new interventions:**
 - **`muddle`** (Lockpick; not lethal). The host smells its floor marks at 0.3 of their strength, so at full load it can't tell which chamber it is in and follows road signs weakly. It also swaps brood and store, both in the situation it is asked in and in the signs it follows home. This is the nest's "roam".
-- **`crown`** (Bloom; lethal, off the menu by default, like cull). From a high load only (≥ `HIGH_LOAD` 0.7), a host by the queen kills her, and a host by a brood item kills it, each with chance `CROWN_RATE` (0.05) a second. The queen's death orphans the colony (§33). The first cut killed at once; spores painted on the royal chamber then orphaned the colony in its first second.
+- **`crown`** (Bloom; lethal, off the menu by default, like cull). From a high load only (≥ `HIGH_LOAD` 0.7), a host by the queen kills her, and a host by a brood item kills it, each with chance `CROWN_RATE` (0.05) a second. The queen's death orphans the colony (§33). The first cut killed at once; spores painted on the royal chamber then orphaned the colony in its first second. **Since §39** it acts at any load, at `CROWN_RATE` × the host's load a second: from a high load only, grooming took every host below it within seconds and no queen died in a game.
 
 **The midden.** An infected corpse carries its load and strain. Put on the midden by a strain that sporulates (Bloom, `sporulates`), it puts spores on the ground there (`MIDDEN_SPORES` 3). Other strains die with their host: carrying them out is hygiene.
 
-**Nest odour** (recognition) drifts toward the ants in the colony's royal chambers in the side view, as §4 asks. The first cut kept the nest's disc (r 3), which held few of them once the royal chamber had widened to 9–12 columns.
+**Nest odour** (recognition) drifts toward the ants in the colony's royal chambers in the side view, as §4 asks. The first cut kept the nest's disc (r 3), which held few of them once the royal chamber had widened to 9–12 columns. (Untested until §39.)
 
-**Only where there is a nest.** `muddle` and `crown` (`NEST_ONLY`) are dropped from the menu on the top-down maps, where there are no chambers or queen: `Fungus.menu` filters them, and the Jev lane reads its menu back from the fungus.
+**Only where there is a nest.** `muddle` and `crown` (`NEST_ONLY`) are dropped from the menu on the top-down maps, where there are no chambers or queen: `Fungus.menu` filters them, and the Jev lane reads its menu back from the fungus. Since §39 the page hides their buttons there too, and `Fungus.menu` hands out a copy (adding to the live set skipped the filter).
+
+**Each view its own cache** (since §39). `home` is one of the host's own chambers in the side view and home-scented ground on a top-down map, so the fungus lane's cache context (`fungusContext`) names the side view; the top-down maps keep theirs.
+
+**The midden rarely spores.** Most fight dead rot where they fall before an undertaker reaches them (§36), so a Bloom corpse put on the midden, and the spores it leaves there, are rare in play.
 
 **`FUNGUS_BRAIN_VERSION`** is 4. The legend says what each ground is.
 
@@ -1735,16 +1742,18 @@ This replaces the home-field ratio. It makes 4 × 4 × 3 × 4 × 2 = 384 situati
 - Garden still unifies, at the same times (104–108 s against 108–112 s), with no deaths.
 - Without the fungus the colonies now lose 21–72 ants each, where §29 lost none: raids reach the other nest since slice 7 (§36). So Garden's peace is now worth something.
 
-**Crown and muddle in a game.** Neither is chosen by the local rule, only by Jev, so a scripted policy stands in. Colony 1 is painted 4× at its hole; 300 + 300 ants; 10 minutes.
+**Crown and muddle in a game.** Neither is chosen by the local rule, only by Jev, so a scripted policy stands in.
 
-| Seed | Bloom, share: births / ants left | Bloom, crown at high load at home: orphaned at / brood killed / births / ants left | Lockpick: soothe / muddle, food home |
+*As first measured* (colony 1 painted 4× at its hole; 300 + 300 ants; 10 minutes), crown at high load at home orphaned the colony at 12–23 s and muddle showed no cost in food. Neither held up. The review of #27 could not reproduce the crown runs (no harness was committed; with crown acting only from a high load, grooming took every host below it within ~8 s and no queen died in 300 s, even under heavier paint than the UI brush), and muddle had been measured by food, not brood. §39 has the committed harnesses (`scripts/crown.mjs`, `scripts/muddle.mjs`) and the numbers that replace this table:
+
+| Seed | Crown, Bloom stroked across colony 1's hole at 60 s (UI brush, 6 events): queen dies after / brood killed / births, colony 1 vs 0 | The same stroke along its royal chamber: queen dies after | Muddle, Lockpick on both holes (UI brush), 300 s: colony 1's births, local rule vs muddle |
 |---|---|---|---|
-| 1 | 168 / 424 | 17 s / 15 / 1 / 195 | 939 / 1,103 |
-| 2 | 183 / 437 | 23 s / 18 / 3 / 270 | 1,102 / 1,400 |
-| 3 | 187 / 433 | 12 s / 5 / 1 / 236 | 1,781 / 1,760 |
+| 1 | 19 s / 66 / 43 vs 236 | 31 s | 114 vs 99 |
+| 2 | 26 s / 82 / 22 vs 152 | 4 s | 150 vs 129 |
+| 3 | 53 s / 104 / 52 vs 144 | 10 s | 87 vs 80 |
 
-- **Crown is decisive and quick.** A new colony is one chamber, so hosts by the queen are many from the start. An orphaned colony dwindles: 195–270 ants at ten minutes against ~430. Filed: whether crown should wait for something, such as a host's time at high load or the queen's guards.
-- **Muddle shows no cost in food** (within seed noise). A likely reason, not yet measured: foragers home by the vector and the hole outside, and inside the home trail backs up the blunted signs.
+- **Crown is decisive and quick** once it can act at any load (§39). Bloom reaches nearly all of colony 1 within 30 s, and the nurses by the queen carry it. Whether it should wait for something, such as a host's time by the queen or her guards, is open (`ja-yif.2`).
+- **Muddle costs brood.** A muddled nurse follows the store's signs with brood in its jaws, and a muddled porter takes the larvae's food toward the stores. §39 keeps it as the intervention's intended cost and measures it.
 
 **Bench** (side view, 1,200 + 1,200 ants): 7.3 ms a tick, against 7.0 ms.
 
@@ -1781,17 +1790,154 @@ The legend's longer `ground` line is shared across a request's hosts, so it cost
 
 ## 38. Several queens, adoption, orphans merging: a design note (nest slice 9, ja-wjw, 2026-11-02)
 
-Docs only: `docs/queens-and-merging.md`. It designs, for MR 8 and MR 10:
+Docs only: `docs/queens-and-merging.md`. It designs, for the species framework (`ja-8fd`) and the lifetime layer (`ja-1vg`):
 - **queens as a list**, with a per-species trait (one or several; the fire ant's polygyne form is a per-colony flag, after Ross & Keller 1998);
 - **queen adoption** within odour tolerance, once nuptial flights exist;
 - **orphans merging into a tolerated neighbour**, after an African army ant (Kronauer et al. 2010): an orphaned colony's workers defect when they meet a calm colony they tolerate (a new, mutual check), walking the raid path to its hole; a colony half of whose workers defected ends **merged**, not fallen. The note lists what the code needs for this (an adopt/leave pair instead of spawn/kill, brood moved between colonies, per-colony raid targets, the host's cap). With Bloom's crown and Garden this is the "infect the queen" unification play of docs/nest-and-home.md;
 - **worker-laid males**, in the lifetime layer.
 
-No situation changes for the ants or the fungus; the strategist might gain `orphaned` (stances are cached per situation, so this doubles the distinct stance situations, not the calls; measure with `npm run colony-cost` when built). Thelytokous species (*Cataglyphis cursor*) make workers without a queen: for them orphaning is not an ending.
+No situation changes for the ants or the fungus; the strategist might gain `orphaned` (stances are cached per situation and calls follow distinct situations, so this can double both the distinct stance situations and the stance calls; measure with `npm run colony-cost -- --side` when built). Thelytokous species (*Cataglyphis cursor*) make workers without a queen: for them orphaning is not an ending.
 
 An agent review checked the note's code claims; it caught that recognition has no per-ant odour blending, that `spawn`/`kill` reset or leave what a defector should keep, and that the fungus's `allied` contact is one-way and infected-only. The note is corrected.
 
 Follow-ups: `ja-8fd.1`, `ja-8fd.2`, `ja-1vg.1`, `ja-1vg.2`.
 
+**The owner's answers** (2026-11-02, after the review of #28): more than two colonies is coming soon, so merging is worth building (with two, Garden alone unifies); and crown stays, reachable in real play (§39). The note's §7 lists them, and the decisions still open: "merged" as an ending, whether the Unite aim allows crown, polydomy or abandonment, a calm gate on defection, defectors keeping their old odour (§3.3 of the note: as built, a defector carries none of the orphan's odour, so the host's gestalt never moves toward it), the host's cap, thelytoky, crown's pacing, `orphaned` in the strategist's situation, the midden, how Bloom and Garden share the colony to be orphaned (the first strain in holds a host), and brood. The review also corrected the note's odour model and its two-strain play.
+
 **Jev cost:** unchanged (no code).
 
+## 39. Fix-up after the reviews of the nest stack: raids, the midden, the fungus on the nest, any number of colonies (2026-11-02)
+
+The agent reviews of #26 (midden, raids), #27 (the fungus on the nest), #28 (the queens design note), #18 (the nest design) and #22 (roles and marks) found that raids parked the young at their own hole, the midden was a wall, crown could not happen in a game, and several docs and cost notes were wrong or missing. The owner decided two things: **more than two colonies is coming soon** (nothing may assume one rival), and **crown stays**, reachable in real play. Harnesses, committed: `scripts/raids.mjs`, `scripts/raid-food.mjs`, `scripts/crown.mjs`, `scripts/muddle.mjs`, `scripts/fungus-cost.mjs`, and `scripts/colony-cost.mjs --side`. All use the app's own setup: `generateSideWorld(seed)`, `Game` with `mulberry32(seed * 7919)`.
+
+**Closes:** #26 review items 1–5 and its nits; #27 items 1–5 and its nits; #28's note fixes; #18 items 1–3 and the stale lines; #22's nits and its `--side` request.
+
+### Raids
+
+**The young are no raiders** (#26 blocker). Raid stance made every explorer a fighter, the young too; a young raider climbed to its hole, was put back down the shaft (slice 6), and climbed again. Now an ant that may not go out, with no enemy near, explores when the policy (local or Jev) answers "fight" under raid stance. A local mechanic after the answer, like zoning itself: the cached answer is unchanged.
+
+**Raiders walk on to the raided nest.** Measuring the midden fix showed raiders stopping 12–13 columns short of the rival's hole, in the pits by its mound, whatever the midden. Two causes:
+- an ant "saw" strangers through soil (`#enemyHeading` took the nearest stranger within two cells): a raider on the walkway charged ants in a tunnel under it, into the soil, for good. It now needs a clear line (`#clearTo`), on maps with soil;
+- a side-view raider climbed the alarm gradient by free steering before walking to its target. It now walks the ground to the raided nest cell by cell, past the alarm (a raider with an enemy in sight still charges it; defending, alarm still calls fighters).
+
+**The midden deters; it is no wall** (#26 item 2). The midden's mark saturates, so a raider turned back with chance 0.98 at every step onto it. Now:
+- the turn-back chance is `1 − exp(−mark / 5)` × `MIDDEN_CROWD` (3) / the raider's own colony's ants within two cells, once they are more than 3: a scout or a handful shies, a raid in force presses on;
+- the mark is laid over the midden cell's column and 3 either side, tapering (`MIDDEN_SPREAD`).
+
+**Raids aim at the nearest rival, of any number** (owner). The game points each colony's raids at the nearest colony that is not beaten and not kin by odour (`nearestRival`, re-aimed at each strategy step), and gives raiders that colony's marks for its midden (`raidMarks`). Each colony knows every other nest (`Colony.others`): which nest a column belongs to (nearer its hole than any other, now with the row's parity: `centreX(cx, cy)`), and which way the midden faces (toward the nearest neighbour, at most 40 % of the way).
+
+**Measured** (`scripts/raids.mjs`: 600 + 600 ants; 100 of colony 0's workers killed underground at 60 s; colony 1 forced to raid from 300 s; means over 300–450 s, sampled each second):
+
+| Seed | Raiders within 20 columns of colony 0's hole: before / after / after, midden erased | Inside colony 0's nest (most at once) | Colony 1's young at its own hole: before / after | Deaths during the raid, colony 0 / 1: before / after | Buried, colony 0 / 1 (picked up): before / after |
+|---|---|---|---|---|---|
+| 1 | 0.3 / 18.5 / 0.9 | 0 / 0 | 78.9 % / 1.2 % | 330 / 222 → 436 / 325 | 98 / 0 (239 / 0) → 98 / 0 (291 / 0) |
+| 2 | 2.5 / 2.6 / 4.3 | 0 (1) / 0 | 42.4 % / 0.5 % | 131 / 141 → 157 / 179 | 100 / 0 (306 / 0) → 100 / 0 (455 / 0) |
+| 3 | 0 / 1.9 / 6.6 | 0 / 0 | 60.7 % / 0.4 % | 214 / 209 → 326 / 376 | 122 / 0 (320 / 0) → 122 / 1 (358 / 1) |
+
+"Before" is the stack's head (nest 9); colony 1's raiders went to the rival's ground and stayed 12–13 columns short of it. Raids are bloodier now: more raiders reach colony 0's doorstep, and more of colony 0's undertakers carrying corpses out die there, which is why its pick-ups outnumber its burials (a corpse dropped by a carrier that dies is picked up again).
+
+- **The young stay in:** 0.4–1.2 % of the raiding colony's young at its hole, against 42–79 %.
+- **Raiders reach the rival's hole,** but in this setup none gets in, midden or not: colony 0 defends (its strategist sees enemies at its nest and losses), and the raiders die in the fights at its hole. Erasing colony 0's midden every tick changes little now: the midden is no longer what stops them.
+- **Past a midden, in force:** `midden.test.ts` gives a rival a buried heap (20 dead, its mark laid every tick from the heap) and sends 150 middle-aged raiders: at least 3 get in under its hole; with the old turn-back rule, none.
+
+### The midden
+
+- **A raiding colony buries** (#26 item 3). Middle-aged fighters with no enemy near, underground in their own nest, now undertake. In the forced raids the raiding colony still buries next to nothing: its dead lie more than `MIDDEN_NEAR` out, at the rival's (`ja-yif.4`).
+- **Corpses past the midden are carried back to it.** Taken up between the midden and `MIDDEN_NEAR`, a corpse was "carried out" to a point already passed, put down at once off the midden, and taken up again. Now the undertaker walks it back toward the hole to the midden's far edge.
+- **The midden is a count per cell** (`Colony.midden`), not a list growing all game: a buried corpse leaves `corpses`, and the game hears of each burial (`onBury`) for the midden's spores.
+
+### The fungus on the nest
+
+**Crown is reachable** (#27 item 1; owner). From a high load only, no queen died in a game. Crown is now the spores a host passes on as it tends the queen and brood: a host by her kills her with chance `CROWN_RATE` (0.05) × its load a second, and likewise each brood item it is by (`regicide` = load). `scripts/crown.mjs`: 600 + 600 ants, crown on the menu, a scripted policy (crown wherever a Bloom host is in its own chamber, as Jev under an aim like "kill their queen" would), Bloom with the UI brush (radius 3, spores 2, dose 0.15) at 60 s:
+
+| Seed | 6 events across colony 1's hole: queen dies after | brood killed | births, colony 1 / colony 0 (300 s) | 6 events along its royal chamber: queen dies after |
+|---|---|---|---|---|
+| 1 | 19 s | 66 | 43 / 236 | 31 s |
+| 2 | 26 s | 82 | 22 / 152 | 4 s |
+| 3 | 53 s | 104 | 52 / 144 | 10 s |
+
+At a fifth of the rate (0.01) the royal-chamber stroke still kills her in 4–34 s: many hosts are by her at once, so the rate alone barely paces it. Whether crown should wait (a host's time by the queen, her guards) stays open (`ja-yif.2`).
+
+**Muddle costs brood: kept as its intended cost** (#27 item 2). Lockpick with the UI brush on both holes at 30 s, 300 + 300 ants, 300 s, every host muddling against the local rule (soothe), `scripts/muddle.mjs`:
+
+| Seed | Births, colony 0 / 1: local rule | Muddle | Change | Brood at 300 s: local → muddle |
+|---|---|---|---|---|
+| 1 | 112 / 114 | 114 / 99 | +2 % / −13 % | 34 / 23 → 34 / 51 |
+| 2 | 90 / 150 | 94 / 129 | +4 % / −14 % | 24 / 19 → 33 / 23 |
+| 3 | 140 / 87 | 141 / 80 | +1 % / −8 % | 44 / 15 → 9 / 30 |
+| 4 | 139 / 101 | 78 / 82 | −44 % / −19 % | 12 / 43 → 64 / 25 |
+
+Food home moves either way (585 / 548 → 592 / 666 on seed 1; 639 / 610 → 571 / 428 on seed 4), so food was the wrong measure. In most colonies muddle costs 8–19 % of births in 270 s; in one of eight, 44 % (seed 4's colony 0, whose brood piles up unhatched: 64 at the end against 12), as the review found under heavier paint (35–40 %).
+
+A muddled nurse follows the store's signs with brood in its jaws (and at `HOLD_MAX` puts it down where it is); a muddled porter takes the larvae's food toward the stores. Exempting brood carriers from the swap was tried and did not bring the births back (colony 1: 87 and 121 against 114 and 150), so the cost is the whole misreading, nurses and porters, as muddle's blurb says ("it gets lost inside"). Not lethal, but not free.
+
+**Whose tunnel is local, for any number of colonies** (#27 item 5). The nearest hole (map-wide, and wrong for polydomy) is gone: a host in a tunnel is on its own (`tunnel`) where its colony's home scent is at least `borderRatio` (2) times the strongest other colony's, on another's (`foreign`) where that holds the other way, and `border` where neither does. Top-down `home` / `foreign` reads every other colony's scent the same way (with two colonies, as before).
+
+**Nest odour has a test** (#27 item 4): masked hosts in the royal chamber, outside the old disc, move `nestOdour`; in a brood chamber, or in the disc but out of the royal chamber, they don't. It fails with the disc rule back.
+
+**Nits:** the fungus lane's cache context names the side view (each view its own cache; the top-down maps keep theirs); the page hides `NEST_ONLY` buttons on top-down maps; `Fungus.menu` returns a copy; one `swapBroodStore` helper; nest-and-home §4 says only lethal crown was built; fungalPolicy.ts's header says foreign covers another's tunnels; §37's count is 3 × 4 × 4 × 4 × 2; the oxlint warnings in the tests are gone. From #22: `#roleFor` takes only the row; `chambers.test.ts` explains its 2× floor bound; §32 gives the marks' spreading cost as the PR measured it (14 %).
+
+### Food home: the gain from slice 6 to slice 7 (#26 item 5)
+
+`scripts/raid-food.mjs`, a natural game (local rule and strategist), seed 3, 600 + 600 ants, 600 s:
+
+| Branch | Food home, colony 0 + 1 | Births | Losses (fights) | Colony 0 raiding, share of the time | Its fighters while raiding: underground / out |
+|---|---|---|---|---|---|
+| nest 6 (slice 6) | 1,498 + 1,286 = 2,784 | 295 / 302 | 2 / 2 | 35 % | 719 / 82 |
+| nest 7 (slice 7) | 2,356 + 1,232 = 3,588 | 293 / 296 | 6 / 26 | 28 % | 220 / 352 |
+| nest 9 (the stack's head) | 2,356 + 1,232 = 3,588 | 293 / 296 | 6 / 26 | 28 % | 220 / 352 |
+| this fix-up | 2,722 + 1,665 = 4,387 | 405 / 345 | 132 / 202 | 32 % | 109 / 298 |
+
+- **Slice 6 to 7 (+29 % here, +26 % over §36's six colonies) is the raiders getting out,** not the midden. On slice 6 a raiding colony's fighters (almost all its explorers) sat in its own nest, 719 underground against 82 out, for the third of the game it raided: nobody explored, so nobody found food, and no raid ever reached the rival (2 losses each). From slice 7 they leave the nest, and when the stance turns back to forage they are already out on the ground, spread along it, and find food. Colony 0, the raider, gains all of it (1,498 → 2,356); colony 1, which never raided, is unchanged.
+- **This fix-up adds +22 %,** with raids that now reach the rival in a natural game (132 / 202 lost in fights, against 6 / 26), and more births (dead workers free room under the cap, `maxAnts`). Which change carries the food gain is not separated here: raiders that walk on rather than charge ants through soil, and inside ants no longer distracted by enemies they can't reach, both change who is out and where.
+
+### Jev cost
+
+All estimates offline (`estimateTokens` on the requests a game would send, behind each lane's own cache logic); no live call. The stack's head ("before") and this fix-up give the same figures unless both are shown.
+
+**Colony lane, side view** (`npm run colony-cost -- --side 5 600 1`: 600 + 600 ants, 5 sim-minutes, five doctrines, the first again at the end; new with this fix-up, #22's request):
+
+| | Distinct ant situations | Tokens | Tokens per question | $ per game | $ per hour at this pace (a doctrine a minute) |
+|---|---|---|---|---|---|
+| before and after | 113 | ~222k | ~589 | $0.0093 | $0.112 |
+
+Unchanged by this fix-up, and against #22's review of #24 (120, 225k, 568, $0.114). Under the $0.25/h target. On the top-down map `npm run colony-cost` is as before.
+
+**Fungus lane, per game** (`node scripts/fungus-cost.mjs <play> 5 600 1`: 600 + 600 ants, 5 minutes, the UI brush, 6 events, at 30 s; the player's default menu, Bloom with crown added where named; the "Unite" aim):
+
+| Play | Distinct fungal situations asked | Requests | Tokens per game | Tokens per question | $ per game |
+|---|---|---|---|---|---|
+| Lockpick, both holes | 54 | 26 | ~30.5k | ~564 | $0.0013 |
+| Bloom, colony 1's hole | 44 | 21 | ~23.3k | ~529 | $0.0010 |
+| Bloom with crown, colony 1's hole | 52 → 47 | 21 → 22 | ~27.6k → 26.8k | ~530 → 569 | $0.0012 → $0.0011 |
+| Garden, both royal chambers | 81 | 30 | ~43.4k | ~535 | $0.0018 |
+
+- Per fungal situation, at 100 to a request (§37): Lockpick 276, Bloom 343 with every intervention, Garden 315. Unchanged: no legend, situation or question changed. As a game asks them (a few to a request, each request carrying the legend and aim) a question costs ~530–570.
+- Even a whole game is about a fifth of a cent, a few cents an hour if the player replays; the lane's cost is its fixed per-request share, not the situations.
+- The side view now has its own cache context, so the first side-view game under an aim asks afresh what a top-down game had cached under it.
+- #27's review counted more distinct situations under heavier paint (Lockpick 35 → 67, 2.3× per game, from slice 7 to 8); these runs use the UI brush.
+
+CLAUDE.md's fungus-lane figure now gives both numbers.
+
+### Docs
+
+- docs/nest-and-home.md: §5 rewritten to what was built (`homeTrail` says where the ant is, no levels, no `down`, which was dropped) with the measured costs, each labelled estimate or live; §3.3 says what was built; the header and §4's stale lines, §2's line numbers (now symbols), §6's "no vector", and slice 8's baseline (§29's rerun) are fixed; bead IDs instead of "MR N" where touched.
+- docs/queens-and-merging.md: §3.3's odour model (a defector carries none of the orphan's odour, so the host's gestalt never moves toward it; a mixed odour needs per-ant odour memory); §3.4's two-strain conflict (the first strain in holds a host); "doubles the stance situations, not the calls" corrected; the owner's answers recorded and the remaining decisions listed as open (§7).
+- §28's "not built yet", §30's open `down`, and §36–§38 point here.
+
+### Tests
+
+Each new test fails with its fix reverted (checked one by one):
+- `midden.test.ts`: a raiding colony of every age keeps its young in (longest stay at the hole under 5 s, against 58 s reverted; 68 % of the young's samples at the hole reverted); a raid in force gets past a rival's buried midden and in under its hole (0 reverted), and the mark lies over ±3 columns; a corpse past the midden is carried back and buried, picked up once; any number of colonies: raids to the nearest rival (kin skipped), the midden toward the nearest neighbour (reverted: 44 columns out the wrong way). The "shies" test's raider is middle-aged now: the young are no raiders.
+- `fungusHome.test.ts`: whose tunnel by the scent where the host stands, three colonies (fails with the nearest hole); crown below a high load kills the queen in minutes, and `regicide` follows the load (fail with the old threshold); `Fungus.menu` is a copy; the nest's odour follows hosts in the royal chamber and not elsewhere (fails with the disc). The four-grounds test lays each shaft's scent (an unscented tunnel says nothing about whose it is).
+- `fungalPolicy.test.ts`: the side view has its own fungus cache context.
+
+Full suite: 300 of 300 (`node --test --test-concurrency=2 --test-timeout=600000`, niced); `tsc -b` clean; oxlint 9 warnings, down from 14, all older (8 in colony.ts, 1 in chambers.test.ts); those in `midden.test.ts` and `fungusHome.test.ts` (#27's nit) are fixed.
+
+### Follow-ups
+
+- `ja-yif.2`: crown's pacing (reachable now; should it wait?).
+- `ja-yif.3`: fights still resolve through soil (`resolveFights` counts neighbours whatever lies between).
+- `ja-yif.4`: the battle dead are never collected past `MIDDEN_NEAR`.
+- `ja-yif.5`: during a raid the young follow the royal mark up the shaft (no stays, but ~9 % of samples near the hole on the test map).
+- `ja-8fd.3`: the rest of N colonies: `Game` builds two, `unity()` reads two nests, and `foreign` (Bloom's share, cross-laying) is one colony.
