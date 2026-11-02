@@ -44,43 +44,52 @@ test("chambers: the founding chamber is the colony's royal one with a floor; a f
 });
 
 test("a crowded nest digs chambers: the founding one widens, new ones start off the tunnels, and floor grows", () => {
-  const map = generateSideWorld(2, SMALL);
-  const g = new Game(map, { antCount: 400, rival: false }, mulberry32(4));
-  const ch = map.chambers!;
-  const floor0 = ch.floorOf[0]!;
-  for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
-  const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
-  assert.ok(mine.length >= 3, `${mine.length} chambers`);
-  // Floor at least doubles. Over worlds 1–4 and games 4–6 it grows 2.3–3.7× (2.4–3.6× before #17 was merged in, whose
-  // Y forks change the tunnels): ×3 sat inside that spread, and the merge's new random path put this run at 2.3×.
-  assert.ok(ch.floorOf[0]! > floor0 * 2, `floor ${floor0} → ${ch.floorOf[0]}`);
-  // No chamber was dug into another: widening and new chambers don't break into other passages (review of slice 2).
-  for (let y = 0; y < map.size.h; y++)
-    for (let x = 0; x < map.size.w; x++) {
-      const a = ch.at(x, y);
-      if (a < 0) continue;
-      for (let d = 0; d < 6; d++) {
-        const b = ch.at(nx(x, y, d), ny(y, d));
-        assert.ok(b < 0 || b === a, `chambers ${a} and ${b} touch at (${x}, ${y})`);
+  // Three games. Every check holds in each, except the depth trend (last), which must hold in at least 2 of 3: it is one
+  // nest's handful of stacked chambers, and fails in about 1 game in 6–9 (1 of 9 on nest 4, worlds 1–4, games 4–8; 0 of 9
+  // before #14's backfill guards; about 1 in 6 in earlier measurements, on either side of #17's merge).
+  let trends = 0;
+  const halves: string[] = [];
+  for (const seed of [4, 5, 6]) {
+    const map = generateSideWorld(2, SMALL);
+    const g = new Game(map, { antCount: 400, rival: false }, mulberry32(seed));
+    const ch = map.chambers!;
+    const floor0 = ch.floorOf[0]!;
+    for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
+    const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
+    assert.ok(mine.length >= 3, `game ${seed}: ${mine.length} chambers`);
+    // Floor at least doubles. Over worlds 1–4 and games 4–6 it grows 2.3–3.7× (2.4–3.6× before #17 was merged in, whose
+    // Y forks change the tunnels): ×3 sat inside that spread, and the merge's new random path put one run at 2.3×.
+    assert.ok(ch.floorOf[0]! > floor0 * 2, `game ${seed}: floor ${floor0} → ${ch.floorOf[0]}`);
+    // No chamber was dug into another: widening and new chambers don't break into other passages (review of slice 2).
+    for (let y = 0; y < map.size.h; y++)
+      for (let x = 0; x < map.size.w; x++) {
+        const a = ch.at(x, y);
+        if (a < 0) continue;
+        for (let d = 0; d < 6; d++) {
+          const b = ch.at(nx(x, y, d), ny(y, d));
+          assert.ok(b < 0 || b === a, `game ${seed}: chambers ${a} and ${b} touch at (${x}, ${y})`);
+        }
       }
-    }
-  // Every chamber cell is open: backfill never fills one.
-  for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `chamber cell (${x}, ${y}) filled`);
-  // Tschinkel: the gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth.
-  const gaps = mine
-    .map((b) => {
-      let gap = Infinity;
-      for (const a of mine) if (a.floorRow < b.floorRow && a.x1 >= b.x0 && a.x0 <= b.x1) gap = Math.min(gap, b.floorRow - a.floorRow);
-      return { depth: b.floorRow - groundTop(map, Math.round((b.x0 + b.x1) / 2)), gap };
-    })
-    .filter((x) => x.gap < Infinity)
-    .sort((p, q) => p.depth - q.depth);
-  const half = Math.floor(gaps.length / 2);
-  const mean = (xs: { gap: number }[]) => xs.reduce((s, x) => s + x.gap, 0) / xs.length;
-  // At least 3 stacked (a chamber with another above it). One run is noisy: over worlds 1–4 and games 4–6 it is 2–9, on
-  // either side of #17's merge (its Y forks change the tunnels); 4 sat inside that spread.
-  assert.ok(gaps.length >= 3, `${gaps.length} stacked chambers`);
-  assert.ok(mean(gaps.slice(half)) > mean(gaps.slice(0, half)), `gap above, shallower half ${mean(gaps.slice(0, half)).toFixed(1)} vs deeper half ${mean(gaps.slice(half)).toFixed(1)}`);
+    // Every chamber cell is open: backfill never fills one.
+    for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `game ${seed}: chamber cell (${x}, ${y}) filled`);
+    // Tschinkel: the gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth.
+    const gaps = mine
+      .map((b) => {
+        let gap = Infinity;
+        for (const a of mine) if (a.floorRow < b.floorRow && a.x1 >= b.x0 && a.x0 <= b.x1) gap = Math.min(gap, b.floorRow - a.floorRow);
+        return { depth: b.floorRow - groundTop(map, Math.round((b.x0 + b.x1) / 2)), gap };
+      })
+      .filter((x) => x.gap < Infinity)
+      .sort((p, q) => p.depth - q.depth);
+    const half = Math.floor(gaps.length / 2);
+    const mean = (xs: { gap: number }[]) => xs.reduce((s, x) => s + x.gap, 0) / xs.length;
+    // At least 3 stacked (a chamber with another above it). One run is noisy: over worlds 1–4 and games 4–6 it is 2–9, on
+    // either side of #17's merge (its Y forks change the tunnels); 4 sat inside that spread.
+    assert.ok(gaps.length >= 3, `game ${seed}: ${gaps.length} stacked chambers`);
+    if (mean(gaps.slice(half)) > mean(gaps.slice(0, half))) trends++;
+    halves.push(`game ${seed}: ${mean(gaps.slice(0, half)).toFixed(1)} vs ${mean(gaps.slice(half)).toFixed(1)}`);
+  }
+  assert.ok(trends >= 2, `gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`);
 });
 
 test("a roomy nest barely digs (ja-wii): the same few ants dig far less when their chambers have floor enough", () => {
