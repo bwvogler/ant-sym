@@ -921,7 +921,13 @@ The product owner asked why the tunnels are all right angles. On the square grid
 - **The nearest enemy is the nearest by distance**, not the first in ring order (review of #9: within ring 2 it could pick a cell 2 away over one √3 away, leaning north-west).
 - **Tunnel headings are kept in 252 steps,** not 255: a multiple of 6, so a fork's ±60° and 120° land exactly. With 255 every fork was half a step off the same way, and it added up (worst 2.1° in the meander test).
 - **`handOnWall`'s `lost` tests only the back-hand cell** (review of #9). A follower with a speck at its front hand only turned 120° into the open back-hand cell, put the speck on its other hand and walked off; it now passes the speck and turns round it at the next cell. A homing test across a speckled cavern went from a median 164 s home (57 of 200 never home in 300 s) to 12 s (1 of 200).
-- **Tests:** `main`'s homing tests from the review of #8 (ring of tunnels, tunnel handover) are ported to hex maps; its square-only corner-slip and float32 tests are dropped (hexes have no corners to slip through, and `hex.test.ts` covers the landing check). The fungus, recognition, emission and perception tests place ants at hex cell centres. New: a speck at the front hand (`handOnWall`), and at least 12 junctions in the meander field.
+- **Second review (of the merge):**
+  - **No square-grid assumption left in the sim.**
+  - **A fork's second arm** is taken two ways round from the way actually dug, not from the aim. From the aim, a dithered dig put the two arms side by side about 1 fork in 8, and the second could never be dug. The meander field now has 38 junctions.
+  - **Fork entries** whose cell later widens into a chamber are never read again: about 4 % of dug cells, at most one per cell, for one game. Bounded, left.
+  - **The fungus is calibrated for 7-cell windows,** against 9 on the square grid. The enemy disc is 19 cells, not 25, and the nest watch is a disc, not a square. Ratios (fights, contact load) are unchanged, but count-gated terms (grooming mates, kin and allied contact) fire a little less, so §15–23's fungus numbers may be a little off on hexes.
+  - **`colony-cost` painted alarm by row count** as if rows were 1 apart, so about 12 % of blots fell off the map. It now uses `worldExtent`.
+- **Tests:** `main`'s homing tests from the review of #8 (ring of tunnels, tunnel handover) are ported to hex maps; its square-only corner-slip test is dropped (hexes have no corners to slip through), and its float32 test becomes an invariant in the underground game: no ant-tick is ever inside a solid cell. The fungus, recognition, emission and perception tests place ants at hex cell centres. New: a speck at the front hand (`handOnWall`), and at least 12 junctions in the meander field.
 
 ## 25. Getting home through dug ground (MR 9, 2026-11-01)
 
