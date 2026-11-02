@@ -34,18 +34,71 @@ export BD_NON_INTERACTIVE=1
 
 GITDIR="$(git rev-parse --absolute-git-dir)"
 STATE="$GITDIR/beads-sync"
+LOCK="$STATE/lock"
 DBROOT=".beads/embeddeddolt"   # bd bootstrap treats any non-empty one as an existing database
 DB="$DBROOT/ja"
 REPO_STATE="$DB/.dolt/repo_state.json"
-MANIFEST="$DB/.dolt/noms/manifest"
+MANIFEST="$DB/.dolt/noms/manifest"   # changes on every Dolt commit, not on reads
+mkdir -p "$STATE"
+chmod 700 .beads 2>/dev/null
+
+# `bd bootstrap` rewrites sync.remote in config.yaml to the temporary mirror; a run killed
+# mid-bootstrap (hook timeout) leaves it there. Put the committed value back first.
+if grep -q 'beads-sync/mirror.git' .beads/config.yaml 2>/dev/null && [ -f "$STATE/config.yaml.bak" ]; then
+  cp "$STATE/config.yaml.bak" .beads/config.yaml
+fi
 # The Dolt remote URL is sync.remote from .beads/config.yaml (git+ssh://…; the cloud
 # proxy rewrites ssh GitHub URLs to https).
 URL="$(sed -n 's/^[[:space:]]*remote:[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' .beads/config.yaml | head -1)"
 [ -n "$URL" ] || URL="git+$(git remote get-url origin)"
-mkdir -p "$STATE"
-chmod 700 .beads 2>/dev/null
 
-stamp() { cksum < "$MANIFEST" > "$STATE/stamp" 2>/dev/null; }
+# One sync at a time: Stop runs push async, and SessionStart (start) also fires on
+# resume, clear and compact. mkdir is atomic on macOS and Linux. Waits rather than
+# skipping, so a write made while an earlier push runs still goes out; a lock whose
+# process is gone (killed, OOM, container restart) is broken.
+acquire_lock() {
+  local waited=0 pid
+  until mkdir "$LOCK" 2>/dev/null; do
+    pid="$(cat "$LOCK/pid" 2>/dev/null)"
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+      echo "beads-sync: breaking a stale lock left by process $pid"
+      rm -rf "$LOCK"
+      continue
+    fi
+    if [ "$waited" -ge 180 ]; then
+      echo "beads-sync: another sync (pid ${pid:-?}) has held $LOCK for 3 minutes; giving up"
+      return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  echo $$ > "$LOCK/pid"
+  trap 'rm -rf "$LOCK"' EXIT
+}
+
+# Retry a command up to 4 times.
+retry() {
+  local n=0
+  until "$@"; do
+    n=$((n + 1))
+    [ "$n" -ge 4 ] && return 1
+    sleep $((2 ** n))
+  done
+}
+
+# Print the branch's SHA. Returns 0 if it exists, 2 if it doesn't, 1 if origin
+# couldn't be reached (so a network blip is never mistaken for "no branch").
+remote_branch() {
+  local out rc n=0
+  while :; do
+    out="$(git ls-remote --exit-code origin "$REF")"; rc=$?
+    [ "$rc" -eq 0 ] && { printf '%s\n' "$out" | cut -f1; return 0; }
+    [ "$rc" -eq 2 ] && return 2
+    n=$((n + 1))
+    [ "$n" -ge 4 ] && return 1
+    sleep $((2 ** n))
+  done
+}
 
 # Point the Dolt remote `origin` at the GitHub repo with git_ref = the sync branch.
 set_ref() {
@@ -71,16 +124,6 @@ bootstrap() {
   return $rc
 }
 
-# Retry a command up to 4 times.
-retry() {
-  local n=0
-  until "$@"; do
-    n=$((n + 1))
-    [ "$n" -ge 4 ] && return 1
-    sleep $((2 ** n))
-  done
-}
-
 # Clone the shared history: mirror the branch into a local bare repo's refs/dolt/data
 # (where bootstrap looks; Dolt also needs one branch there).
 bootstrap_from_branch() {
@@ -103,7 +146,8 @@ adopt() {
   echo "beads-sync: this database's history is separate from $BRANCH; adopting $BRANCH and replaying local issues on top"
   bd export --include-memories -o "$backup" || {
     echo "beads-sync: could not export the local database; left it as it is"; return 1; }
-  mv "$DBROOT" "$aside"
+  mv "$DBROOT" "$aside" || {
+    echo "beads-sync: could not move the local database aside; left it as it is"; return 1; }
   if ! bootstrap_from_branch; then
     rm -rf "$DBROOT"; mv "$aside" "$DBROOT"; echo "beads-sync: restored the local database"; return 1
   fi
@@ -127,44 +171,60 @@ pull_or_adopt() {
 
 case "$cmd" in
 start|seed)
-  remote_sha="$(retry git ls-remote origin "$REF" | cut -f1)"
+  acquire_lock || exit 0
+  remote_sha="$(remote_branch)"; rs=$?
+  if [ "$rs" -eq 1 ]; then
+    echo "beads-sync: could not reach origin to check $BRANCH; not syncing this time"
+    exit 0
+  fi
   if [ ! -f "$REPO_STATE" ]; then
     # Leftovers without a Dolt repo in them make bd bootstrap report "already exists".
-    [ -d "$DBROOT" ] && mv "$DBROOT" "$STATE/embeddeddolt.empty.$(date +%s)"
-    if [ -n "$remote_sha" ]; then
+    if [ -d "$DBROOT" ]; then
+      mv "$DBROOT" "$STATE/embeddeddolt.empty.$(date +%s)" || exit 0
+    fi
+    if [ "$rs" -eq 0 ]; then
       bootstrap_from_branch || exit 0
     else
       bootstrap || { echo "beads-sync: bootstrap from .beads/issues.jsonl failed"; exit 0; }
     fi
   fi
   set_ref || { echo "beads-sync: could not set the Dolt remote ref"; exit 0; }
-  if [ -z "$remote_sha" ] && [ "$cmd" = seed ]; then
+  if [ "$rs" -eq 2 ] && [ "$cmd" = seed ]; then
     echo "beads-sync: seeding $BRANCH from this database"
     retry bd dolt push || echo "beads-sync: seeding $BRANCH failed"
-  elif [ -z "$remote_sha" ]; then
+  elif [ "$rs" -eq 2 ]; then
     echo "beads-sync: $BRANCH does not exist on origin; working locally. Run scripts/beads-sync.sh seed to create it."
   else
-    [ "$cmd" = seed ] && echo "beads-sync: $BRANCH already exists; not seeding. Pulling instead."
+    [ "$cmd" = seed ] && echo "beads-sync: $BRANCH ($remote_sha) already exists; not seeding. Pulling instead."
     pull_or_adopt || echo "beads-sync: bd dolt pull from $BRANCH failed"
   fi
-  stamp
+  # No stamp here: local commits a killed or failed push left behind must still go out,
+  # so the next push compares against the last *pushed* state (one no-op push at worst).
   ;;
 push)
   [ -f "$REPO_STATE" ] || exit 0
-  # One push at a time (the Stop hook runs async); mkdir is atomic on macOS and Linux.
-  mkdir "$STATE/lock" 2>/dev/null || exit 0
-  trap 'rmdir "$STATE/lock"' EXIT
-  [ "$(cksum < "$MANIFEST")" = "$(cat "$STATE/stamp" 2>/dev/null)" ] && exit 0
-  if [ -z "$(retry git ls-remote origin "$REF")" ]; then
-    echo "beads-sync: $BRANCH does not exist on origin; not creating it (run scripts/beads-sync.sh seed)"
-    exit 1
-  fi
-  set_ref || exit 1
-  for _ in 1 2 3 4; do
-    if bd dolt push; then stamp; exit 0; fi
-    pull_or_adopt || sleep 2
+  acquire_lock || exit 1
+  # The stamp is the manifest as it was *before* the last successful push, so a write that
+  # lands during a push differs from it and goes out on the next pass of this loop.
+  for _ in 1 2 3 4 5 6; do
+    pre="$(cksum < "$MANIFEST")"
+    [ "$pre" = "$(cat "$STATE/stamp" 2>/dev/null)" ] && exit 0
+    remote_branch >/dev/null; rs=$?
+    if [ "$rs" -eq 2 ]; then
+      echo "beads-sync: $BRANCH does not exist on origin; not creating it (run scripts/beads-sync.sh seed)"
+      exit 1
+    elif [ "$rs" -ne 0 ]; then
+      echo "beads-sync: could not reach origin; run scripts/beads-sync.sh push to retry"
+      exit 1
+    fi
+    set_ref || exit 1
+    if bd dolt push; then
+      printf '%s\n' "$pre" > "$STATE/stamp"
+    else
+      pull_or_adopt || sleep 2
+    fi
   done
-  echo "beads-sync: bd dolt push to $BRANCH failed; run scripts/beads-sync.sh push to retry"
+  echo "beads-sync: bd dolt push to $BRANCH did not settle; run scripts/beads-sync.sh push to retry"
   exit 1
   ;;
 *)
