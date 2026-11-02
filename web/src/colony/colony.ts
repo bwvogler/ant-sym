@@ -1102,6 +1102,22 @@ export class Colony {
   }
 
   /**
+   * The side view: whether cell (x, y) is ground a chamber's floor stands on: directly under a chamber cell, or beside
+   * one on that chamber's floor row (a tunnel dug down, or out at floor level, from a chamber). Open, it takes floor
+   * from the chamber; filled back, it gives it back (see #backfill).
+   */
+  #floorGround(x: number, y: number): boolean {
+    const ch = this.map.chambers;
+    if (!ch) return false;
+    if (ch.at(stepX(x, y, 4), stepY(y, 4)) >= 0 || ch.at(stepX(x, y, 5), stepY(y, 5)) >= 0) return true;
+    for (const d of [0, 3]) {
+      const id = ch.at(stepX(x, y, d), stepY(y, d));
+      if (id >= 0 && ch.list[id]!.floorRow === y) return true;
+    }
+    return false;
+  }
+
+  /**
    * Backfill: a pellet carrier at cell (cx, cy) drops its pellet into a neighbouring cell that nobody
    * uses, filling it back with soil, instead of hauling it all the way out. Leaf-cutting ants put most of
    * their soil back inside this way, refilling unused space (Pielström & Roces); harvester ants very
@@ -1112,7 +1128,9 @@ export class Colony {
    * - it holds no food and no ant of either colony, and is not by any nest;
    * - it is not the cell this carrier dug its pellet from (that would undo its own dig), nor any cell dug in the
    *   last BACKFILL.young seconds: fresh digging is where the colony is going (tunnels toward food), not excess
-   *   space. Leaf-cutters refill older galleries they no longer use (Pielström & Roces).
+   *   space. Leaf-cutters refill older galleries they no longer use (Pielström & Roces). Except the ground a
+   *   chamber's floor stands on (see #floorGround): filling a tunnel dug down out of a chamber builds its floor
+   *   back, which is construction, not spare soil put away. BACKFILL.hold still applies: floor fills stay put.
    */
   #backfill(i: number, cx: number, cy: number): boolean {
     const { map } = this;
@@ -1122,7 +1140,7 @@ export class Colony {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
       if (ty * 65536 + tx === this.#lastDug[i]) continue; // the cell it just dug: not straight back in
-      if (this.time - map.dugAt.get(tx, ty) < backfill.young) continue; // dug lately: the live frontier, not excess
+      if (this.time - map.dugAt.get(tx, ty) < backfill.young && !this.#floorGround(tx, ty)) continue; // dug lately: the live frontier, not excess
       if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, backfill.maxOpen)) continue;
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
       this.enemies?.look?.(this.odour[i] as number, -1); // any ant of another colony, stranger or not (a tolerance below 0 counts every band)
