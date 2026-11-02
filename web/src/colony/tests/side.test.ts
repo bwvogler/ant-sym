@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../colony.ts";
+import { Colony, HOLE_SIGHT } from "../colony.ts";
 import { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny } from "../hex.ts";
 import { AIR, digCell, generateSideWorld, groundRow, isSky, mulberry32, OPEN, reachable, rockAt, SIDE_WORLD, SOIL, type WorldMap } from "../world.ts";
@@ -147,34 +147,39 @@ test("homing in the side view: a carrier on the ground walks to its entrance and
   }
 });
 
-test("foraging in the side view: carriers on the ground make for the hole, never away from it (no shuttling past it), and soil is conserved", () => {
+test("foraging in the side view: carriers on the ground make for where they believe the hole is, never away from it (no shuttling past it), and soil is conserved", () => {
   const map = generateSideWorld(4, { nestCount: 1 });
   const g = new Game(map, { antCount: 400 }, mulberry32(11));
   const c = g.player;
   const e = c.nest.entrance!;
   const lastD = new Float32Array(c.n).fill(-1);
+  const lastSearch = new Float32Array(c.n);
   let samples = 0;
   let away = 0;
   for (let k = 0; k < 30 * 200; k++) {
     g.tick(1 / 30);
     if (k % 60 === 0) {
-      // Every 2 s: a carrier on the ground should be nearer the hole (along the ground) than 2 s ago.
+      // Every 2 s: a carrier on the ground should be nearer (along the ground) than 2 s ago to where it believes the hole
+      // is: its drifting vector's estimate and its search offset (nest slice 1), or the hole itself once in sight.
       for (let i = 0; i < c.n; i++) {
         c.antCell(i);
         const onGround = c.alive[i] && c.carrying[i] && isSky(map, CELL[0] as number, CELL[1] as number);
-        const d = Math.abs(c.x[i]! - e.x);
-        if (onGround && lastD[i]! >= 0) {
+        const near = Math.hypot(c.x[i]! - e.x, c.y[i]! - e.y) < HOLE_SIGHT;
+        const believed = near ? e.x : e.x + c.driftSurf[i]! * c.odoSurf[i]! + c.search[i]!;
+        const d = Math.abs(c.x[i]! - believed);
+        if (onGround && lastD[i]! >= 0 && c.search[i] === lastSearch[i]) {
           samples++;
           if (d > lastD[i]! + 2) away++;
         }
         lastD[i] = onGround ? d : -1;
+        lastSearch[i] = c.search[i]!;
       }
       assert.equal(c.soilDug, c.soilOut + c.soilFilled + c.carriedPellets().dug + c.soilLost, "dug = mound + filled + carried + lost");
     }
   }
   assert.ok(c.stored > 40, `food home: ${c.stored}`);
   assert.ok(samples > 50, `${samples} samples of carriers on the ground`);
-  assert.ok(away <= samples * 0.03, `${away} of ${samples} times a carrier on the ground had moved away from the hole (they used to shuttle past it)`);
+  assert.ok(away <= samples * 0.03, `${away} of ${samples} times a carrier on the ground had moved away from where it believed the hole was (they used to shuttle past it)`);
 });
 
 test("the ground line's crust stays: explorers walking the surface dig only by their own entrance, and the ground line is never filled", () => {

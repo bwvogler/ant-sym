@@ -1246,3 +1246,61 @@ Rings of scented tunnels were most of the stuck share in `ja-dy9`.
 As underground in §22, the colonies never meet in ten minutes, so "unified" is reached without a meeting (`ja-i0f`). This table is the baseline that nest slice 8 (the fungus on the new home) is measured against.
 
 **Jev cost:** unchanged. The colony situation is the stack's (`TOKENS_PER_SITUATION` ≈ 235), and the fungus lane is main's.
+
+## 30. Home by a drifting vector, the hole in sight, and road signs (nest slice 1, ja-6tj, 2026-11-02)
+
+The side view no longer gives ants an exact vector home through the soil (docs/nest-and-home.md §3.1). Top-down maps keep exact homing, so earlier numbers still reproduce.
+
+**The vector drifts.** Each ant keeps an odometer and a drift drawn per trip (Gaussian, σ = `PI_DRIFT` 0.1), so it believes its goal lies drift × distance away, to one side.
+- Only the way out counts. The vector it walks home on is the one it brought out; counting the walk home and the search moved the believed goal as fast as the ant chased it (the first cut did, and 40 % of a colony was out over 120 s).
+- Depth never drifts: gravity tells an ant how far it has climbed.
+- **On the surface,** the vector starts afresh coming up out of the hole.
+- **Underground,** a self-referenced memory of the chamber starts afresh in the chamber.
+
+**Local cues snap the believed goal to the real one:**
+- the hole within `HOLE_SIGHT` (6, seen and smelled);
+- the chamber in clear view within `NEST_SIGHT`.
+
+**Search.** An ant that reaches its believed hole and finds nothing searches in loops either side, each 1.6× wider (Wehner's systematic search).
+
+**Road signs.** Underground, standing on a strong nest trail fades the memory's error (time constant `ROAD_SIGN`, 2 s). It is read on the floor under the ant, since the sensors ahead are often in soil in a tunnel. Without this, diggers that had walked 300–700 cells underground were tens of cells off, and stuck. In slice 3 the chamber marks take this role.
+
+**Pellet carriers climb.** They head up and out without a vector: up the shaft is the hole. Steering them by a drifted vector had them surfacing off target and dropping spoil beside the hole.
+
+**Bug2 on the ground.** With the hole in sight but no open cell nearer it, a homing ant keeps a hand on the surface until it is nearer than where it got stuck.
+- It starts with the hand that climbs.
+- After `GROUND_FLIP` (24) cells it turns back with the other hand.
+- Before this, the ground walk only stepped to nearer cells and rocked between two cells in a pit by the mound. That trapped 318 ants of one colony on slice 0 (seed 3) and 647 on an early cut of this slice.
+
+**Measured** (side view, 600 + 600 ants, 600 s, seeds 1–6; ants out over 120 s sampled every 10 s from 120 s, mean / worst sample per colony; food home both colonies):
+
+| Seed | Slice 0: out > 120 s | food home | Slice 1: out > 120 s | food home |
+|---|---|---|---|---|
+| 1 | 0.4 % / 4 % | 2832 | 1.4 % / 7 % | 2806 |
+| 2 | 0.1 % / 1 % | 2651 | 1.0 % / 2 % | 2811 |
+| 3 | 10.6 % / 56 % | 2630 | 1.5 % / 3 % | 2890 |
+| 4 | 5.8 % / 26 % | 2321 | 3.2 % / 12 % | 2610 |
+| 5 | 0.7 % / 3 % | 2693 | 0.4 % / 2 % | 2786 |
+| 6 | 0.9 % / 6 % | 2833 | 0.5 % / 1 % | 2872 |
+| mean | 3.1 % (worst 56 %) | 15,960 | 1.3 % (worst 12 %) | 16,775 |
+
+Homing with error is a little slower where it was already easy (seeds 1–2), but no colony jams any more, and food home is up 5 %.
+
+**Tick time** (`colony-bench 1200 60 1`, run back to back with slice 0):
+
+| Side view | Slice 0 | Slice 1 | Change |
+|---|---|---|---|
+| Two colonies | 5.0–5.2 ms | 5.5 ms | about +7 % |
+| One colony | 2.2–2.35 ms | 2.7 ms | about +15 % |
+
+The cost is a cell lookup and a scent read per ant per tick, and the belief is computed only for homing ants.
+
+**Tests.**
+- `homing.test.ts` covers:
+  - the vector's error grows with the way out, starts afresh, and is fixed on the way home;
+  - a carrier 12 cells off walks to its belief, searches, and gets home;
+  - road signs fade the error;
+  - top-down maps keep no vector.
+- side.test.ts's "never away from the hole" now reads "never away from where it believes the hole is" (searching aside).
+
+**Jev cost:** unchanged. `down` is a sense in the sim, but not yet in the situation; slice 3 decides that.

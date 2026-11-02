@@ -75,10 +75,12 @@ The mound (MR 14–15) already matches the biology: spoil carried out, an angle 
 
 The side view keeps its entrance, shaft, walkway and mound. The founding chamber becomes the **royal chamber**, and the rest is dug.
 
-1. **Gravity and a noisy vector.**
-   - **Down is a sense:** each ant knows which way is up.
-   - **On the surface,** homing ants keep a home vector to *their entrance* with error that grows with distance walked. The entrance odour and the hole itself (already `SEEN`-like) pull them in. The vector **resets in the shaft**.
-   - **Underground there is no vector to the chamber.** An ant homes by gravity (going in means going down), by the road signs below, and by memory of the last junction it passed.
+1. **Gravity and a noisy vector.** *Built in slice 1 (PRD §30).*
+   - **Down is a sense:** each ant knows which way is up. In the sim this means the vector's *depth* never drifts, and a pellet carrier simply climbs out.
+   - **On the surface,** homing ants keep a home vector to *their entrance*. Its error is drift × distance walked out (σ 10 %, drawn per trip), fixed once the ant turns for home. Within a few cells, the hole itself and the entrance's smell pull them in. An ant that reaches its believed hole and finds nothing searches in growing loops either side. The vector **starts afresh coming up out of the hole**.
+   - **Underground there is no exact vector to the chamber.** An ant keeps a self-referenced memory of the chamber (Heyman et al.'s "self-referenced memories"): the same kind of drifting vector, started afresh in the chamber.
+   - **Road signs correct it.** Standing on a strong nest trail fades its error (until slice 3, the home trail; then the chamber marks).
+   - With its branches and walls, the tunnel walker follows scent first, as before.
 2. **Chambers that ants dig.** A chamber is a widening off a shaft, about 1 row high and wide in the side view. Excavation is:
    - **regulated by crowding:** dig while floor per worker is below a target, so `ja-wii` is folded in here;
    - **drawn to brood:** a chamber grows where brood lies.
