@@ -1320,3 +1320,56 @@ The cost is a cell lookup and a scent read per ant per tick, and the belief is c
 - side.test.ts's "never away from the hole" now reads "never away from where it believes the hole is" (searching aside).
 
 **Jev cost:** unchanged. `down` is a sense in the sim, but not yet in the situation; slice 3 decides that.
+
+## 31. Ants dig the nest's chambers, as much as they need (nest slice 2, ja-60r with ja-wii, 2026-11-02)
+
+The side view's nest is no longer one pre-dug disc. The ants dig chambers off its tunnels, as many as the colony's crowding asks for (docs/nest-and-home.md §3.2).
+
+**Chambers** (`chambers.ts`, pure). Each chamber knows its cells, its floor, its colony, its role and its brood (slice 4 fills brood in).
+- The founding disc is chamber 0 and is royal.
+- Floor is a chamber cell with ground under it to stand on. At first floor needed ground under both of a cell's lower neighbours. Every tunnel dug down out of a chamber then took two floor cells with it, and the founding chamber's floor wore away to nothing.
+- Backfill never fills a chamber cell.
+
+**Crowding regulates digging.** A colony is crowded while its chambers' floor is less than `FLOOR_PER_ANT` (0.1) per ant underground.
+- **Crowded,** explorers widen their chamber along its floor, 2 rows high. Widening is likelier near the top, where traffic is (`WIDEN_DEPTH` 30), and brood pulls it (`BROOD_PULL`, from slice 4).
+- **Crowded,** explorers in tunnels also start new chambers sideways, likelier near the top (`exp(−depth / 40)`).
+  - None start in the top 8 rows. One started 5 rows down beside the shaft trapped a whole colony's pellet carriers.
+  - None start within `4 + 0.15 × depth` rows of a chamber in the same stack.
+- **Roomy,** every other kind of digging happens at `ROOMY_DIG` (15 %) of its rate: tunnel ends, starts off walls, faces met head-on. A 30-ant colony in the founding chamber dug 3–7 cells in two minutes, against about 78 without chambers.
+
+**Chambers never join.** A chamber face (widening or new) is dug whatever the tunnel spacing rules say, so it may open onto a tunnel (a junction), but never onto another chamber of either colony. The first cut forbade opening onto any passage, and chambers stayed at 1–6 cells with every colony crowded 100 % of the time.
+
+**Measured** (side view, 600 + 600 ants, 600 s, seeds 1–6; the slice 1 numbers are from §30):
+
+| | Slice 1 | Slice 2 |
+|---|---|---|
+| Cells dug, all colonies | 43,422 | 31,116 (−28 %) |
+| Floor per ant underground | none | held at about 0.1 (crowded 24–64 % of the time) |
+| Chambers per colony at 600 s | 1 (given) | 8–18 |
+| Out over 120 s, mean / worst | 1.45 % / 11 % | 1.45 % / 11 % |
+| Food home | 16,705 | 15,676 (−6 %) |
+
+Food home is down because less digging reaches less of the food underground. Pellet carriers climbing out of wide chambers by straight line and Bug2 can still wander (filed as a follow-up).
+
+**Depth profile** (Tschinkel; per 10-row band below the ground):
+- **Gap to the chamber above in the same stack** grows with depth on 11 of 12 colonies (one is nearly flat at 9–11): about 4–10 rows at 10–20 deep, 5–13 at 20–30, 7–14 at 30–40, and 10–32 below 40.
+- **Size:** chambers are largest 10–30 rows down (mean 13–50 cells) and small below 30 (1–24 cells).
+- **The topmost 10 rows** hold smaller chambers than the next band: none start in the top 8 rows, and the crust and mound are there.
+
+**Tick time** (back to back with slice 1): side view one colony 2.85 ms against 2.71 ms; two colonies 5.77 ms against 5.34 ms (+5–8 %).
+
+**Rendering:** chamber cells are a faint mound-coloured wash; slice 3 tints them by role.
+
+**Tests:** `chambers.test.ts` covers:
+- bookkeeping;
+- a crowded nest digging chambers, with floor growing and gaps growing with depth;
+- a roomy nest barely digging;
+- no two chambers touching (it fails on the reviewed cut).
+
+**Agent review.** The review found four problems, all fixed:
+1. The gravity rule added during this slice (a homing ant in the hole never steps back up) was tested by a test that passed without it. Measured without the rule, seed 3 is at 0.6 % and seed 6 unchanged, so the cluster of 146 ants rocking in the hole on seed 3 had been cured by keeping chambers out of the top 8 rows. The rule and its test are gone.
+2. In a roomy nest, aimed digs were damped twice (0.15² ≈ 2 %). They are now damped once. The roomy test checks the rate is above `ROOMY_DIG`, and it fails on the reviewed cut.
+3. Chamber faces could dig into other chambers. They no longer do.
+4. New chambers kept their spacing only from the colony's own chambers; now from every colony's.
+
+**Jev cost:** unchanged.

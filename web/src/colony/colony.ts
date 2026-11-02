@@ -1,4 +1,5 @@
 import { type Channel, Pheromones } from "./pheromone.ts";
+import { CHAMBER_HEIGHT } from "./chambers.ts";
 import { TOLERANCE } from "./recognition.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, OPEN, takeLoose, rockAt, setTunnelHeading, SOIL, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
@@ -211,6 +212,12 @@ export class Colony {
   #groundT: Uint16Array;
   /** the hole x (#holeX) groundMin was measured against */
   #groundRef: Float64Array;
+  // Chambers (nest slice 2): the side view's nest is dug, not given.
+  /** the face this ant is digging for a chamber (packed y·65536 + x; −1 none), and for which: chamber id + 1, or 0 for a new one */
+  #chamberCell: Int32Array;
+  #chamberFor: Int16Array;
+  /** ants underground last tick (the side view): with the chambers' floor, how crowded the nest is */
+  inNest = 0;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
   #belief: Nest = { x: 0, y: 0, r: 0 };
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
@@ -409,6 +416,8 @@ export class Colony {
     this.#groundMin = new Float64Array(n).fill(NaN); // float64: compared with the metric itself (float32 rounding let the ant "beat" it on the cell it was set at)
     this.#groundT = new Uint16Array(n);
     this.#groundRef = new Float64Array(n).fill(NaN);
+    this.#chamberCell = new Int32Array(n).fill(-1);
+    this.#chamberFor = new Int16Array(n);
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -499,6 +508,7 @@ export class Colony {
     this.search[i] = 0;
     this.#under[i] = 1;
     this.#groundMin[i] = NaN;
+    this.#chamberCell[i] = -1;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
@@ -840,7 +850,20 @@ export class Colony {
     } else {
       const side = this.hand[i] as number;
       const next = handOnWall(map, cx, cy, dir, side);
-      if (next === (dir + 3) % 6 || rockAt(map, stepX(cx, cy, next), stepY(cy, next)) !== OPEN) {
+      const chamberHere = mode === EXPLORE && this.#entrance && this.#mayDig(cx, cy) && this.crowded() ? (map.chambers?.at(cx, cy) ?? -1) : -1;
+      // In a chamber still narrow enough to walk like a tunnel (a new one, a cell or two): widen it along its floor.
+      const widen = chamberHere >= 0 && this.#rng() < WIDEN ? this.#widenWay(cx, cy, dir) : -1;
+      const start = widen < 0 && mode === EXPLORE && this.#entrance && this.#mayDig(cx, cy) && this.crowded() ? this.#newChamberWay(cx, cy) : -1;
+      if (widen >= 0) {
+        dir = widen;
+        this.digAim[i] = DIR_ANGLE[widen] as number;
+        this.#aimChamber(i, stepX(cx, cy, widen), stepY(cy, widen), chamberHere + 1);
+      } else if (start >= 0) {
+        // A new chamber, sideways off this tunnel (see #newChamberWay).
+        dir = start;
+        this.digAim[i] = DIR_ANGLE[start] as number;
+        this.#aimChamber(i, stepX(cx, cy, start), stepY(cy, start), 0);
+      } else if (next === (dir + 3) % 6 || rockAt(map, stepX(cx, cy, next), stepY(cy, next)) !== OPEN) {
         // A dead end: dig on. The tunnel carries a heading (the one its end was dug at), which drifts a
         // little each cell: the end cell nearest that heading is dug, so tunnels wander at any angle
         // rather than run straight along the grid. Now and then it forks, 60° to one side.
@@ -852,6 +875,8 @@ export class Colony {
         // grows roomy and they spread out, the less). That is how real colonies stop excavating once
         // they have room (Rasse & Deneubourg 2001); a lone ant at a far tunnel's end still digs now and then.
         if (dug >= 0 && this.friends && this.#rng() > digChance(this.friends, cx, cy)) dug = -1;
+        // A roomy nest (the side view's chambers have floor enough) barely digs on (ja-wii: digging stops with room).
+        if (dug >= 0 && !this.crowded() && this.#rng() > ROOMY_DIG) dug = -1;
         if (dug < 0 && rockAt(map, stepX(cx, cy, next), stepY(cy, next)) !== OPEN) {
           this.gx[i] = NO_CELL; // walled in on every side (it can't be, having walked in): steer freely
           return false;
@@ -880,7 +905,16 @@ export class Colony {
     const wallDir = (dir + side + 6) % 6; // the wall cell ahead on the hand side
     const wx = stepX(cx, cy, wallDir);
     const wy = stepY(cy, wallDir);
-    if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && this.#mayDig(cx, cy) && startable(map, wx, wy, wallDir)) {
+    const crowded = this.crowded();
+    const here = map.chambers?.at(cx, cy) ?? -1;
+    const brood = here >= 0 ? map.chambers!.list[here]!.brood : 0;
+    const widen = !fresh && here >= 0 && crowded && this.#mayDig(cx, cy) && this.#rng() < WIDEN * (1 + BROOD_PULL * Math.min(brood, 10)) ? this.#widenWay(cx, cy, wallDir) : -1;
+    if (widen >= 0) {
+      // Widen the chamber along its floor (dug like any face; the cell joins the chamber when it is open: see tick).
+      dir = widen;
+      this.digAim[i] = DIR_ANGLE[widen] as number;
+      this.#aimChamber(i, stepX(cx, cy, widen), stepY(cy, widen), here + 1);
+    } else if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && (crowded || this.#rng() < ROOMY_DIG) && this.#mayDig(cx, cy) && startable(map, wx, wy, wallDir)) {
       dir = wallDir;
       this.digAim[i] = DIR_ANGLE[wallDir] as number;
     } else {
@@ -891,6 +925,24 @@ export class Colony {
     this.gx[i] = stepX(cx, cy, dir);
     this.gy[i] = stepY(cy, dir);
     return true;
+  }
+
+  /** Ant i dug its chamber face (x, y): it joins that chamber, or founds one. */
+  #chamberDug(i: number, x: number, y: number): void {
+    const ch = this.map.chambers!;
+    const open = (ax: number, ay: number) => rockAt(this.map, ax, ay) === OPEN;
+    let id = (this.#chamberFor[i] as number) - 1;
+    if (id < 0) {
+      if (!this.#chamberRoom(x, y, y - groundTop(this.map, x))) return; // another was started near it meanwhile: a tunnel stub
+      id = ch.add(this.params.nest, y).id;
+    }
+    ch.claim(id, x, y, open);
+  }
+
+  /** Ant i is going to dig cell (x, y) for a chamber: `forId` = its id + 1, or 0 for a new chamber there. */
+  #aimChamber(i: number, x: number, y: number, forId: number): void {
+    this.#chamberCell[i] = y * 65536 + x;
+    this.#chamberFor[i] = forId;
   }
 
   /**
@@ -1126,6 +1178,88 @@ export class Colony {
   }
 
   /**
+   * Whether the nest is crowded (the side view, nest slice 2): fewer floor cells in the colony's chambers than
+   * FLOOR_PER_ANT for each ant underground. A crowded nest digs (chambers first); a roomy one barely digs at all
+   * (Odontomachus keeps ~2 cm² of floor per worker whatever its size; Rasse & Deneubourg's digging that stops with room).
+   * The top-down maps have no chambers: always as before.
+   */
+  crowded(): boolean {
+    const ch = this.map.chambers;
+    if (!ch || !this.#entrance) return true;
+    return this.inNest * FLOOR_PER_ANT > (ch.floorOf[this.params.nest] ?? 0);
+  }
+
+  /**
+   * An explorer touching a wall of its own colony's chamber, the nest crowded: the wall cell (a neighbour of (cx, cy),
+   * the way `prefer` first) that widens the chamber along its floor (within CHAMBER_HEIGHT rows of it), or −1.
+   */
+  #widenWay(cx: number, cy: number, prefer: number): number {
+    const ch = this.map.chambers;
+    if (!ch) return -1;
+    const id = ch.at(cx, cy);
+    if (id < 0) return -1;
+    const c = ch.list[id]!;
+    if (c.colony !== this.params.nest) return -1;
+    // Chambers near the top are widened most (traffic: every forager passes them), so the nest is top-heavy (Tschinkel).
+    if (this.#rng() > Math.exp(-Math.max(0, c.floorRow - groundTop(this.map, cx)) / WIDEN_DEPTH)) return -1;
+    for (let k = 0; k < 6; k++) {
+      const d = (prefer + (k & 1 ? (k + 1) >> 1 : -(k >> 1)) + 6) % 6; // the preferred way, then alternately either side of it
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (ty > c.floorRow || ty <= c.floorRow - CHAMBER_HEIGHT) continue;
+      if (rockAt(this.map, tx, ty) !== SOIL || this.map.loose?.get(tx, ty) === 1 || this.#crust(tx, ty)) continue;
+      if (this.#joinsChamber(tx, ty, id)) continue;
+      return d;
+    }
+    return -1;
+  }
+
+  /**
+   * An explorer in a tunnel of the side view's nest, crowded: start a new chamber sideways off it, here? Likelier near
+   * the top (exp(−depth / CHAMBER_DEPTH)), and only CHAMBER_GAP + depth × CHAMBER_GAP_GROWTH rows from the colony's
+   * nearest chamber round it, so they come out top-heavy with the gaps growing with depth (Tschinkel). The way, or −1.
+   */
+  #newChamberWay(cx: number, cy: number): number {
+    const ch = this.map.chambers;
+    if (!ch || isSky(this.map, cx, cy) || ch.at(cx, cy) >= 0) return -1;
+    const depth = cy - groundTop(this.map, cx);
+    if (depth < CHAMBER_MIN_DEPTH || this.#rng() > NEW_CHAMBER * Math.exp(-depth / CHAMBER_DEPTH)) return -1;
+    if (!this.#chamberRoom(cx, cy, depth)) return -1;
+    const first = this.#rng() < 0.5 ? 0 : 3; // east or west, along the row
+    for (const d of [first, 3 - first]) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      if (rockAt(this.map, tx, ty) === SOIL && this.map.loose?.get(tx, ty) !== 1 && !this.#crust(tx, ty) && !this.#joinsChamber(tx, ty, -1)) return d;
+    }
+    return -1;
+  }
+
+  /**
+   * Whether digging soil cell (x, y) open for chamber `own` (−1: a new one) would join it to another chamber, this
+   * colony's or another's. The tunnel rules' spacing check (startable) is bypassed for chamber faces; opening onto a
+   * tunnel is fine (a junction), but two chambers dug into one another lose their roles and their floors run together.
+   */
+  #joinsChamber(x: number, y: number, own: number): boolean {
+    const ch = this.map.chambers!;
+    for (let d = 0; d < 6; d++) {
+      const id = ch.at(stepX(x, y, d), stepY(y, d));
+      if (id >= 0 && id !== own) return true;
+    }
+    return false;
+  }
+
+  /** Whether a new chamber may start at row cy near column cx: no chamber (of any colony) within the gap for that depth. */
+  #chamberRoom(cx: number, cy: number, depth: number): boolean {
+    const ch = this.map.chambers!;
+    const gap = CHAMBER_GAP + depth * CHAMBER_GAP_GROWTH;
+    for (const c of ch.list) {
+      if (c.cells === 0) continue; // any colony's: a chamber is not started inside or against another nest's
+      if (Math.abs(c.floorRow - cy) < gap && cx >= c.x0 - CHAMBER_SPREAD && cx <= c.x1 + CHAMBER_SPREAD) return false;
+    }
+    return true;
+  }
+
+  /**
    * Whether an ant at cell (cx, cy) may dig from there: underground, yes; on the ground line (side view), no: the
    * hole is the way in (and every face there is crust: see #crust), or explorers would pock the ground with holes.
    */
@@ -1196,6 +1330,7 @@ export class Colony {
 
   /** Whether cell (x, y) is within a nest's radius + 2 (any colony's: a rival's chamber is no dead end to fill either). */
   #byANest(x: number, y: number): boolean {
+    if ((this.map.chambers?.at(x, y) ?? -1) >= 0) return true; // a chamber is never filled
     for (const n of this.map.nests ?? [this.nest]) if (Math.hypot(centreX(x, y) - n.x, centreY(y) - n.y) < n.r + 2) return true;
     return false;
   }
@@ -1721,7 +1856,15 @@ export class Colony {
         if (CELL[0] === lx && CELL[1] === ly) landOpen = true;
       }
       let face = !landOpen && mode === EXPLORE && !carrying && !pellet ? soilFace(map, this.x[i] as number, this.y[i] as number, nx, ny, h, this.gx[i] as number, this.gy[i] as number) : NO_FACE;
-      if (face === START_FACE) face = digging || rng() < START ? DIG_FACE : GLANCE;
+      if (face === START_FACE) face = digging || rng() < START * (this.crowded() ? 1 : ROOMY_DIG) ? DIG_FACE : GLANCE;
+      // A roomy nest (ja-wii): a tunnel's end met head-on is dug only now and then; turned along the wall otherwise, so the
+      // next tick doesn't simply try again.
+      else if (face === DIG_FACE && !digging && Number.isNaN(this.digAim[i] as number) && map.chambers && !this.crowded() && rng() > ROOMY_DIG) face = GLANCE; // (an aimed face passed ROOMY_DIG when it was chosen)
+      // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say.
+      if (face !== NO_FACE && this.#chamberCell[i] >= 0 && mode === EXPLORE && !carrying && !pellet) {
+        cellOf(nx, ny);
+        if (this.#chamberCell[i] === (CELL[1] as number) * 65536 + (CELL[0] as number) && rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL) face = DIG_FACE;
+      }
       if (face === DIG_FACE && map.sky) {
         cellOf(nx, ny);
         const looseFace = map.loose?.get(CELL[0] as number, CELL[1] as number) === 1;
@@ -1764,6 +1907,9 @@ export class Colony {
             this.#spoilTo[i] = NaN;
             h += Math.PI;
           } else if (left <= 0 && digCell(map, fx, fy)) {
+            // A chamber face: the cell joins its chamber (or founds a new one, if there is still room for one there).
+            if (this.#chamberCell[i] === fy * 65536 + fx && map.chambers) this.#chamberDug(i, fx, fy);
+            this.#chamberCell[i] = -1;
             // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
             const aim = this.digAim[i] as number;
             setTunnelHeading(map, fx, fy, Number.isNaN(aim) ? (DIR_ANGLE[crossedDir(map, this.x[i] as number, this.y[i] as number, nx, ny)] as number) + gauss(rng) * TUNNEL_DRIFT : aim);
@@ -1906,6 +2052,11 @@ export class Colony {
       }
       this.heading[i] = h;
     }
+    if (this.#entrance) {
+      let under = 0;
+      for (let k = 0; k < this.n; k++) if (this.alive[k] && this.#under[k]) under++;
+      this.inNest = under;
+    }
     ph.advance(dt);
     // Growth: the larder turns into ants while there is room.
     while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
@@ -1960,6 +2111,24 @@ export const PI_DRIFT = 0.1;
 export const HOLE_SIGHT = 6;
 /** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one this much wider, to at most SEARCH_MAX. */
 const SEARCH_START = 3;
+// Chambers (nest slice 2): see crowded(), #widenWay, #newChamberWay.
+/** Floor cells a nest keeps per ant underground: below it the nest is crowded and digs (Odontomachus ~2 cm² per worker, at the sim's scale). */
+export const FLOOR_PER_ANT = 0.1;
+/** Chance an explorer touching its crowded chamber's wall widens it there; brood lying in it makes it likelier (× 1 + BROOD_PULL per brood, up to 10). */
+const WIDEN = 0.3;
+const BROOD_PULL = 0.2;
+/** Widening falls off with a chamber's depth (rows) as exp(−depth / WIDEN_DEPTH). */
+const WIDEN_DEPTH = 30;
+/** Chance per tunnel cell (at the surface; × exp(−depth / CHAMBER_DEPTH)) that a crowded explorer starts a new chamber there. */
+const NEW_CHAMBER = 0.04;
+const CHAMBER_DEPTH = 40;
+/** No chamber within the top rows (the crust and mound), and none within CHAMBER_GAP + depth × CHAMBER_GAP_GROWTH rows (and CHAMBER_SPREAD columns) of another. */
+const CHAMBER_MIN_DEPTH = 8;
+const CHAMBER_GAP = 4;
+const CHAMBER_GAP_GROWTH = 0.15;
+const CHAMBER_SPREAD = 10;
+/** A roomy nest digs this share as often as before (tunnels at dead ends, starts off walls, head-on). */
+export const ROOMY_DIG = 0.15;
 /** Cells a homing ant follows the ground's surface round spoil before trying the other hand. */
 const GROUND_FLIP = 24;
 /** Cells an ant feels ahead along the surface, each way, to choose which hand to follow it with. */

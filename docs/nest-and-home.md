@@ -81,7 +81,7 @@ The side view keeps its entrance, shaft, walkway and mound. The founding chamber
    - **Underground there is no exact vector to the chamber.** An ant keeps a self-referenced memory of the chamber (Heyman et al.'s "self-referenced memories"): the same kind of drifting vector, started afresh in the chamber.
    - **Road signs correct it.** Standing on a strong nest trail fades its error (until slice 3, the home trail; then the chamber marks).
    - With its branches and walls, the tunnel walker follows scent first, as before.
-2. **Chambers that ants dig.** A chamber is a widening off a shaft, about 1 row high and wide in the side view. Excavation is:
+2. **Chambers that ants dig.** *Built in slice 2 (PRD §31).* A chamber is a widening off a shaft, 2 rows high in the side view. Excavation is:
    - **regulated by crowding:** dig while floor per worker is below a target, so `ja-wii` is folded in here;
    - **drawn to brood:** a chamber grows where brood lies.
 

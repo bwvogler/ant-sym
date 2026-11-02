@@ -1,3 +1,4 @@
+import { Chambers } from "./chambers.ts";
 import { CHUNK, CHUNK_BITS, ChunkLayer, local } from "./chunks.ts";
 import { CELL, cellOf, centreX, centreY, extent, hexDistance, nx, ny, R } from "./hex.ts";
 
@@ -75,6 +76,13 @@ export interface WorldMap {
   sky?: ChunkLayer<Uint8Array>;
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
   loose?: ChunkLayer<Uint8Array>;
+  /** the side view: the nests' chambers (nest slice 2): which cells are chambers, and each chamber's floor */
+  chambers?: Chambers;
+}
+
+/** Whether integer cell (x, y) is open ground (for Chambers' floor counts). */
+function openCell(map: WorldMap): (x: number, y: number) => boolean {
+  return (x, y) => inBounds(map, x, y) && rockAt(map, x, y) === OPEN;
 }
 
 export interface WorldOptions {
@@ -252,6 +260,10 @@ export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
     map.sky.set(x, y, 0); // ground now (a pellet on the mound, in the side view)
     updateSurface(map, x, y);
   }
+  if (map.chambers) {
+    map.chambers.release(x, y);
+    map.chambers.changed(x, y, openCell(map));
+  }
   return true;
 }
 
@@ -262,6 +274,7 @@ export function digCell(map: WorldMap, x: number, y: number): boolean {
   map.filledAt.set(x, y, -Infinity); // a pellet dug out again no longer smells of building
   map.dug++;
   if (map.sky) updateSurface(map, x, y);
+  map.chambers?.changed(x, y, openCell(map));
   return true;
 }
 
@@ -662,7 +675,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
   const loose = new ChunkLayer((n) => new Uint8Array(n), 0);
-  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: filledLayer(), sky, loose };
+  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: filledLayer(), sky, loose, chambers: new Chambers() };
   const ground = new Int32Array(size.w);
   for (let x = 0; x < size.w; x++) ground[x] = Math.max(2, Math.min(size.h - 8, groundRow(seed, o, x)));
   for (let y = 0; y < size.h; y++)
@@ -688,7 +701,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   let ex = Math.round(size.w * (0.3 + 0.15 * rng()));
   for (let k = 0; k < o.nestCount; k++) {
     if (k > 0) ex = Math.min(size.w - 24, ex + o.nestGap);
-    nests.push(digNest(map, ground, ex, o.chamberDepth, rng));
+    nests.push(digNest(map, ground, ex, o.chamberDepth, rng, k));
   }
   map.nest = nests[0] as Nest;
   map.nests = nests;
@@ -761,7 +774,7 @@ function walkwayRow(map: WorldMap, x: number, g: number): number {
  * Dig a nest into the side view at column ex: a shaft from the ground line slanting down (alternating
  * south-east and south-west steps, mostly one way: about 60° below level) to a round chamber `depth` rows down.
  */
-function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, rng: () => number): Nest {
+function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, rng: () => number, colony: number): Nest {
   const g = ground[ex] as number;
   const way = rng() < 0.5 ? 1 : 2; // SE or SW, the shaft's slant
   let x = ex;
@@ -783,6 +796,13 @@ function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, r
   // The entrance is the hole itself, the shaft's top cell: always open (the cell above it can lose its footing and be sky).
   const nest: Nest = { x: cxw, y: cyw, r: 3, entrance: { x: centreX(ex, g), y: centreY(g) } };
   disc(map, cxw, cyw, nest.r + 1.5, (fx, fy) => open(fx, fy));
+  // The founding chamber: the colony's first, where the queen will be (slice 4 makes it the royal chamber).
+  if (map.chambers) {
+    let bottom = 0;
+    disc(map, cxw, cyw, nest.r + 1.5, (_fx, fy) => (bottom = Math.max(bottom, fy)));
+    const c = map.chambers.add(colony, bottom, "royal");
+    disc(map, cxw, cyw, nest.r + 1.5, (fx, fy) => map.chambers!.claim(c.id, fx, fy, openCell(map)));
+  }
   // The ground round the hole changed: re-derive the walkway there.
   for (let yy = g - 2; yy <= g + 1; yy++) for (let xx = ex - 2; xx <= ex + 2; xx++) if (inBounds(map, xx, yy)) updateSurface(map, xx, yy);
   return nest;
