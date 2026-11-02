@@ -1,6 +1,6 @@
 # Home is a nest, not a point
 
-*Design note, 2026-11-01. It builds on the side view (PRD §27, MR 13–15). This note is design only: the slices at the end are filed as beads, and nothing here is built yet.*
+*Design note, 2026-11-01. It builds on the side view (PRD §27). Written as design only; slices 0–9 at the end were filed as beads and have since been built (PRD §29–§38), with a fix-up after their reviews (PRD §39). Each section of §3–§5 says what was built and where it differs from the design.*
 
 The owner asked: *where is the "home" signal for ants? Is it a queen thing? Are there structures or specialised spaces? We tested the home as a disc, but that isn't realistic underground, and the ant-farm view breaks it.*
 
@@ -55,21 +55,21 @@ In a single-queen species, losing the queen means **no more workers are ever mad
 
 **So the realistic answer for the game:** losing the queen *dooms* a colony; it doesn't end it on the spot.
 
-## 2. What the sim does today, and why it breaks
+## 2. What the sim did before the nest, and why it broke
 
-On the side-view branch (`ccr-f8368183-i7kj76-mr15`):
+On the side-view branch (`ccr-f8368183-i7kj76-mr15`), before slice 0. The nest slices replaced every row of this table. Symbols, not line numbers, since those moved:
 
 | Today | Where | Why it isn't real |
 |---|---|---|
-| The nest is one disc, `Nest {x, y, r: 3}`, pre-dug 14 rows down with a shaft to an `entrance` | `world.ts:29`, `digNest` `world.ts:764` | Real nests are many chambers, dug by the ants |
-| Underground, a homing ant steers by the **exact, noise-free vector to the chamber centre** (`toNest`), with Bug2 wall-following toward it | `colony.ts:1227`, `colony.ts:1260` | No ant knows where the chamber is through solid soil, and real path integration resets inside the nest |
-| On the walkway it homes column by column to the hole; pellet carriers home to the entrance | `#goal` `colony.ts:846` | Right in spirit: home is the hole. But the vector is exact |
-| A sensor inside the disc reads `SEEN = 100` for home: a beacon | `colony.ts:521` | Fine as "I am home", but it is the only place with an identity |
-| One home field, laid by every ant that isn't carrying, stronger the sooner it has been home | `colony.ts:1390` | One scent for everything: it cannot say "brood this way" or "store that way" |
-| Food home is the `stored` / `larder` scalars; every 4 food makes an ant, born in the disc | `colony.ts:1574`, `colony.ts:1589`, `#place` `colony.ts:351` | No food anywhere on the map, no queen, no brood |
+| The nest is one disc, `Nest {x, y, r: 3}`, pre-dug 14 rows down with a shaft to an `entrance` | `Nest` and `digNest` (world.ts) | Real nests are many chambers, dug by the ants |
+| Underground, a homing ant steers by the **exact, noise-free vector to the chamber centre** (`toNest`), with Bug2 wall-following toward it | `toNest` and the Bug2 wall walk in `Colony.tick` | No ant knows where the chamber is through solid soil, and real path integration resets inside the nest |
+| On the walkway it homes column by column to the hole; pellet carriers home to the entrance | `#goal` (colony.ts) | Right in spirit: home is the hole. But the vector is exact |
+| A sensor inside the disc reads `SEEN = 100` for home: a beacon | `#sense` (colony.ts) | Fine as "I am home", but it is the only place with an identity |
+| One home field, laid by every ant that isn't carrying, stronger the sooner it has been home | the trail-laying step of `Colony.tick` | One scent for everything: it cannot say "brood this way" or "store that way" |
+| Food home is the `stored` / `larder` scalars; every 4 food makes an ant, born in the disc | `stored`, `larder`, `spawn` and `#place` (colony.ts) | No food anywhere on the map, no queen, no brood |
 | No down | (none) | Gravity is the one cue every ant has underground |
 
-The mound (MR 14–15) already matches the biology: spoil carried out, an angle of repose, and a disc that scales with nest volume.
+The mound (PRD §27) already matches the biology: spoil carried out, an angle of repose, and a disc that scales with nest volume.
 
 ## 3. The model
 
@@ -86,7 +86,7 @@ The side view keeps its entrance, shaft, walkway and mound. The founding chamber
    - **drawn to brood:** a chamber grows where brood lies.
 
    The depth profile should come out top-heavy, with gaps between chambers growing with depth. That is the check against Tschinkel.
-3. **Roles and road signs.**
+3. **Roles and road signs.** *Built in slice 3 (PRD §32).*
    - Each chamber has a role:
      - **royal:** the queen and eggs; the founding chamber;
      - **brood:** larvae and pupae;
@@ -94,15 +94,17 @@ The side view keeps its entrance, shaft, walkway and mound. The founding chamber
      - **reception:** top, where foragers drop food;
      - **midden:** refuse.
    - Workers in a chamber lay its role's mark on the floor, and junctions keep a mark of what lies down each branch.
-   - Inside the nest, these marks replace the single home field: an ant heading somewhere follows the mark of where it is going.
-4. **The queen and brood.**
+   - Inside the nest, an ant heading somewhere follows the mark of where it is going.
+
+   *As built* (PRD §32): the marks are five channels, laid underground by each ant for the last chamber it was in, fainter the longer since. Homing in a tunnel follows the mark of where it is going (`SIGN_WEIGHT` × the home trail, which stays and still counts where there are no signs): royal, a brood chamber for a nurse with brood, reception for a forager with food. The situation does not ask by that mark. Underground, `homeTrail` says where the ant *is*: `tunnel`, or a chamber of its colony by role, with no levels; on the ground and on the top-down maps it is the home trail's level as before. There is no `down` field (§5).
+4. **The queen and brood.** *Built in slice 4 (PRD §33).*
    - The queen sits in the royal chamber and lays eggs at a rate fed by food brought to her.
    - Eggs become larvae, then pupae, then workers. Larvae must be fed: food is carried to them.
    - The queen's pheromone draws nurses to the royal chamber. Nurses carry brood to her and to the brood chambers, and move brood with depth.
    - **Ants are born from pupae, not from the larder counter.**
-5. **Zoned by age.** Each ant has an age. The young nurse deep, middle-aged ants dig and carry inside, and the old forage. Age is a perception and assignment input (castes, `ja-jhd`, build on it).
-6. **Food flow.** Foragers drop food at **reception**. Inside workers carry it down to **store**, and from store to **brood** and the queen. `stored` / `larder` become food lying in chambers, which the map shows.
-7. **The midden.** Refuse (corpses; later, spent fungus garden) is carried to a midden: by default at the edge of the mound, deep in some species. A midden marks a boundary to other colonies.
+5. **Zoned by age.** *Built in slice 6 (PRD §35).* Each ant has an age. The young nurse deep, middle-aged ants dig and carry inside, and the old forage. Age is a perception and assignment input (castes, `ja-jhd`, build on it).
+6. **Food flow.** *Built in slice 5 (PRD §34).* Foragers drop food at **reception**. Inside workers carry it down to **store**, and from store to **brood** and the queen. `stored` / `larder` become food lying in chambers, which the map shows.
+7. **The midden.** *Built in slice 7 (PRD §36).* Refuse (corpses; later, spent fungus garden) is carried to a midden: by default at the edge of the mound, deep in some species. A midden marks a boundary to other colonies.
 
 ### Queen loss
 When the queen dies, the colony is **orphaned**:
@@ -110,15 +112,15 @@ When the queen dies, the colony is **orphaned**:
 - brood in progress finishes;
 - the workers age and die off.
 
-*Fallen* stays "no workers left". *Orphaned* is shown as a state (a banner and the stats), not an ending. Several queens, adopting queens and pleometrosis are per-species options (MR 8 species framework, `ja-8fd`; queens and lineage, `ja-1vg`).
+*Fallen* stays "no workers left". *Orphaned* is shown as a state (a banner and the stats), not an ending. Several queens, adopting queens and pleometrosis are per-species options (the species framework, `ja-8fd`; queens and lineage, `ja-1vg`).
 
-**A path to unification (speculative, to design in MR 8):** in some multi-queen species, workers can join or adopt from a neighbour. An orphaned colony merging into a neighbour it tolerates (same odour, via Garden) is a unification route grounded in biology. It is also a hard, lethal, strain-gated fungus play: infect the queen.
+**A path to unification** (*designed in slice 9: docs/queens-and-merging.md, PRD §38*)**:** in some multi-queen species, workers can join or adopt from a neighbour. An orphaned colony merging into a neighbour it tolerates (same odour, via Garden) is a unification route grounded in biology. It is also a hard, lethal, strain-gated fungus play: infect the queen.
 
 ## 4. What the fungus touches
 
-The fungus milestone (PR #7, on `main`) is not yet on this stack. Slice 0 below merges it.
+The fungus milestone (PR #7, on `main`) was merged into this stack by slice 0 (PRD §29).
 
-Then the nest gives the fungus new levers, each with a basis:
+The nest gives the fungus new levers, each with a basis. *Built in slice 8 (PRD §37).*
 - **Chamber marks are perception** (§16's gains, per channel). A host misreads a *brood* mark as *store*, or loses the *royal* mark. The nest equivalent of "roam".
 - **Ground** becomes a host's place in the nest:
   - **chamber role**, own colony's;
@@ -126,25 +128,31 @@ Then the nest gives the fungus new levers, each with a basis:
   - **surface**;
   - **foreign** (another colony's nest).
 
-  This replaces the home-field ratio (`fungus.ts`, ground).
-- **Queen and brood infection.** Lethal or sterilising, strain-gated, and on the menu off by default, like cull. A queen infection orphans the colony.
+  This replaces the home-field ratio (`fungus.ts`, ground). *As built:* `home` is any of its own colony's chambers (no chamber role: that would multiply the situations by five), and whose tunnel a host is in goes by the home scent where it stands, for any number of colonies (PRD §39; slice 8's first cut took the nearest hole).
+- **Queen and brood infection.** Lethal or sterilising, strain-gated, and on the menu off by default, like cull. A queen infection orphans the colony. *As built:* lethal only (Bloom's `crown`); a sterilising form was not built. Since PRD §39 it acts at any load, at a rate that grows with it.
 - **The midden** is where infected corpses go: hygiene that clears the fungus or, for a strain that sporulates there, spreads it (*Escovopsis*-like).
 - **Nest odour** (recognition) drifts toward the ants in the royal chamber, not those in a disc.
 - `FUNGUS_BRAIN_VERSION` bumps when the fungal situation's `ground` changes.
 
 ## 5. Jev cost
 
-The ant's situation changes inside the nest: `homeTrail` is replaced, inside the nest, by the mark of where it is going, with values *none / reception / brood / royal / store / midden* and their strength, plus `down` for the gravity sense.
-- Today's estimate is about **235 input tokens per ant situation** (`TOKENS_PER_SITUATION` on this branch). A situation is mode × tired × the food, home and alarm trail levels × enemy × stance.
-- The new field adds about 6 roles × 3 levels in place of homeTrail's 4 levels. Expect around +10–20 tokens per situation (the legend grows), and more distinct situations per game.
-- Measure both in slice 3 before merging (CLAUDE.md: tokens per ant go in the PR).
+*Designed:* inside the nest, `homeTrail` would become the mark of where the ant is going (6 roles × 3 levels), plus a `down` field for the gravity sense, at about +10–20 tokens per situation.
+
+*Built* (slice 3, PRD §32): `homeTrail` says where the ant **is**: `tunnel` or one of its colony's chambers by role, with no levels. **`down` was dropped:** PRD §30 left it to slice 3, and gravity needed no field, since every ant underground climbs or descends by it already (§3.1) and nothing it decides turns on it. `SITUATIONS` is 3,888.
+
+Measured costs, each labelled:
+- **Colony lane, per situation** (estimate, `estimateTokens` on 100 situations to a request): about 237 tokens on the ground and 238 in the nest, against 235 before (+2–3).
+- **Colony lane, distinct situations per game** (side view, 600 + 600 ants, 600 s, seeds 1–3): 209–242, against 88–91 before slice 3.
+- **Colony lane, per question and per hour** (estimate, `npm run colony-cost -- --side`, PRD §39; 600 + 600 ants, 5 minutes, a doctrine a minute): 113 distinct situations, ~589 tokens per question, ~222k tokens a game, about $0.11 an hour. The design's "+10–20 tokens" was per situation at 100 to a request; a question as a game asks it costs about twice that (PRD §12: ~451 tokens per question asked live on the top-down map), since a request carries the legend and doctrine for fewer situations.
+- **Fungus lane** (estimate): per fungal situation at 100 to a request, side view, every intervention on the menu, Lockpick 276, Bloom 343, Garden 315 (PRD §37, against ~315 before the nest); per 5-minute game with the UI brush, 44–81 distinct situations, ~530–570 tokens per question, 23–43k tokens, about $0.001–0.002 a game (PRD §39).
+- No live figure: there is no API key in the cloud sessions that built the nest.
 
 ## 6. Tests that pin the disc
 
 What each becomes:
 - **`tests/side.test.ts`:**
   - homing to the entrance stays;
-  - "down to the chamber" becomes "down to the royal chamber by gravity and marks, with no vector";
+  - "down to the chamber" becomes "down to the royal chamber by gravity and marks, and a drifting vector" (slice 1 built a self-referenced memory that drifts, corrected by road signs, not "no vector");
   - the world test checks the founding chamber is the royal one.
 - **`tests/colony.test.ts`:**
   - top-down homing tests (Bug2, walls, tunnels) stay on the top-down test maps: there the nest is a disc entrance at ground level;
@@ -169,5 +177,5 @@ Each is a bead under the epic. Each measures something before it merges.
 | 5 | Food flow: reception, store, brood | food home; trips per food |
 | 6 | Age and zoning (prerequisite for castes, `ja-jhd`) | where ants are by age |
 | 7 | The midden | corpses cleared; boundary effect on raids |
-| 8 | The fungus on the new home: chamber-mark levers, nest `ground`, queen and brood infection | unity and deaths against PRD §22 |
-| 9 | Design for MR 8: several queens, adoption, an orphaned colony merging (a unification route) | design note |
+| 8 | The fungus on the new home: chamber-mark levers, nest `ground`, queen and brood infection | unity and deaths against the side view's own baseline, PRD §29's rerun of PRD §22 |
+| 9 | Design for the species framework (`ja-8fd`): several queens, adoption, an orphaned colony merging (a unification route) | design note |

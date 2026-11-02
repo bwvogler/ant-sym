@@ -11,10 +11,10 @@ import { INTERVENTIONS, STRAINS } from "./fungus.ts";
 // player's menu has on, so the answer is always something the fungus can do.
 
 /** Bump when the fungal situation, the legend or the question change: old cached answers no longer apply. */
-export const FUNGUS_BRAIN_VERSION = 3;
+export const FUNGUS_BRAIN_VERSION = 4;
 
 export const FUNGUS_LEGEND =
-  "You are a fungus living inside the ants of rival colonies. You never decide what an ant does: each ant chooses for itself from what it senses. You choose what you do to the ant you are in, which changes what it senses, what it gives off and how others see it. Each key in `hosts` is one ant you live in, as you sense it from inside. strain is which of your strains it carries. load is how much of you is in it: low, mid or high. host is what the ant is doing: explore, follow (a food trail), return (home) or fight. ground is whose home scent is where it stands: home (its own colony's), border, or foreign (another colony's). contact is who touches it: none; kin (its own colony's ants); allied (another colony's ants that smell close enough to be tolerated: colonies coming together); or strangers (ants that smell different, whom ants fight unless calmed). groomed means enough of its nestmates are around to groom you off it (going dormant shows them less of you; it does not send them away). aim is what you want: follow it.";
+  "You are a fungus living inside the ants of rival colonies. You never decide what an ant does: each ant chooses for itself from what it senses. You choose what you do to the ant you are in, which changes what it senses, what it gives off and how others see it. Each key in `hosts` is one ant you live in, as you sense it from inside. strain is which of your strains it carries. load is how much of you is in it: low, mid or high. host is what the ant is doing: explore, follow (a food trail), return (home) or fight. ground is where it stands: home (its own colony's ground; inside a nest, one of its own colony's chambers), tunnel (its own nest's tunnels), border (between, or the open ground), or foreign (another colony's ground or chamber). contact is who touches it: none; kin (its own colony's ants); allied (another colony's ants that smell close enough to be tolerated: colonies coming together); or strangers (ants that smell different, whom ants fight unless calmed). groomed means enough of its nestmates are around to groom you off it (going dormant shows them less of you; it does not send them away). aim is what you want: follow it.";
 
 /** What a host of this strain may be given: what the strain allows and the menu has on, in the table's order. */
 export function offeredFor(strainId: string, menu: ReadonlySet<string>): string[] {
@@ -69,10 +69,15 @@ export function readIntervention(answers: Record<string, JevAnswer>, id: string,
   return offered.includes(a.choice) ? a.choice : null;
 }
 
-/** What a cached answer was asked under: a different aim, legend, intervention wording or question wording is a different cache (the menu is in each key). */
-export function fungusContext(aim: string): string {
+/**
+ * What a cached answer was asked under: a different aim, legend, intervention wording or question wording is a different
+ * cache (the menu is in each key). So is the view: `home` is one of the host's own chambers in the side view and
+ * home-scented ground on a top-down map, so the same situation is a different place (review of #27: Garden's answers
+ * crossed views). The top-down maps keep the context they had.
+ */
+export function fungusContext(aim: string, view: "top" | "side" = "top"): string {
   const blurbs = INTERVENTIONS.map((v) => `${v.id}:${v.name}:${v.blurb}`).join("\n");
-  return `fungus-v${FUNGUS_BRAIN_VERSION}-${hash(FUNGUS_LEGEND + JSON.stringify(interventionQuestion("h0", ["x"])) + blurbs + "\u0000" + aim.trim())}`;
+  return `fungus-v${FUNGUS_BRAIN_VERSION}${view === "side" ? "-side" : ""}-${hash(FUNGUS_LEGEND + JSON.stringify(interventionQuestion("h0", ["x"])) + blurbs + "\u0000" + aim.trim())}`;
 }
 
 /** Aims to start from: the player's words for what the fungus wants. */
