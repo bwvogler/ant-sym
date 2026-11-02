@@ -17,9 +17,11 @@ export interface Chamber {
   colony: number;
   /** the row its floor was started on: chambers widen along it, at most CHAMBER_HEIGHT rows up */
   floorRow: number;
-  /** the columns it spans (its westmost and eastmost cells) */
+  /** the columns it spans (its westmost and eastmost cells), and the rows (its top and bottom) */
   x0: number;
   x1: number;
+  y0: number;
+  y1: number;
   /** cells in it */
   cells: number;
   /** of them, cells with ground under them to stand on (floor) */
@@ -53,7 +55,7 @@ export class Chambers {
 
   /** A new chamber for `colony`, its floor on row `floorRow` (no cells yet: claim them). */
   add(colony: number, floorRow: number, role: Role = "none"): Chamber {
-    const c: Chamber = { id: this.list.length, colony, floorRow, x0: Infinity, x1: -Infinity, cells: 0, floor: 0, role, brood: 0, food: 0, sumX: 0, sumY: 0 };
+    const c: Chamber = { id: this.list.length, colony, floorRow, x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, cells: 0, floor: 0, role, brood: 0, food: 0, sumX: 0, sumY: 0 };
     this.list.push(c);
     while (this.floorOf.length <= colony) this.floorOf.push(0);
     return c;
@@ -69,6 +71,8 @@ export class Chambers {
     c.sumY += y;
     c.x0 = Math.min(c.x0, x);
     c.x1 = Math.max(c.x1, x);
+    c.y0 = Math.min(c.y0, y);
+    c.y1 = Math.max(c.y1, y);
     this.#refloor(x, y, open);
   }
 
@@ -93,6 +97,18 @@ export class Chambers {
     c.cells--;
     c.sumX -= x;
     c.sumY -= y;
+    // Its span shrinks if that was an end column (rare: only tests and cave-ins release cells, so a scan will do).
+    if (x !== c.x0 && x !== c.x1) return;
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    for (let yy = c.y0; yy <= c.y1; yy++)
+      for (let xx = c.x0; xx <= c.x1; xx++)
+        if (this.at(xx, yy) === id) {
+          x0 = Math.min(x0, xx);
+          x1 = Math.max(x1, xx);
+        }
+    c.x0 = x0;
+    c.x1 = x1;
   }
 
   #refloor(x: number, y: number, open: (x: number, y: number) => boolean): void {

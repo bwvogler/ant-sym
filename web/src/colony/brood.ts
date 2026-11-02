@@ -6,7 +6,8 @@ export const EGG = 0;
 export const LARVA = 1;
 export const PUPA = 2;
 export type Stage = typeof EGG | typeof LARVA | typeof PUPA;
-export const STAGE_NAMES = ["egg", "larva", "pupa"] as const;
+/** Food a larva is fed before it pupates (an egg costs 1 more: a worker costs 4). */
+export const LARVA_FOOD = 3;
 
 export interface BroodItem {
   /** the cell it lies on (or its nurse's, while held) */
@@ -32,9 +33,11 @@ export class Brood {
     return b;
   }
 
-  remove(b: BroodItem): void {
-    const k = this.items.indexOf(b);
-    if (k >= 0) this.items.splice(k, 1);
+  /** Food the brood still has to be fed: what each egg and larva lacks of LARVA_FOOD (a pupa is fed). */
+  owed(): number {
+    let s = 0;
+    for (const b of this.items) s += owed(b);
+    return s;
   }
 
   /** Eggs, larvae and pupae. */
@@ -47,4 +50,14 @@ export class Brood {
   get size(): number {
     return this.items.length;
   }
+}
+
+/** Whether a larva has been fed all it needs (a pupa has; an egg hasn't). */
+export function isFed(b: BroodItem): boolean {
+  return b.fed >= LARVA_FOOD - 1e-9;
+}
+
+/** Food brood item b still has to be fed: none once it is a pupa. */
+export function owed(b: BroodItem): number {
+  return b.stage === PUPA ? 0 : LARVA_FOOD - b.fed;
 }
