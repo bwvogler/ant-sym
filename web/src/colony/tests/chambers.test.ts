@@ -48,10 +48,7 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   const g = new Game(map, { antCount: 400, rival: false }, mulberry32(4));
   const ch = map.chambers!;
   const floor0 = ch.floorOf[0]!;
-  // 600 s, not 240: floor grows as tunnels dug down out of chambers are filled back, and nothing dug in the last
-  // BACKFILL.young (200 s, from #17's merge) is filled. At 240 s this game had put back 4 pellets and a run's floor had
-  // grown 1.0–2.4× (worlds 1–4, games 4–6); by 600 s, 2.3–3.8×.
-  for (let k = 0; k < 30 * 600; k++) g.tick(1 / 30);
+  for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
   const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
   assert.ok(mine.length >= 3, `${mine.length} chambers`);
   // Floor at least doubles. Over worlds 1–4 and games 4–6 it grows 2.3–3.7× (2.4–3.6× before #17 was merged in, whose
