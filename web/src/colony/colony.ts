@@ -265,6 +265,10 @@ export class Colony {
   // The midden (nest slice 7): corpses lie where workers die until an undertaker carries them out to the midden.
   /** the colony's dead: where each lies (a cell), who carries it (−1 none), and whether it is on the midden; died: when */
   readonly corpses: { x: number; y: number; held: number; midden: boolean; died: number }[] = [];
+  /** Whether ant i carries a corpse (drawn as one, not as soil). */
+  carriesCorpse(i: number): boolean {
+    return this.#corpse[i] === 1;
+  }
   /** 1 while an ant carries a corpse (moved like a soil pellet: up and out, along the ground) */
   #corpse: Uint8Array;
   /** corpses carried to the midden */
@@ -396,6 +400,8 @@ export class Colony {
   foreign: Pheromones | null = null;
   /** where raiders go: the rival's nest */
   raidTarget: Nest | null = null;
+  /** the side view: the rival's chamber, where raiders go once in at its hole (set by the game) */
+  raidNest: Nest | null = null;
   time = 0;
   /** food units brought home */
   stored = 0;
@@ -698,6 +704,28 @@ export class Colony {
     return this.band(i) !== 0;
   }
 
+  /** Whether column cx is nearer this colony's hole than the rival's (raiding: still at home, or already at theirs). */
+  #inOwnNest(cx: number): boolean {
+    const t = this.raidTarget;
+    if (!t || !this.#entrance) return true;
+    const x = centreX(cx, 0);
+    return Math.abs(x - this.#entrance.x) <= Math.abs(x - t.x);
+  }
+
+  /** Which side of its hole the colony's midden lies: toward its rival (a boundary between them), east if alone. */
+  #middenSide(): -1 | 1 {
+    const t = this.raidTarget;
+    return t && this.#entrance && t.x < this.#entrance.x ? -1 : 1;
+  }
+
+  /** How far out the midden lies: past the mound's largest reach, fixed, so the mound never grows over it (review of
+   *  slice 7: placed past the mound's current edge, it was buried as the mound spread, and moved with it). */
+  #middenAt(): number {
+    // Never past 40 % of the way to the rival: each midden on its own colony's ground (two nests close together).
+    const t = this.raidTarget;
+    return t && this.#entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.#entrance.x))) : MIDDEN_AT;
+  }
+
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
   #outbound(i: number): boolean {
     return this.queen !== null && this.band(i) === 2;
@@ -970,7 +998,12 @@ export class Colony {
           const v = m.get(stepX(cx, cy, best), stepY(cy, best));
           if (v >= FAINT && this.#rng() < 1 - Math.exp(-v / MIDDEN_SCALE)) best = rockAt(map, stepX(cx, cy, (dir + 3) % 6), stepY(cy, (dir + 3) % 6)) === OPEN ? (dir + 3) % 6 : -1;
         }
-      } else best = this.#climbOut(cx, cy);
+      } else if (this.#inOwnNest(cx) || !this.raidNest) best = this.#climbOut(cx, cy);
+      else {
+        // In at the rival's hole: down to its chamber (review of slice 7: it climbed back out, to its own hole).
+        this.#holeX = this.raidNest.x;
+        best = this.#towardHole(cx, cy, false, NaN, this.raidNest.y);
+      }
       dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
       this.digAim[i] = NaN;
     } else if (mode === RETURN && ent && isSky(map, cx, cy)) {
@@ -1655,7 +1688,7 @@ export class Colony {
    * carries it out like spoil, up the shaft and along the ground, to the midden.
    */
   #undertake(i: number, dt: number): void {
-    if (this.corpses.length === 0 || this.mode[i] !== EXPLORE || this.carrying[i] || this.pellet[i] || this.#holdsBrood[i] || this.#rng() > PICK_CORPSE * dt) return;
+    if (this.corpses.length === 0 || (this.mode[i] !== EXPLORE && this.mode[i] !== FOLLOW) || this.carrying[i] || this.pellet[i] || this.#holdsBrood[i] || this.#rng() > PICK_CORPSE * dt) return;
     this.antCell(i);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
@@ -1672,8 +1705,8 @@ export class Colony {
         this.#spoilTo[i] = NaN;
         if (outside) {
           // Already out: straight along the ground to the midden (it won't come up out of the hole, where that is set).
-          this.#spoilTo[i] = Math.min(MOUND_REACH, 3 + this.#heaped / (2 * MOUND_HEIGHT)) + MIDDEN_PAST;
-          this.#spoilSide[i] = MIDDEN_SIDE;
+          this.#spoilTo[i] = this.#middenAt();
+          this.#spoilSide[i] = this.#middenSide();
           this.#spoilT[i] = 0;
         }
         this.mode[i] = RETURN;
@@ -1685,6 +1718,10 @@ export class Colony {
 
   /** The midden keeps smelling of the colony while corpses lie on it (MIDDEN_MARK a second each, up to 20 counted). */
   #middenSmell(dt: number): void {
+    for (let k = this.corpses.length - 1; k >= 0; k--) {
+      const c = this.corpses[k]!;
+      if (c.held < 0 && !c.midden && this.time - c.died > CORPSE_ROT) this.corpses.splice(k, 1); // the midden stays
+    }
     let n = 0;
     for (const k of this.corpses) {
       if (k.held >= 0) {
@@ -2042,10 +2079,14 @@ export class Colony {
     const { map, ph } = this;
     if (this.#corpse[i]) {
       // On the midden: the corpse lies on the ground there, and the midden smells of the colony (a boundary: see raids).
+      // A carrier that gave up short of it (SPOIL_GIVE_UP) leaves the corpse lying, unmarked, for another to take on.
       const row = groundTop(map, col) - 1;
-      for (const k of this.corpses) if (k.held === i) ((k.held = -1), (k.midden = true), (k.x = col), (k.y = row));
-      ph.depositCell("midden", col, row, MIDDEN_MARK);
-      this.buried++;
+      const onMidden = Math.abs(col - (this.#entranceCol + (this.#spoilSide[i] as number) * this.#middenAt())) <= 3;
+      for (const k of this.corpses) if (k.held === i) ((k.held = -1), (k.midden = onMidden), (k.x = col), (k.y = row));
+      if (onMidden) {
+        ph.depositCell("midden", col, row, MIDDEN_MARK);
+        this.buried++;
+      }
       this.#corpse[i] = 0;
       this.pellet[i] = 0;
       this.#spoilTo[i] = NaN;
@@ -2471,8 +2512,15 @@ export class Colony {
         // A calm ant (the fungus's cue) does not charge.
         if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - (this.calm[i] as number)));
         else if (Math.max(al, af, ar) >= FAINT) h += climb(al, af, ar, p.turnRate * dt);
-        else if (this.stance === "raid" && this.raidTarget && !detouring && this.#entrance && this.#walkTunnel(i, FIGHT, p.speed * dt)) h = this.#towardTarget(i);
-        else if (this.stance === "raid" && this.raidTarget && !detouring) {
+        else if (this.stance === "raid" && this.raidTarget && this.#entrance && ((this.detour[i] = 0), this.#walkTunnel(i, FIGHT, p.speed * dt))) h = this.#towardTarget(i);
+        else if (this.stance === "raid" && this.raidTarget && this.#entrance && this.#under[i]) {
+          // A raider in a chamber (no tunnel: free steering): out of its own nest by its hole, or on into the rival's.
+          // Steering straight at the rival's hole through soil left nearly every raider bumping inside its own nest.
+          this.antCell(i);
+          const own = this.#inOwnNest(CELL[0] as number);
+          const aim = own ? this.#entrance : (this.raidNest ?? this.raidTarget);
+          h = turnToward(h, Math.atan2(aim.y - (this.y[i] as number), aim.x - (this.x[i] as number)), p.turnRate * dt) + noise * p.wander * 0.25;
+        } else if (this.stance === "raid" && this.raidTarget && !detouring) {
           const t = this.raidTarget;
           h = turnToward(h, Math.atan2(t.y - (this.y[i] as number), t.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
           // The rival's midden marks its ground: raiders shy from it (Pogonomyrmex badius; slice 7).
@@ -2673,7 +2721,7 @@ export class Colony {
         this.#spoilT[i] = (this.#spoilT[i] as number) + dt;
         const col = CELL[0] as number;
         const onGround = isSky(map, col, CELL[1] as number);
-        if ((onGround && (this.#spoilSide[i] as number) * (col - this.#entranceCol) >= (this.#spoilTo[i] as number)) || (this.#spoilT[i] as number) > SPOIL_GIVE_UP) this.#dropOut(i, col);
+        if ((onGround && (this.#spoilSide[i] as number) * (col - this.#entranceCol) >= (this.#spoilTo[i] as number)) || (this.#spoilT[i] as number) > (this.#corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) this.#dropOut(i, col);
         // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
         // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
       } else if (pellet && atEntrance && !this.#fillIntent[i]) {
@@ -2683,8 +2731,8 @@ export class Colony {
         const reach = Math.min(MOUND_REACH, 3 + this.#heaped / (2 * MOUND_HEIGHT));
         if (this.#corpse[i]) {
           // A corpse goes to the midden: one heap just past the mound's edge (harvesters: at the edge of the cleared disc).
-          this.#spoilTo[i] = reach + MIDDEN_PAST;
-          this.#spoilSide[i] = MIDDEN_SIDE;
+          this.#spoilTo[i] = this.#middenAt();
+          this.#spoilSide[i] = this.#middenSide();
         } else {
           this.#spoilTo[i] = 2 + reach * Math.sqrt(rng());
           this.#spoilSide[i] = rng() < 0.5 ? -1 : 1;
@@ -2861,11 +2909,14 @@ const FEED_RATE = 0.5;
 // The midden (nest slice 7): see #undertake, #dropOut, #middenSmell.
 /** Chance per second an idle middle-aged ant underground picks up a corpse within two cells of it. */
 const PICK_CORPSE = 1;
-/** The midden lies this many cells past the mound's reach, always on this side of the hole. */
+/** The midden lies at least this many cells past the mound's reach. */
 const MIDDEN_PAST = 3;
-const MIDDEN_SIDE = 1;
-/** Corpses on the ground are taken to the midden from within this many columns of the hole. */
-const MIDDEN_NEAR = 20;
+/** Corpses on the ground are taken to the midden from within this many columns of the hole (out to the midden). */
+const MIDDEN_NEAR = 100;
+/** Seconds an undertaker walks a corpse out before it puts it down short of the midden (a pellet's 15 s fell short of it on hilly ground). */
+const CORPSE_GIVE_UP = 60;
+/** Seconds after death a corpse not on the midden rots away (the dead in the field would otherwise pile up all game). */
+export const CORPSE_ROT = 900;
 /** Midden mark laid when a corpse is put on the midden; a tenth of it a second while it lies there. */
 const MIDDEN_MARK = 20;
 /** How hard raiders turn away from the rival's midden mark, as a share of turnRate (alarm avoidance is alarmAvoid). */
@@ -3057,6 +3108,8 @@ export function moundRadius(pellets: number, nestR: number): number {
 const MOUND_HEIGHT = 3;
 /** The side view: the farthest (columns) a pellet is carried from the hole; past it the disc grows higher, not wider. */
 const MOUND_REACH = 90;
+/** The midden lies this many columns from the hole, toward the rival (see #middenSide): just past the mound's largest reach. */
+export const MIDDEN_AT = MOUND_REACH + MIDDEN_PAST;
 /** The side view: seconds a carrier walks a pellet out before it drops it wherever it is (heaped on top of its column, clear of the crater). */
 const SPOIL_GIVE_UP = 15;
 /** The side view: an explorer on the ground beside a steep flank of the mound picks a pellet off it to spread, with this chance a cell. */

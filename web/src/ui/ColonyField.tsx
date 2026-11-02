@@ -556,11 +556,24 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
           ctx.fillRect(x + Math.cos(col.heading[i] as number) * half - crumb / 2, y + Math.sin(col.heading[i] as number) * half - crumb / 2, crumb, crumb);
         }
         ctx.fillStyle = theme.mound;
+        ctx.strokeStyle = theme.mound;
+        ctx.lineWidth = Math.max(1, d * 0.8);
+        ctx.beginPath();
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || !col.pellet[i] || !inView(col.x[i] as number, col.y[i] as number)) continue;
           const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
-          ctx.fillRect(x + Math.cos(col.heading[i] as number) * half - crumb / 2, y + Math.sin(col.heading[i] as number) * half - crumb / 2, crumb, crumb);
+          const px = x + Math.cos(col.heading[i] as number) * half;
+          const py = y + Math.sin(col.heading[i] as number) * half;
+          if (col.carriesCorpse(i)) {
+            // A corpse in the jaws: the dead's grey cross, half size (slice 7 review: it was drawn as a soil crumb).
+            const h = crumb * 0.75;
+            ctx.moveTo(px - h, py - h);
+            ctx.lineTo(px + h, py + h);
+            ctx.moveTo(px + h, py - h);
+            ctx.lineTo(px - h, py + h);
+          } else ctx.fillRect(px - crumb / 2, py - crumb / 2, crumb, crumb);
         }
+        ctx.stroke();
       }
 
       // The followed ant: a jade ring.

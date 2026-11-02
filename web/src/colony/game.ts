@@ -97,6 +97,7 @@ export class Game {
         c.enemies = this.recognition;
         const other = this.colonies[1 - k]!.nest;
         c.raidTarget = other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other; // side view: in at their hole
+        if (other.entrance) c.raidNest = other; // and then down to their chamber
         // Only ants whose perception the fungus has bent read it (Colony.foreignFood).
         c.foreign = this.colonies[1 - k]!.ph;
       }
