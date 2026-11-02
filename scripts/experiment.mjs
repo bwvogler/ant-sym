@@ -5,11 +5,20 @@
 //
 // Usage: node scripts/experiment.mjs <assay ...|all> [--seeds 1-10] [--seconds N]
 //          [--set colony.deposit=2,4,8] [--set game.fight.rate=1,2] [--json out.json] [--jobs N]
+//          [--policy cache:<file>]
 //
 // --set takes a dotted path under colony / rival / game and a comma list of
 // values; several --set flags run their cross product. Pheromone channels are
 // colony.channels.<food|home|alarm>.<evaporation|diffusion>.
-import { writeFileSync } from "node:fs";
+//
+// --policy cache:<file> replays Jev's cached answers for the first colony
+// (scripts/colony-live.mjs writes them: modes, stances and responses, with
+// the brain versions they were asked under). A cache asked under other
+// versions is refused (its keys would match nothing, or the wrong
+// situations). Anything the cache lacks falls back to the local rule, so each
+// result says how much of it was Jev: cache hits per lane. An assay that sets
+// its own policy or stance (A6's raiders) keeps it.
+import { readFileSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 
@@ -58,6 +67,7 @@ async function main() {
   let seconds;
   let json;
   let jobs = availableParallelism();
+  let policy = null;
   const sets = [];
   for (let k = 0; k < args.length; k++) {
     const a = args[k];
@@ -65,6 +75,7 @@ async function main() {
     else if (a === "--seconds") seconds = Number(args[++k]);
     else if (a === "--json") json = args[++k];
     else if (a === "--jobs") jobs = Number(args[++k]);
+    else if (a === "--policy") policy = args[++k];
     else if (a === "--set") {
       const [path, values] = args[++k].split("=");
       sets.push({ path, values: values.split(",").map(parse) });
@@ -74,11 +85,20 @@ async function main() {
   const { ASSAYS } = await import("../web/src/colony/experiment.ts");
   const chosen = ids.length === 0 || ids.includes("all") ? ASSAYS : ids.map((id) => ASSAYS.find((x) => x.id === id) ?? fail(`no assay "${id}" (have: ${ASSAYS.map((x) => x.id).join(", ")})`));
   const cs = combos(sets);
+  if (policy) {
+    if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file>`);
+    const cache = loadCache(policy.slice(6));
+    const { COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } = await import("../web/src/colony/colonyBrain.ts");
+    const want = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
+    if (JSON.stringify(cache.version) !== JSON.stringify(want)) fail(`${policy.slice(6)} was asked under brain versions ${JSON.stringify(cache.version)}; the code is at ${JSON.stringify(want)}. Ask afresh (scripts/colony-live.mjs).`);
+    const n = (t) => Object.keys(t ?? {}).length;
+    console.log(`Replaying Jev's answers under the doctrine "${cache.doctrine?.name ?? "?"}" (${cache.view ?? "?"} view, seed ${cache.seed}): ${n(cache.modes)} modes, ${n(cache.stances)} stances, ${Object.entries(cache.responses ?? {}).map(([h, t]) => `${n(t)} ${h}`).join(", ")}.`);
+  }
 
   // One job per assay, combination and seed; the longest assays first, so the pool ends together.
   const secondsOf = (id) => ASSAYS.find((x) => x.id === id).seconds;
   const queue = [];
-  for (const assay of chosen) for (const [ci, c] of cs.entries()) for (const seed of seeds) queue.push({ id: assay.id, ci, o: c.o, seed, seconds });
+  for (const assay of chosen) for (const [ci, c] of cs.entries()) for (const seed of seeds) queue.push({ id: assay.id, ci, o: c.o, seed, seconds, policy });
   queue.sort((a, b) => secondsOf(b.id) - secondsOf(a.id));
   const results = new Map(); // `${id}|${ci}` → runs
   const t0 = performance.now();
@@ -121,6 +141,13 @@ async function main() {
       }
       const ms = runs.map((r) => r.msPerTick);
       console.log(`| ms/tick | ${fmt(median(ms))} | ${fmt(Math.min(...ms))} | ${fmt(Math.max(...ms))} |\n`);
+      if (policy) {
+        // How much of the result was Jev: cache hits per lane, over every lookup of every seed.
+        const sum = {};
+        for (const r of runs) for (const [lane, { hit, miss }] of Object.entries(r.lookups ?? {})) ((sum[lane] ??= { hit: 0, miss: 0 }), (sum[lane].hit += hit), (sum[lane].miss += miss));
+        const parts = Object.entries(sum).filter(([, v]) => v.hit + v.miss > 0).map(([lane, v]) => `${lane} ${Math.round((100 * v.hit) / (v.hit + v.miss))} % of ${(v.hit + v.miss).toLocaleString()}`);
+        console.log(`Jev's answers (cache hits; the rest the local rule): ${parts.join(", ") || "no lookups"}\n`);
+      }
     }
   }
   console.error(`${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`);
@@ -136,8 +163,42 @@ function inWorker(job) {
   });
 }
 
+function loadCache(file) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch (e) {
+    fail(`--policy cache:${file}: ${e.message}`);
+  }
+}
+
 async function work() {
-  const { id, o, seed, seconds } = workerData;
+  const { id, o, seed, seconds, policy } = workerData;
   const { ASSAYS, runAssay } = await import("../web/src/colony/experiment.ts");
-  parentPort.postMessage(runAssay(ASSAYS.find((x) => x.id === id), seed, o, seconds));
+  const lookups = {};
+  const count = (lane, hit) => {
+    const l = (lookups[lane] ??= { hit: 0, miss: 0 });
+    if (hit) l.hit++;
+    else l.miss++;
+  };
+  const brains = {};
+  if (policy) {
+    const { localPolicy, localStance } = await import("../web/src/colony/colony.ts");
+    const { responsesFromAnswers, situationKey, stanceKey } = await import("../web/src/colony/colonyBrain.ts");
+    const cache = loadCache(policy.slice(6));
+    const lane = (table, key, local, name) => (s) => {
+      const a = table?.[key(s)];
+      count(name, a !== undefined);
+      return a ?? local(s);
+    };
+    brains.policy = lane(cache.modes, situationKey, localPolicy, "mode");
+    brains.stance = lane(cache.stances, stanceKey, localStance, "stance");
+    brains.responses = responsesFromAnswers(cache.responses ?? {}, undefined, count);
+  }
+  const run = runAssay(
+    ASSAYS.find((x) => x.id === id),
+    seed,
+    { ...o, ...brains },
+    seconds,
+  );
+  parentPort.postMessage({ ...run, lookups });
 }
