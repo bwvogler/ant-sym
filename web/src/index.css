@@ -34,7 +34,9 @@
   --warn-soft: #fbf1de;
   --err: #b42318;
   --err-soft: #fde9e7;
+  --err-ink: #ffffff; /* text on a filled err button */
   --heat: 31 111 92; /* rgb triplet for the deficit heatmap */
+  --spore: #7a4fa0; /* the fungus: spores on the ground, infected ants */
   --soil: #e3d5bf; /* the colony's undug ground */
   --mound: #6e6250; /* dug soil: the mound at a nest, a pellet in an ant's jaws (greyer than the rival's tone) */
 }
@@ -60,7 +62,9 @@
     --warn-soft: #3a2b12;
     --err: #f28b82;
     --err-soft: #3d1a17;
+    --err-ink: #2a0e0b;
     --heat: 95 184 157;
+    --spore: #c39be3;
     --soil: #3b3429;
     --mound: #a39a8a;
   }
@@ -85,6 +89,8 @@
   --color-warn-soft: var(--warn-soft);
   --color-err: var(--err);
   --color-err-soft: var(--err-soft);
+  --color-err-ink: var(--err-ink);
+  --color-spore: var(--spore);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }

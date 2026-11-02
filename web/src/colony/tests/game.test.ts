@@ -140,15 +140,18 @@ test("the game: both colonies forage and grow, they meet and fight, stances are 
   let carried = 0;
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.carrying[i]! ? 1 : 0;
   assert.equal(Math.round(you.foodLeft + you.stored + rival.stored + carried), map.foodTotal, "food is conserved");
-  assert.ok(["playing", "won", "lost"].includes(g.outcome()));
+  assert.ok(["playing", "unified", "fallen"].includes(g.outcome()));
 });
 
 test("the outcome: a colony with no ants and too little food for one more is beaten", () => {
   const g = new Game(generateWorld(2, OPEN_WORLD), { antCount: 10, rivalAnts: 10 }, mulberry32(5));
+  // The player is the fungus (docs/fungus-policy.md §9): a colony beaten is a loss for it, whichever colony.
   for (let i = 0; i < g.rival!.n; i++) g.rival!.kill(i);
-  assert.equal(g.outcome(), "won");
+  assert.equal(g.outcome(), "fallen");
+  assert.equal(g.fallen(), 1);
   g.rival!.larder = 4;
   assert.equal(g.outcome(), "playing", "it can still raise an ant");
   for (let i = 0; i < g.player.n; i++) g.player.kill(i);
-  assert.equal(g.outcome(), "lost");
+  assert.equal(g.outcome(), "fallen");
+  assert.equal(g.fallen(), 0);
 });
