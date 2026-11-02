@@ -1295,7 +1295,8 @@ The side view no longer gives ants an exact vector home through the soil (docs/n
 
 **Bug2 on the ground.** With no open cell nearer the hole it heads for, a homing ant keeps a hand on the surface until it is nearer than where it got stuck.
 - It picks its hand by feeling ahead along the surface both ways (`GROUND_LOOK`, 16 cells) and taking the side that gets nearer sooner. In a gully between two heaps, one side leads over toward the hole and the other along the far heap and away.
-- After `GROUND_FLIP` (24) cells it turns back with the other hand.
+- After `GROUND_FLIP` (24) cells it turns back with the other hand, and each leg after that is twice the last (24, 48, 96 … cells), so a leg always passes where the one before began.
+  - With equal legs the walk back ended where it started, and flipped there again for ever. Merging #17 (2026-11-02) changed the tunnels (Y forks), and so the mound; on seed 4 that left a pit on the mound whose only way out other than back led away from the hole, so both hands left it the same way. Carriers shuttled 24 cells either side of it: "away from the hole" in side.test.ts went from 7.8 % to 10.3 % (bound 10 %), and to 17.4 % on another seed. With doubling legs it is 1.2–6.8 % over six seeds (before the merge: 0.9–7.8 %).
 - If the hole it heads for changes (it comes into sight), the follow starts afresh.
 - Before this, the ground walk only stepped to nearer cells and rocked between two cells in a pit by the mound. That trapped 318 ants of one colony on slice 0 (seed 3) and 647 on an early cut of this slice.
 

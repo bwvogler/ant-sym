@@ -207,7 +207,7 @@ export class Colony {
   #under: Uint8Array;
   /** the side view: a homing ant following the ground's surface round spoil to the hole: the nearness (#holeMetric) it must beat to let go; NaN = not following */
   #groundMin: Float64Array;
-  /** cells walked on that surface (each GROUND_FLIP, the other hand) */
+  /** cells walked on that surface (at each flipDue, the other hand) */
   #groundT: Uint16Array;
   /** the hole x (#holeX) groundMin was measured against */
   #groundRef: Float64Array;
@@ -797,8 +797,10 @@ export class Colony {
         const ka = this.#groundLook(cx, cy, dir, 1, m);
         const kb = this.#groundLook(cx, cy, dir, -1, m);
         if (ka !== kb) this.hand[i] = ka < kb ? -1 : 1; // handOnWall below takes −hand
-      } else if ((this.#groundT[i] = (this.#groundT[i] as number) + 1) % GROUND_FLIP === 0) {
-        // The long way round: the other hand, and turned back.
+      } else if (flipDue((this.#groundT[i] = Math.min(65535, (this.#groundT[i] as number) + 1)))) {
+        // The long way round: the other hand, and turned back. Each leg is twice the last (GROUND_FLIP, then 2×, 4×...):
+        // with equal legs, the walk back after a flip ended where it started, and flipped there again, for ever (a pit
+        // on the mound whose only other way out was back: both hands left it the same way).
         this.hand[i] = -(this.hand[i] as number);
         dir = (dir + 3) % 6;
       }
@@ -2023,8 +2025,14 @@ export const PI_DRIFT = 0.1;
 export const HOLE_SIGHT = 6;
 /** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one this much wider, to at most SEARCH_MAX. */
 const SEARCH_START = 3;
-/** Cells a homing ant follows the ground's surface round spoil before trying the other hand. */
+/** Cells a homing ant follows the ground's surface round spoil before trying the other hand (then twice as far each time: see flipDue). */
 const GROUND_FLIP = 24;
+/** Whether, after `t` cells on the ground's surface, the ant turns back with the other hand: at GROUND_FLIP × (1, 3, 7, 15, ...) cells, so each leg is twice the last and passes where the one before began. */
+function flipDue(t: number): boolean {
+  if (t % GROUND_FLIP !== 0) return false;
+  const k = t / GROUND_FLIP + 1;
+  return (k & (k - 1)) === 0;
+}
 /** Cells an ant feels ahead along the surface, each way, to choose which hand to follow it with. */
 const GROUND_LOOK = 16;
 /** Seconds on a strong nest trail for the in-nest memory's error to fall to 1/e. */
