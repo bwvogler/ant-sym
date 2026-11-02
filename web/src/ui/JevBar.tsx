@@ -1,4 +1,5 @@
 import type { SchedulerState } from "./jevScheduler.ts";
+import { Bar, NEAR_CAP } from "./Panel.tsx";
 
 // The cost line, under the field: one pane with Start/Stop, the running cost
 // of this run against its caps, and the request telemetry, so spend is in
@@ -28,7 +29,7 @@ export default function JevBar(p: Props) {
   const reason = run?.stopReason;
   const spendShare = run && run.caps.capUsd > 0 ? Math.min(1, run.usd / run.caps.capUsd) : 0;
   const timeShare = run && run.caps.capSeconds > 0 ? Math.min(1, run.elapsedSeconds / run.caps.capSeconds) : 0;
-  const banner =
+  const banner: { tone: "warn" | "accent"; text: string } | null =
     stopped && (reason === "spend-cap" || reason === "time-cap")
       ? {
           tone: "warn",
@@ -57,7 +58,7 @@ export default function JevBar(p: Props) {
         {running ? (
           <button
             type="button"
-            className="rounded-md bg-err px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="rounded-md bg-err px-4 py-2 text-sm font-medium text-err-ink hover:opacity-90"
             onClick={p.stop}
           >
             Stop
@@ -83,7 +84,7 @@ export default function JevBar(p: Props) {
               {run ? `of $${run.caps.capUsd.toFixed(2)}` : "this run"}
             </span>
           </div>
-          <Meter value={spendShare} />
+          <Bar value={spendShare} warnAt={NEAR_CAP} thin />
         </div>
 
         <Stat
@@ -99,7 +100,7 @@ export default function JevBar(p: Props) {
                 : "—"
             }
           />
-          <Meter value={timeShare} />
+          <Bar value={timeShare} warnAt={NEAR_CAP} thin />
         </div>
         <Stat
           label="requests · open"
@@ -145,7 +146,7 @@ export default function JevBar(p: Props) {
       )}
       {banner && (
         <p
-          className={`mt-3 truncate rounded-md px-3 py-1.5 text-sm ${banner.tone === "warn" ? "bg-warn-soft text-warn" : banner.tone === "err" ? "bg-err-soft text-err" : "bg-accent-soft text-accent"}`}
+          className={`mt-3 truncate rounded-md px-3 py-1.5 text-sm ${banner.tone === "warn" ? "bg-warn-soft text-warn" : "bg-accent-soft text-accent"}`}
           title={banner.text}
         >
           {banner.text}
@@ -162,17 +163,6 @@ function Stat({ label, value }: { label: string; value: string }) {
         {label}
       </span>
       <span className="font-mono text-sm tabular-nums text-fg">{value}</span>
-    </div>
-  );
-}
-
-function Meter({ value }: { value: number }) {
-  return (
-    <div className="mt-1 h-1 w-full overflow-hidden rounded bg-raised">
-      <div
-        className={`h-full ${value > 0.85 ? "bg-warn" : "bg-accent"} transition-[width] duration-300`}
-        style={{ width: `${Math.round(value * 100)}%` }}
-      />
     </div>
   );
 }

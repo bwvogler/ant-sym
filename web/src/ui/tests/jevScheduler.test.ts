@@ -11,7 +11,7 @@ import { PolicyCache, situationKey } from "../../sim/policyCache.ts";
 // "there are no scheduler tests at all" — the 429 release could be deleted
 // and the suite stayed green).
 
-const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReason: null, elapsedSeconds: 0, caps: { capUsd: 0.5, capSeconds: 180 }, requests: 0, inFlight: 0, inputTokens: 0, usd: 0, sessionInputTokens: 0, sessionUsd: 0, aborted: 0, medianMs: null, p90Ms: null, statuses: {}, remainingUsd: 0.5, remainingSeconds: 180 };
+const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReason: null, elapsedSeconds: 0, caps: { capUsd: 0.5, capSeconds: 180 }, requests: 0, inFlight: 0, maxInFlight: 5, inputTokens: 0, usd: 0, sessionInputTokens: 0, sessionUsd: 0, aborted: 0, medianMs: null, p90Ms: null, statuses: {}, remainingUsd: 0.5, remainingSeconds: 180 };
 
 type Reply = { status: number; body: unknown } | ((signal: AbortSignal | undefined) => Promise<{ status: number; body: unknown }>);
 
@@ -120,6 +120,25 @@ test("Stop aborts the browser side of open calls and releases their ants; the ab
   assert.equal(parked(e), 0);
   assert.equal(st.failures, 0);
   assert.equal(st.lastError, null);
+});
+
+test("never keeps more calls open than the server allows (JEV_IN_FLIGHT below the browser's width)", async () => {
+  const e = world(40);
+  let open = 0;
+  let most = 0;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => ({ ...RUN, maxInFlight: 1 }) } as Response;
+    open++;
+    most = Math.max(most, open);
+    // never answers on its own; Stop aborts it
+    return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener("abort", () => (open--, reject(Object.assign(new Error("aborted"), { name: "AbortError" })))));
+  }) as typeof fetch;
+  const s = make(e, { intervalMs: 10, minAgeSeconds: 0, batch: 5, inFlight: 5, overseer: false });
+  await s.start({});
+  await tick(60);
+  await s.stop("user");
+  s.dispose();
+  assert.equal(most, 1, "one call at a time, as the server's limit says");
 });
 
 test("a reply that cannot be read does not strand the batch", async () => {

@@ -8,14 +8,15 @@
 // rule (free). Tokens per question are estimated from request size
 // (colonyBrain.estimateTokens); the ledger counts the real ones live.
 //
-// Usage: node scripts/colony-cost.mjs [minutes=10] [ants=800] [seed=1]
+// Usage: node scripts/colony-cost.mjs [minutes=10] [ants=600] [seed=1]
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
 import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
 import { Game } from "../web/src/colony/game.ts";
 import { generateWorld, mulberry32 } from "../web/src/colony/world.ts";
+import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const [minutes = 10, ants = 600, seed = 1] = process.argv.slice(2).map(Number);
-const USD = 0.042 / 1e6;
+const USD = USD_PER_INPUT_TOKEN;
 const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 

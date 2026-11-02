@@ -7,8 +7,6 @@ export interface GridSize {
   h: number;
 }
 
-export const DEFAULT_GRID: GridSize = { w: 96, h: 64 };
-
 /** Box-downsample an RGBA buffer to a darkness grid in 0..1 (1 = black). Alpha-weighted so transparent pixels count as paper. */
 export function rgbaToDarkness(rgba: Uint8ClampedArray, srcW: number, srcH: number, size: GridSize): Float32Array {
   const out = new Float32Array(size.w * size.h);
