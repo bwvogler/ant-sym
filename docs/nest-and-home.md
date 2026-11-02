@@ -102,7 +102,7 @@ The side view keeps its entrance, shaft, walkway and mound. The founding chamber
    - **Ants are born from pupae, not from the larder counter.**
 5. **Zoned by age.** *Built in slice 6 (PRD §35).* Each ant has an age. The young nurse deep, middle-aged ants dig and carry inside, and the old forage. Age is a perception and assignment input (castes, `ja-jhd`, build on it).
 6. **Food flow.** *Built in slice 5 (PRD §34).* Foragers drop food at **reception**. Inside workers carry it down to **store**, and from store to **brood** and the queen. `stored` / `larder` become food lying in chambers, which the map shows.
-7. **The midden.** Refuse (corpses; later, spent fungus garden) is carried to a midden: by default at the edge of the mound, deep in some species. A midden marks a boundary to other colonies.
+7. **The midden.** *Built in slice 7 (PRD §36).* Refuse (corpses; later, spent fungus garden) is carried to a midden: by default at the edge of the mound, deep in some species. A midden marks a boundary to other colonies.
 
 ### Queen loss
 When the queen dies, the colony is **orphaned**:

@@ -1613,3 +1613,46 @@ Fewer ants dig, since only the middle-aged do, so chambers and floor grow more s
 **Not built:** castes (`ja-jhd`) build on these bands.
 
 **Jev cost:** unchanged.
+
+## 36. The midden: the dead carried out, and a boundary (nest slice 7, ja-li6, 2026-11-02)
+
+In the side view with a queen, a worker that dies leaves a corpse where it fell. Undertakers carry the dead to the colony's midden on the ground, just past the mound's edge: harvester ants keep it at the edge of the cleared disc (AntWiki, *The Ants* ch. 18). The midden marks the colony's ground, and raiders shy from it (*Pogonomyrmex badius*; docs/nest-and-home.md §3.7).
+
+**Undertakers.**
+- Inside, an idle middle-aged ant with a corpse within two cells picks it up (`PICK_CORPSE` 1 a second).
+- On the ground, any idle ant within `MIDDEN_NEAR` (20) columns of its hole does.
+- A corpse carrier moves like a soil pellet carrier: up the shaft and along the ground. It puts the corpse on the midden: `MIDDEN_PAST` (3) cells past the mound's reach, on `MIDDEN_SIDE` (east) of the hole.
+- Corpse carriers are kept out of the soil accounting (dug = mound + filled + carried + lost holds), out of backfill, and out of soil losses.
+
+**The midden's mark** is the fifth mark channel, `midden`, laid where a corpse is put down (`MIDDEN_MARK` 20) and a little every second while corpses lie there.
+
+**Raids in the side view.** Before this slice, raiders could not get there at all. They steered straight at the rival's hole: through soil from inside their own nest, and off the bumpy walkway on the ground.
+- Now a raider underground climbs out of its own nest.
+- On the ground it walks cell by cell to the rival's hole, as homing ants walk to their own.
+- About to step onto the rival's midden, it turns back with chance 1 − exp(−mark / `MIDDEN_SCALE` 5).
+- Raids now meet foragers on the ground, so fights happen: on seed 1, 100 more deaths in five minutes of raiding.
+
+**Measured** (side view, 600 + 600 ants; 100 of colony 0's workers killed underground at 60 s; colony 1 set to raid from 300 s):
+
+| Seed | Of 100 dead on the midden by 30 / 60 / 120 / 240 s | Raiders of colony 1 within 20 / 40 columns of colony 0's hole, 300–600 s: midden on / mark erased |
+|---|---|---|
+| 1 | 47 / 78 / 96 / 100 | 0 / 0 both |
+| 2 | 42 / 61 / 77 / 100 | 0.2 / 0.6 both |
+| 3 | 40 / 60 / 94 / 100 | 0 / 0 both |
+
+- **The dead are cleared** within about two minutes.
+- **The boundary effect can't be seen in full games yet.** Raids are fought out on the ground near the raiders' own nest, and in five minutes raiders seldom come within 20 columns of the rival's hole, with or without its midden. The unit test shows the mechanism: a raider walking at the rival's hole reaches it with no midden, and keeps off with one. Filed as a follow-up: measure it once raids carry across.
+
+**Corpses left lying.** Corpses farther out on the ground stay where they fell: about 20–100 per game, the fights' dead near the other nest.
+
+**Food home** (seeds 1–3, 600 s, six colonies): 8,905 against slice 6's 7,794, with raids now fought on the ground. Births 191–328; out over 120 s 0.3–0.8 %.
+
+**Rendering:** the dead are drawn as small grey crosses.
+
+**Tests:** `midden.test.ts`:
+- the dead are carried out to the midden past the mound, and soil accounting holds;
+- a raider shies from the rival's midden; this fails without the turn-back.
+
+**Not built:** a deep midden chamber (*Atta cephalotes*). The `midden` role exists, but no chamber is given it.
+
+**Jev cost:** unchanged.

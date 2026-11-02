@@ -478,6 +478,22 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
             }
           }
         }
+        // Nest slice 7: the dead, where they lie or on the midden (a grey cross each).
+        ctx.strokeStyle = theme.mound;
+        ctx.lineWidth = Math.max(1, d * 0.8);
+        ctx.beginPath();
+        for (const k of col.corpses) {
+          if (k.held >= 0) continue;
+          const wx = centreX(k.x, k.y);
+          const wy = centreY(k.y);
+          if (!inView(wx, wy)) continue;
+          const [x, y] = toScreen(c, v, wx, wy);
+          ctx.moveTo(x - bd, y - bd);
+          ctx.lineTo(x + bd, y + bd);
+          ctx.moveTo(x + bd, y - bd);
+          ctx.lineTo(x - bd, y + bd);
+        }
+        ctx.stroke();
         if (col.queen && inView(col.queen.x, col.queen.y)) {
           const [x, y] = toScreen(c, v, col.queen.x, col.queen.y);
           const qr = Math.max(3, len * 0.9);

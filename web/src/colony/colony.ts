@@ -262,6 +262,13 @@ export class Colony {
   portTrips = 0;
   /** food porters are carrying between chambers: still the colony's (the queen's reserve and the strategist count it) */
   #inJaws = 0;
+  // The midden (nest slice 7): corpses lie where workers die until an undertaker carries them out to the midden.
+  /** the colony's dead: where each lies (a cell), who carries it (−1 none), and whether it is on the midden; died: when */
+  readonly corpses: { x: number; y: number; held: number; midden: boolean; died: number }[] = [];
+  /** 1 while an ant carries a corpse (moved like a soil pellet: up and out, along the ground) */
+  #corpse: Uint8Array;
+  /** corpses carried to the midden */
+  buried = 0;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
   #belief: Nest = { x: 0, y: 0, r: 0 };
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
@@ -472,6 +479,7 @@ export class Colony {
     this.#broodTo = new Int16Array(n).fill(-1);
     this.#portTo = new Int16Array(n).fill(-1);
     this.#porter = new Uint8Array(n);
+    this.#corpse = new Uint8Array(n);
     // The queen lies on the royal chamber's floor (the founding chamber's centre, a little down).
     if (this.#entrance && map.chambers) this.queen = { alive: true, x: this.nest.x, y: this.nest.y + 1 };
     this.#spoilTo = new Float32Array(n).fill(NaN);
@@ -577,6 +585,7 @@ export class Colony {
     this.#holdT[i] = 0;
     this.#portTo[i] = -1;
     this.#porter[i] = 0;
+    this.#corpse[i] = 0;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
@@ -748,10 +757,17 @@ export class Colony {
       this.#portTo[i] = -1;
     }
     if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
-    if (this.pellet[i]) {
+    this.antCell(i);
+    if (this.#corpse[i]) {
+      // The corpse it carried falls where it falls, with it.
+      for (const k of this.corpses) if (k.held === i) ((k.held = -1), (k.x = CELL[0] as number), (k.y = CELL[1] as number));
+      this.#corpse[i] = 0;
+    } else if (this.pellet[i]) {
       if (this.#loosePellet[i]) this.looseLost++;
       else this.soilLost++;
     }
+    // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7).
+    if (this.queen) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, midden: false, died: this.time });
     this.#spoilTo[i] = NaN;
     this.#loosePellet[i] = 0;
     this.#fillIntent[i] = 0;
@@ -770,7 +786,7 @@ export class Colony {
     let dug = 0;
     let loose = 0;
     for (let i = 0; i < this.n; i++)
-      if (this.alive[i] && this.pellet[i]) {
+      if (this.alive[i] && this.pellet[i] && !this.#corpse[i]) {
         if (this.#loosePellet[i]) loose++;
         else dug++;
       }
@@ -915,7 +931,10 @@ export class Colony {
     // Homing on the ground line (side view) goes cell by cell to the hole wherever the walkway is, one cell
     // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
     const carryingOut = mode === RETURN && this.pellet[i] === 1 && this.#entrance !== null && !Number.isNaN(this.#spoilTo[i] as number);
-    const groundHome = carryingOut || (mode === RETURN && this.#entrance !== null && isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number)));
+    // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
+    const raiding = mode === FIGHT && this.#entrance !== null && this.stance === "raid" && this.raidTarget !== null;
+    const onSky = isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number));
+    const groundHome = carryingOut || ((mode === RETURN || raiding) && this.#entrance !== null && onSky);
     if (fresh && !hugging && !groundHome && this.#noTunnel[i] === packed) {
       this.gx[i] = NO_CELL; // looked here already: open ground
       return false;
@@ -938,6 +957,22 @@ export class Colony {
       const best = inShaft ? this.#towardHole(cx, cy, false) : this.#awayFromHole(cx, cy, this.#spoilSide[i] as number);
       if (best < 0) this.#spoilTo[i] = 0; // the map's edge, or nowhere farther: it drops it here
       dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
+    } else if (raiding) {
+      const t = this.raidTarget as Nest;
+      let best: number;
+      if (isSky(map, cx, cy)) {
+        this.#holeX = t.x;
+        best = this.#towardHole(cx, cy, true, NaN, t.y);
+        // The rival's midden marks its ground (Pogonomyrmex badius): a raider about to step onto it turns back, the more
+        // surely the stronger it smells.
+        const m = this.foreign?.fields.midden;
+        if (best >= 0 && m) {
+          const v = m.get(stepX(cx, cy, best), stepY(cy, best));
+          if (v >= FAINT && this.#rng() < 1 - Math.exp(-v / MIDDEN_SCALE)) best = rockAt(map, stepX(cx, cy, (dir + 3) % 6), stepY(cy, (dir + 3) % 6)) === OPEN ? (dir + 3) % 6 : -1;
+        }
+      } else best = this.#climbOut(cx, cy);
+      dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
+      this.digAim[i] = NaN;
     } else if (mode === RETURN && ent && isSky(map, cx, cy)) {
       // On the ground line (side view), homing is to the hole: the way nearer it along the ground (home scent lies
       // along the walkway both sides of the hole, so the most-scent rule below walks a carrier past it and on).
@@ -1615,6 +1650,52 @@ export class Colony {
       }
   }
 
+  /**
+   * An undertaker (slice 7): an idle middle-aged ant underground with a corpse lying within two cells picks it up and
+   * carries it out like spoil, up the shaft and along the ground, to the midden.
+   */
+  #undertake(i: number, dt: number): void {
+    if (this.corpses.length === 0 || this.mode[i] !== EXPLORE || this.carrying[i] || this.pellet[i] || this.#holdsBrood[i] || this.#rng() > PICK_CORPSE * dt) return;
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    // Inside, the middle-aged do it; on the ground near the hole (fights fall there too), whoever is out.
+    const outside = isSky(this.map, cx, cy);
+    if (outside ? Math.abs(cx - this.#entranceCol) > MIDDEN_NEAR : this.band(i) !== 1) return;
+    for (const k of this.corpses)
+      if (k.held < 0 && !k.midden && hexDistance(k.x, k.y, cx, cy) <= 2) {
+        k.held = i;
+        this.#corpse[i] = 1;
+        this.pellet[i] = 1;
+        this.#loosePellet[i] = 0;
+        this.#fillIntent[i] = 0;
+        this.#spoilTo[i] = NaN;
+        if (outside) {
+          // Already out: straight along the ground to the midden (it won't come up out of the hole, where that is set).
+          this.#spoilTo[i] = Math.min(MOUND_REACH, 3 + this.#heaped / (2 * MOUND_HEIGHT)) + MIDDEN_PAST;
+          this.#spoilSide[i] = MIDDEN_SIDE;
+          this.#spoilT[i] = 0;
+        }
+        this.mode[i] = RETURN;
+        this.#homeAfresh(i);
+        this.gx[i] = NO_CELL;
+        return;
+      }
+  }
+
+  /** The midden keeps smelling of the colony while corpses lie on it (MIDDEN_MARK a second each, up to 20 counted). */
+  #middenSmell(dt: number): void {
+    let n = 0;
+    for (const k of this.corpses) {
+      if (k.held >= 0) {
+        // Carried: it goes where its undertaker goes.
+        this.antCell(k.held);
+        k.x = CELL[0] as number;
+        k.y = CELL[1] as number;
+      } else if (k.midden && n++ < 20) this.ph.depositCell("midden", k.x, k.y, MIDDEN_MARK * dt * 0.1);
+    }
+  }
+
   /** Ant i puts down the brood it holds where it stands (in the chamber it was taking it to, or wherever it died). */
   #dropBrood(i: number, atX = NaN, atY = NaN): void {
     const ch = this.map.chambers;
@@ -1895,10 +1976,9 @@ export class Colony {
    * The side view: the way from cell (cx, cy) to an open neighbour nearer the hole (along the ground: by
    * column, then straight-line distance; else by straight-line distance), or −1 if none is nearer.
    */
-  #towardHole(cx: number, cy: number, alongGround: boolean, below = NaN): number {
-    const ent = this.#entrance as Nest;
+  #towardHole(cx: number, cy: number, alongGround: boolean, below = NaN, hy = (this.#entrance as Nest).y): number {
     const hx = this.#holeX; // where the ant believes the hole is (see #believe)
-    const metric = (x: number, y: number) => (alongGround ? Math.abs(x - hx) * 1000 : 0) + Math.hypot(x - hx, y - ent.y);
+    const metric = (x: number, y: number) => (alongGround ? Math.abs(x - hx) * 1000 : 0) + Math.hypot(x - hx, y - hy);
     let best = -1;
     let bestD = (Number.isNaN(below) ? metric(centreX(cx, cy), centreY(cy)) : below) - 1e-6;
     for (let d = 0; d < 6; d++) {
@@ -1960,6 +2040,17 @@ export class Colony {
    */
   #dropOut(i: number, col: number): void {
     const { map, ph } = this;
+    if (this.#corpse[i]) {
+      // On the midden: the corpse lies on the ground there, and the midden smells of the colony (a boundary: see raids).
+      const row = groundTop(map, col) - 1;
+      for (const k of this.corpses) if (k.held === i) ((k.held = -1), (k.midden = true), (k.x = col), (k.y = row));
+      ph.depositCell("midden", col, row, MIDDEN_MARK);
+      this.buried++;
+      this.#corpse[i] = 0;
+      this.pellet[i] = 0;
+      this.#spoilTo[i] = NaN;
+      return;
+    }
     const side = (this.#spoilSide[i] || 1) as -1 | 1;
     const heap = (): void => {
       const cell = heapMound(map, this.#entranceCol, side, 0, this.#holes, col) ?? heapMound(map, this.#entranceCol, side === 1 ? -1 : 1, 0, this.#holes, col);
@@ -2240,7 +2331,7 @@ export class Colony {
         }
         const side = this.wall[i] as number;
         // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
-        const look = pellet && map.hasSoil && Number.isNaN(this.#spoilTo[i] as number) && (this.since[i] as number) > BACKFILL.after && this.#enteredCell(i);
+        const look = pellet && !this.#corpse[i] && map.hasSoil && Number.isNaN(this.#spoilTo[i] as number) && (this.since[i] as number) > BACKFILL.after && this.#enteredCell(i);
         const lx = CELL[0] as number;
         const ly = CELL[1] as number;
         if (look && this.#backfill(i, lx, ly)) {
@@ -2380,9 +2471,19 @@ export class Colony {
         // A calm ant (the fungus's cue) does not charge.
         if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - (this.calm[i] as number)));
         else if (Math.max(al, af, ar) >= FAINT) h += climb(al, af, ar, p.turnRate * dt);
+        else if (this.stance === "raid" && this.raidTarget && !detouring && this.#entrance && this.#walkTunnel(i, FIGHT, p.speed * dt)) h = this.#towardTarget(i);
         else if (this.stance === "raid" && this.raidTarget && !detouring) {
           const t = this.raidTarget;
           h = turnToward(h, Math.atan2(t.y - (this.y[i] as number), t.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
+          // The rival's midden marks its ground: raiders shy from it (Pogonomyrmex badius; slice 7).
+          const m = this.foreign;
+          if (m) {
+            const x = this.x[i] as number;
+            const y = this.y[i] as number;
+            const d = p.sensorDistance;
+            const read = (a: number) => m.read("midden", x + Math.cos(a) * d, y + Math.sin(a) * d);
+            h += avoid(read(h - p.sensorAngle), read(h), read(h + p.sensorAngle), p.turnRate * dt * MIDDEN_AVOID);
+          }
         } else h += noise * p.wander;
       } else if (!digging) {
         const seen = Math.max(fl, ff, fr) >= SEEN;
@@ -2580,8 +2681,14 @@ export class Colony {
         // (MOUND_REACH at most; more of them farther out, √ of a uniform draw), so the mound spreads as a disc, its area
         // tracking the nest's volume (Tschinkel 2015), where you see them drop it.
         const reach = Math.min(MOUND_REACH, 3 + this.#heaped / (2 * MOUND_HEIGHT));
-        this.#spoilTo[i] = 2 + reach * Math.sqrt(rng());
-        this.#spoilSide[i] = rng() < 0.5 ? -1 : 1;
+        if (this.#corpse[i]) {
+          // A corpse goes to the midden: one heap just past the mound's edge (harvesters: at the edge of the cleared disc).
+          this.#spoilTo[i] = reach + MIDDEN_PAST;
+          this.#spoilSide[i] = MIDDEN_SIDE;
+        } else {
+          this.#spoilTo[i] = 2 + reach * Math.sqrt(rng());
+          this.#spoilSide[i] = rng() < 0.5 ? -1 : 1;
+        }
         this.#spoilT[i] = 0;
         this.#staleWalk[i] = 0;
         this.wall[i] = 0;
@@ -2663,6 +2770,7 @@ export class Colony {
         if (this.queen) {
           this.#nurse(i, dt);
           if (this.#port(i, dt)) h += Math.PI;
+          this.#undertake(i, dt);
         }
       }
       this.heading[i] = h;
@@ -2676,7 +2784,10 @@ export class Colony {
     }
     ph.advance(dt);
     // Growth: in the side view, the queen and brood (#nestLife); elsewhere the larder turns into ants while there is room.
-    if (this.queen) this.#nestLife(dt);
+    if (this.queen) {
+      this.#nestLife(dt);
+      this.#middenSmell(dt);
+    }
     else while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
   }
 }
@@ -2747,6 +2858,20 @@ export const T_PUPA = 20;
 const LAY_INTERVAL = 0.5;
 /** Food a larva takes per second with two nurses or more by it. */
 const FEED_RATE = 0.5;
+// The midden (nest slice 7): see #undertake, #dropOut, #middenSmell.
+/** Chance per second an idle middle-aged ant underground picks up a corpse within two cells of it. */
+const PICK_CORPSE = 1;
+/** The midden lies this many cells past the mound's reach, always on this side of the hole. */
+const MIDDEN_PAST = 3;
+const MIDDEN_SIDE = 1;
+/** Corpses on the ground are taken to the midden from within this many columns of the hole. */
+const MIDDEN_NEAR = 20;
+/** Midden mark laid when a corpse is put on the midden; a tenth of it a second while it lies there. */
+const MIDDEN_MARK = 20;
+/** How hard raiders turn away from the rival's midden mark, as a share of turnRate (alarm avoidance is alarmAvoid). */
+const MIDDEN_AVOID = 1.5;
+/** A raider on the ground turns back from a cell of the rival's midden with chance 1 − exp(−mark / MIDDEN_SCALE). */
+const MIDDEN_SCALE = 5;
 /** Chance per second an idle ant in reception or a store, with food there, carries a unit on (see #port). */
 const PORT_RATE = 3;
 /** Food the royal chamber is kept stocked with for the queen (a few eggs' worth, and the larvae lying with her). */
