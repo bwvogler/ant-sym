@@ -20,7 +20,8 @@ The `ja` database syncs through the **`beads-dolt` branch**, not `refs/dolt/data
 ```sh
 npm --prefix web install
 npm run dev                    # http://localhost:38500
-npm test                       # node --test
+npm test                       # node --test, 60 s per file
+npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
 node scripts/probe.mjs 20 100  # live-API probe: latency, tokens, burst
 ```
 

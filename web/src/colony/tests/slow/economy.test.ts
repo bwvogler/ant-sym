@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isFed, LARVA, LARVA_FOOD } from "../brood.ts";
-import { LIFESPAN } from "../colony.ts";
-import { Game } from "../game.ts";
-import { generateSideWorld, mulberry32 } from "../world.ts";
+import { isFed, LARVA, LARVA_FOOD } from "../../brood.ts";
+import { LIFESPAN } from "../../colony.ts";
+import { Game } from "../../game.ts";
+import { generateSideWorld, mulberry32 } from "../../world.ts";
 
 // The side view's long-run economy (PRD §41, the F2 fix-up; review of nest slice 4). With a queen, workers die of age and
 // only brood replaces them, so a colony lasts only if the food it brings home reaches the larvae. On nest 9 every colony
