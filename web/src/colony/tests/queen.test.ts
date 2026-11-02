@@ -20,9 +20,23 @@ function bare(seed: number) {
 
 test("the side view's colony has a queen; the top-down maps keep the larder, with no queen", () => {
   assert.equal(new Colony(generateWorld(1), { antCount: 10 }, mulberry32(1)).queen, null);
-  const c = new Colony(generateSideWorld(2, SMALL), { antCount: 10 }, mulberry32(1));
+  const map = generateSideWorld(2, SMALL);
+  const c = new Colony(map, { antCount: 10 }, mulberry32(1));
   assert.ok(c.queen?.alive);
   assert.equal(c.orphaned, false);
+  // She lies on the royal chamber's floor: its bottom row, under the founding chamber's centre (review of slice 4: she
+  // was placed a row below the centre, rows above the floor).
+  for (const seed of [1, 2, 3, 4]) {
+    const m = generateSideWorld(seed, { ...SMALL, nestCount: 2 });
+    for (const k of [0, 1]) {
+      const q = new Colony(m, { antCount: 1, nest: k }, mulberry32(1)).queen!;
+      cellOf(q.x, q.y);
+      const royal = m.chambers!.list.find((ch) => ch.colony === k && ch.role === "royal")!;
+      assert.equal(m.chambers!.at(CELL[0] as number, CELL[1] as number), royal.id, `seed ${seed}, colony ${k}: in her chamber`);
+      assert.equal(CELL[1], royal.floorRow, `seed ${seed}, colony ${k}: on its floor`);
+      assert.ok(Math.abs(q.x - m.nests[k]!.x) <= 1, `seed ${seed}, colony ${k}: under its centre`);
+    }
+  }
 });
 
 test("queen to worker: she lays while there is food; an egg becomes a larva, is fed, pupates, and a worker is born where the pupa lay", () => {

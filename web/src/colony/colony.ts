@@ -1722,7 +1722,9 @@ export class Colony {
    * A porter at cell (cx, cy) not by its target chamber: another of the colony's chambers it is in or beside where it puts
    * its food down instead, or −1. One of the target's role that wants food itself: road signs are by role, so the brood
    * mark leads to the nearest brood chamber, not to the one chosen (a porter circled one 24 columns away that it never
-   * reached: seed 2, F1's runs). After HOLD_MAX seconds carrying, any of its chambers, like a nurse with brood.
+   * reached: seed 2, F1's runs). After HOLD_MAX seconds carrying, any of its chambers, like a nurse with brood; by
+   * none then, it takes the food to the royal chamber instead (the nest's heart, where the road signs lead), never
+   * down on a tunnel's floor, where a forager would bring it "home" a second time.
    */
   #portInstead(i: number, cx: number, cy: number, target: number, dt: number): number {
     const ch = this.map.chambers!;
@@ -1737,6 +1739,17 @@ export class Colony {
       if (c.role === role) {
         this.#portView();
         if ((this.#want.get(id) ?? 0) - c.food - (this.#enRouteTo.get(id) ?? 0) > 0) return id;
+      }
+    }
+    if (late && role !== "royal") {
+      const royal = ch.list.find((c) => c.colony === this.params.nest && c.role === "royal");
+      if (royal) {
+        this.#enRouteTo.set(target, (this.#enRouteTo.get(target) ?? 1) - 1);
+        this.#enRouteTo.set(royal.id, (this.#enRouteTo.get(royal.id) ?? 0) + 1);
+        this.#portTo[i] = royal.id;
+        this.#holdT[i] = 0;
+        this.#homeAfresh(i);
+        this.gx[i] = NO_CELL;
       }
     }
     return -1;
@@ -3235,7 +3248,7 @@ const RECEPTION_MIN = 4;
 /** Rows either side of a chamber's mean row searched for its cell nearest that mean (the founding disc is the tallest: 9 rows). */
 const CHAMBER_SCAN = 5;
 /** A worker's mean lifespan, seconds (each 0.7–1.3× it): an orphaned colony dwindles as its workers age out. */
-export const LIFESPAN = 1800;
+export const LIFESPAN = 3600;
 /** The queen's royal mark per second; her death rate per stranger at her side. */
 const QUEEN_MARK = 10;
 const QUEEN_FIGHT = 1;
@@ -3259,7 +3272,7 @@ const WIDEN_DEPTH = 30;
 const NEW_CHAMBER = 0.04;
 const CHAMBER_DEPTH = 40;
 /** No chamber within the top rows (the crust and mound), and none within CHAMBER_GAP + depth × CHAMBER_GAP_GROWTH rows (and CHAMBER_SPREAD columns) of another. */
-const CHAMBER_MIN_DEPTH = 8;
+export const CHAMBER_MIN_DEPTH = 8;
 const CHAMBER_GAP = 4;
 const CHAMBER_GAP_GROWTH = 0.15;
 const CHAMBER_SPREAD = 10;
