@@ -1087,7 +1087,7 @@ The product owner asked whether the earth ring was grounded, adding that "the so
   - re-dug cells no longer smell of fresh pellets;
   - fills keep clear of every nest, not only the carrier's own.
 
-## 18. The side view: a cross-section
+## 27. The side view: a cross-section
 
 **MR 13** (owner's request, 2026-11-01): "I'm not seeing it deposit above ground because we don't see above ground — or is this not a cross section?"
 - **Before:** the colony view was a top-down slice at one depth, and the mound was only a ring overlay.
