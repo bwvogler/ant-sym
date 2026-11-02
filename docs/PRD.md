@@ -974,7 +974,18 @@ MR 8 (hexagons) kept the underground economy but more ants stayed out long: 20�
 **Jev:** situations, legend and request are unchanged. Tokens are unchanged.
 
 **Review of #10, fixed on merging #9 (2026-11-02):**
-- **Every wall underground is followed cell by cell,** rock as well as soil (`cellWall = map.hasSoil || soil`). A rock speck in dug ground was followed by touch, out of reach of every release the cell-by-cell follower has (re-anchoring, `nearer`, `anywhere`, the give-up on coming back round, `sight`), so carriers circled it until the 120 s give-up: on seed 2 about 85 of one colony's carriers round one speck at once. The speckled-cavern test now runs with soil, rock-and-soil and rock specks; the rock variants fail without this.
+- **Every wall underground is followed cell by cell,** rock as well as soil (`cellWall = map.hasSoil || soil`). A rock speck in dug ground was followed by touch, out of reach of every release the cell-by-cell follower has (re-anchoring, `nearer`, `anywhere`, the give-up on coming back round, `sight`), so carriers circled it until the 120 s give-up: on seed 2 about 85 of one colony's carriers round one speck at once. The speckled-cavern test now runs with soil, rock-and-soil and rock specks; the rock variants fail without this. Whole games underground (600 + 600 ants, 600 s, seeds 1–5; food home per colony, and the share of ants homing for over 120 s, sampled every 5 s after the first 2 minutes):
+
+  | Seed | Without | With | Homing > 120 s, without → with |
+  |---|---|---|---|
+  | 1 | 451 / 1,311 | 241 / 1,330 | 1.3 → 0.6 % |
+  | 2 | 1,001 / 1,274 | 769 / 1,387 | 2.2 → 0.5 % |
+  | 3 | 1,203 / 718 | 1,228 / 756 | 3.5 → 0.5 % |
+  | 4 | 134 / 935 | 1,234 / 966 | 17.5 → 0.7 % |
+  | 5 | 1,676 / 845 | 1,418 / 1,296 | 1.6 → 0.4 % |
+  | All | 9,548 | 10,625 (+11 %) | |
+
+  Single games are noisy (seeds 1 and 2 bring home less), but every seed has fewer ants out long, and seed 4's first colony, stuck round rock without it, brings home nine times the food.
 - **An island release counts against `NO_GAIN`** like `anywhere`: leave, meet the same spot, go round and leave had no bound. Progress is named (`GAIN`, 0.5).
 - **The wall's cell is the landing cell** the step was judged on (float32), not the float64 step.
 - **The "no corner spins" reorder of `handOnWall`** is the same rule as #9's review fix (`lost` tests only the back-hand cell): checked over all 1,536 neighbour, direction, side and parity cases. It also changes how explorers walk tunnels and hug chamber walls.
