@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Colony } from "../colony.ts";
 import { alarm, deplete, runAssay, runGame, withOverrides } from "../experiment.ts";
 import { Game, gameRng } from "../game.ts";
+import { localResponses } from "../responses.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../world.ts";
 
 // The behaviour assays (experiment.ts), the gate: the ones today's ants pass, short, two seeds each.
@@ -40,6 +41,15 @@ test("overrides: a fight override keeps the other fight params; rival params rea
   const g = new Game(generateWorld(1, OPEN_WORLD), { antCount: 10, rivalAnts: 10 }, gameRng(1), spec.sides);
   assert.equal(g.rival?.params.deposit, 7);
   assert.equal(g.player.params.deposit, 4);
+});
+
+test("overrides: responses replace the assay's own hook by hook", () => {
+  const base = { ...deplete.spec(1), sides: { responses: { ...localResponses, trailRate: () => 3 } } };
+  const spec = withOverrides(base, { responses: { get: () => false } });
+  const t = { mode: "explore", carrying: "none", porter: false, digging: false, atNest: false, enemy: false, stance: "forage" } as const;
+  assert.equal(spec.sides?.responses?.get(t), false);
+  assert.equal(spec.sides?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
+  assert.equal(spec.sides?.responses?.carry(t), "return");
 });
 
 for (const seed of [1, 2]) {

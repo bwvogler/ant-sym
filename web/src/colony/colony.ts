@@ -4,6 +4,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
+import { type Item, localResponses, type Responses, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
@@ -202,7 +203,11 @@ export class Colony {
   params: ColonyParams;
   policy: Policy;
   stancePolicy: StancePolicy;
+  /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
+  responses: Responses = localResponses;
   stance: Stance = "forage";
+  /** the situation handed to a response, refilled for each call (#touch): a response reads it and does not keep it */
+  #t: Touch = { mode: "explore", carrying: "none", porter: false, digging: false, atNest: false, enemy: false, stance: "forage" };
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -722,6 +727,31 @@ export class Colony {
     this.gainMarks[i] = 1;
     this.swapMarks[i] = 0;
     this.regicide[i] = 0;
+  }
+
+  /** What ant i holds, as a response sees it. */
+  item(i: number): Item {
+    return this.carrying[i] ? "food" : this.pellet[i] ? (this.#corpse[i] ? "corpse" : "soil") : this.#holdsBrood[i] ? "brood" : "none";
+  }
+
+  /**
+   * Ant i's situation for a response, in the shared Touch object (read it, don't keep it): its mode, load and where it
+   * is now. `enemy` comes from the caller (the tick's enemy look, or the fights).
+   */
+  touch(i: number, enemy: boolean, mode: number = this.mode[i] as number, item: Item = this.item(i), atNest?: boolean): Touch {
+    const t = this.#t;
+    t.mode = MODES[mode] as Mode;
+    t.carrying = item;
+    t.porter = this.#porter[i] === 1;
+    t.digging = (this.digT[i] as number) > 0;
+    if (atNest === undefined) {
+      const dx = (this.x[i] as number) - this.nest.x;
+      const dy = (this.y[i] as number) - this.nest.y;
+      t.atNest = dx * dx + dy * dy < this.nest.r * this.nest.r;
+    } else t.atNest = atNest;
+    t.enemy = enemy;
+    t.stance = this.stance;
+    return t;
   }
 
   /** Living ants. */
@@ -1946,7 +1976,7 @@ export class Colony {
    * is wanted. A forager arriving at reception with food already waiting there (the porters aren't keeping up) carries
    * its own on to where it is wanted.
    */
-  #port(i: number, dt: number): boolean {
+  #port(i: number, dt: number, enemy = false): boolean {
     const ch = this.map.chambers!;
     this.antCell(i);
     const cx = CELL[0] as number;
@@ -1977,6 +2007,7 @@ export class Colony {
           return false;
         }
       }
+      if (!this.responses.drop(this.touch(i, enemy, this.mode[i] as number, "food"))) return false;
       this.carrying[i] = 0;
       this.#stock(c, 1);
       if (this.#porter[i]) ((this.portTrips++), (this.#inJaws -= 1));
@@ -2821,11 +2852,15 @@ export class Colony {
       const y0 = this.y[i] as number;
       let mode = this.mode[i] as number;
       const prevMode = mode;
+      const item: Item = carrying ? "food" : pellet ? (this.#corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
+      const resp = this.responses;
       if (carrying || pellet || nursing) {
-        mode = RETURN;
-        this.mode[i] = RETURN;
+        // What a carrier does is its carry response (locally: home), not a mode choice; the next question comes once the load is down.
+        mode = MODES.indexOf(resp.carry(this.touch(i, toEnemy !== null, mode, item)));
+        if (mode < 0) mode = RETURN;
+        this.mode[i] = mode;
         this.#asked[i] = -1;
-        this.#question[i] = -1; // going home is not a choice; the next question comes once the food is down
+        this.#question[i] = -1;
       } else {
         const tired = (this.since[i] as number) > p.patience * (this.clock[i] as number);
         const food = trailLevel(Math.max(fl, ff, fr));
@@ -3089,18 +3124,24 @@ export class Colony {
         else if (this.#entrance && this.#outbound(i) && this.#under[i]) h = turnToward(h, Math.atan2(this.#entrance.y - (this.y[i] as number), this.#entrance.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
         else h += noise * p.wander;
       }
-      // Every mode but fighting shies away from alarm.
-      if (mode !== FIGHT && !digging) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * dt);
+      // Smelling alarm: the alarmGain response says how hard to shy from it (locally: every mode but fighting, unless digging).
+      if (Math.max(al, af, ar) >= FAINT) {
+        const gain = resp.alarmGain(this.touch(i, toEnemy !== null, mode, item));
+        if (gain > 0) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
+      }
 
       // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none, and
       // nor does a porter (food moved between chambers is no food to recruit to: its trail drew 4–5× as many ants to
       // follow food scent underground, review of slice 5; it lays its chamber's mark like any ant inside, #layMark).
       // The fungus can make it louder or quieter, and have a food carrier leak its food trail into the other colony's
       // field (exact as-is: × 1, nothing leaked).
-      if (!pellet && !this.#porter[i]) {
-        const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt * (this.layGain[i] as number);
+      // Which trail, and how much, are the trail and trailRate responses.
+      const tt = this.touch(i, toEnemy !== null, mode, item);
+      const trail = resp.trail(tt);
+      if (trail !== "none") {
+        const laid = p.deposit * resp.trailRate(tt) * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt * (this.layGain[i] as number);
         this.antCell(i);
-        ph.depositCell(carrying ? "food" : "home", CELL[0] as number, CELL[1] as number, laid);
+        ph.depositCell(trail, CELL[0] as number, CELL[1] as number, laid);
         const leak = this.crossLay[i] as number;
         if (carrying && leak > 0 && this.foreign) this.foreign.depositCell("food", CELL[0] as number, CELL[1] as number, laid * leak);
       }
@@ -3268,7 +3309,7 @@ export class Colony {
       const ent = this.#entrance;
       const atEntrance = ent !== null && Math.hypot((this.x[i] as number) - ent.x, (this.y[i] as number) - ent.y) < ent.r;
       this.antCell(i);
-      if (!carrying && !pellet && mode !== FIGHT && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
+      if (!carrying && !pellet && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, atNest)) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
         this.#homeAfresh(i);
         this.since[i] = 0;
@@ -3315,7 +3356,7 @@ export class Colony {
         this.bestD[i] = Infinity;
         this.stallT[i] = 0;
         if ((this.since[i] as number) > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
-        if (carrying && !this.queen) {
+        if (carrying && !this.queen && resp.drop(this.touch(i, toEnemy !== null, mode, item, atNest))) {
           this.carrying[i] = 0;
           this.stored++;
           this.larder++;
@@ -3377,7 +3418,7 @@ export class Colony {
         if (this.map.chambers) this.#layMark(i, dt);
         if (this.queen) {
           this.#nurse(i, dt);
-          if (this.#port(i, dt)) h += Math.PI;
+          if (this.#port(i, dt, toEnemy !== null)) h += Math.PI;
           this.#undertake(i, dt, toEnemy === null);
         }
       }

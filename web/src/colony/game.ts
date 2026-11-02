@@ -4,6 +4,7 @@ import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type 
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
+import type { Responses } from "./responses.ts";
 import { mulberry32, type WorldMap } from "./world.ts";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
@@ -50,6 +51,9 @@ export interface Sides {
   rival?: Partial<ColonyParams>;
   rivalPolicy?: Policy;
   rivalStance?: StancePolicy;
+  /** the first colony's responses (responses.ts; default the local ones), and the second's */
+  responses?: Responses;
+  rivalResponses?: Responses;
 }
 
 /**
@@ -128,9 +132,11 @@ export class Game {
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
     const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
+    if (player.responses) mine.responses = player.responses;
     this.colonies = [mine];
     if (this.params.rival && map.nests.length > 1)
       this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 }, rng, player.rivalPolicy ?? localPolicy, player.rivalStance ?? localStance));
+    if (player.rivalResponses && this.colonies[1]) this.colonies[1].responses = player.rivalResponses;
     this.#grids = this.colonies.map(() => new CountGrid());
     this.fungus = new Fungus(map, this.params.fungus);
     this.colonies.forEach((c, k) => {

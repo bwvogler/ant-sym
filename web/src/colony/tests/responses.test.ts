@@ -1,0 +1,164 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { CountGrid, occupancy, resolveFights } from "../battle.ts";
+import { Colony } from "../colony.ts";
+import { packResponseRequest, readResponse, RESPONSE_HOOKS, responseContext, responsesFromAnswers } from "../colonyBrain.ts";
+import { localResponses, responses, touchKey, type Touch } from "../responses.ts";
+import { foodAt, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
+import { at, nestAt, put } from "./hexmaps.ts";
+
+// The ant's response hooks (responses.ts): the local ones are the rules the colony had (the golden masters
+// pin that whole games are unchanged); here, each hook swapped on its own changes what it should, and only
+// that, and the lanes and readers that let Jev answer them.
+
+/** A bare 40×12 top-down field: the nest on the left, one food cell straight east of it, 8 cells out. */
+function corridor(food = 3): WorldMap {
+  const size = { w: 40, h: 12 };
+  const f = new Float32Array(size.w * size.h);
+  f[6 * size.w + 14] = food;
+  return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
+}
+
+const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, atNest: false, enemy: false, stance: "forage", ...t });
+
+/** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
+function forage(c: Colony, seconds = 20): { picked: boolean } {
+  put(c, 0, 10, 6);
+  c.heading[0] = 0;
+  let picked = false;
+  for (let k = 0; k < 30 * seconds && c.stored === 0; k++) {
+    c.tick(1 / 30);
+    if (c.carrying[0]) picked = true;
+  }
+  return { picked };
+}
+
+test("localResponses are the colony's rules before the hooks", () => {
+  assert.equal(localResponses.get(touch({})), true);
+  assert.equal(localResponses.get(touch({ mode: "fight" })), false, "not mid-fight");
+  assert.equal(localResponses.carry(touch({ carrying: "food" })), "return");
+  assert.equal(localResponses.carry(touch({ carrying: "corpse" })), "return");
+  assert.equal(localResponses.drop(touch({ carrying: "food", atNest: true })), true);
+  assert.equal(localResponses.trail(touch({ carrying: "food" })), "food");
+  assert.equal(localResponses.trail(touch({})), "home");
+  assert.equal(localResponses.trail(touch({ carrying: "brood" })), "home", "a nurse marks the way home");
+  for (const t of [touch({ carrying: "soil" }), touch({ carrying: "corpse" }), touch({ carrying: "food", porter: true })]) assert.equal(localResponses.trail(t), "none", JSON.stringify(t));
+  assert.equal(localResponses.trailRate(touch({})), 1);
+  assert.equal(localResponses.alarmGain(touch({ mode: "fight" })), 0);
+  assert.equal(localResponses.alarmGain(touch({ digging: true })), 0);
+  assert.equal(localResponses.alarmGain(touch({})), 1);
+  assert.equal(localResponses.raiseAlarm(touch({ mode: "fight", enemy: true })), 1);
+});
+
+test("get: an ant whose get response says no walks over food and leaves it", () => {
+  const map = corridor(3);
+  const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(1));
+  c.responses = responses({ get: () => false });
+  const { picked } = forage(c, 10);
+  assert.equal(picked, false);
+  const f = at(14, 6);
+  assert.equal(foodAt(map, f.x, f.y), 3);
+  // And the local rule does pick it up on the same walk.
+  const d = new Colony(corridor(3), { antCount: 1, wander: 0 }, mulberry32(1));
+  assert.ok(forage(d, 10).picked);
+});
+
+test("drop: an ant whose drop response says no keeps its food at the nest", () => {
+  const c = new Colony(corridor(3), { antCount: 1, wander: 0 }, mulberry32(1));
+  c.responses = responses({ drop: () => false });
+  const { picked } = forage(c, 20);
+  assert.ok(picked);
+  assert.equal(c.stored, 0);
+  assert.equal(c.carrying[0], 1);
+  const d = new Colony(corridor(3), { antCount: 1, wander: 0 }, mulberry32(1));
+  forage(d, 20);
+  assert.equal(d.stored, 1, "the local rule stores it");
+});
+
+test("carry: the carry response decides the carrier's mode, and the mode policy is not asked", () => {
+  let asked = 0;
+  const c = new Colony(corridor(3), { antCount: 1, wander: 0 }, mulberry32(1), (s) => (asked++, s.mode));
+  c.responses = responses({ carry: () => "explore" });
+  put(c, 0, 14, 6); // on the food cell
+  c.heading[0] = 0;
+  c.tick(1 / 30); // picks the food up
+  assert.equal(c.carrying[0], 1);
+  const before = asked;
+  c.tick(1 / 30);
+  assert.equal(c.mode[0], 0, "explore, as the carry response said");
+  assert.equal(asked, before, "the mode policy is not asked while carrying");
+});
+
+test("trail: no trail laid when the response says none; double when trailRate says 2", () => {
+  const quiet = new Colony(corridor(0), { antCount: 50 }, mulberry32(3));
+  quiet.responses = responses({ trail: () => "none" });
+  for (let k = 0; k < 60; k++) quiet.tick(1 / 30);
+  assert.equal(quiet.ph.total("home"), 0);
+
+  const once = new Colony(corridor(0), { antCount: 50 }, mulberry32(3));
+  const twice = new Colony(corridor(0), { antCount: 50 }, mulberry32(3));
+  twice.responses = responses({ trailRate: () => 2 });
+  once.tick(1 / 30);
+  twice.tick(1 / 30);
+  assert.ok(once.ph.total("home") > 0);
+  assert.ok(Math.abs(twice.ph.total("home") - 2 * once.ph.total("home")) < 1e-3 * once.ph.total("home"));
+});
+
+/** Ten ants of each of two colonies in one cell of a bare field, fighting once; the first colony with `r` as its responses. */
+function melee(r = localResponses): Colony {
+  const m = worldFromArrays({ w: 40, h: 12 }, [nestAt(4, 6, 2), nestAt(36, 6, 2)]);
+  const a = new Colony(m, { antCount: 10, maxAnts: 10, nest: 0 }, mulberry32(1));
+  const b = new Colony(m, { antCount: 10, maxAnts: 10, nest: 1 }, mulberry32(2));
+  a.responses = r;
+  for (const c of [a, b]) for (let i = 0; i < c.n; i++) put(c, i, 20, 6);
+  resolveFights([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 0.05, () => 0.999);
+  return a;
+}
+
+test("raiseAlarm: fighters lay none when it says 0, twice as much when it says 2", () => {
+  const normal = melee().ph.total("alarm");
+  assert.ok(normal > 0);
+  assert.equal(melee(responses({ raiseAlarm: () => 0 })).ph.total("alarm"), 0);
+  assert.ok(Math.abs(melee(responses({ raiseAlarm: () => 2 })).ph.total("alarm") - 2 * normal) < 1e-6 * normal);
+});
+
+test("touch: what a response sees of an ant", () => {
+  const c = new Colony(corridor(3), { antCount: 2, maxAnts: 2 }, mulberry32(1));
+  c.carrying[1] = 1;
+  put(c, 1, 30, 6);
+  assert.deepEqual({ ...c.touch(0, false) }, touch({ atNest: true }));
+  assert.deepEqual({ ...c.touch(1, true) }, touch({ carrying: "food", enemy: true }));
+  assert.equal(c.item(1), "food");
+});
+
+test("response lanes: one question per situation, cached per hook and doctrine", () => {
+  assert.equal(touchKey(touch({ carrying: "food", atNest: true })), "explore|food|-|-|nest|clear|forage");
+  for (const h of RESPONSE_HOOKS) {
+    const req = packResponseRequest(h, [{ id: "s0", situation: touch({}) }, { id: "s1", situation: touch({ mode: "fight", enemy: true }) }], "Gather food.");
+    assert.equal(Object.keys(req.questions).length, 2, h);
+    assert.notEqual(responseContext(h, "Gather food."), responseContext(h, "Fight."), "a new doctrine is a new cache");
+  }
+  assert.notEqual(responseContext("get", "x"), responseContext("drop", "x"), "each hook its own cache");
+});
+
+test("readResponse: nouls are yes strictly above ½; choices must be one of the hook's answers", () => {
+  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.9 } }, "s0"), true);
+  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.5 } }, "s0"), false);
+  assert.equal(readResponse("drop", { s0_drop: { type: "choice", choice: "yes" } }, "s0"), null);
+  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "return" } }, "s0"), "return");
+  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "dance" } }, "s0"), null);
+  assert.equal(readResponse("trail", { s0_trail: { type: "choice", choice: "none" } }, "s0"), "none");
+  assert.equal(readResponse("trail", {}, "s0"), null);
+});
+
+test("responsesFromAnswers: cached answers win, the local responses cover the rest, and every lookup is heard", () => {
+  const t = touch({ mode: "follow" });
+  const heard: string[] = [];
+  const r = responsesFromAnswers({ get: { [touchKey(t)]: false }, trail: { [touchKey(t)]: "none" } }, localResponses, (h, hit) => heard.push(`${h}:${hit}`));
+  assert.equal(r.get(t), false);
+  assert.equal(r.get(touch({})), true, "not cached: local");
+  assert.equal(r.trail(t), "none");
+  assert.equal(r.carry(touch({ carrying: "food" })), "return", "no cache for carry: local");
+  assert.equal(r.trailRate(t), localResponses.trailRate(t), "hooks that are not lanes stay local");
+  assert.deepEqual(heard, ["get:true", "get:false", "trail:true"]);
+});

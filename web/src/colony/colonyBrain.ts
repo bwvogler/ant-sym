@@ -1,6 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "../sim/policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
+import { localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -11,6 +12,10 @@ import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSitu
 // The colony's doctrine — the player's words for how the colony should
 // behave — rides in the shared state, so a new doctrine is a new question
 // and cached answers are kept per doctrine (`policyContext`, `stanceContext`).
+// The ant's small responses (responses.ts: get, carry, drop, trail) each have
+// a lane too: one question per response situation (`Touch`), under the same
+// doctrine (`packResponseRequest`, `responseContext`). They are not asked by
+// the page yet: scripts/colony-live.mjs asks them, colony-cost estimates them.
 
 /** Bump when the situation fields or their meaning change: old cached answers no longer apply. */
 export const COLONY_BRAIN_VERSION = 4;
@@ -114,6 +119,91 @@ export function policyContext(doctrine: string): string {
 /** The same for cached stances. */
 export function stanceContext(doctrine: string): string {
   return `stance-v${STANCE_BRAIN_VERSION}-${hash(STRATEGY_LEGEND + JSON.stringify(stanceQuestion("c0")) + doctrine.trim())}`;
+}
+
+/** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
+export const RESPONSE_BRAIN_VERSION = 1;
+
+export const RESPONSE_LEGEND =
+  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside. digging says it is digging at a soil face. atNest says whether it is inside its own nest. enemy says whether ants of another colony are within two steps. stance is what the colony as a whole is doing: forage, defend or raid. doctrine is how the colony wants its ants to behave: follow it.";
+
+export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail"] as const;
+export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
+
+export function responseQuestion(hook: ResponseHook, id: string): JevRequest["questions"] {
+  const ant = `ant \`${id}\``;
+  switch (hook) {
+    case "get":
+      return { [`${id}_get`]: { type: "noul", instructions: `Going by the doctrine, ${ant} is touching food with empty jaws: should it pick one piece up?` } };
+    case "drop":
+      return { [`${id}_drop`]: { type: "noul", instructions: `Going by the doctrine, ${ant} is carrying food where it can put it down (its nest, or the chamber the food goes to): should it put it down here?` } };
+    case "carry":
+      return { [`${id}_carry`]: { type: "choice", instructions: `Going by the doctrine, ${ant} is carrying something: what should it do?`, criteria: MODE_CRITERIA } };
+    case "trail":
+      return {
+        [`${id}_trail`]: {
+          type: "choice",
+          instructions: `Going by the doctrine, which scent should ${ant} lay as it walks?`,
+          criteria: { food: "food: mark the way to food (it is carrying food home)", home: "home: mark the way home (it is walking out)", none: "none: lay nothing" },
+        },
+      };
+  }
+}
+
+/** One request for many response situations of one hook. */
+export function packResponseRequest(hook: ResponseHook, items: { id: string; situation: Touch }[], doctrine: string): JevRequest {
+  const ants: Record<string, Touch> = {};
+  const questions: JevRequest["questions"] = {};
+  for (const it of items) {
+    const t = it.situation;
+    ants[it.id] = { mode: t.mode, carrying: t.carrying, porter: t.porter, digging: t.digging, atNest: t.atNest, enemy: t.enemy, stance: t.stance };
+    Object.assign(questions, responseQuestion(hook, it.id));
+  }
+  return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
+}
+
+/** What a cached response was asked under (hook, legend, wording, doctrine). */
+export function responseContext(hook: ResponseHook, doctrine: string): string {
+  return `${hook}-v${RESPONSE_BRAIN_VERSION}-${hash(RESPONSE_LEGEND + JSON.stringify(responseQuestion(hook, "s0")) + doctrine.trim())}`;
+}
+
+/** What a response hook answers: the same type as the hook in responses.ts. */
+export type ResponseAnswer = boolean | Mode | Trail;
+const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
+
+/**
+ * A response from a reply, or null when it is missing or not one of the hook's answers (the local response covers
+ * it). `get` and `drop` are nouls: yes strictly above ½, so exactly 0.5 is no.
+ */
+export function readResponse(hook: ResponseHook, answers: Record<string, JevAnswer>, id: string): ResponseAnswer | null {
+  const a = answers[`${id}_${hook}`];
+  if (!a) return null;
+  if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
+  if (a.type !== "choice") return null;
+  if (hook === "carry") return (MODES as readonly string[]).includes(a.choice) ? (a.choice as Mode) : null;
+  return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
+}
+
+/** Cached response answers per hook, keyed by touchKey: what scripts/colony-live.mjs saves and the experiments replay. */
+export type ResponseCache = Partial<Record<ResponseHook, Record<string, ResponseAnswer>>>;
+
+/**
+ * Responses that answer from a cache, and from `base` for any situation (or hook) the cache lacks. `onLookup`, if
+ * given, hears every lookup (hook, and whether the cache had it): the replay's hit rate.
+ */
+export function responsesFromAnswers(cache: ResponseCache, base: Responses = localResponses, onLookup?: (hook: ResponseHook, hit: boolean) => void): Responses {
+  const over: Partial<Responses> = {};
+  for (const hook of RESPONSE_HOOKS) {
+    const table = cache[hook];
+    if (!table) continue;
+    const local = base[hook] as (t: Touch) => ResponseAnswer;
+    (over as Record<ResponseHook, (t: Touch) => ResponseAnswer>)[hook] = (t) => {
+      const a = table[touchKey(t)];
+      onLookup?.(hook, a !== undefined);
+      return a ?? local(t);
+    };
+  }
+  return responses({ ...base, ...over });
 }
 
 /**

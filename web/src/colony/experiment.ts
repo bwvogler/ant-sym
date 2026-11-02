@@ -2,6 +2,7 @@ import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import type { ColonyParams, Mode, Policy, Stance, StancePolicy } from "./colony.ts";
 import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
+import { localResponses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
 import { dropFood, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
@@ -256,6 +257,8 @@ export interface Overrides {
   /** the player's brains (e.g. Jev's cached answers, replayed); an assay that sets its own policy or stance keeps it */
   policy?: Policy;
   stance?: StancePolicy;
+  /** the player's responses, hook by hook: they replace the assay's own (or the local ones) only for the hooks they define */
+  responses?: Partial<Responses>;
 }
 
 /** Colony params as an override gives them: pheromone channels merge per channel and per field. */
@@ -279,6 +282,7 @@ export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   if (o.rival) sides.rival = mergeColony(sides.rival, o.rival);
   if (o.policy && !sides.policy) sides.policy = o.policy;
   if (o.stance && !sides.stance) sides.stance = o.stance;
+  if (o.responses) sides.responses = { ...(sides.responses ?? localResponses), ...o.responses };
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
   else delete game.fight;
