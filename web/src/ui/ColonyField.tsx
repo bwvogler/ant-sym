@@ -493,6 +493,20 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
           ctx.moveTo(x + bd, y - bd);
           ctx.lineTo(x - bd, y + bd);
         }
+        // The midden keeps a count per cell: one cross a cell, larger the more lie there.
+        for (const [key, n] of col.midden) {
+          const mx = key % 65536;
+          const my = Math.floor(key / 65536);
+          const wx = centreX(mx, my);
+          const wy = centreY(my);
+          if (!inView(wx, wy)) continue;
+          const [x, y] = toScreen(c, v, wx, wy);
+          const s = bd * Math.min(3, 1 + Math.log2(n) / 3);
+          ctx.moveTo(x - s, y - s);
+          ctx.lineTo(x + s, y + s);
+          ctx.moveTo(x + s, y - s);
+          ctx.lineTo(x - s, y + s);
+        }
         ctx.stroke();
         if (col.queen && inView(col.queen.x, col.queen.y)) {
           const [x, y] = toScreen(c, v, col.queen.x, col.queen.y);

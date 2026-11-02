@@ -12,8 +12,9 @@ import { MODES, type Mode } from "./colony.ts";
 //   load     — low / mid / high
 //   host     — what the ant is doing: its mode (a carrier counts as return)
 //   ground   — whose ground it stands on: home, border, foreign (by home scent; in the side view, nest slice 8:
-//              home is its own colony's chamber, tunnel its own nest's tunnels, border the open ground, foreign
-//              another colony's chamber)
+//              home is its own colony's chamber, tunnel its own nest's tunnels, border the open ground (or a
+//              tunnel whose scent is nobody's clearly), foreign another colony's chamber or tunnels; whose tunnel
+//              it is goes by the home scent where the host stands, of any number of colonies)
 //   contact  — who touches it: none; kin (its own colony); allied (another
 //              colony's ants, within tolerance: unification, felt where it
 //              happens); or strangers (past tolerance, by odour)

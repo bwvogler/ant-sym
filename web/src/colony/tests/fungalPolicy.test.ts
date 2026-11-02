@@ -200,6 +200,9 @@ test("the fungus lane's request: the aim, one choice per fungal situation among 
   assert.deepEqual(offeredIn(fungalKey(sit(), offer("garden"))), offer("garden"), "a key says what its question offered");
   assert.deepEqual(offeredIn(fungalKey(sit(), [])), []);
   assert.notEqual(fungusContext("a"), fungusContext("b"), "a new aim, a new cache");
+  // Review of #27: "home" is a chamber in the side view and home-scented ground from above: each view its own cache.
+  assert.notEqual(fungusContext("a", "side"), fungusContext("a"), "the side view, its own cache");
+  assert.equal(fungusContext("a", "top"), fungusContext("a"), "the top-down maps keep theirs");
   // PR #7 review: the menu was in the context, so switching cull (Bloom's alone) dropped Garden's and Lockpick's answers.
   const withCull = new Set([...menu, "cull"]);
   assert.equal(fungalKey(sit(), offeredFor("garden", withCull)), fungalKey(sit(), offer("garden")), "cull does not touch Garden's questions");

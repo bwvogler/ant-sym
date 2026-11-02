@@ -14,7 +14,7 @@ import { STRAINS, useColony, type Brush, type Ground, type SideStats } from "./u
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import { AIMS } from "./colony/fungusBrain.ts";
-import { INTERVENTIONS, LETHAL } from "./colony/fungus.ts";
+import { INTERVENTIONS, LETHAL, NEST_ONLY } from "./colony/fungus.ts";
 
 // The colony page: a procedural world, two rival colonies (Ink and Amber,
 // named for how they are drawn), and the fungus: the player, and nobody's
@@ -273,7 +273,8 @@ export default function ColonyApp() {
             <div className="mt-4" aria-label="fungus policy">
               <span>What the fungus may do</span>
               <div className="mt-1 flex flex-wrap gap-1 text-xs">
-                {INTERVENTIONS.map((v) => {
+                {/* the nest's interventions (muddle, crown) only where there is a nest: the fungus drops them on top-down maps */}
+                {INTERVENTIONS.filter((v) => game.map.sky || !NEST_ONLY.has(v.id)).map((v) => {
                   const on = controls.menu.includes(v.id);
                   const lethal = LETHAL.has(v.id);
                   return (

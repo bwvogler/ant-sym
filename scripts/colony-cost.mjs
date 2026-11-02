@@ -8,19 +8,27 @@
 // rule (free). Tokens per question are estimated from request size
 // (colonyBrain.estimateTokens); the ledger counts the real ones live.
 //
-// Usage: node scripts/colony-cost.mjs [minutes=10] [ants=600] [seed=1]
+// --side plays the side view (the nest, its chambers and in-nest situations: PRD §32), as the app sets it up
+// (generateSideWorld(seed), Game with mulberry32(seed * 7919)); without it, the top-down map (generateWorld) with
+// the rng this script always used, so earlier figures reproduce.
+//
+// Usage: node scripts/colony-cost.mjs [--side] [minutes=10] [ants=600] [seed=1]
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
 import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
 import { Game } from "../web/src/colony/game.ts";
-import { generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
+import { generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
-const [minutes = 10, ants = 600, seed = 1] = process.argv.slice(2).map(Number);
+const side = process.argv.includes("--side");
+const [minutes = 10, ants = 600, seed = 1] = process.argv
+  .slice(2)
+  .filter((a) => a !== "--side")
+  .map(Number);
 const USD = USD_PER_INPUT_TOKEN;
 const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
-const map = generateWorld(seed);
+const map = side ? generateSideWorld(seed) : generateWorld(seed);
 const extent = worldExtent(map);
 let doctrine = DOCTRINES[0].text;
 let tokens = 0;
@@ -59,7 +67,7 @@ function lane(key, pack, contextOf, local) {
 }
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
-const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed + 7), { policy: modes.policy, stance: stances.policy });
+const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(side ? seed * 7919 : seed + 7), { policy: modes.policy, stance: stances.policy });
 const colony = game.player;
 const flush = () => {
   modes.flush();
@@ -94,7 +102,7 @@ for (const d of plan) {
 
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
 const r = game.rival;
-console.log(`game cost, offline: seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
+console.log(`game cost, offline (${side ? "side view" : "top-down"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
 console.log(`you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`);
 console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations; ${game.strategyChoices / game.colonies.length} stance choices each\n`);
 for (const p of phases) console.log(`  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`);
