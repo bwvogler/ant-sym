@@ -1756,10 +1756,12 @@ The legend's longer `ground` line is shared across a request's hosts, so it cost
 Docs only: `docs/queens-and-merging.md`. It designs, for MR 8 and MR 10:
 - **queens as a list**, with a per-species trait (one or several; the fire ant's polygyne form is a per-colony flag, after Ross & Keller 1998);
 - **queen adoption** within odour tolerance, once nuptial flights exist;
-- **orphans merging into a tolerated neighbour**, after army ants (Kronauer et al. 2010): an orphaned colony's workers defect when they meet a colony they tolerate, and a merged colony counts as unified, not fallen. With Bloom's crown and Garden this is the "infect the queen" unification play of docs/nest-and-home.md;
+- **orphans merging into a tolerated neighbour**, after an African army ant (Kronauer et al. 2010): an orphaned colony's workers defect when they meet a calm colony they tolerate (a new, mutual check), walking the raid path to its hole; a colony half of whose workers defected ends **merged**, not fallen. The note lists what the code needs for this (an adopt/leave pair instead of spawn/kill, brood moved between colonies, per-colony raid targets, the host's cap). With Bloom's crown and Garden this is the "infect the queen" unification play of docs/nest-and-home.md;
 - **worker-laid males**, in the lifetime layer.
 
-No situation changes for the ants or the fungus; the strategist might gain `orphaned` (negligible cost; measure with `npm run colony-cost` when built).
+No situation changes for the ants or the fungus; the strategist might gain `orphaned` (stances are cached per situation, so this doubles the distinct stance situations, not the calls; measure with `npm run colony-cost` when built). Thelytokous species (*Cataglyphis cursor*) make workers without a queen: for them orphaning is not an ending.
+
+An agent review checked the note's code claims; it caught that recognition has no per-ant odour blending, that `spawn`/`kill` reset or leave what a defector should keep, and that the fungus's `allied` contact is one-way and infected-only. The note is corrected.
 
 Follow-ups: `ja-8fd.1`, `ja-8fd.2`, `ja-1vg.1`, `ja-1vg.2`.
 
