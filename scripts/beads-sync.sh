@@ -8,8 +8,12 @@
 # that and `bd bootstrap` only looks at refs/dolt/data, so this script sets the
 # parameter itself and bootstraps fresh clones through a local bare mirror.
 #
-#   scripts/beads-sync.sh start   bootstrap or seed the database, then pull (SessionStart hook)
+#   scripts/beads-sync.sh start   bootstrap the database from the branch, then pull (SessionStart hook)
 #   scripts/beads-sync.sh push    push local changes; on rejection pull, merge, retry (Stop hook)
+#   scripts/beads-sync.sh seed    create the branch from this database (only when it doesn't exist)
+#
+# start and push never create the branch: a session that arrived first would otherwise
+# publish whatever stale .beads/issues.jsonl its checkout had (happened 2026-11-02).
 #
 # Never fails the session: problems are reported on stderr and the script exits 0
 # from `start`. stdout stays clean because the SessionStart hook prints `bd prime` JSON.
@@ -77,7 +81,7 @@ retry() {
 }
 
 case "$cmd" in
-start)
+start|seed)
   remote_sha="$(retry git ls-remote origin "$REF" | cut -f1)"
   if [ ! -f "$REPO_STATE" ]; then
     if [ -n "$remote_sha" ]; then
@@ -96,9 +100,14 @@ start)
     fi
   fi
   set_ref || { echo "beads-sync: could not set the Dolt remote ref"; exit 0; }
-  if [ -z "$remote_sha" ]; then
-    echo "beads-sync: $BRANCH does not exist yet; seeding it from this database"
+  if [ -z "$remote_sha" ] && [ "$cmd" = seed ]; then
+    echo "beads-sync: seeding $BRANCH from this database"
     retry bd dolt push || echo "beads-sync: seeding $BRANCH failed"
+  elif [ -z "$remote_sha" ]; then
+    echo "beads-sync: $BRANCH does not exist on origin; working locally. Run scripts/beads-sync.sh seed to create it."
+  elif [ "$cmd" = seed ]; then
+    echo "beads-sync: $BRANCH already exists; not seeding. Pulled instead."
+    retry bd dolt pull
   elif ! retry bd dolt pull; then
     cat <<EOF
 beads-sync: bd dolt pull failed. If it reports divergent histories, this database was
@@ -115,6 +124,10 @@ push)
   mkdir "$STATE/lock" 2>/dev/null || exit 0
   trap 'rmdir "$STATE/lock"' EXIT
   [ "$(cksum < "$MANIFEST")" = "$(cat "$STATE/stamp" 2>/dev/null)" ] && exit 0
+  if [ -z "$(retry git ls-remote origin "$REF")" ]; then
+    echo "beads-sync: $BRANCH does not exist on origin; not creating it (run scripts/beads-sync.sh seed)"
+    exit 1
+  fi
   set_ref || exit 1
   for _ in 1 2 3 4; do
     if bd dolt push; then stamp; exit 0; fi
@@ -124,7 +137,7 @@ push)
   exit 1
   ;;
 *)
-  echo "usage: scripts/beads-sync.sh start|push"
+  echo "usage: scripts/beads-sync.sh start|push|seed"
   exit 2
   ;;
 esac
