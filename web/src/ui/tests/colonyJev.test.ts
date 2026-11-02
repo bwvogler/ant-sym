@@ -433,7 +433,17 @@ test("both colonies on one doctrine: each situation is asked once for both, and 
   for (const r of modeRequests(reqs)) assert.equal(r.state.doctrine, "Same.");
   run(a!, 2);
   run(b!, 2);
-  for (const c of [a!, b!]) for (let i = 0; i < c.n; i++) if (c.alive[i] && !c.carrying[i]) assert.equal(c.mode[i], 2, "Jev said return");
+  // Every ant whose situation Jev has answered takes the answer. (One that met a new situation in the last
+  // ticks is still on the local rule while its question is out: which ants do depends on the map, not the client.)
+  let answered = 0;
+  [a!, b!].forEach((c, k) => {
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i] || c.carrying[i] || j.explain(c.lastQuestion(i) as Situation, k).by !== "jev") continue;
+      answered++;
+      assert.equal(c.mode[i], 2, "Jev said return");
+    }
+  });
+  assert.ok(answered > 20, `most ants are on Jev's answer (${answered})`);
 });
 
 test("each colony its own doctrine: its questions carry its own words, its own cache, and explain names who decided for either colony", async () => {

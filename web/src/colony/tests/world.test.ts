@@ -1,4 +1,6 @@
 import { test } from "node:test";
+import { CELL, cellOf, centreX, centreY, nx as hnx, ny as hny } from "../hex.ts";
+import { at } from "./hexmaps.ts";
 import assert from "node:assert/strict";
 import { CountGrid } from "../battle.ts";
 import { CHUNK, ChunkLayer, chunkKey, chunkOf } from "../chunks.ts";
@@ -45,7 +47,7 @@ test("terrain is position-pure: a chunk is the same whatever else was generated,
   let total = 0;
   for (let y = 0; y < SMALL.h; y++)
     for (let x = 0; x < SMALL.w; x++) {
-      const raw = heightAt(5, x, y) > cut ? 1 : 0;
+      const raw = heightAt(5, centreX(x, y), centreY(y)) > cut ? 1 : 0;
       if (rockAt(small, x, y) === raw && rockAt(big, x, y) === raw) same++;
       total++;
     }
@@ -68,11 +70,11 @@ test("generateWorld, open ground: a nest on main ground, food it can walk to, ro
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
         const i: number = y * w + x;
-        if (foodAt(m, x, y) > 0) assert.equal(reach[i], 1, `seed ${seed}: food at (${x}, ${y}) cannot be reached`);
+        if (m.food.get(x, y) > 0) assert.equal(reach[i], 1, `seed ${seed}: food at (${x}, ${y}) cannot be reached`);
         if (!rockAt(m, x, y)) open++;
         joined += reach[i]!;
       }
-    for (const n of m.nests) assert.equal(reach[Math.floor(n.y) * w + Math.floor(n.x)], 1, `seed ${seed}: a nest cannot be walked to`);
+    for (const n of m.nests) assert.equal(reach[cellIndex(m, n.x, n.y)], 1, `seed ${seed}: a nest cannot be walked to`);
     assert.ok(joined > open * 0.6, `seed ${seed}: the nest reaches only ${joined} of ${open} open cells`);
     shares.push(1 - open / (w * h));
   }
@@ -101,7 +103,7 @@ test("blocked: rock and the edge of the map", () => {
   for (let y = 0; y < m.size.h && !found; y++)
     for (let x = 0; x < m.size.w && !found; x++)
       if (rockAt(m, x, y)) {
-        assert.ok(blocked(m, x + 0.5, y + 0.5));
+        assert.ok(blocked(m, at(x, y).x, at(x, y).y));
         found = true;
       }
   assert.ok(found);
@@ -119,12 +121,13 @@ test("escapes: open ground escapes, a walled pocket does not", () => {
 test("takeFood and dropFood keep the map's running count", () => {
   const m = worldFromArrays({ w: 10, h: 10 }, [{ x: 1, y: 1, r: 1 }], { food: Object.assign(new Array(100).fill(0), { 55: 2 }) });
   assert.equal(m.foodLeft, 2);
-  assert.ok(takeFood(m, 5.5, 5.5));
-  assert.ok(takeFood(m, 5.5, 5.5));
-  assert.ok(!takeFood(m, 5.5, 5.5), "nothing left");
+  const f = at(5, 5);
+  assert.ok(takeFood(m, f.x, f.y));
+  assert.ok(takeFood(m, f.x + 0.2, f.y - 0.2), "anywhere in the hexagon");
+  assert.ok(!takeFood(m, f.x, f.y), "nothing left");
   assert.equal(m.foodLeft, 0);
-  dropFood(m, 2.5, 2.5, 1);
-  assert.equal(foodAt(m, 2, 2), 1);
+  dropFood(m, at(2, 2).x, at(2, 2).y, 1);
+  assert.equal(foodAt(m, at(2, 2).x, at(2, 2).y), 1);
   assert.equal(m.foodLeft, 1);
 });
 
@@ -137,22 +140,23 @@ test("Pheromones: deposit and read, capped; evaporation takes its share; nothing
   const rock = new Uint8Array(25);
   rock[2 * 5 + 3] = 1; // east of the centre
   const ph = new Pheromones(bare(size, rock), { food: { evaporation: 0.5, diffusion: 0 }, home: { evaporation: 0, diffusion: 1 }, alarm: { evaporation: 0, diffusion: 0 } });
-  ph.deposit("food", 2.5, 2.5, 10);
-  assert.equal(ph.read("food", 2.2, 2.9), 10);
+  const c = at(2, 2);
+  ph.deposit("food", c.x, c.y, 10);
+  assert.equal(ph.read("food", c.x - 0.2, c.y + 0.3), 10);
   assert.equal(ph.read("food", -1, 0), -1, "off the map reads as worse than bare ground");
-  ph.deposit("food", 0.5, 0.5, 1000);
-  assert.equal(ph.read("food", 0.5, 0.5), MAX_LEVEL);
+  ph.deposit("food", at(0, 0).x, at(0, 0).y, 1000);
+  assert.equal(ph.read("food", at(0, 0).x, at(0, 0).y), MAX_LEVEL);
   ph.step(0.1);
-  assert.ok(Math.abs(ph.read("food", 2.5, 2.5) - 10 * 0.95) < 1e-5, "5 % of it evaporated in 0.1 s at 50 %/s");
+  assert.ok(Math.abs(ph.read("food", c.x, c.y) - 10 * 0.95) < 1e-5, "5 % of it evaporated in 0.1 s at 50 %/s");
 
-  ph.deposit("home", 2.5, 2.5, 8);
+  ph.deposit("home", c.x, c.y, 8);
   for (let k = 0; k < 20; k++) ph.step(0.1);
-  assert.equal(ph.read("home", 3.5, 2.5), 0, "the rock cell holds nothing");
-  assert.ok(ph.read("home", 1.5, 2.5) > 0, "it spread to open neighbours");
+  assert.equal(ph.read("home", at(3, 2).x, at(3, 2).y), 0, "the rock cell holds nothing");
+  assert.ok(ph.read("home", at(1, 2).x, at(1, 2).y) > 0, "it spread to open neighbours");
   assert.ok(Math.abs(ph.total("home") - 8) < 1e-3, "spreading without evaporation keeps the total");
 });
 
-/** The old dense step, kept as the reference the sparse one must match. */
+/** A plain dense step over the whole map, on the six hex neighbours: the reference the sparse one must match. */
 function denseStep(f: Float32Array, rock: Uint8Array, w: number, h: number, p: ChannelParams, dt: number): Float32Array {
   const keep = Math.max(0, 1 - p.evaporation * dt);
   const k = Math.min(0.25, p.diffusion * dt);
@@ -162,13 +166,22 @@ function denseStep(f: Float32Array, rock: Uint8Array, w: number, h: number, p: C
       const i = y * w + x;
       if (rock[i]) continue;
       const v = f[i]!;
-      const l = x > 0 && !rock[i - 1] ? f[i - 1]! : v;
-      const r = x < w - 1 && !rock[i + 1] ? f[i + 1]! : v;
-      const u = y > 0 && !rock[i - w] ? f[i - w]! : v;
-      const d = y < h - 1 && !rock[i + w] ? f[i + w]! : v;
-      out[i] = (v + k * ((l + r + u + d) / 4 - v)) * keep;
+      let sum = 0;
+      for (let d = 0; d < 6; d++) {
+        const ax = hnx(x, y, d);
+        const ay = hny(y, d);
+        const j = ay * w + ax;
+        sum += ax >= 0 && ay >= 0 && ax < w && ay < h && !rock[j] ? f[j]! : v;
+      }
+      out[i] = (v + k * (sum / 6 - v)) * keep;
     }
   return out;
+}
+
+/** Index into a flat map array of the cell under world (x, y). */
+function cellIndex(m: WorldMap, x: number, y: number): number {
+  cellOf(x, y);
+  return (CELL[1] as number) * m.size.w + (CELL[0] as number);
 }
 
 test("the sparse step matches the dense one, across chunk borders and a ragged map edge", () => {
@@ -180,20 +193,23 @@ test("the sparse step matches the dense one, across chunk borders and a ragged m
   let dense: Float32Array = new Float32Array(w * h);
   const lay = (x: number, y: number, v: number) => {
     if (rock[y * w + x]) return;
-    ph.deposit("food", x + 0.5, y + 0.5, v);
+    ph.deposit("food", at(x, y).x, at(x, y).y, v);
     dense[y * w + x] = Math.min(MAX_LEVEL, dense[y * w + x]! + v);
   };
-  // Trails straddling the chunk borders at x = 64, 128 and y = 64, and the ragged edges at x = 149, y = 89.
+  // Trails straddling the chunk borders at x = 64, 128 and y = 64, the ragged edges at x = 149, y = 89,
+  // and both corners that touch a diagonal chunk: (63, 63) → (64, 64) and (64, 64) → (63, 63).
   for (let t = 0; t < 140; t++) lay(5 + t, 63, 3);
   for (let t = 0; t < 80; t++) lay(64, 5 + t, 3);
   lay(149, 89, 10);
   lay(127, 64, 10);
+  lay(63, 63, 10);
+  lay(128, 64, 10);
   for (let s = 0; s < 300; s++) {
     ph.step(1 / 30);
     dense = denseStep(dense, rock, w, h, params, 1 / 30);
   }
   let worst = 0;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) worst = Math.max(worst, Math.abs(ph.read("food", x + 0.5, y + 0.5) - dense[y * w + x]!));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) worst = Math.max(worst, Math.abs(ph.read("food", at(x, y).x, at(x, y).y) - dense[y * w + x]!));
   assert.ok(worst < 1e-4, `largest difference ${worst}`);
 });
 
@@ -205,13 +221,13 @@ test("faint scent crosses chunk borders as the dense step says (a steady source 
   const ph = new Pheromones(m, { food: params, home: params, alarm: params });
   let dense: Float32Array = new Float32Array(size.w * size.h);
   for (let s = 0; s < 600; s++) {
-    ph.deposit("food", 56.5, 32.5, 1);
+    ph.deposit("food", at(56, 32).x, at(56, 32).y, 1);
     dense[32 * size.w + 56] = Math.min(MAX_LEVEL, dense[32 * size.w + 56]! + 1);
     ph.step(0.1);
     dense = denseStep(dense, rock, size.w, size.h, params, 0.1);
   }
   let worst = 0;
-  for (let x = 56; x < 80; x++) worst = Math.max(worst, Math.abs(ph.read("food", x + 0.5, 32.5) - dense[32 * size.w + x]!));
+  for (let x = 56; x < 80; x++) worst = Math.max(worst, Math.abs(ph.read("food", at(x, 32).x, at(x, 32).y) - dense[32 * size.w + x]!));
   assert.ok(dense[32 * size.w + 64]! > 1e-3, "the dense step carries scent across the border, to x = 64");
   assert.ok(worst < 1e-4, `largest difference across the border ${worst}`);
 });
@@ -273,11 +289,11 @@ test("ChunkLayer: growing the table in every direction keeps what was written; d
   assert.equal(l.get(1, 1), 1);
 });
 
-test("chunkRock is exactly the height threshold, cell for cell", () => {
+test("chunkRock is exactly the height threshold at each hexagon's centre, cell for cell", () => {
   const cut = rockCut(0.22);
   for (const [cx, cy] of [[0, 0], [3, -2], [-5, 7]] as const) {
     const r = chunkRock(9, cx, cy, cut);
-    for (let ly = 0; ly < CHUNK; ly += 7) for (let lx = 0; lx < CHUNK; lx += 5) assert.equal(r[ly * CHUNK + lx], heightAt(9, cx * CHUNK + lx, cy * CHUNK + ly) > cut ? 1 : 0);
+    for (let ly = 0; ly < CHUNK; ly += 7) for (let lx = 0; lx < CHUNK; lx += 5) assert.equal(r[ly * CHUNK + lx], heightAt(9, centreX(cx * CHUNK + lx, cy * CHUNK + ly), centreY(cy * CHUNK + ly)) > cut ? 1 : 0);
   }
 });
 
@@ -307,10 +323,10 @@ test("underground (the default): mostly soil, some rock, small open chambers; ev
     let walkable = 0;
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
-        if (foodAt(m, x, y) > 0) assert.equal(reach[y * w + x], 1, `seed ${seed}: food at (${x}, ${y}) can't be dug to`);
+        if (m.food.get(x, y) > 0) assert.equal(reach[y * w + x], 1, `seed ${seed}: food at (${x}, ${y}) can't be dug to`);
         walkable += walk[y * w + x]!;
       }
-    for (const n of m.nests) assert.equal(reach[Math.floor(n.y) * w + Math.floor(n.x)], 1, `seed ${seed}: the rival can't be dug to`);
+    for (const n of m.nests) assert.equal(reach[cellIndex(m, n.x, n.y)], 1, `seed ${seed}: the rival can't be dug to`);
     assert.ok(walkable < 2000, `seed ${seed}: the nest's chamber leads only ${walkable} cells on foot: the rest must be dug`);
     assert.equal(m.dug, 0);
   }
@@ -326,14 +342,15 @@ test("OPEN_WORLD has no soil at all; soil and rock both block, only soil digs, a
   rock[1 * 8 + 2] = SOIL;
   rock[1 * 8 + 3] = ROCK;
   const m = worldFromArrays({ w: 8, h: 4 }, [{ x: 6, y: 2, r: 1 }], { rock });
-  assert.ok(blocked(m, 2.5, 1.5) && blocked(m, 3.5, 1.5), "soil and rock are both solid");
-  assert.ok(soilAt(m, 2.5, 1.5) && !soilAt(m, 3.5, 1.5) && !soilAt(m, 4.5, 1.5));
-  assert.equal(dig(m, 3.5, 1.5), false, "rock doesn't dig");
-  assert.equal(dig(m, 4.5, 1.5), false, "nor open ground");
-  assert.equal(dig(m, 2.5, 1.5), true);
+  const [s2, r3, o4] = [at(2, 1), at(3, 1), at(4, 1)];
+  assert.ok(blocked(m, s2.x, s2.y) && blocked(m, r3.x, r3.y), "soil and rock are both solid");
+  assert.ok(soilAt(m, s2.x, s2.y) && !soilAt(m, r3.x, r3.y) && !soilAt(m, o4.x, o4.y));
+  assert.equal(dig(m, r3.x, r3.y), false, "rock doesn't dig");
+  assert.equal(dig(m, o4.x, o4.y), false, "nor open ground");
+  assert.equal(dig(m, s2.x, s2.y), true);
   assert.equal(rockAt(m, 2, 1), OPEN);
   assert.equal(m.dug, 1);
-  assert.ok(!blocked(m, 2.5, 1.5));
+  assert.ok(!blocked(m, s2.x, s2.y));
 });
 
 test("reachable: on foot through open ground only; digging, through soil too but never rock", () => {
@@ -352,17 +369,17 @@ test("pheromone stays out of soil and spreads into a cell once it is dug", () =>
   const p = { evaporation: 0.01, diffusion: 0.5 };
   const ph = new Pheromones(m, { food: p, home: p, alarm: p });
   for (let k = 0; k < 60; k++) {
-    ph.deposit("food", 5.5, 1.5, 1);
+    ph.deposit("food", at(5, 1).x, at(5, 1).y, 1);
     ph.step(0.1);
   }
-  assert.equal(ph.read("food", 6.5, 1.5), 0, "none in the soil at the tunnel's end");
-  assert.ok(dig(m, 6.5, 1.5));
+  assert.equal(ph.read("food", at(6, 1).x, at(6, 1).y), 0, "none in the soil at the tunnel's end");
+  assert.ok(dig(m, at(6, 1).x, at(6, 1).y));
   for (let k = 0; k < 20; k++) ph.step(0.1);
-  assert.ok(ph.read("food", 6.5, 1.5) > 0.01, "the dug cell takes scent at once");
-  assert.equal(ph.read("food", 7.5, 1.5), 0, "and the soil beyond it still none");
+  assert.ok(ph.read("food", at(6, 1).x, at(6, 1).y) > 0.01, "the dug cell takes scent at once");
+  assert.equal(ph.read("food", at(7, 1).x, at(7, 1).y), 0, "and the soil beyond it still none");
 });
 
-test("golden: OPEN_WORLD is the surface map from before digging (rock, food and nests hashed against MR 6's generator)", () => {
+test("golden: the generator is deterministic (rock, food and nests of two hex worlds hashed; MR 8 moved the grid to hexes, so these were re-pinned)", () => {
   const fnv = (str: string) => {
     let h = 0x811c9dc5;
     for (let i = 0; i < str.length; i++) {
@@ -372,8 +389,8 @@ test("golden: OPEN_WORLD is the surface map from before digging (rock, food and 
     return h;
   };
   const cases = [
-    { seed: 1, size: { w: 512, h: 320 }, want: [1638616079, 99905159, 2034486026, 23760] },
-    { seed: 3, size: SMALL, want: [499592708, 3355082296, 1584426184, 3348] },
+    { seed: 1, size: { w: 512, h: 368 }, want: [2818396198, 628526820, 2969980867, 33348] },
+    { seed: 3, size: SMALL, want: [2641910334, 659708478, 3422956274, 4140] },
   ];
   for (const { seed, size, want } of cases) {
     const m = generateWorld(seed, { ...OPEN_WORLD, size });

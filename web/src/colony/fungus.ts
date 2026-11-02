@@ -3,7 +3,8 @@ import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import { MODES, type Colony, type Mode } from "./colony.ts";
 import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, encodeFungal, loadLevel, localFungusRule, type FungalSituation, type FungusPolicy, type FungusRule, type Ground } from "./fungalPolicy.ts";
 import type { Recognition } from "./recognition.ts";
-import { rockAt, type WorldMap } from "./world.ts";
+import { CELL, discOffsets } from "./hex.ts";
+import { disc, rockAt, type WorldMap } from "./world.ts";
 
 // The fungus, pure: the player. It has no body on the map of its own, only
 // spores on the ground and load inside ants (docs/fungus-policy.md). This
@@ -168,8 +169,13 @@ const SPORE_GONE = 1e-3;
 
 /** The last local coordinate in a chunk. */
 const EDGE = CHUNK - 1;
-/** Offsets of the 3×3 cells around a cell, inside one chunk's array. */
-const AROUND = [-CHUNK - 1, -CHUNK, -CHUNK + 1, -1, 0, 1, CHUNK - 1, CHUNK, CHUNK + 1];
+/** A cell and its six hex neighbours as offsets into a chunk's flat array, for an even row ([0]) and an odd row ([1]): chunks are 64 wide, so a row's parity in its chunk is its parity on the map. */
+const AROUND = [0, 1].map((parity) => {
+  const o = discOffsets(1)[parity] as Int16Array;
+  const out: number[] = [];
+  for (let k = 0; k < o.length; k += 2) out.push((o[k + 1] as number) * CHUNK + (o[k] as number));
+  return out;
+});
 
 /**
  * Load per cell, summed over the ants in it, with the strain of the most loaded ant there.
@@ -286,18 +292,15 @@ export class Fungus {
    * carrying another strain keeps it (first in holds the host); the dose still adds load.
    */
   paint(colonies: readonly Colony[], x: number, y: number, radius: number, spores: number, dose: number, strain: number): void {
-    const { w, h } = this.map.size;
+    const { w } = this.map.size;
     const s = Math.max(0, Math.min(this.strains.length - 1, Math.floor(strain)));
     const r2 = radius * radius;
-    for (let cy = Math.max(0, Math.floor(y - radius)); cy <= Math.min(h - 1, Math.floor(y + radius)); cy++)
-      for (let cx = Math.max(0, Math.floor(x - radius)); cx <= Math.min(w - 1, Math.floor(x + radius)); cx++) {
-        const dx = cx + 0.5 - x;
-        const dy = cy + 0.5 - y;
-        if (dx * dx + dy * dy > r2 || rockAt(this.map, cx, cy)) continue;
-        this.spores.set(cx, cy, Math.min(this.params.maxSpores, this.spores.get(cx, cy) + spores));
-        this.sporeStrain.set(cx, cy, s);
-        this.#sporeCells.add(cy * w + cx);
-      }
+    disc(this.map, x, y, radius, (cx, cy) => {
+      if (rockAt(this.map, cx, cy)) return;
+      this.spores.set(cx, cy, Math.min(this.params.maxSpores, this.spores.get(cx, cy) + spores));
+      this.sporeStrain.set(cx, cy, s);
+      this.#sporeCells.add(cy * w + cx);
+    });
     for (const c of colonies)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
@@ -333,8 +336,9 @@ export class Fungus {
       for (let i = 0; i < c.n; i++) {
         const l = c.load[i] as number;
         if (!c.alive[i] || l === 0) continue;
-        const cx = Math.min(w - 1, Math.max(0, Math.floor(c.x[i] as number)));
-        const cy = Math.min(h - 1, Math.max(0, Math.floor(c.y[i] as number)));
+        c.antCell(i);
+        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         const s = c.strain[i] as number;
         all.add(cx, cy, l, s);
         vis.add(cx, cy, l * this.#shows(c, i, s), s);
@@ -349,8 +353,9 @@ export class Fungus {
       const vis = this.#visible[k] as LoadGrid;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
-        const cx = Math.min(w - 1, Math.max(0, Math.floor(c.x[i] as number)));
-        const cy = Math.min(h - 1, Math.max(0, Math.floor(c.y[i] as number)));
+        c.antCell(i);
+        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         const l = c.load[i] as number;
         const ground = this.spores.get(cx, cy);
         const near = all.any(cx - 1, cy - 1, cx + 1, cy + 1);
@@ -405,7 +410,7 @@ export class Fungus {
           const theirs = c.foreign ? c.foreign.fields.home.get(cx, cy) : 0;
           if (own > 0 && own >= p.borderRatio * theirs) ground = "home";
           else if (theirs > 0 && theirs >= p.borderRatio * own) ground = "foreign";
-          // Who touches it, in the 3×3 cells around: strangers (past tolerance, by odour alone: a calmed stranger
+          // Who touches it, in its cell and the six around: strangers (past tolerance, by odour alone: a calmed stranger
           // still smells strange), else ants of another colony it tolerates (allied: unification, felt where it
           // happens), else its own colony's (kin), else none.
           let contact: FungalSituation["contact"] = nb.ants - nb.own > 0.5 ? "allied" : nb.own - 1 > 0.5 ? "kin" : "none";
@@ -454,9 +459,9 @@ export class Fungus {
   }
 
   /**
-   * The 3×3 cells around (cx, cy), read in one pass: everyone's load and its most loaded cell
+   * The cell (cx, cy) and its six neighbours, read in one pass: everyone's load and its most loaded cell
    * (when `load`), colony k's visible load (when `visible`), ants of every colony, and colony
-   * k's own. Where the 3×3 lies inside one chunk (~94 % of cells) each layer's chunk array is
+   * k's own. Where they lie inside one chunk (~94 % of cells) each layer's chunk array is
    * fetched once and indexed; cells past a ragged map edge inside a chunk are never written,
    * so they read 0 like the clipped slow path.
    */
@@ -471,18 +476,19 @@ export class Fungus {
       const bx = cx >> CHUNK_BITS;
       const by = cy >> CHUNK_BITS;
       const o = (ly << CHUNK_BITS) | lx;
+      const around = AROUND[cy & 1] as number[];
       for (let j = 0; j < grids.length; j++) {
         const a = (grids[j] as CountGrid).layer.chunk(bx, by);
         if (!a) continue;
         let n = 0;
-        for (const d of AROUND) n += a[o + d] as number;
+        for (const d of around) n += a[o + d] as number;
         nb.ants += n;
         if (j === k) nb.own = n;
       }
       const la = load ? this.#all.sum.chunk(bx, by) : undefined;
       if (la) {
         let top = 0;
-        for (const d of AROUND) {
+        for (const d of around) {
           const v = la[o + d] as number;
           nb.load += v;
           if (v > top) {
@@ -494,29 +500,32 @@ export class Fungus {
         }
       }
       const va = visible ? vis.sum.chunk(bx, by) : undefined;
-      if (va) for (const d of AROUND) nb.visible += va[o + d] as number;
+      if (va) for (const d of around) nb.visible += va[o + d] as number;
       return;
     }
     const { w, h } = this.map.size;
     let top = 0;
-    for (let y = Math.max(0, cy - 1); y <= Math.min(h - 1, cy + 1); y++)
-      for (let x = Math.max(0, cx - 1); x <= Math.min(w - 1, cx + 1); x++) {
-        for (let j = 0; j < grids.length; j++) {
-          const n = (grids[j] as CountGrid).get(x, y);
-          nb.ants += n;
-          if (j === k) nb.own += n;
-        }
-        if (load) {
-          const v = this.#all.get(x, y);
-          nb.load += v;
-          if (v > top) {
-            top = v;
-            nb.topX = x;
-            nb.topY = y;
-          }
-        }
-        if (visible) nb.visible += vis.get(x, y);
+    const o = discOffsets(1)[cy & 1] as Int16Array;
+    for (let q = 0; q < o.length; q += 2) {
+      const x = cx + (o[q] as number);
+      const y = cy + (o[q + 1] as number);
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      for (let j = 0; j < grids.length; j++) {
+        const n = (grids[j] as CountGrid).get(x, y);
+        nb.ants += n;
+        if (j === k) nb.own += n;
       }
+      if (load) {
+        const v = this.#all.get(x, y);
+        nb.load += v;
+        if (v > top) {
+          top = v;
+          nb.topX = x;
+          nb.topY = y;
+        }
+      }
+      if (visible) nb.visible += vis.get(x, y);
+    }
   }
 
   /**

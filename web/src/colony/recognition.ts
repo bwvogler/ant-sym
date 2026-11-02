@@ -1,5 +1,6 @@
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
+import { CELL, discOffsets } from "./hex.ts";
 
 // Recognition, pure (ja-t4d.3, docs/fungus-policy.md §4.B). Who is an enemy
 // is no longer "an ant of another colony" but "an ant whose odour differs
@@ -148,8 +149,9 @@ export class Recognition {
       const { w, h } = c.map.size;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
-        const cx = Math.min(w - 1, Math.max(0, Math.floor(c.x[i] as number)));
-        const cy = Math.min(h - 1, Math.max(0, Math.floor(c.y[i] as number)));
+        c.antCell(i);
+        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         const b = binOf(c.odour[i] as number);
         if (calmed) {
           (this.#everyone[b] as SumGrid).add(cx, cy, 1);
@@ -190,7 +192,7 @@ export class Recognition {
   }
 
   /**
-   * Strangers in the (2r+1)² cells around (cx, cy), clipped to w × h, to the odour last looked at: weighted by
+   * Strangers in the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to w × h, to the odour last looked at: weighted by
    * (1 − calm), as a fight counts them, or with `byOdour` each counted once, calmed or not (who smells
    * different, which calming does not change: what the fungus senses as contact).
    */
@@ -201,8 +203,13 @@ export class Recognition {
     for (let b = 0, m = everyone ? this.#strange & this.#occupiedEveryone : this.#mask; m; b++, m >>= 1) {
       if (!(m & 1)) continue;
       const g = bins[b] as SumGrid;
-      if (!g.any(cx - r, cy - r, cx + r, cy + r)) continue;
-      for (let y = Math.max(0, cy - r); y <= Math.min(h - 1, cy + r); y++) for (let x = Math.max(0, cx - r); x <= Math.min(w - 1, cx + r); x++) s += g.get(x, y);
+      if (!g.any(cx - r - 1, cy - r, cx + r + 1, cy + r)) continue;
+      const o = discOffsets(r)[cy & 1] as Int16Array;
+      for (let k = 0; k < o.length; k += 2) {
+        const x = cx + (o[k] as number);
+        const y = cy + (o[k + 1] as number);
+        if (x >= 0 && y >= 0 && x < w && y < h) s += g.get(x, y);
+      }
     }
     return s;
   }

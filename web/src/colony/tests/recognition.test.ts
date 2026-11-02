@@ -6,6 +6,7 @@ import { Fungus, INTERVENTIONS, STRAINS, intervention } from "../fungus.ts";
 import { Game, QUIET } from "../game.ts";
 import { BINS, FUNGAL, MAX_MASK, Recognition, binCentre, binOf } from "../recognition.ts";
 import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../world.ts";
+import { at, put } from "./hexmaps.ts";
 
 /** Every host runs its strain's default intervention. */
 const strainDefault = (sit: { strain: string }) => STRAINS.find((x) => x.id === sit.strain)!.expresses;
@@ -26,8 +27,7 @@ function placed(map: WorldMap, nest: number, odour: number, cells: [number, numb
     const cell = cells[i];
     c.alive[i] = cell ? 1 : 0;
     if (cell) {
-      c.x[i] = cell[0] + 0.5;
-      c.y[i] = cell[1] + 0.5;
+      put(c, i, cell[0], cell[1]);
     }
   }
   return c;
@@ -102,7 +102,7 @@ test("a calmed encounter raises no alarm; a real fight does", () => {
     const rec = new Recognition();
     rec.build(cs);
     resolveFights(cs, cs.map((c) => occupancy(c, new CountGrid())), 0.1, () => 0.999, undefined, rec);
-    return (cs[0] as Colony).ph.read("alarm", 20.5, 6.5);
+    return (cs[0] as Colony).ph.read("alarm", at(20, 6).x, at(20, 6).y);
   };
   assert.ok(alarm(0) > 0);
   assert.equal(alarm(0.8), 0, "facing a fifth of an enemy");

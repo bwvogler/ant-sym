@@ -1,3 +1,4 @@
+import { centreX, centreY, R } from "./hex.ts";
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
 import { Fungus, type FungusParams } from "./fungus.ts";
@@ -124,8 +125,9 @@ export class Game {
     const { w, h } = this.map.size;
     const r = this.params.nestWatch;
     let s = 0;
-    for (let y = Math.max(0, Math.floor(c.nest.y - r)); y <= Math.min(h - 1, Math.floor(c.nest.y + r)); y++)
-      for (let x = Math.max(0, Math.floor(c.nest.x - r)); x <= Math.min(w - 1, Math.floor(c.nest.x + r)); x++) s += rec.get(x, y);
+    for (let y = Math.max(0, Math.floor((c.nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((c.nest.y + r) / R)); y++)
+      for (let x = Math.max(0, Math.floor(c.nest.x - r - 1)); x <= Math.min(w - 1, Math.ceil(c.nest.x + r)); x++)
+        if (Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) <= r) s += rec.get(x, y);
     return s;
   }
 

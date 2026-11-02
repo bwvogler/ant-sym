@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { R } from "../hex.ts";
 import { CountGrid, occupancy } from "../battle.ts";
 import { Colony, localPolicy, type Policy, type Situation } from "../colony.ts";
 import { packModeRequest, situationKey } from "../colonyBrain.ts";
@@ -79,7 +80,7 @@ test("an infected host smells the rival's food trail as its own and climbs it to
     const { c } = recorder(map);
     c.foreign = rival;
     c.foreignFood[0] = smell;
-    at(c, 10.5, 6.5);
+    at(c, 10.5, 6.5 * R);
     // 5 s: the trail takes a host there in ~3 s. Much longer and a healthy ant, turned back by the map's
     // east edge, can wander onto the food by luck (it did at 7.5 s once the rng draws changed).
     for (let k = 0; k < 30 * 5 && !c.carrying[0]; k++) c.tick(1 / 30);
@@ -121,9 +122,9 @@ test("the host's own policy is asked the very question a healthy ant would be as
 test("alarm gain 0: a host does not shy from alarm it cannot smell", () => {
   const turn = (gain: number) => {
     const { c } = recorder(field());
-    // Alarm under the left and front sensors of an ant heading east along y = 6.5; the right is clear.
+    // Alarm under the left and front sensors of an ant heading east along row 6; the right is clear.
     for (let x = 14; x <= 18; x++) for (let y = 3; y <= 6; y++) c.ph.fields.alarm.set(x, y, 8);
-    at(c, 12, 6.5);
+    at(c, 12, 6.5 * R);
     c.gainAlarm[0] = gain;
     for (let k = 0; k < 10; k++) c.tick(1 / 30);
     return c.heading[0] as number;
