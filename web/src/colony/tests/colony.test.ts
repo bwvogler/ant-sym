@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { avoid, chooseDig, climb, Colony, moundRadius, SWELL, decode, DIG_FACE, digChance, setTunnelDrift, diggable, encodeSituation, GLANCE, FOLLOW_GIVE_UP, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, START_FACE, startable, trailLevel, tunnelEnd, turnToward, WALL_LOST, wallSide, type Situation } from "../colony.ts";
 import { fillCell, foodIn, generateWorld, tunnelHeading, mulberry32, OPEN, OPEN_WORLD, ROCK, rockAt, setRock, SOIL, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, hexMap, nestAt, put } from "./hexmaps.ts";
-import { CELL, centreY, nx, ny } from "../hex.ts";
+import { CELL, centreX, centreY, hexDistance, nx, ny } from "../hex.ts";
 
 /** A bare 40×12 field: the nest on the left (cell (6, 6)), one food cell straight east of it along row 6 (cell (14, 6)). */
 function corridor(food = 3): WorldMap {
@@ -71,7 +71,7 @@ test("the policy is asked only when an ant's situation changes, and its answer i
   assert.equal(c.mode[0], 1, "follow");
   assert.equal(c.decisions, 1);
   assert.equal(c.situationsSeen, 1);
-  assert.equal(SITUATIONS, 1296);
+  assert.equal(SITUATIONS, 3888); // home: 3 trail levels or 6 places in the nest (nest slice 3)
 });
 
 test("a policy answering nonsense falls back to the plain rule instead of breaking the ant", () => {
@@ -846,4 +846,54 @@ test("soil is conserved underground: every dug cell is on the mound, back in a d
   }
   assert.ok(filled > 0, "some soil went back into dead ends");
   assert.equal(map.filled, filled);
+});
+
+test("hexes: a homing ant led round a ring of tunnels by home scent gets out and home (review of #8, and of the merge)", () => {
+  // A ring of radius 3 with strong home scent, and a tunnel east off it to the chamber with fainter scent: by scent
+  // alone the ant takes the ring at the junction for ever. After TUNNEL_STALL it picks branches by its home vector.
+  const size = { w: 40, h: 30 };
+  const rock = new Uint8Array(size.w * size.h).fill(SOIL);
+  const open = (x: number, y: number) => (rock[y * size.w + x] = OPEN);
+  const ring: [number, number][] = [];
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++)
+      if (hexDistance(x, y, 12, 14) === 3) {
+        open(x, y);
+        ring.push([x, y]);
+      }
+  const tunnelCells: [number, number][] = [];
+  for (let x = 16; x <= 26; x++) {
+    open(x, 14);
+    tunnelCells.push([x, 14]);
+  }
+  for (let y = 12; y <= 16; y++) for (let x = 27; x <= 30; x++) open(x, y);
+  const nest = { x: centreX(28, 14), y: centreY(14), r: 1.5 };
+  const map = worldFromArrays(size, [nest], { rock });
+  for (let seed = 1; seed <= 3; seed++) {
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+    for (const [x, y] of ring) c.ph.depositCell("home", x, y, 40);
+    for (const [x, y] of tunnelCells) c.ph.depositCell("home", x, y, 4);
+    put(c, 0, 9, 14);
+    c.heading[0] = -Math.PI / 2;
+    c.mode[0] = 2;
+    let home = false;
+    for (let t = 0; t < 30 * 90 && !home; t++) {
+      c.tick(1 / 30);
+      home = Math.hypot((c.x[0] as number) - nest.x, (c.y[0] as number) - nest.y) < nest.r;
+    }
+    assert.ok(home, `seed ${seed}: out of the ring and home within 90 s, at (${(c.x[0] as number).toFixed(1)}, ${(c.y[0] as number).toFixed(1)})`);
+  }
+});
+
+test("sent home by its policy, an ant starts the trip afresh: a detour from giving up on a wall doesn't carry over (review of the merge)", () => {
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), (s) => (s.tired ? "return" : "explore"));
+  put(c, 0, 20, 6);
+  c.mode[0] = 0;
+  c.since[0] = c.params.patience + 1; // tired: the policy sends it home
+  c.detour[0] = 20;
+  c.bumps[0] = 4;
+  c.tick(1 / 30);
+  assert.equal(c.mode[0], 2);
+  assert.ok((c.detour[0] as number) <= 0, `detour ${c.detour[0]}`);
+  assert.equal(c.bumps[0], 0);
 });

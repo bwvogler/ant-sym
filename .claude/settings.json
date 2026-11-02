@@ -4,8 +4,21 @@
       {
         "hooks": [
           {
-            "command": "command -v bd >/dev/null 2>&1 && bd prime --hook-json || true",
-            "type": "command"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/beads-sync.sh start; command -v bd >/dev/null 2>&1 && bd prime --hook-json || true",
+            "type": "command",
+            "timeout": 300
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/beads-sync.sh push",
+            "type": "command",
+            "async": true
           }
         ],
         "matcher": ""
