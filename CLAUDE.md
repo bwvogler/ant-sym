@@ -22,11 +22,7 @@ npm install && npm --prefix web install
 npm run dev                    # http://localhost:38500
 npm test                       # node --test
 node scripts/probe.mjs 20 100  # live-API probe: latency, tokens, burst
-npm run exp -- all --seeds 1-10   # offline assays (web/src/colony/assays.ts); --set colony.deposit=2,4 sweeps
-node scripts/colony-live.mjs all --budget 0.10   # live: Jev vs the local rule per lane, saves replayable caches
 ```
-
-Behaviour changes to the colony go through the assays: compare `npm run exp` against the baseline table (PRD §14), choose by the worst seed, confirm on seeds 11–20. A change meant to alter no behaviour must keep `tests/golden.test.ts` bit-exact.
 
 Editing `web/server/*.ts` does **not** restart the running Vite (measured 2026-10-25: the old ledger kept serving after a branch switch). Restart `npm run dev` after server changes; `/api/health` shows the live run summary shape, so check it has the field you added.
 

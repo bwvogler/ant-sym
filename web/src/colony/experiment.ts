@@ -1,31 +1,136 @@
-import { MODES, type Colony, type Mode, type Stance } from "./colony.ts";
-import { Game, type GameParams, type Side } from "./game.ts";
+import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
+import type { ColonyOptions, Mode, Stance } from "./colony.ts";
+import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import type { Channel } from "./pheromone.ts";
-import { generateWorld, mulberry32, type WorldMap, type WorldOptions } from "./world.ts";
+import { dropFood, generateWorld, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
-// The experiment harness, pure: build a game from a spec, run it headless for
-// N seconds with scripted events, and collect a metrics time series and a
-// summary. This is the one place seeding is defined: the colony page, the
-// scripts and the tests all build games through `newGame`, so a seed means
-// the same game everywhere (ja-jdu). Assays (assays.ts) and the sweep script
-// (scripts/experiment.mjs) are built on `runGame`.
+// Experiments, pure: run a game headless from a seed, with scripted events
+// (paint, add food) and probes that measure behaviour, and score it against a
+// target taken from real ants. `runGame` is the one place a run's random
+// numbers are defined (`gameRng`, shared with the page), so a number measured
+// here reproduces on the colony page with the same seed.
+//
+// An *assay* is a small hand-built arena with one question about the colony
+// (does the traffic settle on the shorter of two branches? does a trail to an
+// emptied patch die out?) and a pass mark from the literature, or a design
+// target where the literature gives none. scripts/experiment.mjs sweeps
+// assays over seeds and parameter values.
 
-/** The sim step every headless run uses, and the page's longest step. */
-export const DT = 1 / 30;
-/** An ant out this long without being home or finding food counts as stuck (ja-ipu). */
-export const STUCK_AFTER = 120;
-/** Below this many living ants a colony's stuck share is not counted (one stuck ant of three is not a homing failure). */
-export const MIN_STUCK_POP = 20;
+export type Event =
+  | { at: number; kind: "paint"; colony?: number; channel: Channel; x: number; y: number; r: number; amount: number }
+  | { at: number; kind: "food"; x: number; y: number; r: number; perCell: number }
+  | { at: number; kind: "call"; run: (game: Game) => void };
 
-/**
- * The game's rng for a seed: the map comes from the seed itself (generateWorld), the ants' rng
- * from this. `generation` is the page's Restart counter: the same map, a fresh run.
- */
-export function gameRng(seed: number, generation = 0): () => number {
-  return mulberry32(seed * 7919 + generation);
+/** Something that watches a run: called after every tick, asked for its numbers at the end. */
+export interface Probe {
+  tick(game: Game, dt: number): void;
+  summary(game: Game): Record<string, number>;
 }
 
-/** A cell rectangle, x0 ≤ x < x1, y0 ≤ y < y1. */
+export interface RunSpec {
+  seed: number;
+  /** the map, or how to make it from the seed; default generateWorld(seed) */
+  map?: WorldMap | ((seed: number) => WorldMap);
+  game?: Partial<GameParams>;
+  sides?: Sides;
+  seconds: number;
+  /** sim step, seconds; the page steps at most 1/30 s */
+  dt?: number;
+  events?: Event[];
+  probes?: Probe[];
+}
+
+export interface RunResult {
+  seed: number;
+  seconds: number;
+  ticks: number;
+  msPerTick: number;
+  metrics: Record<string, number>;
+}
+
+/** Seconds out before an ant counts as stuck (ja-ipu's measure). */
+export const STUCK_AFTER = 120;
+
+/** Run a game headless and collect the standard numbers plus every probe's. */
+export function runGame(spec: RunSpec): { game: Game; result: RunResult } {
+  const map = typeof spec.map === "function" ? spec.map(spec.seed) : (spec.map ?? generateWorld(spec.seed));
+  const game = new Game(map, spec.game, gameRng(spec.seed), spec.sides);
+  const dt = spec.dt ?? 1 / 30;
+  const events = [...(spec.events ?? [])].sort((a, b) => a.at - b.at);
+  const probes = [stuckProbe(), ...(spec.probes ?? [])];
+  let next = 0;
+  let ticks = 0;
+  const t0 = performance.now();
+  while (game.time < spec.seconds - 1e-9) {
+    while (next < events.length && (events[next] as Event).at <= game.time + 1e-9) apply(game, events[next++] as Event);
+    game.tick(dt);
+    ticks++;
+    for (const p of probes) p.tick(game, dt);
+  }
+  const msPerTick = (performance.now() - t0) / Math.max(1, ticks);
+  const metrics: Record<string, number> = {};
+  game.colonies.forEach((c, k) => {
+    const side = k === 0 ? "you" : "rival";
+    metrics[`${side}.ants`] = c.population;
+    metrics[`${side}.stored`] = c.stored;
+    metrics[`${side}.foodHome`] = map.foodTotal > 0 ? c.stored / map.foodTotal : 0;
+    metrics[`${side}.losses`] = c.losses;
+    metrics[`${side}.births`] = c.births;
+    metrics[`${side}.situations`] = c.situationsSeen;
+  });
+  const outcome = game.outcome();
+  metrics.outcome = outcome === "won" ? 1 : outcome === "lost" ? -1 : 0;
+  for (const p of probes) Object.assign(metrics, p.summary(game));
+  return { game, result: { seed: spec.seed, seconds: game.time, ticks, msPerTick, metrics } };
+}
+
+function apply(game: Game, e: Event): void {
+  if (e.kind === "paint") (game.colonies[e.colony ?? 0] ?? game.player).paint(e.channel, e.x, e.y, e.r, e.amount);
+  // Food added later is not part of foodTotal: foodHome stays a share of what the map started with.
+  else if (e.kind === "food") disc(game.map.size, e.x, e.y, e.r, (x, y) => dropFood(game.map, x + 0.5, y + 0.5, e.perCell));
+  else e.run(game);
+}
+
+/** Every cell within r of (cx, cy), clipped to the map. */
+export function disc(size: WorldSize, cx: number, cy: number, r: number, fn: (x: number, y: number) => void): void {
+  for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(size.h - 1, Math.ceil(cy + r)); y++)
+    for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(size.w - 1, Math.ceil(cx + r)); x++) if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r) fn(x, y);
+}
+
+/** Food left within r of (cx, cy). */
+export function foodIn(map: WorldMap, cx: number, cy: number, r: number): number {
+  let s = 0;
+  disc(map.size, cx, cy, r, (x, y) => (s += map.food.get(x, y)));
+  return s;
+}
+
+/** The largest share of each colony out longer than STUCK_AFTER, sampled every second after the first STUCK_AFTER seconds. */
+export function stuckProbe(): Probe {
+  const worst: number[] = [];
+  let nextAt = STUCK_AFTER;
+  return {
+    tick(game) {
+      if (game.time < nextAt) return;
+      nextAt += 1;
+      game.colonies.forEach((c, k) => {
+        let out = 0;
+        let alive = 0;
+        for (let i = 0; i < c.n; i++) {
+          if (!c.alive[i]) continue;
+          alive++;
+          if ((c.since[i] as number) > STUCK_AFTER) out++;
+        }
+        worst[k] = Math.max(worst[k] ?? 0, alive > 0 ? out / alive : 0);
+      });
+    },
+    summary() {
+      const m: Record<string, number> = {};
+      worst.forEach((w, k) => (m[`${k === 0 ? "you" : "rival"}.maxStuck`] = w));
+      return m;
+    },
+  };
+}
+
 export interface Rect {
   x0: number;
   y0: number;
@@ -33,371 +138,390 @@ export interface Rect {
   y1: number;
 }
 
-export function inRect(r: Rect, x: number, y: number): boolean {
-  return x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1;
-}
+const inRect = (r: Rect, x: number, y: number) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1;
 
-/** Something that happens to the game at a set time (seconds), before that tick. */
-export type GameEvent =
-  | { at: number; kind: "paint"; colony?: number; channel: Channel; x: number; y: number; radius: number; amount: number }
-  | { at: number; kind: "food"; x: number; y: number; radius: number; amount: number }
-  | { at: number; kind: "clearFood"; rect?: Rect }
-  | { at: number; kind: "call"; run: (game: Game) => void };
-
-export interface GameSpec {
-  seed: number;
-  /** a generated world's options (default: generateWorld(seed)), or a hand-built arena */
-  world?: Partial<WorldOptions> | ((seed: number) => WorldMap);
-  game?: Partial<GameParams>;
-  player?: Side;
-  rival?: Side;
-  /** the page's Restart counter */
-  generation?: number;
-}
-
-export interface RunSpec extends GameSpec {
-  seconds: number;
-  dt?: number;
-  events?: GameEvent[];
-  /** seconds between samples (default 1) */
-  sampleEvery?: number;
-  /** named regions: ants inside are counted at each sample, entries every tick */
-  regions?: Record<string, Rect>;
-  /** hold the player's stance at this, whatever the strategist says (assays) */
-  forceStance?: Stance;
-  /** time every tick (ms per tick in the summary); off by default, it costs a little */
-  timeTicks?: boolean;
-}
-
-/** A game from a spec: the same seed and spec are the same game on the page, in a script or in a test. */
-export function newGame(spec: GameSpec): Game {
-  const map = typeof spec.world === "function" ? spec.world(spec.seed) : generateWorld(spec.seed, spec.world);
-  return new Game(map, spec.game, gameRng(spec.seed, spec.generation), spec.player, spec.rival);
-}
-
-export interface RegionSample {
-  ants: number;
-  carrying: number;
-  modes: Record<Mode, number>;
-  /** ants that walked into the region since the start */
-  entries: number;
-}
-
-export interface ColonySample {
-  population: number;
-  stored: number;
-  births: number;
-  losses: number;
-  decisions: number;
-  situationsSeen: number;
-  modes: Record<Mode, number>;
-  carrying: number;
-  /** ants more than two cells outside the nest's radius */
-  out: number;
-  /** ants that have left the nest since the start */
-  exits: number;
-  /** ants out longer than STUCK_AFTER without being home or finding food */
-  stuck: number;
-  stance: Stance;
-  regions: Record<string, RegionSample>;
-}
-
-export interface Sample {
-  t: number;
-  foodLeft: number;
-  colonies: ColonySample[];
-}
-
-export interface ColonySummary {
-  population: number;
-  stored: number;
-  /** stored ÷ all the food the map had (at the start, plus any added by events) */
-  foodHome: number;
-  births: number;
-  losses: number;
-  decisions: number;
-  situationsSeen: number;
-  /** stuck ÷ population at the end (0 for a colony under MIN_STUCK_POP ants) */
-  stuckEnd: number;
-  /** the largest stuck share over the samples */
-  stuckMax: number;
-}
-
-export interface RunResult {
-  seed: number;
-  seconds: number;
-  outcome: ReturnType<Game["outcome"]>;
-  foodTotal: number;
-  colonies: ColonySummary[];
-  msPerTick: { mean: number; p90: number } | null;
-  samples: Sample[];
-  game: Game;
-}
-
-/** Living ants per mode. */
-export function modeCounts(c: Colony): Record<Mode, number> {
-  return c.counts();
-}
-
-export function carryingCount(c: Colony): number {
-  let s = 0;
-  for (let i = 0; i < c.n; i++) if (c.alive[i] && c.carrying[i]) s++;
-  return s;
-}
-
-/** Whether ant i is out of its nest: more than two cells past the nest's radius. */
-export function isOut(c: Colony, i: number): boolean {
-  const r = c.nest.r + 2;
-  const dx = (c.x[i] as number) - c.nest.x;
-  const dy = (c.y[i] as number) - c.nest.y;
-  return dx * dx + dy * dy > r * r;
-}
-
-export function outCount(c: Colony): number {
-  let s = 0;
-  for (let i = 0; i < c.n; i++) if (c.alive[i] && isOut(c, i)) s++;
-  return s;
-}
-
-/** Ants out longer than `after` seconds without being home or finding food. */
-export function stuckCount(c: Colony, after = STUCK_AFTER): number {
-  let s = 0;
-  for (let i = 0; i < c.n; i++) if (c.alive[i] && (c.since[i] as number) > after) s++;
-  return s;
-}
-
-/** Ants of colony c inside a rectangle, with their modes and loads. */
-export function regionCount(c: Colony, r: Rect): Omit<RegionSample, "entries"> {
-  const modes = { explore: 0, follow: 0, return: 0, fight: 0 };
-  let ants = 0;
-  let carrying = 0;
-  for (let i = 0; i < c.n; i++) {
-    if (!c.alive[i] || !inRect(r, c.x[i] as number, c.y[i] as number)) continue;
-    ants++;
-    if (c.carrying[i]) carrying++;
-    modes[MODES[c.mode[i] as number] as Mode]++;
-  }
-  return { ants, carrying, modes };
-}
-
-/** Food units left on the map inside a rectangle. */
-export function foodIn(map: WorldMap, r: Rect): number {
-  let s = 0;
-  for (let y = Math.max(0, r.y0); y < Math.min(map.size.h, r.y1); y++) for (let x = Math.max(0, r.x0); x < Math.min(map.size.w, r.x1); x++) s += map.food.get(x, y);
-  return s;
-}
-
-/** Remove every unit of food inside a rectangle (the whole map when none is given), keeping foodLeft true. */
-export function clearFood(map: WorldMap, r?: Rect): number {
-  const rect = r ?? { x0: 0, y0: 0, x1: map.size.w, y1: map.size.h };
-  let removed = 0;
-  for (let y = Math.max(0, rect.y0); y < Math.min(map.size.h, rect.y1); y++)
-    for (let x = Math.max(0, rect.x0); x < Math.min(map.size.w, rect.x1); x++) {
-      const v = map.food.get(x, y);
-      if (!v) continue;
-      map.food.set(x, y, 0);
-      removed += v;
-    }
-  map.foodLeft -= removed;
-  return removed;
-}
-
-/** Put `amount` food on every open cell within `radius` of (x, y). */
-export function addFood(map: WorldMap, x: number, y: number, radius: number, amount: number): void {
-  for (let cy = Math.max(0, Math.floor(y - radius)); cy <= Math.min(map.size.h - 1, Math.floor(y + radius)); cy++)
-    for (let cx = Math.max(0, Math.floor(x - radius)); cx <= Math.min(map.size.w - 1, Math.floor(x + radius)); cx++) {
-      if (map.rock.get(cx, cy) || Math.hypot(cx + 0.5 - x, cy + 0.5 - y) > radius) continue;
-      map.food.set(cx, cy, map.food.get(cx, cy) + amount);
-      map.foodLeft += amount;
-      map.foodTotal += amount;
-    }
-}
-
-function apply(game: Game, e: GameEvent): void {
-  switch (e.kind) {
-    case "paint":
-      game.colonies[e.colony ?? 0]?.paint(e.channel, e.x, e.y, e.radius, e.amount);
-      break;
-    case "food":
-      addFood(game.map, e.x, e.y, e.radius, e.amount);
-      break;
-    case "clearFood":
-      clearFood(game.map, e.rect);
-      break;
-    case "call":
-      e.run(game);
-      break;
-  }
-}
-
-/** Per colony, per ant slot: whether the ant was out of the nest / in each region last tick, and the entry counts. */
-class Tracker {
-  readonly out: Uint8Array[];
-  readonly exits: number[];
-  readonly inside: Record<string, Uint8Array[]> = {};
-  readonly entries: Record<string, number[]> = {};
-  readonly game: Game;
-  readonly regions: Record<string, Rect>;
-  constructor(game: Game, regions: Record<string, Rect>) {
-    this.game = game;
-    this.regions = regions;
-    this.out = game.colonies.map((c) => {
-      const a = new Uint8Array(c.n);
-      for (let i = 0; i < c.n; i++) a[i] = c.alive[i] && isOut(c, i) ? 1 : 0;
-      return a;
-    });
-    this.exits = game.colonies.map(() => 0);
-    for (const [name, r] of Object.entries(regions)) {
-      this.inside[name] = game.colonies.map((c) => {
-        const a = new Uint8Array(c.n);
-        for (let i = 0; i < c.n; i++) a[i] = c.alive[i] && inRect(r, c.x[i] as number, c.y[i] as number) ? 1 : 0;
-        return a;
-      });
-      this.entries[name] = game.colonies.map(() => 0);
-    }
-  }
-
-  step(): void {
-    const names = Object.keys(this.regions);
-    this.game.colonies.forEach((c, k) => {
-      const out = this.out[k] as Uint8Array;
+/** Ant-seconds a colony spends in each region from `from` to `to` (s). */
+export function occupancyProbe(regions: Record<string, Rect>, from = 0, to = Infinity, colony = 0): Probe {
+  const total: Record<string, number> = Object.fromEntries(Object.keys(regions).map((k) => [k, 0]));
+  return {
+    tick(game, dt) {
+      if (game.time < from || game.time > to) return;
+      const c = game.colonies[colony];
+      if (!c) return;
       for (let i = 0; i < c.n; i++) {
-        if (!c.alive[i]) {
-          out[i] = 0;
-          for (const name of names) (this.inside[name]![k] as Uint8Array)[i] = 0;
-          continue;
-        }
-        const o = isOut(c, i) ? 1 : 0;
-        if (o && !out[i]) this.exits[k]!++;
-        out[i] = o;
-        for (const name of names) {
-          const ins = this.inside[name]![k] as Uint8Array;
-          const v = inRect(this.regions[name] as Rect, c.x[i] as number, c.y[i] as number) ? 1 : 0;
-          if (v && !ins[i]) this.entries[name]![k]!++;
-          ins[i] = v;
-        }
+        if (!c.alive[i]) continue;
+        const x = c.x[i] as number;
+        const y = c.y[i] as number;
+        for (const [k, r] of Object.entries(regions)) if (inRect(r, x, y)) total[k] = (total[k] as number) + dt;
       }
+    },
+    summary: () => ({ ...total }),
+  };
+}
+
+/** Ants of a colony within r of (x, y) right now. */
+export function antsNear(game: Game, x: number, y: number, r: number, colony = 0): number {
+  const c = game.colonies[colony];
+  if (!c) return 0;
+  let s = 0;
+  for (let i = 0; i < c.n; i++) if (c.alive[i] && Math.hypot((c.x[i] as number) - x, (c.y[i] as number) - y) <= r) s++;
+  return s;
+}
+
+// ---------------------------------------------------------------- arenas
+
+/** A hand-built map: all rock until carved, then food piles and nests. */
+export class Arena {
+  readonly size: WorldSize;
+  readonly rock: Uint8Array;
+  readonly food: Float32Array;
+
+  constructor(w: number, h: number, open = false) {
+    this.size = { w, h };
+    this.rock = new Uint8Array(w * h).fill(open ? 0 : 1);
+    this.food = new Float32Array(w * h);
+  }
+
+  /** Open ground over the inclusive rectangle. */
+  carve(x0: number, y0: number, x1: number, y1: number): this {
+    for (let y = Math.max(0, y0); y <= Math.min(this.size.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(this.size.w - 1, x1); x++) this.rock[y * this.size.w + x] = 0;
+    return this;
+  }
+
+  /** Rock over the inclusive rectangle. */
+  wall(x0: number, y0: number, x1: number, y1: number): this {
+    for (let y = Math.max(0, y0); y <= Math.min(this.size.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(this.size.w - 1, x1); x++) this.rock[y * this.size.w + x] = 1;
+    return this;
+  }
+
+  /** A pile of `perCell` food on every open cell within r of (cx, cy). */
+  pile(cx: number, cy: number, r: number, perCell: number): this {
+    disc(this.size, cx, cy, r, (x, y) => {
+      const i = y * this.size.w + x;
+      if (!this.rock[i]) this.food[i] = perCell;
     });
+    return this;
+  }
+
+  build(nests: Nest[]): WorldMap {
+    return worldFromArrays(this.size, nests, { rock: this.rock, food: this.food });
   }
 }
 
-function sample(game: Game, tracker: Tracker, regions: Record<string, Rect>): Sample {
+// ---------------------------------------------------------------- assays
+
+/** Parameter changes from the command line, applied on top of an assay's own. */
+export interface Overrides {
+  colony?: ColonyOptions;
+  rival?: ColonyOptions;
+  game?: Partial<Omit<GameParams, "fight">> & { fight?: Partial<FightParams> };
+}
+
+export interface Assay {
+  id: string;
+  title: string;
+  /** the behaviour expected and where the number comes from */
+  target: string;
+  seconds: number;
+  spec(seed: number): RunSpec;
+  /** the assay's own numbers from a run; `pass` is 1 or 0, or absent when there is no pass mark yet */
+  score(result: RunResult, game: Game): Record<string, number>;
+}
+
+/** An assay's run with overrides merged in (colony and rival params deep-merged per channel; fight merged). */
+export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
+  const sides = { ...spec.sides };
+  if (o.colony) sides.colony = mergeColony(sides.colony, o.colony);
+  if (o.rival) sides.rival = mergeColony(sides.rival, o.rival);
+  const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
+  if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
+  else delete game.fight;
+  return { ...spec, sides, game };
+}
+
+function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOptions {
+  const channels: NonNullable<ColonyOptions["channels"]> = { ...a.channels };
+  for (const [ch, cp] of Object.entries(b.channels ?? {}) as [Channel, object][]) channels[ch] = { ...channels[ch], ...cp };
+  return { ...a, ...b, channels };
+}
+
+/** Run one assay on one seed. */
+export function runAssay(assay: Assay, seed: number, o: Overrides = {}, seconds?: number): RunResult {
+  const spec = withOverrides(assay.spec(seed), o);
+  if (seconds !== undefined) spec.seconds = seconds;
+  const { game, result } = runGame(spec);
+  Object.assign(result.metrics, assay.score(result, game));
+  return result;
+}
+
+const always =
+  <T extends string>(v: T) =>
+  (): T =>
+    v;
+
+/**
+ * A1 — the double bridge. A small nest room with two exits to one food room: the short branch is
+ * ~64 cells, the long one ~102 (it dips 19 cells further down and back up). Real Argentine ants end
+ * up almost all on the short branch in most trials (Goss et al. 1989): the first ants back are the
+ * ones that took it, so its trail grows first. Measured on equal 30-cell stretches of each branch
+ * from 60 s on.
+ */
+export const bridge: Assay = {
+  id: "bridge",
+  title: "A1 double bridge: short vs long branch",
+  target: "≥ 80 % of branch traffic on the short branch (Goss et al. 1989: almost all ants, most trials)",
+  seconds: 300,
+  spec: (seed) => ({
+    seed,
+    seconds: 300,
+    map: () =>
+      new Arena(100, 62)
+        .carve(2, 22, 15, 38) // nest room
+        .carve(80, 22, 97, 38) // food room
+        .carve(16, 22, 79, 27) // short branch
+        .carve(16, 33, 21, 38) // long branch: out of the room's lower exit,
+        .carve(16, 33, 21, 57) // down,
+        .carve(16, 52, 75, 57) // along (the stretch measured),
+        .carve(70, 33, 75, 57) // up,
+        .carve(70, 33, 79, 38) // and into the food room
+        .pile(89, 30, 4, 40)
+        .build([{ x: 8, y: 30, r: 3 }]),
+    game: { antCount: 300, rival: false },
+    probes: [occupancyProbe({ short: { x0: 30, y0: 22, x1: 60, y1: 28 }, long: { x0: 30, y0: 52, x1: 60, y1: 58 } }, 60)],
+  }),
+  score: (r) => {
+    const s = r.metrics.short as number;
+    const l = r.metrics.long as number;
+    const share = s + l > 0 ? s / (s + l) : NaN;
+    return { shortShare: share, pass: share >= 0.8 ? 1 : 0 };
+  },
+};
+
+/**
+ * A2a — two equal sources at the same distance. A mass-recruiting colony breaks the symmetry and
+ * concentrates on one (Beckers et al. 1990, Lasius niger with two 1 M sources). Food quality is not
+ * modelled yet, so the rich-vs-poor test (A2b) waits for Phase 3.
+ */
+export const twin: Assay = {
+  id: "twin",
+  title: "A2a two equal sources: does the colony pick one?",
+  target: "the busier source takes ≥ 70 % of the food carried (design mark; Beckers et al. 1990: the colony concentrates on one)",
+  seconds: 240,
+  spec: (seed) => ({
+    seed,
+    seconds: 240,
+    map: () => new Arena(100, 100, true).pile(25, 20, 3, 200).pile(75, 20, 3, 200).build([{ x: 50, y: 85, r: 3 }]),
+    game: { antCount: 300, rival: false },
+  }),
+  score: (_r, game) => {
+    const start = 200 * countDisc(game.map.size, 25, 20, 3);
+    const left = start - foodIn(game.map, 25, 20, 3);
+    const right = start - foodIn(game.map, 75, 20, 3);
+    const share = left + right > 0 ? Math.max(left, right) / (left + right) : NaN;
+    return { majorityShare: share, pass: share >= 0.7 ? 1 : 0 };
+  },
+};
+
+function countDisc(size: WorldSize, cx: number, cy: number, r: number): number {
+  let n = 0;
+  disc(size, cx, cy, r, () => n++);
+  return n;
+}
+
+/**
+ * A3 — a patch runs out. Traffic to it should die away soon after: the food trail is no longer
+ * refreshed and evaporates (half-life ~12 s), and ants that find nothing should leave rather than
+ * circle (no ant mills). Design mark: the crowd at the patch is under a fifth of its peak within 60 s.
+ */
+export const deplete: Assay = {
+  id: "deplete",
+  title: "A3 depletion: traffic leaves an emptied patch",
+  target: "crowd at the emptied patch < 20 % of its peak within 60 s of the last food (design mark)",
+  seconds: 300,
+  spec: (seed) => {
+    const patch = { x: 50, y: 40 };
+    const crowd: number[] = [];
+    let emptyAt = NaN;
+    let nextAt = 1;
+    let follow60 = NaN;
+    const probe: Probe = {
+      tick(game) {
+        if (game.time + 1e-9 < nextAt) return;
+        nextAt += 1;
+        crowd.push(antsNear(game, patch.x, patch.y, 6));
+        if (Number.isNaN(emptyAt) && foodIn(game.map, patch.x, patch.y, 2) <= 0) emptyAt = game.time;
+        if (!Number.isNaN(emptyAt) && Number.isNaN(follow60) && game.time >= emptyAt + 60) follow60 = game.player.counts().follow / Math.max(1, game.player.population);
+      },
+      summary(): Record<string, number> {
+        if (Number.isNaN(emptyAt)) return { emptyAt: NaN, peakCrowd: NaN, clearAfter: NaN, followAfter60: NaN };
+        const k0 = Math.floor(emptyAt);
+        const peak = Math.max(...crowd.slice(0, k0 + 1));
+        const smooth = (k: number) => crowd.slice(Math.max(0, k - 4), k + 1).reduce((a, b) => a + b, 0) / Math.min(5, k + 1);
+        let clear = NaN;
+        for (let k = k0; k < crowd.length; k++)
+          if (smooth(k) < 0.2 * peak) {
+            clear = k + 1 - emptyAt;
+            break;
+          }
+        return { emptyAt, peakCrowd: peak, clearAfter: clear, followAfter60: follow60 };
+      },
+    };
+    return {
+      seed,
+      seconds: 300,
+      map: () => new Arena(100, 100, true).pile(patch.x, patch.y, 2, 10).build([{ x: 50, y: 80, r: 3 }]),
+      game: { antCount: 200, rival: false },
+      probes: [probe],
+    };
+  },
+  score: (r) => {
+    const c = r.metrics.clearAfter as number;
+    return { pass: Number.isFinite(c) && c <= 60 ? 1 : 0 };
+  },
+};
+
+/**
+ * A4 — alarm on a busy trail. The fungus's alarm brush on the middle of a trail: foragers should
+ * scatter from it at once, and the trail should be back in use once the alarm has faded
+ * (evaporation 0.25/s). Design marks: the crowd drops to half within 10 s; back to half its
+ * earlier level within 60 s.
+ */
+export const alarm: Assay = {
+  id: "alarm",
+  title: "A4 alarm on a trail: scatter, then recover",
+  target: "crowd ≤ 50 % in the 10 s after alarm; back to ≥ 50 % of before within 60 s (design marks)",
+  seconds: 240,
+  spec: (seed) => {
+    const spot = { x: 50, y: 50 };
+    const at = 120;
+    const crowd: number[] = [];
+    let nextAt = 1;
+    const probe: Probe = {
+      tick(game) {
+        if (game.time + 1e-9 < nextAt) return;
+        nextAt += 1;
+        crowd.push(antsNear(game, spot.x, spot.y, 6));
+      },
+      summary() {
+        const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
+        const before = mean(crowd.slice(at - 10, at));
+        const after = mean(crowd.slice(at + 1, at + 11));
+        let back = NaN;
+        for (let k = at + 1; k < crowd.length; k++)
+          if (mean(crowd.slice(Math.max(at + 1, k - 4), k + 1)) >= 0.5 * before) {
+            back = k + 1 - at;
+            break;
+          }
+        return { crowdBefore: before, scatter: before > 0 ? after / before : NaN, recoverAfter: back };
+      },
+    };
+    return {
+      seed,
+      seconds: 240,
+      map: () => new Arena(100, 100, true).pile(50, 18, 3, 200).build([{ x: 50, y: 82, r: 3 }]),
+      game: { antCount: 300, rival: false },
+      events: [{ at, kind: "paint", channel: "alarm", x: spot.x, y: spot.y, r: 3, amount: 12 }],
+      probes: [probe],
+    };
+  },
+  score: (r) => {
+    const s = r.metrics.scatter as number;
+    const b = r.metrics.recoverAfter as number;
+    return { pass: s <= 0.5 && Number.isFinite(b) && b <= 60 ? 1 : 0 };
+  },
+};
+
+/**
+ * A5 — foraging regulation. With no food, a harvester-ant colony keeps most foragers home; when
+ * foragers start coming back with food, more go out (Gordon; Pinter-Wollman et al. 2013: the rate of
+ * returning foragers sets the rate of outgoing ones). Food appears at 120 s. Design mark: the share
+ * of the colony outside the nest before food is at most half what it is once food flows.
+ */
+export const regulate: Assay = {
+  id: "regulate",
+  title: "A5 foraging regulation: do foragers stay home without food?",
+  target: "share outside before food ≤ ½ × share outside once food flows (Gordon; Pinter-Wollman et al. 2013)",
+  seconds: 360,
+  spec: (seed) => {
+    const nest = { x: 50, y: 50, r: 3 };
+    const outside: number[] = [];
+    let nextAt = 1;
+    const probe: Probe = {
+      tick(game) {
+        if (game.time + 1e-9 < nextAt) return;
+        nextAt += 1;
+        const c = game.player;
+        let out = 0;
+        let alive = 0;
+        for (let i = 0; i < c.n; i++) {
+          if (!c.alive[i]) continue;
+          alive++;
+          if (Math.hypot((c.x[i] as number) - nest.x, (c.y[i] as number) - nest.y) > nest.r + 2) out++;
+        }
+        outside.push(alive ? out / alive : 0);
+      },
+      summary() {
+        const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
+        return { outsideBefore: mean(outside.slice(60, 120)), outsideAfter: mean(outside.slice(240, 360)) };
+      },
+    };
+    return {
+      seed,
+      seconds: 360,
+      map: () => new Arena(100, 100, true).build([nest]),
+      game: { antCount: 300, rival: false },
+      events: [{ at: 120, kind: "food", x: 50, y: 15, r: 3, perCell: 200 }],
+      probes: [probe],
+    };
+  },
+  score: (r) => {
+    const b = r.metrics.outsideBefore as number;
+    const a = r.metrics.outsideAfter as number;
+    return { pass: b <= 0.5 * a ? 1 : 0 };
+  },
+};
+
+/** A6 arenas: attackers (you, always raiding) against defenders (the rival, local rule), with or without a 2-cell pass between them. */
+function battleSpec(seed: number, pass: boolean): RunSpec {
+  const a = new Arena(120, 40).carve(2, 2, 117, 37);
+  if (pass) a.wall(56, 2, 63, 37).carve(56, 19, 63, 20);
   return {
-    t: game.time,
-    foodLeft: game.map.foodLeft,
-    colonies: game.colonies.map((c, k) => {
-      const reg: Record<string, RegionSample> = {};
-      for (const [name, r] of Object.entries(regions)) reg[name] = { ...regionCount(c, r), entries: tracker.entries[name]![k] as number };
-      return {
-        population: c.population,
-        stored: c.stored,
-        births: c.births,
-        losses: c.losses,
-        decisions: c.decisions,
-        situationsSeen: c.situationsSeen,
-        modes: modeCounts(c),
-        carrying: carryingCount(c),
-        out: outCount(c),
-        exits: tracker.exits[k] as number,
-        stuck: stuckCount(c),
-        stance: c.stance,
-        regions: reg,
-      };
-    }),
+    seed,
+    seconds: 180,
+    map: () => a.build([{ x: 20, y: 20, r: 3 }, { x: 100, y: 20, r: 3 }]),
+    game: { antCount: 200, rivalAnts: 200 },
+    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid") },
   };
 }
 
-/** Run a game headless for spec.seconds and collect its samples and summary. */
-export function runGame(spec: RunSpec): RunResult {
-  const game = newGame(spec);
-  const dt = spec.dt ?? DT;
-  const every = spec.sampleEvery ?? 1;
-  const regions = spec.regions ?? {};
-  const events = [...(spec.events ?? [])].sort((a, b) => a.at - b.at);
-  const tracker = new Tracker(game, regions);
-  const samples: Sample[] = [];
-  const ms: number[] = [];
-  const steps = Math.round(spec.seconds / dt);
-  const sampleSteps = Math.max(1, Math.round(every / dt));
-  let ev = 0;
-  if (spec.forceStance) game.player.stance = spec.forceStance;
-  samples.push(sample(game, tracker, regions));
-  for (let k = 0; k < steps; k++) {
-    while (ev < events.length && (events[ev] as GameEvent).at <= game.time + dt / 2) apply(game, events[ev++] as GameEvent);
-    if (spec.timeTicks) {
-      const t0 = performance.now();
-      game.tick(dt);
-      ms.push(performance.now() - t0);
-    } else game.tick(dt);
-    if (spec.forceStance) game.player.stance = spec.forceStance;
-    tracker.step();
-    if ((k + 1) % sampleSteps === 0) samples.push(sample(game, tracker, regions));
-  }
-  const foodTotal = game.map.foodTotal; // at the end: food added by events counts
-  let msPerTick: RunResult["msPerTick"] = null;
-  if (ms.length) {
-    const warm = ms.slice(Math.min(ms.length - 1, Math.round(5 / dt))).sort((a, b) => a - b);
-    msPerTick = { mean: warm.reduce((a, b) => a + b, 0) / warm.length, p90: warm[Math.floor(0.9 * (warm.length - 1))] as number };
-  }
-  return {
-    seed: spec.seed,
-    seconds: spec.seconds,
-    outcome: game.outcome(),
-    foodTotal,
-    colonies: game.colonies.map((c, k) => {
-      // A colony of a handful of ants (nearly beaten) says nothing about homing: its share counts as 0.
-      const stuckShare = (c: ColonySample) => (c.population >= MIN_STUCK_POP ? c.stuck / c.population : 0);
-      const shares = samples.map((s) => stuckShare(s.colonies[k]!));
-      const last = samples.at(-1)!.colonies[k]!;
-      return {
-        population: c.population,
-        stored: c.stored,
-        foodHome: foodTotal > 0 ? c.stored / foodTotal : 0,
-        births: c.births,
-        losses: c.losses,
-        decisions: c.decisions,
-        situationsSeen: c.situationsSeen,
-        stuckEnd: stuckShare(last),
-        stuckMax: Math.max(0, ...shares),
-      };
-    }),
-    msPerTick,
-    samples,
-    game,
-  };
-}
+const exchange = (r: RunResult) => {
+  const att = r.metrics["you.losses"] as number;
+  const def = r.metrics["rival.losses"] as number;
+  return { attackerLosses: att, defenderLosses: def, exchange: att / Math.max(1, def) };
+};
 
-/** Samples with lo ≤ t ≤ hi. */
-export function between(samples: Sample[], lo: number, hi: number): Sample[] {
-  return samples.filter((s) => s.t >= lo - 1e-6 && s.t <= hi + 1e-6);
-}
+/**
+ * A6 — combat through a narrow pass. Narrow passes favour defenders (Lymbery et al. 2023, via the
+ * research note): only a few attackers can engage at once. Compare the exchange ratio (attackers
+ * lost per defender lost) here with `open`; no pass mark until terrain-limited combat lands (Phase 4).
+ */
+export const pass: Assay = { id: "pass", title: "A6 combat through a 2-cell pass", target: "exchange (attackers lost per defender) well above `open` (Lymbery et al. 2023); report only", seconds: 180, spec: (s) => battleSpec(s, true), score: exchange };
+export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass`; report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
 
-export function mean(xs: number[]): number {
-  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
-}
+/**
+ * G — the real game on a generated world, 600 + 600 ants. Also the homing regression (A7): the
+ * share of either colony out longer than 120 s must stay at or under 7 % (ja-ipu's baseline).
+ */
+export const game: Assay = {
+  id: "game",
+  title: "G full game on generated worlds (with A7 homing)",
+  target: "no colony with > 7 % of its ants out over 120 s at any moment (provisional: also counts far explorers, see PRD §14.2); food home and outcome reported",
+  seconds: 600,
+  spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rivalAnts: 600 } }),
+  score: (r) => {
+    const worst = Math.max(r.metrics["you.maxStuck"] ?? 0, r.metrics["rival.maxStuck"] ?? 0);
+    return { maxStuck: worst, pass: worst <= 0.07 ? 1 : 0 };
+  },
+};
 
-export function median(xs: number[]): number {
-  if (!xs.length) return NaN;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? (s[m] as number) : ((s[m - 1] as number) + (s[m] as number)) / 2;
-}
-
-/** Pearson correlation; 0 when either series is flat. */
-export function correlation(a: number[], b: number[]): number {
-  const n = Math.min(a.length, b.length);
-  if (n < 2) return 0;
-  const ma = mean(a.slice(0, n));
-  const mb = mean(b.slice(0, n));
-  let sab = 0;
-  let saa = 0;
-  let sbb = 0;
-  for (let i = 0; i < n; i++) {
-    const da = (a[i] as number) - ma;
-    const db = (b[i] as number) - mb;
-    sab += da * db;
-    saa += da * da;
-    sbb += db * db;
-  }
-  return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
-}
+export const ASSAYS: Assay[] = [bridge, twin, deplete, alarm, regulate, pass, open, game];

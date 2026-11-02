@@ -1,60 +1,69 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { A1, A2, A3, A4, A5, A6, A7, ASSAYS, summarize, type Assay, type AssayRun } from "../assays.ts";
+import { Colony } from "../colony.ts";
+import { alarm, bridge, deplete, regulate, runAssay, runGame, twin, withOverrides } from "../experiment.ts";
+import { Game, gameRng } from "../game.ts";
+import { generateWorld } from "../world.ts";
 
-// The gate: short versions of the assays (assays.ts), two or three seeds
-// each, so a change that breaks a behaviour the colony already has fails
-// npm test. The full sweeps (ten seeds, full length, parameter grids) stay in
-// scripts/experiment.mjs. An assay the colony does not pass yet is a `todo`
-// naming the phase meant to make it pass (one seed: enough to see it flip);
-// that phase turns it into a test.
+// The behaviour assays, short: the ones today's ants pass are a regression
+// gate; the ones they don't yet are `todo` (they run, their pass mark is the
+// phase's goal, docs/PRD.md §14). Full sweeps: scripts/experiment.mjs.
 
-const runs = (a: Assay, seeds: number[]): AssayRun[] => seeds.map((s) => a.run(s, {}, true));
-const show = (r: AssayRun) => `seed ${r.seed}: ${Object.entries(r.metrics).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(", ")}`;
-
-test("assays: ids are unique and every metric names which way is better", () => {
-  const ids = ASSAYS.map((a) => a.id);
-  assert.equal(new Set(ids).size, ids.length);
-  for (const a of ASSAYS) for (const m of a.metrics) assert.ok(m.better === "high" || m.better === "low", `${a.id}.${m.key}`);
+test("runGame: the same seed gives the same numbers", () => {
+  const a = runAssay(deplete, 3, {}, 90).metrics;
+  const b = runAssay(deplete, 3, {}, 90).metrics;
+  assert.deepEqual(a, b);
 });
 
-test("A1 double bridge (short): traffic settles on the short branch", () => {
-  for (const r of runs(A1, [1, 2])) assert.ok(r.pass, show(r));
+test("runGame seeds the game like the page (gameRng): same food home after 20 s", () => {
+  const { game } = runGame({ seed: 4, seconds: 20, game: { antCount: 200, rivalAnts: 200 } });
+  const page = new Game(generateWorld(4), { antCount: 200, rivalAnts: 200 }, gameRng(4));
+  for (let k = 0; k < 600; k++) page.tick(1 / 30);
+  assert.equal(page.player.stored, game.player.stored);
+  assert.equal(page.rival?.stored, game.rival?.stored);
 });
 
-test("A4 alarm (short): a blot of alarm reaches a few cells and fades within seconds", () => {
-  for (const r of runs(A4, [1, 2])) {
-    const { reach, fade } = r.metrics as { reach: number; fade: number };
-    assert.ok(reach >= 3 && reach <= 10, show(r));
-    assert.ok(fade >= 10 && fade <= 40, show(r));
-  }
+test("overrides: channel params merge per field and reach the pheromone fields", () => {
+  const spec = withOverrides(deplete.spec(1), { colony: { deposit: 9, channels: { food: { evaporation: 0.5 } } } });
+  assert.equal(spec.sides?.colony?.deposit, 9);
+  const c = new Colony(generateWorld(1), { antCount: 10, ...spec.sides?.colony });
+  assert.equal(c.ph.params.food.evaporation, 0.5);
+  assert.equal(c.ph.params.food.diffusion, 0.3);
+  assert.equal(c.ph.params.alarm.evaporation, 0.25);
 });
 
-test("A6 combat (short): in the open, outnumbered 2:1, the defenders lose more than they kill", () => {
-  for (const r of runs(A6, [1, 2, 3])) assert.ok((r.metrics.openExchange as number) < 1, show(r));
+test("overrides: a fight override keeps the other fight params", () => {
+  const spec = withOverrides(deplete.spec(1), { game: { fight: { rate: 3 } } });
+  assert.equal(spec.game?.fight?.rate, 3);
+  assert.equal(spec.game?.fight?.alarm, 8);
 });
 
-test("A7 homing (short): few ants are stuck out on a small map", () => {
-  for (const r of runs(A7, [1, 2])) assert.ok(r.pass, show(r));
+for (const seed of [1, 2]) {
+  test(`A3 depletion passes (seed ${seed}): traffic leaves an emptied patch within 60 s`, () => {
+    const m = runAssay(deplete, seed).metrics;
+    assert.equal(m.pass, 1, `clearAfter ${m.clearAfter}`);
+  });
+
+  test(`A4 alarm passes (seed ${seed}): foragers scatter, then the trail recovers`, () => {
+    const m = runAssay(alarm, seed).metrics;
+    assert.equal(m.pass, 1, `scatter ${m.scatter}, recoverAfter ${m.recoverAfter}`);
+  });
+}
+
+test("A1 double bridge: ≥ 80 % on the short branch", { todo: "Phase 3: trail marking as a response" }, () => {
+  const m = runAssay(bridge, 1).metrics;
+  assert.ok(Number.isFinite(m.shortShare));
+  assert.equal(m.pass, 1, `shortShare ${m.shortShare}`);
 });
 
-test("A3 depletion (short): traffic leaves a dead trail within 60 s, no mills", { todo: "Phase 3: the no-entry mark (baseline: ~65–75 s)" }, () => {
-  for (const r of runs(A3, [1])) assert.ok(r.pass, show(r));
+test("A2a two equal sources: the colony concentrates on one", { todo: "Phase 3: trail marking as a response" }, () => {
+  const m = runAssay(twin, 1).metrics;
+  assert.ok(Number.isFinite(m.majorityShare));
+  assert.equal(m.pass, 1, `majorityShare ${m.majorityShare}`);
 });
 
-test("A4 alarm (short): foragers scatter from alarm, defenders gather", { todo: "Phase 4: graded alarm (baseline is borderline)" }, () => {
-  for (const r of runs(A4, [1])) assert.ok(r.pass, show(r));
-});
-
-test("A6 combat (short): even fights trade evenly and a narrow pass favours the defenders", { todo: "Phase 4: terrain-limited combat" }, () => {
-  const rs = runs(A6, [1, 2, 3]);
-  assert.ok(summarize(A6, rs).verdict, rs.map(show).join("; "));
-});
-
-test("A2 rich vs poor (short): the rich source wins; an established poor trail persists", { todo: "Phase 3: food quality" }, () => {
-  for (const r of runs(A2, [1])) assert.ok(r.pass, show(r));
-});
-
-test("A5 regulation (short): foragers stay home while foraging fails and go out as returns pick up", { todo: "Phase 5: activation from the rate of successful returns" }, () => {
-  for (const r of runs(A5, [1])) assert.ok(r.pass, show(r));
+test("A5 regulation: foragers stay home without food", { todo: "Phase 5: forager activation from returns" }, () => {
+  const m = runAssay(regulate, 1).metrics;
+  assert.ok(Number.isFinite(m.outsideBefore));
+  assert.equal(m.pass, 1, `outside before ${m.outsideBefore}, after ${m.outsideAfter}`);
 });

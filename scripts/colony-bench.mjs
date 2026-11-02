@@ -5,7 +5,8 @@
 // trail laid, more chunks awake) are the honest ones.
 //
 // Usage: node scripts/colony-bench.mjs [ants per colony=1200] [sim seconds=60] [seed=1]
-import { newGame } from "../web/src/colony/experiment.ts";
+import { Game } from "../web/src/colony/game.ts";
+import { generateWorld, mulberry32 } from "../web/src/colony/world.ts";
 
 const [ants = 1200, seconds = 60, seed = 1] = process.argv.slice(2).map(Number);
 const DT = 1 / 30;
@@ -16,8 +17,9 @@ const SIZES = [
 
 for (const size of SIZES) {
   const t0 = performance.now();
-  const game = newGame({ seed, world: { size }, game: { antCount: ants, rivalAnts: ants } });
+  const map = generateWorld(seed, { size });
   const gen = performance.now() - t0;
+  const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 31 + 7));
   const steps = Math.round(seconds / DT);
   const warm = Math.round(5 / DT);
   const ms = [];

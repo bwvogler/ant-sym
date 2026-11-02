@@ -47,7 +47,7 @@ export default function AntCard({ followed, colony, rival, explain, onClose }: P
         </button>
       </div>
       {carrying ? (
-        <p className="mt-2 text-xs text-fg-3">Carrying food: what to do with it is a response (onCarry), not a mode choice. It is asked again once it puts the food down.</p>
+        <p className="mt-2 text-xs text-fg-3">Carrying food home: a mechanic, not a choice. It is asked again once it puts the food down.</p>
       ) : q ? (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-fg-3">last asked:</span>
@@ -71,7 +71,6 @@ function chips(s: Situation): [string, string][] {
   return [
     ["mode", s.mode],
     [s.tired ? "tired" : "fresh", ""],
-    [s.atNest ? "at nest" : "out", ""],
     ["food", s.foodTrail],
     ["home", s.homeTrail],
     ["alarm", s.alarm],

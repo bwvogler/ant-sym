@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
-import { newGame } from "../colony/experiment.ts";
-import type { Outcome } from "../colony/game.ts";
+import { Game, gameRng, type Outcome } from "../colony/game.ts";
+import { generateWorld } from "../colony/world.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
 // loop, like useEngine for the picture: React state carries only what the
 // panel shows, the renderer reads the colonies' typed arrays every frame. A
-// new seed, ant count or rival setting is a new game on a fresh map. Games
-// are built by experiment.newGame, so a seed here is the same game as in the
-// scripts and the assays.
+// new seed, ant count or rival setting is a new game on a fresh map.
 
 /** The fungus's brushes: lure paints food scent (ants follow it), alarm paints alarm (ants shy away, a doctrine can send them home). */
 export type Brush = "none" | "lure" | "alarm";
@@ -66,7 +64,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   // Bumped by Restart: the same seed again, from scratch.
   const [generation, setGeneration] = useState(0);
   const game = useMemo(
-    () => newGame({ seed: controls.seed, generation, game: { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival } }),
+    () => new Game(generateWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival }, gameRng(controls.seed, generation)),
     [controls.seed, controls.antCount, controls.rival, generation],
   );
   const colony = game.player;

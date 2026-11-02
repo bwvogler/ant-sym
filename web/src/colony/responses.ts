@@ -1,88 +1,70 @@
-import type { Mode, Stance, Trail } from "./colony.ts";
+import type { Mode, Stance } from "./colony.ts";
 
-// Responses, pure: what an ant does when something happens to it, as hooks
-// the colony calls at the moment the event fires. Each hook is a pure
-// function of a small view of the ant (what it is doing, what it carries,
-// whether it is home, and what its antennae read ahead), so each can later
-// be tuned, scripted in an experiment, or asked of Jev as its own cached
-// lane (colonyBrain.ts: HOOK_LANES). `localResponses` is the rule the colony
-// has always followed, hook for hook; a golden test holds it to that.
-//
-// When each hook fires:
-//   onFood     — standing on food, carrying nothing: take it?
-//   onCarry    — just picked something up: which mode to carry it in
-//   atSite     — carrying, at the nest: put it down?
-//   mark       — every step: which trail to lay
-//   onContact  — enemies in the 3×3 cells around: fight, flee, or drop the load and run
-//   raiseAlarm — in a fight: how much alarm to lay
-//   alarmGain  — smelling alarm: steer away from it, ignore it, or climb it
+// An ant's responses to what it touches and carries, pure. Choosing a mode is
+// the ant's one big decision (colony.ts, a `Policy`); these are the small
+// ones that used to be fixed mechanics: whether to pick food up, where to go
+// while carrying, whether to put it down here, which trail to lay and how
+// much, how hard to shy from alarm, how loudly to raise it in a fight. Each
+// is a function of a small situation (`Touch`), so each can later be a
+// cached Jev question asked only when its moment comes, like the mode.
+// `localResponses` is exactly the old mechanics (tests/golden.test.ts pins
+// that); later behaviour MRs (docs/PRD.md §14) change them one at a time,
+// each against the assays in experiment.ts.
 
-export const ITEMS = ["none", "food", "soil", "egg"] as const;
-/** What an ant carries. Stored per ant as its index (0 = nothing, 1 = food). */
+/** What an ant can hold. Soil and eggs come with digging and brood (behaviour MR 2). */
+export const ITEMS = ["none", "food"] as const;
 export type Item = (typeof ITEMS)[number];
 
-export const CONTACTS = ["fight", "flee", "drop"] as const;
-export type Contact = (typeof CONTACTS)[number];
-
-export const ALARM_LEVELS = ["none", "normal", "strong"] as const;
-export type AlarmLevel = (typeof ALARM_LEVELS)[number];
-/** Alarm laid per answer, as a share of the fight's alarm rate. */
-export const ALARM_GAIN: Record<AlarmLevel, number> = { none: 0, normal: 1, strong: 2 };
-
-export const ALARM_RESPONSES = ["flee", "ignore", "approach"] as const;
-export type AlarmResponse = (typeof ALARM_RESPONSES)[number];
-
-export const MARKS = ["food", "home", "none"] as const;
-export type MarkChoice = (typeof MARKS)[number];
-
 /**
- * What an ant knows when a hook fires: discrete, so an answer can be cached per view. The colony
- * keeps one per colony and refills it before each call: a hook must not hold on to it.
+ * What a response may depend on: few values, so an answer could be cached per situation. The
+ * colony fills one shared object per call, so a response must read it and not keep it.
  */
-export interface AntView {
+export interface Touch {
   mode: Mode;
   carrying: Item;
-  /** inside the nest's radius */
+  /** inside its own nest's radius */
   atNest: boolean;
-  /** out longer than the colony's patience without finding food */
-  tired: boolean;
-  foodTrail: Trail;
-  homeTrail: Trail;
-  alarm: Trail;
-  /** an ant of another colony within enemyRange cells */
-  enemy: "none" | "near";
+  /** an enemy within the colony's enemy range (always true in a fight) */
+  enemy: boolean;
   stance: Stance;
 }
 
+export type Trail = "food" | "home" | "none";
+
 export interface Responses {
-  onFood(v: AntView): boolean;
-  onCarry(v: AntView): Mode;
-  atSite(v: AntView): boolean;
-  mark(v: AntView): MarkChoice;
-  onContact(v: AntView): Contact;
-  raiseAlarm(v: AntView): AlarmLevel;
-  alarmGain(v: AntView): AlarmResponse;
+  /** Touching food with empty jaws: take one unit? */
+  get(t: Touch): boolean;
+  /** Carrying: what to do (asked every step while carrying; the mode policy is not asked then). */
+  carry(t: Touch): Mode;
+  /** Carrying, at a place it could put the load down (today only its nest): put it down? */
+  drop(t: Touch): boolean;
+  /** Which trail to lay this step. */
+  trail(t: Touch): Trail;
+  /** How much of it, as a share of the colony's `deposit`. */
+  trailRate(t: Touch): number;
+  /** How hard to steer away from alarm, as a share of the colony's `alarmAvoid` (0 = ignore it). */
+  alarmGain(t: Touch): number;
+  /** In a fight: alarm laid, as a share of the fight's `alarm` rate. */
+  raiseAlarm(t: Touch): number;
 }
 
-export type Hook = keyof Responses;
-export const HOOKS: Hook[] = ["onFood", "onCarry", "atSite", "mark", "onContact", "raiseAlarm", "alarmGain"];
-
-/**
- * Today's rules, hook for hook. Food is taken unless the ant is fighting; a carrier goes home and
- * puts its load down at the nest; walking out marks the way home and carrying food marks the way
- * to it; every ant in a fight fights and lays alarm; everyone but a fighter shies away from alarm.
- */
+/** The old mechanics, unchanged: take food unless fighting, carry it home, put it down there, mark the way, shy from alarm unless fighting, always raise it in a fight. */
 export const localResponses: Responses = {
-  onFood: (v) => v.mode !== "fight",
-  onCarry: () => "return",
-  atSite: (v) => v.atNest,
-  mark: (v) => (v.carrying === "food" ? "food" : "home"),
-  onContact: () => "fight",
-  raiseAlarm: () => "normal",
-  alarmGain: (v) => (v.mode === "fight" ? "ignore" : "flee"),
+  get: (t) => t.mode !== "fight",
+  carry: () => "return",
+  drop: (t) => t.atNest,
+  trail: (t) => (t.carrying === "food" ? "food" : "home"),
+  trailRate: () => 1,
+  alarmGain: (t) => (t.mode === "fight" ? 0 : 1),
+  raiseAlarm: () => 1,
 };
 
-/** localResponses with some hooks replaced: an experiment's scripted responses. */
-export function withResponses(over: Partial<Responses>, base: Responses = localResponses): Responses {
-  return { ...base, ...over };
+/** Responses with some hooks replaced (experiments, tests): the rest stay local. */
+export function responses(over: Partial<Responses> = {}): Responses {
+  return { ...localResponses, ...over };
+}
+
+/** Every situation a response can be asked in: 4 modes × 2 items × at nest × enemy × 3 stances = 96. */
+export function touchKey(t: Touch): string {
+  return `${t.mode}|${t.carrying}|${t.atNest ? "nest" : "out"}|${t.enemy ? "enemy" : "clear"}|${t.stance}`;
 }

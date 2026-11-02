@@ -16,6 +16,3 @@ exports/
 
 # Beads / Dolt files (added by bd init)
 *.gate.lock*
-
-# Experiment output (scripts/experiment.mjs)
-experiments/out/

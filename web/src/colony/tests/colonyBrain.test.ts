@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DOCTRINES, estimateTokens, packModeRequest, policyContext, readMode, situationKey } from "../colonyBrain.ts";
 import type { Situation } from "../colony.ts";
 
-const S: Situation = { mode: "follow", tired: false, atNest: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
+const S: Situation = { mode: "follow", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
 
 test("situationKey is stable and tells situations apart", () => {
   assert.equal(situationKey(S), situationKey({ ...S }));

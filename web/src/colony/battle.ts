@@ -2,11 +2,9 @@ import { ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
 import type { WorldSize } from "./world.ts";
 
-// Fights, pure. An ant with enemies in the 3×3 cells around it is in a fight.
-// Its onContact response (responses.ts) says whether it stands and fights,
-// laying alarm in its own colony's field by its raiseAlarm response (so
-// allies smell it and, by stance or doctrine, come or keep away), or flees
-// or drops its load and runs; either way it may die. Its chance of dying in dt is
+// Fights, pure. An ant with enemies in the 3×3 cells around it is in a fight:
+// it lays alarm in its own colony's field (as loud as its raiseAlarm response says) (so allies smell it and, by stance
+// or doctrine, come or keep away) and may die. Its chance of dying in dt is
 // Lanchester-like: rate × dt × enemies around ÷ allies around, so equal
 // numbers trade and the bigger crowd wins. Deaths are decided for everyone
 // before anyone is removed, so the order colonies are listed in is no edge.
@@ -86,8 +84,6 @@ export function around(grid: CountGrid, size: WorldSize, cx: number, cy: number,
 /** Resolve one dt of fighting between colonies; `grids[k]` is colony k's occupancy. Returns the deaths per colony. */
 export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT): number[] {
   const deaths: number[][] = colonies.map(() => []);
-  /** per colony, pairs of (ant, 0 = flee | 1 = drop and run) */
-  const reactions: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
     const size = c.map.size;
     for (let i = 0; i < c.n; i++) {
@@ -101,20 +97,13 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       }
       if (enemies === 0) continue;
       const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy));
-      // The ant's onContact response: stand and fight (laying alarm by its raiseAlarm response), or flee / drop and run once the fight is resolved.
-      const contact = c.responses.onContact(c.viewOf(i));
-      if (contact === "fight") c.fightAlarm(i, p.alarm, dt);
-      else reactions[k]!.push(i, contact === "flee" ? 0 : 1);
+      const raise = c.responses.raiseAlarm(c.touch(i, true));
+      if (raise) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * raise * dt);
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
     }
   });
   colonies.forEach((c, k) => {
     for (const i of deaths[k]!) c.kill(i);
-    const r = reactions[k]!;
-    for (let j = 0; j < r.length; j += 2) {
-      if (r[j + 1] === 0) c.flee(r[j] as number);
-      else c.dropAndRun(r[j] as number);
-    }
   });
   return deaths.map((d) => d.length);
 }

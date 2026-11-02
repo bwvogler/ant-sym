@@ -1,6 +1,6 @@
 import { type Channel, type ChannelParams, DEFAULT_CHANNELS, Pheromones } from "./pheromone.ts";
-import { ALARM_GAIN, ITEMS, localResponses, type AntView, type Item, type Responses } from "./responses.ts";
-import { blocked, dropFood, rockAt, takeFood, type Nest, type WorldMap } from "./world.ts";
+import { localResponses, type Responses, type Touch } from "./responses.ts";
+import { blocked, dropFood, foodAt, rockAt, takeFood, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays like the picture sim, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -12,13 +12,12 @@ import { blocked, dropFood, rockAt, takeFood, type Nest, type WorldMap } from ".
 //             nest is: real ants path-integrate); carrying, lay food trail
 //   fight   — go for enemies in sight, else up the colony's alarm trail,
 //             else (raiding) toward the rival's nest
-// Which mode to be in is the main choice, asked only when a non-carrying
-// ant's situation changes, never every frame. That choice is a `Policy`: the
-// local rule, or Jev cached per situation (colonyBrain.ts, ui/colonyJev.ts).
-// Everything else an ant does when something happens to it (picking food up,
-// what to do while carrying it, putting it down, which trail to lay, meeting
-// an enemy, smelling alarm) is a `Responses` hook (responses.ts), called when
-// that event fires; `localResponses` is the rule the colony always had. Above the
+// Picking food up, what to do while carrying, putting it down, which trail
+// to lay and how hard to shy from alarm are the ant's small responses
+// (responses.ts; the local ones are the old fixed mechanics). Which mode to be
+// in is the big choice, asked only when a non-carrying ant's situation
+// changes, never every frame. That choice is a `Policy`: the local rule, or
+// Jev cached per situation (colonyBrain.ts, ui/colonyJev.ts). Above the
 // ants, the colony's stance (forage, defend, raid) is the strategist's
 // choice, made every few seconds from a coarse view of the colony (game.ts).
 
@@ -42,13 +41,11 @@ export function trailLevel(v: number): Trail {
   return v >= STRONG ? "strong" : v >= FAINT ? "faint" : "none";
 }
 
-/** What a mode choice may depend on: few values, so an answer can be cached per situation. Carrying ants are not asked: onCarry chose their mode when they picked up. */
+/** What a mode choice may depend on: few values, so an answer can be cached per situation. Carrying ants are never asked: they go home. */
 export interface Situation {
   mode: Mode;
   /** out longer than the colony's patience without finding food */
   tired: boolean;
-  /** inside its own nest (so a cached "return" can tell it is already home: ja-qnx) */
-  atNest: boolean;
   foodTrail: Trail;
   homeTrail: Trail;
   alarm: Trail;
@@ -137,58 +134,23 @@ export interface ColonyParams {
   patience: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
-  /** what a sensor reads for a food cell it sees (or the nest, for a homing ant): above any trail, so sight beats scent */
-  seen: number;
   /** cells around an ant it checks for enemies (a square of side 2 × enemyRange + 1) */
   enemyRange: number;
-  /** seconds of wall-following before giving up on this wall for a while */
+  /** seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round) */
   followGiveUp: number;
-  /** seconds of wall-following before trying the other side once */
+  /** seconds of wall-following before trying the other side of the wall */
   followFlip: number;
-  /** evaporation and spread of each of the colony's pheromone channels */
+  /** evaporation and spread of each pheromone channel */
   channels: Record<Channel, ChannelParams>;
 }
 
-/** Seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round). */
-export const FOLLOW_GIVE_UP = 120;
-/** Seconds of wall-following before trying the other side once (same line home). */
-export const FOLLOW_FLIP = 45;
+/** What a colony is built from: any params, and any part of any channel's. */
+export type ColonyOptions = Partial<Omit<ColonyParams, "channels">> & { channels?: Partial<Record<Channel, Partial<ChannelParams>>> };
 
-export const DEFAULT_COLONY: ColonyParams = {
-  antCount: 800,
-  maxAnts: 1200,
-  foodPerAnt: 4,
-  nest: 0,
-  speed: 7,
-  sensorDistance: 3,
-  sensorAngle: 0.6,
-  turnRate: 6,
-  wander: 4,
-  deposit: 4,
-  depositDecay: 20,
-  patience: 60,
-  alarmAvoid: 1.5,
-  seen: 100,
-  enemyRange: 2,
-  followGiveUp: FOLLOW_GIVE_UP,
-  followFlip: FOLLOW_FLIP,
-  channels: DEFAULT_CHANNELS,
-};
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, enemyRange: 2, followGiveUp: 120, followFlip: 45, channels: DEFAULT_CHANNELS };
 
-/** Params with defaults filled in; `channels` merges per channel and per field, so `{ channels: { food: { evaporation: 0.1 } } }` keeps the rest. */
-export function colonyParams(params: Partial<Omit<ColonyParams, "channels">> & { channels?: Partial<Record<Channel, Partial<ChannelParams>>> } = {}): ColonyParams {
-  const p: ColonyParams = { ...DEFAULT_COLONY, ...params, channels: DEFAULT_CHANNELS };
-  if (params.channels) {
-    const c = { ...DEFAULT_CHANNELS };
-    for (const k of Object.keys(params.channels) as Channel[]) c[k] = { ...DEFAULT_CHANNELS[k], ...params.channels[k] };
-    p.channels = c;
-  }
-  if (params.maxAnts === undefined) p.maxAnts = Math.max(p.antCount, Math.round(p.antCount * 1.5));
-  return p;
-}
-
-/** What `new Colony` and `new Game` take: any params, channels merged field by field. */
-export type ColonyOptions = Parameters<typeof colonyParams>[0];
+/** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
+const SEEN = 100;
 
 export class Colony {
   readonly map: WorldMap;
@@ -197,8 +159,8 @@ export class Colony {
   params: ColonyParams;
   policy: Policy;
   stancePolicy: StancePolicy;
-  /** what ants do when something happens to them (responses.ts) */
-  responses: Responses;
+  /** the ant's small responses (pick up, carry, drop, mark, shy from alarm, raise it) */
+  responses: Responses = localResponses;
   stance: Stance = "forage";
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
@@ -207,7 +169,6 @@ export class Colony {
   heading: Float32Array;
   /** index into MODES */
   mode: Uint8Array;
-  /** index into ITEMS: 0 = nothing, 1 = food */
   carrying: Uint8Array;
   alive: Uint8Array;
   /** bumped every time a slot gets a new ant, so (slot, gen) names one ant even after its slot is reused */
@@ -231,10 +192,6 @@ export class Colony {
   #asked: Int16Array;
   /** the question behind each ant's current mode: its situation (with the mode it had) when last asked; −1 = never */
   #question: Int16Array;
-  /** what each ant sensed on its last tick, packed (see #pack): for hooks called outside the tick (fights) */
-  #sensed: Uint16Array;
-  /** the view handed to response hooks, refilled before each call */
-  #view: AntView = { mode: "explore", carrying: "none", atNest: false, tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
   /** enemy ants per cell, kept by the game each tick; null when there is no rival */
   enemies: CellCounts | null = null;
   /** where raiders go: the rival's nest */
@@ -253,18 +210,22 @@ export class Colony {
   /** which of the SITUATIONS the policy has been asked about: what a cached Jev policy would pay for */
   seen = new Uint8Array(SITUATIONS);
   #rng: () => number;
+  /** the situation handed to a response: one object, refilled for every call */
+  #t: Touch = { mode: "explore", carrying: "none", atNest: false, enemy: false, stance: "forage" };
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   #s = new Float64Array(9);
 
-  constructor(map: WorldMap, params: ColonyOptions = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance, responses: Responses = localResponses) {
+  constructor(map: WorldMap, params: ColonyOptions = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
     this.map = map;
-    this.responses = responses;
-    this.params = colonyParams(params);
+    const channels = { ...DEFAULT_COLONY.channels };
+    for (const [ch, cp] of Object.entries(params.channels ?? {}) as [Channel, Partial<ChannelParams>][]) channels[ch] = { ...channels[ch], ...cp };
+    this.params = { ...DEFAULT_COLONY, ...params, channels };
+    if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
     this.nest = map.nests?.[this.params.nest] ?? map.nest;
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
-    this.ph = new Pheromones(map, this.params.channels);
+    this.ph = new Pheromones(map, channels);
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -284,7 +245,6 @@ export class Colony {
     this.my = new Float32Array(n).fill(NaN);
     this.#asked = new Int16Array(n).fill(-1);
     this.#question = new Int16Array(n).fill(-1);
-    this.#sensed = new Uint16Array(n);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
     for (let k = 0; k < this.params.antCount; k++) this.#place(k);
@@ -305,9 +265,21 @@ export class Colony {
     this.mx[i] = NaN;
     this.#asked[i] = -1;
     this.#question[i] = -1;
-    this.#sensed[i] = 0;
     this.gen[i] = ((this.gen[i] as number) + 1) >>> 0;
     this.alive[i] = 1;
+  }
+
+  /** Ant i's situation for a response, in the shared Touch object (read it, don't keep it). */
+  touch(i: number, enemy: boolean): Touch {
+    const t = this.#t;
+    const dx = (this.x[i] as number) - this.nest.x;
+    const dy = (this.y[i] as number) - this.nest.y;
+    t.mode = MODES[this.mode[i] as number] as Mode;
+    t.carrying = this.carrying[i] ? "food" : "none";
+    t.atNest = dx * dx + dy * dy < this.nest.r * this.nest.r;
+    t.enemy = enemy;
+    t.stance = this.stance;
+    return t;
   }
 
   /** Living ants. */
@@ -362,47 +334,6 @@ export class Colony {
     return this.alive[i] && q >= 0 ? decode(q) : null;
   }
 
-  /**
-   * Ant i as the response hooks see it, from what it sensed on its last tick: for hooks called
-   * outside the colony's own tick (onContact and raiseAlarm, from the fights). The returned object
-   * is reused by the next call.
-   */
-  viewOf(i: number): AntView {
-    const v = this.#view;
-    const p = this.#sensed[i] as number;
-    v.mode = MODES[this.mode[i] as number] as Mode;
-    v.carrying = ITEMS[this.carrying[i] as number] as Item;
-    v.foodTrail = TRAILS[p & 3] as Trail;
-    v.homeTrail = TRAILS[(p >> 2) & 3] as Trail;
-    v.alarm = TRAILS[(p >> 4) & 3] as Trail;
-    v.enemy = p & 64 ? "near" : "none";
-    v.tired = (p & 128) !== 0;
-    v.atNest = (p & 256) !== 0;
-    v.stance = this.stance;
-    return v;
-  }
-
-  /** Alarm laid by ant i in a fight this step, from its raiseAlarm response: `rate` × dt × the answer's gain. */
-  fightAlarm(i: number, rate: number, dt: number): void {
-    const gain = ALARM_GAIN[this.responses.raiseAlarm(this.viewOf(i))];
-    if (gain > 0) this.ph.deposit("alarm", this.x[i] as number, this.y[i] as number, rate * dt * gain);
-  }
-
-  /** Ant i turns for home: an onContact "flee". */
-  flee(i: number): void {
-    if (!this.alive[i]) return;
-    this.mode[i] = RETURN;
-    this.#asked[i] = -1;
-  }
-
-  /** Ant i drops what it carries where it stands and turns for home: an onContact "drop". */
-  dropAndRun(i: number): void {
-    if (!this.alive[i]) return;
-    if (this.carrying[i] === 1) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
-    this.carrying[i] = 0;
-    this.flee(i);
-  }
-
   /** Distinct situations the policy has been asked about. */
   get situationsSeen(): number {
     let s = 0;
@@ -441,7 +372,6 @@ export class Colony {
     const sy = (this.y[i] as number) + dy * d;
     const s = this.#s;
     const { map, nest } = this;
-    const SEEN = this.params.seen;
     if (sx < 0 || sy < 0 || sx >= map.size.w || sy >= map.size.h) {
       s[slot] = s[slot + 3] = s[slot + 6] = -1;
       return;
@@ -481,7 +411,7 @@ export class Colony {
     return blocked(this.map, x + Math.cos(angle) * d, y + Math.sin(angle) * d);
   }
 
-  /** The nearest cell holding enemies within enemyRange of ant i, as a heading, or null. */
+  /** The nearest cell holding enemies within params.enemyRange of ant i, as a heading, or null. */
   #enemyHeading(i: number): number | null {
     const g = this.enemies;
     if (!g) return null;
@@ -538,48 +468,37 @@ export class Colony {
       const af = sn[7] as number;
       const ar = sn[8] as number;
       const toEnemy = this.#enemyHeading(i);
-      const x0 = this.x[i] as number;
-      const y0 = this.y[i] as number;
-      const home0 = (x0 - nest.x) * (x0 - nest.x) + (y0 - nest.y) * (y0 - nest.y) < nest.r * nest.r;
-      const tired = (this.since[i] as number) > p.patience;
-      const food = trailLevel(Math.max(fl, ff, fr));
-      const home = trailLevel(Math.max(hl, hf, hr));
-      const alarm = trailLevel(Math.max(al, af, ar));
-      const enemy = toEnemy === null ? 0 : 1;
 
       // The mode choice, only when the situation changed since the ant was last asked.
-      // A carrying ant is not asked: onCarry chose its mode at pickup (it is asked afresh once it puts the load down).
-      const carrying = this.carrying[i] !== 0;
+      // A carrying ant is not asked: its carry response says what to do (the local one: go home),
+      // and it is asked afresh once it puts the food down.
+      const carrying = this.carrying[i] === 1;
+      const R = this.responses;
       let mode = this.mode[i] as number;
       if (carrying) {
+        mode = MODES.indexOf(R.carry(this.touch(i, toEnemy !== null)));
+        if (mode < 0) mode = RETURN;
+        this.mode[i] = mode;
         this.#asked[i] = -1;
-        this.#question[i] = -1;
+        this.#question[i] = -1; // carrying is not the mode policy's choice; the next question comes once the food is down
       } else {
+        const tired = (this.since[i] as number) > p.patience;
+        const food = trailLevel(Math.max(fl, ff, fr));
+        const home = trailLevel(Math.max(hl, hf, hr));
+        const alarm = trailLevel(Math.max(al, af, ar));
+        const enemy = toEnemy === null ? 0 : 1;
         const stance = STANCES.indexOf(this.stance);
-        const before = encode(mode, tired, home0, food, home, alarm, enemy, stance);
-        // Crossing the nest's edge alone does not re-ask: the ant is asked with atNest as it is when anything else changes.
-        if (encode(mode, tired, false, food, home, alarm, enemy, stance) !== this.#asked[i]) {
-          mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, atNest: home0, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
+        const before = encode(mode, tired, food, home, alarm, enemy, stance);
+        if (before !== this.#asked[i]) {
+          mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
           this.mode[i] = mode;
-          this.#asked[i] = encode(mode, tired, false, food, home, alarm, enemy, stance);
+          this.#asked[i] = encode(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
           this.#question[i] = before;
           this.decisions++;
         }
       }
-      // What the response hooks see this tick.
-      const v = this.#view;
-      v.mode = MODES[mode] as Mode;
-      v.carrying = ITEMS[this.carrying[i] as number] as Item;
-      v.atNest = home0;
-      v.tired = tired;
-      v.foodTrail = food;
-      v.homeTrail = home;
-      v.alarm = alarm;
-      v.enemy = enemy ? "near" : "none";
-      v.stance = this.stance;
-      this.#sensed[i] = TRAILS.indexOf(food) | (TRAILS.indexOf(home) << 2) | (TRAILS.indexOf(alarm) << 4) | (enemy << 6) | (tired ? 128 : 0) | (home0 ? 256 : 0);
       // Steer by mode.
       const noise = (rng() - 0.5) * 2 * dt;
       const detouring = (this.detour[i] as number) > 0;
@@ -642,21 +561,19 @@ export class Colony {
           h = turnToward(h, Math.atan2(t.y - (this.y[i] as number), t.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
         } else h += noise * p.wander;
       } else {
-        const seen = Math.max(fl, ff, fr) >= p.seen;
+        const seen = Math.max(fl, ff, fr) >= SEEN;
         h += seen ? climb(fl, ff, fr, p.turnRate * dt) : noise * p.wander;
       }
-      // Smelling alarm: the alarmGain response steers away from it, ignores it or climbs it.
-      if (Math.max(al, af, ar) >= FAINT) {
-        const g = this.responses.alarmGain(v);
-        if (g === "flee") h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * dt);
-        else if (g === "approach") h += climb(al, af, ar, p.turnRate * p.alarmAvoid * dt);
-      }
+      // Shy away from alarm (the local response: every mode but fighting, fully).
+      const t = this.touch(i, toEnemy !== null);
+      const gain = R.alarmGain(t);
+      if (gain) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
 
-      // Lay trail: the mark response picks which (today: walking out marks the way home, carrying food the way to it).
-      const mark = this.responses.mark(v);
-      if (mark !== "none") {
-        const laid = p.deposit * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt;
-        ph.deposit(mark, this.x[i] as number, this.y[i] as number, laid);
+      // Lay trail (the local response: walking out marks the way home, carrying food marks the way to it).
+      const trail = R.trail(t);
+      if (trail !== "none") {
+        const laid = p.deposit * R.trailRate(t) * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt;
+        ph.deposit(trail, this.x[i] as number, this.y[i] as number, laid);
       }
 
       // Move; rock or the edge turns the ant back somewhere random.
@@ -692,25 +609,21 @@ export class Colony {
         this.y[i] = ny;
       }
 
-      // Food and the nest: onFood decides whether to take food the ant stands on, onCarry what to do
-      // with it, atSite whether to put it down at the nest. The nest rests a tired ant.
+      // Pick up food where there is some if the get response says so (the local one: unless fighting);
+      // at the nest, put the load down if the drop response says so (the local one: always). The nest rests a tired ant.
       const ndx = (this.x[i] as number) - nest.x;
       const ndy = (this.y[i] as number) - nest.y;
       const atNest = ndx * ndx + ndy * ndy < nest.r * nest.r;
-      v.atNest = atNest;
-      if (!carrying && map.food.get(Math.floor(this.x[i] as number), Math.floor(this.y[i] as number)) > 0 && this.responses.onFood(v) && takeFood(map, this.x[i] as number, this.y[i] as number)) {
+      if (!carrying && foodAt(map, this.x[i] as number, this.y[i] as number) > 0 && R.get(this.touch(i, toEnemy !== null)) && takeFood(map, this.x[i] as number, this.y[i] as number)) {
         this.carrying[i] = 1;
         this.wall[i] = 0;
         this.mx[i] = NaN;
         this.since[i] = 0;
         h += Math.PI;
-        v.carrying = "food";
-        const carry = MODES.indexOf(this.responses.onCarry(v));
-        this.mode[i] = carry < 0 ? RETURN : carry;
       } else if (atNest) {
         this.wall[i] = 0;
         this.mx[i] = NaN;
-        if (carrying && this.responses.atSite(v)) {
+        if (carrying && R.drop(this.touch(i, toEnemy !== null))) {
           this.carrying[i] = 0;
           this.stored++;
           this.larder++;
@@ -726,8 +639,8 @@ export class Colony {
   }
 }
 
-/** Every situation a mode choice can be asked in: mode × tired × atNest × food × home × alarm × enemy × stance = 4 × 2 × 2 × 3 × 3 × 3 × 2 × 3 = 2,592. */
-export const SITUATIONS = MODES.length * 2 * 2 * TRAILS.length ** 3 * 2 * STANCES.length;
+/** Every situation a mode choice can be asked in: mode × tired × food × home × alarm × enemy × stance = 4 × 2 × 3 × 3 × 3 × 2 × 3 = 1,296. */
+export const SITUATIONS = MODES.length * 2 * TRAILS.length ** 3 * 2 * STANCES.length;
 
 /** A situation from its index in SITUATIONS: the inverse of encode. */
 export function decode(code: number): Situation {
@@ -742,19 +655,17 @@ export function decode(code: number): Situation {
   c = Math.floor(c / 3);
   const foodTrail = TRAILS[c % 3] as Trail;
   c = Math.floor(c / 3);
-  const atNest = c % 2 === 1;
-  c = Math.floor(c / 2);
   const tired = c % 2 === 1;
   const mode = MODES[Math.floor(c / 2)] as Mode;
-  return { mode, tired, atNest, foodTrail, homeTrail, alarm, enemy, stance };
+  return { mode, tired, foodTrail, homeTrail, alarm, enemy, stance };
 }
 
 export function encodeSituation(s: Situation): number {
-  return encode(MODES.indexOf(s.mode), s.tired, s.atNest, s.foodTrail, s.homeTrail, s.alarm, s.enemy === "near" ? 1 : 0, STANCES.indexOf(s.stance));
+  return encode(MODES.indexOf(s.mode), s.tired, s.foodTrail, s.homeTrail, s.alarm, s.enemy === "near" ? 1 : 0, STANCES.indexOf(s.stance));
 }
 
-function encode(mode: number, tired: boolean, atNest: boolean, food: Trail, home: Trail, alarm: Trail, enemy: number, stance: number): number {
-  return ((((((mode * 2 + (tired ? 1 : 0)) * 2 + (atNest ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
+function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: Trail, enemy: number, stance: number): number {
+  return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * 3 + TRAILS.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
 }
 
 /** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */

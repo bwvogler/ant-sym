@@ -1,7 +1,7 @@
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyOptions, type Policy, type StancePolicy } from "./colony.ts";
-import { localResponses, type Responses } from "./responses.ts";
-import type { WorldMap } from "./world.ts";
+import type { Responses } from "./responses.ts";
+import { mulberry32, type WorldMap } from "./world.ts";
 
 // The game, pure: the player's colony and (optionally) a rival on one map,
 // sharing its food. Each tick: the colonies move (each seeing the other's
@@ -25,12 +25,24 @@ export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts:
 
 export type Outcome = "playing" | "won" | "lost";
 
-/** One side's brain and params: what `new Game` takes for the player and for the rival. */
-export interface Side {
+/** How each side plays: the player's policy, strategist and colony params, and the same for the rival (default: the local rule). */
+export interface Sides {
   policy?: Policy;
   stance?: StancePolicy;
-  responses?: Responses;
   colony?: ColonyOptions;
+  rival?: ColonyOptions;
+  rivalPolicy?: Policy;
+  rivalStance?: StancePolicy;
+  responses?: Responses;
+  rivalResponses?: Responses;
+}
+
+/**
+ * The game's random numbers for a seed: one scheme for the page, the experiments and the scripts,
+ * so a number measured offline reproduces on the page. `generation` is the page's Restart count.
+ */
+export function gameRng(seed: number, generation = 0): () => number {
+  return mulberry32(seed * 7919 + generation);
 }
 
 export class Game {
@@ -45,13 +57,18 @@ export class Game {
   #nextStrategy = 0;
   #rng: () => number;
 
-  constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Side = {}, rival: Side = {}) {
+  constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Sides = {}) {
     this.map = map;
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
-    const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance, player.responses ?? localResponses);
+    const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
+    if (player.responses) mine.responses = player.responses;
     this.colonies = [mine];
-    if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1, ...rival.colony }, rng, rival.policy ?? localPolicy, rival.stance ?? localStance, rival.responses ?? localResponses));
+    if (this.params.rival && map.nests.length > 1) {
+      const rival = new Colony(map, { antCount: this.params.rivalAnts, ...player.rival, nest: 1 }, rng, player.rivalPolicy ?? localPolicy, player.rivalStance ?? localStance);
+      if (player.rivalResponses) rival.responses = player.rivalResponses;
+      this.colonies.push(rival);
+    }
     this.#grids = this.colonies.map(() => new CountGrid());
     this.#enemy = this.colonies.map(() => new CountGrid());
     this.colonies.forEach((c, k) => {
