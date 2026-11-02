@@ -1363,6 +1363,7 @@ The side view's nest is no longer one pre-dug disc. The ants dig chambers off it
   - None start in the top 8 rows. One started 5 rows down beside the shaft trapped a whole colony's pellet carriers.
   - None start within `4 + 0.15 × depth` rows of a chamber in the same stack.
 - **Roomy,** every other kind of digging happens at `ROOMY_DIG` (15 %) of its rate: tunnel ends, starts off walls, faces met head-on. A 30-ant colony in the founding chamber dug 3–7 cells in two minutes, against about 78 without chambers.
+  - Since #17 was merged in (2026-11-02), a Y fork's second arm, left for the next digger to pass, is another kind of digging; it is damped the same way. Undamped, it raised the roomy colony's dig ratio (roomy ÷ no chambers, over 30 games on nest 5) from 0.34 before the merge to 0.38 (one game, world 2 game 8, to 1.00: as much as with no chambers); damped it is 0.35 (that game 0.33).
 
 **Chambers never join.** A chamber face (widening or new) is dug whatever the tunnel spacing rules say, so it may open onto a tunnel (a junction), but never onto another chamber of either colony. The first cut forbade opening onto any passage, and chambers stayed at 1–6 cells with every colony crowded 100 % of the time.
 
