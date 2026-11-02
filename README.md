@@ -43,13 +43,17 @@ spend and time caps from the real `usage.input_tokens` of every reply.
   attractor when it points at ink) and a "recognisable" noul.
 - **Overlays**: deficit heatmap, pheromone trails. **Local rule** brain for a free
   comparison with a greedy gradient walk.
-- **Colony** (the *Colony* tab, `#colony`): a procedural world of rock, food, your nest
-  and a rival's. Food makes ants, fights kill them, and each colony's strategist picks
-  forage, defend or raid. The ants forage on their own. They lay a trail to food and a trail home,
-  and switch between exploring, following and going home. You are the fungus:
-  paint *lure* or *alarm* scent (free), and set the colony's *doctrine*. With
-  **Start Jev**, Jev picks each ant's mode, once per situation under that doctrine,
-  for about two cents an hour (PRD §9–10).
+- **Colony** (the *Colony* tab, `#colony`): a procedural 512×320 world of rock, soil
+  and food, dug underground by default (*Ground → open* for the surface), with two
+  colonies, Ink and Amber. Food makes ants, fights kill them, and each colony's
+  strategist picks forage, defend or raid. The ants forage on their own: they lay a
+  trail to food and a trail home, and switch between exploring, following and going home.
+  You are the fungus and nothing else: paint spores of one of three strains, choose what
+  the fungus may do and what it aims for, and paint *lure* or *alarm* scent. You win
+  when the colonies become one (*unified*) and lose if one falls. With **Start Jev**, Jev
+  picks every colony's ant modes and stances under its doctrine, and what the fungus does
+  under your aim, each once per situation, for roughly $0.10–0.15 an hour of retuning
+  (PRD §11–12, §19).
 
 ## How it talks to Jev
 
@@ -57,8 +61,8 @@ One request carries about a hundred ants. The state is a JSON object with one ke
 per ant; each ant gets its own `choice` (eight compass directions or stay) and its
 own `noul` (settle). Jev evaluates each question against the state independently,
 so a packed request costs the same as a hundred single ones but takes one round
-trip (~300 ms). Six requests run in parallel, which is the browser's connection
-limit per host. Details, the schema bake-off and the measured token budget are in
+trip (~300 ms). Five requests run in parallel: the browser allows six per host, and
+the sixth stays free so Stop gets through at once (`JEV_IN_FLIGHT` lowers it). Details, the schema bake-off and the measured token budget are in
 [docs/PRD.md](docs/PRD.md).
 
 The **cached** brain (Jev settings → Brain schema) asks those same questions once per
@@ -89,12 +93,13 @@ should lower the default caps.
 ## Development
 
 ```sh
-cd web
-npm test          # sim + server tests (node --test, native TS)
-npm run lint      # oxlint
-npx tsc -b        # types
+npm test            # every node --test suite: server, sim, colony, ui (native TS, Node ≥ 22.18)
+npm run lint        # oxlint
+npm run typecheck   # tsc -b
 ```
 
-`web/src/sim` is pure and testable headless; `web/server` is the proxy and ledger;
-`web/src/ui` is React and canvas. Work is tracked with [beads](https://github.com/steveyegge/beads)
+`web/src/sim` (picture) and `web/src/colony` (colony and fungus) are pure and testable
+headless, except `sim/targets.ts`, which rasterises text and images in the browser;
+`web/shared` holds the wire types; `web/server` is the proxy and ledger; `web/src/ui` is
+React, canvas and the browser-side Jev clients. Work is tracked with [beads](https://github.com/steveyegge/beads)
 (`bd ready`). MIT.
