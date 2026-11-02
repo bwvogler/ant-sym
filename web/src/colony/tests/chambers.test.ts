@@ -51,6 +51,8 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
   const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
   assert.ok(mine.length >= 3, `${mine.length} chambers`);
+  // Floor at least doubles. Over worlds 1–4 and games 4–6 it grows 2.3–3.7× (2.4–3.6× before #17 was merged in, whose
+  // Y forks change the tunnels): ×3 sat inside that spread, and the merge's new random path put this run at 2.3×.
   assert.ok(ch.floorOf[0]! > floor0 * 2, `floor ${floor0} → ${ch.floorOf[0]}`);
   // No chamber was dug into another: widening and new chambers don't break into other passages (review of slice 2).
   for (let y = 0; y < map.size.h; y++)
@@ -80,12 +82,18 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
 });
 
 test("a roomy nest barely digs (ja-wii): the same few ants dig far less when their chambers have floor enough", () => {
+  // Summed over four games: 30 ants dig little, so one game's ratio is noisy (over 30 games, 0.32 ± 0.15 before #17 was
+  // merged in and 0.40 ± 0.22 after; one game in eight was over 0.5 even before).
   const dug = (chambers: boolean) => {
-    const map = generateSideWorld(2, SMALL);
-    if (!chambers) map.chambers = undefined; // no chambers: never roomy (as before slice 2)
-    const c = new Colony(map, { antCount: 30, maxAnts: 30 }, mulberry32(6));
-    for (let k = 0; k < 30 * 120; k++) c.tick(1 / 30);
-    return c.soilDug;
+    let s = 0;
+    for (const seed of [6, 7, 8, 9]) {
+      const map = generateSideWorld(2, SMALL);
+      if (!chambers) map.chambers = undefined; // no chambers: never roomy (as before slice 2)
+      const c = new Colony(map, { antCount: 30, maxAnts: 30 }, mulberry32(seed));
+      for (let k = 0; k < 30 * 120; k++) c.tick(1 / 30);
+      s += c.soilDug;
+    }
+    return s;
   };
   const roomy = dug(true);
   const before = dug(false);

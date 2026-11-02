@@ -1,8 +1,8 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef } from "react";
 import { CHUNK } from "../colony/chunks.ts";
 import { type Colony, moundRadius } from "../colony/colony.ts";
-import { INFECTED, type Fungus } from "../colony/fungus.ts";
 import { CELL, cellOf, centreX, centreY, R, SIDE } from "../colony/hex.ts";
+import { INFECTED, type Fungus } from "../colony/fungus.ts";
 import { BINS, binOf } from "../colony/recognition.ts";
 import { AIR, SOIL, worldExtent } from "../colony/world.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";

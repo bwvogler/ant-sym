@@ -846,7 +846,7 @@ An agent reviewed 1e, local sensing, the multi-colony client and the reframe, an
 
 Unconfirmed points the review raised, filed rather than fixed: lane starvation (the fungus lane is filled last each cycle); a 429 re-queue lost after a doctrine switch; colony k without its own doctrine following colony 0's only at the next game; `Fungus.configure` alone not telling Jev the menu; cull's push depending on which side of 0.5 the nest's odour has drifted to.
 
-*§24–28 were §15–19 on the side-view stack (MR 8–15 and the nest design); they were renumbered when `main` (the fungus, §15–23) was merged in (nest slice 0, ja-6nm).*
+*§24–28 were §15–19 on the side-view stack (MR 8–15 and the nest design); they were renumbered when `main` (the fungus, §15–23) was merged in (on #17, and in nest slice 0, ja-6nm).*
 
 ## 24. Hexagons, and tunnels that meander (MR 8, 2026-11-01)
 
@@ -875,7 +875,7 @@ The product owner asked why the tunnels are all right angles. On the square grid
 **The meander.** A tunnel's direction belongs to the tunnel, not the digger.
 - Each dug cell stores the heading it was dug at (`map.digHeading`, 255 steps round the circle).
 - The next digger at the end reads it, adds a small drift (σ 0.2 rad a cell), and digs one of the two ways either side of it, in proportion to how near each is (`chooseDig`). So a tunnel runs at its heading on average, at any angle.
-- Forks take ±60° plus noise. New tunnels start along the face.
+- Forks are Ys: one arm 60° to one side now, the other 60° to the other side, dug by the next digger to pass the fork (`markFork` / `takeFork`). A fork with one arm 60° off and the other straight on can't happen on hexes: the cell straight on touches the 60° arm, so it is no longer a tunnel's end and is never dug (review of #9: 2 junctions in the meander field, against #8's 21; with Ys, 27). New tunnels start along the face.
 - The review caught that the heading was dropped on the ant's last step to the face, so the drift never added up along a tunnel; the test passed on noise. Fixed. The test now needs more than 20 % of runs to sit 20°+ off every way. Fresh noise per cell gives about 8 %, and it measured 9 % before the fix.
 
 **Drawing** (`ColonyField.tsx`).
@@ -917,6 +917,20 @@ The product owner asked why the tunnels are all right angles. On the square grid
 
 **Jev:** situations, legend and request are unchanged. The tokens per question and per ant are unchanged.
 
+**Merged with `main` (#7 fungus, #13), 2026-11-02.** The fungus came in on square cells and now runs on hexes:
+- **Windows are hex discs.** Fights, recognition (`Recognition.around`), the fungus's contact and grooming (`#gather`), and the nearest-enemy search read the cell and its six neighbours (7 cells, where the square read 9). `enemiesNearNest` counts strangers in a world-unit disc. So contact and fight counts per encounter are a little lower than on the square grid.
+- **Ant cells come from `antCell`** (the hex cell, cached), not `floor(x)`, everywhere the fungus and recognition place ants. The spore brush paints a hex disc (`disc`, now exported from `world.ts`).
+- **The nearest enemy is the nearest by distance**, not the first in ring order (review of #9: within ring 2 it could pick a cell 2 away over one √3 away, leaning north-west).
+- **Tunnel headings are kept in 252 steps,** not 255: a multiple of 6, so a fork's ±60° and 120° land exactly. With 255 every fork was half a step off the same way, and it added up (worst 2.1° in the meander test).
+- **`handOnWall`'s `lost` tests only the back-hand cell** (review of #9). A follower with a speck at its front hand only turned 120° into the open back-hand cell, put the speck on its other hand and walked off; it now passes the speck and turns round it at the next cell. A homing test across a speckled cavern went from a median 164 s home (57 of 200 never home in 300 s) to 12 s (1 of 200).
+- **Second review (of the merge):**
+  - **No square-grid assumption left in the sim.**
+  - **A fork's second arm** is taken two ways round from the way actually dug, not from the aim. From the aim, a dithered dig put the two arms side by side about 1 fork in 8, and the second could never be dug. The meander field now has 38 junctions.
+  - **Fork entries** whose cell later widens into a chamber are never read again: about 4 % of dug cells, at most one per cell, for one game. Bounded, left.
+  - **The fungus is calibrated for 7-cell windows,** against 9 on the square grid. The enemy disc is 19 cells, not 25, and the nest watch is a disc, not a square. Ratios (fights, contact load) are unchanged, but count-gated terms (grooming mates, kin and allied contact) fire a little less, so §15–23's fungus numbers may be a little off on hexes.
+  - **`colony-cost` painted alarm by row count** as if rows were 1 apart, so about 12 % of blots fell off the map. It now uses `worldExtent`.
+- **Tests:** `main`'s homing tests from the review of #8 (ring of tunnels, tunnel handover) are ported to hex maps; its square-only corner-slip test is dropped (hexes have no corners to slip through), and its float32 test becomes an invariant in the underground game: no ant-tick is ever inside a solid cell. The fungus, recognition, emission and perception tests place ants at hex cell centres. New: a speck at the front hand (`handOnWall`), and at least 12 junctions in the meander field.
+
 ## 25. Getting home through dug ground (MR 9, 2026-11-01)
 
 MR 8 (hexagons) kept the underground economy but more ants stayed out long: 20–27 % out over 120 s (MR 7: 8–23 %). The reviewer's stall scan (900 + 900 ants, seed 1, 180 s) found 151 ants that hadn't moved 2 cells in over 30 s. Traces found three faults in wall-following round soil:
@@ -936,7 +950,7 @@ MR 8 (hexagons) kept the underground economy but more ants stayed out long: 20�
    - **Caught by the review, before the PR:** re-anchoring reset progress. Carriers left a wall, bumped the same spot and re-anchored, cycling over ~3 cells every 1–2 s; the stall scan (within 2 cells) missed them. In closed caverns with a far exit, 12 of 12 were stuck for 300 s.
    - Now:
      - "homing over 60 s with more than 15 releases and no wandering" counts 0, 0, 1 and 2 on seeds 1–4 (was 20, 4, 75, 12);
-     - closed caverns all get home (26–28 s mean);
+     - closed caverns all get home (26–28 s mean; #8 took about 15 s, so this is slower than before the livelock it fixes: bead `ja-cav`);
      - the stall scan finds nothing still over 8 s.
 
 **Digging is social.** Rasse & Deneubourg (2001): workers dig more where nestmates crowd, so digging falls off as the nest grows roomy and they spread out.
@@ -966,6 +980,26 @@ MR 8 (hexagons) kept the underground economy but more ants stayed out long: 20�
 - **Bench:** no change (3.7 ms underground, 5.4 ms open, back to back with MR 8). The browser holds ~60 fps at every zoom, with no console errors in light, dark or phone layouts.
 
 **Jev:** situations, legend and request are unchanged. Tokens are unchanged.
+
+**Review of #10, fixed on merging #9 (2026-11-02):**
+- **Every wall underground is followed cell by cell,** rock as well as soil (`cellWall = map.hasSoil || soil`). A rock speck in dug ground was followed by touch, out of reach of every release the cell-by-cell follower has (re-anchoring, `nearer`, `anywhere`, the give-up on coming back round, `sight`), so carriers circled it until the 120 s give-up: on seed 2 about 85 of one colony's carriers round one speck at once. The speckled-cavern test now runs with soil, rock-and-soil and rock specks; the rock variants fail without this. Whole games underground (600 + 600 ants, 600 s, seeds 1–5; food home per colony, and the share of ants homing for over 120 s, sampled every 5 s after the first 2 minutes):
+
+  | Seed | Without | With | Homing > 120 s, without → with |
+  |---|---|---|---|
+  | 1 | 451 / 1,311 | 241 / 1,330 | 1.3 → 0.6 % |
+  | 2 | 1,001 / 1,274 | 769 / 1,387 | 2.2 → 0.5 % |
+  | 3 | 1,203 / 718 | 1,228 / 756 | 3.5 → 0.5 % |
+  | 4 | 134 / 935 | 1,234 / 966 | 17.5 → 0.7 % |
+  | 5 | 1,676 / 845 | 1,418 / 1,296 | 1.6 → 0.4 % |
+  | All | 9,548 | 10,625 (+11 %) | |
+
+  Single games are noisy (seeds 1 and 2 bring home less), but every seed has fewer ants out long, and seed 4's first colony, stuck round rock without it, brings home nine times the food.
+- **An island release counts against `NO_GAIN`** like `anywhere`: leave, meet the same spot, go round and leave had no bound. Progress is named (`GAIN`, 0.5).
+- **The wall's cell is the landing cell** the step was judged on (float32), not the float64 step.
+- **The "no corner spins" reorder of `handOnWall`** is the same rule as #9's review fix (`lost` tests only the back-hand cell): checked over all 1,536 neighbour, direction, side and parity cases. It also changes how explorers walk tunnels and hug chamber walls.
+- **A tunnel that its home scent leads into is walked** (`#walkTunnel`), not turned from toward the home vector: from a tunnel that can point into soil, and the blocked step started a new wall every tick (the review of #8's freeze, kept through the merge).
+- **The meander test's drift bound is back to 2°** (headings in 252 steps, from #9).
+- **Not fixed: closed caverns** (`ja-cav`): 18–29 s, mean 26 s over 16 seeds, against #8's 12–18 s. Longer look-ahead for the `anywhere` release and `NO_GAIN` 1–2 didn't change it much (`NO_GAIN` 1: mean 19 s but one seed 52 s).
 
 ## 26. Where the dug soil goes (MR 10–11, 2026-11-01)
 
@@ -1192,34 +1226,26 @@ Slices 0–9 are beads under the epic, starting with merging the fungus mileston
 
 The fungus milestone (§15–23, PR #7) and the maintenance review (#13) were built on square cells; the side-view stack (§24–27) rewrote the colony on hexes. This merge puts them together. The sections were renumbered (see the note above §24).
 
-**How it was merged.** `colony.ts` keeps the stack's hex movement and homing. Main's fungus hooks were ported onto it:
-- the per-ant fungus arrays and `asIs`;
-- the perception gains in `#sense`;
-- `look` and the `ENEMY` threshold in enemy sensing;
-- the fungal clock on tiredness, and calm on charging;
-- `layGain`, and the food leak into the rival's field.
+**How it was merged.** `main` reached this branch twice: here first, and again through #17 (mr15), which merged `main` itself and was then merged in (2026-11-02). That second merge was criss-cross (two bases: the stack before #17's own merge, and `main`), so git took the hunks the first cut had dropped as deliberate deletions; they were put back by hand. `colony.ts` is now #17's, and its port of the fungus onto hexes is described in §24 ("Merged with `main`") and §25 ("Review of #10"). On top of it, this slice keeps:
+- after a stall, `#walkTunnel` picks branches by the vector to the ant's goal (`#goalX`, `#goalY`: the entrance on the ground line, else the nest), not always to the nest;
+- `bestD` and `stallT` are reset when the goal changes (nest ↔ entrance), so progress is judged toward the goal the ant now has. There is one stall clock, advanced once a tick;
+- backfill asks for every ant of another colony (`look` at tolerance −1), so it won't wall one in, stranger or not;
+- `Game.enemiesNearNest` watches the entrance as well as the chamber, in world units;
+- solo underground, the game refreshes occupancy through `#refresh()` like every other case (the same work: one colony, no recognition).
 
-Two of main's homing fixes apply on hexes too and were ported:
-- **A trip home starts afresh**, whether the ant picked up food or its policy sent it home: no detour or bumps carried over.
-- **No progress for `TUNNEL_STALL` (20 s):** the tunnel walker picks branches by the home vector for `BY_VECTOR` (15 s), then goes back to scent. Without this, homing carriers can circle a ring of scented tunnels for ever.
+**Main's five homing fixes** (the review of #8), on hexes:
 
-The agent review of this merge found that the first cut had dropped both, and reproduced the ring trap on hexes (6 of 6 seeds). Each now has a test that fails without it.
-
-Main's "lost wall" fix (`WALL_LOST`) is not carried over. On hexes a wall-follower walks the wall cell by cell with a hand on it, so it can't drift off into the open.
-
-**Grid code moved to hexes** (`hex.ts`):
-
-| Where | Change |
+| Fix | Disposition |
 |---|---|
-| `Recognition.build` | bins each ant by its hex cell |
-| `Recognition.around` | the cell and its neighbours within `r` hex steps (was a (2r+1)² square) |
-| `Fungus.step`, `#gather` | an ant's cell, and its six neighbours (was the 3×3 square) |
-| `Fungus.paint` | the brush is a disc of hex centres |
-| `Game.enemiesNearNest` | the hex disc round the chamber, and the entrance as well |
+| A trip home starts afresh (`#homeAfresh`: detour, bumps, wall, line home, lost-wall clock, stall clock) | Kept: on food pickup, on picking up a pellet, and when the policy sends an ant home. One definition. |
+| No progress for `TUNNEL_STALL` (20 s): branches by the home vector for `BY_VECTOR` (15 s) | Kept, with the goal-change reset above. Without it carriers circle a ring of scented tunnels for ever (6 of 6 seeds on the first cut); two ring tests, one per ring shape. |
+| Lost wall (`WALL_LOST`, `untouched`): touching no rock for 1.5 s lets go of the wall | Kept. Rock on open ground is still followed by touch, so a follower thrown off it by alarm circles in the open until the 120 s give-up without it. Two tests. |
+| No new wall on give-up: a give-up earlier in the tick re-read (`wandering`) before a blocked step starts a wall | Kept. Its test sets the ant at `centreY(10)`: at `y = 10`, on hexes row 11, the step was never blocked and the test passed without the fix. |
+| Tunnel handover and float32 | Kept. A wall-follower handed to a scented tunnel is walked on by `#walkTunnel`, not turned to the home vector; positions are rounded to float32 (`Math.fround`) before the landing cell is judged; the underground game asserts no ant-tick inside a solid cell. |
 
-Backfill now asks Recognition for every ant of another colony (`look` at tolerance −1), so it won't wall one in, stranger or not. Tests that placed ants at square-cell centres (`x + 0.5, y + 0.5`) place them at hex centres instead (`centreX`, `centreY`).
+With #17 merged in, `tsc` and oxlint are clean and all 257 tests pass.
 
-**Measured** (`scripts/colony-bench.mjs 1200 60 1`, merged vs the stack's tip mr15):
+**Measured** on the first cut of this merge, before #17 was merged in (`scripts/colony-bench.mjs 1200 60 1`, merged vs the stack's tip mr15 as it then was):
 - **Fungus hooks alone:** before the two homing fixes, the side view was identical to mr15 ant for ant (one colony 497 stored; two 448 / 439).
 - **With the fixes:** the side view stores 482 (one colony) and 462 / 500 (two).
 - **Tick time:** unchanged within noise, side view two colonies 5.15 ms against 5.23 ms.
@@ -1269,7 +1295,8 @@ The side view no longer gives ants an exact vector home through the soil (docs/n
 
 **Bug2 on the ground.** With no open cell nearer the hole it heads for, a homing ant keeps a hand on the surface until it is nearer than where it got stuck.
 - It picks its hand by feeling ahead along the surface both ways (`GROUND_LOOK`, 16 cells) and taking the side that gets nearer sooner. In a gully between two heaps, one side leads over toward the hole and the other along the far heap and away.
-- After `GROUND_FLIP` (24) cells it turns back with the other hand.
+- After `GROUND_FLIP` (24) cells it turns back with the other hand, and each leg after that is twice the last (24, 48, 96 … cells), so a leg always passes where the one before began.
+  - With equal legs the walk back ended where it started, and flipped there again for ever. Merging #17 (2026-11-02) changed the tunnels (Y forks), and so the mound; on seed 4 that left a pit on the mound whose only way out other than back led away from the hole, so both hands left it the same way. Carriers shuttled 24 cells either side of it: "away from the hole" in side.test.ts went from 7.8 % to 10.3 % (bound 10 %), and to 17.4 % on another seed. With doubling legs it is 1.2–6.8 % over six seeds (before the merge: 0.9–7.8 %).
 - If the hole it heads for changes (it comes into sight), the follow starts afresh.
 - Before this, the ground walk only stepped to nearer cells and rocked between two cells in a pit by the mound. That trapped 318 ants of one colony on slice 0 (seed 3) and 647 on an early cut of this slice.
 
