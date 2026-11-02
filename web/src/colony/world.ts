@@ -1,6 +1,6 @@
 import { Chambers } from "./chambers.ts";
 import { CHUNK, CHUNK_BITS, ChunkLayer, local } from "./chunks.ts";
-import { CELL, cellOf, centreX, centreY, extent, hexDistance, nx, ny, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, E, extent, hexDistance, NE, NW, nx, ny, R, W } from "./hex.ts";
 
 // The colonies' world, pure: a procedural map from a seed, kept in 64×64
 // chunks (chunks.ts). Rock comes from three octaves of hashed value noise:
@@ -836,6 +836,21 @@ function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, r
   }
   // The ground round the hole changed: re-derive the walkway there.
   for (let yy = g - 2; yy <= g + 1; yy++) for (let xx = ex - 2; xx <= ex + 2; xx++) if (inBounds(map, xx, yy)) updateSurface(map, xx, yy);
+  // Re-ground the hole's rim. The walkway crosses over the hole by its two upper neighbours (NW and NE, which touch each
+  // other); each stands on the hole and on the hole's west (east) neighbour. Where the ground steps down a row beside the
+  // hole, that neighbour is sky, and with the hole dug out the upper cell lost its footing and fell to AIR: the walkway
+  // ran on only through the hole cell, which explorers never step onto (30 of 100 seeds; review of #15). A cell of soil
+  // there (crust: never dug) keeps the rim.
+  for (const [up, side] of [
+    [NW, W],
+    [NE, E],
+  ] as const) {
+    const sx = nx(ex, g, side);
+    if (!map.sky || !inBounds(map, sx, g) || map.rock.get(nx(ex, g, up), ny(g, up)) !== AIR || map.sky.get(sx, g) !== 1) continue;
+    map.rock.set(sx, g, SOIL);
+    map.sky.set(sx, g, 0);
+    for (let d = -1; d < 6; d++) updateSurface(map, d < 0 ? sx : nx(sx, g, d), d < 0 ? g : ny(g, d));
+  }
   return nest;
 }
 

@@ -1109,7 +1109,7 @@ The product owner asked whether the earth ring was grounded, adding that "the so
 - **The walkway** is the air cells touching solid ground. They are stored as OPEN, so ants walk the ground line and its overhangs with every existing rule, and scent lies only on the walkway and in tunnels (the sky costs nothing to step).
 - **`map.sky`** marks cells above ground. `updateSurface` re-derives walkway and air whenever a cell is dug or filled.
 - **Nests.** Each nest is a chamber (radius 3) 14 rows down, joined by a steep zigzag shaft to its **entrance**, the hole where the shaft meets the ground line (always open ground, with the walkway beside it). The rival's entrance is 340 columns along.
-- **Food.** Piles 3–6 cells wide lie on the walkway (seeds and bits, as harvester ants forage): about three per 64 columns, at least 16 from an entrance. Pockets lie in the soil at least 10 rows down. Everything is reachable, walking or digging.
+- **Food.** Piles 3–6 cells wide lie on the walkway (seeds and bits, as harvester ants forage): four per 64 columns (`surfacePatches`), at least 16 from an entrance. Pockets lie in the soil, centred at least 10 rows down; their cells are at least 4 rows down. Food the player's ants couldn't reach by digging is dropped, and every pile on the ground can be walked to (§39).
 
 **Ants:**
 - **Where homing heads.** A homing ant heads for the chamber when underground. Pellet carriers, and any ant on the walkway, head for the **entrance**, the hole itself: path integration home is to the hole, not through the ground. A change of goal drops the wall being followed.
@@ -1343,8 +1343,10 @@ The cost is a cell lookup and a scent read per ant per tick, and the belief is c
   - the vector's error grows with the way out, starts afresh, and is fixed on the way home;
   - a carrier 12 cells off walks to its belief, searches, and gets home;
   - road signs fade the error;
-  - top-down maps keep no vector.
-- side.test.ts's "never away from the hole" now reads "never away from where it believes the hole is" (searching aside).
+  - top-down maps keep no vector;
+  - a homing ant whose vector is within 3 cells never searches (the review fix below).
+  §39 adds tests for Bug2's other side, errors of 90 and 150 cells and a belief past the map's edge, and the vector's reset at the ant's own hole only.
+- side.test.ts's "never away from the hole" measures against the real hole, with the two bounds below (the review reverted a first rewrite that measured against the believed hole).
 
 **Jev cost:** unchanged. `down` is a sense in the sim, but not yet in the situation; slice 3 decides that.
 
