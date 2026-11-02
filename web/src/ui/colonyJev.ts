@@ -113,7 +113,7 @@ export class ColonyJev {
     read: (a, id, _s, key) => readIntervention(a, id, offeredIn(key)),
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
     asks: (s) => worthAsking(offeredFor(s.strain, this.#menu)),
-    contextOf: fungusContext,
+    contextOf: (aim) => fungusContext(aim, this.#fungus?.map.sky ? "side" : "top"),
     words: "",
   });
   /** caches by context, shared by every lane asking under it */
@@ -228,6 +228,7 @@ export class ColonyJev {
     this.#fungus = fungus;
     fungus.policy = this.fungusPolicy;
     this.setMenu(fungus.menu);
+    this.#recontext(this.#fungal, this.#fungal.words); // the view is part of the fungus's context (fungusContext)
   }
 
   /** The player's aim for the fungus: its own caches (free if used before). */

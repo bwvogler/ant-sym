@@ -58,8 +58,10 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
   const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
   assert.ok(mine.length >= 3, `${mine.length} chambers`);
-  // Floor at least doubles. Over worlds 1–4 and games 4–6 it grows 2.3–3.7× (2.4–3.6× before #17 was merged in, whose
-  // Y forks change the tunnels): ×3 sat inside that spread, and the merge's new random path put world 2's game 4 at 2.3×.
+  // Floor at least doubles. Why 2× and not the 3× this test had before nest slice 3: the claim is that a crowded nest
+  // grows its floor, and 3× sits inside the seed-to-seed spread. Over worlds 1–4 and games 4–6 floor grows 2.3–3.7×
+  // (2.4–3.6× before #17 was merged in, whose Y forks change the tunnels); review of #22: on this world slice 2 reached
+  // 3.50× and slice 3 2.94× (roles change who walks where), other seeds 2.75–3.56×. A doubling is what no game misses.
   assert.ok(ch.floorOf[0]! > floor0 * 2, `floor ${floor0} → ${ch.floorOf[0]}`);
   // No chamber was dug into another: widening and new chambers don't break into other passages (review of slice 2).
   for (let y = 0; y < map.size.h; y++)

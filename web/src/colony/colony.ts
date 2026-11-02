@@ -58,6 +58,21 @@ export type Place = (typeof PLACES)[number];
 export const HOMES = [...TRAILS, ...PLACES] as const;
 export type Home = (typeof HOMES)[number];
 
+/** A dead worker in the side view (nest slice 7): the cell it lies in, who carries it (−1 none), when it died, and the fungus in it. */
+export interface Corpse {
+  x: number;
+  y: number;
+  held: number;
+  died: number;
+  load: number;
+  strain: number;
+}
+
+/** Brood read as store and store as brood (the fungus's muddle, nest slice 8); any other mark as it is. */
+export function swapBroodStore(m: Mark): Mark {
+  return m === "brood" ? "store" : m === "store" ? "brood" : m;
+}
+
 /** What a mode choice may depend on: few values, so an answer can be cached per situation. Carrying ants are never asked: they go home. */
 export interface Situation {
   mode: Mode;
@@ -265,8 +280,12 @@ export class Colony {
   /** food porters are carrying between chambers: still the colony's (the queen's reserve and the strategist count it) */
   #inJaws = 0;
   // The midden (nest slice 7): corpses lie where workers die until an undertaker carries them out to the midden.
-  /** the colony's dead: where each lies (a cell), who carries it (−1 none), and whether it is on the midden; died: when */
-  readonly corpses: { x: number; y: number; held: number; midden: boolean; died: number; load: number; strain: number; spored: boolean }[] = [];
+  /** the colony's dead not yet on the midden: where each lies (a cell), who carries it (−1 none), when it died, its fungus */
+  readonly corpses: Corpse[] = [];
+  /** the midden: corpses buried per cell (packed y × 65536 + x), a count rather than a list growing all game (review of #26) */
+  readonly midden = new Map<number, number>();
+  /** called with each corpse as it is put on the midden (the game: a sporulating strain's spores there) */
+  onBury: ((k: Corpse) => void) | null = null;
   /** Whether ant i carries a corpse (drawn as one, not as soil). */
   carriesCorpse(i: number): boolean {
     return this.#corpse[i] === 1;
@@ -375,7 +394,7 @@ export class Colony {
   gainMarks: Float32Array;
   /** 0..1: past ½, brood smells like store and store like brood */
   swapMarks: Float32Array;
-  /** 0..1: past ½, it kills the queen and brood it touches (lethal, the fungus's crown) */
+  /** 0..1: how surely it kills the queen and brood it touches, CROWN_RATE × this a second (lethal, the fungus's crown; its load) */
   regicide: Float32Array;
   /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
   wall: Int8Array;
@@ -405,14 +424,18 @@ export class Colony {
   enemies: CellCounts | null = null;
   /** the colony's odour: the nest's gestalt, which ants at the nest relax toward and newborns take */
   nestOdour: number;
-  /** the other colony's scent, for ants whose perception reads it (set by the game; null with no rival) */
+  /** another colony's scent, for ants whose perception reads it: the one this colony would raid, its nearest rival (set by the game; null with no rival) */
   foreign: Pheromones | null = null;
   /** this colony's own ants per cell, kept by the game each tick underground; null on its own */
   friends: CellCounts | null = null;
-  /** where raiders go: the rival's nest */
+  /** where raiders go: the nest of the colony raided (in the side view, its hole); set by the game, the nearest rival of any number */
   raidTarget: Nest | null = null;
-  /** the side view: the rival's chamber, where raiders go once in at its hole (set by the game) */
+  /** the side view: the raided colony's chamber, where raiders go once in at its hole (set by the game) */
   raidNest: Nest | null = null;
+  /** the raided colony's marks: its midden, which raiders shy from (set by the game with raidTarget) */
+  raidMarks: Pheromones | null = null;
+  /** every other colony's nest, however many (set by the game): whose ground a column is, and which way the midden faces */
+  others: Nest[] = [];
   time = 0;
   /** food units brought home */
   stored = 0;
@@ -708,26 +731,57 @@ export class Colony {
     return this.band(i) !== 0;
   }
 
-  /** Whether column cx is nearer this colony's hole than the rival's (raiding: still at home, or already at theirs). */
-  #inOwnNest(cx: number): boolean {
-    const t = this.raidTarget;
-    if (!t || !this.#entrance) return true;
-    const x = centreX(cx, 0);
-    return Math.abs(x - this.#entrance.x) <= Math.abs(x - t.x);
+  /** The other colonies' holes (or nests, on a top-down map), and the raid target if the game set no others. */
+  #otherHoles(): { x: number; y: number }[] {
+    const out: { x: number; y: number }[] = this.others.map((o) => o.entrance ?? o);
+    if (this.raidTarget && !out.some((o) => Math.abs(o.x - this.raidTarget!.x) < 1)) out.push(this.raidTarget);
+    return out;
   }
 
-  /** Which side of its hole the colony's midden lies: toward its rival (a boundary between them), east if alone. */
+  /** Whether cell (cx, cy) is nearer this colony's hole than any other colony's (raiding: still at home, or already at theirs). */
+  #inOwnNest(cx: number, cy: number): boolean {
+    if (!this.#entrance) return true;
+    const x = centreX(cx, cy);
+    const own = Math.abs(x - this.#entrance.x);
+    for (const o of this.#otherHoles()) if (Math.abs(x - o.x) < own) return false;
+    return true;
+  }
+
+  /** The hole of the nearest other colony (the midden faces it), or null alone. */
+  #neighbour(): { x: number; y: number } | null {
+    if (!this.#entrance) return null;
+    let best: { x: number; y: number } | null = null;
+    for (const o of this.#otherHoles()) if (!best || Math.abs(o.x - this.#entrance.x) < Math.abs(best.x - this.#entrance.x)) best = o;
+    return best;
+  }
+
+  /** Which side of its hole the colony's midden lies: toward its nearest neighbour (a boundary between them), east if alone. */
   #middenSide(): -1 | 1 {
-    const t = this.raidTarget;
+    const t = this.#neighbour();
     return t && this.#entrance && t.x < this.#entrance.x ? -1 : 1;
   }
 
   /** How far out the midden lies: past the mound's largest reach, fixed, so the mound never grows over it (review of
    *  slice 7: placed past the mound's current edge, it was buried as the mound spread, and moved with it). */
   #middenAt(): number {
-    // Never past 40 % of the way to the rival: each midden on its own colony's ground (two nests close together).
-    const t = this.raidTarget;
+    // Never past 40 % of the way to the nearest neighbour on that side: each midden on its own colony's ground (nests close together).
+    const t = this.#neighbour();
     return t && this.#entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.#entrance.x))) : MIDDEN_AT;
+  }
+
+  /** The middle of the midden: its column (side view). */
+  #middenCol(): number {
+    return this.#entranceCol + this.#middenSide() * this.#middenAt();
+  }
+
+  /**
+   * The chance a raider about to step onto a cell of the raided colony's midden (mark v there) turns back. A lone scout
+   * mostly does; a raid in force presses on (review of #26: one saturated cell turned back 98 % of raiders, so none ever
+   * got into the rival's nest): the chance falls with its own colony's ants around it (`friends`, within two cells).
+   */
+  #middenTurn(v: number, cx: number, cy: number): number {
+    const company = this.friends ? this.#around(this.friends, cx, cy) : 1;
+    return (1 - Math.exp(-v / MIDDEN_SCALE)) * Math.min(1, MIDDEN_CROWD / company);
   }
 
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
@@ -799,7 +853,7 @@ export class Colony {
       else this.soilLost++;
     }
     // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7).
-    if (this.queen) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, midden: false, died: this.time, load: this.load[i] as number, strain: this.strain[i] as number, spored: false });
+    if (this.queen) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, died: this.time, load: this.load[i] as number, strain: this.strain[i] as number });
     this.#spoilTo[i] = NaN;
     this.#loosePellet[i] = 0;
     this.#fillIntent[i] = 0;
@@ -1003,7 +1057,7 @@ export class Colony {
       // from it to where it drops it (away from the hole from inside the shaft is down it).
       const inShaft = !isSky(map, cx, cy) && !(cx === this.#entranceCol && cy === this.#entranceRow);
       const best = inShaft ? this.#towardHole(cx, cy, false) : this.#awayFromHole(cx, cy, this.#spoilSide[i] as number);
-      if (best < 0) this.#spoilTo[i] = 0; // the map's edge, or nowhere farther: it drops it here
+      if (best < 0) this.#spoilTo[i] = Math.min(0, this.#spoilTo[i] as number); // the map's edge, or nowhere farther: it drops it here (one carried back to the midden walks on: #undertake)
       dir = best < 0 ? handOnWall(map, cx, cy, dir, -(this.hand[i] as number)) : best;
     } else if (raiding) {
       const t = this.raidTarget as Nest;
@@ -1011,14 +1065,14 @@ export class Colony {
       if (isSky(map, cx, cy)) {
         this.#holeX = t.x;
         best = this.#towardHole(cx, cy, true, NaN, t.y);
-        // The rival's midden marks its ground (Pogonomyrmex badius): a raider about to step onto it turns back, the more
-        // surely the stronger it smells.
-        const m = this.foreign?.fields.midden;
+        // The rival's midden marks its ground (Pogonomyrmex badius): a raider about to step onto it may turn back, the
+        // more surely the stronger it smells and the fewer of its own colony are with it (#middenTurn).
+        const m = this.raidMarks?.fields.midden;
         if (best >= 0 && m) {
           const v = m.get(stepX(cx, cy, best), stepY(cy, best));
-          if (v >= FAINT && this.#rng() < 1 - Math.exp(-v / MIDDEN_SCALE)) best = rockAt(map, stepX(cx, cy, (dir + 3) % 6), stepY(cy, (dir + 3) % 6)) === OPEN ? (dir + 3) % 6 : -1;
+          if (v >= FAINT && this.#rng() < this.#middenTurn(v, cx, cy)) best = rockAt(map, stepX(cx, cy, (dir + 3) % 6), stepY(cy, (dir + 3) % 6)) === OPEN ? (dir + 3) % 6 : -1;
         }
-      } else if (this.#inOwnNest(cx) || !this.raidNest) best = this.#climbOut(cx, cy);
+      } else if (this.#inOwnNest(cx, cy) || !this.raidNest) best = this.#climbOut(cx, cy);
       else {
         // In at the rival's hole: down to its chamber (review of slice 7: it climbed back out, to its own hole).
         this.#holeX = this.raidNest.x;
@@ -1226,7 +1280,7 @@ export class Colony {
     let id = (this.#chamberFor[i] as number) - 1;
     if (id < 0) {
       if (!this.#chamberRoom(x, y, y - groundTop(this.map, x))) return; // another was started near it meanwhile: a tunnel stub
-      id = ch.add(this.params.nest, y, this.#roleFor(x, y)).id;
+      id = ch.add(this.params.nest, y, this.#roleFor(y)).id;
     }
     ch.claim(id, x, y, open);
   }
@@ -1485,8 +1539,7 @@ export class Colony {
   #perceivedPlace(i: number, role: Mark | null): Mark | null {
     if (!role) return null;
     if ((this.gainMarks[i] as number) < 0.5) return null;
-    if ((this.swapMarks[i] as number) >= 0.5) return role === "brood" ? "store" : role === "store" ? "brood" : role;
-    return role;
+    return (this.swapMarks[i] as number) >= 0.5 ? swapBroodStore(role) : role;
   }
 
   /** The role of this colony's chamber at cell (x, y) (a role-less or another colony's chamber reads as tunnel), or null if in none. */
@@ -1524,9 +1577,10 @@ export class Colony {
   /** Where ant i heads when it homes into the nest (the chamber it reads its road signs for): a nurse with brood, a brood chamber; else royal, the queen's (slice 5: carriers to reception). */
   #destMark(i: number): Mark {
     const m = this.#trueDestMark(i);
-    // The fungus can swap brood and store (nest slice 8): it follows the other one's signs.
-    if ((this.swapMarks[i] as number) >= 0.5) return m === "brood" ? "store" : m === "store" ? "brood" : m;
-    return m;
+    // The fungus can swap brood and store (nest slice 8): it follows the other one's signs. A muddled nurse takes brood
+    // toward the stores, and a porter takes the larvae's food there: muddle costs a colony births (PRD §39, an intended
+    // cost: exempting brood carriers did not bring the births back).
+    return (this.swapMarks[i] as number) >= 0.5 ? swapBroodStore(m) : m;
   }
 
   #trueDestMark(i: number): Mark {
@@ -1746,18 +1800,23 @@ export class Colony {
 
   /**
    * An undertaker (slice 7): an idle middle-aged ant underground with a corpse lying within two cells picks it up and
-   * carries it out like spoil, up the shaft and along the ground, to the midden.
+   * carries it out like spoil, up the shaft and along the ground, to the midden. `calm`: no enemy is near it.
    */
-  #undertake(i: number, dt: number): void {
-    if (this.corpses.length === 0 || (this.mode[i] !== EXPLORE && this.mode[i] !== FOLLOW) || this.carrying[i] || this.pellet[i] || this.#holdsBrood[i] || this.#rng() > PICK_CORPSE * dt) return;
+  #undertake(i: number, dt: number, calm: boolean): void {
+    if (this.corpses.length === 0 || this.carrying[i] || this.pellet[i] || this.#holdsBrood[i]) return;
+    const mode = this.mode[i] as number;
+    // A raiding colony's middle-aged are all fighters (raid stance): one with no enemy near, still in its own nest, buries
+    // its dead too (review of #26: a raiding colony buried nothing, and its dead lay in its own chambers).
+    if (mode !== EXPLORE && mode !== FOLLOW && !(mode === FIGHT && calm && this.#under[i] && this.band(i) === 1)) return;
+    if (this.#rng() > PICK_CORPSE * dt) return;
     this.antCell(i);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
     // Inside, the middle-aged do it; on the ground near the hole (fights fall there too), whoever is out.
     const outside = isSky(this.map, cx, cy);
-    if (outside ? Math.abs(cx - this.#entranceCol) > MIDDEN_NEAR : this.band(i) !== 1) return;
+    if (outside ? Math.abs(cx - this.#entranceCol) > MIDDEN_NEAR : this.band(i) !== 1 || (mode === FIGHT && !this.#inOwnNest(cx, cy))) return;
     for (const k of this.corpses)
-      if (k.held < 0 && !k.midden && hexDistance(k.x, k.y, cx, cy) <= 2) {
+      if (k.held < 0 && hexDistance(k.x, k.y, cx, cy) <= 2) {
         k.held = i;
         this.#corpse[i] = 1;
         this.pellet[i] = 1;
@@ -1766,8 +1825,12 @@ export class Colony {
         this.#spoilTo[i] = NaN;
         if (outside) {
           // Already out: straight along the ground to the midden (it won't come up out of the hole, where that is set).
-          this.#spoilTo[i] = this.#middenAt();
-          this.#spoilSide[i] = this.#middenSide();
+          // From past the midden, back toward it: carried out from there, it was put down at once where it lay, off the
+          // midden, and picked up again (review of #26: one corpse nine times).
+          const side = this.#middenSide();
+          const past = side * (cx - this.#entranceCol) > this.#middenAt();
+          this.#spoilTo[i] = past ? -this.#middenAt() : this.#middenAt();
+          this.#spoilSide[i] = past ? -side : side;
           this.#spoilT[i] = 0;
         }
         this.mode[i] = RETURN;
@@ -1777,20 +1840,34 @@ export class Colony {
       }
   }
 
-  /** The midden keeps smelling of the colony while corpses lie on it (MIDDEN_MARK a second each, up to 20 counted). */
+  /** The midden keeps smelling of the colony while corpses lie on it (a tenth of MIDDEN_MARK a second each, up to 20 counted). */
   #middenSmell(dt: number): void {
     for (let k = this.corpses.length - 1; k >= 0; k--) {
       const c = this.corpses[k]!;
-      if (c.held < 0 && !c.midden && this.time - c.died > CORPSE_ROT) this.corpses.splice(k, 1); // the midden stays
+      if (c.held < 0 && this.time - c.died > CORPSE_ROT) this.corpses.splice(k, 1); // off the midden, it rots (the buried are counted in `midden`)
     }
-    let n = 0;
-    for (const k of this.corpses) {
+    for (const k of this.corpses)
       if (k.held >= 0) {
         // Carried: it goes where its undertaker goes.
         this.antCell(k.held);
         k.x = CELL[0] as number;
         k.y = CELL[1] as number;
-      } else if (k.midden && n++ < 20) this.ph.depositCell("midden", k.x, k.y, MIDDEN_MARK * dt * 0.1);
+      }
+    let left = 20;
+    for (const [key, count] of this.midden) {
+      if (left <= 0) break;
+      const n = Math.min(left, count);
+      left -= n;
+      this.#markMidden(key % 65536, MIDDEN_MARK * dt * 0.1 * n);
+    }
+  }
+
+  /** Lay `amount` of midden mark on the ground at column `col`, and tapering over MIDDEN_SPREAD columns either side. */
+  #markMidden(col: number, amount: number): void {
+    for (let dx = -MIDDEN_SPREAD; dx <= MIDDEN_SPREAD; dx++) {
+      const x = col + dx;
+      if (x < 0 || x >= this.map.size.w) continue;
+      this.ph.depositCell("midden", x, groundTop(this.map, x) - 1, (amount * (MIDDEN_SPREAD + 1 - Math.abs(dx))) / (MIDDEN_SPREAD + 1));
     }
   }
 
@@ -1849,10 +1926,13 @@ export class Colony {
       }
     }
     // The fungus's crown (nest slice 8, lethal): a host running it kills the queen and the brood it touches, each at
-    // CROWN_RATE a second (at once, spores painted on the royal chamber orphaned the colony in its first second).
-    const crown = 1 - Math.exp(-CROWN_RATE * dt);
+    // CROWN_RATE × its regicide (its load) a second: the spores it passes on as it tends them (at once, spores painted
+    // on the royal chamber orphaned the colony in its first second; from a high load only, grooming kept every host
+    // below it within seconds and no queen ever died: review of #27).
     for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i] || (this.regicide[i] as number) < 0.5 || !this.#under[i]) continue; // the queen and brood are underground
+      const r = this.regicide[i] as number;
+      if (!this.alive[i] || r <= 0 || !this.#under[i]) continue; // the queen and brood are underground
+      const crown = 1 - Math.exp(-CROWN_RATE * r * dt);
       this.antCell(i);
       const hx = CELL[0] as number;
       const hy = CELL[1] as number;
@@ -1926,15 +2006,14 @@ export class Colony {
     return s;
   }
 
-  /** The role a new chamber at (x, y) takes: the colony's first one well above the royal chamber is reception; below it, store; else brood. */
-  #roleFor(x: number, y: number): Role {
+  /** The role a new chamber with its floor on row y takes (its column plays no part): the colony's first one well above the royal chamber is reception; below it, store; else brood. */
+  #roleFor(y: number): Role {
     const ch = this.map.chambers!;
     const mine = ch.list.filter((c) => c.colony === this.params.nest && c.cells > 0);
     const royal = mine.find((c) => c.role === "royal");
     if (!royal) return "brood";
     if (y < royal.floorRow - RECEPTION_ABOVE && !mine.some((c) => c.role === "reception")) return "reception";
     if (y > royal.floorRow + STORE_BELOW) return "store";
-    void x;
     return "brood";
   }
 
@@ -2168,11 +2247,21 @@ export class Colony {
       // On the midden: the corpse lies on the ground there, and the midden smells of the colony (a boundary: see raids).
       // A carrier that gave up short of it (SPOIL_GIVE_UP) leaves the corpse lying, unmarked, for another to take on.
       const row = groundTop(map, col) - 1;
-      const onMidden = Math.abs(col - (this.#entranceCol + (this.#spoilSide[i] as number) * this.#middenAt())) <= 3;
-      for (const k of this.corpses) if (k.held === i) ((k.held = -1), (k.midden = onMidden), (k.x = col), (k.y = row));
-      if (onMidden) {
-        ph.depositCell("midden", col, row, MIDDEN_MARK);
-        this.buried++;
+      const onMidden = Math.abs(col - this.#middenCol()) <= 3;
+      for (let n = this.corpses.length - 1; n >= 0; n--) {
+        const k = this.corpses[n] as Corpse;
+        if (k.held !== i) continue;
+        k.held = -1;
+        k.x = col;
+        k.y = row;
+        if (onMidden) {
+          this.corpses.splice(n, 1);
+          const key = row * 65536 + col;
+          this.midden.set(key, (this.midden.get(key) ?? 0) + 1);
+          this.#markMidden(col, MIDDEN_MARK);
+          this.buried++;
+          this.onBury?.(k);
+        }
       }
       this.#corpse[i] = 0;
       this.pellet[i] = 0;
@@ -2331,7 +2420,9 @@ export class Colony {
       const dx = centreX(x, y) - ax;
       const dy = centreY(y) - ay;
       const d = dx * dx + dy * dy;
-      if (d < best) {
+      // Not through soil: a raider on the ground charged strangers in a tunnel under it, into the soil, for good (review of
+      // #26: raiders stuck in the pits by the rival's mound, none in at its hole).
+      if (d < best && (!this.map.hasSoil || this.#clearTo(ax, ay, centreX(x, y), centreY(y)))) {
         best = d;
         heading = Math.atan2(dy, dx);
       }
@@ -2408,6 +2499,10 @@ export class Colony {
         if (before !== this.#asked[i]) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
+          // Zoned by age: an ant that may not go out is no raider. Sent raiding, a young one climbed to its hole, was put
+          // back down the shaft, and climbed again (review of #26: 70–93 of ~110 young raiders parked at the hole). With
+          // no enemy near, it explores (with one near, it fights where it is).
+          if (mode === FIGHT && !enemy && this.stance === "raid" && this.queen && !this.#mayGoOut(i)) mode = EXPLORE;
           if (mode === RETURN && this.mode[i] !== RETURN) this.#homeAfresh(i);
           this.mode[i] = mode;
           this.#asked[i] = encode(mode, tired, food, home, alarm, enemy, stance);
@@ -2620,21 +2715,24 @@ export class Colony {
         else h += climb(fl, ff, fr, p.turnRate * dt) + noise * p.wander * 0.25;
       } else if (mode === FIGHT) {
         // A calm ant (the fungus's cue) does not charge.
+        // A raider in the side view walks on to the raided nest, cell by cell, past the alarm of fights behind it: steering
+        // freely up the alarm left raiders in the pits by the rival's mound, 12–13 columns short of its hole (none got in).
+        const sideRaid = this.stance === "raid" && this.raidTarget !== null && this.#entrance !== null;
         if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - (this.calm[i] as number)));
-        else if (Math.max(al, af, ar) >= FAINT) h += climb(al, af, ar, p.turnRate * dt);
-        else if (this.stance === "raid" && this.raidTarget && this.#entrance && ((this.detour[i] = 0), this.#walkTunnel(i, FIGHT, p.speed * dt))) h = this.#towardTarget(i);
+        else if (Math.max(al, af, ar) >= FAINT && !sideRaid) h += climb(al, af, ar, p.turnRate * dt);
+        else if (sideRaid && ((this.detour[i] = 0), this.#walkTunnel(i, FIGHT, p.speed * dt))) h = this.#towardTarget(i);
         else if (this.stance === "raid" && this.raidTarget && this.#entrance && this.#under[i]) {
           // A raider in a chamber (no tunnel: free steering): out of its own nest by its hole, or on into the rival's.
           // Steering straight at the rival's hole through soil left nearly every raider bumping inside its own nest.
           this.antCell(i);
-          const own = this.#inOwnNest(CELL[0] as number);
+          const own = this.#inOwnNest(CELL[0] as number, CELL[1] as number);
           const aim = own ? this.#entrance : (this.raidNest ?? this.raidTarget);
           h = turnToward(h, Math.atan2(aim.y - (this.y[i] as number), aim.x - (this.x[i] as number)), p.turnRate * dt) + noise * p.wander * 0.25;
         } else if (this.stance === "raid" && this.raidTarget && !detouring) {
           const t = this.raidTarget;
           h = turnToward(h, Math.atan2(t.y - (this.y[i] as number), t.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
           // The rival's midden marks its ground: raiders shy from it (Pogonomyrmex badius; slice 7).
-          const m = this.foreign;
+          const m = this.raidMarks;
           if (m) {
             const x = this.x[i] as number;
             const y = this.y[i] as number;
@@ -2936,7 +3034,7 @@ export class Colony {
         if (this.queen) {
           this.#nurse(i, dt);
           if (this.#port(i, dt)) h += Math.PI;
-          this.#undertake(i, dt);
+          this.#undertake(i, dt, toEnemy === null);
         }
       }
       this.heading[i] = h;
@@ -3026,7 +3124,7 @@ export const T_LARVA = 20;
 export const T_PUPA = 20;
 /** At most one egg this often (seconds), while there is food and room. */
 const LAY_INTERVAL = 0.5;
-/** The fungus's crown (nest slice 8): the chance a second that a host by the queen, or by a brood item, kills it. */
+/** The fungus's crown (nest slice 8): the chance a second that a host by the queen, or by a brood item, kills it, at full load (× its load). */
 export const CROWN_RATE = 0.05;
 /** Food a larva takes per second with two nurses or more by it. */
 const FEED_RATE = 0.5;
@@ -3041,12 +3139,20 @@ const MIDDEN_NEAR = 100;
 const CORPSE_GIVE_UP = 60;
 /** Seconds after death a corpse not on the midden rots away (the dead in the field would otherwise pile up all game). */
 export const CORPSE_ROT = 900;
-/** Midden mark laid when a corpse is put on the midden; a tenth of it a second while it lies there. */
+/** Midden mark laid when a corpse is put on the midden; a tenth of it a second while it lies there. Each is spread over
+ *  the cell's column and MIDDEN_SPREAD columns either side, tapering (review of #26: one cell at the saturated level). */
 const MIDDEN_MARK = 20;
+/** Columns either side of a midden cell its mark is laid over. */
+const MIDDEN_SPREAD = 3;
 /** How hard raiders turn away from the rival's midden mark, as a share of turnRate (alarm avoidance is alarmAvoid). */
 const MIDDEN_AVOID = 1.5;
-/** A raider on the ground turns back from a cell of the rival's midden with chance 1 − exp(−mark / MIDDEN_SCALE). */
+/**
+ * A raider on the ground turns back from a cell of the rival's midden with chance 1 − exp(−mark / MIDDEN_SCALE), times
+ * MIDDEN_CROWD / (its own colony's ants within two cells, itself included) once they are more than MIDDEN_CROWD: a scout
+ * or a handful shies, a raid in force presses on (see #middenTurn).
+ */
 const MIDDEN_SCALE = 5;
+const MIDDEN_CROWD = 3;
 /** Chance per second an idle ant in reception or a store, with food there, carries a unit on (see #port). */
 const PORT_RATE = 3;
 /** Food the royal chamber is kept stocked with for the queen (a few eggs' worth, and the larvae lying with her). */
@@ -3238,7 +3344,7 @@ export function moundRadius(pellets: number, nestR: number): number {
 const MOUND_HEIGHT = 3;
 /** The side view: the farthest (columns) a pellet is carried from the hole; past it the disc grows higher, not wider. */
 const MOUND_REACH = 90;
-/** The midden lies this many columns from the hole, toward the rival (see #middenSide): just past the mound's largest reach. */
+/** The midden lies this many columns from the hole, toward the nearest other colony (see #middenSide): just past the mound's largest reach. */
 export const MIDDEN_AT = MOUND_REACH + MIDDEN_PAST;
 /** The side view: seconds a carrier walks a pellet out before it drops it wherever it is (heaped on top of its column, clear of the crater). */
 const SPOIL_GIVE_UP = 15;
