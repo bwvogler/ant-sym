@@ -1433,3 +1433,54 @@ The cost figures above come from a scratch script on the side view: `scripts/col
 - every chamber gets a role, and the royal mark is strongest in the royal chamber;
 - an ant home with food is asked "royal", and on the ground the home trail level;
 - a policy that always answers "return" to a returning ant no longer parks the colony, on either view.
+
+## 33. The queen and brood; births from pupae; losing the queen orphans the colony (nest slice 4, ja-eyp, 2026-11-02)
+
+In the side view, workers come from brood, not from a counter (docs/nest-and-home.md §3.4, "Queen loss"). The top-down maps keep the larder → ants rule and have no queen.
+
+**The queen** lies on the royal chamber's floor.
+- **Laying:** she lays an egg at most every `LAY_INTERVAL` (0.5 s). She lays only while the larder holds, beyond what the brood already laid will be fed, a whole worker's food, and while there is room under the cap. Without that reserve, eggs laid into an empty larder starved as larvae.
+- **Her pheromone** is the royal mark, strongest where she lies.
+- **She can be killed** by strangers at her side (rate `QUEEN_FIGHT` per stranger: a raid that reaches the royal chamber), or by `killQueen()` (the fungus's, slice 8).
+
+**Brood** (`brood.ts`, pure) goes from egg to larva to pupa to worker.
+- **Egg:** 1 food, 15 s.
+- **Larva:** fed 3 food from the larder by the nurses within two cells of it (0.5 a second with two or more), for at least 20 s.
+- **Pupa:** 20 s, then a worker is born where it lay.
+- A worker still costs 4 food (`foodPerAnt`) and arrives about a minute after its egg.
+- **Nurses:** an idle ant in the royal chamber picks up an egg near it and takes it to the brood chamber holding the least brood, steering by the homing machinery and the brood mark. With no brood chamber yet, brood stays with the queen. Each chamber counts the brood lying in it, so slice 2's brood pull works.
+
+**Ageing.** Workers have a lifespan of `LIFESPAN` (1,800 s), 0.7–1.3× it each. The founding workers start between newborn and half a lifespan old, so none dies of age in a 10-minute game. Old age doesn't count as a loss for the strategist.
+
+**Orphaned.** With the queen dead there are no new eggs, brood in progress still hatches, and the workers age out.
+- On seed 1, alone, with the queen killed at 300 s: 900 workers at 600 s, 842 at 900 s, 458 at 1,500 s, 136 at 2,100 s, none at 2,700 s. Then the colony is fallen.
+- **Beaten** in the side view now means no workers and no pupa left. Eggs and larvae need nurses, and the queen alone can't feed them.
+- The stats table shows "queen" or "orphaned", and the brood as eggs / larvae / pupae.
+
+**The strategist's larder.** It read 8 food or more as a full larder and sent explorers raiding. With brood, the larder holds what the brood will be fed while the colony grows, and every colony went raiding (689 of 765 ants fighting on seed 2). Now the larder counts as full only for food the brood won't eat, at the cap.
+
+**Measured** (side view, 600 + 600 ants, 600 s, seeds 1–3; workers at 120 / 240 / 360 / 480 / 600 s per colony):
+
+| Seed | Slice 3 (larder → ants) | Slice 4 (queen, brood) | Food home, slice 3 → 4 |
+|---|---|---|---|
+| 1 | 717 / 771 / 865 / 900 / 900; 715 / 772 / 817 / 862 / 890 | 701 / 797 / 900 / 900 / 900; 691 / 801 / 877 / 899 / 900 | 1375 / 1163 → 1375 / 1376 |
+| 2 | 722 / 810 / 874 / 900 / 900; 735 / 820 / 887 / 900 / 900 | 662 / 739 / 789 / 876 / 900; 675 / 748 / 814 / 893 / 899 | 1344 / 1403 → 1268 / 1282 |
+| 3 | 738 / 846 / 900 / 900 / 900; 752 / 830 / 900 / 900 / 900 | 667 / 759 / 817 / 876 / 898; 710 / 818 / 899 / 900 / 900 | 1400 / 1410 → 1310 / 1321 |
+
+- **Growth** reaches the cap about as before. Birth comes about a minute after the food does, so colonies run 5–10 % smaller in the first minutes.
+- **Homing:** 0.6–1.2 % out over 120 s.
+- **Tick time** is about the same as slice 3 (two colonies 6.23 ms against 6.44 ms).
+
+**Not built:** moving brood up and down for temperature (there is no temperature yet), and larvae dying unfed (they wait).
+
+**Rendering:** brood is drawn as small dots (eggs pale, larvae cream, pupae tan) and the queen as a larger body in her colony's colour, hollow and crossed out once dead.
+
+**Tests:** `queen.test.ts`:
+- the side view has a queen and the top-down maps don't;
+- egg to larva to pupa to worker, no sooner than the three stages;
+- nurses fill a brood chamber;
+- orphaned: no eggs, brood still hatches, the workers age out, and old age is no loss;
+- strangers kill the queen, and the side-view beaten rule;
+- the strategist's larder.
+
+**Jev cost:** unchanged. The ants' situation is the same; the brood is not in it.

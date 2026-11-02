@@ -97,9 +97,9 @@ export default function ColonyApp() {
             {stats && (
               // One line per cell: on a phone the table scrolls sideways in its card rather than wrapping "963 / 871 / 1" over three lines.
               <div className="mt-3 overflow-x-auto border-t border-line pt-3">
-                <dl className="grid w-max min-w-full grid-cols-[repeat(7,auto)] gap-x-4 gap-y-1 whitespace-nowrap font-mono text-xs text-fg-2">
+                <dl className="grid w-max min-w-full grid-cols-[repeat(8,auto)] gap-x-4 gap-y-1 whitespace-nowrap font-mono text-xs text-fg-2">
                   <dt className="text-fg-3" />
-                  {["ants", "food home", "lost", "born", "dug / mound / filled", "stance"].map((h) => (
+                  {["ants", "food home", "lost", "born", "queen · brood", "dug / mound / filled", "stance"].map((h) => (
                     <dt key={h} className="text-[11px] uppercase tracking-wide text-fg-3">
                       {h}
                     </dt>
@@ -379,6 +379,9 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
       <dd className="tabular-nums">{s.stored.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.losses.toLocaleString()}</dd>
       <dd className="tabular-nums">{s.births.toLocaleString()}</dd>
+      <dd className={`tabular-nums ${s.queen === "lost" ? "text-err" : ""}`} title="the queen, and brood: eggs / larvae / pupae (side view). A colony whose queen is lost is orphaned: no more eggs; its workers age out.">
+        {s.queen === null ? "–" : `${s.queen === "lost" ? "orphaned" : "queen"} · ${s.brood.join(" / ")}`}
+      </dd>
       <dd className="tabular-nums" title="soil cells dug / pellets of it brought out to the mound / pellets put back into unused space underground (side view: loose mound pellets too)">
         {s.dug.toLocaleString()} / {s.mound.toLocaleString()} / {s.filled.toLocaleString()}
       </dd>

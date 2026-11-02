@@ -27,6 +27,9 @@ export interface Chamber {
   role: Role;
   /** brood lying in it (slice 4): digging is drawn to it */
   brood: number;
+  /** sums of its cells' x and y (its centre is these over cells) */
+  sumX: number;
+  sumY: number;
 }
 
 /** A chamber is this many rows high: it widens along its floor and the row above, and no higher (chambers are ~1 cm high whatever their area). */
@@ -48,7 +51,7 @@ export class Chambers {
 
   /** A new chamber for `colony`, its floor on row `floorRow` (no cells yet: claim them). */
   add(colony: number, floorRow: number, role: Role = "none"): Chamber {
-    const c: Chamber = { id: this.list.length, colony, floorRow, x0: Infinity, x1: -Infinity, cells: 0, floor: 0, role, brood: 0 };
+    const c: Chamber = { id: this.list.length, colony, floorRow, x0: Infinity, x1: -Infinity, cells: 0, floor: 0, role, brood: 0, sumX: 0, sumY: 0 };
     this.list.push(c);
     while (this.floorOf.length <= colony) this.floorOf.push(0);
     return c;
@@ -60,6 +63,8 @@ export class Chambers {
     const c = this.list[id] as Chamber;
     this.cell.set(x, y, id + 1);
     c.cells++;
+    c.sumX += x;
+    c.sumY += y;
     c.x0 = Math.min(c.x0, x);
     c.x1 = Math.max(c.x1, x);
     this.#refloor(x, y, open);
@@ -84,6 +89,8 @@ export class Chambers {
     }
     this.cell.set(x, y, 0);
     c.cells--;
+    c.sumX -= x;
+    c.sumY -= y;
   }
 
   #refloor(x: number, y: number, open: (x: number, y: number) => boolean): void {

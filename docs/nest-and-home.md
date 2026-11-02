@@ -95,7 +95,7 @@ The side view keeps its entrance, shaft, walkway and mound. The founding chamber
      - **midden:** refuse.
    - Workers in a chamber lay its role's mark on the floor, and junctions keep a mark of what lies down each branch.
    - Inside the nest, these marks replace the single home field: an ant heading somewhere follows the mark of where it is going.
-4. **The queen and brood.**
+4. **The queen and brood.** *Built in slice 4 (PRD §33).*
    - The queen sits in the royal chamber and lays eggs at a rate fed by food brought to her.
    - Eggs become larvae, then pupae, then workers. Larvae must be fed: food is carried to them.
    - The queen's pheromone draws nurses to the royal chamber. Nurses carry brood to her and to the brood chambers, and move brood with depth.

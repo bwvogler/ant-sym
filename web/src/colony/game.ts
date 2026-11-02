@@ -1,6 +1,7 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
+import { PUPA } from "./brood.ts";
 import { Fungus, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { WorldMap } from "./world.ts";
@@ -203,8 +204,12 @@ export class Game {
     this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain);
   }
 
-  /** Beaten: no ants left and too little food in the larder for one more. */
+  /**
+   * Beaten: no ants left and too little food in the larder for one more. In the side view (nest slice 4) ants come
+   * only from pupae: no workers and no pupa left (eggs and larvae need nurses), whatever the queen or the larder.
+   */
   static beaten(c: Colony): boolean {
+    if (c.queen) return c.population === 0 && !c.brood.items.some((b) => b.stage === PUPA);
     return c.population === 0 && c.larder < c.params.foodPerAnt;
   }
 

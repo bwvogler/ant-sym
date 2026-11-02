@@ -1,4 +1,5 @@
 import { type Channel, type Mark, MARKS, Pheromones } from "./pheromone.ts";
+import { Brood, EGG, LARVA, PUPA, type BroodItem } from "./brood.ts";
 import { CHAMBER_HEIGHT, type Role } from "./chambers.ts";
 import { TOLERANCE } from "./recognition.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
@@ -235,6 +236,20 @@ export class Colony {
   #sinceRole: Float32Array;
   /** seconds an ant has rested at home in "return" (see REST) */
   #restT: Float32Array;
+  // The queen and brood (nest slice 4; the side view only: elsewhere the larder still becomes ants directly).
+  /** the colony's queen, in its royal chamber (null on the top-down maps); a colony whose queen is dead is orphaned */
+  queen: { alive: boolean; x: number; y: number } | null = null;
+  readonly brood = new Brood();
+  /** seconds owed toward the queen's next egg */
+  #layT = 0;
+  /** each ant's age and lifespan, seconds (the side view: workers die of age, so an orphaned colony dwindles) */
+  age: Float32Array;
+  lifespan: Float32Array;
+  /** 1 while an ant carries brood (a nurse), and the chamber it is taking it to */
+  #holdsBrood: Uint8Array;
+  #broodTo: Int16Array;
+  /** workers that died of age */
+  diedOld = 0;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
   #belief: Nest = { x: 0, y: 0, r: 0 };
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
@@ -438,6 +453,12 @@ export class Colony {
     this.#lastRole = new Uint8Array(n);
     this.#sinceRole = new Float32Array(n);
     this.#restT = new Float32Array(n);
+    this.age = new Float32Array(n);
+    this.lifespan = new Float32Array(n).fill(Infinity);
+    this.#holdsBrood = new Uint8Array(n);
+    this.#broodTo = new Int16Array(n).fill(-1);
+    // The queen lies on the royal chamber's floor (the founding chamber's centre, a little down).
+    if (this.#entrance && map.chambers) this.queen = { alive: true, x: this.nest.x, y: this.nest.y + 1 };
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -487,6 +508,8 @@ export class Colony {
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
     for (let k = 0; k < this.params.antCount; k++) this.#place(k);
+    // The founding workers are of all ages (from birth to half a lifespan), so they don't all die at once.
+    if (this.queen) for (let k = 0; k < this.params.antCount; k++) this.age[k] = this.#rng() * 0.5 * (this.lifespan[k] as number);
   }
 
   #place(i: number): void {
@@ -532,6 +555,10 @@ export class Colony {
     this.#lastRole[i] = 0; // born in the royal chamber: it lays royal once it has been there a tick
     this.#sinceRole[i] = 0;
     this.#restT[i] = 0;
+    this.age[i] = 0;
+    this.lifespan[i] = this.queen ? LIFESPAN * (0.7 + 0.6 * this.#rng()) : Infinity;
+    this.#holdsBrood[i] = 0;
+    this.#broodTo[i] = -1;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
@@ -596,18 +623,46 @@ export class Colony {
     return s;
   }
 
-  /** A new ant at the nest, in the first free slot; false when the colony is at its cap. */
-  spawn(): boolean {
+  /** A new ant at the nest, in the first free slot (at world (x, y) if given: where its pupa lay); false when the colony is at its cap. */
+  spawn(x?: number, y?: number): boolean {
     const i = this.alive.indexOf(0);
     if (i < 0) return false;
     this.#place(i);
+    if (x !== undefined && y !== undefined) {
+      this.x[i] = x;
+      this.y[i] = y;
+    }
     this.births++;
     return true;
   }
 
-  /** Ant i dies where it stands; food it carried drops on that cell (a soil pellet is just lost). */
-  kill(i: number): void {
+  /**
+   * Food at home that won't become ants (what the strategist reads as a full larder). On the top-down maps the larder
+   * becomes ants at once while there is room, so it is all of it. With a queen (the side view) the larder also holds
+   * what her brood will be fed, and fills while the colony grows: only food beyond that, at the cap, is spare.
+   */
+  #spare(): number {
+    if (!this.queen) return this.larder;
+    if (this.population + this.brood.size < this.params.maxAnts) return 0;
+    let owed = 0;
+    for (const b of this.brood.items) if (b.stage !== PUPA) owed += LARVA_FOOD - b.fed;
+    return this.larder - owed;
+  }
+
+  /** The queen dies (a raider at her side; later, the fungus): the colony is orphaned, it lays no more eggs. */
+  killQueen(): void {
+    if (this.queen) this.queen.alive = false;
+  }
+
+  /** Whether the colony has lost its queen (the side view; the top-down maps have none to lose). */
+  get orphaned(): boolean {
+    return this.queen !== null && !this.queen.alive;
+  }
+
+  /** Ant i dies where it stands; food it carried drops on that cell (a soil pellet is just lost; brood it carried lies there). `lost`: a loss to the strategist (a fight), not old age. */
+  kill(i: number, lost = true): void {
     if (!this.alive[i]) return;
+    if (this.#holdsBrood[i]) this.#dropBrood(i);
     if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
     if (this.pellet[i]) {
       if (this.#loosePellet[i]) this.looseLost++;
@@ -620,8 +675,10 @@ export class Colony {
     this.carrying[i] = 0;
     this.pellet[i] = 0;
     this.digT[i] = 0;
-    this.losses++;
-    this.recentLosses++;
+    if (lost) {
+      this.losses++;
+      this.recentLosses++;
+    }
   }
 
   /** Pellets in jaws now: dug ones (on their way out, or to fill) and loose ones off the mound (side view). */
@@ -688,7 +745,7 @@ export class Colony {
       losses: this.recentLosses < 1 ? "none" : this.recentLosses < 10 ? "some" : "heavy",
       enemyNearNest,
       foodLeft: left > 0.5 ? "plenty" : left > 0.15 ? "some" : "scarce",
-      larder: this.larder >= 2 * this.params.foodPerAnt ? "full" : "low",
+      larder: this.#spare() >= 2 * this.params.foodPerAnt ? "full" : "low",
     };
   }
 
@@ -1247,9 +1304,162 @@ export class Colony {
     if (laid > 1e-4) this.ph.depositCell(MARKS[r - 1] as Mark, cx, cy, laid);
   }
 
-  /** Where ant i heads when it homes into the nest (the chamber it reads its road signs for): royal, the queen's, for now (slice 5: carriers to reception). */
-  #destMark(_i: number): Mark {
-    return "royal";
+  /** Where ant i heads when it homes into the nest (the chamber it reads its road signs for): a nurse with brood, a brood chamber; else royal, the queen's (slice 5: carriers to reception). */
+  #destMark(i: number): Mark {
+    return this.#holdsBrood[i] ? "brood" : "royal";
+  }
+
+  /** Scratch: the chamber a nurse takes brood to, as a goal (its centre). */
+  #broodNest: Nest = { x: 0, y: 0, r: 1.5 };
+  #broodGoal(i: number): Nest {
+    const c = this.map.chambers?.list[this.#broodTo[i] as number];
+    if (!c || c.cells === 0) return this.nest;
+    this.#broodNest.x = centreX(Math.round(c.sumX / c.cells), Math.round(c.sumY / c.cells));
+    this.#broodNest.y = centreY(Math.round(c.sumY / c.cells));
+    return this.#broodNest;
+  }
+
+  /**
+   * A nurse (nest slice 4): an idle ant in its royal chamber picks up an egg lying near it and takes it to the brood
+   * chamber with the least brood; there, it lays it down. Its brood goes where it goes.
+   */
+  #nurse(i: number, dt: number): void {
+    const ch = this.map.chambers!;
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    if (this.#holdsBrood[i]) {
+      for (const b of this.brood.items)
+        if (b.held === i) {
+          b.x = cx;
+          b.y = cy;
+        }
+      if (ch.at(cx, cy) === this.#broodTo[i]) this.#dropBrood(i);
+      return;
+    }
+    if (this.mode[i] !== EXPLORE || this.carrying[i] || this.pellet[i] || this.#placeAt(cx, cy) !== "royal" || this.#rng() > PICK_BROOD * dt) return;
+    let to = -1;
+    let least = Infinity;
+    for (const c of ch.list)
+      if (c.colony === this.params.nest && c.role === "brood" && c.cells > 0 && c.brood < least) {
+        least = c.brood;
+        to = c.id;
+      }
+    if (to < 0) return; // no brood chamber yet: brood stays with the queen
+    for (const b of this.brood.items)
+      if (b.held < 0 && b.stage === EGG && hexDistance(b.x, b.y, cx, cy) <= 2) {
+        b.held = i;
+        if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
+        b.chamber = -1;
+        this.#holdsBrood[i] = 1;
+        this.#broodTo[i] = to;
+        this.#homeAfresh(i);
+        this.gx[i] = NO_CELL;
+        return;
+      }
+  }
+
+  /** Ant i puts down the brood it holds where it stands (in the chamber it was taking it to, or wherever it died). */
+  #dropBrood(i: number): void {
+    const ch = this.map.chambers;
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    for (const b of this.brood.items)
+      if (b.held === i) {
+        b.held = -1;
+        b.x = cx;
+        b.y = cy;
+        b.chamber = ch ? ch.at(cx, cy) : -1;
+        if (b.chamber >= 0) ch!.list[b.chamber]!.brood++;
+      }
+    this.#holdsBrood[i] = 0;
+    this.#broodTo[i] = -1;
+    this.mode[i] = EXPLORE;
+    this.#asked[i] = -1;
+    this.#question[i] = -1;
+  }
+
+  /**
+   * The colony's life cycle, once a tick (the side view): workers age and die; the queen, alive, lays an egg every
+   * LAY_INTERVAL while food is in the larder and there is room for more workers; eggs hatch into larvae, nurses near a
+   * larva feed it from the larder, a fed larva pupates, and a pupa becomes a worker where it lies.
+   */
+  #nestLife(dt: number): void {
+    const ch = this.map.chambers!;
+    const p = this.params;
+    for (let i = 0; i < this.n; i++) {
+      if (!this.alive[i]) continue;
+      if ((this.age[i] = (this.age[i] as number) + dt) > (this.lifespan[i] as number)) {
+        this.kill(i, false);
+        this.diedOld++;
+      }
+    }
+    const q = this.queen!;
+    if (q.alive) {
+      cellOf(q.x, q.y);
+      const qx = CELL[0] as number;
+      const qy = CELL[1] as number;
+      // Her pheromone: the royal mark, strongest where she lies, drawing nurses to her.
+      this.ph.depositCell("royal", qx, qy, QUEEN_MARK * dt);
+      // Strangers at her side kill her (a raid that reaches the royal chamber).
+      const g = this.enemies;
+      if (g) {
+        g.look?.(this.nestOdour, p.tolerance);
+        let strangers = 0;
+        const o = discOffsets(1)[qy & 1] as Int16Array;
+        for (let k = 0; k < o.length; k += 2) strangers += g.get(qx + (o[k] as number), qy + (o[k + 1] as number));
+        if (strangers >= ENEMY && this.#rng() < 1 - Math.exp(-QUEEN_FIGHT * strangers * dt)) q.alive = false;
+      }
+      this.#layT += dt;
+      // She lays only while the larder holds, beyond what the brood already laid will be fed, a whole worker's food:
+      // eggs laid into an empty larder starve as larvae.
+      let owed = 0;
+      for (const b of this.brood.items) if (b.stage !== PUPA) owed += LARVA_FOOD - b.fed;
+      while (q.alive && this.#layT >= LAY_INTERVAL) {
+        this.#layT -= LAY_INTERVAL;
+        if (this.larder < owed + EGG_FOOD + LARVA_FOOD || this.population + this.brood.size >= p.maxAnts) {
+          this.#layT = 0;
+          break;
+        }
+        this.larder -= EGG_FOOD;
+        owed += LARVA_FOOD;
+        const at = ch.at(qx, qy);
+        this.brood.add(qx, qy, at);
+        if (at >= 0) ch.list[at]!.brood++;
+      }
+    }
+    for (let k = this.brood.items.length - 1; k >= 0; k--) {
+      const b = this.brood.items[k] as BroodItem;
+      b.t += dt;
+      if (b.stage === EGG && b.t >= T_EGG) {
+        b.stage = LARVA;
+        b.t = 0;
+      } else if (b.stage === LARVA) {
+        if (b.held < 0 && b.fed < LARVA_FOOD && this.larder > 0) {
+          // Fed by the nurses round it (the colony's own ants within two cells), from the larder.
+          const nurses = this.friends ? this.#around(this.friends, b.x, b.y) : 2;
+          const take = Math.min(this.larder, LARVA_FOOD - b.fed, FEED_RATE * Math.min(1, nurses / 2) * dt);
+          b.fed += take;
+          this.larder -= take;
+        }
+        if (b.fed >= LARVA_FOOD - 1e-9 && b.t >= T_LARVA) {
+          b.stage = PUPA;
+          b.t = 0;
+        }
+      } else if (b.stage === PUPA && b.t >= T_PUPA && b.held < 0 && this.spawn(centreX(b.x, b.y), centreY(b.y))) {
+        if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
+        this.brood.items.splice(k, 1);
+      }
+    }
+  }
+
+  /** Ants on a count grid within two cells of (x, y). */
+  #around(g: CellCounts, x: number, y: number): number {
+    let s = 0;
+    const o = discOffsets(2)[y & 1] as Int16Array;
+    for (let k = 0; k < o.length; k += 2) s += g.get(x + (o[k] as number), y + (o[k + 1] as number));
+    return s;
   }
 
   /** The role a new chamber at (x, y) takes: the colony's first one well above the royal chamber is reception; below it, store; else brood. */
@@ -1679,16 +1889,17 @@ export class Colony {
       // So does one carrying a soil pellet it dug, to drop on the mound.
       const carrying = this.carrying[i] === 1;
       const pellet = this.pellet[i] === 1;
+      const nursing = this.#holdsBrood[i] === 1;
       if (!pellet) this.#staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
       // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
       // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
-      const goal = this.#goal(i, pellet);
+      const goal = nursing ? this.#broodGoal(i) : this.#goal(i, pellet);
       let nest = goal;
       const x0 = this.x[i] as number;
       const y0 = this.y[i] as number;
       let mode = this.mode[i] as number;
       const prevMode = mode;
-      if (carrying || pellet) {
+      if (carrying || pellet || nursing) {
         mode = RETURN;
         this.mode[i] = RETURN;
         this.#asked[i] = -1;
@@ -2145,6 +2356,7 @@ export class Colony {
         // Read on the floor where it stands (a road sign is under its antennae; the sensors ahead are often in soil in a tunnel).
         if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
         if (this.map.chambers) this.#layMark(i, dt);
+        if (this.queen) this.#nurse(i, dt);
       }
       this.heading[i] = h;
     }
@@ -2154,8 +2366,9 @@ export class Colony {
       this.inNest = under;
     }
     ph.advance(dt);
-    // Growth: the larder turns into ants while there is room.
-    while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
+    // Growth: in the side view, the queen and brood (#nestLife); elsewhere the larder turns into ants while there is room.
+    if (this.queen) this.#nestLife(dt);
+    else while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
   }
 }
 
@@ -2209,6 +2422,25 @@ export const HOLE_SIGHT = 6;
 const SEARCH_START = 3;
 /** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
 export const REST = 10;
+// The queen and brood (nest slice 4): see #nestLife, #nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
+/** Food in an egg, and fed to a larva before it pupates. */
+const EGG_FOOD = 1;
+const LARVA_FOOD = 3;
+/** Seconds as an egg; at least this long as a larva (and fed); as a pupa. */
+export const T_EGG = 15;
+export const T_LARVA = 20;
+export const T_PUPA = 20;
+/** At most one egg this often (seconds), while there is food and room. */
+const LAY_INTERVAL = 0.5;
+/** Food a larva takes per second with two nurses or more by it. */
+const FEED_RATE = 0.5;
+/** Chance per second an idle ant in the royal chamber picks up an egg near it to take to a brood chamber. */
+const PICK_BROOD = 0.5;
+/** A worker's mean lifespan, seconds (each 0.7–1.3× it): an orphaned colony dwindles as its workers age out. */
+export const LIFESPAN = 1800;
+/** The queen's royal mark per second; her death rate per stranger at her side. */
+const QUEEN_MARK = 10;
+const QUEEN_FIGHT = 1;
 // Floor marks (nest slice 3): see #layMark, #destMark, #roleFor.
 /** Marks are laid at the colony's trail deposit per second just out of a chamber, falling to 1/e after MARK_DECAY seconds away from it. */
 const MARK_DECAY = 30;
