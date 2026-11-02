@@ -1,5 +1,6 @@
+import { Chambers } from "./chambers.ts";
 import { CHUNK, CHUNK_BITS, ChunkLayer, local } from "./chunks.ts";
-import { CELL, cellOf, centreX, centreY, extent, hexDistance, nx, ny, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, E, extent, hexDistance, NE, NW, nx, ny, R, W } from "./hex.ts";
 
 // The colonies' world, pure: a procedural map from a seed, kept in 64×64
 // chunks (chunks.ts). Rock comes from three octaves of hashed value noise:
@@ -73,10 +74,31 @@ export interface WorldMap {
    * later the mound); the rest is AIR (solid, never dug, drawn as sky). updateSurface keeps it so as ground changes.
    */
   sky?: ChunkLayer<Uint8Array>;
+  /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
+  loose?: ChunkLayer<Uint8Array>;
+  /**
+   * The side view: cells of loose soil on the map (heapMound adds one, takeLoose takes one). The mound is every colony's:
+   * ants pick up whichever spoil they meet, so only this total is a count of cells (a colony's own count went negative
+   * when it took more of a rival's spoil than of its own: review of MR 15).
+   */
+  moundCells?: number;
+  /** the side view: the nests' chambers (nest slice 2): which cells are chambers, and each chamber's floor */
+  chambers?: Chambers;
   /** when each cell was last dug open by an ant (simulated seconds; −Infinity = never): fresh digging is the live frontier, not filled back (BACKFILL.young) */
   dugAt: ChunkLayer<Float32Array>;
   /** forks begun but not finished: a tunnel's end cell → its second arm (the way to dig, and the heading the arm carries on), which the next digger to pass digs */
   forks?: Map<number, Fork>;
+}
+
+/** Whether integer cell (x, y) is open ground (for Chambers' floor counts), one function per map (made once, not per dig). */
+const openCells = new WeakMap<WorldMap, (x: number, y: number) => boolean>();
+export function openCell(map: WorldMap): (x: number, y: number) => boolean {
+  let f = openCells.get(map);
+  if (!f) {
+    f = (x, y) => inBounds(map, x, y) && rockAt(map, x, y) === OPEN;
+    openCells.set(map, f);
+  }
+  return f;
 }
 
 export interface WorldOptions {
@@ -254,6 +276,10 @@ export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
     map.sky.set(x, y, 0); // ground now (a pellet on the mound, in the side view)
     updateSurface(map, x, y);
   }
+  if (map.chambers) {
+    map.chambers.release(x, y);
+    map.chambers.changed(x, y, openCell(map));
+  }
   return true;
 }
 
@@ -265,6 +291,7 @@ export function digCell(map: WorldMap, x: number, y: number, t = -Infinity): boo
   map.dugAt.set(x, y, t);
   map.dug++;
   if (map.sky) updateSurface(map, x, y);
+  map.chambers?.changed(x, y, openCell(map));
   return true;
 }
 
@@ -694,7 +721,8 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   const cut = rockCut(o.rockiness);
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
-  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer(), sky };
+  const loose = new ChunkLayer((n) => new Uint8Array(n), 0);
+  const map: WorldMap = { size, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer(), sky, loose, moundCells: 0, chambers: new Chambers() };
   const ground = new Int32Array(size.w);
   for (let x = 0; x < size.w; x++) ground[x] = Math.max(2, Math.min(size.h - 8, groundRow(seed, o, x)));
   for (let y = 0; y < size.h; y++)
@@ -720,7 +748,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   let ex = Math.round(size.w * (0.3 + 0.15 * rng()));
   for (let k = 0; k < o.nestCount; k++) {
     if (k > 0) ex = Math.min(size.w - 24, ex + o.nestGap);
-    nests.push(digNest(map, ground, ex, o.chamberDepth, rng));
+    nests.push(digNest(map, ground, ex, o.chamberDepth, rng, k));
   }
   map.nest = nests[0] as Nest;
   map.nests = nests;
@@ -793,7 +821,7 @@ function walkwayRow(map: WorldMap, x: number, g: number): number {
  * Dig a nest into the side view at column ex: a shaft from the ground line slanting down (alternating
  * south-east and south-west steps, mostly one way: about 60° below level) to a round chamber `depth` rows down.
  */
-function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, rng: () => number): Nest {
+function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, rng: () => number, colony: number): Nest {
   const g = ground[ex] as number;
   const way = rng() < 0.5 ? 1 : 2; // SE or SW, the shaft's slant
   let x = ex;
@@ -815,7 +843,118 @@ function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, r
   // The entrance is the hole itself, the shaft's top cell: always open (the cell above it can lose its footing and be sky).
   const nest: Nest = { x: cxw, y: cyw, r: 3, entrance: { x: centreX(ex, g), y: centreY(g) } };
   disc(map, cxw, cyw, nest.r + 1.5, (fx, fy) => open(fx, fy));
+  // The founding chamber: the colony's first, where the queen will be (slice 4 makes it the royal chamber).
+  if (map.chambers) {
+    let bottom = 0;
+    disc(map, cxw, cyw, nest.r + 1.5, (_fx, fy) => (bottom = Math.max(bottom, fy)));
+    const c = map.chambers.add(colony, bottom, "royal");
+    disc(map, cxw, cyw, nest.r + 1.5, (fx, fy) => map.chambers!.claim(c.id, fx, fy, openCell(map)));
+  }
   // The ground round the hole changed: re-derive the walkway there.
   for (let yy = g - 2; yy <= g + 1; yy++) for (let xx = ex - 2; xx <= ex + 2; xx++) if (inBounds(map, xx, yy)) updateSurface(map, xx, yy);
+  // Re-ground the hole's rim. The walkway crosses over the hole by its two upper neighbours (NW and NE, which touch each
+  // other); each stands on the hole and on the hole's west (east) neighbour. Where the ground steps down a row beside the
+  // hole, that neighbour is sky, and with the hole dug out the upper cell lost its footing and fell to AIR: the walkway
+  // ran on only through the hole cell, which explorers never step onto (30 of 100 seeds; review of #15). A cell of soil
+  // there (crust: never dug) keeps the rim.
+  for (const [up, side] of [
+    [NW, W],
+    [NE, E],
+  ] as const) {
+    const sx = nx(ex, g, side);
+    if (!map.sky || !inBounds(map, sx, g) || map.rock.get(nx(ex, g, up), ny(g, up)) !== AIR || map.sky.get(sx, g) !== 1) continue;
+    map.rock.set(sx, g, SOIL);
+    map.sky.set(sx, g, 0);
+    for (let d = -1; d < 6; d++) updateSurface(map, d < 0 ? sx : nx(sx, g, d), d < 0 ? g : ny(g, d));
+  }
   return nest;
+}
+
+/** The top of the ground in column x (side view): the first row from the top that isn't sky, or the map's height. */
+export function groundTop(map: WorldMap, x: number): number {
+  const sky = map.sky;
+  if (!sky) return 0;
+  for (let y = 0; y < map.size.h; y++) if (sky.get(x, y) !== 1) return y;
+  return map.size.h;
+}
+
+/**
+ * Heap one cell of loose soil on the mound by the entrance in column `ex` (side view), as a sandpile: it lands
+ * two to four columns off the hole on `side` (−1 west, +1 east) and slides downhill (to the lower neighbouring
+ * column, outward on a tie) while one is a row or more lower. At most one row per column is about 41°, the
+ * angle of repose of damp soil (dry sand ≈ 34°). Near the hole a column holds no more than a row per column of
+ * distance from it, so the inner side slopes down into the hole at the same angle: a ring with a funnel-shaped
+ * crater, the hole open at its bottom. Every hole in `holes` (all nests' entrance columns; its own by default)
+ * keeps its funnel, so one colony's mound never buries another's way in. Food on the cell it buries is lifted on top.
+ * Returns the cell heaped, or null if there is no room on that side (the sky's top, the map's edge).
+ */
+export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number, holes: readonly number[] = [ex], from?: number): [number, number] | null {
+  if (!map.sky || !map.loose) return null;
+  const tops = holes.map((h) => groundTop(map, h));
+  // Room in column c: on the map, no hole's column, and below every funnel's slope up from its hole.
+  const ok = (c: number) => {
+    if (c < 0 || c >= map.size.w) return false;
+    const top = groundTop(map, c);
+    for (let k = 0; k < holes.length; k++) {
+      const h = holes[k] as number;
+      if (c === h || (tops[k] as number) - top >= Math.abs(c - h) - 1) return false;
+    }
+    return true;
+  };
+  // Landing beyond the map's edge lands at the edge; then out from the funnel if it is inside it, else back in.
+  // `from`: the column it is dropped in (by an ant standing there); else `land` columns past the crater's rim.
+  let x = Math.max(0, Math.min(map.size.w - 1, from ?? ex + side * (2 + land)));
+  while (x >= 0 && x < map.size.w && !ok(x)) x += side;
+  if (x < 0 || x >= map.size.w) {
+    x = Math.max(0, Math.min(map.size.w - 1, x));
+    while (x !== ex && !ok(x)) x -= side;
+    if (x === ex) return null;
+  }
+  for (let guard = 0; guard < map.size.w; guard++) {
+    const here = groundTop(map, x);
+    const out = x + side;
+    const back = x - side;
+    const dOut = ok(out) ? groundTop(map, out) - here : -Infinity;
+    const dBack = ok(back) ? groundTop(map, back) - here : -Infinity;
+    if (dOut >= 1 && dOut >= dBack) x = out;
+    else if (dBack >= 1) x = back;
+    else break;
+  }
+  const y = groundTop(map, x) - 1;
+  if (y < 1) return null;
+  const f = map.food.get(x, y);
+  if (f > 0) {
+    map.food.set(x, y, 0);
+    map.food.set(x, y - 1, map.food.get(x, y - 1) + f);
+  }
+  map.rock.set(x, y, SOIL);
+  map.sky.set(x, y, 0);
+  map.loose.set(x, y, 1);
+  map.moundCells = (map.moundCells ?? 0) + 1;
+  updateSurface(map, x, y);
+  return [x, y];
+}
+
+/**
+ * The side view: take a pellet of loose soil at cell (x, y) off the mound's top (an ant picks one up), so it is the
+ * column's top that goes (above ground again, walkway or sky), never a hole under hanging spoil. False if (x, y) isn't
+ * loose soil at its column's top. (Taking from inside the heap, the column settled a cell; nothing ever did: review of MR 15.)
+ */
+export function takeLoose(map: WorldMap, x: number, y: number): boolean {
+  if (!map.sky || !map.loose || map.loose.get(x, y) !== 1 || rockAt(map, x, y) !== SOIL || groundTop(map, x) !== y) return false;
+  map.loose.set(x, y, 0);
+  map.moundCells = (map.moundCells ?? 0) - 1;
+  map.rock.set(x, y, OPEN);
+  map.sky.set(x, y, 1);
+  updateSurface(map, x, y);
+  // Food on top of the cell taken, left in the sky, comes down with it.
+  const above = ny(y, 4);
+  for (const ax of [nx(x, y, 4), nx(x, y, 5)]) {
+    const f = map.food.get(ax, above);
+    if (f > 0 && rockAt(map, ax, above) !== OPEN && rockAt(map, x, y) === OPEN) {
+      map.food.set(ax, above, 0);
+      map.food.set(x, y, map.food.get(x, y) + f);
+    }
+  }
+  return true;
 }
