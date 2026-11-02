@@ -63,7 +63,7 @@ export interface WorldMap {
   filled: number;
   /** whether the map has any soil (underground): without it there are no tunnels to walk or dig, and ants skip looking for them */
   hasSoil: boolean;
-  /** the heading each dug cell was dug at (1–255 round the circle; 0 = not dug): the run of a tunnel, which the next digger carries on */
+  /** the heading each dug cell was dug at (1–252 round the circle; 0 = not dug): the run of a tunnel, which the next digger carries on */
   digHeading: ChunkLayer<Uint8Array>;
   /** when each cell was last filled back with soil (simulated seconds; −Infinity = never): fresh pellets smell, and draw more (see pelletScent) */
   filledAt: ChunkLayer<Float32Array>;
@@ -75,6 +75,8 @@ export interface WorldMap {
   sky?: ChunkLayer<Uint8Array>;
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
   loose?: ChunkLayer<Uint8Array>;
+  /** forks begun but not finished: a tunnel's end cell → its second arm (the way to dig, and the heading the arm carries on), which the next digger to pass digs */
+  forks?: Map<number, Fork>;
 }
 
 export interface WorldOptions {
@@ -309,15 +311,44 @@ function filledLayer(): ChunkLayer<Float32Array> {
 }
 
 /** The heading integer cell (x, y) was dug at, in radians; NaN if it wasn't dug (a chamber, or never soil). */
+/** Steps a dug cell's heading is kept in: a multiple of 6, so the six ways and a fork's ±60° and 120° are exact (255 put each fork half a step off, always the same way, and it added up). */
+const HEADING_STEPS = 252;
+
 export function tunnelHeading(map: WorldMap, x: number, y: number): number {
   const v = map.digHeading.get(x, y);
-  return v === 0 ? NaN : ((v - 1) / 255) * 2 * Math.PI;
+  return v === 0 ? NaN : ((v - 1) / HEADING_STEPS) * 2 * Math.PI;
+}
+
+const forkKey = (x: number, y: number): number => (y + 32768) * 131072 + (x + 32768);
+
+/** A fork's undug arm: the way from the fork's cell to dig (0–5), and the heading the new tunnel carries on. */
+export interface Fork {
+  dir: number;
+  aim: number;
+}
+
+/**
+ * A fork begun at cell (x, y): one arm dug, the other (way `dir`, carrying heading `aim`) left for the next digger to pass.
+ * On hexes a fork has to be a Y: both arms 60° off the tunnel's run, never one straight on, because the
+ * cell straight on touches a 60° arm and so is no longer a tunnel's end (it would never be dug).
+ */
+export function markFork(map: WorldMap, x: number, y: number, dir: number, aim: number): void {
+  (map.forks ??= new Map()).set(forkKey(x, y), { dir, aim });
+}
+
+/** A fork's undug arm at cell (x, y), taken (forgotten) as it is read; null if none. */
+export function takeFork(map: WorldMap, x: number, y: number): Fork | null {
+  const k = forkKey(x, y);
+  const f = map.forks?.get(k);
+  if (f === undefined) return null;
+  map.forks!.delete(k);
+  return f;
 }
 
 /** Remember the heading integer cell (x, y) was dug at. */
 export function setTunnelHeading(map: WorldMap, x: number, y: number, h: number): void {
   const t = (((h / (2 * Math.PI)) % 1) + 1) % 1;
-  map.digHeading.set(x, y, 1 + (Math.round(t * 255) % 255));
+  map.digHeading.set(x, y, 1 + (Math.round(t * HEADING_STEPS) % HEADING_STEPS));
 }
 
 /** Food units in the cell under world (x, y). */
@@ -482,7 +513,7 @@ export function escapes(map: WorldMap, x: number, y: number, radius: number, thr
 }
 
 /** Visit every cell whose centre is within `r` of world (cx, cy), on the map. */
-function disc(map: WorldMap, cx: number, cy: number, r: number, fn: (x: number, y: number) => void): void {
+export function disc(map: WorldMap, cx: number, cy: number, r: number, fn: (x: number, y: number) => void): void {
   for (let y = Math.max(0, Math.floor(cy / R - r / R - 1)); y <= Math.min(map.size.h - 1, Math.ceil(cy / R + r / R)); y++)
     for (let x = Math.max(0, Math.floor(cx - r - 1)); x <= Math.min(map.size.w - 1, Math.ceil(cx + r)); x++) if (Math.hypot(centreX(x, y) - cx, centreY(y) - cy) <= r) fn(x, y);
 }
