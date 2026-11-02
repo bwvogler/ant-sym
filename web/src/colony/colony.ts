@@ -153,7 +153,7 @@ export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, food
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
-/** Cells around an ant it checks for enemies (a square of side 2 × ENEMY_RANGE + 1). */
+/** Cells around an ant it checks for enemies (the hex disc of radius ENEMY_RANGE). */
 const ENEMY_RANGE = 2;
 
 export class Colony {
@@ -241,6 +241,9 @@ export class Colony {
   detour: Float32Array;
   /** recent bumps, fading over seconds: each bump in a row doubles the next detour */
   bumps: Float32Array;
+  /** the nearest a homing ant has been to its goal this trip, and seconds since it last got a cell nearer (a ring of scented tunnels) */
+  bestD: Float32Array;
+  stallT: Float32Array;
   /** fungal load, 0..1 (fungus.ts): the fungus inside the ant; it never touches the ant's choices directly */
   load: Float32Array;
   /** which strain (an index into the fungus's strains) the load is; meaningful only where load > 0 */
@@ -387,6 +390,8 @@ export class Colony {
     this.since = new Float32Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
+    this.bestD = new Float32Array(n).fill(Infinity);
+    this.stallT = new Float32Array(n);
     this.load = new Float32Array(n);
     this.strain = new Uint8Array(n);
     this.resist = new Float32Array(n);
@@ -442,6 +447,8 @@ export class Colony {
     this.since[i] = 0;
     this.detour[i] = 0;
     this.bumps[i] = 0;
+    this.bestD[i] = Infinity;
+    this.stallT[i] = 0;
     // A newborn is clean and unprimed.
     this.load[i] = 0;
     this.strain[i] = 0;
@@ -491,6 +498,19 @@ export class Colony {
     this.crossLay[i] = 0;
     this.quiet[i] = 0;
     this.estrange[i] = 0;
+  }
+
+  /**
+   * Ant i starts a trip home (it picked up food, or its policy sent it home): a detour or bumps run up exploring would
+   * otherwise switch its homing off, and its progress clock starts again (main's review of #8, carried onto hexes).
+   */
+  #homeAfresh(i: number): void {
+    this.detour[i] = 0;
+    this.bumps[i] = 0;
+    this.wall[i] = 0;
+    this.mx[i] = NaN;
+    this.bestD[i] = Infinity;
+    this.stallT[i] = 0;
   }
 
   /** Living ants. */
@@ -709,15 +729,19 @@ export class Colony {
     } else if (mode === RETURN || mode === FOLLOW) {
       // The way ahead (not back, unless it's a dead end) with the most scent: home scent, laid by
       // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.
+      // Homing with no progress for TUNNEL_STALL seconds: the way that points most nearly home, by its home vector.
       const field = mode === RETURN ? this.ph.fields.home : this.ph.fields.food;
+      const byVector = mode === RETURN && (this.stallT[i] as number) > TUNNEL_STALL;
+      const hx = this.#goalX - centreX(cx, cy);
+      const hy = this.#goalY - centreY(cy);
       let best = -1;
-      let bestV = 0;
+      let bestV = byVector ? -Infinity : 0;
       for (const turn of [0, 1, -1, 2, -2]) {
         const d = (dir + turn + 6) % 6;
         const tx = stepX(cx, cy, d);
         const ty = stepY(cy, d);
         if (rockAt(map, tx, ty) !== OPEN) continue;
-        const v = field.get(tx, ty);
+        const v = byVector ? Math.cos(DIR_ANGLE[d] as number) * hx + Math.sin(DIR_ANGLE[d] as number) * hy : field.get(tx, ty);
         if (v > bestV) {
           bestV = v;
           best = d;
@@ -813,7 +837,7 @@ export class Colony {
       const ty = stepY(cy, d);
       if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, BACKFILL.maxOpen)) continue;
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
-      this.enemies?.look?.(this.odour[i] as number, this.tolerance[i] as number); // strangers to this ant (recognition.ts: get reads the last look)
+      this.enemies?.look?.(this.odour[i] as number, -1); // any ant of another colony, stranger or not (a tolerance below 0 counts every band)
       if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
       if (this.#byANest(tx, ty)) continue;
       if (this.#entrance && (isSky(map, tx, ty) || this.#byAnEntrance(tx, ty))) continue; // the ground line and the holes stay open
@@ -959,6 +983,8 @@ export class Colony {
     if (kind !== this.#goalKind[i]) {
       // A new goal: the wall it was following, and its line home, were for the other one.
       this.#goalKind[i] = kind;
+      this.bestD[i] = Infinity; // progress is toward the new goal
+      this.stallT[i] = 0;
       this.wall[i] = 0;
       this.mx[i] = NaN;
       this.gx[i] = NO_CELL;
@@ -1300,6 +1326,7 @@ export class Colony {
         if (before !== this.#asked[i]) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
+          if (mode === RETURN && this.mode[i] !== RETURN) this.#homeAfresh(i);
           this.mode[i] = mode;
           this.#asked[i] = encode(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
@@ -1332,6 +1359,16 @@ export class Colony {
         const x = this.x[i] as number;
         const y = this.y[i] as number;
         const toNest = Math.atan2(nest.y - y, nest.x - x);
+        // Progress: no cell nearer its goal in TUNNEL_STALL seconds (home scent can lead round a ring of tunnels for
+        // ever), and the tunnel walker picks branches by its home vector for BY_VECTOR seconds; then by scent again.
+        const near = Math.hypot(nest.x - x, nest.y - y);
+        if (near < (this.bestD[i] as number) - 1) {
+          this.bestD[i] = near;
+          this.stallT[i] = 0;
+        } else if ((this.stallT[i] = (this.stallT[i] as number) + dt) > TUNNEL_STALL + BY_VECTOR) {
+          this.bestD[i] = near;
+          this.stallT[i] = 0;
+        }
         if (this.#entrance && (this.wall[i] !== 0 || detouring)) {
           // On the ground line it homes cell by cell (see #walkTunnel): no walls to follow, no detour to wander (an
           // explorer's detour, run up bumping round, used to carry on once it had food, and walk it away from the hole).
@@ -1646,11 +1683,7 @@ export class Colony {
       this.antCell(i);
       if (!carrying && !pellet && mode !== FIGHT && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
-        // A fresh trip home: a detour or bumps run up exploring would otherwise switch its homing off (main's review of #8).
-        this.detour[i] = 0;
-        this.bumps[i] = 0;
+        this.#homeAfresh(i);
         this.since[i] = 0;
         h += Math.PI;
       } else if (pellet && ent && !Number.isNaN(this.#spoilTo[i] as number)) {
@@ -1683,6 +1716,8 @@ export class Colony {
       } else if (atNest && !(pellet && ent)) {
         this.wall[i] = 0;
         this.mx[i] = NaN;
+        this.bestD[i] = Infinity;
+        this.stallT[i] = 0;
         if ((this.since[i] as number) > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
         if (carrying) {
           this.carrying[i] = 0;
@@ -1738,6 +1773,9 @@ function encode(mode: number, tired: boolean, food: Trail, home: Trail, alarm: T
 export const FOLLOW_GIVE_UP = 120;
 /** Seconds of wall-following before trying the other side once (same line home). */
 export const FOLLOW_FLIP = 45;
+/** Seconds a homing ant may get no nearer its goal before tunnel branches are picked by its home vector, and for how long. */
+export const TUNNEL_STALL = 20;
+export const BY_VECTOR = 15;
 /** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
 const M_LINE_WIDTH = 0.6;
 /** Releases from a soil wall a trip may make without getting any nearer home, before only progress counts. */

@@ -1199,9 +1199,13 @@ The fungus milestone (§15–23, PR #7) and the maintenance review (#13) were bu
 - the fungal clock on tiredness, and calm on charging;
 - `layGain`, and the food leak into the rival's field.
 
-One square-grid homing fix from main also applies on hexes and was ported: picking up food starts the trip home afresh, with no detour or bumps carried over.
+Two of main's homing fixes apply on hexes too and were ported:
+- **A trip home starts afresh**, whether the ant picked up food or its policy sent it home: no detour or bumps carried over.
+- **No progress for `TUNNEL_STALL` (20 s):** the tunnel walker picks branches by the home vector for `BY_VECTOR` (15 s), then goes back to scent. Without this, homing carriers can circle a ring of scented tunnels for ever.
 
-Main's other homing fixes (a lost wall let go of, tunnel stalls broken by the home vector) were written for square cells and are not carried over. On hexes a wall-follower walks the wall cell by cell with a hand on it, and nest slice 1 replaces underground homing anyway.
+The agent review of this merge found that the first cut had dropped both, and reproduced the ring trap on hexes (6 of 6 seeds). Each now has a test that fails without it.
+
+Main's "lost wall" fix (`WALL_LOST`) is not carried over. On hexes a wall-follower walks the wall cell by cell with a hand on it, so it can't drift off into the open.
 
 **Grid code moved to hexes** (`hex.ts`):
 
@@ -1213,13 +1217,23 @@ Main's other homing fixes (a lost wall let go of, tunnel stalls broken by the ho
 | `Fungus.paint` | the brush is a disc of hex centres |
 | `Game.enemiesNearNest` | the hex disc round the chamber, and the entrance as well |
 
-Backfill now asks Recognition about strangers to the digging ant, not "any enemy". Tests that placed ants at square-cell centres (`x + 0.5, y + 0.5`) place them at hex centres instead (`centreX`, `centreY`).
+Backfill now asks Recognition for every ant of another colony (`look` at tolerance −1), so it won't wall one in, stranger or not. Tests that placed ants at square-cell centres (`x + 0.5, y + 0.5`) place them at hex centres instead (`centreX`, `centreY`).
 
 **Measured** (`scripts/colony-bench.mjs 1200 60 1`, merged vs the stack's tip mr15):
-- **Side view:** identical, ant for ant, with no fungus: one colony stores 497; two store 448 / 439.
-- **Top-down maps:** within a few percent, from the "afresh" reset. For example, open 160×100 stores 2263 / 435 against 2517 / 446.
-- **Tick time:** unchanged within noise, side view two colonies 5.08 ms against 5.23 ms.
-- **Tests:** all 251 pass.
+- **Fungus hooks alone:** before the two homing fixes, the side view was identical to mr15 ant for ant (one colony 497 stored; two 448 / 439).
+- **With the fixes:** the side view stores 482 (one colony) and 462 / 500 (two).
+- **Tick time:** unchanged within noise, side view two colonies 5.15 ms against 5.23 ms.
+- **Tests:** all 253 pass.
+
+**Homing on the side view** (600 + 600 ants, 600 s; ants out over 120 s, sampled every 10 s from 120 s, mean and worst sample per colony):
+
+| Seed | mr15 (= merge without the fixes): out > 120 s | food home | With the fixes: out > 120 s | food home |
+|---|---|---|---|---|
+| 1 | 17.2 % (worst 75 %) | 1345 / 1126 | 0.4 % (worst 4 %) | 1437 / 1395 |
+| 2 | 0.1 % (1 %) | 1258 / 1481 | 0.1 % (1 %) | 1236 / 1415 |
+| 3 | 18.0 % (59 %) | 1003 / 1352 | 10.6 % (56 %) | 1209 / 1421 |
+
+Rings of scented tunnels were most of the stuck share in `ja-dy9`.
 
 **§22 rerun on the side view** (Garden painted 4× on each chamber, 300 + 300 ants, 10 sim-minutes):
 
