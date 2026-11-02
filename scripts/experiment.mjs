@@ -11,8 +11,8 @@
 //                  [--set colony.deposit=2,4,8] [--set colony.channels.food.evaporation=0.03,0.06]
 //                  [--policy local|cache:<file>] [--jobs N] [--out file.json]
 // Keys: colony.* (the player's colony; both sides in the combat assay), rival.*, game.* (game.fight.rate, …).
-// --policy cache:<file> replays cached Jev answers ({ modes: { situationKey: mode }, stances: { stanceKey: stance } },
-// written by scripts/colony-live.mjs); situations it lacks fall back to the local rule.
+// --policy cache:<file> replays cached Jev answers ({ modes: { situationKey: mode }, stances: { stanceKey: stance },
+// hooks: { hook: { hookKey: answer } } }, written by scripts/colony-live.mjs); anything it lacks falls back to the local rule.
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
@@ -143,12 +143,13 @@ async function work() {
   }
   if (policy.startsWith("cache:")) {
     const { localPolicy, localStance } = await import("../web/src/colony/colony.ts");
-    const { situationKey, stanceKey } = await import("../web/src/colony/colonyBrain.ts");
+    const { responsesFromAnswers, situationKey, stanceKey } = await import("../web/src/colony/colonyBrain.ts");
     const cache = JSON.parse(readFileSync(policy.slice(6), "utf8"));
     const modes = cache.modes ?? {};
     const stances = cache.stances ?? {};
     cfg.policy = (s) => modes[situationKey(s)] ?? localPolicy(s);
     cfg.stance = (s) => stances[stanceKey(s)] ?? localStance(s);
+    cfg.responses = responsesFromAnswers(cache.hooks ?? {});
   } else if (policy !== "local") throw new Error(`--policy ${policy}: local or cache:<file>`);
   const out = [];
   for (const id of ids) out.push({ id, run: ASSAYS.find((a) => a.id === id).run(seed, cfg, short) });

@@ -90,8 +90,15 @@ test("running: each new situation is asked once; the answers are cached and the 
   assert.equal(new Set(all).size, all.length, "no situation asked twice");
   assert.equal(j.state.cached, all.length);
   run(c, 1);
-  const modes = c.counts();
-  assert.equal(modes.return, c.population, "every ant took Jev's answer on its next tick");
+  // Every ant asked about a situation Jev has answered took that answer (an ant that just walked into a new situation, e.g. out of the nest, is on the local rule while it is asked).
+  let answered = 0;
+  for (let i = 0; i < c.n; i++) {
+    const q = c.lastQuestion(i);
+    if (!q || j.explain(q).by !== "jev") continue;
+    answered++;
+    assert.equal(c.mode[i], 2, `ant ${i} took Jev's "return"`);
+  }
+  assert.ok(answered >= c.population * 0.8, `${answered} of ${c.population} ants on Jev's answer`);
   assert.ok(j.state.hits > 0);
   assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, all.length, "persisted under the doctrine");
 });
@@ -106,6 +113,7 @@ test("a new doctrine has its own cache; switching back to an old one is free", a
   run(c, 3);
   await tick(40);
   const first = sent.flat().length;
+  const askedFirst = new Set(sent.flat());
   j.setDoctrine(DOCTRINES[1]!.text);
   assert.equal(j.state.cached, 0);
   run(c, 1);
@@ -115,7 +123,8 @@ test("a new doctrine has its own cache; switching back to an old one is free", a
   j.setDoctrine(DOCTRINES[0]!.text);
   run(c, 1);
   await tick(40);
-  assert.equal(sent.length, afterSecond, "back to the first doctrine: no calls for situations it has answered");
+  const again = sent.slice(afterSecond).flat();
+  assert.ok(again.every((k) => !askedFirst.has(k)), "back to the first doctrine: no calls for situations it has answered");
 });
 
 test("a 409 ends the run and the colony is back on the local rule", async () => {
@@ -129,7 +138,7 @@ test("a 409 ends the run and the colony is back on the local rule", async () => 
   await tick(40);
   assert.equal(j.state.phase, "stopped");
   assert.match(String(j.state.lastError), /spend-cap/);
-  assert.equal(j.policy({ mode: "follow", tired: true, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" }), "return", "the local rule answers");
+  assert.equal(j.policy({ mode: "follow", tired: true, atNest: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" }), "return", "the local rule answers");
 });
 
 test("busy puts the situations back in the queue; a failure cools down instead of hammering", async () => {
@@ -194,7 +203,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const SIT = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" } as const;
+const SIT = { mode: "explore", tired: false, atNest: false, foodTrail: "none", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" } as const;
 
 test("a late Stop reply does not overwrite a run started again in the meantime", async () => {
   const slowStop = deferred<void>();
@@ -271,7 +280,7 @@ test("explain says who decides a situation, without counting or queuing it", asy
   const j = make();
   const c = colony();
   j.attach(c);
-  const s = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" } as const;
+  const s = { mode: "explore", tired: false, atNest: false, foodTrail: "none", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" } as const;
   assert.deepEqual(j.explain(s), { mode: "explore", by: "local" }, "off: the local rule");
   await j.start();
   const before = { hits: j.state.hits, misses: j.state.misses };
@@ -288,7 +297,7 @@ test("explain alone never asks Jev", async () => {
   const j = make();
   j.attach(colony());
   await j.start();
-  j.explain({ mode: "explore", tired: true, foodTrail: "faint", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" });
+  j.explain({ mode: "explore", tired: true, atNest: false, foodTrail: "faint", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" });
   await tick(60); // several cycles
   assert.equal(sent.length, 0, "no /api/jev request");
 });

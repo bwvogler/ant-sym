@@ -1,6 +1,7 @@
 import { FAINT, type ColonyOptions, type Colony, type Policy, type StancePolicy } from "./colony.ts";
 import { between, correlation, foodIn, mean, median, runGame, type Rect, type RunResult, type RunSpec } from "./experiment.ts";
 import type { GameParams } from "./game.ts";
+import type { Responses } from "./responses.ts";
 import { mulberry32, worldFromArrays, type Nest, type WorldMap } from "./world.ts";
 
 // Assays, pure: small hand-built arenas, each with a pass/fail target taken
@@ -18,6 +19,7 @@ export interface AssayConfig {
   game?: Partial<GameParams>;
   policy?: Policy;
   stance?: StancePolicy;
+  responses?: Responses;
 }
 
 export interface MetricDef {
@@ -94,7 +96,7 @@ function solo(seed: number, cfg: AssayConfig, world: (seed: number) => WorldMap,
     seed,
     world,
     game: { rival: false, antCount: ARENA_ANTS, ...cfg.game },
-    player: { policy: cfg.policy, stance: cfg.stance, colony: { antCount: ARENA_ANTS, maxAnts: ARENA_ANTS, ...colony, ...cfg.colony } },
+    player: { policy: cfg.policy, stance: cfg.stance, responses: cfg.responses, colony: { antCount: ARENA_ANTS, maxAnts: ARENA_ANTS, ...colony, ...cfg.colony } },
     ...spec,
   });
 }
@@ -328,7 +330,7 @@ function skirmish(seed: number, cfg: AssayConfig, a: { n: number; at: Rect }, b:
     seed,
     world,
     game: { rival: true, antCount: a.n, rivalAnts: b.n, ...cfg.game },
-    player: { policy: fight, colony: side(a.n) },
+    player: { policy: fight, responses: cfg.responses, colony: side(a.n) },
     rival: { policy: fight, colony: { ...side(b.n), ...cfg.rival } },
     seconds,
     events: [
@@ -386,7 +388,7 @@ function gameRun(seed: number, cfg: AssayConfig, short: boolean): RunResult {
       seed,
       world: short ? { size: { w: 160, h: 100 } } : {},
       game: { antCount: ants, rivalAnts: ants, ...cfg.game },
-      player: { policy: cfg.policy, stance: cfg.stance, colony: cfg.colony },
+      player: { policy: cfg.policy, stance: cfg.stance, responses: cfg.responses, colony: cfg.colony },
       rival: { colony: cfg.rival },
       seconds: short ? 240 : 600,
       sampleEvery: 5,

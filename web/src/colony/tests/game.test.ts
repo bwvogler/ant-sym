@@ -21,7 +21,7 @@ function crowd(c: Colony, x: number, y: number, count: number): void {
   }
 }
 
-const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
+const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, atNest: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
 const view = (s: Partial<StanceSituation>): StanceSituation => ({ stance: "forage", ants: "some", losses: "none", enemyNearNest: false, foodLeft: "plenty", larder: "low", ...s });
 
 test("generateWorld: two nests, a walk apart, joined on foot, with food away from both", () => {

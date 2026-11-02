@@ -12,10 +12,10 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nest], { food: f });
 }
 
-const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
+const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, atNest: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
 
 test("localPolicy: tired goes home; a strong food trail is followed; none means explore; faint keeps the mode", () => {
-  assert.equal(localPolicy(sit({ tired: true, foodTrail: "strong" })), "return");
+  assert.equal(localPolicy(sit({ tired: true, atNest: false, foodTrail: "strong" })), "return");
   assert.equal(localPolicy(sit({ foodTrail: "strong" })), "follow");
   assert.equal(localPolicy(sit({ mode: "follow", foodTrail: "none" })), "explore");
   assert.equal(localPolicy(sit({ mode: "follow", foodTrail: "faint" })), "follow");
@@ -69,7 +69,7 @@ test("the policy is asked only when an ant's situation changes, and its answer i
   assert.equal(c.mode[0], 1, "follow");
   assert.equal(c.decisions, 1);
   assert.equal(c.situationsSeen, 1);
-  assert.equal(SITUATIONS, 1296);
+  assert.equal(SITUATIONS, 2592);
 });
 
 test("a policy answering nonsense falls back to the plain rule instead of breaking the ant", () => {

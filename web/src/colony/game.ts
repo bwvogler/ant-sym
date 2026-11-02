@@ -1,5 +1,6 @@
 import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, localPolicy, localStance, type ColonyOptions, type Policy, type StancePolicy } from "./colony.ts";
+import { localResponses, type Responses } from "./responses.ts";
 import type { WorldMap } from "./world.ts";
 
 // The game, pure: the player's colony and (optionally) a rival on one map,
@@ -28,6 +29,7 @@ export type Outcome = "playing" | "won" | "lost";
 export interface Side {
   policy?: Policy;
   stance?: StancePolicy;
+  responses?: Responses;
   colony?: ColonyOptions;
 }
 
@@ -47,9 +49,9 @@ export class Game {
     this.map = map;
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
-    const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
+    const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance, player.responses ?? localResponses);
     this.colonies = [mine];
-    if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1, ...rival.colony }, rng, rival.policy ?? localPolicy, rival.stance ?? localStance));
+    if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1, ...rival.colony }, rng, rival.policy ?? localPolicy, rival.stance ?? localStance, rival.responses ?? localResponses));
     this.#grids = this.colonies.map(() => new CountGrid());
     this.#enemy = this.colonies.map(() => new CountGrid());
     this.colonies.forEach((c, k) => {

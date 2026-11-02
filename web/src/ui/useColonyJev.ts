@@ -30,7 +30,7 @@ const localStore: CacheStore = {
 };
 
 /** Estimated input tokens per situation, from the size of a full request (the ledger counts the real ones). */
-const SAMPLE: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
+const SAMPLE: Situation = { mode: "explore", tired: false, atNest: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
 export const TOKENS_PER_SITUATION = Math.round(estimateTokens(packModeRequest(Array.from({ length: 100 }, (_, n) => ({ id: `s${n}`, situation: SAMPLE })), DOCTRINES[0]!.text)) / 100);
 
 export interface DoctrineChoice {
