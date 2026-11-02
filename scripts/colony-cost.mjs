@@ -7,23 +7,29 @@
 // before at the end, and paint alarm now and then. The rival plays the local
 // rule (free). Tokens per question are estimated from request size
 // (colonyBrain.estimateTokens); the ledger counts the real ones live.
-// The ant's small responses (get, carry, drop, trail: responses.ts) are
-// costed the same way, as if each were its own Jev lane; they are not asked
-// live yet, so they are reported apart from the session total.
 //
-// Usage: node scripts/colony-cost.mjs [minutes=10] [ants=800] [seed=1]
+// --side plays the side view (the nest, its chambers and in-nest situations: PRD §32), as the app sets it up
+// (generateSideWorld(seed), Game with mulberry32(seed * 7919)); without it, the top-down map (generateWorld) with
+// the rng this script always used, so earlier figures reproduce.
+//
+// Usage: node scripts/colony-cost.mjs [--side] [minutes=10] [ants=600] [seed=1]
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
-import { DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
-import { localResponses, responses, touchKey } from "../web/src/colony/responses.ts";
+import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
 import { Game } from "../web/src/colony/game.ts";
-import { generateWorld, mulberry32 } from "../web/src/colony/world.ts";
+import { generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
+import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
-const [minutes = 10, ants = 600, seed = 1] = process.argv.slice(2).map(Number);
-const USD = 0.042 / 1e6;
+const side = process.argv.includes("--side");
+const [minutes = 10, ants = 600, seed = 1] = process.argv
+  .slice(2)
+  .filter((a) => a !== "--side")
+  .map(Number);
+const USD = USD_PER_INPUT_TOKEN;
 const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
-const map = generateWorld(seed);
+const map = side ? generateSideWorld(seed) : generateWorld(seed);
+const extent = worldExtent(map);
 let doctrine = DOCTRINES[0].text;
 let tokens = 0;
 let requests = 0;
@@ -38,11 +44,10 @@ function lane(key, pack, contextOf, local) {
     asked,
     policy: (s) => {
       const k = key(s);
-      if (!asked.get(contextOf(doctrine))?.has(k)) queue.set(k, { ...s }); // a copy: responses share one Touch object
+      if (!asked.get(contextOf(doctrine))?.has(k)) queue.set(k, s);
       return local(s); // the stand-in's answer, and what the colony does until Jev answers
     },
-    tokens: 0,
-    flush(counted = true) {
+    flush() {
       const context = contextOf(doctrine);
       const set = asked.get(context) ?? new Set();
       asked.set(context, set);
@@ -50,13 +55,9 @@ function lane(key, pack, contextOf, local) {
       queue.clear();
       for (let b = 0; b < items.length; b += 100) {
         const chunk = items.slice(b, b + 100);
-        const tok = estimateTokens(pack(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
-        this.tokens += tok;
-        if (counted) {
-          tokens += tok;
-          requests++;
-          questions += chunk.length;
-        }
+        tokens += estimateTokens(pack(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
+        requests++;
+        questions += chunk.length;
         for (const [k] of chunk) set.add(k);
       }
     },
@@ -66,17 +67,11 @@ function lane(key, pack, contextOf, local) {
 }
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
-const hooks = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, lane(touchKey, (items, d) => packResponseRequest(h, items, d), (d) => responseContext(h, d), localResponses[h])]));
-const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed + 7), {
-  policy: modes.policy,
-  stance: stances.policy,
-  responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
-});
+const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(side ? seed * 7919 : seed + 7), { policy: modes.policy, stance: stances.policy });
 const colony = game.player;
 const flush = () => {
   modes.flush();
   stances.flush();
-  for (const h of RESPONSE_HOOKS) hooks[h].flush(false);
 };
 
 // The session: a doctrine for each slice of time, the first one again at the end (should be free).
@@ -89,7 +84,6 @@ for (const d of plan) {
   doctrine = d.text;
   modes.clear();
   stances.clear();
-  for (const h of RESPONSE_HOOKS) hooks[h].clear();
   colony.reconsider();
   const before = { tokens, requests, modes: modes.seen(policyContext(doctrine)), stances: stances.seen(stanceContext(doctrine)) };
   const end = t + slice;
@@ -100,7 +94,7 @@ for (const d of plan) {
       next = t + BATCH_EVERY;
     }
     // The fungus paints a blot of alarm somewhere every ~20 s.
-    if (rng() < DT / 20) colony.paint("alarm", rng() * map.size.w, rng() * map.size.h, 3, 12);
+    if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12); // world units: rows are R apart
   }
   flush();
   phases.push({ name: d.name, newSituations: modes.seen(policyContext(doctrine)) - before.modes, newStances: stances.seen(stanceContext(doctrine)) - before.stances, tokens: tokens - before.tokens, requests: requests - before.requests });
@@ -108,14 +102,9 @@ for (const d of plan) {
 
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
 const r = game.rival;
-console.log(`game cost, offline: seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
+console.log(`game cost, offline (${side ? "side view" : "top-down"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
 console.log(`you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`);
 console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations; ${game.strategyChoices / game.colonies.length} stance choices each\n`);
 for (const p of phases) console.log(`  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`);
 console.log(`\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${Math.round(tokens / Math.max(1, questions))} tok per question, ${Math.round(colony.decisions / Math.max(1, questions))} mode choices per question)`);
 console.log(`≈ ${usd((tokens * 60) / minutes)} per hour at this pace of retuning (one every ${(slice / 60).toFixed(1)} min); target ≤ $0.25/h`);
-console.log(`\nresponse lanes, if each were asked like the modes (not live yet; not in the total above):`);
-for (const h of RESPONSE_HOOKS) {
-  const seen = plan.reduce((n, d, k) => n + (plan.findIndex((x) => x.text === d.text) === k ? hooks[h].seen(responseContext(h, d.text)) : 0), 0);
-  console.log(`  ${h.padEnd(6)} ${String(seen).padStart(3)} situations over the doctrines · ~${hooks[h].tokens.toLocaleString().padStart(6)} tok ≈ ${usd(hooks[h].tokens)}`);
-}

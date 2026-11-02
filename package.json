@@ -7,13 +7,13 @@
   "scripts": {
     "dev": "npm --prefix web run dev",
     "test": "npm --prefix web test",
+    "test:slow": "npm --prefix web run test:slow",
     "lint": "npm --prefix web run lint",
     "typecheck": "npm --prefix web run typecheck",
     "colony-bench": "node scripts/colony-bench.mjs",
     "probe": "node scripts/probe.mjs",
     "situations": "node scripts/situations.mjs",
     "cacheprobe": "node scripts/cacheprobe.mjs",
-    "colony-cost": "node scripts/colony-cost.mjs",
-    "exp": "node scripts/experiment.mjs"
+    "colony-cost": "node scripts/colony-cost.mjs"
   }
 }

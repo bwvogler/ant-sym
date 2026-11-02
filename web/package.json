@@ -8,8 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "typecheck": "tsc -b",
-    "test": "node --test --test-timeout=60000 --test-force-exit server/tests/*.test.ts src/sim/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/*.test.ts",
-    "preview": "vite preview"
+    "test": "node --test --test-timeout=60000 server/tests/*.test.ts src/sim/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/*.test.ts",
+    "preview": "vite preview",
+    "test:slow": "node --test --test-timeout=1200000 src/colony/tests/slow/*.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

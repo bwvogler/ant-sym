@@ -2,24 +2,31 @@
 // (both colonies on the local rule) on each map size and reports the median
 // and 90th-percentile milliseconds per tick after a warm-up, plus the ants
 // alive at the end. Ants spread out over the run, so the late ticks (more
-// trail laid, more chunks awake) are the honest ones.
+// trail laid, more chunks awake) are the honest ones. Each size runs twice:
+// underground (soil the ants dig, seen from above) and the open surface; then
+// the side view (the app's default: a cross-section) at its own size, one colony and two.
 //
-// Usage: node scripts/colony-bench.mjs [ants per colony=1200] [sim seconds=60] [seed=1]
+// With spores=1, Bloom is painted over both nests at the start: every ant of
+// both colonies carries load, the fungus's worst case per tick.
+//
+// Usage: node scripts/colony-bench.mjs [ants per colony=1200] [sim seconds=60] [seed=1] [spores=0]
 import { Game } from "../web/src/colony/game.ts";
-import { generateWorld, mulberry32 } from "../web/src/colony/world.ts";
+import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, SIDE_WORLD } from "../web/src/colony/world.ts";
 
-const [ants = 1200, seconds = 60, seed = 1] = process.argv.slice(2).map(Number);
+const [ants = 1200, seconds = 60, seed = 1, spores = 0] = process.argv.slice(2).map(Number);
 const DT = 1 / 30;
 const SIZES = [
   { w: 160, h: 100 },
   { w: 512, h: 320 },
 ];
 
-for (const size of SIZES) {
+const RUNS = [...SIZES.flatMap((s) => [[s, "underground"], [s, "open"]]), [SIDE_WORLD.size, "side, one colony"], [SIDE_WORLD.size, "side, two"]];
+for (const [size, ground] of RUNS) {
   const t0 = performance.now();
-  const map = generateWorld(seed, { size });
+  const map = ground.startsWith("side") ? generateSideWorld(seed, ground === "side, two" ? {} : { nestCount: 1 }) : generateWorld(seed, ground === "open" ? { ...OPEN_WORLD, size } : { size });
   const gen = performance.now() - t0;
   const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 31 + 7));
+  if (spores) for (const c of game.colonies) game.paintSpores(c.nest.x, c.nest.y, c.nest.r + 2, 3, 0.3, 1);
   const steps = Math.round(seconds / DT);
   const warm = Math.round(5 / DT);
   const ms = [];
@@ -33,5 +40,6 @@ for (const size of SIZES) {
   const mean = (ms.reduce((a, b) => a + b, 0) / ms.length).toFixed(2);
   const alive = game.colonies.map((c) => c.population).join(" + ");
   const awake = game.colonies[0].ph.awakeChunks?.() ?? "n/a";
-  console.log(`${size.w}×${size.h}: generate ${gen.toFixed(0)} ms; tick mean ${mean} ms, median ${q(0.5)} ms, p90 ${q(0.9)} ms over ${seconds} s; ants ${alive}; stored ${game.colonies.map((c) => c.stored).join(" / ")}; awake chunks ${awake}`);
+  const dug = game.colonies.map((c) => c.soilDug).join(" / ");
+  console.log(`${size.w}×${size.h} ${ground}: generate ${gen.toFixed(0)} ms; tick mean ${mean} ms, median ${q(0.5)} ms, p90 ${q(0.9)} ms over ${seconds} s; ants ${alive}; stored ${game.colonies.map((c) => c.stored).join(" / ")}; dug ${dug}; awake chunks ${awake}${spores ? `; infected ${game.colonies.map((c) => game.fungus.census(c).infected).join(" + ")}` : ""}`);
 }

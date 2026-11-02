@@ -1,7 +1,6 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "../sim/policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
-import { localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -14,10 +13,12 @@ import { localResponses, responses, touchKey, type Responses, type Touch, type T
 // and cached answers are kept per doctrine (`policyContext`, `stanceContext`).
 
 /** Bump when the situation fields or their meaning change: old cached answers no longer apply. */
-export const COLONY_BRAIN_VERSION = 2;
+export const COLONY_BRAIN_VERSION = 4;
+/** The strategist's: its view didn't change with the nest (slice 3), so its cached stances keep (it shared the ants' version before). */
+export const STANCE_BRAIN_VERSION = 3;
 
 export const COLONY_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony. mode is what the ant is doing now: explore (wander looking for new food, marking the way home), follow (walk up a food scent toward food), return (walk home) or fight (go for enemy ants, or follow the colony's alarm scent to a fight, or raid the enemy nest). tired means it has been out a long time without finding food. foodTrail, homeTrail and alarm say how strong each scent is just ahead of the ant: none, faint or strong. Food scent is laid by ants carrying food home, so it leads to food; home scent leads home; alarm scent is laid by ants in a fight, or by the fungus, and marks danger. enemy is near when an ant of the rival colony is within two steps. stance is what the colony as a whole is doing: forage, defend or raid. An ant carrying food always goes home and is never asked. doctrine is how the colony wants its ants to behave: follow it.";
+  "Each key in `ants` is the situation of one worker ant of a colony. mode is what the ant is doing now: explore (wander looking for new food, marking the way home, digging tunnels through soil), follow (walk up a food scent toward food), return (walk home) or fight (go for enemy ants, or follow the colony's alarm scent to a fight, or raid the enemy nest). tired means it has been out a long time without finding food. foodTrail and alarm say how strong each scent is just ahead of the ant: none, faint or strong. Food scent is laid by ants carrying food home, so it leads to food; alarm scent is laid by ants in a fight, or by the fungus, and marks danger. homeTrail, on the ground, is how strong the home scent ahead is (none, faint or strong; it leads home); inside the nest it says where the ant is: in a tunnel, or in one of the nest's chambers by what the chamber is for (royal: the queen's; brood; store: food kept; reception: where food comes in; midden: refuse). An ant inside the nest is home. enemy is near when an ant of the rival colony is within two steps. stance is what the colony as a whole is doing: forage, defend or raid. An ant carrying food, or soil it dug, always goes home and is never asked. doctrine is how the colony wants its ants to behave: follow it.";
 
 export const STRATEGY_LEGEND =
   "`colony` describes an ant colony at war with a rival colony over the same food. stance is what it is doing now: forage (gather food), defend (fight near home) or raid (send fighters to the rival's nest). ants is how many ants it has against how many it can feed: few, some or many. losses is how many ants it lost lately: none, some or heavy. enemyNearNest says whether rival ants are close to home. foodLeft is how much food is left on the map: plenty, some or scarce. larder is food stored at home beyond what new ants need: low or full. doctrine is how the colony wants to behave: follow it.";
@@ -35,7 +36,7 @@ export const DOCTRINES: Doctrine[] = [
 ];
 
 const MODE_CRITERIA: Record<Mode, string> = {
-  explore: "explore: wander and look for new food",
+  explore: "explore: wander and look for new food, digging through soil",
   follow: "follow: walk up the food scent toward food",
   return: "return: walk home",
   fight: "fight: go for enemy ants, follow alarm scent to a fight, or raid the rival nest",
@@ -112,86 +113,7 @@ export function policyContext(doctrine: string): string {
 
 /** The same for cached stances. */
 export function stanceContext(doctrine: string): string {
-  return `stance-v${COLONY_BRAIN_VERSION}-${hash(STRATEGY_LEGEND + JSON.stringify(stanceQuestion("c0")) + doctrine.trim())}`;
-}
-
-/**
- * The ant's small responses (responses.ts) as Jev questions: each is asked only when its moment
- * comes (touching food, carrying, at a place to put the load down, laying trail) and cached per
- * situation and doctrine like the modes. Not wired to the client yet: behaviour MRs turn lanes on
- * one at a time, after their assays; until then colony-cost estimates what each would cost. The
- * rates (trail amount, alarm gain, alarm raised) stay local tuning knobs, not questions.
- */
-export const RESPONSE_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none or food. atNest says whether it is inside its own nest. enemy says whether an ant of the rival colony is within two steps. stance is what the colony as a whole is doing: forage, defend or raid. doctrine is how the colony wants its ants to behave: follow it.";
-
-export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail"] as const;
-export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
-
-export function responseQuestion(hook: ResponseHook, id: string): JevRequest["questions"] {
-  const ant = `ant \`${id}\``;
-  switch (hook) {
-    case "get":
-      return { [`${id}_get`]: { type: "noul", instructions: `Going by the doctrine, ${ant} is touching food with empty jaws: should it pick one piece up?` } };
-    case "drop":
-      return { [`${id}_drop`]: { type: "noul", instructions: `Going by the doctrine, ${ant} is carrying food at its nest: should it put it down here?` } };
-    case "carry":
-      return { [`${id}_carry`]: { type: "choice", instructions: `Going by the doctrine, ${ant} is carrying food: what should it do?`, criteria: MODE_CRITERIA } };
-    case "trail":
-      return {
-        [`${id}_trail`]: {
-          type: "choice",
-          instructions: `Going by the doctrine, which scent should ${ant} lay as it walks?`,
-          criteria: { food: "food: mark the way to food (it is carrying food home)", home: "home: mark the way home (it is walking out)", none: "none: lay nothing" },
-        },
-      };
-  }
-}
-
-/** One request for many response situations of one hook. */
-export function packResponseRequest(hook: ResponseHook, items: { id: string; situation: Touch }[], doctrine: string): JevRequest {
-  const ants: Record<string, Touch> = {};
-  const questions: JevRequest["questions"] = {};
-  for (const it of items) {
-    const t = it.situation;
-    ants[it.id] = { mode: t.mode, carrying: t.carrying, atNest: t.atNest, enemy: t.enemy, stance: t.stance };
-    Object.assign(questions, responseQuestion(hook, it.id));
-  }
-  return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
-}
-
-/** What a cached response was asked under (hook, legend, wording, doctrine). */
-export function responseContext(hook: ResponseHook, doctrine: string): string {
-  return `${hook}-v${COLONY_BRAIN_VERSION}-${hash(RESPONSE_LEGEND + JSON.stringify(responseQuestion(hook, "s0")) + doctrine.trim())}`;
-}
-
-/** What a response hook answers: the same type as the hook in responses.ts. */
-export type ResponseAnswer = boolean | Mode | Trail;
-const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
-
-/** A response from a reply, or null when it is missing or not one of the hook's answers (the local response covers it). A noul is yes above ½. */
-export function readResponse(hook: ResponseHook, answers: Record<string, JevAnswer>, id: string): ResponseAnswer | null {
-  const a = answers[`${id}_${hook}`];
-  if (!a) return null;
-  if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
-  if (a.type !== "choice") return null;
-  if (hook === "carry") return (MODES as readonly string[]).includes(a.choice) ? (a.choice as Mode) : null;
-  return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
-}
-
-/** Cached response answers per hook, keyed by touchKey: what scripts/colony-live.mjs saves and the experiments replay. */
-export type ResponseCache = Partial<Record<ResponseHook, Record<string, ResponseAnswer>>>;
-
-/** Responses that answer from a cache, and from `base` for any situation (or hook) the cache lacks. */
-export function responsesFromAnswers(cache: ResponseCache, base: Responses = localResponses): Responses {
-  const over: Partial<Responses> = {};
-  for (const hook of RESPONSE_HOOKS) {
-    const table = cache[hook];
-    if (!table) continue;
-    const local = base[hook] as (t: Touch) => ResponseAnswer;
-    (over as Record<ResponseHook, (t: Touch) => ResponseAnswer>)[hook] = (t) => table[touchKey(t)] ?? local(t);
-  }
-  return responses({ ...base, ...over });
+  return `stance-v${STANCE_BRAIN_VERSION}-${hash(STRATEGY_LEGEND + JSON.stringify(stanceQuestion("c0")) + doctrine.trim())}`;
 }
 
 /**
