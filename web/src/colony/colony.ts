@@ -399,6 +399,8 @@ export class Colony {
   since: Float32Array;
   /** seconds of unsuccessful search, less rest inside the nest: tired above the colony's patience (ja-q47) */
   fatigue: Float32Array;
+  /** 1 from when fatigue passes patience until it has rested to nothing: a tired forager rests fully, not just under the line */
+  #tired: Uint8Array;
   /** seconds left of a detour after bumping into rock, when the pull toward the nest (or the raid) is off */
   detour: Float32Array;
   /** recent bumps, fading over seconds: each bump in a row doubles the next detour */
@@ -593,6 +595,7 @@ export class Colony {
     this.gen = new Uint32Array(n);
     this.since = new Float32Array(n);
     this.fatigue = new Float32Array(n);
+    this.#tired = new Uint8Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
     this.load = new Float32Array(n);
@@ -674,6 +677,7 @@ export class Colony {
     this.hugT[i] = 0;
     this.since[i] = 0;
     this.fatigue[i] = 0;
+    this.#tired[i] = 0;
     this.detour[i] = 0;
     this.bumps[i] = 0;
     // A newborn is clean and unprimed.
@@ -800,6 +804,11 @@ export class Colony {
     CELL[0] = keepX;
     CELL[1] = keepY;
     return p;
+  }
+
+  /** Whether ant i is tired: past the colony's patience, or not yet fully rested since it was (ja-q47). */
+  #isTired(i: number): boolean {
+    return this.#tired[i] === 1 || (this.fatigue[i] as number) > this.params.patience;
   }
 
   /** Whether ant i stands in its own nest (not a stranger's), by its cell. Leaves the shared CELL as it found it. */
@@ -3002,7 +3011,7 @@ export class Colony {
             this.mode[i] = mode;
           }
         }
-        const tired = (this.fatigue[i] as number) > p.patience;
+        const tired = this.#isTired(i);
         const food = trailLevel(Math.max(fl, ff, fr));
         const home = this.#homeField(i, hl, hf, hr);
         const alarm = trailLevel(Math.max(al, af, ar));
@@ -3457,6 +3466,7 @@ export class Colony {
         this.#homeAfresh(i);
         this.since[i] = 0;
         this.fatigue[i] = 0; // found food: the search succeeded
+        this.#tired[i] = 0;
         h += Math.PI;
       } else if (pellet && ent && !Number.isNaN(this.#spoilTo[i] as number)) {
         // Carrying a pellet out along the ground (side view): dropped where it stands once far enough out (or stuck).
@@ -3514,7 +3524,7 @@ export class Colony {
         this.since[i] = 0;
         // Home and resting in "return" (its policy said so, or a cached answer did: ja-qnx): after REST seconds it is
         // asked afresh as an explorer, once it is no longer tired (fatigue rests it first: ja-q47).
-        if (mode === RETURN && !carrying && !pellet && (this.fatigue[i] as number) <= p.patience && (this.#restT[i] = (this.#restT[i] as number) + dt) > REST) {
+        if (mode === RETURN && !carrying && !pellet && !this.#isTired(i) && (this.#restT[i] = (this.#restT[i] as number) + dt) > REST) {
           this.mode[i] = EXPLORE;
           this.#asked[i] = -1;
           this.#restT[i] = 0;
@@ -3529,7 +3539,11 @@ export class Colony {
       {
         const inside = atNest || (ent !== null && this.#under[i] === 1 && this.#ownNestHere(i));
         if (inside) this.fatigue[i] = Math.max(0, (this.fatigue[i] as number) - (p.patience / p.restTime) * dt);
-        else if (!carrying && !pellet && !nursing && (this.mode[i] === EXPLORE || this.mode[i] === FOLLOW)) this.fatigue[i] = (this.fatigue[i] as number) + dt / (this.clock[i] as number);
+        else if (!this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && (this.mode[i] === EXPLORE || this.mode[i] === FOLLOW)) this.fatigue[i] = (this.fatigue[i] as number) + dt / (this.clock[i] as number);
+        // Tired once past patience, and until fully rested: resting only to just under the line sent foragers out to
+        // tire again at once (G: up to 8 held, food home -9 %, in the first sweep).
+        if ((this.fatigue[i] as number) > p.patience) this.#tired[i] = 1;
+        else if (this.fatigue[i] === 0) this.#tired[i] = 0;
       }
       // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
       // returning (Jev answered "return" to every returner, home or not: PRD §42.4), so a fresh one that has got home with
@@ -3545,7 +3559,7 @@ export class Colony {
       // - in any chamber, it left the young off the queen's side (zoning.test);
       // - for the young and middle-aged, who work inside, it sent porters out and the queen starved on 1-2 of 4 worlds in
       //   the hour-long economy run (slow/economy.test).
-      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && (this.fatigue[i] as number) <= p.patience && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i))) {
+      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && !this.#isTired(i) && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i))) {
         this.mode[i] = p.arrive === "follow" ? FOLLOW : EXPLORE;
         this.#asked[i] = -1;
         this.#restT[i] = 0;

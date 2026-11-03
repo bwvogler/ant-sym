@@ -271,13 +271,13 @@ test("rest on a top-down map: a tired returner rests in the nest for restTime be
   c.mode[0] = 2;
   c.fatigue[0] = c.params.patience * 1.5; // tired
   let left = -1;
-  for (let k = 1; k <= 30 * 60 && left < 0; k++) {
+  for (let k = 1; k <= 30 * 90 && left < 0; k++) {
     c.tick(1 / 30);
     if (c.mode[0] !== 2) left = k / 30;
   }
-  // From 1.5 × patience, rest inside takes it under patience in a third of restTime (10 s) at the soonest; it rests only
-  // while inside the nest's radius, which a homing ant drifts in and out of, so allow up to restTime.
-  assert.ok(left >= 9.9 && left <= 30, `rested and out after ${left.toFixed(1)} s`);
+  // From 1.5 × patience a full rest inside takes 1.5 × restTime (45 s) at the soonest (tired until fully rested); it
+  // rests only while inside the nest's radius, which a homing ant drifts in and out of, so allow some more.
+  assert.ok(left >= 44.9 && left <= 75, `rested and out after ${left.toFixed(1)} s`);
 });
 
 test("fatigue (ja-q47): the young (inside workers) never tire; carrying neither tires nor rests outside; rest comes a little at a time", () => {
