@@ -109,9 +109,9 @@ export const ENEMY = 0.5;
  * explorers (and fighters) go raiding, followers keep foraging. Defending:
  * alarm calls fighters. A fight that is over sends the ant home. Otherwise
  * forage: a strong food trail is followed, none means explore, a faint one
- * is followed out from the hole and otherwise keeps what the ant was doing.
- * Going home tired breaks ant mills: without it, followers circled trails to
- * food that was gone until nobody was left exploring.
+ * keeps what the ant was doing (an ant that just dropped its food heads back
+ * out along it). Going home tired breaks ant mills: without it, followers
+ * circled trails to food that was gone until nobody was left exploring.
  */
 export const localPolicy: Policy = (s) => {
   if (s.enemy === "near") return "fight";
@@ -121,9 +121,6 @@ export const localPolicy: Policy = (s) => {
   if (s.mode === "fight") return "return";
   if (s.foodTrail === "strong") return "follow";
   if (s.foodTrail === "none") return "explore";
-  // A faint trail by the hole (strong home scent) is followed out: home, a trip is over (`arrive`), so this is how an
-  // ant that just put its food down heads back out along its trail.
-  if (s.homeTrail === "strong") return "follow";
   return s.mode === "return" ? "follow" : s.mode;
 };
 
@@ -2958,11 +2955,14 @@ export class Colony {
         this.#loaded[i] = 1;
       } else {
         // Its load just put down, wherever that was (spoil on the mound, a corpse on the midden, food in the larder): the
-        // carrying trip is over, so it is not returning any more (ja-qnx; `arrive`).
+        // carrying trip is over, so it is not returning any more (ja-qnx; `arrive`). It heads back out along its trail: a
+        // follower, which a fresh ant is asked as the local rule asked a returner (both follow a trail, explore without
+        // one). As an explorer, the middle-aged diggers no longer followed the carriers' scent down to reception, where
+        // they port its food on: food piled up there (A8, seeds 5-6: 30-37 % of the nest's food carried on, main 87-100 %).
         if (this.#loaded[i]) {
           this.#loaded[i] = 0;
           if (p.arrive !== "return" && mode === RETURN) {
-            mode = p.arrive === "follow" ? FOLLOW : EXPLORE;
+            mode = FOLLOW;
             this.mode[i] = mode;
           }
         }
@@ -3485,18 +3485,21 @@ export class Colony {
       } else this.since[i] = (this.since[i] as number) + dt;
       if (!atNest) this.#restT[i] = 0;
       // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
-      // returning (Jev answered "return" to every returner, home or not: PRD §42.4), so one that has got home with
-      // empty jaws is no longer returning; it is asked afresh as `arrive` says. Home is its hole, or underground the royal
-      // chamber, where it homes to. Ending trips in any chamber left the young off the queen's side (zoning.test) and the
-      // royal chamber short of idle ants to port its food, so larvae starved beside it (slow/economy.test).
-      // Underground nothing else resets `since`, so arriving rests the ant too. Only foragers (the old, zoned by age) make
-      // trips: the young and middle-aged work inside, and ending their "trips" too sent porters out of the nest and
-      // starved the queen of food on one to two of four worlds in the hour-long economy run (slow/economy.test).
-      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && (atNest || (ent !== null && this.#under[i] === 1 && this.band(i) === 2 && this.#home(i)))) {
+      // returning (Jev answered "return" to every returner, home or not: PRD §42.4), so a fresh one that has got home with
+      // empty jaws is no longer returning: it is asked afresh as `arrive` says. A tired one stays in, as before (in the
+      // side view nothing underground rests it: the colony's tired foragers retire inside; resting them sent them out
+      // again, and more food than the porters could carry piled up at reception, A8). Home is the nest on a top-down
+      // map. In the side view it is the royal chamber, where a returner homes to, and only for foragers (the old, zoned
+      // by age), as measured:
+      // - at its hole (passed on the way in, where a returner is asked afresh anyway) the trip's end sent explorers down
+      //   the carriers' food scent into the nest, where they jammed carriers (A8);
+      // - in any chamber, it left the young off the queen's side (zoning.test);
+      // - for the young and middle-aged, who work inside, it sent porters out and the queen starved on 1-2 of 4 worlds in
+      //   the hour-long economy run (slow/economy.test).
+      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && (this.since[i] as number) <= p.patience * (this.clock[i] as number) && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i))) {
         this.mode[i] = p.arrive === "follow" ? FOLLOW : EXPLORE;
         this.#asked[i] = -1;
         this.#restT[i] = 0;
-        this.since[i] = 0; // home rests a tired ant, as the hole does (still tired, it was sent straight home again)
       }
       if (ent) {
         // Zoned by age (slice 6): an ant not to go out that has just stepped up out of the hole onto the ground goes

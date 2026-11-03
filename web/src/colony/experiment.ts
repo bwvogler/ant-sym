@@ -1,5 +1,6 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import type { ColonyParams, Mode, Policy, Stance, StancePolicy } from "./colony.ts";
+import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
 import { localResponses, type Responses } from "./responses.ts";
@@ -602,4 +603,61 @@ export const gameTop: Assay = {
   score: (r) => ({ maxHeld: Math.max(r.metrics["you.maxHeld"] ?? 0, r.metrics["rival.maxHeld"] ?? 0) }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, deplete, alarm, regulate, pass, open, game, gameTop];
+/**
+ * Inside the nest (side view, the first colony), every 30 s: food lying in each kind of chamber, larvae waiting unfed
+ * with food enough in the nest, and the first birth. `beyond` is the share of the food lying in the nest that has
+ * been carried on past reception (stores, brood chambers, the queen's), averaged over the samples from 300 s on.
+ */
+export function nestFlowProbe(): Probe {
+  let nextAt = 30;
+  let beyond = 0;
+  let samples = 0;
+  let receptionMax = 0;
+  let starved = 0;
+  let firstBirth = NaN;
+  return {
+    tick(game) {
+      const c = game.player;
+      if (Number.isNaN(firstBirth) && c.births > 0) firstBirth = game.time;
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 30;
+      const ch = game.map.chambers;
+      if (!ch) return;
+      let reception = 0;
+      let lying = 0;
+      for (const k of ch.list) {
+        if (k.colony !== c.params.nest) continue;
+        lying += k.food;
+        if (k.role === "reception") reception += k.food;
+      }
+      receptionMax = Math.max(receptionMax, reception);
+      const waiting = c.brood.items.filter((b) => b.stage === LARVA && b.t > 120 && !isFed(b)).length;
+      if (c.larder >= waiting * LARVA_FOOD) starved = Math.max(starved, waiting);
+      if (game.time >= 300 && lying > 0) {
+        beyond += 1 - reception / lying;
+        samples++;
+      }
+    },
+    summary(game) {
+      return { beyond: samples ? beyond / samples : NaN, receptionMax, starved, firstBirth, portTrips: game.player.portTrips, handedOn: game.player.handedOn };
+    },
+  };
+}
+
+/**
+ * A8: the nest's food flow (behaviour MR 2). Harvester foragers drop seeds only in the top chambers and other workers
+ * carry them down to the seed chambers in stages (Tschinkel, Rink & Kwapich 2015); larvae are fed from what reaches
+ * them. No rate could be read (docs/nest-and-home.md §3.5), so it reports: the share carried on past reception,
+ * reception's largest pile, larvae left unfed beside food (the economy test's measure, slow/economy.test), the first
+ * birth, porter trips.
+ */
+export const nestFlow: Assay = {
+  id: "nestFlow",
+  title: "A8 nest flow: food carried on from reception, larvae fed",
+  target: "report only (Tschinkel, Rink & Kwapich 2015: food dropped in the top chambers is carried down by others); larvae unfed beside food ≤ 5 is the economy test's bound",
+  seconds: 900,
+  spec: (seed) => ({ seed, seconds: 900, game: { antCount: 600, rival: false }, probes: [nestFlowProbe()] }),
+  score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
+};
+
+export const ASSAYS: Assay[] = [bridge, twin, deplete, alarm, regulate, pass, open, game, gameTop, nestFlow];
