@@ -24,7 +24,11 @@ npm run dev                    # http://localhost:38500
 npm test                       # node --test, 60 s per file
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
+npm run exp -- all --seeds 1-10   # behaviour assays (web/src/colony/experiment.ts), offline; --set sweeps, --policy cache:<file> replays Jev
+node scripts/colony-live.mjs all --budget 0.10   # live: Jev against the local rule per lane; saves replayable caches (experiments/out/)
 ```
+
+A change that should not alter behaviour must keep the golden masters bit-exact (`tests/golden.test.ts`, `tests/slow/golden.test.ts`); one that should re-records them (`GOLDEN_WRITE=1`) and says so in its PR. Tune behaviour against the assays: compare `npm run exp` with the baseline (PRD §42), choose by the worst seed, confirm on seeds 11–20.
 
 Merges to `main` deploy `web/dist` to GitHub Pages (`.github/workflows/pages.yml`, `BASE_PATH=/ant-sym/`). Pages has no API, so `ui/backend.ts` probes `/api/health` and the UI disables Jev. New fetches to the API must go through `apiUrl()`, never a bare `/api/...`.
 

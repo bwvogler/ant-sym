@@ -11,6 +11,7 @@
     "lint": "npm --prefix web run lint",
     "typecheck": "npm --prefix web run typecheck",
     "colony-bench": "node scripts/colony-bench.mjs",
-    "colony-cost": "node scripts/colony-cost.mjs"
+    "colony-cost": "node scripts/colony-cost.mjs",
+    "exp": "node scripts/experiment.mjs"
   }
 }

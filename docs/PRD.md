@@ -2222,3 +2222,115 @@ New or changed, each failing with its fix reverted (mutation-checked): the recep
 - The `HOLD_MAX` paths (a nurse's and now a porter's) still have no test.
 
 **Jev cost:** unchanged. No situation, legend or question changed.
+
+## 42. Behaviours as responses, tuned by assays (behaviour MR 0–1, 2026-11-02)
+
+The plan (beads ja-eyk … ja-6df; the design is from `claude/fungus-behavior-palette-qg2n9p`, ported to this colony by #30's review): turn each hard-coded ant mechanic into a **response** to what the ant senses, with today's rule as the default. Then tune one behaviour per MR against **assays** whose targets come from published ant behaviour. MR 0 builds the harness and measures today's ants. MR 1 puts the responses in with no behaviour change, and asks Jev the response questions once, live.
+
+### 42.1 The harness (MR 0)
+
+- **One seeding scheme.** `game.gameRng(seed, generation)` is the page's `mulberry32(seed × 7919 + generation)`. The page, `runGame`, `colony-cost --side` and `colony-live` use it, so a number measured offline reproduces on the page with the same seed (ja-jdu; §9's old figures stay as measured). The benches (`colony-bench`, `side-bench` and the like) keep their own inline seeding on purpose: their `root=` option measures older checkouts, which have no `gameRng`. The same goes for tests that build a game directly.
+- **`colony/experiment.ts`**:
+  - `runGame` builds the page's side-view game by default, or any map. It takes `Sides` (each colony's policy, strategist, params and responses), scripted events (paint, add food, any call) and probes.
+  - Probes: `heldProbe` (foragers holding food over 120 s, as `slow/side.test` counts them), occupancy of regions, and ants near a spot. `heldProbe` and assay G deliberately repeat `slow/side.test`'s measure and bound (≤ 2), so a sweep and the guard agree.
+  - Arenas are top-down hex maps drawn in cell coordinates (`Arena`); probes and events work in world units.
+- **Tunable at today's values:** pheromone channels per colony (`colony.channels.food.evaporation`, merged per channel and field), `enemyRange`, and the second colony's params and brains.
+- **`npm run exp -- <assays|all> [--seeds 1-10] [--set colony.deposit=2,4,8 …]`** runs the cross product of every `--set` over the seeds in worker threads. It prints the median, min and max of each metric with the pass count, and can write JSON.
+- **Golden masters**, recorded on main before any of this. Each checks every 10 s: stored, births, losses, decisions, population, and a bit-exact hash of every ant.
+  - `tests/golden.test.ts` (~19 s): a side-view game and a top-down war with alarm.
+  - `tests/slow/golden.test.ts` (~2 min): a 600 s side-view war with fights and brood births.
+  - MR 0 and MR 1 pass both unchanged. A change meant to alter behaviour re-records them (`GOLDEN_WRITE=1`) and says so.
+- **The gate.** `tests/assays.test.ts` (fast) has what today's ants pass: A3 and A4 on two seeds, plus seeding and overrides. `tests/slow/assays.test.ts` holds the assays they fail as `todo`, each naming the MR meant to fix it.
+
+### 42.2 Baseline: today's ants on main, seeds 1–10
+
+`npm run exp -- all --seeds 1-10`: 90 runs, 18 min on 3 threads.
+
+| Assay | Target | Pass | Median (min–max) |
+|---|---|---|---|
+| A1 double bridge (Goss et al. 1989) | ≥ 80 % of branch traffic on the short branch | 0/10 | short share 0.49 (0.40–0.59) |
+| A2a twin sources (Beckers et al. 1990) | the busier source ≥ 70 % | 0/10 | 0.52 (0.51–0.54) |
+| A3 depletion | the crowd < 20 % of its peak within 60 s of the last food | 10/10 | 41 s (29–48) |
+| A4 alarm on a trail | scatter ≤ 50 % in 10 s; back ≥ 50 % within 60 s | 10/10 | scatter 0.00; back in 19 s (19–21) |
+| A5 regulation (Gordon; Pinter-Wollman et al. 2013) | out before food ≤ ½ out after | 0/10 | 0.97 out before, 0.90 after |
+| A6 2-cell pass vs open (Lymbery et al. 2023) | report only | — | exchange 1.05 (0.57–1.67) vs 0.92 (0.59–1.27) |
+| G side-view game, 600 + 600, 600 s | ≤ 2 foragers holding food over 120 s per colony | 10/10 | held 1 (0–2); food home 9 % / 6 % |
+| G′ top-down game (`OPEN_WORLD`) | report only | — | held **10 (4–131)**; food home 13 % / 12 % |
+
+- **A1 depends on the arena's shape.** On these hex arenas the short branch gets half the traffic. The palette branch's square arena gave 0.67, and a 60×40 bridge there gave 0.87 (ja-dez). Settle the arena before tuning trails against it (MR 3).
+- **A3 and A4 pass:** the trail evaporates, and *tired* sends ants home.
+- **A2a and A5 fail by design:** nothing breaks the symmetry between sources, and every ant is always out. MRs 3 and 5 address them.
+- **A6:** a 2-cell pass already tilts the exchange slightly toward the defenders. MR 4's terrain-limited combat is still the plan.
+- **G′ is new:** the top-down map strands carriers that the side view, since F1 (§40), does not. The worst seed had 131 foragers holding food over 120 s (ja-9uj).
+
+### 42.3 Response hooks (MR 1)
+
+`colony/responses.ts`: each hook is a function of a small `Touch`. A Touch is mode × carrying (none, food, soil, corpse or brood) × porter × digging × at nest × enemy × stance. `localResponses` are main's rules before the hooks:
+
+| Hook | Called | Local rule |
+|---|---|---|
+| `get` | touching food, jaws empty | take it, unless fighting |
+| `carry` | every step while carrying anything (the mode policy is not asked then) | `return` |
+| `drop` | carrying food where it goes: the larder on a top-down map, the chamber in the side view | yes |
+| `trail` / `trailRate` | every step | food when carrying food; nothing for soil, corpses or porters; else home; × 1 |
+| `alarmGain` | smelling alarm | 0 fighting or digging, else 1 (× `alarmAvoid`) |
+| `raiseAlarm` | in a fight | 1 (× the fight's alarm rate) |
+
+- The fungus's modulations (`layGain`, `quiet`, `crossLay`, `gainAlarm`) and REST stay outside the hooks. They scale what a response decides.
+- Soil, corpse and brood pickups stay mechanics for now (MR 2).
+- **No behaviour change, and no cost:**
+  - both golden masters pass bit for bit;
+  - `colony-bench`, 600 + 600 side view: 4.92 ms/tick on main, 4.90 with the hooks, with identical food stored and soil dug.
+- **Jev.** `get`, `carry`, `drop` and `trail` each have a lane in `colonyBrain.ts`: a packer, `RESPONSE_LEGEND`, `readResponse` (a noul is yes strictly above ½), `responsesFromAnswers`, and a context per hook and doctrine. They sit under their own `RESPONSE_BRAIN_VERSION` 2. It became 2 after review, when the legend's "within two steps" became "within the colony's enemy range", since `enemyRange` is now tunable. The page does not ask them.
+- **Mode lane:** its schema, legend and `COLONY_BRAIN_VERSION` (4) are unchanged, so tokens per ant are unchanged. `colony-cost -- --side 5 600 1` gives ~581 tok per question and $0.091/h.
+- **Response lanes, if asked:** get ~553, carry ~441, drop ~581 and trail ~318 tok per question, about $0.027/h more.
+
+### 42.4 Live check and replay (2026-11-02)
+
+`scripts/colony-live.mjs`:
+- runs one headless game, the page's side view (seed 1, 600 + 600, 300 s, alarm painted about every 20 s);
+- collects every distinct situation of each lane;
+- asks Jev each one per doctrine through the server's `JevClient`, in requests of up to 100, under a hard budget;
+- saves one cache per doctrine, with the brain versions and every lane's cache context it was asked under, and the game it played (seed, ants, seconds, view);
+- if a request fails, it stops and still writes what was already paid for.
+
+`npm run exp -- … --policy cache:<file>` replays a cache offline. It refuses a cache asked under other versions or other contexts (a legend or question edited without a version bump, or another doctrine), and reports cache hits per lane, so each result says how much of it was Jev. `colony-live --from <cache>` is a second round: it replays the cache's own game and asks only the situations the replay met that the cache lacked. The caches measured below were asked under `RESPONSE_BRAIN_VERSION` 1; they no longer replay against the code, which is as intended.
+
+**Spent: $0.0036** (87k input tokens: round 1 $0.0033, the Forage second round $0.0003).
+
+| Lane | Situations | Est. tok/q | Real tok/q | Agrees with local: Forage | Cautious | Warlike |
+|---|---|---|---|---|---|---|
+| mode | 91 | 237 | 199 | 75 % | 74 % | 56 % |
+| stance | 2 | 389 | 400 | 100 % | 100 % | 50 % |
+| get | 3 | 269 | 256 | 100 % | 100 % | 67 % |
+| carry | 14 | 268 | 224 | 79 % | 79 % | 71 % |
+| drop | 3 | 294 | 270 | 33 % | 33 % | 33 % |
+| trail | 14 | 216 | 195 | 36 % | 29 % | 36 % |
+
+- Real tokens are 0.84–1.09× the estimate.
+- Three hundred seconds of the side view met no alarm and no raid situations. For doctrine-following on alarm and raids, see the top-down live run on #30: Cautious sent ants home on alarm in 71 of 78 situations, and Warlike sent every raid-stance explorer to fight.
+- Here, Warlike goes home tired in only 22 of 38 situations (Forage and Cautious: 38 of 38), and picks "raid" for a full colony.
+
+**Replayed, Jev's answers break foraging.** The Forage cache after its second round answers 95–100 % of lookups.
+
+| Replay (median) | Local | Forage | Cautious | Warlike |
+|---|---|---|---|---|
+| G side view, seeds 1–5: food home, you / rival | 9 % / 6 % | 2 % / 5 % | 1 % / 8 % | 1 % / 7 % |
+| G: foragers holding food over 120 s (bound 2) | 1 | 92 | 57 | 86 |
+| A2a twin: food home | 37 % | 0 % | 0 % | 0 % |
+| A5: out before food | 0.97 | 0.64 | 0.83 | 0.90 |
+
+An ablation on the side-view game (seed 1, 300 s, Forage's answers; food home under the local rule: 1,074):
+
+| Replayed alone | Food home | Held over 120 s |
+|---|---|---|
+| mode answers | 624 (−42 %) | 0 |
+| … minus the 16 answers "a fresh returner: return" | 1,115 | 0 |
+| carry answers | 728 (−32 %) | **56** |
+| drop answers | 1,195 | 0 |
+| trail answers | 1,269 | 0 |
+
+- **ja-qnx, live on main:** Jev keeps returners returning ("fresh returner → return": 14 of 15 situations under Forage and Cautious, 15 of 15 under Warlike). §32's REST sends a resting ant out after 10 s, but the ant is sent home again as soon as it is asked. Without those answers, foraging is back to the local rule's level. The fix is still a mechanic or a change of meaning.
+- **Carry answers strand food:** Jev tells some carriers to explore, follow or fight. This is where the held food comes from. Turn the carry lane on only with the food's destination in its question (ja-1pm).
+- **The drop question misreads the side view:** food is put down in a chamber, which is outside `atNest` (the hole's radius). So Jev is asked "carrying food, out: put it down?" and says no in 2 of 3 situations. It did no harm in 300 s, but `Touch` needs an "in its chambers" notion before drop is asked live (ja-1pm).
+- **Trail:** explorers are told to lay nothing (5–7 of 14 views, ja-68l.8). On the side view this cost nothing in 300 s; on the palette branch's top-down bridge it halved food home.
