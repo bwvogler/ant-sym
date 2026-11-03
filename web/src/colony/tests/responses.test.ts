@@ -177,7 +177,12 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
     for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN * (i % 2); // half young (nurses), half middle-aged (undertakers)
     const held: Partial<Record<Item, number>> = {};
     for (let k = 0; k < 30 * 150; k++) {
-      if (k === 30 * 20) for (let i = 0, n = 0; i < c.n && n < 20; i++) if (c.alive[i] && c.item(i) === "none" && c.y[i]! > map.nest.entrance!.y + 3) (c.kill(i), n++);
+      if (k === 30 * 20)
+        for (let i = 0, n = 0; i < c.n && n < 20; i++)
+          if (c.alive[i] && c.item(i) === "none" && c.y[i]! > map.nest.entrance!.y + 3) {
+            c.kill(i);
+            n++;
+          }
       g.tick(1 / 30);
       if (k % 30 === 0) {
         const now: Partial<Record<Item, number>> = {};
