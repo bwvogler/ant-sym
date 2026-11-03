@@ -2398,3 +2398,68 @@ Harvester foragers drop seeds only in the top chambers, and other workers carry 
 - reception's largest pile;
 - larvae unfed beside food (the economy test's measure);
 - the first birth, and porter trips.
+- **Seeds 1–10 (local):** `beyond` median 1.00 (0.67–1.00); reception's largest pile median 1 (0–214); at most 9 larvae unfed beside food on one seed.
+- **`main`, seeds 1–8:** `beyond` 0.87–1.00, larvae unfed 0–18.
+
+### 43.5 Assays, seeds 1–10 (local rule, against §42.2)
+
+| Assay | §42.2 | MR 2 |
+|---|---|---|
+| A1 double bridge | 0/10, short share 0.49 | 0/10, 0.48 (0.39–0.60) |
+| A2a twin sources | 0/10, 0.52 | 0/10, 0.52 |
+| A3 depletion | 10/10, 41 s | 10/10, 39 s (25–49) |
+| A4 alarm | 10/10, back in 19 s | 10/10, back in 19 s (19–20) |
+| A5 regulation | 0/10, 0.97 / 0.90 | 0/10, 0.97 / 0.91 |
+| A6 pass / open | 1.05 / 0.92 | 1.05 / 0.92 |
+| G side view | 10/10, held 1 (0–2), food home 9 % / 6 % | 9/10, held 1.5 (0–3), 9 % / 7 % |
+| G′ top-down | held 10 (4–131) | held 10 (6–136): carriers there still only take (ja-9uj) |
+| A8 nest flow | — | `beyond` 1.00 (0.67–1.00) |
+
+**Held-out seeds 11–20:**
+- G passes 10/10: held 1 (0–2), food home 9.5 % / 6.5 %.
+- A3 passes 10/10: 38 s (4–52).
+- A4 passes 10/10: back in 19 s (19–22).
+- A8: `beyond` 1.00 (0.75–1.00), at most 2 larvae unfed beside food.
+
+### 43.6 Live check and replay (2026-11-03)
+
+`colony-live.mjs mode,stance,get,carry,drop` on the side view (seed 1, 600 + 600, 300 s), then a second round per doctrine (`--from`). **Spent $0.0057** (139k input tokens).
+
+| Lane | Situations | Real tok/q | Agrees with local: Forage | Cautious | Warlike |
+|---|---|---|---|---|---|
+| mode | 141 | 201 | 69 % | 65 % | 65 % |
+| stance | 4 | 282 | 50 % | 50 % | 75 % |
+| get | 14 | 147 | 64 % | 50 % | 43 % |
+| carry | 35 | 212 | **100 %** (was 79 %) | **100 %** (79 %) | **97 %** (71 %) |
+| drop | 5 | 219 | **100 %** (was 33 %) | **100 %** (33 %) | **100 %** (33 %) |
+
+- **get:** Jev declines loose soil off the mound in 4–8 of 14 situations.
+- **Warlike's only carry disagreement:** put food down out on the ground when raiding.
+
+**Replayed** (`npm run exp -- game twin regulate nestFlow --policy cache:…`, seeds 1–10; the second colony is local):
+
+| | Local | Forage | Cautious | Warlike |
+|---|---|---|---|---|
+| G food home, you / rival | 9.2 % / 6.5 % | 5.8 % / 9.6 % | 4.0 % / 8.3 % | 0.7 % / 8.5 % |
+| G held over 120 s, most (§42.4: Forage 92) | 3 | 3 | 1 | 2 |
+| A2a twin, food home (§42.4: 0 % under every doctrine) | 37 % | 38 % | 38 % | 33 % |
+| A5 out before / after food | 0.97 / 0.91 | 0.97 / 0.90 | 0.97 / 0.90 | 0.97 / 0.90 |
+| A8 `beyond`; food home | 1.00; 2,129 | 1.00; 1,663 | 0.99; 1,173 | 1.00; 29 |
+
+- **Stranding is gone:** under Forage, held carriers fall from 92 to 3 and the twin arena forages as the local rule does.
+- **Forage still brings home 62 % of the local rule's food over 600 s.** Ablation on G, seeds 1–5, one lane at a time (local 10,974):
+  - carry and drop are bit-identical to local;
+  - modes 8,095 (−26 %);
+  - stances 9,049 (−18 %: Jev keeps foraging where the local strategist raids);
+  - get 9,881 (−10 %).
+
+  Which answers cost the food is ja-5ty. Warlike's 0.7 % is its own mill (ja-3sy).
+
+**Cost** (`colony-cost --side 5 600 1`):
+- **Mode lane:** ~546 tok per question, $0.092/h, unchanged.
+- **Response lanes, if asked:** get ~650, carry ~531, drop ~708, trail ~361 tok per question, about **$0.060/h** more (MR 1: $0.027/h). The legend now explains places, offered items and the carry answers. The page still asks none of them.
+
+**Beads:**
+- **Closed:** ja-qnx (parking: fixed; residual cost in ja-5ty), ja-1pm, ja-2x2, ja-mz7.
+- **Filed:** ja-xu6 (the economy's knife-edge), ja-3sy (Warlike's tiredness), ja-q47 (tiredness as a body state), ja-5ty (Forage's residual cost).
+- **Notes added:** "drop and run" on ja-902, loot to a rival's entrance on ja-um8.
