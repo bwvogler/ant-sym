@@ -2353,7 +2353,7 @@ MR 2 was planned as "get/drop by item, carrying no longer forces going home, nes
   - Food goes on the map, where anyone may take it. A porter's food goes only into one of its chambers, where it is stocked: it was already counted home.
   - Soil and corpses only on the ground (soil heaps there; a corpse lies there, or goes on the midden if it is there).
   - Brood where the ant stands.
-  - What can't be put down here is kept. An ant doesn't take up a load it has just put down until it has stepped off that cell.
+  - What can't be put down here is kept. A forager doesn't take up **food** it has just put down until it has stepped off that cell. Brood and corpses have no such guard: with brood always answered "put down" over 300 s, 537 put-downs met 537 re-takes, with no tight loop (review of #35).
 - **The question** names each load's destination: food home into the nest for the larvae and stores, a porter's to the chamber that wants it, soil to the mound, a corpse to the midden, brood to a brood chamber.
 - **Deferred:** "drop and run" on contact goes to MR 4 (ja-902), and taking food to a rival's entrance to MR 5 (ja-um8).
 - **Food conservation** (`food.test`) also runs with every 40th food carry answered "put down" (foragers out and in tunnels, porters in chambers): no drift. If a porter's food isn't stocked when put down, it drifts by 235.
@@ -2361,7 +2361,8 @@ MR 2 was planned as "get/drop by item, carrying no longer forces going home, nes
 ### 43.3 A trip home ends at home (ja-qnx)
 
 Jev reads the mode as "keep doing this": every ant whose mode was `return` was told `return`, home or not (Cautious and Warlike: 23 of 23). Asked as explorers or followers, fresh ants inside the nest were told explore or follow. Nothing ended the trip, and in the side view's chambers not even REST did, since it runs only at the hole. Colony param `arrive` (default `explore`; `return` is the old behaviour):
-- **A fresh forager returning with empty jaws that gets home stops returning** and is asked afresh as an explorer. Home is the nest on a top-down map. In the side view it is the royal chamber, where a returner homes to, and only for the old (the foragers, zoned by age). A tired one stays in, as before.
+- **A fresh forager returning with empty jaws that gets home stops returning** and is asked afresh as an explorer. Home is the nest on a top-down map. In the side view it is the royal chamber, where a returner homes to, and only for the old (the foragers, zoned by age).
+- **A tired one stays in, in the side view only.** On a top-down map the nest resets the timer the moment the ant arrives, so every returner there reads fresh and goes out at once (review of #35). That is the timer artefact ja-q47 replaces.
 - **A load put down anywhere ends the carrying trip.** The ant is asked as a follower. For a fresh ant the local rule answers that exactly as it answered a returner (a trail is followed; no trail, explore), so the local colony is unchanged there.
 
 Each narrowing was forced by a measurement:
@@ -2394,6 +2395,20 @@ Arriving as a follower did worse under Jev (Cautious 5,928, Warlike 6,254): Jev 
 
   The colony's economy is on a knife-edge when the young run out: only young and middle-aged explorers port food to the queen. That predates this MR (ja-xu6).
 - Warlike's answers ignore tiredness, and with the parked returners gone their mill shows: on seed 3, 29 carriers were held at the shaft top (ja-3sy).
+
+**Speed** (review of #35):
+- As first pushed, the side view ticked about 11 % slower (the reviewer's `colony-bench 600 60 1`, two colonies: 3.58 against 3.96–4.00 ms). Every carrier built a Touch every step to hear the local "take", and `place` was worked out for every ant's trail call.
+- **Fixes:**
+  - the local carry response isn't asked;
+  - `Touch.place` is worked out only when a response reads it;
+  - the own-nest check no longer builds an array.
+- **After**, interleaved with `main` on one machine: medians 2.88 / 2.90 / 3.03 / 2.42 ms against `main`'s 2.86 / 2.91 / 2.72 / 2.79. Food and digging are identical.
+
+**What an ant senses here** (vision.md):
+- `Touch.place` and the end of a trip read the chamber's role through `#perceivedPlace`, so the fungus's muddling acts on them.
+- Telling its own nest from a stranger's still reads the other colonies' hole positions (`#inOwnNest`).
+- The arrival rule's age gate is scripted by age.
+- Both are now rows in the gap table (ja-k4k.2, ja-k4k.1).
 
 ### 43.4 A8: the nest's food flow (report only)
 

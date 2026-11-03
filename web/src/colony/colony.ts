@@ -183,8 +183,10 @@ export interface ColonyParams {
   /** evaporation and spread of the colony's pheromone channels, per channel and field; those left out keep their defaults */
   channels: Partial<Record<Channel, Partial<ChannelParams>>>;
   /**
-   * What an ant going home with empty jaws is once it gets there (its hole, or one of its chambers), before it is asked
-   * afresh: "explore" or "follow" end the trip (ja-qnx); "return" keeps it going home until REST sends it out.
+   * Trips end (ja-qnx): with "explore" or "follow", a fresh forager going home with empty jaws is that once it gets there
+   * (the nest on a top-down map; the royal chamber in the side view, the old only), and asked afresh; and any value but
+   * "return" also makes an ant that has just put its load down a follower (whatever this says: see the tick). "return"
+   * keeps the old behaviour, bit for bit: returning until REST sends it out.
    */
   arrive: "explore" | "follow" | "return";
 }
@@ -212,7 +214,10 @@ export class Colony {
   responses: Responses = localResponses;
   stance: Stance = "forage";
   /** the situation handed to a response, refilled for each call (#touch): a response reads it and does not keep it */
-  #t: Touch = { mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage" };
+  /** the ant the shared Touch describes */
+  #ti = 0;
+  /** The shared Touch. Its `place` is worked out only when a response reads it: the local ones never do, and working it out for every ant's trail every step cost the side view ~5 % a tick (review of #35). */
+  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -757,7 +762,7 @@ export class Colony {
     t.carrying = item;
     t.porter = this.#porter[i] === 1;
     t.digging = (this.digT[i] as number) > 0;
-    t.place = this.place(i);
+    this.#ti = i; // t.place reads ant i's place when asked
     t.offered = offered;
     t.enemy = enemy;
     t.stance = this.stance;
@@ -777,7 +782,7 @@ export class Colony {
       this.antCell(i);
       const cx = CELL[0] as number;
       const cy = CELL[1] as number;
-      p = !this.#inOwnNest(cx, cy) ? "out" : this.#placeAt(cx, cy) ? "chamber" : "tunnel";
+      p = !this.#inOwnNest(cx, cy) ? "out" : this.#perceivedPlace(i, this.#placeAt(cx, cy)) ? "chamber" : "tunnel";
     } else {
       const dx = (this.x[i] as number) - this.nest.x;
       const dy = (this.y[i] as number) - this.nest.y;
@@ -795,7 +800,7 @@ export class Colony {
     this.antCell(i);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
-    const at = this.#inOwnNest(cx, cy) ? this.#placeAt(cx, cy) : null;
+    const at = this.#inOwnNest(cx, cy) ? this.#perceivedPlace(i, this.#placeAt(cx, cy)) : null;
     CELL[0] = keepX;
     CELL[1] = keepY;
     return at === "royal";
@@ -866,8 +871,14 @@ export class Colony {
     if (!this.#entrance) return true;
     const x = centreX(cx, cy);
     const own = Math.abs(x - this.#entrance.x);
-    for (const o of this.#otherHoles()) if (Math.abs(x - o.x) < own) return false;
-    return true;
+    // The same holes as #otherHoles, without building its array: this runs for every carrier every step (Touch.place).
+    let raidListed = !this.raidTarget;
+    for (const n of this.others) {
+      const o = n.entrance ?? n;
+      if (Math.abs(x - o.x) < own) return false;
+      if (!raidListed && Math.abs(o.x - this.raidTarget!.x) < 1) raidListed = true;
+    }
+    return raidListed || Math.abs(x - this.raidTarget!.x) >= own;
   }
 
   /** The hole of the nearest other colony (the midden faces it), or null alone. */
@@ -2739,8 +2750,11 @@ export class Colony {
       this.carrying[i] = 0;
     } else if (this.pellet[i]) {
       if (!this.#entrance) {
-        // Top-down: a pellet is only a count (soil out at the nest); one put down elsewhere is lost.
-        this.soilLost++;
+        // Top-down: a pellet is only a count: put down at the nest it is soil out (as the nest branch counts it), elsewhere lost.
+        const dx = (this.x[i] as number) - this.nest.x;
+        const dy = (this.y[i] as number) - this.nest.y;
+        if (dx * dx + dy * dy < this.nest.r * this.nest.r) this.soilOut++;
+        else this.soilLost++;
         this.#clearPellet(i);
       } else if (isSky(this.map, cx, cy)) this.#dropOut(i, cx);
       else return;
@@ -2921,7 +2935,9 @@ export class Colony {
       const toEnemy = this.#enemyHeading(i);
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
       // this step (its trip is over: see `arrive`).
-      if ((this.carrying[i] || this.pellet[i] || this.#holdsBrood[i]) && this.responses.carry(this.touch(i, toEnemy !== null)) === "put down") this.#putDown(i);
+      // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
+      // the side view ~11 % a tick for nothing, review of #35.)
+      if (this.responses.carry !== localResponses.carry && (this.carrying[i] || this.pellet[i] || this.#holdsBrood[i]) && this.responses.carry(this.touch(i, toEnemy !== null)) === "put down") this.#putDown(i);
 
       // The mode choice, only when the situation changed since the ant was last asked.
       // A carrying ant goes home: a mechanic, never asked (and asked afresh once it puts the food down).
@@ -3486,9 +3502,11 @@ export class Colony {
       if (!atNest) this.#restT[i] = 0;
       // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
       // returning (Jev answered "return" to every returner, home or not: PRD §42.4), so a fresh one that has got home with
-      // empty jaws is no longer returning: it is asked afresh as `arrive` says. A tired one stays in, as before (in the
-      // side view nothing underground rests it: the colony's tired foragers retire inside; resting them sent them out
-      // again, and more food than the porters could carry piled up at reception, A8). Home is the nest on a top-down
+      // empty jaws is no longer returning: it is asked afresh as `arrive` says. In the side view a tired one stays in, as
+      // before: nothing underground rests it, so the colony's tired foragers retire inside (resting them sent them out
+      // again, and more food than the porters could carry piled up at reception, A8). On a top-down map rest is instant:
+      // the nest has just reset `since` above, so every returner there reads fresh and goes out at once (a timer artefact
+      // that ja-q47 replaces). Home is the nest on a top-down
       // map. In the side view it is the royal chamber, where a returner homes to, and only for foragers (the old, zoned
       // by age), as measured:
       // - at its hole (passed on the way in, where a returner is asked afresh anyway) the trip's end sent explorers down

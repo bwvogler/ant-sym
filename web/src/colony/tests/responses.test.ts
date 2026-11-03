@@ -263,3 +263,13 @@ test("arrive in the side view: a fresh forager returning to the royal chamber is
   assert.equal(at(0.6, 1e4), 2, "a tired forager stays in");
   assert.equal(at(YOUNG / 2, 0), 2, "the young work inside: they make no trips");
 });
+
+test("arrive on a top-down map: the nest rests a tired returner at once, so its trip ends there too (the timer ja-q47 replaces)", () => {
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+  c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+  put(c, 0, 6, 6); // in the nest
+  c.mode[0] = 2;
+  c.since[0] = 1e4; // tired
+  c.tick(1 / 30);
+  assert.notEqual(c.mode[0], 2, "the hole reset its timer, so it reads fresh and its trip is over");
+});
