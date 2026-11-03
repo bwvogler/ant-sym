@@ -1,18 +1,48 @@
 <h1 align="center">Jev Ants</h1>
 
-<p align="center"><em>Ants that form the picture you type, one decision at a time.</em></p>
+<p align="center"><em>Ant colonies whose every choice comes from what an ant can sense, and a fungus that turns their rivalry into one colony by working through those senses.</em></p>
 
-<p align="center">
-  <img src="docs/ants.gif" width="720" alt="A thousand ants holding the word JEV walk over to spell ANTS, then back again">
-</p>
+## Goal
 
-<p align="center"><sub>Live capture, played forward then back: 1,000 ants morph from JEV to ANTS with the Morph button. Each morph takes about 10 s and costs about six cents.</sub></p>
+**One policy per species, fed only by the senses.** Each species, and each colony, has a
+single policy. Every choice an ant makes comes out of it: where to walk, whether to dig, what
+to carry, whom to fight. Its only input is what that ant can actually perceive: trail and alarm
+odours, the hydrocarbons of an ant it touches, how often it meets returning foragers, vibration,
+gravity, its own drifting home vector, its own body. All of it is grounded in research on real
+ants. Nurses, diggers, foragers, undertakers and chamber roles should *emerge* from that one
+policy acting on local cues, not be scripted beside it.
 
-Every ant is its own [Jev](https://typesafe.ai) agent. It sees the nine cells around it, how
-many ants each still wants, and the headings of its neighbours, and Jev answers *which way*
-and *whether to settle*. From a random scatter, a thousand of those small decisions turn into
-a word, or an uploaded picture, in about fifteen seconds and seven cents. Change the word and
-they walk from the old shape into the new one.
+**A fungus that works through those senses.** The player is a fungus. It changes what a host
+perceives and what it gives off, the way real manipulators do: *Rickia* changes one cuticular
+alkane, and supercolonies form when recognition odours stop differing. It responds to signals
+the fungus itself can sense, and it has effectors of its own: sporulation, a scent of its own,
+and a host's body near the end. It never decides for an ant.
+
+**From conflict to collaboration.** Left alone, colonies compete. The fungus shapes its policy
+so they tolerate each other, share trails and divide the work, until they act as one.
+
+**Then more capable organisms.** The same pattern of a sense table and an action set under one
+policy shape extends to other ant species, then to other social insects, then beyond. The
+fungus adapts its policy to each new host it can reach.
+
+The long form is [docs/vision.md](docs/vision.md).
+
+## Where it stands
+
+- The ant policy chooses one of four modes (explore, follow, return, fight) from six sensed
+  fields. A colony stance (forage, defend, raid) is chosen from colony-wide totals and
+  broadcast to every ant.
+- Much of the nest is still scripted from knowledge no ant has: work by age thresholds,
+  chamber placement and roles, nursing and food flow, the midden, raid targets. Each one is
+  listed in the [gap table](docs/vision.md#where-the-code-is-today), with the sensed cue that
+  should replace it and a bead (`ja-k4k`).
+- The fungus already acts through perception, emission and the body: channel gains,
+  recognition tolerance, odour masking, trail laying, and (`crown`) a lethal infection
+  passed to the queen and brood a host tends. What it *senses* still includes facts no fungus
+  could read, such as the host's mode.
+
+[Jev](https://typesafe.ai) answers each policy question once per *situation* rather than once
+per ant, and the answers are cached, so a game costs roughly $0.10–0.15 an hour.
 
 ## Run it
 
@@ -28,22 +58,7 @@ spend and time caps from the real `usage.input_tokens` of every reply.
 
 ## What you can do
 
-- **Type a word** (two lines make two rows) or **upload an image** (button, or drop
-  it on the field). Black-and-white pictures work best; the target preview shows
-  what the ants are asked to draw.
-- **Start Jev.** Ants scatter and Jev steers them. The panel shows the running
-  cost, tokens, latency, requests in flight, and one ant's live state and answer.
-- **Stop** any time, or let it stop by itself: when the picture is formed, at the
-  **spend cap** (default $0.50) or at the **time cap** (default 3 min). A formed
-  picture costs nothing to hold.
-- **Morph.** Change the picture while stopped and press Morph: the ants walk from the
-  old shape into the new one. **Scatter** replays a formation from scratch.
-- **Image overseer.** Every 4 s Jev looks at the field and the target as two PNGs and
-  returns a box (the region most lacking ants, drawn in jade and used as an
-  attractor when it points at ink) and a "recognisable" noul.
-- **Overlays**: deficit heatmap, pheromone trails. **Local rule** brain for a free
-  comparison with a greedy gradient walk.
-- **Colony** (the *Colony* tab, `#colony`): a procedural 512×320 world of rock, soil
+- **The colony game**: a procedural 512×320 world of rock, soil
   and food, dug underground by default (*Ground → open* for the surface), with two
   colonies, Ink and Amber. Food makes ants, fights kill them, and each colony's
   strategist picks forage, defend or raid. The ants forage on their own: they lay a
@@ -57,29 +72,34 @@ spend and time caps from the real `usage.input_tokens` of every reply.
 
 ## How it talks to Jev
 
-One request carries about a hundred ants. The state is a JSON object with one key
-per ant; each ant gets its own `choice` (eight compass directions or stay) and its
-own `noul` (settle). Jev evaluates each question against the state independently,
-so a packed request costs the same as a hundred single ones but takes one round
-trip (~300 ms). Five requests run in parallel: the browser allows six per host, and
-the sixth stays free so Stop gets through at once (`JEV_IN_FLIGHT` lowers it). Details, the schema bake-off and the measured token budget are in
-[docs/PRD.md](docs/PRD.md).
+A request carries up to a hundred *situations*. The state is a JSON object with one key per
+situation; each gets its own question (an ant's mode, a colony's stance, one of the fungus's
+interventions). Jev evaluates each question against the state independently, so a packed
+request costs the same as a hundred single ones but takes one round trip. Each distinct
+situation is asked once and its answer reused (turned and mirrored copies count as one where
+the world allows it), so cost follows how many different things happen, not how many ants
+there are. Until an answer arrives an ant follows the local rule.
 
-The **cached** brain (Jev settings → Brain schema) asks those same questions once per
-*situation* instead of once per ant decision. A situation is which neighbours want
-ants, whether the ant's cell has room, and where the far field points, with turned
-and mirrored copies counted as one. Every later ant in a known situation reuses the
-answer without a call. Offline, it asks 11–34× fewer tokens per formation
-(`npm run situations`, PRD §8.6). `npm run cacheprobe` checks it against the live API.
+The server keeps a connection pool so parallel requests overlap, and counts the real
+`usage.input_tokens` of every reply against the spend and time caps. Output tokens are free.
+Colony questions run about 450–560 input tokens each as a game asks them (`npm run
+colony-cost`), the fungus's about 530–570. The schemas, measured numbers and every design
+decision are in [docs/PRD.md](docs/PRD.md).
 
-| | per ant | per 1,000-ant formation |
-|---|---|---|
-| State | ~45 tokens | |
-| Compass choice + settle noul | ~250 tokens | |
-| Decisions needed | ~5 | ~1.7 M tokens |
-| Cost at $0.042 / M input tokens | | **≈ $0.07** |
+## Documentation
 
-Output tokens are free. The overseer adds about 1,300 tokens per look.
+- [docs/vision.md](docs/vision.md): the goal, what an ant may sense, and what is still scripted.
+- [docs/README.md](docs/README.md): the index of research notes and how they cite. Each note
+  links the primary papers it rests on:
+  - [ant-communication.md](docs/ant-communication.md): signal channels, their ranges and
+    lifetimes, and recognising rivals;
+  - [nest-and-home.md](docs/nest-and-home.md): homing by path integration, gravity and floor
+    marks; the queen; nest architecture; jobs by place and age;
+  - [fungus-policy.md](docs/fungus-policy.md): what real parasites do to ants, and the levers
+    the fungus can pull;
+  - [queens-and-merging.md](docs/queens-and-merging.md): several queens, and orphaned
+    colonies merging.
+- [docs/PRD.md](docs/PRD.md): the decision log, with every measured number.
 
 ## Hosting
 
@@ -102,13 +122,12 @@ setup: Settings → Pages → Source: GitHub Actions.
 ## Development
 
 ```sh
-npm test            # every node --test suite: server, sim, colony, ui (native TS, Node ≥ 22.18)
+npm test            # every node --test suite: server, colony, ui (native TS, Node ≥ 22.18)
 npm run lint        # oxlint
 npm run typecheck   # tsc -b
 ```
 
-`web/src/sim` (picture) and `web/src/colony` (colony and fungus) are pure and testable
-headless, except `sim/targets.ts`, which rasterises text and images in the browser;
+`web/src/colony` (colony, nest and fungus) is pure TypeScript and testable headless;
 `web/shared` holds the wire types; `web/server` is the proxy and ledger; `web/src/ui` is
-React, canvas and the browser-side Jev clients. Work is tracked with [beads](https://github.com/steveyegge/beads)
+React, canvas and the browser-side Jev client. Work is tracked with [beads](https://github.com/steveyegge/beads)
 (`bd ready`). MIT.

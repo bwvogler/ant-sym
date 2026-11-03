@@ -1,5 +1,7 @@
 # Home is a nest, not a point
 
+*Part of the [research notes](README.md) behind the [vision](vision.md).*
+
 *Design note, 2026-11-01. It builds on the side view (PRD §27). Written as design only; slices 0–9 at the end were filed as beads and have since been built (PRD §29–§38), with a fix-up after their reviews (PRD §39). Each section of §3–§5 says what was built and where it differs from the design.*
 
 The owner asked: *where is the "home" signal for ants? Is it a queen thing? Are there structures or specialised spaces? We tested the home as a disc, but that isn't realistic underground, and the ant-farm view breaks it.*
@@ -14,7 +16,7 @@ The short answer:
 
 ### Outside: home is the hole
 - **Path integration.** A forager keeps a running home vector from its steps and a sky compass. It points to the nest entrance, and its error grows with distance walked: roughly 10 % of distance and a couple of degrees of heading ([Wehner 2006](https://www.imls.uzh.ch/static/CMS_publications/wehner/literatur/pdf06/wehner20062.pdf); [*Cataglyphis noda*, PMC5966506](https://pmc.ncbi.nlm.nih.gov/articles/PMC5966506)).
-- **Landmarks correct the drift.** These include visual landmarks, ground texture, and an **odour at the entrance** that ants learn and can pick out of a blend ([Audubon](https://audubon.org/news/desert-ants-use-odors-find-their-way-home)).
+- **Landmarks correct the drift.** These include visual landmarks, ground texture, and an **odour at the entrance** that ants learn and can pick out of a blend ([Audubon](https://audubon.org/news/desert-ants-use-odors-find-their-way-home) *(secondary)*).
 - **The vector resets to zero only inside the nest** ([s00359-018-1260-6](https://link.springer.com/article/10.1007/s00359-018-1260-6)).
 
 So outside, "home" is a small hole that the ant finds approximately and then homes in on by local cues.
@@ -48,7 +50,7 @@ The queen's scent is a destination ("where she is"), not the colony's home signa
 - **Zoned by age.** The youngest workers sit deep with the queen and brood. They move up as they age, and only the oldest forage, from the top chambers ([Tschinkel, J. Insect Sci. 4:21](https://bioone.org/journals/journal-of-insect-science/volume-4/issue-21)).
 - **Brood is moved** up and down to the best temperature (*Pogonomyrmex salinus*: [Boise State](https://scholarworks.boisestate.edu/bio_facpubs/308)).
 - **Food goes in at the top and is stored deep.** Harvester foragers drop seeds only in the topmost chambers, and other workers carry them down to granaries 20–80 cm deep ([Tschinkel & Kwapich 2016](https://keep.lib.asu.edu/system/files/c160/Florida_Harvester_Ant_2016.pdf)).
-- **Refuse goes to a midden.** It is at the edge of the cleared disc in harvesters ([AntWiki, *The Ants* ch. 18](https://antwiki.org/wiki/The_Ants_Chapter_18)), and the midden also deters other ants, acting as a boundary ([CiNii](https://cir.nii.ac.jp/crid/1362544420347763584)). It is in deep chambers in *Atta cephalotes* and on the surface in *A. colombica*.
+- **Refuse goes to a midden.** It is at the edge of the cleared disc in harvesters ([AntWiki, *The Ants* ch. 18](https://antwiki.org/wiki/The_Ants_Chapter_18) *(secondary)*), and the midden also deters other ants, acting as a boundary ([CiNii](https://cir.nii.ac.jp/crid/1362544420347763584)). It is in deep chambers in *Atta cephalotes* and on the surface in *A. colombica*.
 
 ### Losing the queen
 In a single-queen species, losing the queen means **no more workers are ever made**. Within 1–4 weeks dominant workers start laying male eggs, and the colony's workers and brood dwindle. Orphaned *Temnothorax* colonies can still make males for years ([Queen execution in a monogynous ant, PMC7882922](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7882922/); [BMC Evol. Biol.](https://link.springer.com/content/pdf/10.1186/s12862-018-1320-0.pdf)). Species with several queens keep going, and some adopt queens.

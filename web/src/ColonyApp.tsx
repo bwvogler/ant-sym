@@ -7,8 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 import AntCard from "./ui/AntCard.tsx";
 import ColonyField from "./ui/ColonyField.tsx";
 import type { Followed } from "./ui/follow.ts";
-import Nav from "./ui/Nav.tsx";
-import { Bar, NEAR_CAP, Slider } from "./ui/Panel.tsx";
+import { Bar, NEAR_CAP, Slider } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { STRAINS, useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
@@ -53,10 +52,7 @@ export default function ColonyApp() {
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
-          <Nav page="colony" />
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
         <p className="text-sm text-fg-3">two colonies, one map: trails, not orders</p>
       </header>
       {isDemo(backend) && <DemoNote />}

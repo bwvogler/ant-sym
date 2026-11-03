@@ -1,11 +1,11 @@
-import type { JevAnswer, JevProxyReply, JevRequest, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
+import { DEFAULT_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
 import { apiUrl } from "./backend.ts";
 import { localPolicy, localStance, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
 import { fungalKey, fungusContext, offeredFor, offeredIn, packFungusRequest, readIntervention, worthAsking } from "../colony/fungusBrain.ts";
 import { INTERVENTIONS, LETHAL, type Fungus } from "../colony/fungus.ts";
-import { PolicyCache } from "../sim/policyCache.ts";
+import { PolicyCache } from "../colony/policyCache.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
 // game. The player is the fungus, so no colony is the player's: Jev, when on,
@@ -19,8 +19,8 @@ import { PolicyCache } from "../sim/policyCache.ts";
 // question in flight for one is not asked again for the other. Every policy
 // is synchronous: a cached answer if there is one, otherwise the local rule
 // for now while the question is queued. Every interval the queues go to Jev,
-// at most `batch` situations a request; same proxy, same ledger, same caps as
-// the picture: a 409 ends the run and everyone carries on locally.
+// at most `batch` situations a request; same proxy, same ledger, same caps:
+// a 409 ends the run and everyone carries on locally.
 
 export interface ColonyJevOptions {
   batch: number;
@@ -30,8 +30,8 @@ export interface ColonyJevOptions {
 
 export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300 };
 
-/** Colony runs are long and cheap: higher time cap, lower spend cap than a picture. */
-export const COLONY_CAPS: RunCaps = { capUsd: 0.1, capSeconds: 1800 };
+/** The caps a colony run starts with: $0.10 and 30 minutes (the server's default too). */
+export const COLONY_CAPS: RunCaps = DEFAULT_CAPS;
 
 /** Where cached answers outlive the page; injectable so tests need no localStorage. */
 export interface CacheStore {

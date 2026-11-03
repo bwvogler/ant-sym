@@ -2,6 +2,8 @@
 
 *Written 2026-10-25 from an interview with Aaron. Every decision below was chosen explicitly; the "why" is kept so later work can revisit it on purpose rather than by accident.*
 
+> **Status (2026-11-02): the picture mode is removed.** The app was first built to make ants form a typed or uploaded picture (§1–8 and the picture parts of §3–4). That mode, its code (`web/src/sim`, `App.tsx`, the picture Jev scheduler and overseer) and its scripts (`probe`, `situations`, `cacheprobe`, `bakeoff`) are gone; the colony game (§9 on) is the whole app. §1–8 stay as the record of the interview, the Jev contract and the measured token and latency numbers the colony's cost estimates were calibrated on. Where they say "the app" or point at `sim/`, read "the removed picture mode". The architecture below is current.
+
 ## 1. Vision
 
 A web app where a few hundred to a couple of thousand ants, scattered at random, walk around and collectively form whatever the user typed or uploaded: a word, a letter, a black-and-white image. The point of the app is to **showcase Jev** (TypeSafe's System One decision model): every ant's step is a Jev decision made from what the ant can see around it. Nothing central plans the picture. It emerges.
@@ -35,26 +37,23 @@ The table is the original interview, with later reversals marked *(now: …)*. T
 ```
 browser (Vite + React)                               node (Vite dev-server middleware, web/server/)
 ┌────────────────────────────────────────┐           ┌──────────────────────────────────┐
-│ sim/       picture: pure TS, no DOM    │           │ api.ts    wrap(): same-origin    │
-│   grid, ants, local, engine            │  POST     │ http.ts   JSON bodies, HttpError │
-│   jevBrain   ants → request → intent   │ /api/jev  │ jev.ts    node:https Agent pool  │
-│   policyCache situations, cache        │ ────────► │           of N → TypeSafe        │
-│   overseer   images → box / noul       │ ◄──────── │ ledger.ts tokens, $, caps, width │
-│   targets    text/image → grid (DOM)   │  answers  └──────────────────────────────────┘
-│ colony/    colony + fungus: pure TS    │                         │ Bearer JEV_API_KEY
-│   world, colony, pheromone, battle,    │                         ▼
-│   recognition, fungus, game, brains    │            https://api.typesafe.ai/v1/systemone
-│ ui/        React, canvas, Jev clients  │
-│   jevScheduler (picture), colonyJev    │   shared/jev.ts: wire types, price, caps,
-│   Field / ColonyField, panels, hooks   │                  in-flight width (both sides)
-└────────────────────────────────────────┘
+│ colony/    colony + fungus: pure TS    │           │ api.ts    wrap(): same-origin    │
+│   world, colony, pheromone, battle,    │  POST     │ http.ts   JSON bodies, HttpError │
+│   recognition, fungus, game, brains,   │ /api/jev  │ jev.ts    node:https Agent pool  │
+│   policyCache (situation → answer)     │ ────────► │           of N → TypeSafe        │
+│ ui/        React, canvas, Jev client   │ ◄──────── │ ledger.ts tokens, $, caps, width │
+│   colonyJev (queues, batches, caches)  │  answers  └──────────────────────────────────┘
+│   ColonyField, panels, hooks           │                         │ Bearer JEV_API_KEY
+└────────────────────────────────────────┘                         ▼
+                                                      https://api.typesafe.ai/v1/systemone
+   shared/jev.ts: wire types, price, caps, in-flight width (both sides)
 ```
 
-- **Sim loop** runs in the browser with `requestAnimationFrame`. Each tick: move ants by heading × pace, update the density grid, decay pheromone, redraw. Jev answers arrive asynchronously and update each ant's *intent* (heading, pace, settled); the tick loop never waits on the network.
-- **Scheduler**: every 200 ms, pick the ants whose last decision is oldest (and not settled, or settled but with a deficit that changed), pack them 100 per request, post. In-flight limit 5 (browsers allow 6 connections per host; one stays free so Stop reaches the server at once). The server retries 429/529 honouring `retry-after`; the browser treats a 429 "busy" from the proxy as "release these ants, try next cycle".
-- **Server** holds the key, forwards packed requests, counts `usage.input_tokens` and enforces the caps. The overseer is the browser's (`sim/overseer.ts`, `ui/overseerImages.ts`): it renders two PNGs and posts them as one more request.
+- **Game loop** runs in the browser with `requestAnimationFrame`; Jev answers arrive asynchronously and the tick never waits on the network.
+- **Scheduler** (`ui/colonyJev.ts`): every interval, the queued situations go to Jev, at most `batch` a request, with an in-flight limit (browsers allow 6 connections per host; one stays free so Stop reaches the server at once). The server retries 429/529 honouring `retry-after`; a 429 "busy" from the proxy releases the situations to be asked next cycle.
+- **Server** holds the key, forwards packed requests, counts `usage.input_tokens` and enforces the caps.
 - **Connection pool**: Node's `fetch` on one dispatcher serialised our requests (10 × 50 ants took 2.9 s stacked; separate connections took 0.65 s for 8 × 100). The server uses a `node:https` `Agent` sized for the in-flight limit (an undici `Agent` queued behind one warm socket too, `web/server/jev.ts`), and a test pins that parallel requests overlap.
-- `sim/` (but `targets.ts`) and `colony/` are pure and covered by `node --test`; the renderer and React layer are thin.
+- `colony/` is pure and covered by `node --test`; the renderer and React layer are thin.
 
 ## 4. The Jev contract
 
