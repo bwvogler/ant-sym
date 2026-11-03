@@ -601,6 +601,50 @@ test("Stop pressed while Start is on the wire: the run stays stopped, and the ru
   assert.deepEqual(actions, ["start", "stop", "stop"]);
 });
 
+test("Start, Stop, Start before the first reply: the late reply leaves the second run alone (review of #32)", async () => {
+  const first = deferred<void>();
+  const actions: string[] = [];
+  let starts = 0;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).includes("api/run")) {
+      const action = String((JSON.parse(String(init?.body ?? "{}")) as { action?: string }).action);
+      actions.push(action);
+      if (action === "start" && ++starts === 1) await first.promise;
+      return { ok: true, status: 200, json: async () => RUN } as Response;
+    }
+    const r = await answerAll("explore")(JSON.parse(String(init?.body)) as JevRequest);
+    return { ok: true, status: 200, json: async () => r.body } as Response;
+  }) as typeof fetch;
+  const j = make();
+  j.attach(colony());
+  const one = j.start();
+  await j.stop();
+  await j.start();
+  first.resolve();
+  await one;
+  await tick(20);
+  assert.equal(j.state.phase, "running", "the second run is on");
+  assert.deepEqual(actions, ["start", "stop", "start"], "no stop sent for the late first reply: it would end the second run");
+});
+
+test("Start while running aborts the old run's calls", async () => {
+  const signals: AbortSignal[] = [];
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).includes("api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
+    signals.push(init!.signal!);
+    return new Promise<Response>((_, reject) => init!.signal!.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }))));
+  }) as typeof fetch;
+  const j = make();
+  const c = colony();
+  j.attach(c);
+  await j.start();
+  run(c, 2);
+  await tick(30);
+  assert.ok(signals.length > 0, "a call is in flight");
+  await j.start();
+  assert.ok(signals.every((s) => s.aborted), "the first run's calls were cut");
+});
+
 test("busy after a new game: the situations go back into the new game's lanes, not the old one's (ja-1u2)", async () => {
   const gate = deferred<void>();
   const asked: string[][] = [];

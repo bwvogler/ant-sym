@@ -140,6 +140,8 @@ export class ColonyJev {
    * latch: React's StrictMode disposes the client once on mount and keeps using it, so Start must work after a dispose.
    */
   #life = 0;
+  /** Bumped by every start(): a late Start reply closes its run only if no later Start has begun (that run is the server's current one). */
+  #starts = 0;
   /** where the next cycle starts in the lanes, so no lane waits behind the others' long queues (ja-ytc) */
   #nextLane = 0;
   #listeners = new Set<Listener>();
@@ -324,6 +326,7 @@ export class ColonyJev {
 
   async start(caps: Partial<RunCaps> = COLONY_CAPS): Promise<void> {
     const life = this.#life;
+    const startNo = ++this.#starts;
     let run: RunSummary;
     try {
       const res = await fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start", caps: { ...COLONY_CAPS, ...caps } }) });
@@ -336,12 +339,15 @@ export class ColonyJev {
       this.#set({ lastError: `start failed: ${String(e)}` });
       return;
     }
-    if (life !== this.#life) {
-      // Disposed or stopped while Start was on the wire: close the run it opened, start no timers (ja-7tf).
+    if (life !== this.#life || startNo !== this.#starts) {
+      // Disposed or stopped while Start was on the wire: close the run it opened, start no timers (ja-7tf). The server's
+      // stop ends whatever run is current, so if a later Start has begun, that run is the later one's: leave it alone.
+      if (startNo !== this.#starts) return;
       void fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) }).catch(() => {});
       return;
     }
     this.#runSeq++;
+    this.#aborter.abort(); // a Start while running: the old run's calls end with it, and free their in-flight slots
     this.#aborter = new AbortController();
     this.#clearQueues();
     this.#cooldown = 0;
