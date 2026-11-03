@@ -244,3 +244,22 @@ test("arrive: putting a load down ends the trip, wherever it was put down", () =
   c.tick(1 / 30);
   assert.equal(c.mode[0], 0, "load down: exploring, not returning");
 });
+
+test("arrive in the side view: a fresh forager returning to the royal chamber is no longer returning; a tired one, or a young one, stays in", () => {
+  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
+  const at = (age: number, since: number) => {
+    const c = new Colony(generateSideWorld(2, SMALL), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+    c.policy = (s) => (s.mode === "return" ? "return" : "explore"); // Jev's answer to returners: keep returning
+    c.x[0] = c.queen!.x;
+    c.y[0] = c.queen!.y;
+    c.age[0] = age * LIFESPAN;
+    c.lifespan[0] = Infinity;
+    c.mode[0] = 2;
+    c.since[0] = since;
+    for (let k = 0; k < 5; k++) c.tick(1 / 30);
+    return c.mode[0];
+  };
+  assert.notEqual(at(0.6, 0), 2, "a fresh forager: its trip is over");
+  assert.equal(at(0.6, 1e4), 2, "a tired forager stays in");
+  assert.equal(at(YOUNG / 2, 0), 2, "the young work inside: they make no trips");
+});
