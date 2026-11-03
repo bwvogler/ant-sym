@@ -26,6 +26,8 @@ npm run test:slow              # whole-game guards (web/src/colony/tests/slow): 
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
 ```
 
+Merges to `main` deploy `web/dist` to GitHub Pages (`.github/workflows/pages.yml`, `BASE_PATH=/ant-sym/`). Pages has no API, so `ui/backend.ts` probes `/api/health` and the UI disables Jev. New fetches to the API must go through `apiUrl()`, never a bare `/api/...`.
+
 The test script must not use `--test-force-exit`. On Node 22, combined with `--test-timeout`, it sometimes ends a test file early and drops its remaining tests without a failure; runs reported 216 or 224 tests, all green (2026-11-01). Schedulers are disposed in `afterEach`, so nothing keeps the process alive without it.
 
 Editing `web/server/*.ts` does **not** restart the running Vite (measured 2026-10-25: the old ledger kept serving after a branch switch). Restart `npm run dev` after server changes; `/api/health` shows the live run summary shape, so check it has the field you added.

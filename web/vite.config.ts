@@ -6,6 +6,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { apiPlugins } from "./server/api.ts";
 
 export default defineConfig({
+  // BASE_PATH=/ant-sym/ for the GitHub Pages build; dev serves from the root.
+  base: process.env.BASE_PATH ?? "/",
   plugins: [react(), tailwindcss(), apiPlugins()],
   // Fixed port, strict so a second instance fails loudly instead of serving a
   // twin on the next port. 38500 = Jev Ants; Lingo Dojo is 38400, Atlas 38300,

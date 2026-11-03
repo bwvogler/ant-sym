@@ -110,6 +110,15 @@ environment. The handlers check `Origin` against the host and keep the key out o
 every response and log. Each visitor shares one spend ledger, so a hosted copy
 should lower the default caps.
 
+## Live demo
+
+Every merge to `main` publishes the static build to GitHub Pages
+(`.github/workflows/pages.yml`, after lint, typecheck and tests):
+<https://bwvogler.github.io/ant-sym/>. The API is dev-server middleware, so the
+page has no backend and no key: Start Jev is disabled with a notice, and the
+local-rule ants, text and image targets and the colony sim all play. One-time
+setup: Settings → Pages → Source: GitHub Actions.
+
 ## Development
 
 ```sh
