@@ -1,13 +1,13 @@
-import { afterEach, test } from "node:test";
+import { afterEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, localPolicy, localStance, type Mode, type Situation } from "../../colony/colony.ts";
 import { DOCTRINES, policyContext, situationKey, stanceContext, stanceKey } from "../../colony/colonyBrain.ts";
-import { fungalKey } from "../../colony/fungusBrain.ts";
+import { fungalKey, fungusContext, offeredFor } from "../../colony/fungusBrain.ts";
 import { generateWorld, mulberry32, OPEN_WORLD } from "../../colony/world.ts";
 import { Game } from "../../colony/game.ts";
 import { STRAINS, intervention } from "../../colony/fungus.ts";
 import { decodeFungal, type FungalSituation } from "../../colony/fungalPolicy.ts";
-import { ColonyJev, validAnswer, type CacheStore } from "../colonyJev.ts";
+import { ColonyJev, type CacheStore } from "../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
 // The colony's Jev client against a scripted fetch: no server, no key.
@@ -523,15 +523,21 @@ test("stored answers a lane could not have given are dropped on load (ja-ue6)", 
   assert.equal(j.stancePolicy(raided), "defend");
 });
 
-test("validAnswer: modes, stances, and only an intervention the host was offered", () => {
-  assert.ok(validAnswer("mode", "k", "return"));
-  assert.ok(!validAnswer("mode", "k", "flee"));
-  assert.ok(validAnswer("stance", "k", "raid"));
-  assert.ok(!validAnswer("stance", "k", "explore"));
-  const key = fungalKey(GARDEN, ["dormant", "blend"]);
-  assert.ok(validAnswer("fungus", key, "blend"));
-  assert.ok(!validAnswer("fungus", key, "soothe"), "allowed by the strain, but not offered when asked");
-  assert.ok(!validAnswer("mode", "k", 3 as unknown as string));
+test("a stored fungus answer is kept only if the host was offered it when asked (ja-ue6)", () => {
+  const store = memoryStore();
+  const j = make(store);
+  const g = infectedGame();
+  j.attach(g.player);
+  const offered = offeredFor("garden", g.fungus.menu);
+  const other = { ...GARDEN, load: "high" as const };
+  const notOffered = (["dormant", "blend", "soothe", "share", "roam", "muddle", "cull", "crown"] as const).find((id) => !offered.includes(id))!;
+  store.data.set(fungusContext("Stored aim.", g.map.sky ? "side" : "top"), [
+    [fungalKey(GARDEN, offered), offered[0]!],
+    [fungalKey(other, offered), notOffered],
+  ]);
+  j.attachFungus(g.fungus);
+  j.setAim("Stored aim.");
+  assert.equal(j.state.fungusCached, 1, `kept ${offered[0]}, dropped ${notOffered}`);
 });
 
 test("dispose while Start is on the wire: no run opens, nothing is asked, and the server's run is stopped (ja-7tf)", async () => {
@@ -560,6 +566,39 @@ test("dispose while Start is on the wire: no run opens, nothing is asked, and th
   assert.notEqual(j.state.phase, "running");
   assert.equal(jev, 0, "no Jev call from a disposed client");
   assert.deepEqual(actions, ["start", "stop"], "the run Start opened is closed");
+});
+
+test("Start works after a dispose, as under React's StrictMode, which disposes once on mount and keeps the client", async () => {
+  scriptFetch(answerAll("explore"));
+  const j = make();
+  const c = colony();
+  j.attach(c);
+  j.dispose();
+  j.subscribe(() => {}); // StrictMode runs the effect again: a fresh subscription on the same client
+  await j.start();
+  assert.equal(j.state.phase, "running");
+  run(c, 2);
+  await tick(40);
+  assert.ok(j.state.requests > 0, "it asks Jev");
+});
+
+test("Stop pressed while Start is on the wire: the run stays stopped, and the run Start opened is closed", async () => {
+  const gate = deferred<void>();
+  const actions: string[] = [];
+  globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
+    const action = String((JSON.parse(String(init?.body ?? "{}")) as { action?: string }).action);
+    actions.push(action);
+    if (action === "start") await gate.promise;
+    return { ok: true, status: 200, json: async () => RUN } as Response;
+  }) as typeof fetch;
+  const j = make();
+  j.attach(colony());
+  const started = j.start();
+  await j.stop();
+  gate.resolve();
+  await started;
+  assert.notEqual(j.state.phase, "running");
+  assert.deepEqual(actions, ["start", "stop", "stop"]);
 });
 
 test("busy after a new game: the situations go back into the new game's lanes, not the old one's (ja-1u2)", async () => {
@@ -609,23 +648,47 @@ test("a colony with no doctrine of its own follows the first colony's when it ch
   assert.deepEqual(j.state.doctrineCached, [1, 0], "once it has its own doctrine, it keeps it");
 });
 
-test("lanes take turns: a long mode queue does not keep the fungus waiting (ja-ytc)", async () => {
-  const order: string[] = [];
-  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
-    if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
-    const req = JSON.parse(String(init?.body)) as JevRequest & { state: Record<string, unknown> };
-    order.push(req.state.hosts ? "fungus" : req.state.ants ? "mode" : "stance");
-    const r = await answerAll("explore")(req);
-    return { ok: true, status: 200, json: async () => r.body } as Response;
-  }) as typeof fetch;
-  const j = new ColonyJev({ intervalMs: 10, batch: 1, inFlight: 1 });
-  live.add(j);
-  j.attach(colony(5));
-  await j.start();
-  const trails = ["none", "faint", "strong"] as const;
-  for (const foodTrail of trails) for (const homeTrail of trails) for (const alarm of trails) j.policy(sit({ foodTrail, homeTrail, alarm })); // 27 mode questions
-  j.fungusPolicy(GARDEN);
-  await tick(80);
-  assert.ok(order.length >= 4, order.join(","));
-  assert.ok(order.slice(0, 4).includes("fungus"), `the fungus is asked among the first requests, not after 27 mode ones: ${order.slice(0, 6).join(",")}`);
+test("lanes take turns at any request latency: a long mode queue does not keep the fungus waiting (ja-ytc)", async () => {
+  // Mocked intervals, so the cycle count is exact (a wall-clock version flaked under load). Latency in cycles: the
+  // first cut moved its pointer every cycle, so a 3-cycle request found the mode lane first at every free slot.
+  for (const latency of [1, 2, 3, 4, 5, 6]) {
+    mock.timers.enable({ apis: ["setInterval"] });
+    try {
+      let now = 0;
+      const pending: { due: number; done: () => void }[] = [];
+      const order: string[] = [];
+      globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+        if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
+        const req = JSON.parse(String(init?.body)) as JevRequest & { state: Record<string, unknown> };
+        order.push(req.state.hosts ? "fungus" : req.state.ants ? "mode" : "stance");
+        await new Promise<void>((done) => pending.push({ due: now + latency, done }));
+        const r = await answerAll("explore")(req);
+        return { ok: true, status: 200, json: async () => r.body } as Response;
+      }) as typeof fetch;
+      const j = new ColonyJev({ intervalMs: 10, batch: 1, inFlight: 1 });
+      live.add(j);
+      j.attach(colony(5));
+      await j.start();
+      const trails = ["none", "faint", "strong"] as const;
+      for (const foodTrail of trails) for (const homeTrail of trails) for (const alarm of trails) j.policy(sit({ foodTrail, homeTrail, alarm })); // 27 mode questions
+      j.fungusPolicy(GARDEN);
+      const settle = async () => {
+        for (let k = 0; k < 5; k++) await new Promise((r) => setImmediate(r));
+      };
+      for (let cycle = 0; cycle < 40 && !order.includes("fungus"); cycle++) {
+        now++;
+        for (const p of pending.splice(0)) if (p.due <= now) p.done();
+        else pending.push(p);
+        await settle();
+        mock.timers.tick(10);
+        await settle();
+      }
+      const at = order.indexOf("fungus");
+      assert.ok(at >= 0 && at < 3, `latency ${latency} cycles: the fungus is request #${at + 1} (${order.slice(0, 5).join(",")})`);
+      j.dispose();
+      for (const p of pending) p.done();
+    } finally {
+      mock.timers.reset();
+    }
+  }
 });

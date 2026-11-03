@@ -285,7 +285,11 @@ With Jev on, each ant's mode choice is **Jev's answer for its situation under th
 - The queue goes out every 300 ms: at most 100 situations per request, 2 requests in flight, each situation asked once.
 - Answers fill the cache and every ant reconsiders on its next tick.
 - It uses the same proxy, ledger and caps as the picture, with colony defaults of $0.10 and 30 min.
-- On 409 it stops and goes back to the local rule. On busy it requeues. On a failure it cools down for 5 cycles.
+- On 409 it stops and goes back to the local rule. On a failure it cools down for 5 cycles.
+- On busy it requeues the batch into every current lane asking under the context it was asked under, not only the lane that sent it. That lane may be gone after a new game, or have moved to another doctrine (ja-1u2, PR #32).
+- Lanes take turns (ja-ytc, PR #32): each cycle takes one batch per lane per pass, starting after the last lane served. A long mode queue no longer keeps the fungus and the other colonies waiting.
+- Stored answers are kept only if the lane's question could have given them (ja-ue6). Saving merges with what another tab stored (`ui/cacheStore.ts`).
+- A Start reply that lands after Stop or after the page unmounts opens no run, and stops the server run it opened (ja-7tf). This uses a counter, not a latch, because React's StrictMode disposes the client once on mount and keeps using it.
 
 **Cost, offline** (`npm run colony-cost`: 800 ants, 10 sim-minutes, 5 doctrines with the first one repeated last, alarm painted every ~20 s). The stand-in for Jev is the local rule; tokens are estimated from request size.
 

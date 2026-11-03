@@ -395,3 +395,12 @@ test("dispose while Start is on the wire: no run opens, nothing is asked, and th
   assert.equal(jev, 0, "no Jev call from a disposed scheduler");
   assert.deepEqual(actions, ["start", "stop"], "the run Start opened is closed");
 });
+
+test("Start works after a dispose, as under React's StrictMode, which disposes once on mount and keeps the scheduler", async () => {
+  scriptFetch({ status: 503, body: { error: "unused" } });
+  const s = make(world(), { intervalMs: 10 });
+  s.dispose();
+  s.subscribe(() => {});
+  await s.start({ capUsd: 0.1 });
+  assert.equal(s.state.phase, "running");
+});

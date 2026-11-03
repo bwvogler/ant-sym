@@ -113,8 +113,11 @@ export class JevScheduler {
   #aborter = new AbortController();
   /** Bumps on every start, so a look that began in an old run cannot steer the new one. */
   #runSeq = 0;
-  /** set by dispose: a Start reply landing afterwards must not open a run on a scheduler nobody shows (ja-7tf) */
-  #disposed = false;
+  /**
+   * Bumped by dispose and Stop. A Start reply that lands after either must not open a run (ja-7tf). A counter, not a
+   * latch: React's StrictMode disposes the scheduler once on mount and keeps using it, so Start must work after a dispose.
+   */
+  #life = 0;
   #pending: Uint8Array;
   #listeners = new Set<Listener>();
   #state: SchedulerState = { phase: "idle", run: null, pending: 0, requestsSent: 0, failures: 0, lastError: null, sample: null, neutral: null, overseer: null, stoppedOnTarget: 0, stoppedFor: null, sessionUsd: 0, sessionTokens: 0, cache: { hits: 0, waited: 0, asked: 0, situations: 0 } };
@@ -159,6 +162,7 @@ export class JevScheduler {
 
   /** Start a run on the server and begin scheduling. */
   async start(caps: Partial<RunCaps>): Promise<void> {
+    const life = this.#life;
     // The previous run's grace-period calls may have landed since its stop: take their final line first.
     if (this.#state.phase === "stopped") await this.#refresh();
     let run: RunSummary;
@@ -173,8 +177,8 @@ export class JevScheduler {
       this.#set({ lastError: `start failed: ${String(e)}` });
       return;
     }
-    if (this.#disposed) {
-      // The page went away while Start was on the wire: close the run it opened, start no timers (ja-7tf).
+    if (life !== this.#life) {
+      // Disposed or stopped while Start was on the wire: close the run it opened, start no timers (ja-7tf).
       void fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) }).catch(() => {});
       return;
     }
@@ -203,6 +207,7 @@ export class JevScheduler {
 
   /** Stop: tell the server why, go idle, hand every ant back to the local rule. */
   async stop(reason: "user" | "formed" | "blank" = "user"): Promise<void> {
+    this.#life++;
     this.#halt();
     this.#set({ stoppedFor: reason });
     // Drop the browser side of every open call first: the server gives a call
@@ -262,7 +267,7 @@ export class JevScheduler {
   }
 
   dispose(): void {
-    this.#disposed = true;
+    this.#life++;
     this.#halt();
     this.#aborter.abort();
     this.#listeners.clear();
