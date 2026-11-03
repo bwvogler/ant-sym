@@ -1,5 +1,7 @@
 # The fungus policy: brainstorm for a game about unifying ants
 
+*Part of the [research notes](README.md) behind the [vision](vision.md).*
+
 *Research and brainstorm note, 2026-11-01, revised the same day. The goal: the player is a fungus that unifies ant colonies. It alters behaviour so that rival colonies **collaborate**, **specialize** and **reorganize**, instead of one wiping out the other. Biology comes from primary papers and reviews found by web search. Most full texts could not be opened, so figures come from abstracts or citing pages, and anything not confirmed is marked **unverified**. Code references are to `web/src/colony/` at commit `e59e298`.*
 
 ## TL;DR
@@ -299,23 +301,23 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 
 ## Sources
 
-- *Rickia wasmannii*, pacifying alkane and lowered aggression: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9935638/ · https://link.springer.com/10.1038/s42003-023-04541-7 · https://www.pubmed.gov/36797462/
-- Argentine ants, recognition hydrocarbons and supercolonies: https://bmcbiol.biomedcentral.com/articles/10.1186/1741-7007-7-71 · https://esa.confex.com/esa/2005/techprogram/paper_22074.htm · https://core.ac.uk/download/18156603.pdf · https://www.entm.purdue.edu/ants/pubs/9.pdf
-- Leafcutter fungus garden as a source of colony odour: https://locus.ufv.br/items/702e4948-e873-4394-b7f6-f7d19a4759ad · https://test01.ku.dk/:obvius/pureproxy/3974268/da/publications/the-origin-of-the-chemical-profiles-of-fungal-symbionts-and-their · https://www.scielo.br/j/babt/a/ZWkj9KN6n5Nb97vZwR6G9zx/?lang=en
-- Fungus-to-ant feedback (Green & Kooij 2018): https://springerlink.bibliotecabuap.elogim.com/doi/10.1007/s00049-018-0260-x · https://www.frontiersin.org/articles/10.3389/fevo.2020.00095/full
-- *Escovopsis*, caste-specialized defence and midden workers: https://researchprofiles.ku.dk/da/publications/caste-specialization-in-behavioral-defenses-against-fungus-garden/ · https://www.tara.tcd.ie/items/60e96153-be24-4979-a574-c089e296cb17 · https://pmc.ncbi.nlm.nih.gov/articles/PMC5992151
-- *Ophiocordyceps*, foraging, rhythm and clock: https://research-portal.uu.nl/en/publications/getting-lost-the-fungal-hijacking-of-ant-foraging-behaviour-in-sp/ · https://www.sciencedaily.com/releases/2018/03/180313130636.htm · https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7341126/ · https://www.nature.com/articles/s41598-023-40065-0.pdf
-- *Ophiocordyceps* death grip (Hughes et al. 2011): https://www.biomedcentral.com/1472-6785/11/13
-- *Pandora formicae*: https://pmc.ncbi.nlm.nih.gov/articles/PMC5624889 · https://www.antwiki.org/wiki/Summiting_Behaviour
-- *Metarhizium* and social immunity: https://www.eurekalert.org/news-releases/778188 · https://journals.plos.org/plosbiology/article/info:doi/10.1371/journal.pbio.1001300 · https://antwiki.org/wiki/Social_Immunity_and_Disease_Resistance · https://discovermagazine.com/planet-earth/terminally-ill-ants-choose-to-die-alone
-- Lancet fluke: https://pmc.ncbi.nlm.nih.gov/articles/PMC7084154 · https://www.ulethbridge.ca/node/26288 · https://prism.ucalgary.ca/items/4ed30da6-ecc3-4ef0-957b-619f251b0668
-- *Myrmeconema neotropicum*: https://en.wikipedia.org/wiki/Myrmeconema_neotropicum · https://newsarchive.berkeley.edu/news/media/releases/2008/01/16_ants.shtml
-- Octopamine, serotonin and aggression (pavement ants): https://pmc.ncbi.nlm.nih.gov/articles/PMC5112987 · https://sicb.org/?p=12108
-- Microbiome and nestmate recognition: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4741111/ · https://www.biorxiv.org/content/10.1101/335521.full.pdf
-- *Wolbachia* in Pharaoh ants (preprint): https://www.biorxiv.org/content/10.1101/2023.01.31.526493.full.pdf
-- Parabiosis: https://link.springer.com/doi/10.1007/s00040-007-0914-0 · https://escholarship.org/uc/item/7c26m5s9 · https://pmc.ncbi.nlm.nih.gov/articles/PMC3579830
-- Pleometrosis: https://pmc.ncbi.nlm.nih.gov/articles/PMC7862224 · https://doi.org/10.3389/fevo.2022.768752
-- Response-threshold division of labour: https://pmc.ncbi.nlm.nih.gov/articles/PMC1688885 · https://link.springer.com/content/pdf/10.1007/s00265-012-1343-2.pdf · https://arxiv.org/pdf/2308.07122
+- [*Rickia wasmannii*, pacifying alkane and lowered aggression](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9935638/) · [link.springer.com](https://link.springer.com/10.1038/s42003-023-04541-7) · [pubmed.gov](https://www.pubmed.gov/36797462/)
+- [Argentine ants, recognition hydrocarbons and supercolonies](https://bmcbiol.biomedcentral.com/articles/10.1186/1741-7007-7-71) · [esa.confex.com](https://esa.confex.com/esa/2005/techprogram/paper_22074.htm) · [core.ac.uk](https://core.ac.uk/download/18156603.pdf) · [entm.purdue.edu](https://www.entm.purdue.edu/ants/pubs/9.pdf)
+- [Leafcutter fungus garden as a source of colony odour](https://locus.ufv.br/items/702e4948-e873-4394-b7f6-f7d19a4759ad) · [test01.ku.dk](https://test01.ku.dk/:obvius/pureproxy/3974268/da/publications/the-origin-of-the-chemical-profiles-of-fungal-symbionts-and-their) · [scielo.br](https://www.scielo.br/j/babt/a/ZWkj9KN6n5Nb97vZwR6G9zx/?lang=en)
+- [Fungus-to-ant feedback (Green & Kooij 2018)](https://springerlink.bibliotecabuap.elogim.com/doi/10.1007/s00049-018-0260-x) · [frontiersin.org](https://www.frontiersin.org/articles/10.3389/fevo.2020.00095/full)
+- [*Escovopsis*, caste-specialized defence and midden workers](https://researchprofiles.ku.dk/da/publications/caste-specialization-in-behavioral-defenses-against-fungus-garden/) · [tara.tcd.ie](https://www.tara.tcd.ie/items/60e96153-be24-4979-a574-c089e296cb17) · [PMC5992151](https://pmc.ncbi.nlm.nih.gov/articles/PMC5992151)
+- [*Ophiocordyceps*, foraging, rhythm and clock](https://research-portal.uu.nl/en/publications/getting-lost-the-fungal-hijacking-of-ant-foraging-behaviour-in-sp/) · [sciencedaily.com](https://www.sciencedaily.com/releases/2018/03/180313130636.htm) *(secondary)* · [PMC7341126](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7341126/) · [nature.com](https://www.nature.com/articles/s41598-023-40065-0.pdf)
+- [*Ophiocordyceps* death grip (Hughes et al. 2011)](https://www.biomedcentral.com/1472-6785/11/13)
+- [*Pandora formicae*](https://pmc.ncbi.nlm.nih.gov/articles/PMC5624889) · [antwiki.org](https://www.antwiki.org/wiki/Summiting_Behaviour) *(secondary)*
+- [*Metarhizium* and social immunity](https://www.eurekalert.org/news-releases/778188) *(secondary)* · [journals.plos.org](https://journals.plos.org/plosbiology/article/info:doi/10.1371/journal.pbio.1001300) · [antwiki.org](https://antwiki.org/wiki/Social_Immunity_and_Disease_Resistance) *(secondary)* · [discovermagazine.com](https://discovermagazine.com/planet-earth/terminally-ill-ants-choose-to-die-alone) *(secondary)*
+- [Lancet fluke](https://pmc.ncbi.nlm.nih.gov/articles/PMC7084154) · [ulethbridge.ca](https://www.ulethbridge.ca/node/26288) *(secondary)* · [prism.ucalgary.ca](https://prism.ucalgary.ca/items/4ed30da6-ecc3-4ef0-957b-619f251b0668)
+- [*Myrmeconema neotropicum*](https://en.wikipedia.org/wiki/Myrmeconema_neotropicum) *(secondary)* · [newsarchive.berkeley.edu](https://newsarchive.berkeley.edu/news/media/releases/2008/01/16_ants.shtml) *(secondary)*
+- [Octopamine, serotonin and aggression (pavement ants)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5112987) · [sicb.org](https://sicb.org/?p=12108) *(secondary)*
+- [Microbiome and nestmate recognition](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4741111/) · [biorxiv.org](https://www.biorxiv.org/content/10.1101/335521.full.pdf)
+- [*Wolbachia* in Pharaoh ants (preprint)](https://www.biorxiv.org/content/10.1101/2023.01.31.526493.full.pdf)
+- [Parabiosis](https://link.springer.com/doi/10.1007/s00040-007-0914-0) · [escholarship.org](https://escholarship.org/uc/item/7c26m5s9) · [PMC3579830](https://pmc.ncbi.nlm.nih.gov/articles/PMC3579830)
+- [Pleometrosis](https://pmc.ncbi.nlm.nih.gov/articles/PMC7862224) · [doi.org](https://doi.org/10.3389/fevo.2022.768752)
+- [Response-threshold division of labour](https://pmc.ncbi.nlm.nih.gov/articles/PMC1688885) · [link.springer.com](https://link.springer.com/content/pdf/10.1007/s00265-012-1343-2.pdf) · [arxiv.org](https://arxiv.org/pdf/2308.07122)
 
 ## 10. More colonies, and other species (planned with MR 8, `ja-8fd`)
 

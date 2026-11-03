@@ -1,12 +1,48 @@
 <h1 align="center">Jev Ants</h1>
 
-<p align="center"><em>Two ant colonies and a fungus on one map, each ant steered by a Jev decision.</em></p>
+<p align="center"><em>Ant colonies whose every choice comes from what an ant can sense, and a fungus that turns their rivalry into one colony by working through those senses.</em></p>
 
-Every ant forages on its own: it lays a trail to food and a trail home, and switches between
-exploring, following and going home. [Jev](https://typesafe.ai) decides, once per *situation*
-rather than once per ant, which mode an ant should be in under its colony's doctrine, which
-stance each colony takes (forage, defend, raid), and what the fungus does under the player's
-aim. Answers are cached, so a game costs roughly $0.10–0.15 an hour of retuning.
+## Goal
+
+**One policy per species, fed only by the senses.** Each species, and each colony, has a
+single policy. Every choice an ant makes comes out of it: where to walk, whether to dig, what
+to carry, whom to fight. Its only input is what that ant can actually perceive: trail and alarm
+odours, the hydrocarbons of an ant it touches, how often it meets returning foragers, vibration,
+gravity, its own drifting home vector, its own body. All of it is grounded in research on real
+ants. Nurses, diggers, foragers, undertakers and chamber roles should *emerge* from that one
+policy acting on local cues, not be scripted beside it.
+
+**A fungus that works through those senses.** The player is a fungus. It changes what a host
+perceives and what it gives off, the way real manipulators do: *Rickia* changes one cuticular
+alkane, and supercolonies form when recognition odours stop differing. It responds to signals
+the fungus itself can sense, and it has effectors of its own: sporulation, a scent of its own,
+and a host's body near the end. It never decides for an ant.
+
+**From conflict to collaboration.** Left alone, colonies compete. The fungus shapes its policy
+so they tolerate each other, share trails and divide the work, until they act as one.
+
+**Then more capable organisms.** The same pattern of a sense table and an action set under one
+policy shape extends to other ant species, then to other social insects, then beyond. The
+fungus adapts its policy to each new host it can reach.
+
+The long form is [docs/vision.md](docs/vision.md).
+
+## Where it stands
+
+- The ant policy chooses one of four modes (explore, follow, return, fight) from six sensed
+  fields. A colony stance (forage, defend, raid) is chosen from colony-wide totals and
+  broadcast to every ant.
+- Much of the nest is still scripted from knowledge no ant has: work by age thresholds,
+  chamber placement and roles, nursing and food flow, the midden, raid targets. Each one is
+  listed in the [gap table](docs/vision.md#where-the-code-is-today), with the sensed cue that
+  should replace it and a bead (`ja-k4k`).
+- The fungus already acts through perception, emission and the body: channel gains,
+  recognition tolerance, odour masking, trail laying, and (`crown`) a lethal infection
+  passed to the queen and brood a host tends. What it *senses* still includes facts no fungus
+  could read, such as the host's mode.
+
+[Jev](https://typesafe.ai) answers each policy question once per *situation* rather than once
+per ant, and the answers are cached, so a game costs roughly $0.10–0.15 an hour.
 
 ## Run it
 
@@ -49,6 +85,21 @@ The server keeps a connection pool so parallel requests overlap, and counts the 
 Colony questions run about 450–560 input tokens each as a game asks them (`npm run
 colony-cost`), the fungus's about 530–570. The schemas, measured numbers and every design
 decision are in [docs/PRD.md](docs/PRD.md).
+
+## Documentation
+
+- [docs/vision.md](docs/vision.md): the goal, what an ant may sense, and what is still scripted.
+- [docs/README.md](docs/README.md): the index of research notes and how they cite. Each note
+  links the primary papers it rests on:
+  - [ant-communication.md](docs/ant-communication.md): signal channels, their ranges and
+    lifetimes, and recognising rivals;
+  - [nest-and-home.md](docs/nest-and-home.md): homing by path integration, gravity and floor
+    marks; the queen; nest architecture; jobs by place and age;
+  - [fungus-policy.md](docs/fungus-policy.md): what real parasites do to ants, and the levers
+    the fungus can pull;
+  - [queens-and-merging.md](docs/queens-and-merging.md): several queens, and orphaned
+    colonies merging.
+- [docs/PRD.md](docs/PRD.md): the decision log, with every measured number.
 
 ## Hosting
 
