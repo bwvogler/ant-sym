@@ -105,9 +105,16 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   //   nest 9 with #14 (99eed4b)      floor ×1.1–2.4, mean 1.90; stacked 1–8, 3 of 9 under 3
   //   F2, merged with F1 and F3      floor ×2.06–2.94, mean 2.43; stacked 2–8, mean 4.9, 1 of 9 under 3 (world 2 game 4,
   //                                  this test's first game: 2, 4, 5 here)
-  // So floor grows at least ×2 in every game again, as before #14. Stacked chambers keep the mean bound over the three
-  // games (3.7 on them); at least 3 in every game, as before #14, fails in that one game of nine.
-  for (const [k, x] of growth.entries()) assert.ok(x >= 2, `game ${4 + k}: floor growth ×${x.toFixed(2)} (${growth.map((v) => v.toFixed(2)).join(", ")})`);
+  //   MR 3.1, tiredness a body state  floor ×1.19–2.69, mean 2.17 (20 games: ×1.19–3.06, mean 2.21, main 2.45);
+  //                                  this test's games 1.75, 2.69, 1.81 (PRD §44)
+  // Through F2, floor grew at least ×2 in every game. MR 3.1 removed an artefact it leaned on: "tired" was a timer that
+  // nothing underground reset, so tired ants retired inside for good; now they rest and go out again, the digging is
+  // the same and less of it is chamber floor. Re-baselined by the owner's choice (PRD §44): at least ×1.5 in every game
+  // and ×2 on average, which nest 9's backfill regression (×1.1 in this test's first game, mean 1.90) still fails.
+  // Bead ja-k4k.3: chamber growth from sensed crowding. Stacked chambers keep the mean bound over the three games.
+  for (const [k, x] of growth.entries()) assert.ok(x >= 1.5, `game ${4 + k}: floor growth ×${x.toFixed(2)} (${growth.map((v) => v.toFixed(2)).join(", ")})`);
+  const meanGrowth = growth.reduce((a, b) => a + b, 0) / growth.length;
+  assert.ok(meanGrowth >= 2, `floor growth, mean over three games ×${meanGrowth.toFixed(2)} (${growth.map((v) => v.toFixed(2)).join(", ")})`);
   const meanStacked = stacked.reduce((a, b) => a + b, 0) / stacked.length;
   assert.ok(meanStacked >= 3, `stacked chambers, mean over three games ${meanStacked.toFixed(1)} (${stacked.join(", ")})`);
   assert.ok(trends >= 2, `the spacing rule shows: gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`);
