@@ -4,7 +4,7 @@ import JevPanel from "./ui/JevPanel.tsx";
 import Nav from "./ui/Nav.tsx";
 import Panel from "./ui/Panel.tsx";
 import DemoNote from "./ui/DemoNote.tsx";
-import { jevUnavailable } from "./ui/backend.ts";
+import { isDemo, jevUnavailable } from "./ui/backend.ts";
 import { useBackend } from "./ui/useBackend.ts";
 import { useEngine } from "./ui/useEngine.ts";
 import { useJev } from "./ui/useJev.ts";
@@ -25,7 +25,7 @@ export default function App() {
   const jev = useJev(engine, stats?.formed ?? false, stats?.targetVersion ?? 0, blank);
   const running = jev.state.phase === "running";
   const backend = useBackend();
-  const demo = backend !== null && !backend.hasBackend;
+  const demo = isDemo(backend);
   const startBlocked = jevUnavailable(backend) ?? (controls.brain !== "jev" ? "Switch Brain to Jev first" : blank ? "Type a word or upload a picture first" : null);
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { apiUrl, detectBackend, jevUnavailable } from "../backend.ts";
+import { apiUrl, detectBackend, isDemo, jevUnavailable } from "../backend.ts";
 
 const reply = (status: number, body: unknown, json = true) =>
   (async () => ({ ok: status >= 200 && status < 300, status, json: async () => (json ? body : Promise.reject(new SyntaxError("<html>"))) }) as Response) as typeof fetch;
@@ -28,7 +28,10 @@ test("static host: 404, HTML body, or network error all mean no backend", async 
   assert.match(jevUnavailable(none)!, /Demo build/);
 });
 
-test("no verdict while the probe is pending", () => {
-  assert.equal(jevUnavailable(null), null);
+test("Start stays disabled while the probe is pending; isDemo only after it answers", () => {
+  assert.match(jevUnavailable(null)!, /Checking/);
+  assert.equal(isDemo(null), false);
+  assert.equal(isDemo({ hasBackend: false, hasKey: false }), true);
+  assert.equal(isDemo({ hasBackend: true, hasKey: false }), false);
   assert.equal(jevUnavailable({ hasBackend: true, hasKey: true }), null);
 });

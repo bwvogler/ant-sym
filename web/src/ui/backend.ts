@@ -26,9 +26,14 @@ export async function detectBackend(fetchFn: typeof fetch = fetch): Promise<Back
   }
 }
 
+/** True once the probe has answered and there is no backend (the static demo). */
+export function isDemo(b: Backend | null): boolean {
+  return b !== null && !b.hasBackend;
+}
+
 /** Why Start Jev is unavailable for want of a backend or key, or null. */
 export function jevUnavailable(b: Backend | null): string | null {
-  if (b === null) return null; // still asking: the click itself reports any failure
+  if (b === null) return "Checking for the Jev server…";
   if (!b.hasBackend) return "Demo build: Jev needs the local server and a JEV_API_KEY. Ants run on the local rule here.";
   if (!b.hasKey) return "JEV_API_KEY is not set in the server's environment";
   return null;
