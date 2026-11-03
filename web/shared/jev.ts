@@ -84,5 +84,6 @@ export interface RunSummary {
  */
 export const DEFAULT_IN_FLIGHT = 5;
 export const USD_PER_INPUT_TOKEN = 0.042 / 1_000_000;
-export const DEFAULT_CAPS: RunCaps = { capUsd: 0.5, capSeconds: 180 };
+/** A colony run is long and cheap: $0.10 and 30 minutes (about an hour of retuning costs $0.10–0.15, PRD §39). */
+export const DEFAULT_CAPS: RunCaps = { capUsd: 0.1, capSeconds: 1800 };
 export const DEFAULT_JEV_MODEL = "jev-latest";

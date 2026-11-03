@@ -23,7 +23,7 @@ npm --prefix web install
 npm run dev                    # http://localhost:38500
 npm test                       # node --test, 60 s per file
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
-node scripts/colony-cost.mjs   # live-API cost of a colony game (tokens per question, $/h)
+node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
 ```
 
 The test script must not use `--test-force-exit`. On Node 22, combined with `--test-timeout`, it sometimes ends a test file early and drops its remaining tests without a failure; runs reported 216 or 224 tests, all green (2026-11-01). Schedulers are disposed in `afterEach`, so nothing keeps the process alive without it.

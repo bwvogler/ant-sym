@@ -47,15 +47,15 @@ test("the time cap stops the run; a stopped run admits nothing; start resets", (
   const s = l.summary(60_000);
   assert.equal(s.running, true);
   assert.equal(s.requests, 0);
-  assert.equal(s.caps.capUsd, 0.5);
-  assert.equal(s.caps.capSeconds, 180);
+  assert.equal(s.caps.capUsd, 0.1);
+  assert.equal(s.caps.capSeconds, 1800);
 });
 
 test("caps are clamped and junk falls back to defaults", () => {
   const l = new Ledger();
   const s = l.start({ capUsd: 1e9, capSeconds: Number.NaN }, 0);
   assert.equal(s.caps.capUsd, 100);
-  assert.equal(s.caps.capSeconds, 180);
+  assert.equal(s.caps.capSeconds, 1800);
 });
 
 test("in-flight calls reserve their worst case against the cap, and the pool has a ceiling", () => {

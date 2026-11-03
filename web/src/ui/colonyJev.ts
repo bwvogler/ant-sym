@@ -1,4 +1,4 @@
-import type { JevAnswer, JevProxyReply, JevRequest, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
+import { DEFAULT_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
 import { localPolicy, localStance, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
@@ -29,8 +29,8 @@ export interface ColonyJevOptions {
 
 export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300 };
 
-/** Colony runs are long and cheap: higher time cap, lower spend cap than a short run would need. */
-export const COLONY_CAPS: RunCaps = { capUsd: 0.1, capSeconds: 1800 };
+/** The caps a colony run starts with: $0.10 and 30 minutes (the server's default too). */
+export const COLONY_CAPS: RunCaps = DEFAULT_CAPS;
 
 /** Where cached answers outlive the page; injectable so tests need no localStorage. */
 export interface CacheStore {

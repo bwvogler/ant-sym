@@ -18,15 +18,16 @@ import { DEFAULT_CAPS, DEFAULT_IN_FLIGHT, USD_PER_INPUT_TOKEN, type RunCaps, typ
 // Round three: each call reserves from its own payload size (bytes / 1.5,
 // capped at the context limit) rather than from "the largest reply seen",
 // which let a big call slip in under a small one's reservation. Measured
-// 2026-10-25: the compass pack is 2.16 bytes per billed token, the noul pack
-// 3.39, the overseer (base64 images) 19.6, so bytes / 1.5 over-reserves by
-// 1.4× or more and never under-reserves. Tokens are also summed across runs
+// 2026-10-25, on the removed picture schemas: the compass pack is 2.16 bytes
+// per billed token, the noul pack 3.39, so bytes / 1.5 over-reserves by 1.4× or
+// more and never under-reserves. The colony and fungus packs have not been
+// measured for this ratio (bead ja-cu4). Tokens are also summed across runs
 // so a reply landing after its run ended is still on the session line.
 
 const LATENCY_WINDOW = 200;
 /** Reserved per in-flight call when its size is unknown: the 64k-token context limit, the most one request can bill. */
 export const RESERVE_TOKENS = 64_000;
-/** Request bytes per reserved token: below every measured schema (2.16 compass, 3.39 nouls, 19.6 overseer). */
+/** Request bytes per reserved token: below every measured schema (2.16 compass, 3.39 nouls: both from the removed picture mode; see ja-cu4 for the colony packs). */
 export const RESERVE_BYTES_PER_TOKEN = 1.5;
 
 /** The tokens to hold back for a request of `bytes` JSON bytes. */
