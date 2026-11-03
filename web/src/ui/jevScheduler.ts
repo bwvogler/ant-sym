@@ -1,4 +1,5 @@
 import type { JevProxyReply, JevRequest, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
+import { apiUrl } from "./backend.ts";
 import { compass } from "../sim/ants.ts";
 import type { Engine } from "../sim/engine.ts";
 import { antState, applyDecision, calibration, packRequest, POLICY_CONTEXT, readDecision, type AntState, type Neutral, type Schema } from "../sim/jevBrain.ts";
@@ -161,7 +162,7 @@ export class JevScheduler {
     if (this.#state.phase === "stopped") await this.#refresh();
     let run: RunSummary;
     try {
-      const res = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start", caps }) });
+      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start", caps }) });
       run = (await res.json()) as RunSummary;
       if (!res.ok) {
         this.#set({ lastError: (run as unknown as { error?: string }).error ?? `start failed (${res.status})` });
@@ -203,7 +204,7 @@ export class JevScheduler {
     // the stop request does not queue behind them.
     this.#aborter.abort();
     try {
-      const res = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: reason === "formed" ? "formed" : "stop" }) });
+      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: reason === "formed" ? "formed" : "stop" }) });
       const run = (await res.json()) as RunSummary;
       this.#absorb(run);
       this.#set({ phase: "stopped", run });
@@ -217,7 +218,7 @@ export class JevScheduler {
   async #refresh(): Promise<void> {
     if (this.#state.phase !== "stopped") return;
     try {
-      const run = (await (await fetch("/api/run")).json()) as RunSummary;
+      const run = (await (await fetch(apiUrl("api/run"))).json()) as RunSummary;
       this.#absorb(run);
       this.#set({ run });
     } catch {
@@ -278,7 +279,7 @@ export class JevScheduler {
     try {
       const images = await this.opts.renderImages(e.target, e.occupancy, e.params.size);
       if (seq !== this.#runSeq || this.#state.phase !== "running") return;
-      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildOverseerRequest(images.target, images.current)), signal: this.#aborter.signal });
+      const res = await fetch(apiUrl("api/jev"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildOverseerRequest(images.target, images.current)), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
       if (seq !== this.#runSeq || this.#state.phase !== "running") return; // a late look must not steer a later run
       if (res.status === 409) {
@@ -341,7 +342,7 @@ export class JevScheduler {
     let reply: JevProxyReply | null = null;
     let error: string | null = null;
     try {
-      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: this.#aborter.signal });
+      const res = await fetch(apiUrl("api/jev"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
       if (res.status === 409) {
         // A cap fired or the run was stopped elsewhere.
