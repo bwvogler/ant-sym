@@ -1,10 +1,11 @@
-import type { JevAnswer, JevProxyReply, JevRequest, JevResponse, RunCaps, RunSummary } from "../../shared/jev.ts";
+import { DEFAULT_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
+import { apiUrl } from "./backend.ts";
 import { localPolicy, localStance, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
 import { fungalKey, fungusContext, offeredFor, offeredIn, packFungusRequest, readIntervention, worthAsking } from "../colony/fungusBrain.ts";
 import { INTERVENTIONS, LETHAL, type Fungus } from "../colony/fungus.ts";
-import { PolicyCache } from "../sim/policyCache.ts";
+import { PolicyCache } from "../colony/policyCache.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
 // game. The player is the fungus, so no colony is the player's: Jev, when on,
@@ -18,8 +19,8 @@ import { PolicyCache } from "../sim/policyCache.ts";
 // question in flight for one is not asked again for the other. Every policy
 // is synchronous: a cached answer if there is one, otherwise the local rule
 // for now while the question is queued. Every interval the queues go to Jev,
-// at most `batch` situations a request; same proxy, same ledger, same caps as
-// the picture: a 409 ends the run and everyone carries on locally.
+// at most `batch` situations a request; same proxy, same ledger, same caps:
+// a 409 ends the run and everyone carries on locally.
 
 export interface ColonyJevOptions {
   batch: number;
@@ -29,8 +30,8 @@ export interface ColonyJevOptions {
 
 export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300 };
 
-/** Colony runs are long and cheap: higher time cap, lower spend cap than a picture. */
-export const COLONY_CAPS: RunCaps = { capUsd: 0.1, capSeconds: 1800 };
+/** The caps a colony run starts with: $0.10 and 30 minutes (the server's default too). */
+export const COLONY_CAPS: RunCaps = DEFAULT_CAPS;
 
 /** Where cached answers outlive the page; injectable so tests need no localStorage. */
 export interface CacheStore {
@@ -304,7 +305,7 @@ export class ColonyJev {
   async start(caps: Partial<RunCaps> = COLONY_CAPS): Promise<void> {
     let run: RunSummary;
     try {
-      const res = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start", caps: { ...COLONY_CAPS, ...caps } }) });
+      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start", caps: { ...COLONY_CAPS, ...caps } }) });
       run = (await res.json()) as RunSummary;
       if (!res.ok) {
         this.#set({ lastError: (run as unknown as { error?: string }).error ?? `start failed (${res.status})` });
@@ -329,7 +330,7 @@ export class ColonyJev {
     // If Start is pressed again before this reply lands, the reply belongs to the old run: ignore it.
     const seq = this.#runSeq;
     try {
-      const res = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) });
+      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) });
       const run = (await res.json()) as RunSummary;
       if (seq === this.#runSeq) this.#set({ phase: "stopped", run });
     } catch (e) {
@@ -403,7 +404,7 @@ export class ColonyJev {
     let reply: JevProxyReply | null = null;
     let error: string | null = null;
     try {
-      const res = await fetch("/api/jev", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(l.pack(items, l.words)), signal: this.#aborter.signal });
+      const res = await fetch(apiUrl("api/jev"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(l.pack(items, l.words)), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
       if (res.status === 409) {
         const run = (body as { run?: RunSummary }).run ?? null;

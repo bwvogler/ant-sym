@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Ants that form the picture you type or upload, each step a Jev decision",
+  "description": "Two colonies of ants and a fungus on one map, each ant steered by a Jev decision",
   "scripts": {
     "dev": "npm --prefix web run dev",
     "test": "npm --prefix web test",
@@ -11,9 +11,6 @@
     "lint": "npm --prefix web run lint",
     "typecheck": "npm --prefix web run typecheck",
     "colony-bench": "node scripts/colony-bench.mjs",
-    "probe": "node scripts/probe.mjs",
-    "situations": "node scripts/situations.mjs",
-    "cacheprobe": "node scripts/cacheprobe.mjs",
     "colony-cost": "node scripts/colony-cost.mjs",
     "exp": "node scripts/experiment.mjs"
   }

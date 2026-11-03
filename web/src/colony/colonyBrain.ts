@@ -1,5 +1,5 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
-import { hash } from "../sim/policyCache.ts";
+import { hash } from "./policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
 import { localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 

@@ -12,9 +12,8 @@ export class HttpError extends Error {
   }
 }
 
-// A packed request of 100 ants is ~80 KB; an overseer request carries two
-// base64 PNGs (≤ 1568 px per side) and can reach a few MB.
-const MAX_JSON_BODY = 8 << 20;
+// A packed request of 100 situations is ~80 KB, so 1 MB leaves a wide margin.
+const MAX_JSON_BODY = 1 << 20;
 
 export async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];

@@ -52,7 +52,7 @@ function odourColour(ink: [number, number, number], warn: [number, number, numbe
 
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
 const HEX_ZOOM = 12;
-/** The warm tone the picture heatmap uses for "too many": here, the way home. */
+/** The warm tone for the way home. */
 const HOME_RGB: [number, number, number] = [196, 110, 40];
 /** Brood by stage (egg, larva, pupa): pale to tan, legible on the chamber washes in both themes. */
 const BROOD_RGB = ["#f2eee2", "#e8cf8a", "#b88a4a"];
