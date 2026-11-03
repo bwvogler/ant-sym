@@ -125,42 +125,58 @@ export function foodIn(map: WorldMap, wx: number, wy: number, r: number): number
  * Foragers holding food longer than STUCK_AFTER, the most at any 10-s sample from STUCK_AFTER on, per colony
  * (slow/side.test's measure; porters are not counted): `maxHeld`. That measure reads the colony's `since`, which the
  * nest resets every tick, so it misses a carrier that won't put its food down at home; `maxCarrying` counts by the
- * probe's own clock, from pickup to put-down, wherever the ant is (#31's review, ja-1pm).
+ * probe's own clock, from pickup to put-down, wherever the ant is (#31's review, ja-1pm). `maxPorting`: porters (food
+ * moved between chambers, which both other measures leave out) holding theirs over STUCK_AFTER (review of #36, ja-3po).
  */
 export function heldProbe(): Probe {
   const worst: number[] = [];
   const worstCarry: number[] = [];
+  const worstPort: number[] = [];
   const carryT: Float64Array[] = [];
+  const portT: Float64Array[] = [];
   let nextAt = STUCK_AFTER;
   return {
     tick(game, dt) {
       game.colonies.forEach((c, k) => {
-        let t = carryT[k];
-        if (!t || t.length < c.n) {
-          const grown = new Float64Array(c.n);
-          if (t) grown.set(t);
-          t = carryT[k] = grown;
+        const grow = (a: Float64Array[]): Float64Array => {
+          let t = a[k];
+          if (!t || t.length < c.n) {
+            const grown = new Float64Array(c.n);
+            if (t) grown.set(t);
+            t = a[k] = grown;
+          }
+          return t;
+        };
+        const t = grow(carryT);
+        const pt = grow(portT);
+        for (let i = 0; i < c.n; i++) {
+          t[i] = c.alive[i] && c.carrying[i] && !c.porting(i) ? (t[i] as number) + dt : 0;
+          pt[i] = c.alive[i] && c.carrying[i] && c.porting(i) ? (pt[i] as number) + dt : 0;
         }
-        for (let i = 0; i < c.n; i++) t[i] = c.alive[i] && c.carrying[i] && !c.porting(i) ? (t[i] as number) + dt : 0;
       });
       if (game.time + 1e-9 < nextAt) return;
       nextAt += 10;
       game.colonies.forEach((c, k) => {
         let held = 0;
         let carrying = 0;
+        let porting = 0;
         const t = carryT[k] as Float64Array;
+        const pt = portT[k] as Float64Array;
         for (let i = 0; i < c.n; i++) {
           if (c.alive[i] && c.carrying[i] && !c.porting(i) && (c.since[i] as number) > STUCK_AFTER) held++;
           if ((t[i] as number) > STUCK_AFTER) carrying++;
+          if ((pt[i] as number) > STUCK_AFTER) porting++;
         }
         worst[k] = Math.max(worst[k] ?? 0, held);
         worstCarry[k] = Math.max(worstCarry[k] ?? 0, carrying);
+        worstPort[k] = Math.max(worstPort[k] ?? 0, porting);
       });
     },
     summary() {
       const m: Record<string, number> = {};
       worst.forEach((w, k) => (m[`${sideName(k)}.maxHeld`] = w));
       worstCarry.forEach((w, k) => (m[`${sideName(k)}.maxCarrying`] = w));
+      worstPort.forEach((w, k) => (m[`${sideName(k)}.maxPorting`] = w));
       return m;
     },
   };
@@ -589,7 +605,8 @@ export const game: Assay = {
   spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rivalAnts: 600 } }),
   score: (r) => {
     const worst = Math.max(r.metrics["you.maxHeld"] ?? 0, r.metrics["rival.maxHeld"] ?? 0);
-    return { maxHeld: worst, pass: worst <= 2 ? 1 : 0 };
+    // Porters are reported, not judged: they have no bound yet (ja-3po).
+    return { maxHeld: worst, maxPorting: Math.max(r.metrics["you.maxPorting"] ?? 0, r.metrics["rival.maxPorting"] ?? 0), pass: worst <= 2 ? 1 : 0 };
   },
 };
 

@@ -3532,14 +3532,18 @@ export class Colony {
       } else this.since[i] = (this.since[i] as number) + dt;
       if (!atNest) this.#restT[i] = 0;
       // Fatigue (ja-q47, docs/tiredness.md): what makes a forager tired is an unsuccessful search, and rest is a stay
-      // inside. It grows only while the ant is out with empty jaws, exploring or following (scaled by its clock: the
-      // fungus's lever), and falls while it is inside its own nest (its hole on the ground or its tunnels and chambers),
-      // a full rest taking restTime. Finding food clears it (above). Digging, carrying spoil, nursing or a fight
+      // inside. It grows only while the ant is out with empty jaws, exploring, following or fighting (a raid or a defence
+      // tires it too: with fights left out, nothing sent a fighter home, raids never ended and combat losses rose 56-72 %,
+      // review of #36), and falls while it is inside its own nest (its hole on the ground or its tunnels and chambers),
+      // a full rest taking restTime. Finding food clears it (above). Digging, carrying spoil or nursing
       // neither tire nor rest it. Before, a timer that only the hole reset made every inside worker "tired".
       {
         const inside = atNest || (ent !== null && this.#under[i] === 1 && this.#ownNestHere(i));
-        if (inside) this.fatigue[i] = Math.max(0, (this.fatigue[i] as number) - (p.patience / p.restTime) * dt);
-        else if (!this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && (this.mode[i] === EXPLORE || this.mode[i] === FOLLOW)) this.fatigue[i] = (this.fatigue[i] as number) + dt / (this.clock[i] as number);
+        // Both run on the ant's clock (the fungus's lever slows tiring and resting alike), and fatigue stops at twice
+        // patience, so an ant kept out (by Jev, say) needs no more than twice restTime to rest (review of #36).
+        const m = this.mode[i];
+        if (inside) this.fatigue[i] = Math.max(0, (this.fatigue[i] as number) - ((p.patience / p.restTime) * dt) / (this.clock[i] as number));
+        else if (!this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && (m === EXPLORE || m === FOLLOW || m === FIGHT)) this.fatigue[i] = Math.min(2 * p.patience, (this.fatigue[i] as number) + dt / (this.clock[i] as number));
         // Tired once past patience, and until fully rested: resting only to just under the line sent foragers out to
         // tire again at once (G: up to 8 held, food home -9 %, in the first sweep).
         if ((this.fatigue[i] as number) > p.patience) this.#tired[i] = 1;

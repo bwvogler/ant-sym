@@ -15,7 +15,7 @@ This note collects what real foragers do. All numbers come from abstracts or cit
 - **Search grows, then gives way to home cues.** *Cataglyphis fortis* searching for its nest loops wider the longer it searches (Wehner & Wehner 1986). One conference abstract reports that ants that have searched for a while give up and follow the nest's odour plume even against their path integrator. It is not peer-reviewed. No measured give-up time was found.
 - **Food type changes the giving-up time.** In a *Formica* study, foragers left a patch later when the food there was carbohydrate (Behav. Ecol. 19:217). **Unverified**: the exact times were not read.
 
-**For the model:** tiredness should grow with *unsuccessful searching* and be reset by success (finding food). Other work, such as digging, carrying spoil or a fight, is not a failed search and shouldn't count.
+**For the model:** tiredness should grow with *unsuccessful searching* and be reset by success (finding food). Other work, such as digging or carrying spoil, is not a failed search and shouldn't count. A fight outside the nest does tire: it is time out without food, and going home tired is what ends a raid (review of #36: with fights left out, raids never ended).
 
 ## Rest between bouts
 
@@ -28,9 +28,9 @@ This note collects what real foragers do. All numbers come from abstracts or cit
 
 ## What MR 3.1 builds from this
 
-- **Tiredness accrues only outside.** A per-ant `fatigue` grows only while the ant is out searching with empty jaws (exploring or following). It is reset by finding food.
+- **Tiredness accrues only outside.** A per-ant `fatigue` grows only while the ant is out with empty jaws, exploring, following or fighting, up to twice `patience`. It is reset by finding food.
 - **Rest takes time.** While the ant is inside its nest, fatigue falls at a rate, so a full rest takes `restTime` seconds.
-- **The clock lever still applies.** The fungus's `clock` keeps scaling how fast fatigue grows.
+- **The clock lever still applies.** The fungus's `clock` scales how fast fatigue grows and how fast it rests.
 - **`tired` = fatigue above `patience`.**
 - **Left for MR 5:** the encounter-rate trigger for leaving (Gordon), which builds on this rest. That is behaviour MR 5 (`ja-um8`).
 

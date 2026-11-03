@@ -17,7 +17,9 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
-const file = args.find((a) => !a.startsWith("--") && !/^\d/.test(a));
+// The cache is the one argument that is neither a flag nor a flag's value (review of #36: "--assay game cache.json"
+// read "game" as the cache).
+const file = args.find((a, k) => !a.startsWith("--") && !(k > 0 && args[k - 1].startsWith("--")));
 if (!file) {
   console.error("usage: node scripts/ablate.mjs <cache.json> [--assay game] [--seconds 300] [--seeds 1-5] [--jobs N] [--top N]");
   process.exit(1);

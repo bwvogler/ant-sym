@@ -2491,7 +2491,9 @@ Stacked on behaviour MR 2 (§43). Two findings from it:
 
 ### 44.1 Which answers cost the food (ja-5ty)
 
-`scripts/ablate.mjs <cache>` groups a cache's answers that differ from the local rule by lane, by the ant's mode (or the colony's stance), and by local → Jev. It replays an assay once with all of Jev's answers and then once per group, with that group put back to the local rule. Offline, no spend; MR 2's Forage cache (mode lane v4, response lane v3).
+`scripts/ablate.mjs <cache>` groups a cache's answers that differ from the local rule by lane, by the ant's mode (or the colony's stance), and by local → Jev. It replays an assay once with all of Jev's answers and then once per group, with that group put back to the local rule. Offline, no spend.
+
+The cache is MR 2's Forage cache (mode lane v4, response lane v3), committed as `experiments/caches/mr2-forage.json`. Its README gives the commit it replays at (c168ce2): later code is at v5/v4 and refuses it (review of #36).
 
 **Screen** (side view, 600 + 600, 300 s, seeds 1–5): all of Jev 4,846, local 5,598 (Jev 87 %). 57 answers differ, in 16 groups. Every raid-stance group changed nothing: Jev's own stance answers keep Forage out of raids, so those situations never arise.
 
@@ -2508,7 +2510,7 @@ Stacked on behaviour MR 2 (§43). Two findings from it:
 | mode: follower, explore → return (1) | +84 | as above |
 | mode: raid-stance returner, follow → return (2) | −118 | — |
 
-- **The groups explain about 2,750 of the 9,110 food.** The rest is the answers interacting: whole lanes reverted (§43.6) are −26 % for modes and −18 % for stances.
+- **The groups' rows sum to 2,515 of the 9,110 food.** The rest is the answers interacting: whole lanes reverted (§43.6) are −26 % for modes and −18 % for stances.
 - **The legend gaps get legend fixes in §44.2:** what soil, corpses and brood are for, what tired means, and that a fresh ant at home has finished its trip.
 - **The doctrine ones stay.** Forage not raiding, and following faint scent, are what its doctrine asks.
 
@@ -2545,7 +2547,7 @@ MR 2's local rule brought home 23,704. The difference is foragers resting betwee
 - that a carrier answers its own question (replacing "always goes home");
 - what loose soil, corpses and brood are for.
 
-**Re-baselined (owner's choice).** The crowded-nest test (`slow/chambers.test`) leaned on the retired foragers. Over 20 games the floor grows ×1.19–3.06, mean 2.21 (`main` 2.45). The digging totals are the same; less of it is chamber floor. Its bound is now at least ×1.5 in every game and ×2 on average; nest 9's backfill regression still fails it. Restoring chamber growth from sensed crowding is ja-k4k.3.
+**Re-baselined by the owner's choice.** It was asked in the session that built MR 3.1, on 2026-11-03: of "accept and re-baseline", "fatigue for foragers only" and "dig further first", the owner chose the first. The crowded-nest test (`slow/chambers.test`) leaned on the retired foragers. Over 20 games the floor grows ×1.19–3.06, mean 2.21 (`main` 2.45). The digging totals are the same; less of it is chamber floor. Its bound is now at least ×1.5 in every game and ×2 on average; nest 9's backfill regression still fails it. Restoring chamber growth from sensed crowding is ja-k4k.3.
 
 **Hour-long economy** (8 worlds × 2 seedings): 5 of 16 fail the bounds (3 collapse), against `main`'s 6 of 16 (2 collapse) and MR 2's 3 of 16. The knife-edge is unchanged (ja-xu6).
 

@@ -304,3 +304,34 @@ test("fatigue (ja-q47): the young (inside workers) never tire; carrying neither 
   assert.ok(foragersTired > 0, "foragers do tire");
   assert.ok(partialRests > 0, "fatigue falls a tick's rest at a time inside, not in one step");
 });
+
+test("fatigue: finding food clears it at once (the search succeeded)", () => {
+  const c = new Colony(corridor(3), { antCount: 1, maxAnts: 1, wander: 0 }, mulberry32(1));
+  put(c, 0, 14, 6); // on the food
+  c.heading[0] = 0;
+  c.fatigue[0] = c.params.patience * 1.5;
+  c.tick(1 / 30);
+  assert.equal(c.carrying[0], 1, "it took the food");
+  assert.equal(c.fatigue[0], 0, "and is rested by its success");
+});
+
+test("REST waits for rest: a tired returner held at the nest is not sent out after REST's 10 s", () => {
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, restTime: 60 }, mulberry32(1));
+  c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+  c.mode[0] = 2;
+  c.fatigue[0] = c.params.patience * 2; // a full rest takes 120 s
+  for (let k = 0; k < 30 * 20; k++) {
+    put(c, 0, 6, 6); // held in the nest
+    c.tick(1 / 30);
+  }
+  assert.equal(c.mode[0], 2, "still resting at 20 s");
+});
+
+test("fatigue: fighting out of the nest tires an ant too, so a raid ends with the raiders going home (review of #36)", () => {
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+  c.policy = () => "fight";
+  put(c, 0, 30, 6);
+  c.mode[0] = 3;
+  for (let k = 0; k < 30 * 5; k++) c.tick(1 / 30);
+  assert.ok(c.fatigue[0]! > 4, `fatigue ${c.fatigue[0]} after 5 s fighting out`);
+});

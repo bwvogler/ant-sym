@@ -37,6 +37,8 @@ export default function AntCard({ followed, colony, rival, explain, explainFungu
   const mode = MODES[col.mode[i] as number] as Mode;
   const carrying = col.carrying[i] === 1;
   const since = col.since[i] as number;
+  // Tiredness is the ant's fatigue (seconds of unsuccessful search, less rest), not its time out (review of #36).
+  const fatigue = col.fatigue[i] as number;
   const q = col.lastQuestion(i);
   const k = sideIndex(followed);
   const decided = q && !carrying ? explain(q, k) : null;
@@ -48,7 +50,7 @@ export default function AntCard({ followed, colony, rival, explain, explainFungu
         </h2>
         <span className="font-mono text-xs text-fg-2">
           {mode}
-          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
+          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
         </span>
         <button type="button" className="ml-auto rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised" onClick={onClose}>
           Stop following
