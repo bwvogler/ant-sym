@@ -1,5 +1,7 @@
 # Several queens, adoption, and orphans merging
 
+*Part of the [research notes](README.md) behind the [vision](vision.md).*
+
 Design note for the species framework (`ja-8fd`) and the lifetime layer (`ja-1vg`). Nest slice 9 (`ja-wjw`): docs only, nothing here is built. An agent review checked every claim about the code against it; §3's "needs" lists come from that. It picks up where docs/nest-and-home.md §3 leaves queen loss: "Several queens, adopting queens and pleometrosis are per-species options", and "an orphaned colony merging into a neighbour it tolerates is a unification route grounded in biology".
 
 ## 1. Where the sim is now
@@ -146,10 +148,10 @@ An orphaned colony's workers lay male eggs. Males don't work and leave on the ne
 12. Can a colony with a queen absorb a beaten one's last brood? Raiders carry off nothing today; brood raiding (slave-making species) is a separate species trait, not this note.
 
 ## Sources
-- Kronauer, Schöning, d'Ettorre & Boomsma (2010). Colony fusion and worker reproduction after queen loss in army ants. *Proc. R. Soc. B* 277: 755–763 (*Dorylus molestus*, Kenya; cites Schneirla's *Eciton* accounts). <https://pmc.ncbi.nlm.nih.gov/articles/PMC2842746>
-- Ross & Keller (1998). Genetic control of social organization in an ant. *PNAS*. <https://pmc.ncbi.nlm.nih.gov/articles/PMC24356>
-- Gotzek & Ross (2008). Experimental conversion of colony social organization by manipulation of worker genotype composition in fire ants. *J. Insect Behav.* <https://ent.uga.edu/content/dam/caes-subsite/entomology/documents/publications/ross-publications/32-Gotzek%26RossJInsectBehav2008.pdf>
-- Tsutsui, Suarez, Holway & Case (2000). Reduced genetic variation and the success of an invasive species. *PNAS* 97: 5948–5953. <https://pmc.ncbi.nlm.nih.gov/articles/PMC18539>
-- Colony fusion in a parthenogenetic ant, *Pristomyrmex punctatus*. *J. Insect Sci.* 13: 38 (2013). <https://bioone.org/journals/journal-of-insect-science/volume-13/issue-38/031.013.3801/Colony-Fusion-in-a-Parthenogenetic-Ant-Pristomyrmex-punctatus/10.1673/031.013.3801.full>
-- *L. niger* queens fight after the first workers emerge: a 2020 study of pleometrosis in this species. <https://pmc.ncbi.nlm.nih.gov/articles/PMC7419493>
-- Worker reproduction in orphaned colonies: e.g. a long-term *Temnothorax* study, <https://pmc.ncbi.nlm.nih.gov/articles/PMC7882922>. The *Pogonomyrmex badius* and *Atta* findings are from the same literature search and still to be pinned to papers before this note is built on.
+- Kronauer, Schöning, d'Ettorre & Boomsma (2010). Colony fusion and worker reproduction after queen loss in army ants. *Proc. R. Soc. B* 277: 755–763 (*Dorylus molestus*, Kenya; cites Schneirla's *Eciton* accounts). [PMC2842746](https://pmc.ncbi.nlm.nih.gov/articles/PMC2842746)
+- Ross & Keller (1998). Genetic control of social organization in an ant. *PNAS*. [PMC24356](https://pmc.ncbi.nlm.nih.gov/articles/PMC24356)
+- Gotzek & Ross (2008). Experimental conversion of colony social organization by manipulation of worker genotype composition in fire ants. *J. Insect Behav.* [ent.uga.edu](https://ent.uga.edu/content/dam/caes-subsite/entomology/documents/publications/ross-publications/32-Gotzek%26RossJInsectBehav2008.pdf)
+- Tsutsui, Suarez, Holway & Case (2000). Reduced genetic variation and the success of an invasive species. *PNAS* 97: 5948–5953. [PMC18539](https://pmc.ncbi.nlm.nih.gov/articles/PMC18539)
+- Colony fusion in a parthenogenetic ant, *Pristomyrmex punctatus*. *J. Insect Sci.* 13: 38 (2013). [bioone.org](https://bioone.org/journals/journal-of-insect-science/volume-13/issue-38/031.013.3801/Colony-Fusion-in-a-Parthenogenetic-Ant-Pristomyrmex-punctatus/10.1673/031.013.3801.full)
+- *L. niger* queens fight after the first workers emerge: a 2020 study of pleometrosis in this species. [PMC7419493](https://pmc.ncbi.nlm.nih.gov/articles/PMC7419493)
+- Worker reproduction in orphaned colonies: e.g. a long-term *Temnothorax* study, [PMC7882922](https://pmc.ncbi.nlm.nih.gov/articles/PMC7882922). The *Pogonomyrmex badius* and *Atta* findings are from the same literature search and still to be pinned to papers before this note is built on.

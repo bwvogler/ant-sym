@@ -1,5 +1,7 @@
 # Ant communication: what the biology says, and what it means for the colony game
 
+*Part of the [research notes](README.md) behind the [vision](vision.md).*
+
 *Research note, 2026-10-31. Sources are primary papers and reviews found by web search. Most full texts could not be opened from the research session, so every number below comes from an abstract or a citing paper. Anything not confirmed is marked **unverified**. Game numbers come from `web/src/colony/` at commit `b50cfde`.*
 
 ## TL;DR
@@ -139,39 +141,39 @@ No schema change here. If a later change adds a binary situation dimension (item
 
 ## Sources
 
-- Hölldobler & Wilson, *The Ants*, ch. 7 (AntWiki excerpt): https://www.antwiki.org/wiki/The_Ants_Chapter_7
-- Communication in ants (*Current Biology* primer): https://www.cell.com/current-biology/fulltext/S0960-9822(06)01834-3
-- Britannica, animal communication (repertoire sizes): https://www.britannica.com/science/animal-communication
-- Czaczkes, Grüter & Ratnieks 2015, Trail pheromones: an integrative view (*Annu Rev Entomol* 60:581): https://www.annualreviews.org/content/journals/10.1146/annurev-ento-010814-020627
-- Robinson et al. 2005, "No entry" signal in ant foraging (*Nature* 438:442): https://sro.sussex.ac.uk/id/eprint/22787/ · ScienceNews summary: https://sciencenews.org/?p=275
-- Robinson et al. 2008, Decay rates of attractive and repellent pheromones (*Insectes Sociaux*): https://link.springer.com/article/10.1007/s00040-008-0994-5
-- Jeanson et al. 2003, Pheromone trail decay rates on different substrates (*Physiol Entomol*): https://resjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-3032.2003.00332.x
-- *Lasius niger* trail persistence (citing Beckers 1993, Evison 2008): https://pmc.ncbi.nlm.nih.gov/articles/PMC4204274/ · https://link.springer.com/article/10.1007/s00040-024-00995-y
-- Wilson 1962, Fire ant odour trail, information analysis (*Anim Behav*): https://www.sciencedirect.com/science/article/abs/pii/0003347262901422
-- Morgan 2009, Trail pheromones of ants (*Physiol Entomol*): https://resjournals.onlinelibrary.wiley.com/doi/10.1111/j.1365-3032.2008.00658.x
-- Jackson, Holcombe & Ratnieks 2004, Trail geometry gives polarity (*Nature* 432:907): https://www.nature.com/articles/nature03105
-- Hölldobler & Wilson 1978, Multiple recruitment systems of *Oecophylla longinoda*: https://link.springer.com/article/10.1007/BF00300045
-- Hölldobler & Wilson 1977, Colony-specific territorial pheromone (*PNAS*): https://pmc.ncbi.nlm.nih.gov/articles/PMC431076
-- Hölldobler & Wilson 1977, Weaver ants: territory (*Science*): https://www.science.org/doi/10.1126/science.841318
-- Billen & Wang 2025, ant exocrine glands: https://dictionnaire-amoureux-des-fourmis.fr/Noms%20propres/B/Billen%20Johan/Johan-Billen.htm
-- Ant odorant receptors and glomeruli (clonal raider ant): https://pmc.ncbi.nlm.nih.gov/articles/PMC5150400 · https://pmc.ncbi.nlm.nih.gov/articles/PMC8383895
-- Wilson & Bossert, *Pogonomyrmex* alarm concentrations (via review): https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/alarm-pheromone
-- *Atta* stridulation: https://entomobrasilis.org/index.php/ebras/article/download/ebrasilis.v11i2.732/479 · https://link.springer.com/doi/10.1007/BF00174133
-- Prabhakar, Dektar & Gordon 2012, Foraging regulation without spatial information (*PLoS Comput Biol*): https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002670
-- Gordon, harvester ant foraging range and territories: https://core.ac.uk/download/61761527.pdf · https://link.springer.com/doi/10.1007/BF00299951
-- LeBoeuf et al. 2016, Oral transfer in social insects (*eLife*): https://elifesciences.org/articles/20375v1
-- Tandem running and quorum: https://pmc.ncbi.nlm.nih.gov/articles/PMC2039849 · https://www.bristol.ac.uk/news/2016/july/ants.html
-- *Cataglyphis* path integration and foraging distance: https://www.imls.uzh.ch/static/CMS_publications/wehner/literatur/pdf05/wehner20058.pdf
-- Desert ant speed (stepping patterns, *J Exp Biol*): https://cob.silverchair.com/jeb/article-pdf/192/1/107/2854414/jexbio_192_1_107.pdf
-- Draft et al. 2018, Carpenter ant antennal sampling: https://www.biorxiv.org/content/10.1101/327379v1
-- Harvester ant hydrocarbons in nestmate recognition: https://link.springer.com/article/10.1023/A:1005529224856
-- Lenoir et al. 2009, *Lasius niger* hydrocarbons, cuticle to home-range marking (*J Chem Ecol*): https://www.doi.org/10.1007/S10886-009-9669-6
-- Ants sense and follow trail pheromones of community members: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6921000/
-- Wilson 1975/1976, *Pheidole dentata* enemy specification: https://keyapa.com/pheidole/2024/05/29/pheidole-dentata-coping-with-fire-ants/
-- Hölldobler 1976, Tournaments and slavery in a desert ant (*Science*): https://www.science.org/doi/10.1126/science.192.4242.912
-- Regnier & Wilson 1971, Propaganda in slave-maker ants (*Science*): https://link.springer.com/article/10.1007/BF01012348
-- Champer & Schlenoff 2024, Battles between ants: a review: https://pmc.ncbi.nlm.nih.gov/articles/PMC11195475/ · https://entomologytoday.org/2024/07/19/ant-battles-strategies-tactics-toxic-sprays-armor-overwhelming-numbers-more/
-- Plowes & Adams 2005, Lanchester's square law in fire ants (*Proc R Soc B*): https://digitalcommons.lib.uconn.edu/dissertations/AAI3325625 · Adams & Mesterton-Gibbons 2003: https://math.fsu.edu/~mesterto/NewCourses/MAP5932/2016/PDF/PDF03/Adams2003bFightsAmongSocialAnimals.pdf
-- Lymbery, Webber & Didham 2023, Complex battlefields favor strong soldiers (*PNAS*): https://www.pnas.org/doi/10.1073/pnas.2217973120
-- Giraud, Pedersen & Keller 2002, Argentine ant supercolonies (*PNAS*): https://pmc.ncbi.nlm.nih.gov/articles/PMC122904/
-- Thomas et al. 2006, supercolony borders in California: https://www.sciencedaily.com/releases/2006/12/061201110024.htm · https://www.eurekalert.org/news-releases/481928
+- [Hölldobler & Wilson, *The Ants*, ch. 7 (AntWiki excerpt)](https://www.antwiki.org/wiki/The_Ants_Chapter_7) *(secondary)*
+- [Communication in ants (*Current Biology* primer)](https://www.cell.com/current-biology/fulltext/S0960-9822%2806%2901834-3)
+- [Britannica, animal communication (repertoire sizes)](https://www.britannica.com/science/animal-communication) *(secondary)*
+- [Czaczkes, Grüter & Ratnieks 2015, Trail pheromones: an integrative view (*Annu Rev Entomol* 60:581)](https://www.annualreviews.org/content/journals/10.1146/annurev-ento-010814-020627)
+- [Robinson et al. 2005, "No entry" signal in ant foraging (*Nature* 438:442)](https://sro.sussex.ac.uk/id/eprint/22787/) · [ScienceNews summary](https://sciencenews.org/?p=275) *(secondary)*
+- [Robinson et al. 2008, Decay rates of attractive and repellent pheromones (*Insectes Sociaux*)](https://link.springer.com/article/10.1007/s00040-008-0994-5)
+- [Jeanson et al. 2003, Pheromone trail decay rates on different substrates (*Physiol Entomol*)](https://resjournals.onlinelibrary.wiley.com/doi/10.1046/j.1365-3032.2003.00332.x)
+- [*Lasius niger* trail persistence (citing Beckers 1993, Evison 2008)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4204274/) · [link.springer.com](https://link.springer.com/article/10.1007/s00040-024-00995-y)
+- [Wilson 1962, Fire ant odour trail, information analysis (*Anim Behav*)](https://www.sciencedirect.com/science/article/abs/pii/0003347262901422)
+- [Morgan 2009, Trail pheromones of ants (*Physiol Entomol*)](https://resjournals.onlinelibrary.wiley.com/doi/10.1111/j.1365-3032.2008.00658.x)
+- [Jackson, Holcombe & Ratnieks 2004, Trail geometry gives polarity (*Nature* 432:907)](https://www.nature.com/articles/nature03105)
+- [Hölldobler & Wilson 1978, Multiple recruitment systems of *Oecophylla longinoda*](https://link.springer.com/article/10.1007/BF00300045)
+- [Hölldobler & Wilson 1977, Colony-specific territorial pheromone (*PNAS*)](https://pmc.ncbi.nlm.nih.gov/articles/PMC431076)
+- [Hölldobler & Wilson 1977, Weaver ants: territory (*Science*)](https://www.science.org/doi/10.1126/science.841318)
+- [Billen & Wang 2025, ant exocrine glands](https://dictionnaire-amoureux-des-fourmis.fr/Noms%20propres/B/Billen%20Johan/Johan-Billen.htm) *(secondary)*
+- [Ant odorant receptors and glomeruli (clonal raider ant)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5150400) · [PMC8383895](https://pmc.ncbi.nlm.nih.gov/articles/PMC8383895)
+- [Wilson & Bossert, *Pogonomyrmex* alarm concentrations (via review)](https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/alarm-pheromone) *(secondary)*
+- [*Atta* stridulation](https://entomobrasilis.org/index.php/ebras/article/download/ebrasilis.v11i2.732/479) · [link.springer.com](https://link.springer.com/doi/10.1007/BF00174133)
+- [Prabhakar, Dektar & Gordon 2012, Foraging regulation without spatial information (*PLoS Comput Biol*)](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002670)
+- [Gordon, harvester ant foraging range and territories](https://core.ac.uk/download/61761527.pdf) · [link.springer.com](https://link.springer.com/doi/10.1007/BF00299951)
+- [LeBoeuf et al. 2016, Oral transfer in social insects (*eLife*)](https://elifesciences.org/articles/20375v1)
+- [Tandem running and quorum](https://pmc.ncbi.nlm.nih.gov/articles/PMC2039849) · [bristol.ac.uk](https://www.bristol.ac.uk/news/2016/july/ants.html) *(secondary)*
+- [*Cataglyphis* path integration and foraging distance](https://www.imls.uzh.ch/static/CMS_publications/wehner/literatur/pdf05/wehner20058.pdf)
+- [Desert ant speed (stepping patterns, *J Exp Biol*)](https://cob.silverchair.com/jeb/article-pdf/192/1/107/2854414/jexbio_192_1_107.pdf)
+- [Draft et al. 2018, Carpenter ant antennal sampling](https://www.biorxiv.org/content/10.1101/327379v1)
+- [Harvester ant hydrocarbons in nestmate recognition](https://link.springer.com/article/10.1023/A:1005529224856)
+- [Lenoir et al. 2009, *Lasius niger* hydrocarbons, cuticle to home-range marking (*J Chem Ecol*)](https://www.doi.org/10.1007/S10886-009-9669-6)
+- [Ants sense and follow trail pheromones of community members](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6921000/)
+- [Wilson 1975/1976, *Pheidole dentata* enemy specification](https://keyapa.com/pheidole/2024/05/29/pheidole-dentata-coping-with-fire-ants/) *(secondary)*
+- [Hölldobler 1976, Tournaments and slavery in a desert ant (*Science*)](https://www.science.org/doi/10.1126/science.192.4242.912)
+- [Regnier & Wilson 1971, Propaganda in slave-maker ants (*Science*)](https://link.springer.com/article/10.1007/BF01012348)
+- [Champer & Schlenoff 2024, Battles between ants: a review](https://pmc.ncbi.nlm.nih.gov/articles/PMC11195475/) · [entomologytoday.org](https://entomologytoday.org/2024/07/19/ant-battles-strategies-tactics-toxic-sprays-armor-overwhelming-numbers-more/) *(secondary)*
+- [Plowes & Adams 2005, Lanchester's square law in fire ants (*Proc R Soc B*)](https://digitalcommons.lib.uconn.edu/dissertations/AAI3325625) · [Adams & Mesterton-Gibbons 2003](https://math.fsu.edu/~mesterto/NewCourses/MAP5932/2016/PDF/PDF03/Adams2003bFightsAmongSocialAnimals.pdf)
+- [Lymbery, Webber & Didham 2023, Complex battlefields favor strong soldiers (*PNAS*)](https://www.pnas.org/doi/10.1073/pnas.2217973120)
+- [Giraud, Pedersen & Keller 2002, Argentine ant supercolonies (*PNAS*)](https://pmc.ncbi.nlm.nih.gov/articles/PMC122904/)
+- [Thomas et al. 2006, supercolony borders in California](https://www.sciencedaily.com/releases/2006/12/061201110024.htm) *(secondary)* · [eurekalert.org](https://www.eurekalert.org/news-releases/481928) *(secondary)*

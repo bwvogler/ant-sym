@@ -1,5 +1,5 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
-import { hash } from "../sim/policyCache.ts";
+import { hash } from "./policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed

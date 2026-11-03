@@ -1,15 +1,16 @@
 # jev-ants — agent instructions
 
-Ants that form the picture you type or upload, each ant steered by a Jev decision. Single user, localhost, no auth, no database. Read `docs/PRD.md` first: it holds every product decision and the measured Jev numbers.
+Two ant colonies and a fungus on one map, each ant steered by a Jev decision. (The original picture mode, where ants form typed or uploaded images, was removed on 2026-11-02; PRD §1–8 keep its history and measurements.) Single user, localhost, no auth, no database. Read `docs/vision.md` first for the goal (one policy per species fed only by the senses; a fungus that works through them), then `docs/PRD.md`: it holds every product decision and the measured Jev numbers. Research notes are indexed in `docs/README.md`.
 
 ## Patterns to copy, not reinvent
 - Sibling apps: `../lingo-dojo` (closest: `web/server/api.ts` same-origin `wrap()`, Tailwind v4 `@theme inline` tokens in `web/src/index.css`, `.oxlintrc.json`), `../jev-router` (the only other Jev caller: `hooks/policy.ts` has the wire shape and a pure request-builder / response-reader split worth copying).
 - Port **38500**, `strictPort`, `usePolling` watcher (FSEvents is unreliable on this machine). Lingo Dojo is 38400, Atlas 38300, Wine Guide 38200, Basecamp 38100.
 - Every API route goes through `wrap()` with the same-origin check. No exceptions.
 - `JEV_API_KEY` comes from the shell environment. Never read it in the browser, never commit it, never log it.
-- `web/src/sim/` (picture) and `web/src/colony/` (colony, fungus) are pure TypeScript with no DOM; `node --test` covers them directly. The one exception is `sim/targets.ts` (rasterises text and images in the browser). The canvas renderer and React are thin layers over them.
+- New ant behaviour comes from the policy over **sensed** state (see the sense table in `docs/vision.md`). Don't add scripted choices that read global state an ant can't sense: the chamber table, other nests' coordinates, colony-wide counts. Removing one is progress; strike its row in the vision gap table and close its `ja-k4k` bead. A sense not in the table needs a research note with primary sources first.
+- `web/src/colony/` (colony, nest, fungus) is pure TypeScript with no DOM; `node --test` covers it directly. The canvas renderer and React are thin layers over it.
 - Jev requests go through the server's connection pool. A single Node `fetch` dispatcher serialises parallel requests (measured: 10 × 50 ants stacked to 2.9 s; separate connections 0.65 s). Keep the test that proves overlap.
-- Spend is real, at $0.042/M input tokens (`USD_PER_INPUT_TOKEN`). Picture: ~296 tokens per ant decision (compass schema, PRD §8.1b). Colony: tokens per question (~450–560 as asked live, `npm run colony-cost`; the side view, `-- --side`, ~589 estimated, ~$0.11/h, PRD §39); fungus lane 276–343 per fungal situation at 100 to a request (Bloom with every intervention 343), ~530–570 per question as a game asks them, 44–81 situations a 5-minute game (`node scripts/fungus-cost.mjs`, PRD §37, §39). Every change to a state schema, legend or question changes the hourly cost; note the new figure for that lane in the PR.
+- Spend is real, at $0.042/M input tokens (`USD_PER_INPUT_TOKEN`). Colony: tokens per question (~450–560 as asked live, `npm run colony-cost`; the side view, `-- --side`, ~589 estimated, ~$0.11/h, PRD §39); fungus lane 276–343 per fungal situation at 100 to a request (Bloom with every intervention 343), ~530–570 per question as a game asks them, 44–81 situations a 5-minute game (`node scripts/fungus-cost.mjs`, PRD §37, §39). Every change to a state schema, legend or question changes the hourly cost; note the new figure for that lane in the PR.
 
 ## Work tracking
 Beads: `bd ready` for unblocked work, `bd show <id>` for context, `bd close <id>` when done. Prefix `ja`. One PR per milestone, agent review before merge. File new work as beads, not TODO comments.
@@ -22,8 +23,10 @@ npm --prefix web install
 npm run dev                    # http://localhost:38500
 npm test                       # node --test, 60 s per file
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
-node scripts/probe.mjs 20 100  # live-API probe: latency, tokens, burst
+node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
 ```
+
+Merges to `main` deploy `web/dist` to GitHub Pages (`.github/workflows/pages.yml`, `BASE_PATH=/ant-sym/`). Pages has no API, so `ui/backend.ts` probes `/api/health` and the UI disables Jev. New fetches to the API must go through `apiUrl()`, never a bare `/api/...`.
 
 The test script must not use `--test-force-exit`. On Node 22, combined with `--test-timeout`, it sometimes ends a test file early and drops its remaining tests without a failure; runs reported 216 or 224 tests, all green (2026-11-01). Schedulers are disposed in `afterEach`, so nothing keeps the process alive without it.
 

@@ -7,11 +7,13 @@ import { useCallback, useMemo, useState } from "react";
 import AntCard from "./ui/AntCard.tsx";
 import ColonyField from "./ui/ColonyField.tsx";
 import type { Followed } from "./ui/follow.ts";
-import Nav from "./ui/Nav.tsx";
-import { Bar, NEAR_CAP, Slider } from "./ui/Panel.tsx";
+import { Bar, NEAR_CAP, Slider } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { STRAINS, useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
+import DemoNote from "./ui/DemoNote.tsx";
+import { isDemo, jevUnavailable } from "./ui/backend.ts";
+import { useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import { AIMS } from "./colony/fungusBrain.ts";
 import { INTERVENTIONS, LETHAL, NEST_ONLY } from "./colony/fungus.ts";
@@ -31,6 +33,8 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 
 export default function ColonyApp() {
   const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
+  const backend = useBackend();
+  const jevBlocked = jevUnavailable(backend);
   const jev = useColonyJev(game.colonies, game.fungus, controls.menu);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
   // Keyed by a token per game rather than the game itself, so an old game is not kept alive by this state.
@@ -48,12 +52,10 @@ export default function ColonyApp() {
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
-          <Nav page="colony" />
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
         <p className="text-sm text-fg-3">two colonies, one map: trails, not orders</p>
       </header>
+      {isDemo(backend) && <DemoNote />}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="relative" style={{ aspectRatio: `${worldExtent(colony.map).w} / ${worldExtent(colony.map).h}` }}>
@@ -123,7 +125,7 @@ export default function ColonyApp() {
                   Stop Jev
                 </button>
               ) : (
-                <button type="button" className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={jev.start} title="Jev picks every colony's ant modes and stances under that colony's doctrine, and what the fungus does under your aim: each once per situation, cached">
+                <button type="button" className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50" onClick={jev.start} disabled={jevBlocked !== null} title={jevBlocked ?? "Jev picks every colony's ant modes and stances under that colony's doctrine, and what the fungus does under your aim: each once per situation, cached"}>
                   Start Jev
                 </button>
               )}
