@@ -255,7 +255,7 @@ test("arrive in the side view: a fresh forager returning to the royal chamber is
     c.age[0] = age * LIFESPAN;
     c.lifespan[0] = Infinity;
     c.mode[0] = 2;
-    c.since[0] = since;
+    c.fatigue[0] = since;
     for (let k = 0; k < 5; k++) c.tick(1 / 30);
     return c.mode[0];
   };
@@ -264,12 +264,43 @@ test("arrive in the side view: a fresh forager returning to the royal chamber is
   assert.equal(at(YOUNG / 2, 0), 2, "the young work inside: they make no trips");
 });
 
-test("arrive on a top-down map: the nest rests a tired returner at once, so its trip ends there too (the timer ja-q47 replaces)", () => {
-  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+test("rest on a top-down map: a tired returner rests in the nest for restTime before its trip ends (ja-q47; the hole used to rest it at once)", () => {
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, restTime: 30 }, mulberry32(1));
   c.policy = (s) => (s.mode === "return" ? "return" : "explore");
   put(c, 0, 6, 6); // in the nest
   c.mode[0] = 2;
-  c.since[0] = 1e4; // tired
-  c.tick(1 / 30);
-  assert.notEqual(c.mode[0], 2, "the hole reset its timer, so it reads fresh and its trip is over");
+  c.fatigue[0] = c.params.patience * 1.5; // tired
+  let left = -1;
+  for (let k = 1; k <= 30 * 60 && left < 0; k++) {
+    c.tick(1 / 30);
+    if (c.mode[0] !== 2) left = k / 30;
+  }
+  // From 1.5 × patience, rest inside takes it under patience in a third of restTime (10 s) at the soonest; it rests only
+  // while inside the nest's radius, which a homing ant drifts in and out of, so allow up to restTime.
+  assert.ok(left >= 9.9 && left <= 30, `rested and out after ${left.toFixed(1)} s`);
+});
+
+test("fatigue (ja-q47): the young (inside workers) never tire; carrying neither tires nor rests outside; rest comes a little at a time", () => {
+  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
+  const g = new Game(generateSideWorld(2, SMALL), { antCount: 200, rival: false }, mulberry32(4));
+  const c = g.player;
+  const step = c.params.patience / c.params.restTime / 30; // a tick's rest
+  let maxYoung = 0;
+  let partialRests = 0;
+  let foragersTired = 0;
+  for (let k = 0; k < 30 * 300; k++) {
+    const before = Float32Array.from(c.fatigue);
+    g.tick(1 / 30);
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i]) continue;
+      const f = c.fatigue[i]!;
+      if (c.band(i) === 0) maxYoung = Math.max(maxYoung, f);
+      if (c.band(i) === 2 && f > c.params.patience) foragersTired++;
+      if (c.carrying[i] && !c.porting(i)) assert.ok(f <= before[i]! + 1e-6, `ant ${i}, carrying: fatigue rose ${before[i]} -> ${f}`);
+      if (f > 0 && before[i]! - f > step / 2 && before[i]! - f < step * 1.5) partialRests++;
+    }
+  }
+  assert.equal(maxYoung, 0, "the young never go out, so they never tire");
+  assert.ok(foragersTired > 0, "foragers do tire");
+  assert.ok(partialRests > 0, "fatigue falls a tick's rest at a time inside, not in one step");
 });

@@ -2482,3 +2482,32 @@ Harvester foragers drop seeds only in the top chambers, and other workers carry 
 - **Closed:** ja-qnx (parking: fixed; residual cost in ja-5ty), ja-1pm, ja-2x2, ja-mz7.
 - **Filed:** ja-xu6 (the economy's knife-edge), ja-3sy (Warlike's tiredness), ja-q47 (tiredness as a body state), ja-5ty (Forage's residual cost).
 - **Notes added:** "drop and run" on ja-902, loot to a rival's entrance on ja-um8.
+
+## 44. Which of Jev's answers cost the food; tiredness as a body state (MR 3.1, ja-5ty, ja-q47, 2026-11-03)
+
+Stacked on behaviour MR 2 (§43). Two findings from it:
+- Forage's answers, replayed over a 600 s game, brought home 62 % of the local rule's food (ja-5ty).
+- "Tired" was a timer that only the hole reset, so the colony's tired foragers retired inside and the young were "tired" within a minute (ja-q47).
+
+### 44.1 Which answers cost the food (ja-5ty)
+
+`scripts/ablate.mjs <cache>` groups a cache's answers that differ from the local rule by lane, by the ant's mode (or the colony's stance), and by local → Jev. It replays an assay once with all of Jev's answers and then once per group, with that group put back to the local rule. Offline, no spend; MR 2's Forage cache (mode lane v4, response lane v3).
+
+**Screen** (side view, 600 + 600, 300 s, seeds 1–5): all of Jev 4,846, local 5,598 (Jev 87 %). 57 answers differ, in 16 groups. Every raid-stance group changed nothing: Jev's own stance answers keep Forage out of raids, so those situations never arise.
+
+**Confirmed** (600 s, seeds 1–10): all of Jev 14,594, local 23,704 (Jev 62 %).
+
+| Group (answers) | Δ food home reverted | What it is |
+|---|---|---|
+| get: offered loose soil, take → no (2) | **+1,219** | Jev leaves loose soil on the mound. Spoil isn't spread and the hole fills: a legend gap (what soil is for) |
+| mode: fresh returner, follow → return (4) | +408 | a fresh ant at home told to go home: ja-qnx's question again, now asked of followers. A legend gap (what return means at home) |
+| get: offered brood, take → no (2) | +383 | nurses leave eggs and strays lying; larvae are fed only in a brood chamber: a legend gap |
+| stance: raid → forage (2) | +204 | doctrine: Forage raids "only when food runs out" |
+| mode: explorer on a faint trail, explore → follow (7) | +196 | doctrine: Forage says to follow food scent |
+| mode: fresh returner, explore → return (2) | +139 | as follow → return |
+| mode: follower, explore → return (1) | +84 | as above |
+| mode: raid-stance returner, follow → return (2) | −118 | — |
+
+- **The groups explain about 2,750 of the 9,110 food.** The rest is the answers interacting: whole lanes reverted (§43.6) are −26 % for modes and −18 % for stances.
+- **The legend gaps get legend fixes in §44.2:** what soil, corpses and brood are for, what tired means, and that a fresh ant at home has finished its trip.
+- **The doctrine ones stay.** Forage not raiding, and following faint scent, are what its doctrine asks.

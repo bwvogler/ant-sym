@@ -134,12 +134,15 @@ test("alarm gain 0: a host does not shy from alarm it cannot smell", () => {
 });
 
 test("clock: a host feels its time out slowly, so it is not tired yet", () => {
+  // Fatigue (ja-q47) grows by dt / clock while the ant searches outside: 5 s short of tired, 8 s more out tires a
+  // normal ant and not one whose clock runs at half speed.
   const tired = (clock: number) => {
     const { c, asked } = recorder(field());
-    at(c, 20, 6.5, 1.5 * c.params.patience);
+    at(c, 20, 6.5);
+    c.fatigue[0] = c.params.patience - 5;
     c.clock[0] = clock;
-    c.tick(1 / 30);
-    return asked[0]?.tired;
+    for (let k = 0; k < 30 * 8; k++) c.tick(1 / 30);
+    return asked.at(-1)?.tired;
   };
   assert.equal(tired(1), true);
   assert.equal(tired(2), false);
