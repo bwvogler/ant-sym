@@ -4,7 +4,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { type Item, localResponses, type Responses, type Touch } from "./responses.ts";
+import { type Item, localResponses, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
@@ -182,9 +182,16 @@ export interface ColonyParams {
   enemyRange: number;
   /** evaporation and spread of the colony's pheromone channels, per channel and field; those left out keep their defaults */
   channels: Partial<Record<Channel, Partial<ChannelParams>>>;
+  /**
+   * Trips end (ja-qnx): with "explore" or "follow", a fresh forager going home with empty jaws is that once it gets there
+   * (the nest on a top-down map; the royal chamber in the side view, the old only), and asked afresh; and any value but
+   * "return" also makes an ant that has just put its load down a follower (whatever this says: see the tick). "return"
+   * keeps the old behaviour, bit for bit: returning until REST sends it out.
+   */
+  arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}) };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -207,7 +214,10 @@ export class Colony {
   responses: Responses = localResponses;
   stance: Stance = "forage";
   /** the situation handed to a response, refilled for each call (#touch): a response reads it and does not keep it */
-  #t: Touch = { mode: "explore", carrying: "none", porter: false, digging: false, atNest: false, enemy: false, stance: "forage" };
+  /** the ant the shared Touch describes */
+  #ti = 0;
+  /** The shared Touch. Its `place` is worked out only when a response reads it: the local ones never do, and working it out for every ant's trail every step cost the side view ~5 % a tick (review of #35). */
+  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -318,6 +328,10 @@ export class Colony {
   }
   /** 1 while an ant carries a corpse (moved like a soil pellet: up and out, along the ground) */
   #corpse: Uint8Array;
+  /** 1 while an ant carried a load at its last step (what ends its trip when the load is put down: `arrive`) */
+  #loaded: Uint8Array;
+  /** the cell (packed y × 65536 + x) where ant i last put a load down, while it still stands there; else −1 */
+  #putAt: Int32Array;
   /** corpses carried to the midden */
   buried = 0;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
@@ -554,6 +568,8 @@ export class Colony {
     this.#portTo = new Int16Array(n).fill(-1);
     this.#porter = new Uint8Array(n);
     this.#corpse = new Uint8Array(n);
+    this.#loaded = new Uint8Array(n);
+    this.#putAt = new Int32Array(n).fill(-1);
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
     if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers) };
     this.#spoilTo = new Float32Array(n).fill(NaN);
@@ -681,6 +697,8 @@ export class Colony {
     this.#portTo[i] = -1;
     this.#porter[i] = 0;
     this.#corpse[i] = 0;
+    this.#loaded[i] = 0;
+    this.#putAt[i] = -1;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.untouched[i] = 0;
@@ -738,20 +756,54 @@ export class Colony {
    * Ant i's situation for a response, in the shared Touch object (read it, don't keep it): its mode, load and where it
    * is now. `enemy` comes from the caller (the tick's enemy look, or the fights).
    */
-  touch(i: number, enemy: boolean, mode: number = this.mode[i] as number, item: Item = this.item(i), atNest?: boolean): Touch {
+  touch(i: number, enemy: boolean, mode: number = this.mode[i] as number, item: Item = this.item(i), offered: Item = "none"): Touch {
     const t = this.#t;
     t.mode = MODES[mode] as Mode;
     t.carrying = item;
     t.porter = this.#porter[i] === 1;
     t.digging = (this.digT[i] as number) > 0;
-    if (atNest === undefined) {
-      const dx = (this.x[i] as number) - this.nest.x;
-      const dy = (this.y[i] as number) - this.nest.y;
-      t.atNest = dx * dx + dy * dy < this.nest.r * this.nest.r;
-    } else t.atNest = atNest;
+    this.#ti = i; // t.place reads ant i's place when asked
+    t.offered = offered;
     t.enemy = enemy;
     t.stance = this.stance;
     return t;
+  }
+
+  /**
+   * Where ant i is, as it can tell (responses.ts: Where). Underground (side view): in one of its own chambers, in its own
+   * tunnels, or "out" in a stranger's; on the ground or a top-down map: at its hole (within the nest's radius) or out.
+   * Leaves the shared CELL as it found it.
+   */
+  place(i: number): Where {
+    const keepX = CELL[0] as number;
+    const keepY = CELL[1] as number;
+    let p: Where;
+    if (this.#entrance && this.#under[i]) {
+      this.antCell(i);
+      const cx = CELL[0] as number;
+      const cy = CELL[1] as number;
+      p = !this.#inOwnNest(cx, cy) ? "out" : this.#perceivedPlace(i, this.#placeAt(cx, cy)) ? "chamber" : "tunnel";
+    } else {
+      const dx = (this.x[i] as number) - this.nest.x;
+      const dy = (this.y[i] as number) - this.nest.y;
+      p = dx * dx + dy * dy < this.nest.r * this.nest.r ? "hole" : "out";
+    }
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    return p;
+  }
+
+  /** Whether ant i, underground, is home: in its royal chamber, where it homes to. Leaves the shared CELL as it found it. */
+  #home(i: number): boolean {
+    const keepX = CELL[0] as number;
+    const keepY = CELL[1] as number;
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    const at = this.#inOwnNest(cx, cy) ? this.#perceivedPlace(i, this.#placeAt(cx, cy)) : null;
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    return at === "royal";
   }
 
   /** Living ants. */
@@ -819,8 +871,14 @@ export class Colony {
     if (!this.#entrance) return true;
     const x = centreX(cx, cy);
     const own = Math.abs(x - this.#entrance.x);
-    for (const o of this.#otherHoles()) if (Math.abs(x - o.x) < own) return false;
-    return true;
+    // The same holes as #otherHoles, without building its array: this runs for every carrier every step (Touch.place).
+    let raidListed = !this.raidTarget;
+    for (const n of this.others) {
+      const o = n.entrance ?? n;
+      if (Math.abs(x - o.x) < own) return false;
+      if (!raidListed && Math.abs(o.x - this.raidTarget!.x) < 1) raidListed = true;
+    }
+    return raidListed || Math.abs(x - this.raidTarget!.x) >= own;
   }
 
   /** The hole of the nearest other colony (the midden faces it), or null alone. */
@@ -2067,7 +2125,7 @@ export class Colony {
    * A nurse (nest slice 4): an idle ant in its royal chamber picks up an egg lying near it and takes it to the brood
    * chamber with the least brood; there, it lays it down. Its brood goes where it goes.
    */
-  #nurse(i: number, dt: number): void {
+  #nurse(i: number, dt: number, enemy: boolean): void {
     const ch = this.map.chambers!;
     this.antCell(i);
     const cx = CELL[0] as number;
@@ -2113,6 +2171,7 @@ export class Colony {
       if (b.held < 0 && hexDistance(b.x, b.y, cx, cy) <= 2 && ((inRoyal && b.stage === EGG && to >= 0) || b.chamber < 0)) {
         if (to < 0) to = royal;
         if (to < 0) return;
+        if (!this.responses.get(this.touch(i, enemy, this.mode[i] as number, "none", "brood"))) return;
         b.held = i;
         if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
         b.chamber = -1;
@@ -2144,6 +2203,7 @@ export class Colony {
     if (outside ? Math.abs(cx - this.#entranceCol) > MIDDEN_NEAR : this.band(i) !== 1 || (mode === FIGHT && !this.#inOwnNest(cx, cy))) return;
     for (const k of this.corpses)
       if (k.held < 0 && hexDistance(k.x, k.y, cx, cy) <= 2) {
+        if (!this.responses.get(this.touch(i, !calm, mode, "none", "corpse"))) return;
         k.held = i;
         this.#clearPellet(i);
         this.#corpse[i] = 1;
@@ -2662,6 +2722,47 @@ export class Colony {
     this.since[i] = 0;
   }
 
+  /**
+   * Ant i puts its load down where it stands (its carry response said so). Food lies on the ground for anyone to take
+   * (a porter's only in one of its chambers, where it is stocked: it was counted home already, and on the floor a
+   * forager would bring it home twice); soil and corpses only on the ground (soil heaps there, a corpse lies there, or
+   * goes on the midden if that is where it is; underground the walls have no room for them); brood where it is.
+   * What it can't put down here it keeps.
+   */
+  #putDown(i: number): void {
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    if (this.carrying[i]) {
+      if (this.#porter[i]) {
+        const here = this.map.chambers ? this.map.chambers.at(cx, cy) : -1;
+        const c = here >= 0 ? this.map.chambers!.list[here]! : null;
+        if (!c || c.colony !== this.params.nest) return;
+        this.#stock(c, 1);
+        this.portTrips++;
+        this.#inJaws -= 1;
+        this.#porter[i] = 0;
+        this.#portTo[i] = -1;
+      } else {
+        dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
+        this.#putAt[i] = cy * 65536 + cx;
+      }
+      this.carrying[i] = 0;
+    } else if (this.pellet[i]) {
+      if (!this.#entrance) {
+        // Top-down: a pellet is only a count: put down at the nest it is soil out (as the nest branch counts it), elsewhere lost.
+        const dx = (this.x[i] as number) - this.nest.x;
+        const dy = (this.y[i] as number) - this.nest.y;
+        if (dx * dx + dy * dy < this.nest.r * this.nest.r) this.soilOut++;
+        else this.soilLost++;
+        this.#clearPellet(i);
+      } else if (isSky(this.map, cx, cy)) this.#dropOut(i, cx);
+      else return;
+    } else if (this.#holdsBrood[i]) this.#dropBrood(i);
+    this.mx[i] = NaN;
+    this.gx[i] = NO_CELL;
+  }
+
   /** Ant i carries no pellet (or corpse) any more: the pellet, what it was, and where it was taking it, all at once. */
   #clearPellet(i: number): void {
     this.pellet[i] = 0;
@@ -2678,7 +2779,7 @@ export class Colony {
    * it down into the nest to refill unused space, as leaf-cutting ants refill excess space (Pielström & Roces).
    * True if it picked one up.
    */
-  #pickLoose(i: number, cx: number, cy: number): boolean {
+  #pickLoose(i: number, cx: number, cy: number, enemy: boolean): boolean {
     const { map } = this;
     if (!map.loose) return false;
     const u = this.#rng();
@@ -2693,6 +2794,7 @@ export class Colony {
       const steep = groundTop(map, tx + out) - ty >= 1;
       const fill = u < LOOSE_FILL_PICK;
       if (!fill && !steep) continue;
+      if (!this.responses.get(this.touch(i, enemy, this.mode[i] as number, "none", "soil"))) return false;
       if (!takeLoose(map, tx, ty)) continue;
       this.#takeUpLoose(i, tx, fill);
       return true;
@@ -2831,6 +2933,11 @@ export class Colony {
       const af = sn[7] as number;
       const ar = sn[8] as number;
       const toEnemy = this.#enemyHeading(i);
+      // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
+      // this step (its trip is over: see `arrive`).
+      // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
+      // the side view ~11 % a tick for nothing, review of #35.)
+      if (this.responses.carry !== localResponses.carry && (this.carrying[i] || this.pellet[i] || this.#holdsBrood[i]) && this.responses.carry(this.touch(i, toEnemy !== null)) === "put down") this.#putDown(i);
 
       // The mode choice, only when the situation changed since the ant was last asked.
       // A carrying ant goes home: a mechanic, never asked (and asked afresh once it puts the food down).
@@ -2855,13 +2962,26 @@ export class Colony {
       const item: Item = carrying ? "food" : pellet ? (this.#corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
       const resp = this.responses;
       if (carrying || pellet || nursing) {
-        // What a carrier does is its carry response (locally: home), not a mode choice; the next question comes once the load is down.
-        mode = MODES.indexOf(resp.carry(this.touch(i, toEnemy !== null, mode, item)));
-        if (mode < 0) mode = RETURN;
+        // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
+        // question comes once the load is down.
+        mode = RETURN;
         this.mode[i] = mode;
         this.#asked[i] = -1;
         this.#question[i] = -1;
+        this.#loaded[i] = 1;
       } else {
+        // Its load just put down, wherever that was (spoil on the mound, a corpse on the midden, food in the larder): the
+        // carrying trip is over, so it is not returning any more (ja-qnx; `arrive`). It heads back out along its trail: a
+        // follower, which a fresh ant is asked as the local rule asked a returner (both follow a trail, explore without
+        // one). As an explorer, the middle-aged diggers no longer followed the carriers' scent down to reception, where
+        // they port its food on: food piled up there (A8, seeds 5-6: 30-37 % of the nest's food carried on, main 87-100 %).
+        if (this.#loaded[i]) {
+          this.#loaded[i] = 0;
+          if (p.arrive !== "return" && mode === RETURN) {
+            mode = FOLLOW;
+            this.mode[i] = mode;
+          }
+        }
         const tired = (this.since[i] as number) > p.patience * (this.clock[i] as number);
         const food = trailLevel(Math.max(fl, ff, fr));
         const home = this.#homeField(i, hl, hf, hr);
@@ -3309,7 +3429,10 @@ export class Colony {
       const ent = this.#entrance;
       const atEntrance = ent !== null && Math.hypot((this.x[i] as number) - ent.x, (this.y[i] as number) - ent.y) < ent.r;
       this.antCell(i);
-      if (!carrying && !pellet && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, atNest)) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
+      // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
+      const cellKey = (CELL[1] as number) * 65536 + (CELL[0] as number);
+      if (this.#putAt[i] !== cellKey) this.#putAt[i] = -1;
+      if (!carrying && !pellet && this.#putAt[i] < 0 && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, "food")) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
         this.#homeAfresh(i);
         this.since[i] = 0;
@@ -3347,7 +3470,7 @@ export class Colony {
         this.looseBack++;
         this.wall[i] = 0;
         this.mx[i] = NaN;
-      } else if (ent && !carrying && !pellet && mode === EXPLORE && isSky(map, CELL[0] as number, CELL[1] as number) && this.#enteredCell(i) && this.#pickLoose(i, CELL[0] as number, CELL[1] as number)) {
+      } else if (ent && !carrying && !pellet && mode === EXPLORE && isSky(map, CELL[0] as number, CELL[1] as number) && this.#enteredCell(i) && this.#pickLoose(i, CELL[0] as number, CELL[1] as number, toEnemy !== null)) {
         // Picked up a loose pellet off the mound (see #pickLoose).
       } else if (atNest && !(pellet && ent)) {
         this.wall[i] = 0;
@@ -3356,7 +3479,7 @@ export class Colony {
         this.bestD[i] = Infinity;
         this.stallT[i] = 0;
         if ((this.since[i] as number) > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
-        if (carrying && !this.queen && resp.drop(this.touch(i, toEnemy !== null, mode, item, atNest))) {
+        if (carrying && !this.queen && resp.drop(this.touch(i, toEnemy !== null, mode, item))) {
           this.carrying[i] = 0;
           this.stored++;
           this.larder++;
@@ -3377,6 +3500,25 @@ export class Colony {
         }
       } else this.since[i] = (this.since[i] as number) + dt;
       if (!atNest) this.#restT[i] = 0;
+      // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
+      // returning (Jev answered "return" to every returner, home or not: PRD §42.4), so a fresh one that has got home with
+      // empty jaws is no longer returning: it is asked afresh as `arrive` says. In the side view a tired one stays in, as
+      // before: nothing underground rests it, so the colony's tired foragers retire inside (resting them sent them out
+      // again, and more food than the porters could carry piled up at reception, A8). On a top-down map rest is instant:
+      // the nest has just reset `since` above, so every returner there reads fresh and goes out at once (a timer artefact
+      // that ja-q47 replaces). Home is the nest on a top-down
+      // map. In the side view it is the royal chamber, where a returner homes to, and only for foragers (the old, zoned
+      // by age), as measured:
+      // - at its hole (passed on the way in, where a returner is asked afresh anyway) the trip's end sent explorers down
+      //   the carriers' food scent into the nest, where they jammed carriers (A8);
+      // - in any chamber, it left the young off the queen's side (zoning.test);
+      // - for the young and middle-aged, who work inside, it sent porters out and the queen starved on 1-2 of 4 worlds in
+      //   the hour-long economy run (slow/economy.test).
+      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && (this.since[i] as number) <= p.patience * (this.clock[i] as number) && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i))) {
+        this.mode[i] = p.arrive === "follow" ? FOLLOW : EXPLORE;
+        this.#asked[i] = -1;
+        this.#restT[i] = 0;
+      }
       if (ent) {
         // Zoned by age (slice 6): an ant not to go out that has just stepped up out of the hole onto the ground goes
         // back down (carriers aside: soil goes out to the mound; food is on its way in).
@@ -3417,7 +3559,7 @@ export class Colony {
         if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) * (this.gainMarks[i] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
         if (this.map.chambers) this.#layMark(i, dt);
         if (this.queen) {
-          this.#nurse(i, dt);
+          this.#nurse(i, dt, toEnemy !== null);
           if (this.#port(i, dt, toEnemy !== null)) h += Math.PI;
           this.#undertake(i, dt, toEnemy === null);
         }

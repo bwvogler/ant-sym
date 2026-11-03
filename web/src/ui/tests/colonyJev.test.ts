@@ -80,7 +80,7 @@ test("off: the local rule, no calls", async () => {
 });
 
 test("running: each new situation is asked once; the answers are cached and the ants switch to them", async () => {
-  const sent = scriptFetch(answerAll("return"));
+  const sent = scriptFetch(answerAll("follow"));
   const store = memoryStore();
   const j = make(store);
   j.setDoctrine(DOCTRINES[0]!.text);
@@ -95,7 +95,7 @@ test("running: each new situation is asked once; the answers are cached and the 
   assert.equal(j.state.cached, all.length);
   run(c, 1);
   const modes = c.counts();
-  assert.equal(modes.return, c.population, "every ant took Jev's answer on its next tick");
+  assert.equal(modes.follow, c.population, "every ant took Jev's answer on its next tick");
   assert.ok(j.state.hits > 0);
   assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, all.length, "persisted under the doctrine");
 });
@@ -416,7 +416,7 @@ function twoColonies(n = 40) {
 const modeRequests = (reqs: (JevRequest & { state: Record<string, unknown> })[]) => reqs.filter((r) => r.state.ants);
 
 test("both colonies on one doctrine: each situation is asked once for both, and both colonies' ants take the answer", async () => {
-  const { reqs } = scriptByDoctrine(() => "return");
+  const { reqs } = scriptByDoctrine(() => "follow");
   const j = make();
   const [a, b] = twoColonies();
   j.setDoctrineFor(0, "Same.");
@@ -441,7 +441,7 @@ test("both colonies on one doctrine: each situation is asked once for both, and 
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || c.carrying[i] || j.explain(c.lastQuestion(i) as Situation, k).by !== "jev") continue;
       answered++;
-      assert.equal(c.mode[i], 2, "Jev said return");
+      assert.equal(c.mode[i], 1, "Jev said follow");
     }
   });
   assert.ok(answered > 20, `most ants are on Jev's answer (${answered})`);

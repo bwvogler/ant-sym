@@ -1,10 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import type { ChunkLayer } from "../chunks.ts";
 import { Game } from "../game.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD } from "../world.ts";
 
 // Golden masters, shared by tests/golden.test.ts (fast) and tests/slow/golden.test.ts: seeded
 // games recorded on main before the behaviour MRs (response hooks), checked every 10 s for the
-// colonies' counts and a bit-exact hash of every ant. A refactor that should not change behaviour
+// colonies' counts and bit-exact hashes of every ant, each colony's pheromone fields and the map's food. A refactor that should not change behaviour
 // must keep them. A change meant to alter behaviour re-records them (GOLDEN_WRITE=1), says so in
 // its PR, and re-runs the assays (npm run exp).
 
@@ -29,7 +30,14 @@ function fnv(arrays: ArrayBufferView[]): string {
   return (h >>> 0).toString(16);
 }
 
-export type Sample = { t: number; colonies: { stored: number; births: number; losses: number; decisions: number; population: number; ants: string }[] };
+/** Every allocated chunk of a chunked field, with where it is, in table order. */
+function chunked(layer: ChunkLayer<Float32Array>): ArrayBufferView[] {
+  const out: ArrayBufferView[] = [];
+  layer.forEach((cx, cy, a) => out.push(new Int32Array([cx, cy]), a));
+  return out;
+}
+
+export type Sample = { t: number; food: string; colonies: { stored: number; births: number; losses: number; decisions: number; population: number; ants: string; fields: string }[] };
 
 const DT = 1 / 30;
 
@@ -47,7 +55,16 @@ export function record(s: Scenario): Sample[] {
     if (k % every === 0)
       out.push({
         t: Math.round(k * DT),
-        colonies: game.colonies.map((c) => ({ stored: c.stored, births: c.births, losses: c.losses, decisions: c.decisions, population: c.population, ants: fnv([c.x, c.y, c.heading, c.mode, c.carrying, c.pellet, c.alive]) })),
+        food: fnv(chunked(map.food)),
+        colonies: game.colonies.map((c) => ({
+          stored: c.stored,
+          births: c.births,
+          losses: c.losses,
+          decisions: c.decisions,
+          population: c.population,
+          ants: fnv([c.x, c.y, c.heading, c.mode, c.carrying, c.pellet, c.alive]),
+          fields: fnv(Object.values(c.ph.fields).flatMap(chunked)),
+        })),
       });
   }
   return out;

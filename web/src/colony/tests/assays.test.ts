@@ -46,10 +46,10 @@ test("overrides: a fight override keeps the other fight params; rival params rea
 test("overrides: responses replace the assay's own hook by hook", () => {
   const base = { ...deplete.spec(1), sides: { responses: { ...localResponses, trailRate: () => 3 } } };
   const spec = withOverrides(base, { responses: { get: () => false } });
-  const t = { mode: "explore", carrying: "none", porter: false, digging: false, atNest: false, enemy: false, stance: "forage" } as const;
+  const t = { mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage" } as const;
   assert.equal(spec.sides?.responses?.get(t), false);
   assert.equal(spec.sides?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
-  assert.equal(spec.sides?.responses?.carry(t), "return");
+  assert.equal(spec.sides?.responses?.carry(t), "take");
 });
 
 for (const seed of [1, 2]) {
@@ -63,3 +63,12 @@ for (const seed of [1, 2]) {
     assert.equal(m.pass, 1, `scatter ${m.scatter}, recoverAfter ${m.recoverAfter}`);
   });
 }
+
+test("heldProbe: a carrier that won't put its food down at home counts as carrying, though the nest resets its clock", () => {
+  const top = (seed: number) => generateWorld(seed, { ...OPEN_WORLD, size: { w: 80, h: 50 } });
+  const run = (drop: () => boolean) => runGame({ seed: 1, map: top, seconds: 200, game: { antCount: 60, rivalAnts: 0 }, sides: { responses: { ...localResponses, drop } } }).result.metrics;
+  const keeps = run(() => false);
+  assert.ok((keeps["you.maxCarrying"] as number) > 0, `maxCarrying ${keeps["you.maxCarrying"]}`);
+  const local = run(() => true);
+  assert.equal(local["you.maxCarrying"], 0);
+});

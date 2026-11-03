@@ -2334,3 +2334,151 @@ An ablation on the side-view game (seed 1, 300 s, Forage's answers; food home un
 - **Carry answers strand food:** Jev tells some carriers to explore, follow or fight. This is where the held food comes from. Turn the carry lane on only with the food's destination in its question (ja-1pm).
 - **The drop question misreads the side view:** food is put down in a chamber, which is outside `atNest` (the hole's radius). So Jev is asked "carrying food, out: put it down?" and says no in 2 of 3 situations. It did no harm in 300 s, but `Touch` needs an "in its chambers" notion before drop is asked live (ja-1pm).
 - **Trail:** explorers are told to lay nothing (5–7 of 14 views, ja-68l.8). On the side view this cost nothing in 300 s; on the palette branch's top-down bridge it halved food home.
+
+## 43. Get, carry and put down; a trip home ends at home (behaviour MR 2, ja-mz7, 2026-11-03)
+
+MR 2 was planned as "get/drop by item, carrying no longer forces going home, nest rooms, nest flow (A8), food conservation". `main` had since built the nest rooms: reception, stores, brood, the queen's chamber, porters, births from brood (§32–33, §41). So MR 2 became the responses for picking up, carrying and putting down every kind of load, and the two fixes §42.4 found Jev needed: ja-qnx (returners never stop returning) and ja-1pm (carriers told to wander with food).
+
+### 43.1 What an ant touches (no behaviour change)
+
+- **Stronger goldens (ja-2x2).** Each 10-s sample now also hashes every colony's pheromone fields and the map's food. `trailRate × 1.000001` passed before; now it fails at 10 s on both fast scenarios.
+- **`Touch.place`** replaces `atNest`: out, hole (the nest's mouth, or the nest on a top-down map), tunnel (its own) or chamber (its own). The drop question was being asked of a forager in its chamber as "out" (ja-1pm).
+- **`Touch.offered`**: what `get` is offered. Loose soil off the mound, corpses (the undertaker) and brood (the nurse) now ask `get`, after their mechanic's own draw. The local `get` takes food unless fighting and leaves the rest to those mechanics, so the goldens stayed bit-exact.
+- **`heldProbe`** also reports `maxCarrying`, counted by its own clock from pickup to put-down. The colony's `since` resets every tick at the nest, so a carrier refusing to put food down there was invisible.
+
+### 43.2 Carry: take it or put it down (ja-1pm)
+
+`carry` answers **take** (where the load belongs, going home) or **put down** (here), no longer a mode. Told to explore or fight with food in its jaws, a carrier stranded it: 56 held food over 120 s in §42.4's replay.
+- **Put down** (`#putDown`):
+  - Food goes on the map, where anyone may take it. A porter's food goes only into one of its chambers, where it is stocked: it was already counted home.
+  - Soil and corpses only on the ground (soil heaps there; a corpse lies there, or goes on the midden if it is there).
+  - Brood where the ant stands.
+  - What can't be put down here is kept. A forager doesn't take up **food** it has just put down until it has stepped off that cell. Brood and corpses have no such guard: with brood always answered "put down" over 300 s, 537 put-downs met 537 re-takes, with no tight loop (review of #35).
+- **The question** names each load's destination: food home into the nest for the larvae and stores, a porter's to the chamber that wants it, soil to the mound, a corpse to the midden, brood to a brood chamber.
+- **Deferred:** "drop and run" on contact goes to MR 4 (ja-902), and taking food to a rival's entrance to MR 5 (ja-um8).
+- **Food conservation** (`food.test`) also runs with every 40th food carry answered "put down" (foragers out and in tunnels, porters in chambers): no drift. If a porter's food isn't stocked when put down, it drifts by 235.
+
+### 43.3 A trip home ends at home (ja-qnx)
+
+Jev reads the mode as "keep doing this": every ant whose mode was `return` was told `return`, home or not (Cautious and Warlike: 23 of 23). Asked as explorers or followers, fresh ants inside the nest were told explore or follow. Nothing ended the trip, and in the side view's chambers not even REST did, since it runs only at the hole. Colony param `arrive` (default `explore`; `return` is the old behaviour):
+- **A fresh forager returning with empty jaws that gets home stops returning** and is asked afresh as an explorer. Home is the nest on a top-down map. In the side view it is the royal chamber, where a returner homes to, and only for the old (the foragers, zoned by age).
+- **A tired one stays in, in the side view only.** On a top-down map the nest resets the timer the moment the ant arrives, so every returner there reads fresh and goes out at once (review of #35). That is the timer artefact ja-q47 replaces.
+- **A load put down anywhere ends the carrying trip.** The ant is asked as a follower. For a fresh ant the local rule answers that exactly as it answered a returner (a trail is followed; no trail, explore), so the local colony is unchanged there.
+
+Each narrowing was forced by a measurement:
+
+| Version | What broke | Measured by |
+|---|---|---|
+| any chamber ends a trip | the young left the queen's side | `zoning.test` |
+| every age, resting on arrival | porters (young, middle-aged) went out; the queen starved on 1–2 of 4 worlds | the hour-long economy run |
+| the hole ends a trip too | explorers followed the carriers' scent into the nest (120–145 followers inside against ~35) and jammed carriers | A8, 600 s whole games |
+| tired foragers rested on arrival | the colony's retired foragers went out again; more food than the porters could carry piled up at reception | A8 |
+| a put-down ends as an explorer | the middle-aged diggers stopped following the food trail down to reception, where they port: 30–37 % of the nest's food carried on (main 87–100 %) | A8 seeds 5–6 |
+
+**Replay of the paid mode answers** (mode lane v4, unchanged), side view, 600 + 600, 300 s, seeds 1–10, food home by the first colony. Today's local rule on `main`: 10,903.
+
+| Answers | Before the fix | `arrive` explore (shipped) |
+|---|---|---|
+| local | 10,903 | 11,171 |
+| Forage | 9,037 | 9,995 (92 %) |
+| Cautious | 6,247 | 7,812 |
+| Warlike | 5,631 | 7,236 |
+
+Arriving as a follower did worse under Jev (Cautious 5,928, Warlike 6,254): Jev sends followers at home home again.
+
+**The local colony** (seeds 1–8 against `main`):
+- 600 + 600, 600 s: the most foragers holding food over 120 s per colony is 0–3 (`main` 0–2). The guard's seeds 4 and 6: 0 / 0 and 1 / 0. Food home 32,472 (`main` 31,609).
+- A8 (below): food home 16,167 (`main` 16,964).
+- The hour-long economy run (`slow/economy.test`'s setup) on worlds 1–8:
+  - at the test's seeding: one collapse (world 3); `main` has none, but 2 worlds fail its stranded-larvae bound;
+  - with each seed nudged by 1: `main` fails 4 of 8 (2 collapse), this branch 2 of 8 (2 collapse).
+
+  The colony's economy is on a knife-edge when the young run out: only young and middle-aged explorers port food to the queen. That predates this MR (ja-xu6).
+- Warlike's answers ignore tiredness, and with the parked returners gone their mill shows: on seed 3, 29 carriers were held at the shaft top (ja-3sy).
+
+**Speed** (review of #35):
+- As first pushed, the side view ticked about 11 % slower (the reviewer's `colony-bench 600 60 1`, two colonies: 3.58 against 3.96–4.00 ms). Every carrier built a Touch every step to hear the local "take", and `place` was worked out for every ant's trail call.
+- **Fixes:**
+  - the local carry response isn't asked;
+  - `Touch.place` is worked out only when a response reads it;
+  - the own-nest check no longer builds an array.
+- **After**, interleaved with `main` on one machine: medians 2.88 / 2.90 / 3.03 / 2.42 ms against `main`'s 2.86 / 2.91 / 2.72 / 2.79. Food and digging are identical.
+
+**What an ant senses here** (vision.md):
+- `Touch.place` and the end of a trip read the chamber's role through `#perceivedPlace`, so the fungus's muddling acts on them.
+- Telling its own nest from a stranger's still reads the other colonies' hole positions (`#inOwnNest`).
+- The arrival rule's age gate is scripted by age.
+- Both are now rows in the gap table (ja-k4k.2, ja-k4k.1).
+
+### 43.4 A8: the nest's food flow (report only)
+
+Harvester foragers drop seeds only in the top chambers, and other workers carry them down in stages to the seed chambers (Tschinkel, Rink & Kwapich 2015, now cited in docs/nest-and-home.md §3.5). No transport rate could be read in this session, so A8 has no pass mark. `npm run exp -- nestFlow` (one colony, 600 ants, 900 s) reports:
+- `beyond`: the share of the nest's food carried on past reception, from 300 s on;
+- reception's largest pile;
+- larvae unfed beside food (the economy test's measure);
+- the first birth, and porter trips.
+- **Seeds 1–10 (local):** `beyond` median 1.00 (0.67–1.00); reception's largest pile median 1 (0–214); at most 9 larvae unfed beside food on one seed.
+- **`main`, seeds 1–8:** `beyond` 0.87–1.00, larvae unfed 0–18.
+
+### 43.5 Assays, seeds 1–10 (local rule, against §42.2)
+
+| Assay | §42.2 | MR 2 |
+|---|---|---|
+| A1 double bridge | 0/10, short share 0.49 | 0/10, 0.48 (0.39–0.60) |
+| A2a twin sources | 0/10, 0.52 | 0/10, 0.52 |
+| A3 depletion | 10/10, 41 s | 10/10, 39 s (25–49) |
+| A4 alarm | 10/10, back in 19 s | 10/10, back in 19 s (19–20) |
+| A5 regulation | 0/10, 0.97 / 0.90 | 0/10, 0.97 / 0.91 |
+| A6 pass / open | 1.05 / 0.92 | 1.05 / 0.92 |
+| G side view | 10/10, held 1 (0–2), food home 9 % / 6 % | 9/10, held 1.5 (0–3), 9 % / 7 % |
+| G′ top-down | held 10 (4–131) | held 10 (6–136): carriers there still only take (ja-9uj) |
+| A8 nest flow | — | `beyond` 1.00 (0.67–1.00) |
+
+**Held-out seeds 11–20:**
+- G passes 10/10: held 1 (0–2), food home 9.5 % / 6.5 %.
+- A3 passes 10/10: 38 s (4–52).
+- A4 passes 10/10: back in 19 s (19–22).
+- A8: `beyond` 1.00 (0.75–1.00), at most 2 larvae unfed beside food.
+
+### 43.6 Live check and replay (2026-11-03)
+
+`colony-live.mjs mode,stance,get,carry,drop` on the side view (seed 1, 600 + 600, 300 s), then a second round per doctrine (`--from`). **Spent $0.0057** (139k input tokens).
+
+| Lane | Situations | Real tok/q | Agrees with local: Forage | Cautious | Warlike |
+|---|---|---|---|---|---|
+| mode | 141 | 201 | 69 % | 65 % | 65 % |
+| stance | 4 | 282 | 50 % | 50 % | 75 % |
+| get | 14 | 147 | 64 % | 50 % | 43 % |
+| carry | 35 | 212 | **100 %** (was 79 %) | **100 %** (79 %) | **97 %** (71 %) |
+| drop | 5 | 219 | **100 %** (was 33 %) | **100 %** (33 %) | **100 %** (33 %) |
+
+- **get:** Jev declines loose soil off the mound in 4–8 of 14 situations.
+- **Warlike's only carry disagreement:** put food down out on the ground when raiding.
+
+**Replayed** (`npm run exp -- game twin regulate nestFlow --policy cache:…`, seeds 1–10; the second colony is local):
+
+| | Local | Forage | Cautious | Warlike |
+|---|---|---|---|---|
+| G food home, you / rival | 9.2 % / 6.5 % | 5.8 % / 9.6 % | 4.0 % / 8.3 % | 0.7 % / 8.5 % |
+| G held over 120 s, most (§42.4: Forage 92) | 3 | 3 | 1 | 2 |
+| A2a twin, food home (§42.4: 0 % under every doctrine) | 37 % | 38 % | 38 % | 33 % |
+| A5 out before / after food | 0.97 / 0.91 | 0.97 / 0.90 | 0.97 / 0.90 | 0.97 / 0.90 |
+| A8 `beyond`; food home | 1.00; 2,129 | 1.00; 1,663 | 0.99; 1,173 | 1.00; 29 |
+
+- **Stranding is gone:** under Forage, held carriers fall from 92 to 3 and the twin arena forages as the local rule does.
+- **Forage still brings home 62 % of the local rule's food over 600 s.** Ablation on G, seeds 1–5, one lane at a time (local 10,974):
+  - carry and drop are bit-identical to local;
+  - modes 8,095 (−26 %);
+  - stances 9,049 (−18 %: Jev keeps foraging where the local strategist raids);
+  - get 9,881 (−10 %).
+
+  Which answers cost the food is ja-5ty. Warlike's 0.7 % is its own mill (ja-3sy).
+
+**Cost** (`colony-cost --side 5 600 1`):
+- **Mode lane:** ~546 tok per question, $0.092/h, unchanged.
+- **Response lanes, if asked:** get ~650, carry ~531, drop ~708, trail ~361 tok per question, about **$0.060/h** more (MR 1: $0.027/h). The legend now explains places, offered items and the carry answers. The page still asks none of them.
+
+**Beads:**
+- **Closed:** ja-qnx (parking: fixed; residual cost in ja-5ty), ja-1pm, ja-2x2, ja-mz7.
+- **Filed:** ja-xu6 (the economy's knife-edge), ja-3sy (Warlike's tiredness), ja-q47 (tiredness as a body state), ja-5ty (Forage's residual cost).
+- **Notes added:** "drop and run" on ja-902, loot to a rival's entrance on ja-um8.

@@ -1,7 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
-import { localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
+import { CARRY, type Carry, localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -122,10 +122,10 @@ export function stanceContext(doctrine: string): string {
 }
 
 /** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
-export const RESPONSE_BRAIN_VERSION = 2;
+export const RESPONSE_BRAIN_VERSION = 3;
 
 export const RESPONSE_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside. digging says it is digging at a soil face. atNest says whether it is inside its own nest. enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance is what the colony as a whole is doing: forage, defend or raid. doctrine is how the colony wants its ants to behave: follow it.";
+  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside. digging says it is digging at a soil face. place is where it is: out (away from its nest), hole (at its nest's mouth), tunnel (in its own nest's tunnels) or chamber (in one of its own nest's chambers). offered, when it may pick something up, is what lies within reach: food, soil (a loose pellet off the mound), corpse or brood. enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance is what the colony as a whole is doing: forage, defend or raid. doctrine is how the colony wants its ants to behave: follow it.";
 
 export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail"] as const;
 export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
@@ -134,11 +134,20 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
   const ant = `ant \`${id}\``;
   switch (hook) {
     case "get":
-      return { [`${id}_get`]: { type: "noul", instructions: `Going by the doctrine, ${ant} is touching food with empty jaws: should it pick one piece up?` } };
+      return { [`${id}_get`]: { type: "noul", instructions: `Going by the doctrine, ${ant} has empty jaws and the thing named by offered within reach: should it pick it up?` } };
     case "drop":
       return { [`${id}_drop`]: { type: "noul", instructions: `Going by the doctrine, ${ant} is carrying food where it can put it down (its nest, or the chamber the food goes to): should it put it down here?` } };
     case "carry":
-      return { [`${id}_carry`]: { type: "choice", instructions: `Going by the doctrine, ${ant} is carrying something: what should it do?`, criteria: MODE_CRITERIA } };
+      return {
+        [`${id}_carry`]: {
+          type: "choice",
+          instructions: `Going by the doctrine, ${ant} is carrying what carrying says: what should it do with it?`,
+          criteria: {
+            take: "take: carry it where it belongs (food home into the nest, for the colony's larvae and stores; a porter's food to the chamber that wants it; soil out to the mound; a corpse to the midden; brood to a brood chamber)",
+            "put down": "put down: put it down here, where it stands, and do something else",
+          },
+        },
+      };
     case "trail":
       return {
         [`${id}_trail`]: {
@@ -152,11 +161,13 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
 
 /** One request for many response situations of one hook. */
 export function packResponseRequest(hook: ResponseHook, items: { id: string; situation: Touch }[], doctrine: string): JevRequest {
-  const ants: Record<string, Touch> = {};
+  const ants: Record<string, Partial<Touch>> = {};
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
     const t = it.situation;
-    ants[it.id] = { mode: t.mode, carrying: t.carrying, porter: t.porter, digging: t.digging, atNest: t.atNest, enemy: t.enemy, stance: t.stance };
+    // offered only means something to `get`; the other lanes don't pay for it.
+    const { offered, ...rest } = t;
+    ants[it.id] = hook === "get" ? { ...rest, offered } : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
@@ -176,7 +187,7 @@ export function cacheContexts(doctrine: string): Record<"mode" | "stance" | Resp
 }
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
-export type ResponseAnswer = boolean | Mode | Trail;
+export type ResponseAnswer = boolean | Carry | Trail;
 const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
 
 /**
@@ -188,7 +199,7 @@ export function readResponse(hook: ResponseHook, answers: Record<string, JevAnsw
   if (!a) return null;
   if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
   if (a.type !== "choice") return null;
-  if (hook === "carry") return (MODES as readonly string[]).includes(a.choice) ? (a.choice as Mode) : null;
+  if (hook === "carry") return (CARRY as readonly string[]).includes(a.choice) ? (a.choice as Carry) : null;
   return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
 }
 

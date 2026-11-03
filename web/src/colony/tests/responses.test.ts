@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
-import { Colony } from "../colony.ts";
+import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
+import { Game } from "../game.ts";
 import { packResponseRequest, readResponse, RESPONSE_HOOKS, responseContext, responsesFromAnswers } from "../colonyBrain.ts";
-import { localResponses, responses, touchKey, type Touch } from "../responses.ts";
-import { foodAt, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
+import { type Item, localResponses, responses, touchKey, type Touch } from "../responses.ts";
+import { foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, nestAt, put } from "./hexmaps.ts";
 
 // The ant's response hooks (responses.ts): the local ones are the rules the colony had (the golden masters
@@ -19,7 +20,7 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
 }
 
-const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, atNest: false, enemy: false, stance: "forage", ...t });
+const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", ...t });
 
 /** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
 function forage(c: Colony, seconds = 20): { picked: boolean } {
@@ -34,11 +35,12 @@ function forage(c: Colony, seconds = 20): { picked: boolean } {
 }
 
 test("localResponses are the colony's rules before the hooks", () => {
-  assert.equal(localResponses.get(touch({})), true);
-  assert.equal(localResponses.get(touch({ mode: "fight" })), false, "not mid-fight");
-  assert.equal(localResponses.carry(touch({ carrying: "food" })), "return");
-  assert.equal(localResponses.carry(touch({ carrying: "corpse" })), "return");
-  assert.equal(localResponses.drop(touch({ carrying: "food", atNest: true })), true);
+  assert.equal(localResponses.get(touch({ offered: "food" })), true);
+  assert.equal(localResponses.get(touch({ mode: "fight", offered: "food" })), false, "not mid-fight");
+  for (const offered of ["soil", "corpse", "brood"] as const) assert.equal(localResponses.get(touch({ mode: "fight", offered })), true, `${offered}: the mechanic decides`);
+  assert.equal(localResponses.carry(touch({ carrying: "food" })), "take");
+  assert.equal(localResponses.carry(touch({ carrying: "corpse" })), "take");
+  assert.equal(localResponses.drop(touch({ carrying: "food", place: "chamber" })), true);
   assert.equal(localResponses.trail(touch({ carrying: "food" })), "food");
   assert.equal(localResponses.trail(touch({})), "home");
   assert.equal(localResponses.trail(touch({ carrying: "brood" })), "home", "a nurse marks the way home");
@@ -75,18 +77,25 @@ test("drop: an ant whose drop response says no keeps its food at the nest", () =
   assert.equal(d.stored, 1, "the local rule stores it");
 });
 
-test("carry: the carry response decides the carrier's mode, and the mode policy is not asked", () => {
+test("carry: a carrier takes its load home without the mode policy being asked; told to put it down, it does, and the food lies there", () => {
   let asked = 0;
   const c = new Colony(corridor(3), { antCount: 1, wander: 0 }, mulberry32(1), (s) => (asked++, s.mode));
-  c.responses = responses({ carry: () => "explore" });
   put(c, 0, 14, 6); // on the food cell
   c.heading[0] = 0;
   c.tick(1 / 30); // picks the food up
   assert.equal(c.carrying[0], 1);
   const before = asked;
   c.tick(1 / 30);
-  assert.equal(c.mode[0], 0, "explore, as the carry response said");
+  assert.equal(c.mode[0], 2, "taking it home: return");
   assert.equal(asked, before, "the mode policy is not asked while carrying");
+  put(c, 0, 20, 6); // off the food, so it doesn't take its load straight up again
+  const onMap = c.map.foodLeft;
+  c.responses = responses({ carry: () => "put down" });
+  c.tick(1 / 30);
+  assert.equal(c.carrying[0], 0, "put down");
+  assert.equal(c.map.foodLeft, onMap + 1, "the food is back on the map, not lost");
+  assert.notEqual(c.mode[0], 2, "and its trip is over");
+  assert.equal(c.stored, 0);
 });
 
 test("trail: no trail laid when the response says none; double when trailRate says 2", () => {
@@ -126,13 +135,13 @@ test("touch: what a response sees of an ant", () => {
   const c = new Colony(corridor(3), { antCount: 2, maxAnts: 2 }, mulberry32(1));
   c.carrying[1] = 1;
   put(c, 1, 30, 6);
-  assert.deepEqual({ ...c.touch(0, false) }, touch({ atNest: true }));
+  assert.deepEqual({ ...c.touch(0, false) }, touch({ place: "hole" }));
   assert.deepEqual({ ...c.touch(1, true) }, touch({ carrying: "food", enemy: true }));
   assert.equal(c.item(1), "food");
 });
 
 test("response lanes: one question per situation, cached per hook and doctrine", () => {
-  assert.equal(touchKey(touch({ carrying: "food", atNest: true })), "explore|food|-|-|nest|clear|forage");
+  assert.equal(touchKey(touch({ carrying: "food", place: "chamber" })), "explore|food|-|-|chamber|none|clear|forage");
   for (const h of RESPONSE_HOOKS) {
     const req = packResponseRequest(h, [{ id: "s0", situation: touch({}) }, { id: "s1", situation: touch({ mode: "fight", enemy: true }) }], "Gather food.");
     assert.equal(Object.keys(req.questions).length, 2, h);
@@ -145,7 +154,8 @@ test("readResponse: nouls are yes strictly above ½; choices must be one of the 
   assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.9 } }, "s0"), true);
   assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.5 } }, "s0"), false);
   assert.equal(readResponse("drop", { s0_drop: { type: "choice", choice: "yes" } }, "s0"), null);
-  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "return" } }, "s0"), "return");
+  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "put down" } }, "s0"), "put down");
+  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "return" } }, "s0"), null, "a mode is no carry answer any more");
   assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "dance" } }, "s0"), null);
   assert.equal(readResponse("trail", { s0_trail: { type: "choice", choice: "none" } }, "s0"), "none");
   assert.equal(readResponse("trail", {}, "s0"), null);
@@ -158,7 +168,108 @@ test("responsesFromAnswers: cached answers win, the local responses cover the re
   assert.equal(r.get(t), false);
   assert.equal(r.get(touch({})), true, "not cached: local");
   assert.equal(r.trail(t), "none");
-  assert.equal(r.carry(touch({ carrying: "food" })), "return", "no cache for carry: local");
+  assert.equal(r.carry(touch({ carrying: "food" })), "take", "no cache for carry: local");
   assert.equal(r.trailRate(t), localResponses.trailRate(t), "hooks that are not lanes stay local");
   assert.deepEqual(heard, ["get:true", "get:false", "trail:true"]);
+});
+
+test("get is asked for loose soil, corpses and brood too, and refusing one leaves it lying", () => {
+  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
+  /** A side-view game with dead to bury, run for 150 s; what get was offered, and the most ants holding each item at once. */
+  const run = (refuse: Item | null) => {
+    const map = generateSideWorld(2, SMALL);
+    const g = new Game(map, { antCount: 200, rival: false }, mulberry32(4));
+    const c = g.player;
+    const offered = new Set<Item>();
+    c.responses = responses({ get: (t) => (offered.add(t.offered), t.offered !== refuse && localResponses.get(t)) });
+    for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN * (i % 2); // half young (nurses), half middle-aged (undertakers)
+    const held: Partial<Record<Item, number>> = {};
+    for (let k = 0; k < 30 * 150; k++) {
+      if (k === 30 * 20)
+        for (let i = 0, n = 0; i < c.n && n < 20; i++)
+          if (c.alive[i] && c.item(i) === "none" && c.y[i]! > map.nest.entrance!.y + 3) {
+            c.kill(i);
+            n++;
+          }
+      g.tick(1 / 30);
+      if (k % 30 === 0) {
+        const now: Partial<Record<Item, number>> = {};
+        for (let i = 0; i < c.n; i++) if (c.alive[i]) now[c.item(i)] = (now[c.item(i)] ?? 0) + 1;
+        for (const [it, n] of Object.entries(now) as [Item, number][]) held[it] = Math.max(held[it] ?? 0, n);
+      }
+    }
+    return { offered, held, loose: c.loosePicked };
+  };
+  const local = run(null);
+  for (const it of ["food", "soil", "corpse", "brood"] as const) assert.ok(local.offered.has(it), `get was offered ${it}`);
+  assert.ok((local.held.corpse ?? 0) > 0 && (local.held.brood ?? 0) > 0 && local.loose > 0, JSON.stringify(local));
+  assert.equal(run("corpse").held.corpse ?? 0, 0, "no corpse taken up");
+  assert.equal(run("brood").held.brood ?? 0, 0, "no brood taken up");
+  assert.equal(run("soil").loose, 0, "no loose pellet taken up");
+});
+
+test("arrive (ja-qnx): a returner home with empty jaws is no longer returning, though its policy keeps returners returning", () => {
+  // Jev's answer to every returner, home or not (PRD §42.4): keep returning. Anything else explores.
+  const stubborn = (s: { mode: string }) => (s.mode === "return" ? "return" : "explore") as "return" | "explore";
+  const home = (arrive: "explore" | "return") => {
+    const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, arrive }, mulberry32(1));
+    c.policy = stubborn;
+    put(c, 0, 12, 6);
+    c.mode[0] = 2; // return
+    let left = 0;
+    for (let k = 0; k < 30 * 8; k++) {
+      c.tick(1 / 30);
+      if (c.mode[0] !== 2) left = Math.max(left, Math.hypot(c.x[0]! - c.nest.x, c.y[0]! - c.nest.y));
+    }
+    return { mode: c.mode[0], left };
+  };
+  const ends = home("explore");
+  assert.notEqual(ends.mode, 2, "it explores");
+  assert.ok(ends.left > c0r(), `and walks out again (${ends.left.toFixed(1)})`);
+  assert.equal(home("return").mode, 2, "without it, it stays home returning (until REST)");
+});
+
+/** The corridor's nest radius. */
+const c0r = () => corridor(0).nests[0]!.r;
+
+test("arrive: putting a load down ends the trip, wherever it was put down", () => {
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+  c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+  c.responses = responses({ drop: () => true });
+  put(c, 0, 30, 6);
+  c.carrying[0] = 1;
+  c.tick(1 / 30);
+  assert.equal(c.mode[0], 2, "carrying: going home");
+  c.carrying[0] = 0; // put down out here (as a carrier told to put it down would)
+  c.tick(1 / 30);
+  assert.equal(c.mode[0], 0, "load down: exploring, not returning");
+});
+
+test("arrive in the side view: a fresh forager returning to the royal chamber is no longer returning; a tired one, or a young one, stays in", () => {
+  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
+  const at = (age: number, since: number) => {
+    const c = new Colony(generateSideWorld(2, SMALL), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+    c.policy = (s) => (s.mode === "return" ? "return" : "explore"); // Jev's answer to returners: keep returning
+    c.x[0] = c.queen!.x;
+    c.y[0] = c.queen!.y;
+    c.age[0] = age * LIFESPAN;
+    c.lifespan[0] = Infinity;
+    c.mode[0] = 2;
+    c.since[0] = since;
+    for (let k = 0; k < 5; k++) c.tick(1 / 30);
+    return c.mode[0];
+  };
+  assert.notEqual(at(0.6, 0), 2, "a fresh forager: its trip is over");
+  assert.equal(at(0.6, 1e4), 2, "a tired forager stays in");
+  assert.equal(at(YOUNG / 2, 0), 2, "the young work inside: they make no trips");
+});
+
+test("arrive on a top-down map: the nest rests a tired returner at once, so its trip ends there too (the timer ja-q47 replaces)", () => {
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+  c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+  put(c, 0, 6, 6); // in the nest
+  c.mode[0] = 2;
+  c.since[0] = 1e4; // tired
+  c.tick(1 / 30);
+  assert.notEqual(c.mode[0], 2, "the hole reset its timer, so it reads fresh and its trip is over");
 });

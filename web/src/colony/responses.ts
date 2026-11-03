@@ -18,6 +18,13 @@ export const ITEMS = ["none", "food", "soil", "corpse", "brood"] as const;
 export type Item = (typeof ITEMS)[number];
 
 /**
+ * Where an ant is, as it can tell: out (on the ground away from its hole, or in a stranger's nest), at its hole (the
+ * nest's mouth; on a top-down map, the nest), in its own tunnels, or in one of its own chambers.
+ */
+export const WHERE = ["out", "hole", "tunnel", "chamber"] as const;
+export type Where = (typeof WHERE)[number];
+
+/**
  * What a response may depend on: few values, so an answer could be cached per situation. The
  * colony fills one shared object per call, so a response must read it and not keep it.
  */
@@ -28,8 +35,10 @@ export interface Touch {
   porter: boolean;
   /** an explorer at a soil face, digging */
   digging: boolean;
-  /** inside its own nest's radius */
-  atNest: boolean;
+  /** where it is (see Where) */
+  place: Where;
+  /** what `get` is offered: food on the ground, a loose soil pellet off the mound, a corpse, brood to nurse ("none" for the other responses) */
+  offered: Item;
   /** strangers within the colony's enemy range (always true in a fight) */
   enemy: boolean;
   stance: Stance;
@@ -37,11 +46,20 @@ export interface Touch {
 
 export type Trail = "food" | "home" | "none";
 
+/** What a carrier does with its load: take it where it belongs, or put it down where it stands. */
+export const CARRY = ["take", "put down"] as const;
+export type Carry = (typeof CARRY)[number];
+
 export interface Responses {
-  /** Touching food with empty jaws: take one unit? */
+  /** Empty jaws, touching something it could take (`offered`: food, loose soil, a corpse, brood): take it? */
   get(t: Touch): boolean;
-  /** Carrying anything: which mode to be in (asked every step while carrying; the mode policy is not asked then). */
-  carry(t: Touch): Mode;
+  /**
+   * Carrying anything (asked every step while carrying; the mode policy is not asked then): take it where it belongs
+   * (food home to the nest's chambers, a porter's to the chamber that wants it, soil out to the mound, a corpse to the
+   * midden, brood to a brood chamber), going home to do it; or put it down here, and be asked afresh. (Carrying no
+   * longer has a mode to choose: told to explore or fight with food in its jaws, an ant stranded it, ja-1pm.)
+   */
+  carry(t: Touch): Carry;
   /** Carrying food, at a place it can put it down (the nest on a top-down map; its chamber in the side view): put it down? */
   drop(t: Touch): boolean;
   /** Which trail to lay this step. */
@@ -55,13 +73,13 @@ export interface Responses {
 }
 
 /**
- * The rules before the hooks, unchanged: take food unless fighting; anything carried goes home; put food down
+ * The rules before the hooks, unchanged: take food unless fighting (soil, corpses and brood: whenever the mechanic offers them); anything carried is taken where it belongs; put food down
  * where it goes; walking out marks the way home and carrying food the way to it, while soil, corpse and
  * porter carriers lay nothing; shy from alarm unless fighting or digging; always raise it in a fight.
  */
 export const localResponses: Responses = {
-  get: (t) => t.mode !== "fight",
-  carry: () => "return",
+  get: (t) => t.offered !== "food" || t.mode !== "fight",
+  carry: () => "take",
   drop: () => true,
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
   trailRate: () => 1,
@@ -74,7 +92,7 @@ export function responses(over: Partial<Responses> = {}): Responses {
   return { ...localResponses, ...over };
 }
 
-/** A situation as a cache key: 4 modes × 5 items × porter × digging × at nest × enemy × 3 stances (most combinations never occur). */
+/** A situation as a cache key: 4 modes × 5 items × porter × digging × 4 places × 5 offered × enemy × 3 stances (most combinations never occur). */
 export function touchKey(t: Touch): string {
-  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.atNest ? "nest" : "out"}|${t.enemy ? "enemy" : "clear"}|${t.stance}`;
+  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}`;
 }
