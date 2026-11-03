@@ -49,9 +49,9 @@
      "stored": 75,
      "births": 0,
      "losses": 0,
-     "decisions": 29434,
+     "decisions": 29440,
      "population": 300,
-     "ants": "44ea1456"
+     "ants": "d6b95c6e"
     },
     {
      "stored": 105,
@@ -67,20 +67,20 @@
    "t": 40,
    "colonies": [
     {
-     "stored": 110,
+     "stored": 118,
      "births": 0,
      "losses": 0,
-     "decisions": 40925,
+     "decisions": 40670,
      "population": 300,
-     "ants": "79025489"
+     "ants": "438bd7ee"
     },
     {
-     "stored": 128,
+     "stored": 119,
      "births": 0,
      "losses": 0,
-     "decisions": 39856,
+     "decisions": 40770,
      "population": 300,
-     "ants": "98fd8d4a"
+     "ants": "aa5722f4"
     }
    ]
   },
@@ -88,20 +88,20 @@
    "t": 50,
    "colonies": [
     {
-     "stored": 168,
+     "stored": 172,
      "births": 0,
      "losses": 0,
-     "decisions": 53332,
+     "decisions": 53188,
      "population": 300,
-     "ants": "f4d905e"
+     "ants": "79f0e130"
     },
     {
-     "stored": 161,
+     "stored": 137,
      "births": 0,
      "losses": 0,
-     "decisions": 50047,
+     "decisions": 55728,
      "population": 300,
-     "ants": "1cc53765"
+     "ants": "f069e51d"
     }
    ]
   },
@@ -109,20 +109,20 @@
    "t": 60,
    "colonies": [
     {
-     "stored": 187,
+     "stored": 194,
      "births": 0,
      "losses": 0,
-     "decisions": 64771,
+     "decisions": 67791,
      "population": 300,
-     "ants": "1175e64b"
+     "ants": "cb78beaf"
     },
     {
-     "stored": 182,
+     "stored": 163,
      "births": 0,
      "losses": 0,
-     "decisions": 58850,
+     "decisions": 71997,
      "population": 300,
-     "ants": "f4323395"
+     "ants": "a31c6006"
     }
    ]
   },
@@ -130,20 +130,20 @@
    "t": 70,
    "colonies": [
     {
-     "stored": 214,
+     "stored": 228,
      "births": 7,
      "losses": 0,
-     "decisions": 76202,
+     "decisions": 81778,
      "population": 307,
-     "ants": "fae0c0d0"
+     "ants": "5ad5b073"
     },
     {
-     "stored": 207,
+     "stored": 204,
      "births": 11,
      "losses": 0,
-     "decisions": 68670,
+     "decisions": 83426,
      "population": 311,
-     "ants": "34e97549"
+     "ants": "9d349387"
     }
    ]
   },
@@ -151,20 +151,20 @@
    "t": 80,
    "colonies": [
     {
-     "stored": 254,
+     "stored": 257,
      "births": 18,
      "losses": 0,
-     "decisions": 88050,
+     "decisions": 94416,
      "population": 318,
-     "ants": "3b216e8a"
+     "ants": "bef6a471"
     },
     {
-     "stored": 230,
+     "stored": 213,
      "births": 21,
      "losses": 0,
-     "decisions": 79889,
+     "decisions": 92517,
      "population": 321,
-     "ants": "20cc3a9e"
+     "ants": "da255beb"
     }
    ]
   },
@@ -172,20 +172,20 @@
    "t": 90,
    "colonies": [
     {
-     "stored": 291,
-     "births": 20,
+     "stored": 279,
+     "births": 21,
      "losses": 0,
-     "decisions": 100440,
-     "population": 320,
-     "ants": "7d798538"
+     "decisions": 105358,
+     "population": 321,
+     "ants": "16d295f"
     },
     {
-     "stored": 250,
+     "stored": 220,
      "births": 28,
      "losses": 0,
-     "decisions": 93757,
+     "decisions": 102171,
      "population": 328,
-     "ants": "cc7b4f50"
+     "ants": "90966c4d"
     }
    ]
   }

@@ -14,7 +14,7 @@ export interface Scenario {
   seed: number;
   ants: number;
   seconds: number;
-  /** alarm painted by the player's fungus brush at these times (s), at the map's centre */
+  /** alarm painted by the player's fungus brush at these times (s): at the player's entrance in the side view (where its ants pass), at the map's centre top-down */
   alarmAt?: number[];
 }
 
@@ -39,9 +39,10 @@ export function record(s: Scenario): Sample[] {
   const game = new Game(map, { antCount: s.ants, rivalAnts: s.ants }, mulberry32(s.seed * 7919));
   const out: Sample[] = [];
   const alarms = (s.alarmAt ?? []).map((t) => Math.round(t / DT));
+  const spot = map.nests[0]?.entrance ?? { x: map.size.w / 2, y: map.size.h / 2 };
   const every = Math.round(10 / DT);
   for (let k = 1; k <= Math.round(s.seconds / DT); k++) {
-    if (alarms.includes(k)) game.player.paint("alarm", map.size.w / 2, map.size.h / 2, 4, 12);
+    if (alarms.includes(k)) game.player.paint("alarm", spot.x, spot.y, 4, 12);
     game.tick(DT);
     if (k % every === 0)
       out.push({
@@ -52,8 +53,18 @@ export function record(s: Scenario): Sample[] {
   return out;
 }
 
-/** The recording for a fixture file: written afresh with GOLDEN_WRITE=1, else read. */
+/** The recording for a fixture file. GOLDEN_WRITE=1 writes it afresh and then fails the run, so a stray variable can't pass silently. */
 export function fixture(file: URL, scenarios: Scenario[]): Record<string, Sample[]> {
-  if (process.env.GOLDEN_WRITE) writeFileSync(file, JSON.stringify(Object.fromEntries(scenarios.map((s) => [s.name, record(s)])), null, 1) + "\n");
+  if (process.env.GOLDEN_WRITE) {
+    writeFileSync(file, JSON.stringify(Object.fromEntries(scenarios.map((s) => [s.name, record(s)])), null, 1) + "\n");
+    throw new Error(`GOLDEN_WRITE: re-recorded ${file.pathname}; run again without it to check`);
+  }
   return JSON.parse(readFileSync(file, "utf8")) as Record<string, Sample[]>;
+}
+
+/** Check a run against its recording: the same number of samples, each equal. */
+export function check(s: Scenario, want: Sample[] | undefined, got: Sample[], deepEqual: (a: unknown, b: unknown, msg: string) => void, equal: (a: unknown, b: unknown, msg: string) => void): void {
+  equal(!!want, true, `no recording for ${s.name}`);
+  equal(got.length, want!.length, `${s.name}: ${got.length} samples, recording has ${want!.length}`);
+  for (let k = 0; k < want!.length; k++) deepEqual(got[k], want![k], `${s.name}: first difference at t = ${want![k]!.t} s`);
 }
