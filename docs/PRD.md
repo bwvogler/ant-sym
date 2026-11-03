@@ -2524,36 +2524,52 @@ The basis is `docs/tiredness.md`:
 **Before:** tired = `since > patience × clock`. Underground nothing reset `since`, so every inside worker was "tired" within a minute and a tired forager stayed tired. The colony's tired foragers retired inside for good.
 
 **Now** (`colony.ts`):
-- **`fatigue`** grows by `dt / clock` only while the ant is out with empty jaws, exploring or following. The fungus's clock lever still applies.
-- **It falls** at `patience / restTime` per second while the ant is inside its own nest: its hole, or its tunnels and chambers in the side view. Finding food clears it. Digging, spoil, nursing and fights neither tire nor rest it.
-- **Tired once fatigue passes `patience`, until fully rested.** Resting only to just under the line sent foragers out to tire again at once. The first sweep held up to 8 carriers, with food home 9 % lower.
-- **REST** (10 s at the hole, the ja-qnx backstop) acts only on an ant that is no longer tired. The arrival rule's freshness test uses the same flag.
+- **`fatigue`** grows by `dt / clock` while the ant is out of its nest with empty jaws, exploring, following or fighting. It stops at twice `patience`.
+- **It falls** at `patience / restTime / clock` per second while the ant is inside its own nest (its hole, or its tunnels and chambers in the side view). Finding food clears it. Digging, spoil and nursing neither tire nor rest it.
+- **Fights tire too.** As first pushed they didn't. Then nothing sent a fighter home, since `localPolicy` only sends the tired home before the raid and defend rules. Raids never ended, and combat losses rose 56–72 % (review of #36).
+- **Tired once fatigue passes `patience`, until fully rested.** Resting only to just under the line sent foragers out to tire again at once.
+- **REST** (10 s at the hole) acts only on an ant that is no longer tired. The arrival rule's freshness test uses the same flag.
 - **`since`** keeps its other jobs: trail strength, backfill timing, the held-food guard.
+  - The benches' "out > 120 s" (`side-bench`, `economy-bench`) still reads `since`, so it now counts foragers resting inside: 5.2 % against 1.1 %, not a regression.
+  - The ant card shows fatigue beside time out.
 
-**`restTime` sweep**, local rule, seeds 1–10:
+**`restTime` sweep**, local rule, seeds 1–10, before fighting tired ants:
 
-| `restTime` | G pass | most held | A3 | G food home (first colony) |
-|---|---|---|---|---|
-| 30 s (chosen) | 10/10 | 2 | 10/10 | 21,448 |
-| 60 s | 9/10 | 3 | 10/10 | 20,181 |
-| 120 s | 8/10 | 4 | 10/10 | 20,228 |
+| `restTime` | G pass | most held | A3 |
+|---|---|---|---|
+| 30 s (chosen) | 10/10 | 2 | 10/10 |
+| 60 s | 9/10 | 3 | 10/10 |
+| 120 s | 8/10 | 4 | 10/10 |
 
-MR 2's local rule brought home 23,704. The difference is foragers resting between bouts.
+`--set colony.restTime` sets the first colony's only; the rival kept 60 s.
 
-**Legend** (`COLONY_BRAIN_VERSION` 5, `RESPONSE_BRAIN_VERSION` 4). The legend now says:
-- that tired means a long unsuccessful search, rested only by staying inside;
-- that going home tired is how the colony stops searching where food has run out;
-- that a fresh ant inside has finished its trip and is needed out;
-- that a carrier answers its own question (replacing "always goes home");
-- what loose soil, corpses and brood are for.
+**The game against `main` (MR 2)**, local rule, after the review's fix (first colony):
 
-**Re-baselined by the owner's choice.** It was asked in the session that built MR 3.1, on 2026-11-03: of "accept and re-baseline", "fatigue for foragers only" and "dig further first", the owner chose the first. The crowded-nest test (`slow/chambers.test`) leaned on the retired foragers. Over 20 games the floor grows ×1.19–3.06, mean 2.21 (`main` 2.45). The digging totals are the same; less of it is chamber floor. Its bound is now at least ×1.5 in every game and ×2 on average; nest 9's backfill regression still fails it. Restoring chamber growth from sensed crowding is ja-k4k.3.
+| Seeds | G pass | most held | porters held over 120 s | food home | losses you / rival | fewest ants left |
+|---|---|---|---|---|---|---|
+| 1–10, `main` | 9/10 | 3 | 1 | 23,704 | 1,663 / 1,974 | 668 |
+| 1–10, MR 3.1 | 9/10 | 3 | **6** | 24,512 | 1,552 / 2,179 | 610 |
+| 11–20, `main` | 10/10 | 2 | 1 | 22,218 | 1,258 / 1,831 | 696 |
+| 11–20, MR 3.1 | 9/10 | 3 | 0 | 20,424 | 1,685 / 1,478 | 646 |
 
-**Hour-long economy** (8 worlds × 2 seedings): 5 of 16 fail the bounds (3 collapse), against `main`'s 6 of 16 (2 collapse) and MR 2's 3 of 16. The knife-edge is unchanged (ja-xu6).
+- **Porters jam the nest** (review of #36): resting foragers crowd the royal chamber's tunnels. On `side-bench 1-6 600 600 2` the porters holding food over 120 s at the end went from 1 to 20. The held guard and assay G leave porters out, so `heldProbe` now reports `maxPorting`, and `slow/side.test` carries a todo for it. This is ja-3po.
+- **Legend** (`COLONY_BRAIN_VERSION` 5, `RESPONSE_BRAIN_VERSION` 4; stance unchanged). The legend now says:
+  - that tired means a long unsuccessful search, rested only by staying inside;
+  - that going home tired is how the colony stops searching where food has run out;
+  - that a fresh ant inside has finished its trip and is needed out;
+  - that a carrier answers its own question;
+  - what loose soil, corpses and brood are for.
+
+**Re-baselined by the owner's choice.** It was asked in the session that built MR 3.1, on 2026-11-03: of "accept and re-baseline", "fatigue for foragers only" and "dig further first", the owner chose the first.
+- The crowded-nest test (`slow/chambers.test`) leaned on the retired foragers. Over 20 games the floor grows ×1.19–3.06, mean 2.21 (`main` 2.45). The digging totals are the same; less of it is chamber floor.
+- Its bound is now at least ×1.5 in every game and ×2 on average. This test's three games measure ×2.08 on average, a 4 % margin. Nest 9's backfill regression still fails it.
+- Restoring chamber growth from sensed crowding is ja-k4k.3.
+
+**Hour-long economy** (`slow/economy.test`'s setup, worlds 1–8, seeding `mulberry32(w × 7919 + n)` for n = 0 and 1): MR 3.1 fails 5 of 16 (3 collapse), `main` (MR 2) 3 of 16 (3 collapse). The earlier "6 of 16" compared with the `main` before MR 2. The knife-edge is unchanged (ja-xu6).
 
 ### 44.3 Live check and replay (2026-11-03)
 
-`colony-live.mjs mode,stance,get,carry,drop` with second rounds: **$0.0045**. Agreement with the local rule:
+`colony-live.mjs mode,stance,get,carry,drop` with second rounds: **$0.0045**. The caches are in `experiments/caches/mr3.1-*.json`. Agreement with the local rule:
 
 | Lane | MR 2 | MR 3.1 |
 |---|---|---|
@@ -2565,24 +2581,34 @@ MR 2's local rule brought home 23,704. The difference is foragers resting betwee
 - **"A fresh ant at home: return"** is gone under Forage. Its remaining disagreements are explorers following faint trails, which its doctrine asks for.
 - **Nurses now take brood.**
 - **Loose soil off the mound is still declined** in 4–5 of 9 situations, despite the legend.
-- **Cost:** real tokens per mode question ~204. `colony-cost --side`: ~587 tokens per question as the game asks them, **$0.072/h** (MR 2: $0.092/h, because fewer situations are met). Response lanes, if asked: about $0.062/h.
 
-**Replayed**, seeds 1–10 (the local rule with fatigue: G food home 21,928):
+**Cost** (`colony-cost --side 5 600 1`, deterministic; review of #36 corrected the figure first reported):
+
+| Lane | `main` (MR 2), tokens per question | MR 3.1, tokens per question |
+|---|---|---|
+| mode | ~546, $0.092/h | ~657, **$0.074/h** (fewer situations met) |
+| get, if asked | 650 | 811 |
+| carry, if asked | 531 | 640 |
+| drop, if asked | 708 | 863 |
+| trail, if asked | 361 | 456 |
+
+The response lanes cost about $0.062/h if asked; the page asks none of them.
+
+**Replayed**, seeds 1–10. The local rule with fatigue: G food home 24,512.
 
 | | Local | Forage | Cautious | Warlike |
 |---|---|---|---|---|
-| G pass (held ≤ 2) | 10/10 | 8/10 | 6/10 | 9/10 |
-| G most held | 2 | 4 | 5 | **73** (one seed) |
-| G food home, first colony | 21,928 | 16,011 (**73 %**; MR 2: 62 %) | 14,150 | 12,048 |
+| G pass (held ≤ 2) | 9/10 | 7/10 | 9/10 | 7/10 |
+| G most held / porters held | 3 / 6 | 4 / 2 | 5 / **49** | 6 / 0 |
+| G food home, first colony (sum) | 24,512 | 18,329 | 13,960 | 15,600 |
+| … as a share of the map's food (median) | 9.6 % | 5.8 % | 5.4 % | 6.0 % |
 | A2a twin, food home | 37 % | 38 % | 38 % | 38 % |
-| A5 out before / after food | **0.48** / 0.86 (MR 2: 0.97 / 0.91) | 0.48 / 0.83 | 0 / 0 | 0.48 / 0.84 |
-| A8 `beyond`, lowest | 0.59 | 0.71 | 0.93 | 0.91 |
+| A5 out before / after food | **0.48** / 0.86 | 0.48 / 0.83 | 0 / 0 | 0.48 / 0.84 |
+| A8 `beyond`, lowest | 0.59 | 0.71 | 0.93 | 0.86 |
 
-- **ja-5ty:** Forage rises from 62 % to 73 % of the local rule's food home. It stays open: the soil answers and the answers' interactions remain.
-- **ja-3sy:** Warlike's food home is up (4.9 % against 0.7 %), but one seed's mill holds 73 carriers. It stays open.
-- **Held-out seeds 11–20** (local):
-  - A3 passes 10/10 and A4 10/10. A8 `beyond` is 0.82–1.00.
-  - **G passes only 7/10** (held up to 6; MR 2: 10/10). On seed 15, food carriers wait 120–145 s in the tunnels near the entrance, on their way to reception. Resting foragers now go into the nest instead of being turned round at the hole.
-  - Resting in the top chamber instead of the royal one did not help (6/10).
-  - Filed as a bead. `slow/side.test`'s seeds 4 and 6 pass.
-- **A5 moves for the first time.** Foragers now rest at home before food appears (0.48 out against 0.97), a step toward MR 5's activation; the pass mark is half the share out after food.
+- **ja-5ty:** Forage brings home 75 % of the local rule's food (18,329 against 24,512). In MR 2 it was 62 % (14,594 against 23,704): Forage's own total rose 26 % while the local rule's rose 3 %. It stays open: the soil answers and the answers' interactions remain.
+- **ja-3sy:** Warlike's food home is 6.0 % of the map (MR 2: 0.7 %, §43.6), and its worst seed holds 6 carriers, not 73 as before the fight fix. Still over the bound, so it stays open.
+- **ja-3po:** Cautious's porters jam the nest (49).
+- **Held-out seeds 11–20** (local): G 9/10 (`main` 10/10); A3 and A4 10/10 before the fight fix.
+- **A5 moves for the first time.** Foragers now rest at home before food appears (0.48 out against 0.97). The pass mark is half the share out after food.
+- **Bisecting:** the two WIP commits (19fceda, 788d013) fail the fast goldens. They stay, since the branch history isn't rewritten.
