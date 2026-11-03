@@ -335,3 +335,32 @@ test("fatigue: fighting out of the nest tires an ant too, so a raid ends with th
   for (let k = 0; k < 30 * 5; k++) c.tick(1 / 30);
   assert.ok(c.fatigue[0]! > 4, `fatigue ${c.fatigue[0]} after 5 s fighting out`);
 });
+
+test("fatigue: it stops at twice patience, so rest from the worst takes twice restTime; the clock slows rest as it slows tiring", () => {
+  const out = (clock: number) => {
+    const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+    c.policy = () => "explore";
+    c.clock[0] = clock;
+    for (let k = 0; k < 30 * 300; k++) {
+      put(c, 0, 30, 6); // kept out, searching
+      c.tick(1 / 30);
+    }
+    return c;
+  };
+  const kept = out(1);
+  assert.equal(kept.fatigue[0], 2 * kept.params.patience, "capped at twice patience after 300 s out");
+  // Rest from the cap, in the nest: ×1 clock takes 2 × restTime; ×2 clock takes twice that.
+  const rest = (c: Colony, seconds: number) => {
+    c.mode[0] = 2;
+    c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+    for (let k = 0; k < 30 * seconds; k++) {
+      put(c, 0, 6, 6);
+      c.tick(1 / 30);
+    }
+    return c.fatigue[0]!;
+  };
+  assert.ok(rest(kept, kept.params.restTime) > 0.9 * kept.params.patience, "restTime rests only half of the cap");
+  const slow = out(2);
+  assert.equal(slow.fatigue[0], 2 * slow.params.patience, "a ×2 clock reaches the cap too, in 240 s");
+  assert.ok(rest(slow, 2 * slow.params.restTime) > 0.9 * slow.params.patience, "with a ×2 clock, 2 × restTime rests only half of the cap");
+});

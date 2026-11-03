@@ -2552,7 +2552,11 @@ The basis is `docs/tiredness.md`:
 | 11–20, `main` | 10/10 | 2 | 1 | 22,218 | 1,258 / 1,831 | 696 |
 | 11–20, MR 3.1 | 9/10 | 3 | 0 | 20,424 | 1,685 / 1,478 | 646 |
 
-- **Porters jam the nest** (review of #36): resting foragers crowd the royal chamber's tunnels. On `side-bench 1-6 600 600 2` the porters holding food over 120 s at the end went from 1 to 20. The held guard and assay G leave porters out, so `heldProbe` now reports `maxPorting`, and `slow/side.test` carries a todo for it. This is ja-3po.
+- **Losses on seeds 11–20 are uneven:** the first colony loses 34 % more than on `main` (1,685 against 1,258), and the rival 19 % fewer (1,478 against 1,831). Together they are +2.4 %; on seeds 1–10, +2.6 %. Food home on seeds 11–20 is 8 % lower.
+- **A raider standstill** (re-review of #36): in `side-bench` seed 6, colony 1, from 500 to 550 s, up to ~300 fighters stand still for 20 s or more on the surface between the nests, then disperse. That is 10,253 ant-seconds stuck on the ground against `main`'s 104. Losses on that seed are below `main`'s. Bead filed.
+- **Porters: mostly a measurement artefact** (re-review of #36). `side-bench`'s porter count read `since`, which `#becomePorter` doesn't reset, so a forager that had rested inside over 120 s counted the moment it took food on. It now uses its own hold clock: on `side-bench 1-6 600 600 2`, 0 porters held over 120 s at the end on both MR 3.1 and `main` (peaks 3 and 1). The "1 → 20" first reported was the old clock.
+  - A jam was real on af0a548 (seed 6: 9 at the end); fighting tiring removed it.
+  - `heldProbe`'s `maxPorting` (own clock) is at most 6 on G seeds 1–10 and 0 on 11–20; Cautious's replay reaches 49. ja-3po keeps those, and `slow/side.test` keeps a todo guard.
 - **Legend** (`COLONY_BRAIN_VERSION` 5, `RESPONSE_BRAIN_VERSION` 4; stance unchanged). The legend now says:
   - that tired means a long unsuccessful search, rested only by staying inside;
   - that going home tired is how the colony stops searching where food has run out;
