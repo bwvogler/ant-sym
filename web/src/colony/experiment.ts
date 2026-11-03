@@ -122,24 +122,44 @@ export function foodIn(map: WorldMap, wx: number, wy: number, r: number): number
 
 /**
  * Foragers holding food longer than STUCK_AFTER, the most at any 10-s sample from STUCK_AFTER on, per colony
- * (slow/side.test's measure; porters are not counted).
+ * (slow/side.test's measure; porters are not counted): `maxHeld`. That measure reads the colony's `since`, which the
+ * nest resets every tick, so it misses a carrier that won't put its food down at home; `maxCarrying` counts by the
+ * probe's own clock, from pickup to put-down, wherever the ant is (#31's review, ja-1pm).
  */
 export function heldProbe(): Probe {
   const worst: number[] = [];
+  const worstCarry: number[] = [];
+  const carryT: Float64Array[] = [];
   let nextAt = STUCK_AFTER;
   return {
-    tick(game) {
+    tick(game, dt) {
+      game.colonies.forEach((c, k) => {
+        let t = carryT[k];
+        if (!t || t.length < c.n) {
+          const grown = new Float64Array(c.n);
+          if (t) grown.set(t);
+          t = carryT[k] = grown;
+        }
+        for (let i = 0; i < c.n; i++) t[i] = c.alive[i] && c.carrying[i] && !c.porting(i) ? (t[i] as number) + dt : 0;
+      });
       if (game.time + 1e-9 < nextAt) return;
       nextAt += 10;
       game.colonies.forEach((c, k) => {
         let held = 0;
-        for (let i = 0; i < c.n; i++) if (c.alive[i] && c.carrying[i] && !c.porting(i) && (c.since[i] as number) > STUCK_AFTER) held++;
+        let carrying = 0;
+        const t = carryT[k] as Float64Array;
+        for (let i = 0; i < c.n; i++) {
+          if (c.alive[i] && c.carrying[i] && !c.porting(i) && (c.since[i] as number) > STUCK_AFTER) held++;
+          if ((t[i] as number) > STUCK_AFTER) carrying++;
+        }
         worst[k] = Math.max(worst[k] ?? 0, held);
+        worstCarry[k] = Math.max(worstCarry[k] ?? 0, carrying);
       });
     },
     summary() {
       const m: Record<string, number> = {};
       worst.forEach((w, k) => (m[`${sideName(k)}.maxHeld`] = w));
+      worstCarry.forEach((w, k) => (m[`${sideName(k)}.maxCarrying`] = w));
       return m;
     },
   };

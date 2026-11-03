@@ -4,7 +4,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { type Item, localResponses, type Responses, type Touch } from "./responses.ts";
+import { type Item, localResponses, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
@@ -207,7 +207,7 @@ export class Colony {
   responses: Responses = localResponses;
   stance: Stance = "forage";
   /** the situation handed to a response, refilled for each call (#touch): a response reads it and does not keep it */
-  #t: Touch = { mode: "explore", carrying: "none", porter: false, digging: false, atNest: false, enemy: false, stance: "forage" };
+  #t: Touch = { mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage" };
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -738,20 +738,41 @@ export class Colony {
    * Ant i's situation for a response, in the shared Touch object (read it, don't keep it): its mode, load and where it
    * is now. `enemy` comes from the caller (the tick's enemy look, or the fights).
    */
-  touch(i: number, enemy: boolean, mode: number = this.mode[i] as number, item: Item = this.item(i), atNest?: boolean): Touch {
+  touch(i: number, enemy: boolean, mode: number = this.mode[i] as number, item: Item = this.item(i), offered: Item = "none"): Touch {
     const t = this.#t;
     t.mode = MODES[mode] as Mode;
     t.carrying = item;
     t.porter = this.#porter[i] === 1;
     t.digging = (this.digT[i] as number) > 0;
-    if (atNest === undefined) {
-      const dx = (this.x[i] as number) - this.nest.x;
-      const dy = (this.y[i] as number) - this.nest.y;
-      t.atNest = dx * dx + dy * dy < this.nest.r * this.nest.r;
-    } else t.atNest = atNest;
+    t.place = this.place(i);
+    t.offered = offered;
     t.enemy = enemy;
     t.stance = this.stance;
     return t;
+  }
+
+  /**
+   * Where ant i is, as it can tell (responses.ts: Where). Underground (side view): in one of its own chambers, in its own
+   * tunnels, or "out" in a stranger's; on the ground or a top-down map: at its hole (within the nest's radius) or out.
+   * Leaves the shared CELL as it found it.
+   */
+  place(i: number): Where {
+    const keepX = CELL[0] as number;
+    const keepY = CELL[1] as number;
+    let p: Where;
+    if (this.#entrance && this.#under[i]) {
+      this.antCell(i);
+      const cx = CELL[0] as number;
+      const cy = CELL[1] as number;
+      p = !this.#inOwnNest(cx, cy) ? "out" : this.#placeAt(cx, cy) ? "chamber" : "tunnel";
+    } else {
+      const dx = (this.x[i] as number) - this.nest.x;
+      const dy = (this.y[i] as number) - this.nest.y;
+      p = dx * dx + dy * dy < this.nest.r * this.nest.r ? "hole" : "out";
+    }
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    return p;
   }
 
   /** Living ants. */
@@ -2067,7 +2088,7 @@ export class Colony {
    * A nurse (nest slice 4): an idle ant in its royal chamber picks up an egg lying near it and takes it to the brood
    * chamber with the least brood; there, it lays it down. Its brood goes where it goes.
    */
-  #nurse(i: number, dt: number): void {
+  #nurse(i: number, dt: number, enemy: boolean): void {
     const ch = this.map.chambers!;
     this.antCell(i);
     const cx = CELL[0] as number;
@@ -2113,6 +2134,7 @@ export class Colony {
       if (b.held < 0 && hexDistance(b.x, b.y, cx, cy) <= 2 && ((inRoyal && b.stage === EGG && to >= 0) || b.chamber < 0)) {
         if (to < 0) to = royal;
         if (to < 0) return;
+        if (!this.responses.get(this.touch(i, enemy, this.mode[i] as number, "none", "brood"))) return;
         b.held = i;
         if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
         b.chamber = -1;
@@ -2144,6 +2166,7 @@ export class Colony {
     if (outside ? Math.abs(cx - this.#entranceCol) > MIDDEN_NEAR : this.band(i) !== 1 || (mode === FIGHT && !this.#inOwnNest(cx, cy))) return;
     for (const k of this.corpses)
       if (k.held < 0 && hexDistance(k.x, k.y, cx, cy) <= 2) {
+        if (!this.responses.get(this.touch(i, !calm, mode, "none", "corpse"))) return;
         k.held = i;
         this.#clearPellet(i);
         this.#corpse[i] = 1;
@@ -2678,7 +2701,7 @@ export class Colony {
    * it down into the nest to refill unused space, as leaf-cutting ants refill excess space (Pielström & Roces).
    * True if it picked one up.
    */
-  #pickLoose(i: number, cx: number, cy: number): boolean {
+  #pickLoose(i: number, cx: number, cy: number, enemy: boolean): boolean {
     const { map } = this;
     if (!map.loose) return false;
     const u = this.#rng();
@@ -2693,6 +2716,7 @@ export class Colony {
       const steep = groundTop(map, tx + out) - ty >= 1;
       const fill = u < LOOSE_FILL_PICK;
       if (!fill && !steep) continue;
+      if (!this.responses.get(this.touch(i, enemy, this.mode[i] as number, "none", "soil"))) return false;
       if (!takeLoose(map, tx, ty)) continue;
       this.#takeUpLoose(i, tx, fill);
       return true;
@@ -3309,7 +3333,7 @@ export class Colony {
       const ent = this.#entrance;
       const atEntrance = ent !== null && Math.hypot((this.x[i] as number) - ent.x, (this.y[i] as number) - ent.y) < ent.r;
       this.antCell(i);
-      if (!carrying && !pellet && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, atNest)) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
+      if (!carrying && !pellet && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, "food")) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
         this.#homeAfresh(i);
         this.since[i] = 0;
@@ -3347,7 +3371,7 @@ export class Colony {
         this.looseBack++;
         this.wall[i] = 0;
         this.mx[i] = NaN;
-      } else if (ent && !carrying && !pellet && mode === EXPLORE && isSky(map, CELL[0] as number, CELL[1] as number) && this.#enteredCell(i) && this.#pickLoose(i, CELL[0] as number, CELL[1] as number)) {
+      } else if (ent && !carrying && !pellet && mode === EXPLORE && isSky(map, CELL[0] as number, CELL[1] as number) && this.#enteredCell(i) && this.#pickLoose(i, CELL[0] as number, CELL[1] as number, toEnemy !== null)) {
         // Picked up a loose pellet off the mound (see #pickLoose).
       } else if (atNest && !(pellet && ent)) {
         this.wall[i] = 0;
@@ -3356,7 +3380,7 @@ export class Colony {
         this.bestD[i] = Infinity;
         this.stallT[i] = 0;
         if ((this.since[i] as number) > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
-        if (carrying && !this.queen && resp.drop(this.touch(i, toEnemy !== null, mode, item, atNest))) {
+        if (carrying && !this.queen && resp.drop(this.touch(i, toEnemy !== null, mode, item))) {
           this.carrying[i] = 0;
           this.stored++;
           this.larder++;
@@ -3417,7 +3441,7 @@ export class Colony {
         if (this.#under[i] && (ph.fields.home.get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) >= STRONG || ph.fields[this.#destMark(i)].get(CELL[0] as number, CELL[1] as number) * (this.gainHome[i] as number) * (this.gainMarks[i] as number) >= STRONG)) this.odoNest[i] = (this.odoNest[i] as number) * Math.exp(-dt / ROAD_SIGN);
         if (this.map.chambers) this.#layMark(i, dt);
         if (this.queen) {
-          this.#nurse(i, dt);
+          this.#nurse(i, dt, toEnemy !== null);
           if (this.#port(i, dt, toEnemy !== null)) h += Math.PI;
           this.#undertake(i, dt, toEnemy === null);
         }

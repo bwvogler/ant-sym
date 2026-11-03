@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
-import { Colony } from "../colony.ts";
+import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
+import { Game } from "../game.ts";
 import { packResponseRequest, readResponse, RESPONSE_HOOKS, responseContext, responsesFromAnswers } from "../colonyBrain.ts";
-import { localResponses, responses, touchKey, type Touch } from "../responses.ts";
-import { foodAt, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
+import { type Item, localResponses, responses, touchKey, type Touch } from "../responses.ts";
+import { foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, nestAt, put } from "./hexmaps.ts";
 
 // The ant's response hooks (responses.ts): the local ones are the rules the colony had (the golden masters
@@ -19,7 +20,7 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
 }
 
-const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, atNest: false, enemy: false, stance: "forage", ...t });
+const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", ...t });
 
 /** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
 function forage(c: Colony, seconds = 20): { picked: boolean } {
@@ -34,11 +35,12 @@ function forage(c: Colony, seconds = 20): { picked: boolean } {
 }
 
 test("localResponses are the colony's rules before the hooks", () => {
-  assert.equal(localResponses.get(touch({})), true);
-  assert.equal(localResponses.get(touch({ mode: "fight" })), false, "not mid-fight");
+  assert.equal(localResponses.get(touch({ offered: "food" })), true);
+  assert.equal(localResponses.get(touch({ mode: "fight", offered: "food" })), false, "not mid-fight");
+  for (const offered of ["soil", "corpse", "brood"] as const) assert.equal(localResponses.get(touch({ mode: "fight", offered })), true, `${offered}: the mechanic decides`);
   assert.equal(localResponses.carry(touch({ carrying: "food" })), "return");
   assert.equal(localResponses.carry(touch({ carrying: "corpse" })), "return");
-  assert.equal(localResponses.drop(touch({ carrying: "food", atNest: true })), true);
+  assert.equal(localResponses.drop(touch({ carrying: "food", place: "chamber" })), true);
   assert.equal(localResponses.trail(touch({ carrying: "food" })), "food");
   assert.equal(localResponses.trail(touch({})), "home");
   assert.equal(localResponses.trail(touch({ carrying: "brood" })), "home", "a nurse marks the way home");
@@ -126,13 +128,13 @@ test("touch: what a response sees of an ant", () => {
   const c = new Colony(corridor(3), { antCount: 2, maxAnts: 2 }, mulberry32(1));
   c.carrying[1] = 1;
   put(c, 1, 30, 6);
-  assert.deepEqual({ ...c.touch(0, false) }, touch({ atNest: true }));
+  assert.deepEqual({ ...c.touch(0, false) }, touch({ place: "hole" }));
   assert.deepEqual({ ...c.touch(1, true) }, touch({ carrying: "food", enemy: true }));
   assert.equal(c.item(1), "food");
 });
 
 test("response lanes: one question per situation, cached per hook and doctrine", () => {
-  assert.equal(touchKey(touch({ carrying: "food", atNest: true })), "explore|food|-|-|nest|clear|forage");
+  assert.equal(touchKey(touch({ carrying: "food", place: "chamber" })), "explore|food|-|-|chamber|none|clear|forage");
   for (const h of RESPONSE_HOOKS) {
     const req = packResponseRequest(h, [{ id: "s0", situation: touch({}) }, { id: "s1", situation: touch({ mode: "fight", enemy: true }) }], "Gather food.");
     assert.equal(Object.keys(req.questions).length, 2, h);
@@ -161,4 +163,34 @@ test("responsesFromAnswers: cached answers win, the local responses cover the re
   assert.equal(r.carry(touch({ carrying: "food" })), "return", "no cache for carry: local");
   assert.equal(r.trailRate(t), localResponses.trailRate(t), "hooks that are not lanes stay local");
   assert.deepEqual(heard, ["get:true", "get:false", "trail:true"]);
+});
+
+test("get is asked for loose soil, corpses and brood too, and refusing one leaves it lying", () => {
+  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
+  /** A side-view game with dead to bury, run for 150 s; what get was offered, and the most ants holding each item at once. */
+  const run = (refuse: Item | null) => {
+    const map = generateSideWorld(2, SMALL);
+    const g = new Game(map, { antCount: 200, rival: false }, mulberry32(4));
+    const c = g.player;
+    const offered = new Set<Item>();
+    c.responses = responses({ get: (t) => (offered.add(t.offered), t.offered !== refuse && localResponses.get(t)) });
+    for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN * (i % 2); // half young (nurses), half middle-aged (undertakers)
+    const held: Partial<Record<Item, number>> = {};
+    for (let k = 0; k < 30 * 150; k++) {
+      if (k === 30 * 20) for (let i = 0, n = 0; i < c.n && n < 20; i++) if (c.alive[i] && c.item(i) === "none" && c.y[i]! > map.nest.entrance!.y + 3) (c.kill(i), n++);
+      g.tick(1 / 30);
+      if (k % 30 === 0) {
+        const now: Partial<Record<Item, number>> = {};
+        for (let i = 0; i < c.n; i++) if (c.alive[i]) now[c.item(i)] = (now[c.item(i)] ?? 0) + 1;
+        for (const [it, n] of Object.entries(now) as [Item, number][]) held[it] = Math.max(held[it] ?? 0, n);
+      }
+    }
+    return { offered, held, loose: c.loosePicked };
+  };
+  const local = run(null);
+  for (const it of ["food", "soil", "corpse", "brood"] as const) assert.ok(local.offered.has(it), `get was offered ${it}`);
+  assert.ok((local.held.corpse ?? 0) > 0 && (local.held.brood ?? 0) > 0 && local.loose > 0, JSON.stringify(local));
+  assert.equal(run("corpse").held.corpse ?? 0, 0, "no corpse taken up");
+  assert.equal(run("brood").held.brood ?? 0, 0, "no brood taken up");
+  assert.equal(run("soil").loose, 0, "no loose pellet taken up");
 });
