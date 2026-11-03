@@ -46,11 +46,20 @@ export interface Touch {
 
 export type Trail = "food" | "home" | "none";
 
+/** What a carrier does with its load: take it where it belongs, or put it down where it stands. */
+export const CARRY = ["take", "put down"] as const;
+export type Carry = (typeof CARRY)[number];
+
 export interface Responses {
   /** Empty jaws, touching something it could take (`offered`: food, loose soil, a corpse, brood): take it? */
   get(t: Touch): boolean;
-  /** Carrying anything: which mode to be in (asked every step while carrying; the mode policy is not asked then). */
-  carry(t: Touch): Mode;
+  /**
+   * Carrying anything (asked every step while carrying; the mode policy is not asked then): take it where it belongs
+   * (food home to the nest's chambers, a porter's to the chamber that wants it, soil out to the mound, a corpse to the
+   * midden, brood to a brood chamber), going home to do it; or put it down here, and be asked afresh. (Carrying no
+   * longer has a mode to choose: told to explore or fight with food in its jaws, an ant stranded it, ja-1pm.)
+   */
+  carry(t: Touch): Carry;
   /** Carrying food, at a place it can put it down (the nest on a top-down map; its chamber in the side view): put it down? */
   drop(t: Touch): boolean;
   /** Which trail to lay this step. */
@@ -64,13 +73,13 @@ export interface Responses {
 }
 
 /**
- * The rules before the hooks, unchanged: take food unless fighting (soil, corpses and brood: whenever the mechanic offers them); anything carried goes home; put food down
+ * The rules before the hooks, unchanged: take food unless fighting (soil, corpses and brood: whenever the mechanic offers them); anything carried is taken where it belongs; put food down
  * where it goes; walking out marks the way home and carrying food the way to it, while soil, corpse and
  * porter carriers lay nothing; shy from alarm unless fighting or digging; always raise it in a fight.
  */
 export const localResponses: Responses = {
   get: (t) => t.offered !== "food" || t.mode !== "fight",
-  carry: () => "return",
+  carry: () => "take",
   drop: () => true,
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
   trailRate: () => 1,

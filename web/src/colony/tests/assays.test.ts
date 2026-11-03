@@ -49,7 +49,7 @@ test("overrides: responses replace the assay's own hook by hook", () => {
   const t = { mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage" } as const;
   assert.equal(spec.sides?.responses?.get(t), false);
   assert.equal(spec.sides?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
-  assert.equal(spec.sides?.responses?.carry(t), "return");
+  assert.equal(spec.sides?.responses?.carry(t), "take");
 });
 
 for (const seed of [1, 2]) {

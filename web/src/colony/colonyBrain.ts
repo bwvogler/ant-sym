@@ -1,7 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
-import { localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
+import { CARRY, type Carry, localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -138,7 +138,16 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
     case "drop":
       return { [`${id}_drop`]: { type: "noul", instructions: `Going by the doctrine, ${ant} is carrying food where it can put it down (its nest, or the chamber the food goes to): should it put it down here?` } };
     case "carry":
-      return { [`${id}_carry`]: { type: "choice", instructions: `Going by the doctrine, ${ant} is carrying something: what should it do?`, criteria: MODE_CRITERIA } };
+      return {
+        [`${id}_carry`]: {
+          type: "choice",
+          instructions: `Going by the doctrine, ${ant} is carrying what carrying says: what should it do with it?`,
+          criteria: {
+            take: "take: carry it where it belongs (food home into the nest, for the colony's larvae and stores; a porter's food to the chamber that wants it; soil out to the mound; a corpse to the midden; brood to a brood chamber)",
+            "put down": "put down: put it down here, where it stands, and do something else",
+          },
+        },
+      };
     case "trail":
       return {
         [`${id}_trail`]: {
@@ -178,7 +187,7 @@ export function cacheContexts(doctrine: string): Record<"mode" | "stance" | Resp
 }
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
-export type ResponseAnswer = boolean | Mode | Trail;
+export type ResponseAnswer = boolean | Carry | Trail;
 const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
 
 /**
@@ -190,7 +199,7 @@ export function readResponse(hook: ResponseHook, answers: Record<string, JevAnsw
   if (!a) return null;
   if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
   if (a.type !== "choice") return null;
-  if (hook === "carry") return (MODES as readonly string[]).includes(a.choice) ? (a.choice as Mode) : null;
+  if (hook === "carry") return (CARRY as readonly string[]).includes(a.choice) ? (a.choice as Carry) : null;
   return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
 }
 

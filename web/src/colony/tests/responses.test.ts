@@ -38,8 +38,8 @@ test("localResponses are the colony's rules before the hooks", () => {
   assert.equal(localResponses.get(touch({ offered: "food" })), true);
   assert.equal(localResponses.get(touch({ mode: "fight", offered: "food" })), false, "not mid-fight");
   for (const offered of ["soil", "corpse", "brood"] as const) assert.equal(localResponses.get(touch({ mode: "fight", offered })), true, `${offered}: the mechanic decides`);
-  assert.equal(localResponses.carry(touch({ carrying: "food" })), "return");
-  assert.equal(localResponses.carry(touch({ carrying: "corpse" })), "return");
+  assert.equal(localResponses.carry(touch({ carrying: "food" })), "take");
+  assert.equal(localResponses.carry(touch({ carrying: "corpse" })), "take");
   assert.equal(localResponses.drop(touch({ carrying: "food", place: "chamber" })), true);
   assert.equal(localResponses.trail(touch({ carrying: "food" })), "food");
   assert.equal(localResponses.trail(touch({})), "home");
@@ -77,18 +77,25 @@ test("drop: an ant whose drop response says no keeps its food at the nest", () =
   assert.equal(d.stored, 1, "the local rule stores it");
 });
 
-test("carry: the carry response decides the carrier's mode, and the mode policy is not asked", () => {
+test("carry: a carrier takes its load home without the mode policy being asked; told to put it down, it does, and the food lies there", () => {
   let asked = 0;
   const c = new Colony(corridor(3), { antCount: 1, wander: 0 }, mulberry32(1), (s) => (asked++, s.mode));
-  c.responses = responses({ carry: () => "explore" });
   put(c, 0, 14, 6); // on the food cell
   c.heading[0] = 0;
   c.tick(1 / 30); // picks the food up
   assert.equal(c.carrying[0], 1);
   const before = asked;
   c.tick(1 / 30);
-  assert.equal(c.mode[0], 0, "explore, as the carry response said");
+  assert.equal(c.mode[0], 2, "taking it home: return");
   assert.equal(asked, before, "the mode policy is not asked while carrying");
+  put(c, 0, 20, 6); // off the food, so it doesn't take its load straight up again
+  const onMap = c.map.foodLeft;
+  c.responses = responses({ carry: () => "put down" });
+  c.tick(1 / 30);
+  assert.equal(c.carrying[0], 0, "put down");
+  assert.equal(c.map.foodLeft, onMap + 1, "the food is back on the map, not lost");
+  assert.notEqual(c.mode[0], 2, "and its trip is over");
+  assert.equal(c.stored, 0);
 });
 
 test("trail: no trail laid when the response says none; double when trailRate says 2", () => {
@@ -147,7 +154,8 @@ test("readResponse: nouls are yes strictly above ½; choices must be one of the 
   assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.9 } }, "s0"), true);
   assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.5 } }, "s0"), false);
   assert.equal(readResponse("drop", { s0_drop: { type: "choice", choice: "yes" } }, "s0"), null);
-  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "return" } }, "s0"), "return");
+  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "put down" } }, "s0"), "put down");
+  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "return" } }, "s0"), null, "a mode is no carry answer any more");
   assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "dance" } }, "s0"), null);
   assert.equal(readResponse("trail", { s0_trail: { type: "choice", choice: "none" } }, "s0"), "none");
   assert.equal(readResponse("trail", {}, "s0"), null);
@@ -160,7 +168,7 @@ test("responsesFromAnswers: cached answers win, the local responses cover the re
   assert.equal(r.get(t), false);
   assert.equal(r.get(touch({})), true, "not cached: local");
   assert.equal(r.trail(t), "none");
-  assert.equal(r.carry(touch({ carrying: "food" })), "return", "no cache for carry: local");
+  assert.equal(r.carry(touch({ carrying: "food" })), "take", "no cache for carry: local");
   assert.equal(r.trailRate(t), localResponses.trailRate(t), "hooks that are not lanes stay local");
   assert.deepEqual(heard, ["get:true", "get:false", "trail:true"]);
 });
