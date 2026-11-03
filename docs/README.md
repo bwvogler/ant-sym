@@ -9,6 +9,7 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 | [ant-communication.md](ant-communication.md) | research | Signal channels (trail, alarm, contact, vibration, trophallaxis), their ranges and lifetimes, recognising rival colonies, and combat laws. |
 | [nest-and-home.md](nest-and-home.md) | research + design (built) | How ants find home outside (path integration, landmarks, entrance odour) and inside (gravity, memory, floor marks); the queen; nest architecture; jobs by place and age. Designs nest slices 0–9. |
 | [fungus-policy.md](fungus-policy.md) | research + design (built) | What real parasites do to ants (*Rickia*, *Ophiocordyceps*, *Pandora*, supercolonies, response thresholds); about 35 levers the fungus could pull; the fungus policy; more colonies and other species. |
+| [tiredness.md](tiredness.md) | research + design (built, MR 3.1) | When a forager gives up a search and how it recovers: search time sets trip length, rest between bouts inside, inactive reserve workers. Basis for the ant's `fatigue`. |
 | [queens-and-merging.md](queens-and-merging.md) | research + design (not built) | Several queens, adoption, and orphaned colonies merging as a route to unification. |
 
 ## Records
