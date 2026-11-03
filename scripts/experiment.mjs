@@ -88,9 +88,11 @@ async function main() {
   if (policy) {
     if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file>`);
     const cache = loadCache(policy.slice(6));
-    const { COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } = await import("../web/src/colony/colonyBrain.ts");
+    const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } = await import("../web/src/colony/colonyBrain.ts");
     const want = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
     if (JSON.stringify(cache.version) !== JSON.stringify(want)) fail(`${policy.slice(6)} was asked under brain versions ${JSON.stringify(cache.version)}; the code is at ${JSON.stringify(want)}. Ask afresh (scripts/colony-live.mjs).`);
+    // Versions are bumped by hand; the contexts (legend, question wording, doctrine) catch an edit made without a bump.
+    if (JSON.stringify(cache.contexts) !== JSON.stringify(cacheContexts(cache.doctrine?.text ?? ""))) fail(`${policy.slice(6)} was asked under other questions or another doctrine than the code's (cache contexts differ). Ask afresh (scripts/colony-live.mjs).`);
     const n = (t) => Object.keys(t ?? {}).length;
     console.log(`Replaying Jev's answers under the doctrine "${cache.doctrine?.name ?? "?"}" (${cache.view ?? "?"} view, seed ${cache.seed}): ${n(cache.modes)} modes, ${n(cache.stances)} stances, ${Object.entries(cache.responses ?? {}).map(([h, t]) => `${n(t)} ${h}`).join(", ")}.`);
   }
@@ -144,7 +146,12 @@ async function main() {
       if (policy) {
         // How much of the result was Jev: cache hits per lane, over every lookup of every seed.
         const sum = {};
-        for (const r of runs) for (const [lane, { hit, miss }] of Object.entries(r.lookups ?? {})) ((sum[lane] ??= { hit: 0, miss: 0 }), (sum[lane].hit += hit), (sum[lane].miss += miss));
+        for (const r of runs)
+          for (const [lane, { hit, miss }] of Object.entries(r.lookups ?? {})) {
+            const t = (sum[lane] ??= { hit: 0, miss: 0 });
+            t.hit += hit;
+            t.miss += miss;
+          }
         const parts = Object.entries(sum).filter(([, v]) => v.hit + v.miss > 0).map(([lane, v]) => `${lane} ${Math.round((100 * v.hit) / (v.hit + v.miss))} % of ${(v.hit + v.miss).toLocaleString()}`);
         console.log(`Jev's answers (cache hits; the rest the local rule): ${parts.join(", ") || "no lookups"}\n`);
       }

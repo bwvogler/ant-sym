@@ -30,6 +30,7 @@ import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
 import {
+  cacheContexts,
   COLONY_BRAIN_VERSION,
   DOCTRINES,
   estimateTokens,
@@ -55,13 +56,26 @@ const VERSIONS = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, r
 
 const args = process.argv.slice(2);
 const opts = { lanes: "all", budget: 0.1, seconds: 300, seed: 1, ants: 600, top: false, doctrines: "forage,cautious,warlike", from: null, dry: false };
+const given = new Set(); // the game options given on the command line (a second round takes the rest from its cache)
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
   if (a === "--budget") opts.budget = Number(args[++k]);
-  else if (a === "--seconds") opts.seconds = Number(args[++k]);
-  else if (a === "--seed") opts.seed = Number(args[++k]);
-  else if (a === "--ants") opts.ants = Number(args[++k]);
-  else if (a === "--top") opts.top = true;
+  else if (a === "--seconds") {
+    opts.seconds = Number(args[++k]);
+    given.add("seconds");
+  }
+  else if (a === "--seed") {
+    opts.seed = Number(args[++k]);
+    given.add("seed");
+  }
+  else if (a === "--ants") {
+    opts.ants = Number(args[++k]);
+    given.add("ants");
+  }
+  else if (a === "--top") {
+    opts.top = true;
+    given.add("top");
+  }
   else if (a === "--doctrines") opts.doctrines = args[++k];
   else if (a === "--from") opts.from = args[++k];
   else if (a === "--dry") opts.dry = true;
@@ -89,6 +103,17 @@ const base = opts.from ? JSON.parse(readFileSync(opts.from, "utf8")) : null;
 if (base && JSON.stringify(base.version) !== JSON.stringify(VERSIONS)) {
   console.error(`${opts.from} was asked under brain versions ${JSON.stringify(base.version)}; the code is at ${JSON.stringify(VERSIONS)}. Ask afresh.`);
   process.exit(1);
+}
+// Versions are bumped by hand; the contexts also catch a legend or question edited without a bump.
+if (base && JSON.stringify(base.contexts) !== JSON.stringify(cacheContexts(base.doctrine?.text ?? ""))) {
+  console.error(`${opts.from} was asked under other questions or another doctrine than the code's (cache contexts differ). Ask afresh.`);
+  process.exit(1);
+}
+// A second round replays the cache's own game unless told otherwise.
+if (base) {
+  if (!given.has("seed")) opts.seed = base.seed ?? opts.seed;
+  if (!given.has("ants")) opts.ants = base.ants ?? opts.ants;
+  if (!given.has("seconds")) opts.seconds = base.seconds ?? opts.seconds;
 }
 const doctrines = base
   ? [base.doctrine]
@@ -144,8 +169,11 @@ async function ask(req) {
 
 let spentTokens = 0;
 const report = [];
-const caches = Object.fromEntries(doctrines.map((d) => [d.id, base ? structuredClone(base) : { version: VERSIONS, view, seed: opts.seed, doctrine: d, modes: {}, stances: {}, responses: {} }]));
+const caches = Object.fromEntries(
+  doctrines.map((d) => [d.id, base ? structuredClone(base) : { version: VERSIONS, contexts: cacheContexts(d.text), view, seed: opts.seed, ants: opts.ants, seconds: opts.seconds, doctrine: d, modes: {}, stances: {}, responses: {} }]),
+);
 let stopped = false;
+let failure = null;
 try {
   outer: for (const d of doctrines) {
     for (const lane of chosen) {
@@ -170,7 +198,17 @@ try {
         row.asked += chunk.length;
         row.requests++;
         if (opts.dry) continue;
-        const { answers, inputTokens } = await ask(req);
+        let reply;
+        try {
+          reply = await ask(req);
+        } catch (e) {
+          // Keep what was paid for: stop here, and still write the answers so far.
+          failure = e;
+          stopped = true;
+          console.error(`stopping: ${d.id}/${lane} batch ${b / BATCH + 1} failed: ${e.message}`);
+          break outer;
+        }
+        const { answers, inputTokens } = reply;
         spentTokens += inputTokens;
         row.realTokens += inputTokens;
         chunk.forEach(([k, s], n) => {
@@ -198,7 +236,7 @@ try {
 }
 
 const tokens = opts.dry ? report.reduce((a, r) => a + r.estTokens, 0) : spentTokens;
-console.log(`\n${opts.dry ? "would spend" : "spent"} ≈ ${tokens.toLocaleString()} input tokens ≈ $${(tokens * USD_PER_INPUT_TOKEN).toFixed(4)} of a $${opts.budget} budget${stopped ? " (stopped at the budget)" : ""}`);
+console.log(`\n${opts.dry ? "would spend" : "spent"} ≈ ${tokens.toLocaleString()} input tokens ≈ $${(tokens * USD_PER_INPUT_TOKEN).toFixed(4)} of a $${opts.budget} budget${failure ? " (stopped by a failed request: partial caches written)" : stopped ? " (stopped at the budget)" : ""}`);
 if (opts.dry) process.exit(0);
 
 // Where Jev and the local rule part ways, per doctrine and lane (a few examples each).
@@ -217,5 +255,6 @@ const dir = new URL("../experiments/out/", import.meta.url).pathname;
 mkdirSync(dir, { recursive: true });
 const files = doctrines.map((d) => (base ? opts.from : `${dir}jev-cache-${d.id}.json`));
 doctrines.forEach((d, k) => writeFileSync(files[k], JSON.stringify(caches[d.id], null, 1)));
-writeFileSync(`${dir}jev-live-report${base ? "-round2" : ""}.json`, JSON.stringify({ when: new Date().toISOString(), opts, spentTokens, usd: spentTokens * USD_PER_INPUT_TOKEN, report }, null, 1));
+writeFileSync(`${dir}jev-live-report${base ? "-round2" : ""}.json`, JSON.stringify({ when: new Date().toISOString(), opts, spentTokens, usd: spentTokens * USD_PER_INPUT_TOKEN, failure: failure?.message ?? null, report }, null, 1));
 console.log(`\ncaches: ${files.join(", ")} · report in experiments/out/`);
+if (failure) process.exitCode = 1;

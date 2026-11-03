@@ -2226,10 +2226,10 @@ The plan (beads ja-eyk … ja-6df; the design is from `claude/fungus-behavior-pa
 
 ### 42.1 The harness (MR 0)
 
-- **One seeding scheme.** `game.gameRng(seed, generation)` is the page's `mulberry32(seed × 7919 + generation)`. The page, `runGame`, `colony-cost --side` and `colony-live` use it, so a number measured offline reproduces on the page with the same seed (ja-jdu; §9's old figures stay as measured). The top-down benches keep their documented seeds.
+- **One seeding scheme.** `game.gameRng(seed, generation)` is the page's `mulberry32(seed × 7919 + generation)`. The page, `runGame`, `colony-cost --side` and `colony-live` use it, so a number measured offline reproduces on the page with the same seed (ja-jdu; §9's old figures stay as measured). The benches (`colony-bench`, `side-bench` and the like) keep their own inline seeding on purpose: their `root=` option measures older checkouts, which have no `gameRng`. The same goes for tests that build a game directly.
 - **`colony/experiment.ts`**:
   - `runGame` builds the page's side-view game by default, or any map. It takes `Sides` (each colony's policy, strategist, params and responses), scripted events (paint, add food, any call) and probes.
-  - Probes: `heldProbe` (foragers holding food over 120 s, as `slow/side.test` counts them), occupancy of regions, and ants near a spot.
+  - Probes: `heldProbe` (foragers holding food over 120 s, as `slow/side.test` counts them), occupancy of regions, and ants near a spot. `heldProbe` and assay G deliberately repeat `slow/side.test`'s measure and bound (≤ 2), so a sweep and the guard agree.
   - Arenas are top-down hex maps drawn in cell coordinates (`Arena`); probes and events work in world units.
 - **Tunable at today's values:** pheromone channels per colony (`colony.channels.food.evaporation`, merged per channel and field), `enemyRange`, and the second colony's params and brains.
 - **`npm run exp -- <assays|all> [--seeds 1-10] [--set colony.deposit=2,4,8 …]`** runs the cross product of every `--set` over the seeds in worker threads. It prints the median, min and max of each metric with the pass count, and can write JSON.
@@ -2278,7 +2278,7 @@ The plan (beads ja-eyk … ja-6df; the design is from `claude/fungus-behavior-pa
 - **No behaviour change, and no cost:**
   - both golden masters pass bit for bit;
   - `colony-bench`, 600 + 600 side view: 4.92 ms/tick on main, 4.90 with the hooks, with identical food stored and soil dug.
-- **Jev.** `get`, `carry`, `drop` and `trail` each have a lane in `colonyBrain.ts`: a packer, `RESPONSE_LEGEND`, `readResponse` (a noul is yes strictly above ½), `responsesFromAnswers`, and a context per hook and doctrine. They sit under their own `RESPONSE_BRAIN_VERSION` 1. The page does not ask them.
+- **Jev.** `get`, `carry`, `drop` and `trail` each have a lane in `colonyBrain.ts`: a packer, `RESPONSE_LEGEND`, `readResponse` (a noul is yes strictly above ½), `responsesFromAnswers`, and a context per hook and doctrine. They sit under their own `RESPONSE_BRAIN_VERSION` 2. It became 2 after review, when the legend's "within two steps" became "within the colony's enemy range", since `enemyRange` is now tunable. The page does not ask them.
 - **Mode lane:** its schema, legend and `COLONY_BRAIN_VERSION` (4) are unchanged, so tokens per ant are unchanged. `colony-cost -- --side 5 600 1` gives ~581 tok per question and $0.091/h.
 - **Response lanes, if asked:** get ~553, carry ~441, drop ~581 and trail ~318 tok per question, about $0.027/h more.
 
@@ -2288,9 +2288,10 @@ The plan (beads ja-eyk … ja-6df; the design is from `claude/fungus-behavior-pa
 - runs one headless game, the page's side view (seed 1, 600 + 600, 300 s, alarm painted about every 20 s);
 - collects every distinct situation of each lane;
 - asks Jev each one per doctrine through the server's `JevClient`, in requests of up to 100, under a hard budget;
-- saves one cache per doctrine, with the brain versions it was asked under.
+- saves one cache per doctrine, with the brain versions and every lane's cache context it was asked under, and the game it played (seed, ants, seconds, view);
+- if a request fails, it stops and still writes what was already paid for.
 
-`npm run exp -- … --policy cache:<file>` replays a cache offline. It refuses a cache asked under other versions, and reports cache hits per lane, so each result says how much of it was Jev. `colony-live --from <cache>` is a second round: it asks only the situations the replay met that the cache lacked.
+`npm run exp -- … --policy cache:<file>` replays a cache offline. It refuses a cache asked under other versions or other contexts (a legend or question edited without a version bump, or another doctrine), and reports cache hits per lane, so each result says how much of it was Jev. `colony-live --from <cache>` is a second round: it replays the cache's own game and asks only the situations the replay met that the cache lacked. The caches measured below were asked under `RESPONSE_BRAIN_VERSION` 1; they no longer replay against the code, which is as intended.
 
 **Spent: $0.0036** (87k input tokens: round 1 $0.0033, the Forage second round $0.0003).
 

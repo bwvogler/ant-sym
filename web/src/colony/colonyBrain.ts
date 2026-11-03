@@ -122,10 +122,10 @@ export function stanceContext(doctrine: string): string {
 }
 
 /** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
-export const RESPONSE_BRAIN_VERSION = 1;
+export const RESPONSE_BRAIN_VERSION = 2;
 
 export const RESPONSE_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside. digging says it is digging at a soil face. atNest says whether it is inside its own nest. enemy says whether ants of another colony are within two steps. stance is what the colony as a whole is doing: forage, defend or raid. doctrine is how the colony wants its ants to behave: follow it.";
+  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside. digging says it is digging at a soil face. atNest says whether it is inside its own nest. enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance is what the colony as a whole is doing: forage, defend or raid. doctrine is how the colony wants its ants to behave: follow it.";
 
 export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail"] as const;
 export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
@@ -165,6 +165,14 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
 /** What a cached response was asked under (hook, legend, wording, doctrine). */
 export function responseContext(hook: ResponseHook, doctrine: string): string {
   return `${hook}-v${RESPONSE_BRAIN_VERSION}-${hash(RESPONSE_LEGEND + JSON.stringify(responseQuestion(hook, "s0")) + doctrine.trim())}`;
+}
+
+/**
+ * Every lane's cache context under one doctrine: what a saved cache of Jev's answers was asked under (legend,
+ * question wording, version, doctrine). A replay refuses a cache whose contexts differ from the code's.
+ */
+export function cacheContexts(doctrine: string): Record<"mode" | "stance" | ResponseHook, string> {
+  return { mode: policyContext(doctrine), stance: stanceContext(doctrine), ...(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, responseContext(h, doctrine)])) as Record<ResponseHook, string>) };
 }
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
