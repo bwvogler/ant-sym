@@ -9,13 +9,18 @@
 // (colonyBrain.estimateTokens); the ledger counts the real ones live.
 //
 // --side plays the side view (the nest, its chambers and in-nest situations: PRD §32), as the app sets it up
-// (generateSideWorld(seed), Game with mulberry32(seed * 7919)); without it, the top-down map (generateWorld) with
+// (generateSideWorld(seed), Game with gameRng(seed), as the page builds it); without it, the top-down map (generateWorld) with
 // the rng this script always used, so earlier figures reproduce.
+//
+// The ant's response lanes (get, carry, drop, trail: colonyBrain.RESPONSE_HOOKS)
+// are estimated too, as if each were asked like the modes; they are not asked
+// by the page yet, so they are reported apart and not in the session's total.
 //
 // Usage: node scripts/colony-cost.mjs [--side] [minutes=10] [ants=600] [seed=1]
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
-import { DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
-import { Game } from "../web/src/colony/game.ts";
+import { DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
+import { localResponses, responses, touchKey } from "../web/src/colony/responses.ts";
+import { Game, gameRng } from "../web/src/colony/game.ts";
 import { generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
@@ -36,15 +41,16 @@ let requests = 0;
 let questions = 0;
 const phases = [];
 
-/** One kind of question, cached per doctrine like ui/colonyJev.ts. */
-function lane(key, pack, contextOf, local) {
+/** One kind of question, cached per doctrine like ui/colonyJev.ts. `acc`, when given, counts its cost apart from the session's. */
+function lane(key, pack, contextOf, local, acc = null) {
   const asked = new Map(); // context → Set of keys
   const queue = new Map(); // key → situation, waiting for the next batch
   return {
     asked,
+    acc,
     policy: (s) => {
       const k = key(s);
-      if (!asked.get(contextOf(doctrine))?.has(k)) queue.set(k, s);
+      if (!asked.get(contextOf(doctrine))?.has(k) && !queue.has(k)) queue.set(k, { ...s }); // a copy: responses share one Touch object
       return local(s); // the stand-in's answer, and what the colony does until Jev answers
     },
     flush() {
@@ -55,9 +61,16 @@ function lane(key, pack, contextOf, local) {
       queue.clear();
       for (let b = 0; b < items.length; b += 100) {
         const chunk = items.slice(b, b + 100);
-        tokens += estimateTokens(pack(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
-        requests++;
-        questions += chunk.length;
+        const t = estimateTokens(pack(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
+        if (acc) {
+          acc.tokens += t;
+          acc.requests++;
+          acc.questions += chunk.length;
+        } else {
+          tokens += t;
+          requests++;
+          questions += chunk.length;
+        }
         for (const [k] of chunk) set.add(k);
       }
     },
@@ -67,11 +80,17 @@ function lane(key, pack, contextOf, local) {
 }
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
-const game = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(side ? seed * 7919 : seed + 7), { policy: modes.policy, stance: stances.policy });
+const hooks = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, lane(touchKey, (items, d) => packResponseRequest(h, items, d), (d) => responseContext(h, d), localResponses[h], { tokens: 0, requests: 0, questions: 0 })]));
+const game = new Game(map, { antCount: ants, rivalAnts: ants }, side ? gameRng(seed) : mulberry32(seed + 7), {
+  policy: modes.policy,
+  stance: stances.policy,
+  responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
+});
 const colony = game.player;
 const flush = () => {
   modes.flush();
   stances.flush();
+  for (const h of RESPONSE_HOOKS) hooks[h].flush();
 };
 
 // The session: a doctrine for each slice of time, the first one again at the end (should be free).
@@ -84,6 +103,7 @@ for (const d of plan) {
   doctrine = d.text;
   modes.clear();
   stances.clear();
+  for (const h of RESPONSE_HOOKS) hooks[h].clear();
   colony.reconsider();
   const before = { tokens, requests, modes: modes.seen(policyContext(doctrine)), stances: stances.seen(stanceContext(doctrine)) };
   const end = t + slice;
@@ -108,3 +128,11 @@ console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situa
 for (const p of phases) console.log(`  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`);
 console.log(`\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${Math.round(tokens / Math.max(1, questions))} tok per question, ${Math.round(colony.decisions / Math.max(1, questions))} mode choices per question)`);
 console.log(`≈ ${usd((tokens * 60) / minutes)} per hour at this pace of retuning (one every ${(slice / 60).toFixed(1)} min); target ≤ $0.25/h`);
+console.log(`\nresponse lanes, if each were asked like the modes (not asked by the page yet; not in the total above):`);
+let rt = 0;
+for (const h of RESPONSE_HOOKS) {
+  const a = hooks[h].acc;
+  rt += a.tokens;
+  console.log(`  ${h.padEnd(6)} ${String(a.questions).padStart(4)} situations · ${String(a.requests).padStart(3)} requests · ~${a.tokens.toLocaleString().padStart(6)} tok ≈ ${usd(a.tokens)} (~${Math.round(a.tokens / Math.max(1, a.questions))} tok per question)`);
+}
+console.log(`  all four ≈ ${usd((rt * 60) / minutes)} per hour more at this pace`);

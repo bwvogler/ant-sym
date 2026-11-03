@@ -4,7 +4,8 @@ import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type 
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
-import type { WorldMap } from "./world.ts";
+import type { Responses } from "./responses.ts";
+import { mulberry32, type WorldMap } from "./world.ts";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
 // The player is neither: the player is the fungus (fungus.ts). `player` and
@@ -41,6 +42,27 @@ export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts:
  * is no win for the fungus.
  */
 export type Outcome = "playing" | "unified" | "fallen";
+
+/** How each side plays: the first colony's policy, strategist and params, and the same for the second (default: the local rule). */
+export interface Sides {
+  policy?: Policy;
+  stance?: StancePolicy;
+  colony?: Partial<ColonyParams>;
+  rival?: Partial<ColonyParams>;
+  rivalPolicy?: Policy;
+  rivalStance?: StancePolicy;
+  /** the first colony's responses (responses.ts; default the local ones), and the second's */
+  responses?: Responses;
+  rivalResponses?: Responses;
+}
+
+/**
+ * The game's random numbers for a seed: one scheme for the page, the experiments and the side-view scripts, so a
+ * number measured offline reproduces on the page with the same seed. `generation` is the page's Restart count.
+ */
+export function gameRng(seed: number, generation = 0): () => number {
+  return mulberry32(seed * 7919 + generation);
+}
 
 /** How far the fungus has come toward one colony (docs/fungus-policy.md §1). */
 export interface Unity {
@@ -102,7 +124,7 @@ export class Game {
   #nextStrategy = 0;
   #rng: () => number;
 
-  constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: { policy?: Policy; stance?: StancePolicy; colony?: Partial<ColonyParams> } = {}) {
+  constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Sides = {}) {
     this.map = map;
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
@@ -110,8 +132,11 @@ export class Game {
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
     const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
+    if (player.responses) mine.responses = player.responses;
     this.colonies = [mine];
-    if (this.params.rival && map.nests.length > 1) this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, nest: 1, odour: 1, tolerance }, rng));
+    if (this.params.rival && map.nests.length > 1)
+      this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 }, rng, player.rivalPolicy ?? localPolicy, player.rivalStance ?? localStance));
+    if (player.rivalResponses && this.colonies[1]) this.colonies[1].responses = player.rivalResponses;
     this.#grids = this.colonies.map(() => new CountGrid());
     this.fungus = new Fungus(map, this.params.fungus);
     this.colonies.forEach((c, k) => {
