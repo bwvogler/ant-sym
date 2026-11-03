@@ -3,6 +3,9 @@ import JevBar from "./ui/JevBar.tsx";
 import JevPanel from "./ui/JevPanel.tsx";
 import Nav from "./ui/Nav.tsx";
 import Panel from "./ui/Panel.tsx";
+import DemoNote from "./ui/DemoNote.tsx";
+import { jevUnavailable } from "./ui/backend.ts";
+import { useBackend } from "./ui/useBackend.ts";
 import { useEngine } from "./ui/useEngine.ts";
 import { useJev } from "./ui/useJev.ts";
 
@@ -21,7 +24,9 @@ export default function App() {
   const blank = engine.targetTotal <= 0;
   const jev = useJev(engine, stats?.formed ?? false, stats?.targetVersion ?? 0, blank);
   const running = jev.state.phase === "running";
-  const startBlocked = controls.brain !== "jev" ? "Switch Brain to Jev first" : blank ? "Type a word or upload a picture first" : null;
+  const backend = useBackend();
+  const demo = backend !== null && !backend.hasBackend;
+  const startBlocked = jevUnavailable(backend) ?? (controls.brain !== "jev" ? "Switch Brain to Jev first" : blank ? "Type a word or upload a picture first" : null);
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -33,6 +38,7 @@ export default function App() {
           ants that form the picture you type, one decision at a time
         </p>
       </header>
+      {demo && <DemoNote />}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div
