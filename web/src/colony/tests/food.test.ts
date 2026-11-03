@@ -146,12 +146,12 @@ test("porters lay no food trail: food moved between chambers is no food to recru
 });
 
 /** The most food drifted from the map's starting total over a two-colony game, every 5 s: map + jaws + larder + brood (1 + fed each) + 4 a birth. */
-function drift(over?: Partial<Responses>): { worst: number; g: Game } {
+function drift(over?: Partial<Responses>, seconds = 300): { worst: number; g: Game } {
   const map = generateSideWorld(1, { ...SMALL, nestCount: 2 });
   const g = new Game(map, { antCount: 200, rivalAnts: 200 }, mulberry32(7));
   if (over) for (const c of g.colonies) c.responses = responses(over);
   let worst = 0;
-  for (let k = 0; k < 30 * 300; k++) {
+  for (let k = 0; k < 30 * seconds; k++) {
     g.tick(1 / 30);
     if (k % 150) continue;
     let s = map.foodLeft;
@@ -181,7 +181,7 @@ test("food is conserved when carriers put it down anywhere (behaviour MR 2: on t
       where.add(`${t.porter ? "porter" : "forager"} ${t.place}`);
       return "put down";
     },
-  });
+  }, 150); // half the game: the file stays well inside its 60 s beside test:slow (review of #35)
   assert.ok(where.has("forager out") && where.has("forager tunnel") && where.has("porter chamber"), [...where].join(", "));
   assert.ok(g.colonies.every((c) => c.portTrips > 0), "food still moved");
   assert.ok(worst < 1e-6, `food drifted by ${worst}`);
