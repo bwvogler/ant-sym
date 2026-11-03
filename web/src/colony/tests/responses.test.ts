@@ -199,3 +199,40 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
   assert.equal(run("brood").held.brood ?? 0, 0, "no brood taken up");
   assert.equal(run("soil").loose, 0, "no loose pellet taken up");
 });
+
+test("arrive (ja-qnx): a returner home with empty jaws is no longer returning, though its policy keeps returners returning", () => {
+  // Jev's answer to every returner, home or not (PRD §42.4): keep returning. Anything else explores.
+  const stubborn = (s: { mode: string }) => (s.mode === "return" ? "return" : "explore") as "return" | "explore";
+  const home = (arrive: "explore" | "return") => {
+    const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, arrive }, mulberry32(1));
+    c.policy = stubborn;
+    put(c, 0, 12, 6);
+    c.mode[0] = 2; // return
+    let left = 0;
+    for (let k = 0; k < 30 * 8; k++) {
+      c.tick(1 / 30);
+      if (c.mode[0] !== 2) left = Math.max(left, Math.hypot(c.x[0]! - c.nest.x, c.y[0]! - c.nest.y));
+    }
+    return { mode: c.mode[0], left };
+  };
+  const ends = home("explore");
+  assert.notEqual(ends.mode, 2, "it explores");
+  assert.ok(ends.left > c0r(), `and walks out again (${ends.left.toFixed(1)})`);
+  assert.equal(home("return").mode, 2, "without it, it stays home returning (until REST)");
+});
+
+/** The corridor's nest radius. */
+const c0r = () => corridor(0).nests[0]!.r;
+
+test("arrive: putting a load down ends the trip, wherever it was put down", () => {
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+  c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+  c.responses = responses({ drop: () => true });
+  put(c, 0, 30, 6);
+  c.carrying[0] = 1;
+  c.tick(1 / 30);
+  assert.equal(c.mode[0], 2, "carrying: going home");
+  c.carrying[0] = 0; // put down out here (as a carrier told to put it down would)
+  c.tick(1 / 30);
+  assert.equal(c.mode[0], 0, "load down: exploring, not returning");
+});
