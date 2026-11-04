@@ -37,17 +37,9 @@ export function qualityOf(q: number): Quality {
 /**
  * Trail laid by a food carrier, by the food's quality, as a share of the colony's `deposit` (behaviour MR 3): *Lasius
  * niger* lays about 43 % more trail for 1 M sugar than for 0.05–0.1 M (Beckers et al. 1993; docs/trails.md), so rich
- * lays 1.44× what poor does.
+ * lays 1.44× what poor does. The game's ordinary food (fair) keeps 1.
  */
 export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, rich: 1.2 };
-/**
- * A food carrier's trail as a share of `deposit` (behaviour MR 3): a quarter, so the food trail no longer sits at the
- * field's cap near the nest and followers can tell a stronger trail from a weaker (PRD §45.3). The home trail keeps
- * the full deposit: weakening it too (deposit 4 → 1) stranded carriers in the side view (314 held on one seed). Only
- * outside: inside its own nest (tunnels, chambers) a carrier lays as before, where food scent leads to the nest's stores
- * and a weaker trail slowed the nest's chamber growth and food flow (PRD §45.3).
- */
-export const FOOD_TRAIL = 0.25;
 
 /**
  * What a response may depend on: few values, so an answer could be cached per situation. The
@@ -114,7 +106,7 @@ export const localResponses: Responses = {
   carry: () => "take",
   drop: () => true,
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
-  trailRate: (t) => (t.carrying === "food" ? (t.place === "out" || t.place === "hole" ? FOOD_TRAIL : 1) * TRAIL_BY_QUALITY[t.quality] : 1),
+  trailRate: (t) => (t.carrying === "food" ? TRAIL_BY_QUALITY[t.quality] : 1),
   alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : 1),
   raiseAlarm: () => 1,
   noEntry: () => 1,

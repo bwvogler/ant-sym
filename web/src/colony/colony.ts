@@ -4,7 +4,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { FOOD_TRAIL, type Item, localResponses, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
+import { type Item, localResponses, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
@@ -183,6 +183,13 @@ export interface ColonyParams {
    */
   followChoice: number;
   /**
+   * on a top-down map, the food trail's share of `deposit` (behaviour MR 3): a quarter, so it no longer sits at the
+   * field's cap near the nest and a follower can tell a stronger trail from a weaker (PRD §45.3). The home trail keeps
+   * the full deposit (weakening both stranded carriers). The side view keeps 1: there, with no choice to make between
+   * trails, a weaker food trail cost food home and slowed the nest (chambers, brood, porters).
+   */
+  foodTrailTop: number;
+  /**
    * how hard a follower shies from "no entry" (behaviour MR 3): each sensor's food scent counts less by this many times
    * its "no entry" reading; 0 = ignore it, and lay none. Off by default: on the assays it cost A2a more than it gained
    * on A3, which the trail's evaporation and tiredness already clear (PRD §45.4)
@@ -207,7 +214,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 0.25, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -3294,7 +3301,7 @@ export class Colony {
               const lay = resp.noEntry(this.touch(i, toEnemy !== null, mode, item));
               if (lay > 0) {
                 this.antCell(i);
-                ph.depositCell("noEntry", CELL[0] as number, CELL[1] as number, p.deposit * FOOD_TRAIL * lay * dt * NO_ENTRY_RATE);
+                ph.depositCell("noEntry", CELL[0] as number, CELL[1] as number, p.deposit * p.foodTrailTop * lay * dt * NO_ENTRY_RATE);
               }
             }
           }
@@ -3351,7 +3358,7 @@ export class Colony {
       const tt = this.touch(i, toEnemy !== null, mode, item);
       const trail = resp.trail(tt);
       if (trail !== "none") {
-        const laid = p.deposit * resp.trailRate(tt) * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt * (this.layGain[i] as number);
+        const laid = p.deposit * (trail === "food" && this.#entrance === null ? p.foodTrailTop : 1) * resp.trailRate(tt) * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt * (this.layGain[i] as number);
         this.antCell(i);
         ph.depositCell(trail, CELL[0] as number, CELL[1] as number, laid);
         const leak = this.crossLay[i] as number;

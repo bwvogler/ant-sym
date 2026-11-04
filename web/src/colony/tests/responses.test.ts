@@ -35,10 +35,9 @@ function forage(c: Colony, seconds = 20): { picked: boolean } {
 }
 
 test("localResponses are the colony's rules before the hooks", () => {
-  assert.equal(localResponses.trailRate(touch({ carrying: "food", quality: "rich" })), 0.25 * 1.2, "rich food: more trail (behaviour MR 3)");
-  assert.equal(localResponses.trailRate(touch({ carrying: "food", quality: "poor" })), 0.25 * 0.83);
-  assert.equal(localResponses.trailRate(touch({ carrying: "food" })), 0.25, "the food trail outside: a quarter of deposit");
-  assert.equal(localResponses.trailRate(touch({ carrying: "food", place: "tunnel" })), 1, "inside its nest, as before");
+  assert.equal(localResponses.trailRate(touch({ carrying: "food", quality: "rich" })), 1.2, "rich food: more trail (behaviour MR 3)");
+  assert.equal(localResponses.trailRate(touch({ carrying: "food", quality: "poor" })), 0.83);
+  assert.equal(localResponses.trailRate(touch({ carrying: "food" })), 1, "fair food lays as before");
   assert.equal(localResponses.get(touch({ offered: "food" })), true);
   assert.equal(localResponses.get(touch({ mode: "fight", offered: "food" })), false, "not mid-fight");
   for (const offered of ["soil", "corpse", "brood"] as const) assert.equal(localResponses.get(touch({ mode: "fight", offered })), true, `${offered}: the mechanic decides`);
