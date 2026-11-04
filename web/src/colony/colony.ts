@@ -3278,7 +3278,10 @@ export class Colony {
             if (gr < SEEN) gr = Math.max(0, gr - ne(h + a));
           }
           // Which way along the trail: by strength, not just to the strongest sensor (Deneubourg's choice: see choose).
-          h += (p.followChoice > 0 ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng) : climb(gl, gf, gr, p.turnRate * dt)) + noise * p.wander * 0.25;
+          // Top-down maps only. In the side view's chambers food scent leads to stores and brood, and a chance turn there
+          // kept porters from the food (the hour-long economy test: no porter trips, larvae starved); on its ground line,
+          // where trails don't fork, it still halved the colony's births (PRD §45.3).
+          h += (p.followChoice > 0 && this.#entrance === null ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng) : climb(gl, gf, gr, p.turnRate * dt)) + noise * p.wander * 0.25;
           // The trail ends here, strong, falling away all round, and no food in sight: the patch is spent. Mark it "no entry" (Robinson et al. 2005).
           if (p.noEntryAvoid > 0 && !carrying && outside && Math.max(fl, ff, fr) < SEEN) {
             this.antCell(i);
