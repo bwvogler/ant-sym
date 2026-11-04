@@ -403,3 +403,26 @@ test("touchKey: quality is in the key only when it isn't fair (keys cached befor
   assert.equal(touchKey(touch({})), "explore|none|-|-|out|none|clear|forage");
   assert.equal(touchKey(touch({ carrying: "food", quality: "rich" })), "explore|food|-|-|out|none|clear|forage|rich");
 });
+
+test("noEntry: a follower at a food trail's end with no food marks it; with food there, it doesn't; noEntry 0 lays none", () => {
+  const size = { w: 40, h: 12 };
+  const run = (food: number, noEntry: number): number => {
+    const f = new Float32Array(size.w * size.h);
+    if (food) for (let y = 4; y <= 8; y++) for (let x = 21; x <= 23; x++) f[y * size.w + x] = food; // a small pile at the trail's end
+    const map = worldFromArrays(size, [nestAt(4, 6, 2)], { food: f });
+    const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(1));
+    c.policy = () => "follow";
+    c.responses = responses({ noEntry: () => noEntry });
+    // A food trail along rows 5–7 from the nest to x = 20 (on over the pile, when there is one), strongest at its far end, as carriers lay it.
+    for (let x = 8; x <= (food ? 23 : 20); x++) for (let y = 5; y <= 7; y++) c.ph.depositCell("food", x, y, 1 + x / 4);
+    put(c, 0, 12, 6);
+    c.heading[0] = 0;
+    for (let k = 0; k < 30 * 4; k++) c.tick(1 / 30);
+    let s = 0;
+    for (let y = 0; y < size.h; y++) for (let x = 0; x < size.w; x++) s += c.ph.fields.noEntry.get(x, y);
+    return s;
+  };
+  assert.ok(run(0, 1) > 0, "spent: marked");
+  assert.equal(run(3, 1), 0, "food in sight: not marked");
+  assert.equal(run(0, 0), 0, "the noEntry response says none");
+});

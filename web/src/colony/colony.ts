@@ -177,6 +177,16 @@ export interface ColonyParams {
    * docs/tiredness.md): rest is a stay inside, not a step through the hole
    */
   restTime: number;
+  /**
+   * a follower's choice of way by trail strength, the constant k of (k + C)² (see choose); 0 = always the strongest
+   * sensor (before behaviour MR 3). Small k: strength counts for much; large: choices near even.
+   */
+  followChoice: number;
+  /**
+   * how hard a follower shies from "no entry" (behaviour MR 3): each sensor's food scent counts less by this many times
+   * its "no entry" reading; 0 = ignore it
+   */
+  noEntryAvoid: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
@@ -196,10 +206,16 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 1, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, noEntryAvoid: 4, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
+/** Food scent under a follower at least this strong, and weaker all round, is a trail's end (behaviour MR 3: "no entry"). */
+const NO_ENTRY_TRAIL = 1;
+/** ...and every sensor reads under this share of it: the trail drops away ahead and to both sides (not a bend). */
+const NO_ENTRY_DROP = 0.5;
+/** "No entry" laid per second at a spent trail's end, as a multiple of the colony's deposit. */
+const NO_ENTRY_RATE = 4;
 
 /** Every channel's params: the defaults, with `over` merged in per channel and per field. */
 export function channelParams(over: Partial<Record<Channel, Partial<ChannelParams>>> = {}): Record<Channel, ChannelParams> {
@@ -3244,7 +3260,37 @@ export class Colony {
         else h += noise * p.wander;
       } else if (mode === FOLLOW) {
         if (!digging && this.#walkTunnel(i, FOLLOW, p.speed * dt)) h = this.#towardTarget(i);
-        else h += climb(fl, ff, fr, p.turnRate * dt) + noise * p.wander * 0.25;
+        else {
+          // "No entry" ahead (behaviour MR 3): the food scent it marks counts for less. Read only where some was laid, and
+          // only outside (a top-down map, or the side view's ground), where food trails lead to food.
+          const outside = this.#entrance === null || !this.#under[i];
+          let gl = fl;
+          let gf = ff;
+          let gr = fr;
+          if (p.noEntryAvoid > 0 && ph.live("noEntry") && outside) {
+            const x = this.x[i] as number;
+            const y = this.y[i] as number;
+            const d = p.sensorDistance;
+            const ne = (b: number) => p.noEntryAvoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
+            if (gl < SEEN) gl = Math.max(0, gl - ne(h - a));
+            if (gf < SEEN) gf = Math.max(0, gf - ne(h));
+            if (gr < SEEN) gr = Math.max(0, gr - ne(h + a));
+          }
+          // Which way along the trail: by strength, not just to the strongest sensor (Deneubourg's choice: see choose).
+          h += (p.followChoice > 0 ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng) : climb(gl, gf, gr, p.turnRate * dt)) + noise * p.wander * 0.25;
+          // The trail ends here, strong, falling away all round, and no food in sight: the patch is spent. Mark it "no entry" (Robinson et al. 2005).
+          if (!carrying && outside && Math.max(fl, ff, fr) < SEEN) {
+            this.antCell(i);
+            const here = ph.fields.food.get(CELL[0] as number, CELL[1] as number);
+            if (here >= NO_ENTRY_TRAIL && Math.max(fl, ff, fr) < here * NO_ENTRY_DROP) {
+              const lay = resp.noEntry(this.touch(i, toEnemy !== null, mode, item));
+              if (lay > 0) {
+                this.antCell(i);
+                ph.depositCell("noEntry", CELL[0] as number, CELL[1] as number, p.deposit * lay * dt * NO_ENTRY_RATE);
+              }
+            }
+          }
+        }
       } else if (mode === FIGHT) {
         // A calm ant (the fungus's cue) does not charge.
         // A raider in the side view walks on to the raided nest, cell by cell, past the alarm of fights behind it: steering
@@ -4169,6 +4215,21 @@ export function tunnelEnd(map: WorldMap, x: number, y: number, most = 1): boolea
 }
 
 /** Turn toward the strongest of three sensors, at most `max` radians. */
+/**
+ * A follower's turn by Deneubourg's choice function (Deneubourg et al. 1990; Goss et al. 1989; docs/trails.md): left,
+ * ahead or right with chances (k + C)², each sensor's scent C. Where two trails part, the stronger takes more than its
+ * share of followers, which is what lets a colony settle on one of two sources (A2a) and on the richer (A2b). On one
+ * trail the sides read alike and it turns either way, held on by the trail's centre. (`climb`, always to the
+ * strongest, sent followers down whichever trail lay ahead of them: behaviour MR 3, PRD §45.)
+ */
+export function choose(left: number, front: number, right: number, max: number, k: number, rng: () => number): number {
+  const wl = (k + left) ** 2;
+  const wf = (k + front) ** 2;
+  const wr = (k + right) ** 2;
+  const u = rng() * (wl + wf + wr);
+  return u < wl ? -max : u < wl + wf ? 0 : max;
+}
+
 export function climb(left: number, front: number, right: number, max: number): number {
   if (front >= left && front >= right) return 0;
   return left > right ? -max : max;

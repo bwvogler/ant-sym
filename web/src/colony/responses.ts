@@ -89,6 +89,11 @@ export interface Responses {
   alarmGain(t: Touch): number;
   /** In a fight: alarm laid, as a share of the fight's `alarm` rate. */
   raiseAlarm(t: Touch): number;
+  /**
+   * Following a food trail to where it ends, and no food there (behaviour MR 3, docs/trails.md: Robinson et al. 2005):
+   * "no entry" laid, as a share of the colony's `deposit` (0 = none).
+   */
+  noEntry(t: Touch): number;
 }
 
 /**
@@ -104,6 +109,7 @@ export const localResponses: Responses = {
   trailRate: (t) => (t.carrying === "food" ? TRAIL_BY_QUALITY[t.quality] : 1),
   alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : 1),
   raiseAlarm: () => 1,
+  noEntry: () => 1,
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */
