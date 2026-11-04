@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
-import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
+import { choose, Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
 import { Game } from "../game.ts";
 import { packResponseRequest, readResponse, RESPONSE_HOOKS, responseContext, responsesFromAnswers } from "../colonyBrain.ts";
 import { type Item, localResponses, responses, touchKey, type Touch } from "../responses.ts";
-import { foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
+import { dropFood, foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, nestAt, put } from "./hexmaps.ts";
 
 // The ant's response hooks (responses.ts): the local ones are the rules the colony had (the golden masters
@@ -425,4 +425,65 @@ test("noEntry: a follower at a food trail's end with no food marks it; with food
   assert.ok(run(0, 1) > 0, "spent: marked");
   assert.equal(run(3, 1), 0, "food in sight: not marked");
   assert.equal(run(0, 0), 0, "the noEntry response says none");
+});
+
+test("choose (behaviour MR 3): left, ahead or right with chances (k + C)²; near even as k grows", () => {
+  const share = (l: number, f: number, r: number, k: number) => {
+    const rng = mulberry32(7);
+    const n = 20000;
+    const out = { left: 0, ahead: 0, right: 0 };
+    for (let i = 0; i < n; i++) {
+      const t = choose(l, f, r, 1, k, rng);
+      if (t < 0) out.left++;
+      else if (t > 0) out.right++;
+      else out.ahead++;
+    }
+    return { left: out.left / n, ahead: out.ahead / n, right: out.right / n };
+  };
+  const s = share(3, 0, 1, 1); // weights 16, 1, 4
+  assert.ok(Math.abs(s.left - 16 / 21) < 0.02 && Math.abs(s.ahead - 1 / 21) < 0.01 && Math.abs(s.right - 4 / 21) < 0.02, JSON.stringify(s));
+  const big = share(3, 0, 1, 1000);
+  for (const v of Object.values(big)) assert.ok(Math.abs(v - 1 / 3) < 0.02, JSON.stringify(big));
+});
+
+test("dropFood blends quality by amount (and a first drop on bare ground takes the food's)", () => {
+  const map = worldFromArrays({ w: 10, h: 10 }, [nestAt(2, 2, 1)], {});
+  const p = at(6, 6);
+  dropFood(map, p.x, p.y, 1, 0.5);
+  assert.equal(map.quality?.get(6, 6), 0.5);
+  dropFood(map, p.x, p.y, 3, 1.5);
+  assert.equal(map.quality?.get(6, 6), (1 * 0.5 + 3 * 1.5) / 4);
+  assert.equal(foodAt(map, p.x, p.y), 4);
+});
+
+test("followChoice (top-down): at a fork a follower mostly takes the stronger trail, and sometimes the weaker", () => {
+  // A stem east along row 10, then two branches at ±60° (the hex rows' own diagonals): up 4× stronger than down.
+  const size = { w: 40, h: 22 };
+  const branch = (c: Colony, up: boolean, level: number) => {
+    let x = 16;
+    for (let k = 0; k < 9; k++) {
+      const y = up ? 10 - k : 10 + k;
+      for (let w = -1; w <= 1; w++) c.ph.depositCell("food", x + w, y, level);
+      if (y % 2 === 0) x += up ? 0 : 1; // walk the NE / SE diagonal in offset rows
+      else x += up ? 1 : 0;
+    }
+  };
+  let strong = 0;
+  let weak = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const map = worldFromArrays(size, [nestAt(3, 10, 2)], {});
+    const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(seed));
+    c.policy = () => "follow";
+    for (let x = 6; x <= 16; x++) for (let y = 9; y <= 11; y++) c.ph.depositCell("food", x, y, 4);
+    branch(c, true, 8);
+    branch(c, false, 2);
+    put(c, 0, 8, 10);
+    c.heading[0] = 0;
+    for (let k = 0; k < 30 * 4 && Math.abs((c.y[0] as number) - at(8, 10).y) < 5; k++) c.tick(1 / 30);
+    const dy = (c.y[0] as number) - at(8, 10).y;
+    if (dy <= -5) strong++;
+    else if (dy >= 5) weak++;
+  }
+  assert.ok(strong >= 0.7 * (strong + weak) && strong + weak >= 30, `stronger ${strong}, weaker ${weak}`);
+  assert.ok(weak >= 1, `a choice, not a certainty: weaker ${weak} of ${strong + weak}`);
 });

@@ -436,6 +436,19 @@ export function dropFood(map: WorldMap, x: number, y: number, amount: number, qu
   map.foodLeft += amount;
 }
 
+/** Move all the food in cell (fx, fy) onto cell (tx, ty), its quality blended in by amount (foodLeft unchanged). */
+export function moveFoodCell(map: WorldMap, fx: number, fy: number, tx: number, ty: number): void {
+  const f = map.food.get(fx, fy);
+  if (f <= 0) return;
+  const had = map.food.get(tx, ty);
+  if (map.quality) {
+    const q = map.quality;
+    q.set(tx, ty, had > 0 ? (had * q.get(tx, ty) + f * q.get(fx, fy)) / (had + f) : q.get(fx, fy));
+  }
+  map.food.set(fx, fy, 0);
+  map.food.set(tx, ty, had + f);
+}
+
 /** Set rock at integer cell (x, y). */
 export function setRock(map: WorldMap, x: number, y: number, v: Terrain): void {
   if (inBounds(map, x, y)) map.rock.set(x, y, v);
@@ -943,11 +956,7 @@ export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number,
   }
   const y = groundTop(map, x) - 1;
   if (y < 1) return null;
-  const f = map.food.get(x, y);
-  if (f > 0) {
-    map.food.set(x, y, 0);
-    map.food.set(x, y - 1, map.food.get(x, y - 1) + f);
-  }
+  moveFoodCell(map, x, y, x, y - 1);
   map.rock.set(x, y, SOIL);
   map.sky.set(x, y, 0);
   map.loose.set(x, y, 1);
@@ -971,11 +980,7 @@ export function takeLoose(map: WorldMap, x: number, y: number): boolean {
   // Food on top of the cell taken, left in the sky, comes down with it.
   const above = ny(y, 4);
   for (const ax of [nx(x, y, 4), nx(x, y, 5)]) {
-    const f = map.food.get(ax, above);
-    if (f > 0 && rockAt(map, ax, above) !== OPEN && rockAt(map, x, y) === OPEN) {
-      map.food.set(ax, above, 0);
-      map.food.set(x, y, map.food.get(x, y) + f);
-    }
+    if (map.food.get(ax, above) > 0 && rockAt(map, ax, above) !== OPEN && rockAt(map, x, y) === OPEN) moveFoodCell(map, ax, above, x, y);
   }
   return true;
 }

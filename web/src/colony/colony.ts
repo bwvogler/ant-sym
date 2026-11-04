@@ -423,7 +423,7 @@ export class Colony {
   since: Float32Array;
   /** seconds of unsuccessful search, less rest inside the nest: tired above the colony's patience (ja-q47) */
   fatigue: Float32Array;
-  /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; 1 when it holds none */
+  /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; read only while it carries food (left as it was after delivery) */
   quality: Float32Array;
   /** 1 from when fatigue passes patience until it has rested to nothing: a tired forager rests fully, not just under the line */
   #tired: Uint8Array;
@@ -3301,7 +3301,7 @@ export class Colony {
               const lay = resp.noEntry(this.touch(i, toEnemy !== null, mode, item));
               if (lay > 0) {
                 this.antCell(i);
-                ph.depositCell("noEntry", CELL[0] as number, CELL[1] as number, p.deposit * p.foodTrailTop * lay * dt * NO_ENTRY_RATE);
+                ph.depositCell("noEntry", CELL[0] as number, CELL[1] as number, p.deposit * (this.#entrance === null ? p.foodTrailTop : 1) * lay * dt * NO_ENTRY_RATE);
               }
             }
           }
@@ -4229,7 +4229,6 @@ export function tunnelEnd(map: WorldMap, x: number, y: number, most = 1): boolea
   return true;
 }
 
-/** Turn toward the strongest of three sensors, at most `max` radians. */
 /**
  * A follower's turn by Deneubourg's choice function (Deneubourg et al. 1990; Goss et al. 1989; docs/trails.md): left,
  * ahead or right with chances (k + C)², each sensor's scent C. Where two trails part, the stronger takes more than its
@@ -4245,6 +4244,7 @@ export function choose(left: number, front: number, right: number, max: number, 
   return u < wl ? -max : u < wl + wf ? 0 : max;
 }
 
+/** Turn toward the strongest of three sensors, at most `max` radians. */
 export function climb(left: number, front: number, right: number, max: number): number {
   if (front >= left && front >= right) return 0;
   return left > right ? -max : max;
