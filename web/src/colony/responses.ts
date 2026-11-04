@@ -43,7 +43,9 @@ export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, 
 /**
  * A food carrier's trail as a share of `deposit` (behaviour MR 3): a quarter, so the food trail no longer sits at the
  * field's cap near the nest and followers can tell a stronger trail from a weaker (PRD §45.3). The home trail keeps
- * the full deposit: weakening it too (deposit 4 → 1) stranded carriers in the side view (314 held on one seed).
+ * the full deposit: weakening it too (deposit 4 → 1) stranded carriers in the side view (314 held on one seed). Only
+ * outside: inside its own nest (tunnels, chambers) a carrier lays as before, where food scent leads to the nest's stores
+ * and a weaker trail slowed the nest's chamber growth and food flow (PRD §45.3).
  */
 export const FOOD_TRAIL = 0.25;
 
@@ -112,7 +114,7 @@ export const localResponses: Responses = {
   carry: () => "take",
   drop: () => true,
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
-  trailRate: (t) => (t.carrying === "food" ? FOOD_TRAIL * TRAIL_BY_QUALITY[t.quality] : 1),
+  trailRate: (t) => (t.carrying === "food" ? (t.place === "out" || t.place === "hole" ? FOOD_TRAIL : 1) * TRAIL_BY_QUALITY[t.quality] : 1),
   alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : 1),
   raiseAlarm: () => 1,
   noEntry: () => 1,
