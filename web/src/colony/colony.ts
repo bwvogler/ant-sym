@@ -183,12 +183,13 @@ export interface ColonyParams {
    */
   followChoice: number;
   /**
-   * on a top-down map, the food trail's share of `deposit` (behaviour MR 3): a quarter, so it no longer sits at the
-   * field's cap near the nest and a follower can tell a stronger trail from a weaker (PRD §45.3). The home trail keeps
-   * the full deposit (weakening both stranded carriers). The side view keeps 1: there, with no choice to make between
-   * trails, a weaker food trail cost food home and slowed the nest (chambers, brood, porters).
+   * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
+   * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
+   * is raised instead: foodCapTop.)
    */
   foodTrailTop: number;
+  /** on a top-down map, the most food trail a cell holds (behaviour MR 3; the other channels and the side view: MAX_LEVEL 20) */
+  foodCapTop: number;
   /**
    * a food carrier's pull toward the food trail on its way home, top-down (ja-00t): the share of its turning given to the
    * trail where the trail agrees with its home vector, the rest to the vector; 0 = the vector alone (before MR 3)
@@ -221,7 +222,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 0.25, homeTrail: 0, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -568,7 +569,11 @@ export class Colony {
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
-    this.ph = new Pheromones(map, channelParams(this.params.channels));
+    // Top-down, the food trail holds up to foodCapTop (behaviour MR 3): under main's cap a busy trail sat at it near the
+    // nest, and a follower couldn't tell a strong trail from a weak (unless the colony's params set a cap of their own).
+    const chans = channelParams(this.params.channels);
+    if (this.#entrance === null && this.params.channels.food?.max === undefined) chans.food = { ...chans.food, max: this.params.foodCapTop };
+    this.ph = new Pheromones(map, chans);
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -3139,10 +3144,16 @@ export class Colony {
           tf = agrees(h) ? ff : 0;
           tr = agrees(h + a) ? fr : 0;
         }
-        const onTrail = Math.max(tl, tf, tr) >= FAINT;
+        let onTrail = Math.max(tl, tf, tr) >= FAINT;
         if (onTrail && this.wall[i] !== 0) {
-          this.wall[i] = 0; // the trail leads on: let go of the wall
-          this.mx[i] = NaN;
+          // Following a wall: let go only where the trail's way is open. Letting go into rock, it met the same wall again
+          // every step and never got round it (G′ seed 4: 59 carriers held over 120 s within 40 cells of home).
+          const way = tl >= tf && tl >= tr ? h - a : tr > tf ? h + a : h;
+          if (this.#touch(x, y, way, 1.2)) onTrail = false;
+          else {
+            this.wall[i] = 0; // the trail leads on: let go of the wall
+            this.mx[i] = NaN;
+          }
         }
         const side = this.wall[i] as number;
         // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
