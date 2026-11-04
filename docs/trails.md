@@ -38,6 +38,15 @@ Research note for behaviour MR 3 (bead `ja-3ml`, PRD §45). Before MR 3 every fo
 
 **For the model:** an ant that follows a food trail to its end and finds no food there lays "no entry" on the spot. Followers steer away from it. The game's food trail lasts 11.6 s (`ant-communication.md` §2), so a mark lasting about 2× that, ~25 s, keeps the paper's ratio. This is the sensed fix for ant mills, which only *tired* breaks today.
 
+## What MR 3 built from this (PRD §45)
+
+- **A1's arena** is Goss's fork, with the long branch's side alternating by seed. It is scored by passages, and a run counts only when food comes home.
+- **Food quality.** A map layer (`WorldMap.quality`) holds it. An ant tastes it at pickup and carries it, and `Touch.quality` passes it to the responses. `trailRate` gives rich 1.2, fair 1 and poor 0.83.
+- **Followers choose by strength** (Deneubourg's (k + C)² choice, `followChoice` 1), and the food trail is laid at a quarter of `deposit` (`foodTrailTop`). That was the missing piece: at full strength the trail sat at the field's cap near the nest, so a strong trail and a weak one read the same, and followers always turned to the strongest sensor.
+  - **Top-down maps only.** In the side view, trails don't fork, so the weaker food trail only cost food and slowed the nest, so it plays as before.
+- **"No entry"** is built: a channel with t½ ≈ 27 s, a `noEntry` response, and a follower discount (`noEntryAvoid`). It ships off: the marks it laid landed on live trails and cost A2a more than they gained on A3 (bead `ja-4n1`).
+- **Which journeys lay trail:** only carriers lay food trail (*Lasius*). Outbound laying by followers was measured and didn't help A1 (0.50, with a wide spread).
+
 ## Sources
 
 - Goss, Aron, Deneubourg & Pasteels 1989, "Self-organized shortcuts in the Argentine ant", *Naturwissenschaften* 76:579–581: https://link.springer.com/article/10.1007/BF00462870 *(index page)*

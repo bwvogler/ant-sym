@@ -1,0 +1,50 @@
+{
+ "version": {
+  "colony": 5,
+  "stance": 3,
+  "response": 5
+ },
+ "contexts": {
+  "mode": "colony-v5-e792ce70",
+  "stance": "stance-v3-2cfee495",
+  "get": "get-v5-ef48b946",
+  "carry": "carry-v5-5205b446",
+  "drop": "drop-v5-41df0cbf",
+  "trail": "trail-v5-91db73a0"
+ },
+ "view": "top",
+ "seed": 1,
+ "ants": 600,
+ "seconds": 300,
+ "doctrine": {
+  "id": "forage",
+  "name": "Forage",
+  "text": "Gather as much food as possible. Follow a strong food scent; explore when there is none; go home when tired. Fight only an enemy that is close. Raid only when food runs out."
+ },
+ "modes": {},
+ "stances": {},
+ "responses": {
+  "trail": {
+   "explore|none|-|-|hole|none|clear|forage": "home",
+   "explore|none|-|-|out|none|clear|forage": "home",
+   "follow|none|-|-|out|none|clear|forage": "home",
+   "return|food|-|-|out|none|clear|forage": "food",
+   "follow|none|-|-|hole|none|clear|forage": "home",
+   "fight|none|-|-|out|none|enemy|forage": "home",
+   "return|none|-|-|out|none|clear|forage": "home",
+   "return|food|-|-|out|none|enemy|forage": "food",
+   "return|none|-|-|hole|none|clear|forage": "home",
+   "return|food|-|-|out|none|clear|raid": "food",
+   "follow|none|-|-|out|none|clear|raid": "home",
+   "fight|none|-|-|out|none|clear|raid": "home",
+   "return|none|-|-|hole|none|clear|raid": "home",
+   "return|none|-|-|out|none|clear|raid": "home",
+   "follow|none|-|-|hole|none|clear|raid": "home",
+   "explore|none|-|-|out|none|clear|raid": "home",
+   "fight|none|-|-|hole|none|clear|raid": "home",
+   "fight|none|-|-|out|none|enemy|raid": "home",
+   "explore|none|-|-|hole|none|clear|raid": "home",
+   "return|food|-|-|out|none|enemy|raid": "food"
+  }
+ }
+}
