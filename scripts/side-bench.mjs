@@ -6,7 +6,9 @@
 //   out>120   ants out over 120 s (since > 120), sampled every 10 s from 120 s: mean share / worst sample
 //   car>120   foragers holding food over 120 s (carrying it home from outside): at the end / most at any 10 s sample
 //   carMax    longest any forager at the end has held its food (s)
-//   port>120  porters (food moved between chambers, nest slice 5) holding it over 120 s: at the end / most at any sample
+//   port>120  porters (food moved between chambers, nest slice 5) holding it over 120 s, by their own hold clock (since
+//             becoming a porter; `since` isn't reset then, so an ant that rested inside counted at once: review of #36):
+//             at the end / most at any sample
 //   stuck     ant-seconds of ants that haven't left their cell for 20 s or more (sampled every second), split into
 //             ground  on the ground line (sky cells), homing        tip  underground, exploring (dead-end tips: #25)
 //             other   the rest underground
@@ -49,6 +51,7 @@ for (const seed of seeds) {
   const st = cs.map((c) => ({
     last: new Int32Array(c.n).fill(-1),
     still: new Float32Array(c.n),
+    hold: new Float32Array(c.n),
     out: [],
     carEndMax: 0,
     portPeak: 0,
@@ -69,12 +72,16 @@ for (const seed of seeds) {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) {
           s.still[i] = 0;
+          s.hold[i] = 0;
           s.last[i] = -1;
           continue;
         }
         alive++;
         if (c.since[i] > 120) out++;
-        if (c.carrying[i] && c.since[i] > 120) porter(c, i) ? port++ : car++;
+        s.hold[i] = c.carrying[i] && porter(c, i) ? s.hold[i] + 1 : 0; // sampled once a second
+        if (c.carrying[i] && porter(c, i)) {
+          if (s.hold[i] > 120) port++;
+        } else if (c.carrying[i] && c.since[i] > 120) car++;
         c.antCell(i);
         const key = CELL[1] * 65536 + CELL[0];
         s.still[i] = key === s.last[i] ? s.still[i] + 1 : 0;
@@ -105,7 +112,7 @@ for (const seed of seeds) {
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i]) continue;
       if (c.carrying[i] && porter(c, i)) {
-        if (c.since[i] > 120) port++;
+        if (s.hold[i] > 120) port++;
       } else if (c.carrying[i]) {
         if (c.since[i] > 120) car++;
         carMax = Math.max(carMax, c.since[i]);

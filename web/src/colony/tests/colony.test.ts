@@ -889,7 +889,7 @@ test("sent home by its policy, an ant starts the trip afresh: a detour from givi
   const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), (s) => (s.tired ? "return" : "explore"));
   put(c, 0, 20, 6);
   c.mode[0] = 0;
-  c.since[0] = c.params.patience + 1; // tired: the policy sends it home
+  c.fatigue[0] = c.params.patience + 1; // tired: the policy sends it home
   c.detour[0] = 20;
   c.bumps[0] = 4;
   c.tick(1 / 30);

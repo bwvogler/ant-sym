@@ -35,3 +35,5 @@ test("whole games: hardly a forager holds its food over 120 s (seeds 4 and 6, 60
   }
   assert.ok(worst <= 2, `foragers holding food over 120 s, most at any 10-s sample per colony: ${peaks.join("; ")}`);
 });
+
+test.todo("whole games: hardly a porter holds its food over 120 s either, by its own hold clock (ja-3po: G seeds 1-10 reach 6, Cautious's replay 49; side-bench 1-6 shows 0 at the end on MR 3.1 and main)");
