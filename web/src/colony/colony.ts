@@ -184,7 +184,8 @@ export interface ColonyParams {
   followChoice: number;
   /**
    * how hard a follower shies from "no entry" (behaviour MR 3): each sensor's food scent counts less by this many times
-   * its "no entry" reading; 0 = ignore it
+   * its "no entry" reading; 0 = ignore it, and lay none. Off by default: on the assays it cost A2a more than it gained
+   * on A3, which the trail's evaporation and tiredness already clear (PRD §45.4)
    */
   noEntryAvoid: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
@@ -206,7 +207,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 1, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, noEntryAvoid: 4, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 1, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -3279,10 +3280,14 @@ export class Colony {
           // Which way along the trail: by strength, not just to the strongest sensor (Deneubourg's choice: see choose).
           h += (p.followChoice > 0 ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng) : climb(gl, gf, gr, p.turnRate * dt)) + noise * p.wander * 0.25;
           // The trail ends here, strong, falling away all round, and no food in sight: the patch is spent. Mark it "no entry" (Robinson et al. 2005).
-          if (!carrying && outside && Math.max(fl, ff, fr) < SEEN) {
+          if (p.noEntryAvoid > 0 && !carrying && outside && Math.max(fl, ff, fr) < SEEN) {
             this.antCell(i);
             const here = ph.fields.food.get(CELL[0] as number, CELL[1] as number);
-            if (here >= NO_ENTRY_TRAIL && Math.max(fl, ff, fr) < here * NO_ENTRY_DROP) {
+            // Only walking out, by its home vector (home behind it): walking in, the food trail fades ahead as it should.
+            const ox = (this.x[i] as number) - nest.x;
+            const oy = (this.y[i] as number) - nest.y;
+            const outbound = Math.cos(h) * ox + Math.sin(h) * oy > 0.5 * Math.hypot(ox, oy);
+            if (outbound && here >= NO_ENTRY_TRAIL && Math.max(fl, ff, fr) < here * NO_ENTRY_DROP) {
               const lay = resp.noEntry(this.touch(i, toEnemy !== null, mode, item));
               if (lay > 0) {
                 this.antCell(i);

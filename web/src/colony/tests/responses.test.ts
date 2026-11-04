@@ -410,7 +410,7 @@ test("noEntry: a follower at a food trail's end with no food marks it; with food
     const f = new Float32Array(size.w * size.h);
     if (food) for (let y = 4; y <= 8; y++) for (let x = 21; x <= 23; x++) f[y * size.w + x] = food; // a small pile at the trail's end
     const map = worldFromArrays(size, [nestAt(4, 6, 2)], { food: f });
-    const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(1));
+    const c = new Colony(map, { antCount: 1, wander: 0, noEntryAvoid: 4 }, mulberry32(1));
     c.policy = () => "follow";
     c.responses = responses({ noEntry: () => noEntry });
     // A food trail along rows 5–7 from the nest to x = 20 (on over the pile, when there is one), strongest at its far end, as carriers lay it.
