@@ -2655,9 +2655,10 @@ Neither the deposit sweep (0.25–2) alone nor `trailRate` by quality moved A2a 
 
 **Now** (`colony.ts`, top-down maps only):
 - **`followChoice`** (k = 1): a follower turns left, ahead or right with chances (k + C)² (Deneubourg's choice; Goss et al. 1989).
-- **`foodTrailTop`** 0.25: the food trail is laid at a quarter of `deposit`. The home trail keeps the full deposit: lowering `deposit` for both stranded carriers (one seed held 314).
+- **`foodCapTop`** 80: the food channel holds up to 80 rather than `MAX_LEVEL` 20 (`ChannelParams.max`). A busy trail no longer sits at the cap, and followers can tell strong from weak.
+- **The food trail is laid at full strength** (`foodTrailTop` 1). As first pushed it was a quarter, to stay under the cap. That was too weak to reach the level at which explorers follow (≥ 1): on the bridge under 20 of 300 ants followed, and in G′ the explorers left wandering met the rival (review of #37). Explorers judging a weak trail as if it were strong was rejected: an ant can't know how a trail was laid.
 
-Sweep (seeds 1–4) over k and the food trail's deposit:
+Sweep (seeds 1–4, before the raised cap) over k and the food trail's deposit:
 
 | k | deposit 0.5 | 1 | 2 |
 |---|---|---|---|
@@ -2675,11 +2676,23 @@ Sweep (seeds 1–4) over k and the food trail's deposit:
 
 The side view's trails don't fork, so it keeps main's rules. Main's side-view golden masters pass bit for bit; only the top-down war's is re-recorded.
 
-**A1 (owner's call, 2026-11-04).** The choice lifts A1 to about 0.66. Food carriers choose their way home by home vector and wall-following, not by trail, so they lay food trail wherever homing takes them. Two fixes were measured:
-- Outbound laying by followers (*L. humile*-style): 0.50, with a wide spread.
-- Carriers steering home by the food trail: 0.97, but they mill on their own trail and food home falls about 10×.
+### 45.3a Carriers home by trail and vector (ja-00t)
 
-Of "ship at ~0.66", "fix carrier homing in MR 3" and "settle the species rule now", the owner chose the first. Follow-up: `ja-00t`.
+**The problem.** With the choice alone, A1 stalled at about 0.66. A home vector gives a direction, not a route. On the fork it points into the island between the branches, and both branches are equally off its line. So the wall-follower picked the branch, with ja-32w's lean, and carriers laid their food trail wherever it sent them.
+
+**First attempts** (measured, not adopted):
+- Outbound laying by followers (*L. humile*-style): 0.50, with a wide spread.
+- Carriers steering home by the food trail alone: 0.97, but they milled on their own trail and food home fell about 10×.
+
+**The literature.** Foragers combine route cues and pheromone, with path integration as the fallback (Czaczkes et al. 2011, 2013; docs/trails.md). The owner's question, "I thought ants could integrate their way home", led here.
+
+**Now** (top-down):
+- **`homeTrail`** 0.8: a carrier with food steers by the food trail (Deneubourg's choice), 80 % of its turning, only from sensors whose direction lies within **`homeTrailCone`** (90°) of its home vector. The rest of its turning goes to the vector.
+- **Letting go of a wall:** a carrier following a wall lets go for the trail only where the trail's way is open. As first written it let go into rock, met the same wall every step, and never got round: G′ seed 4 held 59.
+
+**Sweep** (seeds 1–6, quarter-strength trail):
+- `homeTrail` 0.8 lifted A1 to 0.91, but only on odd seeds; on even seeds almost no ant followed.
+- With the full trail under the raised cap, every seed passes: A1 0.91–0.99.
 
 ### 45.4 "No entry" (built, shipped off)
 
@@ -2692,57 +2705,80 @@ Of "ship at ~0.66", "fix carrier homing in MR 3" and "settle the species rule no
   - `noEntryAvoid` 4: A3 clears in 6.5 s against 9 s without the mark, but A2a falls from 0.93 to 0.76 and food home by a quarter.
   - Before the walking-out condition, A2a fell to 0.53.
   - The marks land on live trails, near the nest and at patch edges.
-- **Shipped off** (`noEntryAvoid` 0 lays nothing) until a better test for a spent patch exists (`ja-4n1`). A3 passes without it anyway: it clears in 11.5 s (4–33, seeds 1–20), against 41 s on §42.2's baseline.
+- **Shipped off** (`noEntryAvoid` 0 lays nothing) until a better test for a spent patch exists (`ja-4n1`). A3 passes without it anyway (§45.5).
 
 ### 45.5 Assays (local rule)
 
-Top-down, seeds 1–20:
+Top-down, the final defaults. "main" is 47928ed, measured on the same seeds (review of #37, S1: an earlier table here mixed seed ranges and an old A3 figure).
 
-| Assay | Target | Pass | Median (min–max) | §43.5 / §44 |
+| Assay | Target | Seeds 1–10 | Seeds 11–20 | main |
 |---|---|---|---|---|
-| A1 double bridge (fork) | ≥ 80 % short | 0/20 | 0.65 (0.60–0.67) | fork, MR 3.1: 0.37 (0.10–0.53) |
-| A2a two equal sources | busier ≥ 70 % | **16/20** | 0.93 (0.51–0.95) | 0/10, 0.52 |
-| A2b rich vs poor (new) | rich ≥ 70 % | **20/20** | 0.95 (0.91–0.96) | MR 3.1: 0/10, 0.51 |
-| A3 depletion | < 20 % of peak in 60 s | 20/20 | 11.5 s (4–33) | 10/10, 41 s |
-| A4 alarm on a trail | scatter, back | 20/20 | — | 10/10 |
-| A6 pass / open | report | — | exchange 0.95 / 0.94 | 1.05 / 0.92 |
+| A1 double bridge (fork) | ≥ 80 % short | **10/10**, 0.97 (0.91–0.99) | **10/10**, 0.98 (0.97–0.99) | 0.37, 0/20 |
+| A2a two equal sources | busier ≥ 70 % | **10/10**, 0.82 (0.75–0.93) | **10/10**, 0.90 (0.79–0.95) | 0.52, 0/20 |
+| A2b rich vs poor (new) | rich ≥ 70 % | **10/10**, 0.94 (0.87–0.96) | **9/10**, 0.93 (0.11–0.96) | 0.51, 0/20 |
+| A3 depletion | < 20 % of peak in 60 s | 10/10, 17 s (12–25) | 10/10, 19 s (12–26) | 20/20, 30.5 s |
+| A4 alarm on a trail | scatter, back | 10/10 | 10/10 | 20/20 |
+| A6 pass / open (seeds 1–20) | report | exchange 0.95 / 0.94 | | 0.95 / 0.94: no change |
 
-- **G′, the top-down game, seeds 1–10:**
-  - food home 27,928 against main's 32,018 (−13 %);
-  - most held over 120 s on any seed: 81 against main's 129 (ja-9uj).
-- **A2a's food home** is 3,790 against main's 5,538. The colony concentrates on one pile and crowds it: the behaviour asked for, at a cost on this arena.
-- **The side view** is unchanged by construction (golden masters bit for bit), so G, A8, the hour-long economy and the chamber tests keep §44's figures.
-- **Gate:** `slow/assays.test` now runs A2a and A2b on seeds 1 and 2 as tests. A1 stays a todo naming `ja-00t`.
+- **A2b, seed 11–20's one failure:** the colony settled on the poor source (0.11). Amplification sometimes locks onto whichever source took the lead, as Beckers et al. saw with equal sources.
+- **G′, the top-down game (owner's call, 2026-11-04):**
+
+| G′ | main 1–10 | MR 3 1–10 | main 11–20 | MR 3 11–20 |
+|---|---|---|---|---|
+| food home | 32,018 | 39,964 (+25 %) | 32,040 | 43,104 (+35 %) |
+| births | 7,981 | 9,912 | — | 10,608 |
+| losses, you / rival | 6,911 / 6,821 | 10,070 / 9,628 (+46 %) | 7,083 / — | 10,223 / 9,968 (+44 %) |
+| ants alive at the end, you / rival | 7,070 / 7,307 | 5,842 / 7,105 | 6,898 / 7,001 | 6,385 / 6,275 |
+| most held over 120 s, one seed | 129 | 67 | — | 153 (ja-9uj) |
+
+- **The extra deaths are fights in the midfield:** seed 1, 2,158 against main's 969; seed 2, 1,687 against 899. Deaths near either nest are about the same, nearly all in FIGHT. Strong trails carry far more traffic, and both colonies' lanes meet over the shared food mid-map.
+  - The owner accepted this for MR 3 (2026-11-04). Bead `ja-hgq`: behaviour MR 4's contact response is the natural fix.
+  - Neither knob alone avoids it: the review's choice-only and quarter-trail-only runs raised losses too.
+- **The side view is unchanged** by construction (golden masters bit for bit), so G, A8, the hour-long economy and the chamber tests keep §44's figures.
+- **Gate:** `slow/assays.test` runs A1, A2a and A2b on seeds 1 and 2 as tests.
+- **Tests guarding the mechanisms** (review S2):
+  - `choose`'s weights and its large-k limit;
+  - the blended quality's value;
+  - a top-down follower at a fork, which `followChoice` 0 fails.
 
 ### 45.6 The trail lane (ja-68l.8) and the live check (2026-11-04)
 
-- **Legend** (`RESPONSE_BRAIN_VERSION` 5):
+- **Legend v5:**
   - The colony finds food and home only by scent trails: carriers' food trail leads others out, explorers' home trail leads carriers back, and where nobody lays, nobody can follow.
   - Quality is explained, and is sent to the get and trail lanes only.
   - The trail question's choices say what each trail is for.
-- **Live:** `colony-live.mjs mode,trail,get,carry` (side view) and `trail --top`, **$0.0036** together. The caches are in `experiments/caches/mr3-side-*.json` and `mr3-top-*.json`. Agreement with the local rule:
+- **Legend v6** (`RESPONSE_BRAIN_VERSION` 6): a porter's food is already home, and a food trail laid inside the nest leads nestmates in, away from the food outside. The trail question's "none" says the same.
+- **Live, v5:** `colony-live.mjs mode,trail,get,carry` (side view) and `trail --top`, $0.0036. Caches: `experiments/caches/mr3-side-*.json`, `mr3-top-*.json`.
+- **Live, v6:** `colony-live.mjs trail` (side view), $0.0007. Caches: `experiments/caches/mr3-v6-side-*.json`.
 
-| Lane | Side view | Top-down |
+| Lane, agreement with the local rule | Side view | Top-down |
 |---|---|---|
-| mode | 85–90 % | — |
-| trail | 61–74 % (MR 2: explorers told to lay nothing) | **95–100 %** |
-| get | 44–56 % (declines loose soil) | — |
-| carry | 95–100 % | — |
+| mode (v5) | 85–90 % | — |
+| trail, v5 | 61–74 % | **95–100 %** |
+| trail, v6 | 61–70 %: porters told to lay food trail, 3 → 0–1 per doctrine | — |
+| get (v5) | 44–56 % (declines loose soil) | — |
+| carry (v5) | 95–100 % | — |
 
-- **Top-down:** explorers' home trail and carriers' food trail now agree. Replayed (seeds 1–10), every doctrine passes A2a 8/10 (0.94), A2b 10/10 (0.94) and A3 10/10, with A1 at 0.64–0.65: the local rule's figures.
-- **Side view:** the trail lane's disagreements are all inside the nest. Porters are told to lay food trail (3 per doctrine: slice 5 found that this draws 4–5× as many followers underground), and nurses and diggers in chambers to lay no home trail.
-  - Replaying the trail lane alone in G (seeds 1–10): Forage 17,768, Cautious 20,996, Warlike 19,843, against the local rule's 24,512 (−28, −14, −19 %).
-  - ja-68l.8's mark (< 10 % food home) is **not met**. It stays open with this finding: what remains is the porters.
-- **Whole caches in G** (seeds 1–10): Forage 12,076 (7/10), Cautious 12,516 (9/10), Warlike 18,672 (8/10).
+- **Side view, v6:** what remains is followers and diggers in tunnels and chambers told to lay no home trail.
+- **The trail lane alone replayed in G** (seeds 1–10; local 24,512):
+
+| Doctrine | v5 | v6 |
+|---|---|---|
+| Forage | 17,768 (−28 %) | 22,224 (**−9 %**) |
+| Cautious | 20,996 (−14 %) | 22,725 (**−7 %**) |
+| Warlike | 19,843 (−19 %) | 19,233 (−22 %) |
+
+- ja-68l.8's mark (< 10 %) is met for Forage and Cautious and **not for Warlike**. ja-68l.8 stays open for Warlike's answers.
+- **v5's whole caches in G** (seeds 1–10): Forage 12,076 (7/10), Cautious 12,516 (9/10), Warlike 18,672 (8/10).
 
 **Cost** (`colony-cost --side 5 600 1`):
 
-| Lane | MR 3.1, tokens per question | MR 3 |
+| Lane | MR 3.1, tokens per question | MR 3 (v5) |
 |---|---|---|
 | mode | ~657, $0.074/h | ~657, $0.074/h (unchanged) |
 | get, if asked | 811 | 970 |
 | carry, if asked | 640 | 723 |
 | drop, if asked | 863 | 1,024 |
-| trail, if asked | 456 | 591 |
+| trail, if asked | 456 | 591; v6 613 |
 
 The response lanes would cost ~$0.074/h if asked (MR 3.1: ~$0.062/h). The page asks none of them.

@@ -1,0 +1,53 @@
+{
+ "version": {
+  "colony": 5,
+  "stance": 3,
+  "response": 6
+ },
+ "contexts": {
+  "mode": "colony-v5-af50f1aa",
+  "stance": "stance-v3-e7cbf41d",
+  "get": "get-v6-b730b4c5",
+  "carry": "carry-v6-56f83b11",
+  "drop": "drop-v6-3c3215f6",
+  "trail": "trail-v6-a7263170"
+ },
+ "view": "side",
+ "seed": 1,
+ "ants": 600,
+ "seconds": 300,
+ "doctrine": {
+  "id": "warlike",
+  "name": "Warlike",
+  "text": "Destroy the rival colony. Explorers become raiders whenever the colony has ants to spare. Follow alarm scent to every fight. Forage only to grow the colony."
+ },
+ "modes": {},
+ "stances": {},
+ "responses": {
+  "trail": {
+   "explore|none|-|-|chamber|none|clear|forage": "home",
+   "explore|none|-|-|tunnel|none|clear|forage": "home",
+   "explore|none|-|digging|chamber|none|clear|forage": "home",
+   "return|soil|-|-|chamber|none|clear|forage": "none",
+   "explore|none|-|digging|tunnel|none|clear|forage": "home",
+   "explore|none|-|-|out|none|clear|forage": "home",
+   "return|soil|-|-|tunnel|none|clear|forage": "none",
+   "return|soil|-|-|out|none|clear|forage": "none",
+   "follow|none|-|-|out|none|clear|forage": "home",
+   "return|food|-|-|out|none|clear|forage": "food",
+   "follow|none|-|-|tunnel|none|clear|forage": "none",
+   "return|food|-|-|tunnel|none|clear|forage": "food",
+   "follow|none|-|-|chamber|none|clear|forage": "none",
+   "return|food|porter|-|tunnel|none|clear|forage": "food",
+   "return|food|porter|-|chamber|none|clear|forage": "none",
+   "return|food|porter|-|out|none|clear|forage": "home",
+   "return|brood|-|-|chamber|none|clear|forage": "none",
+   "return|brood|-|-|tunnel|none|clear|forage": "none",
+   "return|food|-|-|chamber|none|clear|forage": "food",
+   "return|none|-|-|out|none|clear|forage": "home",
+   "return|none|-|-|tunnel|none|clear|forage": "home",
+   "return|none|-|-|chamber|none|clear|forage": "none",
+   "return|soil|-|-|out|none|enemy|forage": "none"
+  }
+ }
+}

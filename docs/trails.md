@@ -24,7 +24,7 @@ Research note for behaviour MR 3 (bead `ja-3ml`, PRD §45). Before MR 3 every fo
 - **Mass recruiters such as *Lasius* lay trail on the way home from food.** That is the recruitment trail. The game has always done this: carriers lay food trail.
 - **Argentine ants also mark while exploring.** Aron, Deneubourg & Pasteels 1989 suggest the same pheromone serves food and exploratory recruitment. Whether *L. humile* lays on its outbound food trips as well was not settled here: the full text was not reached. **Unverified.**
 
-**For the model:** MR 3 keeps "carriers lay food trail". If A1 can't reach its mark that way, outbound laying by successful foragers is the option to measure. Which species' rule the game follows is the owner's call.
+**For the model:** MR 3 keeps "carriers lay food trail" (*Lasius*). With carriers homing by trail and vector, A1 passes without outbound laying.
 
 ## The "no entry" mark
 
@@ -42,8 +42,9 @@ Research note for behaviour MR 3 (bead `ja-3ml`, PRD §45). Before MR 3 every fo
 
 - **A1's arena** is Goss's fork, with the long branch's side alternating by seed. It is scored by passages, and a run counts only when food comes home.
 - **Food quality.** A map layer (`WorldMap.quality`) holds it. An ant tastes it at pickup and carries it, and `Touch.quality` passes it to the responses. `trailRate` gives rich 1.2, fair 1 and poor 0.83.
-- **Followers choose by strength** (Deneubourg's (k + C)² choice, `followChoice` 1), and the food trail is laid at a quarter of `deposit` (`foodTrailTop`). That was the missing piece: at full strength the trail sat at the field's cap near the nest, so a strong trail and a weak one read the same, and followers always turned to the strongest sensor.
-  - **Top-down maps only.** In the side view, trails don't fork, so the weaker food trail only cost food and slowed the nest, so it plays as before.
+- **Followers choose by strength** (Deneubourg's (k + C)² choice, `followChoice` 1), and the top-down food channel holds up to 80 (`foodCapTop`). That was the missing piece: under the old cap of 20 a busy trail sat at the cap near the nest, so a strong trail and a weak one read the same, and followers always turned to the strongest sensor. Laying a quarter of the trail instead, the first try, left the trail too weak for explorers to follow (review of #37).
+- **Carriers home by trail and vector** (`homeTrail` 0.8): a carrier takes the food trail where it lies within 90° of its home vector, as foragers combine route cues and pheromone with path integration as the fallback (Czaczkes et al. 2011, 2013). At the bridge's fork the vector can't tell the branches apart; the trail can.
+- **Top-down maps only.** In the side view trails don't fork, and every variant tried there slowed the nest, so the side view plays as before.
 - **"No entry"** is built: a channel with t½ ≈ 27 s, a `noEntry` response, and a follower discount (`noEntryAvoid`). It ships off: the marks it laid landed on live trails and cost A2a more than they gained on A3 (bead `ja-4n1`).
 - **Which journeys lay trail:** only carriers lay food trail (*Lasius*). Outbound laying by followers was measured and didn't help A1 (0.50, with a wide spread).
 
