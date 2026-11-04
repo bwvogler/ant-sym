@@ -183,8 +183,7 @@ test("food is conserved when carriers put it down anywhere (behaviour MR 2: on t
     },
   }, 150); // half the game: the file stays well inside its 60 s beside test:slow (review of #35)
   assert.ok(where.has("forager out") && where.has("forager tunnel") && where.has("porter chamber"), [...where].join(", "));
-  // Some colony, not each: with MR 3's weaker food trail, recruitment starts later and one colony may not port within 150 s.
-  assert.ok(g.colonies.some((c) => c.portTrips > 0), "food still moved");
+  assert.ok(g.colonies.every((c) => c.portTrips > 0), "food still moved");
   assert.ok(worst < 1e-6, `food drifted by ${worst}`);
 });
 

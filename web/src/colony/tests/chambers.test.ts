@@ -90,9 +90,6 @@ test("a roomy nest barely digs (ja-wii): the same few ants dig far less when the
     for (const seed of [6, 7, 8, 9]) {
       const map = generateSideWorld(2, SMALL);
       if (!chambers) map.chambers = undefined; // no chambers: never roomy (as before slice 2)
-      // No food: this is the digging gate, not how many diggers foraging draws away (MR 3's trails moved this test's
-      // ratio from 0.36 to 0.47 over 16 games through foraging alone; without food, main and MR 3 dig identically).
-      for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
       const c = new Colony(map, { antCount: 30, maxAnts: 30 }, mulberry32(seed));
       // All middle-aged (diggers, slice 6): this is about how much a nest digs, not who digs.
       for (let i = 0; i < c.n; i++) ((c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN), (c.lifespan[i] = Infinity));
