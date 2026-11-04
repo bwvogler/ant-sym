@@ -276,11 +276,13 @@ export class Arena {
   readonly size: WorldSize;
   readonly rock: Uint8Array;
   readonly food: Float32Array;
+  readonly quality: Float32Array;
 
   constructor(w: number, h: number, open = false) {
     this.size = { w, h };
     this.rock = new Uint8Array(w * h).fill(open ? OPEN : ROCK);
     this.food = new Float32Array(w * h);
+    this.quality = new Float32Array(w * h).fill(1);
   }
 
   /** Open ground over the inclusive cell rectangle. */
@@ -323,12 +325,15 @@ export class Arena {
     return this;
   }
 
-  /** A pile of `perCell` food on every open cell within r (world units) of cell (cx, cy)'s centre. */
-  pile(cx: number, cy: number, r: number, perCell: number): this {
+  /** A pile of `perCell` food of `quality` (world.ts: WorldMap.quality) on every open cell within r (world units) of cell (cx, cy)'s centre. */
+  pile(cx: number, cy: number, r: number, perCell: number, quality = 1): this {
     const c = at(cx, cy);
     discWorld(this.size, c.x, c.y, r, (x, y) => {
       const i = y * this.size.w + x;
-      if (this.rock[i] === OPEN) this.food[i] = perCell;
+      if (this.rock[i] === OPEN) {
+        this.food[i] = perCell;
+        this.quality[i] = quality;
+      }
     });
     return this;
   }
@@ -336,7 +341,7 @@ export class Arena {
   /** The map, with nests centred on cells (cx, cy), radius r (world units). */
   build(nests: { x: number; y: number; r: number }[]): WorldMap {
     const ns: Nest[] = nests.map((n) => ({ ...at(n.x, n.y), r: n.r }));
-    return worldFromArrays(this.size, ns, { rock: this.rock, food: this.food });
+    return worldFromArrays(this.size, ns, { rock: this.rock, food: this.food, ...(this.quality.some((q) => q !== 1) ? { quality: this.quality } : {}) });
   }
 }
 
@@ -480,8 +485,7 @@ export const bridge: Assay = {
 
 /**
  * A2a — two equal sources at the same distance. A mass-recruiting colony breaks the symmetry and
- * concentrates on one (Beckers et al. 1990, Lasius niger with two 1 M sources). Food quality is not
- * modelled yet, so the rich-vs-poor test (A2b) waits for behaviour MR 3.
+ * concentrates on one (Beckers et al. 1990, Lasius niger with two 1 M sources). A2b (richPoor) has a rich and a poor one.
  */
 export const twin: Assay = {
   id: "twin",
@@ -502,6 +506,41 @@ export const twin: Assay = {
     const right = start - foodIn(game.map, b.x, b.y, 3);
     const share = left + right > 0 ? Math.max(left, right) / (left + right) : NaN;
     return { majorityShare: share, pass: share >= 0.7 ? 1 : 0 };
+  },
+};
+
+/**
+ * A2b — a rich and a poor source at the same distance (quality 1.5 against 0.5: Beckers et al. 1993's 1 M against
+ * 0.1 M sugar; docs/trails.md). *Lasius niger* foragers lay more trail for the richer food, and the colony settles on
+ * it. Same arena as A2a; which side is rich alternates with the seed.
+ */
+export const richPoor: Assay = {
+  id: "richPoor",
+  title: "A2b rich vs poor source: does the colony pick the richer?",
+  target: "the rich source takes ≥ 70 % of the food carried (design mark; Beckers et al. 1993: the colony selects the richer source)",
+  seconds: 240,
+  spec: (seed) => {
+    const richLeft = seed % 2 === 1;
+    return {
+      seed,
+      seconds: 240,
+      map: () =>
+        new Arena(100, 100, true)
+          .pile(25, 20, 3, 200, richLeft ? 1.5 : 0.5)
+          .pile(75, 20, 3, 200, richLeft ? 0.5 : 1.5)
+          .build([{ x: 50, y: 85, r: 3 }]),
+      game: { antCount: 300, rival: false },
+    };
+  },
+  score: (r, game) => {
+    const start = 200 * cellsIn(game.map.size, 25, 20, 3);
+    const a = at(25, 20);
+    const b = at(75, 20);
+    const left = start - foodIn(game.map, a.x, a.y, 3);
+    const right = start - foodIn(game.map, b.x, b.y, 3);
+    const rich = r.seed % 2 === 1 ? left : right;
+    const share = left + right > 0 ? rich / (left + right) : NaN;
+    return { richShare: share, pass: share >= 0.7 ? 1 : 0 };
   },
 };
 
@@ -769,4 +808,4 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, deplete, alarm, regulate, pass, open, game, gameTop, nestFlow];
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, pass, open, game, gameTop, nestFlow];

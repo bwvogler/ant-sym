@@ -50,6 +50,11 @@ export interface WorldMap {
   rock: ChunkLayer<Uint8Array>;
   /** food units left per cell; change it through takeFood / dropFood so foodLeft stays true */
   food: ChunkLayer<Float32Array>;
+  /**
+   * how good each cell's food is (1 = the game's ordinary food; Beckers et al. 1993's 1 M sugar against 0.1 M is about
+   * 1.5 against 0.5 here; docs/trails.md); absent when every cell's is 1. Read it through qualityAt.
+   */
+  quality?: ChunkLayer<Float32Array>;
   /** the player's nest (nests[0]) */
   nest: Nest;
   /** every nest: the player's first, then the rivals', reachable from each other */
@@ -391,6 +396,15 @@ export function foodIn(map: WorldMap, x: number, y: number): number {
   return map.food.get(x, y);
 }
 
+/** The quality of the food in integer cell (x, y): 1 unless the map says otherwise. */
+export function qualityAt(map: WorldMap, x: number, y: number): number {
+  return map.quality ? map.quality.get(x, y) : 1;
+}
+
+function qualityLayer(): ChunkLayer<Float32Array> {
+  return new ChunkLayer((n) => new Float32Array(n), 1);
+}
+
 /** Take one unit of food from the cell under world (x, y), if there is any. */
 export function takeFood(map: WorldMap, x: number, y: number): boolean {
   cellOf(x, y);
@@ -407,13 +421,18 @@ export function takeFoodCell(map: WorldMap, cx: number, cy: number): boolean {
   return true;
 }
 
-/** Put `amount` food on the cell under world (x, y). */
-export function dropFood(map: WorldMap, x: number, y: number, amount: number): void {
+/** Put `amount` food of `quality` on the cell under world (x, y): the cell's quality becomes the mean, by amount. */
+export function dropFood(map: WorldMap, x: number, y: number, amount: number, quality = 1): void {
   cellOf(x, y);
   const cx = CELL[0] as number;
   const cy = CELL[1] as number;
   if (!inBounds(map, cx, cy)) return;
-  map.food.set(cx, cy, map.food.get(cx, cy) + amount);
+  const had = map.food.get(cx, cy);
+  if (quality !== 1 || map.quality) {
+    const q = (map.quality ??= qualityLayer());
+    q.set(cx, cy, had > 0 ? (had * q.get(cx, cy) + amount * quality) / (had + amount) : quality);
+  }
+  map.food.set(cx, cy, had + amount);
   map.foodLeft += amount;
 }
 
@@ -436,8 +455,9 @@ function blankLayers(size: WorldSize): { rock: ChunkLayer<Uint8Array>; food: Chu
 }
 
 /** A map from flat row-major arrays (tests, small hand-made fields): rock and food default to none. */
-export function worldFromArrays(size: WorldSize, nests: Nest[], opts: { rock?: ArrayLike<number>; food?: ArrayLike<number>; seed?: number } = {}): WorldMap {
+export function worldFromArrays(size: WorldSize, nests: Nest[], opts: { rock?: ArrayLike<number>; food?: ArrayLike<number>; quality?: ArrayLike<number>; seed?: number } = {}): WorldMap {
   const { rock, food } = blankLayers(size);
+  const quality = opts.quality ? qualityLayer() : undefined;
   let total = 0;
   for (let y = 0; y < size.h; y++)
     for (let x = 0; x < size.w; x++) {
@@ -449,10 +469,11 @@ export function worldFromArrays(size: WorldSize, nests: Nest[], opts: { rock?: A
         food.set(x, y, f);
         total += f;
       }
+      if (quality) quality.set(x, y, opts.quality?.[i] ?? 1);
     }
   let hasSoil = false;
   if (opts.rock) for (let i = 0; i < opts.rock.length && !hasSoil; i++) hasSoil = opts.rock[i] === SOIL;
-  return { size, seed: opts.seed ?? 0, rock, food, nest: nests[0]!, nests, foodTotal: total, foodLeft: total, dug: 0, filled: 0, hasSoil, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer() };
+  return { size, seed: opts.seed ?? 0, rock, food, ...(quality ? { quality } : {}), nest: nests[0]!, nests, foodTotal: total, foodLeft: total, dug: 0, filled: 0, hasSoil, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer() };
 }
 
 /** A layer as a flat row-major array over the map (tests, the reachability oracle). */

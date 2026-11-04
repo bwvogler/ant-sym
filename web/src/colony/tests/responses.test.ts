@@ -20,7 +20,7 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
 }
 
-const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", ...t });
+const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", ...t }) as Touch;
 
 /** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
 function forage(c: Colony, seconds = 20): { picked: boolean } {
@@ -35,6 +35,9 @@ function forage(c: Colony, seconds = 20): { picked: boolean } {
 }
 
 test("localResponses are the colony's rules before the hooks", () => {
+  assert.equal(localResponses.trailRate(touch({ carrying: "food", quality: "rich" })), 1.2, "rich food: more trail (behaviour MR 3)");
+  assert.equal(localResponses.trailRate(touch({ carrying: "food", quality: "poor" })), 0.83);
+  assert.equal(localResponses.trailRate(touch({ carrying: "food" })), 1, "fair food lays as before");
   assert.equal(localResponses.get(touch({ offered: "food" })), true);
   assert.equal(localResponses.get(touch({ mode: "fight", offered: "food" })), false, "not mid-fight");
   for (const offered of ["soil", "corpse", "brood"] as const) assert.equal(localResponses.get(touch({ mode: "fight", offered })), true, `${offered}: the mechanic decides`);
@@ -363,4 +366,40 @@ test("fatigue: it stops at twice patience, so rest from the worst takes twice re
   const slow = out(2);
   assert.equal(slow.fatigue[0], 2 * slow.params.patience, "a ×2 clock reaches the cap too, in 240 s");
   assert.ok(rest(slow, 2 * slow.params.restTime) > 0.9 * slow.params.patience, "with a ×2 clock, 2 × restTime rests only half of the cap");
+});
+
+test("quality: tasted at pickup, carried, offered to get and trailRate, and kept when put down", () => {
+  const size = { w: 40, h: 12 };
+  const f = new Float32Array(size.w * size.h);
+  const q = new Float32Array(size.w * size.h).fill(1);
+  f[6 * size.w + 14] = 3;
+  q[6 * size.w + 14] = 1.5;
+  const map = worldFromArrays(size, [nestAt(6, 6, 2)], { food: f, quality: q });
+  const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(1));
+  const seen: { hook: string; quality: string }[] = [];
+  c.responses = responses({
+    get: (t) => (seen.push({ hook: "get", quality: t.quality }), localResponses.get(t)),
+    trailRate: (t) => (t.carrying === "food" && seen.push({ hook: "trailRate", quality: t.quality }), 1),
+  });
+  const { picked } = forage(c, 20);
+  assert.ok(picked);
+  assert.ok(seen.some((s) => s.hook === "get" && s.quality === "rich"), "get is offered rich food");
+  assert.ok(seen.some((s) => s.hook === "trailRate" && s.quality === "rich"), "a carrier of rich food knows it");
+  // Put down where it stands, the food keeps its quality, blended by amount with what lies there.
+  const m2 = worldFromArrays(size, [nestAt(6, 6, 2)], {});
+  const c2 = new Colony(m2, { antCount: 1, wander: 0 }, mulberry32(1));
+  put(c2, 0, 20, 6);
+  c2.carrying[0] = 1;
+  c2.quality[0] = 0.5;
+  c2.responses = responses({ carry: () => "put down" });
+  c2.tick(1 / 30);
+  assert.equal(c2.carrying[0], 0);
+  const where = at(20, 6);
+  assert.equal(foodAt(m2, where.x, where.y), 1);
+  assert.ok(m2.quality, "a quality layer appears when food other than 1 is put down");
+});
+
+test("touchKey: quality is in the key only when it isn't fair (keys cached before quality still match)", () => {
+  assert.equal(touchKey(touch({})), "explore|none|-|-|out|none|clear|forage");
+  assert.equal(touchKey(touch({ carrying: "food", quality: "rich" })), "explore|food|-|-|out|none|clear|forage|rich");
 });

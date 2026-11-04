@@ -4,8 +4,8 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { type Item, localResponses, type Responses, type Where, type Touch } from "./responses.ts";
-import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { type Item, localResponses, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
+import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -222,7 +222,7 @@ export class Colony {
   /** the ant the shared Touch describes */
   #ti = 0;
   /** The shared Touch. Its `place` is worked out only when a response reads it: the local ones never do, and working it out for every ant's trail every step cost the side view ~5 % a tick (review of #35). */
-  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
+  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -399,6 +399,8 @@ export class Colony {
   since: Float32Array;
   /** seconds of unsuccessful search, less rest inside the nest: tired above the colony's patience (ja-q47) */
   fatigue: Float32Array;
+  /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; 1 when it holds none */
+  quality: Float32Array;
   /** 1 from when fatigue passes patience until it has rested to nothing: a tired forager rests fully, not just under the line */
   #tired: Uint8Array;
   /** seconds left of a detour after bumping into rock, when the pull toward the nest (or the raid) is off */
@@ -595,6 +597,7 @@ export class Colony {
     this.gen = new Uint32Array(n);
     this.since = new Float32Array(n);
     this.fatigue = new Float32Array(n);
+    this.quality = new Float32Array(n).fill(1);
     this.#tired = new Uint8Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
@@ -677,6 +680,7 @@ export class Colony {
     this.hugT[i] = 0;
     this.since[i] = 0;
     this.fatigue[i] = 0;
+    this.quality[i] = 1;
     this.#tired[i] = 0;
     this.detour[i] = 0;
     this.bumps[i] = 0;
@@ -779,6 +783,11 @@ export class Colony {
     t.offered = offered;
     t.enemy = enemy;
     t.stance = this.stance;
+    // Taste (docs/trails.md): the food offered, under the ant; else the food in its jaws.
+    if (offered === "food") {
+      this.antCell(i);
+      t.quality = qualityOf(qualityAt(this.map, CELL[0] as number, CELL[1] as number));
+    } else t.quality = item === "food" ? qualityOf(this.quality[i] as number) : "fair";
     return t;
   }
 
@@ -1076,7 +1085,7 @@ export class Colony {
       this.#porter[i] = 0;
       this.#portTo[i] = -1;
     }
-    if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
+    if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1, this.quality[i] as number);
     this.antCell(i);
     if (this.#corpse[i]) {
       // The corpse it carried falls where it falls, with it.
@@ -2773,7 +2782,7 @@ export class Colony {
         this.#porter[i] = 0;
         this.#portTo[i] = -1;
       } else {
-        dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
+        dropFood(this.map, this.x[i] as number, this.y[i] as number, 1, this.quality[i] as number);
         this.#putAt[i] = cy * 65536 + cx;
       }
       this.carrying[i] = 0;
@@ -3463,6 +3472,7 @@ export class Colony {
       if (this.#putAt[i] !== cellKey) this.#putAt[i] = -1;
       if (!carrying && !pellet && this.#putAt[i] < 0 && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, "food")) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
+        this.quality[i] = qualityAt(map, CELL[0] as number, CELL[1] as number);
         this.#homeAfresh(i);
         this.since[i] = 0;
         this.fatigue[i] = 0; // found food: the search succeeded

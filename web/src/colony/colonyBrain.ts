@@ -165,8 +165,8 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
     const t = it.situation;
-    // offered only means something to `get`; the other lanes don't pay for it.
-    const { offered, ...rest } = t;
+    // offered only means something to `get`; the other lanes don't pay for it. Quality isn't asked yet (MR 3's legend adds it).
+    const { offered, quality: _quality, ...rest } = t;
     ants[it.id] = hook === "get" ? { ...rest, offered } : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }
