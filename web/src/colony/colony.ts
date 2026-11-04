@@ -4,7 +4,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { type Item, localResponses, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
+import { FOOD_TRAIL, type Item, localResponses, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
@@ -207,7 +207,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 1, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -3291,7 +3291,7 @@ export class Colony {
               const lay = resp.noEntry(this.touch(i, toEnemy !== null, mode, item));
               if (lay > 0) {
                 this.antCell(i);
-                ph.depositCell("noEntry", CELL[0] as number, CELL[1] as number, p.deposit * lay * dt * NO_ENTRY_RATE);
+                ph.depositCell("noEntry", CELL[0] as number, CELL[1] as number, p.deposit * FOOD_TRAIL * lay * dt * NO_ENTRY_RATE);
               }
             }
           }
