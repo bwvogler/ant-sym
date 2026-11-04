@@ -6,13 +6,16 @@ import { bridge, regulate, richPoor, runAssay, twin } from "../../experiment.ts"
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
 // slow/side.test.ts.)
 
-test("A1 double bridge: ≥ 80 % on the short branch", { todo: "ja-00t: carriers home by vector, not by trail (MR 3: 0.65)" }, () => {
-  const m = runAssay(bridge, 1).metrics;
-  assert.ok(Number.isFinite(m.shortShare));
-  assert.equal(m.pass, 1, `shortShare ${m.shortShare}`);
+// Behaviour MR 3 with ja-00t (carriers home by trail and vector): seeds 1–10 pass 10/10; 1 and 2 are both sides of the fork.
+test("A1 double bridge: ≥ 80 % on the short branch", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(bridge, seed).metrics;
+    assert.ok(Number.isFinite(m.shortShare));
+    assert.equal(m.pass, 1, `seed ${seed}: shortShare ${m.shortShare}`);
+  }
 });
 
-// Behaviour MR 3 (PRD §45): seeds 1–20 pass 16/20 (A2a) and 20/20 (A2b); seeds 1 and 2 pass both.
+// Behaviour MR 3 (PRD §45): seeds 1–10 pass 10/10 (A2a and A2b).
 test("A2a two equal sources: the colony concentrates on one", () => {
   for (const seed of [1, 2]) {
     const m = runAssay(twin, seed).metrics;
