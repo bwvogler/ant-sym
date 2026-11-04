@@ -190,6 +190,13 @@ export interface ColonyParams {
    */
   foodTrailTop: number;
   /**
+   * a food carrier's pull toward the food trail on its way home, top-down (ja-00t): the share of its turning given to the
+   * trail where the trail agrees with its home vector, the rest to the vector; 0 = the vector alone (before MR 3)
+   */
+  homeTrail: number;
+  /** how far off its home vector (radians) a carrier still takes the food trail home (ja-00t) */
+  homeTrailCone: number;
+  /**
    * how hard a follower shies from "no entry" (behaviour MR 3): each sensor's food scent counts less by this many times
    * its "no entry" reading; 0 = ignore it, and lay none. Off by default: on the assays it cost A2a more than it gained
    * on A3, which the trail's evaporation and tiredness already clear (PRD §45.4)
@@ -214,7 +221,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 0.25, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 0.25, homeTrail: 0, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -3118,6 +3125,25 @@ export class Colony {
             this.detour[i] = 0;
           }
         }
+        // A carrier with food on a top-down map takes the food trail home where it agrees with its home vector (ja-00t,
+        // docs/trails.md: foragers combine route cues and pheromone, path integration the fallback): each sensor's trail
+        // counts only if its direction is within homeTrailCone of the way home. At a fork the vector can't tell the branches
+        // apart (both lie off its line); the trail picks, not the wall a vector-led carrier walks into. Never the trail
+        // alone: all-trail carriers milled on their own trail (PRD §45.3).
+        let tl = 0;
+        let tf = 0;
+        let tr = 0;
+        if (p.homeTrail > 0 && carrying && this.#entrance === null && !detouring && Math.max(fl, ff, fr) >= FAINT && Math.max(fl, ff, fr) < SEEN) {
+          const agrees = (b: number) => Math.cos(b - toNest) >= Math.cos(p.homeTrailCone);
+          tl = agrees(h - a) ? fl : 0;
+          tf = agrees(h) ? ff : 0;
+          tr = agrees(h + a) ? fr : 0;
+        }
+        const onTrail = Math.max(tl, tf, tr) >= FAINT;
+        if (onTrail && this.wall[i] !== 0) {
+          this.wall[i] = 0; // the trail leads on: let go of the wall
+          this.mx[i] = NaN;
+        }
         const side = this.wall[i] as number;
         // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
         const look = pellet && !this.#corpse[i] && map.hasSoil && Number.isNaN(this.#spoilTo[i] as number) && (this.since[i] as number) > backfill.after && this.#enteredCell(i);
@@ -3139,7 +3165,10 @@ export class Colony {
           // Free: the home vector, with the home trail as a hint only (climbing it at full rate let
           // clusters of homing ants circle on their own trail). After giving up on a wall, wander a while.
           if (detouring) h += noise * p.wander;
-          else {
+          else if (onTrail) {
+            h += choose(tl, tf, tr, p.turnRate * dt * p.homeTrail, p.followChoice || 1, rng) + noise * p.wander * 0.25;
+            h = turnToward(h, toNest, p.turnRate * dt * 0.8 * (1 - p.homeTrail));
+          } else {
             // Where it believed home was, and nothing there (the side view's drifting vector): search round it.
             if (nest !== goal && Math.hypot(nest.x - x, nest.y - y) < 1) this.#searchOn(i);
             h += climb(hl, hf, hr, p.turnRate * dt * 0.25) + noise * p.wander * 0.25;
