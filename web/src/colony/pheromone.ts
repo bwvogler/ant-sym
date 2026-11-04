@@ -37,6 +37,8 @@ export interface ChannelParams {
   evaporation: number;
   /** spread per second toward the mean of the six neighbours (0 = none) */
   diffusion: number;
+  /** the most a cell holds (default MAX_LEVEL) */
+  max?: number;
 }
 
 export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
@@ -123,7 +125,7 @@ export class Pheromones {
   depositCell(channel: Channel, cx: number, cy: number, amount: number): void {
     if (cx < 0 || cy < 0 || cx >= this.map.size.w || cy >= this.map.size.h) return;
     const f = this.fields[channel];
-    f.set(cx, cy, Math.min(MAX_LEVEL, f.get(cx, cy) + amount));
+    f.set(cx, cy, Math.min(this.params[channel].max ?? MAX_LEVEL, f.get(cx, cy) + amount));
     this.#awake[channel].add(chunkKey(cx >> CHUNK_BITS, cy >> CHUNK_BITS));
   }
 
