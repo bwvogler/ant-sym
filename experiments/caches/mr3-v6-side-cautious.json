@@ -1,0 +1,53 @@
+{
+ "version": {
+  "colony": 5,
+  "stance": 3,
+  "response": 6
+ },
+ "contexts": {
+  "mode": "colony-v5-94519ecf",
+  "stance": "stance-v3-8d3eea78",
+  "get": "get-v6-5a954a10",
+  "carry": "carry-v6-dadd3224",
+  "drop": "drop-v6-812c3c73",
+  "trail": "trail-v6-6afbc515"
+ },
+ "view": "side",
+ "seed": 1,
+ "ants": 600,
+ "seconds": 300,
+ "doctrine": {
+  "id": "cautious",
+  "name": "Cautious",
+  "text": "Safety first. Any alarm scent means go home, unless the colony is defending. Go home when tired. Otherwise follow food scent, even a faint one. Defend the nest; never raid."
+ },
+ "modes": {},
+ "stances": {},
+ "responses": {
+  "trail": {
+   "explore|none|-|-|chamber|none|clear|forage": "home",
+   "explore|none|-|-|tunnel|none|clear|forage": "home",
+   "explore|none|-|digging|chamber|none|clear|forage": "home",
+   "return|soil|-|-|chamber|none|clear|forage": "none",
+   "explore|none|-|digging|tunnel|none|clear|forage": "home",
+   "explore|none|-|-|out|none|clear|forage": "home",
+   "return|soil|-|-|tunnel|none|clear|forage": "none",
+   "return|soil|-|-|out|none|clear|forage": "none",
+   "follow|none|-|-|out|none|clear|forage": "home",
+   "return|food|-|-|out|none|clear|forage": "food",
+   "follow|none|-|-|tunnel|none|clear|forage": "none",
+   "return|food|-|-|tunnel|none|clear|forage": "food",
+   "follow|none|-|-|chamber|none|clear|forage": "none",
+   "return|food|porter|-|tunnel|none|clear|forage": "none",
+   "return|food|porter|-|chamber|none|clear|forage": "none",
+   "return|food|porter|-|out|none|clear|forage": "home",
+   "return|brood|-|-|chamber|none|clear|forage": "none",
+   "return|brood|-|-|tunnel|none|clear|forage": "none",
+   "return|food|-|-|chamber|none|clear|forage": "food",
+   "return|none|-|-|out|none|clear|forage": "home",
+   "return|none|-|-|tunnel|none|clear|forage": "none",
+   "return|none|-|-|chamber|none|clear|forage": "none",
+   "return|soil|-|-|out|none|enemy|forage": "home"
+  }
+ }
+}

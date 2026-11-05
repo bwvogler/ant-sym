@@ -216,6 +216,45 @@ export function occupancyProbe(regions: Record<string, Rect>, from = 0, to = Inf
   };
 }
 
+/**
+ * Passages through gates: an ant inside a gate's rectangle that crosses its middle line (x = (x0 + x1) / 2), either
+ * way, counts once (`<gate>Passes`). Goss et al. counted passages over each branch; occupancy also counts ants that
+ * dawdle (ja-dez).
+ */
+export function crossingProbe(gates: Record<string, Rect>, from = 0, colony = 0): Probe {
+  const names = Object.keys(gates);
+  const total = names.map(() => 0);
+  let side: Int8Array[] = [];
+  return {
+    tick(game) {
+      const c = game.colonies[colony];
+      if (!c) return;
+      if ((side[0]?.length ?? -1) < c.n)
+        side = names.map((_, g) => {
+          const a = new Int8Array(c.n);
+          a.set(side[g] ?? []);
+          return a;
+        });
+      names.forEach((k, g) => {
+        const r = gates[k] as Rect;
+        const mid = (r.x0 + r.x1) / 2;
+        const sd = side[g] as Int8Array;
+        for (let i = 0; i < c.n; i++) {
+          const x = c.x[i] as number;
+          if (!c.alive[i] || !inRect(r, x, c.y[i] as number)) {
+            sd[i] = 0;
+            continue;
+          }
+          const now = x < mid ? -1 : 1;
+          if (sd[i] !== 0 && sd[i] !== now && game.time >= from) total[g] = (total[g] as number) + 1;
+          sd[i] = now;
+        }
+      });
+    },
+    summary: () => Object.fromEntries(names.map((k, g) => [`${k}Passes`, total[g] as number])),
+  };
+}
+
 /** Ants of a colony within r (world units) of world (x, y) right now. */
 export function antsNear(game: Game, x: number, y: number, r: number, colony = 0): number {
   const c = game.colonies[colony];
@@ -237,11 +276,13 @@ export class Arena {
   readonly size: WorldSize;
   readonly rock: Uint8Array;
   readonly food: Float32Array;
+  readonly quality: Float32Array;
 
   constructor(w: number, h: number, open = false) {
     this.size = { w, h };
     this.rock = new Uint8Array(w * h).fill(open ? OPEN : ROCK);
     this.food = new Float32Array(w * h);
+    this.quality = new Float32Array(w * h).fill(1);
   }
 
   /** Open ground over the inclusive cell rectangle. */
@@ -254,17 +295,45 @@ export class Arena {
     return this.#fill(x0, y0, x1, y1, ROCK);
   }
 
+  /**
+   * Open ground along a polyline given in world units: every cell whose centre is within `half` of a segment. Lets an
+   * arena have corridors at any angle (the hex rows only give 0° and ±60°), so two branches can leave a choice point
+   * at equal angles.
+   */
+  path(points: [number, number][], half: number): this {
+    for (let k = 1; k < points.length; k++) {
+      const [ax, ay] = points[k - 1] as [number, number];
+      const [bx, by] = points[k] as [number, number];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy || 1;
+      const y0 = Math.max(0, Math.floor((Math.min(ay, by) - half) / R) - 1);
+      const y1 = Math.min(this.size.h - 1, Math.ceil((Math.max(ay, by) + half) / R) + 1);
+      for (let y = y0; y <= y1; y++)
+        for (let x = Math.max(0, Math.floor(Math.min(ax, bx) - half) - 1); x <= Math.min(this.size.w - 1, Math.ceil(Math.max(ax, bx) + half) + 1); x++) {
+          const px = centreX(x, y);
+          const py = centreY(y);
+          const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+          if (Math.hypot(px - ax - t * dx, py - ay - t * dy) <= half) this.rock[y * this.size.w + x] = OPEN;
+        }
+    }
+    return this;
+  }
+
   #fill(x0: number, y0: number, x1: number, y1: number, v: number): this {
     for (let y = Math.max(0, y0); y <= Math.min(this.size.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(this.size.w - 1, x1); x++) this.rock[y * this.size.w + x] = v;
     return this;
   }
 
-  /** A pile of `perCell` food on every open cell within r (world units) of cell (cx, cy)'s centre. */
-  pile(cx: number, cy: number, r: number, perCell: number): this {
+  /** A pile of `perCell` food of `quality` (world.ts: WorldMap.quality) on every open cell within r (world units) of cell (cx, cy)'s centre. */
+  pile(cx: number, cy: number, r: number, perCell: number, quality = 1): this {
     const c = at(cx, cy);
     discWorld(this.size, c.x, c.y, r, (x, y) => {
       const i = y * this.size.w + x;
-      if (this.rock[i] === OPEN) this.food[i] = perCell;
+      if (this.rock[i] === OPEN) {
+        this.food[i] = perCell;
+        this.quality[i] = quality;
+      }
     });
     return this;
   }
@@ -272,7 +341,7 @@ export class Arena {
   /** The map, with nests centred on cells (cx, cy), radius r (world units). */
   build(nests: { x: number; y: number; r: number }[]): WorldMap {
     const ns: Nest[] = nests.map((n) => ({ ...at(n.x, n.y), r: n.r }));
-    return worldFromArrays(this.size, ns, { rock: this.rock, food: this.food });
+    return worldFromArrays(this.size, ns, { rock: this.rock, food: this.food, ...(this.quality.some((q) => q !== 1) ? { quality: this.quality } : {}) });
   }
 }
 
@@ -348,48 +417,75 @@ const always =
 
 const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
 
+/** Food a colony must bring home for a bridge run to count: a share measured on almost no traffic says nothing (ja-dez). */
+export const BRIDGE_MIN_STORED = 20;
+
 /**
- * A1 — the double bridge. A small nest room with two exits to one food room: the short branch is
- * ~64 cells, the long one ~102 (it dips 19 rows further down and back up). Real Argentine ants end
- * up almost all on the short branch in most trials (Goss et al. 1989): the first ants back are the
- * ones that took it, so its trail grows first. Measured on equal 30-cell stretches of each branch
- * from 60 s on.
+ * A1 — the double bridge (Goss et al. 1989; docs/trails.md, PRD §45.1). One stem from the nest to a choice point; two
+ * branches leave it at ±30° and look alike for their first 10 units, then the short one runs straight across and the
+ * long one out, along and back (twice the length), and they meet at a mirror-image fork before the food. Only length
+ * tells the branches apart. The long branch's side alternates with the seed (below on odd seeds, above on even ones),
+ * as Goss swapped sides between trials: homing ants on this map lean to one side at a symmetric fork (ja-dez's
+ * measurements), and a fixed side would score that lean, not the trail. Score: passages over equal 16-unit straight
+ * stretches of each branch from 60 s on (ant-seconds too, as `timeShare`), counted only when food came home.
+ * (MR 0's box arena, where the short branch was also the straight line home, scored 0.59 for that reason alone.)
  */
-export const bridge: Assay = {
-  id: "bridge",
-  title: "A1 double bridge: short vs long branch",
-  target: "≥ 80 % of branch traffic on the short branch (Goss et al. 1989: almost all ants, most trials)",
-  seconds: 300,
-  spec: (seed) => ({
+function bridgeSpec(seed: number): RunSpec {
+  // World units. The stem runs right from the nest to fork A; the branches meet at fork B; then the food room.
+  const half = 2.2;
+  const ax = 18;
+  const bx = 62;
+  const d = 10;
+  const dx = d * Math.cos(Math.PI / 6);
+  const dy = d * Math.sin(Math.PI / 6);
+  // The long branch's legs out and back make it twice the short one: 2d + 2v + run = 2 (2d + run).
+  const run = bx - ax - 2 * dx;
+  const v = (2 * d + run) / 2;
+  const up = seed % 2 === 1 ? 1 : -1; // which way the long branch goes (+1: down the map)
+  const row = up === 1 ? 35 : 2 * Math.ceil((dy + v + 6) / R / 2) + 1;
+  const n = at(8, row);
+  const y = n.y;
+  const shortY = y - up * dy;
+  const longY = y + up * (dy + v);
+  const rows = Math.ceil((Math.max(y + dy, longY) + 6) / R);
+  const mid = (ax + bx) / 2;
+  const stretch = (yy: number): Rect => ({ x0: mid - 8, x1: mid + 8, y0: yy - half, y1: yy + half });
+  const gates = { short: stretch(shortY), long: stretch(longY) };
+  return {
     seed,
     seconds: 300,
     map: () =>
-      new Arena(100, 62)
-        .carve(2, 22, 15, 38) // nest room
-        .carve(80, 22, 97, 38) // food room
-        .carve(16, 22, 79, 27) // short branch
-        .carve(16, 33, 21, 38) // long branch: out of the room's lower exit,
-        .carve(16, 33, 21, 57) // down,
-        .carve(16, 52, 75, 57) // along (the stretch measured),
-        .carve(70, 33, 75, 57) // up,
-        .carve(70, 33, 79, 38) // and into the food room
-        .pile(89, 30, 4, 40)
-        .build([{ x: 8, y: 30, r: 3 }]),
+      new Arena(84, rows)
+        .path([[n.x - 5, y], [n.x + 5, y]], 4.5) // nest room
+        .path([[n.x, y], [ax, y]], half) // stem
+        .path([[ax, y], [ax + dx, shortY], [bx - dx, shortY], [bx, y]], half) // short branch
+        .path([[ax, y], [ax + dx, y + up * dy], [ax + dx, longY], [bx - dx, longY], [bx - dx, y + up * dy], [bx, y]], half) // long branch
+        .path([[bx, y], [76, y]], half) // to the food
+        .path([[72, y], [80, y]], 4.5) // food room
+        .pile(76, row, 4, 40)
+        .build([{ x: 8, y: row, r: 3 }]),
     game: { antCount: 300, rival: false },
-    probes: [occupancyProbe({ short: cellRect(30, 22, 59, 27), long: cellRect(30, 52, 59, 57) }, 60)],
-  }),
+    probes: [occupancyProbe(gates, 60), crossingProbe(gates, 60)],
+  };
+}
+
+export const bridge: Assay = {
+  id: "bridge",
+  title: "A1 double bridge: short vs long branch",
+  target: `≥ 80 % of passages on the short branch, with ≥ ${BRIDGE_MIN_STORED} food home (Goss et al. 1989: almost all ants, most trials)`,
+  seconds: 300,
+  spec: bridgeSpec,
   score: (r) => {
-    const s = r.metrics.short as number;
-    const l = r.metrics.long as number;
-    const share = s + l > 0 ? s / (s + l) : NaN;
-    return { shortShare: share, pass: share >= 0.8 ? 1 : 0 };
+    const ratio = (a: number, b: number) => (a + b > 0 ? a / (a + b) : NaN);
+    const passShare = ratio(r.metrics.shortPasses as number, r.metrics.longPasses as number);
+    const shortShare = (r.metrics["you.stored"] as number) >= BRIDGE_MIN_STORED ? passShare : NaN;
+    return { shortShare, timeShare: ratio(r.metrics.short as number, r.metrics.long as number), pass: shortShare >= 0.8 ? 1 : 0 };
   },
 };
 
 /**
  * A2a — two equal sources at the same distance. A mass-recruiting colony breaks the symmetry and
- * concentrates on one (Beckers et al. 1990, Lasius niger with two 1 M sources). Food quality is not
- * modelled yet, so the rich-vs-poor test (A2b) waits for behaviour MR 3.
+ * concentrates on one (Beckers et al. 1990, Lasius niger with two 1 M sources). A2b (richPoor) has a rich and a poor one.
  */
 export const twin: Assay = {
   id: "twin",
@@ -410,6 +506,41 @@ export const twin: Assay = {
     const right = start - foodIn(game.map, b.x, b.y, 3);
     const share = left + right > 0 ? Math.max(left, right) / (left + right) : NaN;
     return { majorityShare: share, pass: share >= 0.7 ? 1 : 0 };
+  },
+};
+
+/**
+ * A2b — a rich and a poor source at the same distance (quality 1.5 against 0.5: Beckers et al. 1993's 1 M against
+ * 0.1 M sugar; docs/trails.md). *Lasius niger* foragers lay more trail for the richer food, and the colony settles on
+ * it. Same arena as A2a; which side is rich alternates with the seed.
+ */
+export const richPoor: Assay = {
+  id: "richPoor",
+  title: "A2b rich vs poor source: does the colony pick the richer?",
+  target: "the rich source takes ≥ 70 % of the food carried (design mark; Beckers et al. 1993: the colony selects the richer source)",
+  seconds: 240,
+  spec: (seed) => {
+    const richLeft = seed % 2 === 1;
+    return {
+      seed,
+      seconds: 240,
+      map: () =>
+        new Arena(100, 100, true)
+          .pile(25, 20, 3, 200, richLeft ? 1.5 : 0.5)
+          .pile(75, 20, 3, 200, richLeft ? 0.5 : 1.5)
+          .build([{ x: 50, y: 85, r: 3 }]),
+      game: { antCount: 300, rival: false },
+    };
+  },
+  score: (r, game) => {
+    const start = 200 * cellsIn(game.map.size, 25, 20, 3);
+    const a = at(25, 20);
+    const b = at(75, 20);
+    const left = start - foodIn(game.map, a.x, a.y, 3);
+    const right = start - foodIn(game.map, b.x, b.y, 3);
+    const rich = r.seed % 2 === 1 ? left : right;
+    const share = left + right > 0 ? rich / (left + right) : NaN;
+    return { richShare: share, pass: share >= 0.7 ? 1 : 0 };
   },
 };
 
@@ -677,4 +808,4 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, deplete, alarm, regulate, pass, open, game, gameTop, nestFlow];
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, pass, open, game, gameTop, nestFlow];

@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
-import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
+import { choose, Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
 import { Game } from "../game.ts";
 import { packResponseRequest, readResponse, RESPONSE_HOOKS, responseContext, responsesFromAnswers } from "../colonyBrain.ts";
 import { type Item, localResponses, responses, touchKey, type Touch } from "../responses.ts";
-import { foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
+import { dropFood, foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, nestAt, put } from "./hexmaps.ts";
 
 // The ant's response hooks (responses.ts): the local ones are the rules the colony had (the golden masters
@@ -20,7 +20,7 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
 }
 
-const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", ...t });
+const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", ...t }) as Touch;
 
 /** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
 function forage(c: Colony, seconds = 20): { picked: boolean } {
@@ -35,6 +35,9 @@ function forage(c: Colony, seconds = 20): { picked: boolean } {
 }
 
 test("localResponses are the colony's rules before the hooks", () => {
+  assert.equal(localResponses.trailRate(touch({ carrying: "food", quality: "rich" })), 1.2, "rich food: more trail (behaviour MR 3)");
+  assert.equal(localResponses.trailRate(touch({ carrying: "food", quality: "poor" })), 0.83);
+  assert.equal(localResponses.trailRate(touch({ carrying: "food" })), 1, "fair food lays as before");
   assert.equal(localResponses.get(touch({ offered: "food" })), true);
   assert.equal(localResponses.get(touch({ mode: "fight", offered: "food" })), false, "not mid-fight");
   for (const offered of ["soil", "corpse", "brood"] as const) assert.equal(localResponses.get(touch({ mode: "fight", offered })), true, `${offered}: the mechanic decides`);
@@ -363,4 +366,124 @@ test("fatigue: it stops at twice patience, so rest from the worst takes twice re
   const slow = out(2);
   assert.equal(slow.fatigue[0], 2 * slow.params.patience, "a ×2 clock reaches the cap too, in 240 s");
   assert.ok(rest(slow, 2 * slow.params.restTime) > 0.9 * slow.params.patience, "with a ×2 clock, 2 × restTime rests only half of the cap");
+});
+
+test("quality: tasted at pickup, carried, offered to get and trailRate, and kept when put down", () => {
+  const size = { w: 40, h: 12 };
+  const f = new Float32Array(size.w * size.h);
+  const q = new Float32Array(size.w * size.h).fill(1);
+  f[6 * size.w + 14] = 3;
+  q[6 * size.w + 14] = 1.5;
+  const map = worldFromArrays(size, [nestAt(6, 6, 2)], { food: f, quality: q });
+  const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(1));
+  const seen: { hook: string; quality: string }[] = [];
+  c.responses = responses({
+    get: (t) => (seen.push({ hook: "get", quality: t.quality }), localResponses.get(t)),
+    trailRate: (t) => (t.carrying === "food" && seen.push({ hook: "trailRate", quality: t.quality }), 1),
+  });
+  const { picked } = forage(c, 20);
+  assert.ok(picked);
+  assert.ok(seen.some((s) => s.hook === "get" && s.quality === "rich"), "get is offered rich food");
+  assert.ok(seen.some((s) => s.hook === "trailRate" && s.quality === "rich"), "a carrier of rich food knows it");
+  // Put down where it stands, the food keeps its quality, blended by amount with what lies there.
+  const m2 = worldFromArrays(size, [nestAt(6, 6, 2)], {});
+  const c2 = new Colony(m2, { antCount: 1, wander: 0 }, mulberry32(1));
+  put(c2, 0, 20, 6);
+  c2.carrying[0] = 1;
+  c2.quality[0] = 0.5;
+  c2.responses = responses({ carry: () => "put down" });
+  c2.tick(1 / 30);
+  assert.equal(c2.carrying[0], 0);
+  const where = at(20, 6);
+  assert.equal(foodAt(m2, where.x, where.y), 1);
+  assert.ok(m2.quality, "a quality layer appears when food other than 1 is put down");
+});
+
+test("touchKey: quality is in the key only when it isn't fair (keys cached before quality still match)", () => {
+  assert.equal(touchKey(touch({})), "explore|none|-|-|out|none|clear|forage");
+  assert.equal(touchKey(touch({ carrying: "food", quality: "rich" })), "explore|food|-|-|out|none|clear|forage|rich");
+});
+
+test("noEntry: a follower at a food trail's end with no food marks it; with food there, it doesn't; noEntry 0 lays none", () => {
+  const size = { w: 40, h: 12 };
+  const run = (food: number, noEntry: number): number => {
+    const f = new Float32Array(size.w * size.h);
+    if (food) for (let y = 4; y <= 8; y++) for (let x = 21; x <= 23; x++) f[y * size.w + x] = food; // a small pile at the trail's end
+    const map = worldFromArrays(size, [nestAt(4, 6, 2)], { food: f });
+    const c = new Colony(map, { antCount: 1, wander: 0, noEntryAvoid: 4 }, mulberry32(1));
+    c.policy = () => "follow";
+    c.responses = responses({ noEntry: () => noEntry });
+    // A food trail along rows 5–7 from the nest to x = 20 (on over the pile, when there is one), strongest at its far end, as carriers lay it.
+    for (let x = 8; x <= (food ? 23 : 20); x++) for (let y = 5; y <= 7; y++) c.ph.depositCell("food", x, y, 1 + x / 4);
+    put(c, 0, 12, 6);
+    c.heading[0] = 0;
+    for (let k = 0; k < 30 * 4; k++) c.tick(1 / 30);
+    let s = 0;
+    for (let y = 0; y < size.h; y++) for (let x = 0; x < size.w; x++) s += c.ph.fields.noEntry.get(x, y);
+    return s;
+  };
+  assert.ok(run(0, 1) > 0, "spent: marked");
+  assert.equal(run(3, 1), 0, "food in sight: not marked");
+  assert.equal(run(0, 0), 0, "the noEntry response says none");
+});
+
+test("choose (behaviour MR 3): left, ahead or right with chances (k + C)²; near even as k grows", () => {
+  const share = (l: number, f: number, r: number, k: number) => {
+    const rng = mulberry32(7);
+    const n = 20000;
+    const out = { left: 0, ahead: 0, right: 0 };
+    for (let i = 0; i < n; i++) {
+      const t = choose(l, f, r, 1, k, rng);
+      if (t < 0) out.left++;
+      else if (t > 0) out.right++;
+      else out.ahead++;
+    }
+    return { left: out.left / n, ahead: out.ahead / n, right: out.right / n };
+  };
+  const s = share(3, 0, 1, 1); // weights 16, 1, 4
+  assert.ok(Math.abs(s.left - 16 / 21) < 0.02 && Math.abs(s.ahead - 1 / 21) < 0.01 && Math.abs(s.right - 4 / 21) < 0.02, JSON.stringify(s));
+  const big = share(3, 0, 1, 1000);
+  for (const v of Object.values(big)) assert.ok(Math.abs(v - 1 / 3) < 0.02, JSON.stringify(big));
+});
+
+test("dropFood blends quality by amount (and a first drop on bare ground takes the food's)", () => {
+  const map = worldFromArrays({ w: 10, h: 10 }, [nestAt(2, 2, 1)], {});
+  const p = at(6, 6);
+  dropFood(map, p.x, p.y, 1, 0.5);
+  assert.equal(map.quality?.get(6, 6), 0.5);
+  dropFood(map, p.x, p.y, 3, 1.5);
+  assert.equal(map.quality?.get(6, 6), (1 * 0.5 + 3 * 1.5) / 4);
+  assert.equal(foodAt(map, p.x, p.y), 4);
+});
+
+test("followChoice (top-down): at a fork a follower mostly takes the stronger trail, and sometimes the weaker", () => {
+  // A stem east along row 10, then two branches at ±60° (the hex rows' own diagonals): up 4× stronger than down.
+  const size = { w: 40, h: 22 };
+  const branch = (c: Colony, up: boolean, level: number) => {
+    let x = 16;
+    for (let k = 0; k < 9; k++) {
+      const y = up ? 10 - k : 10 + k;
+      for (let w = -1; w <= 1; w++) c.ph.depositCell("food", x + w, y, level);
+      if (y % 2 === 0) x += up ? 0 : 1; // walk the NE / SE diagonal in offset rows
+      else x += up ? 1 : 0;
+    }
+  };
+  let strong = 0;
+  let weak = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const map = worldFromArrays(size, [nestAt(3, 10, 2)], {});
+    const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(seed));
+    c.policy = () => "follow";
+    for (let x = 6; x <= 16; x++) for (let y = 9; y <= 11; y++) c.ph.depositCell("food", x, y, 4);
+    branch(c, true, 8);
+    branch(c, false, 2);
+    put(c, 0, 8, 10);
+    c.heading[0] = 0;
+    for (let k = 0; k < 30 * 4 && Math.abs((c.y[0] as number) - at(8, 10).y) < 5; k++) c.tick(1 / 30);
+    const dy = (c.y[0] as number) - at(8, 10).y;
+    if (dy <= -5) strong++;
+    else if (dy >= 5) weak++;
+  }
+  assert.ok(strong >= 0.7 * (strong + weak) && strong + weak >= 30, `stronger ${strong}, weaker ${weak}`);
+  assert.ok(weak >= 1, `a choice, not a certainty: weaker ${weak} of ${strong + weak}`);
 });

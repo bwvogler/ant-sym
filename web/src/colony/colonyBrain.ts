@@ -122,10 +122,10 @@ export function stanceContext(doctrine: string): string {
 }
 
 /** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
-export const RESPONSE_BRAIN_VERSION = 4;
+export const RESPONSE_BRAIN_VERSION = 6;
 
 export const RESPONSE_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside. digging says it is digging at a soil face. place is where it is: out (away from its nest), hole (at its nest's mouth), tunnel (in its own nest's tunnels) or chamber (in one of its own nest's chambers). offered, when it may pick something up, is what lies within reach: food; soil (a loose pellet off the mound: carried down to fill unused tunnels, or farther out, it keeps the mound spread and the nest's entrance clear); corpse (a dead nestmate: on the midden it can't spread disease in the nest); or brood (an egg by the queen, or a larva lying outside the brood chambers: larvae are fed only in a brood chamber, so brood left lying never becomes a worker). enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance is what the colony as a whole is doing: forage, defend or raid. doctrine is how the colony wants its ants to behave: follow it.";
+  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside: that food is already home, and a food trail laid inside the nest leads nestmates in, away from the food outside. digging says it is digging at a soil face. place is where it is: out (away from its nest), hole (at its nest's mouth), tunnel (in its own nest's tunnels) or chamber (in one of its own nest's chambers). offered, when it may pick something up, is what lies within reach: food; soil (a loose pellet off the mound: carried down to fill unused tunnels, or farther out, it keeps the mound spread and the nest's entrance clear); corpse (a dead nestmate: on the midden it can't spread disease in the nest); or brood (an egg by the queen, or a larva lying outside the brood chambers: larvae are fed only in a brood chamber, so brood left lying never becomes a worker). enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance is what the colony as a whole is doing: forage, defend or raid. quality, for food carried or offered, is how good it tastes: poor, fair or rich. The colony finds food and its way home only by scent trails: ants carrying food home lay the food trail that leads others out to it (more for richer food), and ants walking out lay the home trail that leads carriers back; where nobody lays, nobody can follow. doctrine is how the colony wants its ants to behave: follow it.";
 
 export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail"] as const;
 export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
@@ -153,7 +153,11 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
         [`${id}_trail`]: {
           type: "choice",
           instructions: `Going by the doctrine, which scent should ${ant} lay as it walks?`,
-          criteria: { food: "food: mark the way to food (it is carrying food home)", home: "home: mark the way home (it is walking out)", none: "none: lay nothing" },
+          criteria: {
+            food: "food: mark the way to food, so nestmates can follow it out (it is carrying food home)",
+            home: "home: mark the way home, so carriers can find the nest (it is walking out)",
+            none: "none: lay nothing (a porter's food is already home; soil and corpses lead nowhere worth following)",
+          },
         },
       };
   }
@@ -165,9 +169,9 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
     const t = it.situation;
-    // offered only means something to `get`; the other lanes don't pay for it.
-    const { offered, ...rest } = t;
-    ants[it.id] = hook === "get" ? { ...rest, offered } : { ...rest };
+    // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
+    const { offered, quality, ...rest } = t;
+    ants[it.id] = hook === "get" ? { ...rest, offered, quality } : hook === "trail" ? { ...rest, quality } : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };

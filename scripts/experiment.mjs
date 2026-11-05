@@ -9,7 +9,7 @@
 //
 // --set takes a dotted path under colony / rival / game and a comma list of
 // values; several --set flags run their cross product. Pheromone channels are
-// colony.channels.<food|home|alarm>.<evaporation|diffusion>.
+// colony.channels.<food|home|alarm|noEntry>.<evaporation|diffusion>.
 //
 // --policy cache:<file> replays Jev's cached answers for the first colony
 // (scripts/colony-live.mjs writes them: modes, stances and responses, with

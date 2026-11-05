@@ -24,6 +24,23 @@ export type Item = (typeof ITEMS)[number];
 export const WHERE = ["out", "hole", "tunnel", "chamber"] as const;
 export type Where = (typeof WHERE)[number];
 
+/** How good food tastes (docs/trails.md: Beckers et al. 1993): the map's quality, bucketed. */
+export const QUALITY = ["poor", "fair", "rich"] as const;
+export type Quality = (typeof QUALITY)[number];
+/** Quality below this tastes poor, above QUALITY_RICH rich (the game's ordinary food is 1: fair). */
+export const QUALITY_POOR = 0.75;
+export const QUALITY_RICH = 1.25;
+export function qualityOf(q: number): Quality {
+  return q < QUALITY_POOR ? "poor" : q > QUALITY_RICH ? "rich" : "fair";
+}
+
+/**
+ * Trail laid by a food carrier, by the food's quality, as a share of the colony's `deposit` (behaviour MR 3): *Lasius
+ * niger* lays about 43 % more trail for 1 M sugar than for 0.05–0.1 M (Beckers et al. 1993; docs/trails.md), so rich
+ * lays 1.44× what poor does. The game's ordinary food (fair) keeps 1.
+ */
+export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, rich: 1.2 };
+
 /**
  * What a response may depend on: few values, so an answer could be cached per situation. The
  * colony fills one shared object per call, so a response must read it and not keep it.
@@ -42,6 +59,8 @@ export interface Touch {
   /** strangers within the colony's enemy range (always true in a fight) */
   enemy: boolean;
   stance: Stance;
+  /** how good the food is, tasted: the food it carries, or the food `get` offers; "fair" otherwise */
+  quality: Quality;
 }
 
 export type Trail = "food" | "home" | "none";
@@ -70,10 +89,15 @@ export interface Responses {
   alarmGain(t: Touch): number;
   /** In a fight: alarm laid, as a share of the fight's `alarm` rate. */
   raiseAlarm(t: Touch): number;
+  /**
+   * Following a food trail to where it ends, and no food there (behaviour MR 3, docs/trails.md: Robinson et al. 2005):
+   * "no entry" laid, as a share of the colony's `deposit` (0 = none).
+   */
+  noEntry(t: Touch): number;
 }
 
 /**
- * The rules before the hooks, unchanged: take food unless fighting (soil, corpses and brood: whenever the mechanic offers them); anything carried is taken where it belongs; put food down
+ * The rules before the hooks (behaviour MR 3: trailRate follows the quality of food carried): take food unless fighting (soil, corpses and brood: whenever the mechanic offers them); anything carried is taken where it belongs; put food down
  * where it goes; walking out marks the way home and carrying food the way to it, while soil, corpse and
  * porter carriers lay nothing; shy from alarm unless fighting or digging; always raise it in a fight.
  */
@@ -82,9 +106,10 @@ export const localResponses: Responses = {
   carry: () => "take",
   drop: () => true,
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
-  trailRate: () => 1,
+  trailRate: (t) => (t.carrying === "food" ? TRAIL_BY_QUALITY[t.quality] : 1),
   alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : 1),
   raiseAlarm: () => 1,
+  noEntry: () => 1,
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */
@@ -92,7 +117,10 @@ export function responses(over: Partial<Responses> = {}): Responses {
   return { ...localResponses, ...over };
 }
 
-/** A situation as a cache key: 4 modes × 5 items × porter × digging × 4 places × 5 offered × enemy × 3 stances (most combinations never occur). */
+/**
+ * A situation as a cache key: 4 modes × 5 items × porter × digging × 4 places × 5 offered × enemy × 3 stances, then
+ * quality only when it isn't "fair" (so keys from before quality still match: most combinations never occur).
+ */
 export function touchKey(t: Touch): string {
-  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}`;
+  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}${t.quality === "fair" ? "" : `|${t.quality}`}`;
 }

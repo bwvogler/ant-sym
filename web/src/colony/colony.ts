@@ -4,8 +4,8 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { type Item, localResponses, type Responses, type Where, type Touch } from "./responses.ts";
-import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { type Item, localResponses, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
+import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -177,6 +177,32 @@ export interface ColonyParams {
    * docs/tiredness.md): rest is a stay inside, not a step through the hole
    */
   restTime: number;
+  /**
+   * a follower's choice of way by trail strength, the constant k of (k + C)² (see choose); 0 = always the strongest
+   * sensor (before behaviour MR 3). Small k: strength counts for much; large: choices near even.
+   */
+  followChoice: number;
+  /**
+   * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
+   * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
+   * is raised instead: foodCapTop.)
+   */
+  foodTrailTop: number;
+  /** on a top-down map, the most food trail a cell holds (behaviour MR 3; the other channels and the side view: MAX_LEVEL 20) */
+  foodCapTop: number;
+  /**
+   * a food carrier's pull toward the food trail on its way home, top-down (ja-00t): the share of its turning given to the
+   * trail where the trail agrees with its home vector, the rest to the vector; 0 = the vector alone (before MR 3)
+   */
+  homeTrail: number;
+  /** how far off its home vector (radians) a carrier still takes the food trail home (ja-00t) */
+  homeTrailCone: number;
+  /**
+   * how hard a follower shies from "no entry" (behaviour MR 3): each sensor's food scent counts less by this many times
+   * its "no entry" reading; 0 = ignore it, and lay none. Off by default: on the assays it cost A2a more than it gained
+   * on A3, which the trail's evaporation and tiredness already clear (PRD §45.4)
+   */
+  noEntryAvoid: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
@@ -196,10 +222,16 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
+/** Food scent under a follower at least this strong, and weaker all round, is a trail's end (behaviour MR 3: "no entry"). */
+const NO_ENTRY_TRAIL = 1;
+/** ...and every sensor reads under this share of it: the trail drops away ahead and to both sides (not a bend). */
+const NO_ENTRY_DROP = 0.5;
+/** "No entry" laid per second at a spent trail's end, as a multiple of the colony's deposit. */
+const NO_ENTRY_RATE = 4;
 
 /** Every channel's params: the defaults, with `over` merged in per channel and per field. */
 export function channelParams(over: Partial<Record<Channel, Partial<ChannelParams>>> = {}): Record<Channel, ChannelParams> {
@@ -222,7 +254,7 @@ export class Colony {
   /** the ant the shared Touch describes */
   #ti = 0;
   /** The shared Touch. Its `place` is worked out only when a response reads it: the local ones never do, and working it out for every ant's trail every step cost the side view ~5 % a tick (review of #35). */
-  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
+  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -399,6 +431,8 @@ export class Colony {
   since: Float32Array;
   /** seconds of unsuccessful search, less rest inside the nest: tired above the colony's patience (ja-q47) */
   fatigue: Float32Array;
+  /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; read only while it carries food (left as it was after delivery) */
+  quality: Float32Array;
   /** 1 from when fatigue passes patience until it has rested to nothing: a tired forager rests fully, not just under the line */
   #tired: Uint8Array;
   /** seconds left of a detour after bumping into rock, when the pull toward the nest (or the raid) is off */
@@ -535,7 +569,11 @@ export class Colony {
     this.policy = policy;
     this.stancePolicy = stancePolicy;
     this.#rng = rng;
-    this.ph = new Pheromones(map, channelParams(this.params.channels));
+    // Top-down, the food trail holds up to foodCapTop (behaviour MR 3): under main's cap a busy trail sat at it near the
+    // nest, and a follower couldn't tell a strong trail from a weak (unless the colony's params set a cap of their own).
+    const chans = channelParams(this.params.channels);
+    if (this.#entrance === null && this.params.channels.food?.max === undefined) chans.food = { ...chans.food, max: this.params.foodCapTop };
+    this.ph = new Pheromones(map, chans);
     const n = this.params.maxAnts;
     this.n = n;
     this.x = new Float32Array(n);
@@ -595,6 +633,7 @@ export class Colony {
     this.gen = new Uint32Array(n);
     this.since = new Float32Array(n);
     this.fatigue = new Float32Array(n);
+    this.quality = new Float32Array(n).fill(1);
     this.#tired = new Uint8Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
@@ -677,6 +716,7 @@ export class Colony {
     this.hugT[i] = 0;
     this.since[i] = 0;
     this.fatigue[i] = 0;
+    this.quality[i] = 1;
     this.#tired[i] = 0;
     this.detour[i] = 0;
     this.bumps[i] = 0;
@@ -779,6 +819,11 @@ export class Colony {
     t.offered = offered;
     t.enemy = enemy;
     t.stance = this.stance;
+    // Taste (docs/trails.md): the food offered, under the ant; else the food in its jaws.
+    if (offered === "food") {
+      this.antCell(i);
+      t.quality = qualityOf(qualityAt(this.map, CELL[0] as number, CELL[1] as number));
+    } else t.quality = item === "food" ? qualityOf(this.quality[i] as number) : "fair";
     return t;
   }
 
@@ -1076,7 +1121,7 @@ export class Colony {
       this.#porter[i] = 0;
       this.#portTo[i] = -1;
     }
-    if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
+    if (this.carrying[i]) dropFood(this.map, this.x[i] as number, this.y[i] as number, 1, this.quality[i] as number);
     this.antCell(i);
     if (this.#corpse[i]) {
       // The corpse it carried falls where it falls, with it.
@@ -2773,7 +2818,7 @@ export class Colony {
         this.#porter[i] = 0;
         this.#portTo[i] = -1;
       } else {
-        dropFood(this.map, this.x[i] as number, this.y[i] as number, 1);
+        dropFood(this.map, this.x[i] as number, this.y[i] as number, 1, this.quality[i] as number);
         this.#putAt[i] = cy * 65536 + cx;
       }
       this.carrying[i] = 0;
@@ -3085,6 +3130,31 @@ export class Colony {
             this.detour[i] = 0;
           }
         }
+        // A carrier with food on a top-down map takes the food trail home where it agrees with its home vector (ja-00t,
+        // docs/trails.md: foragers combine route cues and pheromone, path integration the fallback): each sensor's trail
+        // counts only if its direction is within homeTrailCone of the way home. At a fork the vector can't tell the branches
+        // apart (both lie off its line); the trail picks, not the wall a vector-led carrier walks into. Never the trail
+        // alone: all-trail carriers milled on their own trail (PRD §45.3).
+        let tl = 0;
+        let tf = 0;
+        let tr = 0;
+        if (p.homeTrail > 0 && carrying && this.#entrance === null && !detouring && Math.max(fl, ff, fr) >= FAINT && Math.max(fl, ff, fr) < SEEN) {
+          const agrees = (b: number) => Math.cos(b - toNest) >= Math.cos(p.homeTrailCone);
+          tl = agrees(h - a) ? fl : 0;
+          tf = agrees(h) ? ff : 0;
+          tr = agrees(h + a) ? fr : 0;
+        }
+        let onTrail = Math.max(tl, tf, tr) >= FAINT;
+        if (onTrail && this.wall[i] !== 0) {
+          // Following a wall: let go only where the trail's way is open. Letting go into rock, it met the same wall again
+          // every step and never got round it (G′ seed 4: 59 carriers held over 120 s within 40 cells of home).
+          const way = tl >= tf && tl >= tr ? h - a : tr > tf ? h + a : h;
+          if (this.#touch(x, y, way, 1.2)) onTrail = false;
+          else {
+            this.wall[i] = 0; // the trail leads on: let go of the wall
+            this.mx[i] = NaN;
+          }
+        }
         const side = this.wall[i] as number;
         // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
         const look = pellet && !this.#corpse[i] && map.hasSoil && Number.isNaN(this.#spoilTo[i] as number) && (this.since[i] as number) > backfill.after && this.#enteredCell(i);
@@ -3106,7 +3176,10 @@ export class Colony {
           // Free: the home vector, with the home trail as a hint only (climbing it at full rate let
           // clusters of homing ants circle on their own trail). After giving up on a wall, wander a while.
           if (detouring) h += noise * p.wander;
-          else {
+          else if (onTrail) {
+            h += choose(tl, tf, tr, p.turnRate * dt * p.homeTrail, p.followChoice || 1, rng) + noise * p.wander * 0.25;
+            h = turnToward(h, toNest, p.turnRate * dt * 0.8 * (1 - p.homeTrail));
+          } else {
             // Where it believed home was, and nothing there (the side view's drifting vector): search round it.
             if (nest !== goal && Math.hypot(nest.x - x, nest.y - y) < 1) this.#searchOn(i);
             h += climb(hl, hf, hr, p.turnRate * dt * 0.25) + noise * p.wander * 0.25;
@@ -3235,7 +3308,44 @@ export class Colony {
         else h += noise * p.wander;
       } else if (mode === FOLLOW) {
         if (!digging && this.#walkTunnel(i, FOLLOW, p.speed * dt)) h = this.#towardTarget(i);
-        else h += climb(fl, ff, fr, p.turnRate * dt) + noise * p.wander * 0.25;
+        else {
+          // "No entry" ahead (behaviour MR 3): the food scent it marks counts for less. Read only where some was laid, and
+          // only outside (a top-down map, or the side view's ground), where food trails lead to food.
+          const outside = this.#entrance === null || !this.#under[i];
+          let gl = fl;
+          let gf = ff;
+          let gr = fr;
+          if (p.noEntryAvoid > 0 && ph.live("noEntry") && outside) {
+            const x = this.x[i] as number;
+            const y = this.y[i] as number;
+            const d = p.sensorDistance;
+            const ne = (b: number) => p.noEntryAvoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
+            if (gl < SEEN) gl = Math.max(0, gl - ne(h - a));
+            if (gf < SEEN) gf = Math.max(0, gf - ne(h));
+            if (gr < SEEN) gr = Math.max(0, gr - ne(h + a));
+          }
+          // Which way along the trail: by strength, not just to the strongest sensor (Deneubourg's choice: see choose).
+          // Top-down maps only. In the side view's chambers food scent leads to stores and brood, and a chance turn there
+          // kept porters from the food (the hour-long economy test: no porter trips, larvae starved); on its ground line,
+          // where trails don't fork, it still halved the colony's births (PRD §45.3).
+          h += (p.followChoice > 0 && this.#entrance === null ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng) : climb(gl, gf, gr, p.turnRate * dt)) + noise * p.wander * 0.25;
+          // The trail ends here, strong, falling away all round, and no food in sight: the patch is spent. Mark it "no entry" (Robinson et al. 2005).
+          if (p.noEntryAvoid > 0 && !carrying && outside && Math.max(fl, ff, fr) < SEEN) {
+            this.antCell(i);
+            const here = ph.fields.food.get(CELL[0] as number, CELL[1] as number);
+            // Only walking out, by its home vector (home behind it): walking in, the food trail fades ahead as it should.
+            const ox = (this.x[i] as number) - nest.x;
+            const oy = (this.y[i] as number) - nest.y;
+            const outbound = Math.cos(h) * ox + Math.sin(h) * oy > 0.5 * Math.hypot(ox, oy);
+            if (outbound && here >= NO_ENTRY_TRAIL && Math.max(fl, ff, fr) < here * NO_ENTRY_DROP) {
+              const lay = resp.noEntry(this.touch(i, toEnemy !== null, mode, item));
+              if (lay > 0) {
+                this.antCell(i);
+                ph.depositCell("noEntry", CELL[0] as number, CELL[1] as number, p.deposit * (this.#entrance === null ? p.foodTrailTop : 1) * lay * dt * NO_ENTRY_RATE);
+              }
+            }
+          }
+        }
       } else if (mode === FIGHT) {
         // A calm ant (the fungus's cue) does not charge.
         // A raider in the side view walks on to the raided nest, cell by cell, past the alarm of fights behind it: steering
@@ -3288,7 +3398,7 @@ export class Colony {
       const tt = this.touch(i, toEnemy !== null, mode, item);
       const trail = resp.trail(tt);
       if (trail !== "none") {
-        const laid = p.deposit * resp.trailRate(tt) * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt * (this.layGain[i] as number);
+        const laid = p.deposit * (trail === "food" && this.#entrance === null ? p.foodTrailTop : 1) * resp.trailRate(tt) * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt * (this.layGain[i] as number);
         this.antCell(i);
         ph.depositCell(trail, CELL[0] as number, CELL[1] as number, laid);
         const leak = this.crossLay[i] as number;
@@ -3463,6 +3573,7 @@ export class Colony {
       if (this.#putAt[i] !== cellKey) this.#putAt[i] = -1;
       if (!carrying && !pellet && this.#putAt[i] < 0 && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, "food")) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
+        this.quality[i] = qualityAt(map, CELL[0] as number, CELL[1] as number);
         this.#homeAfresh(i);
         this.since[i] = 0;
         this.fatigue[i] = 0; // found food: the search succeeded
@@ -4156,6 +4267,21 @@ export function tunnelEnd(map: WorldMap, x: number, y: number, most = 1): boolea
   let open = 0;
   for (let d = 0; d < 6; d++) if (openAt(map, x, y, d) && ++open > most) return false;
   return true;
+}
+
+/**
+ * A follower's turn by Deneubourg's choice function (Deneubourg et al. 1990; Goss et al. 1989; docs/trails.md): left,
+ * ahead or right with chances (k + C)², each sensor's scent C. Where two trails part, the stronger takes more than its
+ * share of followers, which is what lets a colony settle on one of two sources (A2a) and on the richer (A2b). On one
+ * trail the sides read alike and it turns either way, held on by the trail's centre. (`climb`, always to the
+ * strongest, sent followers down whichever trail lay ahead of them: behaviour MR 3, PRD §45.)
+ */
+export function choose(left: number, front: number, right: number, max: number, k: number, rng: () => number): number {
+  const wl = (k + left) ** 2;
+  const wf = (k + front) ** 2;
+  const wr = (k + right) ** 2;
+  const u = rng() * (wl + wf + wr);
+  return u < wl ? -max : u < wl + wf ? 0 : max;
 }
 
 /** Turn toward the strongest of three sensors, at most `max` radians. */

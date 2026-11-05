@@ -1,21 +1,33 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridge, regulate, runAssay, twin } from "../../experiment.ts";
+import { bridge, regulate, richPoor, runAssay, twin } from "../../experiment.ts";
 
-// The behaviour assays today's ants don't pass yet (experiment.ts, docs/PRD.md §42): they run, and their
-// pass mark is the goal of the behaviour MR named in each `todo`; that MR turns it into a test. Too slow
-// together for npm test's 60 s per file. (G, the whole side-view game, is guarded by slow/side.test.ts.)
+// The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
+// don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
+// slow/side.test.ts.)
 
-test("A1 double bridge: ≥ 80 % on the short branch", { todo: "behaviour MR 3: trail marking as a response" }, () => {
-  const m = runAssay(bridge, 1).metrics;
-  assert.ok(Number.isFinite(m.shortShare));
-  assert.equal(m.pass, 1, `shortShare ${m.shortShare}`);
+// Behaviour MR 3 with ja-00t (carriers home by trail and vector): seeds 1–10 pass 10/10; 1 and 2 are both sides of the fork.
+test("A1 double bridge: ≥ 80 % on the short branch", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(bridge, seed).metrics;
+    assert.ok(Number.isFinite(m.shortShare));
+    assert.equal(m.pass, 1, `seed ${seed}: shortShare ${m.shortShare}`);
+  }
 });
 
-test("A2a two equal sources: the colony concentrates on one", { todo: "behaviour MR 3: trail marking as a response" }, () => {
-  const m = runAssay(twin, 1).metrics;
-  assert.ok(Number.isFinite(m.majorityShare));
-  assert.equal(m.pass, 1, `majorityShare ${m.majorityShare}`);
+// Behaviour MR 3 (PRD §45): seeds 1–10 pass 10/10 (A2a and A2b).
+test("A2a two equal sources: the colony concentrates on one", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(twin, seed).metrics;
+    assert.equal(m.pass, 1, `seed ${seed}: majorityShare ${m.majorityShare}`);
+  }
+});
+
+test("A2b rich vs poor source: the colony picks the richer", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(richPoor, seed).metrics;
+    assert.equal(m.pass, 1, `seed ${seed}: richShare ${m.richShare}`);
+  }
 });
 
 test("A5 regulation: foragers stay home without food", { todo: "behaviour MR 5: forager activation from returns" }, () => {

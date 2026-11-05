@@ -23,6 +23,7 @@ This is the budget the policy may draw on. Each row points to the research secti
 | Encounter rate (antennation) | how many foragers are returning with food; local crowding | contact; a rate over seconds to minutes | [ant-communication §1](ant-communication.md#1-how-many-channels) (Gordon) |
 | Vibration (stridulation) | come here, dig here, buried nestmate | short, through the substrate | [ant-communication §1](ant-communication.md#1-how-many-channels) |
 | Trophallaxis | food, hunger, hormones, colony odour | mouth to mouth | [ant-communication §1](ant-communication.md#1-how-many-channels) |
+| Taste | the quality of food in the jaws (sugar strength) | contact, at pickup | [trails](trails.md#trail-amount-follows-food-quality) (Beckers et al. 1993) |
 | Gravity | up and down in the dark | everywhere underground | [nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs) |
 | Path integration | a home vector whose error grows by about 10 % of distance | outside; resets inside the nest | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole) |
 | Landmarks and entrance odour | corrects the vector near home | near the hole | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole) |
