@@ -3456,7 +3456,9 @@ export class Colony {
         // Shying, carriers turned back from fights at their own hole and held their food (G seeds 4, 8: raids, 3 held).
         const noWayRound = carrying && this.#entrance !== null && !this.#under[i];
         if (gain > 0 && !noWayRound) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
-        else if (gain < 0) h += climb(al, af, ar, p.turnRate * p.alarmDraw * -gain * dt); // a faint alarm draws it
+        // A faint alarm draws it: top-down only. In the side view the drawn explorers crowded the tunnels and the ground
+        // line round the nest's fights (G seeds 1–20: 15/20 against 18/20 without the pull).
+        else if (gain < 0 && this.#entrance === null) h += climb(al, af, ar, p.turnRate * p.alarmDraw * -gain * dt);
       }
 
       // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none, and
