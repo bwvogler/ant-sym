@@ -768,8 +768,9 @@ export const contact: Assay = {
 
 /**
  * A10 — faint alarm draws (behaviour MR 4, docs/combat.md: low doses attract, ten times more repel; Moser et al. 1968,
- * Lopes et al. 2022). A faint alarm is painted 5 cells off a busy trail at 120 s: the crowd within 4 cells of it over the
- * next 10 s against the 10 s before. Design mark: at least FAINT_DRAW more ants (before MR 4 it emptied: alarm only repelled).
+ * Lopes et al. 2022). A faint alarm is painted 30 cells from the nest of a colony with no food to find (every ant
+ * exploring) at 120 s: the crowd within 4 cells of it over the next 10 s against the 10 s before. Design mark: at least
+ * FAINT_DRAW more ants (before MR 4 it emptied: alarm only repelled).
  */
 export const FAINT_DRAW = 2;
 export const faintAlarm: Assay = {
@@ -778,7 +779,7 @@ export const faintAlarm: Assay = {
   target: `≥ ${FAINT_DRAW} more ants near a faint alarm than before it (design mark; docs/combat.md)`,
   seconds: 180,
   spec: (seed) => {
-    const spot = at(55, 50);
+    const spot = at(50, 50);
     const when = 120;
     const crowd: number[] = [];
     let nextAt = 1;
@@ -797,7 +798,8 @@ export const faintAlarm: Assay = {
     return {
       seed,
       seconds: 180,
-      map: () => new Arena(100, 100, true).pile(50, 18, 3, 200).build([{ x: 50, y: 82, r: 3 }]),
+      // No food: every ant explores, as the idle foragers a faint alarm should draw (on a busy trail they follow it).
+      map: () => new Arena(100, 100, true).build([{ x: 50, y: 82, r: 3 }]),
       game: { antCount: 300, rival: false },
       // Faint: above the sensors' FAINT (0.05), well under STRONG (1), for a few seconds at the spot.
       events: [0, 2, 4, 6, 8].map((d) => ({ at: when + d, kind: "paint" as const, channel: "alarm" as const, x: spot.x, y: spot.y, r: 2, amount: 0.4 })),

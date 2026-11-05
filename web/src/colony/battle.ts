@@ -24,9 +24,9 @@ export interface FightParams {
   /** alarm laid per second by an ant in a fight */
   alarm: number;
   /**
-   * the most ants of a side that one cell brings to a fight (behaviour MR 4, docs/combat.md): a crowd can't all reach
-   * the ant at once, so where few cells are open round it, as in a pass, few engage (Lymbery et al. 2023). Infinity:
-   * every ant in the seven cells counts, as before.
+   * the most strangers that one cell brings against an ant (behaviour MR 4, docs/combat.md): a crowd can't all reach
+   * it at once, so where few cells are open round it, as in a pass, few engage (Lymbery et al. 2023). Infinity:
+   * every stranger in the seven cells counts, as before.
    */
   perCell: number;
   /**
@@ -151,7 +151,9 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
         }
         if (enemies === 0) continue;
       }
-      const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy, 1, p.perCell));
+      // Allies are uncapped: what narrow ground limits is how many strangers reach the ant at once (capping both sides
+      // cancelled out: the pass's exchange fell from 1.22 to 1.0 at a cap of 2, seeds 1–6).
+      const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy));
       // A calmed encounter (under half an enemy) does not raise the alarm; with no fungus every enemy is whole.
       // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
       // How loudly is its raiseAlarm response (locally: always, × 1).
