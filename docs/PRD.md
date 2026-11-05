@@ -2882,7 +2882,7 @@ Where a cell shows two figures, they are seeds 1–10 / 11–20.
   - **Porters held over 120 s at the end: 15** (main 0), 13 of them on seed 3, colony 0, in tunnels next to its nest.
   - Not the cause, measured: alarm in tunnels (26 when carriers ignore it) and contact inside the nest (14 when ants defend it).
   - Single-change variants clear seed 3 but jam another seed (seed 5, 13). Noted on ja-3po; the slow porter guard is still a todo.
-- **Tests:** `npm test` 335/335; `test:slow` gates A1, A2a, A2b and A9 (seeds 1–2), with A10 a todo (ja-je8) and A5 a todo.
+- **Tests:** `npm test` 336/336; `test:slow` 9 pass, 3 todo (A5; A10, ja-je8; the porter guard, ja-3po). It gates A1, A2a, A2b and A9 on seeds 1–2. `tsc -b` is clean.
 
 ### 46.5 Ants take up room (ja-4ne, filed)
 

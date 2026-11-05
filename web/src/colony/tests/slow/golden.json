@@ -761,7 +761,7 @@
      "stored": 964,
      "births": 212,
      "losses": 4,
-     "decisions": 628964,
+     "decisions": 628943,
      "population": 808,
      "ants": "564bbb9f",
      "fields": "9bb0c4c8"
@@ -785,7 +785,7 @@
      "stored": 993,
      "births": 219,
      "losses": 4,
-     "decisions": 646425,
+     "decisions": 646404,
      "population": 815,
      "ants": "b6ad0d9e",
      "fields": "5f106458"
@@ -809,7 +809,7 @@
      "stored": 1014,
      "births": 222,
      "losses": 11,
-     "decisions": 662638,
+     "decisions": 662617,
      "population": 811,
      "ants": "bbd0fe41",
      "fields": "4ce61c17"
@@ -824,7 +824,7 @@
      "stored": 1514,
      "births": 291,
      "losses": 12,
-     "decisions": 634179,
+     "decisions": 634160,
      "population": 879,
      "ants": "46b3c38b",
      "fields": "fc3bf430"
@@ -833,7 +833,7 @@
      "stored": 1050,
      "births": 223,
      "losses": 24,
-     "decisions": 685614,
+     "decisions": 685523,
      "population": 799,
      "ants": "7340cf03",
      "fields": "e28b690a"
@@ -848,7 +848,7 @@
      "stored": 1601,
      "births": 293,
      "losses": 22,
-     "decisions": 652606,
+     "decisions": 652531,
      "population": 871,
      "ants": "28e927d1",
      "fields": "eea4fa64"
@@ -857,7 +857,7 @@
      "stored": 1071,
      "births": 228,
      "losses": 34,
-     "decisions": 707455,
+     "decisions": 707364,
      "population": 794,
      "ants": "4bf1756a",
      "fields": "7b67f2fb"
@@ -872,7 +872,7 @@
      "stored": 1693,
      "births": 293,
      "losses": 24,
-     "decisions": 669419,
+     "decisions": 669344,
      "population": 869,
      "ants": "71784faf",
      "fields": "7c3929d7"
@@ -881,7 +881,7 @@
      "stored": 1091,
      "births": 232,
      "losses": 34,
-     "decisions": 728499,
+     "decisions": 728408,
      "population": 798,
      "ants": "c70b5e7a",
      "fields": "40a27a72"
@@ -896,7 +896,7 @@
      "stored": 1771,
      "births": 295,
      "losses": 24,
-     "decisions": 692873,
+     "decisions": 692798,
      "population": 871,
      "ants": "960b8a3c",
      "fields": "612ec5be"
@@ -905,7 +905,7 @@
      "stored": 1112,
      "births": 241,
      "losses": 35,
-     "decisions": 747576,
+     "decisions": 747485,
      "population": 806,
      "ants": "2c058ab0",
      "fields": "867c2e45"
@@ -920,7 +920,7 @@
      "stored": 1807,
      "births": 297,
      "losses": 25,
-     "decisions": 710215,
+     "decisions": 710140,
      "population": 872,
      "ants": "e6e82445",
      "fields": "ac4dc420"
@@ -929,7 +929,7 @@
      "stored": 1152,
      "births": 251,
      "losses": 37,
-     "decisions": 766606,
+     "decisions": 766515,
      "population": 814,
      "ants": "527b06bd",
      "fields": "3a6b1f2b"
@@ -944,7 +944,7 @@
      "stored": 1975,
      "births": 298,
      "losses": 25,
-     "decisions": 729460,
+     "decisions": 729385,
      "population": 873,
      "ants": "c141912",
      "fields": "4adf99e8"
@@ -953,7 +953,7 @@
      "stored": 1179,
      "births": 256,
      "losses": 39,
-     "decisions": 785424,
+     "decisions": 785333,
      "population": 817,
      "ants": "60aeddd6",
      "fields": "c1e11535"
@@ -968,7 +968,7 @@
      "stored": 2000,
      "births": 301,
      "losses": 31,
-     "decisions": 754805,
+     "decisions": 754730,
      "population": 870,
      "ants": "801322cb",
      "fields": "c1eaf45c"
@@ -977,7 +977,7 @@
      "stored": 1198,
      "births": 259,
      "losses": 50,
-     "decisions": 803877,
+     "decisions": 803786,
      "population": 809,
      "ants": "68dafee4",
      "fields": "61e342a2"
@@ -992,7 +992,7 @@
      "stored": 2013,
      "births": 308,
      "losses": 32,
-     "decisions": 772681,
+     "decisions": 772606,
      "population": 876,
      "ants": "92444c26",
      "fields": "d5bfb617"
@@ -1001,7 +1001,7 @@
      "stored": 1215,
      "births": 265,
      "losses": 52,
-     "decisions": 823700,
+     "decisions": 823609,
      "population": 813,
      "ants": "a50abb47",
      "fields": "819df659"
@@ -1016,7 +1016,7 @@
      "stored": 2099,
      "births": 310,
      "losses": 36,
-     "decisions": 787661,
+     "decisions": 787586,
      "population": 874,
      "ants": "70ec5a91",
      "fields": "199290b9"
@@ -1025,7 +1025,7 @@
      "stored": 1239,
      "births": 271,
      "losses": 56,
-     "decisions": 847187,
+     "decisions": 847063,
      "population": 815,
      "ants": "e34a9877",
      "fields": "79285e35"
@@ -1040,7 +1040,7 @@
      "stored": 2156,
      "births": 314,
      "losses": 36,
-     "decisions": 802766,
+     "decisions": 802691,
      "population": 878,
      "ants": "bbab6857",
      "fields": "58006597"
@@ -1049,7 +1049,7 @@
      "stored": 1257,
      "births": 279,
      "losses": 56,
-     "decisions": 867136,
+     "decisions": 867012,
      "population": 823,
      "ants": "eddc2682",
      "fields": "aa297574"
@@ -1064,7 +1064,7 @@
      "stored": 2190,
      "births": 317,
      "losses": 39,
-     "decisions": 824678,
+     "decisions": 824603,
      "population": 878,
      "ants": "bd781e81",
      "fields": "2905708e"
@@ -1073,7 +1073,7 @@
      "stored": 1324,
      "births": 288,
      "losses": 68,
-     "decisions": 882021,
+     "decisions": 881897,
      "population": 820,
      "ants": "4286a31e",
      "fields": "a91f293f"
@@ -1088,7 +1088,7 @@
      "stored": 2259,
      "births": 319,
      "losses": 42,
-     "decisions": 849645,
+     "decisions": 849414,
      "population": 877,
      "ants": "85acd435",
      "fields": "66d6b82b"
@@ -1097,7 +1097,7 @@
      "stored": 1356,
      "births": 294,
      "losses": 106,
-     "decisions": 898361,
+     "decisions": 897830,
      "population": 788,
      "ants": "6a386326",
      "fields": "a1a9256"
@@ -1112,7 +1112,7 @@
      "stored": 2300,
      "births": 319,
      "losses": 53,
-     "decisions": 867318,
+     "decisions": 867056,
      "population": 866,
      "ants": "3a3c28e0",
      "fields": "3530ef7"
@@ -1121,7 +1121,7 @@
      "stored": 1374,
      "births": 297,
      "losses": 113,
-     "decisions": 915598,
+     "decisions": 914987,
      "population": 784,
      "ants": "82728fd3",
      "fields": "33ef1282"
@@ -1136,7 +1136,7 @@
      "stored": 2333,
      "births": 327,
      "losses": 54,
-     "decisions": 878809,
+     "decisions": 878547,
      "population": 873,
      "ants": "f108da30",
      "fields": "d6504feb"
@@ -1145,7 +1145,7 @@
      "stored": 1390,
      "births": 298,
      "losses": 113,
-     "decisions": 934083,
+     "decisions": 933447,
      "population": 785,
      "ants": "1e61bc7b",
      "fields": "c859b32b"
@@ -1160,7 +1160,7 @@
      "stored": 2357,
      "births": 329,
      "losses": 55,
-     "decisions": 892389,
+     "decisions": 892127,
      "population": 874,
      "ants": "f5b29f0",
      "fields": "6f903775"
@@ -1169,7 +1169,7 @@
      "stored": 1397,
      "births": 305,
      "losses": 122,
-     "decisions": 954615,
+     "decisions": 953973,
      "population": 783,
      "ants": "8ba60f59",
      "fields": "4c3b977c"
@@ -1184,7 +1184,7 @@
      "stored": 2428,
      "births": 331,
      "losses": 66,
-     "decisions": 906225,
+     "decisions": 905962,
      "population": 865,
      "ants": "9391a4d1",
      "fields": "177a0121"
@@ -1193,7 +1193,7 @@
      "stored": 1424,
      "births": 317,
      "losses": 137,
-     "decisions": 974121,
+     "decisions": 973479,
      "population": 780,
      "ants": "f1bf31a2",
      "fields": "7915428e"
@@ -1208,7 +1208,7 @@
      "stored": 2550,
      "births": 333,
      "losses": 67,
-     "decisions": 921658,
+     "decisions": 921395,
      "population": 866,
      "ants": "fd9df3f7",
      "fields": "be304ae3"
@@ -1217,7 +1217,7 @@
      "stored": 1435,
      "births": 333,
      "losses": 137,
-     "decisions": 992934,
+     "decisions": 992286,
      "population": 796,
      "ants": "fe5f86f0",
      "fields": "b6d90d0e"
@@ -1232,7 +1232,7 @@
      "stored": 2603,
      "births": 338,
      "losses": 68,
-     "decisions": 940817,
+     "decisions": 940554,
      "population": 870,
      "ants": "b2d58dc6",
      "fields": "7ed62173"
@@ -1241,7 +1241,7 @@
      "stored": 1448,
      "births": 335,
      "losses": 142,
-     "decisions": 1013013,
+     "decisions": 1012365,
      "population": 793,
      "ants": "29b4d507",
      "fields": "2150700d"
@@ -1256,7 +1256,7 @@
      "stored": 2631,
      "births": 340,
      "losses": 71,
-     "decisions": 961784,
+     "decisions": 961395,
      "population": 869,
      "ants": "b891ed25",
      "fields": "bef3f6f8"
@@ -1265,7 +1265,7 @@
      "stored": 1458,
      "births": 335,
      "losses": 153,
-     "decisions": 1037320,
+     "decisions": 1036661,
      "population": 782,
      "ants": "5d85dd9a",
      "fields": "53a3be4a"
@@ -1280,7 +1280,7 @@
      "stored": 2671,
      "births": 346,
      "losses": 83,
-     "decisions": 975123,
+     "decisions": 974691,
      "population": 863,
      "ants": "3be0ff0e",
      "fields": "8404e29"
@@ -1289,7 +1289,7 @@
      "stored": 1464,
      "births": 345,
      "losses": 167,
-     "decisions": 1057139,
+     "decisions": 1056439,
      "population": 778,
      "ants": "da45a89b",
      "fields": "822dae32"
@@ -1304,7 +1304,7 @@
      "stored": 2718,
      "births": 347,
      "losses": 83,
-     "decisions": 989161,
+     "decisions": 988729,
      "population": 864,
      "ants": "d363865d",
      "fields": "f5371ffe"
@@ -1313,7 +1313,7 @@
      "stored": 1470,
      "births": 350,
      "losses": 167,
-     "decisions": 1075910,
+     "decisions": 1075210,
      "population": 783,
      "ants": "682b8b42",
      "fields": "b448df39"
@@ -1328,7 +1328,7 @@
      "stored": 2837,
      "births": 352,
      "losses": 84,
-     "decisions": 1008235,
+     "decisions": 1007803,
      "population": 868,
      "ants": "16f7cacd",
      "fields": "5291708"
@@ -1337,7 +1337,7 @@
      "stored": 1499,
      "births": 356,
      "losses": 168,
-     "decisions": 1094758,
+     "decisions": 1094045,
      "population": 788,
      "ants": "f3effd5",
      "fields": "d99a565d"
@@ -1352,7 +1352,7 @@
      "stored": 2879,
      "births": 353,
      "losses": 88,
-     "decisions": 1032363,
+     "decisions": 1031918,
      "population": 865,
      "ants": "c1c67c8b",
      "fields": "3350c64e"
@@ -1361,7 +1361,7 @@
      "stored": 1529,
      "births": 357,
      "losses": 179,
-     "decisions": 1113444,
+     "decisions": 1112585,
      "population": 778,
      "ants": "c55036c0",
      "fields": "7331cd0f"
@@ -1376,7 +1376,7 @@
      "stored": 2912,
      "births": 359,
      "losses": 93,
-     "decisions": 1052927,
+     "decisions": 1052441,
      "population": 866,
      "ants": "d1a3df7",
      "fields": "37ee7dce"
@@ -1385,7 +1385,7 @@
      "stored": 1547,
      "births": 363,
      "losses": 185,
-     "decisions": 1130915,
+     "decisions": 1129686,
      "population": 778,
      "ants": "ae0fd634",
      "fields": "5022cd72"
@@ -1400,7 +1400,7 @@
      "stored": 2927,
      "births": 364,
      "losses": 95,
-     "decisions": 1069768,
+     "decisions": 1069282,
      "population": 869,
      "ants": "13de5b06",
      "fields": "918112e2"
@@ -1409,7 +1409,7 @@
      "stored": 1555,
      "births": 365,
      "losses": 194,
-     "decisions": 1149378,
+     "decisions": 1147998,
      "population": 771,
      "ants": "3cf66b16",
      "fields": "b516ef61"
@@ -1424,7 +1424,7 @@
      "stored": 2955,
      "births": 365,
      "losses": 95,
-     "decisions": 1086687,
+     "decisions": 1086201,
      "population": 870,
      "ants": "4d78dc9",
      "fields": "c4f3322c"
@@ -1433,7 +1433,7 @@
      "stored": 1569,
      "births": 366,
      "losses": 200,
-     "decisions": 1170325,
+     "decisions": 1168945,
      "population": 766,
      "ants": "ed928d02",
      "fields": "3b80d7ac"
