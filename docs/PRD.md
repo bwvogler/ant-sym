@@ -2782,3 +2782,87 @@ Top-down, the final defaults. "main" is 47928ed, measured on the same seeds (rev
 | trail, if asked | 456 | 591; v6 613 |
 
 The response lanes would cost ~$0.074/h if asked (MR 3.1: ~$0.062/h). The page asks none of them.
+
+## 46. Meeting strangers: contact response, graded alarm, terrain (behaviour MR 4, ja-902, ja-dul, ja-qld, ja-hgq, 2026-11-05)
+
+Stacked on #37 (MR 3). Research basis: `docs/combat.md`:
+- Lymbery et al. 2023: narrow ground favours the smaller side;
+- graded alarm: low doses attract, high doses repel (*Atta*, Moser 1968; Lopes et al. 2022);
+- at food, the ant that didn't start an encounter usually retreats (Human & Gordon 1996).
+
+The paper sites were outside the allowlist; numbers there are marked unverified. "Baseline" below is 4e41ade: this branch with the new assays and no behaviour change, run with the same assay code (the side view as on main, the top-down as on #37).
+
+### 46.1 What was there
+
+- **Every ant with a stranger near fought** (`localPolicy`: `enemy: near` → fight): foragers, carriers and nurses alike.
+- **Alarm only repelled.** Fighters climbed it.
+- **ja-dul:** `avoid()` read rock and the map's edge (−1) as the least alarm, so ants steered into walls.
+- **Measured costs:**
+  - A9 (new): two foraging colonies sharing a pile lose 8.9 ants per 100 food brought home.
+  - G′: MR 3's midfield battles (ja-hgq).
+
+### 46.2 Assays (no behaviour change; commit 4e41ade)
+
+- **A4:** recovery is searched from the crowd's lowest point after the alarm (ja-qld).
+- **A6 re-specified: few against many.**
+  - 80 defenders against 200 attackers, and the pass must give the defenders at least 1.5× the same seed's open-ground exchange.
+  - The old A6 pitted equal armies and asked the pass to favour the defenders. Terrain shouldn't favour either side between equals, and it didn't (0.95 against 0.94).
+  - Lymbery's effect is about a smaller side against a larger one.
+- **A9 contact (new):** two colonies on a forage stance, nests at either end, one pile between. Mark: ≤ 4 lost per 100 food, half the baseline.
+- **A10 faint alarm (new):** a faint alarm painted 30 cells from the nest of a colony exploring with no food to find, at 40 s (by 120 s the explorers had tired and gone home). Mark: ≥ 2 more ants near it in the next 10 s.
+
+### 46.3 What MR 4 built
+
+- **ja-dul:** rock and the edge read as the most alarm, not the least.
+- **Graded alarm:**
+  - `Touch.alarm` is none, faint or strong. `alarmGain` may be negative: a pull, at `alarmDraw` (2) × turnRate.
+  - Locally, faint alarm draws an empty-jawed explorer. A follower keeps to its trail: drawn too, at first, the trail's followers crowded every strong alarm's faint fringe and A4 broke (crowd ×1.72 instead of scattering).
+  - Strong alarm repels as before.
+  - An ant meeting a stranger already raised alarm: `resolveFights` lays it for any ant with strangers in its cell or the six round it, whatever its mode.
+- **Contact response** (`contact` hook: fight | flee | drop and run):
+  - Asked every step while strangers are within the colony's enemy range, over the mode policy.
+  - `Touch.odds` is outnumbered, even or outnumbering, by contact: nestmates against strangers in the ant's cell and the six round it (`Colony.nestmates`, the game's occupancy).
+  - **Local rule:**
+    - a carrier takes its load home;
+    - raiders and defenders fight;
+    - on a forage stance every other ant turns away.
+  - **A fleeing ant without a load** runs straight away from the strangers while they are in reach, then home. Homing alone, fleers often walked along or toward them.
+  - **A carrier flees by homing.** Turned straight away, on the side view's ground line it walked away from its own hole (G seed 5, a raid: 3–5 held).
+  - **Tried and dropped:**
+    - Fighting while outnumbering, judged once: one moment's advantage committed an ant to the death (G′ seed 2: 1,742 of 1,894 deaths in fight mode, mid-map, both colonies foraging).
+    - Fighting while outnumbering, judged every step: one side always outnumbers somewhere, and its fighters cut down the other's fleers (G′ seeds 1–4: 7,482 lost, against 6,069 never fighting).
+    - Harm only from strangers that fight (`passive` 0.3 or 0): no better (G′ 8,411 at 0; A9 5.8 at 0.3).
+- **Terrain: nothing to build.**
+  - With 80 defenders against 200, the pass already favours the few: exchange 0.57 against the open's 0.25 (seeds 1–6). Only a few attackers reach the defenders at once through it.
+  - A cap on how many of a side one cell brings to a fight only blunted numbers everywhere: open 0.26 → 0.69 at a cap of 1. Capping both sides cancelled out. The cap was dropped, and `battle.ts` is as on #37.
+  - Making the room ants take physical is bead ja-4ne (below).
+
+### 46.4 Results (local rule, seeds 1–10 / 11–20)
+
+| Assay | Baseline | MR 4 |
+|---|---|---|
+| A4 alarm | 10/10 / 10/10 | 10/10 / 10/10 (scatter 0.35) |
+| A6 few against many through a pass | 9/10 / 7/10, gain 2.36 | 9/10 / 7/10 (unchanged: geometry) |
+| A9 contact, lost per 100 food | 0/10, 8.9 / 0/10, 8.0 | **10/10, 0.87** (food home +27 %) |
+| A10 faint alarm | −1.8 (repelled) | +1.4 / +1.5 (drawn): 3/10 / 2/10 at the mark of 2 |
+| A3, A2a, A1 (top-down trails) | 10/10 | 10/10 |
+| G side-view game | 18/20 (held ≤ 3) | 17/20 (held ≤ 4) |
+| G food home, first colony | 24,512 / 20,424 | 22,619 / 21,579 (−8 % / +6 %) |
+| G′ losses (both colonies), seeds 1–10 | 19,698 | **16,989** (−14 %) |
+| G′ ants alive, seeds 1–10 | 12,947 | **15,418** (+19 %) |
+| G′ food home, seeds 1–10 | 83,068 | 81,940 (−1 %) |
+| A8 nest flow | — | unchanged (one colony: no contact) |
+
+- **ja-hgq:** G′ recovers about two thirds of MR 3's extra losses (main before MR 3: 13,732 on seeds 1–10). It stays open for the rest.
+- **The side view** moves within noise: food home and losses rise on some seeds and fall on others, and one more game in 20 fails the held-food guard (4 against 3).
+
+### 46.5 Ants take up room (ja-4ne, filed)
+
+The owner asked whether cells should hold only a few ants. Measured (seed 1): cells hold any number today.
+
+| Game | Ants per occupied cell | Most in one cell | Ants in cells of 10+ |
+|---|---|---|---|
+| Side view | 2.0–2.1 | 24–29 | 11–20 % |
+| Top-down | 1.5–1.6 | 9–17 | ≤ 7 % |
+
+The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants would shorten the queues but not stop them. Physical exclusion is its own bead, with a research note on ant traffic first (Dussutour et al. 2004). It would make terrain-limited combat physical.
