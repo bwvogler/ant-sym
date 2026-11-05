@@ -214,7 +214,7 @@ export interface ColonyParams {
    * Activation (behaviour MR 5, docs/activation.md): contact-seconds with nestmates carrying food home, in the ant's
    * leaky count `met`, from which a waiting forager senses returns as "few" (RETURNS_MANY times as many: "many"). A
    * rested forager home with empty jaws is then asked `leave` instead of going straight out. 0 = off: it goes straight
-   * out. Top-down maps only.
+   * out. Top-down maps only. 1 (PRD §47: G′ seeds 1–20 lost 6 % fewer ants for 3.5 % less food home; A5 passes).
    */
   leaveGate: number;
   /** a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers) */
@@ -236,7 +236,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 0, scoutRate: 1 / 120, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, scoutRate: 1 / 30, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;

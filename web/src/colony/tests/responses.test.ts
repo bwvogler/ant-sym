@@ -217,7 +217,8 @@ test("arrive (ja-qnx): a returner home with empty jaws is no longer returning, t
   // Jev's answer to every returner, home or not (PRD §42.4): keep returning. Anything else explores.
   const stubborn = (s: { mode: string }) => (s.mode === "return" ? "return" : "explore") as "return" | "explore";
   const home = (arrive: "explore" | "return") => {
-    const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, arrive }, mulberry32(1));
+    // leaveGate 0: the trip's end alone (with the gate, behaviour MR 5, a rested forager home waits for returns: see leave).
+    const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, arrive, leaveGate: 0 }, mulberry32(1));
     c.policy = stubborn;
     put(c, 0, 12, 6);
     c.mode[0] = 2; // return

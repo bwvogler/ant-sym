@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridge, contact, faintAlarm, regulate, richPoor, runAssay, twin } from "../../experiment.ts";
+import { bridge, contact, faintAlarm, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
@@ -30,11 +30,19 @@ test("A2b rich vs poor source: the colony picks the richer", () => {
   }
 });
 
-test("A5 regulation: foragers stay home without food", { todo: "behaviour MR 5: forager activation from returns" }, () => {
-  const m = runAssay(regulate, 1).metrics;
-  assert.ok(Number.isFinite(m.outsideBefore));
-  assert.equal(m.pass, 1, `outside before ${m.outsideBefore}, after ${m.outsideAfter}`);
-});
+// Behaviour MR 5 (PRD §47): A5 passes 10/10 on seeds 1–10 (0.24 outside before food, 0.81 after); A5b guards that
+// departures still fall once food is gone.
+for (const seed of [1, 2]) {
+  test(`A5 regulation: foragers stay home without food (seed ${seed})`, () => {
+    const m = runAssay(regulate, seed).metrics;
+    assert.ok(Number.isFinite(m.outsideBefore));
+    assert.equal(m.pass, 1, `outside before ${m.outsideBefore}, after ${m.outsideAfter}`);
+  });
+  test(`A5b foraging stops: departures fall once food is gone (seed ${seed})`, () => {
+    const m = runAssay(regulateStop, seed).metrics;
+    assert.equal(m.pass, 1, `trips out per minute while food flowed ${m.departsFlow}, once gone ${m.departsGone}`);
+  });
+}
 
 // Behaviour MR 4 (PRD §46): A9 passes 10/10 on seeds 1–10; A10's draw is weak (median +1.3 ants, mark 2).
 test("A9 strangers meet at food: few lost per food brought home", () => {
