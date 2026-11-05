@@ -620,9 +620,13 @@ export const alarm: Assay = {
       summary() {
         const before = mean(crowd.slice(when - 10, when));
         const after = mean(crowd.slice(when + 1, when + 11));
+        // Recovery is searched from the crowd's lowest point in the 10 s after the alarm, not from the alarm itself
+        // (ja-qld): with no scatter at all the crowd never dips, and "back" counted from before it had left.
+        let low = when + 1;
+        for (let k = when + 1; k < Math.min(crowd.length, when + 11); k++) if ((crowd[k] as number) < (crowd[low] as number)) low = k;
         let back = NaN;
-        for (let k = when + 1; k < crowd.length; k++)
-          if (mean(crowd.slice(Math.max(when + 1, k - 4), k + 1)) >= 0.5 * before) {
+        for (let k = low; k < crowd.length; k++)
+          if (mean(crowd.slice(Math.max(low, k - 4), k + 1)) >= 0.5 * before) {
             back = k + 1 - when;
             break;
           }
@@ -720,8 +724,88 @@ const exchange = (r: RunResult) => {
  * (attackers lost per defender lost) here with `open`; no pass mark until terrain-limited combat
  * lands (behaviour MR 4).
  */
-export const pass: Assay = { id: "pass", title: "A6 combat through a 2-cell pass", target: "exchange (attackers lost per defender) well above `open` (Lymbery et al. 2023); report only", seconds: 180, spec: (s) => battleSpec(s, true), score: exchange };
+export const PASS_EXCHANGE = 1.5;
+export const pass: Assay = {
+  id: "pass",
+  title: "A6 combat through a 2-cell pass",
+  target: `exchange (attackers lost per defender) ≥ ${PASS_EXCHANGE}: well above \`open\`'s ~1 (design mark; Lymbery et al. 2023: narrow ground favours the defending line)`,
+  seconds: 180,
+  spec: (s) => battleSpec(s, true),
+  score: (r) => {
+    const e = exchange(r);
+    return { ...e, pass: e.exchange >= PASS_EXCHANGE ? 1 : 0 };
+  },
+};
 export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass`; report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
+
+/**
+ * A9 — strangers meet at food (behaviour MR 4, docs/combat.md). Two colonies on stance forage, nests at either end of
+ * an open field, one food pile between them: their foragers meet there. At food, the ant that didn't start an encounter
+ * usually retreats (Human & Gordon 1996); foragers don't fight to the death over a bait. Score: ants lost per 100 food
+ * brought home (both colonies), and food home. Design mark: at most CONTACT_LOSSES lost per 100 food, half of what the
+ * colonies lost before MR 4 (8.7, 7.2–10.6 on seeds 1–10: every forager that met a stranger fought it).
+ */
+export const CONTACT_LOSSES = 4;
+export const contact: Assay = {
+  id: "contact",
+  title: "A9 strangers meet at food: forage, not war",
+  target: `≤ ${CONTACT_LOSSES} ants lost per 100 food home, both colonies (design mark; docs/combat.md)`,
+  seconds: 300,
+  spec: (seed) => ({
+    seed,
+    seconds: 300,
+    map: () => new Arena(120, 60, true).pile(60, 30, 4, 200).build([{ x: 12, y: 30, r: 3 }, { x: 108, y: 30, r: 3 }]),
+    game: { antCount: 200, rivalAnts: 200 },
+    sides: { stance: always<Stance>("forage"), rivalStance: always<Stance>("forage") },
+  }),
+  score: (r) => {
+    const lost = (r.metrics["you.losses"] as number) + (r.metrics["rival.losses"] as number);
+    const home = (r.metrics["you.stored"] as number) + (r.metrics["rival.stored"] as number);
+    const per100 = home > 0 ? (100 * lost) / home : Infinity;
+    return { lostPer100Food: per100, foodHomeBoth: home, pass: per100 <= CONTACT_LOSSES ? 1 : 0 };
+  },
+};
+
+/**
+ * A10 — faint alarm draws (behaviour MR 4, docs/combat.md: low doses attract, ten times more repel; Moser et al. 1968,
+ * Lopes et al. 2022). A faint alarm is painted 5 cells off a busy trail at 120 s: the crowd within 4 cells of it over the
+ * next 10 s against the 10 s before. Design mark: at least FAINT_DRAW more ants (before MR 4 it emptied: alarm only repelled).
+ */
+export const FAINT_DRAW = 2;
+export const faintAlarm: Assay = {
+  id: "faintAlarm",
+  title: "A10 faint alarm draws ants",
+  target: `≥ ${FAINT_DRAW} more ants near a faint alarm than before it (design mark; docs/combat.md)`,
+  seconds: 180,
+  spec: (seed) => {
+    const spot = at(55, 50);
+    const when = 120;
+    const crowd: number[] = [];
+    let nextAt = 1;
+    const probe: Probe = {
+      tick(game) {
+        if (game.time + 1e-9 < nextAt) return;
+        nextAt += 1;
+        crowd.push(antsNear(game, spot.x, spot.y, 4));
+      },
+      summary() {
+        const before = mean(crowd.slice(when - 10, when));
+        const after = mean(crowd.slice(when + 1, when + 11));
+        return { nearBefore: before, nearAfter: after, draw: after - before };
+      },
+    };
+    return {
+      seed,
+      seconds: 180,
+      map: () => new Arena(100, 100, true).pile(50, 18, 3, 200).build([{ x: 50, y: 82, r: 3 }]),
+      game: { antCount: 300, rival: false },
+      // Faint: above the sensors' FAINT (0.05), well under STRONG (1), for a few seconds at the spot.
+      events: [0, 2, 4, 6, 8].map((d) => ({ at: when + d, kind: "paint" as const, channel: "alarm" as const, x: spot.x, y: spot.y, r: 2, amount: 0.4 })),
+      probes: [probe],
+    };
+  },
+  score: (r) => ({ pass: (r.metrics.draw as number) >= FAINT_DRAW ? 1 : 0 }),
+};
 
 /**
  * G — the real game as the page opens it (the side view), 600 + 600 ants, 10 minutes. Also the
@@ -808,4 +892,4 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, pass, open, game, gameTop, nestFlow];
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, pass, open, contact, faintAlarm, game, gameTop, nestFlow];
