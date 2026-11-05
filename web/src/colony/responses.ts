@@ -138,7 +138,9 @@ export const localResponses: Responses = {
   // raiders and defenders fight, and on a forage stance every ant turns away (at food, the ant that didn't start it usually retreats: Human & Gordon
   // 1996). Fighting only while outnumbering was tried: one side always outnumbers somewhere, and its fighters cut down the
   // other's fleers (G′ seeds 1–4: 7,482 lost against 6,069 never fighting). `odds` is there for a policy that weighs it.
-  contact: (t) => (t.carrying !== "none" ? "flee" : t.stance !== "forage" ? "fight" : "flee"),
+  // An ant its mode policy sent to fight (a doctrine's, or a raid's) fights: the local policy no longer sends ants to
+  // fight just because strangers are near, and it sends a fighter home once the strangers are gone.
+  contact: (t) => (t.carrying !== "none" ? "flee" : t.stance !== "forage" || t.mode === "fight" ? "fight" : "flee"),
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */

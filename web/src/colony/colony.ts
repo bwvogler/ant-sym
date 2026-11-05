@@ -105,7 +105,8 @@ export interface CellCounts {
 export const ENEMY = 0.5;
 
 /**
- * The local rule. An enemy close by: fight it. Tired: go home. Raiding:
+ * The local rule. (An enemy close by is the contact response's to answer, behaviour MR 4: before it, this rule sent
+ * every ant with one near to fight.) Tired: go home. Raiding:
  * explorers (and fighters) go raiding, followers keep foraging. Defending:
  * alarm calls fighters. A fight that is over sends the ant home. Otherwise
  * forage: a strong food trail is followed, none means explore, a faint one
@@ -114,7 +115,6 @@ export const ENEMY = 0.5;
  * circled trails to food that was gone until nobody was left exploring.
  */
 export const localPolicy: Policy = (s) => {
-  if (s.enemy === "near") return "fight";
   if (s.tired) return "return";
   if (s.stance === "raid" && (s.mode === "explore" || s.mode === "fight")) return "fight";
   if (s.stance === "defend" && s.alarm !== "none") return "fight";
@@ -3128,7 +3128,7 @@ export class Colony {
       // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
       // said. Before it, every ant with an enemy near fought. Fleeing is homing: away from the strangers, toward its nest.
       if (toEnemy !== null) {
-        const answer = resp.contact(this.touch(i, true, prevMode, item));
+        const answer = resp.contact(this.touch(i, true, mode, item));
         if (answer === "fight") {
           if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
         } else {

@@ -503,7 +503,7 @@ test("contact (behaviour MR 4): raiders and defenders fight; foraging, every ant
   assert.equal(localResponses.contact(touch({ stance: "raid", odds: "outnumbered" })), "fight");
   assert.equal(localResponses.contact(touch({ stance: "raid", carrying: "food", mode: "return" })), "flee", "a carrier takes its load home, raid or not");
   assert.equal(localResponses.contact(touch({ stance: "defend", odds: "even" })), "fight");
-  assert.equal(localResponses.contact(touch({ mode: "fight", odds: "outnumbered" })), "flee", "foraging, a fighter re-judges its odds");
+  assert.equal(localResponses.contact(touch({ mode: "fight", odds: "outnumbered" })), "fight", "its policy sent it to fight");
   assert.equal(localResponses.contact(touch({ odds: "outnumbering" })), "flee", "foraging, it turns away even outnumbering");
   assert.equal(localResponses.contact(touch({ odds: "even" })), "flee");
   assert.equal(localResponses.contact(touch({ mode: "follow", odds: "outnumbered" })), "flee");

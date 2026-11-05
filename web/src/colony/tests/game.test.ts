@@ -39,8 +39,8 @@ test("generateWorld: two nests, a walk apart, joined on foot, with food away fro
   }
 });
 
-test("localPolicy: enemies are fought; raids take explorers, not followers; defence answers alarm; a fight over sends the ant home", () => {
-  assert.equal(localPolicy(sit({ enemy: "near", tired: true })), "fight");
+test("localPolicy: enemies near are the contact response's (MR 4); raids take explorers, not followers; defence answers alarm; a fight over sends the ant home", () => {
+  assert.equal(localPolicy(sit({ enemy: "near", tired: true })), "return", "an enemy near is no mode question any more: tired, it goes home");
   assert.equal(localPolicy(sit({ stance: "raid", mode: "explore" })), "fight");
   assert.equal(localPolicy(sit({ stance: "raid", mode: "follow", foodTrail: "strong" })), "follow");
   assert.equal(localPolicy(sit({ stance: "defend", alarm: "faint" })), "fight");
