@@ -2907,10 +2907,11 @@ The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants wou
 
 | | Local | Forage | Cautious | Warlike |
 |---|---|---|---|---|
-| G′ food home | 51,515 | 52,526 | 50,360 | 52,346 |
-| G′ losses | 11,056 | 12,340 (+12 %) | 10,999 | 12,956 (+17 %) |
-| A9 lost per 100 food | 0.84 | 3.28 (5/6) | 0.85 (6/6) | 3.75 (4/6) |
+| G′ food home | 53,092 | 52,520 | 51,621 | 52,201 |
+| G′ losses | 11,607 | 12,825 (+10 %) | 11,028 (−5 %) | 12,631 (+9 %) |
+| A9 lost per 100 food | 0.88 (6/6) | 3.46 (5/6) | 0.92 (6/6) | 3.28 (5/6) |
 
+  Re-run after #38's review (S1, and the re-keyed caches); before it, +12 %, −1 % and +17 % against a local 11,056.
   The doctrines that fight cost ants, as their doctrines ask.
 
 **Cost** (`colony-cost --side 5 600 1`):
