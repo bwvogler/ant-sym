@@ -3151,6 +3151,7 @@ export class Colony {
       const item: Item = carrying ? "food" : pellet ? (this.#corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
       const resp = this.responses;
       let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
+      let waiting = false;
       if (carrying || pellet || nursing) {
         // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
         // question comes once the load is down.
@@ -3182,7 +3183,7 @@ export class Colony {
         situation0 = before - mode * MODE_STRIDE;
         // Waiting at home (behaviour MR 5): where the colony gates leaving, a forager home in "return" is asked `leave`
         // (below), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
-        const waiting = gate && mode === RETURN && !enemy && this.#atNestTop(i);
+        waiting = gate && mode === RETURN && !enemy && this.#atNestTop(i);
         if (before !== this.#asked[i] && !waiting) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
@@ -3556,6 +3557,13 @@ export class Colony {
         if (carrying && leak > 0 && this.foreign) this.foreign.depositCell("food", CELL[0] as number, CELL[1] as number, laid * leak);
       }
 
+      // Waiting at home (behaviour MR 5) it stays in: past half the nest's radius it turns back in. Wandering out of the
+      // nest, it was asked its mode, and the mode policy sent it out exploring with nothing coming in.
+      if (waiting) {
+        const dx = home.x - (this.x[i] as number);
+        const dy = home.y - (this.y[i] as number);
+        if (dx * dx + dy * dy > 0.25 * home.r * home.r) h = Math.atan2(dy, dx);
+      }
       // Move; rock or the edge turns the ant back somewhere random.
       // Rounded to float32 first, as stored: checked in float64, 192.999996 is open ground, and stored as
       // 193.0 it would land the ant inside the soil cell beyond, where every step is blocked.

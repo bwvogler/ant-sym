@@ -522,3 +522,43 @@ test("the contact lane (behaviour MR 4) is sent alarm and odds; the other lanes 
   assert.equal(g.s0?.alarm, undefined);
   assert.equal(g.s0?.odds, undefined);
 });
+
+test("leave (behaviour MR 5): out now on many returns, soon on few, wait on none; a fighting stance doesn't wait", () => {
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "many" })), "now");
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "few" })), "soon");
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "none" })), "wait");
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "none", stance: "raid" })), "now");
+  assert.equal(responseKey("leave", touch({ mode: "return", returns: "few" })), "return|none|-|-|out|none|clear|forage|returns:few", "the leave lane keys on returns");
+  assert.equal(responseKey("get", touch({ returns: "many" })), "explore|none|-|-|out|none|clear|forage", "the other lanes, never sent it, don't");
+  type Ants = { ants: Record<string, Record<string, unknown>> };
+  const l = (packResponseRequest("leave", [{ id: "s0", situation: touch({ returns: "few" }) }], "Gather food.").state as Ants).ants;
+  assert.equal(l.s0?.returns, "few");
+  const g = (packResponseRequest("trail", [{ id: "s0", situation: touch({ returns: "few" }) }], "Gather food.").state as Ants).ants;
+  assert.equal(g.s0?.returns, undefined);
+});
+
+test("leave (behaviour MR 5): a rested forager home waits until a nestmate brings food; a scout goes anyway", () => {
+  // Ant 0 is home, rested, in "return"; ant 1 stands beside it holding food (its drop response says no), or isn't there.
+  const run = (carrier: boolean, scoutRate: number) => {
+    const c = new Colony(corridor(0), { antCount: 2, maxAnts: 2, leaveGate: 0.5, scoutRate }, mulberry32(3));
+    c.responses = responses({ drop: () => false });
+    put(c, 0, 6, 6);
+    c.mode[0] = 2; // return
+    put(c, 1, 6, 6);
+    if (carrier) c.carrying[1] = 1;
+    else c.alive[1] = 0;
+    for (let k = 0; k < 30 * 20; k++) {
+      c.tick(1 / 30);
+      if (carrier) {
+        c.x[1] = c.x[0]!;
+        c.y[1] = c.y[0]!;
+      }
+      if (c.mode[0] !== 2) return k / 30;
+    }
+    return Infinity;
+  };
+  assert.equal(run(false, 0), Infinity, "with nobody bringing food and no scouting, it waits");
+  const met = run(true, 0);
+  assert.ok(met < 10, `a nestmate bringing food sends it out (${met.toFixed(1)} s)`);
+  assert.ok(run(false, 5) < 2, "a high scout rate sends it out with no returns");
+});
