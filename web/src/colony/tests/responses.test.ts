@@ -20,7 +20,7 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
 }
 
-const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", ...t }) as Touch;
+const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", returns: "none", ...t }) as Touch;
 
 /** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
 function forage(c: Colony, seconds = 20): { picked: boolean } {
