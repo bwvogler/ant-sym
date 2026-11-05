@@ -2829,7 +2829,7 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
     - a carrier takes its load home;
     - raiders and defenders, and an ant its policy sent to fight, fight;
     - on a forage stance every other ant turns away.
-  - **A fleeing ant without a load** runs straight away from the strangers while they are in reach, then home. Homing alone, fleers often walked along or toward them.
+  - **A fleeing ant without a load** runs straight away from the strangers while they are in reach. Once they are gone its mode policy is asked afresh, and locally it resumes foraging (review of #38: the PRD first said "then home", but the policy put it straight back on its trail). Homing alone, fleers often walked along or toward them.
   - **A carrier flees by homing.** Turned straight away, on the ground line it walked away from its own hole (G seed 5, a raid: 3–5 held).
   - **Tried and dropped:**
     - Fighting while outnumbering, judged once: one moment's advantage committed an ant to the death (G′ seed 2: 1,742 of 1,894 deaths in fight mode, mid-map, both colonies foraging).
@@ -2845,26 +2845,44 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
 
 ### 46.4 Results (local rule)
 
+Measured after #38's review (S1: the contact response records the situation it answered, so a fleeing ant isn't flipped back onto its trail every other step). "Baseline" is 4e41ade run with the same assay code. A10's baseline was run under A10's final spec (de4017f's map and timing).
+
 | Assay | Baseline | MR 4 |
 |---|---|---|
 | A4 alarm | 10/10 / 10/10 | 10/10 (scatter 0.35) |
 | A6 few against many through a pass | 9/10 / 7/10, gain 2.36 | 9/10 (unchanged: geometry) |
-| A9 contact, lost per 100 food | 0/10, 8.9 / 0/10, 8.0 | **10/10, 0.84** (food home +28 %) |
-| A10 faint alarm | −1.8 (repelled) | +1.4 (drawn): 3/10 at the mark of 2 |
+| A9 contact, lost per 100 food | 0/10, 8.9 / 0/10, 8.0 | **10/10, 0.88** (food home +28 %) |
+| A10 faint alarm | −1.8 (repelled) | +1.4 (drawn): 3/10 at the mark of 2 (ja-je8) |
 | A3, A2a, A1 (top-down trails) | 10/10 | 10/10 |
 | G side-view game | 18/20 | **18/20** |
-| G food home, first colony | 24,512 / 20,424 | 23,225 / 20,990 (−5 % / +3 %) |
-| G losses, both colonies | 3,731 / 3,163 | 3,564 / 3,402 |
-| G′ losses, both colonies, seeds 1–10 | 19,698 | **16,520** (−16 %) |
-| G′ ants alive, seeds 1–10 | 12,947 | **15,486** (+20 %) |
-| G′ food home, seeds 1–10 | 83,068 | 80,715 (−3 %) |
-| G′ most held over 120 s | 67 | 53 |
+| G food home, first colony | 24,512 / 20,424 | 22,995 / 20,942 (−6 % / +3 %) |
+| G losses, both colonies | 3,731 / 3,163 | 3,440 / 3,367 |
 | A8 nest flow | 0.59 lowest | unchanged (one colony: no contact) |
 
-- Where a cell shows two figures, they are seeds 1–10 / 11–20.
-- **ja-hgq:** G′ recovers about half of MR 3's extra losses (main before MR 3: 13,732 on seeds 1–10). It stays open for the rest.
-- **The side view** matches the baseline's pass rate. Food home and losses move by a few per cent either way.
-- `npm test` 334/334; `test:slow`: 8 pass, 2 todo (A5; the porter guard).
+Where a cell shows two figures, they are seeds 1–10 / 11–20.
+
+**G′, the top-down game, both colonies** (review S3 asked for seeds 11–20):
+
+| G′ | Baseline 1–10 | MR 4 1–10 | Baseline 11–20 | MR 4 11–20 |
+|---|---|---|---|---|
+| losses | 19,698 | **17,073** (−13 %) | 20,191 | **17,099** (−15 %) |
+| ants alive at the end | 12,947 | **15,436** (+19 %) | 12,660 | **14,903** (+18 %) |
+| food home | 83,068 | 82,657 (−0.5 %) | 84,319 | 80,106 (−5 %) |
+| colonies fallen | 0 | 0 | 0 | 0 |
+| most held over 120 s, one seed | 67 | 117 (seed 4) | 153 | **248** (seed 11) |
+
+- **The smallest colonies (review S2):** the first colony's ants alive at the end.
+  - **Seed 4:** baseline 0, MR 4 **292**.
+  - **Seed 19:** baseline 0, MR 4 **29**: a collapse a few seconds later.
+  - Before MR 3 (main 47928ed) they ended with 370 and 84.
+- **ja-hgq** keeps these seeds open. MR 4 recovers about half of MR 3's extra losses (main before MR 3: 13,732 on seeds 1–10).
+- **Held carriers in G′** (ja-uez) rise on some seeds, worst on seed 11: 248 against 153.
+- **Side-bench** (`side-bench.mjs 1-6 600 600 2`; review S5):
+  - Food home 26,688 (main 25,985); ants stuck on the ground line 54 (main 10,253: main's seed-6 raider standstill is gone).
+  - **Porters held over 120 s at the end: 15** (main 0), 13 of them on seed 3, colony 0, in tunnels next to its nest.
+  - Not the cause, measured: alarm in tunnels (26 when carriers ignore it) and contact inside the nest (14 when ants defend it).
+  - Single-change variants clear seed 3 but jam another seed (seed 5, 13). Noted on ja-3po; the slow porter guard is still a todo.
+- **Tests:** `npm test` 335/335; `test:slow` gates A1, A2a, A2b and A9 (seeds 1–2), with A10 a todo (ja-je8) and A5 a todo.
 
 ### 46.5 Ants take up room (ja-4ne, filed)
 
@@ -2885,7 +2903,7 @@ The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants wou
 - **Agreement with the local rule:** Forage 58 %, Cautious 69 %, Warlike 53 % (83 situations each).
   - Forage and Warlike send empty-jawed explorers on a forage stance to fight when even or outnumbering.
   - Cautious has fighters flee from raids.
-- **Replayed** (first colony; seeds 1–6, G′ both colonies):
+- **Replayed** (Jev's answers for the first colony; seeds 1–6; G′ figures are both colonies' totals):
 
 | | Local | Forage | Cautious | Warlike |
 |---|---|---|---|---|
@@ -2897,13 +2915,15 @@ The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants wou
 
 **Cost** (`colony-cost --side 5 600 1`):
 
-| Lane | MR 3, tokens per question | MR 4 |
+| Lane | main (MR 3), tokens per question | MR 4 |
 |---|---|---|
 | mode | ~657, $0.074/h | ~649, $0.074/h |
-| get, if asked | 970 | 1,203 |
-| carry, if asked | 723 | 894 |
-| drop, if asked | 1,024 | 1,180 |
-| trail, if asked | 613 | 738 |
+| get, if asked | 1,020 | 1,203 |
+| carry, if asked | 750 | 894 |
+| drop, if asked | 1,078 | 1,180 |
+| trail, if asked | 613 (as §45.6 reported) | 738 |
 | contact, if asked | — | 1,405 (2 situations in the side view) |
 
-The legend's new sentences reach every response lane. All five would cost ~$0.096/h if asked (MR 3: ~$0.074/h). The page asks none of them.
+- The main column is the review's own measurement of main (ja-46w corrects §45.6's stale figures). All four lanes on main come to ~$0.078/h.
+- The legend's new sentences reach every response lane: all five would cost ~$0.096/h if asked. The page asks none of them.
+- Since #38's review the contact lane alone keys on alarm and odds (`colonyBrain.responseKey`). Before, every lane's key carried them, so identical requests in get, carry and trail landed under different keys.
