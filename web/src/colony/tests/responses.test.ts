@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { choose, Colony, LIFESPAN, MIDDLE, YOUNG } from "../colony.ts";
 import { Game } from "../game.ts";
-import { packResponseRequest, readResponse, RESPONSE_HOOKS, responseContext, responsesFromAnswers } from "../colonyBrain.ts";
+import { packResponseRequest, readResponse, RESPONSE_HOOKS, responseContext, responseKey, responsesFromAnswers } from "../colonyBrain.ts";
 import { type Item, localResponses, responses, touchKey, type Touch } from "../responses.ts";
 import { dropFood, foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, nestAt, put } from "./hexmaps.ts";
@@ -403,7 +403,7 @@ test("quality: tasted at pickup, carried, offered to get and trailRate, and kept
 
 test("touchKey: quality is in the key only when it isn't fair (keys cached before quality still match)", () => {
   assert.equal(touchKey(touch({})), "explore|none|-|-|out|none|clear|forage");
-  assert.equal(touchKey(touch({ carrying: "food", quality: "rich" })), "explore|food|-|-|out|none|clear|forage|rich|none|none");
+  assert.equal(touchKey(touch({ carrying: "food", quality: "rich" })), "explore|food|-|-|out|none|clear|forage|rich");
 });
 
 test("noEntry: a follower at a food trail's end with no food marks it; with food there, it doesn't; noEntry 0 lays none", () => {
@@ -508,16 +508,17 @@ test("contact (behaviour MR 4): raiders and defenders fight; foraging, every ant
   assert.equal(localResponses.contact(touch({ odds: "even" })), "flee");
   assert.equal(localResponses.contact(touch({ mode: "follow", odds: "outnumbered" })), "flee");
   assert.equal(localResponses.contact(touch({ carrying: "food", mode: "return", odds: "outnumbering" })), "flee");
-  assert.equal(touchKey(touch({ odds: "even" })), "explore|none|-|-|out|none|clear|forage|fair|none|even", "odds in the key");
-  assert.equal(touchKey(touch({})), "explore|none|-|-|out|none|clear|forage", "older keys unchanged");
+  assert.equal(responseKey("contact", touch({ odds: "even" })), "explore|none|-|-|out|none|clear|forage|alarm:none|odds:even", "the contact lane keys on odds and alarm");
+  assert.equal(responseKey("carry", touch({ odds: "even", alarm: "strong" })), "explore|none|-|-|out|none|clear|forage", "the other lanes, never sent them, don't");
 });
 
 test("the contact lane (behaviour MR 4) is sent alarm and odds; the other lanes are not", () => {
   const t = touch({ enemy: true, alarm: "strong", odds: "outnumbered" });
-  const c = packResponseRequest("contact", [{ id: "s0", situation: t }], "Gather food.").state.ants as Record<string, Record<string, unknown>>;
+  type Ants = { ants: Record<string, Record<string, unknown>> };
+  const c = (packResponseRequest("contact", [{ id: "s0", situation: t }], "Gather food.").state as Ants).ants;
   assert.equal(c.s0?.alarm, "strong");
   assert.equal(c.s0?.odds, "outnumbered");
-  const g = packResponseRequest("carry", [{ id: "s0", situation: t }], "Gather food.").state.ants as Record<string, Record<string, unknown>>;
+  const g = (packResponseRequest("carry", [{ id: "s0", situation: t }], "Gather food.").state as Ants).ants;
   assert.equal(g.s0?.alarm, undefined);
   assert.equal(g.s0?.odds, undefined);
 });

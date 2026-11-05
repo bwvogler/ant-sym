@@ -70,8 +70,7 @@ export interface Touch {
   odds: Odds;
 }
 
-export const ODDS = ["none", "outnumbered", "even", "outnumbering"] as const;
-export type Odds = (typeof ODDS)[number];
+export type Odds = "none" | "outnumbered" | "even" | "outnumbering";
 
 /** What an ant does on meeting strangers (behaviour MR 4, docs/combat.md). */
 export const CONTACT = ["fight", "flee", "drop and run"] as const;
@@ -150,9 +149,9 @@ export function responses(over: Partial<Responses> = {}): Responses {
 
 /**
  * A situation as a cache key: 4 modes × 5 items × porter × digging × 4 places × 5 offered × enemy × 3 stances, then
- * quality, alarm and odds, only when one of them isn't its default (fair, none, none), so keys from before them still
- * match (most combinations never occur).
+ * quality only when it isn't "fair" (so keys from before quality still match: most combinations never occur). Alarm and
+ * odds are the contact lane's alone (colonyBrain.responseKey): the other lanes are never sent them.
  */
 export function touchKey(t: Touch): string {
-  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}${t.quality === "fair" && t.alarm === "none" && t.odds === "none" ? "" : `|${t.quality}|${t.alarm}|${t.odds}`}`;
+  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}${t.quality === "fair" ? "" : `|${t.quality}`}`;
 }

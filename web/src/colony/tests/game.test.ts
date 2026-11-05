@@ -155,3 +155,33 @@ test("the outcome: a colony with no ants and too little food for one more is bea
   assert.equal(g.outcome(), "fallen");
   assert.equal(g.fallen(), 0);
 });
+
+test("contact (behaviour MR 4): a foraging ant meeting strangers runs straight away from them", () => {
+  const m = arena();
+  const c = new Colony(m, { antCount: 1, maxAnts: 1, wander: 0, deposit: 0 }, mulberry32(4), () => "explore");
+  const enemies = new CountGrid();
+  enemies.add(20, 8, 3); // two rows south of the ant
+  c.enemies = enemies;
+  put(c, 0, 20, 6);
+  c.heading[0] = 0; // east
+  c.tick(1 / 30);
+  assert.equal(c.mode[0], 2, "fleeing (return) while they are in reach");
+  for (let k = 0; k < 14; k++) c.tick(1 / 30);
+  assert.ok((c.y[0] as number) < at(20, 6).y - 0.3, `it turned north, away: y ${c.y[0]}`);
+});
+
+test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer toward it", () => {
+  const run = (amount: number) => {
+    const m = arena();
+    const c = new Colony(m, { antCount: 1, maxAnts: 1, wander: 0, deposit: 0 }, mulberry32(4), () => "explore");
+    put(c, 0, 20, 6);
+    c.heading[0] = 0; // east
+    const p = at(22, 8);
+    c.paint("alarm", p.x, p.y, 1, amount); // ahead and to the south
+    for (let k = 0; k < 15; k++) c.tick(1 / 30);
+    return c.y[0] as number;
+  };
+  const y0 = at(20, 6).y;
+  assert.ok(run(0.3) > y0 + 0.2, "faint: drawn south, toward it");
+  assert.ok(run(12) < y0 - 0.2, "strong: turned north, away");
+});

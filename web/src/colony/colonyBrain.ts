@@ -221,7 +221,15 @@ export function readResponse(hook: ResponseHook, answers: Record<string, JevAnsw
   return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
 }
 
-/** Cached response answers per hook, keyed by touchKey: what scripts/colony-live.mjs saves and the experiments replay. */
+/**
+ * A response situation's cache key for a hook: touchKey, and for `contact` the alarm and odds it is sent too (the other
+ * lanes aren't sent them, so they don't key on them: review of #38).
+ */
+export function responseKey(hook: ResponseHook, t: Touch): string {
+  return hook === "contact" ? `${touchKey(t)}|alarm:${t.alarm}|odds:${t.odds}` : touchKey(t);
+}
+
+/** Cached response answers per hook, keyed by responseKey: what scripts/colony-live.mjs saves and the experiments replay. */
 export type ResponseCache = Partial<Record<ResponseHook, Record<string, ResponseAnswer>>>;
 
 /**
@@ -235,7 +243,7 @@ export function responsesFromAnswers(cache: ResponseCache, base: Responses = loc
     if (!table) continue;
     const local = base[hook] as (t: Touch) => ResponseAnswer;
     (over as Record<ResponseHook, (t: Touch) => ResponseAnswer>)[hook] = (t) => {
-      const a = table[touchKey(t)];
+      const a = table[responseKey(hook, t)];
       onLookup?.(hook, a !== undefined);
       return a ?? local(t);
     };

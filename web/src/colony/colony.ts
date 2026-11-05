@@ -3081,6 +3081,7 @@ export class Colony {
       const prevMode = mode;
       const item: Item = carrying ? "food" : pellet ? (this.#corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
       const resp = this.responses;
+      let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
       if (carrying || pellet || nursing) {
         // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
         // question comes once the load is down.
@@ -3109,6 +3110,7 @@ export class Colony {
         const enemy = toEnemy === null ? 0 : 1;
         const stance = STANCES.indexOf(this.stance);
         const before = encode(mode, tired, food, home, alarm, enemy, stance);
+        situation0 = before - mode * MODE_STRIDE;
         if (before !== this.#asked[i]) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
@@ -3126,7 +3128,8 @@ export class Colony {
       }
       let fleeFrom: number | null = null;
       // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
-      // said. Before it, every ant with an enemy near fought. Fleeing is homing: away from the strangers, toward its nest.
+      // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
+      // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
       if (toEnemy !== null) {
         const answer = resp.contact(this.touch(i, true, mode, item));
         if (answer === "fight") {
@@ -3140,6 +3143,10 @@ export class Colony {
           if (!carrying && !pellet && !nursing) fleeFrom = toEnemy;
         }
         this.mode[i] = mode;
+        // The situation as answered, with the mode the contact response set: else the mode policy, asked again next step,
+        // put the ant back on its trail and contact turned it round again, resetting its homing every other step (review
+        // of #38: 6,170 flips in 150 s on G′ seed 1).
+        if (situation0 >= 0) this.#asked[i] = situation0 + mode * MODE_STRIDE;
       }
       // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
       // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
@@ -3840,6 +3847,8 @@ export function encodeSituation(s: Situation): number {
   return encode(MODES.indexOf(s.mode), s.tired, s.foodTrail, s.homeTrail, s.alarm, s.enemy === "near" ? 1 : 0, STANCES.indexOf(s.stance));
 }
 
+/** encode's step per mode: encode(m, …) = encode(0, …) + m × MODE_STRIDE. */
+const MODE_STRIDE = 2 * 3 * HOMES.length * 3 * 2 * 3;
 function encode(mode: number, tired: boolean, food: Trail, home: Home, alarm: Trail, enemy: number, stance: number): number {
   return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * HOMES.length + HOMES.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
 }
