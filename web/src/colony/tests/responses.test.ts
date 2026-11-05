@@ -161,6 +161,8 @@ test("readResponse: nouls are yes strictly above ½; choices must be one of the 
   assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "return" } }, "s0"), null, "a mode is no carry answer any more");
   assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "dance" } }, "s0"), null);
   assert.equal(readResponse("trail", { s0_trail: { type: "choice", choice: "none" } }, "s0"), "none");
+  assert.equal(readResponse("contact", { s0_contact: { type: "choice", choice: "drop and run" } }, "s0"), "drop and run");
+  assert.equal(readResponse("contact", { s0_contact: { type: "choice", choice: "home" } }, "s0"), null);
   assert.equal(readResponse("trail", {}, "s0"), null);
 });
 
@@ -508,4 +510,14 @@ test("contact (behaviour MR 4): raiders and defenders fight; foraging, every ant
   assert.equal(localResponses.contact(touch({ carrying: "food", mode: "return", odds: "outnumbering" })), "flee");
   assert.equal(touchKey(touch({ odds: "even" })), "explore|none|-|-|out|none|clear|forage|fair|none|even", "odds in the key");
   assert.equal(touchKey(touch({})), "explore|none|-|-|out|none|clear|forage", "older keys unchanged");
+});
+
+test("the contact lane (behaviour MR 4) is sent alarm and odds; the other lanes are not", () => {
+  const t = touch({ enemy: true, alarm: "strong", odds: "outnumbered" });
+  const c = packResponseRequest("contact", [{ id: "s0", situation: t }], "Gather food.").state.ants as Record<string, Record<string, unknown>>;
+  assert.equal(c.s0?.alarm, "strong");
+  assert.equal(c.s0?.odds, "outnumbered");
+  const g = packResponseRequest("carry", [{ id: "s0", situation: t }], "Gather food.").state.ants as Record<string, Record<string, unknown>>;
+  assert.equal(g.s0?.alarm, undefined);
+  assert.equal(g.s0?.odds, undefined);
 });
