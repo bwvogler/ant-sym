@@ -1,0 +1,22 @@
+# The hosted Jev proxy for the GitHub Pages builds. See docs/hosting.md.
+# Secrets (never in this file): JEV_API_KEY, ACCESS_PASSPHRASE. CI sets them
+# from the repository secrets of the same names on every deploy.
+name = "jev-ants-api"
+main = "index.ts"
+compatibility_date = "2026-10-01"
+# server/jev.ts (shared helpers) imports node:http and node:https at the top.
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Exact origins, comma-separated. PR previews live under the same origin as main.
+ALLOWED_ORIGINS = "https://bwvogler.github.io"
+# Across every run, per UTC day. Per-run caps still apply under it.
+DAILY_CAP_USD = "2"
+
+[[durable_objects.bindings]]
+name = "LEDGER"
+class_name = "JevLedger"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["JevLedger"]

@@ -12,7 +12,8 @@ import { seg } from "./ui/styles.ts";
 import { STRAINS, useColony, type Brush, type Ground, type SideStats } from "./ui/useColony.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import DemoNote from "./ui/DemoNote.tsx";
-import { isDemo, jevUnavailable } from "./ui/backend.ts";
+import { isDemo, jevUnavailable, passphrase } from "./ui/backend.ts";
+import PassNote from "./ui/PassNote.tsx";
 import { useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import { AIMS } from "./colony/fungusBrain.ts";
@@ -33,7 +34,7 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 
 export default function ColonyApp() {
   const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
-  const backend = useBackend();
+  const { backend, recheck } = useBackend();
   const jevBlocked = jevUnavailable(backend);
   const jev = useColonyJev(game.colonies, game.fungus, controls.menu);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
@@ -56,6 +57,7 @@ export default function ColonyApp() {
         <p className="text-sm text-fg-3">two colonies, one map: trails, not orders</p>
       </header>
       {isDemo(backend) && <DemoNote />}
+      {backend?.needsPass && <PassNote onSaved={recheck} wrong={passphrase() !== null} />}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="relative" style={{ aspectRatio: `${worldExtent(colony.map).w} / ${worldExtent(colony.map).h}` }}>

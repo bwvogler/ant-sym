@@ -97,50 +97,73 @@ export function buildServices(env: NodeJS.ProcessEnv): Services & { inFlight: nu
   return { client, ledger: new Ledger({ maxInFlight: inFlight }), now: () => Date.now(), inFlight };
 }
 
+/** A route's answer, transport-neutral: the Vite middleware and the hosted Worker (web/worker) both send it. */
+export interface Reply {
+  status: number;
+  body: unknown;
+}
+
+export function healthReply(svc: Services): Reply {
+  return { status: 200, body: { ok: true, hasKey: svc.client !== null, run: svc.ledger.summary(svc.now()) } };
+}
+
+/** /api/run: GET is the summary; POST {action} starts or stops the run. */
+export function runReply(svc: Services, method: string | undefined, body: { action?: string; caps?: Partial<RunCaps> }): Reply {
+  if (method === "GET") return { status: 200, body: svc.ledger.summary(svc.now()) };
+  if (body.action === "start") return { status: 200, body: svc.ledger.start(body.caps ?? {}, svc.now()) };
+  if (body.action === "stop") return { status: 200, body: svc.ledger.stop("user", svc.now()) };
+  if (body.action === "formed") return { status: 200, body: svc.ledger.stop("formed", svc.now()) };
+  throw new HttpError(400, "action must be start, stop or formed");
+}
+
+/** /api/jev: one Jev call through the ledger. Throws HttpError for 400/502/503. */
+export async function jevReply(svc: Services, raw: unknown): Promise<Reply> {
+  if (!svc.client) throw new HttpError(503, "JEV_API_KEY is not set in the server's environment");
+  const request = validateJevRequest(raw);
+  // Reserve from this request's own size, so a big call cannot hide under a small one's room.
+  const reserve = reserveForBytes(Buffer.byteLength(JSON.stringify(request)));
+  const gate = svc.ledger.admit(svc.now(), reserve);
+  if (!gate.ok) {
+    // 429 "busy" is temporary: the pool is full or what is in flight might
+    // use up the rest of the cap. 409 means the run is over (or never
+    // started). The reply carries the summary so the client learns which
+    // without another trip.
+    return { status: gate.reason === "busy" ? 429 : 409, body: { error: gate.reason, run: svc.ledger.summary(svc.now()) } };
+  }
+  const token = svc.ledger.begin(reserve);
+  const signal = svc.ledger.signal;
+  let result: Awaited<ReturnType<JevCaller["ask"]>>;
+  try {
+    result = await svc.client.ask(request, signal);
+  } catch (e) {
+    const aborted = e instanceof JevAbortError || signal.aborted;
+    // An aborted call never got a reply: its cost is unknown, so it is counted apart, not as a free request.
+    svc.ledger.end(token, { status: 0, ms: 0, inputTokens: 0, aborted });
+    if (aborted) return { status: 409, body: { error: "stopped", run: svc.ledger.summary(svc.now()) } };
+    throw new HttpError(502, `jev unreachable: ${(e as Error).message}`);
+  }
+  // A 200 without answers is not an answer; keep the status for the ledger but say so.
+  const body = result.status === 200 && !isJevResponse(result.body) ? { error: "upstream reply had no answers", upstream: result.body } : result.body;
+  svc.ledger.end(token, result);
+  const reply: JevProxyReply = { ...result, body: body as JevProxyReply["body"], run: svc.ledger.summary(svc.now()) };
+  return { status: 200, body: reply };
+}
+
 export function makeHandlers(svc: Services) {
-  const health: Handler = (_req, res) => sendJson(res, 200, { ok: true, hasKey: svc.client !== null, run: svc.ledger.summary(svc.now()) });
+  const send = (res: ServerResponse, r: Reply) => sendJson(res, r.status, r.body);
+
+  const health: Handler = (_req, res) => send(res, healthReply(svc));
 
   const run: Handler = async (req, res) => {
-    if (req.method === "GET") return sendJson(res, 200, svc.ledger.summary(svc.now()));
+    if (req.method === "GET") return send(res, runReply(svc, "GET", {}));
     if (req.method !== "POST") return methodNotAllowed(res, "GET, POST");
-    const body = await readJsonBody<{ action?: string; caps?: Partial<RunCaps> }>(req);
-    if (body.action === "start") return sendJson(res, 200, svc.ledger.start(body.caps ?? {}, svc.now()));
-    if (body.action === "stop") return sendJson(res, 200, svc.ledger.stop("user", svc.now()));
-    if (body.action === "formed") return sendJson(res, 200, svc.ledger.stop("formed", svc.now()));
-    throw new HttpError(400, "action must be start, stop or formed");
+    send(res, runReply(svc, "POST", await readJsonBody<{ action?: string; caps?: Partial<RunCaps> }>(req)));
   };
 
   const jev: Handler = async (req, res) => {
     if (req.method !== "POST") return methodNotAllowed(res, "POST");
     if (!svc.client) throw new HttpError(503, "JEV_API_KEY is not set in the server's environment");
-    const request = validateJevRequest(await readJsonBody(req));
-    // Reserve from this request's own size, so a big call cannot hide under a small one's room.
-    const reserve = reserveForBytes(Buffer.byteLength(JSON.stringify(request)));
-    const gate = svc.ledger.admit(svc.now(), reserve);
-    if (!gate.ok) {
-      // 429 "busy" is temporary: the pool is full or what is in flight might
-      // use up the rest of the cap. 409 means the run is over (or never
-      // started). The reply carries the summary so the client learns which
-      // without another trip.
-      return sendJson(res, gate.reason === "busy" ? 429 : 409, { error: gate.reason, run: svc.ledger.summary(svc.now()) });
-    }
-    const token = svc.ledger.begin(reserve);
-    const signal = svc.ledger.signal;
-    let result: Awaited<ReturnType<JevCaller["ask"]>>;
-    try {
-      result = await svc.client.ask(request, signal);
-    } catch (e) {
-      const aborted = e instanceof JevAbortError || signal.aborted;
-      // An aborted call never got a reply: its cost is unknown, so it is counted apart, not as a free request.
-      svc.ledger.end(token, { status: 0, ms: 0, inputTokens: 0, aborted });
-      if (aborted) return sendJson(res, 409, { error: "stopped", run: svc.ledger.summary(svc.now()) });
-      throw new HttpError(502, `jev unreachable: ${(e as Error).message}`);
-    }
-    // A 200 without answers is not an answer; keep the status for the ledger but say so.
-    const body = result.status === 200 && !isJevResponse(result.body) ? { error: "upstream reply had no answers", upstream: result.body } : result.body;
-    svc.ledger.end(token, result);
-    const reply: JevProxyReply = { ...result, body: body as JevProxyReply["body"], run: svc.ledger.summary(svc.now()) };
-    sendJson(res, 200, reply);
+    send(res, await jevReply(svc, await readJsonBody(req)));
   };
 
   return { health, run, jev };

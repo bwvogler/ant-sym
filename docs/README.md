@@ -15,6 +15,7 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 
 ## Records
 
+- [hosting.md](hosting.md): GitHub Pages for `main`, a preview per PR, and the Cloudflare Worker that hosts Jev for them behind a passphrase and a daily cap. Setup steps.
 - [PRD.md](PRD.md) is the decision log. It holds every product decision, why it was made, and the measured Jev numbers, milestone by milestone. §1–8 are the removed picture mode.
 
 ## Citation convention

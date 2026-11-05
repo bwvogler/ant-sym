@@ -1,5 +1,5 @@
 import { DEFAULT_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
-import { apiUrl } from "./backend.ts";
+import { apiHeaders, apiUrl } from "./backend.ts";
 import { localPolicy, localStance, MODES, STANCES, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
@@ -329,7 +329,7 @@ export class ColonyJev {
     const startNo = ++this.#starts;
     let run: RunSummary;
     try {
-      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "start", caps: { ...COLONY_CAPS, ...caps } }) });
+      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: apiHeaders(), body: JSON.stringify({ action: "start", caps: { ...COLONY_CAPS, ...caps } }) });
       run = (await res.json()) as RunSummary;
       if (!res.ok) {
         this.#set({ lastError: (run as unknown as { error?: string }).error ?? `start failed (${res.status})` });
@@ -343,7 +343,7 @@ export class ColonyJev {
       // Disposed or stopped while Start was on the wire: close the run it opened, start no timers (ja-7tf). The server's
       // stop ends whatever run is current, so if a later Start has begun, that run is the later one's: leave it alone.
       if (startNo !== this.#starts) return;
-      void fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) }).catch(() => {});
+      void fetch(apiUrl("api/run"), { method: "POST", headers: apiHeaders(), body: JSON.stringify({ action: "stop" }) }).catch(() => {});
       return;
     }
     this.#runSeq++;
@@ -363,7 +363,7 @@ export class ColonyJev {
     // If Start is pressed again before this reply lands, the reply belongs to the old run: ignore it.
     const seq = this.#runSeq;
     try {
-      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) });
+      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: apiHeaders(), body: JSON.stringify({ action: "stop" }) });
       const run = (await res.json()) as RunSummary;
       if (seq === this.#runSeq) this.#set({ phase: "stopped", run });
     } catch (e) {
@@ -451,7 +451,7 @@ export class ColonyJev {
     let reply: JevProxyReply | null = null;
     let error: string | null = null;
     try {
-      const res = await fetch(apiUrl("api/jev"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(l.pack(items, l.words)), signal: this.#aborter.signal });
+      const res = await fetch(apiUrl("api/jev"), { method: "POST", headers: apiHeaders(), body: JSON.stringify(l.pack(items, l.words)), signal: this.#aborter.signal });
       const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
       if (res.status === 409) {
         const run = (body as { run?: RunSummary }).run ?? null;
