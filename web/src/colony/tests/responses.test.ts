@@ -271,7 +271,8 @@ test("arrive in the side view: a fresh forager returning to the royal chamber is
 });
 
 test("rest on a top-down map: a tired returner rests in the nest for restTime before its trip ends (ja-q47; the hole used to rest it at once)", () => {
-  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, restTime: 30 }, mulberry32(1));
+  // leaveGate 0: rest alone (with the gate, behaviour MR 5, the rested ant then waits for returns: see leave).
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, restTime: 30, leaveGate: 0 }, mulberry32(1));
   c.policy = (s) => (s.mode === "return" ? "return" : "explore");
   put(c, 0, 6, 6); // in the nest
   c.mode[0] = 2;
@@ -538,28 +539,27 @@ test("leave (behaviour MR 5): out now on many returns, soon on few, wait on none
   assert.equal(g.s0?.returns, undefined);
 });
 
-test("leave (behaviour MR 5): a rested forager home waits until a nestmate brings food; a scout goes anyway", () => {
-  // Ant 0 is home, rested, in "return"; ant 1 stands beside it holding food (its drop response says no), or isn't there.
-  const run = (carrier: boolean, scoutRate: number) => {
-    const c = new Colony(corridor(0), { antCount: 2, maxAnts: 2, leaveGate: 0.5, scoutRate }, mulberry32(3));
-    c.responses = responses({ drop: () => false });
+test("leave (behaviour MR 5): a rested forager home waits until nestmates come home with food; a scout goes anyway", () => {
+  // Ant 0 is home, rested, in "return". Ant 1, if there, comes home beside it with food once a second and puts it down.
+  const run = (returns: boolean, scoutRate: number) => {
+    const c = new Colony(corridor(0), { antCount: 2, maxAnts: 2, leaveGate: 1, scoutRate }, mulberry32(3));
     put(c, 0, 6, 6);
     c.mode[0] = 2; // return
-    put(c, 1, 6, 6);
-    if (carrier) c.carrying[1] = 1;
-    else c.alive[1] = 0;
+    if (!returns) c.alive[1] = 0;
     for (let k = 0; k < 30 * 20; k++) {
-      c.tick(1 / 30);
-      if (carrier) {
+      if (returns && k % 30 === 0) {
         c.x[1] = c.x[0]!;
         c.y[1] = c.y[0]!;
+        c.carrying[1] = 1;
+        c.mode[1] = 2;
       }
+      c.tick(1 / 30);
       if (c.mode[0] !== 2) return k / 30;
     }
     return Infinity;
   };
-  assert.equal(run(false, 0), Infinity, "with nobody bringing food and no scouting, it waits");
+  assert.equal(run(false, 0), Infinity, "with nobody coming home with food and no scouting, it waits, and stays in the nest");
   const met = run(true, 0);
-  assert.ok(met < 10, `a nestmate bringing food sends it out (${met.toFixed(1)} s)`);
+  assert.ok(met < 10, `nestmates coming home with food send it out (${met.toFixed(1)} s)`);
   assert.ok(run(false, 5) < 2, "a high scout rate sends it out with no returns");
 });

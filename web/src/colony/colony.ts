@@ -211,13 +211,13 @@ export interface ColonyParams {
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
   /**
-   * Activation (behaviour MR 5, docs/activation.md): contact-seconds with nestmates carrying food home, in the ant's
+   * Activation (behaviour MR 5, docs/activation.md): encounters with nestmates coming home with food, in the ant's
    * leaky count `met`, from which a waiting forager senses returns as "few" (RETURNS_MANY times as many: "many"). A
    * rested forager home with empty jaws is then asked `leave` instead of going straight out. 0 = off: it goes straight
-   * out. Top-down maps only. 1 (PRD §47: G′ seeds 1–20 lost 6 % fewer ants for 3.5 % less food home; A5 passes).
+   * out. Top-down maps only. 1 (PRD §47: G′ seeds 1–20 lost 6.4 % fewer ants for 3.4 % less food home; A5 passes).
    */
   leaveGate: number;
-  /** a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers) */
+  /** a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers; foragers waited about 3 min with none returning: 1/180) */
   scoutRate: number;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
   odour: number;
@@ -236,7 +236,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, scoutRate: 1 / 30, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, scoutRate: 1 / 180, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -450,13 +450,17 @@ export class Colony {
   since: Float32Array;
   /** seconds of unsuccessful search, less rest inside the nest: tired above the colony's patience (ja-q47) */
   fatigue: Float32Array;
-  /** contact-seconds with nestmates bringing food home, leaking with a half-life of MET_HALF (behaviour MR 5) */
+  /** encounters with nestmates coming home with food, leaking with a half-life of MET_HALF (behaviour MR 5) */
   met: Float32Array;
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
   #storedSeen = 0;
-  /** this tick's food carriers (not porters) per cell, keyed y × 65536 + x: what a waiting ant touches (behaviour MR 5) */
-  #bringers = new Map<number, number>();
+  /**
+   * Foragers home with food, per cell where each put it down, keyed y × 65536 + x (behaviour MR 5): `#returning` fills
+   * this tick, `#returned` holds last tick's, which the waiting ants round each one meet, once each.
+   */
+  #returning = new Map<number, number>();
+  #returned = new Map<number, number>();
   /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; read only while it carries food (left as it was after delivery) */
   quality: Float32Array;
   /** 1 from when fatigue passes patience until it has rested to nothing: a tired forager rests fully, not just under the line */
@@ -2993,9 +2997,9 @@ export class Colony {
     return dx * dx + dy * dy < this.nest.r * this.nest.r;
   }
 
-  /** Food carriers this tick in cell (cx, cy) and the six round it (behaviour MR 5). */
-  #bringersAround(cx: number, cy: number): number {
-    const g = this.#bringers;
+  /** Last tick's returns with food in cell (cx, cy) and the six round it (behaviour MR 5). */
+  #returnsAround(cx: number, cy: number): number {
+    const g = this.#returned;
     if (g.size === 0) return 0;
     const o = discOffsets(1)[cy & 1] as Int16Array;
     let s = 0;
@@ -3084,19 +3088,15 @@ export class Colony {
     const got = this.stored - this.#storedSeen;
     this.#storedSeen = this.stored;
     this.intakeRate += (got / dt - this.intakeRate) * (1 - Math.exp(-dt / INTAKE_WINDOW));
-    // Activation (behaviour MR 5): where nestmates carrying food home are this tick, for the waiting foragers they touch.
+    // Activation (behaviour MR 5): last tick's returns with food are what the waiting foragers round them meet this tick.
     const gate = p.leaveGate > 0 && this.#entrance === null;
     if (gate) {
-      const g = this.#bringers;
-      g.clear();
-      for (let i = 0; i < this.n; i++) {
-        if (!this.alive[i] || !this.carrying[i] || this.#porter[i]) continue;
-        this.antCell(i);
-        const k = (CELL[1] as number) * 65536 + (CELL[0] as number);
-        g.set(k, (g.get(k) ?? 0) + 1);
-      }
+      const seen = this.#returned;
+      this.#returned = this.#returning;
+      this.#returning = seen;
+      seen.clear();
     }
-    const leak = gate ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1;
+    const metLeak = gate ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1;
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       if (map.sky) this.#unbury(i);
@@ -3557,12 +3557,14 @@ export class Colony {
         if (carrying && leak > 0 && this.foreign) this.foreign.depositCell("food", CELL[0] as number, CELL[1] as number, laid * leak);
       }
 
-      // Waiting at home (behaviour MR 5) it stays in: past half the nest's radius it turns back in. Wandering out of the
-      // nest, it was asked its mode, and the mode policy sent it out exploring with nothing coming in.
+      // Waiting at home (behaviour MR 5) it stays in, milling as far as the nest's rim, where foragers come home: past
+      // WAIT_RIM of the radius it turns back in. Wandering out of the nest, it was asked its mode, and the mode policy
+      // sent it out exploring with nothing coming in; kept to half the radius, it never met a carrier, who puts its food
+      // down on reaching the rim, so only scouts went out.
       if (waiting) {
         const dx = home.x - (this.x[i] as number);
         const dy = home.y - (this.y[i] as number);
-        if (dx * dx + dy * dy > 0.25 * home.r * home.r) h = Math.atan2(dy, dx);
+        if (dx * dx + dy * dy > WAIT_RIM * WAIT_RIM * home.r * home.r) h = Math.atan2(dy, dx);
       }
       // Move; rock or the edge turns the ant back somewhere random.
       // Rounded to float32 first, as stored: checked in float64, 192.999996 is open ground, and stored as
@@ -3727,11 +3729,13 @@ export class Colony {
       const ent = this.#entrance;
       const atEntrance = ent !== null && Math.hypot((this.x[i] as number) - ent.x, (this.y[i] as number) - ent.y) < ent.r;
       this.antCell(i);
-      // Activation (behaviour MR 5, docs/activation.md): an empty-jawed ant at home counts the nestmates carrying food it
-      // touches (its cell and the six round it), as contact-seconds that leak away; only successful returns count.
+      // Activation (behaviour MR 5, docs/activation.md): an empty-jawed ant at home meets each nestmate that comes home
+      // with food beside it (its cell and the six round it) once, in a count that leaks away; only successful returns
+      // count. Counted as seconds of contact instead, a carrier, which turns round the moment its food is down, was met
+      // for a tick: the count stayed under the threshold, and only scouts went out.
       if (gate) {
-        let m = (this.met[i] as number) * leak;
-        if (atNest && !carrying) m += dt * this.#bringersAround(CELL[0] as number, CELL[1] as number);
+        let m = (this.met[i] as number) * metLeak;
+        if (atNest && !carrying) m += this.#returnsAround(CELL[0] as number, CELL[1] as number);
         this.met[i] = m;
       }
       // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
@@ -3791,6 +3795,7 @@ export class Colony {
           this.carrying[i] = 0;
           this.stored++;
           this.larder++;
+          if (gate) this.#returning.set(cellKey, (this.#returning.get(cellKey) ?? 0) + 1);
           h += Math.PI;
         } else if (pellet && !ent) {
           // The soil goes on the mound: real ants dump it round the entrance, which is how mounds grow.
@@ -3983,6 +3988,8 @@ export const RETURNS_MANY = 4;
 export const LEAVE_NOW = 1;
 /** leave answered "soon" */
 export const LEAVE_SOON = 0.2;
+/** how far out a waiting forager mills, as a share of the nest's radius (behaviour MR 5) */
+export const WAIT_RIM = 0.9;
 // The queen and brood (nest slice 4): see #nestLife, #nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
 /** Food in an egg, and fed to a larva before it pupates. */
 const EGG_FOOD = 1;
