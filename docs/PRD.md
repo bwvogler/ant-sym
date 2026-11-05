@@ -2930,3 +2930,134 @@ The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants wou
 - The main column is the review's own measurement of main (ja-46w corrects §45.6's stale figures). All four lanes on main come to ~$0.078/h.
 - The legend's new sentences reach every response lane: all five would cost ~$0.096/h if asked. The page asks none of them.
 - Since #38's review the contact lane alone keys on alarm and odds (`colonyBrain.responseKey`). Before, every lane's key carried them, so identical requests in get, carry and trail landed under different keys.
+
+## 47. Foragers go out because foragers come back (behaviour MR 5, ja-um8, 2026-11-05)
+
+Research basis: `docs/activation.md`.
+- In the red harvester ant, a forager waiting inside leaves on brief contacts with nestmates coming home with food (Gordon; Pinter-Wollman et al. 2013; Pless et al. 2015).
+  - Unsuccessful returns don't count.
+  - It leaves 3–8 s after a rise in contacts.
+  - With none returning, it waits about 3 min.
+- Models describe each ant as a leaky count of contacts with a threshold (Prabhakar et al. 2012; Davidson et al. 2016).
+- A colony knows its food only as this rate (Greene & Gordon 2007).
+
+The paper sites were outside the allowlist; numbers there are marked unverified. "Off" below is this branch with `leaveGate` 0, which matches `main` bit for bit.
+
+**Scope.** ja-um8 also planned raids that start from scouts' trails. They are split off as MR 5.2 (`ja-tu3`, which now blocks ja-jwy), since raids need their own research and assay.
+
+### 47.1 What was there
+
+- **On a top-down map, a rested forager reaching home with empty jaws went straight back out** (`arrive`). Only fatigue kept one inside, and only until rested.
+- **No ant knew whether others were finding food.**
+- **The strategist raided on `foodLeft`,** the map's food total, which no ant senses (vision gap "Stance and raids"). In a 600 s game the map never falls below 66 % of its food, so that rule never fired in G or G′.
+- **A5 failed on every seed:** on seeds 1–20, 0.48 of the colony was outside before food against 0.84 after (mark: at most half).
+
+### 47.2 Assays (no behaviour change; commit 61125a5)
+
+- **A5** also reports trips out per minute in each window, so a pass shows its cause.
+- **A5b, food stops (new):**
+  - food at 60 s, taken away at 240 s;
+  - mark: trips out per minute over 300–420 s at most half those over 150–240 s (Gordon 2002's removals);
+  - `main` already passes 20/20, since fatigue brings unsuccessful foragers home. It is a guard, not the target.
+
+### 47.3 What MR 5 built
+
+- **The cue** (`colony.ts`: `met`, `#returning`, `#returned`).
+  - Each ant keeps a leaky count (half-life 20 s, `MET_HALF`) of encounters with nestmates coming home with food.
+  - A forager that puts its food down at home meets the waiting ants in its cell and the six round it, once each.
+  - The `Touch` gains `returns`: none, few (at least `leaveGate`, 1), or many (4 or more).
+- **Waiting.** On a top-down map, a rested forager home in "return" with empty jaws is asked the new `leave` response instead of its mode policy. The mode policy sends any ant out that smells no food trail.
+  - **"now"** goes out at 1 per second (`LEAVE_NOW`).
+  - **"soon"** at 0.2 per second, about the papers' 3–8 s.
+  - **"wait"** stays in. Only a scout goes, at `scoutRate`, 1/180 per second: about Gordon's 3 minutes with none returning.
+  - A waiting ant mills out to 0.9 of the nest's radius, where foragers come home.
+- **Local rule:** many, now; few, soon; none, wait. A raiding or defending colony doesn't wait.
+- **The strategist** reads `intake`, food stored per ant per second over the last 60 s, instead of `foodLeft`. "None" is below 0.0005, "plenty" from 0.01, and "some" until a minute has passed. `localStance` raids on no intake.
+  - In G and G′, seed 1, intake ran 0.002–0.017 per ant, so neither the old rule nor the new one fires in a 600 s game.
+  - A lone colony never consults the strategist, so the hour-long economy is untouched.
+- **Top-down maps only.** The side view is unchanged: G on seeds 1–10 is identical to `main` on every metric. Side-view activation is bead `ja-web`.
+- **Three wrong turns the measurements caught:**
+  1. **The mode policy sent waiting ants out:** the gate alone changed nothing.
+  2. **Ants kept to half the nest's radius never met a carrier,** who puts its food down at the rim. Ants that drifted out of the nest were asked their mode and left.
+  3. **Contact counted in seconds stayed under the threshold:** a carrier is met for a single tick. So only scouts went out, and with scouts at 1/30 per second, `leave` deaf to returns gave the same A5 and A5b.
+
+### 47.4 Results (local rule)
+
+**The cue does the work** (seeds 1–10, medians; "deaf" answers `leave` as if no returns were ever met):
+
+| | With returns | Deaf to returns |
+|---|---|---|
+| A5 outside before food | 0.12 | 0.12 |
+| A5 outside once food flows | 0.84 | 0.71 |
+| A5 food stored | 5,048 | 4,675 |
+| A5b outside while food flows | 0.81 | 0.60 |
+| A5b trips out per minute while food flows | 2,039 | 1,503 |
+| A5b food stored | 2,900 | 2,127 |
+
+A5's mark alone doesn't tell them apart: both pass 10/10.
+
+**A5 and A5b against off** (seeds 1–10):
+- **A5:** 10/10, against 0/20 on seeds 1–20 off. 0.12 outside before food against 0.48 off, and 0.84 once food flows.
+- **A5b:** 10/10. It stores 2,900, against 4,118 off: a waiting colony ramps up from a few scouts when food appears.
+- **A1–A4 and A9:** unchanged pass counts; food stored −0.2 % to +1.5 %. A9 loses 0.89 ants per 100 food, against 0.87.
+- **A10:** unchanged, 3/10 (ja-je8).
+
+**G′, the top-down game, seeds 1–20** (both colonies' totals):
+
+| | Food home | Losses | Fewest ants alive (seed 19) | Second fewest | Most held over 120 s |
+|---|---|---|---|---|---|
+| Off | 162,763 | 34,172 | 29 | 257 | 248 |
+| MR 5 | 157,116 (−3.5 %) | 32,040 (−6.2 %) | 58 | 389 | 162 |
+
+- **Seeds 1–10:** food −5.0 %, losses −9.3 %.
+- **Seeds 11–20:** food −1.9 %, losses −3.2 %.
+- Seed 19 is ja-hgq's near-collapse on both.
+
+**Tuning** (G′ seeds 1–20, both colonies):
+
+| `leaveGate` | `scoutRate` | Food home | Losses | Fewest alive |
+|---|---|---|---|---|
+| 1 (chosen) | 1/180 | −3.5 % | −6.2 % | 58 |
+| 2 | 1/180 | −4.3 % | −7.3 % | 48 |
+| 1–4 | 1/30 | −2.7 to −4.9 % | −4.7 to −7.3 % | 4–60 |
+
+The 1/30 rows were measured while returns were still counted in seconds (third wrong turn above): there, returns made no difference.
+
+### 47.5 The leave lane and the live check (2026-11-05)
+
+- **Legend** (`RESPONSE_BRAIN_VERSION` 8):
+  - `returns` is sent to the `leave` lane only;
+  - the colony learns there is food to fetch only by meeting nestmates bringing it in, and even a few means there is food out there;
+  - with none returning, an ant that goes out is a scout;
+  - a raiding or defending colony needs its ants out whatever comes back.
+- **Stance legend v4:** intake replaces `foodLeft`.
+- **The question:** now, soon (in a few seconds), or wait.
+- **Live:** `colony-live.mjs leave,stance --top`, $0.0016 in all.
+  - The first legend didn't explain a few returns or a raid, so Jev answered "wait" to them. Agreement with the local rule was 17–50 %, and the replays cost the first colony 11–14 % of its G′ food. That run cost $0.0008.
+  - With the legend above (another $0.0008), agreement is Forage 75 %, Cautious 67 % and Warlike 92 %, over 12 situations each.
+  - Caches: `experiments/caches/mr5-top-*.json`.
+- **Replayed** (Jev's leave and stance answers for the first colony; seeds 1–6; leave answered from the cache 100 % of the time, stance 27–66 %):
+
+| | Local | Forage | Cautious | Warlike |
+|---|---|---|---|---|
+| G′ food home, first colony | 23,587 | 24,044 (+1.9 %) | 24,194 (+2.6 %) | 22,039 (−6.6 %) |
+| G′ losses, both | 10,134 | 10,814 | 11,464 | 10,540 |
+| A5 | 6/6 | 6/6 | 6/6 | 6/6 |
+
+Warlike raids more, as its doctrine asks.
+
+**Cost** (`colony-cost --side 5 600 1`):
+
+| Lane | MR 4, tokens per question | MR 5 |
+|---|---|---|
+| mode | ~649, $0.074/h | ~651, $0.074/h |
+| get, if asked | 1,203 | 1,424 |
+| carry, if asked | 894 | 1,016 |
+| drop, if asked | 1,180 | 1,396 |
+| trail, if asked | 738 | 829 |
+| contact, if asked | 1,405 | 1,641 |
+| leave, if asked | — | never in the side view; 268 asked live, top-down |
+| stance | — | 193 asked live, top-down |
+
+- The legend's new sentences reach every response lane.
+- All six lanes would cost ~$0.109/h if asked, against ~$0.096/h for MR 4's five. The page asks none of them.

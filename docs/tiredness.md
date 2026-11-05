@@ -32,7 +32,7 @@ This note collects what real foragers do. All numbers come from abstracts or cit
 - **Rest takes time.** While the ant is inside its nest, fatigue falls at a rate, so a full rest takes `restTime` seconds.
 - **The clock lever still applies.** The fungus's `clock` scales how fast fatigue grows and how fast it rests.
 - **`tired` = fatigue above `patience`.**
-- **Left for MR 5:** the encounter-rate trigger for leaving (Gordon), which builds on this rest. That is behaviour MR 5 (`ja-um8`).
+- **Built in MR 5** (`ja-um8`, [activation](activation.md)): the encounter-rate trigger for leaving (Gordon). On top-down maps a rested forager waits at home until nestmates come home with food, or scouts now and then.
 
 ## Sources
 

@@ -57,6 +57,21 @@ The paper sites (journals.plos.org, pmc.ncbi.nlm.nih.gov, frontiersin.org) were 
 - **The rate is the information.** Harvester ant colonies don't count the food on their range. They respond to the rate at which successful foragers return (Greene & Gordon 2007: "rate is a crucial source of information in the network of interactions").
 - **For the model:** the strategist's `foodLeft` (the map's food total) gives way to `intake`, the rate of food brought home lately against the colony's size. It is the same signal the waiting foragers sense, summed over the nest.
 
+## What MR 5 built from this (PRD §47)
+
+- **The cue.** Each ant keeps a leaky count, `met` (half-life 20 s), of encounters with nestmates coming home with food. A forager that puts its food down at home meets the waiting ants in its cell and the six round it, once each.
+  - Counted as seconds of contact instead, a carrier was met for a single tick, since it turns round the moment its food is down. The count never reached the threshold, and only scouts went out.
+  - Unsuccessful returns don't count.
+- **Waiting.** On a top-down map, a rested forager home with empty jaws is asked `leave` instead of its mode:
+  - "now" goes out at about 1 per second;
+  - "soon" at 0.2 per second, in line with the 3–8 s delay;
+  - "wait" stays in, milling out to 0.9 of the nest's radius, where foragers come home.
+- **The local rule:** many returns (4 or more), now; a few (at least 1, `leaveGate`), soon; none, wait. A colony that is raiding or defending doesn't wait.
+- **Scouts.** A waiting ant still goes out at 1/180 per second (`scoutRate`), about Gordon's 3 minutes with nothing returning.
+  - With scouts at 1/30 per second, the returns made no difference: every waiting ant was out within a minute or two whatever came back.
+- **The strategist** reads `intake`, food stored per ant per second over the last 60 s, instead of the map's food left.
+- **The side view** is unchanged: a fresh forager still leaves the royal chamber at once (bead `ja-web`).
+
 ## Sources
 
 - Prabhakar, Dektar & Gordon 2012, "The regulation of ant colony foraging activity without spatial information", *PLoS Comput. Biol.* 8:e1002670: https://doaj.org/article/d90b7eebe8b04706ab40c82ac8658ca0 *(index page)* · https://pmc.ncbi.nlm.nih.gov/articles/PMC3426560 · https://engineering.stanford.edu/news/stanford-biologist-and-computer-scientist-discover-anternet *(press)*
