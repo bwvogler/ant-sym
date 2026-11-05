@@ -23,9 +23,15 @@ export interface FightParams {
   rate: number;
   /** alarm laid per second by an ant in a fight */
   alarm: number;
+  /**
+   * the most ants of a side that one cell brings to a fight (behaviour MR 4, docs/combat.md): a crowd can't all reach
+   * the ant at once, so where few cells are open round it, as in a pass, few engage (Lymbery et al. 2023). Infinity:
+   * every ant in the seven cells counts, as before.
+   */
+  perCell: number;
 }
 
-export const DEFAULT_FIGHT: FightParams = { rate: 1.5, alarm: 8 };
+export const DEFAULT_FIGHT: FightParams = { rate: 1.5, alarm: 8, perCell: Infinity };
 
 /**
  * Ants per cell over a map of any size: a chunked Uint16 layer that remembers which cells it
@@ -80,14 +86,17 @@ export function occupancy(colony: Colony, out: CountGrid): CountGrid {
   return out;
 }
 
-/** Sum of a grid over the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to the map. */
-export function around(grid: CountGrid, size: WorldSize, cx: number, cy: number, r = 1): number {
+/**
+ * Sum of a grid over the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to the map,
+ * each cell counting at most `perCell`.
+ */
+export function around(grid: CountGrid, size: WorldSize, cx: number, cy: number, r = 1, perCell = Infinity): number {
   let s = 0;
   const o = discOffsets(r)[cy & 1] as Int16Array;
   for (let k = 0; k < o.length; k += 2) {
     const x = cx + (o[k] as number);
     const y = cy + (o[k + 1] as number);
-    if (x >= 0 && y >= 0 && x < size.w && y < size.h) s += grid.get(x, y);
+    if (x >= 0 && y >= 0 && x < size.w && y < size.h) s += Math.min(perCell, grid.get(x, y));
   }
   return s;
 }
@@ -108,16 +117,16 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       let enemies = 0;
       if (rec) {
         rec.look(c.odour[i] as number, rec.params.tolerance);
-        enemies = rec.around(cx, cy, size.w, size.h) * (1 - (c.calm[i] as number));
+        enemies = rec.around(cx, cy, size.w, size.h, 1, false, p.perCell) * (1 - (c.calm[i] as number));
         if (enemies < 1e-6) continue;
       } else {
         for (let j = 0; j < grids.length; j++) {
           const g = grids[j] as CountGrid;
-          if (j !== k && g.any(cx - 1, cy - 1, cx + 1, cy + 1)) enemies += around(g, size, cx, cy);
+          if (j !== k && g.any(cx - 1, cy - 1, cx + 1, cy + 1)) enemies += around(g, size, cx, cy, 1, p.perCell);
         }
         if (enemies === 0) continue;
       }
-      const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy));
+      const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy, 1, p.perCell));
       // A calmed encounter (under half an enemy) does not raise the alarm; with no fungus every enemy is whole.
       // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
       // How loudly is its raiseAlarm response (locally: always, × 1).

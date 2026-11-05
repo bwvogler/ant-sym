@@ -170,7 +170,8 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
   for (const it of items) {
     const t = it.situation;
     // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
-    const { offered, quality, ...rest } = t;
+    // alarm isn't asked yet (MR 4's contact lane adds it).
+    const { offered, quality, alarm: _alarm, ...rest } = t;
     ants[it.id] = hook === "get" ? { ...rest, offered, quality } : hook === "trail" ? { ...rest, quality } : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }

@@ -53,8 +53,8 @@ const local = {
     return localStance({ stance, ants, losses, enemyNearNest: enemy === "enemy", foodLeft, larder });
   },
   response: (hook, k) => {
-    const [mode, carrying, porter, digging, place, offered, enemy, stance, quality = "fair"] = k.split("|");
-    return localResponses[hook]({ mode, carrying, porter: porter === "porter", digging: digging === "digging", place, offered, enemy: enemy === "enemy", stance, quality });
+    const [mode, carrying, porter, digging, place, offered, enemy, stance, quality = "fair", alarm = "none"] = k.split("|");
+    return localResponses[hook]({ mode, carrying, porter: porter === "porter", digging: digging === "digging", place, offered, enemy: enemy === "enemy", stance, quality, alarm });
   },
 };
 

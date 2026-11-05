@@ -4,7 +4,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { type Item, localResponses, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
+import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
@@ -254,7 +254,12 @@ export class Colony {
   /** the ant the shared Touch describes */
   #ti = 0;
   /** The shared Touch. Its `place` is worked out only when a response reads it: the local ones never do, and working it out for every ant's trail every step cost the side view ~5 % a tick (review of #35). */
-  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
+  /** the ant whose sensors were last read this tick, and the alarm they smelt (touch() reads it; other ants: none) */
+  #alarmAnt = -1;
+  #alarmSmelt: Trail = "none";
+  /** the odds the ant whose sensors were last read met, with strangers in reach (else none) */
+  #oddsNow: Odds = "none";
+  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -519,6 +524,8 @@ export class Colony {
   foreign: Pheromones | null = null;
   /** this colony's own ants per cell, kept by the game each tick underground; null on its own */
   friends: CellCounts | null = null;
+  /** this colony's ants per cell (the game's occupancy), for the odds an ant senses by touch on meeting strangers (MR 4) */
+  nestmates: CellCounts | null = null;
   /** where raiders go: the nest of the colony raided (in the side view, its hole); set by the game, the nearest rival of any number */
   raidTarget: Nest | null = null;
   /** the side view: the raided colony's chamber, where raiders go once in at its hole (set by the game) */
@@ -824,6 +831,8 @@ export class Colony {
       this.antCell(i);
       t.quality = qualityOf(qualityAt(this.map, CELL[0] as number, CELL[1] as number));
     } else t.quality = item === "food" ? qualityOf(this.quality[i] as number) : "fair";
+    t.alarm = i === this.#alarmAnt ? this.#alarmSmelt : "none";
+    t.odds = i === this.#alarmAnt ? this.#oddsNow : "none";
     return t;
   }
 
@@ -2940,6 +2949,37 @@ export class Colony {
     return blocked(this.map, x + Math.cos(angle) * d, y + Math.sin(angle) * d);
   }
 
+  /**
+   * Nestmates against strangers in ant i's cell and the six round it, as it feels them (behaviour MR 4): outnumbered
+   * under two thirds as many, outnumbering over half as many again. Call after #enemyHeading (strangers as it perceives
+   * them). Leaves the shared CELL as it found it.
+   */
+  #odds(i: number): Odds {
+    const g = this.enemies;
+    const f = this.nestmates;
+    if (!g || !f) return "even";
+    const keepX = CELL[0] as number;
+    const keepY = CELL[1] as number;
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    const { w, h } = this.map.size;
+    const o = discOffsets(1)[cy & 1] as Int16Array;
+    let mine = 0;
+    let them = 0;
+    for (let k = 0; k < o.length; k += 2) {
+      const x = cx + (o[k] as number);
+      const y = cy + (o[k + 1] as number);
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      mine += f.get(x, y);
+      them += g.get(x, y);
+    }
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    mine = Math.max(1, mine);
+    return mine > 1.5 * them ? "outnumbering" : mine * 1.5 < them ? "outnumbered" : "even";
+  }
+
   /** The nearest cell holding enemies within enemyRange of ant i, as a heading, or null. */
   #enemyHeading(i: number): number | null {
     const g = this.enemies;
@@ -3004,9 +3044,13 @@ export class Colony {
       const hf = sn[4] as number;
       const hr = sn[5] as number;
       const al = sn[6] as number;
+      // What this ant smells of alarm, for its Touch this tick (behaviour MR 4: graded alarm).
+      this.#alarmAnt = i;
+      this.#alarmSmelt = trailLevel(Math.max(sn[6] as number, sn[7] as number, sn[8] as number));
       const af = sn[7] as number;
       const ar = sn[8] as number;
       const toEnemy = this.#enemyHeading(i);
+      this.#oddsNow = toEnemy === null ? "none" : this.#odds(i);
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
       // this step (its trip is over: see `arrive`).
       // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
@@ -3077,6 +3121,19 @@ export class Colony {
           this.#question[i] = before;
           this.decisions++;
         }
+      }
+      // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
+      // said. Before it, every ant with an enemy near fought. Fleeing is homing: away from the strangers, toward its nest.
+      if (toEnemy !== null) {
+        const answer = resp.contact(this.touch(i, true, prevMode, item));
+        if (answer === "fight") {
+          if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
+        } else {
+          if (answer === "drop and run" && (carrying || pellet || nursing)) this.#putDown(i);
+          if (mode !== RETURN) this.#homeAfresh(i);
+          mode = RETURN;
+        }
+        this.mode[i] = mode;
       }
       // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
       // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
@@ -3387,6 +3444,7 @@ export class Colony {
       if (Math.max(al, af, ar) >= FAINT) {
         const gain = resp.alarmGain(this.touch(i, toEnemy !== null, mode, item));
         if (gain > 0) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
+        else if (gain < 0) h += climb(al, af, ar, p.turnRate * p.alarmAvoid * -gain * dt); // a faint alarm draws it
       }
 
       // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none, and
@@ -4293,8 +4351,12 @@ export function climb(left: number, front: number, right: number, max: number): 
 /** Turn toward the weakest of three alarm sensors, at most `max` radians; nothing when no sensor smells alarm. */
 export function avoid(left: number, front: number, right: number, max: number): number {
   if (Math.max(left, front, right) < FAINT) return 0;
-  if (front <= left && front <= right) return 0;
-  return left < right ? -max : max;
+  // Rock or the map's edge reads −1: never the way out of alarm (ja-dul: it read as the least, and steered ants into walls).
+  const l = left < 0 ? Infinity : left;
+  const f = front < 0 ? Infinity : front;
+  const r = right < 0 ? Infinity : right;
+  if (f <= l && f <= r) return 0;
+  return l < r ? -max : max;
 }
 
 /** Turn `h` toward `target` by at most `max` radians, the short way round. */

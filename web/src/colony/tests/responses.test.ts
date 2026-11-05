@@ -20,7 +20,7 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
 }
 
-const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", ...t }) as Touch;
+const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", ...t }) as Touch;
 
 /** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
 function forage(c: Colony, seconds = 20): { picked: boolean } {
@@ -401,7 +401,7 @@ test("quality: tasted at pickup, carried, offered to get and trailRate, and kept
 
 test("touchKey: quality is in the key only when it isn't fair (keys cached before quality still match)", () => {
   assert.equal(touchKey(touch({})), "explore|none|-|-|out|none|clear|forage");
-  assert.equal(touchKey(touch({ carrying: "food", quality: "rich" })), "explore|food|-|-|out|none|clear|forage|rich");
+  assert.equal(touchKey(touch({ carrying: "food", quality: "rich" })), "explore|food|-|-|out|none|clear|forage|rich|none|none");
 });
 
 test("noEntry: a follower at a food trail's end with no food marks it; with food there, it doesn't; noEntry 0 lays none", () => {
@@ -486,4 +486,25 @@ test("followChoice (top-down): at a fork a follower mostly takes the stronger tr
   }
   assert.ok(strong >= 0.7 * (strong + weak) && strong + weak >= 30, `stronger ${strong}, weaker ${weak}`);
   assert.ok(weak >= 1, `a choice, not a certainty: weaker ${weak} of ${strong + weak}`);
+});
+
+test("graded alarm (behaviour MR 4): faint draws an empty-jawed explorer or follower; strong repels; fighters and diggers ignore it", () => {
+  assert.equal(localResponses.alarmGain(touch({ alarm: "faint" })), -1, "faint draws an explorer");
+  assert.equal(localResponses.alarmGain(touch({ mode: "follow", alarm: "faint" })), -1);
+  assert.equal(localResponses.alarmGain(touch({ alarm: "faint", carrying: "food", mode: "return" })), 1, "a carrier keeps clear");
+  assert.equal(localResponses.alarmGain(touch({ alarm: "strong" })), 1, "strong repels");
+  assert.equal(localResponses.alarmGain(touch({ mode: "fight", alarm: "faint" })), 0);
+  assert.equal(localResponses.alarmGain(touch({ digging: true, alarm: "strong" })), 0);
+});
+
+test("contact (behaviour MR 4): raiders, defenders and fighters fight; foragers fight only outnumbering; carriers go home", () => {
+  assert.equal(localResponses.contact(touch({ stance: "raid", odds: "outnumbered" })), "fight");
+  assert.equal(localResponses.contact(touch({ stance: "defend", odds: "even" })), "fight");
+  assert.equal(localResponses.contact(touch({ mode: "fight", odds: "outnumbered" })), "fight");
+  assert.equal(localResponses.contact(touch({ odds: "outnumbering" })), "fight");
+  assert.equal(localResponses.contact(touch({ odds: "even" })), "flee");
+  assert.equal(localResponses.contact(touch({ mode: "follow", odds: "outnumbered" })), "flee");
+  assert.equal(localResponses.contact(touch({ carrying: "food", mode: "return", odds: "outnumbering" })), "flee");
+  assert.equal(touchKey(touch({ odds: "even" })), "explore|none|-|-|out|none|clear|forage|fair|none|even", "odds in the key");
+  assert.equal(touchKey(touch({})), "explore|none|-|-|out|none|clear|forage", "older keys unchanged");
 });

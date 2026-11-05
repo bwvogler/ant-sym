@@ -196,9 +196,24 @@ export class Recognition {
    * (1 − calm), as a fight counts them, or with `byOdour` each counted once, calmed or not (who smells
    * different, which calming does not change: what the fungus senses as contact).
    */
-  around(cx: number, cy: number, w: number, h: number, r = 1, byOdour = false): number {
+  around(cx: number, cy: number, w: number, h: number, r = 1, byOdour = false, perCell = Infinity): number {
     const everyone = byOdour && this.#calmed;
     const bins = everyone ? this.#everyone : this.bins;
+    if (perCell !== Infinity) {
+      // Each cell's strangers, every odour bin together, count at most perCell (battle.ts: FightParams.perCell).
+      const mask = everyone ? this.#strange & this.#occupiedEveryone : this.#mask;
+      const o = discOffsets(r)[cy & 1] as Int16Array;
+      let s = 0;
+      for (let k = 0; k < o.length; k += 2) {
+        const x = cx + (o[k] as number);
+        const y = cy + (o[k + 1] as number);
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        let c = 0;
+        for (let b = 0, m = mask; m; b++, m >>= 1) if (m & 1) c += (bins[b] as SumGrid).get(x, y);
+        s += Math.min(perCell, c);
+      }
+      return s;
+    }
     let s = 0;
     for (let b = 0, m = everyone ? this.#strange & this.#occupiedEveryone : this.#mask; m; b++, m >>= 1) {
       if (!(m & 1)) continue;

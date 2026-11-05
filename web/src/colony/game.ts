@@ -148,6 +148,7 @@ export class Game {
       };
       if (this.colonies.length > 1) {
         c.enemies = this.recognition;
+        c.nestmates = this.#grids[k] as CountGrid;
         c.others = this.colonies.filter((o) => o !== c).map((o) => o.nest);
         this.#aimRaids(k);
       }

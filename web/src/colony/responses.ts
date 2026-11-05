@@ -61,7 +61,21 @@ export interface Touch {
   stance: Stance;
   /** how good the food is, tasted: the food it carries, or the food `get` offers; "fair" otherwise */
   quality: Quality;
+  /** the alarm it smells, strongest of its three sensors: none, faint or strong (behaviour MR 4: graded alarm) */
+  alarm: "none" | "faint" | "strong";
+  /**
+   * with strangers in contact, nestmates against strangers in its cell and the six round it, by touch (behaviour MR 4):
+   * outnumbered (under two thirds as many), even, outnumbering (over half as many again); "none" with no stranger near
+   */
+  odds: Odds;
 }
+
+export const ODDS = ["none", "outnumbered", "even", "outnumbering"] as const;
+export type Odds = (typeof ODDS)[number];
+
+/** What an ant does on meeting strangers (behaviour MR 4, docs/combat.md). */
+export const CONTACT = ["fight", "flee", "drop and run"] as const;
+export type Contact = (typeof CONTACT)[number];
 
 export type Trail = "food" | "home" | "none";
 
@@ -85,10 +99,18 @@ export interface Responses {
   trail(t: Touch): Trail;
   /** How much of it, as a share of the colony's `deposit`. */
   trailRate(t: Touch): number;
-  /** How hard to steer away from alarm, as a share of the colony's `alarmAvoid` (0 = ignore it). */
+  /**
+   * How hard to steer away from alarm, as a share of the colony's `alarmAvoid` (0 = ignore it); negative steers toward
+   * it (behaviour MR 4: a little alarm draws, docs/combat.md).
+   */
   alarmGain(t: Touch): number;
   /** In a fight: alarm laid, as a share of the fight's `alarm` rate. */
   raiseAlarm(t: Touch): number;
+  /**
+   * Strangers within reach (asked every step while they are, `odds` filled in): fight them; flee (home, away from
+   * them); or drop what it carries and flee (behaviour MR 4).
+   */
+  contact(t: Touch): Contact;
   /**
    * Following a food trail to where it ends, and no food there (behaviour MR 3, docs/trails.md: Robinson et al. 2005):
    * "no entry" laid, as a share of the colony's `deposit` (0 = none).
@@ -107,9 +129,15 @@ export const localResponses: Responses = {
   drop: () => true,
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
   trailRate: (t) => (t.carrying === "food" ? TRAIL_BY_QUALITY[t.quality] : 1),
-  alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : 1),
+  // Graded (behaviour MR 4; docs/combat.md: low doses attract, ten times more repel): a faint alarm draws an empty-jawed
+  // explorer or follower to see; strong alarm repels everyone but fighters and diggers, as before.
+  alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : t.alarm === "faint" && t.carrying === "none" && (t.mode === "explore" || t.mode === "follow") ? -1 : 1),
   raiseAlarm: () => 1,
   noEntry: () => 1,
+  // Behaviour MR 4 (docs/combat.md): before it, every ant with a stranger near fought. Now raiders, defenders and ants
+  // already fighting fight; a carrier takes its load home; any other ant fights only where its side outnumbers the
+  // strangers, else turns for home (at food, the ant that didn't start it usually retreats: Human & Gordon 1996).
+  contact: (t) => (t.stance !== "forage" || t.mode === "fight" ? "fight" : t.carrying !== "none" ? "flee" : t.odds === "outnumbering" ? "fight" : "flee"),
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */
@@ -119,8 +147,9 @@ export function responses(over: Partial<Responses> = {}): Responses {
 
 /**
  * A situation as a cache key: 4 modes × 5 items × porter × digging × 4 places × 5 offered × enemy × 3 stances, then
- * quality only when it isn't "fair" (so keys from before quality still match: most combinations never occur).
+ * quality, alarm and odds, only when one of them isn't its default (fair, none, none), so keys from before them still
+ * match (most combinations never occur).
  */
 export function touchKey(t: Touch): string {
-  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}${t.quality === "fair" ? "" : `|${t.quality}`}`;
+  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}${t.quality === "fair" && t.alarm === "none" && t.odds === "none" ? "" : `|${t.quality}|${t.alarm}|${t.odds}`}`;
 }
