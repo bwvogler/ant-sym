@@ -499,6 +499,7 @@ test("graded alarm (behaviour MR 4): faint draws an empty-jawed explorer, a foll
 
 test("contact (behaviour MR 4): raiders and defenders fight; foraging, every ant turns away", () => {
   assert.equal(localResponses.contact(touch({ stance: "raid", odds: "outnumbered" })), "fight");
+  assert.equal(localResponses.contact(touch({ stance: "raid", carrying: "food", mode: "return" })), "flee", "a carrier takes its load home, raid or not");
   assert.equal(localResponses.contact(touch({ stance: "defend", odds: "even" })), "fight");
   assert.equal(localResponses.contact(touch({ mode: "fight", odds: "outnumbered" })), "flee", "foraging, a fighter re-judges its odds");
   assert.equal(localResponses.contact(touch({ odds: "outnumbering" })), "flee", "foraging, it turns away even outnumbering");

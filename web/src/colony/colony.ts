@@ -3135,7 +3135,9 @@ export class Colony {
           if (answer === "drop and run" && (carrying || pellet || nursing)) this.#putDown(i);
           if (mode !== RETURN) this.#homeAfresh(i);
           mode = RETURN;
-          fleeFrom = toEnemy;
+          // A carrier flees by taking its load home: turned straight away from the strangers, on the side view's ground
+          // line that was often away from its hole (G seed 5, raid stance: 3–5 carriers held over 120 s between the nests).
+          if (!carrying && !pellet && !nursing) fleeFrom = toEnemy;
         }
         this.mode[i] = mode;
       }

@@ -134,11 +134,11 @@ export const localResponses: Responses = {
   alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : t.alarm === "faint" && t.carrying === "none" ? (t.mode === "explore" ? -1 : t.mode === "follow" ? 0 : 1) : 1),
   raiseAlarm: () => 1,
   noEntry: () => 1,
-  // Behaviour MR 4 (docs/combat.md): before it, every ant with a stranger near fought. Now raiders and defenders fight,
-  // and on a forage stance every ant turns away (at food, the ant that didn't start it usually retreats: Human & Gordon
+  // Behaviour MR 4 (docs/combat.md): before it, every ant with a stranger near fought. Now a carrier takes its load home,
+  // raiders and defenders fight, and on a forage stance every ant turns away (at food, the ant that didn't start it usually retreats: Human & Gordon
   // 1996). Fighting only while outnumbering was tried: one side always outnumbers somewhere, and its fighters cut down the
   // other's fleers (G′ seeds 1–4: 7,482 lost against 6,069 never fighting). `odds` is there for a policy that weighs it.
-  contact: (t) => (t.stance !== "forage" ? "fight" : "flee"),
+  contact: (t) => (t.carrying !== "none" ? "flee" : t.stance !== "forage" ? "fight" : "flee"),
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */
