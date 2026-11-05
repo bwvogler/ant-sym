@@ -70,8 +70,9 @@ spend and time caps from the real `usage.input_tokens` of every reply.
   under your aim, each once per situation, for roughly $0.10–0.15 an hour of retuning
   (PRD §11–12, §19).
 - **Learn** (top right): a field guide to what is on screen, with what real ants do and
-  links to the research notes; the policy (what an ant senses, the local rule, the exact
-  request Jev is sent, and its legend, which you can rewrite); and the nest's chambers.
+  links to the research notes; the policy you can edit (each colony's doctrine, the
+  fungus's aim and menu), with how each decides and the exact request Jev is sent; and
+  the nest's chambers.
   Turn on **Labels** on the field to name the chambers and click one to inspect it (PRD §46).
 
 ## How it talks to Jev

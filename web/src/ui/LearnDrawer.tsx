@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MODES, TRAILS, HOMES, STANCES, type Colony, type Situation } from "../colony/colony.ts";
-import { MODE_CRITERIA, RESPONSE_LEGEND, STANCE_CRITERIA, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
+import { DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, STANCE_CRITERIA, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
 import { CONTACTS, decodeFungal, GROUNDS, LOADS, type FungalSituation } from "../colony/fungalPolicy.ts";
-import { INFECTED, INTERVENTIONS, STRAINS } from "../colony/fungus.ts";
+import { INFECTED, INTERVENTIONS, LETHAL, NEST_ONLY, STRAINS } from "../colony/fungus.ts";
+import { AIMS } from "../colony/fungusBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
-import { DEFAULT_LEGENDS, type LaneName } from "./colonyJev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { docUrl, GUIDE, NOTES, type GuideEntry } from "./guide.ts";
 import Help from "./Help.tsx";
@@ -13,32 +13,39 @@ import { colonyName, colonyTone } from "./names.ts";
 import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
 import { css, ROLE_RGB } from "./palette.ts";
 import { byRows, LOCAL_FUNGUS_RULES, LOCAL_MODE_OTHERWISE, LOCAL_MODE_RULES, LOCAL_RESPONSE_RULES, LOCAL_STANCE_OTHERWISE, LOCAL_STANCE_RULES, localModeOtherwise } from "./policyText.ts";
-import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE, tokensPerQuestion, usdPerThousand, type Sample } from "./prompt.ts";
+import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE, tokensPerQuestion, type Sample } from "./prompt.ts";
 import { seg } from "./styles.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
 // The Learn drawer: what the player is looking at, and why. Three tabs: the
 // field guide (each thing on screen, what real ants do, how the game models
-// it, with the research notes it comes from), the policy (how a choice is
-// made, the local rules, the exact request Jev is sent, and the legend, which
-// the player may rewrite), and the nest (its chambers, as only the player can
-// see them). Opened from the header, or from a "?" anywhere (ui/learn.ts).
+// it, with the research notes it comes from), the policy (each colony's
+// doctrine and the fungus's aim, editable, then how each decides and what Jev
+// is sent), and the nest (its chambers, as only the player can see them). Opened from the header, or from a "?" anywhere (ui/learn.ts).
 
 interface Props {
   colonies: readonly Colony[];
   followed: Followed | null;
-  legends: Record<LaneName, string>;
-  setLegend: (lane: LaneName, text: string | null) => void;
+  /** each colony's doctrine and the fungus's aim: the same state as the side panel's (useColonyJev) */
   doctrines: DoctrineChoice[];
+  setDoctrine: (k: number, d: DoctrineChoice) => void;
+  draftDoctrine: (k: number, d: DoctrineChoice) => void;
   aim: DoctrineChoice;
-  /** whether Jev is running (an applied legend is re-asked at once) */
-  running: boolean;
+  setAim: (a: DoctrineChoice) => void;
+  draftAim: (a: DoctrineChoice) => void;
+  /** the fungus's menu and the local rule's settings (useColony controls) */
+  menu: readonly string[];
+  setMenu: (menu: string[]) => void;
+  hide: boolean;
+  cull: boolean;
+  setRule: (r: { hide?: boolean; cull?: boolean }) => void;
+  /** what re-asking under a new doctrine costs now, in words (the side panel's line) */
+  retune: string;
   /** the Pages build: no server, so Jev never runs here */
   demo: boolean;
   /** the map has a nest to look into (the side view) */
   sideView: boolean;
   onSideView: () => void;
-  menu: readonly string[];
 }
 
 const TABS: [LearnTab, string][] = [
@@ -185,49 +192,144 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
 
 // ——— policy ———
 
-type PolicyLane = LaneName | "responses";
-const LANES: [PolicyLane, string][] = [
-  ["mode", "Ants"],
-  ["stance", "Strategist"],
-  ["fungus", "Fungus"],
-  ["responses", "Responses"],
-];
-
+/**
+ * The Policy tab, flat: the words each colony's ants and the fungus follow, editable here as in the side panel (the
+ * same state), then how each decides, one collapsible section each. The legend Jev reads is shown, not edited: the
+ * owner's call (PRD §46).
+ */
 function PolicyTab(props: Props & { focus?: string }) {
-  const first = (LANES.find(([l]) => l === props.focus)?.[0] ?? "mode") as PolicyLane;
-  const [lane, setLane] = useState<PolicyLane>(first);
-  // A "?" that targets another lane switches to it (adjusting state while rendering, as React advises over an effect).
-  const [was, setWas] = useState(first);
-  if (was !== first) {
-    setWas(first);
-    setLane(first);
-  }
+  const sides = props.colonies.length;
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <p className="text-[13px] leading-snug">
-        Every ant chooses for itself from what it senses: there are no orders. When Jev is on, it is asked one question per <em>situation</em> (a combination of what an ant senses, not one per ant), many situations to a request, and the answer is cached
-        under the colony's doctrine; every ant in that situation then takes it. With Jev off, or while a question is on its way, the <em>local rule</em> decides.
+        Each colony's ants follow its <em>doctrine</em>; the fungus follows your <em>aim</em>. With Jev on, Jev reads these words and answers once per situation (what an ant senses, not one ant), and every ant in that situation takes the answer.
+        With Jev off, or while a question is on its way, the local rule decides.
       </p>
-      <div className="flex overflow-hidden rounded-md border border-line text-sm" role="tablist" aria-label="policy lane">
-        {LANES.map(([l, name]) => (
-          <button key={l} type="button" role="tab" aria-selected={lane === l} className={`${seg(lane === l)} flex-1`} onClick={() => setLane(l)}>
-            {name}
-          </button>
-        ))}
+
+      {props.doctrines.slice(0, Math.max(1, sides)).map((d, k) => (
+        <section key={k} className="flex flex-col gap-2" aria-label={`${colonyName(k)} doctrine`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-medium">
+              <span className={colonyTone(k)}>{colonyName(k)}</span> <span className="text-fg-2">doctrine</span>
+            </h3>
+            <div className="flex overflow-hidden rounded-md border border-line text-sm">
+              {DOCTRINES.map((p) => (
+                <button key={p.id} type="button" className={seg(d.id === p.id)} onClick={() => props.setDoctrine(k, { id: p.id, text: p.text })}>
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <textarea
+            id={`learn-doctrine-${k}`}
+            className="w-full resize-y rounded-md border border-line bg-paper px-2 py-1.5 text-[13px] leading-snug text-fg outline-none focus:border-accent"
+            rows={3}
+            value={d.text}
+            onChange={(e) => props.draftDoctrine(k, { id: "custom", text: e.target.value })}
+            onBlur={(e) => props.setDoctrine(k, { id: d.id, text: e.target.value })}
+            aria-label={`${colonyName(k)} doctrine`}
+          />
+        </section>
+      ))}
+      <p className="-mt-2 text-xs text-fg-3">
+        Both the ants' modes and the colony's stance are asked under the doctrine. {props.retune} Colonies with the same doctrine share every answer; one used before is free.
+      </p>
+
+      <section className="flex flex-col gap-2" aria-label="fungus aim">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-medium">
+            <span className="text-spore">Fungus</span> <span className="text-fg-2">aim</span>
+          </h3>
+          <div className="flex overflow-hidden rounded-md border border-line text-sm">
+            {AIMS.map((a) => (
+              <button key={a.id} type="button" className={seg(props.aim.id === a.id)} onClick={() => props.setAim({ id: a.id, text: a.text })}>
+                {a.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <textarea
+          id="learn-aim"
+          className="w-full resize-y rounded-md border border-line bg-paper px-2 py-1.5 text-[13px] leading-snug text-fg outline-none focus:border-accent"
+          rows={3}
+          value={props.aim.text}
+          onChange={(e) => props.draftAim({ id: "custom", text: e.target.value })}
+          onBlur={(e) => props.setAim({ id: props.aim.id, text: e.target.value })}
+          aria-label="fungus aim"
+        />
+        <div className="text-[13px]">
+          <span className="text-fg-2">What the fungus may do</span>
+          <div className="mt-1 flex flex-wrap gap-1 text-xs">
+            {INTERVENTIONS.filter((v) => props.sideView || !NEST_ONLY.has(v.id)).map((v) => {
+              const on = props.menu.includes(v.id);
+              const lethal = LETHAL.has(v.id);
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  aria-pressed={on}
+                  className={`rounded-md border px-2 py-0.5 font-mono ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                  title={`${v.blurb}${lethal ? ". Only strains that allow it (Bloom) can run it." : ""}`}
+                  onClick={() => props.setMenu(on ? props.menu.filter((id) => id !== v.id) : [...props.menu, v.id])}
+                >
+                  {v.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <label className="flex items-center justify-between text-xs text-fg-2">
+          <span>Hide groomed hosts (dormant shows a quarter)</span>
+          <input type="checkbox" checked={props.hide} onChange={(e) => props.setRule({ hide: e.target.checked })} />
+        </label>
+        <label className="flex items-center justify-between text-xs text-fg-2">
+          <span>Cull high-load hosts fighting strangers</span>
+          <input type="checkbox" checked={props.cull} onChange={(e) => props.setRule({ cull: e.target.checked })} />
+        </label>
+        <p className="text-xs text-fg-3">
+          Jev picks, for each host, one of what its strain allows and the menu has on, under your aim. Without Jev each strain does what it was bred for, within the menu and the two settings above.
+        </p>
+      </section>
+
+      <div className="flex flex-col gap-2">
+        <h3 className={h3}>How each decides</h3>
+        <Section id="mode" title="How an ant chooses what to do" focus={props.focus}>
+          <ModeExplainer {...props} />
+        </Section>
+        <Section id="stance" title="How the colony picks its stance" focus={props.focus}>
+          <StanceExplainer />
+        </Section>
+        <Section id="fungus" title="How the fungus chooses what to do to a host" focus={props.focus}>
+          <FungusExplainer {...props} />
+        </Section>
+        <Section id="sent" title="What Jev is sent" focus={props.focus}>
+          <SentExplainer {...props} />
+        </Section>
+        <Section id="responses" title="Small responses (local rule only)" focus={props.focus}>
+          <ResponsesExplainer />
+        </Section>
       </div>
-      {lane === "mode" && <ModeLane {...props} />}
-      {lane === "stance" && <StanceLane {...props} />}
-      {lane === "fungus" && <FungusLane {...props} />}
-      {lane === "responses" && <ResponsesLane />}
+      {props.demo && <p className="text-xs text-fg-3">This build has no server, so Jev never runs here: the local rule decides everything, and the words above take effect when you run the app locally with a key.</p>}
     </div>
+  );
+}
+
+/** One collapsible explainer; open when a "?" or "why?" targets it. */
+function Section({ id, title, focus, children }: { id: string; title: string; focus?: string; children: ReactNode }) {
+  const hot = focus === id;
+  return (
+    <details id={`learn-${id}`} key={hot ? "hot" : "cold"} open={hot || undefined} className={`scroll-mt-2 rounded-lg border bg-panel ${hot ? "border-accent/60" : "border-line"}`}>
+      <summary className="cursor-pointer px-3 py-2 text-[13px] font-medium text-fg">{title}</summary>
+      <div className="flex flex-col gap-3 border-t border-line px-3 py-3">{children}</div>
+    </details>
   );
 }
 
 function Senses({ rows, note }: { rows: [string, string, string][]; note?: ReactNode }) {
   return (
-    <section className={card}>
-      <h3 className={h3}>What it senses</h3>
-      <dl className="mt-2 flex flex-col gap-1 text-[13px]">
+    <div>
+      <h4 className={h3}>What it senses</h4>
+      <dl className="mt-1.5 flex flex-col gap-1 text-[13px]">
         {rows.map(([k, values, what]) => (
           <div key={k} className="grid grid-cols-[6rem_1fr] gap-2">
             <dt className="font-mono text-xs text-fg">{k}</dt>
@@ -237,32 +339,32 @@ function Senses({ rows, note }: { rows: [string, string, string][]; note?: React
           </div>
         ))}
       </dl>
-      {note && <p className="mt-2 text-xs text-fg-3">{note}</p>}
-    </section>
+      {note && <p className="mt-1.5 text-xs text-fg-3">{note}</p>}
+    </div>
   );
 }
 
 function Choices({ items }: { items: [string, string][] }) {
   return (
-    <section className={card}>
-      <h3 className={h3}>What it may choose</h3>
-      <ul className="mt-2 flex flex-col gap-1 text-[13px]">
+    <div>
+      <h4 className={h3}>What it may choose</h4>
+      <ul className="mt-1.5 flex flex-col gap-1 text-[13px]">
         {items.map(([k, text]) => (
           <li key={k}>
             <span className="font-mono text-xs text-accent">{k}</span> — {text}
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }
 
 function RuleTable({ rows, otherwise, live }: { rows: { when: string; then: string }[]; otherwise: string; live?: number }) {
   return (
-    <section className={card}>
-      <h3 className={h3}>The local rule</h3>
-      <p className="mt-1 text-xs text-fg-3">Free, and the baseline Jev is measured against. Read top to bottom: the first line that holds decides.</p>
-      <ol className="mt-2 flex flex-col gap-1 text-[13px]">
+    <div>
+      <h4 className={h3}>The local rule</h4>
+      <p className="mt-0.5 text-xs text-fg-3">Free, and the baseline Jev is measured against. Read top to bottom: the first line that holds decides.</p>
+      <ol className="mt-1.5 flex flex-col gap-1 text-[13px]">
         {rows.map((r, k) => (
           <li key={k} className={`grid grid-cols-[1fr_auto] gap-2 rounded px-1 ${live === k ? "bg-accent-soft" : ""}`}>
             <span>{r.when}</span>
@@ -271,7 +373,7 @@ function RuleTable({ rows, otherwise, live }: { rows: { when: string; then: stri
         ))}
         <li className={`rounded px-1 text-fg-3 ${live === rows.length ? "bg-accent-soft" : ""}`}>{otherwise}</li>
       </ol>
-    </section>
+    </div>
   );
 }
 
@@ -282,10 +384,18 @@ function followedSituation(colonies: readonly Colony[], f: Followed | null): { k
   return col ? { k: sideIndex(f), i: f.i, col, s: col.lastQuestion(f.i) } : null;
 }
 
-function ModeLane(props: Props) {
+/** What the fungus senses in the followed ant, if it is infected. */
+function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: number; s: FungalSituation } | null {
+  const fol = followedSituation(colonies, f);
+  if (!fol || (fol.col.load[fol.i] as number) < INFECTED) return null;
+  const strain = STRAINS[fol.col.strain[fol.i] as number];
+  const code = fol.col.fungal[fol.i] as number;
+  return strain && code >= 0 ? { i: fol.i, s: decodeFungal(code, strain.id) } : null;
+}
+
+function ModeExplainer(props: Props) {
   const fol = followedSituation(props.colonies, props.followed);
   const s = fol?.s ?? SAMPLE_SITUATION;
-  const k = fol?.k ?? 0;
   const live = LOCAL_MODE_RULES.findIndex((r) => r.test(s));
   return (
     <>
@@ -301,29 +411,24 @@ function ModeLane(props: Props) {
         ]}
         note={
           <>
-            Stance is the one field no ant senses: the colony's strategist broadcasts it (a vision gap, <a className="underline" href={docUrl("vision", "where-the-code-is-today")} target="_blank" rel="noreferrer">ja-k4k.6</a>). An ant carrying something is not asked: it answers its load's responses instead.
+            Stance is the one field no ant senses: the colony broadcasts it (a vision gap,{" "}
+            <a className="underline" href={docUrl("vision", "where-the-code-is-today")} target="_blank" rel="noreferrer">
+              ja-k4k.6
+            </a>
+            ). An ant carrying something is not asked: it answers its load's responses instead.
           </>
         }
       />
       <Choices items={MODES.map((m) => [m, MODE_CRITERIA[m].replace(/^\w+: /, "")])} />
       <RuleTable rows={LOCAL_MODE_RULES} otherwise={LOCAL_MODE_OTHERWISE} live={live >= 0 ? live : LOCAL_MODE_RULES.length} />
       <p className="-mt-1 text-xs text-fg-3">
-        Highlighted: the line that decides {fol?.s ? `ant #${fol.i}'s last situation` : "the sample situation below"} ({byRows(LOCAL_MODE_RULES, localModeOtherwise, s)}).
+        Highlighted: the line that decides {fol?.s ? `ant #${fol.i}'s last situation` : "a sample situation (follow an ant to see its own)"}: {byRows(LOCAL_MODE_RULES, localModeOtherwise, s)}.
       </p>
-      <Prompt
-        lane="mode"
-        props={props}
-        words={props.doctrines[k]?.text ?? ""}
-        wordsName={`${colonyName(k)}'s doctrine`}
-        sample={{ lane: "mode", situation: s }}
-        about={fol?.s ? `ant #${fol.i} of the ${colonyName(fol.k)} colony, as last asked` : fol ? `ant #${fol.i} has not been asked yet (it carries something); a sample situation` : "a sample situation (follow an ant to see its own)"}
-      />
     </>
   );
 }
 
-function StanceLane(props: Props) {
-  const live = LOCAL_STANCE_RULES.findIndex((r) => r.test(SAMPLE_STANCE));
+function StanceExplainer() {
   return (
     <>
       <Senses
@@ -338,23 +443,15 @@ function StanceLane(props: Props) {
         note="The strategist is not an ant: it reads colony and map totals no ant could sense. Replacing it with alarm, encounter rates and scouts' trails is an open vision gap (ja-k4k.6)."
       />
       <Choices items={STANCES.map((m) => [m, STANCE_CRITERIA[m].replace(/^\w+: /, "")])} />
-      <RuleTable rows={LOCAL_STANCE_RULES} otherwise={`Otherwise: ${LOCAL_STANCE_OTHERWISE}.`} live={live >= 0 ? live : LOCAL_STANCE_RULES.length} />
-      <Prompt lane="stance" props={props} words={props.doctrines[0]?.text ?? ""} wordsName={`${colonyName(0)}'s doctrine`} sample={{ lane: "stance", situation: SAMPLE_STANCE }} about="a sample view" />
+      <RuleTable rows={LOCAL_STANCE_RULES} otherwise={`Otherwise: ${LOCAL_STANCE_OTHERWISE}.`} />
     </>
   );
 }
 
-function FungusLane(props: Props) {
-  const fol = followedSituation(props.colonies, props.followed);
-  let sensed: FungalSituation | null = null;
-  if (fol && (fol.col.load[fol.i] as number) >= INFECTED) {
-    const strain = STRAINS[fol.col.strain[fol.i] as number];
-    const code = fol.col.fungal[fol.i] as number;
-    if (strain && code >= 0) sensed = decodeFungal(code, strain.id);
-  }
-  const s = sensed ?? SAMPLE_FUNGAL;
+function FungusExplainer(props: Props) {
   return (
     <>
+      <p className="text-[13px]">The fungus never chooses for an ant. It chooses what it does to the ant it is in, which bends what that ant senses and gives off; the ant's own policy still decides what the ant does.</p>
       <Senses
         rows={[
           ["strain", STRAINS.map((x) => x.id).join(" · "), "which strain the host carries"],
@@ -364,49 +461,65 @@ function FungusLane(props: Props) {
           ["contact", CONTACTS.join(" · "), "who touches it"],
           ["groomed", "true · false", "enough nestmates around to groom the fungus off"],
         ]}
-        note="The fungus never chooses for the ant: it chooses what it does to the ant it is in, which bends what that ant senses and gives off. The ant's own policy still decides."
       />
       <Choices items={INTERVENTIONS.filter((v) => props.menu.includes(v.id)).map((v) => [v.name, v.blurb])} />
-      <section className={card}>
-        <h3 className={h3}>The local rule</h3>
-        <ol className="mt-2 flex list-decimal flex-col gap-1 pl-4 text-[13px]">
+      <div>
+        <h4 className={h3}>The local rule</h4>
+        <ol className="mt-1.5 flex list-decimal flex-col gap-1 pl-4 text-[13px]">
           {LOCAL_FUNGUS_RULES.map((r) => (
             <li key={r}>{r}</li>
           ))}
         </ol>
-      </section>
-      <Prompt
-        lane="fungus"
-        props={props}
-        words={props.aim.text}
-        wordsName="your aim"
-        sample={{ lane: "fungus", situation: s, menu: new Set(props.menu) }}
-        about={sensed && fol ? `what the fungus senses in ant #${fol.i}` : "a sample host (follow an infected ant to see its own)"}
-      />
+      </div>
     </>
   );
 }
 
-function ResponsesLane() {
+/** The legend Jev reads (fixed), and the exact request for the followed ant, or a sample. */
+function SentExplainer(props: Props) {
+  const fol = followedSituation(props.colonies, props.followed);
+  const fungal = followedFungal(props.colonies, props.followed);
+  const k = fol?.k ?? 0;
+  const doctrine = props.doctrines[k]?.text ?? "";
+  const lanes: { name: string; sample: Sample; words: string; about: string; tokens: number }[] = [
+    { name: "An ant's mode", sample: { lane: "mode", situation: fol?.s ?? SAMPLE_SITUATION }, words: doctrine, about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation", tokens: tokensPerQuestion("mode", doctrine) },
+    { name: "The colony's stance", sample: { lane: "stance", situation: SAMPLE_STANCE }, words: doctrine, about: "a sample view", tokens: tokensPerQuestion("stance", doctrine) },
+    { name: "The fungus, in one host", sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(props.menu) }, words: props.aim.text, about: fungal ? `ant #${fungal.i}` : "a sample host", tokens: tokensPerQuestion("fungus", props.aim.text) },
+  ];
   return (
     <>
-      <p className="rounded-md bg-raised px-3 py-2 text-xs">
-        On this page the ant's small responses are decided by the local rule: Jev is not asked them here. <span className="font-mono">scripts/colony-live.mjs</span> asks them offline, against this legend and these questions.
+      <p className="text-[13px]">
+        Each request carries a fixed legend (what each field means), then the doctrine or aim, then up to {PER_REQUEST} situations, each with its question. Only the doctrine and aim are yours to change. Tokens cost ${(USD_PER_INPUT_TOKEN * 1e6).toFixed(3)} per million.
       </p>
-      <section className={card}>
-        <h3 className={h3}>The local rule</h3>
-        <dl className="mt-2 flex flex-col gap-1 text-[13px]">
-          {LOCAL_RESPONSE_RULES.map(([hook, rule]) => (
-            <div key={hook} className="grid grid-cols-[3.5rem_1fr] gap-2">
-              <dt className="font-mono text-xs text-accent">{hook}</dt>
-              <dd>{rule}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-      <section className={card}>
-        <h3 className={h3}>The questions</h3>
-        <ul className="mt-2 flex flex-col gap-2 text-[13px]">
+      {lanes.map((l) => (
+        <details key={l.name} className="rounded-md border border-line">
+          <summary className="cursor-pointer px-2 py-1.5 text-xs">
+            <span className="font-medium text-fg">{l.name}</span> <span className="text-fg-3">· ≈ {l.tokens} tokens a question · for {l.about}</span>
+          </summary>
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words border-t border-line bg-raised p-2 font-mono text-[11px] leading-snug text-fg-2">{JSON.stringify(requestFor(l.sample, l.words), null, 2)}</pre>
+        </details>
+      ))}
+    </>
+  );
+}
+
+function ResponsesExplainer() {
+  return (
+    <>
+      <p className="text-[13px]">
+        On this page an ant's small responses are decided by the local rule: Jev is not asked them here. <span className="font-mono text-xs">scripts/colony-live.mjs</span> asks them offline, against this legend and these questions.
+      </p>
+      <dl className="flex flex-col gap-1 text-[13px]">
+        {LOCAL_RESPONSE_RULES.map(([hook, rule]) => (
+          <div key={hook} className="grid grid-cols-[3.5rem_1fr] gap-2">
+            <dt className="font-mono text-xs text-accent">{hook}</dt>
+            <dd>{rule}</dd>
+          </div>
+        ))}
+      </dl>
+      <div>
+        <h4 className={h3}>The questions</h4>
+        <ul className="mt-1.5 flex flex-col gap-1.5 text-[13px]">
           {RESPONSE_HOOKS.map((hook) => {
             const q = Object.values(responseQuestion(hook, "a0"))[0]!;
             return (
@@ -417,77 +530,12 @@ function ResponsesLane() {
             );
           })}
         </ul>
-      </section>
-      <section className={card}>
-        <h3 className={h3}>The legend (read only)</h3>
-        <p className="mt-2 whitespace-pre-wrap text-[13px] leading-snug">{RESPONSE_LEGEND}</p>
-      </section>
-    </>
-  );
-}
-
-/** The prompt a lane sends: its legend (editable), the words it is asked under, and the exact request for one situation, with what a question costs. */
-function Prompt({ lane, props, words, wordsName, sample, about }: { lane: LaneName; props: Props; words: string; wordsName: string; sample: Sample; about: string }) {
-  const applied = props.legends[lane];
-  const [draft, setDraft] = useState(applied);
-  // Applied or reset: the box shows what is now in use.
-  const [was, setWas] = useState(applied);
-  if (was !== applied) {
-    setWas(applied);
-    setDraft(applied);
-  }
-  const edited = applied !== DEFAULT_LEGENDS[lane];
-  const dirty = draft !== applied;
-  const tokens = tokensPerQuestion(lane, words, draft.trim() === "" ? DEFAULT_LEGENDS[lane] : draft);
-  const base = tokensPerQuestion(lane, words, DEFAULT_LEGENDS[lane]);
-  const request = requestFor(sample, words, applied);
-  const delta = base > 0 ? Math.round((100 * (tokens - base)) / base) : 0;
-  return (
-    <section className={card} id={`learn-prompt-${lane}`}>
-      <div className="flex items-center gap-2">
-        <h3 className={h3}>What Jev is told</h3>
-        {edited && <span className="rounded bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn">edited</span>}
       </div>
-      <p className="mt-1 text-xs text-fg-3">
-        Each request carries this legend, then {wordsName}, then the situations, each with its question. The legend is yours to rewrite: an edited legend is a new question, with its own cache. Going back to the default reuses every answer
-        it already has.
-      </p>
-      <label className="mt-2 block text-xs text-fg-3" htmlFor={`legend-${lane}`}>
-        Legend
-      </label>
-      <textarea
-        id={`legend-${lane}`}
-        className="mt-1 w-full resize-y rounded-md border border-line bg-paper px-2 py-1.5 font-mono text-xs leading-snug text-fg outline-none focus:border-accent"
-        rows={8}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-      />
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50" disabled={!dirty} onClick={() => props.setLegend(lane, draft)}>
-          Apply
-        </button>
-        <button type="button" className="rounded-md border border-line-strong px-3 py-1 text-xs text-fg hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50" disabled={!edited && !dirty} onClick={() => props.setLegend(lane, null)}>
-          Reset to default
-        </button>
-        <span className="font-mono text-xs text-fg-2">
-          ≈ {tokens} tokens a question, {PER_REQUEST} to a request{delta !== 0 ? ` (${delta > 0 ? "+" : ""}${delta}% on the default's ${base})` : ""} · ${usdPerThousand(tokens).toFixed(4)} per 1,000 questions
-        </span>
-      </div>
-      <p className="mt-1 text-xs text-fg-3">
-        {props.demo
-          ? "This build has no server, so Jev never runs here: an edit changes the request below. Run the app locally with a key to let Jev answer it."
-          : props.running
-            ? "Jev is on: applying re-asks the situations the colonies meet, at the cost above."
-            : "Applied edits are used when you start Jev."}{" "}
-        Tokens cost ${(USD_PER_INPUT_TOKEN * 1e6).toFixed(3)} per million.
-      </p>
-      <p className="mt-3 text-xs text-fg-3">{wordsName[0]!.toUpperCase() + wordsName.slice(1)} (edit it in the side panel):</p>
-      <p className="mt-1 rounded-md bg-raised px-2 py-1 text-xs">{words || "—"}</p>
-      <details className="mt-3">
-        <summary className="cursor-pointer text-xs text-accent">The exact request for {about}</summary>
-        <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md bg-raised p-2 font-mono text-[11px] leading-snug text-fg-2">{JSON.stringify(request, null, 2)}</pre>
+      <details className="rounded-md border border-line">
+        <summary className="cursor-pointer px-2 py-1.5 text-xs font-medium text-fg">The legend</summary>
+        <p className="whitespace-pre-wrap border-t border-line p-2 text-xs leading-snug">{RESPONSE_LEGEND}</p>
       </details>
-    </section>
+    </>
   );
 }
 

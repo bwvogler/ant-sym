@@ -1,9 +1,9 @@
 import { DEFAULT_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
 import { apiUrl } from "./backend.ts";
 import { localPolicy, localStance, MODES, STANCES, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
-import { COLONY_LEGEND, packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey, STRATEGY_LEGEND } from "../colony/colonyBrain.ts";
+import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
-import { fungalKey, FUNGUS_LEGEND, fungusContext, offeredFor, offeredIn, packFungusRequest, readIntervention, worthAsking } from "../colony/fungusBrain.ts";
+import { fungalKey, fungusContext, offeredFor, offeredIn, packFungusRequest, readIntervention, worthAsking } from "../colony/fungusBrain.ts";
 import { INTERVENTIONS, LETHAL, type Fungus } from "../colony/fungus.ts";
 import { PolicyCache } from "../colony/policyCache.ts";
 
@@ -65,9 +65,6 @@ type Listener = (s: ColonyJevState) => void;
 
 export type LaneName = "mode" | "stance" | "fungus";
 
-/** Each lane's legend as Jev reads it today: what the Learn drawer shows, and what an edit starts from. */
-export const DEFAULT_LEGENDS: Readonly<Record<LaneName, string>> = { mode: COLONY_LEGEND, stance: STRATEGY_LEGEND, fungus: FUNGUS_LEGEND };
-
 /** One stream of questions: how to key, pack and read them, the local fallback, and the words they are asked under. */
 interface Lane<S, A extends string> {
   name: LaneName;
@@ -111,12 +108,6 @@ export class ColonyJev {
   #driven: Driven[] = [];
   /** each colony's doctrine, by index (kept across games: a new world keeps the colonies' natures) */
   #doctrines: string[] = [];
-  /**
-   * The legend each lane's requests carry: the default, or the player's edit (the Learn drawer). It is part of the
-   * lane's context (policyContext, stanceContext, fungusContext), so an edited legend has its own cache and going back
-   * to the default finds the old answers. Declared before #fungal, whose context reads it.
-   */
-  #legends: Record<LaneName, string> = { ...DEFAULT_LEGENDS };
   #store: CacheStore | null;
   #fungus: Fungus | null = null;
   /** the menu the fungus lane asks under: the attached fungus's, or every non-lethal intervention */
@@ -126,12 +117,12 @@ export class ColonyJev {
   #fungal = lane<FungalSituation, string>({
     name: "fungus",
     key: (s) => fungalKey(s, offeredFor(s.strain, this.#menu)),
-    pack: (items, aim) => packFungusRequest(items.map((it) => ({ ...it, offered: offeredIn(it.key) })), aim, this.#legends.fungus),
+    pack: (items, aim) => packFungusRequest(items.map((it) => ({ ...it, offered: offeredIn(it.key) })), aim),
     read: (a, id, _s, key) => readIntervention(a, id, offeredIn(key)),
     valid: (key, a) => offeredIn(key).includes(a),
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
     asks: (s) => worthAsking(offeredFor(s.strain, this.#menu)),
-    contextOf: (aim) => fungusContext(aim, this.#fungus?.map.sky ? "side" : "top", this.#legends.fungus),
+    contextOf: (aim) => fungusContext(aim, this.#fungus?.map.sky ? "side" : "top"),
     words: "",
   });
   /** caches by context, shared by every lane asking under it */
@@ -303,8 +294,8 @@ export class ColonyJev {
       const words = this.#doctrines[k] ?? this.#doctrines[0] ?? "";
       const d: Driven = {
         colony,
-        modes: lane<Situation, Mode>({ name: "mode", key: situationKey, pack: (items, w) => packModeRequest(items, w, this.#legends.mode), read: (a, id) => readMode(a, id), local: localPolicy, valid: (_k, a) => (MODES as readonly string[]).includes(a), contextOf: (w) => policyContext(w, this.#legends.mode), words }),
-        stances: lane<StanceSituation, Stance>({ name: "stance", key: stanceKey, pack: (items, w) => packStanceRequest(items, w, this.#legends.stance), read: (a, id) => readStance(a, id), local: localStance, valid: (_k, a) => (STANCES as readonly string[]).includes(a), contextOf: (w) => stanceContext(w, this.#legends.stance), words }),
+        modes: lane<Situation, Mode>({ name: "mode", key: situationKey, pack: packModeRequest, read: (a, id) => readMode(a, id), local: localPolicy, valid: (_k, a) => (MODES as readonly string[]).includes(a), contextOf: policyContext, words }),
+        stances: lane<StanceSituation, Stance>({ name: "stance", key: stanceKey, pack: packStanceRequest, read: (a, id) => readStance(a, id), local: localStance, valid: (_k, a) => (STANCES as readonly string[]).includes(a), contextOf: stanceContext, words }),
       };
       colony.policy = (s) => this.#lookup(d.modes, s);
       colony.stancePolicy = (s) => this.#lookup(d.stances, s);
@@ -331,31 +322,6 @@ export class ColonyJev {
       const b = this.#recontext(d.stances, text);
       if (a || b) d.colony.reconsider();
     });
-  }
-
-  /** The legend lane `name` asks under now. */
-  legend(name: LaneName): string {
-    return this.#legends[name];
-  }
-
-  /**
-   * The player's words for a lane's legend (null or the default text: the default). Like a new doctrine: the lane's own
-   * cache (free if used before), and the ants (or hosts) reconsider under it. Returns whether anything changed.
-   */
-  setLegend(name: LaneName, text: string | null): boolean {
-    const next = text === null || text.trim() === "" ? DEFAULT_LEGENDS[name] : text;
-    if (next === this.#legends[name]) return false;
-    this.#legends[name] = next;
-    if (name === "fungus") {
-      this.#recontext(this.#fungal, this.#fungal.words);
-      return true;
-    }
-    for (const d of this.#driven) {
-      // Same words, new legend: #recontext sees the context change through contextOf (as setDoctrineFor, the colony reconsiders).
-      const changed = name === "mode" ? this.#recontext(d.modes, d.modes.words) : this.#recontext(d.stances, d.stances.words);
-      if (changed) d.colony.reconsider();
-    }
-    return true;
   }
 
   async start(caps: Partial<RunCaps> = COLONY_CAPS): Promise<void> {

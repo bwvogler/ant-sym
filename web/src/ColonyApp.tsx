@@ -66,15 +66,21 @@ export default function ColonyApp() {
       <LearnDrawer
         colonies={game.colonies}
         followed={followed}
-        legends={jev.legends}
-        setLegend={jev.setLegend}
         doctrines={jev.doctrines}
+        setDoctrine={jev.setDoctrine}
+        draftDoctrine={jev.draftDoctrine}
         aim={jev.aim}
-        running={running}
+        setAim={jev.setAim}
+        draftAim={jev.draftAim}
+        menu={controls.menu}
+        setMenu={(menu) => update({ menu })}
+        hide={controls.hide}
+        cull={controls.cull}
+        setRule={(r) => update(r)}
+        retune={`A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`}
         demo={isDemo(backend)}
         sideView={controls.ground === "side"}
         onSideView={() => update({ ground: "side" })}
-        menu={controls.menu}
       />
       {isDemo(backend) && <DemoNote />}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
