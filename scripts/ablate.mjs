@@ -49,8 +49,8 @@ const local = {
     return localPolicy({ mode, tired: tired === "tired", foodTrail, homeTrail, alarm, enemy, stance });
   },
   stances: (k) => {
-    const [stance, ants, losses, enemy, foodLeft, larder] = k.split("|");
-    return localStance({ stance, ants, losses, enemyNearNest: enemy === "enemy", foodLeft, larder });
+    const [stance, ants, losses, enemy, intake, larder] = k.split("|");
+    return localStance({ stance, ants, losses, enemyNearNest: enemy === "enemy", intake: intake.replace("intake:", ""), larder });
   },
   response: (hook, k) => {
     const f = k.split("|");

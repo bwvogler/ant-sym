@@ -39,7 +39,7 @@ test("policyContext changes with the doctrine and ignores surrounding whitespace
 
 test("stances: key, pack and read; their own context per doctrine", async () => {
   const { packStanceRequest, readStance, stanceContext, stanceKey } = await import("../colonyBrain.ts");
-  const v = { stance: "forage" as const, ants: "many" as const, losses: "none" as const, enemyNearNest: true, foodLeft: "some" as const, larder: "full" as const };
+  const v = { stance: "forage" as const, ants: "many" as const, losses: "none" as const, enemyNearNest: true, intake: "some" as const, larder: "full" as const };
   assert.notEqual(stanceKey(v), stanceKey({ ...v, enemyNearNest: false }));
   const r = packStanceRequest([{ id: "c0", situation: v }], "be brave");
   assert.deepEqual(Object.keys(r.questions), ["c0_stance"]);

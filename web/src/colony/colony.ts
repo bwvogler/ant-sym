@@ -132,18 +132,21 @@ export interface StanceSituation {
   /** ants lost lately (a 30 s fading count) */
   losses: "none" | "some" | "heavy";
   enemyNearNest: boolean;
-  /** share of the map's food still out there */
-  foodLeft: "plenty" | "some" | "scarce";
+  /**
+   * food brought home lately, per ant (behaviour MR 5, docs/activation.md: a colony knows its food only as the rate
+   * foragers bring it in, never as what is left on the map): none, some or plenty
+   */
+  intake: "none" | "some" | "plenty";
   /** food stored but not yet turned into ants (the colony is at its cap) */
   larder: "low" | "full";
 }
 
 export type StancePolicy = (s: StanceSituation) => Stance;
 
-/** The local strategist: defend a nest under attack; raid when food runs out or the colony is full and fed; else forage. */
+/** The local strategist: defend a nest under attack; raid when no food comes in or the colony is full and fed; else forage. */
 export const localStance: StancePolicy = (s) => {
   if (s.enemyNearNest && s.losses !== "none") return "defend";
-  if (s.foodLeft === "scarce" && s.ants !== "few") return "raid";
+  if (s.intake === "none" && s.ants !== "few") return "raid";
   if (s.larder === "full" && s.ants === "many") return "raid";
   return "forage";
 };
@@ -449,6 +452,9 @@ export class Colony {
   fatigue: Float32Array;
   /** contact-seconds with nestmates bringing food home, leaking with a half-life of MET_HALF (behaviour MR 5) */
   met: Float32Array;
+  /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
+  intakeRate = 0;
+  #storedSeen = 0;
   /** this tick's food carriers (not porters) per cell, keyed y × 65536 + x: what a waiting ant touches (behaviour MR 5) */
   #bringers = new Map<number, number>();
   /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; read only while it carries food (left as it was after delivery) */
@@ -1229,13 +1235,14 @@ export class Colony {
   /** The strategist's view of this colony. `enemyNearNest` comes from the game, which sees both colonies. */
   stanceSituation(enemyNearNest: boolean): StanceSituation {
     const pop = this.population / this.params.maxAnts;
-    const left = this.map.foodTotal > 0 ? this.foodLeft / this.map.foodTotal : 0;
+    const intake = this.intakeRate / Math.max(1, this.population);
     return {
       stance: this.stance,
       ants: pop < 0.4 ? "few" : pop < 0.8 ? "some" : "many",
       losses: this.recentLosses < 1 ? "none" : this.recentLosses < 10 ? "some" : "heavy",
       enemyNearNest,
-      foodLeft: left > 0.5 ? "plenty" : left > 0.15 ? "some" : "scarce",
+      // Until it has watched a whole window the colony can't tell: "some".
+      intake: this.time < INTAKE_WINDOW || intake >= INTAKE_PLENTY ? (this.time < INTAKE_WINDOW ? "some" : "plenty") : intake < INTAKE_NONE ? "none" : "some",
       larder: this.#spare() >= 2 * this.params.foodPerAnt ? "full" : "low",
     };
   }
@@ -3073,6 +3080,10 @@ export class Colony {
     const sa = Math.sin(a);
     this.time += dt;
     this.recentLosses *= Math.exp(-dt / 30);
+    // Intake (behaviour MR 5): food stored per second, averaged over INTAKE_WINDOW.
+    const got = this.stored - this.#storedSeen;
+    this.#storedSeen = this.stored;
+    this.intakeRate += (got / dt - this.intakeRate) * (1 - Math.exp(-dt / INTAKE_WINDOW));
     // Activation (behaviour MR 5): where nestmates carrying food home are this tick, for the waiting foragers they touch.
     const gate = p.leaveGate > 0 && this.#entrance === null;
     if (gate) {
@@ -3950,6 +3961,12 @@ export const YOUNG = 0.15;
 export const MIDDLE = 0.35;
 /** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
 export const REST = 10;
+/** seconds over which the colony averages its intake (behaviour MR 5) */
+export const INTAKE_WINDOW = 60;
+/** food stored per ant per second below which the strategist reads "no intake" (behaviour MR 5; tuned, PRD §47) */
+export const INTAKE_NONE = 0.0005;
+/** and above which "plenty" */
+export const INTAKE_PLENTY = 0.01;
 /** half-life (s) of an ant's count of contacts with nestmates bringing food (behaviour MR 5: a rise is felt within seconds, gone in a minute or so) */
 export const MET_HALF = 20;
 /** "many" returns: this many times the colony's leaveGate */
