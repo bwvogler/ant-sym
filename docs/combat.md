@@ -8,7 +8,7 @@ Research note for behaviour MR 4 (bead `ja-902`, PRD §46). What the game did be
 
 The paper sites (pnas.org, europepmc.org) were outside this session's network allowlist, so numbers come from abstracts and press summaries and are marked **unverified**, as in `tiredness.md` and `trails.md`.
 
-## Terrain: narrow ground favours the stronger side, not the bigger
+## Terrain: narrow ground lets the few hold off the many
 
 - **Lymbery, Webber & Didham 2023** (*PNAS* 120:e2217973120) tested Lanchester's prediction: open ground favours numbers, complex ground favours stronger individuals.
   - They pitted 20 Australian meat ants against up to 200 Argentine ants, in featureless arenas and in the same arenas with narrow wooden strips glued to the floor.
@@ -19,7 +19,9 @@ The paper sites (pnas.org, europepmc.org) were outside this session's network al
 - `ant-communication.md` §4 item 5 drew the same game rule from this: cap how many enemies count at once by the open cells around the ant.
 - §4 also says to keep the local, roughly linear hazard: it matches fire-ant data better than a square law.
 
-**For the model:** in `battle.ts`, the enemies and allies an ant faces are capped by the open cells around it. In a 2-cell pass only the front ranks engage, so a defending line holds against a larger force. The pass assay (A6) should then favour the defenders, which today it doesn't (exchange 0.95 in the pass against 0.94 in the open).
+**For the model (as planned):** cap the enemies and allies an ant faces by the open cells round it, so in a 2-cell pass only the front ranks engage.
+
+**What MR 4 found (PRD §46.3):** no cap is needed. With equal soldiers, strength can't differ, so what narrow ground limits is the larger side's numbers. With 80 defenders against 200 attackers, the pass already favoured the few (exchange 0.57 against 0.25 in the open): only a few attackers reach the defenders through it. A per-cell cap only blunted numbers everywhere, so it was dropped. Between equal armies terrain shouldn't favour either side, and the old A6 (200 against 200) rightly showed none.
 
 ## Graded alarm: a little draws, a lot repels or enrages
 
@@ -40,14 +42,16 @@ The paper sites (pnas.org, europepmc.org) were outside this session's network al
 - **Numbers and recruitment win baits.** The Argentine ant's success against native species comes with numerical dominance, aggression and fast recruitment. A strong native dominant suppressed its exploring and foraging (same review).
 - **Dropping food and fleeing:** this session found no source that describes a laden forager dropping its load to flee. It stays a **design choice**, kept because MR 2 left "drop and run" for MR 4, and `#putDown` already conserves food.
 
-**For the model:**
+**For the model (as built, PRD §46.3):**
 - An ant that meets strangers senses the odds by contact: nestmates against strangers around it, as outnumbered, even or outnumbering.
-- A new `contact` response chooses fight, flee, or drop and run.
-- Locally:
-  - fighters (fight mode, raids, a defence near home) fight;
-  - a forager that isn't outnumbering flees, heading away and raising alarm;
-  - a carrier facing a fight it can't win drops its load and runs.
-- This replaces "enemy near → fight" for everyone. It is the sensed fix for the top-down game's midfield battles (bead `ja-hgq`), where two colonies' foragers fought wherever their trails crossed.
+- A new `contact` response chooses fight, flee, or drop and run. It replaces "enemy near → fight" for everyone.
+- **Locally:**
+  - a carrier takes its load home (it never drops it: in this game carrying doesn't slow an ant, so dropping would only lose food);
+  - raiders, defenders, and an ant its mode policy sent to fight, fight;
+  - on a forage stance every other ant turns away, even outnumbering. Fighting while outnumbering was tried: one side always outnumbers somewhere, and its fighters cut down the other's fleers.
+- **A fleeing ant runs straight away** from the strangers while they are in reach, then resumes foraging.
+- **The odds** are in the `Touch` for a policy that weighs them (the contact lane).
+- **ja-hgq:** it is the sensed fix for the top-down game's midfield battles, where two colonies' foragers fought wherever their trails crossed.
 
 ## Sources
 

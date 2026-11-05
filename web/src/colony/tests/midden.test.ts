@@ -203,7 +203,8 @@ test("a raiding colony of every age: the young stay in to nurse, not parked at t
   assert.ok(atHole / young < 0.2, `young at the hole: ${((100 * atHole) / young).toFixed(1)} % of samples`);
   // 15, not 20, since behaviour MR 4 (PRD §46.4): the rival's foragers no longer charge out at raiders but turn away, and
   // the raiders die faster at its crowded hole (109 against 64 in this minute), so fewer are over there at once (17.5
-  // against 49.9). They still go: none of the dead fell on their own side.
+  // against 49.9). They still go: none of the dead fell on their own side. The margin is thin: on main, seeds 3, 4 and 6
+  // already sat at 16.8–18.6, and seeds range from about 17 to 67 (review of #38).
   assert.ok(raiders / 60 >= 15, `${(raiders / 60).toFixed(0)} of the middle-aged and old on the rival's side`);
 });
 

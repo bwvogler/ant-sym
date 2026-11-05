@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridge, regulate, richPoor, runAssay, twin } from "../../experiment.ts";
+import { bridge, contact, faintAlarm, regulate, richPoor, runAssay, twin } from "../../experiment.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
@@ -34,4 +34,17 @@ test("A5 regulation: foragers stay home without food", { todo: "behaviour MR 5: 
   const m = runAssay(regulate, 1).metrics;
   assert.ok(Number.isFinite(m.outsideBefore));
   assert.equal(m.pass, 1, `outside before ${m.outsideBefore}, after ${m.outsideAfter}`);
+});
+
+// Behaviour MR 4 (PRD §46): A9 passes 10/10 on seeds 1–10; A10's draw is weak (median +1.3 ants, mark 2).
+test("A9 strangers meet at food: few lost per food brought home", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(contact, seed).metrics;
+    assert.equal(m.pass, 1, `seed ${seed}: ${m.lostPer100Food} lost per 100 food`);
+  }
+});
+
+test("A10 faint alarm draws explorers", { todo: "ja-je8: the draw is weak (median +1.3 ants)" }, () => {
+  const m = runAssay(faintAlarm, 1).metrics;
+  assert.equal(m.pass, 1, `draw ${m.draw}`);
 });
