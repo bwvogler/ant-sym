@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { CHUNK } from "../colony/chunks.ts";
 import { type Colony, moundRadius } from "../colony/colony.ts";
 import { CELL, cellOf, centreX, centreY, R, SIDE } from "../colony/hex.ts";
@@ -8,6 +8,7 @@ import { AIR, SOIL, worldExtent } from "../colony/world.ts";
 import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { colonyName } from "./names.ts";
+import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -33,6 +34,8 @@ interface Props {
   onPaint: ((x: number, y: number, scale: number) => void) | null;
   followed: Followed | null;
   onFollow: (f: Followed | null) => void;
+  /** with chamber labels on, a click on a chamber (no ant under it): colony k's chamber `id` (the Learn drawer's Nest tab) */
+  onChamber?: (k: number, id: number) => void;
 }
 
 function cssVar(name: string): string {
@@ -52,12 +55,6 @@ function odourColour(ink: [number, number, number], warn: [number, number, numbe
 
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
 const HEX_ZOOM = 12;
-/** The warm tone for the way home. */
-const HOME_RGB: [number, number, number] = [196, 110, 40];
-/** Brood by stage (egg, larva, pupa): pale to tan, legible on the chamber washes in both themes. */
-const BROOD_RGB = ["#f2eee2", "#e8cf8a", "#b88a4a"];
-/** Chamber washes by role (nest slice 3), faint enough to read in both themes: the queen's violet, brood rose, store gold, reception teal, midden grey. */
-const ROLE_RGB: Record<string, [number, number, number]> = { royal: [128, 84, 176], brood: [196, 96, 120], store: [196, 156, 48], reception: [48, 150, 150], midden: [120, 120, 110] };
 /** At or above this zoom (device px per cell) a brush paints its own radius; zoomed further out it widens to match. */
 const BRUSH_ZOOM = 6;
 /** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
@@ -75,8 +72,14 @@ interface ChunkCanvas {
 type Gesture = { kind: "pan" | "paint" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
-export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTrail, showHomeTrail, onPaint, followed, onFollow }: Props) {
+export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTrail, showHomeTrail, onPaint, followed, onFollow, onChamber }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** chamber names drawn on the side view's nests (the Labels button); a click on a chamber then inspects it */
+  const [labels, setLabels] = useState(false);
+  const labelsOn = useRef(labels);
+  useEffect(() => {
+    labelsOn.current = labels;
+  }, [labels]);
   const layers = useRef({ food: showFoodTrail, home: showHomeTrail });
   const cam = useRef<Camera | null>(null);
   const follow = useRef<Followed | null>(followed);
@@ -590,6 +593,35 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         ctx.stroke();
       }
 
+      // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
+      if (labelsOn.current && colony.map.chambers) {
+        const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
+        ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = Math.max(2, px / 4);
+        for (const ch of colony.map.chambers.list) {
+          if (ch.cells === 0 || ch.role === "none") continue;
+          const cy = ch.sumY / ch.cells;
+          const wx = centreX(Math.round(ch.sumX / ch.cells), Math.round(cy));
+          const wy = centreY(cy);
+          if (!inView(wx, wy)) continue;
+          const text = ch.role;
+          const room = (ch.x1 - ch.x0 + 1) * c.zoom;
+          if (ctx.measureText(text).width > room * 1.6) continue;
+          const [x, y] = toScreen(c, v, wx, wy);
+          ctx.strokeStyle = theme.paper;
+          ctx.globalAlpha = 0.85;
+          ctx.strokeText(text, x, y);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = theme.ink;
+          ctx.fillText(text, x, y);
+        }
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
+      }
+
       // The followed ant: a jade ring.
       if (f && fcol) {
         const [x, y] = toScreen(c, v, fcol.x[f.i] as number, fcol.y[f.i] as number);
@@ -715,6 +747,18 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
     return best;
   };
 
+  /** The chamber under the point, as (colony index, chamber id), or null. */
+  const chamberAt = (x: number, y: number): { k: number; id: number } | null => {
+    const chambers = colony.map.chambers;
+    if (!chambers) return null;
+    const [wx, wy] = toWorld(camera(), view(), x, y);
+    cellOf(wx, wy);
+    const id = chambers.at(CELL[0] as number, CELL[1] as number);
+    const ch = id >= 0 ? chambers.list[id] : undefined;
+    if (!ch) return null;
+    return { k: ch.colony === colony.params.nest ? 0 : 1, id };
+  };
+
   const onDown = (e: PointerEvent<HTMLCanvasElement>) => {
     if (e.button === 1) e.preventDefault(); // middle-drag pans; no autoscroll
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -769,6 +813,10 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
       const f = pick(p.x, p.y);
       follow.current = f;
       onFollow(f);
+      if (!f && labelsOn.current && onChamber) {
+        const hit = chamberAt(p.x, p.y);
+        if (hit) onChamber(hit.k, hit.id);
+      }
     }
     if (pointers.current.size === 0) gesture.current = NO_GESTURE;
     // A pinch stays a pinch while two fingers are down (a third lifted); the last finger left pans, and never clicks.
@@ -847,6 +895,11 @@ export default function ColonyField({ colony, rival, fungus, onFrame, showFoodTr
         {rival && (
           <button type="button" className={button} onClick={() => goNest(1)} title="Go to the Amber colony's nest (n cycles nests)">
             {colonyName(1)} nest
+          </button>
+        )}
+        {colony.map.chambers && (
+          <button type="button" className={labels ? button.replace("border-line", "border-accent").replace("text-fg-2", "text-accent") : button} aria-pressed={labels} onClick={() => setLabels((on) => !on)} title="Name each chamber by its role; click a chamber to inspect it in Learn">
+            Labels
           </button>
         )}
       </div>

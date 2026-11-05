@@ -2782,3 +2782,50 @@ Top-down, the final defaults. "main" is 47928ed, measured on the same seeds (rev
 | trail, if asked | 456 | 591; v6 613 |
 
 The response lanes would cost ~$0.074/h if asked (MR 3.1: ~$0.062/h). The page asks none of them.
+
+## 46. Learn: the research, the policy and the nest on the page; an editable prompt (ja-epn, 2026-11-05)
+
+The page showed what happens but not why. The follow card named an ant's situation and who decided, and a few tooltips hinted at the rest. The research behind the senses lived only in `docs/`, the legend Jev reads was invisible, and chambers were unlabelled washes. The owner asked for ways to learn what you're seeing: the research, the policy and the nest structures.
+
+**Decisions (owner, 2026-11-05):**
+- **A Learn drawer, plus "?" buttons where things are.** A header button opens a drawer with three tabs. Each "?" opens it at the matching entry. The drawer's state is one small store (`ui/learn.ts`), so a "?" anywhere needs no callbacks threaded to it. The follow card's situation chips are links into it, and each choice has a "why?".
+- **The research as a field guide that links out.** Each entry covers one thing on screen in three parts: what you see, what real ants do (the notes' own claims) and how the game models it. Its sources link the notes' headings on GitHub, since the Pages build has no server to serve `docs/`. Full notes are not rendered in the page: they mix research with design detail meant for developers.
+- **Scripted behaviour is called out.** Where a behaviour is still a script reading something no ant can sense, the entry says so and names its vision gap (`ja-k4k.*`).
+- **The prompt is editable.** Each lane the page asks Jev (ants' modes, the strategist's stances, the fungus) shows:
+  - its legend, which you may edit;
+  - the doctrine or aim it is asked under;
+  - the exact request for the followed ant's situation, or a sample.
+
+  The question wording and its criteria stay fixed, because they are the valid answers. The response lanes are shown read only: the page doesn't ask Jev them.
+
+**How it is built:**
+- **Field guide:** `ui/guide.ts` (16 entries) and its list of the notes. `tests/guide.test.ts` checks the guide against `docs/`:
+  - every cited note and heading exists, with anchors slugged as GitHub does;
+  - every note in the docs index is listed;
+  - every gap an entry calls scripted is still an open row in `vision.md`'s gap table.
+
+  So closing a gap or renaming a heading fails the test and names the entry to rewrite.
+- **The local rules in words:** `ui/policyText.ts` gives `localPolicy` and `localStance` as rows ("when …, then …"). `tests/policyText.test.ts` walks all 3,888 situations and every stance view and checks the rows give exactly the code's answers. The Policy tab highlights the row that decides the followed ant's situation.
+- **The legend is a parameter.** It defaults to today's text in the request packers and their contexts:
+  - `packModeRequest` / `policyContext`
+  - `packStanceRequest` / `stanceContext`
+  - `packFungusRequest` / `fungusContext`
+
+  At the default every context is unchanged (pinned in `colonyJev.test.ts`: `colony-v5-e792ce70`, `stance-v3-2cfee495`, `fungus-v4-side-dd6804a8`), so every cached answer stays valid.
+- **Editing the legend in the client.** `ColonyJev.setLegend(lane, text | null)` works like a new doctrine:
+  - the lane gets its own cache, and the colonies reconsider under it;
+  - null or a blank legend is the default, and going back to it is free.
+
+  Edits apply on **Apply**, not per keystroke, because applying while Jev runs re-asks every situation the colonies meet. Edits last the page's life, as doctrines do.
+- **Cost of an edited legend:** the drawer shows tokens per question, packed 100 to a request as the page's estimates always were (`ui/prompt.ts`), against the default's figure, and $ per 1,000 questions. The legend is shared by a request's situations, so even a much shorter legend moves the per-question figure only a few percent at 100 to a request. Live requests carry fewer situations, so the legend weighs more there.
+- **Nest tab:** `ui/nest.ts` reads each nest from the chamber table: per chamber its role, depth below the ground line, cells (floor), the ants in it now, brood and food; plus the queen, the brood by stage, inside against out, and the midden. The tab says plainly that this is the player's view: an ant senses only the role of the chamber it stands in.
+- **Labels on the field:** a **Labels** button on the field (side view) names each chamber by its role. With labels on, a click on a chamber with no ant under it opens the Nest tab at that chamber's row.
+- **Shared colours:** the field's role, brood and home-trail colours moved to `ui/palette.ts`, so the swatches and the canvas share one source.
+
+**Cost.** None at the default prompt: the requests and their contexts are byte-identical (`colony-cost` unchanged: ~769 tokens per question on the top-down session, $0.022/h). An edited legend changes it, and the drawer shows by how much.
+
+**Not done:**
+- Rendering whole notes in the page.
+- Moving the camera to a chamber picked in the table.
+- Recording who decided at decision time rather than at render time (`ja-kxw`, still open).
+- Filed while doing this: `ja-px9`. `docs/nest-chemistry.md` is missing although `ja-k4k.9` is closed.

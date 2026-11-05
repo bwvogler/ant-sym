@@ -1,0 +1,231 @@
+import { BROOD_RGB, css, HOME_RGB, ROLE_RGB } from "./palette.ts";
+
+// The Learn drawer's field guide: one entry per thing on screen, in three
+// parts. What you see, what real ants do (from the research notes in docs/,
+// each claim the note's own), and how the game models it. Where a behaviour
+// is still a script that reads something an ant can't sense, the entry says
+// so and names the vision gap's bead. Sources link the notes on GitHub (the
+// Pages build has no server to serve them). tests/guide.test.ts checks every
+// cited note and heading exists and every gap bead is still open in
+// docs/vision.md, so the guide fails loudly when the docs move on.
+
+export const REPO = "https://github.com/bwvogler/ant-sym";
+export const docUrl = (note: string, anchor = "") => `${REPO}/blob/main/docs/${note}.md${anchor ? `#${anchor}` : ""}`;
+
+export interface Source {
+  /** a note in docs/, without .md */
+  note: string;
+  /** a heading's GitHub anchor in it ("" for the top) */
+  anchor: string;
+  label: string;
+}
+
+export interface GuideEntry {
+  id: string;
+  title: string;
+  /** CSS colours that stand for it on the field */
+  swatch?: string[];
+  onScreen: string;
+  realAnts: string;
+  inGame: string;
+  /** still scripted: a vision gap (docs/vision.md "Where the code is today"), its bead and what the script reads */
+  scripted?: { bead: string; reads: string };
+  sources: Source[];
+}
+
+const HEAT = "rgb(var(--heat))";
+
+export const GUIDE: GuideEntry[] = [
+  {
+    id: "food-trail",
+    title: "Food trail",
+    swatch: [HEAT],
+    onScreen: "The green wash (Trails: “to food”). Ants carrying food home lay it, so it leads out to food.",
+    realAnts:
+      "Recruitment trails last minutes, about as long as a trip; long-lived “route memory” trails last hours to days. Black garden ants (Lasius niger) lay about 43 % more trail marks for rich sugar than for weak, and that alone lets a colony pick the richer of two sources.",
+    inGame: "Laid by carriers on the way home, more for richer food. It fades in about 12 s, a short-lived recruitment trail: the game has no long-lived memory trail.",
+    sources: [
+      { note: "ant-communication", anchor: "2-distance-and-time-scales", label: "Distance and time scales" },
+      { note: "trails", anchor: "trail-amount-follows-food-quality", label: "Trail amount follows food quality" },
+    ],
+  },
+  {
+    id: "home-trail",
+    title: "Home trail and the way home",
+    swatch: [css(HOME_RGB)],
+    onScreen: "The orange wash (Trails: “to home”). Ants walking out lay it, so it leads carriers back.",
+    realAnts:
+      "Outside, home is a small hole. A forager keeps a running home vector from its steps and a sky compass, with an error of roughly 10 % of the distance walked; landmarks and an odour at the entrance correct it near home, and the vector resets only inside the nest.",
+    inGame: "Ants walking out lay the home trail; on the top-down maps a carrier follows the food trail where it agrees with its home vector, and the vector otherwise.",
+    sources: [
+      { note: "nest-and-home", anchor: "outside-home-is-the-hole", label: "Outside: home is the hole" },
+      { note: "trails", anchor: "which-journeys-lay-trail", label: "Which journeys lay trail" },
+    ],
+  },
+  {
+    id: "food-quality",
+    title: "Tasting food",
+    swatch: ["var(--accent)"],
+    onScreen: "A jade crumb at an ant's head: it is carrying food. Food on the map varies in how good it is.",
+    realAnts: "An ant tastes the food in its jaws (sugar strength) when it picks it up: a contact sense. Richer food gets more trail.",
+    inGame: "Each food cell has a quality (poor, fair or rich). The ant tastes it at pickup and lays its food trail 0.83×, 1× or 1.2× as strongly.",
+    sources: [{ note: "trails", anchor: "trail-amount-follows-food-quality", label: "Trail amount follows food quality" }],
+  },
+  {
+    id: "double-bridge",
+    title: "Choosing a branch",
+    onScreen: "Where trails fork, traffic piles onto one branch.",
+    realAnts:
+      "Argentine ants given a bridge with a short and a long branch end up almost all on the short one: the ants that took it come back first, so its trail grows first. Offered two equal food sources, a colony usually concentrates on one of them.",
+    inGame: "A follower picks among the trails ahead by strength, more than in proportion to it (Deneubourg's choice), so a small lead grows. On the bridge assay the colony settles on the short branch.",
+    sources: [{ note: "trails", anchor: "the-double-bridge", label: "The double bridge" }],
+  },
+  {
+    id: "no-entry",
+    title: "The “no entry” mark",
+    onScreen: "Not drawn: the mark is built, but switched off.",
+    realAnts:
+      "Pharaoh's ants lay a repellent at forks leading to nothing: facing a marked branch, 71 % took the other one. It lasts about twice as long as the attractive trail. It helps a colony leave an emptied source sooner.",
+    inGame: "An ant that follows a food trail to its end and finds no food can lay it. It ships switched off: the marks landed on live trails and cost the colony more than they saved (bead ja-4n1). Today only tiredness breaks a mill round emptied food.",
+    sources: [{ note: "trails", anchor: "the-no-entry-mark", label: "The “no entry” mark" }],
+  },
+  {
+    id: "alarm",
+    title: "Alarm",
+    swatch: ["var(--warn)"],
+    onScreen: "Brown haze where ants fight, or where you paint the alarm brush.",
+    realAnts: "Alarm is volatile: it reaches a few centimetres and fades fast, so it calls the nearby ants, not the colony. Its meaning depends on strength: faint attracts, strong triggers attack or digging.",
+    inGame: "It fades in about 3 s and reaches about 5 cells. Ants shy from it unless fighting; a colony that defends sends fighters to it. The graded meaning (faint attracts) is not built yet.",
+    sources: [
+      { note: "ant-communication", anchor: "tldr", label: "Ant communication: TL;DR" },
+      { note: "fungus-policy", anchor: "a-perception-what-the-host-senses", label: "Fungus levers: perception" },
+    ],
+  },
+  {
+    id: "strangers",
+    title: "Strangers and battles",
+    swatch: ["var(--ink)", "var(--warn)"],
+    onScreen: "Ants are coloured by their odour: Ink's start dark, Amber's in the warn tone. Fights break out where they meet.",
+    realAnts:
+      "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. Neighbouring colonies are the most aggressive, and the closer colony often wins because it recruits faster. Fire-ant battles follow a roughly linear law, not Lanchester's square law; complex ground favours strong soldiers, open ground favours numbers.",
+    inGame: "An ant of the other colony within two steps counts as an enemy if its odour is far enough from the ant's own. Fights are settled by the odds in the cells around.",
+    scripted: { bead: "ja-k4k.6", reads: "the colony's stance (forage, defend, raid) comes from map-wide food and colony totals, and raids aim at the rival's hole by its coordinates" },
+    sources: [{ note: "ant-communication", anchor: "3-rival-colonies", label: "Rival colonies" }],
+  },
+  {
+    id: "fatigue",
+    title: "Tiredness and rest",
+    onScreen: "On the follow card: fatigue against patience. A tired ant heads home.",
+    realAnts:
+      "A harvester forager's trip is set by how long it searched, not how far it went: it goes home as soon as it finds a seed. Foragers rest inside between trips, and 25–50 % of workers may be inactive at any moment, a reserve.",
+    inGame: "Fatigue grows only while an ant searches outside with empty jaws, is cleared by finding food, and falls while it rests inside. Going home tired is what stops ants circling a trail to food that is gone.",
+    sources: [
+      { note: "tiredness", anchor: "what-ends-a-foraging-trip", label: "What ends a foraging trip" },
+      { note: "tiredness", anchor: "rest-between-bouts", label: "Rest between bouts" },
+    ],
+  },
+  {
+    id: "chambers",
+    title: "Chambers",
+    swatch: (["royal", "brood", "store", "reception"] as const).map((r) => css(ROLE_RGB[r]!)),
+    onScreen: "Side view: tinted rooms off the shafts. Violet is the queen's, rose brood, gold store, teal reception (where food comes in). Turn on Labels on the field to name them.",
+    realAnts:
+      "A nest is shafts with chambers off them (Tschinkel's “shish-kebab”). Chambers are about 1 cm high whatever their area, largest near the top, with gaps that grow with depth; there is about 2 cm² of floor per worker. Brood, not CO₂, decides where ants dig.",
+    inGame: "Ants dig chambers two rows high off the shafts. A new chamber's role comes from its depth against the queen's: reception above it, store below, brood otherwise.",
+    scripted: { bead: "ja-k4k.3", reads: "the colony's total floor per ant, every chamber of every colony, and a role fixed at founding" },
+    sources: [{ note: "nest-and-home", anchor: "nest-structure", label: "Nest structure" }],
+  },
+  {
+    id: "inside",
+    title: "Finding the way inside",
+    onScreen: "Underground, the follow card's “home” chip names the chamber the ant stands in.",
+    realAnts: "In the dark nest ants use gravity, memories of places, and chemical “road signs” laid on the floor at decision points. Each chamber's floor smells different, so its role can be read from its smell.",
+    inGame: "An ant underground senses the role of the chamber it stands in (stand-in for floor smell). How it steers to the queen or the hole is still scripted.",
+    scripted: { bead: "ja-k4k.2", reads: "the queen's exact position, a whole-nest distance field and the true way home" },
+    sources: [{ note: "nest-and-home", anchor: "inside-gravity-memory-and-road-signs", label: "Inside: gravity, memory and road signs" }],
+  },
+  {
+    id: "queen",
+    title: "The queen",
+    swatch: ["var(--ink)"],
+    onScreen: "Side view: the large oval in the royal chamber. Hollow and crossed out when dead.",
+    realAnts:
+      "Her pheromone draws workers to tend and rescue her; it says where she is, not where home is. In a single-queen species, losing her means no more workers are ever made: the colony is doomed, but not ended at once.",
+    inGame: "She lays eggs while the colony has food. A colony that loses her is orphaned: no more eggs, and its workers age out.",
+    sources: [
+      { note: "nest-and-home", anchor: "the-queen", label: "The queen" },
+      { note: "nest-and-home", anchor: "losing-the-queen", label: "Losing the queen" },
+      { note: "queens-and-merging", anchor: "2-what-ants-do", label: "Queens and merging: what ants do" },
+    ],
+  },
+  {
+    id: "brood",
+    title: "Brood",
+    swatch: BROOD_RGB,
+    onScreen: "Small squares in the chambers: eggs pale, larvae cream, pupae tan.",
+    realAnts: "Workers move brood to the queen, and up and down the nest to the best temperature. Where brood lies is where ants dig.",
+    inGame: "Eggs hatch into larvae; nurses feed larvae in brood chambers; pupae become workers.",
+    scripted: { bead: "ja-k4k.4", reads: "the least-tended brood chamber colony-wide and every chamber's need" },
+    sources: [{ note: "nest-and-home", anchor: "places-with-jobs", label: "Places with jobs" }],
+  },
+  {
+    id: "jobs",
+    title: "Jobs by age",
+    onScreen: "Young ants stay below, middle-aged ones dig and carry, the old forage.",
+    realAnts: "The youngest workers sit deep with the queen and brood and move up as they age; only the oldest forage, from the top chambers. Food goes in at the top and is stored deep.",
+    inGame: "Each ant's age sets its work: nurse, dig and carry, or forage.",
+    scripted: { bead: "ja-k4k.1", reads: "fixed age thresholds, not response thresholds over sensed signals" },
+    sources: [{ note: "nest-and-home", anchor: "places-with-jobs", label: "Places with jobs" }],
+  },
+  {
+    id: "midden",
+    title: "Mound and midden",
+    swatch: ["var(--mound)"],
+    onScreen: "The ring of dug soil round each nest, and grey crosses: the dead, carried out to the midden.",
+    realAnts: "Harvester ants put refuse at the edge of the cleared disc round the nest, and the midden also deters other ants: a boundary.",
+    inGame: "Diggers carry soil up to the mound; the dead are carried past it to the midden.",
+    scripted: { bead: "ja-k4k.5", reads: "the rival's hole position, every nest and entrance, and a scan of every ant" },
+    sources: [{ note: "nest-and-home", anchor: "places-with-jobs", label: "Places with jobs" }],
+  },
+  {
+    id: "fungus",
+    title: "The fungus",
+    swatch: ["var(--spore)"],
+    onScreen: "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). You are the fungus.",
+    realAnts:
+      "Real parasites change what an ant perceives, gives off and can do, not its plans. Rickia makes its hosts carry more of one alkane, and they are attacked less by strangers. Ophiocordyceps hosts lose their daily rhythm and communicate less. Grooming off Metarhizium passes low doses that immunise nestmates.",
+    inGame:
+      "The fungus never chooses for an ant: each ant's policy decides from what it senses, and the fungus bends those senses. Lockpick (after Rickia) hides and calms; Bloom (after Metarhizium) spreads fast and is groomed off; Garden (after the leafcutter's garden) gives its hosts its own odour.",
+    sources: [
+      { note: "fungus-policy", anchor: "3-what-real-parasites-do-to-ants", label: "What real parasites do to ants" },
+      { note: "fungus-policy", anchor: "2-two-policies-and-the-perceived-state-between-them", label: "Two policies, and the perceived state between them" },
+    ],
+  },
+  {
+    id: "unity",
+    title: "One colony",
+    onScreen: "The Unity bar in the Fungus panel. Ants' colours meet in between as their odours mix.",
+    realAnts:
+      "Introduced Argentine ants form supercolonies whose nests smell alike and don't fight, across about 6,000 km of southern Europe. Orphaned army-ant colonies fused with a neighbour in 7 of 10 trials.",
+    inGame: "The colonies are one when their nests smell alike (within tolerance) and nobody has died fighting for a minute.",
+    sources: [
+      { note: "fungus-policy", anchor: "1-what-unified-should-mean-measurably", label: "What “unified” should mean" },
+      { note: "queens-and-merging", anchor: "2-what-ants-do", label: "Merging" },
+    ],
+  },
+];
+
+/** The research notes, for the guide's footer (docs/README.md's table). */
+export const NOTES: { note: string; title: string; covers: string }[] = [
+  { note: "vision", title: "Vision", covers: "The goal, what an ant may sense, and which behaviours are still scripted." },
+  { note: "ant-communication", title: "Ant communication", covers: "Signal channels, their ranges and lifetimes, rival colonies, combat laws." },
+  { note: "nest-and-home", title: "Nest and home", covers: "Finding home outside and inside, the queen, nest architecture, jobs by place and age." },
+  { note: "trails", title: "Trails", covers: "The double bridge, trail amount by food quality, the “no entry” mark." },
+  { note: "tiredness", title: "Tiredness", covers: "When a forager gives up a search and how it recovers." },
+  { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
+  { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
+];
+
+export function guideEntry(id: string): GuideEntry | undefined {
+  return GUIDE.find((e) => e.id === id);
+}

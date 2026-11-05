@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Colony, Situation } from "../colony/colony.ts";
 import { COLONY_NAMES } from "./names.ts";
-import { DOCTRINES, estimateTokens, packModeRequest } from "../colony/colonyBrain.ts";
+import { DOCTRINES } from "../colony/colonyBrain.ts";
 import type { FungalSituation } from "../colony/fungalPolicy.ts";
-import { AIMS, offeredFor, packFungusRequest } from "../colony/fungusBrain.ts";
-import { INTERVENTIONS, type Fungus } from "../colony/fungus.ts";
+import { AIMS } from "../colony/fungusBrain.ts";
+import type { Fungus } from "../colony/fungus.ts";
 import { browserCache } from "./cacheStore.ts";
-import { ColonyJev, type ColonyJevState } from "./colonyJev.ts";
+import { ColonyJev, DEFAULT_LEGENDS, type ColonyJevState, type LaneName } from "./colonyJev.ts";
+import { tokensPerQuestion } from "./prompt.ts";
 
 // React face of the colonies' Jev client: one client for the page's life
 // (the colonies change with the world, the caches do not), its state mirrored
@@ -14,15 +15,11 @@ import { ColonyJev, type ColonyJevState } from "./colonyJev.ts";
 // player's lever) and the fungus's aim (the player's). Cached answers live in
 // localStorage under their context (cacheStore.ts).
 
-/** Estimated input tokens per situation, from the size of a full request (the ledger counts the real ones). */
-const SAMPLE: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
-export const TOKENS_PER_SITUATION = Math.round(estimateTokens(packModeRequest(Array.from({ length: 100 }, (_, n) => ({ id: `s${n}`, situation: SAMPLE })), DOCTRINES[0]!.text)) / 100);
+/** Estimated input tokens per situation at the default legend, from the size of a full request (the ledger counts the real ones). */
+export const TOKENS_PER_SITUATION = tokensPerQuestion("mode", DOCTRINES[0]!.text, DEFAULT_LEGENDS.mode);
 
 /** The same for a fungal situation (legend + aim dominate, as for the ants). */
-const FUNGAL_SAMPLE: FungalSituation = { strain: "garden", load: "mid", host: "explore", ground: "border", contact: "kin", groomed: false };
-export const TOKENS_PER_FUNGAL_SITUATION = Math.round(
-  estimateTokens(packFungusRequest(Array.from({ length: 100 }, (_, n) => ({ id: `h${n}`, situation: FUNGAL_SAMPLE, offered: offeredFor(FUNGAL_SAMPLE.strain, new Set(INTERVENTIONS.map((v) => v.id))) })), AIMS[0]!.text)) / 100,
-);
+export const TOKENS_PER_FUNGAL_SITUATION = tokensPerQuestion("fungus", AIMS[0]!.text, DEFAULT_LEGENDS.fungus);
 
 export interface DoctrineChoice {
   /** a preset's id, or "custom" */
@@ -77,5 +74,15 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
     [jev],
   );
 
-  return { state, start, stop, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus };
+  // The legends each lane asks under: the defaults, or the player's edits (the Learn drawer). Kept for the page's life, like the doctrines.
+  const [legends, setLegendsState] = useState<Record<LaneName, string>>({ ...DEFAULT_LEGENDS });
+  const setLegend = useCallback(
+    (name: LaneName, text: string | null) => {
+      jev.setLegend(name, text);
+      setLegendsState((all) => ({ ...all, [name]: jev.legend(name) }));
+    },
+    [jev],
+  );
+
+  return { state, start, stop, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus, legends, setLegend };
 }

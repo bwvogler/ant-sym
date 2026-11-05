@@ -52,14 +52,14 @@ export function worthAsking(offered: readonly string[]): boolean {
 }
 
 /** One request for many fungal situations: one shared state (legend, aim, hosts), one choice each among what its host was offered. */
-export function packFungusRequest(items: { id: string; situation: FungalSituation; offered: readonly string[] }[], aim: string): JevRequest {
+export function packFungusRequest(items: { id: string; situation: FungalSituation; offered: readonly string[] }[], aim: string, legend: string = FUNGUS_LEGEND): JevRequest {
   const hosts: Record<string, FungalSituation> = {};
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
     hosts[it.id] = { ...it.situation };
     Object.assign(questions, interventionQuestion(it.id, it.offered));
   }
-  return { state: { legend: FUNGUS_LEGEND, aim, hosts }, questions };
+  return { state: { legend, aim, hosts }, questions };
 }
 
 /** An intervention from a reply, or null when it is missing or not one of what was offered (not cached; the local rule covers it). */
@@ -75,9 +75,9 @@ export function readIntervention(answers: Record<string, JevAnswer>, id: string,
  * home-scented ground on a top-down map, so the same situation is a different place (review of #27: Garden's answers
  * crossed views). The top-down maps keep the context they had.
  */
-export function fungusContext(aim: string, view: "top" | "side" = "top"): string {
+export function fungusContext(aim: string, view: "top" | "side" = "top", legend: string = FUNGUS_LEGEND): string {
   const blurbs = INTERVENTIONS.map((v) => `${v.id}:${v.name}:${v.blurb}`).join("\n");
-  return `fungus-v${FUNGUS_BRAIN_VERSION}${view === "side" ? "-side" : ""}-${hash(FUNGUS_LEGEND + JSON.stringify(interventionQuestion("h0", ["x"])) + blurbs + "\u0000" + aim.trim())}`;
+  return `fungus-v${FUNGUS_BRAIN_VERSION}${view === "side" ? "-side" : ""}-${hash(legend + JSON.stringify(interventionQuestion("h0", ["x"])) + blurbs + "\u0000" + aim.trim())}`;
 }
 
 /** Aims to start from: the player's words for what the fungus wants. */

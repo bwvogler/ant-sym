@@ -7,7 +7,7 @@ import { generateWorld, mulberry32, OPEN_WORLD } from "../../colony/world.ts";
 import { Game } from "../../colony/game.ts";
 import { STRAINS, intervention } from "../../colony/fungus.ts";
 import { decodeFungal, type FungalSituation } from "../../colony/fungalPolicy.ts";
-import { ColonyJev, type CacheStore } from "../colonyJev.ts";
+import { ColonyJev, DEFAULT_LEGENDS, type CacheStore } from "../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
 // The colony's Jev client against a scripted fetch: no server, no key.
@@ -735,4 +735,59 @@ test("lanes take turns at any request latency: a long mode queue does not keep t
       mock.timers.reset();
     }
   }
+});
+
+test("the default legends keep today's contexts: cached answers stay valid (Learn drawer)", () => {
+  assert.equal(policyContext(DOCTRINES[0]!.text), "colony-v5-e792ce70");
+  assert.equal(stanceContext(DOCTRINES[0]!.text), "stance-v3-2cfee495");
+  assert.equal(fungusContext("Make the two colonies one: bring them to smell alike, and stop them fighting. Never kill a host.", "side"), "fungus-v4-side-dd6804a8");
+  assert.equal(policyContext(DOCTRINES[0]!.text, DEFAULT_LEGENDS.mode), policyContext(DOCTRINES[0]!.text));
+  assert.notEqual(policyContext(DOCTRINES[0]!.text, "something else"), policyContext(DOCTRINES[0]!.text));
+});
+
+test("an edited legend is what the requests carry, under its own cache; back to the default is free (Learn drawer)", async () => {
+  const legends: string[] = [];
+  const sent = scriptFetch((req) => {
+    if ((req.state as { ants?: unknown }).ants) legends.push(String((req.state as { legend: string }).legend));
+    return answerAll("explore")(req);
+  });
+  const store = memoryStore();
+  const j = make(store);
+  j.setDoctrine(DOCTRINES[0]!.text);
+  const c = colony();
+  j.attach(c);
+  await j.start();
+  run(c, 3);
+  await tick(40);
+  const first = sent.flat().length;
+  assert.ok(first > 0);
+  assert.ok(legends.every((l) => l === DEFAULT_LEGENDS.mode), "the default legend went out");
+
+  assert.equal(j.setLegend("mode", "Ants. Choose well."), true);
+  assert.equal(j.legend("mode"), "Ants. Choose well.");
+  assert.equal(j.state.cached, 0, "a new legend starts its own cache");
+  run(c, 1);
+  await tick(40);
+  assert.ok(sent.flat().length > first, "re-asked under the new legend");
+  assert.equal(legends.at(-1), "Ants. Choose well.");
+  assert.ok(store.data.has(policyContext(DOCTRINES[0]!.text, "Ants. Choose well.")), "kept under the edited legend's context");
+
+  const asked = sent.length;
+  assert.equal(j.setLegend("mode", null), true);
+  assert.equal(j.legend("mode"), DEFAULT_LEGENDS.mode);
+  assert.equal(j.setLegend("mode", "   "), false, "a blank legend is the default");
+  run(c, 1);
+  await tick(40);
+  assert.equal(sent.length, asked, "back to the default legend: no calls for situations it has answered");
+});
+
+test("the fungus's legend is its own: editing it leaves the ants' lanes alone", () => {
+  scriptFetch(answerAll("explore"));
+  const j = make();
+  j.setDoctrine(DOCTRINES[0]!.text);
+  j.attach(colony());
+  assert.equal(j.setLegend("fungus", "A fungus."), true);
+  assert.equal(j.legend("fungus"), "A fungus.");
+  assert.equal(j.legend("mode"), DEFAULT_LEGENDS.mode);
+  assert.equal(j.legend("stance"), DEFAULT_LEGENDS.stance);
 });
