@@ -2899,19 +2899,21 @@ The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants wou
 
 - **Legend v7** (`RESPONSE_BRAIN_VERSION` 7): alarm (none, faint, strong) and odds (outnumbered, even, outnumbering), sent to the contact lane only. Strangers in reach hurt any ant they touch; an ant fighting outnumbered dies; one that turns away lives to forage.
 - **The question:** fight, flee (home, keeping its load), or drop and run.
-- **Live:** `colony-live.mjs contact --top`, **$0.0023**; the side view meets only 2 contact situations in 300 s. Caches: `experiments/caches/mr4-top-*.json`.
-- **Agreement with the local rule:** Forage 58 %, Cautious 69 %, Warlike 53 % (83 situations each).
+- **Live:** `colony-live.mjs contact --top`, first asked for **$0.0023** (83 situations per doctrine). The side view meets only 2 contact situations in 300 s.
+- **Re-asked after #38's re-review (N1′), $0.0034.**
+  - The S1 fix made fight and return stick while strangers are near, so contact is now asked with `mode: fight` or `mode: return`. The first caches, collected while the mode reset to explore or follow every step, covered only 28–38 % of the replays' contact questions.
+  - A fresh run met 95 situations per doctrine, and a second round (`--from`) added 33, 25 and 19 more. The caches in `experiments/caches/mr4-top-*.json` now answer **100 %** of the contact questions the replays below ask.
+- **Agreement with the local rule** (95 situations each): Forage 68 %, Cautious 66 %, Warlike 52 %.
   - Forage and Warlike send empty-jawed explorers on a forage stance to fight when even or outnumbering.
-  - Cautious has fighters flee from raids.
-- **Replayed** (Jev's answers for the first colony; seeds 1–6; G′ figures are both colonies' totals):
+  - Cautious has fighters flee from raids, and in the second round declines most fights (40 % agreement).
+- **Replayed** (Jev's answers for the first colony; seeds 1–6; G′ figures are both colonies' totals; contact answered from the cache 100 % of the time):
 
 | | Local | Forage | Cautious | Warlike |
 |---|---|---|---|---|
-| G′ food home | 53,092 | 52,520 | 51,621 | 52,201 |
-| G′ losses | 11,607 | 12,825 (+10 %) | 11,028 (−5 %) | 12,631 (+9 %) |
-| A9 lost per 100 food | 0.88 (6/6) | 3.46 (5/6) | 0.92 (6/6) | 3.28 (5/6) |
+| G′ food home | 53,092 | 52,892 | 50,173 | 51,264 |
+| G′ losses | 11,607 | 12,402 (+7 %) | 10,780 (−7 %) | 12,575 (+8 %) |
+| A9 lost per 100 food | 0.88 (6/6) | 2.27 (6/6) | 0.92 (6/6) | 3.49 (6/6) |
 
-  Re-run after #38's review (S1, and the re-keyed caches); before it, +12 %, −1 % and +17 % against a local 11,056.
   The doctrines that fight cost ants, as their doctrines ask.
 
 **Cost** (`colony-cost --side 5 600 1`):
