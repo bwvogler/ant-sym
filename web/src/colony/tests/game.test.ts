@@ -156,18 +156,19 @@ test("the outcome: a colony with no ants and too little food for one more is bea
   assert.equal(g.fallen(), 0);
 });
 
-test("contact (behaviour MR 4): a foraging ant meeting strangers runs straight away from them", () => {
+test("contact (behaviour MR 4): a foraging ant meeting strangers runs straight away from them, not just home", () => {
+  // The strangers stand between the ant and its nest (to the west): homing alone would walk it into them.
   const m = arena();
   const c = new Colony(m, { antCount: 1, maxAnts: 1, wander: 0, deposit: 0 }, mulberry32(4), () => "explore");
   const enemies = new CountGrid();
-  enemies.add(20, 8, 3); // two rows south of the ant
+  enemies.add(18, 6, 3); // two cells west of the ant, on its line home
   c.enemies = enemies;
   put(c, 0, 20, 6);
-  c.heading[0] = 0; // east
+  c.heading[0] = Math.PI; // west, toward them
   c.tick(1 / 30);
   assert.equal(c.mode[0], 2, "fleeing (return) while they are in reach");
   for (let k = 0; k < 14; k++) c.tick(1 / 30);
-  assert.ok((c.y[0] as number) < at(20, 6).y - 0.3, `it turned north, away: y ${c.y[0]}`);
+  assert.ok((c.x[0] as number) > at(20, 6).x + 0.3, `it ran east, away from them and from home: x ${c.x[0]}`);
 });
 
 test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer toward it", () => {
