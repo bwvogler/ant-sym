@@ -130,8 +130,8 @@ export const localResponses: Responses = {
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
   trailRate: (t) => (t.carrying === "food" ? TRAIL_BY_QUALITY[t.quality] : 1),
   // Graded (behaviour MR 4; docs/combat.md: low doses attract, ten times more repel): a faint alarm draws an empty-jawed
-  // explorer or follower to see; strong alarm repels everyone but fighters and diggers, as before.
-  alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : t.alarm === "faint" && t.carrying === "none" && (t.mode === "explore" || t.mode === "follow") ? -1 : 1),
+  // explorer to see, and a follower keeps to its trail; strong alarm repels everyone but fighters and diggers, as before.
+  alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : t.alarm === "faint" && t.carrying === "none" ? (t.mode === "explore" ? -1 : t.mode === "follow" ? 0 : 1) : 1),
   raiseAlarm: () => 1,
   noEntry: () => 1,
   // Behaviour MR 4 (docs/combat.md): before it, every ant with a stranger near fought. Now raiders, defenders and ants

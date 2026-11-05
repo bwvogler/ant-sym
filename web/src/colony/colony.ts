@@ -203,6 +203,8 @@ export interface ColonyParams {
    * on A3, which the trail's evaporation and tiredness already clear (PRD §45.4)
    */
   noEntryAvoid: number;
+  /** how hard a faint alarm draws an ant whose alarmGain is negative, as a share of turnRate (behaviour MR 4) */
+  alarmDraw: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
@@ -222,7 +224,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 1, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -3444,7 +3446,7 @@ export class Colony {
       if (Math.max(al, af, ar) >= FAINT) {
         const gain = resp.alarmGain(this.touch(i, toEnemy !== null, mode, item));
         if (gain > 0) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
-        else if (gain < 0) h += climb(al, af, ar, p.turnRate * p.alarmAvoid * -gain * dt); // a faint alarm draws it
+        else if (gain < 0) h += climb(al, af, ar, p.turnRate * p.alarmDraw * -gain * dt); // a faint alarm draws it
       }
 
       // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none, and

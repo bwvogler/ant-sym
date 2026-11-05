@@ -488,9 +488,9 @@ test("followChoice (top-down): at a fork a follower mostly takes the stronger tr
   assert.ok(weak >= 1, `a choice, not a certainty: weaker ${weak} of ${strong + weak}`);
 });
 
-test("graded alarm (behaviour MR 4): faint draws an empty-jawed explorer or follower; strong repels; fighters and diggers ignore it", () => {
+test("graded alarm (behaviour MR 4): faint draws an empty-jawed explorer, a follower holds its trail; strong repels; fighters and diggers ignore it", () => {
   assert.equal(localResponses.alarmGain(touch({ alarm: "faint" })), -1, "faint draws an explorer");
-  assert.equal(localResponses.alarmGain(touch({ mode: "follow", alarm: "faint" })), -1);
+  assert.equal(localResponses.alarmGain(touch({ mode: "follow", alarm: "faint" })), 0, "a follower keeps to its trail");
   assert.equal(localResponses.alarmGain(touch({ alarm: "faint", carrying: "food", mode: "return" })), 1, "a carrier keeps clear");
   assert.equal(localResponses.alarmGain(touch({ alarm: "strong" })), 1, "strong repels");
   assert.equal(localResponses.alarmGain(touch({ mode: "fight", alarm: "faint" })), 0);

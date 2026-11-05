@@ -29,9 +29,18 @@ export interface FightParams {
    * every ant in the seven cells counts, as before.
    */
   perCell: number;
+  /**
+   * the harm a stranger does that isn't fighting (in fight mode), as a share of a fighter's (behaviour MR 4,
+   * docs/combat.md): a forager on its way, or one turning to flee, doesn't attack. 1: every stranger in reach harms, as before.
+   */
+  passive: number;
 }
 
-export const DEFAULT_FIGHT: FightParams = { rate: 1.5, alarm: 8, perCell: Infinity };
+export const DEFAULT_FIGHT: FightParams = { rate: 1.5, alarm: 8, perCell: Infinity, passive: 1 };
+
+/** Fighters per cell, per colony (resolveFights builds them only when `passive` < 1). */
+const fighterGrids = new WeakMap<Colony, CountGrid>();
+const FIGHT_MODE = 3;
 
 /**
  * Ants per cell over a map of any size: a chunked Uint16 layer that remembers which cells it
@@ -107,6 +116,22 @@ export function around(grid: CountGrid, size: WorldSize, cx: number, cy: number,
  */
 export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT, rec: Recognition | null = null): number[] {
   const deaths: number[][] = colonies.map(() => []);
+  const passive = p.passive ?? 1;
+  const fighters =
+    passive < 1
+      ? colonies.map((c) => {
+          let g = fighterGrids.get(c);
+          if (!g) fighterGrids.set(c, (g = new CountGrid()));
+          g.reset();
+          const { w, h } = c.map.size;
+          for (let i = 0; i < c.n; i++) {
+            if (!c.alive[i] || c.mode[i] !== FIGHT_MODE) continue;
+            c.antCell(i);
+            g.add(Math.min(w - 1, Math.max(0, CELL[0] as number)), Math.min(h - 1, Math.max(0, CELL[1] as number)));
+          }
+          return g;
+        })
+      : null;
   colonies.forEach((c, k) => {
     const size = c.map.size;
     for (let i = 0; i < c.n; i++) {
@@ -134,7 +159,20 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
         const loud = (1 - (c.quiet[i] as number)) * c.responses.raiseAlarm(c.touch(i, true));
         if (loud > 0) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
       }
-      if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
+      // Meeting strangers raised the alarm (above) whether they fight or not; the harm is theirs if they fight.
+      let harm = enemies;
+      // Strangers that aren't fighting harm at `passive` of a fighter's rate: the share of them in reach that fight, by colony.
+      if (fighters) {
+        let all = 0;
+        let fight = 0;
+        for (let j = 0; j < grids.length; j++) {
+          if (j === k) continue;
+          all += around(grids[j] as CountGrid, size, cx, cy);
+          fight += around(fighters[j] as CountGrid, size, cx, cy);
+        }
+        if (all > 0) harm *= (fight + passive * (all - fight)) / all;
+      }
+      if (rng() < 1 - Math.exp((-p.rate * dt * harm) / allies)) deaths[k]!.push(i);
     }
   });
   colonies.forEach((c, k) => {
