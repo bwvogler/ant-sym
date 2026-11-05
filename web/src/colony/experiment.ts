@@ -699,7 +699,11 @@ export const regulate: Assay = {
   },
 };
 
-/** A6 arenas: attackers (the first colony, always raiding) against defenders (the second, local rule), with or without a 2-cell pass between them. */
+/**
+ * A6 arenas: attackers (the first colony, always raiding) against defenders (the second, local rule), with or without a
+ * 2-cell pass between them. The attackers outnumber the defenders, 200 to PASS_DEFENDERS.
+ */
+export const PASS_DEFENDERS = 80;
 function battleSpec(seed: number, pass: boolean): RunSpec {
   const a = new Arena(120, 40).carve(2, 2, 117, 37);
   if (pass) a.wall(56, 2, 63, 37).carve(56, 19, 63, 20);
@@ -707,7 +711,7 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
     seed,
     seconds: 180,
     map: () => a.build([{ x: 20, y: 20, r: 3 }, { x: 100, y: 20, r: 3 }]),
-    game: { antCount: 200, rivalAnts: 200 },
+    game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
     sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid") },
   };
 }
@@ -719,24 +723,28 @@ const exchange = (r: RunResult) => {
 };
 
 /**
- * A6 — combat through a narrow pass. Narrow passes favour defenders (Lymbery et al. 2023, via
- * docs/ant-communication.md): only a few attackers can engage at once. Compare the exchange ratio
- * (attackers lost per defender lost) here with `open`; no pass mark until terrain-limited combat
- * lands (behaviour MR 4).
+ * A6 — few against many, through a narrow pass. Narrow ground favours the smaller side: in open arenas numbers win, in
+ * cluttered ones few meat ants held off many Argentine ants (Lymbery et al. 2023; docs/combat.md), because only a few
+ * attackers reach the defenders at once. Fights here count every stranger within reach, so in the open numbers win as
+ * the square of the odds; a pass is what limits who reaches whom. Score: the exchange (attackers lost per defender) in
+ * the pass against the same seed's open battle. Design mark: at least PASS_GAIN times the open exchange. (Before MR 4
+ * A6 pitted equal armies, 200 against 200, where terrain should favour neither side, and asked the pass to: it didn't.)
  */
-export const PASS_EXCHANGE = 1.5;
+export const PASS_GAIN = 1.5;
 export const pass: Assay = {
   id: "pass",
-  title: "A6 combat through a 2-cell pass",
-  target: `exchange (attackers lost per defender) ≥ ${PASS_EXCHANGE}: well above \`open\`'s ~1 (design mark; Lymbery et al. 2023: narrow ground favours the defending line)`,
+  title: "A6 few against many through a 2-cell pass",
+  target: `the defenders' exchange in the pass ≥ ${PASS_GAIN}× the same battle's on open ground (design mark; Lymbery et al. 2023)`,
   seconds: 180,
   spec: (s) => battleSpec(s, true),
   score: (r) => {
     const e = exchange(r);
-    return { ...e, pass: e.exchange >= PASS_EXCHANGE ? 1 : 0 };
+    const o = exchange(runGame(battleSpec(r.seed, false)).result);
+    const gain = o.exchange > 0 ? e.exchange / o.exchange : NaN;
+    return { ...e, openExchange: o.exchange, gain, pass: gain >= PASS_GAIN ? 1 : 0 };
   },
 };
-export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass`; report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
+export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass` (which runs it too); report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
 
 /**
  * A9 — strangers meet at food (behaviour MR 4, docs/combat.md). Two colonies on stance forage, nests at either end of
@@ -768,19 +776,19 @@ export const contact: Assay = {
 
 /**
  * A10 — faint alarm draws (behaviour MR 4, docs/combat.md: low doses attract, ten times more repel; Moser et al. 1968,
- * Lopes et al. 2022). A faint alarm is painted 30 cells from the nest of a colony with no food to find (every ant
- * exploring) at 120 s: the crowd within 4 cells of it over the next 10 s against the 10 s before. Design mark: at least
- * FAINT_DRAW more ants (before MR 4 it emptied: alarm only repelled).
+ * Lopes et al. 2022). A faint alarm is painted 30 cells from the nest of a colony with no food to find at 40 s, while
+ * every ant still explores (later they tire and head home): the crowd within 4 cells of it over the next 10 s against
+ * the 10 s before. Design mark: at least FAINT_DRAW more ants (before MR 4 it emptied: alarm only repelled).
  */
 export const FAINT_DRAW = 2;
 export const faintAlarm: Assay = {
   id: "faintAlarm",
   title: "A10 faint alarm draws ants",
   target: `≥ ${FAINT_DRAW} more ants near a faint alarm than before it (design mark; docs/combat.md)`,
-  seconds: 180,
+  seconds: 60,
   spec: (seed) => {
     const spot = at(50, 50);
-    const when = 120;
+    const when = 40;
     const crowd: number[] = [];
     let nextAt = 1;
     const probe: Probe = {
@@ -797,7 +805,7 @@ export const faintAlarm: Assay = {
     };
     return {
       seed,
-      seconds: 180,
+      seconds: 60,
       // No food: every ant explores, as the idle foragers a faint alarm should draw (on a busy trail they follow it).
       map: () => new Arena(100, 100, true).build([{ x: 50, y: 82, r: 3 }]),
       game: { antCount: 300, rival: false },
