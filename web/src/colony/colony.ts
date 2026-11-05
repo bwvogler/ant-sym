@@ -3452,7 +3452,10 @@ export class Colony {
       // Smelling alarm: the alarmGain response says how hard to shy from it (locally: every mode but fighting, unless digging).
       if (Math.max(al, af, ar) >= FAINT) {
         const gain = resp.alarmGain(this.touch(i, toEnemy !== null, mode, item));
-        if (gain > 0) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
+        // On the side view's ground line a carrier can't go round alarm, only turn back: it carries on home through it.
+        // Shying, carriers turned back from fights at their own hole and held their food (G seeds 4, 8: raids, 3 held).
+        const noWayRound = carrying && this.#entrance !== null && !this.#under[i];
+        if (gain > 0 && !noWayRound) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
         else if (gain < 0) h += climb(al, af, ar, p.turnRate * p.alarmDraw * -gain * dt); // a faint alarm draws it
       }
 
