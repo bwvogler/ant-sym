@@ -2815,46 +2815,56 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
 
 - **ja-dul:** rock and the edge read as the most alarm, not the least.
 - **Graded alarm:**
-  - `Touch.alarm` is none, faint or strong. `alarmGain` may be negative: a pull, at `alarmDraw` (2) × turnRate.
-  - Locally, faint alarm draws an empty-jawed explorer. A follower keeps to its trail: drawn too, at first, the trail's followers crowded every strong alarm's faint fringe and A4 broke (crowd ×1.72 instead of scattering).
-  - Strong alarm repels as before.
+  - `Touch.alarm` is none, faint or strong. `alarmGain` may be negative: a pull, at `alarmDraw` (2) × turnRate. Locally, faint alarm draws an empty-jawed explorer.
+  - **Top-down only.**
+    - In the side view the drawn explorers crowded the tunnels and the ground line round fights: G seeds 1–20 passed 15/20 with the pull, 18/20 without.
+    - A follower keeps to its trail. Drawn too, at first, the trail's followers crowded every strong alarm's faint fringe, and A4 broke (crowd ×1.72 instead of scattering).
+  - Strong alarm repels as before. On the side view's ground line a carrier doesn't shy from it: it can't go round, only turn back, and it turned back from fights at its own hole (G seeds 4, 8: raids, 3 held).
   - An ant meeting a stranger already raised alarm: `resolveFights` lays it for any ant with strangers in its cell or the six round it, whatever its mode.
 - **Contact response** (`contact` hook: fight | flee | drop and run):
-  - Asked every step while strangers are within the colony's enemy range, over the mode policy.
-  - `Touch.odds` is outnumbered, even or outnumbering, by contact: nestmates against strangers in the ant's cell and the six round it (`Colony.nestmates`, the game's occupancy).
+  - Asked every step while strangers are within the colony's enemy range.
+  - `Touch.odds` is outnumbered, even or outnumbering, by contact: nestmates against strangers in the ant's cell and the six round it (`Colony.nestmates`).
+  - **`localPolicy` no longer sends every ant with an enemy near to fight.** That is the contact response's now, and it sees the mode the policy chose.
   - **Local rule:**
     - a carrier takes its load home;
-    - raiders and defenders fight;
+    - raiders and defenders, and an ant its policy sent to fight, fight;
     - on a forage stance every other ant turns away.
   - **A fleeing ant without a load** runs straight away from the strangers while they are in reach, then home. Homing alone, fleers often walked along or toward them.
-  - **A carrier flees by homing.** Turned straight away, on the side view's ground line it walked away from its own hole (G seed 5, a raid: 3–5 held).
+  - **A carrier flees by homing.** Turned straight away, on the ground line it walked away from its own hole (G seed 5, a raid: 3–5 held).
   - **Tried and dropped:**
     - Fighting while outnumbering, judged once: one moment's advantage committed an ant to the death (G′ seed 2: 1,742 of 1,894 deaths in fight mode, mid-map, both colonies foraging).
     - Fighting while outnumbering, judged every step: one side always outnumbers somewhere, and its fighters cut down the other's fleers (G′ seeds 1–4: 7,482 lost, against 6,069 never fighting).
-    - Harm only from strangers that fight (`passive` 0.3 or 0): no better (G′ 8,411 at 0; A9 5.8 at 0.3).
+    - Harm only from strangers that fight (`passive` 0.3 or 0): no better (G′ 8,411 at 0).
 - **Terrain: nothing to build.**
   - With 80 defenders against 200, the pass already favours the few: exchange 0.57 against the open's 0.25 (seeds 1–6). Only a few attackers reach the defenders at once through it.
   - A cap on how many of a side one cell brings to a fight only blunted numbers everywhere: open 0.26 → 0.69 at a cap of 1. Capping both sides cancelled out. The cap was dropped, and `battle.ts` is as on #37.
-  - Making the room ants take physical is bead ja-4ne (below).
+- **Tests:**
+  - graded `alarmGain`, `contact` (local), the contact lane's packing and reading, and `avoid` at rock;
+  - `game.test`'s fighting ant: its policy's "fight" is honoured;
+  - `midden.test`'s raid: its bound is 15 raiders on the rival's side, not 20. The rival's foragers no longer charge out, and raiders die faster at its crowded hole (109 against 64 in that minute), so fewer are over there at once (17.5 against 49.9).
 
-### 46.4 Results (local rule, seeds 1–10 / 11–20)
+### 46.4 Results (local rule)
 
 | Assay | Baseline | MR 4 |
 |---|---|---|
-| A4 alarm | 10/10 / 10/10 | 10/10 / 10/10 (scatter 0.35) |
-| A6 few against many through a pass | 9/10 / 7/10, gain 2.36 | 9/10 / 7/10 (unchanged: geometry) |
-| A9 contact, lost per 100 food | 0/10, 8.9 / 0/10, 8.0 | **10/10, 0.87** (food home +27 %) |
-| A10 faint alarm | −1.8 (repelled) | +1.4 / +1.5 (drawn): 3/10 / 2/10 at the mark of 2 |
+| A4 alarm | 10/10 / 10/10 | 10/10 (scatter 0.35) |
+| A6 few against many through a pass | 9/10 / 7/10, gain 2.36 | 9/10 (unchanged: geometry) |
+| A9 contact, lost per 100 food | 0/10, 8.9 / 0/10, 8.0 | **10/10, 0.84** (food home +28 %) |
+| A10 faint alarm | −1.8 (repelled) | +1.4 (drawn): 3/10 at the mark of 2 |
 | A3, A2a, A1 (top-down trails) | 10/10 | 10/10 |
-| G side-view game | 18/20 (held ≤ 3) | 17/20 (held ≤ 4) |
-| G food home, first colony | 24,512 / 20,424 | 22,619 / 21,579 (−8 % / +6 %) |
-| G′ losses (both colonies), seeds 1–10 | 19,698 | **16,989** (−14 %) |
-| G′ ants alive, seeds 1–10 | 12,947 | **15,418** (+19 %) |
-| G′ food home, seeds 1–10 | 83,068 | 81,940 (−1 %) |
-| A8 nest flow | — | unchanged (one colony: no contact) |
+| G side-view game | 18/20 | **18/20** |
+| G food home, first colony | 24,512 / 20,424 | 23,225 / 20,990 (−5 % / +3 %) |
+| G losses, both colonies | 3,731 / 3,163 | 3,564 / 3,402 |
+| G′ losses, both colonies, seeds 1–10 | 19,698 | **16,520** (−16 %) |
+| G′ ants alive, seeds 1–10 | 12,947 | **15,486** (+20 %) |
+| G′ food home, seeds 1–10 | 83,068 | 80,715 (−3 %) |
+| G′ most held over 120 s | 67 | 53 |
+| A8 nest flow | 0.59 lowest | unchanged (one colony: no contact) |
 
-- **ja-hgq:** G′ recovers about two thirds of MR 3's extra losses (main before MR 3: 13,732 on seeds 1–10). It stays open for the rest.
-- **The side view** moves within noise: food home and losses rise on some seeds and fall on others, and one more game in 20 fails the held-food guard (4 against 3).
+- Where a cell shows two figures, they are seeds 1–10 / 11–20.
+- **ja-hgq:** G′ recovers about half of MR 3's extra losses (main before MR 3: 13,732 on seeds 1–10). It stays open for the rest.
+- **The side view** matches the baseline's pass rate. Food home and losses move by a few per cent either way.
+- `npm test` 334/334; `test:slow`: 8 pass, 2 todo (A5; the porter guard).
 
 ### 46.5 Ants take up room (ja-4ne, filed)
 
@@ -2866,3 +2876,34 @@ The owner asked whether cells should hold only a few ants. Measured (seed 1): ce
 | Top-down | 1.5–1.6 | 9–17 | ≤ 7 % |
 
 The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants would shorten the queues but not stop them. Physical exclusion is its own bead, with a research note on ant traffic first (Dussutour et al. 2004). It would make terrain-limited combat physical.
+
+### 46.6 The contact lane and the live check (2026-11-05)
+
+- **Legend v7** (`RESPONSE_BRAIN_VERSION` 7): alarm (none, faint, strong) and odds (outnumbered, even, outnumbering), sent to the contact lane only. Strangers in reach hurt any ant they touch; an ant fighting outnumbered dies; one that turns away lives to forage.
+- **The question:** fight, flee (home, keeping its load), or drop and run.
+- **Live:** `colony-live.mjs contact --top`, **$0.0023**; the side view meets only 2 contact situations in 300 s. Caches: `experiments/caches/mr4-top-*.json`.
+- **Agreement with the local rule:** Forage 58 %, Cautious 69 %, Warlike 53 % (83 situations each).
+  - Forage and Warlike send empty-jawed explorers on a forage stance to fight when even or outnumbering.
+  - Cautious has fighters flee from raids.
+- **Replayed** (first colony; seeds 1–6, G′ both colonies):
+
+| | Local | Forage | Cautious | Warlike |
+|---|---|---|---|---|
+| G′ food home | 51,515 | 52,526 | 50,360 | 52,346 |
+| G′ losses | 11,056 | 12,340 (+12 %) | 10,999 | 12,956 (+17 %) |
+| A9 lost per 100 food | 0.84 | 3.28 (5/6) | 0.85 (6/6) | 3.75 (4/6) |
+
+  The doctrines that fight cost ants, as their doctrines ask.
+
+**Cost** (`colony-cost --side 5 600 1`):
+
+| Lane | MR 3, tokens per question | MR 4 |
+|---|---|---|
+| mode | ~657, $0.074/h | ~649, $0.074/h |
+| get, if asked | 970 | 1,203 |
+| carry, if asked | 723 | 894 |
+| drop, if asked | 1,024 | 1,180 |
+| trail, if asked | 613 | 738 |
+| contact, if asked | — | 1,405 (2 situations in the side view) |
+
+The legend's new sentences reach every response lane. All five would cost ~$0.096/h if asked (MR 3: ~$0.074/h). The page asks none of them.
