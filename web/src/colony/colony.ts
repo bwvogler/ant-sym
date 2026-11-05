@@ -4,7 +4,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { type Item, localResponses, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
+import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
@@ -105,7 +105,8 @@ export interface CellCounts {
 export const ENEMY = 0.5;
 
 /**
- * The local rule. An enemy close by: fight it. Tired: go home. Raiding:
+ * The local rule. (An enemy close by is the contact response's to answer, behaviour MR 4: before it, this rule sent
+ * every ant with one near to fight.) Tired: go home. Raiding:
  * explorers (and fighters) go raiding, followers keep foraging. Defending:
  * alarm calls fighters. A fight that is over sends the ant home. Otherwise
  * forage: a strong food trail is followed, none means explore, a faint one
@@ -114,7 +115,6 @@ export const ENEMY = 0.5;
  * circled trails to food that was gone until nobody was left exploring.
  */
 export const localPolicy: Policy = (s) => {
-  if (s.enemy === "near") return "fight";
   if (s.tired) return "return";
   if (s.stance === "raid" && (s.mode === "explore" || s.mode === "fight")) return "fight";
   if (s.stance === "defend" && s.alarm !== "none") return "fight";
@@ -203,6 +203,8 @@ export interface ColonyParams {
    * on A3, which the trail's evaporation and tiredness already clear (PRD §45.4)
    */
   noEntryAvoid: number;
+  /** how hard a faint alarm draws an ant whose alarmGain is negative, as a share of turnRate (behaviour MR 4) */
+  alarmDraw: number;
   /** how hard ants turn away from alarm, as a share of turnRate */
   alarmAvoid: number;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
@@ -222,7 +224,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -254,7 +256,12 @@ export class Colony {
   /** the ant the shared Touch describes */
   #ti = 0;
   /** The shared Touch. Its `place` is worked out only when a response reads it: the local ones never do, and working it out for every ant's trail every step cost the side view ~5 % a tick (review of #35). */
-  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
+  /** the ant whose sensors were last read this tick, and the alarm they smelt (touch() reads it; other ants: none) */
+  #alarmAnt = -1;
+  #alarmSmelt: Trail = "none";
+  /** the odds the ant whose sensors were last read met, with strangers in reach (else none) */
+  #oddsNow: Odds = "none";
+  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -519,6 +526,8 @@ export class Colony {
   foreign: Pheromones | null = null;
   /** this colony's own ants per cell, kept by the game each tick underground; null on its own */
   friends: CellCounts | null = null;
+  /** this colony's ants per cell (the game's occupancy), for the odds an ant senses by touch on meeting strangers (MR 4) */
+  nestmates: CellCounts | null = null;
   /** where raiders go: the nest of the colony raided (in the side view, its hole); set by the game, the nearest rival of any number */
   raidTarget: Nest | null = null;
   /** the side view: the raided colony's chamber, where raiders go once in at its hole (set by the game) */
@@ -824,6 +833,8 @@ export class Colony {
       this.antCell(i);
       t.quality = qualityOf(qualityAt(this.map, CELL[0] as number, CELL[1] as number));
     } else t.quality = item === "food" ? qualityOf(this.quality[i] as number) : "fair";
+    t.alarm = i === this.#alarmAnt ? this.#alarmSmelt : "none";
+    t.odds = i === this.#alarmAnt ? this.#oddsNow : "none";
     return t;
   }
 
@@ -2940,6 +2951,37 @@ export class Colony {
     return blocked(this.map, x + Math.cos(angle) * d, y + Math.sin(angle) * d);
   }
 
+  /**
+   * Nestmates against strangers in ant i's cell and the six round it, as it feels them (behaviour MR 4): outnumbered
+   * under two thirds as many, outnumbering over half as many again. Call after #enemyHeading (strangers as it perceives
+   * them). Leaves the shared CELL as it found it.
+   */
+  #odds(i: number): Odds {
+    const g = this.enemies;
+    const f = this.nestmates;
+    if (!g || !f) return "even";
+    const keepX = CELL[0] as number;
+    const keepY = CELL[1] as number;
+    this.antCell(i);
+    const cx = CELL[0] as number;
+    const cy = CELL[1] as number;
+    const { w, h } = this.map.size;
+    const o = discOffsets(1)[cy & 1] as Int16Array;
+    let mine = 0;
+    let them = 0;
+    for (let k = 0; k < o.length; k += 2) {
+      const x = cx + (o[k] as number);
+      const y = cy + (o[k + 1] as number);
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      mine += f.get(x, y);
+      them += g.get(x, y);
+    }
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    mine = Math.max(1, mine);
+    return mine > 1.5 * them ? "outnumbering" : mine * 1.5 < them ? "outnumbered" : "even";
+  }
+
   /** The nearest cell holding enemies within enemyRange of ant i, as a heading, or null. */
   #enemyHeading(i: number): number | null {
     const g = this.enemies;
@@ -3004,9 +3046,13 @@ export class Colony {
       const hf = sn[4] as number;
       const hr = sn[5] as number;
       const al = sn[6] as number;
+      // What this ant smells of alarm, for its Touch this tick (behaviour MR 4: graded alarm).
+      this.#alarmAnt = i;
+      this.#alarmSmelt = trailLevel(Math.max(sn[6] as number, sn[7] as number, sn[8] as number));
       const af = sn[7] as number;
       const ar = sn[8] as number;
       const toEnemy = this.#enemyHeading(i);
+      this.#oddsNow = toEnemy === null ? "none" : this.#odds(i);
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
       // this step (its trip is over: see `arrive`).
       // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
@@ -3035,6 +3081,7 @@ export class Colony {
       const prevMode = mode;
       const item: Item = carrying ? "food" : pellet ? (this.#corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
       const resp = this.responses;
+      let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
       if (carrying || pellet || nursing) {
         // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
         // question comes once the load is down.
@@ -3063,6 +3110,7 @@ export class Colony {
         const enemy = toEnemy === null ? 0 : 1;
         const stance = STANCES.indexOf(this.stance);
         const before = encode(mode, tired, food, home, alarm, enemy, stance);
+        situation0 = before - mode * MODE_STRIDE;
         if (before !== this.#asked[i]) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
@@ -3077,6 +3125,28 @@ export class Colony {
           this.#question[i] = before;
           this.decisions++;
         }
+      }
+      let fleeFrom: number | null = null;
+      // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
+      // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
+      // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
+      if (toEnemy !== null) {
+        const answer = resp.contact(this.touch(i, true, mode, item));
+        if (answer === "fight") {
+          if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
+        } else {
+          if (answer === "drop and run" && (carrying || pellet || nursing)) this.#putDown(i);
+          if (mode !== RETURN) this.#homeAfresh(i);
+          mode = RETURN;
+          // A carrier flees by taking its load home: turned straight away from the strangers, on the side view's ground
+          // line that was often away from its hole (G seed 5, raid stance: 3–5 carriers held over 120 s between the nests).
+          if (!carrying && !pellet && !nursing) fleeFrom = toEnemy;
+        }
+        this.mode[i] = mode;
+        // The situation as answered, with the mode the contact response set: else the mode policy, asked again next step,
+        // put the ant back on its trail and contact turned it round again, resetting its homing every other step (review
+        // of #38: 6,170 flips in 150 s on G′ seed 1).
+        if (situation0 >= 0) this.#asked[i] = situation0 + mode * MODE_STRIDE;
       }
       // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
       // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
@@ -3383,10 +3453,19 @@ export class Colony {
         else if (this.#entrance && this.#outbound(i) && this.#under[i]) h = turnToward(h, Math.atan2(this.#entrance.y - (this.y[i] as number), this.#entrance.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
         else h += noise * p.wander;
       }
+      // Fleeing (behaviour MR 4): straight away from the strangers while they are in reach (then it resumes). Homing alone, the
+      // fleeing ant often walked along them, or toward them, and died: G′ seed 2, 1,127 of the dead were fleeing.
+      if (fleeFrom !== null && (this.#entrance === null || !this.#under[i])) h = turnToward(h, fleeFrom + Math.PI, p.turnRate * dt * 2);
       // Smelling alarm: the alarmGain response says how hard to shy from it (locally: every mode but fighting, unless digging).
       if (Math.max(al, af, ar) >= FAINT) {
         const gain = resp.alarmGain(this.touch(i, toEnemy !== null, mode, item));
-        if (gain > 0) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
+        // On the side view's ground line a carrier can't go round alarm, only turn back: it carries on home through it.
+        // Shying, carriers turned back from fights at their own hole and held their food (G seeds 4, 8: raids, 3 held).
+        const noWayRound = carrying && this.#entrance !== null && !this.#under[i];
+        if (gain > 0 && !noWayRound) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
+        // A faint alarm draws it: top-down only. In the side view the drawn explorers crowded the tunnels and the ground
+        // line round the nest's fights (G seeds 1–20: 15/20 against 18/20 without the pull).
+        else if (gain < 0 && this.#entrance === null) h += climb(al, af, ar, p.turnRate * p.alarmDraw * -gain * dt);
       }
 
       // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none, and
@@ -3768,6 +3847,8 @@ export function encodeSituation(s: Situation): number {
   return encode(MODES.indexOf(s.mode), s.tired, s.foodTrail, s.homeTrail, s.alarm, s.enemy === "near" ? 1 : 0, STANCES.indexOf(s.stance));
 }
 
+/** encode's step per mode: encode(m, …) = encode(0, …) + m × MODE_STRIDE. */
+const MODE_STRIDE = 2 * 3 * HOMES.length * 3 * 2 * 3;
 function encode(mode: number, tired: boolean, food: Trail, home: Home, alarm: Trail, enemy: number, stance: number): number {
   return (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * HOMES.length + HOMES.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 + enemy) * 3 + stance;
 }
@@ -4293,8 +4374,12 @@ export function climb(left: number, front: number, right: number, max: number): 
 /** Turn toward the weakest of three alarm sensors, at most `max` radians; nothing when no sensor smells alarm. */
 export function avoid(left: number, front: number, right: number, max: number): number {
   if (Math.max(left, front, right) < FAINT) return 0;
-  if (front <= left && front <= right) return 0;
-  return left < right ? -max : max;
+  // Rock or the map's edge reads −1: never the way out of alarm (ja-dul: it read as the least, and steered ants into walls).
+  const l = left < 0 ? Infinity : left;
+  const f = front < 0 ? Infinity : front;
+  const r = right < 0 ? Infinity : right;
+  if (f <= l && f <= r) return 0;
+  return l < r ? -max : max;
 }
 
 /** Turn `h` toward `target` by at most `max` radians, the short way round. */

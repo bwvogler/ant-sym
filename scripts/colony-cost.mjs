@@ -18,8 +18,8 @@
 //
 // Usage: node scripts/colony-cost.mjs [--side] [minutes=10] [ants=600] [seed=1]
 import { localPolicy, localStance } from "../web/src/colony/colony.ts";
-import { DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
-import { localResponses, responses, touchKey } from "../web/src/colony/responses.ts";
+import { DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, responseKey, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
+import { localResponses, responses } from "../web/src/colony/responses.ts";
 import { Game, gameRng } from "../web/src/colony/game.ts";
 import { generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
@@ -80,7 +80,7 @@ function lane(key, pack, contextOf, local, acc = null) {
 }
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
-const hooks = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, lane(touchKey, (items, d) => packResponseRequest(h, items, d), (d) => responseContext(h, d), localResponses[h], { tokens: 0, requests: 0, questions: 0 })]));
+const hooks = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, lane((t) => responseKey(h, t), (items, d) => packResponseRequest(h, items, d), (d) => responseContext(h, d), localResponses[h], { tokens: 0, requests: 0, questions: 0 })]));
 const game = new Game(map, { antCount: ants, rivalAnts: ants }, side ? gameRng(seed) : mulberry32(seed + 7), {
   policy: modes.policy,
   stance: stances.policy,
@@ -135,4 +135,4 @@ for (const h of RESPONSE_HOOKS) {
   rt += a.tokens;
   console.log(`  ${h.padEnd(6)} ${String(a.questions).padStart(4)} situations · ${String(a.requests).padStart(3)} requests · ~${a.tokens.toLocaleString().padStart(6)} tok ≈ ${usd(a.tokens)} (~${Math.round(a.tokens / Math.max(1, a.questions))} tok per question)`);
 }
-console.log(`  all four ≈ ${usd((rt * 60) / minutes)} per hour more at this pace`);
+console.log(`  all ${RESPONSE_HOOKS.length} ≈ ${usd((rt * 60) / minutes)} per hour more at this pace`);

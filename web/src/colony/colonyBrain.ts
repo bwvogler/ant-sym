@@ -1,7 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
-import { CARRY, type Carry, localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
+import { CARRY, type Carry, CONTACT, type Contact, localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -122,12 +122,12 @@ export function stanceContext(doctrine: string): string {
 }
 
 /** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
-export const RESPONSE_BRAIN_VERSION = 6;
+export const RESPONSE_BRAIN_VERSION = 7;
 
 export const RESPONSE_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside: that food is already home, and a food trail laid inside the nest leads nestmates in, away from the food outside. digging says it is digging at a soil face. place is where it is: out (away from its nest), hole (at its nest's mouth), tunnel (in its own nest's tunnels) or chamber (in one of its own nest's chambers). offered, when it may pick something up, is what lies within reach: food; soil (a loose pellet off the mound: carried down to fill unused tunnels, or farther out, it keeps the mound spread and the nest's entrance clear); corpse (a dead nestmate: on the midden it can't spread disease in the nest); or brood (an egg by the queen, or a larva lying outside the brood chambers: larvae are fed only in a brood chamber, so brood left lying never becomes a worker). enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance is what the colony as a whole is doing: forage, defend or raid. quality, for food carried or offered, is how good it tastes: poor, fair or rich. The colony finds food and its way home only by scent trails: ants carrying food home lay the food trail that leads others out to it (more for richer food), and ants walking out lay the home trail that leads carriers back; where nobody lays, nobody can follow. doctrine is how the colony wants its ants to behave: follow it.";
+  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside: that food is already home, and a food trail laid inside the nest leads nestmates in, away from the food outside. digging says it is digging at a soil face. place is where it is: out (away from its nest), hole (at its nest's mouth), tunnel (in its own nest's tunnels) or chamber (in one of its own nest's chambers). offered, when it may pick something up, is what lies within reach: food; soil (a loose pellet off the mound: carried down to fill unused tunnels, or farther out, it keeps the mound spread and the nest's entrance clear); corpse (a dead nestmate: on the midden it can't spread disease in the nest); or brood (an egg by the queen, or a larva lying outside the brood chambers: larvae are fed only in a brood chamber, so brood left lying never becomes a worker). enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance is what the colony as a whole is doing: forage, defend or raid. quality, for food carried or offered, is how good it tastes: poor, fair or rich. The colony finds food and its way home only by scent trails: ants carrying food home lay the food trail that leads others out to it (more for richer food), and ants walking out lay the home trail that leads carriers back; where nobody lays, nobody can follow. alarm is the alarm scent it smells: none, faint (a little: something is happening near) or strong (a fight close by). odds, when strangers are within reach, is how many nestmates are round it against them: outnumbered, even or outnumbering. Strangers in reach hurt any ant they touch, fighting or not, and an ant that fights where its side is outnumbered dies; one that turns away and leaves lives to forage. doctrine is how the colony wants its ants to behave: follow it.";
 
-export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail"] as const;
+export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail", "contact"] as const;
 export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
 
 export function responseQuestion(hook: ResponseHook, id: string): JevRequest["questions"] {
@@ -145,6 +145,18 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
           criteria: {
             take: "take: carry it where it belongs (food home into the nest, for the colony's larvae and stores; a porter's food to the chamber that wants it; soil out to the mound; a corpse to the midden; brood to a brood chamber)",
             "put down": "put down: put it down here, where it stands, and do something else",
+          },
+        },
+      };
+    case "contact":
+      return {
+        [`${id}_contact`]: {
+          type: "choice",
+          instructions: `Going by the doctrine, ${ant} has strangers of another colony within reach (odds says how many nestmates are round it against them): what should it do?`,
+          criteria: {
+            fight: "fight: attack the strangers where they are",
+            flee: "flee: turn away from them and go home, keeping whatever it carries",
+            "drop and run": "drop and run: put down what it carries here and flee home",
           },
         },
       };
@@ -170,8 +182,9 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
   for (const it of items) {
     const t = it.situation;
     // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
-    const { offered, quality, ...rest } = t;
-    ants[it.id] = hook === "get" ? { ...rest, offered, quality } : hook === "trail" ? { ...rest, quality } : { ...rest };
+    // alarm and odds only to `contact`.
+    const { offered, quality, alarm, odds, ...rest } = t;
+    ants[it.id] = hook === "get" ? { ...rest, offered, quality } : hook === "trail" ? { ...rest, quality } : hook === "contact" ? { ...rest, alarm, odds } : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
@@ -191,7 +204,7 @@ export function cacheContexts(doctrine: string): Record<"mode" | "stance" | Resp
 }
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
-export type ResponseAnswer = boolean | Carry | Trail;
+export type ResponseAnswer = boolean | Carry | Trail | Contact;
 const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
 
 /**
@@ -204,10 +217,19 @@ export function readResponse(hook: ResponseHook, answers: Record<string, JevAnsw
   if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
   if (a.type !== "choice") return null;
   if (hook === "carry") return (CARRY as readonly string[]).includes(a.choice) ? (a.choice as Carry) : null;
+  if (hook === "contact") return (CONTACT as readonly string[]).includes(a.choice) ? (a.choice as Contact) : null;
   return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
 }
 
-/** Cached response answers per hook, keyed by touchKey: what scripts/colony-live.mjs saves and the experiments replay. */
+/**
+ * A response situation's cache key for a hook: touchKey, and for `contact` the alarm and odds it is sent too (the other
+ * lanes aren't sent them, so they don't key on them: review of #38).
+ */
+export function responseKey(hook: ResponseHook, t: Touch): string {
+  return hook === "contact" ? `${touchKey(t)}|alarm:${t.alarm}|odds:${t.odds}` : touchKey(t);
+}
+
+/** Cached response answers per hook, keyed by responseKey: what scripts/colony-live.mjs saves and the experiments replay. */
 export type ResponseCache = Partial<Record<ResponseHook, Record<string, ResponseAnswer>>>;
 
 /**
@@ -221,7 +243,7 @@ export function responsesFromAnswers(cache: ResponseCache, base: Responses = loc
     if (!table) continue;
     const local = base[hook] as (t: Touch) => ResponseAnswer;
     (over as Record<ResponseHook, (t: Touch) => ResponseAnswer>)[hook] = (t) => {
-      const a = table[touchKey(t)];
+      const a = table[responseKey(hook, t)];
       onLookup?.(hook, a !== undefined);
       return a ?? local(t);
     };
