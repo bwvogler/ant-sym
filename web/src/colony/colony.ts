@@ -3124,6 +3124,7 @@ export class Colony {
           this.decisions++;
         }
       }
+      let fleeFrom: number | null = null;
       // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
       // said. Before it, every ant with an enemy near fought. Fleeing is homing: away from the strangers, toward its nest.
       if (toEnemy !== null) {
@@ -3134,6 +3135,7 @@ export class Colony {
           if (answer === "drop and run" && (carrying || pellet || nursing)) this.#putDown(i);
           if (mode !== RETURN) this.#homeAfresh(i);
           mode = RETURN;
+          fleeFrom = toEnemy;
         }
         this.mode[i] = mode;
       }
@@ -3442,6 +3444,9 @@ export class Colony {
         else if (this.#entrance && this.#outbound(i) && this.#under[i]) h = turnToward(h, Math.atan2(this.#entrance.y - (this.y[i] as number), this.#entrance.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
         else h += noise * p.wander;
       }
+      // Fleeing (behaviour MR 4): straight away from the strangers while they are in reach, then home. Homing alone, the
+      // fleeing ant often walked along them, or toward them, and died: G′ seed 2, 1,127 of the dead were fleeing.
+      if (fleeFrom !== null && (this.#entrance === null || !this.#under[i])) h = turnToward(h, fleeFrom + Math.PI, p.turnRate * dt * 2);
       // Smelling alarm: the alarmGain response says how hard to shy from it (locally: every mode but fighting, unless digging).
       if (Math.max(al, af, ar) >= FAINT) {
         const gain = resp.alarmGain(this.touch(i, toEnemy !== null, mode, item));
