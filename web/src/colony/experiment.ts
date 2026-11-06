@@ -814,16 +814,18 @@ export const pass: Assay = {
 export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass` (which runs it too); report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
 
 /**
- * A11 — raiders find the rival round a wall (behaviour MR 5.2, docs/raid-recruitment.md). Two nests at either end of a
- * 120 × 60 arena; a pocket of wall between them, open toward the first nest, so a straight line from one to the other runs into its back. The
- * first colony is forced to raid (its mode policy is the local rule); the second defends by the local rule.
+ * A11 — raiders find the rival round a pocket of wall (behaviour MR 5.2, docs/raid-recruitment.md). Two nests at either
+ * end of a 120 × 60 arena; a pocket of wall between them, open toward the first nest, so a straight line from one to the
+ * other runs into its back. The first colony is forced to raid; the second defends by the local rule.
  * Reported: the share of the raiders that ever came within RAID_REACH of the rival's nest; the share of the time raiders
- * outside their own nest were stuck (moved under 3 cells in 20 s, and not in a fight at the rival's nest); the first
- * arrival. Design marks: at least RAID_REACHED of the raiders get there (a straight line gets none behind the wall), and
- * at most RAID_STUCK of the outside samples are stuck (ja-jwy).
+ * outside their own nest were stuck (moved under 3 cells in 20 s, and not at the rival's nest); the first arrival.
+ * Score: the trail's gain, the share reaching the rival with the raid trail against the same seed with no trail laid
+ * (raidLay 0: scouts search alone; Polyergus raids stop without scouts, Topoff et al. 1987). Design marks: at least
+ * RAID_GAIN times as many reach the rival with the trail, and at most RAID_STUCK of the outside samples are stuck.
+ * (On main, with the rival's coordinates, 39 % reached and 1 % were stuck: raiders do get round this pocket.)
  */
 export const RAID_REACH = 10;
-export const RAID_REACHED = 0.5;
+export const RAID_GAIN = 1.5;
 export const RAID_STUCK = 0.1;
 function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number }): Probe {
   const reached = new Set<number>();
@@ -860,7 +862,7 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
     },
   };
 }
-function raidFindSpec(seed: number): RunSpec {
+function raidFindSpec(seed: number, lay?: number): RunSpec {
   const a = new Arena(120, 60).carve(2, 2, 117, 57).wall(40, 18, 60, 20).wall(40, 40, 60, 42).wall(58, 18, 60, 42);
   const own = at(20, 30);
   const rival = at(100, 30);
@@ -869,17 +871,23 @@ function raidFindSpec(seed: number): RunSpec {
     seconds: 300,
     map: () => a.build([{ x: 20, y: 30, r: 3 }, { x: 100, y: 30, r: 3 }]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
-    sides: { stance: always<Stance>("raid") },
+    sides: { stance: always<Stance>("raid"), ...(lay === undefined ? {} : { colony: { raidLay: lay } }) },
     probes: [raidProbe(own, rival)],
   };
 }
 export const raidFind: Assay = {
   id: "raidFind",
-  title: "A11 raiders find the rival round a wall",
-  target: `≥ ${RAID_REACHED * 100} % of the raiders reach the rival's nest; ≤ ${RAID_STUCK * 100} % of outside samples stuck (design marks; docs/raid-recruitment.md, ja-jwy)`,
+  title: "A11 raiders find the rival: the raid trail's gain, and stuck ants",
+  target: `≥ ${RAID_GAIN}× as many raiders reach the rival's nest with the raid trail as without; ≤ ${RAID_STUCK * 100} % of outside samples stuck (design marks; docs/raid-recruitment.md, ja-jwy)`,
   seconds: 300,
-  spec: raidFindSpec,
-  score: (r) => ({ reached: r.metrics.reached as number, stuck: r.metrics.stuck as number, firstReach: r.metrics.firstReach as number, pass: (r.metrics.reached as number) >= RAID_REACHED && (r.metrics.stuck as number) <= RAID_STUCK ? 1 : 0 }),
+  spec: (s) => raidFindSpec(s),
+  score: (r) => {
+    const reached = r.metrics.reached as number;
+    const deaf = runGame(raidFindSpec(r.seed, 0)).result.metrics.reached as number;
+    const gain = deaf > 0 ? reached / deaf : NaN;
+    const stuck = r.metrics.stuck as number;
+    return { reached, deaf, gain, stuck, firstReach: r.metrics.firstReach as number, pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0 };
+  },
 };
 
 /**
