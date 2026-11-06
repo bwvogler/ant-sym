@@ -214,12 +214,12 @@ export interface ColonyParams {
    * Activation (behaviour MR 5, docs/activation.md): encounters with nestmates coming home with food, in the ant's
    * leaky count `met`, from which a waiting forager senses returns as "few" (RETURNS_MANY times as many: "many"). A
    * rested forager home with empty jaws is then asked `leave` instead of going straight out. 0 = off: it goes straight
-   * out. Top-down maps only. 1 (PRD §47.4: G′ seeds 1–20 lost 5.2 % fewer ants for 2.9 % less food home; A5 passes).
+   * out. Top-down maps only. 1 (PRD §48.4: G′ seeds 1–20 lost 5.2 % fewer ants for 2.9 % less food home; A5 passes).
    */
   leaveGate: number;
   /**
    * a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers;
-   * foragers waited about 3 min with none returning). 1/90: at 1/180 G′'s worst seed fell to 5 ants alive (PRD §47.4)
+   * foragers waited about 3 min with none returning). 1/90: at 1/180 G′'s worst seed fell to 5 ants alive (PRD §48.4)
    */
   scoutRate: number;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
@@ -3980,7 +3980,7 @@ export const MIDDLE = 0.35;
 export const REST = 10;
 /** seconds over which the colony averages its intake (behaviour MR 5) */
 export const INTAKE_WINDOW = 60;
-/** food stored per ant per second below which the strategist reads "no intake" (behaviour MR 5; tuned, PRD §47) */
+/** food stored per ant per second below which the strategist reads "no intake" (behaviour MR 5; tuned, PRD §48) */
 export const INTAKE_NONE = 0.0005;
 /** and above which "plenty" */
 export const INTAKE_PLENTY = 0.01;

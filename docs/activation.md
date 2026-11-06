@@ -1,6 +1,6 @@
 # Activation: foragers go out because foragers come back
 
-Research note for behaviour MR 5 (bead `ja-um8`, PRD §47). What the game did before MR 5:
+Research note for behaviour MR 5 (bead `ja-um8`, PRD §48). What the game did before MR 5:
 - A rested forager that reached home with empty jaws went straight back out (`arrive`).
 - Only fatigue kept an ant inside, and only until it was rested (MR 3.1, `tiredness.md`).
 - No ant knew whether others were finding food.
@@ -57,7 +57,7 @@ The paper sites (journals.plos.org, pmc.ncbi.nlm.nih.gov, frontiersin.org) were 
 - **The rate is the information.** Harvester ant colonies don't count the food on their range. They respond to the rate at which successful foragers return (Greene & Gordon 2007: "rate is a crucial source of information in the network of interactions").
 - **For the model:** the strategist's `foodLeft` (the map's food total) gives way to `intake`, the rate of food brought home lately against the colony's size. It is the same signal the waiting foragers sense, summed over the nest.
 
-## What MR 5 built from this (PRD §47)
+## What MR 5 built from this (PRD §48)
 
 - **The cue.** Each ant keeps a leaky count, `met` (half-life 20 s), of encounters with nestmates coming home with food. A forager that puts its food down at home meets the waiting ants in its cell and the six round it, once each.
   - Counted as seconds of contact instead, a carrier was met for a single tick, since it turns round the moment its food is down. The count never reached the threshold, and only scouts went out.

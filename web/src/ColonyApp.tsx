@@ -17,6 +17,9 @@ import { useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import { AIMS } from "./colony/fungusBrain.ts";
 import { INTERVENTIONS, LETHAL, NEST_ONLY } from "./colony/fungus.ts";
+import LearnDrawer from "./ui/LearnDrawer.tsx";
+import Help from "./ui/Help.tsx";
+import { openLearn } from "./ui/learn.ts";
 
 // The colony page: a procedural world, two rival colonies (Ink and Amber,
 // named for how they are drawn), and the fungus: the player, and nobody's
@@ -53,8 +56,32 @@ export default function ColonyApp() {
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-4 px-4 py-5">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Jev Ants</h1>
-        <p className="text-sm text-fg-3">two colonies, one map: trails, not orders</p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-fg-3">two colonies, one map: trails, not orders</p>
+          <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised" onClick={() => openLearn({ tab: "guide" })} title="What you are seeing, the policy behind it, and the research it comes from">
+            Learn
+          </button>
+        </div>
       </header>
+      <LearnDrawer
+        colonies={game.colonies}
+        followed={followed}
+        doctrines={jev.doctrines}
+        setDoctrine={jev.setDoctrine}
+        draftDoctrine={jev.draftDoctrine}
+        aim={jev.aim}
+        setAim={jev.setAim}
+        draftAim={jev.draftAim}
+        menu={controls.menu}
+        setMenu={(menu) => update({ menu })}
+        hide={controls.hide}
+        cull={controls.cull}
+        setRule={(r) => update(r)}
+        retune={`A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`}
+        demo={isDemo(backend)}
+        sideView={controls.ground === "side"}
+        onSideView={() => update({ ground: "side" })}
+      />
       {isDemo(backend) && <DemoNote />}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -69,6 +96,7 @@ export default function ColonyApp() {
               onPaint={controls.brush === "none" ? null : paint}
               followed={followed}
               onFollow={setFollowed}
+              onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
             />
           </div>
           {followed ? (
@@ -76,7 +104,7 @@ export default function ColonyApp() {
           ) : (
             <p className="-mt-2 text-xs text-fg-3">
               {controls.brush === "none"
-                ? "Drag to pan · wheel or pinch to zoom · arrow keys and +/− work too · tap or click an ant to follow it."
+                ? "Drag to pan · wheel or pinch to zoom · arrow keys and +/− work too · tap or click an ant to follow it · Learn (top right) explains what you see."
                 : "Dragging paints with the brush · pinch or wheel to zoom · space+drag or right-drag pans · set the brush to “none” to follow an ant."}
             </p>
           )}
@@ -129,6 +157,7 @@ export default function ColonyApp() {
                   Start Jev
                 </button>
               )}
+              <Help to={{ tab: "policy", id: "mode" }} label="how Jev decides" />
               <div className="min-w-[8rem]">
                 <div className="flex items-baseline gap-2">
                   <span className="font-mono text-2xl font-semibold tabular-nums text-fg">{run ? usd(run.usd) : "$0.0000"}</span>
@@ -198,7 +227,9 @@ export default function ColonyApp() {
             <Slider label="Ants per colony" value={controls.antCount} min={100} max={2000} step={50} format={(v) => String(v)} onChange={(v) => update({ antCount: v })} />
             <Slider label="Speed" value={controls.speed} min={0.25} max={4} step={0.25} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => update({ speed: v })} />
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-sm text-fg-2">Trails</span>
+              <span className="flex items-center gap-1.5 text-sm text-fg-2">
+                Trails <Help to={{ tab: "guide", id: "food-trail" }} label="trails" />
+              </span>
               <div className="flex overflow-hidden rounded-md border border-line text-sm">
                 <button type="button" className={seg(controls.showFoodTrail)} onClick={() => update({ showFoodTrail: !controls.showFoodTrail })} title="Laid by ants carrying food home: it leads to food">
                   to food
@@ -219,7 +250,9 @@ export default function ColonyApp() {
           </section>
 
           <section className="rounded-lg border border-line bg-panel p-4 text-sm text-fg-2">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-fg-3">Fungus</h2>
+            <h2 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-3">
+              Fungus <Help to={{ tab: "guide", id: "fungus" }} label="the fungus" />
+            </h2>
             <div className="mt-3 flex items-center justify-between">
               <span>Brush</span>
               <div className="flex overflow-hidden rounded-md border border-line text-sm">
@@ -261,7 +294,9 @@ export default function ColonyApp() {
             {stats && stats.sides.length > 1 && (
               <div className="mt-3" aria-label="unity">
                 <div className="flex items-baseline justify-between">
-                  <span>Unity</span>
+                  <span className="flex items-center gap-1.5">
+                    Unity <Help to={{ tab: "guide", id: "unity" }} label="one colony" />
+                  </span>
                   <span className="font-mono text-sm tabular-nums text-fg">{Math.round(100 * stats.unity.score)}%</span>
                 </div>
                 <Bar value={stats.unity.score} />
@@ -273,7 +308,9 @@ export default function ColonyApp() {
             )}
 
             <div className="mt-4" aria-label="fungus policy">
-              <span>What the fungus may do</span>
+              <span className="flex items-center gap-1.5">
+                What the fungus may do <Help to={{ tab: "policy", id: "fungus" }} label="the fungus's policy" />
+              </span>
               <div className="mt-1 flex flex-wrap gap-1 text-xs">
                 {/* the nest's interventions (muddle, crown) only where there is a nest: the fungus drops them on top-down maps */}
                 {INTERVENTIONS.filter((v) => game.map.sky || !NEST_ONLY.has(v.id)).map((v) => {
@@ -328,7 +365,9 @@ export default function ColonyApp() {
           </section>
 
           <section className="rounded-lg border border-line bg-panel p-4 text-sm text-fg-2" aria-label="colonies">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-fg-3">Colonies</h2>
+            <h2 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-3">
+              Colonies <Help to={{ tab: "policy", id: "mode" }} label="the ants' policy" />
+            </h2>
             <p className="mt-1 text-xs text-fg-3">Each colony's nature: the doctrine its ants follow when Jev is on. Not yours to steer: you are the fungus. A scenario setting.</p>
             {jev.doctrines.slice(0, stats ? stats.sides.length : 1).map((d, k) => (
               <div key={k} className="mt-3">

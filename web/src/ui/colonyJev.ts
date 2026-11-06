@@ -63,7 +63,7 @@ export interface ColonyJevState {
 
 type Listener = (s: ColonyJevState) => void;
 
-type LaneName = "mode" | "stance" | "fungus";
+export type LaneName = "mode" | "stance" | "fungus";
 
 /** One stream of questions: how to key, pack and read them, the local fallback, and the words they are asked under. */
 interface Lane<S, A extends string> {

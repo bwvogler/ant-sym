@@ -2931,7 +2931,43 @@ The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants wou
 - The legend's new sentences reach every response lane: all five would cost ~$0.096/h if asked. The page asks none of them.
 - Since #38's review the contact lane alone keys on alarm and odds (`colonyBrain.responseKey`). Before, every lane's key carried them, so identical requests in get, carry and trail landed under different keys.
 
-## 47. Foragers go out because foragers come back (behaviour MR 5, ja-um8, 2026-11-05)
+## 47. Learn: the research, the policy and the nest on the page (ja-epn, 2026-11-05)
+
+The page showed what happens but not why. The follow card named an ant's situation and who decided, and a few tooltips hinted at the rest. The research behind the senses lived only in `docs/`, the legend Jev reads was invisible, and chambers were unlabelled washes. The owner asked for ways to learn what you're seeing: the research, the policy and the nest structures.
+
+**Decisions (owner, 2026-11-05):**
+- **A Learn drawer, plus "?" buttons where things are.** A header button opens a drawer with three tabs. Each "?" opens it at the matching entry. The drawer's state is one small store (`ui/learn.ts`), so a "?" anywhere needs no callbacks threaded to it. The follow card's situation chips are links into it, and each choice has a "why?".
+- **The research as a field guide that links out.** Each entry covers one thing on screen in three parts: what you see, what real ants do (the notes' own claims) and how the game models it. Its sources link the notes' headings on GitHub, since the Pages build has no server to serve `docs/`. Full notes are not rendered in the page: they mix research with design detail meant for developers.
+- **Scripted behaviour is called out.** Where a behaviour is still a script reading something no ant can sense, the entry says so and names its vision gap (`ja-k4k.*`).
+- **The policy is editable there; the prompt is not.** A first version made each lane's legend editable. The owner's review: edit the *policy*, meaning each colony's doctrine and the fungus's aim, menu and hide/cull settings, and leave the rest of the prompt alone. The Policy tab is flat:
+  - The editors come first, bound to the same state as the side panel, so either place changes both. Edits commit on blur, as in the side panel.
+  - Then one level of collapsible sections explains how each decides: an ant's mode, the colony's stance, the fungus in a host, what Jev is sent (the legends, read only, with the exact request for the followed ant or a sample) and the small responses (local rule only).
+  - A "?" or "why?" opens the section it targets.
+- **The fungus has a policy too.** Jev picks, per fungal situation, what the fungus does to a host, under the player's aim and within the menu. With Jev off, each strain runs its default, within the menu and the hide/cull settings.
+- **Later, policy by inheritance (`ja-ygc`, owner's idea).** A living colony's doctrine would be fixed. A change would come only through a new queen sent out to found a colony, and only by some fraction of the mother's policy.
+
+**How it is built:**
+- **Field guide:** `ui/guide.ts` (16 entries) and its list of the notes. `tests/guide.test.ts` checks the guide against `docs/`:
+  - every cited note and heading exists, with anchors slugged as GitHub does;
+  - every note in the docs index is listed;
+  - every gap an entry calls scripted is still an open row in `vision.md`'s gap table.
+
+  So closing a gap or renaming a heading fails the test and names the entry to rewrite.
+- **The local rules in words:** `ui/policyText.ts` gives `localPolicy` and `localStance` as rows ("when …, then …"). `tests/policyText.test.ts` walks all 3,888 situations and every stance view and checks the rows give exactly the code's answers. The Policy tab highlights the row that decides the followed ant's situation.
+- **What Jev is sent** (`ui/prompt.ts`): the exact request for one situation from the same packers the client uses, and tokens per question at 100 situations to a request (the page's estimates always were). The brain modules and the Jev client are unchanged from main, apart from exporting `MODE_CRITERIA` and `STANCE_CRITERIA` and the `LaneName` type.
+- **Nest tab:** `ui/nest.ts` reads each nest from the chamber table: per chamber its role, depth below the ground line, cells (floor), the ants in it now, brood and food; plus the queen, the brood by stage, inside against out, and the midden. The tab says plainly that this is the player's view: an ant senses only the role of the chamber it stands in.
+- **Labels on the field:** a **Labels** button on the field (side view) names each chamber by its role. With labels on, a click on a chamber with no ant under it opens the Nest tab at that chamber's row.
+- **Shared colours:** the field's role, brood and home-trail colours moved to `ui/palette.ts`, so the swatches and the canvas share one source.
+
+**Cost.** None: the requests and their contexts are byte-identical (`colony-cost` unchanged: ~769 tokens per question on the top-down session, $0.022/h). A doctrine or aim edited in the drawer re-asks exactly as one edited in the side panel always has.
+
+**Not done:**
+- Rendering whole notes in the page.
+- Moving the camera to a chamber picked in the table.
+- Recording who decided at decision time rather than at render time (`ja-kxw`, still open).
+- Filed while doing this: `ja-px9`. `docs/nest-chemistry.md` is missing although `ja-k4k.9` is closed.
+
+## 48. Foragers go out because foragers come back (behaviour MR 5, ja-um8, 2026-11-05)
 
 Research basis: `docs/activation.md`.
 - In the red harvester ant, a forager waiting inside leaves on brief contacts with nestmates coming home with food (Gordon; Pinter-Wollman et al. 2013; Pless et al. 2015).
@@ -2945,14 +2981,14 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
 
 **Scope.** ja-um8 also planned raids that start from scouts' trails. They are split off as MR 5.2 (`ja-tu3`, which now blocks ja-jwy), since raids need their own research and assay.
 
-### 47.1 What was there
+### 48.1 What was there
 
 - **On a top-down map, a rested forager reaching home with empty jaws went straight back out** (`arrive`). Only fatigue kept one inside, and only until rested.
 - **No ant knew whether others were finding food.**
 - **The strategist raided on `foodLeft`,** the map's food total, which no ant senses (vision gap "Stance and raids"). In a 600 s game the map never falls below 66 % of its food, so that rule never fired in G or G′.
 - **A5 failed on every seed:** on seeds 1–20, 0.48 of the colony was outside before food against 0.84 after (mark: at most half).
 
-### 47.2 Assays (no behaviour change; commit 61125a5)
+### 48.2 Assays (no behaviour change; commit 61125a5)
 
 - **A5** also reports trips out per minute in each window, so a pass shows its cause.
 - **A5b, food stops (new):**
@@ -2960,7 +2996,7 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
   - mark: trips out per minute over 300–420 s at most half those over 150–240 s (Gordon 2002's removals);
   - `main` already passes 20/20, since fatigue brings unsuccessful foragers home. It is a guard, not the target.
 
-### 47.3 What MR 5 built
+### 48.3 What MR 5 built
 
 - **The cue** (`colony.ts`: `met`, `#returning`, `#returned`).
   - Each ant keeps a leaky count (half-life 20 s, `MET_HALF`) of encounters with nestmates coming home with food.
@@ -2969,7 +3005,7 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
 - **Waiting.** On a top-down map, a rested forager home in "return" with empty jaws is asked the new `leave` response instead of its mode policy. The mode policy sends any ant out that smells no food trail.
   - **"now"** goes out at 1 per second (`LEAVE_NOW`).
   - **"soon"** at 0.2 per second, about the papers' 3–8 s.
-  - **"wait"** stays in. Only a scout goes, at `scoutRate`, 1/90 per second: a waiting ant goes out on its own after 90 s on average, against Gordon's foragers waiting about 3 minutes with none returning. At 1/180, G′'s worst seed fell to 5 ants alive (§47.4).
+  - **"wait"** stays in. Only a scout goes, at `scoutRate`, 1/90 per second: a waiting ant goes out on its own after 90 s on average, against Gordon's foragers waiting about 3 minutes with none returning. At 1/180, G′'s worst seed fell to 5 ants alive (§48.4).
   - **One roll a step** (review of #39, S1): an ant home in "return" passes both the rest check and the trip's end in one step, and before the fix it rolled `leave` at each. Every rate ran at about twice its stated value; the numbers below are all after the fix.
   - A waiting ant mills out to 0.9 of the nest's radius, where foragers come home.
 - **Local rule:** many, now; few, soon; none, wait. A raiding or defending colony doesn't wait.
@@ -2982,7 +3018,7 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
   2. **Ants kept to half the nest's radius never met a carrier,** who puts its food down at the rim. Ants that drifted out of the nest were asked their mode and left.
   3. **Contact counted in seconds stayed under the threshold:** a carrier is met for a single tick. So only scouts went out, and with scouts at 1/30 per second, `leave` deaf to returns gave the same A5 and A5b.
 
-### 47.4 Results (local rule)
+### 48.4 Results (local rule)
 
 **The cue does the work** (seeds 1–10, medians; "deaf" answers `leave` as if no returns were ever met):
 
@@ -3025,7 +3061,7 @@ Before the fix, with two rolls a step: `leaveGate` 1 against 2 at a stated 1/180
 
 The 1/30 runs were measured while returns were still counted in seconds (third wrong turn above): there, returns made no difference.
 
-### 47.5 The leave lane and the live check (2026-11-05)
+### 48.5 The leave lane and the live check (2026-11-05)
 
 - **Legend** (`RESPONSE_BRAIN_VERSION` 8):
   - `returns` is sent to the `leave` lane only;

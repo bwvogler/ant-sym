@@ -40,14 +40,14 @@ export const DOCTRINES: Doctrine[] = [
   { id: "warlike", name: "Warlike", text: "Destroy the rival colony. Explorers become raiders whenever the colony has ants to spare. Follow alarm scent to every fight. Forage only to grow the colony." },
 ];
 
-const MODE_CRITERIA: Record<Mode, string> = {
+export const MODE_CRITERIA: Record<Mode, string> = {
   explore: "explore: wander and look for new food, digging through soil",
   follow: "follow: walk up the food scent toward food",
   return: "return: walk home",
   fight: "fight: go for enemy ants, follow alarm scent to a fight, or raid the rival nest",
 };
 
-const STANCE_CRITERIA: Record<Stance, string> = {
+export const STANCE_CRITERIA: Record<Stance, string> = {
   forage: "forage: gather food, fight only what comes close",
   defend: "defend: fighters stay near home and answer alarm",
   raid: "raid: send spare ants to fight at the rival's nest",
