@@ -227,6 +227,8 @@ export interface ColonyParams {
   raidLay: number;
   /** seconds of contact with strangers that make a scout a finder */
   findAt: number;
+  /** a raider waiting at home with no raid trail goes out as a scout at this rate per second (raids only; foragers: scoutRate) */
+  raidScout: number;
   /**
    * a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers;
    * foragers waited about 3 min with none returning). 1/90: at 1/180 G′'s worst seed fell to 5 ants alive (PRD §48.4)
@@ -249,7 +251,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, raidGate: 1, raidLay: 1, findAt: 0.3, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -3010,9 +3012,9 @@ export class Colony {
    * A rested forager waiting at home with empty jaws: does it go out this step (behaviour MR 5, docs/activation.md)? Its
    * `leave` response says how soon, from the returns it has felt; "wait" still lets a scout go at `scoutRate`.
    */
-  #leaves(i: number, dt: number, enemy: boolean): boolean {
+  #leaves(i: number, dt: number, enemy: boolean, scout = this.params.scoutRate): boolean {
     const answer = this.responses.leave(this.touch(i, enemy, RETURN, "none"));
-    const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : this.params.scoutRate;
+    const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : scout;
     return this.#rng() < 1 - Math.exp(-rate * dt);
   }
 
@@ -3239,7 +3241,7 @@ export class Colony {
         // (behaviour MR 5.2). Once it has gone it is out of the rule for a few seconds, so it clears the nest.
         if (rgate && !waiting && this.stance === "raid" && mode === FIGHT && !enemy && (this.#goT[i] as number) <= 0 && this.#atNestTop(i) && this.#raidSmelt(i) === "none") {
           waiting = true;
-          if (this.#leaves(i, dt, false)) {
+          if (this.#leaves(i, dt, false, p.raidScout)) {
             waiting = false;
             this.#goT[i] = RAID_GO;
           }
