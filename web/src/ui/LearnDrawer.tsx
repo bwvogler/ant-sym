@@ -12,7 +12,7 @@ import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
 import { css, ROLE_RGB } from "./palette.ts";
-import { byRows, LOCAL_FUNGUS_RULES, LOCAL_MODE_OTHERWISE, LOCAL_MODE_RULES, LOCAL_RESPONSE_RULES, LOCAL_STANCE_OTHERWISE, LOCAL_STANCE_RULES, localModeOtherwise } from "./policyText.ts";
+import { byRows, LOCAL_FUNGUS_RULES, LOCAL_MODE_OTHERWISE, LOCAL_MODE_RULES, LOCAL_MODE_STRANGERS, LOCAL_RESPONSE_RULES, LOCAL_STANCE_OTHERWISE, LOCAL_STANCE_RULES, localModeOtherwise } from "./policyText.ts";
 import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE, tokensPerQuestion, type Sample } from "./prompt.ts";
 import { seg } from "./styles.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
@@ -195,7 +195,7 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
 /**
  * The Policy tab, flat: the words each colony's ants and the fungus follow, editable here as in the side panel (the
  * same state), then how each decides, one collapsible section each. The legend Jev reads is shown, not edited: the
- * owner's call (PRD §46).
+ * owner's call (PRD §47).
  */
 function PolicyTab(props: Props & { focus?: string }) {
   const sides = props.colonies.length;
@@ -406,7 +406,7 @@ function ModeExplainer(props: Props) {
           ["foodTrail", TRAILS.join(" · "), "food scent just ahead"],
           ["homeTrail", HOMES.join(" · "), "home scent ahead on the ground; underground, the chamber it stands in"],
           ["alarm", TRAILS.join(" · "), "alarm scent just ahead"],
-          ["enemy", "none · near", "an ant of the other colony within two steps"],
+          ["enemy", "none · near", "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)"],
           ["stance", STANCES.join(" · "), "what the colony as a whole is doing"],
         ]}
         note={
@@ -421,6 +421,7 @@ function ModeExplainer(props: Props) {
       />
       <Choices items={MODES.map((m) => [m, MODE_CRITERIA[m].replace(/^\w+: /, "")])} />
       <RuleTable rows={LOCAL_MODE_RULES} otherwise={LOCAL_MODE_OTHERWISE} live={live >= 0 ? live : LOCAL_MODE_RULES.length} />
+      <p className="-mt-1 text-xs text-fg-3">{LOCAL_MODE_STRANGERS}</p>
       <p className="-mt-1 text-xs text-fg-3">
         Highlighted: the line that decides {fol?.s ? `ant #${fol.i}'s last situation` : "a sample situation (follow an ant to see its own)"}: {byRows(LOCAL_MODE_RULES, localModeOtherwise, s)}.
       </p>

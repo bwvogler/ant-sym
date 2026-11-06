@@ -73,7 +73,7 @@ spend and time caps from the real `usage.input_tokens` of every reply.
   links to the research notes; the policy you can edit (each colony's doctrine, the
   fungus's aim and menu), with how each decides and the exact request Jev is sent; and
   the nest's chambers.
-  Turn on **Labels** on the field to name the chambers and click one to inspect it (PRD §46).
+  Turn on **Labels** on the field to name the chambers and click one to inspect it (PRD §47).
 
 ## How it talks to Jev
 

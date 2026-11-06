@@ -4,7 +4,7 @@
 // default, --top for the top-down map; the local rule and local responses,
 // alarm painted about every 20 s) collects the distinct situations of each
 // lane: ant modes, stances, and the get/carry/drop/trail responses
-// (colonyBrain.RESPONSE_HOOKS, keyed by responses.touchKey). Then, per
+// (colonyBrain.RESPONSE_HOOKS, keyed by colonyBrain.responseKey). Then, per
 // doctrine, each lane's situations are packed with the real packers and sent
 // through the server's JevClient (pooled connection, per-attempt timeout,
 // retry-after), a request at a time, until the budget would be passed.
@@ -42,12 +42,13 @@ import {
   readStance,
   RESPONSE_BRAIN_VERSION,
   RESPONSE_HOOKS,
+  responseKey,
   situationKey,
   STANCE_BRAIN_VERSION,
   stanceKey,
 } from "../web/src/colony/colonyBrain.ts";
 import { runGame } from "../web/src/colony/experiment.ts";
-import { localResponses, responses, touchKey } from "../web/src/colony/responses.ts";
+import { localResponses, responses } from "../web/src/colony/responses.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, worldExtent } from "../web/src/colony/world.ts";
 
 const BATCH = 100;
@@ -93,7 +94,7 @@ if (!(opts.budget > 0 && opts.budget <= 1)) throw new Error("--budget must be in
 const LANES = {
   mode: { key: situationKey, pack: packModeRequest, read: readMode, local: localPolicy },
   stance: { key: stanceKey, pack: packStanceRequest, read: readStance, local: localStance },
-  ...Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, { key: touchKey, pack: (items, d) => packResponseRequest(h, items, d), read: (ans, id) => readResponse(h, ans, id), local: localResponses[h] }])),
+  ...Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, { key: (t) => responseKey(h, t), pack: (items, d) => packResponseRequest(h, items, d), read: (ans, id) => readResponse(h, ans, id), local: localResponses[h] }])),
 };
 const chosen = opts.lanes === "all" ? Object.keys(LANES) : opts.lanes.split(",");
 for (const l of chosen) if (!LANES[l]) throw new Error(`no lane ${l} (have ${Object.keys(LANES).join(", ")})`);

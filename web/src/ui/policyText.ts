@@ -15,14 +15,16 @@ export interface RuleRow<S, A extends string> {
 
 /** localPolicy (colony.ts), row by row: the first row that holds decides. */
 export const LOCAL_MODE_RULES: RuleRow<Situation, Mode>[] = [
-  { when: "an ant of the other colony is within two steps", then: "fight", test: (s) => s.enemy === "near" },
   { when: "it is tired (searched long outside without finding food)", then: "return", test: (s) => s.tired },
   { when: "the colony raids and the ant is exploring or fighting", then: "fight", test: (s) => s.stance === "raid" && (s.mode === "explore" || s.mode === "fight") },
   { when: "the colony defends and there is alarm scent ahead", then: "fight", test: (s) => s.stance === "defend" && s.alarm !== "none" },
-  { when: "it was fighting and no enemy is near: the fight is over", then: "return", test: (s) => s.mode === "fight" },
+  { when: "it was fighting, and its colony is not raiding: go home", then: "return", test: (s) => s.mode === "fight" },
   { when: "a strong food trail lies ahead", then: "follow", test: (s) => s.foodTrail === "strong" },
   { when: "no food trail lies ahead", then: "explore", test: (s) => s.foodTrail === "none" },
 ];
+
+/** Strangers in reach are not this rule's to answer (behaviour MR 4): the contact response decides. */
+export const LOCAL_MODE_STRANGERS = "Strangers within reach are not this rule's: the ant's contact response answers them (fight, flee, or drop and run; see Small responses).";
 
 /** What localPolicy does when no row holds: a faint trail keeps the ant at what it was doing, and one heading home turns to follow it. */
 export const LOCAL_MODE_OTHERWISE = "Otherwise (a faint food trail): keep doing what it was doing; an ant that was going home follows the trail back out instead.";
@@ -57,4 +59,6 @@ export const LOCAL_RESPONSE_RULES: [hook: string, rule: string][] = [
   ["carry", "Take whatever it holds where it belongs: food home, soil to the mound, the dead to the midden, brood to a brood chamber."],
   ["drop", "Put food down where it goes."],
   ["trail", "Carrying food: lay the food trail, more for richer food. Walking out: lay the home trail. Porters, soil and corpse carriers: nothing."],
+  ["alarm", "Faint alarm draws an explorer with empty jaws to look, and a follower keeps to its trail; strong alarm repels every ant but fighters and diggers."],
+  ["contact", "Strangers in reach: an ant carrying something takes it home; raiding, defending, or already sent to fight, it fights; otherwise, on a forage stance, it turns away and goes home."],
 ];

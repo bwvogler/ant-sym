@@ -95,9 +95,11 @@ export const GUIDE: GuideEntry[] = [
     swatch: ["var(--warn)"],
     onScreen: "Brown haze where ants fight, or where you paint the alarm brush.",
     realAnts: "Alarm is volatile: it reaches a few centimetres and fades fast, so it calls the nearby ants, not the colony. Its meaning depends on strength: faint attracts, strong triggers attack or digging.",
-    inGame: "It fades in about 3 s and reaches about 5 cells. Ants shy from it unless fighting; a colony that defends sends fighters to it. The graded meaning (faint attracts) is not built yet.",
+    inGame:
+      "It fades in about 3 s and reaches about 5 cells, and its meaning is graded: a faint alarm draws an explorer with empty jaws to look, while a strong one repels every ant but fighters and diggers. Ants in a fight lay it, and so does an ant that meets a stranger. A colony that defends sends fighters to it.",
     sources: [
       { note: "ant-communication", anchor: "tldr", label: "Ant communication: TL;DR" },
+      { note: "combat", anchor: "graded-alarm-a-little-draws-a-lot-repels-or-enrages", label: "Graded alarm" },
       { note: "fungus-policy", anchor: "a-perception-what-the-host-senses", label: "Fungus levers: perception" },
     ],
   },
@@ -107,10 +109,15 @@ export const GUIDE: GuideEntry[] = [
     swatch: ["var(--ink)", "var(--warn)"],
     onScreen: "Ants are coloured by their odour: Ink's start dark, Amber's in the warn tone. Fights break out where they meet.",
     realAnts:
-      "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. Neighbouring colonies are the most aggressive, and the closer colony often wins because it recruits faster. Fire-ant battles follow a roughly linear law, not Lanchester's square law; complex ground favours strong soldiers, open ground favours numbers.",
-    inGame: "An ant of the other colony within two steps counts as an enemy if its odour is far enough from the ant's own. Fights are settled by the odds in the cells around.",
+      "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. At food, the ant that didn't start an encounter usually retreats. Fire-ant battles follow a roughly linear law, not Lanchester's square law; narrow, cluttered ground lets a few strong defenders hold off many attackers, open ground favours numbers.",
+    inGame:
+      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, or drop its load and run. Without Jev: a carrier takes its load home, raiders and defenders fight, and on a forage stance the rest turn away. Fights are settled by the odds in the cells around, so in a narrow pass only the front ranks meet.",
     scripted: { bead: "ja-k4k.6", reads: "the colony's stance (forage, defend, raid) comes from map-wide food and colony totals, and raids aim at the rival's hole by its coordinates" },
-    sources: [{ note: "ant-communication", anchor: "3-rival-colonies", label: "Rival colonies" }],
+    sources: [
+      { note: "ant-communication", anchor: "3-rival-colonies", label: "Rival colonies" },
+      { note: "combat", anchor: "meeting-a-stranger-fight-flee-or-drop-and-run", label: "Meeting a stranger" },
+      { note: "combat", anchor: "terrain-narrow-ground-lets-the-few-hold-off-the-many", label: "Terrain" },
+    ],
   },
   {
     id: "fatigue",
@@ -221,6 +228,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "ant-communication", title: "Ant communication", covers: "Signal channels, their ranges and lifetimes, rival colonies, combat laws." },
   { note: "nest-and-home", title: "Nest and home", covers: "Finding home outside and inside, the queen, nest architecture, jobs by place and age." },
   { note: "trails", title: "Trails", covers: "The double bridge, trail amount by food quality, the “no entry” mark." },
+  { note: "combat", title: "Combat", covers: "Narrow ground and the few against the many, graded alarm, meeting a stranger." },
   { note: "tiredness", title: "Tiredness", covers: "When a forager gives up a search and how it recovers." },
   { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
