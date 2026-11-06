@@ -231,6 +231,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "combat", title: "Combat", covers: "Narrow ground and the few against the many, graded alarm, meeting a stranger." },
   { note: "tiredness", title: "Tiredness", covers: "When a forager gives up a search and how it recovers." },
   { note: "activation", title: "Activation", covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake." },
+  { note: "raid-recruitment", title: "Raid recruitment", covers: "Scouts find a rival and recruit before a raid; encounters at a border recruit; a trail brings the fighters." },
   { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
 ];
