@@ -163,7 +163,9 @@ export const localResponses: Responses = {
   contact: (t) => (t.carrying !== "none" ? "flee" : t.stance !== "forage" || t.mode === "fight" ? "fight" : "flee"),
   // Behaviour MR 5 (docs/activation.md): a waiting forager goes out on the returns of successful foragers (Gordon;
   // Pinter-Wollman et al. 2013); with none, it waits, and only scouts go. A fighting stance doesn't wait for food.
-  leave: (t) => (t.stance === "raid" ? (t.raid === "none" ? "wait" : "now") : t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : "wait"),
+  // A raider (mode fight) home on a raid stance goes on a scout's trail (behaviour MR 5.2); a forager answers its returns, and a
+  // colony that raids or defends sends it out whatever comes back (MR 5).
+  leave: (t) => (t.mode === "fight" ? (t.stance === "raid" && t.raid === "none" ? "wait" : "now") : t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : "wait"),
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */

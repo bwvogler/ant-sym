@@ -822,7 +822,8 @@ export const open: Assay = { id: "open", title: "A6 control: the same battle on 
  * Score: the trail's gain, the share reaching the rival with the raid trail against the same seed with no trail laid
  * (raidLay 0: scouts search alone; Polyergus raids stop without scouts, Topoff et al. 1987). Design marks: at least
  * RAID_GAIN times as many reach the rival with the trail, and at most RAID_STUCK of the outside samples are stuck.
- * (On main, with the rival's coordinates, 39 % reached and 1 % were stuck: raiders do get round this pocket.)
+ * `straight` is the same battle with the raiders sent at the rival hole's coordinates (`raidGate` 0, as before MR 5.2): the
+ * trail is a sensed cue, and costs reach against it (review of #41).
  */
 export const RAID_REACH = 10;
 export const RAID_GAIN = 1.5;
@@ -862,7 +863,7 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
     },
   };
 }
-function raidFindSpec(seed: number, lay?: number): RunSpec {
+function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
   const a = new Arena(120, 60).carve(2, 2, 117, 57).wall(40, 18, 60, 20).wall(40, 40, 60, 42).wall(58, 18, 60, 42);
   const own = at(20, 30);
   const rival = at(100, 30);
@@ -871,7 +872,7 @@ function raidFindSpec(seed: number, lay?: number): RunSpec {
     seconds: 300,
     map: () => a.build([{ x: 20, y: 30, r: 3 }, { x: 100, y: 30, r: 3 }]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
-    sides: { stance: always<Stance>("raid"), ...(lay === undefined ? {} : { colony: { raidLay: lay } }) },
+    sides: { stance: always<Stance>("raid"), ...(colony ? { colony } : {}) },
     probes: [raidProbe(own, rival)],
   };
 }
@@ -883,10 +884,11 @@ export const raidFind: Assay = {
   spec: (s) => raidFindSpec(s),
   score: (r) => {
     const reached = r.metrics.reached as number;
-    const deaf = runGame(raidFindSpec(r.seed, 0)).result.metrics.reached as number;
+    const deaf = runGame(raidFindSpec(r.seed, { raidLay: 0 })).result.metrics.reached as number;
+    const straight = runGame(raidFindSpec(r.seed, { raidGate: 0 })).result.metrics.reached as number; // main: at the rival hole's coordinates
     const gain = deaf > 0 ? reached / deaf : NaN;
     const stuck = r.metrics.stuck as number;
-    return { reached, deaf, gain, stuck, firstReach: r.metrics.firstReach as number, pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0 };
+    return { reached, deaf, straight, gain, stuck, firstReach: r.metrics.firstReach as number, pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0 };
   },
 };
 

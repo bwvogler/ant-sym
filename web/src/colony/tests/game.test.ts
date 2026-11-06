@@ -216,3 +216,39 @@ test("raids by trail (behaviour MR 5.2): a raider that meets strangers outside g
   assert.equal(old.reported, 0, "raidGate 0: no finders");
   assert.ok(!old.live, "raidGate 0: no trail");
 });
+
+test("raids by trail (review of #41): a raider with no enemy near climbs the raid trail; a finder is not made on the trail", () => {
+  // One raider out on an open field, a raid gradient rising to the east, and nothing else: it walks up the gradient.
+  const m = arena();
+  const c = new Colony(m, { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(4));
+  c.stance = "raid";
+  for (let y = 1; y <= 10; y++)
+    for (let x = 8; x <= 38; x++) {
+      const p = at(x, y);
+      c.ph.deposit("raid", p.x, p.y, 0.1 * (x - 6));
+    }
+  put(c, 0, 14, 6);
+  c.heading[0] = Math.PI; // facing away from it
+  const x0 = c.x[0] as number;
+  for (let k = 0; k < 120; k++) c.tick(1 / 30);
+  assert.ok((c.x[0] as number) > x0 + 6, `climbed east: ${x0.toFixed(1)} → ${(c.x[0] as number).toFixed(1)}`);
+
+  // A stranger beside a raider that stands on a raid trail is fought, not reported: the trail is where a scout was before.
+  const g = new Game(arena(), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid" });
+  const [a, b] = g.colonies as [Colony, Colony];
+  for (let i = 0; i < a.n; i++) {
+    a.alive[i] = i === 0 ? 1 : 0;
+    b.alive[i] = i === 0 ? 1 : 0;
+  }
+  put(a, 0, 20, 6);
+  put(b, 0, 20, 6);
+  const here = at(20, 6);
+  let reported = 0;
+  for (let k = 0; k < 90; k++) {
+    a.ph.deposit("raid", here.x, here.y, 1);
+    put(b, 0, 20, 6);
+    g.tick(1 / 30);
+    if (a.reporting[0]) reported++;
+  }
+  assert.equal(reported, 0, "no finder on a raid trail");
+});

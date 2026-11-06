@@ -3012,8 +3012,8 @@ export class Colony {
    * A rested forager waiting at home with empty jaws: does it go out this step (behaviour MR 5, docs/activation.md)? Its
    * `leave` response says how soon, from the returns it has felt; "wait" still lets a scout go at `scoutRate`.
    */
-  #leaves(i: number, dt: number, enemy: boolean, scout = this.params.scoutRate): boolean {
-    const answer = this.responses.leave(this.touch(i, enemy, RETURN, "none"));
+  #leaves(i: number, dt: number, enemy: boolean, scout = this.params.scoutRate, mode = RETURN): boolean {
+    const answer = this.responses.leave(this.touch(i, enemy, mode, "none"));
     const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : scout;
     return this.#rng() < 1 - Math.exp(-rate * dt);
   }
@@ -3241,7 +3241,7 @@ export class Colony {
         // (behaviour MR 5.2). Once it has gone it is out of the rule for a few seconds, so it clears the nest.
         if (rgate && !waiting && this.stance === "raid" && mode === FIGHT && !enemy && (this.#goT[i] as number) <= 0 && this.#atNestTop(i) && this.#raidSmelt(i) === "none") {
           waiting = true;
-          if (this.#leaves(i, dt, false, p.raidScout)) {
+          if (this.#leaves(i, dt, false, p.raidScout, FIGHT)) {
             waiting = false;
             this.#goT[i] = RAID_GO;
           }

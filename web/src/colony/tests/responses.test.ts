@@ -530,19 +530,24 @@ test("leave (behaviour MR 5): out now on many returns, soon on few, wait on none
   assert.equal(localResponses.leave(touch({ mode: "return", returns: "few" })), "soon");
   assert.equal(localResponses.leave(touch({ mode: "return", returns: "none" })), "wait");
   assert.equal(localResponses.leave(touch({ mode: "return", returns: "none", stance: "defend" })), "now");
-  // Raiding (behaviour MR 5.2): fighters go out on a scout's raid trail; without one they wait, and the scouts search.
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "none", stance: "raid" })), "now", "a forager home on a raid stance goes out whatever comes back (MR 5)");
+  // Raiding (behaviour MR 5.2): a raider home, in mode fight, goes on a scout's raid trail; without one it waits, and the scouts search.
   assert.equal(localResponses.leave(touch({ mode: "fight", stance: "raid", raid: "none" })), "wait");
   assert.equal(localResponses.leave(touch({ mode: "fight", stance: "raid", raid: "faint" })), "now");
   assert.equal(localResponses.leave(touch({ mode: "fight", stance: "raid", raid: "strong" })), "now");
-  assert.equal(responseKey("leave", touch({ mode: "return", returns: "few" })), "return|none|-|-|out|none|clear|forage|returns:few|raid:strong", "the leave lane keys on returns and the raid trail");
+  assert.equal(responseKey("leave", touch({ mode: "return", returns: "few" })), "return|none|-|-|out|none|clear|forage|returns:few", "a forager's key has its returns");
+  assert.equal(responseKey("leave", touch({ mode: "fight", stance: "raid", raid: "faint" })), "fight|none|-|-|out|none|clear|raid|raid:faint", "a raider's key has the raid trail, and no returns");
   assert.equal(responseKey("get", touch({ returns: "many" })), "explore|none|-|-|out|none|clear|forage", "the other lanes, never sent it, don't");
   type Ants = { ants: Record<string, Record<string, unknown>> };
-  const l = (packResponseRequest("leave", [{ id: "s0", situation: touch({ returns: "few" }) }], "Gather food.").state as Ants).ants;
+  const l = (packResponseRequest("leave", [{ id: "s0", situation: touch({ mode: "return", returns: "few" }) }], "Gather food.").state as Ants).ants;
   assert.equal(l.s0?.returns, "few");
-  assert.equal(l.s0?.raid, "strong");
+  assert.equal(l.s0?.raid, undefined, "a forager is not sent the raid trail");
+  const f = (packResponseRequest("leave", [{ id: "s0", situation: touch({ mode: "fight", stance: "raid", raid: "faint" }) }], "Gather food.").state as Ants).ants;
+  assert.equal(f.s0?.raid, "faint");
+  assert.equal(f.s0?.returns, undefined, "a raider is not sent its returns");
   const g = (packResponseRequest("trail", [{ id: "s0", situation: touch({ returns: "few" }) }], "Gather food.").state as Ants).ants;
   assert.equal(g.s0?.returns, undefined);
-  assert.equal(g.s0?.raid, undefined, "only the leave lane is sent the raid trail");
+  assert.equal(g.s0?.raid, undefined, "only the leave lane is sent either");
 });
 
 test("leave (behaviour MR 5): a rested forager home waits until nestmates come home with food; a scout goes anyway", () => {
