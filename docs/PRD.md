@@ -3126,7 +3126,7 @@ Research basis: `docs/raid-recruitment.md`. Every figure in it was read in a sea
 ### 49.3 Results (local rule)
 
 **A11, raiders find the rival round a pocket of wall** (200 raiders against 80 defenders, 300 s; new, seeds 1–20):
-- **With the trail:** 0.33 of the raiders reach the rival's nest (0.23–0.50); **without it** (`raidLay` 0: scouts search alone) 0.21 (0.10–0.36); `raidGate` 0, the old straight line: 0.38.
+- **With the trail:** 0.33 of the raiders reach the rival's nest (0.23–0.50); **without it** (`raidLay` 0: scouts search alone) 0.21 (0.10–0.36); `raidGate` 0, the old straight line (reported as `straight`): 0.39 (0.28–0.53). The trail is a sensed cue, and costs reach against coordinates.
 - **Gain** 1.67 median (0.65–4.24); the mark (at least 1.5× and at most 10 % stuck) passes 12/20 seeds, with a worst seed of 0.65. Stuck: 1 %.
 - Raiders lose less ground to the defenders: 63 attackers lost per run against 90 with coordinates, at 0.34 against 0.38 reaching.
 - **Tuning** (scout rate against finder's contact time): the best worst seed was `findAt` 1 at a raid scout rate of 0.05 (gain 1.08 worst, 16/20), but against a deaf control that kept the slower scouts. With the control matched, 0.05 gave gain 0.72: too many scouts need no trail. Kept: 0.3 and 1/90.
@@ -3149,10 +3149,19 @@ Losses −3 % and −10 %, food the same median. **The worst seed is worse:** se
 
 ### 49.4 Jev (at most $0.10)
 
-- **Live:** `colony-live.mjs all --top`, 257,897 and 258,365 tokens, **$0.0108 and $0.0109**. The leave lane is the lane with a new sense.
-- **First legend:** Cautious answered "wait" for a raiding ant with a strong trail. The legend now says a trail is the call to go; Cautious still waits (`raid:strong` → wait; only many returns say now).
-- **Replays** (G′ seeds 1–6, the first colony's food, against the local rule's 4,186 and 915 lost): Forage 4,794 (+14.5 %), losses 864 (−5.5 %); Cautious 2,539 (−39 %), 549 (−40 %); Warlike 3,074 (−27 %), 815 (−11 %). Stance was answered from the cache only 17–56 % of the time. In MR 5 the replays were +0.3, −1.6 and −5.5 %. The doctrines now hold raiders (and, on a raid stance, the foragers) at home: a doctrine effect, filed as `ja-7je`.
-- **Cost:** mode ~651 tokens per question ($0.074/h, unchanged); the response legend grew by one sentence, so all six response lanes together come to ~$0.116/h (MR 5: $0.109).
+- **Live:** `colony-live.mjs all --top`, about 250,000 input tokens a run, **$0.0105–0.0109** each (four runs). The leave lane is the lane with a new sense.
+- **The first version asked a waiting raider as a returning forager** (review of #41, S1): both got one key and one answer. Now a waiting raider is asked in mode fight, with the raid trail; a forager in mode return, with its returns. On a raid stance every ant at home is a raider to be, so all are asked as fighters. The legend no longer tells Jev to override its doctrine.
+- **Replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,186 and 915):
+
+| | Food stored | Lost | MR 5 (food) |
+|---|---|---|---|
+| Forage | 4,847 (+15.8 %) | 805 (−12 %) | +0.3 % |
+| Cautious | 2,505 (−40 %) | 539 (−41 %) | −1.6 % |
+| Warlike | 1,931 (−54 %) | 861 (−6 %) | −5.5 % |
+
+- **What the replays say.** Cautious and Warlike answer "wait" to a raider with no trail under it, and nearly all the raid-stance keys the run met were that one. A raid stance then idles the colony: the strategist raids when no food comes in, and a colony waiting for a trail brings none in. The local rule has the same loop, and only scouts (1/90 per second) break it. G′'s median food holds only because most seeds never raid for long. Filed as `ja-7je`, now a stance call-off question (no source reached).
+- **A variant that kept foragers out on a raid stance** (asked as returning foragers, `returns`, "now" locally): Cautious +3.5 %, Forage +12.7 %, Warlike −26 %. But every ant then went out with no trail, and A11's trail did not beat scouts alone (0.29 reach against 0.40, gain 0.78, 0/20): the trail was no cue. Not kept: it undoes what MR 5.2 is for.
+- **Cost:** mode ~651 tokens per question ($0.074/h, unchanged); the response legend grew, so all six response lanes together come to ~$0.116/h (MR 5: $0.109).
 
 ### 49.5 Left out
 
