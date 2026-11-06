@@ -3101,3 +3101,62 @@ Warlike raids more, as its doctrine asks. Before the fix the same caches replaye
 
 - The legend's new sentences reach every response lane.
 - All six lanes would cost ~$0.109/h if asked, against ~$0.096/h for MR 4's five. The page asks none of them.
+
+## 49. Raiders follow a scout's trail (behaviour MR 5.2, ja-tu3, ja-jwy, 2026-11-06)
+
+Research basis: `docs/raid-recruitment.md`. Every figure in it was read in a search summary, not the paper (the hosts were outside the network allowlist), so all are **unverified**.
+- Slave-making ants send scouts first. Removing *Polyergus breviceps* scouts left raids on 2 of 11 days (Topoff et al. 1987). A scout that finds a host nest goes home and recruits at its own entrance, and a column follows. Whether raiders follow a scent trail is disputed; a trail plus sight fits.
+- At a border an encounter recruits: honeypot-ant tournaments by alarm and a trail, weaver ants by a sternal-gland attractant and a rectal-gland trail.
+- Not found: whether rivals follow each other's trails, how a scout senses a rival nest itself, when a raid is called off. So the finder's cue is the sense the game has (meeting strangers), and a rival-nest odour is not built.
+
+### 49.1 What was there
+
+- A raiding colony's fighters steered straight at `raidTarget`, the rival hole's coordinates. No ant senses those (vision gap "Stance and raids").
+- Bead ja-jwy said a straight line sticks behind rock. In the new assay A11 it doesn't on `main`: raiders get round a pocket of wall (39 % reach the rival, 1 % stuck), by the detour rule. So the change here is the sense, not a rescue from walls.
+
+### 49.2 What MR 5.2 built (top-down maps; `raidGate` 1)
+
+- **A finder.** On a raid stance, a raider outside with empty jaws, no raid trail under it, and `findAt` (0.3) seconds of contact with strangers goes home (mode forced to "return", fleeing from them) and lays the new **`raid` channel** on the way: `raidLay` × `deposit`, 0.5 + seconds met (at most 3), falling with time since the find as the food trail does. Channel: evaporation 0.04, diffusion 0.3 (a fifth channel, as `noEntry` was a fourth; asleep until used).
+- **Fighters follow it.** A raider with no enemy near climbs the raid trail; with none it walks out, away from its home trail, and wanders (a scout). Walking to the coordinates is gone on top-down maps; the side view keeps it (its raiders already walk the tunnels cell by cell).
+- **Waiting.** A raider home with no raid trail under it waits like a forager with no returns (MR 5): it mills in the nest and goes out as a scout at `raidScout` (1/90 per second). With a trail under it, the `leave` response says "now". Once gone it is out of the rule for `RAID_GO` 4 s.
+- **`Touch.raid`** (none, faint, strong) is sent to the `leave` lane only. `leave` locally: a raid stance goes on a trail and waits without one; defend goes now; forage as MR 5. A colony without the gate reads "strong", so it behaves as before.
+- **Versions:** `RESPONSE_BRAIN_VERSION` 9. Mode and stance lanes unchanged.
+- **Side view and `raidGate` 0:** the same as `main`; the side-view golden is bit for bit, the top-down golden re-recorded.
+
+### 49.3 Results (local rule)
+
+**A11, raiders find the rival round a pocket of wall** (200 raiders against 80 defenders, 300 s; new, seeds 1–20):
+- **With the trail:** 0.33 of the raiders reach the rival's nest (0.23–0.50); **without it** (`raidLay` 0: scouts search alone) 0.21 (0.10–0.36); `raidGate` 0, the old straight line: 0.38.
+- **Gain** 1.67 median (0.65–4.24); the mark (at least 1.5× and at most 10 % stuck) passes 12/20 seeds, with a worst seed of 0.65. Stuck: 1 %.
+- Raiders lose less ground to the defenders: 63 attackers lost per run against 90 with coordinates, at 0.34 against 0.38 reaching.
+- **Tuning** (scout rate against finder's contact time): the best worst seed was `findAt` 1 at a raid scout rate of 0.05 (gain 1.08 worst, 16/20), but against a deaf control that kept the slower scouts. With the control matched, 0.05 gave gain 0.72: too many scouts need no trail. Kept: 0.3 and 1/90.
+- A single scout's trail is weak: `raidLay` 2 and 4 reached less (0.26, 0.24), since a stronger lay spreads wide.
+
+**A6 few against many through a pass** (seeds 1–6): pass 4/6, gain 1.70 (`main`: 9/10, 2.36). Raiders arrive by the trail in a trickle rather than at once, so more die per defender in the open (0.61 against 0.31 attackers per defender): the pass's relative gain falls.
+
+**A1–A5b, A9** (seeds 1–10): pass 10/10 each, as before (no raids in them). Slow suite: 14 pass, A10 todo.
+
+**G′, the top-down game, seeds 1–20** (both colonies on trail against both on the old coordinates; medians and extremes, the totals were not kept):
+
+| | Trail | Coordinates |
+|---|---|---|
+| First colony: ants alive at the end | 882 (3–900) | 855 (38–900) |
+| First colony: food stored | 4,086 (1,419–5,190) | 4,086 (1,337–5,780) |
+| First colony: ants lost | 853 (181–1,009) | 880 (131–1,260) |
+| Rival: ants lost | 773 (175–1,093) | 862 (123–1,186) |
+
+Losses −3 % and −10 %, food the same median. **The worst seed is worse:** seed 19 (ja-hgq) ends with 3 ants against 38. The rival is full (900) and raids from 60 s on, and its finders keep reporting. The mechanism works as meant on it, and it kills more.
+
+### 49.4 Jev (at most $0.10)
+
+- **Live:** `colony-live.mjs all --top`, 257,897 and 258,365 tokens, **$0.0108 and $0.0109**. The leave lane is the lane with a new sense.
+- **First legend:** Cautious answered "wait" for a raiding ant with a strong trail. The legend now says a trail is the call to go; Cautious still waits (`raid:strong` → wait; only many returns say now).
+- **Replays** (G′ seeds 1–6, the first colony's food, against the local rule's 4,186 and 915 lost): Forage 4,794 (+14.5 %), losses 864 (−5.5 %); Cautious 2,539 (−39 %), 549 (−40 %); Warlike 3,074 (−27 %), 815 (−11 %). Stance was answered from the cache only 17–56 % of the time. In MR 5 the replays were +0.3, −1.6 and −5.5 %. The doctrines now hold raiders (and, on a raid stance, the foragers) at home: a doctrine effect, filed as `ja-7je`.
+- **Cost:** mode ~651 tokens per question ($0.074/h, unchanged); the response legend grew by one sentence, so all six response lanes together come to ~$0.116/h (MR 5: $0.109).
+
+### 49.5 Left out
+
+- **The side view** still raids by coordinates and tunnel; its trail needs the tunnels' own senses (`ja-1a9`).
+- **Food or loot at a rival's entrance** (ja-um8's deferred note from MR 2) needs brood and prey carrying: `ja-gkl`.
+- **Stance** is still broadcast (`ja-k4k.6`).
+- **A rival-nest odour,** column marching, call-off: no sources reached.

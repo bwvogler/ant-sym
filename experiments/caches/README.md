@@ -15,3 +15,4 @@
 The MR 3.1 caches no longer replay after MR 3 (asked under response version 4), and the mr3-side/mr3-top caches (version 5) no longer replay after e6bce1f (version 6). The mr3-v6 and mr4 caches no longer replay after MR 5 (response version 8, stance version 4).
 
 `mr2-forage.json` is the ablation's "all of Jev's answers" input: the cache MR 2's live check wrote, which MR 3.1's live check later overwrote in `experiments/out/`.
+| `mr52-top-forage.json`, `mr52-top-cautious.json`, `mr52-top-warlike.json` | 2026-11-06, MR 5.2, each doctrine, top-down (`--top`), seed 1, 600 + 600, 300 s: the leave lane with the raid trail | 5 / 4 / 9 | until the next stance or response version | PRD §49.4: `npm run exp -- gameTop --seeds 1-6 --policy cache:experiments/caches/mr52-top-forage.json` |
