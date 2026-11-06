@@ -3013,7 +3013,10 @@ export class Colony {
    * `leave` response says how soon, from the returns it has felt; "wait" still lets a scout go at `scoutRate`.
    */
   #leaves(i: number, dt: number, enemy: boolean, scout = this.params.scoutRate, mode = RETURN): boolean {
-    const answer = this.responses.leave(this.touch(i, enemy, mode, "none"));
+    // On a raid stance, where the colony recruits by trail, every ant at home is a raider to be: asked in mode fight, so its
+    // answer rests on the raid trail and not on food returns (review of #41).
+    const asked = this.params.raidGate > 0 && this.#entrance === null && this.stance === "raid" ? FIGHT : mode;
+    const answer = this.responses.leave(this.touch(i, enemy, asked, "none"));
     const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : scout;
     return this.#rng() < 1 - Math.exp(-rate * dt);
   }
