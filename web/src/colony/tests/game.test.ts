@@ -186,3 +186,33 @@ test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer tow
   assert.ok(run(0.3) > y0 + 0.2, "faint: drawn south, toward it");
   assert.ok(run(12) < y0 - 0.2, "strong: turned north, away");
 });
+
+test("raids by trail (behaviour MR 5.2): a raider that meets strangers outside goes home laying the raid trail; one at home waits for it", () => {
+  const run = (raidGate: number) => {
+    const g = new Game(arena(), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid", colony: { raidGate } });
+    const [a, b] = g.colonies as [Colony, Colony];
+    for (let i = 0; i < a.n; i++) {
+      a.alive[i] = i < 2 ? 1 : 0;
+      b.alive[i] = i === 0 ? 1 : 0;
+    }
+    // Ant 0 is out on the field beside a stranger; ant 1 is at its own nest.
+    put(a, 0, 20, 6);
+    put(b, 0, 20, 6);
+    put(a, 1, 4, 6);
+    let reported = 0;
+    let waited = 0;
+    for (let k = 0; k < 90; k++) {
+      put(b, 0, 20, 6);
+      g.tick(1 / 30);
+      if (a.reporting[0]) reported++;
+      if (a.alive[1] && Math.hypot((a.x[1] as number) - a.nest.x, (a.y[1] as number) - a.nest.y) < a.nest.r) waited++;
+    }
+    return { reported, waited, live: a.ph.live("raid") };
+  };
+  const trail = run(1);
+  assert.ok(trail.reported > 0 && trail.live, "a finder turned for home and laid the raid trail");
+  assert.ok(trail.waited > 60, "the raider at home waited: no trail, no word where the rival is");
+  const old = run(0);
+  assert.equal(old.reported, 0, "raidGate 0: no finders");
+  assert.ok(!old.live, "raidGate 0: no trail");
+});

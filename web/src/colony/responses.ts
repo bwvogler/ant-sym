@@ -73,6 +73,11 @@ export interface Touch {
    * ants leave on the rate of successful returns): none, few or many; "none" where the colony doesn't gate leaving
    */
   returns: Returns;
+  /**
+   * the raid trail it smells where it is (behaviour MR 5.2, docs/raid-recruitment.md): none, faint or strong. A colony that
+   * doesn't recruit raiders by trail (raidGate 0, or the side view) reads "strong", so its raiders leave as they did.
+   */
+  raid: "none" | "faint" | "strong";
 }
 
 export type Returns = "none" | "few" | "many";
@@ -158,7 +163,7 @@ export const localResponses: Responses = {
   contact: (t) => (t.carrying !== "none" ? "flee" : t.stance !== "forage" || t.mode === "fight" ? "fight" : "flee"),
   // Behaviour MR 5 (docs/activation.md): a waiting forager goes out on the returns of successful foragers (Gordon;
   // Pinter-Wollman et al. 2013); with none, it waits, and only scouts go. A fighting stance doesn't wait for food.
-  leave: (t) => (t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : "wait"),
+  leave: (t) => (t.stance === "raid" ? (t.raid === "none" ? "wait" : "now") : t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : "wait"),
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */

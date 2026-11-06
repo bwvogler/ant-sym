@@ -218,6 +218,16 @@ export interface ColonyParams {
    */
   leaveGate: number;
   /**
+   * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
+   * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
+   * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
+   */
+  raidGate: number;
+  /** the raid trail a finder lays, as a share of `deposit` (more after meeting more strangers) */
+  raidLay: number;
+  /** seconds of contact with strangers that make a scout a finder */
+  findAt: number;
+  /**
    * a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers;
    * foragers waited about 3 min with none returning). 1/90: at 1/180 G′'s worst seed fell to 5 ants alive (PRD §48.4)
    */
@@ -239,7 +249,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, raidGate: 1, raidLay: 1, findAt: 0.3, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -455,6 +465,12 @@ export class Colony {
   fatigue: Float32Array;
   /** encounters with nestmates coming home with food, leaking with a half-life of MET_HALF (behaviour MR 5) */
   met: Float32Array;
+  /** seconds in contact with strangers, leaking (behaviour MR 5.2): how much of the rival a scout met; more lays a stronger raid trail */
+  foes: Float32Array;
+  /** 1 while the ant goes home to tell of the strangers it found, laying the raid trail (behaviour MR 5.2) */
+  reporting: Uint8Array;
+  /** seconds a raider that left the nest on a raid trail stays out of the waiting rule (behaviour MR 5.2) */
+  #goT: Float32Array;
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
   #storedSeen = 0;
@@ -669,6 +685,9 @@ export class Colony {
     this.since = new Float32Array(n);
     this.fatigue = new Float32Array(n);
     this.met = new Float32Array(n);
+    this.foes = new Float32Array(n);
+    this.reporting = new Uint8Array(n);
+    this.#goT = new Float32Array(n);
     this.quality = new Float32Array(n).fill(1);
     this.#tired = new Uint8Array(n);
     this.detour = new Float32Array(n);
@@ -753,6 +772,9 @@ export class Colony {
     this.since[i] = 0;
     this.fatigue[i] = 0;
     this.met[i] = 0;
+    this.foes[i] = 0;
+    this.reporting[i] = 0;
+    this.#goT[i] = 0;
     this.quality[i] = 1;
     this.#tired[i] = 0;
     this.detour[i] = 0;
@@ -866,6 +888,7 @@ export class Colony {
     const few = this.params.leaveGate;
     const met = this.met[i] as number;
     t.returns = few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
+    t.raid = this.#raidSmelt(i);
     return t;
   }
 
@@ -2993,6 +3016,13 @@ export class Colony {
     return this.#rng() < 1 - Math.exp(-rate * dt);
   }
 
+  /** The raid trail under ant i (behaviour MR 5.2); "strong" where the colony doesn't recruit raiders by trail. */
+  #raidSmelt(i: number): "none" | "faint" | "strong" {
+    if (this.params.raidGate <= 0 || this.#entrance !== null) return "strong";
+    if (!this.ph.live("raid")) return "none";
+    return trailLevel(this.ph.read("raid", this.x[i] as number, this.y[i] as number));
+  }
+
   /** Whether ant i is within its nest's radius on a top-down map. */
   #atNestTop(i: number): boolean {
     const dx = (this.x[i] as number) - this.nest.x;
@@ -3100,6 +3130,9 @@ export class Colony {
       seen.clear();
     }
     const metLeak = gate ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1;
+    // Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`.
+    const rgate = p.raidGate > 0 && this.#entrance === null;
+    const foeLeak = rgate ? Math.exp((-dt * Math.LN2) / FOES_HALF) : 1;
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       if (map.sky) this.#unbury(i);
@@ -3125,6 +3158,11 @@ export class Colony {
       const ar = sn[8] as number;
       const toEnemy = this.#enemyHeading(i);
       this.#oddsNow = toEnemy === null ? "none" : this.#odds(i);
+      if (rgate) {
+        this.foes[i] = (this.foes[i] as number) * foeLeak + (toEnemy === null ? 0 : dt);
+        if (this.reporting[i] === 1 && this.#atNestTop(i)) this.reporting[i] = 0;
+        if ((this.#goT[i] as number) > 0) this.#goT[i] = (this.#goT[i] as number) - dt;
+      }
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
       // this step (its trip is over: see `arrive`).
       // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
@@ -3138,6 +3176,15 @@ export class Colony {
       const pellet = this.pellet[i] === 1;
       const nursing = this.#holdsBrood[i] === 1;
       if (!pellet) this.#staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
+      // A finder (behaviour MR 5.2): a raider outside, its jaws empty, no raid trail under it, that has been in contact with
+      // strangers for findAt seconds goes home to tell, laying the raid trail on the way. (A raider on the trail meeting
+      // strangers fights them: the trail is where the scout was before.)
+      if (rgate && toEnemy !== null && this.reporting[i] === 0 && !carrying && !pellet && !nursing && this.stance === "raid" && (this.foes[i] as number) >= p.findAt && !this.#atNestTop(i) && this.#raidSmelt(i) === "none") {
+        this.reporting[i] = 1;
+        this.since[i] = 0;
+        this.#homeAfresh(i);
+      }
+      const reporting = this.reporting[i] === 1;
       // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
       // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
       let goal = this.#goal(i, pellet);
@@ -3156,14 +3203,14 @@ export class Colony {
       let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
       let waiting = false;
       let rolled = false; // asked `leave` this step already (behaviour MR 5): one roll a step, at the rate it answers
-      if (carrying || pellet || nursing) {
+      if (carrying || pellet || nursing || reporting) {
         // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
         // question comes once the load is down.
         mode = RETURN;
         this.mode[i] = mode;
         this.#asked[i] = -1;
         this.#question[i] = -1;
-        this.#loaded[i] = 1;
+        if (!reporting) this.#loaded[i] = 1;
       } else {
         // Its load just put down, wherever that was (spoil on the mound, a corpse on the midden, food in the larder): the
         // carrying trip is over, so it is not returning any more (ja-qnx; `arrive`). It heads back out along its trail: a
@@ -3188,6 +3235,15 @@ export class Colony {
         // Waiting at home (behaviour MR 5): where the colony gates leaving, a forager home in "return" is asked `leave`
         // (below), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
         waiting = gate && mode === RETURN && !enemy && this.#atNestTop(i);
+        // A raider home with no raid trail to go on waits like a forager with no returns; a scout goes now and then
+        // (behaviour MR 5.2). Once it has gone it is out of the rule for a few seconds, so it clears the nest.
+        if (rgate && !waiting && this.stance === "raid" && mode === FIGHT && !enemy && (this.#goT[i] as number) <= 0 && this.#atNestTop(i) && this.#raidSmelt(i) === "none") {
+          waiting = true;
+          if (this.#leaves(i, dt, false)) {
+            waiting = false;
+            this.#goT[i] = RAID_GO;
+          }
+        }
         if (before !== this.#asked[i] && !waiting) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.stance }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
@@ -3209,7 +3265,7 @@ export class Colony {
       // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
       if (toEnemy !== null) {
         const answer = resp.contact(this.touch(i, true, mode, item));
-        if (answer === "fight") {
+        if (answer === "fight" && !reporting) {
           if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
         } else {
           if (answer === "drop and run" && (carrying || pellet || nursing)) this.#putDown(i);
@@ -3508,6 +3564,17 @@ export class Colony {
           const own = this.#inOwnNest(CELL[0] as number, CELL[1] as number);
           const aim = own ? this.#entrance : (this.raidNest ?? this.raidTarget);
           h = turnToward(h, Math.atan2(aim.y - (this.y[i] as number), aim.x - (this.x[i] as number)), p.turnRate * dt) + noise * p.wander * 0.25;
+        } else if (rgate && this.stance === "raid" && !detouring) {
+          // Raiding by trail (behaviour MR 5.2): up the raid trail where there is one; without one, out and away from the home
+          // trail, searching (the scouts). No coordinates: the trail runs where a scout walked, so it goes round rock.
+          const x = this.x[i] as number;
+          const y = this.y[i] as number;
+          const d = p.sensorDistance;
+          const rl = Math.max(0, ph.read("raid", x + Math.cos(h - a) * d, y + Math.sin(h - a) * d));
+          const rf = Math.max(0, ph.read("raid", x + Math.cos(h) * d, y + Math.sin(h) * d));
+          const rr = Math.max(0, ph.read("raid", x + Math.cos(h + a) * d, y + Math.sin(h + a) * d));
+          if (Math.max(rl, rf, rr) >= FAINT) h += climb(rl, rf, rr, p.turnRate * dt) + noise * p.wander * 0.25;
+          else h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander;
         } else if (this.stance === "raid" && this.raidTarget && !detouring) {
           const t = this.raidTarget;
           h = turnToward(h, Math.atan2(t.y - (this.y[i] as number), t.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
@@ -3559,6 +3626,12 @@ export class Colony {
         ph.depositCell(trail, CELL[0] as number, CELL[1] as number, laid);
         const leak = this.crossLay[i] as number;
         if (carrying && leak > 0 && this.foreign) this.foreign.depositCell("food", CELL[0] as number, CELL[1] as number, laid * leak);
+      }
+
+      // A finder lays the raid trail home (behaviour MR 5.2), strongest where it met the strangers, more the more it met.
+      if (reporting && rgate) {
+        this.antCell(i);
+        ph.depositCell("raid", CELL[0] as number, CELL[1] as number, p.deposit * p.raidLay * Math.min(3, 0.5 + (this.foes[i] as number)) * Math.exp(-(this.since[i] as number) / p.depositDecay) * dt);
       }
 
       // Waiting at home (behaviour MR 5) it stays in, milling as far as the nest's rim, where foragers come home: past
@@ -3986,6 +4059,10 @@ export const INTAKE_NONE = 0.0005;
 export const INTAKE_PLENTY = 0.01;
 /** half-life (s) of an ant's count of contacts with nestmates bringing food (behaviour MR 5: a rise is felt within seconds, gone in a minute or so) */
 export const MET_HALF = 20;
+/** half-life (s) of a scout's count of seconds in contact with strangers (behaviour MR 5.2) */
+export const FOES_HALF = 20;
+/** seconds a raider that has left the nest stays out of the waiting rule (behaviour MR 5.2) */
+export const RAID_GO = 4;
 /** "many" returns: this many times the colony's leaveGate */
 export const RETURNS_MANY = 4;
 /** leave answered "now": the rate per second a waiting forager goes out (one left 3–8 s after a rise in contacts: Pinter-Wollman et al. 2013) */
