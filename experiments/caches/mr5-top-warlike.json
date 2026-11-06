@@ -1,0 +1,62 @@
+{
+ "version": {
+  "colony": 5,
+  "stance": 4,
+  "response": 8
+ },
+ "contexts": {
+  "mode": "colony-v5-af50f1aa",
+  "stance": "stance-v4-1cc01e21",
+  "get": "get-v8-4f3cdfe3",
+  "carry": "carry-v8-6f9cda8b",
+  "drop": "drop-v8-656de420",
+  "trail": "trail-v8-a816c306",
+  "contact": "contact-v8-280dbb2f",
+  "leave": "leave-v8-93a7517a"
+ },
+ "view": "top",
+ "seed": 1,
+ "ants": 600,
+ "seconds": 300,
+ "doctrine": {
+  "id": "warlike",
+  "name": "Warlike",
+  "text": "Destroy the rival colony. Explorers become raiders whenever the colony has ants to spare. Follow alarm scent to every fight. Forage only to grow the colony."
+ },
+ "modes": {},
+ "stances": {
+  "forage|some|none|clear|intake:some|low": "forage",
+  "forage|many|none|clear|intake:some|low": "raid",
+  "forage|many|some|clear|intake:some|low": "raid",
+  "forage|many|some|clear|intake:plenty|full": "raid",
+  "raid|many|heavy|clear|intake:plenty|full": "raid",
+  "raid|many|heavy|clear|intake:plenty|low": "raid",
+  "forage|many|heavy|clear|intake:plenty|full": "raid",
+  "raid|many|heavy|enemy|intake:plenty|full": "defend",
+  "defend|many|heavy|clear|intake:plenty|full": "raid",
+  "defend|many|heavy|enemy|intake:plenty|full": "defend",
+  "forage|many|heavy|clear|intake:plenty|low": "raid",
+  "forage|many|heavy|enemy|intake:plenty|full": "defend",
+  "defend|many|heavy|clear|intake:plenty|low": "raid",
+  "raid|many|heavy|enemy|intake:plenty|low": "defend",
+  "forage|many|heavy|enemy|intake:plenty|low": "defend",
+  "defend|many|heavy|clear|intake:some|low": "raid",
+  "forage|many|heavy|clear|intake:some|low": "raid"
+ },
+ "responses": {
+  "leave": {
+   "return|none|-|-|hole|none|clear|raid|returns:many": "now",
+   "return|none|-|-|hole|none|clear|raid|returns:few": "now",
+   "return|none|-|-|hole|none|clear|forage|returns:none": "wait",
+   "return|none|-|-|hole|none|clear|forage|returns:many": "now",
+   "return|none|-|-|hole|none|clear|forage|returns:few": "soon",
+   "return|none|-|-|hole|none|clear|raid|returns:none": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:many": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:few": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:none": "now",
+   "return|none|-|-|hole|none|enemy|forage|returns:few": "now",
+   "return|none|-|-|hole|none|enemy|forage|returns:none": "wait",
+   "return|none|-|-|hole|none|enemy|forage|returns:many": "now"
+  }
+ }
+}

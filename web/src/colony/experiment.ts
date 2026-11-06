@@ -5,7 +5,7 @@ import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
 import { localResponses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
-import { dropFood, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import { dropFood, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -650,10 +650,64 @@ export const alarm: Assay = {
 };
 
 /**
+ * A5's probe: once a second, the share of the colony outside the nest; every tick, trips out (an ant crossing from inside
+ * the nest's radius + 2 to outside it). Both are reported over windows of seconds [from, to).
+ */
+function outingProbe(nest: { x: number; y: number }, windows: Record<string, [number, number]>): Probe {
+  const outside: number[] = [];
+  const departs: number[] = [];
+  let was: Uint8Array = new Uint8Array(0);
+  let nextAt = 1;
+  return {
+    tick(game) {
+      const c = game.player;
+      if (was.length < c.n) {
+        const w = new Uint8Array(c.n);
+        w.set(was);
+        was = w;
+      }
+      const sec = Math.floor(game.time);
+      let out = 0;
+      let alive = 0;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i]) continue;
+        alive++;
+        const o = Math.hypot((c.x[i] as number) - nest.x, (c.y[i] as number) - nest.y) > c.nest.r + 2 ? 1 : 0;
+        if (o && !was[i]) departs[sec] = (departs[sec] ?? 0) + 1;
+        was[i] = o;
+        out += o;
+      }
+      if (game.time + 1e-9 >= nextAt) {
+        nextAt += 1;
+        outside.push(alive ? out / alive : 0);
+      }
+    },
+    summary() {
+      const m: Record<string, number> = {};
+      for (const [k, [a, b]] of Object.entries(windows)) {
+        m[`outside${k}`] = mean(outside.slice(a, b));
+        let d = 0;
+        for (let t = a; t < b; t++) d += departs[t] ?? 0;
+        m[`departs${k}`] = (d / (b - a)) * 60; // trips out per minute
+      }
+      return m;
+    },
+  };
+}
+
+/** Take every unit of food from the cells within r of world (x, y). */
+function clearFood(game: Game, x: number, y: number, r: number): void {
+  discWorld(game.map.size, x, y, r + 2, (cx, cy) => {
+    while (takeFoodCell(game.map, cx, cy));
+  });
+}
+
+/**
  * A5 — foraging regulation. With no food, a harvester-ant colony keeps most foragers home; when
  * foragers start coming back with food, more go out (Gordon; Pinter-Wollman et al. 2013: the rate of
- * returning foragers sets the rate of outgoing ones). Food appears at 120 s. Design mark: the share
- * of the colony outside the nest before food is at most half what it is once food flows.
+ * returning foragers sets the rate of outgoing ones; docs/activation.md). Food appears at 120 s. Design mark: the share
+ * of the colony outside the nest before food is at most half what it is once food flows. Trips out per minute are
+ * reported beside it, so a pass shows its cause.
  */
 export const regulate: Assay = {
   id: "regulate",
@@ -663,39 +717,52 @@ export const regulate: Assay = {
   spec: (seed) => {
     const nest = at(50, 50);
     const food = at(50, 15);
-    const outside: number[] = [];
-    let nextAt = 1;
-    const probe: Probe = {
-      tick(game) {
-        if (game.time + 1e-9 < nextAt) return;
-        nextAt += 1;
-        const c = game.player;
-        let out = 0;
-        let alive = 0;
-        for (let i = 0; i < c.n; i++) {
-          if (!c.alive[i]) continue;
-          alive++;
-          if (Math.hypot((c.x[i] as number) - nest.x, (c.y[i] as number) - nest.y) > c.nest.r + 2) out++;
-        }
-        outside.push(alive ? out / alive : 0);
-      },
-      summary() {
-        return { outsideBefore: mean(outside.slice(60, 120)), outsideAfter: mean(outside.slice(240, 360)) };
-      },
-    };
     return {
       seed,
       seconds: 360,
       map: () => new Arena(100, 100, true).build([{ x: 50, y: 50, r: 3 }]),
       game: { antCount: 300, rival: false },
       events: [{ at: 120, kind: "food", x: food.x, y: food.y, r: 3, perCell: 200 }],
-      probes: [probe],
+      probes: [outingProbe(nest, { Before: [60, 120], After: [240, 360] })],
     };
   },
   score: (r) => {
     const b = r.metrics.outsideBefore as number;
     const a = r.metrics.outsideAfter as number;
     return { pass: b <= 0.5 * a ? 1 : 0 };
+  },
+};
+
+/**
+ * A5b — foraging stops when food does. Food appears at 60 s and is taken away at 240 s, carriers' loads aside. With no
+ * successful foragers coming back, departures fall within minutes (Gordon 2002: removing returning foragers cut the
+ * outgoing rate, settling in about 3 min; docs/activation.md). Design mark: trips out per minute over the last two
+ * minutes are at most half those while food flowed.
+ */
+export const regulateStop: Assay = {
+  id: "regulateStop",
+  title: "A5b foraging stops: do departures fall once the food is gone?",
+  target: "trips out per minute, 300–420 s ≤ ½ × 150–240 s (Gordon 2002)",
+  seconds: 420,
+  spec: (seed) => {
+    const nest = at(50, 50);
+    const food = at(50, 15);
+    return {
+      seed,
+      seconds: 420,
+      map: () => new Arena(100, 100, true).build([{ x: 50, y: 50, r: 3 }]),
+      game: { antCount: 300, rival: false },
+      events: [
+        { at: 60, kind: "food", x: food.x, y: food.y, r: 3, perCell: 200 },
+        { at: 240, kind: "call", run: (g) => clearFood(g, food.x, food.y, 3) },
+      ],
+      probes: [outingProbe(nest, { Flow: [150, 240], Gone: [300, 420] })],
+    };
+  },
+  score: (r) => {
+    const f = r.metrics.departsFlow as number;
+    const g = r.metrics.departsGone as number;
+    return { pass: g <= 0.5 * f ? 1 : 0 };
   },
 };
 
@@ -902,4 +969,4 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, pass, open, contact, faintAlarm, game, gameTop, nestFlow];
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, contact, faintAlarm, game, gameTop, nestFlow];

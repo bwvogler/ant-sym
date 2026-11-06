@@ -68,7 +68,18 @@ export interface Touch {
    * outnumbered (under two thirds as many), even, outnumbering (over half as many again); "none" with no stranger near
    */
   odds: Odds;
+  /**
+   * nestmates bringing food home it has touched lately, at home (behaviour MR 5, docs/activation.md: Gordon's harvester
+   * ants leave on the rate of successful returns): none, few or many; "none" where the colony doesn't gate leaving
+   */
+  returns: Returns;
 }
+
+export type Returns = "none" | "few" | "many";
+
+/** How soon a rested forager waiting at home goes out (behaviour MR 5): now, soon, or wait (only a scout goes). */
+export const LEAVE = ["now", "soon", "wait"] as const;
+export type Leave = (typeof LEAVE)[number];
 
 export type Odds = "none" | "outnumbered" | "even" | "outnumbering";
 
@@ -115,6 +126,11 @@ export interface Responses {
    * "no entry" laid, as a share of the colony's `deposit` (0 = none).
    */
   noEntry(t: Touch): number;
+  /**
+   * Rested, empty-jawed and home, where the colony gates leaving: go out now, soon, or wait (only a scout goes out, now
+   * and then). `returns` says how many nestmates bringing food it has met lately (behaviour MR 5).
+   */
+  leave(t: Touch): Leave;
 }
 
 /**
@@ -140,6 +156,9 @@ export const localResponses: Responses = {
   // An ant its mode policy sent to fight (a doctrine's, or a raid's) fights: the local policy no longer sends ants to
   // fight just because strangers are near, and it sends a fighter home once the strangers are gone.
   contact: (t) => (t.carrying !== "none" ? "flee" : t.stance !== "forage" || t.mode === "fight" ? "fight" : "flee"),
+  // Behaviour MR 5 (docs/activation.md): a waiting forager goes out on the returns of successful foragers (Gordon;
+  // Pinter-Wollman et al. 2013); with none, it waits, and only scouts go. A fighting stance doesn't wait for food.
+  leave: (t) => (t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : "wait"),
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */

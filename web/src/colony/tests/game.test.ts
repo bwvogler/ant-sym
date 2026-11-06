@@ -23,7 +23,7 @@ function crowd(c: Colony, x: number, y: number, count: number): void {
 }
 
 const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
-const view = (s: Partial<StanceSituation>): StanceSituation => ({ stance: "forage", ants: "some", losses: "none", enemyNearNest: false, foodLeft: "plenty", larder: "low", ...s });
+const view = (s: Partial<StanceSituation>): StanceSituation => ({ stance: "forage", ants: "some", losses: "none", enemyNearNest: false, intake: "some", larder: "low", ...s });
 
 test("generateWorld: two nests, a walk apart, joined on foot, with food away from both", () => {
   for (let seed = 1; seed <= 15; seed++) {
@@ -51,8 +51,8 @@ test("localPolicy: enemies near are the contact response's (MR 4); raids take ex
 test("localStance: defend a nest under attack, raid when food is scarce or the colony is full and fed, else forage", () => {
   assert.equal(localStance(view({ enemyNearNest: true, losses: "some" })), "defend");
   assert.equal(localStance(view({ enemyNearNest: true })), "forage", "an enemy passing by is not an attack");
-  assert.equal(localStance(view({ foodLeft: "scarce" })), "raid");
-  assert.equal(localStance(view({ foodLeft: "scarce", ants: "few" })), "forage", "too few to raid");
+  assert.equal(localStance(view({ intake: "none" })), "raid");
+  assert.equal(localStance(view({ intake: "none", ants: "few" })), "forage", "too few to raid");
   assert.equal(localStance(view({ larder: "full", ants: "many" })), "raid");
   assert.equal(localStance(view({})), "forage");
 });

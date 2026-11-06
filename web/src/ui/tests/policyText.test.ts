@@ -18,6 +18,6 @@ test("the stance rule in words gives localStance's answer for every view", () =>
     for (const ants of ["few", "some", "many"] as const)
       for (const losses of ["none", "some", "heavy"] as const)
         for (const enemyNearNest of [false, true])
-          for (const foodLeft of ["plenty", "some", "scarce"] as const) for (const larder of ["low", "full"] as const) views.push({ stance, ants, losses, enemyNearNest, foodLeft, larder });
+          for (const intake of ["none", "some", "plenty"] as const) for (const larder of ["low", "full"] as const) views.push({ stance, ants, losses, enemyNearNest, intake, larder });
   for (const v of views) assert.equal(byRows(LOCAL_STANCE_RULES, () => LOCAL_STANCE_OTHERWISE, v), localStance(v), JSON.stringify(v));
 });

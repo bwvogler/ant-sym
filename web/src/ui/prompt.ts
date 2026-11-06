@@ -13,7 +13,7 @@ import type { LaneName } from "./colonyJev.ts";
 // estimates have always been.
 
 export const SAMPLE_SITUATION: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
-export const SAMPLE_STANCE: StanceSituation = { stance: "forage", ants: "some", losses: "none", enemyNearNest: false, foodLeft: "plenty", larder: "low" };
+export const SAMPLE_STANCE: StanceSituation = { stance: "forage", ants: "some", losses: "none", enemyNearNest: false, intake: "some", larder: "low" };
 export const SAMPLE_FUNGAL: FungalSituation = { strain: "garden", load: "mid", host: "explore", ground: "border", contact: "kin", groomed: false };
 const ALL_ON = new Set(INTERVENTIONS.map((v) => v.id));
 

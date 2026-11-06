@@ -1,0 +1,62 @@
+{
+ "version": {
+  "colony": 5,
+  "stance": 4,
+  "response": 8
+ },
+ "contexts": {
+  "mode": "colony-v5-94519ecf",
+  "stance": "stance-v4-b1ce9ef4",
+  "get": "get-v8-f76a30ae",
+  "carry": "carry-v8-1e25d586",
+  "drop": "drop-v8-2c098445",
+  "trail": "trail-v8-d85eef03",
+  "contact": "contact-v8-a26438a2",
+  "leave": "leave-v8-6fe7e9df"
+ },
+ "view": "top",
+ "seed": 1,
+ "ants": 600,
+ "seconds": 300,
+ "doctrine": {
+  "id": "cautious",
+  "name": "Cautious",
+  "text": "Safety first. Any alarm scent means go home, unless the colony is defending. Go home when tired. Otherwise follow food scent, even a faint one. Defend the nest; never raid."
+ },
+ "modes": {},
+ "stances": {
+  "forage|some|none|clear|intake:some|low": "forage",
+  "forage|many|none|clear|intake:some|low": "forage",
+  "forage|many|some|clear|intake:some|low": "forage",
+  "forage|many|some|clear|intake:plenty|full": "forage",
+  "raid|many|heavy|clear|intake:plenty|full": "defend",
+  "raid|many|heavy|clear|intake:plenty|low": "forage",
+  "forage|many|heavy|clear|intake:plenty|full": "forage",
+  "raid|many|heavy|enemy|intake:plenty|full": "defend",
+  "defend|many|heavy|clear|intake:plenty|full": "defend",
+  "defend|many|heavy|enemy|intake:plenty|full": "defend",
+  "forage|many|heavy|clear|intake:plenty|low": "forage",
+  "forage|many|heavy|enemy|intake:plenty|full": "defend",
+  "defend|many|heavy|clear|intake:plenty|low": "defend",
+  "raid|many|heavy|enemy|intake:plenty|low": "defend",
+  "forage|many|heavy|enemy|intake:plenty|low": "defend",
+  "defend|many|heavy|clear|intake:some|low": "defend",
+  "forage|many|heavy|clear|intake:some|low": "forage"
+ },
+ "responses": {
+  "leave": {
+   "return|none|-|-|hole|none|clear|raid|returns:many": "now",
+   "return|none|-|-|hole|none|clear|raid|returns:few": "now",
+   "return|none|-|-|hole|none|clear|forage|returns:none": "wait",
+   "return|none|-|-|hole|none|clear|forage|returns:many": "wait",
+   "return|none|-|-|hole|none|clear|forage|returns:few": "soon",
+   "return|none|-|-|hole|none|clear|raid|returns:none": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:many": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:few": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:none": "wait",
+   "return|none|-|-|hole|none|enemy|forage|returns:few": "wait",
+   "return|none|-|-|hole|none|enemy|forage|returns:none": "wait",
+   "return|none|-|-|hole|none|enemy|forage|returns:many": "wait"
+  }
+ }
+}

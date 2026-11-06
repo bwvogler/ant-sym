@@ -20,7 +20,7 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
 }
 
-const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", ...t }) as Touch;
+const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", returns: "none", ...t }) as Touch;
 
 /** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
 function forage(c: Colony, seconds = 20): { picked: boolean } {
@@ -217,7 +217,8 @@ test("arrive (ja-qnx): a returner home with empty jaws is no longer returning, t
   // Jev's answer to every returner, home or not (PRD §42.4): keep returning. Anything else explores.
   const stubborn = (s: { mode: string }) => (s.mode === "return" ? "return" : "explore") as "return" | "explore";
   const home = (arrive: "explore" | "return") => {
-    const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, arrive }, mulberry32(1));
+    // leaveGate 0: the trip's end alone (with the gate, behaviour MR 5, a rested forager home waits for returns: see leave).
+    const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, arrive, leaveGate: 0 }, mulberry32(1));
     c.policy = stubborn;
     put(c, 0, 12, 6);
     c.mode[0] = 2; // return
@@ -270,7 +271,8 @@ test("arrive in the side view: a fresh forager returning to the royal chamber is
 });
 
 test("rest on a top-down map: a tired returner rests in the nest for restTime before its trip ends (ja-q47; the hole used to rest it at once)", () => {
-  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, restTime: 30 }, mulberry32(1));
+  // leaveGate 0: rest alone (with the gate, behaviour MR 5, the rested ant then waits for returns: see leave).
+  const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, restTime: 30, leaveGate: 0 }, mulberry32(1));
   c.policy = (s) => (s.mode === "return" ? "return" : "explore");
   put(c, 0, 6, 6); // in the nest
   c.mode[0] = 2;
@@ -521,4 +523,43 @@ test("the contact lane (behaviour MR 4) is sent alarm and odds; the other lanes 
   const g = (packResponseRequest("carry", [{ id: "s0", situation: t }], "Gather food.").state as Ants).ants;
   assert.equal(g.s0?.alarm, undefined);
   assert.equal(g.s0?.odds, undefined);
+});
+
+test("leave (behaviour MR 5): out now on many returns, soon on few, wait on none; a fighting stance doesn't wait", () => {
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "many" })), "now");
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "few" })), "soon");
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "none" })), "wait");
+  assert.equal(localResponses.leave(touch({ mode: "return", returns: "none", stance: "raid" })), "now");
+  assert.equal(responseKey("leave", touch({ mode: "return", returns: "few" })), "return|none|-|-|out|none|clear|forage|returns:few", "the leave lane keys on returns");
+  assert.equal(responseKey("get", touch({ returns: "many" })), "explore|none|-|-|out|none|clear|forage", "the other lanes, never sent it, don't");
+  type Ants = { ants: Record<string, Record<string, unknown>> };
+  const l = (packResponseRequest("leave", [{ id: "s0", situation: touch({ returns: "few" }) }], "Gather food.").state as Ants).ants;
+  assert.equal(l.s0?.returns, "few");
+  const g = (packResponseRequest("trail", [{ id: "s0", situation: touch({ returns: "few" }) }], "Gather food.").state as Ants).ants;
+  assert.equal(g.s0?.returns, undefined);
+});
+
+test("leave (behaviour MR 5): a rested forager home waits until nestmates come home with food; a scout goes anyway", () => {
+  // Ant 0 is home, rested, in "return". Ant 1, if there, comes home beside it with food once a second and puts it down.
+  const run = (returns: boolean, scoutRate: number) => {
+    const c = new Colony(corridor(0), { antCount: 2, maxAnts: 2, leaveGate: 1, scoutRate }, mulberry32(3));
+    put(c, 0, 6, 6);
+    c.mode[0] = 2; // return
+    if (!returns) c.alive[1] = 0;
+    for (let k = 0; k < 30 * 20; k++) {
+      if (returns && k % 30 === 0) {
+        c.x[1] = c.x[0]!;
+        c.y[1] = c.y[0]!;
+        c.carrying[1] = 1;
+        c.mode[1] = 2;
+      }
+      c.tick(1 / 30);
+      if (c.mode[0] !== 2) return k / 30;
+    }
+    return Infinity;
+  };
+  assert.equal(run(false, 0), Infinity, "with nobody coming home with food and no scouting, it waits, and stays in the nest");
+  const met = run(true, 0);
+  assert.ok(met < 10, `nestmates coming home with food send it out (${met.toFixed(1)} s)`);
+  assert.ok(run(false, 5) < 2, "a high scout rate sends it out with no returns");
 });

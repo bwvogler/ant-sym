@@ -35,7 +35,7 @@ export function localModeOtherwise(s: Situation): Mode {
 /** localStance (colony.ts), row by row. */
 export const LOCAL_STANCE_RULES: RuleRow<StanceSituation, Stance>[] = [
   { when: "enemies are near the nest and ants were lost lately", then: "defend", test: (s) => s.enemyNearNest && s.losses !== "none" },
-  { when: "food on the map is scarce and the colony is not small", then: "raid", test: (s) => s.foodLeft === "scarce" && s.ants !== "few" },
+  { when: "no food has come in lately and the colony is not small", then: "raid", test: (s) => s.intake === "none" && s.ants !== "few" },
   { when: "the larder is full and the colony is at its size", then: "raid", test: (s) => s.larder === "full" && s.ants === "many" },
 ];
 export const LOCAL_STANCE_OTHERWISE: Stance = "forage";
@@ -61,4 +61,5 @@ export const LOCAL_RESPONSE_RULES: [hook: string, rule: string][] = [
   ["trail", "Carrying food: lay the food trail, more for richer food. Walking out: lay the home trail. Porters, soil and corpse carriers: nothing."],
   ["alarm", "Strong alarm repels every ant but fighters and diggers. On the top-down maps a faint one draws an explorer with empty jaws to look, and a follower keeps to its trail."],
   ["contact", "Strangers in reach: an ant carrying something takes it home; raiding, defending, or already sent to fight, it fights; otherwise, on a forage stance, it turns away and goes home."],
+  ["leave", "Rested and waiting at home (top-down maps): many nestmates coming home with food, go now; a few, go soon; none, wait, and only now and then go out to scout. A colony that raids or defends doesn't wait."],
 ];

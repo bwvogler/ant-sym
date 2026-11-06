@@ -457,10 +457,10 @@ function StanceExplainer() {
           ["ants", "few · some · many", "living ants against how many it can feed"],
           ["losses", "none · some · heavy", "ants lost lately"],
           ["enemyNearNest", "true · false", "rival ants close to home"],
-          ["foodLeft", "plenty · some · scarce", "food left on the whole map"],
+          ["intake", "none · some · plenty", "food its foragers brought home lately, for its size"],
           ["larder", "low · full", "food stored beyond what new ants need"],
         ]}
-        note="The strategist is not an ant: it reads colony and map totals no ant could sense. Replacing it with alarm, encounter rates and scouts' trails is an open vision gap (ja-k4k.6)."
+        note="The strategist is not an ant: it reads colony totals. Its food is the rate foragers bring it home (behaviour MR 5), not what is left on the map; the stance is still broadcast, and raids still aim at the rival's hole by its coordinates (ja-k4k.6, ja-tu3)."
       />
       <Choices items={STANCES.map((m) => [m, STANCE_CRITERIA[m].replace(/^\w+: /, "")])} />
       <RuleTable rows={LOCAL_STANCE_RULES} otherwise={`Otherwise: ${LOCAL_STANCE_OTHERWISE}.`} />

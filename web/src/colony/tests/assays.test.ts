@@ -46,7 +46,7 @@ test("overrides: a fight override keeps the other fight params; rival params rea
 test("overrides: responses replace the assay's own hook by hook", () => {
   const base = { ...deplete.spec(1), sides: { responses: { ...localResponses, trailRate: () => 3 } } };
   const spec = withOverrides(base, { responses: { get: () => false } });
-  const t = { mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none" } as const;
+  const t = { mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", returns: "none" } as const;
   assert.equal(spec.sides?.responses?.get(t), false);
   assert.equal(spec.sides?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
   assert.equal(spec.sides?.responses?.carry(t), "take");

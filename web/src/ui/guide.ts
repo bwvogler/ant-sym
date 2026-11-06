@@ -112,7 +112,7 @@ export const GUIDE: GuideEntry[] = [
       "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. At food, the ant that didn't start an encounter usually retreats. Fire-ant battles follow a roughly linear law, not Lanchester's square law; narrow, cluttered ground lets a few strong defenders hold off many attackers, open ground favours numbers.",
     inGame:
       "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, or drop its load and run. Without Jev: a carrier takes its load home, raiders and defenders fight, and on a forage stance the rest turn away. Fights are settled by the odds in the cells around, so in a narrow pass only the front ranks meet.",
-    scripted: { bead: "ja-k4k.6", reads: "the colony's stance (forage, defend, raid) comes from map-wide food and colony totals, and raids aim at the rival's hole by its coordinates" },
+    scripted: { bead: "ja-k4k.6", reads: "the colony's stance (forage, defend, raid) comes from colony totals and is broadcast to every ant, and raids aim at the rival's hole by its coordinates" },
     sources: [
       { note: "ant-communication", anchor: "3-rival-colonies", label: "Rival colonies" },
       { note: "combat", anchor: "meeting-a-stranger-fight-flee-or-drop-and-run", label: "Meeting a stranger" },
@@ -230,6 +230,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "trails", title: "Trails", covers: "The double bridge, trail amount by food quality, the “no entry” mark." },
   { note: "combat", title: "Combat", covers: "Narrow ground and the few against the many, graded alarm, meeting a stranger." },
   { note: "tiredness", title: "Tiredness", covers: "When a forager gives up a search and how it recovers." },
+  { note: "activation", title: "Activation", covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake." },
   { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
 ];
