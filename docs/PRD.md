@@ -2930,3 +2930,39 @@ The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants wou
 - The main column is the review's own measurement of main (ja-46w corrects §45.6's stale figures). All four lanes on main come to ~$0.078/h.
 - The legend's new sentences reach every response lane: all five would cost ~$0.096/h if asked. The page asks none of them.
 - Since #38's review the contact lane alone keys on alarm and odds (`colonyBrain.responseKey`). Before, every lane's key carried them, so identical requests in get, carry and trail landed under different keys.
+
+## 47. Learn: the research, the policy and the nest on the page (ja-epn, 2026-11-05)
+
+The page showed what happens but not why. The follow card named an ant's situation and who decided, and a few tooltips hinted at the rest. The research behind the senses lived only in `docs/`, the legend Jev reads was invisible, and chambers were unlabelled washes. The owner asked for ways to learn what you're seeing: the research, the policy and the nest structures.
+
+**Decisions (owner, 2026-11-05):**
+- **A Learn drawer, plus "?" buttons where things are.** A header button opens a drawer with three tabs. Each "?" opens it at the matching entry. The drawer's state is one small store (`ui/learn.ts`), so a "?" anywhere needs no callbacks threaded to it. The follow card's situation chips are links into it, and each choice has a "why?".
+- **The research as a field guide that links out.** Each entry covers one thing on screen in three parts: what you see, what real ants do (the notes' own claims) and how the game models it. Its sources link the notes' headings on GitHub, since the Pages build has no server to serve `docs/`. Full notes are not rendered in the page: they mix research with design detail meant for developers.
+- **Scripted behaviour is called out.** Where a behaviour is still a script reading something no ant can sense, the entry says so and names its vision gap (`ja-k4k.*`).
+- **The policy is editable there; the prompt is not.** A first version made each lane's legend editable. The owner's review: edit the *policy*, meaning each colony's doctrine and the fungus's aim, menu and hide/cull settings, and leave the rest of the prompt alone. The Policy tab is flat:
+  - The editors come first, bound to the same state as the side panel, so either place changes both. Edits commit on blur, as in the side panel.
+  - Then one level of collapsible sections explains how each decides: an ant's mode, the colony's stance, the fungus in a host, what Jev is sent (the legends, read only, with the exact request for the followed ant or a sample) and the small responses (local rule only).
+  - A "?" or "why?" opens the section it targets.
+- **The fungus has a policy too.** Jev picks, per fungal situation, what the fungus does to a host, under the player's aim and within the menu. With Jev off, each strain runs its default, within the menu and the hide/cull settings.
+- **Later, policy by inheritance (`ja-ygc`, owner's idea).** A living colony's doctrine would be fixed. A change would come only through a new queen sent out to found a colony, and only by some fraction of the mother's policy.
+
+**How it is built:**
+- **Field guide:** `ui/guide.ts` (16 entries) and its list of the notes. `tests/guide.test.ts` checks the guide against `docs/`:
+  - every cited note and heading exists, with anchors slugged as GitHub does;
+  - every note in the docs index is listed;
+  - every gap an entry calls scripted is still an open row in `vision.md`'s gap table.
+
+  So closing a gap or renaming a heading fails the test and names the entry to rewrite.
+- **The local rules in words:** `ui/policyText.ts` gives `localPolicy` and `localStance` as rows ("when …, then …"). `tests/policyText.test.ts` walks all 3,888 situations and every stance view and checks the rows give exactly the code's answers. The Policy tab highlights the row that decides the followed ant's situation.
+- **What Jev is sent** (`ui/prompt.ts`): the exact request for one situation from the same packers the client uses, and tokens per question at 100 situations to a request (the page's estimates always were). The brain modules and the Jev client are unchanged from main, apart from exporting `MODE_CRITERIA` and `STANCE_CRITERIA` and the `LaneName` type.
+- **Nest tab:** `ui/nest.ts` reads each nest from the chamber table: per chamber its role, depth below the ground line, cells (floor), the ants in it now, brood and food; plus the queen, the brood by stage, inside against out, and the midden. The tab says plainly that this is the player's view: an ant senses only the role of the chamber it stands in.
+- **Labels on the field:** a **Labels** button on the field (side view) names each chamber by its role. With labels on, a click on a chamber with no ant under it opens the Nest tab at that chamber's row.
+- **Shared colours:** the field's role, brood and home-trail colours moved to `ui/palette.ts`, so the swatches and the canvas share one source.
+
+**Cost.** None: the requests and their contexts are byte-identical (`colony-cost` unchanged: ~769 tokens per question on the top-down session, $0.022/h). A doctrine or aim edited in the drawer re-asks exactly as one edited in the side panel always has.
+
+**Not done:**
+- Rendering whole notes in the page.
+- Moving the camera to a chamber picked in the table.
+- Recording who decided at decision time rather than at render time (`ja-kxw`, still open).
+- Filed while doing this: `ja-px9`. `docs/nest-chemistry.md` is missing although `ja-k4k.9` is closed.

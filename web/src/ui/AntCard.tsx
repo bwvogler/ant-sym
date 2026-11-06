@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { MODES, type Colony, type Mode, type Situation } from "../colony/colony.ts";
+import { MODES, TRAILS, type Colony, type Mode, type Situation } from "../colony/colony.ts";
 import { INFECTED, INTERVENTIONS, STRAINS } from "../colony/fungus.ts";
 import { decodeFungal, type FungalSituation } from "../colony/fungalPolicy.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
+import Help from "./Help.tsx";
+import { openLearn, type LearnTarget } from "./learn.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
 // when it last chose, and who made the choice: Jev's cached answer for
@@ -61,14 +63,17 @@ export default function AntCard({ followed, colony, rival, explain, explainFungu
       ) : q ? (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-fg-3">last asked:</span>
-          {chips(q).map(([k, v]) => (
-            <span key={k} className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2">
+          {chips(q).map(([k, v, to]) => (
+            <button key={k} type="button" className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2 hover:text-accent hover:underline" onClick={() => openLearn(to)} title={`Learn: ${k}`}>
               {k} {v}
-            </span>
+            </button>
           ))}
           <span className="text-fg-3">→</span>
           <span className="rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent">{mode}</span>
           <span className="text-fg-3">{decided ? `by ${BY[decided.by]}` : ""}</span>
+          <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "mode" })}>
+            why?
+          </button>
         </div>
       ) : (
         <p className="mt-2 text-xs text-fg-3">Not asked yet.</p>
@@ -96,6 +101,7 @@ function Fungal({ col, i, explain }: { col: Colony; i: number; explain: Props["e
     {sensed && (
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
         <span className="text-fg-3">the fungus senses:</span>
+        <Help to={{ tab: "guide", id: "fungus" }} label="the fungus" />
         {(
           [
             ["load", sensed.load],
@@ -112,6 +118,9 @@ function Fungal({ col, i, explain }: { col: Colony; i: number; explain: Props["e
         <span className="text-fg-3">→</span>
         <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-spore">{run?.name ?? "?"}</span>
         <span className="text-fg-3">{by ? `by ${FUNGUS_BY[by]}` : ""}</span>
+        <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "fungus" })}>
+          why?
+        </button>
       </div>
     )}
     <p className="mt-2 text-xs text-fg-2">
@@ -158,14 +167,16 @@ function perceives(col: Colony, i: number): string[] {
   return out;
 }
 
-function chips(s: Situation): [string, string][] {
+/** The situation's fields, each with where the Learn drawer explains it. */
+function chips(s: Situation): [string, string, LearnTarget][] {
+  const underground = !(TRAILS as readonly string[]).includes(s.homeTrail);
   return [
-    ["mode", s.mode],
-    [s.tired ? "tired" : "fresh", ""],
-    ["food", s.foodTrail],
-    ["home", s.homeTrail],
-    ["alarm", s.alarm],
-    ["enemy", s.enemy],
-    ["stance", s.stance],
+    ["mode", s.mode, { tab: "policy", id: "mode" }],
+    [s.tired ? "tired" : "fresh", "", { tab: "guide", id: "fatigue" }],
+    ["food", s.foodTrail, { tab: "guide", id: "food-trail" }],
+    ["home", s.homeTrail, { tab: "guide", id: underground ? "inside" : "home-trail" }],
+    ["alarm", s.alarm, { tab: "guide", id: "alarm" }],
+    ["enemy", s.enemy, { tab: "guide", id: "strangers" }],
+    ["stance", s.stance, { tab: "policy", id: "stance" }],
   ];
 }

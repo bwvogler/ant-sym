@@ -14,6 +14,8 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 | [combat.md](combat.md) | research + design (MR 4) | Narrow ground lets a smaller, stronger side hold off numbers (Lymbery et al. 2023); alarm that draws at low doses and repels at high; who retreats when strangers meet at food. Basis for terrain-limited combat, graded alarm and the `contact` response. |
 | [queens-and-merging.md](queens-and-merging.md) | research + design (not built) | Several queens, adoption, and orphaned colonies merging as a route to unification. |
 
+The page's **Learn** drawer quotes these notes in its field guide (`web/src/ui/guide.ts`), linking their headings. `guide.test.ts` fails when a cited heading is renamed or a gap the guide calls scripted is closed: update the entry with the note.
+
 ## Records
 
 - [PRD.md](PRD.md) is the decision log. It holds every product decision, why it was made, and the measured Jev numbers, milestone by milestone. §1–8 are the removed picture mode.
