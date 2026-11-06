@@ -63,12 +63,17 @@ export default function LearnDrawer(props: Props) {
   const body = useRef<HTMLDivElement>(null);
   const open = target !== null;
 
-  // Opening moves focus into the drawer; Escape closes it.
+  // Opening moves focus into the drawer; Escape closes it. An Escape the field already handled (it unfollows an ant)
+  // is the field's alone (review: one key did both). A doctrine or aim being typed is committed first: its onBlur
+  // would not run once the textarea unmounts, leaving Jev on the old words while both panels show the new.
   useEffect(() => {
     if (!open) return;
     panel.current?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeLearn();
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const a = document.activeElement;
+      if (a instanceof HTMLElement && panel.current?.contains(a)) a.blur();
+      closeLearn();
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
@@ -105,7 +110,7 @@ export default function LearnDrawer(props: Props) {
       </div>
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-sm text-fg-2">
         {target.tab === "guide" && <GuideTab focus={target.id} />}
-        {target.tab === "policy" && <PolicyTab {...props} focus={target.id} />}
+        {target.tab === "policy" && <PolicyTab {...props} focus={target.id} ping={target} />}
         {target.tab === "nest" && <NestTab {...props} focus={target.id} />}
       </div>
     </div>
@@ -197,7 +202,7 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
  * same state), then how each decides, one collapsible section each. The legend Jev reads is shown, not edited: the
  * owner's call (PRD §47).
  */
-function PolicyTab(props: Props & { focus?: string }) {
+function PolicyTab(props: Props & { focus?: string; ping: object }) {
   const sides = props.colonies.length;
   return (
     <div className="flex flex-col gap-4">
@@ -293,19 +298,19 @@ function PolicyTab(props: Props & { focus?: string }) {
 
       <div className="flex flex-col gap-2">
         <h3 className={h3}>How each decides</h3>
-        <Section id="mode" title="How an ant chooses what to do" focus={props.focus}>
+        <Section id="mode" ping={props.ping} title="How an ant chooses what to do" focus={props.focus}>
           <ModeExplainer {...props} />
         </Section>
-        <Section id="stance" title="How the colony picks its stance" focus={props.focus}>
+        <Section id="stance" ping={props.ping} title="How the colony picks its stance" focus={props.focus}>
           <StanceExplainer />
         </Section>
-        <Section id="fungus" title="How the fungus chooses what to do to a host" focus={props.focus}>
+        <Section id="fungus" ping={props.ping} title="How the fungus chooses what to do to a host" focus={props.focus}>
           <FungusExplainer {...props} />
         </Section>
-        <Section id="sent" title="What Jev is sent" focus={props.focus}>
+        <Section id="sent" ping={props.ping} title="What Jev is sent" focus={props.focus}>
           <SentExplainer {...props} />
         </Section>
-        <Section id="responses" title="Small responses (local rule only)" focus={props.focus}>
+        <Section id="responses" ping={props.ping} title="Small responses (local rule only)" focus={props.focus}>
           <ResponsesExplainer />
         </Section>
       </div>
@@ -314,11 +319,20 @@ function PolicyTab(props: Props & { focus?: string }) {
   );
 }
 
-/** One collapsible explainer; open when a "?" or "why?" targets it. */
-function Section({ id, title, focus, children }: { id: string; title: string; focus?: string; children: ReactNode }) {
+/**
+ * One collapsible explainer. The reader opens and closes it; a "?" or "why?" aimed at it opens it again, each time it is
+ * pressed (`ping` is the drawer's target, a new object per press), and leaves the other sections as the reader left them.
+ */
+function Section({ id, title, focus, ping, children }: { id: string; title: string; focus?: string; ping: object; children: ReactNode }) {
   const hot = focus === id;
+  const [open, setOpen] = useState(hot);
+  const [seen, setSeen] = useState(ping);
+  if (seen !== ping) {
+    setSeen(ping);
+    if (hot) setOpen(true);
+  }
   return (
-    <details id={`learn-${id}`} key={hot ? "hot" : "cold"} open={hot || undefined} className={`scroll-mt-2 rounded-lg border bg-panel ${hot ? "border-accent/60" : "border-line"}`}>
+    <details id={`learn-${id}`} open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className={`scroll-mt-2 rounded-lg border bg-panel ${hot ? "border-accent/60" : "border-line"}`}>
       <summary className="cursor-pointer px-3 py-2 text-[13px] font-medium text-fg">{title}</summary>
       <div className="flex flex-col gap-3 border-t border-line px-3 py-3">{children}</div>
     </details>
@@ -382,6 +396,11 @@ function followedSituation(colonies: readonly Colony[], f: Followed | null): { k
   if (!f || !colonies[0]) return null;
   const col = followedColony(colonies[0], colonies[1] ?? null, f);
   return col ? { k: sideIndex(f), i: f.i, col, s: col.lastQuestion(f.i) } : null;
+}
+
+/** The menu as the fungus runs it on this map: the nest's interventions only where there is a nest (Fungus.menu drops them). */
+function mapMenu(props: Props): string[] {
+  return props.menu.filter((id) => props.sideView || !NEST_ONLY.has(id));
 }
 
 /** What the fungus senses in the followed ant, if it is infected. */
@@ -463,7 +482,7 @@ function FungusExplainer(props: Props) {
           ["groomed", "true · false", "enough nestmates around to groom the fungus off"],
         ]}
       />
-      <Choices items={INTERVENTIONS.filter((v) => props.menu.includes(v.id)).map((v) => [v.name, v.blurb])} />
+      <Choices items={INTERVENTIONS.filter((v) => mapMenu(props).includes(v.id)).map((v) => [v.name, v.blurb])} />
       <div>
         <h4 className={h3}>The local rule</h4>
         <ol className="mt-1.5 flex list-decimal flex-col gap-1 pl-4 text-[13px]">
@@ -485,7 +504,7 @@ function SentExplainer(props: Props) {
   const lanes: { name: string; sample: Sample; words: string; about: string; tokens: number }[] = [
     { name: "An ant's mode", sample: { lane: "mode", situation: fol?.s ?? SAMPLE_SITUATION }, words: doctrine, about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation", tokens: tokensPerQuestion("mode", doctrine) },
     { name: "The colony's stance", sample: { lane: "stance", situation: SAMPLE_STANCE }, words: doctrine, about: "a sample view", tokens: tokensPerQuestion("stance", doctrine) },
-    { name: "The fungus, in one host", sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(props.menu) }, words: props.aim.text, about: fungal ? `ant #${fungal.i}` : "a sample host", tokens: tokensPerQuestion("fungus", props.aim.text) },
+    { name: "The fungus, in one host", sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(mapMenu(props)) }, words: props.aim.text, about: fungal ? `ant #${fungal.i}` : "a sample host", tokens: tokensPerQuestion("fungus", props.aim.text) },
   ];
   return (
     <>
@@ -508,7 +527,7 @@ function ResponsesExplainer() {
   return (
     <>
       <p className="text-[13px]">
-        On this page an ant's small responses are decided by the local rule: Jev is not asked them here. <span className="font-mono text-xs">scripts/colony-live.mjs</span> asks them offline, against this legend and these questions.
+        On this page an ant's small responses are decided by the local rule: Jev is not asked them here. <span className="font-mono text-xs">scripts/colony-live.mjs</span> asks the questions below offline, against this legend; the alarm rule has no question yet.
       </p>
       <dl className="flex flex-col gap-1 text-[13px]">
         {LOCAL_RESPONSE_RULES.map(([hook, rule]) => (

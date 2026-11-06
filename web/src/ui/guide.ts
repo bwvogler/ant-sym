@@ -96,7 +96,7 @@ export const GUIDE: GuideEntry[] = [
     onScreen: "Brown haze where ants fight, or where you paint the alarm brush.",
     realAnts: "Alarm is volatile: it reaches a few centimetres and fades fast, so it calls the nearby ants, not the colony. Its meaning depends on strength: faint attracts, strong triggers attack or digging.",
     inGame:
-      "It fades in about 3 s and reaches about 5 cells, and its meaning is graded: a faint alarm draws an explorer with empty jaws to look, while a strong one repels every ant but fighters and diggers. Ants in a fight lay it, and so does an ant that meets a stranger. A colony that defends sends fighters to it.",
+      "It fades in about 3 s and reaches about 5 cells, and its meaning is graded: a strong alarm repels every ant but fighters and diggers, and on the top-down maps a faint one draws an explorer with empty jaws to look (in the side view the drawn explorers crowded the tunnels, so it doesn't there). Ants in a fight lay it, and so does an ant that meets a stranger. A colony that defends sends fighters to it.",
     sources: [
       { note: "ant-communication", anchor: "tldr", label: "Ant communication: TL;DR" },
       { note: "combat", anchor: "graded-alarm-a-little-draws-a-lot-repels-or-enrages", label: "Graded alarm" },

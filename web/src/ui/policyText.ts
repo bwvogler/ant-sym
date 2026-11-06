@@ -18,7 +18,7 @@ export const LOCAL_MODE_RULES: RuleRow<Situation, Mode>[] = [
   { when: "it is tired (searched long outside without finding food)", then: "return", test: (s) => s.tired },
   { when: "the colony raids and the ant is exploring or fighting", then: "fight", test: (s) => s.stance === "raid" && (s.mode === "explore" || s.mode === "fight") },
   { when: "the colony defends and there is alarm scent ahead", then: "fight", test: (s) => s.stance === "defend" && s.alarm !== "none" },
-  { when: "it was fighting, and its colony is not raiding: go home", then: "return", test: (s) => s.mode === "fight" },
+  { when: "it was fighting, and its colony is not raiding", then: "return", test: (s) => s.mode === "fight" },
   { when: "a strong food trail lies ahead", then: "follow", test: (s) => s.foodTrail === "strong" },
   { when: "no food trail lies ahead", then: "explore", test: (s) => s.foodTrail === "none" },
 ];
@@ -59,6 +59,6 @@ export const LOCAL_RESPONSE_RULES: [hook: string, rule: string][] = [
   ["carry", "Take whatever it holds where it belongs: food home, soil to the mound, the dead to the midden, brood to a brood chamber."],
   ["drop", "Put food down where it goes."],
   ["trail", "Carrying food: lay the food trail, more for richer food. Walking out: lay the home trail. Porters, soil and corpse carriers: nothing."],
-  ["alarm", "Faint alarm draws an explorer with empty jaws to look, and a follower keeps to its trail; strong alarm repels every ant but fighters and diggers."],
+  ["alarm", "Strong alarm repels every ant but fighters and diggers. On the top-down maps a faint one draws an explorer with empty jaws to look, and a follower keeps to its trail."],
   ["contact", "Strangers in reach: an ant carrying something takes it home; raiding, defending, or already sent to fight, it fights; otherwise, on a forage stance, it turns away and goes home."],
 ];
