@@ -214,10 +214,13 @@ export interface ColonyParams {
    * Activation (behaviour MR 5, docs/activation.md): encounters with nestmates coming home with food, in the ant's
    * leaky count `met`, from which a waiting forager senses returns as "few" (RETURNS_MANY times as many: "many"). A
    * rested forager home with empty jaws is then asked `leave` instead of going straight out. 0 = off: it goes straight
-   * out. Top-down maps only. 1 (PRD §47: G′ seeds 1–20 lost 6.4 % fewer ants for 3.4 % less food home; A5 passes).
+   * out. Top-down maps only. 1 (PRD §47.4: G′ seeds 1–20 lost 5.2 % fewer ants for 2.9 % less food home; A5 passes).
    */
   leaveGate: number;
-  /** a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers; foragers waited about 3 min with none returning: 1/180) */
+  /**
+   * a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers;
+   * foragers waited about 3 min with none returning). 1/90: at 1/180 G′'s worst seed fell to 5 ants alive (PRD §47.4)
+   */
   scoutRate: number;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
   odour: number;
@@ -236,7 +239,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, scoutRate: 1 / 180, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -1246,7 +1249,7 @@ export class Colony {
       losses: this.recentLosses < 1 ? "none" : this.recentLosses < 10 ? "some" : "heavy",
       enemyNearNest,
       // Until it has watched a whole window the colony can't tell: "some".
-      intake: this.time < INTAKE_WINDOW || intake >= INTAKE_PLENTY ? (this.time < INTAKE_WINDOW ? "some" : "plenty") : intake < INTAKE_NONE ? "none" : "some",
+      intake: this.time < INTAKE_WINDOW ? "some" : intake < INTAKE_NONE ? "none" : intake >= INTAKE_PLENTY ? "plenty" : "some",
       larder: this.#spare() >= 2 * this.params.foodPerAnt ? "full" : "low",
     };
   }
@@ -3152,6 +3155,7 @@ export class Colony {
       const resp = this.responses;
       let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
       let waiting = false;
+      let rolled = false; // asked `leave` this step already (behaviour MR 5): one roll a step, at the rate it answers
       if (carrying || pellet || nursing) {
         // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
         // question comes once the load is down.
@@ -3806,7 +3810,7 @@ export class Colony {
         this.since[i] = 0;
         // Home and resting in "return" (its policy said so, or a cached answer did: ja-qnx): after REST seconds it is
         // asked afresh as an explorer, once it is no longer tired (fatigue rests it first: ja-q47).
-        if (mode === RETURN && !carrying && !pellet && !this.#isTired(i) && (this.#restT[i] = (this.#restT[i] as number) + dt) > REST && (!gate || this.#leaves(i, dt, toEnemy !== null))) {
+        if (mode === RETURN && !carrying && !pellet && !this.#isTired(i) && (this.#restT[i] = (this.#restT[i] as number) + dt) > REST && (!gate || ((rolled = true), this.#leaves(i, dt, toEnemy !== null)))) {
           this.mode[i] = EXPLORE;
           this.#asked[i] = -1;
           this.#restT[i] = 0;
@@ -3845,7 +3849,7 @@ export class Colony {
       // - in any chamber, it left the young off the queen's side (zoning.test);
       // - for the young and middle-aged, who work inside, it sent porters out and the queen starved on 1-2 of 4 worlds in
       //   the hour-long economy run (slow/economy.test).
-      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && !this.#isTired(i) && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i)) && (!gate || this.#leaves(i, dt, toEnemy !== null))) {
+      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && !this.#isTired(i) && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i)) && (!gate || (!rolled && this.#leaves(i, dt, toEnemy !== null)))) {
         this.mode[i] = p.arrive === "follow" ? FOLLOW : EXPLORE;
         this.#asked[i] = -1;
         this.#restT[i] = 0;

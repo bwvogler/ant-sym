@@ -67,7 +67,7 @@ The paper sites (journals.plos.org, pmc.ncbi.nlm.nih.gov, frontiersin.org) were 
   - "soon" at 0.2 per second, in line with the 3–8 s delay;
   - "wait" stays in, milling out to 0.9 of the nest's radius, where foragers come home.
 - **The local rule:** many returns (4 or more), now; a few (at least 1, `leaveGate`), soon; none, wait. A colony that is raiding or defending doesn't wait.
-- **Scouts.** A waiting ant still goes out at 1/180 per second (`scoutRate`), about Gordon's 3 minutes with nothing returning.
+- **Scouts.** A waiting ant still goes out at 1/90 per second (`scoutRate`), the same order as Gordon's 3 minutes with nothing returning; at 1/180 the top-down game's worst seed fell to 5 ants alive.
   - With scouts at 1/30 per second, the returns made no difference: every waiting ant was out within a minute or two whatever came back.
 - **The strategist** reads `intake`, food stored per ant per second over the last 60 s, instead of the map's food left.
 - **The side view** is unchanged: a fresh forager still leaves the royal chamber at once (bead `ja-web`).

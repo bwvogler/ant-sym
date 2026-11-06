@@ -2969,7 +2969,8 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
 - **Waiting.** On a top-down map, a rested forager home in "return" with empty jaws is asked the new `leave` response instead of its mode policy. The mode policy sends any ant out that smells no food trail.
   - **"now"** goes out at 1 per second (`LEAVE_NOW`).
   - **"soon"** at 0.2 per second, about the papers' 3–8 s.
-  - **"wait"** stays in. Only a scout goes, at `scoutRate`, 1/180 per second: about Gordon's 3 minutes with none returning.
+  - **"wait"** stays in. Only a scout goes, at `scoutRate`, 1/90 per second: a waiting ant goes out on its own after 90 s on average, against Gordon's foragers waiting about 3 minutes with none returning. At 1/180, G′'s worst seed fell to 5 ants alive (§47.4).
+  - **One roll a step** (review of #39, S1): an ant home in "return" passes both the rest check and the trip's end in one step, and before the fix it rolled `leave` at each. Every rate ran at about twice its stated value; the numbers below are all after the fix.
   - A waiting ant mills out to 0.9 of the nest's radius, where foragers come home.
 - **Local rule:** many, now; few, soon; none, wait. A raiding or defending colony doesn't wait.
 - **The strategist** reads `intake`, food stored per ant per second over the last 60 s, instead of `foodLeft`. "None" is below 0.0005, "plenty" from 0.01, and "some" until a minute has passed. `localStance` raids on no intake.
@@ -2987,19 +2988,19 @@ The paper sites were outside the allowlist; numbers there are marked unverified.
 
 | | With returns | Deaf to returns |
 |---|---|---|
-| A5 outside before food | 0.12 | 0.12 |
-| A5 outside once food flows | 0.84 | 0.71 |
-| A5 food stored | 5,048 | 4,675 |
-| A5b outside while food flows | 0.81 | 0.60 |
-| A5b trips out per minute while food flows | 2,039 | 1,503 |
-| A5b food stored | 2,900 | 2,127 |
+| A5 outside before food | 0.14 | 0.14 |
+| A5 outside once food flows | 0.85 | 0.71 |
+| A5 food stored | 5,074 | 4,674 |
+| A5b outside while food flows | 0.82 | 0.62 |
+| A5b trips out per minute while food flows | 2,254 | 1,636 |
+| A5b food stored | 3,338 | 2,372 |
 
 A5's mark alone doesn't tell them apart: both pass 10/10.
 
 **A5 and A5b against off** (seeds 1–10):
-- **A5:** 10/10, against 0/20 on seeds 1–20 off. 0.12 outside before food against 0.48 off, and 0.84 once food flows.
-- **A5b:** 10/10. It stores 2,900, against 4,118 off: a waiting colony ramps up from a few scouts when food appears.
-- **A1–A4 and A9:** unchanged pass counts; food stored −0.2 % to +1.5 %. A9 loses 0.89 ants per 100 food, against 0.87.
+- **A5:** 10/10, against 0/20 on seeds 1–20 off. 0.14 outside before food against 0.48 off, and 0.85 once food flows.
+- **A5b:** 10/10. It stores 3,338, against 4,118 off: a waiting colony ramps up from a few scouts when food appears.
+- **A1–A4 and A9:** unchanged pass counts; food stored −0.2 % to +1.5 % (measured before S1's fix, at the same effective scout rate).
 - **A10:** unchanged, 3/10 (ja-je8).
 
 **G′, the top-down game, seeds 1–20** (both colonies' totals):
@@ -3007,21 +3008,22 @@ A5's mark alone doesn't tell them apart: both pass 10/10.
 | | Food home | Losses | Fewest ants alive (seed 19) | Second fewest | Most held over 120 s |
 |---|---|---|---|---|---|
 | Off | 162,763 | 34,172 | 29 | 257 | 248 |
-| MR 5 | 157,116 (−3.5 %) | 32,040 (−6.2 %) | 58 | 389 | 162 |
+| MR 5 | 158,012 (−2.9 %) | 32,393 (−5.2 %) | 38 | 348 | 190 |
 
-- **Seeds 1–10:** food −5.0 %, losses −9.3 %.
-- **Seeds 11–20:** food −1.9 %, losses −3.2 %.
+- **Seeds 1–10:** food −5.2 %, losses −8.3 %.
+- **Seeds 11–20:** food −0.5 %, losses −2.1 %.
 - Seed 19 is ja-hgq's near-collapse on both.
 
-**Tuning** (G′ seeds 1–20, both colonies):
+**Tuning** (G′ seeds 1–20, both colonies; one roll a step):
 
 | `leaveGate` | `scoutRate` | Food home | Losses | Fewest alive |
 |---|---|---|---|---|
-| 1 (chosen) | 1/180 | −3.5 % | −6.2 % | 58 |
-| 2 | 1/180 | −4.3 % | −7.3 % | 48 |
-| 1–4 | 1/30 | −2.7 to −4.9 % | −4.7 to −7.3 % | 4–60 |
+| 1 (chosen) | 1/90 | −2.9 % | −5.2 % | 38 |
+| 1 | 1/180 | −3.9 % | −7.4 % | 5 |
 
-The 1/30 rows were measured while returns were still counted in seconds (third wrong turn above): there, returns made no difference.
+Before the fix, with two rolls a step: `leaveGate` 1 against 2 at a stated 1/180 (about 1/90 in effect) gave −3.5 % against −4.3 % food and 58 against 48 alive at worst; at a stated 1/30, thresholds 1–4 gave −2.7 to −4.9 % food and 4–60 alive at worst.
+
+The 1/30 runs were measured while returns were still counted in seconds (third wrong turn above): there, returns made no difference.
 
 ### 47.5 The leave lane and the live check (2026-11-05)
 
@@ -3036,15 +3038,17 @@ The 1/30 rows were measured while returns were still counted in seconds (third w
   - The first legend didn't explain a few returns or a raid, so Jev answered "wait" to them. Agreement with the local rule was 17–50 %, and the replays cost the first colony 11–14 % of its G′ food. That run cost $0.0008.
   - With the legend above (another $0.0008), agreement is Forage 75 %, Cautious 67 % and Warlike 92 %, over 12 situations each.
   - Caches: `experiments/caches/mr5-top-*.json`.
-- **Replayed** (Jev's leave and stance answers for the first colony; seeds 1–6; leave answered from the cache 100 % of the time, stance 27–66 %):
+- **Replayed** (Jev's leave and stance answers for the first colony; seeds 1–6; after S1's fix):
+  - `leave` was answered from the cache 100 % of the time.
+  - `stance` was answered from the cache only 31–68 % of the time; the local rule answered the rest. So the doctrine columns are part Jev, part local rule (review of #39, N3).
 
 | | Local | Forage | Cautious | Warlike |
 |---|---|---|---|---|
-| G′ food home, first colony | 23,587 | 24,044 (+1.9 %) | 24,194 (+2.6 %) | 22,039 (−6.6 %) |
-| G′ losses, both | 10,134 | 10,814 | 11,464 | 10,540 |
+| G′ food home, first colony | 23,444 | 23,520 (+0.3 %) | 23,063 (−1.6 %) | 22,144 (−5.5 %) |
+| G′ losses, both | 10,216 | 9,831 (−3.8 %) | 10,375 (+1.6 %) | 10,507 (+2.8 %) |
 | A5 | 6/6 | 6/6 | 6/6 | 6/6 |
 
-Warlike raids more, as its doctrine asks.
+Warlike raids more, as its doctrine asks. Before the fix the same caches replayed at +1.9 / +2.6 / −6.6 % food and +7 / +13 / +4 % losses (N4).
 
 **Cost** (`colony-cost --side 5 600 1`):
 

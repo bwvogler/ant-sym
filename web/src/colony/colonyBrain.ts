@@ -236,8 +236,7 @@ export function readResponse(hook: ResponseHook, answers: Record<string, JevAnsw
 
 /**
  * A response situation's cache key for a hook: touchKey, for `contact` the alarm and odds it is sent too, and for `leave`
- * the returns (the other
- * lanes aren't sent them, so they don't key on them: review of #38).
+ * the returns (the other lanes aren't sent them, so they don't key on them: review of #38).
  */
 export function responseKey(hook: ResponseHook, t: Touch): string {
   return hook === "contact" ? `${touchKey(t)}|alarm:${t.alarm}|odds:${t.odds}` : hook === "leave" ? `${touchKey(t)}|returns:${t.returns}` : touchKey(t);

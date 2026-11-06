@@ -30,7 +30,7 @@ test("A2b rich vs poor source: the colony picks the richer", () => {
   }
 });
 
-// Behaviour MR 5 (PRD §47): A5 passes 10/10 on seeds 1–10 (0.24 outside before food, 0.81 after); A5b guards that
+// Behaviour MR 5 (PRD §47): A5 passes 10/10 on seeds 1–10 (0.14 outside before food, 0.85 after); A5b guards that
 // departures still fall once food is gone.
 for (const seed of [1, 2]) {
   test(`A5 regulation: foragers stay home without food (seed ${seed})`, () => {
