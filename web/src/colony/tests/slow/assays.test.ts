@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridge, contact, faintAlarm, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
+import { bridge, contact, faintAlarm, raidFind, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
@@ -50,6 +50,18 @@ test("A9 strangers meet at food: few lost per food brought home", () => {
     const m = runAssay(contact, seed).metrics;
     assert.equal(m.pass, 1, `seed ${seed}: ${m.lostPer100Food} lost per 100 food`);
   }
+});
+
+// Behaviour MR 5.2 (PRD §49): A11 passes 12/20 seeds (gain 1.67 median, 0.65–4.24; the seeds are noisy). Guarded as the mark's
+// own claim: most of seeds 1–10 gain at least RAID_GAIN from the trail, none is stuck.
+test("A11 raiders find the rival: the raid trail helps most seeds, and none is stuck", () => {
+  let passed = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const m = runAssay(raidFind, seed).metrics;
+    assert.ok((m.stuck as number) <= 0.1, `seed ${seed}: stuck ${m.stuck}`);
+    passed += m.pass as number;
+  }
+  assert.ok(passed >= 6, `${passed}/10 seeds gained ${1.5}× from the trail`);
 });
 
 test("A10 faint alarm draws explorers", { todo: "ja-je8: the draw is weak (median +1.3 ants)" }, () => {
