@@ -5,7 +5,8 @@ import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
-import { mulberry32, type WorldMap } from "./world.ts";
+import { isSky, mulberry32, rockAt, type Rng, type WorldMap } from "./world.ts";
+import { decode, encode, fillLike } from "./save.ts";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
 // The player is neither: the player is the fungus (fungus.ts). `player` and
@@ -32,9 +33,38 @@ export interface GameParams {
   fight: FightParams;
   fungus: Partial<FungusParams>;
   recognition: Partial<RecognitionParams>;
+  /**
+   * Food regrows (the fungus game, ja-lo8.5, owner's choice in PRD §49.5): the food piles the world began with on the
+   * ground (the side view's walkway; every pile on a top-down map) grow back toward their first size, a unit at a time,
+   * at their deficit ÷ this many seconds each. 0: never (the lab, the goldens and the assays).
+   */
+  regrow: number;
 }
 
-export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {} };
+export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0 };
+
+/** Bump when what a save holds changes: an older save is refused, not misread. */
+export const SAVE_VERSION = 1;
+
+/** A saved game (Game.save): JSON. */
+export interface GameSave {
+  version: number;
+  time: number;
+  strategyChoices: number;
+  landed: unknown;
+  regrown: number;
+  params: unknown;
+  map: unknown;
+  colonies: Record<string, unknown>[];
+  /** each colony's raid target, as a colony index (−1: none) */
+  raids: number[];
+  fungus: Record<string, unknown>;
+  recognition: Record<string, unknown>;
+  private: { fightDeaths: number; lastFightDeath: number; nextStrategy: number; regrowClock: number; rng: number | null; regrowRng: number | null };
+}
+
+/** The game's regrowth (GameParams.regrow): a pile eaten bare is half back in about 20 minutes. */
+export const GAME_REGROW = 1800;
 
 /**
  * The fungus's game: unified (one colony: the goal), fallen (a colony is gone: the fungus has lost hosts it
@@ -126,6 +156,13 @@ export class Game {
   #lastFightDeath = 0;
   #nextStrategy = 0;
   #rng: () => number;
+  /** the ground's food piles as the world began (cell index, units), for regrowth; null when food does not regrow */
+  #piles: { cells: Int32Array; full: Float32Array } | null = null;
+  /** regrowth's own random numbers: the game's stream is never drawn from for it */
+  #regrowRng: Rng | null = null;
+  #regrowClock = 0;
+  /** food units that have grown back (map.foodTotal grows by it too) */
+  regrown = 0;
 
   constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Sides = {}) {
     this.map = map;
@@ -157,6 +194,50 @@ export class Game {
       }
     });
     this.#refresh();
+    if (this.params.regrow > 0) this.#notePiles();
+  }
+
+  /** The ground's food piles now (as the world began): cells with food, on the walkway in the side view, anywhere top-down. */
+  #notePiles(): void {
+    const { w, h } = this.map.size;
+    const cells: number[] = [];
+    const full: number[] = [];
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const v = this.map.food.get(x, y);
+        if (v > 0 && (!this.map.sky || isSky(this.map, x, y))) {
+          cells.push(y * w + x);
+          full.push(v);
+        }
+      }
+    this.#piles = { cells: Int32Array.from(cells), full: Float32Array.from(full) };
+    this.#regrowRng = mulberry32(this.map.seed * 92821 + 17);
+  }
+
+  /** Once a second: each pile cell short of its first size grows a unit back with chance deficit ÷ regrow. */
+  #regrow(dt: number): void {
+    const piles = this.#piles;
+    if (!piles) return;
+    this.#regrowClock += dt;
+    if (this.#regrowClock < 1) return;
+    const owed = this.#regrowClock;
+    this.#regrowClock = 0;
+    const { w } = this.map.size;
+    const rate = owed / this.params.regrow;
+    for (let k = 0; k < piles.cells.length; k++) {
+      const c = piles.cells[k] as number;
+      const x = c % w;
+      const y = (c - x) / w;
+      const v = this.map.food.get(x, y);
+      const short = (piles.full[k] as number) - v;
+      if (short < 1 || rockAt(this.map, x, y)) continue; // full, or built over (a mound)
+      if (this.#regrowRng!() < short * rate) {
+        this.map.food.set(x, y, v + 1);
+        this.map.foodLeft += 1;
+        this.map.foodTotal += 1;
+        this.regrown += 1;
+      }
+    }
   }
 
   /**
@@ -167,7 +248,11 @@ export class Game {
   #aimRaids(k: number): void {
     const c = this.colonies[k] as Colony;
     const target = nearestRival(c, this.colonies, this.recognition.params.tolerance);
-    if (!target) return;
+    if (target) this.#aimAt(c, target);
+  }
+
+  /** Colony c's raids, and the rival trail its bent ants read, at colony `target`. */
+  #aimAt(c: Colony, target: Colony): void {
     const other = target.nest;
     c.raidTarget = other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other; // side view: in at their hole
     c.raidNest = other.entrance ? other : null; // and then down to their chamber
@@ -252,6 +337,7 @@ export class Game {
     // After fights: the dead neither pass load on nor groom (the occupancy grids still count them as groomers for this one step).
     // The fungus steps every few ticks (fungus.ts advance); when it is idle its clock does not run.
     // The midden's spores (nest slices 7–8) are laid as each corpse is buried: see onBury in the constructor.
+    if (this.#piles) this.#regrow(dt);
     if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null);
     if (this.time >= this.#nextStrategy) {
       this.#nextStrategy = this.time + this.params.strategyEvery;
@@ -315,5 +401,57 @@ export class Game {
   outcome(): Outcome {
     if (this.fallen() >= 0) return "fallen";
     return this.rival && this.unity().unified ? "unified" : "playing";
+  }
+
+  // ——— saving (save.ts, ja-lo8.6) ———
+
+  /**
+   * The whole game as JSON: the map as dug and eaten, every colony, the fungus, recognition, the game's clocks and its
+   * random streams. `load` puts it back into a game built afresh from the same world and settings (the page's
+   * ui/saves.ts keeps the seed, view and settings beside it).
+   */
+  save(): GameSave {
+    const map = Object.fromEntries(Object.entries(this.map).filter(([k]) => k !== "nests" && k !== "nest"));
+    return {
+      version: SAVE_VERSION,
+      time: this.time,
+      strategyChoices: this.strategyChoices,
+      landed: encode(this.landed),
+      regrown: this.regrown,
+      params: encode(this.params),
+      map: encode(map),
+      colonies: this.colonies.map((c) => c.saveState()),
+      raids: this.colonies.map((c) => this.colonies.findIndex((o) => o.ph === c.raidMarks)),
+      fungus: this.fungus.saveState(),
+      recognition: this.recognition.saveState(),
+      private: { fightDeaths: this.#fightDeaths, lastFightDeath: this.#lastFightDeath, nextStrategy: this.#nextStrategy, regrowClock: this.#regrowClock, rng: (this.#rng as Partial<Rng>).state ?? null, regrowRng: this.#regrowRng?.state ?? null },
+    };
+  }
+
+  /** A save back into this game, built afresh from the same world and settings (Game.save). */
+  load(saved: GameSave): void {
+    if (saved.version !== SAVE_VERSION) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
+    if (saved.colonies.length !== this.colonies.length) throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
+    this.time = saved.time;
+    this.strategyChoices = saved.strategyChoices;
+    this.landed = decode(saved.landed) as Game["landed"];
+    this.regrown = saved.regrown;
+    this.params = decode(saved.params) as GameParams;
+    fillLike(this.map, saved.map);
+    this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));
+    this.colonies.forEach((c, k) => {
+      const t = this.colonies[saved.raids[k] ?? -1];
+      if (t) this.#aimAt(c, t);
+    });
+    this.fungus.loadState(saved.fungus);
+    this.recognition.loadState(saved.recognition);
+    const p = saved.private;
+    this.#fightDeaths = p.fightDeaths;
+    this.#lastFightDeath = p.lastFightDeath;
+    this.#nextStrategy = p.nextStrategy;
+    this.#regrowClock = p.regrowClock;
+    if (p.rng !== null && "state" in this.#rng) (this.#rng as Rng).state = p.rng;
+    if (p.regrowRng !== null && this.#regrowRng) this.#regrowRng.state = p.regrowRng;
+    this.#refresh();
   }
 }

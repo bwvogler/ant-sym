@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { colonyName } from "./names.ts";
 import { LANDING_COLONY } from "./useColony.ts";
+import { describe, type SaveRecord } from "./saves.ts";
 
-// The fungus game's first screen (ja-lo8.5): what the player is, and Start. The field waits behind it, paused. Saved
-// games (Continue) come with ja-lo8.6.
+// The fungus game's first screen (ja-lo8.5): what the player is, Start, and Continue the last saved game (ja-lo8.6).
+// The field waits behind it, paused.
 
-export default function StartScreen({ seed, onStart }: { seed: number; onStart: (seed: number) => void }) {
+export default function StartScreen({ seed, onStart, latest, onContinue }: { seed: number; onStart: (seed: number) => void; latest: SaveRecord | null; onContinue: (r: SaveRecord) => void }) {
   const [s, setS] = useState(seed);
   const ink = colonyName(LANDING_COLONY);
   return (
@@ -29,10 +30,21 @@ export default function StartScreen({ seed, onStart }: { seed: number; onStart: 
           <button type="button" className="rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised" onClick={() => setS(1 + Math.floor(Math.random() * 99_999))}>
             another
           </button>
-          <button type="button" className="ml-auto rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={() => onStart(s)} autoFocus>
+          <button type="button" className="ml-auto rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={() => onStart(s)} autoFocus={!latest}>
             Start
           </button>
         </div>
+        {latest && (
+          <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
+            <p className="min-w-0 flex-1 text-xs text-fg-3">
+              {describe(latest)}
+              {latest.chapter ? <span className="block truncate">{latest.chapter}</span> : null}
+            </p>
+            <button type="button" className="rounded-md border border-accent px-4 py-2 text-sm font-medium text-accent hover:bg-accent-soft" onClick={() => onContinue(latest)} autoFocus>
+              Continue
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );

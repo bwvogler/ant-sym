@@ -11,6 +11,7 @@ import { seg } from "./styles.ts";
 import { MAX_SPEED, STRAINS, type ColonyControls, type ColonyStats, type Ground, type SideStats } from "./useColony.ts";
 import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
+import { AUTOSAVE, describe, SLOTS, type SaveRecord } from "./saves.ts";
 
 // The Details screen (ja-lo8.2): everything the game does not need on its main screen. The colonies' numbers, Jev's
 // spend and caches, the unity and infection figures, the world's settings, and the lab: the spore brush, strains, the
@@ -29,6 +30,8 @@ interface Props {
   restart: () => void;
   newWorld: () => void;
   jev: Jev;
+  saves: { list: SaveRecord[]; save: (slot: number) => Promise<void> };
+  onLoad: (r: SaveRecord) => void;
 }
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
@@ -67,6 +70,7 @@ export default function DetailsScreen(props: Props) {
           <JevCard {...props} />
           <FungusNumbers {...props} />
           <World {...props} />
+          <SavedGames {...props} />
           <Lab {...props} />
           <Debug {...props} />
         </div>
@@ -344,6 +348,34 @@ function Lab({ game, controls, update, stats, jev }: Props) {
         </div>
       </div>
       {locked && <p className="mt-3 text-xs text-warn">{jev.lock}</p>}
+    </Card>
+  );
+}
+
+/** Saved games: the autosave and the player's slots, each with Load; Save to a slot. */
+function SavedGames({ saves, onLoad, controls }: Props) {
+  const slots = Array.from({ length: SLOTS }, (_, k) => k);
+  return (
+    <Card label="saved games" title="Saved games">
+      <p className="mt-1 text-xs text-fg-3">The game saves itself every minute and when you leave the tab (the autosave). Continue on the start screen opens the newest.</p>
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {slots.map((slot) => {
+          const r = saves.list.find((x) => x.slot === slot);
+          return (
+            <li key={slot} className="flex items-center gap-2 text-xs">
+              <span className="min-w-0 flex-1 truncate">{r ? describe(r) : slot === AUTOSAVE ? "Autosave · empty" : `Slot ${slot} · empty`}</span>
+              {slot !== AUTOSAVE && (
+                <button type="button" className="rounded-md border border-line px-2 py-1 hover:bg-raised disabled:opacity-50" disabled={!controls.started} onClick={() => void saves.save(slot)}>
+                  Save here
+                </button>
+              )}
+              <button type="button" className="rounded-md border border-line px-2 py-1 hover:bg-raised disabled:opacity-50" disabled={!r} onClick={() => r && onLoad(r)}>
+                Load
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }

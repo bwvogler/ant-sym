@@ -130,15 +130,29 @@ export const DEFAULT_WORLD: WorldOptions = { size: { w: 512, h: 368 }, rockiness
 /** The open surface map (before digging): ~22 % rock, no soil. */
 export const OPEN_WORLD: Partial<WorldOptions> = { rockiness: 0.22, soil: 0, patchesPerChunk: 1.5, foodMinDist: 24 };
 
-/** Small, fast, seedable: the same seed is the same sequence on every machine. */
-export function mulberry32(seed: number): () => number {
+/** A random stream whose position can be read and set (a save keeps it: save.ts). */
+export interface Rng {
+  (): number;
+  /** where the stream is: setting it back replays the same numbers */
+  state: number;
+}
+
+/** Small, fast, seedable: the same seed is the same sequence on every machine. Its `state` can be saved and set. */
+export function mulberry32(seed: number): Rng {
   let s = seed | 0;
-  return () => {
+  const next = (() => {
     s = (s + 0x6d2b79f5) | 0;
     let t = Math.imul(s ^ (s >>> 15), 1 | s);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  }) as Rng;
+  Object.defineProperty(next, "state", {
+    get: () => s,
+    set: (v: number) => {
+      s = v | 0;
+    },
+  });
+  return next;
 }
 
 function mix(h: number): number {

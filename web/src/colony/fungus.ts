@@ -1,3 +1,4 @@
+import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
@@ -624,5 +625,21 @@ export class Fungus {
       }
     }
     return { infected, living, meanLoad: infected ? load / infected : 0, meanResist: living ? resist / living : 0 };
+  }
+
+  /** The fungus's state for a save (save.ts): the ground's spores, its settings, its menu and clock. Its policy is the page's to wire. */
+  saveState(): Record<string, unknown> {
+    return { spores: encode(this.spores), sporeStrain: encode(this.sporeStrain), sporeCells: encode(this.#sporeCells), hosts: this.hosts, rule: encode(this.rule), params: encode(this.params), menu: encode(this.#menu), clock: this.#clock };
+  }
+
+  loadState(r: Record<string, unknown>): void {
+    fillLike(this.spores, r.spores);
+    fillLike(this.sporeStrain, r.sporeStrain);
+    fillLike(this.#sporeCells, r.sporeCells);
+    this.hosts = r.hosts as number;
+    this.rule = decode(r.rule) as FungusRule;
+    this.params = decode(r.params) as FungusParams;
+    this.menu = decode(r.menu) as Set<string>;
+    this.#clock = r.clock as number;
   }
 }

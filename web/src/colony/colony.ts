@@ -1,3 +1,4 @@
+import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
 import { type Channel, type ChannelParams, DEFAULT_CHANNELS, type Mark, MARKS, Pheromones } from "./pheromone.ts";
 import { Brood, EGG, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
@@ -256,6 +257,9 @@ export function channelParams(over: Partial<Record<Channel, Partial<ChannelParam
   for (const [ch, p] of Object.entries(over) as [Channel, Partial<ChannelParams>][]) out[ch] = { ...DEFAULT_CHANNELS[ch], ...p };
   return out;
 }
+
+/** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices) and the policies. */
+const COLONY_SKIP: ReadonlySet<string> = new Set(["map", "nest", "policy", "stancePolicy", "responses", "onBury", "enemies", "foreign", "friends", "nestmates", "raidTarget", "raidNest", "raidMarks", "others"]);
 
 export class Colony {
   readonly map: WorldMap;
@@ -3924,6 +3928,155 @@ export class Colony {
       this.#middenSmell(dt);
     }
     else while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
+  }
+
+  // ——— saving (save.ts, ja-lo8.6) ———
+
+  /**
+   * This colony's state for a save: its public data (not the references the game wires: the map, other colonies'
+   * scent, the grids, its policies; its own scent saves itself), and every private field but its random stream (the game saves that,
+   * shared by every colony). Generated from the field declarations; tests/save.test.ts fails on any field missed.
+   */
+  saveState(): Record<string, unknown> {
+    return {
+      fields: saveFields(this, COLONY_SKIP),
+      private: encodeSave({
+      ti: this.#ti,
+      alarmAnt: this.#alarmAnt,
+      alarmSmelt: this.#alarmSmelt,
+      oddsNow: this.#oddsNow,
+      t: this.#t,
+      cellX: this.#cellX,
+      cellY: this.#cellY,
+      cellAtX: this.#cellAtX,
+      cellAtY: this.#cellAtY,
+      noTunnel: this.#noTunnel,
+      staleWalk: this.#staleWalk,
+      looked: this.#looked,
+      goalKind: this.#goalKind,
+      under: this.#under,
+      groundMin: this.#groundMin,
+      groundT: this.#groundT,
+      outDist: this.#outDist,
+      outCells: this.#outCells,
+      outVersion: this.#outVersion,
+      outAt: this.#outAt,
+      groundRef: this.#groundRef,
+      chamberCell: this.#chamberCell,
+      chamberFor: this.#chamberFor,
+      lastRole: this.#lastRole,
+      sinceRole: this.#sinceRole,
+      restT: this.#restT,
+      layT: this.#layT,
+      holdsBrood: this.#holdsBrood,
+      broodTo: this.#broodTo,
+      holdT: this.#holdT,
+      portTo: this.#portTo,
+      porter: this.#porter,
+      inJaws: this.#inJaws,
+      corpse: this.#corpse,
+      loaded: this.#loaded,
+      putAt: this.#putAt,
+      belief: this.#belief,
+      entrance: this.#entrance,
+      entranceCol: this.#entranceCol,
+      entranceRow: this.#entranceRow,
+      holes: this.#holes,
+      spoilTo: this.#spoilTo,
+      spoilSide: this.#spoilSide,
+      spoilT: this.#spoilT,
+      soil: this.#soil,
+      heaped: this.#heaped,
+      goalX: this.#goalX,
+      goalY: this.#goalY,
+      holeX: this.#holeX,
+      cameFrom: this.#cameFrom,
+      lastDug: this.#lastDug,
+      noGain: this.#noGain,
+      storedSeen: this.#storedSeen,
+      returning: this.#returning,
+      returned: this.#returned,
+      tired: this.#tired,
+      asked: this.#asked,
+      question: this.#question,
+      s: this.#s,
+      chamberNest: this.#chamberNest,
+      goalCells: this.#goalCells,
+      want: this.#want,
+      enRouteTo: this.#enRouteTo,
+      portViewAt: this.#portViewAt,
+      }),
+    };
+  }
+
+  /** A saved state back into this colony (saveState), in place where it can be: a fresh colony of the same world and params. */
+  loadState(saved: Record<string, unknown>): void {
+    loadFields(this, saved.fields as Record<string, unknown>);
+    const r = saved.private as Record<string, unknown>;
+    if ("ti" in r) this.#ti = fillLike(this.#ti, r.ti) as never;
+    if ("alarmAnt" in r) this.#alarmAnt = fillLike(this.#alarmAnt, r.alarmAnt) as never;
+    if ("alarmSmelt" in r) this.#alarmSmelt = fillLike(this.#alarmSmelt, r.alarmSmelt) as never;
+    if ("oddsNow" in r) this.#oddsNow = fillLike(this.#oddsNow, r.oddsNow) as never;
+    if ("t" in r) this.#t = fillLike(this.#t, r.t) as never;
+    if ("cellX" in r) this.#cellX = fillLike(this.#cellX, r.cellX) as never;
+    if ("cellY" in r) this.#cellY = fillLike(this.#cellY, r.cellY) as never;
+    if ("cellAtX" in r) this.#cellAtX = fillLike(this.#cellAtX, r.cellAtX) as never;
+    if ("cellAtY" in r) this.#cellAtY = fillLike(this.#cellAtY, r.cellAtY) as never;
+    if ("noTunnel" in r) this.#noTunnel = fillLike(this.#noTunnel, r.noTunnel) as never;
+    if ("staleWalk" in r) this.#staleWalk = fillLike(this.#staleWalk, r.staleWalk) as never;
+    if ("looked" in r) this.#looked = fillLike(this.#looked, r.looked) as never;
+    if ("goalKind" in r) this.#goalKind = fillLike(this.#goalKind, r.goalKind) as never;
+    if ("under" in r) this.#under = fillLike(this.#under, r.under) as never;
+    if ("groundMin" in r) this.#groundMin = fillLike(this.#groundMin, r.groundMin) as never;
+    if ("groundT" in r) this.#groundT = fillLike(this.#groundT, r.groundT) as never;
+    if ("outDist" in r) this.#outDist = fillLike(this.#outDist, r.outDist) as never;
+    if ("outCells" in r) this.#outCells = fillLike(this.#outCells, r.outCells) as never;
+    if ("outVersion" in r) this.#outVersion = fillLike(this.#outVersion, r.outVersion) as never;
+    if ("outAt" in r) this.#outAt = fillLike(this.#outAt, r.outAt) as never;
+    if ("groundRef" in r) this.#groundRef = fillLike(this.#groundRef, r.groundRef) as never;
+    if ("chamberCell" in r) this.#chamberCell = fillLike(this.#chamberCell, r.chamberCell) as never;
+    if ("chamberFor" in r) this.#chamberFor = fillLike(this.#chamberFor, r.chamberFor) as never;
+    if ("lastRole" in r) this.#lastRole = fillLike(this.#lastRole, r.lastRole) as never;
+    if ("sinceRole" in r) this.#sinceRole = fillLike(this.#sinceRole, r.sinceRole) as never;
+    if ("restT" in r) this.#restT = fillLike(this.#restT, r.restT) as never;
+    if ("layT" in r) this.#layT = fillLike(this.#layT, r.layT) as never;
+    if ("holdsBrood" in r) this.#holdsBrood = fillLike(this.#holdsBrood, r.holdsBrood) as never;
+    if ("broodTo" in r) this.#broodTo = fillLike(this.#broodTo, r.broodTo) as never;
+    if ("holdT" in r) this.#holdT = fillLike(this.#holdT, r.holdT) as never;
+    if ("portTo" in r) this.#portTo = fillLike(this.#portTo, r.portTo) as never;
+    if ("porter" in r) this.#porter = fillLike(this.#porter, r.porter) as never;
+    if ("inJaws" in r) this.#inJaws = fillLike(this.#inJaws, r.inJaws) as never;
+    if ("corpse" in r) this.#corpse = fillLike(this.#corpse, r.corpse) as never;
+    if ("loaded" in r) this.#loaded = fillLike(this.#loaded, r.loaded) as never;
+    if ("putAt" in r) this.#putAt = fillLike(this.#putAt, r.putAt) as never;
+    if ("belief" in r) this.#belief = fillLike(this.#belief, r.belief) as never;
+    if ("entrance" in r) this.#entrance = fillLike(this.#entrance, r.entrance) as never;
+    if ("entranceCol" in r) this.#entranceCol = fillLike(this.#entranceCol, r.entranceCol) as never;
+    if ("entranceRow" in r) this.#entranceRow = fillLike(this.#entranceRow, r.entranceRow) as never;
+    if ("holes" in r) this.#holes = fillLike(this.#holes, r.holes) as never;
+    if ("spoilTo" in r) this.#spoilTo = fillLike(this.#spoilTo, r.spoilTo) as never;
+    if ("spoilSide" in r) this.#spoilSide = fillLike(this.#spoilSide, r.spoilSide) as never;
+    if ("spoilT" in r) this.#spoilT = fillLike(this.#spoilT, r.spoilT) as never;
+    if ("soil" in r) this.#soil = fillLike(this.#soil, r.soil) as never;
+    if ("heaped" in r) this.#heaped = fillLike(this.#heaped, r.heaped) as never;
+    if ("goalX" in r) this.#goalX = fillLike(this.#goalX, r.goalX) as never;
+    if ("goalY" in r) this.#goalY = fillLike(this.#goalY, r.goalY) as never;
+    if ("holeX" in r) this.#holeX = fillLike(this.#holeX, r.holeX) as never;
+    if ("cameFrom" in r) this.#cameFrom = fillLike(this.#cameFrom, r.cameFrom) as never;
+    if ("lastDug" in r) this.#lastDug = fillLike(this.#lastDug, r.lastDug) as never;
+    if ("noGain" in r) this.#noGain = fillLike(this.#noGain, r.noGain) as never;
+    if ("storedSeen" in r) this.#storedSeen = fillLike(this.#storedSeen, r.storedSeen) as never;
+    if ("returning" in r) this.#returning = fillLike(this.#returning, r.returning) as never;
+    if ("returned" in r) this.#returned = fillLike(this.#returned, r.returned) as never;
+    if ("tired" in r) this.#tired = fillLike(this.#tired, r.tired) as never;
+    if ("asked" in r) this.#asked = fillLike(this.#asked, r.asked) as never;
+    if ("question" in r) this.#question = fillLike(this.#question, r.question) as never;
+    if ("s" in r) this.#s = fillLike(this.#s, r.s) as never;
+    if ("chamberNest" in r) this.#chamberNest = fillLike(this.#chamberNest, r.chamberNest) as never;
+    if ("goalCells" in r) this.#goalCells = fillLike(this.#goalCells, r.goalCells) as never;
+    if ("want" in r) this.#want = fillLike(this.#want, r.want) as never;
+    if ("enRouteTo" in r) this.#enRouteTo = fillLike(this.#enRouteTo, r.enRouteTo) as never;
+    if ("portViewAt" in r) this.#portViewAt = fillLike(this.#portViewAt, r.portViewAt) as never;
   }
 }
 

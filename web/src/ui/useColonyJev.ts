@@ -108,6 +108,19 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
   );
 
   const fungusAnswers = useCallback(() => jev.fungusAnswers(), [jev]);
+  /**
+   * A saved game's words back (ui/saves.ts): its aim and each colony's doctrine. Not a change of policy, so not held
+   * back by the lock: the answers under those words are cached, or asked once Jev runs.
+   */
+  const restore = useCallback(
+    (a: DoctrineChoice, ds: DoctrineChoice[]) => {
+      setAimState(a);
+      jev.setAim(a.text);
+      setDoctrinesState(ds.map((d) => ({ ...d })));
+      ds.forEach((d, k) => jev.setDoctrineFor(k, d.text));
+    },
+    [jev],
+  );
 
-  return { state, start, stop, lock, resumable, fungusAnswers, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus };
+  return { state, start, stop, lock, resumable, fungusAnswers, restore, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus };
 }

@@ -1,3 +1,4 @@
+import { decode, encode } from "./save.ts";
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
@@ -285,5 +286,17 @@ export class Recognition {
       }
     }
     this.#moving = moving || masked;
+  }
+
+  /** What carries over between ticks, for a save (save.ts): its settings and clock. The bands are built afresh every tick. */
+  saveState(): Record<string, unknown> {
+    return { params: encode(this.params), clock: this.#clock, moving: this.#moving };
+  }
+
+  loadState(r: Record<string, unknown>): void {
+    this.params = decode(r.params) as RecognitionParams;
+    this.#clock = r.clock as number;
+    this.#moving = r.moving as boolean;
+    this.#lookOdour = NaN; // the look cache is made afresh
   }
 }

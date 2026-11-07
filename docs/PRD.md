@@ -3281,3 +3281,59 @@ Three existing problems, each with its bead:
 - **Feeding collapses (`ja-xu6`).** On seed 2, larvae starve beside a full larder once the young are gone.
 
 Since the queen and new queens are the game's middle chapters, slices 7–9 need colonies that last. The owner decides how (§49.5).
+
+### 49.5 Keeping colonies alive in long games: the owner's choice, and food that regrows (2026-11-07)
+
+**Decision** (owner, on §49.4's finding):
+- **Built now:** food regrows.
+- **Wanted, as beads if hard:** foraging underground food (`ja-p0k`) and fixing larvae that starve beside a full larder (`ja-xu6`). Both are behaviour MRs:
+  - `ja-xu6`'s cause is the age bar on porting and nursing (`#port`, `#nurse`: band 2 never). When births stall, nobody old moves food to the brood. Lifting the bar changes behaviour from the first minute, since founders start up to half a lifespan old, so goldens and assays have to be redone (`ja-k4k.1`).
+  - `ja-xu6` now blocks the queen-birth slice (`ja-lo8.9`).
+- **Left alone:** the war (`ja-war`).
+
+**Regrowth (`GameParams.regrow`, `GAME_REGROW` = 1,800 s).**
+- **What grows back:** the food piles the world began with on the ground (the side view's walkway; every pile top-down) grow back toward their first size. Each unit comes back with chance deficit ÷ 1,800 a second.
+- **Constraints:**
+  - whole units only, so no trace amounts that ants would smell;
+  - not under the mound;
+  - on its own random stream, so the game's draws are untouched;
+  - food that grows back is added to `map.foodTotal`, so food conservation still balances.
+- **Where it's on:** the page. Off by default, so goldens, assays and tests are unchanged (`tests/regrow.test.ts`).
+- **Ceiling:** about 7,000 units of ground food on seed 1's map, so at most about 4 food/s map-wide when it is all eaten.
+
+**Measured** (`REGROW=1800 node scripts/economy-bench.mjs <seed> 7200 600 2 1200`; no fungus; 7,200 s is 30 minutes at 4×; Ink / Amber workers):
+
+| Seed | Without regrowth | With regrowth |
+|---|---|---|
+| 1 | Ink gone; Amber 95 | **579 / 425**, both queens alive; intake 0.5–0.6/s each |
+| 2 | both gone | Ink's workers all died in war by 4,800 s (1,065 lost; queen alive, no brood that can finish); **Amber 783** |
+| 3 | Amber gone; Ink 137 | **858 / 381** at 6,000 s, both queens alive |
+
+Regrowth ends the starvation: a lone colony now holds steady. War still ends a colony on one seed in three (`ja-war`, left as is). On seed 1 Ink held 129 unfed larvae for about 20 minutes beside 263 food in its larder before recovering: that is `ja-xu6`.
+
+### 49.6 Slice 6: saving games (ja-lo8.6, 2026-11-07)
+
+**How a save works.**
+- **Contents.** `Game.save()` is the game as JSON:
+  - the map as dug and eaten;
+  - every colony, including all 64 of `Colony`'s private fields (save and load generated from their declarations);
+  - each colony's scent;
+  - the chamber table;
+  - the fungus and recognition;
+  - the game's clocks;
+  - its random streams. `mulberry32` now exposes its `state`, with identical sequences.
+- **Restore.** `Game.load()` pours a save into a game built afresh from the same world and settings, so every reference is wired as usual. Raid aims are saved as colony indices.
+- **Format.** `colony/save.ts` encodes typed arrays as base64, chunk layers as their chunks, and Maps and Sets as lists. An object with `saveState` / `loadState` saves itself. Getters are skipped.
+
+**The guard** (`tests/save.test.ts`, side and top-down, the fungus landed):
+1. Run 40 s, save, JSON round-trip, restore into a fresh game.
+2. Saving again reproduces the save field for field. A dropped field shows at once: a mutant that skips `#under` fails. `#restT` didn't, being all zeros at 40 s.
+3. Run on 20 s: every typed array, scent and map layer, the spores, the brood and the chambers hash as the unbroken run's.
+
+**On the page** (`ui/saves.ts`, IndexedDB; memory where IndexedDB can't open).
+- **What a record holds:** the save, the settings that rebuild the world (seed, view, ants, rival, Restart count), and the player's state (aim, doctrines, menu, hide and cull).
+- **Slots:** an autosave every 60 s and when the tab is hidden, plus two slots of the player's.
+- **Where:** the start screen offers **Continue** (the newest), and Details has a Saved games card (Save here, Load).
+- **Browser check:** saved at 0:48 of sim; after a page reload, Continue came back at 0:48, at chapter 4, with the fungus in all of Ink, and no page errors.
+
+**No sim change.** Goldens are bit-exact. Nothing is asked of Jev, so the cost is unchanged.

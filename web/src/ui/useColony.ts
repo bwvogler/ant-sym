@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
 import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
-import { Game, gameRng, type Outcome, type Unity } from "../colony/game.ts";
+import { Game, GAME_REGROW, gameRng, type Outcome, type Unity } from "../colony/game.ts";
 import { chapterOf, type ChapterView } from "../colony/chapters.ts";
 import { colonyName } from "./names.ts";
+import type { GameSettings, SaveRecord } from "./saves.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
@@ -138,10 +139,20 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const [controls, setControls] = useState<ColonyControls>(initial);
   // Bumped by Restart: the same seed again, from scratch.
   const [generation, setGeneration] = useState(0);
-  const game = useMemo(
-    () => new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival }, gameRng(controls.seed, generation)),
-    [controls.seed, controls.antCount, controls.rival, controls.ground, generation],
-  );
+  // A saved game to pour into the next game built (loadSave): built from its own settings, then restored (save.ts).
+  const pending = useRef<SaveRecord | null>(null);
+  const [loads, setLoads] = useState(0);
+  const game = useMemo(() => {
+    const g = new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW }, gameRng(controls.seed, generation));
+    const r = pending.current;
+    if (r && r.settings.seed === controls.seed && r.settings.ground === controls.ground && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
+      pending.current = null;
+      g.load(r.game);
+    }
+    return g;
+    // `loads` rebuilds the game when a save has the same settings as the game now
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controls.seed, controls.antCount, controls.rival, controls.ground, generation, loads]);
   const colony = game.player;
   // The player's policy settings outlive a game: apply them to every new one's fungus.
   useEffect(() => {
@@ -216,6 +227,16 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   useEffect(() => {
     if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN);
   }, [game, controls.started]);
+  /** A saved game, as it was: its world and settings, then its state (Game.load), playing. The player's state is the page's to put back. */
+  const loadSave = useCallback((r: SaveRecord) => {
+    pending.current = r;
+    setGeneration(r.settings.generation);
+    setControls((c) => ({ ...c, seed: r.settings.seed, ground: r.settings.ground, antCount: r.settings.antCount, rival: r.settings.rival, started: true, playing: true }));
+    setLoads((n) => n + 1);
+  }, []);
+  /** What builds this game again (saves.ts). */
+  const settings: GameSettings = { seed: controls.seed, ground: controls.ground, antCount: controls.antCount, rival: controls.rival, generation };
+
   /** The start screen's Start: this seed, playing, the fungus lands. */
   const start = useCallback((seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })), []);
 
@@ -235,7 +256,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     [game, controls.brush, controls.strain],
   );
 
-  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start };
+  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start, loadSave, settings };
 }
 
 /** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */

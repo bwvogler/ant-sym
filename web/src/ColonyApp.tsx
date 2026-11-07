@@ -9,6 +9,8 @@ import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { MAX_SPEED, useColony, type ColonyStats } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
+import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
+import type { Game } from "./colony/game.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo } from "./ui/backend.ts";
 import { useBackend } from "./ui/useBackend.ts";
@@ -32,7 +34,7 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {
-  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start } = useColony();
+  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start, loadSave, settings } = useColony();
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend);
   const [details, setDetails] = useState(false);
@@ -44,6 +46,16 @@ export default function ColonyApp() {
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
   useNotices(stats, jev.lock, jev.state.phase);
+  const games = useSaves(game, settings, { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull }, stats, controls.started);
+  const continueFrom = useCallback(
+    (r: SaveRecord) => {
+      loadSave(r);
+      jev.restore(r.player.aim, r.player.doctrines);
+      update({ menu: r.player.menu, hide: r.player.hide, cull: r.player.cull });
+      pushToast(`Back where you were: ${describe(r)}.`, "good");
+    },
+    [loadSave, jev, update],
+  );
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   const painting = controls.brush === "spores";
   return (
@@ -82,9 +94,9 @@ export default function ColonyApp() {
         sideView={controls.ground === "side"}
         onSideView={() => update({ ground: "side" })}
       />
-      <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} />
+      <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} saves={games} onLoad={(r) => (continueFrom(r), closeDetails())} />
       <Toasts />
-      {!controls.started && <StartScreen seed={controls.seed} onStart={start} />}
+      {!controls.started && <StartScreen seed={controls.seed} onStart={start} latest={games.list[0] ?? null} onContinue={continueFrom} />}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm" aria-label="game bar">
         <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={() => update({ playing: !controls.playing })}>
@@ -259,4 +271,50 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
       pushToast(lock, "warn");
     }
   }, [phase, lock]);
+}
+
+/** What the page knows of saved games, and how to save one now. */
+export interface Saves {
+  list: SaveRecord[];
+  save: (slot: number) => Promise<void>;
+}
+
+/**
+ * Saved games (ja-lo8.6): the list (newest first), saving to a slot, and the autosave: every AUTOSAVE_MS while a game
+ * is under way, and when the tab is hidden (the player may not come back to this tab).
+ */
+function useSaves(game: Game, settings: GameSettings, player: PlayerState, stats: ColonyStats | null, started: boolean): Saves {
+  const store = useMemo(() => browserSaves(), []);
+  const [list, setList] = useState<SaveRecord[]>([]);
+  const refresh = useCallback(() => void store.list().then(setList).catch(() => setList([])), [store]);
+  useEffect(refresh, [refresh]);
+  // The latest of everything, for the timer and the hidden-tab handler (they outlive renders).
+  const now = useRef({ game, settings, player, stats, started });
+  useEffect(() => {
+    now.current = { game, settings, player, stats, started };
+  });
+  const save = useCallback(
+    async (slot: number) => {
+      const n = now.current;
+      if (!n.started) return;
+      try {
+        await store.put(record(slot, n.settings, n.player, n.game.save(), n.stats?.chapter.goal ?? ""));
+        refresh();
+      } catch (e) {
+        pushToast(`Couldn't save: ${String(e)}`, "warn");
+      }
+    },
+    [store, refresh],
+  );
+  useEffect(() => {
+    if (!started) return;
+    const timer = setInterval(() => void save(AUTOSAVE), AUTOSAVE_MS);
+    const hidden = () => document.visibilityState === "hidden" && void save(AUTOSAVE);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, [started, save]);
+  return { list, save };
 }
