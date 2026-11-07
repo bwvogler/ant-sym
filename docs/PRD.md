@@ -3157,14 +3157,15 @@ Food +8 % and +12 %, losses the same. **The worst seed is worse:** seed 19 (ja-h
 - **The first version asked a waiting raider as a returning forager** (review of #41, S1): both got one key and one answer. Now a recruited ant is asked as a raider (fight, with the raid trail) and a forager as a forager (return, with its returns), and the legend no longer tells Jev to override its doctrine.
 - **Replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,186 and 915):
 
-| | Food stored | Lost | MR 5 (food) | Clock version |
+| | All lanes: food stored | Lost | `leave` and `stance` only (as MR 5's caches) | MR 5 (food) |
 |---|---|---|---|---|
-| Forage | 5,069 (+21 %) | 825 (−10 %) | +0.3 % | +15.8 % |
-| Cautious | 3,803 (−9 %) | 636 (−30 %) | −1.6 % | −30 % |
-| Warlike | 1,994 (−52 %) | 859 (−6 %) | −5.5 % | −54 % |
+| Forage | 5,069 (+21 %) | 825 | 4,860 (+16 %) | +0.3 % |
+| Cautious | 3,803 (−9 %) | 636 | 4,679 (+12 %) | −1.6 % |
+| Warlike | 1,994 (−52 %) | 859 | 3,521 (−16 %) | −5.5 % |
 
+- **Like for like.** MR 5's caches held only the `leave` and `stance` lanes (`experiments/caches/README.md`); this MR's were recorded with every lane, so Jev's mode, contact and trail answers are in them too. Stripped to the same two lanes (no spend), Forage and Cautious gain and Warlike loses 16 % (MR 5: −5.5 %). Most of Warlike's −52 % is Jev's mode and contact answers under a warlike doctrine (more ants sent to fight), not the raid trail.
 - **Why Cautious recovered.** In the waiting version a larder-full colony sat on a raid stance for good, its ants waiting or sent home by the doctrine's mode answers, and stored nothing more (a minute-by-minute trace of seed 1: 847 of 900 ants in mode return, 4–90 outside). As a bias, a raid stance leaves the foragers foraging.
-- **Warlike is the cache's, not the trail's:** with the old coordinates (`raidGate` 0) the same cache stores 1,860, with the waiting trail 1,931. The Warlike and Cautious caches re-recorded under this legend answer differently from MR 5's (the MR 5 caches replayed −5.5 % and −1.6 % on `main`); a second Cautious recording agreed with the first on 272 of 290 mode answers. The legend and the `leave` question changed, so every lane was re-asked. Not separated further (`ja-7je`).
+- **Warlike's all-lane loss is not the trail's:** with the old coordinates (`raidGate` 0) the same all-lane cache stores 1,860. A second Cautious recording agreed with the first on 272 of 290 mode answers, so it is not run-to-run noise either. What remains like for like is Warlike −16 % against MR 5's −5.5 % (`ja-7je`).
 - **Cost:** mode ~651 tokens per question ($0.074/h, unchanged); the response legend grew, so all six response lanes together come to ~$0.116/h (MR 5: $0.109).
 
 ### 49.5 How a raid ends
