@@ -18,9 +18,10 @@ import { loadPrecache } from "./precache.ts";
 // player's lever) and the fungus's aim (the player's). Cached answers live in
 // localStorage under their context (cacheStore.ts).
 //
-// Jev is always on (the fungus game, ja-lo8.2): the run starts as soon as the server and its key are there, and starts
-// again after a time cap. While it can't run, `lock` says why, and the page's policy editors are disabled: the game
-// plays on the answers already cached (policyLock.ts).
+// Jev in the fungus game (ja-lo8.2; PR #42 review S6): the page plays the answers it ships and those Jev gave before,
+// and asks Jev only when the player changes a policy: a new aim or doctrine starts a run, which asks the situations
+// with no answer under the player's own words (never a preset's: they ship) and ends at its time cap. While Jev can't
+// run, `lock` says why, and the page's policy editors are disabled (policyLock.ts).
 
 /** Estimated input tokens per situation, from the size of a full request (the ledger counts the real ones). */
 export const TOKENS_PER_SITUATION = tokensPerQuestion("mode", DOCTRINES[0]!.text);
@@ -37,8 +38,11 @@ export interface DoctrineChoice {
 /** Every colony starts foraging: one doctrine, one shared cache, no extra spend. */
 const FIRST_DOCTRINES: DoctrineChoice[] = COLONY_NAMES.map(() => ({ id: DOCTRINES[0]!.id, text: DOCTRINES[0]!.text }));
 
+/** The preset words, whose answers ship with the page (ui/precache.ts): never asked (ColonyJevOptions.shipped). */
+const SHIPPED: ReadonlySet<string> = new Set([...DOCTRINES.map((d) => d.text), ...AIMS.map((a) => a.text)]);
+
 export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: readonly string[], backend: Backend | null = null) {
-  const jev = useMemo(() => new ColonyJev({}, browserCache), []);
+  const jev = useMemo(() => new ColonyJev({ shipped: SHIPPED }, browserCache), []);
   const [state, setState] = useState<ColonyJevState>(jev.state);
   const [doctrines, setDoctrinesState] = useState<DoctrineChoice[]>(FIRST_DOCTRINES);
   const [aim, setAimState] = useState<DoctrineChoice>({ id: AIMS[0]!.id, text: AIMS[0]!.text });
@@ -72,32 +76,38 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
   useEffect(() => jev.setMenu(new Set(menu)), [jev, menu]);
 
+  // A run starts with a change of words (shouldStart), or by hand (Details → Resume): never by itself.
+  const [starting, setStarting] = useState(false);
+  const start = useCallback(() => {
+    setStarting(true);
+    void jev.start().finally(() => setStarting(false));
+  }, [jev]);
+  const stop = useCallback(() => void jev.stop(), [jev]);
+  const lock = policyLock(backend, state, starting);
+  /** Whether a change of words should start a run now, read by the setters. */
+  const startRef = useRef(false);
+  useEffect(() => {
+    lockRef.current = lock;
+    startRef.current = shouldStart(backend, state, starting);
+  }, [lock, backend, state, starting]);
+  const resumable = canResume(backend, state, starting);
+  /** New words from the player: asked from now on, so a run starts if none is on. */
+  const changed = useCallback(() => {
+    if (!startRef.current) return;
+    startRef.current = false;
+    start();
+  }, [start]);
+
   const draftDoctrine = useCallback((k: number, d: DoctrineChoice) => setDoctrinesState((all) => all.map((x, j) => (j === k ? d : x))), []);
   const setDoctrine = useCallback(
     (k: number, d: DoctrineChoice) => {
       if (lockRef.current !== null) return;
       draftDoctrine(k, d);
       jev.setDoctrineFor(k, d.text);
+      if (!SHIPPED.has(d.text)) changed();
     },
-    [jev, draftDoctrine],
+    [jev, draftDoctrine, changed],
   );
-  // The page's own start: once when the server and key are there, again after a time cap (shouldStart).
-  const [starting, setStarting] = useState(false);
-  const startedOnce = useRef(false);
-  const start = useCallback(() => {
-    startedOnce.current = true;
-    setStarting(true);
-    void jev.start().finally(() => setStarting(false));
-  }, [jev]);
-  const stop = useCallback(() => void jev.stop(), [jev]);
-  useEffect(() => {
-    if (shouldStart(backend, state, startedOnce.current, starting)) start();
-  }, [backend, state, starting, start]);
-  const lock = policyLock(backend, state, starting);
-  useEffect(() => {
-    lockRef.current = lock;
-  }, [lock]);
-  const resumable = canResume(backend, state, starting);
 
   const explain = useCallback((s: Situation, k: number) => jev.explain(s, k), [jev]);
   const explainFungus = useCallback((s: FungalSituation) => jev.explainFungus(s), [jev]);
@@ -106,14 +116,16 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
       if (lockRef.current !== null) return;
       setAimState(a);
       jev.setAim(a.text);
+      if (!SHIPPED.has(a.text)) changed();
     },
-    [jev],
+    [jev, changed],
   );
 
   const fungusAnswers = useCallback(() => jev.fungusAnswers(), [jev]);
   /**
    * A saved game's words back (ui/saves.ts): its aim and each colony's doctrine. Not a change of policy, so not held
-   * back by the lock: the answers under those words are cached, or asked once Jev runs.
+   * back by the lock: the answers under those words are cached, and words of the player's own start a run where one
+   * could, to ask what is left.
    */
   const restore = useCallback(
     (a: DoctrineChoice, ds: DoctrineChoice[]) => {
@@ -121,8 +133,9 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
       jev.setAim(a.text);
       setDoctrinesState(ds.map((d) => ({ ...d })));
       ds.forEach((d, k) => jev.setDoctrineFor(k, d.text));
+      if (!SHIPPED.has(a.text) || ds.some((d) => !SHIPPED.has(d.text))) changed();
     },
-    [jev],
+    [jev, changed],
   );
 
   return { state, start, stop, lock, resumable, fungusAnswers, restore, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus };

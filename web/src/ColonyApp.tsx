@@ -23,7 +23,7 @@ import Toasts from "./ui/Toasts.tsx";
 import { pushToast } from "./ui/toasts.ts";
 
 // The game's main screen (ja-lo8.2): the field, a slim top bar, and the fungus, the player. You shape the fungus's
-// policy in words (its aim); Jev, always on, reads them and decides what the fungus does in each host it lives in.
+// policy in words (its aim); Jev reads them and decides what the fungus does in each host it lives in.
 // Each colony's doctrine is its nature, out of the player's reach (docs/new-queens.md: it changes only through a new
 // queen, ja-lo8.9). Everything else (the colonies' numbers, Jev's spend, the world's settings, the lab tools) is on
 // the Details screen.

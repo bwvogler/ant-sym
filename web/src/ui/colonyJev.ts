@@ -28,9 +28,15 @@ export interface ColonyJevOptions {
   intervalMs: number;
   /** milliseconds a gathering lane (the fungus's) lets its queue fill before sending a part-full request */
   gatherMs: number;
+  /**
+   * Words whose answers ship with the page (the preset doctrines and aims): a situation with no answer under them is
+   * never asked, even while a run is on. Jev is asked only for words the player wrote (owner, PR #42 review S6): under
+   * a preset, an unanswered situation plays an earlier answer or the local rule, free.
+   */
+  shipped: ReadonlySet<string>;
 }
 
-export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: FUNGUS_GATHER_MS };
+export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: FUNGUS_GATHER_MS, shipped: new Set() };
 
 /** The caps a colony run starts with: $0.10 and 30 minutes (the server's default too). */
 export const COLONY_CAPS: RunCaps = DEFAULT_CAPS;
@@ -240,9 +246,9 @@ export class ColonyJev {
 
   /**
    * The answer for situation s in lane l: Jev's cached answer whenever there is one, run or no run (the fungus game,
-   * ja-lo8.2: Jev is always on, and when it can't answer the game plays on what it already answered); else an earlier
+   * ja-lo8.2: the game plays on what Jev already answered, and asks only when the player changes a policy); else an earlier
    * answer under words this lane had before (stale, ja-lo8.3); else the local rule. While a run is on, a situation with
-   * no current answer is queued to be asked.
+   * no current answer is queued to be asked, unless the lane's words are a shipped preset's (opts.shipped).
    */
   #lookup<S, A extends string>(l: Lane<S, A>, s: S): A {
     if (l.asks && !l.asks(s)) return l.local(s);
@@ -254,7 +260,7 @@ export class ColonyJev {
       else this.#state.misses++;
     }
     if (hit) return hit;
-    if (running && !this.#asking.has(askKey(l.context, key)) && !l.queue.has(key)) {
+    if (running && !this.opts.shipped.has(l.words) && !this.#asking.has(askKey(l.context, key)) && !l.queue.has(key)) {
       if (l.queue.size === 0) l.since = Date.now();
       l.queue.set(key, s);
     }

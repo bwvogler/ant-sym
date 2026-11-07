@@ -120,6 +120,24 @@ test("running: each new situation is asked once; the answers are cached and the 
   assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, all.length, "persisted under the doctrine");
 });
 
+test("shipped words are never asked, even while a run is on; the player's own words are (PR #42 review S6)", async () => {
+  const sent = scriptFetch(answerAll("follow"));
+  const preset = DOCTRINES[0]!.text;
+  const j = new ColonyJev({ intervalMs: 10, gatherMs: 0, shipped: new Set([preset]) });
+  live.add(j);
+  j.setDoctrine(preset);
+  const c = colony();
+  j.attach(c);
+  await j.start();
+  run(c, 3);
+  await tick(40);
+  assert.equal(sent.length, 0, "a preset's unanswered situations play the local rule, free");
+  j.setDoctrine("Gather what you can, and bring it home.");
+  run(c, 3);
+  await tick(40);
+  assert.ok(sent.flat().length > 0, "words of the player's own are asked");
+});
+
 test("a new doctrine has its own cache; switching back to an old one is free", async () => {
   const sent = scriptFetch(answerAll("explore"));
   const j = make();

@@ -134,7 +134,7 @@ function JevCard({ jev }: Props) {
   const perHour = run && run.elapsedSeconds > 5 ? (run.usd / run.elapsedSeconds) * 3600 : null;
   return (
     <Card label="colony jev" title={<>Jev <Help to={{ tab: "policy", id: "mode" }} label="how Jev decides" /></>}>
-      <p className="mt-1 text-xs text-fg-3">Jev is always on: it answers each situation once, under each colony's doctrine and your aim, and every ant in that situation takes the answer. When it can't run, the game plays the answers it already gave, and no policy can be changed.</p>
+      <p className="mt-1 text-xs text-fg-3">Jev answers each situation once, under each colony's doctrine and your aim, and every ant in that situation takes the answer. The preset doctrines and aims ship with their answers; Jev runs when you write words of your own, and asks only the situations they have no answer for yet. When it can't run, the game plays the answers it already gave, and no policy can be changed.</p>
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
         {running ? (
           <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised" onClick={jev.stop} title="Stop asking Jev: cached answers keep playing, and policies can't be changed until it runs again">
