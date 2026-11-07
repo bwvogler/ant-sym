@@ -14,7 +14,8 @@
 // (no sampling): fills of floor ground (see Colony #floorGround) and of other cells, how many of each were dug out again,
 // and re-digs of filled cells as a share of all digs. It also checks food conservation every 10 s: map food + food in
 // jaws + larder + Σ brood (1 + fed) + 4 × births stays at the food the map started with.
-// A run is deterministic: the same arguments give the same numbers.
+// A run is deterministic: the same arguments give the same numbers. REGROW=<seconds> (env) turns on the game's food
+// regrowth (GameParams.regrow; the page uses game.GAME_REGROW); food that grows back is added to the map's total.
 //
 // Usage: node scripts/economy-bench.mjs [seeds=1-2] [seconds=3600] [ants per colony=600] [colonies=2] [every=600] [root=this repo] [small=0] [food=1]
 //   seeds: a list and/or ranges (1-6, or 1,3,5). root: another checkout to measure (its web/src/colony is imported), so
@@ -47,7 +48,7 @@ console.log(`economy-bench: seeds ${seeds.join(",")}, ${seconds} s, ${ants} ants
 for (const seed of seeds) {
   const map = W.generateSideWorld(seed, { ...(small ?? {}), nestCount: colonies });
   if (foodScale !== 1) scaleFood(map, foodScale);
-  const g = new Game(map, { antCount: ants, rivalAnts: ants, rival: colonies > 1 }, W.mulberry32(seed * 7919));
+  const g = new Game(map, { antCount: ants, rivalAnts: ants, rival: colonies > 1, regrow: Number(process.env.REGROW ?? 0) }, W.mulberry32(seed * 7919));
   const cs = g.colonies;
   const ch = map.chambers; // none before nest slice 2: older checkouts are measured too
   const floor0 = cs.map((_, k) => ch?.floorOf[k] ?? 0);

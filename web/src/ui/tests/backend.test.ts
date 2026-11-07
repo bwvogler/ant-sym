@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { apiUrl, detectBackend, isDemo, jevUnavailable } from "../backend.ts";
+import { apiUrl, detectBackend, isDemo } from "../backend.ts";
+import { policyLock } from "../policyLock.ts";
+
+const running = { phase: "running" as const, run: null, lastError: null };
 
 const reply = (status: number, body: unknown, json = true) =>
   (async () => ({ ok: status >= 200 && status < 300, status, json: async () => (json ? body : Promise.reject(new SyntaxError("<html>"))) }) as Response) as typeof fetch;
@@ -17,7 +20,7 @@ test("live server with a key", async () => {
 test("live server without a key", async () => {
   const b = await detectBackend(reply(200, { ok: true, hasKey: false }));
   assert.deepEqual(b, { hasBackend: true, hasKey: false });
-  assert.match(jevUnavailable(b)!, /JEV_API_KEY/);
+  assert.match(policyLock(b, running)!, /JEV_API_KEY/);
 });
 
 test("static host: 404, HTML body, or network error all mean no backend", async () => {
@@ -25,13 +28,13 @@ test("static host: 404, HTML body, or network error all mean no backend", async 
   assert.deepEqual(await detectBackend(reply(404, null)), none);
   assert.deepEqual(await detectBackend(reply(200, null, false)), none);
   assert.deepEqual(await detectBackend((async () => { throw new TypeError("offline"); }) as typeof fetch), none);
-  assert.match(jevUnavailable(none)!, /Demo build/);
+  assert.match(policyLock(none, running)!, /No Jev server/);
 });
 
-test("Start stays disabled while the probe is pending; isDemo only after it answers", () => {
-  assert.match(jevUnavailable(null)!, /Checking/);
+test("policies stay locked while the probe is pending; isDemo only after it answers", () => {
+  assert.match(policyLock(null, running)!, /Checking/);
   assert.equal(isDemo(null), false);
   assert.equal(isDemo({ hasBackend: false, hasKey: false }), true);
   assert.equal(isDemo({ hasBackend: true, hasKey: false }), false);
-  assert.equal(jevUnavailable({ hasBackend: true, hasKey: true }), null);
+  assert.equal(policyLock({ hasBackend: true, hasKey: true }, running), null);
 });

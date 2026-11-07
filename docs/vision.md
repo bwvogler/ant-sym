@@ -32,7 +32,7 @@ This is the budget the policy may draw on. Each row points to the research secti
 | Brood | dig here, tend here | local | [nest-and-home §1](nest-and-home.md#nest-structure) |
 | Own body | age, hunger, load, fatigue | internal | [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants) (response thresholds) |
 
-**Not yet researched:** corpse odour, which matters for the midden, and the substrate cues a fungus can sense. Write a note, with primary sources, before building on either.
+**Not yet researched:** corpse odour, which matters for the midden. Write a note, with primary sources, before building on it. What a fungus senses inside its host is in [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers). Most of it is marked design: no paper shows a fungus reading those cues.
 
 ## Where the code is today
 
@@ -60,20 +60,23 @@ This is the budget the policy may draw on. Each row points to the research secti
 
 ## The fungus
 
-**Today** (`fungus.ts`, `fungalPolicy.ts`). The fungus picks an intervention per fungal situation. Most of its levers already act the right way:
-- **On perception:** `soothe`, `share`, `roam` and `muddle` change channel gains, tolerance, the clock and floor marks.
-- **On emission:** `blend` and `cull` change the host's odour; `share` changes trail laying; `soothe` quiets the host.
-- **On the body:** `crown` passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
+**Today** (`fungus.ts`, `fungalPolicy.ts`, `levers.ts`; since `ja-lo8.4`). The fungus senses its host's body and sets a level for every lever, per fungal situation ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)):
+- **What it senses:** arousal (perceived alarm, strangers close), touch (a nestmate or a foreigner on the cuticle), place (the substrate underfoot, the queen's mark), task (age band, standing in for juvenile hormone), carrying and grooming. Neither the host's mode nor a chamber's owner is read.
+- **On perception:** gains on food, rival trails, home, alarm, stranger scent and floor marks, and the felt time out.
+- **On emission:** trail laid, trail leaked to other colonies, alarm laid, a calming cue, the fungus's own odour, and how much of the fungus shows to groomers.
+- **Lethal, off until the player turns them on:** the odour weapon, and `crown`, which passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
 - **Its own effectors:** spores on the ground, contact spread, and Bloom corpses on the midden that sporulate.
 
 The gaps:
-- **The fungal situation reads things a fungus can't sense.** Its `host` field is read straight from the ant's mode. In the side view, `ground` comes from the chamber table's owner. It should rest on what the fungus could sense: contact chemistry, its own load and the substrate (`ja-k4k.7`).
+- ~~**The fungal situation reads things a fungus can't sense** (its host's mode; the chamber table's owner)~~: closed by `ja-lo8.4` (`ja-k4k.7`). Most of the new senses are marked design in §11: no paper shows a fungus reading them.
 - **The fungus has no scent of its own on the ground,** and no choice of where or when to sporulate, such as summiting (`ja-k4k.8`).
 
 The biology and the full catalogue of levers:
 - [fungus-policy §2](fungus-policy.md#2-two-policies-and-the-perceived-state-between-them): two policies, and the perceived state between them;
 - [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants): what real parasites do;
-- [fungus-policy §4](fungus-policy.md#4-the-levers-the-fungus-can-pull): about 35 levers sorted into perception, recognition, emission, body, spread and world.
+- [fungus-policy §4](fungus-policy.md#4-the-levers-the-fungus-can-pull): about 35 levers sorted into perception, recognition, emission, body, spread and world;
+- [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers): the game's account of what the fungus senses inside an ant, and its perception and emission levers;
+- [new-queens](new-queens.md): when a colony rears new queens, and the fungus's two levers on it (queen signal and queen scent).
 
 ## The ladder
 

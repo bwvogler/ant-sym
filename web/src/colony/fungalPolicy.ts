@@ -1,81 +1,76 @@
-import { MODES, type Mode } from "./colony.ts";
-
-// The fungus policy, pure (ja-t4d.5, docs/fungus-policy.md §5): what the
-// fungus does to each ant it lives in. It never decides for an ant; it picks
-// one intervention per host, from what the fungus in that host can sense.
-// The host's own policy (the local rule, or Jev under its colony's doctrine)
-// still chooses everything the ant does, from the state the fungus bends.
+// The fungus policy, pure (ja-t4d.5; redesigned for the fungus game, ja-lo8.4, docs/fungus-policy.md §11): what the
+// fungus does to each ant it lives in. It never decides for an ant; it sets a level for each of its levers in that
+// host, from what the fungus in that host can sense. The host's own policy (the local rule, or Jev under its
+// colony's doctrine) still chooses everything the ant does, from the state the fungus bends.
 //
-// The fungal situation is coarse, so an answer can be cached per situation
-// (the Jev lane, fungusBrain.ts), like an ant's mode:
-//   strain   — which strain the host carries (it decides what is offered)
-//   load     — low / mid / high
-//   host     — what the ant is doing: its mode (a carrier counts as return)
-//   ground   — whose ground it stands on: home, border, foreign (by home scent; in the side view, nest slice 8:
-//              home is its own colony's chamber, tunnel its own nest's tunnels, border the open ground (or a
-//              tunnel whose scent is nobody's clearly), foreign another colony's chamber or tunnels; whose tunnel
-//              it is goes by the home scent where the host stands, of any number of colonies)
-//   contact  — who touches it: none; kin (its own colony); allied (another
-//              colony's ants, within tolerance: unification, felt where it
-//              happens); or strangers (past tolerance, by odour)
-//   groomed  — whether its nestmates are grooming the fungus off it
-// All of it local to the host, like an ant's own senses: the fungus knows
-// nothing map-wide (no "how far apart are the nests"), and nothing here
-// assumes two colonies. Unity is the player's meter, not the fungus's sense.
+// The fungal situation is what the fungus senses inside its host: its body, not its decisions (the host's mode is
+// not a sense: §11.2), and nothing map-wide.
+//   arousal  — calm; alarmed (it perceives alarm); fighting (it perceives strangers close: the state it fights in)
+//   touch    — who touches its cuticle, by smell: none, a nestmate, a foreigner (an ant that smells of another colony,
+//              tolerated or not; by odour, not by colony: PR #42 review S4)
+//   place    — the substrate underfoot: outside, a tunnel, a chamber, or by the queen (her mark on the floor)
+//   task     — its physiology (juvenile hormone tracks task): nurse, inside worker, forager; or a queen (ja-lo8.7)
+//   carrying — what is in its jaws: nothing, food, brood
+//   groomed  — nestmates grooming the fungus off its cuticle
+// Coarse, so an answer is cached per situation (the Jev lane, fungusBrain.ts) and asked only as hosts meet it.
 
-export const LOADS = ["low", "mid", "high"] as const;
-export type Load = (typeof LOADS)[number];
-export const GROUNDS = ["home", "border", "foreign", "tunnel"] as const;
-export type Ground = (typeof GROUNDS)[number];
-export const CONTACTS = ["none", "kin", "allied", "strangers"] as const;
-export type Contact = (typeof CONTACTS)[number];
+export const AROUSALS = ["calm", "alarmed", "fighting"] as const;
+export type Arousal = (typeof AROUSALS)[number];
+export const TOUCHES = ["none", "nestmate", "foreigner"] as const;
+export type Touch = (typeof TOUCHES)[number];
+export const PLACES = ["outside", "tunnel", "chamber", "queen"] as const;
+export type Place = (typeof PLACES)[number];
+export const TASKS = ["nurse", "inside", "forager", "queen"] as const;
+export type Task = (typeof TASKS)[number];
+export const CARRYING = ["nothing", "food", "brood"] as const;
+export type Carrying = (typeof CARRYING)[number];
 
 export interface FungalSituation {
-  /** the strain's id */
-  strain: string;
-  load: Load;
-  host: Mode;
-  ground: Ground;
-  contact: Contact;
+  arousal: Arousal;
+  touch: Touch;
+  place: Place;
+  task: Task;
+  carrying: Carrying;
   groomed: boolean;
 }
 
-/** An intervention's id, for the host the situation describes. */
+/**
+ * The fungus's policy: for a host in this situation, Jev's levels as a cache answer (levers.encodeLevels over the levers
+ * asked), a preset's id (levers.PRESETS: the local rule's answers), or STRAIN_DEFAULT.
+ */
 export type FungusPolicy = (s: FungalSituation) => string;
 
-/** Situations per strain: 3 × 4 × 4 × 4 × 2 = 384. */
-export const FUNGAL_SITUATIONS = LOADS.length * MODES.length * GROUNDS.length * CONTACTS.length * 2;
+/** Situations: 3 × 3 × 4 × 4 × 3 × 2 = 864 (a queen's are a few of them: she is always by herself, at home). */
+export const FUNGAL_SITUATIONS = AROUSALS.length * TOUCHES.length * PLACES.length * TASKS.length * CARRYING.length * 2;
 
-/** A load at or past this is "high": where the local rule culls, and where cull takes full effect (Fungus.express). */
+/** A load at or past this is "high": where cull takes full effect (Fungus.express). */
 export const HIGH_LOAD = 0.7;
 
-export function loadLevel(l: number): Load {
-  return l >= HIGH_LOAD ? "high" : l >= 0.3 ? "mid" : "low";
+/** The fungal situation as one number (0 .. FUNGAL_SITUATIONS − 1): what a host keeps of what it was last asked. */
+export function encodeFungal(s: FungalSituation): number {
+  return (((((AROUSALS.indexOf(s.arousal) * TOUCHES.length + TOUCHES.indexOf(s.touch)) * PLACES.length + PLACES.indexOf(s.place)) * TASKS.length + TASKS.indexOf(s.task)) * CARRYING.length + CARRYING.indexOf(s.carrying)) * 2) + (s.groomed ? 1 : 0);
 }
 
-/** The fungal situation without its strain, as one number (0 .. FUNGAL_SITUATIONS − 1): what a host keeps of what it was last asked. */
-export function encodeFungal(s: Omit<FungalSituation, "strain">): number {
-  return (((LOADS.indexOf(s.load) * MODES.length + MODES.indexOf(s.host)) * GROUNDS.length + GROUNDS.indexOf(s.ground)) * CONTACTS.length + CONTACTS.indexOf(s.contact)) * 2 + (s.groomed ? 1 : 0);
-}
-
-export function decodeFungal(code: number, strain: string): FungalSituation {
+export function decodeFungal(code: number): FungalSituation {
   let c = code;
   const groomed = c % 2 === 1;
   c = Math.floor(c / 2);
-  const contact = CONTACTS[c % CONTACTS.length] as Contact;
-  c = Math.floor(c / CONTACTS.length);
-  const ground = GROUNDS[c % GROUNDS.length] as Ground;
-  c = Math.floor(c / GROUNDS.length);
-  const host = MODES[c % MODES.length] as Mode;
-  const load = LOADS[Math.floor(c / MODES.length)] as Load;
-  return { strain, load, host, ground, contact, groomed };
+  const carrying = CARRYING[c % CARRYING.length] as Carrying;
+  c = Math.floor(c / CARRYING.length);
+  const task = TASKS[c % TASKS.length] as Task;
+  c = Math.floor(c / TASKS.length);
+  const place = PLACES[c % PLACES.length] as Place;
+  c = Math.floor(c / PLACES.length);
+  const touch = TOUCHES[c % TOUCHES.length] as Touch;
+  const arousal = AROUSALS[Math.floor(c / TOUCHES.length)] as Arousal;
+  return { arousal, touch, place, task, carrying, groomed };
 }
 
 /** The local rule's settings: the player's thresholds on the free policy (§5.1, lever 5). */
 export interface FungusRule {
-  /** a groomed host goes dormant, where it shows a quarter as much (DORMANT_SHOW): it hides from grooming instead of acting */
+  /** a groomed host hides (the dormant preset: it shows a quarter as much) instead of acting */
   hide: boolean;
-  /** a high-load host fighting strangers is culled (odour weapon), where the strain and the menu allow it */
+  /** a host fighting a foreigner is culled (the odour weapon), where the menu allows it */
   cull: boolean;
 }
 
@@ -86,25 +81,19 @@ export const DEFAULT_RULE: FungusRule = { hide: false, cull: false };
 export const STRAIN_DEFAULT = "default";
 
 /**
- * The local rule: free, the default, and the baseline Jev is measured against.
+ * The local rule: free, the default, and the baseline Jev is measured against. It answers with presets:
  *   groomed, and hiding → dormant (a dormant host shows a quarter as much to its groomers)
- *   culling, a high-load host fighting strangers → cull
+ *   culling, a host fighting a foreigner → cull
  *   otherwise → the strain's own default (Lockpick soothes, Bloom shares, Garden blends)
- * What a strain cannot do, or the menu has switched off, falls back (Fungus.choose).
+ * Levers the menu has off are left as they are (Fungus.choose).
  *
- * Why so little (PRD §19): four situational rules were built and measured against each strain's default
- * (sharing routes and roaming away from home, soothing strangers, sequencing them by how close the
- * colonies are, and switching only once unified; the last two read a map-wide "how far apart are the
- * nests", since removed: the fungus senses only what is local to its host). None beat the default; most unified later and cost
- * lives, because any intervention that takes a Garden host off blend before the colonies are one
- * brings less of the fungus's odour home, and after unification shared routes brought in no more
- * food. Situational play is what the per-host situation is for: the player's settings here, and Jev
- * under the player's aim (fungusBrain.ts).
+ * Why so little (PRD §19): four situational rules were built and measured against each strain's default; none beat
+ * it. Situational play is what the per-host situation is for: Jev, under the player's aim (fungusBrain.ts).
  */
 export function localFungusRule(rule: FungusRule = DEFAULT_RULE): FungusPolicy {
   return (s) => {
     if (rule.hide && s.groomed) return "dormant";
-    if (rule.cull && s.contact === "strangers" && s.host === "fight" && s.load === "high") return "cull";
+    if (rule.cull && s.touch === "foreigner" && s.arousal === "fighting") return "cull";
     return STRAIN_DEFAULT;
   };
 }

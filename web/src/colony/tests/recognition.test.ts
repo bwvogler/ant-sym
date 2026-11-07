@@ -2,14 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, localPolicy, type Situation } from "../colony.ts";
-import { Fungus, INTERVENTIONS, STRAINS, intervention } from "../fungus.ts";
+import { Fungus, STRAINS, preset } from "../fungus.ts";
+import { compose, LEVERS } from "../levers.ts";
 import { Game, QUIET } from "../game.ts";
 import { BINS, FUNGAL, MAX_MASK, Recognition, binCentre, binOf } from "../recognition.ts";
 import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../world.ts";
 import { at, put } from "./hexmaps.ts";
 
 /** Every host runs its strain's default intervention. */
-const strainDefault = (sit: { strain: string }) => STRAINS.find((x) => x.id === sit.strain)!.expresses;
+/** Every host runs its strain's default preset (Fungus.resolve). */
+const strainDefault = () => "default";
 
 // Recognition (ja-t4d.3): enemies are strangers by odour, not by colony; the
 // fungus calms (B1), widens a host's tolerance (B4) and gives it its own odour
@@ -153,7 +155,7 @@ test("a host is never a stranger to its own nest, at any share any intervention 
     const o = n0 + MAX_MASK * (FUNGAL - n0);
     assert.ok(Math.abs(o - n0) < tol, `nest ${n0}: host at ${o}`);
   }
-  for (const v of INTERVENTIONS) assert.ok(v.levers.mask >= 0 && v.levers.mask <= MAX_MASK, v.id);
+  for (const lever of LEVERS) for (let level = 0; level < lever.words.length; level++) assert.ok(compose({ [lever.id]: level }).mask >= 0 && compose({ [lever.id]: level }).mask <= MAX_MASK, lever.id);
 });
 
 test("judged as an ant judges it (by band centre, in float32), a host at full share is still no stranger to a healthy nestmate", () => {
@@ -182,11 +184,11 @@ test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, 
   f.hosts = 2;
   f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
-  assert.equal(c.expr[0], intervention("soothe"));
+  assert.equal(c.expr[0], preset("soothe"));
   assert.ok(Math.abs((c.calm[0] as number) - 0.8) < 1e-5);
   assert.ok(Math.abs((c.tolerance[0] as number) - 0.65) < 1e-5);
   assert.equal(c.mask[0], 0);
-  assert.equal(c.expr[1], intervention("blend"));
+  assert.equal(c.expr[1], preset("blend"));
   assert.ok(Math.abs((c.mask[1] as number) - 0.3) < 1e-5, "half load, half the share");
   assert.equal(c.calm[1], 0);
 });

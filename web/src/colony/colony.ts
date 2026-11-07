@@ -1,3 +1,4 @@
+import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
 import { type Channel, type ChannelParams, DEFAULT_CHANNELS, type Mark, MARKS, Pheromones } from "./pheromone.ts";
 import { Brood, EGG, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
@@ -123,6 +124,25 @@ export const localPolicy: Policy = (s) => {
   if (s.foodTrail === "none") return "explore";
   return s.mode === "return" ? "follow" : s.mode;
 };
+
+/**
+ * A colony's queen (nest slice 4): where she lies, and the fungus in her (ja-lo8.7): her attendants infect her by
+ * contact as they would any ant, her nestmates groom it off, and what the fungus does in her is her levers: how much
+ * of it she shows, and how much of her royal mark she lays.
+ */
+export interface Queen {
+  alive: boolean;
+  x: number;
+  y: number;
+  /** the fungus in her, 0..1, its strain (an index into the fungus's strains), and her resistance */
+  load: number;
+  strain: number;
+  resist: number;
+  /** the share of her strain's visibility she shows her groomers (the showing lever) */
+  show: number;
+  /** her royal mark laid × this (the queen-signal lever) */
+  signal: number;
+}
 
 /** The strategist's coarse view of its own colony: few values, so a stance can be cached per view too. */
 export interface StanceSituation {
@@ -272,6 +292,9 @@ export function channelParams(over: Partial<Record<Channel, Partial<ChannelParam
   return out;
 }
 
+/** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices) and the policies. */
+const COLONY_SKIP: ReadonlySet<string> = new Set(["map", "nest", "policy", "stancePolicy", "responses", "onBury", "enemies", "foreign", "friends", "nestmates", "raidTarget", "raidNest", "raidMarks", "others"]);
+
 export class Colony {
   readonly map: WorldMap;
   readonly ph: Pheromones;
@@ -359,7 +382,7 @@ export class Colony {
   #restT: Float32Array;
   // The queen and brood (nest slice 4; the side view only: elsewhere the larder still becomes ants directly).
   /** the colony's queen, in its royal chamber (null on the top-down maps); a colony whose queen is dead is orphaned */
-  queen: { alive: boolean; x: number; y: number } | null = null;
+  queen: Queen | null = null;
   readonly brood = new Brood();
   /** seconds owed toward the queen's next egg */
   #layT = 0;
@@ -504,7 +527,7 @@ export class Colony {
   strain: Uint8Array;
   /** immune priming from grooming visible nestmates, 0..1: scales down every load the ant takes */
   resist: Float32Array;
-  /** the intervention the fungus runs in this ant (an index into fungus.ts INTERVENTIONS; 0 = dormant) */
+  /** the preset the fungus runs in this ant (an index into levers.ts PRESETS; 0 = as it is or dormant; CUSTOM = Jev's own mix of levels) */
   expr: Uint8Array;
   // What the ant perceives (docs/fungus-policy.md §2): gains on the scent that is there, 1 = as it is.
   // The fungus writes them (fungus.ts); the ant cannot tell. Its situation and its steering both read
@@ -537,7 +560,7 @@ export class Colony {
   quiet: Float32Array;
   /** how far (× 0.5) the fungus pushes its odour away from its nest's: past the tolerance, its own colony takes it for a stranger (B6) */
   estrange: Float32Array;
-  /** the fungal situation (fungalPolicy.ts encodeFungal, without the strain) the fungus last chose for it in; −1 = none */
+  /** the fungal situation (fungalPolicy.ts encodeFungal) the fungus last chose for it in; −1 = none */
   fungal: Int16Array;
   // What the fungus bends inside the nest (nest slice 8; the fungus writes them, 1 / 0 = as it is).
   /** the nest's floor marks smelled × this: road signs, and the chamber it is in */
@@ -546,6 +569,8 @@ export class Colony {
   swapMarks: Float32Array;
   /** 0..1: how surely it kills the queen and brood it touches, CROWN_RATE × this a second (lethal, the fungus's crown; its load) */
   regicide: Float32Array;
+  /** the share of its strain's visibility it shows its groomers (the fungus's "showing" lever, ja-lo8.4): under 1 it hides the fungus */
+  show: Float32Array;
   /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
   wall: Int8Array;
   /** distance home to beat to leave a wall: where it met the wall, or underground the nearest it has been since its last give-up */
@@ -621,11 +646,7 @@ export class Colony {
       cellOf(this.nest.entrance.x, this.nest.entrance.y);
       this.#entranceCol = CELL[0] as number;
       this.#entranceRow = CELL[1] as number;
-      for (const n of map.nests ?? [this.nest])
-        if (n.entrance) {
-          cellOf(n.entrance.x, n.entrance.y);
-          this.#holes.push(CELL[0] as number);
-        }
+      this.seeHoles();
     }
     this.policy = policy;
     this.stancePolicy = stancePolicy;
@@ -679,7 +700,7 @@ export class Colony {
     this.#loaded = new Uint8Array(n);
     this.#putAt = new Int32Array(n).fill(-1);
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
-    if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers) };
+    if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers), load: 0, strain: 0, resist: 0, show: 1, signal: 1 };
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -725,6 +746,7 @@ export class Colony {
     this.gainMarks = new Float32Array(n).fill(1);
     this.swapMarks = new Float32Array(n);
     this.regicide = new Float32Array(n);
+    this.show = new Float32Array(n).fill(1);
     this.wall = new Int8Array(n);
     this.hitDist = new Float32Array(n);
     this.followT = new Float32Array(n);
@@ -747,6 +769,21 @@ export class Colony {
   }
 
   /** Where the queen lies (world position): the royal chamber's floor row, the cell on it nearest the founding chamber's centre. */
+  /**
+   * Every nest's hole on the map (side view), whose funnels the colony's mound keeps open (world.heapMound). Again
+   * whenever a colony is founded (Game.addColony), so an older colony's mound never buries the new hole (PR #42
+   * review, S3).
+   */
+  seeHoles(): void {
+    if (!this.#entrance) return;
+    this.#holes = [];
+    for (const n of this.map.nests ?? [this.nest])
+      if (n.entrance) {
+        cellOf(n.entrance.x, n.entrance.y);
+        this.#holes.push(CELL[0] as number);
+      }
+  }
+
   #royalFloor(ch: Chambers): { x: number; y: number } {
     const royal = ch.list.find((c) => c.colony === this.params.nest && c.role === "royal");
     if (!royal) return { x: this.nest.x, y: this.nest.y };
@@ -869,6 +906,12 @@ export class Colony {
     this.gainMarks[i] = 1;
     this.swapMarks[i] = 0;
     this.regicide[i] = 0;
+    this.show[i] = 1;
+  }
+
+  /** Whether ant i holds brood in its jaws (a nurse carrying an egg, larva or pupa): what the fungus in it senses as `carrying`. */
+  holdsBrood(i: number): boolean {
+    return this.#holdsBrood[i] === 1;
   }
 
   /** What ant i holds, as a response sees it. */
@@ -2451,7 +2494,8 @@ export class Colony {
       const qx = CELL[0] as number;
       const qy = CELL[1] as number;
       // Her pheromone: the royal mark, strongest where she lies, drawing nurses to her.
-      this.ph.depositCell("royal", qx, qy, QUEEN_MARK * dt);
+      // × her signal: the fungus in her can damp it (its queen-signal lever, ja-lo8.7; 1 as she is).
+      this.ph.depositCell("royal", qx, qy, QUEEN_MARK * q.signal * dt);
       // Strangers at her side kill her (a raid that reaches the royal chamber).
       const g = this.enemies;
       if (g) {
@@ -4034,6 +4078,157 @@ export class Colony {
       this.#middenSmell(dt);
     }
     else while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
+  }
+
+  // ——— saving (save.ts, ja-lo8.6) ———
+
+  /**
+   * This colony's state for a save: its public data (not the references the game wires: the map, other colonies'
+   * scent, the grids, its policies; its own scent saves itself), and every private field but its random stream (the game saves that,
+   * shared by every colony). Generated from the field declarations; tests/save.test.ts fails on any field missed.
+   */
+  saveState(): Record<string, unknown> {
+    return {
+      fields: saveFields(this, COLONY_SKIP),
+      private: encodeSave({
+      ti: this.#ti,
+      alarmAnt: this.#alarmAnt,
+      alarmSmelt: this.#alarmSmelt,
+      oddsNow: this.#oddsNow,
+      t: this.#t,
+      cellX: this.#cellX,
+      cellY: this.#cellY,
+      cellAtX: this.#cellAtX,
+      cellAtY: this.#cellAtY,
+      noTunnel: this.#noTunnel,
+      staleWalk: this.#staleWalk,
+      looked: this.#looked,
+      goalKind: this.#goalKind,
+      under: this.#under,
+      groundMin: this.#groundMin,
+      groundT: this.#groundT,
+      outDist: this.#outDist,
+      outCells: this.#outCells,
+      outVersion: this.#outVersion,
+      outAt: this.#outAt,
+      groundRef: this.#groundRef,
+      chamberCell: this.#chamberCell,
+      chamberFor: this.#chamberFor,
+      lastRole: this.#lastRole,
+      sinceRole: this.#sinceRole,
+      restT: this.#restT,
+      layT: this.#layT,
+      holdsBrood: this.#holdsBrood,
+      broodTo: this.#broodTo,
+      holdT: this.#holdT,
+      portTo: this.#portTo,
+      porter: this.#porter,
+      inJaws: this.#inJaws,
+      corpse: this.#corpse,
+      loaded: this.#loaded,
+      putAt: this.#putAt,
+      belief: this.#belief,
+      entrance: this.#entrance,
+      entranceCol: this.#entranceCol,
+      entranceRow: this.#entranceRow,
+      holes: this.#holes,
+      spoilTo: this.#spoilTo,
+      spoilSide: this.#spoilSide,
+      spoilT: this.#spoilT,
+      soil: this.#soil,
+      heaped: this.#heaped,
+      goalX: this.#goalX,
+      goalY: this.#goalY,
+      holeX: this.#holeX,
+      cameFrom: this.#cameFrom,
+      lastDug: this.#lastDug,
+      noGain: this.#noGain,
+      gone: this.#gone,
+      storedSeen: this.#storedSeen,
+      returning: this.#returning,
+      returned: this.#returned,
+      tired: this.#tired,
+      asked: this.#asked,
+      question: this.#question,
+      s: this.#s,
+      chamberNest: this.#chamberNest,
+      goalCells: this.#goalCells,
+      want: this.#want,
+      enRouteTo: this.#enRouteTo,
+      portViewAt: this.#portViewAt,
+      }),
+    };
+  }
+
+  /** A saved state back into this colony (saveState), in place where it can be: a fresh colony of the same world and params. */
+  loadState(saved: Record<string, unknown>): void {
+    loadFields(this, saved.fields as Record<string, unknown>);
+    const r = saved.private as Record<string, unknown>;
+    if ("ti" in r) this.#ti = fillLike(this.#ti, r.ti) as never;
+    if ("alarmAnt" in r) this.#alarmAnt = fillLike(this.#alarmAnt, r.alarmAnt) as never;
+    if ("alarmSmelt" in r) this.#alarmSmelt = fillLike(this.#alarmSmelt, r.alarmSmelt) as never;
+    if ("oddsNow" in r) this.#oddsNow = fillLike(this.#oddsNow, r.oddsNow) as never;
+    if ("t" in r) this.#t = fillLike(this.#t, r.t) as never;
+    if ("cellX" in r) this.#cellX = fillLike(this.#cellX, r.cellX) as never;
+    if ("cellY" in r) this.#cellY = fillLike(this.#cellY, r.cellY) as never;
+    if ("cellAtX" in r) this.#cellAtX = fillLike(this.#cellAtX, r.cellAtX) as never;
+    if ("cellAtY" in r) this.#cellAtY = fillLike(this.#cellAtY, r.cellAtY) as never;
+    if ("noTunnel" in r) this.#noTunnel = fillLike(this.#noTunnel, r.noTunnel) as never;
+    if ("staleWalk" in r) this.#staleWalk = fillLike(this.#staleWalk, r.staleWalk) as never;
+    if ("looked" in r) this.#looked = fillLike(this.#looked, r.looked) as never;
+    if ("goalKind" in r) this.#goalKind = fillLike(this.#goalKind, r.goalKind) as never;
+    if ("under" in r) this.#under = fillLike(this.#under, r.under) as never;
+    if ("groundMin" in r) this.#groundMin = fillLike(this.#groundMin, r.groundMin) as never;
+    if ("groundT" in r) this.#groundT = fillLike(this.#groundT, r.groundT) as never;
+    if ("outDist" in r) this.#outDist = fillLike(this.#outDist, r.outDist) as never;
+    if ("outCells" in r) this.#outCells = fillLike(this.#outCells, r.outCells) as never;
+    if ("outVersion" in r) this.#outVersion = fillLike(this.#outVersion, r.outVersion) as never;
+    if ("outAt" in r) this.#outAt = fillLike(this.#outAt, r.outAt) as never;
+    if ("groundRef" in r) this.#groundRef = fillLike(this.#groundRef, r.groundRef) as never;
+    if ("chamberCell" in r) this.#chamberCell = fillLike(this.#chamberCell, r.chamberCell) as never;
+    if ("chamberFor" in r) this.#chamberFor = fillLike(this.#chamberFor, r.chamberFor) as never;
+    if ("lastRole" in r) this.#lastRole = fillLike(this.#lastRole, r.lastRole) as never;
+    if ("sinceRole" in r) this.#sinceRole = fillLike(this.#sinceRole, r.sinceRole) as never;
+    if ("restT" in r) this.#restT = fillLike(this.#restT, r.restT) as never;
+    if ("layT" in r) this.#layT = fillLike(this.#layT, r.layT) as never;
+    if ("holdsBrood" in r) this.#holdsBrood = fillLike(this.#holdsBrood, r.holdsBrood) as never;
+    if ("broodTo" in r) this.#broodTo = fillLike(this.#broodTo, r.broodTo) as never;
+    if ("holdT" in r) this.#holdT = fillLike(this.#holdT, r.holdT) as never;
+    if ("portTo" in r) this.#portTo = fillLike(this.#portTo, r.portTo) as never;
+    if ("porter" in r) this.#porter = fillLike(this.#porter, r.porter) as never;
+    if ("inJaws" in r) this.#inJaws = fillLike(this.#inJaws, r.inJaws) as never;
+    if ("corpse" in r) this.#corpse = fillLike(this.#corpse, r.corpse) as never;
+    if ("loaded" in r) this.#loaded = fillLike(this.#loaded, r.loaded) as never;
+    if ("putAt" in r) this.#putAt = fillLike(this.#putAt, r.putAt) as never;
+    if ("belief" in r) this.#belief = fillLike(this.#belief, r.belief) as never;
+    if ("entrance" in r) this.#entrance = fillLike(this.#entrance, r.entrance) as never;
+    if ("entranceCol" in r) this.#entranceCol = fillLike(this.#entranceCol, r.entranceCol) as never;
+    if ("entranceRow" in r) this.#entranceRow = fillLike(this.#entranceRow, r.entranceRow) as never;
+    if ("holes" in r) this.#holes = fillLike(this.#holes, r.holes) as never;
+    if ("spoilTo" in r) this.#spoilTo = fillLike(this.#spoilTo, r.spoilTo) as never;
+    if ("spoilSide" in r) this.#spoilSide = fillLike(this.#spoilSide, r.spoilSide) as never;
+    if ("spoilT" in r) this.#spoilT = fillLike(this.#spoilT, r.spoilT) as never;
+    if ("soil" in r) this.#soil = fillLike(this.#soil, r.soil) as never;
+    if ("heaped" in r) this.#heaped = fillLike(this.#heaped, r.heaped) as never;
+    if ("goalX" in r) this.#goalX = fillLike(this.#goalX, r.goalX) as never;
+    if ("goalY" in r) this.#goalY = fillLike(this.#goalY, r.goalY) as never;
+    if ("holeX" in r) this.#holeX = fillLike(this.#holeX, r.holeX) as never;
+    if ("cameFrom" in r) this.#cameFrom = fillLike(this.#cameFrom, r.cameFrom) as never;
+    if ("lastDug" in r) this.#lastDug = fillLike(this.#lastDug, r.lastDug) as never;
+    if ("noGain" in r) this.#noGain = fillLike(this.#noGain, r.noGain) as never;
+    if ("gone" in r) this.#gone = fillLike(this.#gone, r.gone) as never;
+    if ("storedSeen" in r) this.#storedSeen = fillLike(this.#storedSeen, r.storedSeen) as never;
+    if ("returning" in r) this.#returning = fillLike(this.#returning, r.returning) as never;
+    if ("returned" in r) this.#returned = fillLike(this.#returned, r.returned) as never;
+    if ("tired" in r) this.#tired = fillLike(this.#tired, r.tired) as never;
+    if ("asked" in r) this.#asked = fillLike(this.#asked, r.asked) as never;
+    if ("question" in r) this.#question = fillLike(this.#question, r.question) as never;
+    if ("s" in r) this.#s = fillLike(this.#s, r.s) as never;
+    if ("chamberNest" in r) this.#chamberNest = fillLike(this.#chamberNest, r.chamberNest) as never;
+    if ("goalCells" in r) this.#goalCells = fillLike(this.#goalCells, r.goalCells) as never;
+    if ("want" in r) this.#want = fillLike(this.#want, r.want) as never;
+    if ("enRouteTo" in r) this.#enRouteTo = fillLike(this.#enRouteTo, r.enRouteTo) as never;
+    if ("portViewAt" in r) this.#portViewAt = fillLike(this.#portViewAt, r.portViewAt) as never;
   }
 }
 

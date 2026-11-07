@@ -58,21 +58,18 @@ spend and time caps from the real `usage.input_tokens` of every reply.
 
 ## What you can do
 
-- **The colony game**: a procedural 512×320 world of rock, soil
-  and food, dug underground by default (*Ground → open* for the surface), with two
-  colonies, Ink and Amber. Food makes ants, fights kill them, and each colony's
-  strategist picks forage, defend or raid. The ants forage on their own: they lay a
-  trail to food and a trail home, and switch between exploring, following and going home.
-  You are the fungus and nothing else: paint spores of one of three strains, choose what
-  the fungus may do and what it aims for, and paint *lure* or *alarm* scent. You win
-  when the colonies become one (*unified*) and lose if one falls. With **Start Jev**, Jev
-  picks every colony's ant modes and stances under its doctrine, and what the fungus does
-  under your aim, each once per situation, for roughly $0.10–0.15 an hour of retuning
-  (PRD §11–12, §19).
+- **The fungus game** (the epic `ja-lo8`, PRD §50): a procedural world seen from the side (*Details → Ground → from above* for the surface), with two colonies, Ink and Amber. Food makes ants, fights kill them, and each colony's strategist picks forage, defend or raid. The ants forage on their own: they lay a trail to food and a trail home, and switch between exploring, following and going home.
+  - A start screen opens the game: your spores fall by the Ink colony's hole and ants walking out pick them up (`Game.land`). It runs at 4× by default (1–8× in the top bar), and the top bar's goal line follows the chapters (`colony/chapters.ts`).
+  - You are the fungus and nothing else. The main screen is the field, a top bar (play, speed, time, where the game stands) and the fungus's panel: how far it has spread, and its **aim**, your words for what it wants.
+  - Jev picks every colony's ant modes and stances under its doctrine, and what the fungus does under your aim, each once per situation. Answers are kept and some ship with the page, so Jev is asked only for a situation with no answer yet under the words in force, and a game that meets only answered situations spends nothing. One daily budget caps what Jev costs (`JEV_DAILY_USD`, default $0.10; PRD §11–12, §19, §50.11).
+  - The page ships Jev's answer to every ant and strategist situation under each preset doctrine (`web/public/precache/`, `scripts/precache.mjs`), so a first game asks Jev almost nothing. Answers are kept and keep playing when Jev can't run (no key, the spend cap reached, the Pages build); then no policy can be changed.
+  - New words don't wipe the board: until Jev answers a situation under them, the earlier words' answer plays, dimmed in the ant card.
+  - Each colony's doctrine is its nature, not yours to rewrite. You win when the colonies become one (*unified*) and lose if one falls.
+- **Details** (top right): the colonies' numbers, Jev's spend and caches (Stop and Resume), infection and unity, the world's settings, and the lab: the spore brush and its three strains, the fungus's menu, and each colony's doctrine for experiments.
 - **Learn** (top right): a field guide to what is on screen, with what real ants do and
-  links to the research notes; the policy you can edit (each colony's doctrine, the
-  fungus's aim and menu), with how each decides and the exact request Jev is sent; and
-  the nest's chambers.
+  links to the research notes; the policy (the fungus's aim and menu, which you shape, and
+  each colony's doctrine, which you can read), with how each decides and the exact request
+  Jev is sent; and the nest's chambers.
   Turn on **Labels** on the field to name the chambers and click one to inspect it (PRD §47).
 
 ## How it talks to Jev
@@ -120,8 +117,8 @@ should lower the default caps.
 Every merge to `main` publishes the static build to GitHub Pages
 (`.github/workflows/pages.yml`, after lint, typecheck and tests):
 <https://bwvogler.github.io/ant-sym/>. The API is dev-server middleware, so the
-page has no backend and no key: Start Jev is disabled with a notice, and the
-local-rule ants, text and image targets and the colony sim all play. One-time
+page has no backend and no key: the game plays Jev's answers already kept in the
+browser, the local rule elsewhere, and the policy editors say why they are disabled. One-time
 setup: Settings → Pages → Source: GitHub Actions.
 
 ## Development

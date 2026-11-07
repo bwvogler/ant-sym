@@ -1,3 +1,4 @@
+import { decode, encode, fillLike } from "./save.ts";
 import { CHUNK, CHUNK_BITS, CHUNK_CELLS, ChunkLayer, chunkKey, chunkOf } from "./chunks.ts";
 import { CELL, cellOf } from "./hex.ts";
 import type { WorldMap } from "./world.ts";
@@ -334,5 +335,18 @@ export class Pheromones {
       for (const v of a) s += v;
     });
     return s;
+  }
+
+  /** This field's state for a save (save.ts): its layers, settings, which chunks are awake, and its clocks. */
+  saveState(): Record<string, unknown> {
+    return { fields: encode(this.fields), params: encode(this.params), awake: encode(this.#awake), clock: encode(this.#clock), head: encode(this.#head) };
+  }
+
+  loadState(r: Record<string, unknown>): void {
+    fillLike(this.fields, r.fields);
+    this.params = decode(r.params) as Record<Channel, ChannelParams>;
+    fillLike(this.#awake, r.awake);
+    this.#clock = fillLike(this.#clock, r.clock) as Record<Channel, number>;
+    this.#head = fillLike(this.#head, r.head) as Record<Channel, number>;
   }
 }

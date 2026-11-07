@@ -130,15 +130,29 @@ export const DEFAULT_WORLD: WorldOptions = { size: { w: 512, h: 368 }, rockiness
 /** The open surface map (before digging): ~22 % rock, no soil. */
 export const OPEN_WORLD: Partial<WorldOptions> = { rockiness: 0.22, soil: 0, patchesPerChunk: 1.5, foodMinDist: 24 };
 
-/** Small, fast, seedable: the same seed is the same sequence on every machine. */
-export function mulberry32(seed: number): () => number {
+/** A random stream whose position can be read and set (a save keeps it: save.ts). */
+export interface Rng {
+  (): number;
+  /** where the stream is: setting it back replays the same numbers */
+  state: number;
+}
+
+/** Small, fast, seedable: the same seed is the same sequence on every machine. Its `state` can be saved and set. */
+export function mulberry32(seed: number): Rng {
   let s = seed | 0;
-  return () => {
+  const next = (() => {
     s = (s + 0x6d2b79f5) | 0;
     let t = Math.imul(s ^ (s >>> 15), 1 | s);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  }) as Rng;
+  Object.defineProperty(next, "state", {
+    get: () => s,
+    set: (v: number) => {
+      s = v | 0;
+    },
+  });
+  return next;
 }
 
 function mix(h: number): number {
@@ -902,6 +916,16 @@ function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, r
     for (let d = -1; d < 6; d++) updateSurface(map, d < 0 ? sx : nx(sx, g, d), d < 0 ? g : ny(g, d));
   }
   return nest;
+}
+
+/**
+ * A new colony's nest dug mid-game (Game.addColony, ja-lo8.8): a hole in column `ex` (side view), a slanted shaft
+ * `depth` rows down, and a founding chamber for colony `colony`, as the world's own nests are dug.
+ */
+export function foundNest(map: WorldMap, ex: number, colony: number, rng: () => number, depth = SIDE_WORLD.chamberDepth): Nest {
+  const ground = new Int32Array(map.size.w);
+  ground[ex] = groundTop(map, ex);
+  return digNest(map, ground, ex, depth, rng, colony);
 }
 
 /** The top of the ground in column x (side view): the first row from the top that isn't sky, or the map's height. */

@@ -3186,3 +3186,359 @@ Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; sea
 - **Food or loot at a rival's entrance** (ja-um8's deferred note from MR 2) needs brood and prey carrying: `ja-gkl`.
 - **Stance** is still broadcast (`ja-k4k.6`).
 - **A rival-nest odour,** column marching, call-off: no sources reached.
+
+## 50. The fungus game: decisions (ja-lo8, 2026-11-06 / 07)
+
+The page was a sim with everything on one screen. The owner asked for a game, to be built in ten stacked slices under the epic `ja-lo8` (slice beads `ja-lo8.1`–`.10`). These are the owner's decisions, from the plan's review.
+
+**The game.**
+- The player starts as a fungus that lands near a colony's entrance.
+- **The fungus policy is always the player's, and it is the game's main handle.**
+  - The player writes an aim in words. Jev sets a **level for every lever**, per situation the fungus senses inside its host. The answer is no longer one bundle: the owner wants to pull many levers at once, interpreted from natural language.
+  - The levers bend what the host **perceives** and what it **gives off** ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)).
+  - The senses may be finer than before. The fungus's own load is dropped as a sense, and the host's mode was never one.
+- **Answers fill in as situations come up.** When the aim changes, old answers stay in force, dimmed, until each situation's new answer arrives. Nothing re-asks the whole table, and nothing is pre-asked.
+- **The table stays out of sight.** It and per-cell pins are available in Learn and Details, not on the main screen, so the main screen keeps some magic.
+- **One fungus.** The three strains become lab presets.
+- **Colony policy is hidden until the fungus infects a queen.**
+  - After that, a colony's policy changes **only when a new queen is born**: a free rewrite, at that moment only.
+  - The new words drive **only her offspring**, in the **daughter colony she founds**.
+  - Her ants act on her mother's answers, dimmed, until their own arrive.
+- **How the new queen gets the fungus.** She picks it up by contact on her way out of the nest. No vertical transmission ([new-queens §4](new-queens.md#4-where-the-fungus-comes-in)).
+- **The fungus's lever on queen birth** must be a real lever in the catalogue. There are two: *queen signal* (emission, in the queen) and *queen scent* (perception, in nurses). Both are design, and both are built.
+- **Pace.**
+  - The page defaults to a faster speed (4×) rather than a separate game clock, so every rate scales together and no sim constant changes.
+  - Queen births may stay rare.
+  - **Games are saved** (IndexedDB autosave, slots) and played over several sittings.
+- **Jev is always on** (superseded by §50.11: Jev is asked only for situations with no cached answer, under one daily budget).
+  - The page ships answers for the preset doctrines.
+  - When Jev cannot answer (no key, funds or cap spent, the Pages build), the game keeps playing on cached answers, but **no policy can be changed**, the fungus's or the ants'.
+- **Main screen and Details.** The main screen is decluttered. The colony table, Jev's figures, unity, infection, world settings and the lab tools move to a Details screen.
+
+**Research.** [new-queens.md](new-queens.md) (new):
+- colonies rear queens when large;
+- the queen's pheromone holds it back, and in fire ants workers kill sexual larvae while they sense it (Klobuchar & Deslippe 2002);
+- founding is claustral, on the queen's reserves.
+
+The game's rule follows: a fed larva where nurses perceive a faint queen's mark becomes a gyne, and one where they perceive a strong mark is culled.
+
+**Superseded.** `ja-ygc` (doctrine inherited by a fraction, through a founding queen) is superseded by the epic: a full rewrite, but only at a queen's birth.
+
+**Cost.** This section changes no request. Slice 4 (`ja-lo8.4`) changes the fungus lane's legend, situation and questions, and will report its tokens per question.
+
+### 50.1 Slice 2: the main screen, Details, Jev always on (ja-lo8.2, 2026-11-07)
+
+**The main screen** holds four things:
+- the field;
+- a top bar: Play/Pause, speeds 0.5–4×, sim time, and one line on where the game stands;
+- the fungus's panel: its share in each colony, unity, and its aim (presets and words);
+- the followed ant's card.
+
+**The Details screen** takes everything else:
+- the colony table and mode counts;
+- Jev's spend, caches, Stop and Resume;
+- infection, resistance and unity figures;
+- the world's settings (seed, ground, rival, ants, speed slider, trails);
+- the **lab**: the spore brush and strains, the fungus's menu, hide and cull, and each colony's doctrine, for experiments.
+
+**Learn** shows doctrines read-only. **Removed:** the lure and alarm brushes, which painted only the first colony's fields.
+
+**Jev is always on** (`ui/policyLock.ts`, tested):
+- **When it starts.** The page starts a run once the server and its key are there, and starts a new one after a time cap. A spend cap or a Stop is final until the player presses Resume.
+- **Cached answers play whether or not a run is on.** `colonyJev.ts` `#lookup` no longer falls back to the local rule just because no run is on; only uncached situations use the local rule.
+- **What locks the policies:** the probe pending, no server, no key, a run starting, stopped or capped. While locked, every editor that sets words or the menu is disabled and says why, and `useColonyJev`'s setters refuse words. Losing Jev mid-game raises a notice (`ui/toasts.ts`).
+
+**Measured.**
+- A page load with a key started a run by itself: 17 requests and $0.0007 in 7 s.
+- With the key unset, the aim is disabled and the panel reads "JEV_API_KEY is not set…".
+- Desktop and phone layouts were checked with Playwright: no page errors, and no sideways scroll on the Details screen.
+
+**No behaviour change in the sim.** Goldens are untouched, and requests and their contexts are byte-identical, so the cost is unchanged.
+
+### 50.2 Slice 3: shipped answers, and stale answers that fill in (ja-lo8.3, 2026-11-07)
+
+**Shipped answers.** `scripts/precache.mjs` asked Jev every mode situation (3,888) and every strategist view (324) under each preset doctrine (Forage, Cautious, Warlike):
+- **Packing:** the browser's own packers, keys and contexts.
+- **Cost:** 129 requests, **$0.1046** in total (estimate $0.1245), 0 failed.
+- **Output:** 12,636 answers in `web/public/precache/`, 708 kB raw, about 11 kB gzipped per mode bundle.
+- **Loading:** at start the page fetches them once (`ui/precache.ts`) and seeds the client's caches (`ColonyJev.seed`), under any answer the browser already has. Only answers the lane's question allows are kept.
+- **Guard:** `tests/precache.test.ts` fails when a bundle's context or a brain version no longer matches the code.
+
+**Measured:**
+- **A fresh browser with a key:** 0 requests in 8 s, and 100 % of mode choices from the cache. Before, a page load made 17 requests in 7 s ($0.0007).
+- **The Pages build** (`vite preview` under `/ant-sym/`) plays 3,888 mode and 324 stance answers with no server, and says why policies are locked.
+
+**Stale answers fill in** (owner, PRD §50: "dim the old values and fill them in as they roll"):
+- **Earlier contexts.** Each lane keeps up to three earlier contexts. On a new doctrine or aim, a situation with no answer under the new words plays the newest earlier answer, and is queued to be asked again.
+- **Display.** The ant card shows it faded, "by Jev's answer under its earlier doctrine (aim), while the new one is asked".
+- **Daughters.** `setDoctrineFor(k, words, inherit)` makes a lane fall back on other words instead: a daughter colony on her mother's doctrine (ja-lo8.9).
+- **Nothing is asked all at once.**
+
+**No sim change.** The goldens are untouched. Requests and contexts are byte-identical, so there are no new tokens per question.
+
+### 50.3 Slice 4: fungus v2: senses inside the ant, a level for every lever (ja-lo8.4, 2026-11-07)
+
+**What changed** (fungus-policy §11):
+
+*The fungal situation*
+- **What it is now:** what the fungus senses inside its host:
+  - arousal: calm, alarmed or fighting, from what the host last perceived;
+  - touch: none, nestmate or foreigner;
+  - place: outside, tunnel, chamber, or by the queen (her royal mark underfoot; a nest's disc on top-down maps);
+  - task: the age band, nurse, inside or forager;
+  - carrying: nothing, food or brood;
+  - groomed.
+
+  That makes 648 situations.
+- **What is gone:** the host's mode, the fungus's load, the strain, and the chamber owner's `ground`. This closes `ja-k4k.7`. A test pins that a host's situation does not change with its mode.
+
+*The answer*
+- **Levels, not one intervention.** Each answer is a level per lever (`levers.ts`): 15 levers, of which 13 are non-lethal and on the menu by default (11 on top-down maps, with no floor marks). Jev is asked one `score` question per lever on the menu. The answer is cached as the levels in table order, so the key carries the levers asked.
+- **The menu is a set of levers.** Lethal levers (odour weapon, crown) are off until turned on, and never asked while off.
+- **Strains** keep their spread traits and a default preset, and lose their `allows` gating.
+- **Presets.** The old interventions are now presets: named sets of levels whose values are exactly the old bundles'. So the local rule (each strain's default, plus the hide and cull settings) plays as before.
+- **Goldens are unchanged:** they paint no spores.
+
+*Hiding*
+- Hiding is now the "fungus showing" lever (`Colony.show`, not lerped by load). It replaces `expr === 0` plus "dormant on the menu".
+- `expr` names the preset a host's levels are, or `CUSTOM` (255) for Jev's own mix.
+
+*The lane*
+- **Batching:** at most 50 hosts to a request (`FUNGUS_BATCH`). The lane waits up to 2 s for a part-full request to fill (`FUNGUS_GATHER_MS`, `ColonyJevOptions.gatherMs`), since the legend is most of a small request. Hosts play their stale or default levels meanwhile.
+- **The legend** names each lever in a few words (`brief`), about 807 estimated tokens. A first draft that spelled out every level's words was about 2,000.
+
+*The UI*
+- **The ant card** lists what the fungus senses, then the levers it pulls, with stale ones dimmed.
+- **Learn → "How the fungus works"** has a one-line diagram, the senses, the levers, the local rule, and a "Show the table" toggle. The table lists Jev's answers so far, lazily filled, with an earlier aim's answers dimmed.
+- **Lever chips** replace intervention chips, in Details and Learn.
+- **Pins are not built** (`ja-lo8.11`): the owner asked that the table stay out of sight anyway.
+
+**Cost (live):**
+- **A live check of 4 situations under "Unite":** 3,530 input tokens, 883 per situation, against an estimate of 3,358. Every score parsed.
+  - Jev pulled the fungal odour (some) and the calming cue (some) everywhere.
+  - Where hosts touched foreigners it also had them read rival trails partly and damped the alarm laid.
+  - It leaked trail where a forager carrying food met a foreigner.
+- **Shipped fungus answers.** `precache.mjs --lanes fungus` asked the 90 situations a recorded side-view game meets (Garden on both royal chambers, Lockpick at both holes, 300 s) under each preset aim. That is 270 answers for **$0.0082**, about 724 real tokens per situation at about 45 to a request.
+
+**Cost as a game asks** (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1):
+
+| Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+|---|---|---|---|---|---|
+| Garden | 91 | 23 | 842 | 0.0032 | 0.039 |
+| Lockpick | 58 | 15 | 847 | 0.0021 | 0.025 |
+| Bloom | 68 | 23 | 914 | 0.0026 | 0.031 |
+
+Before (§39): 44–81 situations and about 560 tokens per situation as asked, $0.001–0.002 a game. Asking every lever costs about 1.5× per situation, under a cent an hour more.
+
+### 50.4 Slice 5: start, 4×, the landing, goals (ja-lo8.5, 2026-11-07)
+
+**Built:**
+- **The start screen** (`ui/StartScreen.tsx`) explains what the player is and has a world seed and Start. The field waits behind it, paused.
+- **Start lands the fungus.** `Game.land(k, strain)` drops spores on the ground just past colony k's hole: 3 cells along, radius 2, 3 spores, and no ant dosed directly. The first hosts are ants that walk through it. The game's fungus is Garden.
+- **Every later game lands too.** Once started, New world and Restart also begin with the landing.
+- **Speed.** The page defaults to **4×**, the top bar offers 1–8×, and Details has a slider to 8×. No sim constant changed (owner, §50).
+- **"Running at N×".** The top bar shows it when the measured sim-seconds per wall-second fall below 85 % of the speed asked (`ColonyStats.pace`).
+- **Goals.** `colony/chapters.ts` (pure, tested) drives a goal line in the top bar and a notice when a chapter ends:
+  1. land;
+  2. a first host;
+  3. a quarter of the colony;
+  4. the queen;
+  5. a new queen;
+  6. her colony.
+
+  Chapters 4–6 wait on `ja-lo8.7` and `ja-lo8.9`.
+
+**Measured:**
+- **The landing:** the first host within 2 minutes (test). In the browser, Garden took the whole Ink colony about 80 s of sim after the landing, so chapter 3 passes almost at once. This is Garden's spread as built (`ja-260`, the fungus budget), and the goals wait on balance (`ja-lo8.10`).
+- **Speed:** 3.6–3.8× real against 4× asked, on a 4-core machine with three benchmarks running, with no "running at" warning.
+
+**The blocker: a 2-hour game runs every colony down.** `scripts/economy-bench.mjs`, 7,200 s (30 minutes at 4×), 600 + 600 ants, no fungus, local rule:
+
+| Seed | First queen lost | At 7,200 s |
+|---|---|---|
+| 1 | Ink, by 3,600 s | Ink gone; Amber 95 ants, its intake 0.07/s |
+| 2 | Ink, by 1,200 s | both gone: Amber's last ants aged out with 123 unfed larvae beside 325 food in its larder |
+| 3 | Amber, by 1,200 s | Amber gone; Ink 137 ants, falling |
+
+Three existing problems, each with its bead:
+- **War (`ja-war`).** About 1,000 ants of the losing colony die in fights, and raids reach a queen within 20–60 min.
+- **Surface food runs out (`ja-p0k`).** About three quarters of the map's food lies underground and is never foraged, so intake falls to 0 by 2,400 s.
+- **Feeding collapses (`ja-xu6`).** On seed 2, larvae starve beside a full larder once the young are gone.
+
+Since the queen and new queens are the game's middle chapters, slices 7–9 need colonies that last. The owner decides how (§50.5).
+
+### 50.5 Keeping colonies alive in long games: the owner's choice, and food that regrows (2026-11-07)
+
+**Decision** (owner, on §50.4's finding):
+- **Built now:** food regrows.
+- **Wanted, as beads if hard:** foraging underground food (`ja-p0k`) and fixing larvae that starve beside a full larder (`ja-xu6`). Both are behaviour MRs:
+  - `ja-xu6`'s cause is the age bar on porting and nursing (`#port`, `#nurse`: band 2 never). When births stall, nobody old moves food to the brood. Lifting the bar changes behaviour from the first minute, since founders start up to half a lifespan old, so goldens and assays have to be redone (`ja-k4k.1`).
+  - `ja-xu6` now blocks the queen-birth slice (`ja-lo8.9`).
+- **Left alone:** the war (`ja-war`).
+
+**Regrowth (`GameParams.regrow`, `GAME_REGROW` = 1,800 s).**
+- **What grows back:** the food piles the world began with on the ground (the side view's walkway; every pile top-down) grow back toward their first size. Each unit comes back with chance deficit ÷ 1,800 a second.
+- **Constraints:**
+  - whole units only, so no trace amounts that ants would smell;
+  - not under the mound;
+  - on its own random stream, so the game's draws are untouched;
+  - food that grows back is added to `map.foodTotal`, so food conservation still balances.
+- **Where it's on:** the page. Off by default, so goldens, assays and tests are unchanged (`tests/regrow.test.ts`).
+- **Ceiling:** about 7,000 units of ground food on seed 1's map, so at most about 4 food/s map-wide when it is all eaten.
+
+**Measured** (`REGROW=1800 node scripts/economy-bench.mjs <seed> 7200 600 2 1200`; no fungus; 7,200 s is 30 minutes at 4×; Ink / Amber workers):
+
+| Seed | Without regrowth | With regrowth |
+|---|---|---|
+| 1 | Ink gone; Amber 95 | **579 / 425**, both queens alive; intake 0.5–0.6/s each |
+| 2 | both gone | Ink's workers all died in war by 4,800 s (1,065 lost; queen alive, no brood that can finish); **Amber 783** |
+| 3 | Amber gone; Ink 137 | **858 / 381** at 6,000 s, both queens alive |
+
+Regrowth ends the starvation: a lone colony now holds steady. War still ends a colony on one seed in three (`ja-war`, left as is). On seed 1 Ink held 129 unfed larvae for about 20 minutes beside 263 food in its larder before recovering: that is `ja-xu6`.
+
+### 50.6 Slice 6: saving games (ja-lo8.6, 2026-11-07)
+
+**How a save works.**
+- **Contents.** `Game.save()` is the game as JSON:
+  - the map as dug and eaten;
+  - every colony, including all 64 of `Colony`'s private fields (save and load generated from their declarations);
+  - each colony's scent;
+  - the chamber table;
+  - the fungus and recognition;
+  - the game's clocks;
+  - its random streams. `mulberry32` now exposes its `state`, with identical sequences.
+- **Restore.** `Game.load()` pours a save into a game built afresh from the same world and settings, so every reference is wired as usual. Raid aims are saved as colony indices.
+- **Format.** `colony/save.ts` encodes typed arrays as base64, chunk layers as their chunks, and Maps and Sets as lists. An object with `saveState` / `loadState` saves itself. Getters are skipped.
+
+**The guard** (`tests/save.test.ts`, side and top-down, the fungus landed):
+1. Run 40 s, save, JSON round-trip, restore into a fresh game.
+2. Saving again reproduces the save field for field. A dropped field shows at once: a mutant that skips `#under` fails. `#restT` didn't, being all zeros at 40 s.
+3. Run on 20 s: every typed array, scent and map layer, the spores, the brood and the chambers hash as the unbroken run's.
+
+**On the page** (`ui/saves.ts`, IndexedDB; memory where IndexedDB can't open).
+- **What a record holds:** the save, the settings that rebuild the world (seed, view, ants, rival, Restart count), and the player's state (aim, doctrines, menu, hide and cull).
+- **Slots:** an autosave every 60 s and when the tab is hidden, plus two slots of the player's.
+- **Where:** the start screen offers **Continue** (the newest), and Details has a Saved games card (Save here, Load).
+- **Browser check:** saved at 0:48 of sim; after a page reload, Continue came back at 0:48, at chapter 4, with the fungus in all of Ink, and no page errors.
+
+**No sim change.** Goldens are bit-exact. Nothing is asked of Jev, so the cost is unchanged.
+
+### 50.7 Slice 7: the queen as a host (ja-lo8.7, 2026-11-07)
+
+**Built:**
+- **Her state.** `Colony.queen` (a `Queen`) gains load, strain, resistance, show and signal.
+- **Infection.** `Fungus.step` adds her to the load grids, so she is a source like any host. `#stepQueen` steps her as an ant is stepped:
+  - contact load from the ants around her, her attendants, at the strain's transmission;
+  - spores under her;
+  - grooming by the nestmates around her (up to the usual four).
+- **Her own situation:** task `queen`, place `queen`, calm, touched by nestmates or none. That adds a value to `task`: 864 situations.
+- **Her own levers:** "fungus showing", and the new emission lever **queen signal**. Its levels 0.1 / 0.4 / 1 / 1.5 / 2 multiply the royal mark she lays (`QUEEN_MARK × signal`, lerped by her load).
+  - **Per-host asking.** Levers carry `hosts` (workers, queen, both), so a queen is asked only her two and a worker never hers (`askedLevers`, per-situation keys).
+  - **What it is for.** Queen signal is the emission route to new queens (new-queens §4); the gyne rule that reads the mark comes with `ja-lo8.9`.
+- **The reveal.** `Game.revealed[k]` is set the first tick the fungus is in colony k's queen (load ≥ `INFECTED`) and never cleared. It is saved with the game.
+  - **What it opens:** chapter 4 ends, and Learn → Policy shows that colony's doctrine. Before, it reads "Closed to you: reach the … colony's queen". The "What Jev is sent" sample hides the words too.
+  - **The lab:** Details hides the colonies' doctrines behind a "Show" button.
+- **The fungus panel** shows the fungus in each queen.
+
+**Jev:**
+- `FUNGUS_BRAIN_VERSION` 6: the legend gains the queen task and the queen-signal lever.
+- Re-shipped fungus answers: 93 situations per preset aim, 3 of them a queen's, for **$0.0083**.
+  - Under Unite and Peace, Jev leaves a queen as she is.
+  - Under Spread, it dims how much of the fungus she shows.
+
+**Tests** (`tests/queenHost.test.ts`):
+- loaded attendants infect her and clean ones don't;
+- she is asked only her levers;
+- a strongly damped signal cuts her mark to under half;
+- the reveal fires once, stays, and survives a save.
+
+**Pace (to balance, `ja-lo8.10` / `ja-260`).** In the browser at 8×, Garden from the landing reached Ink's queen at 46 s of sim (about 6 s of wall time), so chapters 2–4 pass almost at once. The game needs a slower or costlier spread before it is a game.
+
+No change to the colony lanes: their requests are byte-identical, and the goldens are bit-exact (they paint no spores).
+
+### 50.8 Slice 8: several colonies at runtime (ja-lo8.8, 2026-11-07)
+
+**Built:**
+- **`Game.addColony({ x, y, antCount, odour })`.**
+  - In the side view it digs a hole in the column under x, with the world's own shaft and founding royal chamber (`world.foundNest`, exported from `digNest`). Top-down, it places a nest's disc.
+  - It adds a `Colony` of that many workers at that odour (its queen in the side view), then rewires every colony: grids, burials, enemies, the other nests, raids.
+  - **Kin.** A daughter at her mother's odour is kin, and is not raided by her.
+- **Saves.** `Game.founded` records each founding. A save re-founds them on a fresh map before pouring the state back, and stays bit-exact (`tests/addColony.test.ts`).
+- **Unity for any number of colonies.** The gap is the widest between any two standing nests' odours, and mixing counts ants within tolerance of another colony's nest. With two colonies it is the same as before.
+- **The page draws any number of colonies.**
+  - The field, the minimap, picking and the nest buttons (one per colony; `n` cycles them) take the colonies list.
+  - `Followed` carries a colony index (`k`).
+  - Names and tones go on past Ink and Amber: Jade, Rust, Slate, Moss.
+  - The Jev client re-attaches when a colony is pushed onto the game's list.
+- **Lab:** "Found a colony between the nests" (Details), until queens found colonies themselves (`ja-lo8.9`).
+
+**Checked:**
+- In the browser, Jade's hole, shaft, chamber and queen draw on the field, with its line in the fungus panel and its nest button.
+- In tests, a third colony's ants choose and live, and the other colonies know its nest.
+
+**Not done:** `Colony.foreign` stays "the nearest rival's trail", which already works for any number of colonies, rather than the strongest trail at the cell.
+
+### 50.9 Review fixes (PR #42, 2026-11-07)
+
+The PR's review found three blockers and six should-fix items; each is fixed on the branch with a test that fails without it.
+
+**Founding colonies** (`Game.addColony`):
+- **B1. A save restores the founded nest as dug.** A load re-dug each founded nest on the restored game's random stream, so a shaft could slant elsewhere (rng seed 13: x 411 instead of 417). `Founding.nest` records the nest as dug, and a load founds from it without digging.
+- **B2. Its own nest index.** The colony took index k in `map.nests`, which always holds the world's two nests: with the rival off it took the unused second nest. It now takes the index of the nest it pushed.
+- **S2. No shared holes.** A founding within `HOLE_GAP` (8) columns of a hole moves along to the nearest free column; top-down, `NEST_GAP` (12) between nests.
+- **S3. Every colony keeps every hole open.** `Colony.seeHoles()` runs on every rewire, so an older colony's mound never buries a founded hole.
+- A founded colony that falls no longer ends the game (`Game.fallen` reads the world's own colonies only).
+
+**Saves:**
+- **B3. An unreadable save never blanks the page.** Continue offers the newest save this version can read (`saves.newestReadable`); Details lists the others as from an older version, with Load disabled; a failed load plays a fresh game of the save's world with a notice; an error boundary round the app shows what broke and a Reload button.
+- **S1. The save test reads Colony's `#field` declarations** and requires the save to hold exactly those, bar its random stream; the run-on hash includes each colony's private state. Dropping `tired` from the save now fails it.
+
+**The fungus's touch is smell (S4).** `touch` was read from the colonies' occupancy grids, colony membership, which the fungus can't sense. It is now read from recognition's odour bands (`Recognition.around`, by odour, at the healthy tolerance, against the host colony's nest odour): as odours converge, a foreign ant that smells like home reads as a nestmate, and an estranged nestmate as a foreigner. The legend says so ("an ant that smells of another colony"): `FUNGUS_BRAIN_VERSION` 7.
+
+**Jev runs only when the player changes a policy (S6, the owner's decision; superseded by §50.11).** This replaced §50's "Jev is always on":
+- No run starts on page load or restarts at a time cap. A change of words, the fungus's aim or a colony's doctrine, starts one; the time cap ends it. Details → Resume still starts one by hand.
+- The policy editors are open whenever Jev could run: running, starting, never started, or after a time cap. The spend cap, the player's Stop, a failed start, and no server or key lock them, saying why.
+- The preset doctrines' and aims' words ship their answers and are never asked, even while a run is on (`ColonyJevOptions.shipped`): their unanswered situations play an earlier answer or the local rule, free. Restoring a save with words of the player's own starts a run.
+
+**Cost (S5).**
+- **Colony lanes:** unchanged (colony v5, stance v4).
+- **Fungus lane, v7.** Re-shipped answers: 93 situations per preset aim, 279 answers for **$0.0083**, about 708 real tokens per situation. As a game asks them (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1), now only under the player's own words:
+
+  | Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+  |---|---|---|---|---|---|
+  | Garden | 94 | 24 | 867 | 0.0034 | 0.041 |
+  | Lockpick | 60 | 16 | 877 | 0.0022 | 0.027 |
+  | Bloom | 72 | 30 | 1,017 | 0.0031 | 0.037 |
+
+  At v6 the same runs were 865–1,014. Under a preset aim and doctrines a game now asks nothing.
+
+**Left as filed:** the autosave's size (6.7 MB of JSON, ~260 ms in node at the page's defaults: a hitch every 60 s), a founded colony starting on Forage rather than its mother's doctrine (`ja-lo8.9`), and the fungus precache being side view only (a top-down game under a preset aim plays the local rule where nothing ships).
+
+### 50.10 Merging #41: shipping what the tests got (2026-11-07)
+
+#41 (behaviour MR 5.2) raised `COLONY_BRAIN_VERSION` to 6: one sentence of the mode legend, what the raid stance asks. Asking every mode situation again under the three presets would cost about $0.12 (117 requests). The owner's direction: don't precompute everything; ship what comes out of the tests.
+
+- `scripts/precache.mjs --import` ships the answers a live check already got (a `colony-live.mjs` cache), refusing any file asked under another context. Nothing is asked.
+- MR 5.2's live check (`experiments/caches/mr52-top-*.json`, top-down, seed 1, 300 s) holds 290 mode answers per doctrine under the current context, so the mode bundles now hold those 290 (of 3,888), for $0. The stance bundles (v4, unchanged) keep all 324.
+- `tests/precache.test.ts` now asks for a non-empty bundle of valid answers per preset, not every situation.
+- **What it costs in play.** Under S6 (§50.9) a preset's words are never asked, so a situation with no shipped answer plays the local rule. How many a game meets: in 600 s of 600 + 600 ants under the local rule, side world 1 met 330 mode situations, both side worlds 558, and the side and top-down worlds of seeds 1 and 2 together 834. The 290 shipped are top-down ones; most side-view situations in the nest play the local rule until a side-view live check is imported.
+- The merge also caught a field #41 added to `Colony` (`#gone`, a raider out on a raid) that the save left out: the S1 test (§50.9) failed on it, and it is now saved.
+
+### 50.11 Asking only for what isn't cached; one daily budget (PR #42 re-review S7, S8, 2026-11-07)
+
+The owner's rule: **don't spend while answers are cached; ask Jev only for the situations that aren't.** It replaces §50.9's S6 ("Jev runs only when the player changes a policy"; preset words never asked), which would have needed every situation pre-cached. The owner doesn't want a full precache while the game is in development.
+
+**S7, what is asked:**
+- The `shipped` exclusion is gone. A situation with no answer under the words in force, preset or the player's own, is asked, and its answer goes into the browser's cache. The shipped bundles are a head start, not a requirement.
+- With no run on, a miss calls `ColonyJev.wantsRun`. The page starts a run if Jev could run (`policyLock.shouldStart`): server and key there, not stopped by the player, the budget not spent. A page whose every situation met is cached starts no run and spends nothing.
+- On Pages (no API), presets play the shipped answers and the local rule, as before.
+- Measured by the re-review against the 290-answer import (180 s, seed 1, 600 + 600 ants): 50.8 % of side-view mode questions came from the shipped bundle (32 distinct situations missing), 97.2 % top-down (115 missing). Those few situations are now asked once and cached.
+
+**S8, one budget, not per-run caps:**
+- The caps date from the picture demo, where a run asked for as long as it was open. Here an open run costs nothing, so a time cap guarded nothing, and a per-run spend cap set no ceiling on total spend once runs start themselves.
+- The game's runs start with `GAME_CAPS` (no caps that bind), so a run stays open from the first miss until the page closes (its exit stops it).
+- The server's ledger keeps **one budget per UTC day across every run and page load**: `JEV_DAILY_USD`, default `DAILY_BUDGET_USD` $0.10. It counts every reply billed, including one landing after its run ended, and reserves for calls in flight as the spend cap does. The day's spend is kept in `data/jev-budget.json` (gitignored), so a restarted server knows it.
+- **When it is spent:** the run stops with reason `budget`, a new run ends as it starts, nothing more is asked, the game plays cached answers, stale answers and the local rule, and the policy editors lock with "Jev's daily budget ($0.10) is spent … until tomorrow".
+- **Details shows the budget** (spent of today's, and what is left) beside the run's own figures. Tests: a second run on the same day starts with what the first spent; a new day starts again; a reply from a replaced run counts; the store carries a restart.
+- The per-run caps stay in the ledger, with their old default, for any caller that asks for them.
+

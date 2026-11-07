@@ -4,12 +4,14 @@ import { R } from "../hex.ts";
 import { CountGrid, occupancy } from "../battle.ts";
 import { Colony, localPolicy, type Policy, type Situation } from "../colony.ts";
 import { packModeRequest, situationKey } from "../colonyBrain.ts";
-import { Fungus, INTERVENTIONS, STRAINS, intervention } from "../fungus.ts";
+import { Fungus, STRAINS, preset } from "../fungus.ts";
+import { compose, LEVERS, PRESETS } from "../levers.ts";
 import { Pheromones } from "../pheromone.ts";
 import { mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** Every host runs its strain's default intervention. */
-const strainDefault = (sit: { strain: string }) => STRAINS.find((x) => x.id === sit.strain)!.expresses;
+/** Every host runs its strain's default preset (Fungus.resolve). */
+const strainDefault = () => "default";
 
 // The perception layer (ja-t4d.2): the fungus bends what a host senses, and
 // the host's own policy decides from that bent state. The policy is never
@@ -165,11 +167,11 @@ test("the fungus writes a host's perception from its intervention and load; a cl
   f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
 
-  assert.equal(c.expr[0], intervention("share"), "Bloom's default: share");
+  assert.equal(c.expr[0], preset("share"), "Bloom's default: share");
   assert.ok(Math.abs((c.gainFood[0] as number) - 1.25) < 1e-3, `food ×1.25 at half load: ${c.gainFood[0]}`);
   assert.ok(Math.abs((c.foreignFood[0] as number) - 0.5) < 1e-3);
   assert.equal(c.gainAlarm[0], 1, "share leaves alarm alone");
-  assert.equal(c.expr[1], intervention("soothe"), "Lockpick's default: soothe");
+  assert.equal(c.expr[1], preset("soothe"), "Lockpick's default: soothe");
   assert.ok(Math.abs((c.gainAlarm[1] as number) - 0.25) < 1e-6, "alarm ×0.25 at full load");
 
   // A strain that clears at once: the host is clean after one step, and perceives as it is.
@@ -183,11 +185,13 @@ test("the fungus writes a host's perception from its intervention and load; a cl
   }
 });
 
-test("every intervention keeps its gains in a range a sensor can read: never past what seen food reads", () => {
-  for (const v of INTERVENTIONS) {
-    for (const g of [v.levers.food, v.levers.home, v.levers.alarm, v.levers.foreignFood]) assert.ok(g >= 0 && g <= 4, `${v.id}: ${g}`);
-    assert.ok(v.levers.clock > 0, `${v.id}: a clock must run`);
-  }
-  assert.equal(INTERVENTIONS[0]?.id, "dormant");
-  for (const s of STRAINS) assert.doesNotThrow(() => intervention(s.expresses), `${s.id} expresses a known intervention`);
+test("every lever at every level keeps the host's gains in a range a sensor can read: never past what seen food reads", () => {
+  for (const lever of LEVERS)
+    for (let level = 0; level < lever.words.length; level++) {
+      const v = compose({ [lever.id]: level });
+      for (const g of [v.food, v.home, v.alarm, v.foreignFood]) assert.ok(g >= 0 && g <= 4, `${lever.id} ${level}: ${g}`);
+      assert.ok(v.clock > 0, `${lever.id}: a clock must run`);
+    }
+  assert.equal(PRESETS[0]?.id, "dormant");
+  for (const s of STRAINS) assert.doesNotThrow(() => preset(s.expresses), `${s.id} expresses a known preset`);
 });

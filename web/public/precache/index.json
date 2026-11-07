@@ -1,0 +1,72 @@
+{
+  "bundles": [
+    {
+      "lane": "fungus",
+      "aim": "peace",
+      "context": "fungus-v7-side-affc2028",
+      "file": "fungus-peace.json",
+      "answers": 93
+    },
+    {
+      "lane": "fungus",
+      "aim": "spread",
+      "context": "fungus-v7-side-d12ec805",
+      "file": "fungus-spread.json",
+      "answers": 93
+    },
+    {
+      "lane": "fungus",
+      "aim": "unite",
+      "context": "fungus-v7-side-02993145",
+      "file": "fungus-unite.json",
+      "answers": 93
+    },
+    {
+      "lane": "mode",
+      "doctrine": "cautious",
+      "context": "colony-v6-df2615cf",
+      "file": "mode-cautious.json",
+      "answers": 290
+    },
+    {
+      "lane": "mode",
+      "doctrine": "forage",
+      "context": "colony-v6-b40a2370",
+      "file": "mode-forage.json",
+      "answers": 290
+    },
+    {
+      "lane": "mode",
+      "doctrine": "warlike",
+      "context": "colony-v6-7209a8aa",
+      "file": "mode-warlike.json",
+      "answers": 290
+    },
+    {
+      "lane": "stance",
+      "doctrine": "cautious",
+      "context": "stance-v4-b1ce9ef4",
+      "file": "stance-cautious.json",
+      "answers": 324
+    },
+    {
+      "lane": "stance",
+      "doctrine": "forage",
+      "context": "stance-v4-657ca221",
+      "file": "stance-forage.json",
+      "answers": 324
+    },
+    {
+      "lane": "stance",
+      "doctrine": "warlike",
+      "context": "stance-v4-1cc01e21",
+      "file": "stance-warlike.json",
+      "answers": 324
+    }
+  ],
+  "versions": {
+    "colony": 6,
+    "stance": 4,
+    "fungus": 7
+  }
+}

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
-import { INTERVENTIONS, LETHAL, STRAINS, type Fungus } from "../colony/fungus.ts";
-import { Game, gameRng, type Outcome, type Unity } from "../colony/game.ts";
+import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
+import { Game, GAME_REGROW, gameRng, type Outcome, type Unity } from "../colony/game.ts";
+import { chapterOf, type ChapterView } from "../colony/chapters.ts";
+import { colonyName } from "./names.ts";
+import { pushToast } from "./toasts.ts";
+import type { GameSettings, SaveRecord } from "./saves.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
@@ -10,10 +14,11 @@ import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts
 // new seed, ant count or rival setting is a new game on a fresh map.
 
 /**
- * The fungus's brushes: lure paints food scent (ants follow it), alarm paints alarm (ants shy away, a doctrine
- * can send them home), spores inoculate: spores on the ground and a dose of the chosen strain into the ants there.
+ * The spore brush, a lab tool (Details): spores on the ground and a dose of the chosen strain into the ants there. The
+ * lure and alarm brushes are gone (ja-lo8.2): they painted only the first colony's fields, a leftover from when the
+ * player was that colony, and the fungus works through its hosts, not the player's hand.
  */
-export type Brush = "none" | "lure" | "alarm" | "spores";
+export type Brush = "none" | "spores";
 
 export interface ColonyControls {
   seed: number;
@@ -25,7 +30,7 @@ export interface ColonyControls {
   brush: Brush;
   /** which of the fungus's strains the spore brush paints (an index into STRAINS) */
   strain: number;
-  /** the fungus's menu: the interventions the player has on (§5.1, lever 4) */
+  /** the fungus's menu: the levers the player has on (§5.1, lever 4; levers.ts) */
   menu: string[];
   /** the local rule's settings: hide groomed hosts; cull high-load fighters among strangers */
   hide: boolean;
@@ -34,14 +39,23 @@ export interface ColonyControls {
   rival: boolean;
   /** the side view (a cross-section: sky, the ground line, the nest dug below) or the open surface from above */
   ground: Ground;
+  /** the player pressed Start (the start screen, ja-lo8.5): every game from then on begins with the fungus landing */
+  started: boolean;
 }
 
 export type Ground = "side" | "open";
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, menu: INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)), hide: false, cull: false, rival: true, ground: "side" };
+/** The game's default speed (owner, PRD §50: faster by default, every rate scaled together; no sim constant changes). */
+export const GAME_SPEED = 4;
+/** The top speed the controls offer. */
+export const MAX_SPEED = 8;
+/** The game's fungus: one species, the player's, which spreads like Garden (PRD §50; the other strains are lab presets). */
+export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
+/** The colony the fungus lands by. */
+export const LANDING_COLONY = 0;
 
-/** Per paint event (a pointer move while dragging): radius in cells and the amount laid per cell. */
-const BRUSHES = { lure: { channel: "food", radius: 2, amount: 3 }, alarm: { channel: "alarm", radius: 3, amount: 12 } } as const;
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: GAME_STRAIN, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side" };
+
 /** The spore brush, per paint event: radius in cells, spores laid per cell, and load dosed into each ant under it. */
 const SPORES = { radius: 3, spores: 2, dose: 0.15 } as const;
 
@@ -56,6 +70,8 @@ export interface SideStats {
   births: number;
   /** nest slice 4 (the side view): the queen ("lost": orphaned), and brood as eggs / larvae / pupae; null on the top-down maps */
   queen: "alive" | "lost" | null;
+  /** the fungus in the queen, 0..1 (ja-lo8.7) */
+  queenLoad: number;
   brood: [number, number, number];
   /** brood killed by the fungus's crown (nest slice 8) */
   broodKilled: number;
@@ -92,6 +108,10 @@ export interface ColonyStats {
   sporeCells: number;
   /** how far the fungus has come toward one colony */
   unity: Unity;
+  /** sim seconds per wall second over the last second: below the speed asked when the machine can't keep up */
+  pace: number;
+  /** where the player stands (chapters.ts) */
+  chapter: ChapterView;
 }
 
 /** Ants in each mode, over every colony. */
@@ -112,7 +132,7 @@ function seenTogether(colonies: readonly Colony[]): number {
 
 function side(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, queenLoad: c.queen?.load ?? 0, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
@@ -122,10 +142,28 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const [controls, setControls] = useState<ColonyControls>(initial);
   // Bumped by Restart: the same seed again, from scratch.
   const [generation, setGeneration] = useState(0);
-  const game = useMemo(
-    () => new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival }, gameRng(controls.seed, generation)),
-    [controls.seed, controls.antCount, controls.rival, controls.ground, generation],
-  );
+  // A saved game to pour into the next game built (loadSave): built from its own settings, then restored (save.ts).
+  const pending = useRef<SaveRecord | null>(null);
+  const [loads, setLoads] = useState(0);
+  const game = useMemo(() => {
+    const build = () => new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW }, gameRng(controls.seed, generation));
+    const g = build();
+    const r = pending.current;
+    if (r && r.settings.seed === controls.seed && r.settings.ground === controls.ground && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
+      pending.current = null;
+      try {
+        g.load(r.game);
+      } catch (e) {
+        // A save this game can't read (another version, another shape): a fresh game of the same world rather than a
+        // blank page (PR #42 review, B3). The notice waits until React has finished rendering.
+        queueMicrotask(() => pushToast(`That save couldn't be loaded (${e instanceof Error ? e.message : String(e)}); this is a fresh game of its world.`, "warn"));
+        return build();
+      }
+    }
+    return g;
+    // `loads` rebuilds the game when a save has the same settings as the game now
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controls.seed, controls.antCount, controls.rival, controls.ground, generation, loads]);
   const colony = game.player;
   // The player's policy settings outlive a game: apply them to every new one's fungus.
   useEffect(() => {
@@ -145,6 +183,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     const decisions = () => game.colonies.reduce((n, c) => n + c.decisions, 0);
     let rateAt = { t: colony.time, decisions: decisions() };
     let rate = 0;
+    let paceAt = { wall: performance.now(), sim: game.time };
+    let pace = controls.playing ? controls.speed : 0;
     const loop = (t: number) => {
       // Clamped both ways: a first frame stamped before `last` would step the sim backwards (negative trail).
       const dt = Math.max(0, Math.min(0.05, (t - last) / 1000));
@@ -153,6 +193,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         const total = dt * controls.speed;
         const steps = Math.max(1, Math.ceil(total / MAX_STEP));
         for (let k = 0; k < steps; k++) game.tick(total / steps);
+      }
+      if (t - paceAt.wall >= 1000) {
+        pace = ((game.time - paceAt.sim) * 1000) / (t - paceAt.wall);
+        paceAt = { wall: t, sim: game.time };
       }
       if (colony.time - rateAt.t >= 1) {
         rate = (decisions() - rateAt.decisions) / (colony.time - rateAt.t);
@@ -172,6 +216,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           outcome: game.outcome(),
           sporeCells: game.fungus.sporeCells,
           unity: game.unity(),
+          pace,
+          chapter: chapterFor(game),
         });
         lastStats = t;
       }
@@ -188,6 +234,23 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     return () => cancelAnimationFrame(raf);
   }, [game, colony, controls.playing, controls.speed]);
 
+  // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
+  useEffect(() => {
+    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN);
+  }, [game, controls.started]);
+  /** A saved game, as it was: its world and settings, then its state (Game.load), playing. The player's state is the page's to put back. */
+  const loadSave = useCallback((r: SaveRecord) => {
+    pending.current = r;
+    setGeneration(r.settings.generation);
+    setControls((c) => ({ ...c, seed: r.settings.seed, ground: r.settings.ground, antCount: r.settings.antCount, rival: r.settings.rival, started: true, playing: true }));
+    setLoads((n) => n + 1);
+  }, []);
+  /** What builds this game again (saves.ts). */
+  const settings: GameSettings = { seed: controls.seed, ground: controls.ground, antCount: controls.antCount, rival: controls.rival, generation };
+
+  /** The start screen's Start: this seed, playing, the fungus lands. */
+  const start = useCallback((seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })), []);
+
   const onFrame = useCallback((fn: () => void) => {
     frameListeners.current.add(fn);
     return () => void frameListeners.current.delete(fn);
@@ -198,16 +261,19 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** Paint at (x, y) in cells; `scale` widens the brush (the field passes more when zoomed out, so a stroke stays a stroke on screen). */
   const paint = useCallback(
     (x: number, y: number, scale = 1) => {
-      if (controls.brush === "none") return;
-      if (controls.brush === "spores") {
-        game.paintSpores(x, y, SPORES.radius * scale, SPORES.spores, SPORES.dose, controls.strain);
-        return;
-      }
-      const b = BRUSHES[controls.brush];
-      colony.paint(b.channel, x, y, b.radius * scale, b.amount);
+      if (controls.brush !== "spores") return;
+      game.paintSpores(x, y, SPORES.radius * scale, SPORES.spores, SPORES.dose, controls.strain);
     },
-    [game, colony, controls.brush, controls.strain],
+    [game, controls.brush, controls.strain],
   );
 
-  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint };
+  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start, loadSave, settings };
+}
+
+/** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */
+function chapterFor(game: Game): ChapterView {
+  const k = game.landed?.colony ?? LANDING_COLONY;
+  const c = game.colonies[k] ?? game.player;
+  const f = game.fungus.census(c);
+  return chapterOf({ landed: game.landed !== null, colony: colonyName(k), hosts: f.infected, share: f.living ? f.infected / f.living : 0, queenInfected: game.revealed[k] === true, gynes: 0, daughters: 0 });
 }
