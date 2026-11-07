@@ -3210,7 +3210,7 @@ The page was a sim with everything on one screen. The owner asked for a game, to
   - The page defaults to a faster speed (4×) rather than a separate game clock, so every rate scales together and no sim constant changes.
   - Queen births may stay rare.
   - **Games are saved** (IndexedDB autosave, slots) and played over several sittings.
-- **Jev is always on** (superseded by §50.9: Jev runs only when the player changes a policy).
+- **Jev is always on** (superseded by §50.11: Jev is asked only for situations with no cached answer, under one daily budget).
   - The page ships answers for the preset doctrines.
   - When Jev cannot answer (no key, funds or cap spent, the Pages build), the game keeps playing on cached answers, but **no policy can be changed**, the fungus's or the ants'.
 - **Main screen and Details.** The main screen is decluttered. The colony table, Jev's figures, unity, infection, world settings and the lab tools move to a Details screen.
@@ -3495,7 +3495,7 @@ The PR's review found three blockers and six should-fix items; each is fixed on 
 
 **The fungus's touch is smell (S4).** `touch` was read from the colonies' occupancy grids, colony membership, which the fungus can't sense. It is now read from recognition's odour bands (`Recognition.around`, by odour, at the healthy tolerance, against the host colony's nest odour): as odours converge, a foreign ant that smells like home reads as a nestmate, and an estranged nestmate as a foreigner. The legend says so ("an ant that smells of another colony"): `FUNGUS_BRAIN_VERSION` 7.
 
-**Jev runs only when the player changes a policy (S6, the owner's decision).** This replaces §50's "Jev is always on":
+**Jev runs only when the player changes a policy (S6, the owner's decision; superseded by §50.11).** This replaced §50's "Jev is always on":
 - No run starts on page load or restarts at a time cap. A change of words, the fungus's aim or a colony's doctrine, starts one; the time cap ends it. Details → Resume still starts one by hand.
 - The policy editors are open whenever Jev could run: running, starting, never started, or after a time cap. The spend cap, the player's Stop, a failed start, and no server or key lock them, saying why.
 - The preset doctrines' and aims' words ship their answers and are never asked, even while a run is on (`ColonyJevOptions.shipped`): their unanswered situations play an earlier answer or the local rule, free. Restoring a save with words of the player's own starts a run.
@@ -3523,4 +3523,22 @@ The PR's review found three blockers and six should-fix items; each is fixed on 
 - `tests/precache.test.ts` now asks for a non-empty bundle of valid answers per preset, not every situation.
 - **What it costs in play.** Under S6 (§50.9) a preset's words are never asked, so a situation with no shipped answer plays the local rule. How many a game meets: in 600 s of 600 + 600 ants under the local rule, side world 1 met 330 mode situations, both side worlds 558, and the side and top-down worlds of seeds 1 and 2 together 834. The 290 shipped are top-down ones; most side-view situations in the nest play the local rule until a side-view live check is imported.
 - The merge also caught a field #41 added to `Colony` (`#gone`, a raider out on a raid) that the save left out: the S1 test (§50.9) failed on it, and it is now saved.
+
+### 50.11 Asking only for what isn't cached; one daily budget (PR #42 re-review S7, S8, 2026-11-07)
+
+The owner's rule: **don't spend while answers are cached; ask Jev only for the situations that aren't.** It replaces §50.9's S6 ("Jev runs only when the player changes a policy"; preset words never asked), which would have needed every situation pre-cached. The owner doesn't want a full precache while the game is in development.
+
+**S7, what is asked:**
+- The `shipped` exclusion is gone. A situation with no answer under the words in force, preset or the player's own, is asked, and its answer goes into the browser's cache. The shipped bundles are a head start, not a requirement.
+- With no run on, a miss calls `ColonyJev.wantsRun`. The page starts a run if Jev could run (`policyLock.shouldStart`): server and key there, not stopped by the player, the budget not spent. A page whose every situation met is cached starts no run and spends nothing.
+- On Pages (no API), presets play the shipped answers and the local rule, as before.
+- Measured by the re-review against the 290-answer import (180 s, seed 1, 600 + 600 ants): 50.8 % of side-view mode questions came from the shipped bundle (32 distinct situations missing), 97.2 % top-down (115 missing). Those few situations are now asked once and cached.
+
+**S8, one budget, not per-run caps:**
+- The caps date from the picture demo, where a run asked for as long as it was open. Here an open run costs nothing, so a time cap guarded nothing, and a per-run spend cap set no ceiling on total spend once runs start themselves.
+- The game's runs start with `GAME_CAPS` (no caps that bind), so a run stays open from the first miss until the page closes (its exit stops it).
+- The server's ledger keeps **one budget per UTC day across every run and page load**: `JEV_DAILY_USD`, default `DAILY_BUDGET_USD` $0.10. It counts every reply billed, including one landing after its run ended, and reserves for calls in flight as the spend cap does. The day's spend is kept in `data/jev-budget.json` (gitignored), so a restarted server knows it.
+- **When it is spent:** the run stops with reason `budget`, a new run ends as it starts, nothing more is asked, the game plays cached answers, stale answers and the local rule, and the policy editors lock with "Jev's daily budget ($0.10) is spent … until tomorrow".
+- **Details shows the budget** (spent of today's, and what is left) beside the run's own figures. Tests: a second run on the same day starts with what the first spent; a new day starts again; a reply from a replaced run counts; the store carries a restart.
+- The per-run caps stay in the ledger, with their old default, for any caller that asks for them.
 
