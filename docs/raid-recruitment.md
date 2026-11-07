@@ -49,7 +49,7 @@ The paper hosts (link.springer.com, pmc.ncbi.nlm.nih.gov, groups.csail.mit.edu) 
 - **The nearest measured give-up** is the harvester forager's: it waits about 3 minutes with no forager returning, and goes deeper after about 8 (`activation.md`, Gordon 2025).
 - **Not found:** the trigger that ends a raid, a number for raider patience, and whether the retreat spreads by contact.
 
-**For the model:** a raider that has waited at home with no raid trail for `raidPatience` (180 s, a design value of the order of Gordon's 3 minutes) stands down and reads its stance as forage: its own clock, no new sense. A call-off that spreads by contact with raiders coming home empty has one summary line behind it, and is left out.
+**For the model:** a raider that has waited at home with no raid trail for `raidPatience` (120 s, a design value of the order of Gordon's 3 minutes) stands down and reads its stance as forage: its own clock, no new sense. A call-off that spreads by contact with raiders coming home empty has one summary line behind it, and is left out.
 
 ## Sources
 
