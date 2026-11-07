@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ChunkLayer } from "../chunks.ts";
@@ -42,6 +43,8 @@ function hashGame(g: Game): string {
     walk(c);
     for (const l of Object.values(c.ph.fields)) layer(l);
     text([c.stored, c.births, c.losses, c.decisions, c.larder, c.stance, c.queen, c.brood.items, c.corpses]);
+    // Its private fields too, as its save holds them: the hash above sees only what can be read from outside.
+    text(c.saveState().private);
   }
   layer(g.fungus.spores);
   return (h >>> 0).toString(16);
@@ -88,4 +91,20 @@ test("a save of another version is refused", () => {
   const g = build("top", 2);
   const s = g.save();
   assert.throws(() => build("top", 2).load({ ...s, version: s.version + 1 }), /version/);
+});
+
+test("a colony's save holds every private field it declares (but its random stream, the game's)", () => {
+  // The save's private list is written out by hand: a field left off it would lose its value on every load, and the
+  // restored game would only show it once that field mattered (PR #42 review, S1: tired, holdsBrood and cameFrom each
+  // slipped past the run-on test). So: every `#field` declared in Colony, and nothing else, is saved.
+  const src = readFileSync(new URL("../colony.ts", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("export class Colony "));
+  const declared = new Set<string>();
+  for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
+  declared.delete("rng");
+  const g = build("side", 2);
+  const saved = Object.keys(g.colonies[0]!.saveState().private as object);
+  assert.ok(declared.size > 50, `found the declarations (${declared.size})`);
+  assert.deepEqual([...declared].filter((k) => !saved.includes(k)).sort(), [], "declared but not saved");
+  assert.deepEqual(saved.filter((k) => !declared.has(k)).sort(), [], "saved but not declared");
 });
