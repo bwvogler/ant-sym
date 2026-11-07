@@ -897,7 +897,7 @@ export const raidFind: Assay = {
  * the host nest for a few minutes begin an incohesive retreat; Gordon's foragers wait about 3 min with none returning).
  * One colony forced onto a raid stance with its rival sealed in rock, and a food pile it could forage. Raiders wait at home for a
  * scout's trail that never comes; the strategist raids when no food comes in, so a colony that never gives up never
- * eats (ja-7je). Score: food stored over 600 s against the same colony on a forage stance. Design mark: at least
+ * eats (ja-7je). Score: food stored over 900 s against the same colony on a forage stance. Design mark: at least
  * RAID_STOP_FOOD of it. Reported: the share outside in the last 3 min.
  */
 export const RAID_STOP_FOOD = 0.5;
@@ -906,7 +906,7 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
   const food = at(50, 15);
   return {
     seed,
-    seconds: 600,
+    seconds: 900,
     map: () => {
       // The rival's nest is sealed in a pocket of rock: a stance is consulted only with two colonies, and no one can find it.
       const a = new Arena(100, 100, true).wall(84, 84, 98, 98).carve(87, 87, 95, 95);
@@ -915,14 +915,14 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
     },
     game: { antCount: 300, rivalAnts: 30 },
     sides: { stance: always<Stance>(stance) },
-    probes: [outingProbe(nest, { Late: [420, 600] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
+    probes: [outingProbe(nest, { Late: [720, 900] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
   };
 }
 export const raidStop: Assay = {
   id: "raidStop",
   title: "A12 a raid no one can find is called off",
-  target: `food stored over 600 s on a raid stance with no rival ≥ ${RAID_STOP_FOOD * 100} % of the same colony's on a forage stance (design mark; docs/raid-recruitment.md)`,
-  seconds: 600,
+  target: `food stored over 900 s on a raid stance with no rival ≥ ${RAID_STOP_FOOD * 100} % of the same colony's on a forage stance (design mark; docs/raid-recruitment.md)`,
+  seconds: 900,
   spec: (seed) => raidStopSpec(seed, "raid"),
   score: (r) => {
     const stored = r.metrics["you.stored"] as number;

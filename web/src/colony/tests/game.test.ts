@@ -252,3 +252,31 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
   }
   assert.equal(reported, 0, "no finder on a raid trail");
 });
+
+test("raid call-off (behaviour MR 5.2): a raider that waits raidPatience seconds with no trail stands down, until the stance changes", () => {
+  const home = () => {
+    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidPatience: 5 }, mulberry32(8));
+    c.stance = "raid";
+    put(c, 0, 4, 6);
+    return c;
+  };
+  // No trail: after 5 s (and a moment to start waiting) it reads its stance as forage.
+  const c = home();
+  c.tick(1 / 30);
+  assert.equal(c.touch(0, false).stance, "raid", "at first it is a raider");
+  for (let k = 0; k < 30 * 8; k++) c.tick(1 / 30);
+  assert.equal(c.touch(0, false).stance, "forage", "called off after raidPatience");
+  // A new stance is a new order: the clock starts afresh.
+  c.stance = "defend";
+  c.tick(1 / 30);
+  c.stance = "raid";
+  c.tick(1 / 30);
+  assert.equal(c.touch(0, false).stance, "raid", "raiding again once the stance changed");
+  // A trail under it keeps it a raider: the call is the trail, and it never gives up.
+  const t = home();
+  for (let k = 0; k < 30 * 8; k++) {
+    for (let y = 4; y <= 8; y++) for (let x = 2; x <= 6; x++) t.ph.deposit("raid", at(x, y).x, at(x, y).y, 1);
+    t.tick(1 / 30);
+  }
+  assert.equal(t.touch(0, false).stance, "raid", "no call-off on a trail");
+});
