@@ -139,13 +139,20 @@ test("what the fungus senses is its host's body, never its mode, and nothing map
     const f = new Fungus(map, { grooming: 0 });
     f.hosts = 1;
     setup(a, b);
-    f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6);
+    const rec = new Recognition();
+    rec.build([a, b]);
+    f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6, rec);
     return decodeFungal(a.fungal[0] as number);
   };
   assert.equal(sense(() => {}).touch, "none");
   assert.equal(sense((_a, b) => ((b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y))).touch, "foreigner");
   assert.equal(sense((a) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y))).touch, "nestmate");
   assert.equal(sense((a, b) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y), (b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y))).touch, "foreigner", "a foreigner over a nestmate");
+  // Touch is smell, not colony (PR #42 review, S4): an ant of the other colony that smells like home is a nestmate to
+  // the fungus, and a nestmate that smells foreign is a foreigner; the host's own odour never counts.
+  assert.equal(sense((_a, b) => ((b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y), (b.odour[0] = 0))).touch, "nestmate", "a foreign ant at the host's odour");
+  assert.equal(sense((a) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y), (a.odour[1] = 1))).touch, "foreigner", "an estranged nestmate");
+  assert.equal(sense((a) => (a.odour[0] = 1)).touch, "none", "a host that smells foreign itself, alone");
   assert.equal(sense(() => {}).place, "outside");
   assert.equal(sense((a) => ((a.x[0] = at(4, 6).x), (a.y[0] = at(4, 6).y))).place, "chamber", "on a nest's disc, top-down");
   assert.equal(sense(() => {}).task, "forager", "top-down: every ant forages");

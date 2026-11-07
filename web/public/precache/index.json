@@ -3,21 +3,21 @@
     {
       "lane": "fungus",
       "aim": "peace",
-      "context": "fungus-v6-side-0526a10d",
+      "context": "fungus-v7-side-affc2028",
       "file": "fungus-peace.json",
       "answers": 93
     },
     {
       "lane": "fungus",
       "aim": "spread",
-      "context": "fungus-v6-side-55f5ac12",
+      "context": "fungus-v7-side-d12ec805",
       "file": "fungus-spread.json",
       "answers": 93
     },
     {
       "lane": "fungus",
       "aim": "unite",
-      "context": "fungus-v6-side-c2257caa",
+      "context": "fungus-v7-side-02993145",
       "file": "fungus-unite.json",
       "answers": 93
     },
@@ -67,6 +67,6 @@
   "versions": {
     "colony": 5,
     "stance": 4,
-    "fungus": 6
+    "fungus": 7
   }
 }

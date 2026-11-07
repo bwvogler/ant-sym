@@ -6,7 +6,8 @@
 // The fungal situation is what the fungus senses inside its host: its body, not its decisions (the host's mode is
 // not a sense: §11.2), and nothing map-wide.
 //   arousal  — calm; alarmed (it perceives alarm); fighting (it perceives strangers close: the state it fights in)
-//   touch    — who touches its cuticle: none, a nestmate, a foreigner (an ant of another colony, tolerated or not)
+//   touch    — who touches its cuticle, by smell: none, a nestmate, a foreigner (an ant that smells of another colony,
+//              tolerated or not; by odour, not by colony: PR #42 review S4)
 //   place    — the substrate underfoot: outside, a tunnel, a chamber, or by the queen (her mark on the floor)
 //   task     — its physiology (juvenile hormone tracks task): nurse, inside worker, forager; or a queen (ja-lo8.7)
 //   carrying — what is in its jaws: nothing, food, brood

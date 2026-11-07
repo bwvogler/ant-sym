@@ -2,9 +2,9 @@ import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
-import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, TASKS, encodeFungal, localFungusRule, type Arousal, type FungalSituation, type FungusPolicy, type FungusRule, type Place } from "./fungalPolicy.ts";
+import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, TASKS, encodeFungal, localFungusRule, type Arousal, type FungalSituation, type FungusPolicy, type FungusRule, type Place, type Touch } from "./fungalPolicy.ts";
 import { compose, decodeLevels, LETHAL_LEVERS, leverFor, LEVERS, NEST_LEVERS, presetOf, PRESETS, type LeverLevels, type Preset } from "./levers.ts";
-import type { Recognition } from "./recognition.ts";
+import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
 import { disc, rockAt, type WorldMap } from "./world.ts";
 
@@ -284,7 +284,7 @@ export class Fungus {
    * nestmates. Then the ground's spores fade. (`_rec` is kept for callers: who a host perceives as a stranger is now
    * read from what the host perceived, not judged here, ja-lo8.4.)
    */
-  step(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, _rec: Recognition | null = null): void {
+  step(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null = null): void {
     if (!this.active) return;
     const p = this.params;
     const { w, h } = this.map.size;
@@ -379,9 +379,7 @@ export class Fungus {
           const ns = this.strains[strain] as Strain;
           const sit: FungalSituation = {
             arousal: this.#arousal(c, i),
-            // Who touches its cuticle, in its cell and the six around: a foreigner (an ant of another colony, tolerated
-            // or not: whether they fight is arousal's), else a nestmate, else none.
-            touch: nb.ants - nb.own > 0.5 ? "foreigner" : nb.own - 1 > 0.5 ? "nestmate" : "none",
+            touch: this.#touch(c, cx, cy, nb.ants - 1, rec, c.odour[i] as number),
             place: this.#place(colonies, cx, cy),
             task: TASKS[Math.min(2, c.band(i))] ?? "forager",
             carrying: c.carrying[i] ? "food" : c.holdsBrood(i) ? "brood" : "nothing",
@@ -401,7 +399,7 @@ export class Fungus {
 
     // Each colony's queen, read against the same grids.
     colonies.forEach((c, k) => {
-      if (this.#stepQueen(c, k, grids, dt)) hosts++;
+      if (this.#stepQueen(c, k, grids, dt, rec)) hosts++;
     });
 
     // Spores taken, then the ground fades.
@@ -429,7 +427,7 @@ export class Fungus {
    * does in her, from what it senses there (task "queen", place "queen"): how much of it she shows, and how much of her
    * royal mark she lays. Returns whether she is a host after the step.
    */
-  #stepQueen(c: Colony, k: number, grids: readonly CountGrid[], dt: number): boolean {
+  #stepQueen(c: Colony, k: number, grids: readonly CountGrid[], dt: number, rec: Recognition | null): boolean {
     const q = c.queen;
     if (!q || !q.alive) return false;
     const p = this.params;
@@ -472,7 +470,7 @@ export class Fungus {
     }
     const sit: FungalSituation = {
       arousal: "calm",
-      touch: nb.ants - nb.own > 0.5 ? "foreigner" : mates > 0.5 ? "nestmate" : "none",
+      touch: this.#touch(c, cx, cy, nb.ants, rec, null),
       place: "queen",
       task: "queen",
       carrying: "nothing",
@@ -482,6 +480,26 @@ export class Fungus {
     q.show = v.show;
     q.signal = 1 + (v.queenSignal - 1) * nl;
     return true;
+  }
+
+  /**
+   * Who touches the host's cuticle, in its cell and the six around, by smell (fungus-policy §11): a foreigner when an ant
+   * there smells of another colony (its odour further from the host colony's than the healthy tolerance: tolerated or
+   * not, since whether they fight is arousal's), else a nestmate when any other ant is there, else none. By odour, not
+   * by colony (PR #42 review, S4): as odours converge a foreign ant that smells like home reads as a nestmate, and an
+   * estranged nestmate as a foreigner. `others`: the ants around, not counting the host; `own`: the host's own odour
+   * (an ant is in the bands it counts; the queen is not), so a host that smells foreign itself does not count itself.
+   */
+  #touch(c: Colony, cx: number, cy: number, others: number, rec: Recognition | null, own: number | null): Touch {
+    let foreign = 0;
+    if (rec) {
+      const tol = rec.params.tolerance;
+      rec.look(c.nestOdour, tol);
+      const { w, h } = this.map.size;
+      foreign = rec.around(cx, cy, w, h, 1, true);
+      if (own !== null && Math.abs(binCentre(binOf(own)) - c.nestOdour) > tol + STRANGER_EPS) foreign -= 1;
+    }
+    return foreign > 0.5 ? "foreigner" : others - foreign > 0.5 ? "nestmate" : "none";
   }
 
   /**

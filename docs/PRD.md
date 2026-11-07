@@ -3125,7 +3125,7 @@ The page was a sim with everything on one screen. The owner asked for a game, to
   - The page defaults to a faster speed (4×) rather than a separate game clock, so every rate scales together and no sim constant changes.
   - Queen births may stay rare.
   - **Games are saved** (IndexedDB autosave, slots) and played over several sittings.
-- **Jev is always on.**
+- **Jev is always on** (superseded by §49.9: Jev runs only when the player changes a policy).
   - The page ships answers for the preset doctrines.
   - When Jev cannot answer (no key, funds or cap spent, the Pages build), the game keeps playing on cached answers, but **no policy can be changed**, the fungus's or the ants'.
 - **Main screen and Details.** The main screen is decluttered. The colony table, Jev's figures, unity, infection, world settings and the lab tools move to a Details screen.
@@ -3392,3 +3392,40 @@ No change to the colony lanes: their requests are byte-identical, and the golden
 - In tests, a third colony's ants choose and live, and the other colonies know its nest.
 
 **Not done:** `Colony.foreign` stays "the nearest rival's trail", which already works for any number of colonies, rather than the strongest trail at the cell.
+
+### 49.9 Review fixes (PR #42, 2026-11-07)
+
+The PR's review found three blockers and six should-fix items; each is fixed on the branch with a test that fails without it.
+
+**Founding colonies** (`Game.addColony`):
+- **B1. A save restores the founded nest as dug.** A load re-dug each founded nest on the restored game's random stream, so a shaft could slant elsewhere (rng seed 13: x 411 instead of 417). `Founding.nest` records the nest as dug, and a load founds from it without digging.
+- **B2. Its own nest index.** The colony took index k in `map.nests`, which always holds the world's two nests: with the rival off it took the unused second nest. It now takes the index of the nest it pushed.
+- **S2. No shared holes.** A founding within `HOLE_GAP` (8) columns of a hole moves along to the nearest free column; top-down, `NEST_GAP` (12) between nests.
+- **S3. Every colony keeps every hole open.** `Colony.seeHoles()` runs on every rewire, so an older colony's mound never buries a founded hole.
+- A founded colony that falls no longer ends the game (`Game.fallen` reads the world's own colonies only).
+
+**Saves:**
+- **B3. An unreadable save never blanks the page.** Continue offers the newest save this version can read (`saves.newestReadable`); Details lists the others as from an older version, with Load disabled; a failed load plays a fresh game of the save's world with a notice; an error boundary round the app shows what broke and a Reload button.
+- **S1. The save test reads Colony's `#field` declarations** and requires the save to hold exactly those, bar its random stream; the run-on hash includes each colony's private state. Dropping `tired` from the save now fails it.
+
+**The fungus's touch is smell (S4).** `touch` was read from the colonies' occupancy grids, colony membership, which the fungus can't sense. It is now read from recognition's odour bands (`Recognition.around`, by odour, at the healthy tolerance, against the host colony's nest odour): as odours converge, a foreign ant that smells like home reads as a nestmate, and an estranged nestmate as a foreigner. The legend says so ("an ant that smells of another colony"): `FUNGUS_BRAIN_VERSION` 7.
+
+**Jev runs only when the player changes a policy (S6, the owner's decision).** This replaces §49's "Jev is always on":
+- No run starts on page load or restarts at a time cap. A change of words, the fungus's aim or a colony's doctrine, starts one; the time cap ends it. Details → Resume still starts one by hand.
+- The policy editors are open whenever Jev could run: running, starting, never started, or after a time cap. The spend cap, the player's Stop, a failed start, and no server or key lock them, saying why.
+- The preset doctrines' and aims' words ship their answers and are never asked, even while a run is on (`ColonyJevOptions.shipped`): their unanswered situations play an earlier answer or the local rule, free. Restoring a save with words of the player's own starts a run.
+
+**Cost (S5).**
+- **Colony lanes:** unchanged (colony v5, stance v4).
+- **Fungus lane, v7.** Re-shipped answers: 93 situations per preset aim, 279 answers for **$0.0083**, about 708 real tokens per situation. As a game asks them (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1), now only under the player's own words:
+
+  | Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+  |---|---|---|---|---|---|
+  | Garden | 94 | 24 | 867 | 0.0034 | 0.041 |
+  | Lockpick | 60 | 16 | 877 | 0.0022 | 0.027 |
+  | Bloom | 72 | 30 | 1,017 | 0.0031 | 0.037 |
+
+  At v6 the same runs were 865–1,014. Under a preset aim and doctrines a game now asks nothing.
+
+**Left as filed:** the autosave's size (6.7 MB of JSON, ~260 ms in node at the page's defaults: a hitch every 60 s), a founded colony starting on Forage rather than its mother's doctrine (`ja-lo8.9`), and the fungus precache being side view only (a top-down game under a preset aim plays the local rule where nothing ships).
+
