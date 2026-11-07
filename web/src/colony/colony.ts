@@ -3032,7 +3032,17 @@ export class Colony {
     const asked = this.params.raidGate > 0 && this.#entrance === null && this.#stanceOf(i) === "raid" ? FIGHT : mode;
     const answer = this.responses.leave(this.touch(i, enemy, asked, "none"));
     const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : scout;
-    return this.#rng() < 1 - Math.exp(-rate * dt);
+    const goes = this.#rng() < 1 - Math.exp(-rate * dt);
+    // A raider told to wait, with no trail to go on, is called off after raidPatience seconds of it (behaviour MR 5.2): for this
+    // ant, until the colony's stance changes. Counted here, so a raider waiting at home in either mode runs the same clock.
+    if (asked === FIGHT && this.params.raidPatience > 0 && this.#entrance === null) {
+      if (answer !== "wait" || goes) this.#waitT[i] = 0;
+      else if ((this.#waitT[i] = (this.#waitT[i] as number) + dt) >= this.params.raidPatience) {
+        this.#stoodAt[i] = STANCES.indexOf(this.stance) + 1;
+        this.#waitT[i] = 0;
+      }
+    }
+    return goes;
   }
 
   /** The stance ant i acts on: the colony's, unless it has stood down from a raid it could not find (behaviour MR 5.2: call-off). */
@@ -3187,6 +3197,7 @@ export class Colony {
         if (this.reporting[i] === 1 && this.#atNestTop(i)) this.reporting[i] = 0;
         if ((this.#goT[i] as number) > 0) this.#goT[i] = (this.#goT[i] as number) - dt;
         if (this.#stoodAt[i] !== 0 && this.#stoodAt[i] !== STANCES.indexOf(this.stance) + 1) this.#stoodAt[i] = 0; // a new stance is a new order
+        if ((this.#waitT[i] as number) > 0 && !this.#atNestTop(i)) this.#waitT[i] = 0; // out of the nest, it is not waiting
       }
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
       // this step (its trip is over: see `arrive`).
@@ -3267,14 +3278,8 @@ export class Colony {
           if (this.#leaves(i, dt, false, p.raidScout, FIGHT)) {
             waiting = false;
             this.#goT[i] = RAID_GO;
-            this.#waitT[i] = 0;
-          } else if (p.raidPatience > 0 && (this.#waitT[i] = (this.#waitT[i] as number) + dt) >= p.raidPatience) {
-            // No trail for raidPatience seconds: the raid is called off, for this ant, until the colony's stance changes.
-            this.#stoodAt[i] = STANCES.indexOf(this.stance) + 1;
-            this.#waitT[i] = 0;
-            waiting = false;
           }
-        } else if (rgate) this.#waitT[i] = 0;
+        }
         if (before !== this.#asked[i] && !waiting) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.#stanceOf(i) }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
