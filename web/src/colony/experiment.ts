@@ -893,6 +893,46 @@ export const raidFind: Assay = {
 };
 
 /**
+ * A12 — a raid no one can find is called off (behaviour MR 5.2, docs/raid-recruitment.md: Polyergus raiders that mill about
+ * the host nest for a few minutes begin an incohesive retreat; Gordon's foragers wait about 3 min with none returning).
+ * One colony forced onto a raid stance with its rival sealed in rock, and a food pile it could forage. Raiders wait at home for a
+ * scout's trail that never comes; the strategist raids when no food comes in, so a colony that never gives up never
+ * eats (ja-7je). Score: food stored over 600 s against the same colony on a forage stance. Design mark: at least
+ * RAID_STOP_FOOD of it. Reported: the share outside in the last 3 min.
+ */
+export const RAID_STOP_FOOD = 0.5;
+function raidStopSpec(seed: number, stance: Stance): RunSpec {
+  const nest = at(50, 50);
+  const food = at(50, 15);
+  return {
+    seed,
+    seconds: 600,
+    map: () => {
+      // The rival's nest is sealed in a pocket of rock: a stance is consulted only with two colonies, and no one can find it.
+      const a = new Arena(100, 100, true).wall(84, 84, 98, 98).carve(87, 87, 95, 95);
+      a.pile(50, 15, 3, 200);
+      return a.build([{ x: 50, y: 50, r: 3 }, { x: 91, y: 91, r: 3 }]);
+    },
+    game: { antCount: 300, rivalAnts: 30 },
+    sides: { stance: always<Stance>(stance) },
+    probes: [outingProbe(nest, { Late: [420, 600] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
+  };
+}
+export const raidStop: Assay = {
+  id: "raidStop",
+  title: "A12 a raid no one can find is called off",
+  target: `food stored over 600 s on a raid stance with no rival ≥ ${RAID_STOP_FOOD * 100} % of the same colony's on a forage stance (design mark; docs/raid-recruitment.md)`,
+  seconds: 600,
+  spec: (seed) => raidStopSpec(seed, "raid"),
+  score: (r) => {
+    const stored = r.metrics["you.stored"] as number;
+    const control = runGame(raidStopSpec(r.seed, "forage")).result.metrics["you.stored"] as number;
+    const share = control > 0 ? stored / control : NaN;
+    return { stored, control, share, outsideLate: r.metrics.outsideLate as number, pass: share >= RAID_STOP_FOOD ? 1 : 0 };
+  },
+};
+
+/**
  * A9 — strangers meet at food (behaviour MR 4, docs/combat.md). Two colonies on stance forage, nests at either end of
  * an open field, one food pile between them: their foragers meet there. At food, the ant that didn't start an encounter
  * usually retreats (Human & Gordon 1996); foragers don't fight to the death over a bait. Score: ants lost per 100 food
@@ -1048,4 +1088,4 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, contact, faintAlarm, game, gameTop, nestFlow];
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, faintAlarm, game, gameTop, nestFlow];

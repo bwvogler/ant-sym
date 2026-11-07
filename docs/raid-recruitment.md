@@ -40,6 +40,17 @@ The paper hosts (link.springer.com, pmc.ncbi.nlm.nih.gov, groups.csail.mit.edu) 
 - **Sight is kept in the model by the side view's tunnel walk** and by the contact response near a fight. The top-down raider has no sight of its own beyond the scent.
 - **Left out:** raiders as a column, tandem running, head-butting, the colony's call-off. Each is a later slice.
 
+## How a raid ends
+
+- **By abandonment, ant by ant.** After raiders reach a *Polyergus* host nest they mill about for a few minutes, then an incohesive retreat starts, and more and more workers join the return as it goes. They find their way home by sight and by the chemical trail scouts and raiders laid on the way out. (Wikipedia and navajonature summaries of the *Psyche* literature.) **Unverified.**
+- **Nothing found says an order ends a raid.** Army-ant raids run in bouts, relaunched 12–17 times in one agent-based model, and no cause for a bout ending was found. **Unverified.**
+- **Trails fade without reinforcement,** so recruitment lasts only while finds continue. A starving forager lays trail more readily (*Lasius niger*, *J. Exp. Biol.* 209:4224). Not specific to raids. **Unverified.**
+- **A stronger side ends a tournament fast:** the weaker retreats or is raided (honeypot ants). **Unverified.**
+- **The nearest measured give-up** is the harvester forager's: it waits about 3 minutes with no forager returning, and goes deeper after about 8 (`activation.md`, Gordon 2025).
+- **Not found:** the trigger that ends a raid, a number for raider patience, and whether the retreat spreads by contact.
+
+**For the model:** a raider that has waited at home with no raid trail for `raidPatience` (180 s, a design value of the order of Gordon's 3 minutes) stands down and reads its stance as forage: its own clock, no new sense. A call-off that spreads by contact with raiders coming home empty has one summary line behind it, and is left out.
+
 ## Sources
 
 - Topoff, Bodini, Sherman & Goodloe 1987, "The role of scouting in slave raids by *Polyergus breviceps*", *Psyche* 94:261–270: https://groups.csail.mit.edu/mac/projects/psyche/94/94-261.html *(search summary only)*
@@ -47,3 +58,6 @@ The paper hosts (link.springer.com, pmc.ncbi.nlm.nih.gov, groups.csail.mit.edu) 
 - Pohl & Foitzik 2013, *Insectes Sociaux*, doi 10.1007/s00040-013-0293-7 *(search summary only)*
 - Hölldobler & Lumsden 1980, "Territorial strategies in ants", *Science* *(from memory)*; https://rd.springer.com/content/pdf/10.1007%2FBF00299887.pdf *(search summary only)*
 - Hölldobler & Wilson 1977, "Weaver ants: social establishment and maintenance of territory", *Science* 195: https://pherobase.com/literature/data/details/M/41416 *(index page)*
+- Wikipedia "Polyergus breviceps" and navajonature.org, *Polyergus breviceps* *(secondary; search summaries)*; the *Psyche* 94 issue (biodiversitylibrary.org/part/183861)
+- A 2018 agent-based army-ant raid model: "Directional raids by army ants as an adaption to patchily distributed food" *(search summary only)*
+- *Lasius niger* trail laying and starvation: *J. Exp. Biol.* 209:4224, "Starvation drives a threshold triggering communication" *(search summary only)*
