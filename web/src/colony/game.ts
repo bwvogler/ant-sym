@@ -45,7 +45,7 @@ export interface GameParams {
 export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0 };
 
 /** Bump when what a save holds changes: an older save is refused, not misread. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony). */
 export const HOLE_GAP = 8;
@@ -468,13 +468,16 @@ export class Game {
    * hole, where its ants walk out and back. No ant is dosed directly: the first hosts are ants that walk through it.
    * The top-down maps have no hole: it falls at the nest's rim. Lands once; returns where.
    */
-  land(k: number, strain: number, spores = LANDING.spores): { x: number; y: number } {
+  land(k: number, strain: number, { spores = LANDING.spores, evolve = false }: { spores?: number; evolve?: boolean } = {}): { x: number; y: number } {
     if (this.landed) return this.landed;
     const c = this.colonies[k] ?? this.player;
     const e = c.nest.entrance ?? { x: c.nest.x + c.nest.r, y: c.nest.y };
     const x = e.x + LANDING.offset;
     const y = e.y - (c.nest.entrance ? 0.5 : 0);
+    // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
+    if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
+    this.fungus.root(x, y, LANDING.radius);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
   }

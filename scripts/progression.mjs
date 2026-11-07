@@ -1,0 +1,95 @@
+// Offline: how the fungus game paces (ja-lo8.12, PRD §49.11). The app's setup (side world, 600 + 600 ants, regrowth,
+// gameRng(seed)), the landing by colony 0's hole, and the fungus policy from the page's shipped answers under a preset aim
+// (web/public/precache/fungus-<aim>.json; a situation not shipped plays the strain's default, as on the page while Jev
+// is asked). With --evolve the game's fungus starts weak and buys upgrades as a player might: the first affordable in
+// the buy order, as soon as it can. Reports when each chapter is reached (first host, a quarter of the colony, the
+// queen), each purchase, and the colony's infected share and resistance every minute. Seeds run in parallel.
+//
+// Usage: node scripts/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
+//          [--order stealth,infectivity,...] [--strain garden] [--no-buy]
+import { readFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
+import { fileURLToPath } from "node:url";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
+
+const args = process.argv.slice(2);
+const opt = (name, fallback) => {
+  const k = args.indexOf(`--${name}`);
+  return k < 0 ? fallback : args[k + 1];
+};
+const flag = (name) => args.includes(`--${name}`);
+const DEFAULT_ORDER = "stealth,infectivity,persistence,infectivity,recognition,stealth,trails,senses,infectivity,evasion,royal,recognition,trails,persistence,evasion,royal";
+
+if (isMainThread) {
+  const [a, b = a] = opt("seeds", "1-3").split("-").map(Number);
+  const seeds = Array.from({ length: b - a + 1 }, (_, k) => a + k);
+  const job = { seconds: Number(opt("seconds", 900)), aim: opt("aim", "unite"), evolve: flag("evolve"), buy: !flag("no-buy"), order: opt("order", DEFAULT_ORDER).split(","), strain: opt("strain", "garden") };
+  const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
+  const results = [];
+  let next = 0;
+  await new Promise((done) => {
+    let running = 0;
+    const launch = () => {
+      if (next >= seeds.length) return running === 0 && done();
+      const seed = seeds[next++];
+      running++;
+      const w = new Worker(fileURLToPath(import.meta.url), { workerData: { ...job, seed }, argv: [] });
+      w.on("message", (r) => results.push(r));
+      w.on("error", (e) => console.error(`seed ${seed}:`, e));
+      w.on("exit", () => (running--, launch()));
+    };
+    for (let k = 0; k < width; k++) launch();
+  });
+  results.sort((x, y) => x.seed - y.seed);
+  console.log(`aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`);
+  for (const r of results) {
+    console.log(`seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rival)} · biomass earned ${r.earned}`);
+    if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
+    console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
+  }
+  const worst = (k) => (results.some((r) => r[k] < 0) ? "never (some seed)" : `${Math.max(...results.map((r) => r[k]))} s`);
+  console.log(`worst seed: quarter ${worst("quarter")}, queen ${worst("queen")}`);
+} else {
+  const { Game, GAME_REGROW, gameRng } = await import("../web/src/colony/game.ts");
+  const { INFECTED, STRAINS, askedLevers } = await import("../web/src/colony/fungus.ts");
+  const { fungalKey } = await import("../web/src/colony/fungusBrain.ts");
+  const { STRAIN_DEFAULT } = await import("../web/src/colony/fungalPolicy.ts");
+  const { generateSideWorld } = await import("../web/src/colony/world.ts");
+  const { seed, seconds, aim, evolve, buy, order, strain } = workerData;
+  const answers = new Map(JSON.parse(readFileSync(new URL(`../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
+  const g = new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
+  const menu = g.fungus.menu;
+  g.fungus.policy = (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT;
+  g.land(0, STRAINS.findIndex((s) => s.id === strain), { evolve });
+  const DT = 1 / 30;
+  const r = { seed, first: -1, quarter: -1, half: -1, queen: -1, rival: -1, bought: [], minutes: [], earned: 0 };
+  const share = (c) => {
+    const f = g.fungus.census(c);
+    return { s: f.living ? f.infected / f.living : 0, n: f.infected, resist: f.meanResist };
+  };
+  let want = 0;
+  for (let k = 0; g.time < seconds; k++) {
+    g.tick(DT);
+    const e = g.fungus.evolution;
+    if (e && buy) {
+      // The first upgrade in the buy order not yet bought to that count, as soon as it is affordable.
+      while (want < order.length && e.cost(order[want]) === null) want++;
+      if (want < order.length && g.fungus.upgrade(order[want])) r.bought.push(`${Math.round(g.time)}s ${order[want++]}`);
+    }
+    if (k % 15) continue;
+    const t = Math.round(g.time);
+    const [a, b] = g.colonies.map(share);
+    if (r.first < 0 && a.n > 0) r.first = t;
+    if (r.quarter < 0 && a.s >= 0.25) r.quarter = t;
+    if (r.half < 0 && a.s >= 0.5) r.half = t;
+    if (r.queen < 0 && g.revealed[0]) r.queen = t;
+    if (r.rival < 0 && b && b.n > 0) r.rival = t;
+    if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
+  }
+  r.earned = Math.round(g.fungus.evolution?.earned ?? 0);
+  parentPort.postMessage(r);
+}
+
+function fmt(t) {
+  return t < 0 ? "never" : `${t} s`;
+}

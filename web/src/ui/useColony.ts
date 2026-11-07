@@ -236,7 +236,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
 
   // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
   useEffect(() => {
-    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN);
+    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
   }, [game, controls.started]);
   /** A saved game, as it was: its world and settings, then its state (Game.load), playing. The player's state is the page's to put back. */
   const loadSave = useCallback((r: SaveRecord) => {
