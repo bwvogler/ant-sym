@@ -45,11 +45,11 @@ export interface ColonyControls {
 
 export type Ground = "side" | "open";
 
-/** The game's default speed (owner, PRD §49: faster by default, every rate scaled together; no sim constant changes). */
+/** The game's default speed (owner, PRD §50: faster by default, every rate scaled together; no sim constant changes). */
 export const GAME_SPEED = 4;
 /** The top speed the controls offer. */
 export const MAX_SPEED = 8;
-/** The game's fungus: one species, the player's, which spreads like Garden (PRD §49; the other strains are lab presets). */
+/** The game's fungus: one species, the player's, which spreads like Garden (PRD §50; the other strains are lab presets). */
 export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 /** The colony the fungus lands by. */
 export const LANDING_COLONY = 0;

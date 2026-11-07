@@ -30,7 +30,7 @@ import { pushToast } from "./ui/toasts.ts";
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 
-/** The speeds the top bar offers (4× is the game's default; PRD §49); the Details screen's slider has the rest. */
+/** The speeds the top bar offers (4× is the game's default; PRD §50); the Details screen's slider has the rest. */
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {

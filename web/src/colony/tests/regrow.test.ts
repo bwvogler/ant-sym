@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Game } from "../game.ts";
 import { generateSideWorld, isSky, mulberry32 } from "../world.ts";
 
-// Food regrows (ja-lo8.5, PRD §49.5): the ground's piles grow back toward their first size; off by default.
+// Food regrows (ja-lo8.5, PRD §50.5): the ground's piles grow back toward their first size; off by default.
 
 const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridge, contact, faintAlarm, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
+import { bridge, contact, faintAlarm, raidFind, raidStop, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
@@ -49,6 +49,34 @@ test("A9 strangers meet at food: few lost per food brought home", () => {
   for (const seed of [1, 2]) {
     const m = runAssay(contact, seed).metrics;
     assert.equal(m.pass, 1, `seed ${seed}: ${m.lostPer100Food} lost per 100 food`);
+  }
+});
+
+// Behaviour MR 5.2 (PRD §49): raids by trail. A11's trail gain is 1.24 (0.89–2.75) and 7/20 seeds reach its mark of 1.5; guarded as
+// what holds today: none is stuck and the trail never hurts. The mark itself is a todo (ja-sf1).
+test("A11 raiders find the rival: none stuck, and the raid trail does not hurt", () => {
+  const gains: number[] = [];
+  for (let seed = 1; seed <= 10; seed++) {
+    const m = runAssay(raidFind, seed).metrics;
+    assert.ok((m.stuck as number) <= 0.1, `seed ${seed}: stuck ${m.stuck}`);
+    gains.push(m.gain as number);
+  }
+  gains.sort((a, b) => a - b);
+  assert.ok((gains[5] as number) >= 1, `median gain ${gains[5]}`);
+});
+
+test("A11 the raid trail gains 1.5× on most seeds", { todo: "ja-sf1: gain 1.24 median, 7/20 seeds" }, () => {
+  let passed = 0;
+  for (let seed = 1; seed <= 10; seed++) passed += runAssay(raidFind, seed).metrics.pass as number;
+  assert.ok(passed >= 6, `${passed}/10`);
+});
+
+// Behaviour MR 5.2 (PRD §49.3): A12 passes 20/20 (food stored 1.00 of the forage colony's, worst 0.99); the first version, with raiders
+// waiting for a trail, stored 10 of 7,400.
+test("A12 a raid no one can find doesn't starve the colony", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(raidStop, seed).metrics;
+    assert.equal(m.pass, 1, `seed ${seed}: stored ${m.stored} of ${m.control}`);
   }
 });
 

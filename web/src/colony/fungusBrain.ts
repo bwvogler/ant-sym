@@ -17,7 +17,7 @@ export const FUNGUS_BATCH = 50;
 
 /**
  * How long the lane lets new situations gather before it sends a part-full request (ms). The legend is most of a small
- * request; hosts play their earlier or default levels meanwhile. Measured with scripts/fungus-cost.mjs (PRD §49.3).
+ * request; hosts play their earlier or default levels meanwhile. Measured with scripts/fungus-cost.mjs (PRD §50.3).
  */
 export const FUNGUS_GATHER_MS = 2000;
 

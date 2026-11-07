@@ -35,7 +35,7 @@ export interface GameParams {
   fungus: Partial<FungusParams>;
   recognition: Partial<RecognitionParams>;
   /**
-   * Food regrows (the fungus game, ja-lo8.5, owner's choice in PRD §49.5): the food piles the world began with on the
+   * Food regrows (the fungus game, ja-lo8.5, owner's choice in PRD §50.5): the food piles the world began with on the
    * ground (the side view's walkway; every pile on a top-down map) grow back toward their first size, a unit at a time,
    * at their deficit ÷ this many seconds each. 0: never (the lab, the goldens and the assays).
    */
@@ -189,7 +189,7 @@ export class Game {
   regrown = 0;
   /**
    * Per colony: the fungus has been in its queen (ja-lo8.7), so its doctrine is open to the player from then on (PRD
-   * §49: colony policy is hidden until the fungus infects a queen). Never closes again.
+   * §50: colony policy is hidden until the fungus infects a queen). Never closes again.
    */
   revealed: boolean[] = [];
 

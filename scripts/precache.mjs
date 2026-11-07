@@ -14,8 +14,15 @@
 //
 // JEV_API_KEY comes from the environment and is never printed.
 //
+// --import: no spend. Ship the answers a live test already got (scripts/colony-live.mjs caches, e.g.
+// experiments/caches/mr52-top-*.json) instead of asking every situation: each file's mode and stance answers go into
+// the bundle for its doctrine when they were asked under the context the code asks under now; any other file is
+// refused. The page plays the local rule where nothing ships (a preset's words are never asked: PR #42 review S6).
+// This is the default way to re-ship after a colony legend or version change: the PR's live check has the answers.
+//
 // Usage: node scripts/precache.mjs [--lanes mode,stance] [--doctrines forage,cautious,warlike] [--budget 0.35]
 //        [--in-flight 4] [--dry]
+//        node scripts/precache.mjs --import <cache.json> [<cache.json> ...]
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
@@ -45,7 +52,7 @@ const BATCH = 100;
 const OUT = new URL("../web/public/precache/", import.meta.url);
 
 const args = process.argv.slice(2);
-const opts = { lanes: "mode,stance,fungus", doctrines: DOCTRINES.map((d) => d.id).join(","), budget: 0.35, inFlight: 4, dry: false };
+const opts = { lanes: "mode,stance,fungus", doctrines: DOCTRINES.map((d) => d.id).join(","), budget: 0.35, inFlight: 4, dry: false, import: [] };
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
   if (a === "--lanes") opts.lanes = args[++k];
@@ -53,10 +60,11 @@ for (let k = 0; k < args.length; k++) {
   else if (a === "--budget") opts.budget = Number(args[++k]);
   else if (a === "--in-flight") opts.inFlight = Math.max(1, Number(args[++k]));
   else if (a === "--dry") opts.dry = true;
+  else if (a === "--import") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.import.push(args[++k]);
   else throw new Error(`unknown argument ${a}`);
 }
 const KEY = process.env.JEV_API_KEY;
-if (!opts.dry && !KEY) throw new Error("JEV_API_KEY is not set (or use --dry for an estimate)");
+if (!opts.dry && !opts.import.length && !KEY) throw new Error("JEV_API_KEY is not set (or use --dry for an estimate, or --import)");
 
 /** Every strategist view: the fields of colony.StanceSituation, every value. */
 function stanceSituations() {
@@ -158,6 +166,30 @@ for (const lane of lanes) {
       jobs.push({ lane, file, items, req });
     }
   }
+}
+if (opts.import.length) {
+  // Answers a live test got, under the context the code asks under now: shipped as they are, nothing asked.
+  for (const path of opts.import) {
+    const c = JSON.parse(readFileSync(path, "utf8"));
+    const d = DOCTRINES.find((x) => x.text === c.doctrine?.text);
+    if (!d) throw new Error(`${path}: its doctrine is not a preset's`);
+    for (const [lane, field] of [["mode", "modes"], ["stance", "stances"]]) {
+      if (!lanes.includes(lane)) continue;
+      const b = bundles.get(`${lane}-${d.id}.json`);
+      if (!b) continue;
+      if (c.contexts?.[lane] !== b.context) throw new Error(`${path}: its ${lane} answers were asked under ${c.contexts?.[lane]}, the code asks under ${b.context}`);
+      let got = 0;
+      for (const [key, a] of Object.entries(c[field] ?? {}))
+        if (!b.answers.has(key)) {
+          b.answers.set(key, a);
+          got++;
+        }
+      console.log(`${path} → ${b.file}: +${got}`);
+    }
+  }
+  save();
+  for (const b of bundles.values()) console.log(`  ${b.file}: ${b.answers.size} answers`);
+  process.exit(0);
 }
 console.log(`${jobs.length} requests, ≈ ${Math.round(estimate).toLocaleString()} tokens ≈ $${(estimate * USD_PER_INPUT_TOKEN).toFixed(4)} (budget $${opts.budget.toFixed(2)})`);
 if (opts.dry) process.exit(0);

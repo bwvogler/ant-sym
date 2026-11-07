@@ -30,14 +30,17 @@ test("every shipped bundle is under the context the code asks under, for a prese
   }
 });
 
-test("every preset doctrine ships every mode and stance answer, and only answers the question allows", () => {
+// A bundle holds what a live test got (scripts/precache.mjs --import), not necessarily every situation: the page plays
+// the local rule where nothing ships (PR #42: cache what the tests produce rather than asking every situation).
+test("every preset doctrine ships mode and stance answers, each situation once, and only answers the question allows", () => {
   for (const lane of ["mode", "stance"])
     for (const d of DOCTRINES) {
       const b = index.bundles.find((x) => x.lane === lane && x.doctrine === d.id);
       assert.ok(b, `no ${lane} bundle for ${d.id}`);
       const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
       assert.equal(pairs.length, b.answers);
-      assert.equal(pairs.length, SIZE[lane], `${b.file}: not every situation is answered`);
+      assert.ok(pairs.length > 0 && pairs.length <= SIZE[lane]!, `${b.file}: ${pairs.length} answers`);
+      assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
       for (const [, a] of pairs) assert.ok(VALID[lane]!.includes(a), `${b.file}: ${a}`);
     }
 });

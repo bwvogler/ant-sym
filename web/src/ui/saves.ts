@@ -2,7 +2,7 @@ import { SAVE_VERSION, type GameSave } from "../colony/game.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 import type { Ground } from "./useColony.ts";
 
-// Saved games (the fungus game, ja-lo8.6): a game is long (queen births are rare: PRD §49), so it is kept between
+// Saved games (the fungus game, ja-lo8.6): a game is long (queen births are rare: PRD §50), so it is kept between
 // sittings. A record is the game's own save (Game.save) plus what the page needs to build the same game again (its
 // world seed, view and settings) and the player's state (the fungus's aim, menu and rule; each colony's doctrine).
 // Slot 0 is the autosave (every AUTOSAVE_MS and when the tab is hidden); slots 1 and 2 are the player's. Kept in
