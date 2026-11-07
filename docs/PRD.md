@@ -3524,3 +3524,71 @@ The PR's review found three blockers and six should-fix items; each is fixed on 
 - **What it costs in play.** Under S6 (§50.9) a preset's words are never asked, so a situation with no shipped answer plays the local rule. How many a game meets: in 600 s of 600 + 600 ants under the local rule, side world 1 met 330 mode situations, both side worlds 558, and the side and top-down worlds of seeds 1 and 2 together 834. The 290 shipped are top-down ones; most side-view situations in the nest play the local rule until a side-view live check is imported.
 - The merge also caught a field #41 added to `Colony` (`#gone`, a raider out on a raid) that the save left out: the S1 test (§50.9) failed on it, and it is now saved.
 
+
+### 50.11 Infection difficulty and the fungus's progress: a body, adaptations and reach (ja-lo8.12, 2026-11-07)
+
+**The problem, measured.** The landing alone (no ant dosed) took the whole colony and its queen within half a minute of sim, on every strain and seed (`scripts/progression.mjs`, side world, 600 + 600 ants, local rule plus the shipped answers of an aim):
+
+| Seeds 1–3, Unite | First host | A quarter | The queen |
+|---|---|---|---|
+| Garden as listed, the game before this | 2 s | 12–14 s | 19–25 s |
+
+At 4× that is a few seconds of wall time, and the fungus started with every power it would ever have. Infection was a cliff, not a slope. In a mixed nest, every ant settles at the same load once transmission beats what four groomers take off a visible host, so there was no middle. Below that threshold, a lone host could not infect anyone: `clear` zeroed a clean ant's first step, so the minimum dose depended on step size.
+
+**The owner's decisions.**
+- **Strength unlocks, Jev answers the full range.** Upgrades widen how far each group of levers may go. Jev is still asked every lever on its full scale, and the level is held only where it takes effect, so caches are never re-asked at an unlock.
+- **A grounded body, and adaptations from growth** rather than a currency: a real mycelium at the landing, and upgrades that come from fungus grown in hosts. A research note with primary sources comes first ([fungus-body.md](fungus-body.md)).
+- **The queen keeps a larger grooming cap (8) as a stop-gap,** and grooming, still scripted, is filed as a vision gap (`ja-k4k.12`, a new row in the gap table).
+
+**Built.**
+- **Reach** (`levers.hold`, `Fungus.held`). Each lever's level is pulled toward "as is" until it is within the lever's reach (0, 1 or 2 levels). It is applied in `expressLevels` and in the queen's step. A lab or test preset (`express`) is not held. `fungalKey` and the request are unchanged, and a test pins that.
+- **The fungus's body and evolution** (`colony/evolution.ts`, `Fungus.evolve`, `Fungus.root`, `Game.land(k, strain, { evolve: true })`, which only the page passes):
+  - **Its strain starts weak:** transmission 0.12, decay 0.03/s. In a crowded nest, four groomers take more off a visible host than it passes on.
+  - **A mycelium at the landing.** Its mass grows logistically (rate 0.03/s) up to the patch's capacity. It puts out a share of its mass a second as spores onto the landing cells, paid out of its mass, so it settles where growth meets sporulation. Foragers keep walking through it all game.
+  - **Adaptations from fungus grown in hosts:** load taken on from spores or by contact (`Evolution.replicate`). The mycelium's own growth gives spores, not adaptations. The n-th adaptation comes at growth 10 × (1.28ⁿ − 1)/0.28, so each takes 1.28× the growth of the last.
+  - **The upgrades,** costed in adaptations, 1–4 a level:
+    - Spread: Infectivity (0.12 → 0.15 → 0.23 → 0.3), Persistence (decay 0.03 → 0.012 → 0), Mycelium (capacity 30 → 60 → 120), Fruiting body (0.6 → 1.2 → 2 % of mass a second as spores), Immune evasion (0 → 35 → 70 % of primed resistance slipped past).
+    - Reach: Stealth (showing), Senses (starts at one step), Recognition, Trails, Royal (the side view only).
+    - Lethal levers stay on the menu toggle. The 40 adaptations' worth is not all reached in 20 minutes, so what the player chooses matters.
+- **The minimum dose is a rate** (`FungusParams.minDose` 0.02/s): a clean ant takes no load from a rate below it, at any step. `clear` zeroes only a falling load. At the 0.1 s step this is the old behaviour, and every earlier test passed unchanged.
+- **The queen's retinue:** `queenGroomers` 8. It is a stop-gap; see `ja-k4k.12`.
+- **The page.**
+  - The Fungus panel shows the mycelium, the fungus in ants, adaptations to choose with a bar toward the next, and each upgrade's next level with a button.
+  - The ant card shows a held lever as what the host runs, plus "(wants …)" and the upgrade that would widen it.
+  - A notice says when there is an adaptation to choose, and the guide has an entry on the body and adaptations.
+  - `SAVE_VERSION` is 2: the fungus's save holds its evolution and its patch.
+
+**Measured** (same harness; the evolving fungus chooses the next upgrade in a fixed order as soon as it can; 20 minutes; the order fits each aim: Spread takes Stealth first, Unite last):
+
+| Aim | Seed | A quarter | Half | The queen | Adaptations at 20 min |
+|---|---|---|---|---|---|
+| Unite | 1 | 307 s | 372 s | 407 s | 29 |
+| Unite | 2 | 301 s | 315 s | 340 s | 29 |
+| Unite | 3 | 224 s | 257 s | 275 s | 29 |
+| Spread | 1 | 265 s | 293 s | 325 s | 28 |
+| Spread | 2 | 317 s | 332 s | 345 s | 29 |
+| Spread | 3 | 193 s | 219 s | 226 s | 29 |
+| Unite (confirm) | 11 | 360 s | 394 s | 400 s | 29 |
+| Unite (confirm) | 12 | 406 s | 425 s | 426 s | 29 |
+| Unite (confirm) | 13 | 281 s | 291 s | 336 s | 29 |
+| Unite, choosing nothing | 1–3 | never in 15 min | — | never | 4–5 waiting |
+
+- **The shape.** One adaptation arrives at the landing. Then a quiet two to three minutes follow while the trickle by the hole grows the next few. The breakthrough is the choice that tips transmission over grooming (Infectivity II, or Persistence with Infectivity I, or Stealth under an aim that hides). Then comes a run of choices as the nest fills, and a slower stream after that, about one a minute or two.
+- **The worst seed:** a quarter at 406 s and the queen at 426 s (about 1¾ minutes of wall time at 4×). The best: 193 s and 226 s. Before, the spread was 12–25 s.
+- **How the tuning got here.** Seed variance came from how many ants walk past the hole. A patch topped up to a fixed level from nothing, with income from carried load, varied 4× in early income between seeds (quarter at 27–295 s). A mycelium that pays for its spores, with adaptations from growth in hosts, narrowed it to the table's 193–406 s. The patch first starved to nothing when it kept a level topped up; spores as a share of mass settle instead.
+- **Not settled:** once the nest is held, the colony's resistance climbs to 0.7–0.9 by 20 minutes, but the fungus holds 100 % on every seed. Whether the colony should claw back is for `ja-lo8.10` (balance).
+
+**Jev cost: unchanged.** No legend, question, situation or brain version changed, and reach acts after the answer. So the fungus lane's ~708 real tokens per situation and its shipped answers stand (`precache.test` passes unchanged). An upgrade re-asks nothing.
+
+**Tests** (`tests/evolution.test.ts`, 7):
+- hold pulls toward as is, and leaves an unheld lever's range alone;
+- reach changes the host's gains but not the asked levers or the cache key;
+- adaptations come at rising thresholds and are given level by level, and a save round-trips;
+- the mycelium settles where growth meets sporulation, and its growth gives no adaptations;
+- the minimum dose means the same at a 0.1 s and a 0.02 s step;
+- the landing roots, sporulates and grows adaptations, and a lab landing has no body;
+- listed Garden takes over 90 % in 60 s, while the evolving one, choosing nothing, stays under half.
+
+`tests/save.test.ts` now lands the fungus evolving, as the page does.
+
+**Beads:** `ja-lo8.12` (this), `ja-k4k.12` (grooming from sensed cues), `ja-260` (the brush's cost, still open: the lab brush is free), `ja-lo8.10` (balance: the colony clawing back).

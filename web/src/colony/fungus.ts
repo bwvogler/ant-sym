@@ -9,8 +9,9 @@ import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.
 import { CELL, cellOf, discOffsets } from "./hex.ts";
 import { disc, rockAt, type WorldMap } from "./world.ts";
 
-// The fungus, pure: the player. It has no body on the map of its own, only
-// spores on the ground and load inside ants (docs/fungus-policy.md). This
+// The fungus, pure: the player. It is spores on the ground and load inside ants
+// (docs/fungus-policy.md), and in the game a mycelium where it landed, which
+// grows and pays for the spores it puts out (evolution.ts, ja-lo8.12). This
 // module is how it gets there and how it moves (ja-t4d.1): the spore brush,
 // contact transmission across colonies, and the colony's answer to it,
 // grooming, which clears visible load and primes the groomers against it.
@@ -224,11 +225,13 @@ export class Fungus {
   /** cells holding spores, as y * w + x */
   readonly #sporeCells = new Set<number>();
   /**
-   * The evolving fungus's base (ja-lo8.12): the cells it landed on, as y * w + x. Its body grows there and keeps
-   * sporulating, so their spores never fall below the evolution's `spores` trait: a trickle of foragers walks through
-   * them all game, whether or not the fungus has a hold in the nest.
+   * The evolving fungus's base (ja-lo8.12): the cells it landed on, as y * w + x. Its mycelium grows there and puts out
+   * spores onto them, paid for out of its mass (evolution.ts): a trickle of foragers walks through them all game,
+   * whether or not the fungus has a hold in the nest.
    */
   #base: number[] = [];
+  /** fungus the evolving strain grew in hosts this step (load taken on from spores or by contact) */
+  #made = 0;
   /** everyone's load, for transmission */
   readonly #all = new LoadGrid();
   /** each colony's visible load, for grooming's priming */
@@ -343,9 +346,9 @@ export class Fungus {
     });
 
     let hosts = 0;
-    // The load the evolving fungus's hosts carry this step: what it grows biomass from.
+    // Fungus the evolving strain grows in hosts this step (load taken on from spores or by contact): what it adapts from.
     const evolving = this.#evolution ? this.#evolution.strain : -1;
-    let grown = 0;
+    this.#made = 0;
     const taken = this.#taken;
     taken.length = 0;
     const nb = this.#nb;
@@ -387,6 +390,7 @@ export class Fungus {
         if (l === 0 && gain < p.minDose * dt) gain = 0;
         let strain = s;
         if (l === 0 && gain > 0) strain = contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
+        if (gain > 0 && strain === evolving) this.#made += gain;
 
         // Grooming by nestmates around (at most p.groomers of them), and the host's own clearing.
         const mates = Math.max(0, nb.own - 1);
@@ -404,7 +408,6 @@ export class Fungus {
         c.strain[i] = nl > 0 ? strain : 0;
         if (nl > 0) {
           hosts++;
-          if (strain === evolving) grown += nl;
           // What the fungus in this host senses, and what its policy has it do there (fungus-policy §11.2).
           const ns = this.strains[strain] as Strain;
           const sit: FungalSituation = {
@@ -429,11 +432,8 @@ export class Fungus {
 
     // Each colony's queen, read against the same grids.
     colonies.forEach((c, k) => {
-      if (!this.#stepQueen(c, k, grids, dt, rec)) return;
-      hosts++;
-      if (c.queen && c.queen.strain === evolving) grown += c.queen.load;
+      if (this.#stepQueen(c, k, grids, dt, rec, evolving)) hosts++;
     });
-    this.#evolution?.grow(grown * dt, this.#base.length ? dt : 0);
 
     // Spores taken, then the ground fades.
     for (let k = 0; k < taken.length; k += 3) {
@@ -451,18 +451,20 @@ export class Fungus {
         this.#sporeCells.delete(key);
       } else this.spores.set(x, y, v);
     }
-    // The base sporulates: its cells hold at least the evolution's spores.
+    // The evolving fungus's body (evolution.ts): what it grew in hosts, and its mycelium growing on its patch and
+    // putting out spores there, spread evenly over its cells and paid for out of its mass.
     const e = this.#evolution;
-    if (e && this.#base.length) {
-      const level = e.traits().spores;
-      const strain = e.strain;
-      for (const key of this.#base) {
-        const x = key % w;
-        const y = (key - x) / w;
-        if (this.spores.get(x, y) >= level) continue;
-        this.spores.set(x, y, level);
-        this.sporeStrain.set(x, y, strain);
-        this.#sporeCells.add(key);
+    if (e) {
+      e.replicate(this.#made);
+      if (this.#base.length) {
+        const each = e.grow(dt) / this.#base.length;
+        for (const key of this.#base) {
+          const x = key % w;
+          const y = (key - x) / w;
+          this.spores.set(x, y, Math.min(p.maxSpores, this.spores.get(x, y) + each));
+          this.sporeStrain.set(x, y, e.strain);
+          this.#sporeCells.add(key);
+        }
       }
     }
     this.hosts = hosts;
@@ -474,7 +476,7 @@ export class Fungus {
    * does in her, from what it senses there (task "queen", place "queen"): how much of it she shows, and how much of her
    * royal mark she lays. Returns whether she is a host after the step.
    */
-  #stepQueen(c: Colony, k: number, grids: readonly CountGrid[], dt: number, rec: Recognition | null): boolean {
+  #stepQueen(c: Colony, k: number, grids: readonly CountGrid[], dt: number, rec: Recognition | null, evolving: number): boolean {
     const q = c.queen;
     if (!q || !q.alive) return false;
     const p = this.params;
@@ -504,6 +506,7 @@ export class Fungus {
     if (l === 0 && gain < p.minDose * dt) gain = 0;
     let strain = q.strain;
     if (l === 0 && gain > 0) strain = contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
+    if (gain > 0 && strain === evolving) this.#made += gain;
     const st = this.strains[strain] as Strain;
     const mates = nb.own; // the nestmates around her: her groomers
     const loss = l > 0 ? (p.grooming * st.visibility * q.show * Math.min(p.queenGroomers, mates) + st.decay) * l * dt : 0;

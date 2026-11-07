@@ -62,14 +62,14 @@ function run(g: Game, seconds: number): void {
 for (const view of ["side", "top"] as const)
   test(`a save restored into a fresh game runs on exactly as the unbroken game (${view} view, the fungus landed)`, () => {
     const whole = build(view, 3);
-    whole.land(0, GARDEN);
+    whole.land(0, GARDEN, { evolve: true }); // as the page lands: the fungus's body and evolution are saved too (ja-lo8.12)
     run(whole, 40);
     const before = hashGame(whole);
     run(whole, 20);
     const unbroken = hashGame(whole);
 
     const first = build(view, 3);
-    first.land(0, GARDEN);
+    first.land(0, GARDEN, { evolve: true });
     run(first, 40);
     assert.equal(hashGame(first), before, "the same game, the same state (the test's own check)");
     const saved = JSON.parse(JSON.stringify(first.save())) as GameSave;
@@ -84,7 +84,9 @@ for (const view of ["side", "top"] as const)
     run(again, 20);
     assert.equal(hashGame(again), unbroken, "run on: as if never saved");
     assert.ok(again.landed, "it remembers where the fungus landed");
-    assert.ok(again.fungus.census(again.colonies[0]!).infected > 0);
+    // The fungus is still in the game: its patch sporulating, and fungus grown in hosts so far (a weak start may have no
+    // host at this moment: the colony grooms it out of the nest).
+    assert.ok(again.fungus.sporeCells > 0 && (again.fungus.evolution?.growth ?? 0) > 0);
   });
 
 test("a save of another version is refused", () => {

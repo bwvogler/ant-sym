@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MODES, TRAILS, type Colony, type Mode, type Situation } from "../colony/colony.ts";
 import { INFECTED, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { pulled } from "../colony/levers.ts";
+import { UPGRADES } from "../colony/evolution.ts";
 import { decodeFungal, type FungalSituation } from "../colony/fungalPolicy.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
@@ -99,7 +100,10 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
   const code = col.fungal[i] as number;
   const sensed = code >= 0 ? decodeFungal(code) : null;
   const decided = sensed ? explain(sensed) : null;
-  const levers = decided ? pulled(fungus.resolve(decided.answer, s), fungus.menu) : [];
+  const wanted = decided ? fungus.resolve(decided.answer, s) : {};
+  const levers = decided ? pulled(wanted, fungus.menu) : [];
+  // What the host runs: Jev's levels held to the fungus's reach (ja-lo8.12).
+  const held = fungus.held(wanted);
   const stale = decided?.by === "stale";
   return (
     <>
@@ -127,11 +131,20 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-fg-3">and pulls:</span>
           {levers.length === 0 && <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-3">nothing</span>}
-          {levers.map(({ lever, level }) => (
-            <span key={lever.id} className={`rounded bg-raised px-1.5 py-0.5 font-mono ${lever.kind === "perceive" ? "text-spore" : lever.kind === "lethal" ? "text-err" : "text-accent"} ${stale ? "opacity-50" : ""}`} title={`${lever.kind === "perceive" ? "what it perceives" : "what it gives off"}: ${lever.blurb}`}>
-              {lever.name}: {lever.words[level]}
-            </span>
-          ))}
+          {levers.map(({ lever, level }) => {
+            const runs = held[lever.id] ?? level;
+            const by = runs === level ? null : UPGRADES.find((u) => u.levers?.includes(lever.id));
+            return (
+              <span
+                key={lever.id}
+                className={`rounded bg-raised px-1.5 py-0.5 font-mono ${lever.kind === "perceive" ? "text-spore" : lever.kind === "lethal" ? "text-err" : "text-accent"} ${stale ? "opacity-50" : ""}`}
+                title={`${lever.kind === "perceive" ? "what it perceives" : "what it gives off"}: ${lever.blurb}${by ? `. Jev wants ${lever.words[level]}; your fungus reaches ${lever.words[runs]}: adapt ${by.name} to go further.` : ""}`}
+              >
+                {lever.name}: {lever.words[runs]}
+                {by && <span className="text-fg-3"> (wants {lever.words[level]})</span>}
+              </span>
+            );
+          })}
           <span className="text-fg-3">by {FUNGUS_BY[decided.by]}</span>
           <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "fungus" })}>
             why?

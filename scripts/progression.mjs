@@ -1,8 +1,8 @@
-// Offline: how the fungus game paces (ja-lo8.12, PRD §49.11). The app's setup (side world, 600 + 600 ants, regrowth,
+// Offline: how the fungus game paces (ja-lo8.12, PRD §50.11). The app's setup (side world, 600 + 600 ants, regrowth,
 // gameRng(seed)), the landing by colony 0's hole, and the fungus policy from the page's shipped answers under a preset aim
 // (web/public/precache/fungus-<aim>.json; a situation not shipped plays the strain's default, as on the page while Jev
-// is asked). With --evolve the game's fungus starts weak and buys upgrades as a player might: the first affordable in
-// the buy order, as soon as it can. Reports when each chapter is reached (first host, a quarter of the colony, the
+// is asked). With --evolve the game's fungus starts weak and chooses upgrades as a player might: the next in the
+// order, as soon as it has the adaptations for it. Reports when each chapter is reached (first host, a quarter of the colony, the
 // queen), each purchase, and the colony's infected share and resistance every minute. Seeds run in parallel.
 //
 // Usage: node scripts/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
@@ -18,7 +18,7 @@ const opt = (name, fallback) => {
   return k < 0 ? fallback : args[k + 1];
 };
 const flag = (name) => args.includes(`--${name}`);
-const DEFAULT_ORDER = "stealth,infectivity,persistence,infectivity,recognition,stealth,trails,senses,infectivity,evasion,royal,recognition,trails,persistence,evasion,royal";
+const DEFAULT_ORDER = "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,infectivity,evasion,recognition,trails,royal,fruiting,evasion,royal,stealth";
 
 if (isMainThread) {
   const [a, b = a] = opt("seeds", "1-3").split("-").map(Number);
@@ -43,7 +43,7 @@ if (isMainThread) {
   results.sort((x, y) => x.seed - y.seed);
   console.log(`aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`);
   for (const r of results) {
-    console.log(`seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rival)} · biomass earned ${r.earned}`);
+    console.log(`seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rival)} · adaptations ${r.earned} (growth ${r.growth}), mycelium ${r.mass}`);
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
@@ -62,7 +62,7 @@ if (isMainThread) {
   g.fungus.policy = (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT;
   g.land(0, STRAINS.findIndex((s) => s.id === strain), { evolve });
   const DT = 1 / 30;
-  const r = { seed, first: -1, quarter: -1, half: -1, queen: -1, rival: -1, bought: [], minutes: [], earned: 0 };
+  const r = { seed, first: -1, quarter: -1, half: -1, queen: -1, rival: -1, bought: [], minutes: [], earned: 0, growth: 0, mass: 0 };
   const share = (c) => {
     const f = g.fungus.census(c);
     return { s: f.living ? f.infected / f.living : 0, n: f.infected, resist: f.meanResist };
@@ -86,7 +86,9 @@ if (isMainThread) {
     if (r.rival < 0 && b && b.n > 0) r.rival = t;
     if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
   }
-  r.earned = Math.round(g.fungus.evolution?.earned ?? 0);
+  r.earned = g.fungus.evolution?.earned ?? 0;
+  r.growth = Math.round(g.fungus.evolution?.growth ?? 0);
+  r.mass = (g.fungus.evolution?.mass ?? 0).toFixed(1);
   parentPort.postMessage(r);
 }
 
