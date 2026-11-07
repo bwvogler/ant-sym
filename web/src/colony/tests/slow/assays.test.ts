@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridge, contact, faintAlarm, raidFind, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
+import { bridge, contact, faintAlarm, raidFind, raidStop, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
@@ -62,6 +62,15 @@ test("A11 raiders find the rival: the raid trail helps most seeds, and none is s
     passed += m.pass as number;
   }
   assert.ok(passed >= 6, `${passed}/10 seeds gained ${1.5}× from the trail`);
+});
+
+// Behaviour MR 5.2 (PRD §49.5): A12 passes 20/20 at raidPatience 120 (food stored 0.86 of the forage colony's, worst 0.73); before the
+// call-off it stored 10 of 7,400.
+test("A12 a raid no one can find is called off: the colony eats again", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(raidStop, seed).metrics;
+    assert.equal(m.pass, 1, `seed ${seed}: stored ${m.stored} of ${m.control}`);
+  }
 });
 
 test("A10 faint alarm draws explorers", { todo: "ja-je8: the draw is weak (median +1.3 ants)" }, () => {
