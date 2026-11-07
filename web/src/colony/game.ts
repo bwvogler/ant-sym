@@ -5,7 +5,8 @@ import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
-import { isSky, mulberry32, rockAt, type Rng, type WorldMap } from "./world.ts";
+import { foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { cellOf, CELL } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
@@ -46,6 +47,15 @@ export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts:
 /** Bump when what a save holds changes: an older save is refused, not misread. */
 export const SAVE_VERSION = 1;
 
+/** A colony added mid-game (Game.addColony): where, how many ants, its odour. */
+export interface Founding {
+  x: number;
+  y: number;
+  antCount: number;
+  odour: number;
+  maxAnts?: number;
+}
+
 /** A saved game (Game.save): JSON. */
 export interface GameSave {
   version: number;
@@ -55,6 +65,8 @@ export interface GameSave {
   regrown: number;
   /** per colony: its queen has been reached (Game.revealed) */
   revealed: boolean[];
+  /** colonies added mid-game (Game.addColony), in order */
+  founded?: Founding[];
   params: unknown;
   map: unknown;
   colonies: Record<string, unknown>[];
@@ -186,8 +198,15 @@ export class Game {
     if (player.rivalResponses && this.colonies[1]) this.colonies[1].responses = player.rivalResponses;
     this.#grids = this.colonies.map(() => new CountGrid());
     this.fungus = new Fungus(map, this.params.fungus);
+    this.#wire();
+    this.#refresh();
+    if (this.params.regrow > 0) this.#notePiles();
+  }
+
+  /** Wire every colony to the game: its grids, burials, enemies, the other nests, its raids. Again whenever a colony is added. */
+  #wire(): void {
     this.colonies.forEach((c, k) => {
-      if (map.hasSoil) c.friends = this.#grids[k] as CountGrid;
+      if (this.map.hasSoil) c.friends = this.#grids[k] as CountGrid;
       // Undertakers put the dead on the midden: a host of a strain that sporulates (Bloom) puts spores on the ground there;
       // other strains die with their host (nest slices 7–8).
       c.onBury = (d) => {
@@ -200,8 +219,33 @@ export class Game {
         this.#aimRaids(k);
       }
     });
+  }
+
+  /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
+  founded: Founding[] = [];
+
+  /**
+   * A new colony mid-game (ja-lo8.8; a daughter queen's, ja-lo8.9): in the side view a hole dug in the column under x
+   * with a shaft and a founding chamber, as the world's own nests are dug (world.foundNest); top-down a nest's disc at
+   * (x, y). It starts with `antCount` workers and, in the side view, its queen, at odour `odour` (a daughter: her
+   * mother's, so the two are kin until they drift). Every colony is wired again: the other nests, raids (kin are not
+   * raided), grids. Returns its index.
+   */
+  addColony(f: Founding): number {
+    const k = this.colonies.length;
+    let nest: Nest;
+    if (this.map.sky) {
+      cellOf(f.x, f.y);
+      nest = foundNest(this.map, CELL[0] as number, k, this.#rng);
+    } else nest = { x: f.x, y: f.y, r: 3 };
+    this.map.nests.push(nest);
+    const c = new Colony(this.map, { antCount: f.antCount, maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)), nest: k, odour: f.odour, tolerance: this.recognition.params.tolerance }, this.#rng, localPolicy, localStance);
+    this.colonies.push(c);
+    this.#grids.push(new CountGrid());
+    this.founded.push({ ...f });
+    this.#wire();
     this.#refresh();
-    if (this.params.regrow > 0) this.#notePiles();
+    return k;
   }
 
   /** The ground's food piles now (as the world began): cells with food, on the walkway in the side view, anywhere top-down. */
@@ -308,20 +352,25 @@ export class Game {
   unity(): Unity {
     const deathsPerMinute = this.#fightDeaths;
     const quiet = this.time - this.#lastFightDeath;
-    const [a, b] = this.colonies;
-    if (!a || !b) return { gap: 0, deathsPerMinute, quiet, mixing: 0, score: 0, unified: false };
+    // Every colony still standing (ja-lo8.8: any number of them); with two, as it always was.
+    const live = this.colonies.length > 2 ? this.colonies.filter((c) => !Game.beaten(c)) : this.colonies;
+    if (live.length < 2) return { gap: 0, deathsPerMinute, quiet, mixing: 0, score: 0, unified: false };
     const tol = this.recognition.params.tolerance;
-    const gap = Math.abs(a.nestOdour - b.nestOdour);
+    // The widest gap between any two nests' odours: one colony when even that is within tolerance.
+    let gap = 0;
+    for (let a = 0; a < live.length; a++) for (let b = a + 1; b < live.length; b++) gap = Math.max(gap, Math.abs((live[a] as Colony).nestOdour - (live[b] as Colony).nestOdour));
+    // Mixing: each colony's ants within tolerance of another colony's nest odour (with two: the other one).
     let near = 0;
     let living = 0;
-    for (const [c, other] of [[a, b], [b, a]] as const)
+    for (const c of live)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         living++;
-        if (Math.abs((c.odour[i] as number) - other.nestOdour) <= tol) near++;
+        const o = c.odour[i] as number;
+        if (live.some((other) => other !== c && Math.abs(o - other.nestOdour) <= tol)) near++;
       }
     const recognition = Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
-    const unified = gap <= tol && quiet >= QUIET && !Game.beaten(a) && !Game.beaten(b);
+    const unified = gap <= tol && quiet >= QUIET && live.every((c) => !Game.beaten(c));
     return { gap, deathsPerMinute, quiet, mixing: living ? near / living : 0, score: recognition * Math.min(1, quiet / QUIET), unified };
   }
 
@@ -429,6 +478,7 @@ export class Game {
       landed: encode(this.landed),
       regrown: this.regrown,
       revealed: [...this.revealed],
+      founded: this.founded.map((f) => ({ ...f })),
       params: encode(this.params),
       map: encode(map),
       colonies: this.colonies.map((c) => c.saveState()),
@@ -442,6 +492,8 @@ export class Game {
   /** A save back into this game, built afresh from the same world and settings (Game.save). */
   load(saved: GameSave): void {
     if (saved.version !== SAVE_VERSION) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
+    // Colonies founded mid-game first, as they were: then everything (the map as dug among it) is poured back over them.
+    for (const f of saved.founded ?? []) this.addColony(f);
     if (saved.colonies.length !== this.colonies.length) throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
     this.time = saved.time;
     this.strategyChoices = saved.strategyChoices;

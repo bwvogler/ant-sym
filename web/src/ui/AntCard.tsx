@@ -19,8 +19,7 @@ import type { DecidedBy } from "./colonyJev.ts";
 
 interface Props {
   followed: Followed;
-  colony: Colony;
-  rival: Colony | null;
+  colonies: readonly Colony[];
   fungus: Fungus;
   /** who decided, for an ant of colony k */
   explain: (s: Situation, k: number) => { mode: Mode; by: DecidedBy };
@@ -30,13 +29,13 @@ interface Props {
 
 const BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under its colony's doctrine", stale: "Jev's answer under its earlier doctrine, while the new one is asked", waiting: "the local rule, while Jev is asked", local: "the local rule" };
 
-export default function AntCard({ followed, colony, rival, fungus, explain, explainFungus, onClose }: Props) {
+export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose }: Props) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 250);
     return () => clearInterval(t);
   }, []);
-  const col = followedColony(colony, rival, followed);
+  const col = followedColony(colonies, followed);
   const i = followed.i;
   if (!col) return null;
   const mode = MODES[col.mode[i] as number] as Mode;

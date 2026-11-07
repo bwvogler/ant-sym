@@ -352,6 +352,12 @@ function Lab({ game, controls, update, stats, jev }: Props) {
           </p>
         </div>
       </div>
+      <div className="mt-3 flex items-center gap-2 text-xs">
+        <button type="button" className="rounded-md border border-line px-2 py-1 hover:bg-raised" onClick={() => foundBetween(game)} title="A new colony of 30 ants, kin of the first (its odour), on the ground a third of the way between the first two nests">
+          Found a colony between the nests
+        </button>
+        <span className="text-fg-3">{game.colonies.length} colonies. In the game a colony is founded by a new queen (ja-lo8.9).</span>
+      </div>
       {locked && <p className="mt-3 text-xs text-warn">{jev.lock}</p>}
     </Card>
   );
@@ -470,4 +476,14 @@ export function LeverChips({ game, menu, locked, lock, onChange }: { game: Game;
       ))}
     </div>
   );
+}
+
+/** The lab's founding (Game.addColony): 30 ants at the first colony's odour, a third of the way from the first nest to the second. */
+function foundBetween(game: Game): void {
+  const a = game.colonies[0]?.nest;
+  const b = game.colonies[1]?.nest ?? a;
+  if (!a || !b) return;
+  const ea = a.entrance ?? a;
+  const eb = b.entrance ?? b;
+  game.addColony({ x: ea.x + (eb.x - ea.x) / 3, y: ea.y, antCount: 30, odour: game.colonies[0]!.nestOdour });
 }

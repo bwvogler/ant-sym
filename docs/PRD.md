@@ -3370,3 +3370,25 @@ Regrowth ends the starvation: a lone colony now holds steady. War still ends a c
 **Pace (to balance, `ja-lo8.10` / `ja-260`).** In the browser at 8×, Garden from the landing reached Ink's queen at 46 s of sim (about 6 s of wall time), so chapters 2–4 pass almost at once. The game needs a slower or costlier spread before it is a game.
 
 No change to the colony lanes: their requests are byte-identical, and the goldens are bit-exact (they paint no spores).
+
+### 49.8 Slice 8: several colonies at runtime (ja-lo8.8, 2026-11-07)
+
+**Built:**
+- **`Game.addColony({ x, y, antCount, odour })`.**
+  - In the side view it digs a hole in the column under x, with the world's own shaft and founding royal chamber (`world.foundNest`, exported from `digNest`). Top-down, it places a nest's disc.
+  - It adds a `Colony` of that many workers at that odour (its queen in the side view), then rewires every colony: grids, burials, enemies, the other nests, raids.
+  - **Kin.** A daughter at her mother's odour is kin, and is not raided by her.
+- **Saves.** `Game.founded` records each founding. A save re-founds them on a fresh map before pouring the state back, and stays bit-exact (`tests/addColony.test.ts`).
+- **Unity for any number of colonies.** The gap is the widest between any two standing nests' odours, and mixing counts ants within tolerance of another colony's nest. With two colonies it is the same as before.
+- **The page draws any number of colonies.**
+  - The field, the minimap, picking and the nest buttons (one per colony; `n` cycles them) take the colonies list.
+  - `Followed` carries a colony index (`k`).
+  - Names and tones go on past Ink and Amber: Jade, Rust, Slate, Moss.
+  - The Jev client re-attaches when a colony is pushed onto the game's list.
+- **Lab:** "Found a colony between the nests" (Details), until queens found colonies themselves (`ja-lo8.9`).
+
+**Checked:**
+- In the browser, Jade's hole, shaft, chamber and queen draw on the field, with its line in the fungus panel and its nest button.
+- In tests, a third colony's ants choose and live, and the other colonies know its nest.
+
+**Not done:** `Colony.foreign` stays "the nearest rival's trail", which already works for any number of colonies, rather than the strongest trail at the cell.

@@ -64,7 +64,10 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
     seeded.current = true;
     void loadPrecache((context, entries) => jev.seed(context, entries));
   }, [jev]);
-  useEffect(() => jev.attachColonies(colonies), [jev, colonies]);
+  // A colony founded mid-game is pushed onto the same array (Game.addColony): its length drives a re-attach too.
+  const count = colonies.length;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => jev.attachColonies(colonies), [jev, colonies, count]);
   // The fungus spans the game: the lane drives each new game's, under the player's menu.
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
   useEffect(() => jev.setMenu(new Set(menu)), [jev, menu]);

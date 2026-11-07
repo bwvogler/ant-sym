@@ -132,8 +132,7 @@ export default function ColonyApp() {
         <div className="flex min-w-0 flex-col gap-3 lg:flex-1">
           <div className="relative" style={{ aspectRatio: `${worldExtent(colony.map).w} / ${worldExtent(colony.map).h}` }}>
             <ColonyField
-              colony={colony}
-              rival={game.rival}
+              colonies={game.colonies}
               fungus={game.fungus}
               onFrame={onFrame}
               showFoodTrail={controls.showFoodTrail}
@@ -145,7 +144,7 @@ export default function ColonyApp() {
             />
           </div>
           {followed ? (
-            <AntCard followed={followed} colony={colony} rival={game.rival} fungus={game.fungus} explain={jev.explain} explainFungus={jev.explainFungus} onClose={() => setFollowed(null)} />
+            <AntCard followed={followed} colonies={game.colonies} fungus={game.fungus} explain={jev.explain} explainFungus={jev.explainFungus} onClose={() => setFollowed(null)} />
           ) : (
             <p className="text-xs text-fg-3">
               {painting

@@ -378,7 +378,7 @@ function RuleTable({ rows, otherwise, live }: { rows: { when: string; then: stri
 /** The followed ant, if it is alive and was asked: its colony index and its last situation. */
 function followedSituation(colonies: readonly Colony[], f: Followed | null): { k: number; i: number; col: Colony; s: Situation | null } | null {
   if (!f || !colonies[0]) return null;
-  const col = followedColony(colonies[0], colonies[1] ?? null, f);
+  const col = followedColony(colonies, f);
   return col ? { k: sideIndex(f), i: f.i, col, s: col.lastQuestion(f.i) } : null;
 }
 

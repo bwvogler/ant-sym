@@ -918,6 +918,16 @@ function digNest(map: WorldMap, ground: Int32Array, ex: number, depth: number, r
   return nest;
 }
 
+/**
+ * A new colony's nest dug mid-game (Game.addColony, ja-lo8.8): a hole in column `ex` (side view), a slanted shaft
+ * `depth` rows down, and a founding chamber for colony `colony`, as the world's own nests are dug.
+ */
+export function foundNest(map: WorldMap, ex: number, colony: number, rng: () => number, depth = SIDE_WORLD.chamberDepth): Nest {
+  const ground = new Int32Array(map.size.w);
+  ground[ex] = groundTop(map, ex);
+  return digNest(map, ground, ex, depth, rng, colony);
+}
+
 /** The top of the ground in column x (side view): the first row from the top that isn't sky, or the map's height. */
 export function groundTop(map: WorldMap, x: number): number {
   const sky = map.sky;
