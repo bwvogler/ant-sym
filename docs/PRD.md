@@ -3116,64 +3116,63 @@ Research basis: `docs/raid-recruitment.md`. Every figure in it was read in a sea
 
 ### 49.2 What MR 5.2 built (top-down maps; `raidGate` 1)
 
-- **A finder.** On a raid stance, a raider outside with empty jaws, no raid trail under it, and `findAt` (0.3) seconds of contact with strangers goes home (mode forced to "return", fleeing from them) and lays the new **`raid` channel** on the way: `raidLay` × `deposit`, 0.5 + seconds met (at most 3), falling with time since the find as the food trail does. Channel: evaporation 0.04, diffusion 0.3 (a fifth channel, as `noEntry` was a fourth; asleep until used).
-- **Fighters follow it.** A raider with no enemy near climbs the raid trail; with none it walks out, away from its home trail, and wanders (a scout). Walking to the coordinates is gone on top-down maps; the side view keeps it (its raiders already walk the tunnels cell by cell).
-- **Waiting.** A raider home with no raid trail under it waits like a forager with no returns (MR 5): it mills in the nest and goes out as a scout at `raidScout` (1/90 per second). With a trail under it, the `leave` response says "now". Once gone it is out of the rule for `RAID_GO` 4 s.
-- **`Touch.raid`** (none, faint, strong) is sent to the `leave` lane only, and only for a raider: the lane asks a waiting raider in its own mode (**fight**), a forager in mode return. The key is `…|raid:…` for a raider and `…|returns:…` for a forager (review of #41: first the raider was asked as a returning forager, so both got one answer, and Jev's "wait" for foragers held the raiders). `leave` locally: a raider on a raid stance goes on a trail and waits without one; a forager on a raid or defend stance goes out whatever comes back, as in MR 5. A colony without the gate reads "strong", so it behaves as before.
+- **A raid stance is a bias, not an order.** The colony's stance is still broadcast, but an ant acts on it only if it is **recruited** (`recruited`, `#stanceOf`). Every other ant carries on as a forager, so a raid stance idles no one. An ant is recruited by:
+  - **smelling a scout's raid trail** (its cell and its three sensors, `#raidSense`), or
+  - **going out as a scout**: an ant at home with empty jaws rolls `raidScout` (1/90 per second) and goes out in mode fight.
+  A recruited ant's raid ends when it is home again with no raid trail under it (event-driven; `#gone` records that it went out). No waiting state and no clock: the raid ends when the trail fades or was never laid.
+- **A finder.** A recruited ant outside with empty jaws, no raid trail under it, and `findAt` (0.3) seconds of contact with strangers goes home (mode forced to "return", fleeing from them) and lays the new **`raid` channel** on the way: `raidLay` × `deposit`, 0.5 + seconds met (at most 3), falling with time since the find as the food trail does. Channel: evaporation 0.04, diffusion 0.3 (a fifth channel, as `noEntry` was a fourth; asleep until used).
+- **Fighters follow it.** A recruited ant with no enemy near climbs the raid trail; with none it walks out, away from its home trail, and wanders (a scout). Walking to the coordinates is gone on top-down maps; the side view keeps it (its raiders already walk the tunnels cell by cell).
+- **`Touch.stance` is the ant's own** (`#stanceOf`): forage for an ant not recruited, so Jev's mode and `leave` questions for it are a forager's. **`Touch.raid`** (none, faint, strong) is sent to the `leave` lane only, and only for a raider: a recruited ant home in mode return is asked in mode fight, with the raid trail; a forager in mode return, with its returns. Keys: `…|raid:…` and `…|returns:…`. `leave` locally: a raider goes on a trail and waits without one; a forager on a defend stance goes out whatever comes back, as in MR 5.
 - **Versions:** `RESPONSE_BRAIN_VERSION` 9. Mode and stance lanes unchanged.
 - **Side view and `raidGate` 0:** the same as `main`; the side-view golden is bit for bit, the top-down golden re-recorded.
+- **How it got here.** The first version made raiders wait at home for a trail. Waiting needs something to end it, and a stopwatch (`raidPatience`, 120 s) was the only thing a waiting ant had; the user rejected a clock, and the bias is the alternative. The clock version is in the history of PR #41 (commits `cba2721`–`2e7a4d3`). It reached more raiders (A11 gain 1.67), and it did not fix the replays.
 
-### 49.3 Results (local rule)
+### 49.3 Results (local rule; stance as a bias)
 
-**A11, raiders find the rival round a pocket of wall** (200 raiders against 80 defenders, 300 s; new, seeds 1–20):
-- **With the trail:** 0.33 of the raiders reach the rival's nest (0.23–0.50); **without it** (`raidLay` 0: scouts search alone) 0.21 (0.10–0.36); `raidGate` 0, the old straight line (reported as `straight`): 0.39 (0.28–0.53). The trail is a sensed cue, and costs reach against coordinates.
-- **Gain** 1.67 median (0.65–4.24); the mark (at least 1.5× and at most 10 % stuck) passes 12/20 seeds, with a worst seed of 0.65. Stuck: 1 %.
-- Raiders lose less ground to the defenders: 63 attackers lost per run against 90 with coordinates, at 0.34 against 0.38 reaching.
-- **Tuning** (scout rate against finder's contact time): the best worst seed was `findAt` 1 at a raid scout rate of 0.05 (gain 1.08 worst, 16/20), but against a deaf control that kept the slower scouts. With the control matched, 0.05 gave gain 0.72: too many scouts need no trail. Kept: 0.3 and 1/90.
-- A single scout's trail is weak: `raidLay` 2 and 4 reached less (0.26, 0.24), since a stronger lay spreads wide.
+**A11, raiders find the rival round a pocket of wall** (200 ants against 80 defenders, 300 s; seeds 1–20). Reported over the ants recruited to the raid:
+- **With the trail:** 0.19 of the colony's ants reach the rival's nest (0.12–0.32) as raiders; **with no trail laid** (`raidLay` 0: scouts alone) 0.14 (0.10–0.17); `raidGate` 0, every ant sent at the coordinates (`straight`): 0.39 (0.28–0.53).
+- **Gain** 1.24 median (0.89–2.75); the mark (at least 1.5× and at most 10 % stuck) passes 7/20 seeds. Stuck: 1 %. The clock version gained 1.67 (12/20). Only ants that pass near the nest, or are there, smell the trail, and most of a colony in an arena with no food is out exploring. A stronger lay (`raidLay` 3, 8) did not help (the trail smears), and nor did recruiting by contact with a finder coming home (tried, dropped). Filed as ja-sf1.
 
-**A6 few against many through a pass** (seeds 1–6): pass 4/6, gain 1.70 (`main`: 9/10, 2.36). Raiders arrive by the trail in a trickle rather than at once, so more die per defender in the open (0.61 against 0.31 attackers per defender): the pass's relative gain falls.
+**A12, a raid no one can find** (new; the first colony forced onto a raid stance, the rival sealed in rock, a food pile to forage; 900 s): food stored against the same colony on a forage stance **1.00, 20/20** (0.99 worst). On the first version (waiting raiders) it stored 10 of 7,400.
 
-**A1–A5b, A9** (seeds 1–10): pass 10/10 each, as before (no raids in them). Slow suite: 14 pass, A10 todo.
+**A6 few against many through a pass** (seeds 1–20): pass 16/20, gain 1.82 (1.16–2.88) (`main`: 9/10, 2.36; the clock version 1.70).
 
-**G′, the top-down game, seeds 1–20** (both colonies on trail against both on the old coordinates; medians and extremes, the totals were not kept):
+**A1–A5b, A9** (seeds 1–10): pass 10/10 each, as before (no raids in them).
 
-| | Trail | Coordinates |
+**G′, the top-down game, seeds 1–20** (both colonies; medians and extremes, totals not kept):
+
+| | Bias | Coordinates (`main`) |
 |---|---|---|
-| First colony: ants alive at the end | 882 (3–900) | 855 (38–900) |
-| First colony: food stored | 4,086 (1,419–5,190) | 4,086 (1,337–5,780) |
-| First colony: ants lost | 853 (181–1,009) | 880 (131–1,260) |
-| Rival: ants lost | 773 (175–1,093) | 862 (123–1,186) |
+| First colony: ants alive at the end | 897 (3–900) | 855 (38–900) |
+| First colony: food stored | 4,431 (1,471–6,076) | 4,086 (1,337–5,780) |
+| First colony: ants lost | 865 (82–1,180) | 880 (131–1,260) |
+| Rival: food stored | 4,319 (2,082–5,870) | 3,860 |
+| Rival: ants lost | 847 (84–1,187) | 862 (123–1,186) |
 
-Losses −3 % and −10 %, food the same median. **The worst seed is worse:** seed 19 (ja-hgq) ends with 3 ants against 38. The rival is full (900) and raids from 60 s on, and its finders keep reporting. The mechanism works as meant on it, and it kills more.
+Food +8 % and +12 %, losses the same. **The worst seed is worse:** seed 19 (ja-hgq) ends with 3 ants against 38. The rival is full (900) and raids from 60 s on.
 
 ### 49.4 Jev (at most $0.10)
 
-- **Live:** `colony-live.mjs all --top`, about 250,000 input tokens a run, **$0.0105–0.0109** each (four runs). The leave lane is the lane with a new sense.
-- **The first version asked a waiting raider as a returning forager** (review of #41, S1): both got one key and one answer. Now a waiting raider is asked in mode fight, with the raid trail; a forager in mode return, with its returns. On a raid stance every ant at home is a raider to be, so all are asked as fighters. The legend no longer tells Jev to override its doctrine.
+- **Live:** `colony-live.mjs all --top`, about 250,000 input tokens a run, **$0.0105–0.0109** each (the lane with a new sense is `leave`). Caches `experiments/caches/mr52-top-*.json`, versions 5 / 4 / 9.
+- **The first version asked a waiting raider as a returning forager** (review of #41, S1): both got one key and one answer. Now a recruited ant is asked as a raider (fight, with the raid trail) and a forager as a forager (return, with its returns), and the legend no longer tells Jev to override its doctrine.
 - **Replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,186 and 915):
 
-| | Food stored | Lost | MR 5 (food) |
-|---|---|---|---|
-| Forage | 4,847 (+15.8 %) | 805 (−12 %) | +0.3 % |
-| Cautious | 2,950 (−30 %) | 557 (−39 %) | −1.6 % |
-| Warlike | 1,931 (−54 %) | 857 (−6 %) | −5.5 % |
+| | Food stored | Lost | MR 5 (food) | Clock version |
+|---|---|---|---|---|
+| Forage | 5,069 (+21 %) | 825 (−10 %) | +0.3 % | +15.8 % |
+| Cautious | 3,803 (−9 %) | 636 (−30 %) | −1.6 % | −30 % |
+| Warlike | 1,994 (−52 %) | 859 (−6 %) | −5.5 % | −54 % |
 
-- **What the replays say, after a diagnosis** (G′ seed 1, Cautious, a minute-by-minute trace; the idle loop I first blamed is only part of it):
-  - The colony reaches 900 ants by 90 s and its larder fills, so the strategist's "full and fed" rule puts it on a raid stance from about 210 s. A raid stance idles its ants: Jev's mode lane answers "return" for most of them (847 of 900 in mode return, 4–90 outside), and a faint raid trail at the nest calls them out ("now") only to be sent home again. Food home then stops growing, and the stance holds, since no food comes in. (A12, the same loop with nothing in the way, is what the call-off cures; see 49.5.)
-  - **The caches themselves cost food.** Re-recorded under the new legend, a Cautious cache stores 3,339 and an independent second recording 3,613 with the old coordinates (`raidGate` 0), against the local rule's 4,186 (the MR 5 cache replayed +3 % on `main`). Warlike: 1,860 with coordinates, 1,931 with the trail, so its drop is the cache's, not the trail's. The two Cautious recordings agree on 272 of 290 mode answers.
-  - **The trail adds a smaller cost for Cautious** (3,613 → 2,626 before the call-off was fixed; 2,950 with it).
-
-- **A variant that kept foragers out on a raid stance** (asked as returning foragers, `returns`, "now" locally): Cautious +3.5 %, Forage +12.7 %, Warlike −26 %. But every ant then went out with no trail, and A11's trail did not beat scouts alone (0.29 reach against 0.40, gain 0.78, 0/20): the trail was no cue. Not kept: it undoes what MR 5.2 is for.
+- **Why Cautious recovered.** In the waiting version a larder-full colony sat on a raid stance for good, its ants waiting or sent home by the doctrine's mode answers, and stored nothing more (a minute-by-minute trace of seed 1: 847 of 900 ants in mode return, 4–90 outside). As a bias, a raid stance leaves the foragers foraging.
+- **Warlike is the cache's, not the trail's:** with the old coordinates (`raidGate` 0) the same cache stores 1,860, with the waiting trail 1,931. The Warlike and Cautious caches re-recorded under this legend answer differently from MR 5's (the MR 5 caches replayed −5.5 % and −1.6 % on `main`); a second Cautious recording agreed with the first on 272 of 290 mode answers. The legend and the `leave` question changed, so every lane was re-asked. Not separated further (`ja-7je`).
 - **Cost:** mode ~651 tokens per question ($0.074/h, unchanged); the response legend grew, so all six response lanes together come to ~$0.116/h (MR 5: $0.109).
 
-### 49.5 Raid call-off (review of #41, ja-7je)
+### 49.5 How a raid ends
 
-Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; search summaries only). *Polyergus* raiders that mill about a host nest for a few minutes begin an incohesive retreat, and more join it as it goes; nothing found says an order ends a raid; the nearest measured give-up is the harvester forager's wait of about 3 minutes.
-- **Built (an ant's own clock, no new sense).** On a raid stance a raider's clock runs while it is at home, and meeting a stranger outside starts it again. After `raidPatience` seconds (120) it stands down: it reads its stance as forage (`#stanceOf`) until the colony's stance changes, so its mode and `leave` questions are asked as a forager's. The keys, the lane's legend and the Touch are unchanged. (First the clock counted only "wait" answers; a faint trail calling raiders out, and a doctrine sending them home, kept it from ever running. Counting time at home with no stranger met is the cue.)
-- **A12, a raid no one can find** (new; the first colony forced onto a raid stance, the rival sealed in rock, a food pile to forage; 900 s). Food stored against the same colony on a forage stance: **1.00, 20/20** at patience 60 and 120 (the first clock: 0.86, worst 0.73); before the call-off 10 of 7,400 (0/10).
-- **Left out:** a call-off that spreads by contact with raiders coming home empty (one summary line behind it); the strategist reading how many raiders idle at home (a colony-wide count no ant senses).
-- **Patience, by the worst seed** (seeds 1–20): A11 reach 0.33 either way, worst seed 0.23 at 120 against 0.17 at 60 (gain 1.84 and 1.67, 13/20 each); G′ food 4,080 against 4,122, losses 853 against 819, rival food 3,874 against 4,072. Kept 120. Seed 19 ends with 1 ant (3 before; 38 on `main`).
+Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; search summaries only): *Polyergus* raiders that mill about a host nest for a few minutes begin an incohesive retreat; nothing found says an order ends a raid; trails fade without reinforcement.
+- **In the model**, nothing ends a raid by decision. A raid lives while a scout's trail does: it is laid by finders, it fades (half-life about 17 s), and an ant home with none under it goes back to foraging. A scout that finds nothing tires (the existing fatigue, MR 3.1) and comes home.
+- **Tried and dropped: a patience clock.** A raider that waited `raidPatience` (120 s) at home stood down. It needed a stopwatch because the design had raiders wait; see 49.2. Clocks elsewhere in the code are filed: ja-d8e, ja-cgv, ja-79f, ja-9ve, ja-hy1.
+- **Left out:** a call-off that spreads by contact with raiders coming home empty (one summary line behind it); the strategist reading how many raiders idle (a colony-wide count no ant senses).
 
 ### 49.6 Left out
 

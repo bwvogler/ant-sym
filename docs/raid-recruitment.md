@@ -36,7 +36,7 @@ The paper hosts (link.springer.com, pmc.ncbi.nlm.nih.gov, groups.csail.mit.edu) 
 - **A finder is an ant that meets strangers.** The game already has that sense (`enemy` contact, `docs/ant-communication.md` §3). It stands for meeting the rival's workers at its border or entrance. A rival-nest odour is not built: it was not found in the sources, and a sense needs sources first.
 - **It goes home and lays a trail.** The trail is a recruitment trail of its own, a fifth channel (`raid`), as `noEntry` was a fourth. Laid more strongly after more strangers met (graded, as weaver ants' recruitment is).
 - **Fighters follow the trail, as foragers follow food.** The trail runs over ground a scout walked, so it goes round rock. Walking to coordinates goes.
-- **Waiting fighters go on the trail, not on an order.** A fighter at the nest that smells the trail leaves (`activation.md`: a threshold on a stimulus); without it, only scouts leave (`scoutRate`).
+- **A raid stance is a bias, not an order** (`activation.md`: a threshold on a stimulus). An ant acts on it only once recruited: it smelt a scout's trail, or it went out as a scout at `raidScout`. The rest carry on foraging.
 - **Sight is kept in the model by the side view's tunnel walk** and by the contact response near a fight. The top-down raider has no sight of its own beyond the scent.
 - **Left out:** raiders as a column, tandem running, head-butting, the colony's call-off. Each is a later slice.
 
@@ -49,7 +49,7 @@ The paper hosts (link.springer.com, pmc.ncbi.nlm.nih.gov, groups.csail.mit.edu) 
 - **The nearest measured give-up** is the harvester forager's: it waits about 3 minutes with no forager returning, and goes deeper after about 8 (`activation.md`, Gordon 2025).
 - **Not found:** the trigger that ends a raid, a number for raider patience, and whether the retreat spreads by contact.
 
-**For the model:** a raider that has waited at home with no raid trail for `raidPatience` (120 s, a design value of the order of Gordon's 3 minutes) stands down and reads its stance as forage: its own clock, no new sense. A call-off that spreads by contact with raiders coming home empty has one summary line behind it, and is left out.
+**For the model:** nothing ends a raid by decision. A raid lives while a scout's trail does; an ant that has been out and is home with no trail under it goes back to foraging, and a scout that finds nothing tires and comes home (the existing fatigue). A call-off that spreads by contact with raiders coming home empty has one summary line behind it, and is left out.
 
 ## Sources
 
