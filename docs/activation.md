@@ -50,7 +50,7 @@ The paper sites (journals.plos.org, pmc.ncbi.nlm.nih.gov, frontiersin.org) were 
 ## A colony's bias as a threshold
 
 - **Response thresholds** (Bonabeau, Theraulaz & Deneubourg 1996): an individual takes up a task with probability s² / (s² + θ²), where s is the stimulus and θ the ant's threshold. A colony shifts how much of a task it does by its members' thresholds, not by an order.
-- **For the model:** the doctrine, or a later colony-wide bias, can move the departure threshold (`leaveAt`) and `scoutRate` instead of commanding a stance. That is the full form of "a stance that emerges". MR 5 builds the threshold, and leaves the doctrine's hold on it for later.
+- **For the model:** the doctrine, or a later colony-wide bias, can move the departure threshold (`leaveAt`) and `scoutRate` instead of commanding a stance. That is the full form of "a stance that emerges". MR 5 builds the threshold, and leaves the doctrine's hold on it for later. MR 5.2 uses the same idea for raids: the stimulus is a scout's raid trail ([raid-recruitment.md](raid-recruitment.md)).
 
 ## What a colony knows about food
 
