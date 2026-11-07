@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MODES, TRAILS, HOMES, STANCES, type Colony, type Situation } from "../colony/colony.ts";
 import { DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, STANCE_CRITERIA, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
-import { CONTACTS, decodeFungal, GROUNDS, LOADS, type FungalSituation } from "../colony/fungalPolicy.ts";
-import { INFECTED, INTERVENTIONS, LETHAL, NEST_ONLY, STRAINS } from "../colony/fungus.ts";
+import { AROUSALS, CARRYING, decodeFungal, PLACES, TASKS, TOUCHES, type FungalSituation } from "../colony/fungalPolicy.ts";
+import { INFECTED, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
+import { decodeLevels, pulled, PRESETS } from "../colony/levers.ts";
+import { askedIn } from "../colony/fungusBrain.ts";
+import { LeverChips } from "./DetailsScreen.tsx";
+import type { Game } from "../colony/game.ts";
 import { AIMS } from "../colony/fungusBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
@@ -33,6 +37,10 @@ interface Props {
   draftAim: (a: DoctrineChoice) => void;
   /** why no policy can change now (policyLock), or null: the aim and the menu are disabled while it is set */
   lock: string | null;
+  /** the game (its map, for which levers apply) */
+  game: Game;
+  /** the fungus's answers so far (ColonyJev.fungusAnswers): the table behind "show the table" */
+  fungusAnswers: () => { key: string; answer: string; stale: boolean }[];
   /** the fungus's menu and the local rule's settings (useColony controls) */
   menu: readonly string[];
   setMenu: (menu: string[]) => void;
@@ -250,37 +258,19 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
           aria-label="fungus aim"
         />
         <div className="text-[13px]">
-          <span className="text-fg-2">What the fungus may do</span>
-          <div className="mt-1 flex flex-wrap gap-1 text-xs">
-            {INTERVENTIONS.filter((v) => props.sideView || !NEST_ONLY.has(v.id)).map((v) => {
-              const on = props.menu.includes(v.id);
-              const lethal = LETHAL.has(v.id);
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  aria-pressed={on}
-                  disabled={props.lock !== null}
-                  className={`rounded-md border px-2 py-0.5 font-mono disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
-                  title={`${v.blurb}${lethal ? ". Only strains that allow it (Bloom) can run it." : ""}`}
-                  onClick={() => props.setMenu(on ? props.menu.filter((id) => id !== v.id) : [...props.menu, v.id])}
-                >
-                  {v.name}
-                </button>
-              );
-            })}
-          </div>
+          <span className="text-fg-2">Levers the fungus may pull</span>
+          <LeverChips game={props.game} menu={props.menu} locked={props.lock !== null} lock={props.lock} onChange={props.setMenu} />
         </div>
         <label className="flex items-center justify-between text-xs text-fg-2">
-          <span>Hide groomed hosts (dormant shows a quarter)</span>
+          <span>Local rule: groomed hosts hide (show a quarter)</span>
           <input type="checkbox" checked={props.hide} disabled={props.lock !== null} onChange={(e) => props.setRule({ hide: e.target.checked })} />
         </label>
         <label className="flex items-center justify-between text-xs text-fg-2">
-          <span>Cull high-load hosts fighting strangers</span>
+          <span>Local rule: cull hosts fighting foreigners</span>
           <input type="checkbox" checked={props.cull} disabled={props.lock !== null} onChange={(e) => props.setRule({ cull: e.target.checked })} />
         </label>
         <p className="text-xs text-fg-3">
-          Jev picks, for each host, one of what its strain allows and the menu has on, under your aim. Without Jev each strain does what it was bred for, within the menu and the two settings above.
+          Jev sets, for each situation the fungus senses in a host, a level for every lever on the menu, under your aim. Where Jev has not answered, the strain does what it was bred for, within the menu and the two settings above.
         </p>
       </section>
 
@@ -386,7 +376,7 @@ function followedSituation(colonies: readonly Colony[], f: Followed | null): { k
   return col ? { k: sideIndex(f), i: f.i, col, s: col.lastQuestion(f.i) } : null;
 }
 
-/** The menu as the fungus runs it on this map: the nest's interventions only where there is a nest (Fungus.menu drops them). */
+/** The menu as the fungus runs it on this map: the nest's levers only where there is a nest (Fungus.menu drops them). */
 function mapMenu(props: Props): string[] {
   return props.menu.filter((id) => props.sideView || !NEST_ONLY.has(id));
 }
@@ -395,9 +385,8 @@ function mapMenu(props: Props): string[] {
 function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: number; s: FungalSituation } | null {
   const fol = followedSituation(colonies, f);
   if (!fol || (fol.col.load[fol.i] as number) < INFECTED) return null;
-  const strain = STRAINS[fol.col.strain[fol.i] as number];
   const code = fol.col.fungal[fol.i] as number;
-  return strain && code >= 0 ? { i: fol.i, s: decodeFungal(code, strain.id) } : null;
+  return code >= 0 ? { i: fol.i, s: decodeFungal(code) } : null;
 }
 
 function ModeExplainer(props: Props) {
@@ -457,20 +446,43 @@ function StanceExplainer() {
 }
 
 function FungusExplainer(props: Props) {
+  const fungal = followedFungal(props.colonies, props.followed);
+  const [table, setTable] = useState(false);
+  const menu = new Set(mapMenu(props));
   return (
     <>
-      <p className="text-[13px]">The fungus never chooses for an ant. It chooses what it does to the ant it is in, which bends what that ant senses and gives off; the ant's own policy still decides what the ant does.</p>
+      <p className="text-[13px]">
+        The fungus never chooses for an ant. Inside each ant it lives in, it <em>senses</em> the ant's body, and sets how hard to pull each of its <em>levers</em>: some change what the ant perceives, others what it gives off to other ants. The ant's own policy still decides what the ant does, from the world as it now perceives it.
+      </p>
+      <p className="rounded-md border border-line bg-raised px-2 py-1.5 font-mono text-[11px] leading-snug text-fg-2">
+        what the fungus senses in the ant → a level for each lever → what the ant perceives, and what it gives off → the ant's own choice
+      </p>
       <Senses
         rows={[
-          ["strain", STRAINS.map((x) => x.id).join(" · "), "which strain the host carries"],
-          ["load", LOADS.join(" · "), "how much of the fungus is in it"],
-          ["host", MODES.join(" · "), "what the ant is doing"],
-          ["ground", GROUNDS.join(" · "), "where it stands"],
-          ["contact", CONTACTS.join(" · "), "who touches it"],
-          ["groomed", "true · false", "enough nestmates around to groom the fungus off"],
+          ["arousal", AROUSALS.join(" · "), "the host's arousal: it smells alarm, or strangers are close (amines rise with fighting)"],
+          ["touch", TOUCHES.join(" · "), "who touches its cuticle: a nestmate or an ant of another colony"],
+          ["place", PLACES.join(" · "), "what is underfoot: open ground, a tunnel, a chamber's floor, the queen's mark"],
+          ["task", TASKS.join(" · "), "its body's stage of life (juvenile hormone tracks task): nurse, inside worker, forager"],
+          ["carrying", CARRYING.join(" · "), "what is in its jaws"],
+          ["groomed", "true · false", "its nestmates are grooming the fungus off it"],
         ]}
+        note={
+          <>
+            Most of these are marked design in the research note: no paper shows a fungus reading them. <a className="text-accent hover:underline" href={docUrl("fungus-policy", "11-what-the-fungus-senses-inside-an-ant-and-its-levers")} target="_blank" rel="noreferrer">fungus-policy §11</a>
+            {fungal && <> · The followed ant's fungus senses: <span className="font-mono">{fungal.s.arousal} · {fungal.s.touch} · {fungal.s.place} · {fungal.s.task} · {fungal.s.carrying}{fungal.s.groomed ? " · groomed" : ""}</span>.</>}
+          </>
+        }
       />
-      <Choices items={INTERVENTIONS.filter((v) => mapMenu(props).includes(v.id)).map((v) => [v.name, v.blurb])} />
+      <div>
+        <h4 className={h3}>Its levers</h4>
+        <ul className="mt-1.5 flex flex-col gap-1 text-[13px]">
+          {LEVERS.filter((v) => menu.has(v.id) || v.kind === "lethal").map((v) => (
+            <li key={v.id} className={menu.has(v.id) ? "" : "opacity-60"}>
+              <span className={`font-mono text-xs ${v.kind === "perceive" ? "text-spore" : v.kind === "lethal" ? "text-err" : "text-accent"}`}>{v.name}</span> <span className="text-xs text-fg-3">({v.kind === "perceive" ? "what it perceives" : v.kind === "emit" ? "what it gives off" : menu.has(v.id) ? "lethal, on" : "lethal, off"})</span> — {v.blurb}. <span className="text-xs text-fg-3">{v.words.join(" · ")}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
       <div>
         <h4 className={h3}>The local rule</h4>
         <ol className="mt-1.5 flex list-decimal flex-col gap-1 pl-4 text-[13px]">
@@ -478,8 +490,40 @@ function FungusExplainer(props: Props) {
             <li key={r}>{r}</li>
           ))}
         </ol>
+        <p className="mt-1 text-xs text-fg-3">The strains' defaults are presets, named sets of levels: {PRESETS.filter((p) => p.id !== "dormant").map((p) => p.name).join(", ")}.</p>
+      </div>
+      <div>
+        <button type="button" className="text-xs text-accent underline-offset-2 hover:underline" onClick={() => setTable((t) => !t)}>
+          {table ? "Hide the table" : "Show the table: what Jev has answered so far"}
+        </button>
+        {table && <AnswerTable rows={props.fungusAnswers()} />}
       </div>
     </>
+  );
+}
+
+/** Jev's answers so far, one row per situation met: the senses, then the levers pulled. Stale rows (an earlier aim's) are dimmed. */
+function AnswerTable({ rows }: { rows: { key: string; answer: string; stale: boolean }[] }) {
+  if (rows.length === 0) return <p className="mt-1.5 text-xs text-fg-3">Nothing answered yet: rows fill in as hosts meet situations.</p>;
+  const sorted = [...rows].sort((a, b) => (a.key < b.key ? -1 : 1));
+  return (
+    <div className="mt-1.5 flex flex-col gap-1 text-[12px]">
+      <p className="text-xs text-fg-3">
+        {rows.filter((r) => !r.stale).length} answered under this aim{rows.some((r) => r.stale) ? `, ${rows.filter((r) => r.stale).length} dimmed: an earlier aim's, until Jev answers again` : ""}.
+      </p>
+      {sorted.map((r) => {
+        const senses = r.key.split("|").slice(0, 6);
+        const levels = decodeLevels(r.answer, askedIn(r.key));
+        const on = levels ? pulled(levels) : [];
+        return (
+          <div key={r.key} className={`rounded border border-line px-2 py-1 ${r.stale ? "opacity-50" : ""}`}>
+            <span className="font-mono text-fg-2">{senses.join(" · ")}</span>
+            <span className="text-fg-3"> → </span>
+            {on.length === 0 ? <span className="text-fg-3">nothing</span> : on.map(({ lever, level }) => <span key={lever.id} className="mr-1.5 font-mono text-fg">{lever.name}: {lever.words[level]}</span>)}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

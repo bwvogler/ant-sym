@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { SITUATIONS } from "../colony/colony.ts";
 import { DOCTRINES } from "../colony/colonyBrain.ts";
-import { INTERVENTIONS, LETHAL, NEST_ONLY } from "../colony/fungus.ts";
+import { LETHAL, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
 import type { Game } from "../colony/game.ts";
 import { DEFAULT_RECOGNITION } from "../colony/recognition.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
@@ -299,34 +299,15 @@ function Lab({ game, controls, update, stats, jev }: Props) {
         </div>
         <div aria-label="fungus menu">
           <span className="flex items-center gap-1.5">
-            What the fungus may do <Help to={{ tab: "policy", id: "fungus" }} label="the fungus's policy" />
+            Levers the fungus may pull <Help to={{ tab: "policy", id: "fungus" }} label="the fungus's policy" />
           </span>
-          <div className="mt-1 flex flex-wrap gap-1 text-xs">
-            {/* the nest's interventions (muddle, crown) only where there is a nest: the fungus drops them on top-down maps */}
-            {INTERVENTIONS.filter((v) => game.map.sky || !NEST_ONLY.has(v.id)).map((v) => {
-              const on = controls.menu.includes(v.id);
-              const lethal = LETHAL.has(v.id);
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  aria-pressed={on}
-                  disabled={locked}
-                  className={`rounded-md border px-2 py-0.5 font-mono disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
-                  title={locked ? (jev.lock ?? undefined) : `${v.blurb}${lethal ? ". Only strains that allow it (Bloom) can run it." : ""}`}
-                  onClick={() => update({ menu: on ? controls.menu.filter((id) => id !== v.id) : [...controls.menu, v.id] })}
-                >
-                  {v.name}
-                </button>
-              );
-            })}
-          </div>
+          <LeverChips game={game} menu={controls.menu} locked={locked} lock={jev.lock} onChange={(menu) => update({ menu })} />
           <label className="mt-2 flex items-center justify-between text-xs">
-            <span>Hide groomed hosts (dormant shows a quarter)</span>
+            <span>Local rule: groomed hosts hide (show a quarter)</span>
             <input type="checkbox" checked={controls.hide} disabled={locked} onChange={(e) => update({ hide: e.target.checked })} />
           </label>
           <label className="mt-1 flex items-center justify-between text-xs">
-            <span>Cull high-load hosts fighting strangers</span>
+            <span>Local rule: cull hosts fighting foreigners</span>
             <input type="checkbox" checked={controls.cull} disabled={locked} onChange={(e) => update({ cull: e.target.checked })} />
           </label>
         </div>
@@ -419,6 +400,37 @@ export function Stat({ label, value }: { label: string; value: string }) {
     <div className="flex flex-col">
       <span className="text-[11px] uppercase tracking-wide text-fg-3">{label}</span>
       <span className="font-mono text-sm tabular-nums text-fg">{value}</span>
+    </div>
+  );
+}
+
+/** One chip per lever, on or off the fungus's menu: perception, emission, and the lethal ones (off to start). */
+export function LeverChips({ game, menu, locked, lock, onChange }: { game: Game; menu: readonly string[]; locked: boolean; lock: string | null; onChange: (menu: string[]) => void }) {
+  return (
+    <div className="mt-1 flex flex-col gap-1 text-xs">
+      {(["perceive", "emit", "lethal"] as const).map((kind) => (
+        <div key={kind} className="flex flex-wrap items-center gap-1">
+          <span className="w-16 text-fg-3">{kind === "perceive" ? "perceives" : kind === "emit" ? "gives off" : "lethal"}</span>
+          {/* the nest's levers (floor marks, crown) only where there is a nest */}
+          {LEVERS.filter((v) => v.kind === kind && (game.map.sky || !NEST_ONLY.has(v.id))).map((v) => {
+            const on = menu.includes(v.id);
+            const lethal = LETHAL.has(v.id);
+            return (
+              <button
+                key={v.id}
+                type="button"
+                aria-pressed={on}
+                disabled={locked}
+                className={`rounded-md border px-2 py-0.5 font-mono disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                title={locked ? (lock ?? undefined) : v.blurb}
+                onClick={() => onChange(on ? menu.filter((id) => id !== v.id) : [...menu, v.id])}
+              >
+                {v.name}
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

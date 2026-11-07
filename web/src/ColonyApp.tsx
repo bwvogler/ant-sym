@@ -69,6 +69,8 @@ export default function ColonyApp() {
         setAim={jev.setAim}
         draftAim={jev.draftAim}
         lock={jev.lock}
+        game={game}
+        fungusAnswers={jev.fungusAnswers}
         menu={controls.menu}
         setMenu={(menu) => update({ menu })}
         hide={controls.hide}
@@ -124,7 +126,7 @@ export default function ColonyApp() {
             />
           </div>
           {followed ? (
-            <AntCard followed={followed} colony={colony} rival={game.rival} explain={jev.explain} explainFungus={jev.explainFungus} onClose={() => setFollowed(null)} />
+            <AntCard followed={followed} colony={colony} rival={game.rival} fungus={game.fungus} explain={jev.explain} explainFungus={jev.explainFungus} onClose={() => setFollowed(null)} />
           ) : (
             <p className="text-xs text-fg-3">
               {painting

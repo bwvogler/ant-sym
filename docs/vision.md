@@ -60,16 +60,15 @@ This is the budget the policy may draw on. Each row points to the research secti
 
 ## The fungus
 
-**Today** (`fungus.ts`, `fungalPolicy.ts`). The fungus picks an intervention per fungal situation. Most of its levers already act the right way:
-- **On perception:** `soothe`, `share`, `roam` and `muddle` change channel gains, tolerance, the clock and floor marks.
-- **On emission:** `blend` and `cull` change the host's odour; `share` changes trail laying; `soothe` quiets the host.
-- **On the body:** `crown` passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
+**Today** (`fungus.ts`, `fungalPolicy.ts`, `levers.ts`; since `ja-lo8.4`). The fungus senses its host's body and sets a level for every lever, per fungal situation ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)):
+- **What it senses:** arousal (perceived alarm, strangers close), touch (a nestmate or a foreigner on the cuticle), place (the substrate underfoot, the queen's mark), task (age band, standing in for juvenile hormone), carrying and grooming. Neither the host's mode nor a chamber's owner is read.
+- **On perception:** gains on food, rival trails, home, alarm, stranger scent and floor marks, and the felt time out.
+- **On emission:** trail laid, trail leaked to other colonies, alarm laid, a calming cue, the fungus's own odour, and how much of the fungus shows to groomers.
+- **Lethal, off until the player turns them on:** the odour weapon, and `crown`, which passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
 - **Its own effectors:** spores on the ground, contact spread, and Bloom corpses on the midden that sporulate.
 
 The gaps:
-- **The fungal situation reads things a fungus can't sense.** Its `host` field is read straight from the ant's mode. In the side view, `ground` comes from the chamber table's owner. It should rest on what the fungus could sense inside its host (`ja-k4k.7`, built in `ja-lo8.4`). [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers) has the replacement:
-  - the senses: arousal, touch, place, task, carrying and grooming, each grounded or marked design;
-  - a level for every lever instead of one bundle, split into what the host **perceives** and what it **gives off**.
+- ~~**The fungal situation reads things a fungus can't sense** (its host's mode; the chamber table's owner)~~: closed by `ja-lo8.4` (`ja-k4k.7`). Most of the new senses are marked design in §11: no paper shows a fungus reading them.
 - **The fungus has no scent of its own on the ground,** and no choice of where or when to sporulate, such as summiting (`ja-k4k.8`).
 
 The biology and the full catalogue of levers:

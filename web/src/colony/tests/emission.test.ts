@@ -2,13 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, localPolicy } from "../colony.ts";
-import { Fungus, INTERVENTIONS, STRAINS, intervention } from "../fungus.ts";
+import { Fungus, STRAINS, preset } from "../fungus.ts";
+import { compose, LEVERS } from "../levers.ts";
 import { Pheromones } from "../pheromone.ts";
 import { Recognition } from "../recognition.ts";
 import { mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** Every host runs its strain's default intervention. */
-const strainDefault = (sit: { strain: string }) => STRAINS.find((x) => x.id === sit.strain)!.expresses;
+/** Every host runs its strain's default preset (Fungus.resolve). */
+const strainDefault = () => "default";
 
 // Emission (ja-t4d.4): the fungus changes what a host gives off. Louder or
 // quieter trail (C1), a carrier leaking its food trail into the other
@@ -118,11 +120,11 @@ test("the fungus writes what a host gives off: share is loud and leaks, soothe f
   f.hosts = 2;
   f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
-  assert.equal(c.expr[0], intervention("share"));
+  assert.equal(c.expr[0], preset("share"));
   assert.ok(Math.abs((c.layGain[0] as number) - 1.5) < 1e-5);
   assert.ok(Math.abs((c.crossLay[0] as number) - 1) < 1e-5);
   assert.equal(c.quiet[0], 0);
-  assert.equal(c.expr[1], intervention("soothe"));
+  assert.equal(c.expr[1], preset("soothe"));
   assert.ok(Math.abs((c.quiet[1] as number) - 0.45) < 1e-5, "half load, half the quiet");
   assert.equal(c.layGain[1], 1);
   // Cleared: as it was.
@@ -132,10 +134,14 @@ test("the fungus writes what a host gives off: share is loud and leaks, soothe f
   for (const i of [0, 1]) assert.deepEqual([c.layGain[i], c.crossLay[i], c.quiet[i]], [1, 0, 0]);
 });
 
-test("every intervention keeps what a host gives off in range", () => {
-  for (const v of INTERVENTIONS) {
-    assert.ok(v.levers.lay >= 0 && v.levers.lay <= 3, v.id);
-    assert.ok(v.levers.crossLay >= 0 && v.levers.crossLay <= 1, v.id);
-    assert.ok(v.levers.quiet >= 0 && v.levers.quiet <= 1, v.id);
-  }
+test("every lever at every level keeps what a host gives off in range", () => {
+  for (const lever of LEVERS)
+    for (let level = 0; level < lever.words.length; level++) {
+      const v = compose({ [lever.id]: level });
+      const at = `${lever.id} ${lever.words[level]}`;
+      assert.ok(v.lay >= 0 && v.lay <= 3, at);
+      assert.ok(v.crossLay >= 0 && v.crossLay <= 1, at);
+      assert.ok(1 - v.quiet >= 0 && 1 - v.quiet <= 2, `${at}: alarm laid ×${1 - v.quiet}`);
+      assert.ok(v.show > 0 && v.show <= 2, at);
+    }
 });

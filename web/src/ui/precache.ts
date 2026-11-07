@@ -6,7 +6,9 @@
 /** One shipped bundle: a lane's answers under one doctrine's context. */
 export interface PrecacheBundle {
   lane: string;
-  doctrine: string;
+  /** the preset doctrine (mode, stance) or aim (fungus) it was asked under */
+  doctrine?: string;
+  aim?: string;
   context: string;
   file: string;
   answers: number;

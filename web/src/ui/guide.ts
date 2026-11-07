@@ -202,10 +202,24 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Real parasites change what an ant perceives, gives off and can do, not its plans. Rickia makes its hosts carry more of one alkane, and they are attacked less by strangers. Ophiocordyceps hosts lose their daily rhythm and communicate less. Grooming off Metarhizium passes low doses that immunise nestmates.",
     inGame:
-      "The fungus never chooses for an ant: each ant's policy decides from what it senses, and the fungus bends those senses. Lockpick (after Rickia) hides and calms; Bloom (after Metarhizium) spreads fast and is groomed off; Garden (after the leafcutter's garden) gives its hosts its own odour.",
+      "The fungus never chooses for an ant: each ant's policy decides from what it senses, and the fungus bends those senses and what the ant gives off (see the next entry). The game's fungus spreads like Garden (after the leafcutter's garden): its hosts carry its own odour. In the lab, Lockpick (after Rickia) hides and calms, and Bloom (after Metarhizium) spreads fast and is groomed off.",
     sources: [
       { note: "fungus-policy", anchor: "3-what-real-parasites-do-to-ants", label: "What real parasites do to ants" },
       { note: "fungus-policy", anchor: "2-two-policies-and-the-perceived-state-between-them", label: "Two policies, and the perceived state between them" },
+    ],
+  },
+  {
+    id: "fungus-senses",
+    title: "What the fungus senses, and its levers",
+    swatch: ["var(--spore)"],
+    onScreen: "Follow an infected ant: its card lists what the fungus senses inside it (arousal, touch, place, task, carrying, groomed) and the levers it pulls there, each at a level. Dimmed ones are an earlier aim's, until Jev answers the new one.",
+    realAnts:
+      "A fungus lives in and on its host's body. What it could read there is the host's body: amines that rise with fighting, the cuticle it touches, the juvenile hormone that tracks a worker's task. That a fungus reads these is the game's design; what parasites do with them, changing what a host perceives and gives off, is real (Rickia's alkane, Ophiocordyceps's lost rhythm).",
+    inGame:
+      "Your aim, in words, is read by Jev, which sets a level for every lever in each situation the fungus senses: perception levers (food, rival trails, home, alarm, stranger scent, floor marks, time out) and emission levers (trail laid, trail leaked, alarm laid, calming cue, fungal odour, showing). Lethal levers stay off until you turn them on. The ant still decides, from what it now perceives.",
+    sources: [
+      { note: "fungus-policy", anchor: "11-what-the-fungus-senses-inside-an-ant-and-its-levers", label: "What the fungus senses inside an ant, and its levers" },
+      { note: "new-queens", anchor: "4-where-the-fungus-comes-in", label: "Where the fungus comes in (queen birth)" },
     ],
   },
   {

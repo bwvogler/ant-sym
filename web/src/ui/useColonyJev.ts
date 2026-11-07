@@ -107,5 +107,7 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
     [jev],
   );
 
-  return { state, start, stop, lock, resumable, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus };
+  const fungusAnswers = useCallback(() => jev.fungusAnswers(), [jev]);
+
+  return { state, start, stop, lock, resumable, fungusAnswers, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus };
 }

@@ -4,8 +4,9 @@
 //
 // Lanes: `mode` (every ant situation, colony.SITUATIONS, 3,888) and `stance` (every strategist view, 324), packed with
 // the browser's own packers (colonyBrain.packModeRequest, packStanceRequest) and keyed with its own keys
-// (situationKey, stanceKey), under its own contexts (policyContext, stanceContext). The fungus lane joins with
-// ja-lo8.4, once its situation is final.
+// (situationKey, stanceKey), under its own contexts (policyContext, stanceContext), per preset doctrine. And `fungus`
+// (ja-lo8.4): the fungal situations a recorded side-view game meets (Garden painted on both royal chambers, Lockpick at
+// both holes, 300 s; not all 648), asked with every non-lethal lever, per preset aim (fungusBrain.AIMS), side view.
 //
 // Writes web/public/precache/<lane>-<doctrine>.json ([key, answer] pairs, cacheStore's format) and index.json (each
 // bundle's lane, doctrine, context and size, and the brain versions). tests/precache.test.ts fails when a bundle's
@@ -19,6 +20,12 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
 import { decode, SITUATIONS, STANCES } from "../web/src/colony/colony.ts";
+import { AIMS, FUNGUS_BATCH, FUNGUS_BRAIN_VERSION, fungalKey, fungusContext, packFungusRequest, readLevels } from "../web/src/colony/fungusBrain.ts";
+import { encodeFungal, decodeFungal } from "../web/src/colony/fungalPolicy.ts";
+import { DEFAULT_MENU, STRAINS } from "../web/src/colony/fungus.ts";
+import { Game } from "../web/src/colony/game.ts";
+import { centreX, centreY } from "../web/src/colony/hex.ts";
+import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
 import {
   COLONY_BRAIN_VERSION,
   DOCTRINES,
@@ -38,7 +45,7 @@ const BATCH = 100;
 const OUT = new URL("../web/public/precache/", import.meta.url);
 
 const args = process.argv.slice(2);
-const opts = { lanes: "mode,stance", doctrines: DOCTRINES.map((d) => d.id).join(","), budget: 0.35, inFlight: 4, dry: false };
+const opts = { lanes: "mode,stance,fungus", doctrines: DOCTRINES.map((d) => d.id).join(","), budget: 0.35, inFlight: 4, dry: false };
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
   if (a === "--lanes") opts.lanes = args[++k];
@@ -62,6 +69,29 @@ function stanceSituations() {
   return out;
 }
 
+/** The levers the page asks in the side view: every non-lethal one (Fungus.asked under the default menu, with a nest). */
+const FUNGUS_ASKED = [...DEFAULT_MENU];
+
+/** The fungal situations a side-view game meets: Garden on both royal chambers and Lockpick at both holes, 300 s. */
+function fungalSituations() {
+  const map = generateSideWorld(1);
+  const g = new Game(map, { antCount: 600, rivalAnts: 600 }, mulberry32(7919));
+  const met = new Set();
+  g.fungus.policy = (s) => (met.add(encodeFungal(s)), "default");
+  const strain = (id) => STRAINS.findIndex((x) => x.id === id);
+  for (let t = 0, painted = false; t < 300; t += 1 / 30) {
+    g.tick(1 / 30);
+    if (painted || g.time < 30) continue;
+    painted = true;
+    for (const c of g.colonies) {
+      const royal = map.chambers.list.find((k) => k.colony === c.params.nest && k.role === "royal");
+      g.paintSpores(centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow), centreY(royal.floorRow), 3, 2, 0.3, strain("garden"));
+      g.paintSpores(c.nest.entrance.x, c.nest.entrance.y, 3, 2, 0.3, strain("lockpick"));
+    }
+  }
+  return [...met].sort((a, b) => a - b).map(decodeFungal);
+}
+
 const LANES = {
   mode: {
     situations: () => Array.from({ length: SITUATIONS }, (_, c) => decode(c)),
@@ -79,6 +109,16 @@ const LANES = {
     context: stanceContext,
     id: "c",
   },
+  fungus: {
+    situations: fungalSituations,
+    key: (s) => fungalKey(s, FUNGUS_ASKED),
+    pack: (items, words) => packFungusRequest(items.map((it) => ({ ...it, asked: FUNGUS_ASKED })), words),
+    read: (answers, id) => readLevels(answers, id, FUNGUS_ASKED),
+    context: (words) => fungusContext(words, "side"),
+    id: "h",
+    batch: FUNGUS_BATCH,
+    words: AIMS,
+  },
 };
 
 const lanes = opts.lanes.split(",").map((l) => {
@@ -94,7 +134,7 @@ const doctrines = opts.doctrines.split(",").map((id) => {
 mkdirSync(OUT, { recursive: true });
 const indexUrl = new URL("index.json", OUT);
 const index = existsSync(indexUrl) ? JSON.parse(readFileSync(indexUrl, "utf8")) : { bundles: [] };
-index.versions = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION };
+index.versions = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, fungus: FUNGUS_BRAIN_VERSION };
 
 // The jobs: one request per 100 situations, per lane and doctrine; what each bundle holds already is not asked again.
 const jobs = [];
@@ -103,15 +143,16 @@ let estimate = 0;
 for (const lane of lanes) {
   const L = LANES[lane];
   const all = L.situations();
-  for (const d of doctrines) {
+  for (const d of L.words ?? doctrines) {
     const context = L.context(d.text);
     const file = `${lane}-${d.id}.json`;
     const fileUrl = new URL(file, OUT);
     const have = new Map(existsSync(fileUrl) && index.bundles.some((b) => b.file === file && b.context === context) ? JSON.parse(readFileSync(fileUrl, "utf8")) : []);
-    bundles.set(file, { lane, doctrine: d.id, context, file, answers: have });
+    bundles.set(file, { lane, [L.words ? "aim" : "doctrine"]: d.id, context, file, answers: have });
     const todo = all.filter((s) => !have.has(L.key(s)));
-    for (let k = 0; k < todo.length; k += BATCH) {
-      const items = todo.slice(k, k + BATCH).map((situation, n) => ({ id: `${L.id}${n}`, key: L.key(situation), situation }));
+    const batch = L.batch ?? BATCH;
+    for (let k = 0; k < todo.length; k += batch) {
+      const items = todo.slice(k, k + batch).map((situation, n) => ({ id: `${L.id}${n}`, key: L.key(situation), situation }));
       const req = L.pack(items, d.text);
       estimate += estimateTokens(req);
       jobs.push({ lane, file, items, req });
@@ -129,7 +170,7 @@ function save() {
   index.bundles = index.bundles.filter((b) => !bundles.has(b.file));
   for (const b of bundles.values()) {
     writeFileSync(new URL(b.file, OUT), JSON.stringify([...b.answers].sort(([a], [c]) => (a < c ? -1 : a > c ? 1 : 0))));
-    index.bundles.push({ lane: b.lane, doctrine: b.doctrine, context: b.context, file: b.file, answers: b.answers.size });
+    index.bundles.push({ lane: b.lane, ...(b.aim ? { aim: b.aim } : { doctrine: b.doctrine }), context: b.context, file: b.file, answers: b.answers.size });
   }
   index.bundles.sort((a, b) => (a.file < b.file ? -1 : 1));
   writeFileSync(indexUrl, `${JSON.stringify(index, null, 2)}\n`);

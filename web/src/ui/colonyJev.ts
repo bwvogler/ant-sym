@@ -3,8 +3,8 @@ import { apiUrl } from "./backend.ts";
 import { localPolicy, localStance, MODES, STANCES, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
-import { fungalKey, fungusContext, offeredFor, offeredIn, packFungusRequest, readIntervention, worthAsking } from "../colony/fungusBrain.ts";
-import { INTERVENTIONS, LETHAL, type Fungus } from "../colony/fungus.ts";
+import { askedIn, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "../colony/fungusBrain.ts";
+import { DEFAULT_MENU, LEVERS, type Fungus } from "../colony/fungus.ts";
 import { PolicyCache } from "../colony/policyCache.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
@@ -26,9 +26,11 @@ export interface ColonyJevOptions {
   batch: number;
   inFlight: number;
   intervalMs: number;
+  /** milliseconds a gathering lane (the fungus's) lets its queue fill before sending a part-full request */
+  gatherMs: number;
 }
 
-export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300 };
+export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: FUNGUS_GATHER_MS };
 
 /** The caps a colony run starts with: $0.10 and 30 minutes (the server's default too). */
 export const COLONY_CAPS: RunCaps = DEFAULT_CAPS;
@@ -80,6 +82,15 @@ interface Lane<S, A extends string> {
   valid: (key: string, answer: string) => boolean;
   /** whether a situation is worth asking at all (absent: always); one that is not gets the local rule, free */
   asks?: (s: S) => boolean;
+  /** at most this many situations to a request (absent: the client's batch) */
+  batch?: number;
+  /**
+   * Whether the lane lets its queue fill for opts.gatherMs before it sends less than a full batch (absent: send every
+   * cycle). The fungus's legend is most of a small request, and its hosts play stale or default levels meanwhile (ja-lo8.4).
+   */
+  gather?: boolean;
+  /** when the queue last went from empty to not (Date.now()), for `gather` */
+  since?: number;
   contextOf: (words: string) => string;
   /** the words its requests carry: a colony's doctrine, or the fungus's aim */
   words: string;
@@ -104,7 +115,7 @@ function askKey(context: string, key: string): string {
   return `${context}\u0000${key}`;
 }
 
-function lane<S, A extends string>(spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "valid" | "contextOf" | "words" | "asks">): Lane<S, A> {
+function lane<S, A extends string>(spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "valid" | "contextOf" | "words" | "asks" | "batch" | "gather">): Lane<S, A> {
   return { ...spec, context: spec.contextOf(spec.words), fallback: [], queue: new Map() };
 }
 
@@ -130,21 +141,27 @@ export class ColonyJev {
   #doctrines: string[] = [];
   #store: CacheStore | null;
   #fungus: Fungus | null = null;
-  /** the menu the fungus lane asks under: the attached fungus's, or every non-lethal intervention */
-  #menu: Set<string> = new Set(INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)));
-  // What a host is offered (its strain's allowed ∩ the menu) is in each key, so a question is packed and its
-  // answer read and kept against what it offered when asked, whatever the menu is by the time it lands.
+  /** the menu the fungus lane asks under: the attached fungus's, or every non-lethal lever */
+  #menu: Set<string> = new Set(DEFAULT_MENU);
+  // The levers asked (the menu's, in table order) are in each key, so a question is packed and its answer read and
+  // kept against the levers it asked, whatever the menu is by the time it lands.
   #fungal = lane<FungalSituation, string>({
     name: "fungus",
-    key: (s) => fungalKey(s, offeredFor(s.strain, this.#menu)),
-    pack: (items, aim) => packFungusRequest(items.map((it) => ({ ...it, offered: offeredIn(it.key) })), aim),
-    read: (a, id, _s, key) => readIntervention(a, id, offeredIn(key)),
-    valid: (key, a) => offeredIn(key).includes(a),
+    key: (s) => fungalKey(s, this.#asked()),
+    pack: (items, aim) => packFungusRequest(items.map((it) => ({ ...it, asked: askedIn(it.key) })), aim),
+    read: (a, id, _s, key) => readLevels(a, id, askedIn(key)),
+    valid: validLevels,
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
-    asks: (s) => worthAsking(offeredFor(s.strain, this.#menu)),
+    asks: () => worthAsking(this.#asked()),
     contextOf: (aim) => fungusContext(aim, this.#fungus?.map.sky ? "side" : "top"),
     words: "",
+    batch: FUNGUS_BATCH,
+    gather: true,
   });
+  /** The levers the fungus lane asks: the menu's, in table order. */
+  #asked(): string[] {
+    return LEVERS.filter((v) => this.#menu.has(v.id)).map((v) => v.id);
+  }
   /** caches by context, shared by every lane asking under it */
   #caches = new Map<string, PolicyCache<string>>();
   /** questions in flight, by askKey(context, key), across lanes */
@@ -237,7 +254,10 @@ export class ColonyJev {
       else this.#state.misses++;
     }
     if (hit) return hit;
-    if (running && !this.#asking.has(askKey(l.context, key))) l.queue.set(key, s);
+    if (running && !this.#asking.has(askKey(l.context, key)) && !l.queue.has(key)) {
+      if (l.queue.size === 0) l.since = Date.now();
+      l.queue.set(key, s);
+    }
     return this.#earlier(l, key) ?? l.local(s);
   }
 
@@ -281,6 +301,20 @@ export class ColonyJev {
     return this.#explain(this.#fungal, s);
   }
 
+  /**
+   * The fungus's answers so far, for the Learn drawer's table (ja-lo8.4): each situation answered under the current aim
+   * with the levers asked now, and, where it has none yet, the newest earlier aim's answer, marked stale. Read only.
+   */
+  fungusAnswers(): { key: string; answer: string; stale: boolean }[] {
+    const l = this.#fungal;
+    const asked = this.#asked().join(",");
+    const out = new Map<string, { key: string; answer: string; stale: boolean }>();
+    for (const [key, answer] of this.#cache(l).entries()) if (askedIn(key).join(",") === asked) out.set(key, { key, answer, stale: false });
+    for (const c of l.fallback)
+      for (const [key, answer] of this.#cache(l, c).entries()) if (!out.has(key) && askedIn(key).join(",") === asked) out.set(key, { key, answer, stale: true });
+    return [...out.values()];
+  }
+
   /** Drive the game's fungus: its policy becomes this lane (Jev's cached answer while a run is on, else the fungus's local rule). */
   attachFungus(fungus: Fungus): void {
     this.#fungus = fungus;
@@ -295,9 +329,9 @@ export class ColonyJev {
   }
 
   /**
-   * The player's menu: what the fungus may run. What it offers a host is part of that host's question, so it is in
-   * the key (per strain: answers for a strain whose offer did not change still hold). Queued questions were keyed
-   * under the old menu: dropped, the hosts ask again. Questions in flight are read against what they offered.
+   * The player's menu: the levers the fungus may pull. Which levers are asked is part of every question, so it is in
+   * the key: answers under a menu used before still hold. Queued questions were keyed under the old menu: dropped, the
+   * hosts ask again. Questions in flight are read against the levers they asked.
    */
   setMenu(menu: Set<string>): void {
     this.#menu = new Set(menu);
@@ -494,10 +528,11 @@ export class ColonyJev {
       for (let j = 0; j < lanes.length && this.#inFlight < width; j++) {
         const l = lanes[(first + j) % lanes.length] as Lane<unknown, string>;
         if (l.queue.size === 0) continue;
+        if (l.gather && l.queue.size < (l.batch ?? this.opts.batch) && Date.now() - (l.since ?? 0) < this.opts.gatherMs) continue;
         moved = true; // every pass takes something out of a non-empty queue, so this ends
         const batch: [string, unknown][] = [];
         for (const [k, s] of l.queue) {
-          if (batch.length >= this.opts.batch) break;
+          if (batch.length >= (l.batch ?? this.opts.batch)) break;
           l.queue.delete(k);
           // Another colony's lane may be asking it under the same context already: one question, one answer for both.
           if (this.#asking.has(askKey(l.context, k))) continue;

@@ -3190,3 +3190,57 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 - **Nothing is asked all at once.**
 
 **No sim change.** The goldens are untouched. Requests and contexts are byte-identical, so there are no new tokens per question.
+
+### 49.3 Slice 4: fungus v2: senses inside the ant, a level for every lever (ja-lo8.4, 2026-11-07)
+
+**What changed** (fungus-policy §11):
+
+*The fungal situation*
+- **What it is now:** what the fungus senses inside its host:
+  - arousal: calm, alarmed or fighting, from what the host last perceived;
+  - touch: none, nestmate or foreigner;
+  - place: outside, tunnel, chamber, or by the queen (her royal mark underfoot; a nest's disc on top-down maps);
+  - task: the age band, nurse, inside or forager;
+  - carrying: nothing, food or brood;
+  - groomed.
+
+  That makes 648 situations.
+- **What is gone:** the host's mode, the fungus's load, the strain, and the chamber owner's `ground`. This closes `ja-k4k.7`. A test pins that a host's situation does not change with its mode.
+
+*The answer*
+- **Levels, not one intervention.** Each answer is a level per lever (`levers.ts`): 15 levers, of which 13 are non-lethal and on the menu by default (11 on top-down maps, with no floor marks). Jev is asked one `score` question per lever on the menu. The answer is cached as the levels in table order, so the key carries the levers asked.
+- **The menu is a set of levers.** Lethal levers (odour weapon, crown) are off until turned on, and never asked while off.
+- **Strains** keep their spread traits and a default preset, and lose their `allows` gating.
+- **Presets.** The old interventions are now presets: named sets of levels whose values are exactly the old bundles'. So the local rule (each strain's default, plus the hide and cull settings) plays as before.
+- **Goldens are unchanged:** they paint no spores.
+
+*Hiding*
+- Hiding is now the "fungus showing" lever (`Colony.show`, not lerped by load). It replaces `expr === 0` plus "dormant on the menu".
+- `expr` names the preset a host's levels are, or `CUSTOM` (255) for Jev's own mix.
+
+*The lane*
+- **Batching:** at most 50 hosts to a request (`FUNGUS_BATCH`). The lane waits up to 2 s for a part-full request to fill (`FUNGUS_GATHER_MS`, `ColonyJevOptions.gatherMs`), since the legend is most of a small request. Hosts play their stale or default levels meanwhile.
+- **The legend** names each lever in a few words (`brief`), about 807 estimated tokens. A first draft that spelled out every level's words was about 2,000.
+
+*The UI*
+- **The ant card** lists what the fungus senses, then the levers it pulls, with stale ones dimmed.
+- **Learn → "How the fungus works"** has a one-line diagram, the senses, the levers, the local rule, and a "Show the table" toggle. The table lists Jev's answers so far, lazily filled, with an earlier aim's answers dimmed.
+- **Lever chips** replace intervention chips, in Details and Learn.
+- **Pins are not built** (`ja-lo8.11`): the owner asked that the table stay out of sight anyway.
+
+**Cost (live):**
+- **A live check of 4 situations under "Unite":** 3,530 input tokens, 883 per situation, against an estimate of 3,358. Every score parsed.
+  - Jev pulled the fungal odour (some) and the calming cue (some) everywhere.
+  - Where hosts touched foreigners it also had them read rival trails partly and damped the alarm laid.
+  - It leaked trail where a forager carrying food met a foreigner.
+- **Shipped fungus answers.** `precache.mjs --lanes fungus` asked the 90 situations a recorded side-view game meets (Garden on both royal chambers, Lockpick at both holes, 300 s) under each preset aim. That is 270 answers for **$0.0082**, about 724 real tokens per situation at about 45 to a request.
+
+**Cost as a game asks** (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1):
+
+| Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+|---|---|---|---|---|---|
+| Garden | 91 | 23 | 842 | 0.0032 | 0.039 |
+| Lockpick | 58 | 15 | 847 | 0.0021 | 0.025 |
+| Bloom | 68 | 23 | 914 | 0.0026 | 0.031 |
+
+Before (§39): 44–81 situations and about 560 tokens per situation as asked, $0.001–0.002 a game. Asking every lever costs about 1.5× per situation, under a cent an hour more.

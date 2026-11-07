@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
-import { INTERVENTIONS, LETHAL, STRAINS, type Fungus } from "../colony/fungus.ts";
+import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, gameRng, type Outcome, type Unity } from "../colony/game.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts";
 
@@ -26,7 +26,7 @@ export interface ColonyControls {
   brush: Brush;
   /** which of the fungus's strains the spore brush paints (an index into STRAINS) */
   strain: number;
-  /** the fungus's menu: the interventions the player has on (§5.1, lever 4) */
+  /** the fungus's menu: the levers the player has on (§5.1, lever 4; levers.ts) */
   menu: string[];
   /** the local rule's settings: hide groomed hosts; cull high-load fighters among strangers */
   hide: boolean;
@@ -39,7 +39,7 @@ export interface ColonyControls {
 
 export type Ground = "side" | "open";
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, menu: INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)), hide: false, cull: false, rival: true, ground: "side" };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side" };
 
 /** The spore brush, per paint event: radius in cells, spores laid per cell, and load dosed into each ant under it. */
 const SPORES = { radius: 3, spores: 2, dose: 0.15 } as const;

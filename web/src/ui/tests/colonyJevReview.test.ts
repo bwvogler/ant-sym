@@ -37,7 +37,7 @@ function proxy(opts: { answer: (q: string) => string; status?: (req: Req) => num
     const st = opts.status?.(req) ?? 200;
     if (st === 409) return { ok: false, status: 409, json: async () => ({ error: "over", run: RUN }) } as Response;
     const answers: Record<string, unknown> = {};
-    for (const q of Object.keys(req.questions)) answers[q] = { type: "choice", choice: opts.answer(q), confidence: 0.9 };
+    for (const [q, spec] of Object.entries(req.questions)) answers[q] = spec.type === "score" ? { type: "score", score: Number(opts.answer(q)) } : { type: "choice", choice: opts.answer(q), confidence: 0.9 };
     const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
     return { ok: true, status: 200, json: async () => body } as Response;
   }) as typeof fetch;
@@ -45,59 +45,53 @@ function proxy(opts: { answer: (q: string) => string; status?: (req: Req) => num
 }
 
 function make(store: CacheStore | null = null): ColonyJev {
-  const j = new ColonyJev({ intervalMs: 10 }, store);
+  const j = new ColonyJev({ intervalMs: 10, gatherMs: 0 }, store);
   live.add(j);
   return j;
 }
 
-const fungal = (s: Partial<FungalSituation> = {}): FungalSituation => ({ strain: "garden", load: "mid", host: "explore", ground: "home", contact: "kin", groomed: false, ...s });
+const fungal = (s: Partial<FungalSituation> = {}): FungalSituation => ({ arousal: "calm", touch: "nestmate", place: "chamber", task: "nurse", carrying: "nothing", groomed: false, ...s });
 const fungusRequests = (reqs: Req[]) => reqs.filter((r) => r.state.hosts);
 
-test("no choice, no question: a strain with nothing (or one thing) on the menu is never asked; the local rule decides, free", async () => {
-  const { reqs } = proxy({ answer: () => "dormant" });
+test("no lever on, no question: with the menu empty the fungus is never asked; the local rule decides, free", async () => {
+  const { reqs } = proxy({ answer: () => "1" });
   const j = make();
   j.setAim("x");
-  j.setMenu(new Set(["blend", "share"])); // nothing Lockpick allows (dormant, soothe, roam)
+  j.setMenu(new Set());
   await j.start();
   for (let k = 0; k < 10; k++) {
-    j.fungusPolicy(fungal({ strain: "lockpick" }));
-    await tick(20);
-  }
-  assert.equal(fungusRequests(reqs).length, 0, "Lockpick: nothing on offer");
-  assert.equal(j.explainFungus(fungal({ strain: "lockpick" })).by, "local");
-  j.setMenu(new Set(["blend"]));
-  for (let k = 0; k < 5; k++) {
     j.fungusPolicy(fungal());
     await tick(20);
   }
-  assert.equal(fungusRequests(reqs).length, 0, "Garden: one thing on offer is no choice");
-  j.setMenu(new Set(["blend", "share"]));
+  assert.equal(fungusRequests(reqs).length, 0, "nothing on the menu: nothing to ask");
+  assert.equal(j.explainFungus(fungal()).by, "local");
+  j.setMenu(new Set(["calm"]));
   j.fungusPolicy(fungal());
   await tick(40);
-  assert.equal(fungusRequests(reqs).length, 1, "two things: a question");
-  const crit = Object.keys((Object.values(fungusRequests(reqs)[0]!.questions)[0] as { criteria: object }).criteria);
-  assert.deepEqual(crit, ["blend", "share"]);
+  assert.equal(fungusRequests(reqs).length, 1, "one lever on: a question");
+  assert.deepEqual(Object.keys(fungusRequests(reqs)[0]!.questions), ["h0_calm"], "one score per lever on the menu");
+  assert.deepEqual(j.explainFungus(fungal()), { answer: "1", by: "jev" });
 });
 
-test("a menu change while a fungus question is in flight: its answer is kept for what it was offered, and serves when that menu comes back", async () => {
+test("a menu change while a fungus question is in flight: its answer is kept for the levers it asked, and serves when that menu comes back", async () => {
   let holding = true;
-  const { reqs, release } = proxy({ answer: () => "soothe", hold: () => holding });
+  const { reqs, release } = proxy({ answer: () => "0", hold: () => holding });
   const j = make();
   j.setAim("x");
-  const m1 = new Set(["dormant", "soothe", "share", "roam", "blend"]);
+  const m1 = new Set(["calm", "alarm"]);
   j.setMenu(m1);
   await j.start();
   const s = fungal();
   j.fungusPolicy(s);
   await tick(30);
   assert.equal(fungusRequests(reqs).length, 1);
-  j.setMenu(new Set(["dormant", "blend", "share", "roam"])); // soothe off while it is asked
+  j.setMenu(new Set(["calm"])); // alarm off while it is asked
   holding = false;
   release();
   await tick(30);
-  assert.notEqual(j.explainFungus(s).by, "jev", "soothe is off: the answer does not serve this menu");
+  assert.notEqual(j.explainFungus(s).by, "jev", "alarm is off: the answer does not serve this menu");
   j.setMenu(m1);
-  assert.deepEqual(j.explainFungus(s), { answer: "soothe", by: "jev" }, "paid for under m1, kept under m1");
+  assert.deepEqual(j.explainFungus(s), { answer: "0,0", by: "jev" }, "paid for under m1, kept under m1 (levels in table order: alarm, calm)");
   assert.equal(j.state.fungusCached, 1);
 });
 
@@ -109,7 +103,7 @@ test("a 409 ends the run and cancels what is still in flight: Start again asks i
     hold: tired,
     status: (r) => (!tired(r) && !refused && r.state.ants ? ((refused = true), 409) : 200),
   });
-  const j = new ColonyJev({ intervalMs: 10, batch: 1 });
+  const j = new ColonyJev({ intervalMs: 10, batch: 1, gatherMs: 0 });
   live.add(j);
   const c = new Colony(generateWorld(1, OPEN_WORLD), { antCount: 5 }, mulberry32(9));
   j.attach(c);

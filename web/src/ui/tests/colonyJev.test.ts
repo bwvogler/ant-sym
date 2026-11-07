@@ -2,10 +2,11 @@ import { afterEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, localPolicy, localStance, type Mode, type Situation } from "../../colony/colony.ts";
 import { DOCTRINES, policyContext, situationKey, stanceContext, stanceKey } from "../../colony/colonyBrain.ts";
-import { fungalKey, fungusContext, offeredFor } from "../../colony/fungusBrain.ts";
+import { fungalKey, fungusContext } from "../../colony/fungusBrain.ts";
 import { generateWorld, mulberry32, OPEN_WORLD } from "../../colony/world.ts";
 import { Game } from "../../colony/game.ts";
-import { STRAINS, intervention } from "../../colony/fungus.ts";
+import { LEVERS, STRAINS, preset } from "../../colony/fungus.ts";
+import { encodeLevels, PRESETS } from "../../colony/levers.ts";
 import { decodeFungal, type FungalSituation } from "../../colony/fungalPolicy.ts";
 import { ColonyJev, type CacheStore } from "../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
@@ -50,7 +51,7 @@ function memoryStore(): CacheStore & { data: Map<string, [string, string][]> } {
 const tick = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const live = new Set<ColonyJev>();
 function make(store: CacheStore | null = null): ColonyJev {
-  const j = new ColonyJev({ intervalMs: 10 }, store);
+  const j = new ColonyJev({ intervalMs: 10, gatherMs: 0 }, store);
   live.add(j);
   return j;
 }
@@ -374,15 +375,21 @@ test("explain alone never asks Jev", async () => {
 
 // The fungus's lane (ja-t4d.5): its own questions, under the player's aim, never in an ant's request.
 
-/** Every request, whole; Jev answers modes "explore", stances "forage", and the fungus `fungal`. */
+/** Every request, whole; Jev answers modes "explore", stances "forage", and the fungus preset `fungal`'s levels (as is elsewhere). */
 function scriptAll(fungal: string) {
+  const levels = PRESETS.find((p) => p.id === fungal)!.levels;
   const reqs: (JevRequest & { state: Record<string, unknown> })[] = [];
   globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
     if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
     const req = JSON.parse(String(init?.body)) as JevRequest & { state: Record<string, unknown> };
     reqs.push(req);
     const answers: Record<string, unknown> = {};
-    for (const q of Object.keys(req.questions)) answers[q] = { type: "choice", choice: q.endsWith("_do") ? fungal : q.endsWith("_stance") ? "forage" : "explore", confidence: 0.9 };
+    for (const [q, spec] of Object.entries(req.questions)) {
+      if (spec.type === "score") {
+        const lever = LEVERS.find((v) => v.id === q.slice(q.indexOf("_") + 1))!;
+        answers[q] = { type: "score", score: levels[lever.id] ?? lever.asIs };
+      } else answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : "explore", confidence: 0.9 };
+    }
     const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
     return { ok: true, status: 200, json: async () => body } as Response;
   }) as typeof fetch;
@@ -405,7 +412,7 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
   j.setAim("Spread unseen.");
   // Off: the local rule (Garden's default, blend).
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
-  assert.ok([...g.player.expr].some((e) => e === intervention("blend")), "off: Garden blends");
+  assert.ok([...g.player.expr].some((e) => e === preset("blend")), "off: Garden blends");
   await j.start();
   for (let round = 0; round < 6; round++) {
     for (let k = 0; k < 6; k++) g.tick(1 / 30);
@@ -423,12 +430,12 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
     assert.equal(r.state.hosts, undefined);
   }
   assert.ok(j.state.fungusCached > 0 && j.state.fungusAsked > 0);
-  // Jev said dormant: every host runs dormant now.
+  // Jev's levels were dormant's: every host runs dormant now.
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
   for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && (g.player.load[i] as number) > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
-  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(s).by, "jev");
-  assert.equal(j.explainFungus(s).answer, "dormant");
+  assert.equal(j.explainFungus(s).answer, encodeLevels(PRESETS[0]!.levels, g.fungus.asked), "Jev's levels: dormant's");
 });
 
 test("the fungus lane: a new aim is a new cache, a new menu a new question; stopping hands the fungus back to the local rule", async () => {
@@ -450,17 +457,17 @@ test("the fungus lane: a new aim is a new cache, a new menu a new question; stop
   assert.equal(j.state.fungusCached, 0, "nothing cached under the new aim yet");
   j.setAim("Calm every meeting.");
   assert.equal(j.state.fungusCached, before, "the old aim's answers are still there");
-  const asked = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  const asked = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(asked).by, "jev");
-  j.setMenu(new Set(["dormant", "blend"]));
-  assert.notEqual(j.explainFungus(asked).by, "jev", "a new offer for Garden: a new question");
+  j.setMenu(new Set(["odour", "strangers"]));
+  assert.notEqual(j.explainFungus(asked).by, "jev", "other levers on: a new question");
   assert.equal(j.state.fungusCached, before, "the old menu's answers are kept, for when it comes back");
-  assert.equal(g.fungus.menu.has("soothe"), false, "and the fungus runs under it");
+  assert.equal(g.fungus.menu.has("calm"), false, "and the fungus runs under it");
   await j.stop();
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
-  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number, "garden");
+  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(s).by, "local");
-  assert.ok([...g.player.expr].some((e) => e === intervention("blend")), "stopped: the local rule again");
+  assert.ok([...g.player.expr].some((e) => e === preset("blend")), "stopped: the local rule again");
 });
 
 // Every colony on equal footing (ja-t4d.6): the player is the fungus, so Jev drives each colony under its own doctrine.
@@ -568,7 +575,7 @@ test("explain says 'waiting' while the question is in flight", async () => {
 // Hardening from the reviews of #2–#7 (ja-ue6, ja-7tf, ja-1u2, ja-6yj, ja-ytc).
 
 const sit = (s: Partial<Situation> = {}): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
-const GARDEN: FungalSituation = { strain: "garden", load: "mid", host: "explore", ground: "border", contact: "kin", groomed: false };
+const GARDEN: FungalSituation = { arousal: "calm", touch: "nestmate", place: "outside", task: "forager", carrying: "nothing", groomed: false };
 
 test("stored answers a lane could not have given are dropped on load (ja-ue6)", async () => {
   scriptFetch(answerAll("explore"));
@@ -598,21 +605,20 @@ test("stored answers a lane could not have given are dropped on load (ja-ue6)", 
   assert.equal(j.stancePolicy(raided), "defend");
 });
 
-test("a stored fungus answer is kept only if the host was offered it when asked (ja-ue6)", () => {
+test("a stored fungus answer is kept only if it has a level for each lever its key asked, in range (ja-ue6)", () => {
   const store = memoryStore();
   const j = make(store);
   const g = infectedGame();
   j.attach(g.player);
-  const offered = offeredFor("garden", g.fungus.menu);
-  const other = { ...GARDEN, load: "high" as const };
-  const notOffered = (["dormant", "blend", "soothe", "share", "roam", "muddle", "cull", "crown"] as const).find((id) => !offered.includes(id))!;
+  const asked = g.fungus.asked;
+  const other = { ...GARDEN, groomed: true };
   store.data.set(fungusContext("Stored aim.", g.map.sky ? "side" : "top"), [
-    [fungalKey(GARDEN, offered), offered[0]!],
-    [fungalKey(other, offered), notOffered],
+    [fungalKey(GARDEN, asked), encodeLevels({}, asked)],
+    [fungalKey(other, asked), "9"],
   ]);
   j.attachFungus(g.fungus);
   j.setAim("Stored aim.");
-  assert.equal(j.state.fungusCached, 1, `kept ${offered[0]}, dropped ${notOffered}`);
+  assert.equal(j.state.fungusCached, 1, "kept the full answer, dropped the malformed one");
 });
 
 test("dispose while Start is on the wire: no run opens, nothing is asked, and the server's run is stopped (ja-7tf)", async () => {
@@ -784,7 +790,7 @@ test("lanes take turns at any request latency: a long mode queue does not keep t
         const r = await answerAll("explore")(req);
         return { ok: true, status: 200, json: async () => r.body } as Response;
       }) as typeof fetch;
-      const j = new ColonyJev({ intervalMs: 10, batch: 1, inFlight: 1 });
+      const j = new ColonyJev({ intervalMs: 10, batch: 1, inFlight: 1, gatherMs: 0 });
       live.add(j);
       j.attach(colony(5));
       await j.start();

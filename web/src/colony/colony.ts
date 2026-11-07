@@ -478,7 +478,7 @@ export class Colony {
   strain: Uint8Array;
   /** immune priming from grooming visible nestmates, 0..1: scales down every load the ant takes */
   resist: Float32Array;
-  /** the intervention the fungus runs in this ant (an index into fungus.ts INTERVENTIONS; 0 = dormant) */
+  /** the preset the fungus runs in this ant (an index into levers.ts PRESETS; 0 = as it is or dormant; CUSTOM = Jev's own mix of levels) */
   expr: Uint8Array;
   // What the ant perceives (docs/fungus-policy.md §2): gains on the scent that is there, 1 = as it is.
   // The fungus writes them (fungus.ts); the ant cannot tell. Its situation and its steering both read
@@ -511,7 +511,7 @@ export class Colony {
   quiet: Float32Array;
   /** how far (× 0.5) the fungus pushes its odour away from its nest's: past the tolerance, its own colony takes it for a stranger (B6) */
   estrange: Float32Array;
-  /** the fungal situation (fungalPolicy.ts encodeFungal, without the strain) the fungus last chose for it in; −1 = none */
+  /** the fungal situation (fungalPolicy.ts encodeFungal) the fungus last chose for it in; −1 = none */
   fungal: Int16Array;
   // What the fungus bends inside the nest (nest slice 8; the fungus writes them, 1 / 0 = as it is).
   /** the nest's floor marks smelled × this: road signs, and the chamber it is in */
@@ -520,6 +520,8 @@ export class Colony {
   swapMarks: Float32Array;
   /** 0..1: how surely it kills the queen and brood it touches, CROWN_RATE × this a second (lethal, the fungus's crown; its load) */
   regicide: Float32Array;
+  /** the share of its strain's visibility it shows its groomers (the fungus's "showing" lever, ja-lo8.4): under 1 it hides the fungus */
+  show: Float32Array;
   /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
   wall: Int8Array;
   /** distance home to beat to leave a wall: where it met the wall, or underground the nearest it has been since its last give-up */
@@ -695,6 +697,7 @@ export class Colony {
     this.gainMarks = new Float32Array(n).fill(1);
     this.swapMarks = new Float32Array(n);
     this.regicide = new Float32Array(n);
+    this.show = new Float32Array(n).fill(1);
     this.wall = new Int8Array(n);
     this.hitDist = new Float32Array(n);
     this.followT = new Float32Array(n);
@@ -835,6 +838,12 @@ export class Colony {
     this.gainMarks[i] = 1;
     this.swapMarks[i] = 0;
     this.regicide[i] = 0;
+    this.show[i] = 1;
+  }
+
+  /** Whether ant i holds brood in its jaws (a nurse carrying an egg, larva or pupa): what the fungus in it senses as `carrying`. */
+  holdsBrood(i: number): boolean {
+    return this.#holdsBrood[i] === 1;
   }
 
   /** What ant i holds, as a response sees it. */

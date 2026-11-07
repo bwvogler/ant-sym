@@ -48,9 +48,9 @@ export function byRows<S, A extends string>(rows: readonly RuleRow<S, A>[], othe
 
 /** The fungus's local rule (fungalPolicy.ts localFungusRule) in words. */
 export const LOCAL_FUNGUS_RULES: string[] = [
-  "Groomed, with “hide groomed hosts” on: go dormant (a dormant host shows its groomers a quarter as much).",
-  "With “cull” on, a high-load host fighting strangers: kill it (Bloom only).",
-  "Otherwise: what the strain was bred for (Lockpick soothes, Bloom shares, Garden blends), within what the menu has on.",
+  "Groomed, with “groomed hosts hide” on (Details → Lab): hide the fungus (fungus showing: hidden).",
+  "With “cull” on, a host fighting a foreigner: the odour weapon (lethal; only if it is on the menu).",
+  "Otherwise: what the strain was bred for: Garden carries the fungus's odour and tolerates strangers a little (blend); Lockpick calms (soothe); Bloom shares trails (share). Levers off the menu stay as they are.",
 ];
 
 /** The ant's small responses on this page: decided by the local rule (responses.ts localResponses), never asked live here. */
