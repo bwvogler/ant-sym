@@ -238,26 +238,29 @@ function FungusPanel({ stats, jev, evolve, side }: { stats: ColonyStats | null; 
 
 /** Sim time as m:ss (h:mm:ss past an hour). */
 /**
- * The fungus's body and its adaptations (ja-lo8.12): its mycelium and the fungus in its hosts, adaptations to choose,
- * and each upgrade's next level. Spread upgrades are the fungus's body; reach upgrades how far its levers may go.
+ * The fungus's body and its mutations (ja-lo8.12): its mycelium and the fungus in its hosts, mutations to keep and how
+ * fast they come, and each upgrade's next level. Spread upgrades are the fungus's body; reach upgrades how far its
+ * levers may go.
  */
 function Evolve({ e, evolve, side }: { e: EvolutionStats; evolve: (id: string) => boolean; side: boolean }) {
   return (
     <div className="mt-4" aria-label="evolution">
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span className="flex items-center gap-1.5">
-          Body <Help to={{ tab: "guide", id: "evolution" }} label="the fungus's body and adaptations" />
+          Body <Help to={{ tab: "guide", id: "evolution" }} label="the fungus's body and mutations" />
         </span>
         <span className="font-mono tabular-nums text-fg-2" title="its mycelium by the hole, and the fungus in its hosts">
           mycelium {e.mass.toFixed(0)} · in ants {e.inHosts.toFixed(0)}
         </span>
       </div>
       <div className="mt-2 flex items-baseline justify-between text-xs">
-        <span>Adaptations</span>
-        <span className={`font-mono tabular-nums ${e.adaptations > 0 ? "text-spore" : "text-fg-3"}`}>{e.adaptations} to choose</span>
+        <span>Mutations</span>
+        <span className="font-mono tabular-nums">
+          <span className={e.mutations > 0 ? "text-spore" : "text-fg-3"}>{e.mutations.toLocaleString()}</span>
+          <span className="text-fg-3"> · +{e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min</span>
+        </span>
       </div>
-      <Bar value={e.toNext} thin />
-      <p className="mt-1 text-[11px] text-fg-3">It adapts as it grows inside ants; each one takes more growth than the last. You choose where it goes.</p>
+      <p className="mt-1 text-[11px] text-fg-3">Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep; each level asks more.</p>
       <ul className="mt-2 flex flex-col gap-1" aria-label="upgrades">
         {UPGRADES.filter((u) => side || !u.nest).map((u) => {
           const level = e.levels[u.id] ?? 0;
@@ -274,11 +277,11 @@ function Evolve({ e, evolve, side }: { e: EvolutionStats; evolve: (id: string) =
                 <button
                   type="button"
                   className="shrink-0 rounded-md border border-line px-2 py-0.5 text-fg hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={cost > e.adaptations}
+                  disabled={cost > e.mutations}
                   onClick={() => evolve(u.id)}
-                  title={`${u.blurb}. Next: ${next}, for ${cost} adaptation${cost === 1 ? "" : "s"}.`}
+                  title={`${u.blurb}. Next: ${next}, for ${cost.toLocaleString()} mutation${cost === 1 ? "" : "s"}.`}
                 >
-                  {next} · {cost}
+                  {next} · {cost.toLocaleString()}
                 </button>
               )}
             </li>
@@ -324,13 +327,13 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
     seenChapter.current = chapter;
     if (!first && stats && chapter !== "land") pushToast(goalLine(stats), "good");
   }, [chapter, stats]);
-  // An adaptation to choose is worth a notice, once each time there were none (ja-lo8.12).
-  const adaptations = stats?.evolution?.adaptations ?? 0;
-  const hadAdaptations = useRef(adaptations > 0);
+  // A mutation it can keep is worth a notice, once each time there was none it could afford (ja-lo8.12).
+  const affordable = stats?.evolution ? UPGRADES.some((u) => (u.costs[stats.evolution!.levels[u.id] ?? 0] ?? Infinity) <= stats.evolution!.mutations) : false;
+  const couldAfford = useRef(affordable);
   useEffect(() => {
-    if (adaptations > 0 && !hadAdaptations.current) pushToast("The fungus has adapted: choose where it goes, in the Fungus panel.", "good");
-    hadAdaptations.current = adaptations > 0;
-  }, [adaptations]);
+    if (affordable && !couldAfford.current) pushToast("The fungus has mutations to keep: choose where they go, in the Fungus panel.", "good");
+    couldAfford.current = affordable;
+  }, [affordable]);
   // Losing Jev mid-game (the cap, a stop) is worth a notice; the lock at page load is in the panel already.
   const wasRunning = useRef(false);
   useEffect(() => {

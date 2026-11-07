@@ -123,9 +123,9 @@ export interface EvolutionStats {
   mass: number;
   /** the load in its hosts, summed over every colony's ants and queens */
   inHosts: number;
-  /** adaptations to give, and 0..1 toward the next */
-  adaptations: number;
-  toNext: number;
+  /** mutations to give (whole ones), and how many it makes a minute now: it mutates as fast as it grows */
+  mutations: number;
+  perMinute: number;
   /** the level chosen of each upgrade, by id */
   levels: Record<string, number>;
 }
@@ -139,7 +139,7 @@ function evolutionStats(game: Game): EvolutionStats | null {
     for (let i = 0; i < c.n; i++) if (c.alive[i] && c.strain[i] === e.strain) inHosts += c.load[i] as number;
     if (c.queen?.alive && c.queen.strain === e.strain) inHosts += c.queen.load;
   }
-  return { mass: e.mass, inHosts, adaptations: e.adaptations, toNext: e.toNext, levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])) };
+  return { mass: e.mass, inHosts, mutations: Math.floor(e.mutations), perMinute: 60 * e.rate, levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])) };
 }
 
 /** Ants in each mode, over every colony. */

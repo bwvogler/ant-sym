@@ -6,12 +6,13 @@
 // second, paid out of that mass (design: the literature found gives no conversion). So the mycelium settles where
 // growth meets sporulation, and a thicker fruiting body means more spores from a smaller mycelium.
 //
-// **Its evolution.** It adapts in its hosts: *Metarhizium* passed through ant groups evolved more spores and less of the
-// cue groomers detect (docs/fungus-body.md §3). So adaptations come from fungus grown inside ants, by spores taking
-// hold and by load passing on contact; growth on the substrate gives spores, not adaptations. Each threshold of growth
-// in hosts gives one **adaptation**, and the player picks where it goes. The thresholds rise geometrically, as
-// adaptation in experimental evolution speeds up far less than replication does. The numbers are design, tuned on
-// `node scripts/progression.mjs` (PRD §50.11).
+// **Its evolution.** Every bit of new fungus is a chance to mutate: its mycelium growing on the ground, spores taking
+// hold in an ant, load passing on by contact. So **mutations** come at a fixed share of its growth (`MUTATION`), and a
+// fungus that grows fast mutates fast. Which mutations it keeps is the player's to choose: they give mutations to the
+// next level of an upgrade, and each level asks more than the one before. That choosing is the game's licence (owner,
+// PRD §50.12): real mutations are random and selection keeps what works, and real adaptation speeds up far less than
+// replication does (docs/fungus-body.md §3). The rising costs stand in for that. The numbers are design, tuned on
+// `node scripts/progression.mjs` (PRD §50.11–12).
 //
 // Upgrades are of two kinds:
 // - **Spread**, its body: infectivity (the strain's transmission), persistence (how little a host clears on its own),
@@ -37,7 +38,7 @@ export interface Upgrade {
   blurb: string;
   /** what each level is, in words: index 0 is where the fungus starts */
   steps: readonly string[];
-  /** adaptations for each level after the first: costs[k] takes it to level k + 1 */
+  /** mutations for each level after the first: costs[k] takes it to level k + 1 */
   costs: readonly number[];
   /** spread: the trait it sets, and its value at each level */
   trait?: Trait;
@@ -52,8 +53,11 @@ export interface Upgrade {
 /** The mycelium at its landing: the mass it starts with, how fast it grows (per second, logistic), and the mass one unit of spores costs. */
 export const BODY = { start: 4, growth: 0.03, sporeMass: 1 };
 
-/** Growth to the first adaptation, and how much more each one after asks than the last. */
-export const ADAPT = { first: 10, ratio: 1.28 };
+/** Mutations per unit of new fungus (its growth on the ground and in hosts). */
+export const MUTATION = 0.25;
+
+/** Seconds over which the panel's mutation rate is averaged. */
+const RATE_TAU = 20;
 
 export const UPGRADES: readonly Upgrade[] = [
   {
@@ -62,7 +66,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Infectivity",
     blurb: "how fast it passes from a host to the ants it touches",
     steps: ["weak", "fair", "strong", "virulent"],
-    costs: [1, 1, 3],
+    costs: [3, 6, 3000],
     trait: "transmission",
     values: [0.12, 0.15, 0.23, 0.3],
   },
@@ -72,7 +76,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Persistence",
     blurb: "how little of it a host clears on its own",
     steps: ["clears fast", "clears slowly", "never clears"],
-    costs: [1, 2],
+    costs: [4, 800],
     trait: "decay",
     values: [0.03, 0.012, 0],
   },
@@ -82,7 +86,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Mycelium",
     blurb: "how much mass its patch by the hole can hold: more mass grows faster and pays for more spores",
     steps: ["a thread", "a mat", "a web"],
-    costs: [1, 2],
+    costs: [2, 400],
     trait: "capacity",
     values: [30, 60, 120],
   },
@@ -92,7 +96,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Fruiting body",
     blurb: "how much of its mycelium it turns into spores on its patch each second, for the ants that walk through: more spores, a smaller mycelium",
     steps: ["sparse", "thick", "dense"],
-    costs: [1, 2],
+    costs: [3, 500],
     trait: "spores",
     values: [0.006, 0.012, 0.02],
   },
@@ -102,7 +106,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Immune evasion",
     blurb: "how much of the resistance grooming builds in a colony it slips past",
     steps: ["none", "some", "most"],
-    costs: [3, 4],
+    costs: [2000, 6000],
     trait: "evasion",
     values: [0, 0.35, 0.7],
   },
@@ -112,7 +116,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Stealth",
     blurb: "how well a host can hide it from its groomers (fungus showing); your aim decides whether hosts hide",
     steps: ["shows as it is", "dim", "hidden"],
-    costs: [1, 2],
+    costs: [3, 600],
     levers: ["show"],
     reach: [0, 1, 2],
   },
@@ -122,7 +126,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Senses",
     blurb: "how far it bends what a host smells: food, rival trails, home, alarm, floor marks, time out",
     steps: ["one step", "the full range"],
-    costs: [2],
+    costs: [300],
     levers: ["food", "rival", "home", "alarm", "marks", "time"],
     reach: [1, 2],
   },
@@ -132,7 +136,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Recognition",
     blurb: "how far it bends who a host takes for a stranger: stranger scent, a calming cue, its own odour",
     steps: ["none", "one step", "the full range"],
-    costs: [1, 3],
+    costs: [10, 1500],
     levers: ["strangers", "calm", "odour"],
     reach: [0, 1, 2],
   },
@@ -142,7 +146,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Trails",
     blurb: "how far it bends what a host lays: trail, trail leaked to rivals, alarm in a fight",
     steps: ["none", "one step", "the full range"],
-    costs: [1, 3],
+    costs: [10, 1500],
     levers: ["trail", "leak", "alarmLaid"],
     reach: [0, 1, 2],
   },
@@ -152,7 +156,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Royal",
     blurb: "how far it bends a queen's royal mark (queen signal): the route to new queens",
     steps: ["none", "one step", "the full range"],
-    costs: [2, 4],
+    costs: [1000, 4000],
     levers: ["queenSignal"],
     reach: [0, 1, 2],
     nest: true,
@@ -164,11 +168,6 @@ export function upgrade(id: string): Upgrade {
   const u = UPGRADES.find((x) => x.id === id);
   if (!u) throw new Error(`no upgrade "${id}"`);
   return u;
-}
-
-/** The growth at which the n-th adaptation comes (n ≥ 1): increments of ADAPT.first, each ADAPT.ratio times the last. */
-export function adaptationAt(n: number): number {
-  return n <= 0 ? 0 : (ADAPT.first * (ADAPT.ratio ** n - 1)) / (ADAPT.ratio - 1);
 }
 
 /** The spread traits at a set of levels. */
@@ -186,8 +185,10 @@ export interface Traits {
 export interface EvolutionSave {
   strain: number;
   mass: number;
+  patches: number;
   growth: number;
   spent: number;
+  rate: number;
   levels: Record<string, number>;
 }
 
@@ -195,12 +196,16 @@ export interface EvolutionSave {
 export class Evolution {
   /** the strain (an index into the fungus's strains) whose traits it sets: the fungus that landed */
   readonly strain: number;
-  /** the mycelium's mass at its landing */
-  mass = BODY.start;
-  /** fungus grown in hosts over the game: what adaptations come from */
+  /** the mycelium's mass, over all its patches */
+  mass = 0;
+  /** patches it has rooted (Fungus.root: where it landed, and by each hole a queen carrying it founds) */
+  patches = 0;
+  /** new fungus over the game, on the ground and in hosts: what mutations come from */
   growth = 0;
-  /** adaptations given to upgrades */
+  /** mutations given to upgrades */
   spent = 0;
+  /** mutations a second, averaged over the last RATE_TAU seconds: what the panel shows */
+  rate = 0;
   readonly #levels: Record<string, number>;
 
   constructor(strain: number) {
@@ -213,26 +218,17 @@ export class Evolution {
     return this.#levels[id] ?? 0;
   }
 
-  /** Adaptations its growth has given, spent or not. */
+  /** Mutations its growth has given, kept or not (fractional: the panel shows whole ones). */
   get earned(): number {
-    let n = 0;
-    while (adaptationAt(n + 1) <= this.growth) n++;
-    return n;
+    return MUTATION * this.growth;
   }
 
-  /** Adaptations to give. */
-  get adaptations(): number {
+  /** Mutations to give. */
+  get mutations(): number {
     return this.earned - this.spent;
   }
 
-  /** 0..1: how far its growth is from the last adaptation to the next. */
-  get toNext(): number {
-    const n = this.earned;
-    const a = adaptationAt(n);
-    return Math.max(0, Math.min(1, (this.growth - a) / (adaptationAt(n + 1) - a)));
-  }
-
-  /** Adaptations the next level of `id` takes, or null when it is at its last. */
+  /** Mutations the next level of `id` takes, or null when it is at its last. */
   cost(id: string): number | null {
     return upgrade(id).costs[this.level(id)] ?? null;
   }
@@ -240,33 +236,49 @@ export class Evolution {
   /** Whether the next level of `id` can be chosen now. */
   affordable(id: string): boolean {
     const c = this.cost(id);
-    return c !== null && c <= this.adaptations;
+    return c !== null && c <= this.mutations;
   }
 
-  /** Give adaptations to the next level of `id`; false (nothing given) when it is at its last or there are too few. */
+  /** Give mutations to the next level of `id`; false (nothing given) when it is at its last or there are too few. */
   buy(id: string): boolean {
     const c = this.cost(id);
-    if (c === null || c > this.adaptations) return false;
+    if (c === null || c > this.mutations) return false;
     this.spent += c;
     this.#levels[id] = this.level(id) + 1;
     return true;
   }
 
+  /** A new patch of mycelium takes root (Fungus.root): it brings its own start and room to grow. */
+  root(): void {
+    this.patches++;
+    this.mass += BODY.start;
+  }
+
   /**
-   * dt seconds of the mycelium on its patch: it grows logistically to its capacity and puts out the fruiting body's
-   * share of its mass as spores, paid out of that mass. Returns the spores put out.
+   * dt seconds of the mycelium on its patches: it grows logistically to what they hold and puts out the fruiting body's
+   * share of its mass as spores, paid out of that mass. Its growth counts toward mutations. Returns the spores put out.
    */
   grow(dt: number): number {
+    if (this.patches === 0) return 0;
     const t = this.traits();
-    this.mass += Math.max(0, BODY.growth * this.mass * (1 - this.mass / t.capacity) * dt);
+    const grown = Math.max(0, BODY.growth * this.mass * (1 - this.mass / (t.capacity * this.patches)) * dt);
+    this.mass += grown;
+    this.growth += grown;
     const spores = (t.spores * this.mass * dt) / BODY.sporeMass;
     this.mass -= spores * BODY.sporeMass;
     return spores;
   }
 
-  /** Fungus grown in hosts (load they took on, from spores or by contact): it counts toward adaptations. */
+  /** Fungus grown in hosts (load they took on, from spores or by contact): it counts toward mutations. */
   replicate(load: number): void {
     this.growth += load;
+  }
+
+  /** The panel's mutation rate: `made` new fungus over the last dt seconds, averaged over about RATE_TAU seconds. */
+  pace(made: number, dt: number): void {
+    if (dt <= 0) return;
+    const a = 1 - Math.exp(-dt / RATE_TAU);
+    this.rate += a * ((MUTATION * made) / dt - this.rate);
   }
 
   /** The spread traits at the levels chosen. */
@@ -284,14 +296,16 @@ export class Evolution {
   }
 
   save(): EvolutionSave {
-    return { strain: this.strain, mass: this.mass, growth: this.growth, spent: this.spent, levels: { ...this.#levels } };
+    return { strain: this.strain, mass: this.mass, patches: this.patches, growth: this.growth, spent: this.spent, rate: this.rate, levels: { ...this.#levels } };
   }
 
   static load(r: EvolutionSave): Evolution {
     const e = new Evolution(r.strain);
     e.mass = r.mass;
+    e.patches = r.patches;
     e.growth = r.growth;
     e.spent = r.spent;
+    e.rate = r.rate;
     for (const u of UPGRADES) e.#levels[u.id] = Math.max(0, Math.min(u.steps.length - 1, Math.floor(r.levels[u.id] ?? 0)));
     return e;
   }

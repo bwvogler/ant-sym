@@ -3592,3 +3592,48 @@ At 4× that is a few seconds of wall time, and the fungus started with every pow
 `tests/save.test.ts` now lands the fungus evolving, as the page does.
 
 **Beads:** `ja-lo8.12` (this), `ja-k4k.12` (grooming from sensed cues), `ja-260` (the brush's cost, still open: the lab brush is free), `ja-lo8.10` (balance: the colony clawing back).
+
+### 50.12 Mutations that track growth, and parity for founded colonies (ja-lo8.12, 2026-11-07)
+
+**The owner's direction.**
+- **The first colony must have nothing a founded colony couldn't get.**
+- **Adaptations should be mutation opportunities, and track growth rate.** "A little magical thinking in the interest of game joy" is allowed.
+- **Two ideas for later, filed as beads:** the mycelium finds food (`ja-lo8.13`), and the mycelium offers itself as food (`ja-lo8.14`).
+
+**Parity.**
+- **The colony side was already equal.** A founded colony (`Game.addColony`) gets the same as a colony the world starts with: the same params except its identity, the same cap, a queen, chambers, the same policies and responses, and the same wiring (grids, enemies, burials, raids).
+- **The one asymmetry was this slice's:** only the landing colony had a mycelium by its hole.
+- **Fix.** `Founding.fungus` carries the founding queen's fungus. When it is the evolving strain, the fungus roots a patch by her new hole, so the landing colony gets nothing a founded one can't. Each patch brings its own start (`BODY.start`) and room (capacity × patches). `ja-lo8.9` passes the fungus when it builds founding.
+- **A test pins both:** colony parity, and a patch only for a queen carrying the evolving fungus.
+
+**Mutations** (`MUTATION` 0.25 per unit of new fungus) replace §50.11's adaptations at rising thresholds:
+- **What counts:** every bit of new fungus is a chance to mutate. That is the mycelium growing on the ground, spores taking hold in an ant, and load passing on contact.
+- **So the rate tracks growth.** A fungus that grows fast mutates fast, and the panel shows mutations a minute (averaged over 20 s).
+- **The player keeps them,** giving mutations to an upgrade's next level. Each level asks more than the last: 2–10 for a first level, 300–1,500 for most second ones, 2,000–6,000 for the strongest. The rising costs stand in for selection and for adaptation's diminishing returns ([fungus-body §3](fungus-body.md#3-adapting-to-hosts)).
+- **The licence taken:** growth on the ground counts too, though the passage study ties adaptation to hosts.
+- **The harness picks like a player:** the first affordable upgrade in a priority order, so one it can't yet afford doesn't hold up a cheaper one.
+
+**Measured** (`scripts/progression.mjs`, 20 minutes):
+
+| Aim | Seeds | A quarter | The queen | Kept at 20 min |
+|---|---|---|---|---|
+| Unite | 1–3 | 155–206 s | 201–302 s | 14–16 upgrades |
+| Spread | 1–3 | 136–182 s | 169–212 s | 16–17 |
+| Unite (confirm) | 11–13 | 199–224 s | 216–244 s | 14–16 |
+| Unite, keeping nothing | 1–3 | never in 15 min | never | 53–63 mutations waiting |
+
+- **The rhythm:**
+  - a first choice within 3 s of the landing;
+  - one about every 30–60 s up to the breakthrough (two to three minutes in);
+  - then every one to three minutes as costs climb.
+
+  By 20 minutes about half of everything is kept (4,400–11,600 mutations earned, against 21,600 for all), so choices matter.
+- **Compared with §50.11's thresholds:** the breakthrough comes about a minute earlier, because the mycelium's growth now mutates too. The worst seed is still under four minutes to a quarter of the colony.
+
+**Jev: unchanged.** No request changed, and an upgrade re-asks nothing.
+
+**Tests:** `evolution.test.ts` now has 9:
+- mutations as a share of growth, with rising costs per level;
+- the rate settling at `MUTATION` × growth, and ten times the growth giving ten times the mutations;
+- two patches holding twice as much;
+- parity between first and founded colonies, and a patch for a carried fungus.

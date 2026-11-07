@@ -6,8 +6,9 @@
 
 - **The fungus can live off the host.** *Metarhizium* is rhizosphere-competent and persists in soil for months to more than a year; as a root endophyte it trades insect nitrogen to plants. So a mycelium at the landing that grows on the ground without an ant is grounded (§1).
 - **Spores cost the mycelium: design, not found.** No source found ties conidia to mycelial mass at a rate. The game pays spores out of the mycelium's mass so that nothing is conjured; the rate is design (§2).
-- **It adapts in its hosts.** *Metarhizium* passed through groups of grooming ants for ten cycles evolved more spores and less of the cue groomers detect (§3). So the game's adaptations come from fungus grown in ants, not from growth on the substrate.
-- **Adaptation speeds up far less than replication.** In experimental evolution, a hundredfold more mutation supply bought far less than a hundredfold faster adaptation (§3). So adaptations come at thresholds that rise geometrically.
+- **It adapts in its hosts.** *Metarhizium* passed through groups of grooming ants for ten cycles evolved more spores and less of the cue groomers detect (§3).
+- **Adaptation speeds up far less than replication.** In experimental evolution, a hundredfold more mutation supply bought far less than a hundredfold faster adaptation (§3).
+- **In the game, with some licence (owner):** mutations come at a fixed share of all new fungus, on the ground and in ants, so a fast-growing fungus mutates fast; the player chooses which to keep, and each level of an upgrade asks more mutations than the last, standing in for diminishing returns and for selection.
 - **Grooming is triggered by sensing the pathogen** (fungal ergosterol on an ant; changed cuticular hydrocarbons on infected brood), and queens end up with lower loads. Whether ant queens get more groomers than workers was not found (§4). The game's larger cap for a queen is a stop-gap, tracked as a vision gap (`ja-k4k.12`).
 
 ## 1. Growth without a host
@@ -31,7 +32,7 @@
 - In *E. coli*, varying population size and mutation rate about a hundredfold each sped adaptation far less than proportionally; above the lowest mutation rate it barely changed, which the authors put down to clonal interference (de Visser et al. 1999). This is bacterial, but it argues against "more replication, proportionally faster adaptation".
 - Virulence lost on artificial media and restored by passage through hosts: **not found** (the query was refused).
 
-**In the game:** adaptations come from **fungus grown in ants**, from spores taking hold and from load passing on contact (`Evolution.replicate`); growth on the substrate makes spores, not adaptations. The n-th adaptation comes when that growth reaches a threshold that rises by a constant ratio each time (`ADAPT`), so each one takes more growth than the last. The upgrades themselves follow the evolved traits loosely: *Stealth* (less shown to groomers) and *Fruiting body* (more spores) are what the passage lines evolved; *Infectivity*, *Persistence* and *Immune evasion* are design.
+**In the game** (PRD §50.12): every bit of new fungus is a chance to mutate, so **mutations** come at a fixed share of its growth (`MUTATION`): the mycelium growing on the ground, spores taking hold in an ant, load passing on contact (`Evolution.replicate`, `Evolution.grow`). That counts growth on the substrate too, against the passage result above, which ties adaptation to hosts: a licence taken for the game's sake, since a mutation can arise in any replication; what it is selected for is the game's choosing. The player decides which mutations to keep, and each level of an upgrade costs more than the one before, standing in for selection and for the diminishing returns above. The upgrades themselves follow the evolved traits loosely: *Stealth* (less shown to groomers) and *Fruiting body* (more spores) are what the passage lines evolved; *Infectivity*, *Persistence* and *Immune evasion* are design.
 
 ## 4. Grooming and the queen
 

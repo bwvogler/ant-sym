@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy } from "../battle.ts";
 import { Colony } from "../colony.ts";
-import { adaptationAt, ADAPT, BODY, Evolution, UPGRADES, upgrade } from "../evolution.ts";
+import { BODY, Evolution, MUTATION, UPGRADES, upgrade } from "../evolution.ts";
 import { Fungus, INFECTED, STRAINS, type Strain } from "../fungus.ts";
 import { fungalKey } from "../fungusBrain.ts";
 import { Game } from "../game.ts";
@@ -11,8 +11,9 @@ import { generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from ".
 import { put } from "./hexmaps.ts";
 import type { FungalSituation } from "../fungalPolicy.ts";
 
-// The fungus's body and evolution (ja-lo8.12): reach holds levels where they take effect and nowhere else, adaptations
-// come from growth in hosts, the mycelium pays for its spores, and the minimum dose is a rate.
+// The fungus's body and evolution (ja-lo8.12): reach holds levels where they take effect and nowhere else, mutations
+// come with growth, the mycelium pays for its spores, a founded colony can get what the first colony got, and the
+// minimum dose is a rate.
 
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
@@ -63,8 +64,8 @@ test("reach acts where levels take effect: Jev's question and cache key do not c
   assert.ok(Math.abs((c.gainFood[0] as number) - 1.5) < 1e-9, `held to one step: ${c.gainFood[0]}`);
   assert.deepEqual(f.held({ food: 4, odour: 2 }), { food: 3, odour: 0 }, "and Recognition starts at none");
   const e = f.evolution!;
-  e.growth = adaptationAt(10);
-  assert.ok(f.upgrade("senses"), "two adaptations buy the Senses' full range");
+  e.replicate(upgrade("senses").costs[0]! / MUTATION);
+  assert.ok(f.upgrade("senses"), "the mutations for the Senses' full range");
   f.expressLevels(c, 0, { food: 4 }, 1);
   assert.ok(Math.abs((c.gainFood[0] as number) - 2.5) < 1e-9, `the full range: ${c.gainFood[0]}`);
   // A lab helper runs a preset whatever the menu and the reach say.
@@ -72,20 +73,19 @@ test("reach acts where levels take effect: Jev's question and cache key do not c
   assert.ok(Math.abs((c.gainFood[0] as number) - 1.5) < 1e-9);
 });
 
-test("adaptations: one per threshold of growth in hosts, each further than the last, given to upgrades level by level", () => {
+test("mutations: a fixed share of growth, kept level by level, each level of an upgrade asking more than the last", () => {
+  for (const u of UPGRADES) for (let k = 1; k < u.costs.length; k++) assert.ok(u.costs[k]! > u.costs[k - 1]!, `${u.id}: level ${k + 1} asks more`);
   const e = new Evolution(GARDEN);
-  assert.equal(e.adaptations, 0);
-  assert.ok(Math.abs(adaptationAt(1) - ADAPT.first) < 1e-9);
-  for (let n = 1; n < 30; n++) assert.ok(adaptationAt(n + 1) - adaptationAt(n) > adaptationAt(n) - adaptationAt(n - 1), "each asks more growth than the last");
-  e.replicate(adaptationAt(3));
-  assert.equal(e.earned, 3);
-  assert.equal(e.adaptations, 3);
-  assert.ok(e.buy("infectivity") && e.buy("infectivity"), "levels 1 and 2 take one each");
-  assert.equal(e.cost("infectivity"), upgrade("infectivity").costs[2]);
-  assert.equal(e.buy("infectivity"), false, "level 3 takes three: not enough");
-  assert.equal(e.adaptations, 1);
+  assert.equal(e.mutations, 0);
+  const [a, b, c] = upgrade("infectivity").costs as number[];
+  e.replicate((a! + b!) / MUTATION);
+  assert.ok(Math.abs(e.mutations - (a! + b!)) < 1e-9, "growth × MUTATION");
+  assert.ok(e.buy("infectivity") && e.buy("infectivity"), "levels 1 and 2");
+  assert.equal(e.cost("infectivity"), c);
+  assert.equal(e.buy("infectivity"), false, "level 3: not enough");
+  assert.ok(Math.abs(e.mutations) < 1e-9);
   assert.equal(e.traits().transmission, upgrade("infectivity").values![2]);
-  e.replicate(adaptationAt(40));
+  e.replicate(1e7);
   for (const u of UPGRADES) while (e.buy(u.id));
   for (const u of UPGRADES) assert.equal(e.cost(u.id), null, `${u.id} at its last level`);
   assert.equal(e.buy("infectivity"), false);
@@ -93,8 +93,22 @@ test("adaptations: one per threshold of growth in hosts, each further than the l
   assert.deepEqual(back.save(), e.save(), "a save round-trips");
 });
 
-test("the mycelium grows on its patch and pays for its spores out of its mass; it settles below what the patch holds", () => {
+test("mutations come as fast as the fungus grows: the panel's rate settles at MUTATION × growth a second", () => {
   const e = new Evolution(GARDEN);
+  for (let k = 0; k < 2000; k++) {
+    e.replicate(0.4 * 0.1);
+    e.pace(0.4 * 0.1, 0.1);
+  }
+  assert.ok(Math.abs(e.rate - MUTATION * 0.4) < 1e-3, `rate ${e.rate}`);
+  for (let k = 0; k < 2000; k++) e.pace(4 * 0.1, 0.1);
+  assert.ok(Math.abs(e.rate - MUTATION * 4) < 1e-2, "ten times the growth, ten times the mutations");
+});
+
+test("the mycelium grows on its patches and pays for its spores out of its mass; it settles below what they hold", () => {
+  const e = new Evolution(GARDEN);
+  assert.equal(e.grow(1), 0, "no patch, no mycelium");
+  e.root();
+  assert.equal(e.mass, BODY.start);
   let spores = 0;
   let mass = e.mass;
   for (let k = 0; k < 6000; k++) {
@@ -108,7 +122,10 @@ test("the mycelium grows on its patch and pays for its spores out of its mass; i
   const t = e.traits();
   assert.ok(Math.abs(mass - t.capacity * (1 - t.spores / BODY.growth)) < 0.05, `where growth meets sporulation: ${mass.toFixed(2)}`);
   assert.ok(spores > 0);
-  assert.equal(e.growth, 0, "growth on the substrate gives spores, not adaptations");
+  assert.ok(e.mutations > 0, "its growth on the ground mutates too");
+  e.root();
+  for (let k = 0; k < 6000; k++) e.grow(0.1);
+  assert.ok(Math.abs(e.mass - 2 * t.capacity * (1 - t.spores / BODY.growth)) < 0.1, `two patches hold twice as much: ${e.mass.toFixed(2)}`);
 });
 
 test("the minimum dose is a rate: a clean ant exposed above it is infected at any step, below it at none", () => {
@@ -131,7 +148,7 @@ test("the minimum dose is a rate: a clean ant exposed above it is infected at an
     }
 });
 
-test("the game's landing: an evolving fungus roots by the hole, keeps sporulating there, and grows adaptations in its hosts", () => {
+test("the game's landing: an evolving fungus roots by the hole, keeps sporulating there, and mutates as it grows", () => {
   const g = new Game(generateSideWorld(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   const f = g.fungus;
@@ -142,12 +159,41 @@ test("the game's landing: an evolving fungus roots by the hole, keeps sporulatin
   const onBase = () => f.base.reduce((n, key) => n + f.spores.get(key % w, Math.floor(key / w)), 0);
   for (let k = 0; k < 30 * 120; k++) g.tick(1 / 30);
   assert.ok(onBase() > 0, "two minutes on, its patch still holds spores (the landing's alone fade at 3 % a second)");
-  assert.ok(f.evolution.growth > 0 && f.evolution.earned >= 1, `adaptations from growth in hosts: ${f.evolution.earned}`);
+  assert.ok(f.evolution.mutations >= 1, `mutations from its growth: ${f.evolution.mutations}`);
   // A lab or test landing keeps the strain as listed, with no body.
   const lab = new Game(generateSideWorld(1), { antCount: 50, rivalAnts: 50 }, mulberry32(1));
   lab.land(0, GARDEN);
   assert.equal(lab.fungus.evolution, null);
   assert.equal(lab.fungus.base.length, 0);
+});
+
+test("a colony the world starts with has nothing a founded one can't get", () => {
+  const g = new Game(generateSideWorld(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
+  g.land(0, GARDEN, { evolve: true });
+  for (let k = 0; k < 30 * 5; k++) g.tick(1 / 30);
+  const e = g.colonies[1]!.nest.entrance!;
+  const clean = g.colonies[g.addColony({ x: e.x + 40, y: e.y, antCount: 200, odour: 0.5 })]!;
+  const first = g.colonies[0]!;
+  // The same colony: params but identity, a queen, chambers, policies, responses and the game's wiring.
+  const own = (c: typeof first) => Object.fromEntries(Object.entries(c.params).filter(([k]) => !["nest", "odour", "antCount", "maxAnts"].includes(k)));
+  assert.deepEqual(own(clean), own(first));
+  assert.equal(clean.params.maxAnts, first.params.maxAnts);
+  assert.ok(clean.queen?.alive && first.queen?.alive);
+  assert.equal(clean.policy, first.policy);
+  assert.equal(clean.stancePolicy, first.stancePolicy);
+  assert.equal(clean.responses, first.responses);
+  for (const wire of ["friends", "enemies", "nestmates", "onBury", "raidMarks"] as const) assert.equal(Boolean(clean[wire]), Boolean(first[wire]), wire);
+  assert.equal(clean.others.length, first.others.length);
+  // The fungus: a clean founding gets no patch; one whose queen carries the evolving fungus gets what the landing gave.
+  const patches = g.fungus.base.length;
+  assert.equal(g.fungus.evolution!.patches, 1);
+  const carried = g.colonies[g.addColony({ x: e.x + 80, y: e.y, antCount: 200, odour: 0.5, fungus: { load: 0.4, strain: GARDEN } })]!;
+  assert.equal(carried.queen!.load, 0.4);
+  assert.equal(g.fungus.evolution!.patches, 2, "it roots by her hole");
+  assert.ok(g.fungus.base.length > patches);
+  const { w } = g.map.size;
+  const hole = carried.nest.entrance!;
+  assert.ok(g.fungus.base.slice(patches).every((key) => Math.abs((key % w) + 0.5 - hole.x) < 8), "by her hole, as the landing is by the first colony's");
 });
 
 test("a weak start loses in the nest: Garden as listed takes a quarter of the colony in seconds, the evolving one does not", () => {

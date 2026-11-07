@@ -1,8 +1,8 @@
 // Offline: how the fungus game paces (ja-lo8.12, PRD §50.11). The app's setup (side world, 600 + 600 ants, regrowth,
 // gameRng(seed)), the landing by colony 0's hole, and the fungus policy from the page's shipped answers under a preset aim
 // (web/public/precache/fungus-<aim>.json; a situation not shipped plays the strain's default, as on the page while Jev
-// is asked). With --evolve the game's fungus starts weak and chooses upgrades as a player might: the next in the
-// order, as soon as it has the adaptations for it. Reports when each chapter is reached (first host, a quarter of the colony, the
+// is asked). With --evolve the game's fungus starts weak and chooses upgrades as a player might: the first in the
+// order it has the mutations for, as soon as it has them. Reports when each chapter is reached (first host, a quarter of the colony, the
 // queen), each purchase, and the colony's infected share and resistance every minute. Seeds run in parallel.
 //
 // Usage: node scripts/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
@@ -43,7 +43,7 @@ if (isMainThread) {
   results.sort((x, y) => x.seed - y.seed);
   console.log(`aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`);
   for (const r of results) {
-    console.log(`seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rival)} · adaptations ${r.earned} (growth ${r.growth}), mycelium ${r.mass}`);
+    console.log(`seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rival)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}`);
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
@@ -62,19 +62,24 @@ if (isMainThread) {
   g.fungus.policy = (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT;
   g.land(0, STRAINS.findIndex((s) => s.id === strain), { evolve });
   const DT = 1 / 30;
-  const r = { seed, first: -1, quarter: -1, half: -1, queen: -1, rival: -1, bought: [], minutes: [], earned: 0, growth: 0, mass: 0 };
+  const r = { seed, first: -1, quarter: -1, half: -1, queen: -1, rival: -1, bought: [], minutes: [], earned: 0, spent: 0, growth: 0, mass: 0 };
   const share = (c) => {
     const f = g.fungus.census(c);
     return { s: f.living ? f.infected / f.living : 0, n: f.infected, resist: f.meanResist };
   };
-  let want = 0;
+  const queue = [...order];
   for (let k = 0; g.time < seconds; k++) {
     g.tick(DT);
     const e = g.fungus.evolution;
     if (e && buy) {
-      // The first upgrade in the buy order not yet bought to that count, as soon as it is affordable.
-      while (want < order.length && e.cost(order[want]) === null) want++;
-      if (want < order.length && g.fungus.upgrade(order[want])) r.bought.push(`${Math.round(g.time)}s ${order[want++]}`);
+      // The first upgrade in the order it can keep now, as a player would: one it can't yet afford doesn't hold up a cheaper one.
+      for (let j = 0; j < queue.length; j++) {
+        if (e.cost(queue[j]) === null) queue.splice(j--, 1);
+        else if (g.fungus.upgrade(queue[j])) {
+          r.bought.push(`${Math.round(g.time)}s ${queue.splice(j, 1)[0]}`);
+          break;
+        }
+      }
     }
     if (k % 15) continue;
     const t = Math.round(g.time);
@@ -86,7 +91,8 @@ if (isMainThread) {
     if (r.rival < 0 && b && b.n > 0) r.rival = t;
     if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
   }
-  r.earned = g.fungus.evolution?.earned ?? 0;
+  r.earned = Math.round(g.fungus.evolution?.earned ?? 0);
+  r.spent = g.fungus.evolution?.spent ?? 0;
   r.growth = Math.round(g.fungus.evolution?.growth ?? 0);
   r.mass = (g.fungus.evolution?.mass ?? 0).toFixed(1);
   parentPort.postMessage(r);

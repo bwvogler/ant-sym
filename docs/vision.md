@@ -67,7 +67,7 @@ This is the budget the policy may draw on. Each row points to the research secti
 - **On emission:** trail laid, trail leaked to other colonies, alarm laid, a calming cue, the fungus's own odour, and how much of the fungus shows to groomers.
 - **Lethal, off until the player turns them on:** the odour weapon, and `crown`, which passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
 - **Its own effectors:** spores on the ground, contact spread, and Bloom corpses on the midden that sporulate.
-- **Its body and its progress** (`evolution.ts`, `ja-lo8.12`): in the game it lands weak and takes root as a mycelium by the hole, which grows and pays for the spores it puts out; fungus grown in hosts gives adaptations, which the player gives to its spread traits or to how far each group of levers may reach ([fungus-body](fungus-body.md)). Reach holds a level where it takes effect; Jev is asked the full range.
+- **Its body and its progress** (`evolution.ts`, `ja-lo8.12`): in the game it lands weak and takes root as a mycelium by the hole, which grows and pays for the spores it puts out; every bit of new fungus can mutate, so mutations come as fast as it grows, and the player keeps them as its spread traits or to how far each group of levers may reach ([fungus-body](fungus-body.md)). Reach holds a level where it takes effect; Jev is asked the full range.
 
 The gaps:
 - ~~**The fungal situation reads things a fungus can't sense** (its host's mode; the chamber table's owner)~~: closed by `ja-lo8.4` (`ja-k4k.7`). Most of the new senses are marked design in §11: no paper shows a fungus reading them.

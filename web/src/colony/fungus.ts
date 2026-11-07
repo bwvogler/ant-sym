@@ -455,6 +455,7 @@ export class Fungus {
     // putting out spores there, spread evenly over its cells and paid for out of its mass.
     const e = this.#evolution;
     if (e) {
+      const before = e.growth;
       e.replicate(this.#made);
       if (this.#base.length) {
         const each = e.grow(dt) / this.#base.length;
@@ -466,6 +467,7 @@ export class Fungus {
           this.#sporeCells.add(key);
         }
       }
+      e.pace(e.growth - before, dt);
     }
     this.hosts = hosts;
   }
@@ -711,9 +713,11 @@ export class Fungus {
   root(x: number, y: number, radius: number): void {
     if (!this.#evolution) return;
     const { w } = this.map.size;
+    const have = new Set(this.#base);
     disc(this.map, x, y, radius, (cx, cy) => {
-      if (!rockAt(this.map, cx, cy)) this.#base.push(cy * w + cx);
+      if (!rockAt(this.map, cx, cy) && !have.has(cy * w + cx)) this.#base.push(cy * w + cx);
     });
+    this.#evolution.root();
   }
 
   /** Cells of the fungus's base (root). */
