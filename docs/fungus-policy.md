@@ -353,3 +353,98 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 - Interspecific trail reading is asymmetric (*Camponotus* follows *Crematogaster* trails, not the reverse), which suits the fungus's existing `foreignFood` lever.
 
 **4. The fungal situation needs no change for any of this.** `contact` already says kin, allied or strangers wherever the host is. A host range only changes who can be a host. If species matter to what the fungus should do, `strain` (whose allowed interventions can differ by host species) is where that goes, not a map-wide fact.
+
+## 11. What the fungus senses inside an ant, and its levers
+
+*Added 2026-11-07 for the fungus game (`ja-lo8`; built in `ja-lo8.4`). This section supersedes §5.2's situation table and its menu of bundled interventions. The fungus's situation as built (`fungalPolicy.ts`) has several faults:*
+- *it reads the host's **mode**, which a fungus cannot sense (`ja-k4k.7`);*
+- *in the side view, it reads the chamber table's owner;*
+- *its answer is one of eight bundles (`soothe`, `share`, …) that mix what the host perceives with what it gives off.*
+
+*The owner asked for a clear account instead: what the fungus reads inside its host, and how it bends the host's perception and its emitted signals.*
+
+### 11.1 The two sides of a host
+
+```
+                   the host's senses                       the host's own policy
+world ──▶ [ perception levers: gains on what it senses ] ──▶ perceived situation ──▶ the ant chooses
+                      ▲                                                                    │
+                      │  a level per lever, per fungal situation                            ▼
+                [ the fungus ] ◀── what the fungus senses inside the host ◀──────── the ant acts
+                      │
+                      └──▶ [ emission levers: gains on what it gives off ] ──▶ other ants' senses
+```
+
+**The fungus never chooses for the ant.** It sets **levels**: how loud each of the host's senses is, and how loud each of its signals is. The host's colony policy (the local rule, or Jev under its doctrine) still makes every choice, from the world as the host now perceives it (§2).
+
+### 11.2 What the fungus senses inside its host
+
+A fungus lives in and on the host's body. What it can read is what is in that body: the host's hormones and amines, its cuticle, what is in its crop and jaws, and what touches it. The table gives each sense its basis. Where a sense is the game's own invention it says **design**: no paper shows a fungus reading it.
+
+| Sense | Values | What the fungus reads | Basis |
+|---|---|---|---|
+| `arousal` | calm · alarmed · fighting | the host's arousal state: the alarm it perceives (after the fungus's own gain), or a fight it is in | biogenic amines rise with aggression and recent contact in ants (Bubak 2016, §3); fungus reading them: **design** |
+| `touch` | none · nestmate · foreigner | cuticle-to-cuticle contact: does the ant touching its host smell of the host's colony, or of another? | *Rickia* lives on the cuticle and changes the alkanes there (§3); contact chemistry is how ants recognise each other ([ant-communication §3](ant-communication.md#3-rival-colonies)) |
+| `place` | outside · tunnel · chamber · by the queen | the substrate the host walks on and the marks on it: open ground, a tunnel, a chamber's floor marks, the queen's mark | floor marks and the queen's mark are chemicals on the substrate ([nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs)); the fungus reading them through the host's tarsi: **design** |
+| `task` | nurse · inside worker · forager | the host's juvenile-hormone titre, which tracks the shift from brood care to foraging | JH is higher in foragers than nest workers (*Pogonomyrmex californicus*, Dolezal et al. 2012); a JH analogue moved fire-ant nurses toward outside work (2023). See [new-queens sources](new-queens.md#sources). The fungus reading JH: **design** |
+| `carrying` | nothing · food · brood | what is in the host's crop or jaws | **design** |
+| `groomed` | no · yes | nestmates grooming the host's cuticle, taking the fungus off | grooming removes spores (Konrad et al. 2012, §3) |
+
+- **That is 3 × 3 × 4 × 3 × 3 × 2 = 648 situations.** They are asked lazily, as hosts meet them; a game meets far fewer.
+- **Two senses the built situation had are gone:**
+  - **The host's mode.** What an ant *is doing* is a decision, not something in its body. `arousal`, `task` and `carrying` are the body states that go with modes.
+  - **The fungus's own load.** It decided nothing measurable. It stays a body quantity: a lever's effect still scales with load (§2).
+- **Who is touching is a single sense.** "Allied" (a foreigner within tolerance) and "strangers" become `foreigner` × `arousal`: a calm foreigner is an ant the colonies tolerate, and a foreigner in a fight is a stranger.
+
+### 11.3 The levers
+
+Each lever is a gain on one channel. The policy sets a **level** for every lever in every situation: *strongly damp · damp · as is · boost · strongly boost*. So it pulls as many levers as the aim calls for, at once. A lever with no meaning for a host is ignored: a worker has no queen signal to turn down.
+
+**Perception: what the host senses.** These bend the host's own perceived situation and its steering (§2, "steering and the situation read the same distorted sensors").
+
+| Lever | Damp | Boost | Built as | Basis |
+|---|---|---|---|---|
+| food scent | trails fade; the host explores | the host piles onto routes | `gainFood` (A1) | *Ophiocordyceps* weakens foraging (§3) |
+| rival trails as food | — | the host follows another colony's food trail | `foreignFood` (A3) | parabiosis (§3) |
+| home scent | the host leans on path integration and ranges far | the host clings to home | `gainHome` (A2) | design |
+| alarm | calm under alarm | skittish, routed easily | `gainAlarm` (A4) | amine thresholds (§3) |
+| **stranger scent** | foreigners smell like nestmates: the host fights fewer of them | the host takes more ants for strangers | `tolerance` (B4) | octopamine and serotonin thresholds (§3) |
+| queen scent | the host perceives the queen as faint or absent | the host is drawn to her | new: a gain on the royal mark as the host reads it | design ([new-queens §4](new-queens.md#4-where-the-fungus-comes-in)) |
+| floor marks | the host loses its way inside; brood and store read alike at the extreme | — | `gainMarks`, `swapMarks` (muddle) | design |
+| time out | the host tires slowly and ranges far | the host tires fast and stays home | `clock` (A10) | *Ophiocordyceps* rhythm loss (§3) |
+
+**Is "stranger scent" a sense?** Yes:
+- An ant smells another ant's cuticle, and "stranger" is how far that odour sits from its own colony's.
+- The built lever, `tolerance`, is the threshold on that sense: how far is too far. Damping the stranger scent and widening the tolerance are the same change, seen from the host.
+
+**Emission: what the host gives off.** These bend what *other* ants sense from this host.
+
+| Lever | Damp | Boost | Built as | Basis |
+|---|---|---|---|---|
+| trail laid | quiet hosts leave little trail | loud trails | `layGain` (C1) | *Ophiocordyceps* hosts communicate less (§3) |
+| trail leaked to rivals | — | the host's food trail also lands in other colonies' fields | `crossLay` (C2) | trail chemicals shared across colonies (§4.C) |
+| alarm laid | silent fights: one skirmish recruits no defenders | — | `quiet` (C3) | weakened communication (§3) |
+| calming cue | — | others aim less aggression at the host | `calm` (B1) | *Rickia*'s n‑C23 (§3) |
+| fungal odour | — | the host carries the fungus's own odour, between the colonies' | `mask` (B3/B7) | the leafcutter garden as an odour source (§3) |
+| fungus showing | the host hides the fungus: groomed less | — | visibility (`DORMANT_SHOW`) | stealth against potency (§6) |
+| queen signal | the queen gives off less of her mark: nurses rear gynes | — | new: scales `QUEEN_MARK`, in a queen only | design ([new-queens §4](new-queens.md#4-where-the-fungus-comes-in)) |
+
+**Lethal levers.** They are off unless the player turns them on, and are never asked while off.
+- **odour weapon:** `estrange` (B6), the host's own colony takes it for a stranger;
+- **crown:** `regicide`, the host kills the queen and brood it tends.
+
+### 11.4 How the policy is asked
+
+- **The aim.** The player writes it in words. Jev reads it with the legend and answers, for one fungal situation, a level for each lever: one `score` question per lever (`web/shared/jev.ts`).
+- **Lazily.** A situation is asked when a host first meets it. Its answer is cached under the aim, so every host in that situation runs it from then on.
+- **When the aim changes,** the old answers stay in force, marked stale and dimmed where the table is shown, until each situation's new answer arrives. The whole table is never re-asked at once (owner, 2026-11-07).
+- **Without Jev** (no key, cap spent, the Pages build): cached answers keep playing, and the aim cannot be changed. A situation never asked runs the default table, one readable row per situation; it is the local rule's successor.
+- **Cost.** One question per lever makes a fungal question larger than today's single choice. `ja-lo8.4` measures it with `scripts/fungus-cost.mjs` and records it in the PRD and the PR (CLAUDE.md).
+
+### 11.5 One fungus
+
+- **The game has one fungus, the player's.** The built strains (Lockpick, Bloom, Garden) were three trait sets the player painted. In the game they become lab presets in the Details screen, for the assays.
+- **What a strain gated now has other homes:**
+  - *which interventions exist* becomes the lethal switch and the lever table;
+  - *how visible and how fast it spreads* become the "fungus showing" lever and the fungus's own fixed traits.
+- §5.1's "other organisms, eventually" still holds: another organism is another sense table and lever table under the same shape.

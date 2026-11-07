@@ -233,6 +233,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "activation", title: "Activation", covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake." },
   { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
+  { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];
 
 export function guideEntry(id: string): GuideEntry | undefined {

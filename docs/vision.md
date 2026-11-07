@@ -32,7 +32,7 @@ This is the budget the policy may draw on. Each row points to the research secti
 | Brood | dig here, tend here | local | [nest-and-home §1](nest-and-home.md#nest-structure) |
 | Own body | age, hunger, load, fatigue | internal | [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants) (response thresholds) |
 
-**Not yet researched:** corpse odour, which matters for the midden, and the substrate cues a fungus can sense. Write a note, with primary sources, before building on either.
+**Not yet researched:** corpse odour, which matters for the midden. Write a note, with primary sources, before building on it. What a fungus senses inside its host is in [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers). Most of it is marked design: no paper shows a fungus reading those cues.
 
 ## Where the code is today
 
@@ -67,13 +67,17 @@ This is the budget the policy may draw on. Each row points to the research secti
 - **Its own effectors:** spores on the ground, contact spread, and Bloom corpses on the midden that sporulate.
 
 The gaps:
-- **The fungal situation reads things a fungus can't sense.** Its `host` field is read straight from the ant's mode. In the side view, `ground` comes from the chamber table's owner. It should rest on what the fungus could sense: contact chemistry, its own load and the substrate (`ja-k4k.7`).
+- **The fungal situation reads things a fungus can't sense.** Its `host` field is read straight from the ant's mode. In the side view, `ground` comes from the chamber table's owner. It should rest on what the fungus could sense inside its host (`ja-k4k.7`, built in `ja-lo8.4`). [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers) has the replacement:
+  - the senses: arousal, touch, place, task, carrying and grooming, each grounded or marked design;
+  - a level for every lever instead of one bundle, split into what the host **perceives** and what it **gives off**.
 - **The fungus has no scent of its own on the ground,** and no choice of where or when to sporulate, such as summiting (`ja-k4k.8`).
 
 The biology and the full catalogue of levers:
 - [fungus-policy §2](fungus-policy.md#2-two-policies-and-the-perceived-state-between-them): two policies, and the perceived state between them;
 - [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants): what real parasites do;
-- [fungus-policy §4](fungus-policy.md#4-the-levers-the-fungus-can-pull): about 35 levers sorted into perception, recognition, emission, body, spread and world.
+- [fungus-policy §4](fungus-policy.md#4-the-levers-the-fungus-can-pull): about 35 levers sorted into perception, recognition, emission, body, spread and world;
+- [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers): the game's account of what the fungus senses inside an ant, and its perception and emission levers;
+- [new-queens](new-queens.md): when a colony rears new queens, and the fungus's two levers on it (queen signal and queen scent).
 
 ## The ladder
 

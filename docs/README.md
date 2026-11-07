@@ -14,6 +14,7 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 | [combat.md](combat.md) | research + design (MR 4) | Narrow ground lets a smaller, stronger side hold off numbers (Lymbery et al. 2023); alarm that draws at low doses and repels at high; who retreats when strangers meet at food. Basis for terrain-limited combat, graded alarm and the `contact` response. |
 | [activation.md](activation.md) | research + design (MR 5) | Foragers leave when they meet successful foragers coming home (Gordon; Pinter-Wollman 2013; Pless 2015); a leaky count of contacts with a threshold; patrollers start the day; the colony knows its food only as a rate. Basis for the `leave` response and the strategist's `intake`. |
 | [queens-and-merging.md](queens-and-merging.md) | research + design (not built) | Several queens, adoption, and orphaned colonies merging as a route to unification. |
+| [new-queens.md](new-queens.md) | research + design (not built, `ja-lo8`) | When a colony rears new queens (size, the queen's pheromone, workers culling gyne larvae); the nuptial flight and claustral founding; the fungus's two levers on queen birth. |
 
 The page's **Learn** drawer quotes these notes in its field guide (`web/src/ui/guide.ts`), linking their headings. `guide.test.ts` fails when a cited heading is renamed or a gap the guide calls scripted is closed: update the entry with the note.
 

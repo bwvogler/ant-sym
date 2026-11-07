@@ -3101,3 +3101,42 @@ Warlike raids more, as its doctrine asks. Before the fix the same caches replaye
 
 - The legend's new sentences reach every response lane.
 - All six lanes would cost ~$0.109/h if asked, against ~$0.096/h for MR 4's five. The page asks none of them.
+
+## 49. The fungus game: decisions (ja-lo8, 2026-11-06 / 07)
+
+The page was a sim with everything on one screen. The owner asked for a game, to be built in ten stacked slices under the epic `ja-lo8` (slice beads `ja-lo8.1`–`.10`). These are the owner's decisions, from the plan's review.
+
+**The game.**
+- The player starts as a fungus that lands near a colony's entrance.
+- **The fungus policy is always the player's, and it is the game's main handle.**
+  - The player writes an aim in words. Jev sets a **level for every lever**, per situation the fungus senses inside its host. The answer is no longer one bundle: the owner wants to pull many levers at once, interpreted from natural language.
+  - The levers bend what the host **perceives** and what it **gives off** ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)).
+  - The senses may be finer than before. The fungus's own load is dropped as a sense, and the host's mode was never one.
+- **Answers fill in as situations come up.** When the aim changes, old answers stay in force, dimmed, until each situation's new answer arrives. Nothing re-asks the whole table, and nothing is pre-asked.
+- **The table stays out of sight.** It and per-cell pins are available in Learn and Details, not on the main screen, so the main screen keeps some magic.
+- **One fungus.** The three strains become lab presets.
+- **Colony policy is hidden until the fungus infects a queen.**
+  - After that, a colony's policy changes **only when a new queen is born**: a free rewrite, at that moment only.
+  - The new words drive **only her offspring**, in the **daughter colony she founds**.
+  - Her ants act on her mother's answers, dimmed, until their own arrive.
+- **How the new queen gets the fungus.** She picks it up by contact on her way out of the nest. No vertical transmission ([new-queens §4](new-queens.md#4-where-the-fungus-comes-in)).
+- **The fungus's lever on queen birth** must be a real lever in the catalogue. There are two: *queen signal* (emission, in the queen) and *queen scent* (perception, in nurses). Both are design, and both are built.
+- **Pace.**
+  - The page defaults to a faster speed (4×) rather than a separate game clock, so every rate scales together and no sim constant changes.
+  - Queen births may stay rare.
+  - **Games are saved** (IndexedDB autosave, slots) and played over several sittings.
+- **Jev is always on.**
+  - The page ships answers for the preset doctrines.
+  - When Jev cannot answer (no key, funds or cap spent, the Pages build), the game keeps playing on cached answers, but **no policy can be changed**, the fungus's or the ants'.
+- **Main screen and Details.** The main screen is decluttered. The colony table, Jev's figures, unity, infection, world settings and the lab tools move to a Details screen.
+
+**Research.** [new-queens.md](new-queens.md) (new):
+- colonies rear queens when large;
+- the queen's pheromone holds it back, and in fire ants workers kill sexual larvae while they sense it (Klobuchar & Deslippe 2002);
+- founding is claustral, on the queen's reserves.
+
+The game's rule follows: a fed larva where nurses perceive a faint queen's mark becomes a gyne, and one where they perceive a strong mark is culled.
+
+**Superseded.** `ja-ygc` (doctrine inherited by a fraction, through a founding queen) is superseded by the epic: a full rewrite, but only at a queen's birth.
+
+**Cost.** This section changes no request. Slice 4 (`ja-lo8.4`) changes the fungus lane's legend, situation and questions, and will report its tokens per question.
