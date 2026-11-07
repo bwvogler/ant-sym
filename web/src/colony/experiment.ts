@@ -817,7 +817,7 @@ export const open: Assay = { id: "open", title: "A6 control: the same battle on 
  * A11 — raiders find the rival round a pocket of wall (behaviour MR 5.2, docs/raid-recruitment.md). Two nests at either
  * end of a 120 × 60 arena; a pocket of wall between them, open toward the first nest, so a straight line from one to the
  * other runs into its back. The first colony is forced to raid; the second defends by the local rule.
- * Reported: the share of the raiders that ever came within RAID_REACH of the rival's nest; the share of the time raiders
+ * Reported: the share of the colony's raiders (the ants recruited: scouts, and those a scout's trail called) that ever came within RAID_REACH of the rival's nest; the share of the time raiders
  * outside their own nest were stuck (moved under 3 cells in 20 s, and not at the rival's nest); the first arrival.
  * Score: the trail's gain, the share reaching the rival with the raid trail against the same seed with no trail laid
  * (raidLay 0: scouts search alone; Polyergus raids stop without scouts, Topoff et al. 1987). Design marks: at least
@@ -840,7 +840,8 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
       const c = game.player;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
-        if (Math.hypot((c.x[i] as number) - rival.x, (c.y[i] as number) - rival.y) <= RAID_REACH) {
+        // Raiders only: on a raid stance an ant not recruited carries on as a forager (behaviour MR 5.2); raidGate 0 sends all.
+        if ((c.recruited[i] || c.params.raidGate <= 0) && Math.hypot((c.x[i] as number) - rival.x, (c.y[i] as number) - rival.y) <= RAID_REACH) {
           reached.add(i);
           if (Number.isNaN(first)) first = game.time;
         }

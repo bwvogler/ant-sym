@@ -187,31 +187,31 @@ test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer tow
   assert.ok(run(12) < y0 - 0.2, "strong: turned north, away");
 });
 
-test("raids by trail (behaviour MR 5.2): a raider that meets strangers outside goes home laying the raid trail; one at home waits for it", () => {
+test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside goes home laying the raid trail", () => {
   const run = (raidGate: number) => {
     const g = new Game(arena(), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid", colony: { raidGate } });
     const [a, b] = g.colonies as [Colony, Colony];
     for (let i = 0; i < a.n; i++) {
-      a.alive[i] = i < 2 ? 1 : 0;
+      a.alive[i] = i < 1 ? 1 : 0;
       b.alive[i] = i === 0 ? 1 : 0;
     }
-    // Ant 0 is out on the field beside a stranger; ant 1 is at its own nest.
+    // Ant 0 is out on the field beside a stranger, on a scout's errand.
+    g.tick(1 / 30); // the strategist's first answer sets the stance
     put(a, 0, 20, 6);
     put(b, 0, 20, 6);
-    put(a, 1, 4, 6);
+    a.recruited[0] = 1;
     let reported = 0;
-    let waited = 0;
-    for (let k = 0; k < 90; k++) {
+    for (let k = 0; k < 30; k++) {
+      if (!a.reporting[0]) put(a, 0, 20, 6); // it stays beside the stranger until it has met it long enough
       put(b, 0, 20, 6);
+      b.alive[0] = 1; // the stranger stays (the fight would kill it)
       g.tick(1 / 30);
       if (a.reporting[0]) reported++;
-      if (a.alive[1] && Math.hypot((a.x[1] as number) - a.nest.x, (a.y[1] as number) - a.nest.y) < a.nest.r) waited++;
     }
-    return { reported, waited, live: a.ph.live("raid") };
+    return { reported, live: a.ph.live("raid") };
   };
   const trail = run(1);
   assert.ok(trail.reported > 0 && trail.live, "a finder turned for home and laid the raid trail");
-  assert.ok(trail.waited > 60, "the raider at home waited: no trail, no word where the rival is");
   const old = run(0);
   assert.equal(old.reported, 0, "raidGate 0: no finders");
   assert.ok(!old.live, "raidGate 0: no trail");
@@ -253,30 +253,31 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
   assert.equal(reported, 0, "no finder on a raid trail");
 });
 
-test("raid call-off (behaviour MR 5.2): a raider that waits raidPatience seconds with no trail stands down, until the stance changes", () => {
-  const home = () => {
-    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidPatience: 5 }, mulberry32(8));
+test("raid stance as a bias (behaviour MR 5.2): an ant with no trail carries on as a forager, a trail or a scout's errand makes it a raider, and it is a forager again once home", () => {
+  const colony = (raidScout: number) => {
+    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout }, mulberry32(8));
     c.stance = "raid";
     put(c, 0, 4, 6);
     return c;
   };
-  // No trail: after 5 s (and a moment to start waiting) it reads its stance as forage.
-  const c = home();
-  c.tick(1 / 30);
-  assert.equal(c.touch(0, false).stance, "raid", "at first it is a raider");
-  for (let k = 0; k < 30 * 8; k++) c.tick(1 / 30);
-  assert.equal(c.touch(0, false).stance, "forage", "called off after raidPatience");
-  // A new stance is a new order: the clock starts afresh.
-  c.stance = "defend";
-  c.tick(1 / 30);
-  c.stance = "raid";
-  c.tick(1 / 30);
-  assert.equal(c.touch(0, false).stance, "raid", "raiding again once the stance changed");
-  // A trail under it keeps it a raider: the call is the trail, and it never gives up.
-  const t = home();
-  for (let k = 0; k < 30 * 8; k++) {
-    for (let y = 4; y <= 8; y++) for (let x = 2; x <= 6; x++) t.ph.deposit("raid", at(x, y).x, at(x, y).y, 1);
-    t.tick(1 / 30);
-  }
-  assert.equal(t.touch(0, false).stance, "raid", "no call-off on a trail");
+  // No trail, no errand: it acts on forage, however long the colony raids.
+  const c = colony(0);
+  for (let k = 0; k < 30 * 20; k++) c.tick(1 / 30);
+  assert.equal(c.touch(0, false).stance, "forage", "a raid stance idles no one");
+  // A scout's trail under it recruits it.
+  const t = colony(0);
+  for (let y = 4; y <= 8; y++) for (let x = 2; x <= 6; x++) t.ph.deposit("raid", at(x, y).x, at(x, y).y, 1);
+  t.tick(1 / 30);
+  assert.equal(t.touch(0, false).stance, "raid", "a trail recruits it");
+  // A scout (raidScout huge: it goes at once) is out as a raider, and a forager again when it comes home without a trail.
+  const sc = colony(1000);
+  sc.tick(1 / 30);
+  assert.equal(sc.touch(0, false).stance, "raid", "a scout acts on the raid");
+  assert.equal(sc.recruited[0], 1);
+  put(sc, 0, 20, 6); // away
+  sc.tick(1 / 30);
+  put(sc, 0, 4, 6); // and home again
+  sc.params.raidScout = 0;
+  sc.tick(1 / 30);
+  assert.equal(sc.touch(0, false).stance, "forage", "home with no trail: its raid is over");
 });
