@@ -894,12 +894,12 @@ export const raidFind: Assay = {
 };
 
 /**
- * A12 — a raid no one can find is called off (behaviour MR 5.2, docs/raid-recruitment.md: Polyergus raiders that mill about
- * the host nest for a few minutes begin an incohesive retreat; Gordon's foragers wait about 3 min with none returning).
- * One colony forced onto a raid stance with its rival sealed in rock, and a food pile it could forage. Raiders wait at home for a
- * scout's trail that never comes; the strategist raids when no food comes in, so a colony that never gives up never
- * eats (ja-7je). Score: food stored over 900 s against the same colony on a forage stance. Design mark: at least
- * RAID_STOP_FOOD of it. Reported: the share outside in the last 3 min.
+ * A12 — a raid no one can find doesn't starve the colony (behaviour MR 5.2, docs/raid-recruitment.md). One colony forced onto
+ * a raid stance with its rival sealed in rock, and a food pile it could forage. A raid stance is a bias, not an order: ants not
+ * recruited by a scout's trail go on foraging, and scouts that find no one tire and come home. (The first version made
+ * raiders wait at home for a trail that never came, and the strategist raids when no food comes in, so it never ate: 10 of
+ * 7,400.) Score: food stored over 900 s against the same colony on a forage stance. Design mark: at least RAID_STOP_FOOD
+ * of it. Reported: the share outside in the last 3 min.
  */
 export const RAID_STOP_FOOD = 0.5;
 function raidStopSpec(seed: number, stance: Stance): RunSpec {
@@ -921,7 +921,7 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
 }
 export const raidStop: Assay = {
   id: "raidStop",
-  title: "A12 a raid no one can find is called off",
+  title: "A12 a raid no one can find doesn't starve the colony",
   target: `food stored over 900 s on a raid stance with no rival ≥ ${RAID_STOP_FOOD * 100} % of the same colony's on a forage stance (design mark; docs/raid-recruitment.md)`,
   seconds: 900,
   spec: (seed) => raidStopSpec(seed, "raid"),

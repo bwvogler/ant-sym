@@ -4,6 +4,7 @@ import { at, nestAt, put } from "./hexmaps.ts";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, localPolicy, localStance, type Situation, type StanceSituation } from "../colony.ts";
+import { localResponses } from "../responses.ts";
 import { Game } from "../game.ts";
 import { foodIn, generateWorld, mulberry32, OPEN_WORLD, reachable, worldFromArrays, type WorldMap } from "../world.ts";
 
@@ -280,4 +281,36 @@ test("raid stance as a bias (behaviour MR 5.2): an ant with no trail carries on 
   sc.params.raidScout = 0;
   sc.tick(1 / 30);
   assert.equal(sc.touch(0, false).stance, "forage", "home with no trail: its raid is over");
+});
+
+test("raid stance as a bias (review of #41): an ant not recruited, put in FIGHT, does not walk to the rival hole's coordinates", () => {
+  const run = (raidGate: number) => {
+    const m = arena();
+    const c = new Colony(m, { antCount: 1, maxAnts: 1, nest: 0, raidGate, raidScout: 0 }, mulberry32(9), () => "fight");
+    c.stance = "raid";
+    c.raidTarget = nestAt(36, 6, 2);
+    put(c, 0, 12, 6);
+    c.heading[0] = Math.PI / 2; // facing across the field, not at the rival
+    for (let k = 0; k < 60; k++) c.tick(1 / 30);
+    return Math.hypot((c.x[0] as number) - c.raidTarget.x, (c.y[0] as number) - c.raidTarget.y);
+  };
+  const off = run(0); // the old rule: straight at the coordinates
+  const on = run(1);
+  assert.ok(on > off + 4, `not recruited, it doesn't head for the hole: ${on.toFixed(1)} cells off against ${off.toFixed(1)} with raidGate 0`);
+});
+
+test("raid stance as a bias (review of #41): leave asks a recruited ant as a raider (fight) and the others as foragers (return)", () => {
+  const asked = (recruited: boolean) => {
+    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0 }, mulberry32(10));
+    const modes = new Set<string>();
+    c.responses = { ...localResponses, leave: (t) => (modes.add(t.mode), "wait") };
+    c.stance = "raid";
+    put(c, 0, 4, 6);
+    c.mode[0] = 2; // return
+    if (recruited) c.recruited[0] = 1;
+    for (let k = 0; k < 30 * 15; k++) c.tick(1 / 30);
+    return [...modes];
+  };
+  assert.deepEqual(asked(true), ["fight"]);
+  assert.deepEqual(asked(false), ["return"]);
 });

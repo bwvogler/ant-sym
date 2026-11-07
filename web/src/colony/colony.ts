@@ -3041,15 +3041,12 @@ export class Colony {
     return this.stance === "raid" && this.recruited[i] === 0 && this.params.raidGate > 0 && this.#entrance === null ? "forage" : this.stance;
   }
 
-  /** The raid trail under ant i (behaviour MR 5.2); "strong" where the colony doesn't recruit raiders by trail. */
+  /**
+   * The raid trail ant i smells, strongest of its cell and its three sensors (behaviour MR 5.2): what recruits it, what it is asked
+   * `leave` with, and what keeps it recruited. "strong" where the colony doesn't recruit raiders by trail.
+   */
   #raidSmelt(i: number): "none" | "faint" | "strong" {
     if (this.params.raidGate <= 0 || this.#entrance !== null) return "strong";
-    if (!this.ph.live("raid")) return "none";
-    return trailLevel(this.ph.read("raid", this.x[i] as number, this.y[i] as number));
-  }
-
-  /** The raid trail ant i smells, strongest of its cell and its three sensors (behaviour MR 5.2); where recruitment reads it. */
-  #raidSense(i: number): "none" | "faint" | "strong" {
     if (!this.ph.live("raid")) return "none";
     const x = this.x[i] as number;
     const y = this.y[i] as number;
@@ -3206,7 +3203,7 @@ export class Colony {
         const homeNow = this.#atNestTop(i);
         if (!homeNow) this.#gone[i] = 1;
         if (this.recruited[i] === 0) {
-          if (this.#raidSense(i) !== "none") {
+          if (this.#raidSmelt(i) !== "none") {
             this.recruited[i] = 1;
             this.#gone[i] = 0;
           } else if (homeNow && !this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && this.#rng() < 1 - Math.exp(-p.raidScout * dt)) {
@@ -3622,7 +3619,9 @@ export class Colony {
           const rr = Math.max(0, ph.read("raid", x + Math.cos(h + a) * d, y + Math.sin(h + a) * d));
           if (Math.max(rl, rf, rr) >= FAINT) h += climb(rl, rf, rr, p.turnRate * dt) + noise * p.wander * 0.25;
           else h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander;
-        } else if (this.stance === "raid" && this.raidTarget && !detouring) {
+        } else if (!rgate && this.stance === "raid" && this.raidTarget && !detouring) {
+          // At the rival hole's coordinates: the side view, or raidGate 0 (review of #41: an ant not recruited, put in FIGHT by Jev's
+          // mode lane or a contact, walked here on a top-down map).
           const t = this.raidTarget;
           h = turnToward(h, Math.atan2(t.y - (this.y[i] as number), t.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
           // The rival's midden marks its ground: raiders shy from it (Pogonomyrmex badius; slice 7).

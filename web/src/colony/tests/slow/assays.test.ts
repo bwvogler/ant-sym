@@ -71,9 +71,9 @@ test("A11 the raid trail gains 1.5× on most seeds", { todo: "ja-sf1: gain 1.24 
   assert.ok(passed >= 6, `${passed}/10`);
 });
 
-// Behaviour MR 5.2 (PRD §49.5): A12 passes 20/20 at raidPatience 120 (food stored 0.86 of the forage colony's, worst 0.73); before the
-// call-off it stored 10 of 7,400.
-test("A12 a raid no one can find is called off: the colony eats again", () => {
+// Behaviour MR 5.2 (PRD §49.3): A12 passes 20/20 (food stored 1.00 of the forage colony's, worst 0.99); the first version, with raiders
+// waiting for a trail, stored 10 of 7,400.
+test("A12 a raid no one can find doesn't starve the colony", () => {
   for (const seed of [1, 2]) {
     const m = runAssay(raidStop, seed).metrics;
     assert.equal(m.pass, 1, `seed ${seed}: stored ${m.stored} of ${m.control}`);
