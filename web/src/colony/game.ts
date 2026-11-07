@@ -47,6 +47,11 @@ export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts:
 /** Bump when what a save holds changes: an older save is refused, not misread. */
 export const SAVE_VERSION = 1;
 
+/** Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony). */
+export const HOLE_GAP = 8;
+/** World units between two nests' centres at the least (top-down maps). */
+export const NEST_GAP = 12;
+
 /** A colony added mid-game (Game.addColony): where, how many ants, its odour. */
 export interface Founding {
   x: number;
@@ -54,6 +59,11 @@ export interface Founding {
   antCount: number;
   odour: number;
   maxAnts?: number;
+  /**
+   * The nest as dug (Game.addColony records it). A save founds from it rather than digging again: a second dig would
+   * draw from the restored game's random stream and could put the shaft elsewhere (PR #42 review, B1).
+   */
+  nest?: Nest;
 }
 
 /** A saved game (Game.save): JSON. */
@@ -206,6 +216,7 @@ export class Game {
   /** Wire every colony to the game: its grids, burials, enemies, the other nests, its raids. Again whenever a colony is added. */
   #wire(): void {
     this.colonies.forEach((c, k) => {
+      c.seeHoles();
       if (this.map.hasSoil) c.friends = this.#grids[k] as CountGrid;
       // Undertakers put the dead on the midden: a host of a strain that sporulates (Bloom) puts spores on the ground there;
       // other strains die with their host (nest slices 7–8).
@@ -233,19 +244,49 @@ export class Game {
    */
   addColony(f: Founding): number {
     const k = this.colonies.length;
+    // The new nest's index in map.nests, which holds the world's nests whether or not a colony lives in each (with the
+    // rival off, nest 1 is the world's unused second nest): never the colony's index (PR #42 review, B2).
+    const at = this.map.nests.length;
     let nest: Nest;
-    if (this.map.sky) {
+    if (f.nest) nest = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
+    else if (this.map.sky) {
       cellOf(f.x, f.y);
-      nest = foundNest(this.map, CELL[0] as number, k, this.#rng);
-    } else nest = { x: f.x, y: f.y, r: 3 };
+      nest = foundNest(this.map, this.#freeColumn(CELL[0] as number), at, this.#rng);
+    } else nest = { ...this.#freeSpot(f.x, f.y), r: 3 };
     this.map.nests.push(nest);
-    const c = new Colony(this.map, { antCount: f.antCount, maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)), nest: k, odour: f.odour, tolerance: this.recognition.params.tolerance }, this.#rng, localPolicy, localStance);
+    const c = new Colony(this.map, { antCount: f.antCount, maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)), nest: at, odour: f.odour, tolerance: this.recognition.params.tolerance }, this.#rng, localPolicy, localStance);
     this.colonies.push(c);
     this.#grids.push(new CountGrid());
-    this.founded.push({ ...f });
+    this.founded.push({ ...f, nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) } });
     this.#wire();
     this.#refresh();
     return k;
+  }
+
+  /**
+   * The column nearest `col` at least HOLE_GAP columns from every hole (side view): a second founding at the same spot
+   * moves along rather than digging into a hole that is already there (PR #42 review, S2).
+   */
+  #freeColumn(col: number): number {
+    const taken = this.map.nests.flatMap((n) => {
+      if (!n.entrance) return [];
+      cellOf(n.entrance.x, n.entrance.y);
+      return [CELL[0] as number];
+    });
+    const w = this.map.size.w;
+    for (let d = 0; d < w; d++)
+      for (const c of d === 0 ? [col] : [col + d, col - d])
+        if (c >= HOLE_GAP && c < w - HOLE_GAP && taken.every((t) => Math.abs(t - c) >= HOLE_GAP)) return c;
+    throw new Error("addColony: no room for another hole");
+  }
+
+  /** The spot nearest (x, y) along x at least NEST_GAP from every nest (top-down): as #freeColumn, for nests' discs. */
+  #freeSpot(x: number, y: number): { x: number; y: number } {
+    const { w } = this.map.size;
+    const clear = (cx: number) => this.map.nests.every((n) => Math.hypot(n.x - cx, n.y - y) >= NEST_GAP);
+    for (let d = 0; d < w; d += 1)
+      for (const cx of d === 0 ? [x] : [x + d, x - d]) if (cx >= NEST_GAP && cx <= w - NEST_GAP && clear(cx)) return { x: cx, y };
+    throw new Error("addColony: no room for another nest");
   }
 
   /** The ground's food piles now (as the world began): cells with food, on the walkway in the side view, anywhere top-down. */
@@ -478,7 +519,7 @@ export class Game {
       landed: encode(this.landed),
       regrown: this.regrown,
       revealed: [...this.revealed],
-      founded: this.founded.map((f) => ({ ...f })),
+      founded: this.founded.map((f) => JSON.parse(JSON.stringify(f)) as Founding),
       params: encode(this.params),
       map: encode(map),
       colonies: this.colonies.map((c) => c.saveState()),

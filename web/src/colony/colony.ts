@@ -620,11 +620,7 @@ export class Colony {
       cellOf(this.nest.entrance.x, this.nest.entrance.y);
       this.#entranceCol = CELL[0] as number;
       this.#entranceRow = CELL[1] as number;
-      for (const n of map.nests ?? [this.nest])
-        if (n.entrance) {
-          cellOf(n.entrance.x, n.entrance.y);
-          this.#holes.push(CELL[0] as number);
-        }
+      this.seeHoles();
     }
     this.policy = policy;
     this.stancePolicy = stancePolicy;
@@ -743,6 +739,21 @@ export class Colony {
   }
 
   /** Where the queen lies (world position): the royal chamber's floor row, the cell on it nearest the founding chamber's centre. */
+  /**
+   * Every nest's hole on the map (side view), whose funnels the colony's mound keeps open (world.heapMound). Again
+   * whenever a colony is founded (Game.addColony), so an older colony's mound never buries the new hole (PR #42
+   * review, S3).
+   */
+  seeHoles(): void {
+    if (!this.#entrance) return;
+    this.#holes = [];
+    for (const n of this.map.nests ?? [this.nest])
+      if (n.entrance) {
+        cellOf(n.entrance.x, n.entrance.y);
+        this.#holes.push(CELL[0] as number);
+      }
+  }
+
   #royalFloor(ch: Chambers): { x: number; y: number } {
     const royal = ch.list.find((c) => c.colony === this.params.nest && c.role === "royal");
     if (!royal) return { x: this.nest.x, y: this.nest.y };
