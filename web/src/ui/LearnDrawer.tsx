@@ -460,7 +460,7 @@ function StanceExplainer() {
           ["intake", "none · some · plenty", "food its foragers brought home lately, for its size"],
           ["larder", "low · full", "food stored beyond what new ants need"],
         ]}
-        note="The strategist is not an ant: it reads colony totals. Its food is the rate foragers bring it home (behaviour MR 5), not what is left on the map; the stance is still broadcast, and raids still aim at the rival's hole by its coordinates (ja-k4k.6, ja-tu3)."
+        note="The strategist is not an ant: it reads colony totals. Its food is the rate foragers bring it home (behaviour MR 5), not what is left on the map; the stance is still broadcast, and on the side view raids still aim at the rival's hole by its coordinates (ja-k4k.6); on the top-down map a scout that meets strangers lays a trail home and the fighters follow it (behaviour MR 5.2)."
       />
       <Choices items={STANCES.map((m) => [m, STANCE_CRITERIA[m].replace(/^\w+: /, "")])} />
       <RuleTable rows={LOCAL_STANCE_RULES} otherwise={`Otherwise: ${LOCAL_STANCE_OTHERWISE}.`} />

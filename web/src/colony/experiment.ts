@@ -814,6 +814,125 @@ export const pass: Assay = {
 export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass` (which runs it too); report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
 
 /**
+ * A11 — raiders find the rival round a pocket of wall (behaviour MR 5.2, docs/raid-recruitment.md). Two nests at either
+ * end of a 120 × 60 arena; a pocket of wall between them, open toward the first nest, so a straight line from one to the
+ * other runs into its back. The first colony is forced to raid; the second defends by the local rule.
+ * Reported: the share of the raiders that ever came within RAID_REACH of the rival's nest; the share of the time raiders
+ * outside their own nest were stuck (moved under 3 cells in 20 s, and not at the rival's nest); the first arrival.
+ * Score: the trail's gain, the share reaching the rival with the raid trail against the same seed with no trail laid
+ * (raidLay 0: scouts search alone; Polyergus raids stop without scouts, Topoff et al. 1987). Design marks: at least
+ * RAID_GAIN times as many reach the rival with the trail, and at most RAID_STUCK of the outside samples are stuck.
+ * `straight` is the same battle with the raiders sent at the rival hole's coordinates (`raidGate` 0, as before MR 5.2): the
+ * trail is a sensed cue, and costs reach against it (review of #41).
+ */
+export const RAID_REACH = 10;
+export const RAID_GAIN = 1.5;
+export const RAID_STUCK = 0.1;
+function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number }): Probe {
+  const reached = new Set<number>();
+  const was: number[][] = [];
+  let nextAt = 20;
+  let first = NaN;
+  let stuck = 0;
+  let outside = 0;
+  return {
+    tick(game) {
+      const c = game.player;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i]) continue;
+        if (Math.hypot((c.x[i] as number) - rival.x, (c.y[i] as number) - rival.y) <= RAID_REACH) {
+          reached.add(i);
+          if (Number.isNaN(first)) first = game.time;
+        }
+      }
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 20;
+      for (let i = 0; i < c.n; i++) {
+        const x = c.x[i] as number;
+        const y = c.y[i] as number;
+        const prev = was[i];
+        was[i] = [x, y];
+        if (!c.alive[i] || !prev) continue;
+        if (Math.hypot(x - own.x, y - own.y) <= c.nest.r + 2 || Math.hypot(x - rival.x, y - rival.y) <= RAID_REACH) continue;
+        outside++;
+        if (Math.hypot(x - (prev[0] as number), y - (prev[1] as number)) < 3) stuck++;
+      }
+    },
+    summary(game) {
+      return { reached: reached.size / Math.max(1, game.player.params.antCount), stuck: outside ? stuck / outside : NaN, firstReach: first };
+    },
+  };
+}
+function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
+  const a = new Arena(120, 60).carve(2, 2, 117, 57).wall(40, 18, 60, 20).wall(40, 40, 60, 42).wall(58, 18, 60, 42);
+  const own = at(20, 30);
+  const rival = at(100, 30);
+  return {
+    seed,
+    seconds: 300,
+    map: () => a.build([{ x: 20, y: 30, r: 3 }, { x: 100, y: 30, r: 3 }]),
+    game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
+    sides: { stance: always<Stance>("raid"), ...(colony ? { colony } : {}) },
+    probes: [raidProbe(own, rival)],
+  };
+}
+export const raidFind: Assay = {
+  id: "raidFind",
+  title: "A11 raiders find the rival: the raid trail's gain, and stuck ants",
+  target: `≥ ${RAID_GAIN}× as many raiders reach the rival's nest with the raid trail as without; ≤ ${RAID_STUCK * 100} % of outside samples stuck (design marks; docs/raid-recruitment.md, ja-jwy)`,
+  seconds: 300,
+  spec: (s) => raidFindSpec(s),
+  score: (r) => {
+    const reached = r.metrics.reached as number;
+    const deaf = runGame(raidFindSpec(r.seed, { raidLay: 0 })).result.metrics.reached as number;
+    const straight = runGame(raidFindSpec(r.seed, { raidGate: 0 })).result.metrics.reached as number; // main: at the rival hole's coordinates
+    const gain = deaf > 0 ? reached / deaf : NaN;
+    const stuck = r.metrics.stuck as number;
+    return { reached, deaf, straight, gain, stuck, firstReach: r.metrics.firstReach as number, pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0 };
+  },
+};
+
+/**
+ * A12 — a raid no one can find is called off (behaviour MR 5.2, docs/raid-recruitment.md: Polyergus raiders that mill about
+ * the host nest for a few minutes begin an incohesive retreat; Gordon's foragers wait about 3 min with none returning).
+ * One colony forced onto a raid stance with its rival sealed in rock, and a food pile it could forage. Raiders wait at home for a
+ * scout's trail that never comes; the strategist raids when no food comes in, so a colony that never gives up never
+ * eats (ja-7je). Score: food stored over 900 s against the same colony on a forage stance. Design mark: at least
+ * RAID_STOP_FOOD of it. Reported: the share outside in the last 3 min.
+ */
+export const RAID_STOP_FOOD = 0.5;
+function raidStopSpec(seed: number, stance: Stance): RunSpec {
+  const nest = at(50, 50);
+  const food = at(50, 15);
+  return {
+    seed,
+    seconds: 900,
+    map: () => {
+      // The rival's nest is sealed in a pocket of rock: a stance is consulted only with two colonies, and no one can find it.
+      const a = new Arena(100, 100, true).wall(84, 84, 98, 98).carve(87, 87, 95, 95);
+      a.pile(50, 15, 3, 200);
+      return a.build([{ x: 50, y: 50, r: 3 }, { x: 91, y: 91, r: 3 }]);
+    },
+    game: { antCount: 300, rivalAnts: 30 },
+    sides: { stance: always<Stance>(stance) },
+    probes: [outingProbe(nest, { Late: [720, 900] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
+  };
+}
+export const raidStop: Assay = {
+  id: "raidStop",
+  title: "A12 a raid no one can find is called off",
+  target: `food stored over 900 s on a raid stance with no rival ≥ ${RAID_STOP_FOOD * 100} % of the same colony's on a forage stance (design mark; docs/raid-recruitment.md)`,
+  seconds: 900,
+  spec: (seed) => raidStopSpec(seed, "raid"),
+  score: (r) => {
+    const stored = r.metrics["you.stored"] as number;
+    const control = runGame(raidStopSpec(r.seed, "forage")).result.metrics["you.stored"] as number;
+    const share = control > 0 ? stored / control : NaN;
+    return { stored, control, share, outsideLate: r.metrics.outsideLate as number, pass: share >= RAID_STOP_FOOD ? 1 : 0 };
+  },
+};
+
+/**
  * A9 — strangers meet at food (behaviour MR 4, docs/combat.md). Two colonies on stance forage, nests at either end of
  * an open field, one food pile between them: their foragers meet there. At food, the ant that didn't start an encounter
  * usually retreats (Human & Gordon 1996); foragers don't fight to the death over a bait. Score: ants lost per 100 food
@@ -969,4 +1088,4 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, contact, faintAlarm, game, gameTop, nestFlow];
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, faintAlarm, game, gameTop, nestFlow];

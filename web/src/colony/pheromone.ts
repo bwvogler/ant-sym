@@ -22,7 +22,7 @@ import type { WorldMap } from "./world.ts";
 // shifted right, a chunk's top-left corner also touches the chunk diagonally
 // up-left, and its bottom-right corner the chunk diagonally down-right.
 
-export type Channel = "food" | "home" | "alarm" | "noEntry" | Mark;
+export type Channel = "food" | "home" | "alarm" | "noEntry" | "raid" | Mark;
 /**
  * The nest's road signs (nest slice 3, docs/nest-and-home.md §3.3): each chamber's role, laid on the floor by ants that
  * have been in it, fading the farther they have walked, so each leads back to its kind of chamber (Heyman et al. 2017).
@@ -30,7 +30,7 @@ export type Channel = "food" | "home" | "alarm" | "noEntry" | Mark;
  */
 export type Mark = "royal" | "brood" | "store" | "reception" | "midden";
 export const MARKS: Mark[] = ["royal", "brood", "store", "reception", "midden"];
-export const CHANNELS: Channel[] = ["food", "home", "alarm", "noEntry", ...MARKS];
+export const CHANNELS: Channel[] = ["food", "home", "alarm", "noEntry", "raid", ...MARKS];
 
 export interface ChannelParams {
   /** share lost per second */
@@ -48,6 +48,9 @@ export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
   // "No entry" (behaviour MR 3, docs/trails.md): laid where a food trail ends at no food. Robinson et al. 2008: the
   // repellent lasts about 2.4× the short-lived attractive trail (78 against 33 min), so t½ ≈ 27 s against food's 11.6 s.
   noEntry: { evaporation: 0.026, diffusion: 0.3 },
+  // The raid trail (behaviour MR 5.2, docs/raid-recruitment.md): laid by a scout that met strangers, going home. It outlives
+  // a trip out, not the raid: t½ ≈ 17 s.
+  raid: { evaporation: 0.04, diffusion: 0.3 },
   // Floor marks keep: slow to fade, not spreading (a sign on the floor, not a cloud; spreading them cost 10 % of a tick).
   royal: { evaporation: 0.01, diffusion: 0 },
   brood: { evaporation: 0.01, diffusion: 0 },
