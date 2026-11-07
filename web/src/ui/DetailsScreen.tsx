@@ -8,7 +8,7 @@ import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import Help from "./Help.tsx";
 import { colonyName, colonyTone } from "./names.ts";
 import { seg } from "./styles.ts";
-import { STRAINS, type ColonyControls, type ColonyStats, type Ground, type SideStats } from "./useColony.ts";
+import { MAX_SPEED, STRAINS, type ColonyControls, type ColonyStats, type Ground, type SideStats } from "./useColony.ts";
 import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 
@@ -246,7 +246,7 @@ function World({ game, controls, update, stats, restart, newWorld }: Props) {
         <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />
       </label>
       <Slider label="Ants per colony" value={controls.antCount} min={100} max={2000} step={50} format={(v) => String(v)} onChange={(v) => update({ antCount: v })} />
-      <Slider label="Speed" value={controls.speed} min={0.25} max={4} step={0.25} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => update({ speed: v })} />
+      <Slider label="Speed" value={controls.speed} min={0.25} max={MAX_SPEED} step={0.25} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => update({ speed: v })} />
       <div className="mt-3 flex items-center justify-between">
         <span className="flex items-center gap-1.5">
           Trails drawn <Help to={{ tab: "guide", id: "food-trail" }} label="trails" />

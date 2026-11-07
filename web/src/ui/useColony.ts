@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Colony, Mode, Stance } from "../colony/colony.ts";
 import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, gameRng, type Outcome, type Unity } from "../colony/game.ts";
+import { chapterOf, type ChapterView } from "../colony/chapters.ts";
+import { colonyName } from "./names.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
@@ -35,11 +37,22 @@ export interface ColonyControls {
   rival: boolean;
   /** the side view (a cross-section: sky, the ground line, the nest dug below) or the open surface from above */
   ground: Ground;
+  /** the player pressed Start (the start screen, ja-lo8.5): every game from then on begins with the fungus landing */
+  started: boolean;
 }
 
 export type Ground = "side" | "open";
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side" };
+/** The game's default speed (owner, PRD §49: faster by default, every rate scaled together; no sim constant changes). */
+export const GAME_SPEED = 4;
+/** The top speed the controls offer. */
+export const MAX_SPEED = 8;
+/** The game's fungus: one species, the player's, which spreads like Garden (PRD §49; the other strains are lab presets). */
+export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
+/** The colony the fungus lands by. */
+export const LANDING_COLONY = 0;
+
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: GAME_STRAIN, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side" };
 
 /** The spore brush, per paint event: radius in cells, spores laid per cell, and load dosed into each ant under it. */
 const SPORES = { radius: 3, spores: 2, dose: 0.15 } as const;
@@ -91,6 +104,10 @@ export interface ColonyStats {
   sporeCells: number;
   /** how far the fungus has come toward one colony */
   unity: Unity;
+  /** sim seconds per wall second over the last second: below the speed asked when the machine can't keep up */
+  pace: number;
+  /** where the player stands (chapters.ts) */
+  chapter: ChapterView;
 }
 
 /** Ants in each mode, over every colony. */
@@ -144,6 +161,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     const decisions = () => game.colonies.reduce((n, c) => n + c.decisions, 0);
     let rateAt = { t: colony.time, decisions: decisions() };
     let rate = 0;
+    let paceAt = { wall: performance.now(), sim: game.time };
+    let pace = controls.playing ? controls.speed : 0;
     const loop = (t: number) => {
       // Clamped both ways: a first frame stamped before `last` would step the sim backwards (negative trail).
       const dt = Math.max(0, Math.min(0.05, (t - last) / 1000));
@@ -152,6 +171,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         const total = dt * controls.speed;
         const steps = Math.max(1, Math.ceil(total / MAX_STEP));
         for (let k = 0; k < steps; k++) game.tick(total / steps);
+      }
+      if (t - paceAt.wall >= 1000) {
+        pace = ((game.time - paceAt.sim) * 1000) / (t - paceAt.wall);
+        paceAt = { wall: t, sim: game.time };
       }
       if (colony.time - rateAt.t >= 1) {
         rate = (decisions() - rateAt.decisions) / (colony.time - rateAt.t);
@@ -171,6 +194,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           outcome: game.outcome(),
           sporeCells: game.fungus.sporeCells,
           unity: game.unity(),
+          pace,
+          chapter: chapterFor(game),
         });
         lastStats = t;
       }
@@ -186,6 +211,13 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [game, colony, controls.playing, controls.speed]);
+
+  // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
+  useEffect(() => {
+    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN);
+  }, [game, controls.started]);
+  /** The start screen's Start: this seed, playing, the fungus lands. */
+  const start = useCallback((seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })), []);
 
   const onFrame = useCallback((fn: () => void) => {
     frameListeners.current.add(fn);
@@ -203,5 +235,13 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     [game, controls.brush, controls.strain],
   );
 
-  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint };
+  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start };
+}
+
+/** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */
+function chapterFor(game: Game): ChapterView {
+  const k = game.landed?.colony ?? LANDING_COLONY;
+  const c = game.colonies[k] ?? game.player;
+  const f = game.fungus.census(c);
+  return chapterOf({ landed: game.landed !== null, colony: colonyName(k), hosts: f.infected, share: f.living ? f.infected / f.living : 0, queenInfected: false, gynes: 0, daughters: 0 });
 }

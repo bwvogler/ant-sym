@@ -3244,3 +3244,40 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 | Bloom | 68 | 23 | 914 | 0.0026 | 0.031 |
 
 Before (§39): 44–81 situations and about 560 tokens per situation as asked, $0.001–0.002 a game. Asking every lever costs about 1.5× per situation, under a cent an hour more.
+
+### 49.4 Slice 5: start, 4×, the landing, goals (ja-lo8.5, 2026-11-07)
+
+**Built:**
+- **The start screen** (`ui/StartScreen.tsx`) explains what the player is and has a world seed and Start. The field waits behind it, paused.
+- **Start lands the fungus.** `Game.land(k, strain)` drops spores on the ground just past colony k's hole: 3 cells along, radius 2, 3 spores, and no ant dosed directly. The first hosts are ants that walk through it. The game's fungus is Garden.
+- **Every later game lands too.** Once started, New world and Restart also begin with the landing.
+- **Speed.** The page defaults to **4×**, the top bar offers 1–8×, and Details has a slider to 8×. No sim constant changed (owner, §49).
+- **"Running at N×".** The top bar shows it when the measured sim-seconds per wall-second fall below 85 % of the speed asked (`ColonyStats.pace`).
+- **Goals.** `colony/chapters.ts` (pure, tested) drives a goal line in the top bar and a notice when a chapter ends:
+  1. land;
+  2. a first host;
+  3. a quarter of the colony;
+  4. the queen;
+  5. a new queen;
+  6. her colony.
+
+  Chapters 4–6 wait on `ja-lo8.7` and `ja-lo8.9`.
+
+**Measured:**
+- **The landing:** the first host within 2 minutes (test). In the browser, Garden took the whole Ink colony about 80 s of sim after the landing, so chapter 3 passes almost at once. This is Garden's spread as built (`ja-260`, the fungus budget), and the goals wait on balance (`ja-lo8.10`).
+- **Speed:** 3.6–3.8× real against 4× asked, on a 4-core machine with three benchmarks running, with no "running at" warning.
+
+**The blocker: a 2-hour game runs every colony down.** `scripts/economy-bench.mjs`, 7,200 s (30 minutes at 4×), 600 + 600 ants, no fungus, local rule:
+
+| Seed | First queen lost | At 7,200 s |
+|---|---|---|
+| 1 | Ink, by 3,600 s | Ink gone; Amber 95 ants, its intake 0.07/s |
+| 2 | Ink, by 1,200 s | both gone: Amber's last ants aged out with 123 unfed larvae beside 325 food in its larder |
+| 3 | Amber, by 1,200 s | Amber gone; Ink 137 ants, falling |
+
+Three existing problems, each with its bead:
+- **War (`ja-war`).** About 1,000 ants of the losing colony die in fights, and raids reach a queen within 20–60 min.
+- **Surface food runs out (`ja-p0k`).** About three quarters of the map's food lies underground and is never foraged, so intake falls to 0 by 2,400 s.
+- **Feeding collapses (`ja-xu6`).** On seed 2, larvae starve beside a full larder once the young are gone.
+
+Since the queen and new queens are the game's middle chapters, slices 7–9 need colonies that last. The owner decides how (§49.5).

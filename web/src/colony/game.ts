@@ -86,6 +86,9 @@ const MIDDEN_SPORES = 3;
 /** Seconds without a fight death that unity asks for. */
 export const QUIET = 60;
 
+/** The fungus's landing (Game.land): this far past the hole (cells, along the ground), spores over this radius. */
+export const LANDING = { offset: 3, radius: 2, spores: 3 };
+
 /**
  * The colony c would raid, of any number: the nearest (hole to hole, or nest to nest on a top-down map) that is not
  * beaten and does not smell like kin (nest odours more than `tolerance` apart); null if there is none.
@@ -269,6 +272,25 @@ export class Game {
         this.strategyChoices++;
       });
     }
+  }
+
+  /** Where the fungus landed (Game.land), or null before it has: the fungus game's start (ja-lo8.5). */
+  landed: { colony: number; x: number; y: number; at: number } | null = null;
+
+  /**
+   * The fungus game's start (ja-lo8.5): the player's fungus falls as a few spores on the ground just outside colony k's
+   * hole, where its ants walk out and back. No ant is dosed directly: the first hosts are ants that walk through it.
+   * The top-down maps have no hole: it falls at the nest's rim. Lands once; returns where.
+   */
+  land(k: number, strain: number, spores = LANDING.spores): { x: number; y: number } {
+    if (this.landed) return this.landed;
+    const c = this.colonies[k] ?? this.player;
+    const e = c.nest.entrance ?? { x: c.nest.x + c.nest.r, y: c.nest.y };
+    const x = e.x + LANDING.offset;
+    const y = e.y - (c.nest.entrance ? 0.5 : 0);
+    this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
+    this.landed = { colony: k, x, y, at: this.time };
+    return this.landed;
   }
 
   /** The spore brush: spores on the ground within `radius` of (x, y), and a dose of load into every ant there, of any colony. */

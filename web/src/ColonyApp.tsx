@@ -7,7 +7,8 @@ import DetailsScreen from "./ui/DetailsScreen.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
-import { useColony, type ColonyStats } from "./ui/useColony.ts";
+import { MAX_SPEED, useColony, type ColonyStats } from "./ui/useColony.ts";
+import StartScreen from "./ui/StartScreen.tsx";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo } from "./ui/backend.ts";
 import { useBackend } from "./ui/useBackend.ts";
@@ -27,11 +28,11 @@ import { pushToast } from "./ui/toasts.ts";
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 
-/** The speeds the top bar offers; the Details screen's slider has the rest. */
-const SPEEDS = [0.5, 1, 2, 4] as const;
+/** The speeds the top bar offers (4× is the game's default; PRD §49); the Details screen's slider has the rest. */
+const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {
-  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint } = useColony();
+  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start } = useColony();
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend);
   const [details, setDetails] = useState(false);
@@ -83,6 +84,7 @@ export default function ColonyApp() {
       />
       <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} />
       <Toasts />
+      {!controls.started && <StartScreen seed={controls.seed} onStart={start} />}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm" aria-label="game bar">
         <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={() => update({ playing: !controls.playing })}>
@@ -98,6 +100,11 @@ export default function ColonyApp() {
         <span className="font-mono tabular-nums text-fg-2" title="sim time">
           {clock(stats?.time ?? 0)}
         </span>
+        {stats && controls.playing && stats.pace > 0 && stats.pace < controls.speed * 0.85 && (
+          <span className="rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn" title="This machine can't step the sim that fast: it runs as fast as it can">
+            running at {stats.pace.toFixed(1)}×
+          </span>
+        )}
         <span className="min-w-0 basis-full text-fg-2 sm:basis-0 sm:flex-1 sm:truncate">{goalLine(stats)}</span>
         {painting && (
           <span className="flex items-center gap-2 rounded-md border border-spore/40 bg-raised px-2 py-1 text-xs text-spore">
@@ -221,8 +228,8 @@ function goalLine(stats: ColonyStats | null): string {
   if (!stats) return "";
   if (stats.outcome === "fallen") return `The ${colonyName(stats.fallen)} colony is gone: there is no one left to unite it with.`;
   if (stats.outcome === "unified") return "One colony: the nests smell alike and nobody has died fighting for a minute.";
-  const infected = stats.sides.some((s) => s.infected > 0);
-  return infected ? "The fungus is spreading." : "No ant carries the fungus yet. (Lab: Details → spore brush.)";
+  const c = stats.chapter;
+  return `${c.step < 7 ? `${c.step}. ` : ""}${c.goal}${c.progress > 0 && c.progress < 1 ? ` (${Math.round(100 * c.progress)}%)` : ""}`;
 }
 
 /** Notices for what changed: the game's outcome, and Jev's state where it locks the policies. */
@@ -234,6 +241,15 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
     seenOutcome.current = outcome;
     if (outcome !== "playing") pushToast(goalLine(stats), outcome === "unified" ? "good" : "warn");
   }, [outcome, stats]);
+  // A new chapter is worth a notice.
+  const chapter = stats?.chapter.chapter;
+  const seenChapter = useRef(chapter);
+  useEffect(() => {
+    if (chapter === seenChapter.current) return;
+    const first = seenChapter.current === undefined;
+    seenChapter.current = chapter;
+    if (!first && stats && chapter !== "land") pushToast(goalLine(stats), "good");
+  }, [chapter, stats]);
   // Losing Jev mid-game (the cap, a stop) is worth a notice; the lock at page load is in the panel already.
   const wasRunning = useRef(false);
   useEffect(() => {

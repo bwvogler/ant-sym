@@ -59,6 +59,7 @@ spend and time caps from the real `usage.input_tokens` of every reply.
 ## What you can do
 
 - **The fungus game** (the epic `ja-lo8`, PRD §49): a procedural world seen from the side (*Details → Ground → from above* for the surface), with two colonies, Ink and Amber. Food makes ants, fights kill them, and each colony's strategist picks forage, defend or raid. The ants forage on their own: they lay a trail to food and a trail home, and switch between exploring, following and going home.
+  - A start screen opens the game: your spores fall by the Ink colony's hole and ants walking out pick them up (`Game.land`). It runs at 4× by default (1–8× in the top bar), and the top bar's goal line follows the chapters (`colony/chapters.ts`).
   - You are the fungus and nothing else. The main screen is the field, a top bar (play, speed, time, where the game stands) and the fungus's panel: how far it has spread, and its **aim**, your words for what it wants.
   - Jev is always on. It starts as soon as the server and its key are there, and picks every colony's ant modes and stances under its doctrine, and what the fungus does under your aim, each once per situation, for roughly $0.10–0.15 an hour of retuning (PRD §11–12, §19).
   - The page ships Jev's answer to every ant and strategist situation under each preset doctrine (`web/public/precache/`, `scripts/precache.mjs`), so a first game asks Jev almost nothing. Answers are kept and keep playing when Jev can't run (no key, the spend cap reached, the Pages build); then no policy can be changed.
