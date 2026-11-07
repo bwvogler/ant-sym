@@ -192,26 +192,33 @@ export class ColonyJev {
     };
   }
 
+  /**
+   * The answer for situation s in lane l: Jev's cached answer whenever there is one, run or no run (the fungus game,
+   * ja-lo8.2: Jev is always on, and when it can't answer the game plays on what it already answered); else the local
+   * rule, and, while a run is on, the situation is queued to be asked.
+   */
   #lookup<S, A extends string>(l: Lane<S, A>, s: S): A {
-    if (this.#state.phase !== "running" || (l.asks && !l.asks(s))) return l.local(s);
+    if (l.asks && !l.asks(s)) return l.local(s);
     const key = l.key(s);
     const hit = this.#cache(l).get(key);
-    if (l.name === "mode") {
+    const running = this.#state.phase === "running";
+    if (running && l.name === "mode") {
       if (hit) this.#state.hits++;
       else this.#state.misses++;
     }
     if (hit) return hit;
-    if (!this.#asking.has(askKey(l.context, key))) l.queue.set(key, s);
+    if (running && !this.#asking.has(askKey(l.context, key))) l.queue.set(key, s);
     return l.local(s);
   }
 
   /** Who decides, in lane l, situation s right now: Jev's cached answer, the local rule while Jev is asked, or the local rule. Counts and queues nothing. */
   #explain<S, A extends string>(l: Lane<S, A>, s: S): { answer: A; by: "jev" | "waiting" | "local" } {
     const local = l.local(s);
-    if (this.#state.phase !== "running" || (l.asks && !l.asks(s))) return { answer: local, by: "local" };
+    if (l.asks && !l.asks(s)) return { answer: local, by: "local" };
     const key = l.key(s);
     const hit = this.#cache(l).get(key);
     if (hit) return { answer: hit, by: "jev" };
+    if (this.#state.phase !== "running") return { answer: local, by: "local" };
     return { answer: local, by: l.queue.has(key) || this.#asking.has(askKey(l.context, key)) ? "waiting" : "local" };
   }
 

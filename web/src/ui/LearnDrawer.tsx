@@ -26,13 +26,13 @@ import type { DoctrineChoice } from "./useColonyJev.ts";
 interface Props {
   colonies: readonly Colony[];
   followed: Followed | null;
-  /** each colony's doctrine and the fungus's aim: the same state as the side panel's (useColonyJev) */
+  /** each colony's doctrine (read here: a colony's nature, ja-lo8.2) and the fungus's aim: the same state as the main screen's (useColonyJev) */
   doctrines: DoctrineChoice[];
-  setDoctrine: (k: number, d: DoctrineChoice) => void;
-  draftDoctrine: (k: number, d: DoctrineChoice) => void;
   aim: DoctrineChoice;
   setAim: (a: DoctrineChoice) => void;
   draftAim: (a: DoctrineChoice) => void;
+  /** why no policy can change now (policyLock), or null: the aim and the menu are disabled while it is set */
+  lock: string | null;
   /** the fungus's menu and the local rule's settings (useColony controls) */
   menu: readonly string[];
   setMenu: (menu: string[]) => void;
@@ -207,37 +207,23 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[13px] leading-snug">
-        Each colony's ants follow its <em>doctrine</em>; the fungus follows your <em>aim</em>. With Jev on, Jev reads these words and answers once per situation (what an ant senses, not one ant), and every ant in that situation takes the answer.
-        With Jev off, or while a question is on its way, the local rule decides.
+        Each colony's ants follow its <em>doctrine</em>; the fungus follows your <em>aim</em>. Jev reads these words and answers once per situation (what an ant senses, not one ant), and every ant in that situation takes the answer.
+        Its answers are kept, and play even when Jev can't run; where it has not answered yet, the local rule decides.
       </p>
 
       {props.doctrines.slice(0, Math.max(1, sides)).map((d, k) => (
-        <section key={k} className="flex flex-col gap-2" aria-label={`${colonyName(k)} doctrine`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-medium">
-              <span className={colonyTone(k)}>{colonyName(k)}</span> <span className="text-fg-2">doctrine</span>
-            </h3>
-            <div className="flex overflow-hidden rounded-md border border-line text-sm">
-              {DOCTRINES.map((p) => (
-                <button key={p.id} type="button" className={seg(d.id === p.id)} onClick={() => props.setDoctrine(k, { id: p.id, text: p.text })}>
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <textarea
-            id={`learn-doctrine-${k}`}
-            className="w-full resize-y rounded-md border border-line bg-paper px-2 py-1.5 text-[13px] leading-snug text-fg outline-none focus:border-accent"
-            rows={3}
-            value={d.text}
-            onChange={(e) => props.draftDoctrine(k, { id: "custom", text: e.target.value })}
-            onBlur={(e) => props.setDoctrine(k, { id: d.id, text: e.target.value })}
-            aria-label={`${colonyName(k)} doctrine`}
-          />
+        <section key={k} className="flex flex-col gap-1" aria-label={`${colonyName(k)} doctrine`}>
+          <h3 className="font-medium">
+            <span className={colonyTone(k)}>{colonyName(k)}</span> <span className="text-fg-2">doctrine</span>{" "}
+            <span className="text-xs font-normal text-fg-3">({DOCTRINES.find((p) => p.id === d.id)?.name ?? "custom"})</span>
+          </h3>
+          <p id={`learn-doctrine-${k}`} className="rounded-md border border-line bg-raised px-2 py-1.5 text-[13px] leading-snug text-fg">
+            {d.text}
+          </p>
         </section>
       ))}
       <p className="-mt-2 text-xs text-fg-3">
-        Both the ants' modes and the colony's stance are asked under the doctrine. {props.retune} Colonies with the same doctrine share every answer; one used before is free.
+        A colony's doctrine is its nature: not yours to rewrite while it lives. Both the ants' modes and the colony's stance are asked under it. {props.retune} Colonies with the same doctrine share every answer.
       </p>
 
       <section className="flex flex-col gap-2" aria-label="fungus aim">
@@ -247,7 +233,7 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
           </h3>
           <div className="flex overflow-hidden rounded-md border border-line text-sm">
             {AIMS.map((a) => (
-              <button key={a.id} type="button" className={seg(props.aim.id === a.id)} onClick={() => props.setAim({ id: a.id, text: a.text })}>
+              <button key={a.id} type="button" className={seg(props.aim.id === a.id)} disabled={props.lock !== null} onClick={() => props.setAim({ id: a.id, text: a.text })}>
                 {a.name}
               </button>
             ))}
@@ -258,6 +244,7 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
           className="w-full resize-y rounded-md border border-line bg-paper px-2 py-1.5 text-[13px] leading-snug text-fg outline-none focus:border-accent"
           rows={3}
           value={props.aim.text}
+          disabled={props.lock !== null}
           onChange={(e) => props.draftAim({ id: "custom", text: e.target.value })}
           onBlur={(e) => props.setAim({ id: props.aim.id, text: e.target.value })}
           aria-label="fungus aim"
@@ -273,7 +260,8 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
                   key={v.id}
                   type="button"
                   aria-pressed={on}
-                  className={`rounded-md border px-2 py-0.5 font-mono ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                  disabled={props.lock !== null}
+                  className={`rounded-md border px-2 py-0.5 font-mono disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
                   title={`${v.blurb}${lethal ? ". Only strains that allow it (Bloom) can run it." : ""}`}
                   onClick={() => props.setMenu(on ? props.menu.filter((id) => id !== v.id) : [...props.menu, v.id])}
                 >
@@ -285,11 +273,11 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         </div>
         <label className="flex items-center justify-between text-xs text-fg-2">
           <span>Hide groomed hosts (dormant shows a quarter)</span>
-          <input type="checkbox" checked={props.hide} onChange={(e) => props.setRule({ hide: e.target.checked })} />
+          <input type="checkbox" checked={props.hide} disabled={props.lock !== null} onChange={(e) => props.setRule({ hide: e.target.checked })} />
         </label>
         <label className="flex items-center justify-between text-xs text-fg-2">
           <span>Cull high-load hosts fighting strangers</span>
-          <input type="checkbox" checked={props.cull} onChange={(e) => props.setRule({ cull: e.target.checked })} />
+          <input type="checkbox" checked={props.cull} disabled={props.lock !== null} onChange={(e) => props.setRule({ cull: e.target.checked })} />
         </label>
         <p className="text-xs text-fg-3">
           Jev picks, for each host, one of what its strain allows and the menu has on, under your aim. Without Jev each strain does what it was bred for, within the menu and the two settings above.
@@ -314,7 +302,7 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
           <ResponsesExplainer />
         </Section>
       </div>
-      {props.demo && <p className="text-xs text-fg-3">This build has no server, so Jev never runs here: the local rule decides everything, and the words above take effect when you run the app locally with a key.</p>}
+      {props.lock && <p className="text-xs text-warn">{props.lock}</p>}
     </div>
   );
 }

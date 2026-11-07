@@ -3140,3 +3140,32 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 **Superseded.** `ja-ygc` (doctrine inherited by a fraction, through a founding queen) is superseded by the epic: a full rewrite, but only at a queen's birth.
 
 **Cost.** This section changes no request. Slice 4 (`ja-lo8.4`) changes the fungus lane's legend, situation and questions, and will report its tokens per question.
+
+### 49.1 Slice 2: the main screen, Details, Jev always on (ja-lo8.2, 2026-11-07)
+
+**The main screen** holds four things:
+- the field;
+- a top bar: Play/Pause, speeds 0.5–4×, sim time, and one line on where the game stands;
+- the fungus's panel: its share in each colony, unity, and its aim (presets and words);
+- the followed ant's card.
+
+**The Details screen** takes everything else:
+- the colony table and mode counts;
+- Jev's spend, caches, Stop and Resume;
+- infection, resistance and unity figures;
+- the world's settings (seed, ground, rival, ants, speed slider, trails);
+- the **lab**: the spore brush and strains, the fungus's menu, hide and cull, and each colony's doctrine, for experiments.
+
+**Learn** shows doctrines read-only. **Removed:** the lure and alarm brushes, which painted only the first colony's fields.
+
+**Jev is always on** (`ui/policyLock.ts`, tested):
+- **When it starts.** The page starts a run once the server and its key are there, and starts a new one after a time cap. A spend cap or a Stop is final until the player presses Resume.
+- **Cached answers play whether or not a run is on.** `colonyJev.ts` `#lookup` no longer falls back to the local rule just because no run is on; only uncached situations use the local rule.
+- **What locks the policies:** the probe pending, no server, no key, a run starting, stopped or capped. While locked, every editor that sets words or the menu is disabled and says why, and `useColonyJev`'s setters refuse words. Losing Jev mid-game raises a notice (`ui/toasts.ts`).
+
+**Measured.**
+- A page load with a key started a run by itself: 17 requests and $0.0007 in 7 s.
+- With the key unset, the aim is disabled and the panel reads "JEV_API_KEY is not set…".
+- Desktop and phone layouts were checked with Playwright: no page errors, and no sideways scroll on the Details screen.
+
+**No behaviour change in the sim.** Goldens are untouched, and requests and their contexts are byte-identical, so the cost is unchanged.

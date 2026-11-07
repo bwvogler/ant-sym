@@ -10,10 +10,11 @@ import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts
 // new seed, ant count or rival setting is a new game on a fresh map.
 
 /**
- * The fungus's brushes: lure paints food scent (ants follow it), alarm paints alarm (ants shy away, a doctrine
- * can send them home), spores inoculate: spores on the ground and a dose of the chosen strain into the ants there.
+ * The spore brush, a lab tool (Details): spores on the ground and a dose of the chosen strain into the ants there. The
+ * lure and alarm brushes are gone (ja-lo8.2): they painted only the first colony's fields, a leftover from when the
+ * player was that colony, and the fungus works through its hosts, not the player's hand.
  */
-export type Brush = "none" | "lure" | "alarm" | "spores";
+export type Brush = "none" | "spores";
 
 export interface ColonyControls {
   seed: number;
@@ -40,8 +41,6 @@ export type Ground = "side" | "open";
 
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: 1, playing: true, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: 0, menu: INTERVENTIONS.map((v) => v.id).filter((id) => !LETHAL.has(id)), hide: false, cull: false, rival: true, ground: "side" };
 
-/** Per paint event (a pointer move while dragging): radius in cells and the amount laid per cell. */
-const BRUSHES = { lure: { channel: "food", radius: 2, amount: 3 }, alarm: { channel: "alarm", radius: 3, amount: 12 } } as const;
 /** The spore brush, per paint event: radius in cells, spores laid per cell, and load dosed into each ant under it. */
 const SPORES = { radius: 3, spores: 2, dose: 0.15 } as const;
 
@@ -198,15 +197,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** Paint at (x, y) in cells; `scale` widens the brush (the field passes more when zoomed out, so a stroke stays a stroke on screen). */
   const paint = useCallback(
     (x: number, y: number, scale = 1) => {
-      if (controls.brush === "none") return;
-      if (controls.brush === "spores") {
-        game.paintSpores(x, y, SPORES.radius * scale, SPORES.spores, SPORES.dose, controls.strain);
-        return;
-      }
-      const b = BRUSHES[controls.brush];
-      colony.paint(b.channel, x, y, b.radius * scale, b.amount);
+      if (controls.brush !== "spores") return;
+      game.paintSpores(x, y, SPORES.radius * scale, SPORES.spores, SPORES.dose, controls.strain);
     },
-    [game, colony, controls.brush, controls.strain],
+    [game, controls.brush, controls.strain],
   );
 
   return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint };

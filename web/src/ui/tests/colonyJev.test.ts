@@ -68,6 +68,25 @@ function run(c: Colony, k: number) {
   for (let i = 0; i < k; i++) c.tick(1 / 30);
 }
 
+test("off, with answers cached: they play, and nothing is asked (the fungus game: Jev's answers outlive its run)", async () => {
+  const sent = scriptFetch(answerAll("return"));
+  const store = memoryStore();
+  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const wrong: Mode = localPolicy(s) === "fight" ? "return" : "fight";
+  store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), wrong]]);
+  const j = make(store);
+  const c = colony();
+  j.attach(c);
+  j.setDoctrine(DOCTRINES[0]!.text);
+  assert.equal(c.policy(s), wrong, "the cached answer, not the local rule");
+  assert.equal(j.explain(s).by, "jev");
+  const other: Situation = { ...s, alarm: "strong" };
+  assert.equal(c.policy(other), localPolicy(other), "an unanswered situation: the local rule");
+  assert.equal(j.explain(other).by, "local");
+  await tick(30);
+  assert.equal(sent.length, 0, "no run, no calls");
+});
+
 test("off: the local rule, no calls", async () => {
   const sent = scriptFetch(answerAll("return"));
   const j = make();
