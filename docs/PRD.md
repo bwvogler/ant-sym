@@ -3156,13 +3156,13 @@ Losses −3 % and −10 %, food the same median. **The worst seed is worse:** se
 | | Food stored | Lost | MR 5 (food) |
 |---|---|---|---|
 | Forage | 4,847 (+15.8 %) | 805 (−12 %) | +0.3 % |
-| Cautious | 2,505 (−40 %) | 539 (−41 %) | −1.6 % |
-| Warlike | 1,931 (−54 %) | 861 (−6 %) | −5.5 % |
+| Cautious | 2,950 (−30 %) | 557 (−39 %) | −1.6 % |
+| Warlike | 1,931 (−54 %) | 857 (−6 %) | −5.5 % |
 
-- **What the replays say, after a diagnosis** (G′ seed 1, Cautious, a minute-by-minute trace). The idle loop I first blamed is **not** what holds the colony:
-  - The colony reaches 900 ants by 90 s and its larder fills, so the strategist's "full and fed" rule (`localStance`: larder full and many ants → raid) puts it on a raid stance from about 210 s and keeps it there. A full colony stores no more food, by design.
-  - Under that stance Jev's mode lane answers "return" for most of its ants (847 of 900 in mode return, 4–90 outside), and `leave` says "now" for ants that smell a faint raid trail, so they step out and are sent back. They never wait with no trail, so the call-off clock never runs.
-  - **The cache alone costs about 20 %:** the same cache on this branch with `raidGate` 0 (the old coordinates) stores 3,339 (−20 % against the local rule); with the trail, 2,496. So about half is Jev's answers in the newly recorded cache (the MR 5 Cautious cache replayed +3 % on `main`), and half the trail: raiders without coordinates fight less. Not resolved.
+- **What the replays say, after a diagnosis** (G′ seed 1, Cautious, a minute-by-minute trace; the idle loop I first blamed is only part of it):
+  - The colony reaches 900 ants by 90 s and its larder fills, so the strategist's "full and fed" rule puts it on a raid stance from about 210 s. A raid stance idles its ants: Jev's mode lane answers "return" for most of them (847 of 900 in mode return, 4–90 outside), and a faint raid trail at the nest calls them out ("now") only to be sent home again. Food home then stops growing, and the stance holds, since no food comes in. (A12, the same loop with nothing in the way, is what the call-off cures; see 49.5.)
+  - **The caches themselves cost food.** Re-recorded under the new legend, a Cautious cache stores 3,339 and an independent second recording 3,613 with the old coordinates (`raidGate` 0), against the local rule's 4,186 (the MR 5 cache replayed +3 % on `main`). Warlike: 1,860 with coordinates, 1,931 with the trail, so its drop is the cache's, not the trail's. The two Cautious recordings agree on 272 of 290 mode answers.
+  - **The trail adds a smaller cost for Cautious** (3,613 → 2,626 before the call-off was fixed; 2,950 with it).
 
 - **A variant that kept foragers out on a raid stance** (asked as returning foragers, `returns`, "now" locally): Cautious +3.5 %, Forage +12.7 %, Warlike −26 %. But every ant then went out with no trail, and A11's trail did not beat scouts alone (0.29 reach against 0.40, gain 0.78, 0/20): the trail was no cue. Not kept: it undoes what MR 5.2 is for.
 - **Cost:** mode ~651 tokens per question ($0.074/h, unchanged); the response legend grew, so all six response lanes together come to ~$0.116/h (MR 5: $0.109).
@@ -3170,10 +3170,10 @@ Losses −3 % and −10 %, food the same median. **The worst seed is worse:** se
 ### 49.5 Raid call-off (review of #41, ja-7je)
 
 Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; search summaries only). *Polyergus* raiders that mill about a host nest for a few minutes begin an incohesive retreat, and more join it as it goes; nothing found says an order ends a raid; the nearest measured give-up is the harvester forager's wait of about 3 minutes.
-- **Built (an ant's own clock, no new sense).** A raider that has been told to wait with no raid trail under it for `raidPatience` seconds (120) stands down: it reads its stance as forage (`#stanceOf`) until the colony's stance changes, so its mode and `leave` questions are asked as a forager's. The keys, the lane's legend and the Touch are unchanged. The clock runs in `#leaves`, so a raider waiting at home in either mode counts.
-- **A12, a raid no one can find** (new; the first colony forced onto a raid stance, the rival sealed in rock, a food pile to forage; 900 s). Food stored against the same colony on a forage stance: **0.86 (0.73–0.91), 20/20**; before the call-off 10 of 7,400 (0/10). Patience 90: 0.72; 180: 0.62 and 8/10 (at 900 s); 300: none.
+- **Built (an ant's own clock, no new sense).** On a raid stance a raider's clock runs while it is at home, and meeting a stranger outside starts it again. After `raidPatience` seconds (120) it stands down: it reads its stance as forage (`#stanceOf`) until the colony's stance changes, so its mode and `leave` questions are asked as a forager's. The keys, the lane's legend and the Touch are unchanged. (First the clock counted only "wait" answers; a faint trail calling raiders out, and a doctrine sending them home, kept it from ever running. Counting time at home with no stranger met is the cue.)
+- **A12, a raid no one can find** (new; the first colony forced onto a raid stance, the rival sealed in rock, a food pile to forage; 900 s). Food stored against the same colony on a forage stance: **1.00, 20/20** at patience 60 and 120 (the first clock: 0.86, worst 0.73); before the call-off 10 of 7,400 (0/10).
 - **Left out:** a call-off that spreads by contact with raiders coming home empty (one summary line behind it); the strategist reading how many raiders idle at home (a colony-wide count no ant senses).
-- **No change elsewhere:** A11 reach 0.33 and gain 1.76 (14/20); G′ seeds 1–20: food 4,086, losses 853 median, as before (seed 19: 1 ant against 3; 38 on `main`); the replays are unchanged to within 0.5 %. Patience 180 in G′ was identical to no call-off, 120 moved only the extremes.
+- **Patience, by the worst seed** (seeds 1–20): A11 reach 0.33 either way, worst seed 0.23 at 120 against 0.17 at 60 (gain 1.84 and 1.67, 13/20 each); G′ food 4,080 against 4,122, losses 853 against 819, rival food 3,874 against 4,072. Kept 120. Seed 19 ends with 1 ant (3 before; 38 on `main`).
 
 ### 49.6 Left out
 
