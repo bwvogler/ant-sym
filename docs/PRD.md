@@ -3337,3 +3337,36 @@ Regrowth ends the starvation: a lone colony now holds steady. War still ends a c
 - **Browser check:** saved at 0:48 of sim; after a page reload, Continue came back at 0:48, at chapter 4, with the fungus in all of Ink, and no page errors.
 
 **No sim change.** Goldens are bit-exact. Nothing is asked of Jev, so the cost is unchanged.
+
+### 49.7 Slice 7: the queen as a host (ja-lo8.7, 2026-11-07)
+
+**Built:**
+- **Her state.** `Colony.queen` (a `Queen`) gains load, strain, resistance, show and signal.
+- **Infection.** `Fungus.step` adds her to the load grids, so she is a source like any host. `#stepQueen` steps her as an ant is stepped:
+  - contact load from the ants around her, her attendants, at the strain's transmission;
+  - spores under her;
+  - grooming by the nestmates around her (up to the usual four).
+- **Her own situation:** task `queen`, place `queen`, calm, touched by nestmates or none. That adds a value to `task`: 864 situations.
+- **Her own levers:** "fungus showing", and the new emission lever **queen signal**. Its levels 0.1 / 0.4 / 1 / 1.5 / 2 multiply the royal mark she lays (`QUEEN_MARK × signal`, lerped by her load).
+  - **Per-host asking.** Levers carry `hosts` (workers, queen, both), so a queen is asked only her two and a worker never hers (`askedLevers`, per-situation keys).
+  - **What it is for.** Queen signal is the emission route to new queens (new-queens §4); the gyne rule that reads the mark comes with `ja-lo8.9`.
+- **The reveal.** `Game.revealed[k]` is set the first tick the fungus is in colony k's queen (load ≥ `INFECTED`) and never cleared. It is saved with the game.
+  - **What it opens:** chapter 4 ends, and Learn → Policy shows that colony's doctrine. Before, it reads "Closed to you: reach the … colony's queen". The "What Jev is sent" sample hides the words too.
+  - **The lab:** Details hides the colonies' doctrines behind a "Show" button.
+- **The fungus panel** shows the fungus in each queen.
+
+**Jev:**
+- `FUNGUS_BRAIN_VERSION` 6: the legend gains the queen task and the queen-signal lever.
+- Re-shipped fungus answers: 93 situations per preset aim, 3 of them a queen's, for **$0.0083**.
+  - Under Unite and Peace, Jev leaves a queen as she is.
+  - Under Spread, it dims how much of the fungus she shows.
+
+**Tests** (`tests/queenHost.test.ts`):
+- loaded attendants infect her and clean ones don't;
+- she is asked only her levers;
+- a strongly damped signal cuts her mark to under half;
+- the reveal fires once, stays, and survives a save.
+
+**Pace (to balance, `ja-lo8.10` / `ja-260`).** In the browser at 8×, Garden from the landing reached Ink's queen at 46 s of sim (about 6 s of wall time), so chapters 2–4 pass almost at once. The game needs a slower or costlier spread before it is a game.
+
+No change to the colony lanes: their requests are byte-identical, and the goldens are bit-exact (they paint no spores).

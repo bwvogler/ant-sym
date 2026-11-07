@@ -43,10 +43,12 @@ export interface Levers {
   regicide: number;
   /** the share of its strain's visibility the host shows its groomers: under 1 it hides the fungus (§6, stealth) */
   show: number;
+  /** a queen's royal mark laid × this (ja-lo8.7): damped, her signal is faint, and nurses come to rear new queens (docs/new-queens.md §4) */
+  queenSignal: number;
 }
 
 /** The world as it is. */
-export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0, estrange: 0, marks: 1, swap: 0, regicide: 0, show: 1 };
+export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0, estrange: 0, marks: 1, swap: 0, regicide: 0, show: 1, queenSignal: 1 };
 
 export type LeverKind = "perceive" | "emit" | "lethal";
 
@@ -68,6 +70,8 @@ export interface Lever {
   asIs: number;
   /** only where there is a nest (the side view): chambers' marks, the queen */
   nest?: boolean;
+  /** which hosts it means something in: workers (the default), a queen, or both */
+  hosts?: "workers" | "queen" | "both";
 }
 
 const five = (field: keyof Levers, v: readonly number[]): Partial<Levers>[] => v.map((x) => ({ [field]: x }));
@@ -91,7 +95,8 @@ export const LEVERS: readonly Lever[] = [
   { id: "alarmLaid", kind: "emit", name: "alarm laid", blurb: "how much alarm the host raises when it fights: damped, a skirmish recruits no defenders; boosted, every fight calls more", brief: "how much alarm it raises in a fight (damped: silent)", words: ["strongly damp (silent fights)", "damp", "as is", "boost", "strongly boost"], values: five("quiet", [0.9, 0.5, 0, -0.5, -1]), asIs: 2 },
   { id: "calm", kind: "emit", name: "calming cue", blurb: "a cue the host gives off that lowers the aggression of the ants it meets, and its own", brief: "a cue that calms the ants it meets", words: ["as is (none)", "some", "strong"], values: five("calm", [0, 0.4, 0.8]), asIs: 0 },
   { id: "odour", kind: "emit", name: "fungal odour", blurb: "the host carries the fungus's own odour, between the colonies': colonies whose ants carry it come to smell alike", brief: "your own odour on it: colonies carrying it come to smell alike", words: ["as is (none)", "some", "strong"], values: five("mask", [0, 0.3, 0.6]), asIs: 0 },
-  { id: "show", kind: "emit", name: "fungus showing", blurb: "how much of the fungus the host shows its nestmates: hidden, it is groomed off less; shown, more", brief: "how much of you it shows (damped: groomed off less)", words: ["hidden", "dim", "as is", "plain", "loud"], values: five("show", [0.25, 0.5, 1, 1.5, 2]), asIs: 2 },
+  { id: "show", kind: "emit", name: "fungus showing", blurb: "how much of the fungus the host shows its nestmates: hidden, it is groomed off less; shown, more", brief: "how much of you it shows (damped: groomed off less)", words: ["hidden", "dim", "as is", "plain", "loud"], values: five("show", [0.25, 0.5, 1, 1.5, 2]), asIs: 2, hosts: "both" },
+  { id: "queenSignal", kind: "emit", name: "queen signal", blurb: "how much of her royal mark a queen lays: damped, her signal is faint where her brood lies, and nurses rear new queens there", brief: "in a queen: how much of her royal mark she lays (damped: nurses rear new queens)", words: ["strongly damp", "damp", "as is", "boost", "strongly boost"], values: five("queenSignal", [0.1, 0.4, 1, 1.5, 2]), asIs: 2, nest: true, hosts: "queen" },
   // Lethal: off unless the player turns them on.
   { id: "weapon", kind: "lethal", name: "odour weapon", blurb: "the host smells like nobody's: its own colony and the others take it for a stranger and kill it", brief: "it smells like nobody's: its own colony kills it", words: ["off", "on"], values: five("estrange", [0, 1]), asIs: 0 },
   { id: "crown", kind: "lethal", name: "crown", blurb: "the host kills the queen and the brood it tends: the colony is orphaned", brief: "it kills the queen and brood it tends", words: ["off", "on"], values: five("regicide", [0, 1]), asIs: 0, nest: true },
@@ -208,4 +213,10 @@ export function decodeLevels(answer: string, asked: readonly string[]): LeverLev
     out[lever.id] = level;
   }
   return out;
+}
+
+/** Whether lever `v` means something in a host of this kind: a queen's levers in a queen, a worker's in a worker. */
+export function leverFor(v: Lever, queen: boolean): boolean {
+  const h = v.hosts ?? "workers";
+  return h === "both" || (h === "queen") === queen;
 }

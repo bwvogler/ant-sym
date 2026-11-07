@@ -3,9 +3,9 @@ import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
 import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, TASKS, encodeFungal, localFungusRule, type Arousal, type FungalSituation, type FungusPolicy, type FungusRule, type Place } from "./fungalPolicy.ts";
-import { compose, decodeLevels, LETHAL_LEVERS, LEVERS, NEST_LEVERS, presetOf, PRESETS, type LeverLevels, type Preset } from "./levers.ts";
+import { compose, decodeLevels, LETHAL_LEVERS, leverFor, LEVERS, NEST_LEVERS, presetOf, PRESETS, type LeverLevels, type Preset } from "./levers.ts";
 import type { Recognition } from "./recognition.ts";
-import { CELL, discOffsets } from "./hex.ts";
+import { CELL, cellOf, discOffsets } from "./hex.ts";
 import { disc, rockAt, type WorldMap } from "./world.ts";
 
 // The fungus, pure: the player. It has no body on the map of its own, only
@@ -38,6 +38,11 @@ export const NEST_ONLY: ReadonlySet<string> = NEST_LEVERS;
 
 /** Levers that kill their host: off the player's menu until turned on. */
 export const LETHAL: ReadonlySet<string> = LETHAL_LEVERS;
+
+/** The levers on `menu` that mean something in a queen (`queen`) or a worker, in table order: what Jev is asked. */
+export function askedLevers(menu: ReadonlySet<string>, queen: boolean): string[] {
+  return LEVERS.filter((v) => menu.has(v.id) && leverFor(v, queen)).map((v) => v.id);
+}
 
 /** The menu the fungus starts with: every lever but the lethal ones. */
 export const DEFAULT_MENU: readonly string[] = LEVERS.filter((v) => !LETHAL_LEVERS.has(v.id)).map((v) => v.id);
@@ -301,6 +306,15 @@ export class Fungus {
         all.add(cx, cy, l, s);
         vis.add(cx, cy, l * this.#shows(c, i, s), s);
       }
+      // The queen too (ja-lo8.7): a host like any, who passes it to the ants that tend her.
+      const q = c.queen;
+      if (q && q.alive && q.load > 0) {
+        cellOf(q.x, q.y);
+        const qx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const qy = Math.min(h - 1, Math.max(0, CELL[1] as number));
+        all.add(qx, qy, q.load, q.strain);
+        vis.add(qx, qy, q.load * ((this.strains[q.strain] as Strain).visibility * q.show), q.strain);
+      }
     });
 
     let hosts = 0;
@@ -385,6 +399,11 @@ export class Fungus {
       }
     });
 
+    // Each colony's queen, read against the same grids.
+    colonies.forEach((c, k) => {
+      if (this.#stepQueen(c, k, grids, dt)) hosts++;
+    });
+
     // Spores taken, then the ground fades.
     for (let k = 0; k < taken.length; k += 3) {
       const x = taken[k] as number;
@@ -402,6 +421,67 @@ export class Fungus {
       } else this.spores.set(x, y, v);
     }
     this.hosts = hosts;
+  }
+
+  /**
+   * The fungus in colony c's queen (ja-lo8.7), stepped as an ant's is: load from the ants around her (her attendants) and
+   * the spores under her, less what the nestmates around her groom off and what clears on its own; then what the fungus
+   * does in her, from what it senses there (task "queen", place "queen"): how much of it she shows, and how much of her
+   * royal mark she lays. Returns whether she is a host after the step.
+   */
+  #stepQueen(c: Colony, k: number, grids: readonly CountGrid[], dt: number): boolean {
+    const q = c.queen;
+    if (!q || !q.alive) return false;
+    const p = this.params;
+    const { w, h } = this.map.size;
+    cellOf(q.x, q.y);
+    const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+    const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
+    const l = q.load;
+    const ground = this.spores.get(cx, cy);
+    const near = this.#all.any(cx - 1, cy - 1, cx + 1, cy + 1);
+    if (l === 0 && ground === 0 && !near) return false;
+    const vis = this.#visible[k] as LoadGrid;
+    this.#gather(cx, cy, k, grids, vis, near, false);
+    const nb = this.#nb;
+    let contactGain = 0;
+    let contactStrain = q.strain;
+    if (near) {
+      const load = nb.load - l; // her own load is in the grid; the ants around her are not her
+      if (load > NOTHING && nb.ants > 0) {
+        contactStrain = this.#all.strainAt(nb.topX, nb.topY);
+        contactGain = (this.strains[contactStrain] as Strain).transmission * Math.min(1, load / nb.ants);
+      }
+    }
+    const groundGain = p.pickup * ground;
+    if (groundGain > 0) this.#taken.push(cx, cy, groundGain * dt);
+    const gain = (contactGain + groundGain) * (1 - q.resist) * (1 - l) * dt;
+    let strain = q.strain;
+    if (l === 0 && gain > 0) strain = contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
+    const st = this.strains[strain] as Strain;
+    const mates = nb.own; // the nestmates around her: her groomers
+    const loss = l > 0 ? (p.grooming * st.visibility * q.show * Math.min(p.groomers, mates) + st.decay) * l * dt : 0;
+    let nl = Math.min(1, Math.max(0, l + gain - loss));
+    if (nl < p.clear) nl = 0;
+    q.load = nl;
+    q.strain = nl > 0 ? strain : 0;
+    if (nl === 0) {
+      q.show = 1;
+      q.signal = 1;
+      return false;
+    }
+    const sit: FungalSituation = {
+      arousal: "calm",
+      touch: nb.ants - nb.own > 0.5 ? "foreigner" : mates > 0.5 ? "nestmate" : "none",
+      place: "queen",
+      task: "queen",
+      carrying: "nothing",
+      groomed: p.grooming * st.visibility * Math.min(p.groomers, mates) >= p.groomedAt,
+    };
+    const v = compose(this.choose(sit, strain), this.#menu);
+    q.show = v.show;
+    q.signal = 1 + (v.queenSignal - 1) * nl;
+    return true;
   }
 
   /**
@@ -545,9 +625,14 @@ export class Fungus {
     return localFungusRule(this.rule)(s);
   }
 
-  /** The levers Jev is asked to set, in table order: what the menu has on (ja-lo8.4). */
+  /** The levers Jev is asked to set in a worker, in table order: what the menu has on (ja-lo8.4). */
   get asked(): string[] {
-    return LEVERS.filter((v) => this.#menu.has(v.id)).map((v) => v.id);
+    return askedLevers(this.#menu, false);
+  }
+
+  /** The levers asked for a host in situation s: a queen's (ja-lo8.7) or a worker's, of what the menu has on. */
+  askedFor(s: FungalSituation): string[] {
+    return askedLevers(this.#menu, s.task === "queen");
   }
 
   /**
@@ -557,16 +642,16 @@ export class Fungus {
    * answers.
    */
   choose(sit: FungalSituation, s: number): LeverLevels {
-    return this.resolve((this.policy ?? ((x: FungalSituation) => this.local(x)))(sit), s);
+    return this.resolve((this.policy ?? ((x: FungalSituation) => this.local(x)))(sit), s, sit.task === "queen");
   }
 
-  /** A policy's answer (Jev's levels, a preset's id, or STRAIN_DEFAULT) as levels, for a host of strain index `s`. */
-  resolve(answer: string, s: number): LeverLevels {
+  /** A policy's answer (Jev's levels, a preset's id, or STRAIN_DEFAULT) as levels, for a host of strain index `s` (a queen: `queen`). */
+  resolve(answer: string, s: number, queen = false): LeverLevels {
     const fallback = (this.strains[s] as Strain | undefined)?.expresses ?? "dormant";
     const id = answer === STRAIN_DEFAULT ? fallback : answer;
     const p = PRESETS.find((x) => x.id === id);
     if (p) return p.levels;
-    return decodeLevels(answer, this.asked) ?? (PRESETS.find((x) => x.id === fallback) as Preset).levels;
+    return decodeLevels(answer, queen ? askedLevers(this.#menu, true) : this.asked) ?? (PRESETS.find((x) => x.id === fallback) as Preset).levels;
   }
 
   /** Run preset e (an index into PRESETS) in ant i of colony c at load l, whatever the menu says: a lab and test helper (the step goes through expressLevels under the menu). */

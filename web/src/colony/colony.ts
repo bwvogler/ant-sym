@@ -125,6 +125,25 @@ export const localPolicy: Policy = (s) => {
   return s.mode === "return" ? "follow" : s.mode;
 };
 
+/**
+ * A colony's queen (nest slice 4): where she lies, and the fungus in her (ja-lo8.7): her attendants infect her by
+ * contact as they would any ant, her nestmates groom it off, and what the fungus does in her is her levers: how much
+ * of it she shows, and how much of her royal mark she lays.
+ */
+export interface Queen {
+  alive: boolean;
+  x: number;
+  y: number;
+  /** the fungus in her, 0..1, its strain (an index into the fungus's strains), and her resistance */
+  load: number;
+  strain: number;
+  resist: number;
+  /** the share of her strain's visibility she shows her groomers (the showing lever) */
+  show: number;
+  /** her royal mark laid × this (the queen-signal lever) */
+  signal: number;
+}
+
 /** The strategist's coarse view of its own colony: few values, so a stance can be cached per view too. */
 export interface StanceSituation {
   stance: Stance;
@@ -348,7 +367,7 @@ export class Colony {
   #restT: Float32Array;
   // The queen and brood (nest slice 4; the side view only: elsewhere the larder still becomes ants directly).
   /** the colony's queen, in its royal chamber (null on the top-down maps); a colony whose queen is dead is orphaned */
-  queen: { alive: boolean; x: number; y: number } | null = null;
+  queen: Queen | null = null;
   readonly brood = new Brood();
   /** seconds owed toward the queen's next egg */
   #layT = 0;
@@ -659,7 +678,7 @@ export class Colony {
     this.#loaded = new Uint8Array(n);
     this.#putAt = new Int32Array(n).fill(-1);
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
-    if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers) };
+    if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers), load: 0, strain: 0, resist: 0, show: 1, signal: 1 };
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -2429,7 +2448,8 @@ export class Colony {
       const qx = CELL[0] as number;
       const qy = CELL[1] as number;
       // Her pheromone: the royal mark, strongest where she lies, drawing nurses to her.
-      this.ph.depositCell("royal", qx, qy, QUEEN_MARK * dt);
+      // × her signal: the fungus in her can damp it (its queen-signal lever, ja-lo8.7; 1 as she is).
+      this.ph.depositCell("royal", qx, qy, QUEEN_MARK * q.signal * dt);
       // Strangers at her side kill her (a raid that reaches the royal chamber).
       const g = this.enemies;
       if (g) {

@@ -53,6 +53,8 @@ export interface GameSave {
   strategyChoices: number;
   landed: unknown;
   regrown: number;
+  /** per colony: its queen has been reached (Game.revealed) */
+  revealed: boolean[];
   params: unknown;
   map: unknown;
   colonies: Record<string, unknown>[];
@@ -163,6 +165,11 @@ export class Game {
   #regrowClock = 0;
   /** food units that have grown back (map.foodTotal grows by it too) */
   regrown = 0;
+  /**
+   * Per colony: the fungus has been in its queen (ja-lo8.7), so its doctrine is open to the player from then on (PRD
+   * §49: colony policy is hidden until the fungus infects a queen). Never closes again.
+   */
+  revealed: boolean[] = [];
 
   constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Sides = {}) {
     this.map = map;
@@ -338,6 +345,9 @@ export class Game {
     // The fungus steps every few ticks (fungus.ts advance); when it is idle its clock does not run.
     // The midden's spores (nest slices 7–8) are laid as each corpse is buried: see onBury in the constructor.
     if (this.#piles) this.#regrow(dt);
+    this.colonies.forEach((c, k) => {
+      if (!this.revealed[k] && c.queen && c.queen.load >= INFECTED) this.revealed[k] = true;
+    });
     if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null);
     if (this.time >= this.#nextStrategy) {
       this.#nextStrategy = this.time + this.params.strategyEvery;
@@ -418,6 +428,7 @@ export class Game {
       strategyChoices: this.strategyChoices,
       landed: encode(this.landed),
       regrown: this.regrown,
+      revealed: [...this.revealed],
       params: encode(this.params),
       map: encode(map),
       colonies: this.colonies.map((c) => c.saveState()),
@@ -436,6 +447,7 @@ export class Game {
     this.strategyChoices = saved.strategyChoices;
     this.landed = decode(saved.landed) as Game["landed"];
     this.regrown = saved.regrown;
+    this.revealed = [...(saved.revealed ?? [])];
     this.params = decode(saved.params) as GameParams;
     fillLike(this.map, saved.map);
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));

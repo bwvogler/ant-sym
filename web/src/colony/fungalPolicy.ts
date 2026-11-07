@@ -8,7 +8,7 @@
 //   arousal  — calm; alarmed (it perceives alarm); fighting (it perceives strangers close: the state it fights in)
 //   touch    — who touches its cuticle: none, a nestmate, a foreigner (an ant of another colony, tolerated or not)
 //   place    — the substrate underfoot: outside, a tunnel, a chamber, or by the queen (her mark on the floor)
-//   task     — its physiology (juvenile hormone tracks task): nurse, inside worker, forager
+//   task     — its physiology (juvenile hormone tracks task): nurse, inside worker, forager; or a queen (ja-lo8.7)
 //   carrying — what is in its jaws: nothing, food, brood
 //   groomed  — nestmates grooming the fungus off its cuticle
 // Coarse, so an answer is cached per situation (the Jev lane, fungusBrain.ts) and asked only as hosts meet it.
@@ -19,7 +19,7 @@ export const TOUCHES = ["none", "nestmate", "foreigner"] as const;
 export type Touch = (typeof TOUCHES)[number];
 export const PLACES = ["outside", "tunnel", "chamber", "queen"] as const;
 export type Place = (typeof PLACES)[number];
-export const TASKS = ["nurse", "inside", "forager"] as const;
+export const TASKS = ["nurse", "inside", "forager", "queen"] as const;
 export type Task = (typeof TASKS)[number];
 export const CARRYING = ["nothing", "food", "brood"] as const;
 export type Carrying = (typeof CARRYING)[number];
@@ -39,7 +39,7 @@ export interface FungalSituation {
  */
 export type FungusPolicy = (s: FungalSituation) => string;
 
-/** Situations: 3 × 3 × 4 × 3 × 3 × 2 = 648. */
+/** Situations: 3 × 3 × 4 × 4 × 3 × 2 = 864 (a queen's are a few of them: she is always by herself, at home). */
 export const FUNGAL_SITUATIONS = AROUSALS.length * TOUCHES.length * PLACES.length * TASKS.length * CARRYING.length * 2;
 
 /** A load at or past this is "high": where cull takes full effect (Fungus.express). */

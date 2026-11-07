@@ -69,6 +69,8 @@ export interface SideStats {
   births: number;
   /** nest slice 4 (the side view): the queen ("lost": orphaned), and brood as eggs / larvae / pupae; null on the top-down maps */
   queen: "alive" | "lost" | null;
+  /** the fungus in the queen, 0..1 (ja-lo8.7) */
+  queenLoad: number;
   brood: [number, number, number];
   /** brood killed by the fungus's crown (nest slice 8) */
   broodKilled: number;
@@ -129,7 +131,7 @@ function seenTogether(colonies: readonly Colony[]): number {
 
 function side(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, queenLoad: c.queen?.load ?? 0, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
@@ -264,5 +266,5 @@ function chapterFor(game: Game): ChapterView {
   const k = game.landed?.colony ?? LANDING_COLONY;
   const c = game.colonies[k] ?? game.player;
   const f = game.fungus.census(c);
-  return chapterOf({ landed: game.landed !== null, colony: colonyName(k), hosts: f.infected, share: f.living ? f.infected / f.living : 0, queenInfected: false, gynes: 0, daughters: 0 });
+  return chapterOf({ landed: game.landed !== null, colony: colonyName(k), hosts: f.infected, share: f.living ? f.infected / f.living : 0, queenInfected: game.revealed[k] === true, gynes: 0, daughters: 0 });
 }

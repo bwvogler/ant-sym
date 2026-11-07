@@ -22,7 +22,7 @@ import { JevClient } from "../web/server/jev.ts";
 import { decode, SITUATIONS, STANCES } from "../web/src/colony/colony.ts";
 import { AIMS, FUNGUS_BATCH, FUNGUS_BRAIN_VERSION, fungalKey, fungusContext, packFungusRequest, readLevels } from "../web/src/colony/fungusBrain.ts";
 import { encodeFungal, decodeFungal } from "../web/src/colony/fungalPolicy.ts";
-import { DEFAULT_MENU, STRAINS } from "../web/src/colony/fungus.ts";
+import { askedLevers, DEFAULT_MENU, STRAINS } from "../web/src/colony/fungus.ts";
 import { Game } from "../web/src/colony/game.ts";
 import { centreX, centreY } from "../web/src/colony/hex.ts";
 import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
@@ -69,8 +69,8 @@ function stanceSituations() {
   return out;
 }
 
-/** The levers the page asks in the side view: every non-lethal one (Fungus.asked under the default menu, with a nest). */
-const FUNGUS_ASKED = [...DEFAULT_MENU];
+/** The levers the page asks in the side view for a host in situation s: every non-lethal one that means something in it (Fungus.askedFor under the default menu, with a nest). */
+const fungusAsked = (s) => askedLevers(new Set(DEFAULT_MENU), s.task === "queen");
 
 /** The fungal situations a side-view game meets: Garden on both royal chambers and Lockpick at both holes, 300 s. */
 function fungalSituations() {
@@ -111,9 +111,9 @@ const LANES = {
   },
   fungus: {
     situations: fungalSituations,
-    key: (s) => fungalKey(s, FUNGUS_ASKED),
-    pack: (items, words) => packFungusRequest(items.map((it) => ({ ...it, asked: FUNGUS_ASKED })), words),
-    read: (answers, id) => readLevels(answers, id, FUNGUS_ASKED),
+    key: (s) => fungalKey(s, fungusAsked(s)),
+    pack: (items, words) => packFungusRequest(items.map((it) => ({ ...it, asked: fungusAsked(it.situation) })), words),
+    read: (answers, id, situation) => readLevels(answers, id, fungusAsked(situation)),
     context: (words) => fungusContext(words, "side"),
     id: "h",
     batch: FUNGUS_BATCH,
@@ -192,7 +192,7 @@ async function worker() {
       const b = bundles.get(job.file);
       let got = 0;
       for (const it of job.items) {
-        const a = LANES[job.lane].read(r.body.answers, it.id);
+        const a = LANES[job.lane].read(r.body.answers, it.id, it.situation);
         if (a) {
           b.answers.set(it.key, a);
           got++;

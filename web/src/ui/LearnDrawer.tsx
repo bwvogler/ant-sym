@@ -223,11 +223,17 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         <section key={k} className="flex flex-col gap-1" aria-label={`${colonyName(k)} doctrine`}>
           <h3 className="font-medium">
             <span className={colonyTone(k)}>{colonyName(k)}</span> <span className="text-fg-2">doctrine</span>{" "}
-            <span className="text-xs font-normal text-fg-3">({DOCTRINES.find((p) => p.id === d.id)?.name ?? "custom"})</span>
+            {props.game.revealed[k] && <span className="text-xs font-normal text-fg-3">({DOCTRINES.find((p) => p.id === d.id)?.name ?? "custom"})</span>}
           </h3>
-          <p id={`learn-doctrine-${k}`} className="rounded-md border border-line bg-raised px-2 py-1.5 text-[13px] leading-snug text-fg">
-            {d.text}
-          </p>
+          {props.game.revealed[k] ? (
+            <p id={`learn-doctrine-${k}`} className="rounded-md border border-line bg-raised px-2 py-1.5 text-[13px] leading-snug text-fg">
+              {d.text}
+            </p>
+          ) : (
+            <p id={`learn-doctrine-${k}`} className="rounded-md border border-dashed border-line px-2 py-1.5 text-[13px] leading-snug text-fg-3">
+              Closed to you: reach the {colonyName(k)} colony's queen to read its mind.
+            </p>
+          )}
         </section>
       ))}
       <p className="-mt-2 text-xs text-fg-3">
@@ -532,7 +538,8 @@ function SentExplainer(props: Props) {
   const fol = followedSituation(props.colonies, props.followed);
   const fungal = followedFungal(props.colonies, props.followed);
   const k = fol?.k ?? 0;
-  const doctrine = props.doctrines[k]?.text ?? "";
+  // A colony's doctrine is closed until its queen is reached (ja-lo8.7): the request is shown with the words hidden.
+  const doctrine = props.game.revealed[k] ? (props.doctrines[k]?.text ?? "") : "(closed: reach this colony's queen)";
   const lanes: { name: string; sample: Sample; words: string; about: string; tokens: number }[] = [
     { name: "An ant's mode", sample: { lane: "mode", situation: fol?.s ?? SAMPLE_SITUATION }, words: doctrine, about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation", tokens: tokensPerQuestion("mode", doctrine) },
     { name: "The colony's stance", sample: { lane: "stance", situation: SAMPLE_STANCE }, words: doctrine, about: "a sample view", tokens: tokensPerQuestion("stance", doctrine) },

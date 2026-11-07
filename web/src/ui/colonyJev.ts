@@ -4,7 +4,7 @@ import { localPolicy, localStance, MODES, STANCES, type Colony, type Mode, type 
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
 import { askedIn, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "../colony/fungusBrain.ts";
-import { DEFAULT_MENU, LEVERS, type Fungus } from "../colony/fungus.ts";
+import { askedLevers, DEFAULT_MENU, type Fungus } from "../colony/fungus.ts";
 import { PolicyCache } from "../colony/policyCache.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
@@ -147,20 +147,20 @@ export class ColonyJev {
   // kept against the levers it asked, whatever the menu is by the time it lands.
   #fungal = lane<FungalSituation, string>({
     name: "fungus",
-    key: (s) => fungalKey(s, this.#asked()),
+    key: (s) => fungalKey(s, this.#asked(s)),
     pack: (items, aim) => packFungusRequest(items.map((it) => ({ ...it, asked: askedIn(it.key) })), aim),
     read: (a, id, _s, key) => readLevels(a, id, askedIn(key)),
     valid: validLevels,
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
-    asks: () => worthAsking(this.#asked()),
+    asks: (s) => worthAsking(this.#asked(s)),
     contextOf: (aim) => fungusContext(aim, this.#fungus?.map.sky ? "side" : "top"),
     words: "",
     batch: FUNGUS_BATCH,
     gather: true,
   });
-  /** The levers the fungus lane asks: the menu's, in table order. */
-  #asked(): string[] {
-    return LEVERS.filter((v) => this.#menu.has(v.id)).map((v) => v.id);
+  /** The levers the fungus lane asks for a host in situation s: the menu's, a queen's or a worker's, in table order. */
+  #asked(s?: FungalSituation): string[] {
+    return askedLevers(this.#menu, s?.task === "queen");
   }
   /** caches by context, shared by every lane asking under it */
   #caches = new Map<string, PolicyCache<string>>();
@@ -307,11 +307,12 @@ export class ColonyJev {
    */
   fungusAnswers(): { key: string; answer: string; stale: boolean }[] {
     const l = this.#fungal;
-    const asked = this.#asked().join(",");
+    // A key asked the levers the menu has on now, for its kind of host (a queen's key names the queen's).
+    const current = (key: string) => askedIn(key).join(",") === this.#asked({ task: key.split("|")[3] } as FungalSituation).join(",");
     const out = new Map<string, { key: string; answer: string; stale: boolean }>();
-    for (const [key, answer] of this.#cache(l).entries()) if (askedIn(key).join(",") === asked) out.set(key, { key, answer, stale: false });
+    for (const [key, answer] of this.#cache(l).entries()) if (current(key)) out.set(key, { key, answer, stale: false });
     for (const c of l.fallback)
-      for (const [key, answer] of this.#cache(l, c).entries()) if (!out.has(key) && askedIn(key).join(",") === asked) out.set(key, { key, answer, stale: true });
+      for (const [key, answer] of this.#cache(l, c).entries()) if (!out.has(key) && current(key)) out.set(key, { key, answer, stale: true });
     return [...out.values()];
   }
 

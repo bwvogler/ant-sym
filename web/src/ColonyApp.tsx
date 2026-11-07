@@ -179,6 +179,11 @@ function FungusPanel({ stats, jev }: { stats: ColonyStats | null; jev: ReturnTyp
                 <span className="font-mono tabular-nums text-spore">{Math.round(100 * s.infected)}%</span>
               </div>
               <Bar value={s.infected} thin />
+              {s.queen !== null && (
+                <p className="mt-0.5 text-[11px] text-fg-3">
+                  {s.queen === "lost" ? "its queen is dead" : s.queenLoad >= 0.05 ? <span className="text-spore">in its queen: {Math.round(100 * s.queenLoad)}%</span> : "its queen is clean"}
+                </p>
+              )}
             </div>
           ))}
           {stats.sides.length > 1 && (

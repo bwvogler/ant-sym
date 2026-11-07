@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SITUATIONS } from "../colony/colony.ts";
 import { DOCTRINES } from "../colony/colonyBrain.ts";
 import { LETHAL, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
@@ -271,6 +271,7 @@ function World({ game, controls, update, stats, restart, newWorld }: Props) {
 /** For experiments, not play: the spore brush and strains, the fungus's menu, and each colony's doctrine. */
 function Lab({ game, controls, update, stats, jev }: Props) {
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
+  const [showDoctrines, setShowDoctrines] = useState(false);
   const locked = jev.lock !== null;
   return (
     <Card label="lab" title="Lab" wide>
@@ -319,7 +320,11 @@ function Lab({ game, controls, update, stats, jev }: Props) {
           <span className="flex items-center gap-1.5">
             Colony doctrines <Help to={{ tab: "policy", id: "mode" }} label="the ants' policy" />
           </span>
-          {jev.doctrines.slice(0, stats ? stats.sides.length : 1).map((d, k) => (
+          {!showDoctrines ? (
+            <button type="button" className="mt-2 rounded-md border border-dashed border-line px-2 py-1 text-xs text-fg-3 hover:bg-raised" onClick={() => setShowDoctrines(true)}>
+              Show the colonies' doctrines (lab: in the game they stay closed until you reach a queen)
+            </button>
+          ) : jev.doctrines.slice(0, stats ? stats.sides.length : 1).map((d, k) => (
             <div key={k} className="mt-2">
               <div className="flex items-center justify-between">
                 <span className={colonyTone(k)}>{colonyName(k)}</span>
