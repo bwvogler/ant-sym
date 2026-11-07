@@ -11,7 +11,7 @@ import { seg } from "./styles.ts";
 import { MAX_SPEED, STRAINS, type ColonyControls, type ColonyStats, type Ground, type SideStats } from "./useColony.ts";
 import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
-import { AUTOSAVE, describe, SLOTS, type SaveRecord } from "./saves.ts";
+import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
 
 // The Details screen (ja-lo8.2): everything the game does not need on its main screen. The colonies' numbers, Jev's
 // spend and caches, the unity and infection figures, the world's settings, and the lab: the spore brush, strains, the
@@ -374,13 +374,16 @@ function SavedGames({ saves, onLoad, controls }: Props) {
           const r = saves.list.find((x) => x.slot === slot);
           return (
             <li key={slot} className="flex items-center gap-2 text-xs">
-              <span className="min-w-0 flex-1 truncate">{r ? describe(r) : slot === AUTOSAVE ? "Autosave · empty" : `Slot ${slot} · empty`}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {r ? describe(r) : slot === AUTOSAVE ? "Autosave · empty" : `Slot ${slot} · empty`}
+                {r && !readable(r) ? <span className="text-warn"> · from an older version, can't be loaded</span> : null}
+              </span>
               {slot !== AUTOSAVE && (
                 <button type="button" className="rounded-md border border-line px-2 py-1 hover:bg-raised disabled:opacity-50" disabled={!controls.started} onClick={() => void saves.save(slot)}>
                   Save here
                 </button>
               )}
-              <button type="button" className="rounded-md border border-line px-2 py-1 hover:bg-raised disabled:opacity-50" disabled={!r} onClick={() => r && onLoad(r)}>
+              <button type="button" className="rounded-md border border-line px-2 py-1 hover:bg-raised disabled:opacity-50" disabled={!r || !readable(r)} onClick={() => r && readable(r) && onLoad(r)}>
                 Load
               </button>
             </li>

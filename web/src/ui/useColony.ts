@@ -4,6 +4,7 @@ import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, GAME_REGROW, gameRng, type Outcome, type Unity } from "../colony/game.ts";
 import { chapterOf, type ChapterView } from "../colony/chapters.ts";
 import { colonyName } from "./names.ts";
+import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts";
 
@@ -145,11 +146,19 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const pending = useRef<SaveRecord | null>(null);
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
-    const g = new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW }, gameRng(controls.seed, generation));
+    const build = () => new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW }, gameRng(controls.seed, generation));
+    const g = build();
     const r = pending.current;
     if (r && r.settings.seed === controls.seed && r.settings.ground === controls.ground && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
       pending.current = null;
-      g.load(r.game);
+      try {
+        g.load(r.game);
+      } catch (e) {
+        // A save this game can't read (another version, another shape): a fresh game of the same world rather than a
+        // blank page (PR #42 review, B3). The notice waits until React has finished rendering.
+        queueMicrotask(() => pushToast(`That save couldn't be loaded (${e instanceof Error ? e.message : String(e)}); this is a fresh game of its world.`, "warn"));
+        return build();
+      }
     }
     return g;
     // `loads` rebuilds the game when a save has the same settings as the game now

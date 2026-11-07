@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AUTOSAVE, describe, memorySaves, record } from "../saves.ts";
+import { AUTOSAVE, describe, memorySaves, newestReadable, readable, record } from "../saves.ts";
 import { Game } from "../../colony/game.ts";
 import { generateWorld, mulberry32, OPEN_WORLD } from "../../colony/world.ts";
 
@@ -23,4 +23,17 @@ test("save records: a slot each, newest first, the game's own save inside, and a
   assert.equal(back.time, g.time);
   await store.remove(1);
   assert.equal(await store.get(1), null);
+});
+
+test("a save from another version is listed but never offered or loaded: Continue skips it (PR #42 review, B3)", () => {
+  const g = new Game(generateWorld(4, { ...OPEN_WORLD, size: { w: 120, h: 80 } }), { antCount: 30, rivalAnts: 30 }, mulberry32(4));
+  const settings = { seed: 4, ground: "open" as const, antCount: 30, rival: true, generation: 0 };
+  const player = { aim: { id: "unite", text: "One colony." }, doctrines: [], menu: [], hide: false, cull: false };
+  const ok = { ...record(1, settings, player, g.save(), "1. land"), savedAt: 1000 };
+  const old = { ...record(AUTOSAVE, settings, player, { ...g.save(), version: 0 }, "3. spread"), savedAt: 2000 };
+  assert.equal(readable(ok), true);
+  assert.equal(readable(old), false);
+  assert.equal(newestReadable([old, ok]), ok, "Continue offers the newest this version can read");
+  assert.equal(newestReadable([old]), null);
+  assert.throws(() => g.load(old.game), /version/, "and Game.load refuses it rather than misreading it");
 });

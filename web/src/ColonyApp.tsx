@@ -9,7 +9,7 @@ import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { MAX_SPEED, useColony, type ColonyStats } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
-import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
+import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
 import type { Game } from "./colony/game.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo } from "./ui/backend.ts";
@@ -49,6 +49,10 @@ export default function ColonyApp() {
   const games = useSaves(game, settings, { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull }, stats, controls.started);
   const continueFrom = useCallback(
     (r: SaveRecord) => {
+      if (!readable(r)) {
+        pushToast(`That save is from another version of the game and can't be loaded: ${describe(r)}.`, "warn");
+        return;
+      }
       loadSave(r);
       jev.restore(r.player.aim, r.player.doctrines);
       update({ menu: r.player.menu, hide: r.player.hide, cull: r.player.cull });
@@ -96,7 +100,7 @@ export default function ColonyApp() {
       />
       <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} saves={games} onLoad={(r) => (continueFrom(r), closeDetails())} />
       <Toasts />
-      {!controls.started && <StartScreen seed={controls.seed} onStart={start} latest={games.list[0] ?? null} onContinue={continueFrom} />}
+      {!controls.started && <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm" aria-label="game bar">
         <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={() => update({ playing: !controls.playing })}>

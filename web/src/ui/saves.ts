@@ -1,4 +1,4 @@
-import type { GameSave } from "../colony/game.ts";
+import { SAVE_VERSION, type GameSave } from "../colony/game.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 import type { Ground } from "./useColony.ts";
 
@@ -99,6 +99,19 @@ export function record(slot: number, settings: GameSettings, player: PlayerState
 }
 
 /** "12 min of sim, 3 h ago" style, for a slot's line. */
+/**
+ * Whether this game can read the record: one saved by an older (or newer) version is listed but never loaded, since
+ * Game.load refuses it (PR #42 review, B3).
+ */
+export function readable(r: SaveRecord): boolean {
+  return r.game?.version === SAVE_VERSION;
+}
+
+/** The newest save this game can read, or null: what Continue offers. */
+export function newestReadable(list: readonly SaveRecord[]): SaveRecord | null {
+  return list.find(readable) ?? null;
+}
+
 export function describe(r: SaveRecord, now = Date.now()): string {
   const ago = Math.max(0, now - r.savedAt) / 1000;
   const when = ago < 90 ? "just now" : ago < 5400 ? `${Math.round(ago / 60)} min ago` : ago < 129600 ? `${Math.round(ago / 3600)} h ago` : `${Math.round(ago / 86400)} days ago`;
