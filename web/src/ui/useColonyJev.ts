@@ -10,6 +10,7 @@ import { ColonyJev, type ColonyJevState } from "./colonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
 import type { Backend } from "./backend.ts";
 import { canResume, policyLock, shouldStart } from "./policyLock.ts";
+import { loadPrecache } from "./precache.ts";
 
 // React face of the colonies' Jev client: one client for the page's life
 // (the colonies change with the world, the caches do not), its state mirrored
@@ -55,6 +56,13 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
       if (jev.state.phase === "running") void jev.stop();
       jev.dispose();
     };
+  }, [jev]);
+  // Jev's answers shipped with the page (ui/precache.ts), under any this browser already has.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return; // once per page: StrictMode runs effects twice
+    seeded.current = true;
+    void loadPrecache((context, entries) => jev.seed(context, entries));
   }, [jev]);
   useEffect(() => jev.attachColonies(colonies), [jev, colonies]);
   // The fungus spans the game: the lane drives each new game's, under the player's menu.

@@ -84,8 +84,20 @@ interface Lane<S, A extends string> {
   /** the words its requests carry: a colony's doctrine, or the fungus's aim */
   words: string;
   context: string;
+  /**
+   * The contexts this lane asked under before, newest first (at most FALLBACKS): while the current words have no
+   * answer for a situation, the newest earlier answer acts, marked stale, and the situation is asked again (the
+   * fungus game, ja-lo8.3: old answers dim and fill in as they come, nothing is re-asked all at once).
+   */
+  fallback: string[];
   queue: Map<string, S>;
 }
+
+/** How many earlier contexts a lane falls back on. */
+export const FALLBACKS = 3;
+
+/** Who decided: Jev's answer under the current words; an earlier answer while it is asked again (stale); the local rule while it is asked; the local rule. */
+export type DecidedBy = "jev" | "stale" | "waiting" | "local";
 
 /** In-flight questions are per context: a situation asked under one doctrine is still unasked under another. */
 function askKey(context: string, key: string): string {
@@ -93,7 +105,7 @@ function askKey(context: string, key: string): string {
 }
 
 function lane<S, A extends string>(spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "valid" | "contextOf" | "words" | "asks">): Lane<S, A> {
-  return { ...spec, context: spec.contextOf(spec.words), queue: new Map() };
+  return { ...spec, context: spec.contextOf(spec.words), fallback: [], queue: new Map() };
 }
 
 /** A colony this client drives: its two lanes. */
@@ -101,6 +113,14 @@ interface Driven {
   colony: Colony;
   modes: Lane<Situation, Mode>;
   stances: Lane<StanceSituation, Stance>;
+}
+
+/** A colony's two lanes, asking under `words` (its doctrine). */
+function colonyLanes(words: string): Omit<Driven, "colony"> {
+  return {
+    modes: lane<Situation, Mode>({ name: "mode", key: situationKey, pack: packModeRequest, read: (a, id) => readMode(a, id), local: localPolicy, valid: (_k, a) => (MODES as readonly string[]).includes(a), contextOf: policyContext, words }),
+    stances: lane<StanceSituation, Stance>({ name: "stance", key: stanceKey, pack: packStanceRequest, read: (a, id) => readStance(a, id), local: localStance, valid: (_k, a) => (STANCES as readonly string[]).includes(a), contextOf: stanceContext, words }),
+  };
 }
 
 export class ColonyJev {
@@ -192,10 +212,20 @@ export class ColonyJev {
     };
   }
 
+  /** The newest earlier answer for `key` in lane l (its fallback contexts), or null. */
+  #earlier<S, A extends string>(l: Lane<S, A>, key: string): A | null {
+    for (const c of l.fallback) {
+      const a = this.#cache(l, c).get(key);
+      if (a) return a;
+    }
+    return null;
+  }
+
   /**
    * The answer for situation s in lane l: Jev's cached answer whenever there is one, run or no run (the fungus game,
-   * ja-lo8.2: Jev is always on, and when it can't answer the game plays on what it already answered); else the local
-   * rule, and, while a run is on, the situation is queued to be asked.
+   * ja-lo8.2: Jev is always on, and when it can't answer the game plays on what it already answered); else an earlier
+   * answer under words this lane had before (stale, ja-lo8.3); else the local rule. While a run is on, a situation with
+   * no current answer is queued to be asked.
    */
   #lookup<S, A extends string>(l: Lane<S, A>, s: S): A {
     if (l.asks && !l.asks(s)) return l.local(s);
@@ -208,22 +238,24 @@ export class ColonyJev {
     }
     if (hit) return hit;
     if (running && !this.#asking.has(askKey(l.context, key))) l.queue.set(key, s);
-    return l.local(s);
+    return this.#earlier(l, key) ?? l.local(s);
   }
 
-  /** Who decides, in lane l, situation s right now: Jev's cached answer, the local rule while Jev is asked, or the local rule. Counts and queues nothing. */
-  #explain<S, A extends string>(l: Lane<S, A>, s: S): { answer: A; by: "jev" | "waiting" | "local" } {
+  /** Who decides, in lane l, situation s right now (DecidedBy). Counts and queues nothing. */
+  #explain<S, A extends string>(l: Lane<S, A>, s: S): { answer: A; by: DecidedBy } {
     const local = l.local(s);
     if (l.asks && !l.asks(s)) return { answer: local, by: "local" };
     const key = l.key(s);
     const hit = this.#cache(l).get(key);
     if (hit) return { answer: hit, by: "jev" };
+    const earlier = this.#earlier(l, key);
+    if (earlier) return { answer: earlier, by: "stale" };
     if (this.#state.phase !== "running") return { answer: local, by: "local" };
     return { answer: local, by: l.queue.has(key) || this.#asking.has(askKey(l.context, key)) ? "waiting" : "local" };
   }
 
   /** Who decides an ant of colony k in situation `s` right now (the follow card). */
-  explain(s: Situation, k = 0): { mode: Mode; by: "jev" | "waiting" | "local" } {
+  explain(s: Situation, k = 0): { mode: Mode; by: DecidedBy } {
     const d = this.#driven[k];
     if (!d) return { mode: localPolicy(s), by: "local" };
     const e = this.#explain(d.modes, s);
@@ -245,7 +277,7 @@ export class ColonyJev {
   readonly fungusPolicy: FungusPolicy = (s) => this.#lookup(this.#fungal, s);
 
   /** Who decides what the fungus does in situation `s` right now (the follow card). */
-  explainFungus(s: FungalSituation): { answer: string; by: "jev" | "waiting" | "local" } {
+  explainFungus(s: FungalSituation): { answer: string; by: DecidedBy } {
     return this.#explain(this.#fungal, s);
   }
 
@@ -276,15 +308,51 @@ export class ColonyJev {
     this.#fungal.queue.clear();
   }
 
-  /** New words for a lane: its own cache (free if used before), and a fresh queue. Returns whether the context changed. */
-  #recontext<S, A extends string>(l: Lane<S, A>, words: string): boolean {
+  /**
+   * New words for a lane: its own cache (free if used before), and a fresh queue. The words it had become its newest
+   * fallback (`inherit`, if given, instead: a daughter colony starts on her mother's answers). Returns whether the
+   * context changed.
+   */
+  #recontext<S, A extends string>(l: Lane<S, A>, words: string, inherit?: string): boolean {
     l.words = words;
     const context = l.contextOf(words);
     if (context === l.context) return false;
+    const before = inherit === undefined ? l.context : l.contextOf(inherit);
+    l.fallback = [before, ...l.fallback.filter((c) => c !== before)].filter((c) => c !== context).slice(0, FALLBACKS);
     l.context = context;
     l.queue.clear();
     this.#set(this.#counts());
     return true;
+  }
+
+  /**
+   * Answers shipped with the page (ui/precache.ts) for a context: kept where nothing for that situation is cached yet,
+   * so answers this browser got from Jev win. Only answers this lane's question could give are kept (`valid`). The
+   * colonies reconsider, so shipped answers take hold at once.
+   */
+  seed(context: string, entries: readonly [string, string][]): number {
+    const l = this.#laneFor(context);
+    if (!l) return 0;
+    const cache = this.#cache(l, context);
+    let added = 0;
+    for (const [key, a] of entries)
+      if (!cache.get(key) && l.valid(key, a)) {
+        cache.put(key, a);
+        added++;
+      }
+    if (added) {
+      this.#set(this.#counts());
+      this.#reconsider();
+    }
+    return added;
+  }
+
+  /** A lane whose kind of context this is (by its prefix: colony-, stance-, fungus-), to check answers against. */
+  #laneFor(context: string): Lane<unknown, string> | null {
+    const kind = context.startsWith("colony-") ? "mode" : context.startsWith("stance-") ? "stance" : context.startsWith("fungus-") ? "fungus" : null;
+    if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
+    const d = this.#driven[0] ?? colonyLanes("");
+    return kind === "mode" ? (d.modes as Lane<unknown, string>) : kind === "stance" ? (d.stances as Lane<unknown, string>) : null;
   }
 
   /** Drive this one colony (kept for a single colony; see attachColonies). */
@@ -299,11 +367,7 @@ export class ColonyJev {
   attachColonies(colonies: readonly Colony[]): void {
     this.#driven = colonies.map((colony, k) => {
       const words = this.#doctrines[k] ?? this.#doctrines[0] ?? "";
-      const d: Driven = {
-        colony,
-        modes: lane<Situation, Mode>({ name: "mode", key: situationKey, pack: packModeRequest, read: (a, id) => readMode(a, id), local: localPolicy, valid: (_k, a) => (MODES as readonly string[]).includes(a), contextOf: policyContext, words }),
-        stances: lane<StanceSituation, Stance>({ name: "stance", key: stanceKey, pack: packStanceRequest, read: (a, id) => readStance(a, id), local: localStance, valid: (_k, a) => (STANCES as readonly string[]).includes(a), contextOf: stanceContext, words }),
-      };
+      const d: Driven = { colony, ...colonyLanes(words) };
       colony.policy = (s) => this.#lookup(d.modes, s);
       colony.stancePolicy = (s) => this.#lookup(d.stances, s);
       colony.reconsider();
@@ -320,13 +384,15 @@ export class ColonyJev {
   /**
    * A new doctrine for colony k: its own caches (free if used before, by either colony), and its ants reconsider under
    * it. A colony that has no doctrine of its own follows the first colony's, now as well as at the next game (ja-6yj).
+   * Until the new words are answered, its ants act on the old words' answers, stale; `inherit` names other words to
+   * fall back on instead (a daughter colony on her mother's doctrine, ja-lo8.9).
    */
-  setDoctrineFor(k: number, text: string): void {
+  setDoctrineFor(k: number, text: string, inherit?: string): void {
     this.#doctrines[k] = text;
     this.#driven.forEach((d, j) => {
       if (j !== k && !(k === 0 && this.#doctrines[j] === undefined)) return;
-      const a = this.#recontext(d.modes, text);
-      const b = this.#recontext(d.stances, text);
+      const a = this.#recontext(d.modes, text, inherit);
+      const b = this.#recontext(d.stances, text, inherit);
       if (a || b) d.colony.reconsider();
     });
   }

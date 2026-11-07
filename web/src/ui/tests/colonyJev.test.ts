@@ -186,6 +186,62 @@ test("busy puts the situations back in the queue; a failure cools down instead o
   assert.equal(j2.state.phase, "running", "a failure is not the end of the run");
 });
 
+test("a new doctrine: until Jev answers it, the old doctrine's answers act, stale, and each is asked again (ja-lo8.3)", async () => {
+  const sent = scriptFetch(answerAll("fight"));
+  const store = memoryStore();
+  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const old: Mode = localPolicy(s) === "return" ? "follow" : "return";
+  store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), old]]);
+  const j = make(store);
+  const c = colony();
+  j.setDoctrine(DOCTRINES[0]!.text);
+  j.attach(c);
+  j.setDoctrine(DOCTRINES[1]!.text);
+  assert.equal(c.policy(s), old, "the old words' answer, not the local rule");
+  assert.equal(j.explain(s).by, "stale");
+  await j.start();
+  assert.equal(c.policy(s), old, "still stale while it is asked");
+  await tick(60);
+  assert.ok(sent.flat().length > 0, "the situation was asked under the new words");
+  assert.equal(c.policy(s), "fight", "the new answer replaces it");
+  assert.equal(j.explain(s).by, "jev");
+});
+
+test("a daughter colony falls back on her mother's doctrine, not on the words her lane had before (inherit)", () => {
+  scriptFetch(answerAll("fight"));
+  const store = memoryStore();
+  const s: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const mother = DOCTRINES[2]!.text;
+  const motherSays: Mode = localPolicy(s) === "return" ? "follow" : "return";
+  store.data.set(policyContext(mother), [[situationKey(s), motherSays]]);
+  store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), "fight"]]);
+  const j = make(store);
+  const c = colony();
+  j.setDoctrine(DOCTRINES[0]!.text);
+  j.attach(c);
+  j.setDoctrineFor(0, "Her own words.", mother);
+  assert.equal(c.policy(s), motherSays);
+  assert.equal(j.explain(s).by, "stale");
+});
+
+test("answers shipped with the page are seeded under the ones this browser already has, and only valid ones", () => {
+  scriptFetch(answerAll("fight"));
+  const store = memoryStore();
+  const ctx = policyContext(DOCTRINES[0]!.text);
+  const a: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const b: Situation = { ...a, foodTrail: "strong" };
+  store.data.set(ctx, [[situationKey(a), "return"]]);
+  const j = make(store);
+  const c = colony();
+  j.setDoctrine(DOCTRINES[0]!.text);
+  j.attach(c);
+  const added = j.seed(ctx, [[situationKey(a), "explore"], [situationKey(b), "follow"], ["nonsense", "dance"]]);
+  assert.equal(added, 1, "only b: a is the browser's, and 'dance' is no mode");
+  assert.equal(c.policy(a), "return", "the browser's own answer wins");
+  assert.equal(c.policy(b), "follow", "the shipped answer plays, with no run on");
+  assert.equal(j.seed("elsewhere-v1-0", [[situationKey(a), "explore"]]), 0, "a context of no lane is ignored");
+});
+
 test("the strategist's stance goes through its own cached lane", async () => {
   const stances: string[] = [];
   scriptFetch((req) => {

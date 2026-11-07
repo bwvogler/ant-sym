@@ -3169,3 +3169,24 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 - Desktop and phone layouts were checked with Playwright: no page errors, and no sideways scroll on the Details screen.
 
 **No behaviour change in the sim.** Goldens are untouched, and requests and their contexts are byte-identical, so the cost is unchanged.
+
+### 49.2 Slice 3: shipped answers, and stale answers that fill in (ja-lo8.3, 2026-11-07)
+
+**Shipped answers.** `scripts/precache.mjs` asked Jev every mode situation (3,888) and every strategist view (324) under each preset doctrine (Forage, Cautious, Warlike):
+- **Packing:** the browser's own packers, keys and contexts.
+- **Cost:** 129 requests, **$0.1046** in total (estimate $0.1245), 0 failed.
+- **Output:** 12,636 answers in `web/public/precache/`, 708 kB raw, about 11 kB gzipped per mode bundle.
+- **Loading:** at start the page fetches them once (`ui/precache.ts`) and seeds the client's caches (`ColonyJev.seed`), under any answer the browser already has. Only answers the lane's question allows are kept.
+- **Guard:** `tests/precache.test.ts` fails when a bundle's context or a brain version no longer matches the code.
+
+**Measured:**
+- **A fresh browser with a key:** 0 requests in 8 s, and 100 % of mode choices from the cache. Before, a page load made 17 requests in 7 s ($0.0007).
+- **The Pages build** (`vite preview` under `/ant-sym/`) plays 3,888 mode and 324 stance answers with no server, and says why policies are locked.
+
+**Stale answers fill in** (owner, PRD §49: "dim the old values and fill them in as they roll"):
+- **Earlier contexts.** Each lane keeps up to three earlier contexts. On a new doctrine or aim, a situation with no answer under the new words plays the newest earlier answer, and is queued to be asked again.
+- **Display.** The ant card shows it faded, "by Jev's answer under its earlier doctrine (aim), while the new one is asked".
+- **Daughters.** `setDoctrineFor(k, words, inherit)` makes a lane fall back on other words instead: a daughter colony on her mother's doctrine (ja-lo8.9).
+- **Nothing is asked all at once.**
+
+**No sim change.** The goldens are untouched. Requests and contexts are byte-identical, so there are no new tokens per question.

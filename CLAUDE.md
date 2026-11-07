@@ -26,7 +26,10 @@ npm run test:slow              # whole-game guards (web/src/colony/tests/slow): 
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
 npm run exp -- all --seeds 1-10   # behaviour assays (web/src/colony/experiment.ts), offline; --set sweeps, --policy cache:<file> replays Jev
 node scripts/colony-live.mjs all --budget 0.10   # live: Jev against the local rule per lane; saves replayable caches (experiments/out/)
+node scripts/precache.mjs                       # live (~$0.10): Jev's answer to every mode and stance situation under each preset doctrine, shipped in web/public/precache; re-run when precache.test fails (a legend, question or version moved)
 ```
+
+The page ships Jev's answers (`web/public/precache/`, ja-lo8.3) and plays cached answers whether or not a run is on; a lane whose words changed plays its earlier words' answers, stale, until the new ones arrive. A change to a colony legend, question or brain version must re-run `scripts/precache.mjs` in the same PR.
 
 A change that should not alter behaviour must keep the golden masters bit-exact (`tests/golden.test.ts`, `tests/slow/golden.test.ts`); one that should re-records them (`GOLDEN_WRITE=1`) and says so in its PR. Tune behaviour against the assays: compare `npm run exp` with the baseline (PRD §42), choose by the worst seed, confirm on seeds 11–20.
 

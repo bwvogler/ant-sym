@@ -6,6 +6,7 @@ import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import Help from "./Help.tsx";
 import { openLearn, type LearnTarget } from "./learn.ts";
+import type { DecidedBy } from "./colonyJev.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
 // when it last chose, and who made the choice: Jev's cached answer for
@@ -20,12 +21,12 @@ interface Props {
   colony: Colony;
   rival: Colony | null;
   /** who decided, for an ant of colony k */
-  explain: (s: Situation, k: number) => { mode: Mode; by: "jev" | "waiting" | "local" };
-  explainFungus: (s: FungalSituation) => { answer: string; by: "jev" | "waiting" | "local" };
+  explain: (s: Situation, k: number) => { mode: Mode; by: DecidedBy };
+  explainFungus: (s: FungalSituation) => { answer: string; by: DecidedBy };
   onClose: () => void;
 }
 
-const BY = { jev: "Jev's cached answer under its colony's doctrine", waiting: "the local rule, while Jev is asked", local: "the local rule" } as const;
+const BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under its colony's doctrine", stale: "Jev's answer under its earlier doctrine, while the new one is asked", waiting: "the local rule, while Jev is asked", local: "the local rule" };
 
 export default function AntCard({ followed, colony, rival, explain, explainFungus, onClose }: Props) {
   const [, setTick] = useState(0);
@@ -69,7 +70,9 @@ export default function AntCard({ followed, colony, rival, explain, explainFungu
             </button>
           ))}
           <span className="text-fg-3">→</span>
-          <span className="rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent">{mode}</span>
+          <span className={`rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent ${decided?.by === "stale" ? "opacity-50" : ""}`} title={decided?.by === "stale" ? "stale: the answer under the earlier words, until Jev answers the new ones" : undefined}>
+            {mode}
+          </span>
           <span className="text-fg-3">{decided ? `by ${BY[decided.by]}` : ""}</span>
           <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "mode" })}>
             why?
@@ -84,7 +87,7 @@ export default function AntCard({ followed, colony, rival, explain, explainFungu
 }
 
 /** What the fungus is doing to ant i: strain, load, the intervention it runs, and each sense it bends. */
-const FUNGUS_BY = { jev: "Jev's cached answer under your aim", waiting: "the local rule, while Jev is asked", local: "the local rule" } as const;
+const FUNGUS_BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under your aim", stale: "Jev's answer under your earlier aim, while the new one is asked", waiting: "the local rule, while Jev is asked", local: "the local rule" };
 
 function Fungal({ col, i, explain }: { col: Colony; i: number; explain: Props["explainFungus"] }) {
   const load = col.load[i] as number;
@@ -116,7 +119,9 @@ function Fungal({ col, i, explain }: { col: Colony; i: number; explain: Props["e
           </span>
         ))}
         <span className="text-fg-3">→</span>
-        <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-spore">{run?.name ?? "?"}</span>
+        <span className={`rounded bg-raised px-1.5 py-0.5 font-mono text-spore ${by === "stale" ? "opacity-50" : ""}`} title={by === "stale" ? "stale: the answer under your earlier aim, until Jev answers the new one" : undefined}>
+          {run?.name ?? "?"}
+        </span>
         <span className="text-fg-3">{by ? `by ${FUNGUS_BY[by]}` : ""}</span>
         <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "fungus" })}>
           why?

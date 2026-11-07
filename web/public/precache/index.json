@@ -1,0 +1,50 @@
+{
+  "bundles": [
+    {
+      "lane": "mode",
+      "doctrine": "cautious",
+      "context": "colony-v5-94519ecf",
+      "file": "mode-cautious.json",
+      "answers": 3888
+    },
+    {
+      "lane": "mode",
+      "doctrine": "forage",
+      "context": "colony-v5-e792ce70",
+      "file": "mode-forage.json",
+      "answers": 3888
+    },
+    {
+      "lane": "mode",
+      "doctrine": "warlike",
+      "context": "colony-v5-af50f1aa",
+      "file": "mode-warlike.json",
+      "answers": 3888
+    },
+    {
+      "lane": "stance",
+      "doctrine": "cautious",
+      "context": "stance-v4-b1ce9ef4",
+      "file": "stance-cautious.json",
+      "answers": 324
+    },
+    {
+      "lane": "stance",
+      "doctrine": "forage",
+      "context": "stance-v4-657ca221",
+      "file": "stance-forage.json",
+      "answers": 324
+    },
+    {
+      "lane": "stance",
+      "doctrine": "warlike",
+      "context": "stance-v4-1cc01e21",
+      "file": "stance-warlike.json",
+      "answers": 324
+    }
+  ],
+  "versions": {
+    "colony": 5,
+    "stance": 4
+  }
+}
