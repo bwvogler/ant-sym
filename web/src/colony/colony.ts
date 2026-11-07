@@ -3032,17 +3032,7 @@ export class Colony {
     const asked = this.params.raidGate > 0 && this.#entrance === null && this.#stanceOf(i) === "raid" ? FIGHT : mode;
     const answer = this.responses.leave(this.touch(i, enemy, asked, "none"));
     const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : scout;
-    const goes = this.#rng() < 1 - Math.exp(-rate * dt);
-    // A raider told to wait, with no trail to go on, is called off after raidPatience seconds of it (behaviour MR 5.2): for this
-    // ant, until the colony's stance changes. Counted here, so a raider waiting at home in either mode runs the same clock.
-    if (asked === FIGHT && this.params.raidPatience > 0 && this.#entrance === null) {
-      if (answer !== "wait" || goes) this.#waitT[i] = 0;
-      else if ((this.#waitT[i] = (this.#waitT[i] as number) + dt) >= this.params.raidPatience) {
-        this.#stoodAt[i] = STANCES.indexOf(this.stance) + 1;
-        this.#waitT[i] = 0;
-      }
-    }
-    return goes;
+    return this.#rng() < 1 - Math.exp(-rate * dt);
   }
 
   /** The stance ant i acts on: the colony's, unless it has stood down from a raid it could not find (behaviour MR 5.2: call-off). */
@@ -3197,7 +3187,17 @@ export class Colony {
         if (this.reporting[i] === 1 && this.#atNestTop(i)) this.reporting[i] = 0;
         if ((this.#goT[i] as number) > 0) this.#goT[i] = (this.#goT[i] as number) - dt;
         if (this.#stoodAt[i] !== 0 && this.#stoodAt[i] !== STANCES.indexOf(this.stance) + 1) this.#stoodAt[i] = 0; // a new stance is a new order
-        if ((this.#waitT[i] as number) > 0 && !this.#atNestTop(i)) this.#waitT[i] = 0; // out of the nest, it is not waiting
+        // Raid call-off (behaviour MR 5.2, docs/raid-recruitment.md: how a raid ends): a raider's own clock runs while it is at
+        // home, and a stranger met outside starts it again. After raidPatience seconds at home with none met, the raid is called
+        // off for this ant, until the colony's stance changes. A trail calling it out doesn't stop the clock: raiders sent
+        // out and straight back (by a doctrine that keeps them home) met no one either (ja-7je).
+        if (p.raidPatience > 0 && this.#stanceOf(i) === "raid") {
+          if (toEnemy !== null) this.#waitT[i] = 0;
+          else if (this.#atNestTop(i) && (this.#waitT[i] = (this.#waitT[i] as number) + dt) >= p.raidPatience) {
+            this.#stoodAt[i] = STANCES.indexOf(this.stance) + 1;
+            this.#waitT[i] = 0;
+          }
+        }
       }
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
       // this step (its trip is over: see `arrive`).
