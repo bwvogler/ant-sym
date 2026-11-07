@@ -493,9 +493,13 @@ export class Game {
     return c.population === 0 && c.larder < c.params.foodPerAnt;
   }
 
-  /** The first colony that is beaten, by index, or −1. */
+  /**
+   * The first of the world's own colonies that is beaten, by index, or −1. A colony founded mid-game (addColony) can
+   * fall without ending the game (PR #42 review: a 30-ant colony from the lab ended it).
+   */
   fallen(): number {
-    return this.colonies.findIndex((c) => Game.beaten(c));
+    const own = this.colonies.length - this.founded.length;
+    return this.colonies.findIndex((c, k) => k < own && Game.beaten(c));
   }
 
   outcome(): Outcome {

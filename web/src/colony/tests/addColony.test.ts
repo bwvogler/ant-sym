@@ -99,3 +99,15 @@ test("founding twice at one spot digs a second hole along the ground, and every 
   // The world's colonies learn the founded holes, so their mounds keep those funnels open too (S3).
   for (const c of g.colonies) assert.deepEqual([...(c.saveState().private as { holes: number[] }).holes].sort((x, y) => x - y), [...cols].sort((x, y) => x - y));
 });
+
+test("a founded colony that falls does not end the game; the world's own colonies still do", () => {
+  const g = new Game(generateSideWorld(2), { antCount: 120, rivalAnts: 120 }, mulberry32(11));
+  run(g, 2);
+  g.addColony({ ...spot(g), antCount: 30, odour: 0 });
+  const c = g.colonies[2]!;
+  for (let i = 0; i < c.n; i++) c.alive[i] = 0;
+  if (c.queen) c.queen.alive = false;
+  assert.ok(Game.beaten(c), "the founded colony is beaten");
+  assert.equal(g.fallen(), -1);
+  assert.notEqual(g.outcome(), "fallen");
+});
