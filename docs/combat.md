@@ -53,6 +53,15 @@ The paper sites (pnas.org, europepmc.org) were outside this session's network al
 - **The odds** are in the `Touch` for a policy that weighs them (the contact lane).
 - **ja-hgq:** it is the sensed fix for the top-down game's midfield battles, where two colonies' foragers fought wherever their trails crossed.
 
+## Play
+
+- **See:** ants coloured by their odour, fights where they meet, and brown alarm haze. A forager that meets strangers turns away and runs; a carrier heads home (PRD §46.3). Learn's "Alarm" and "Strangers and battles" entries cover it. Faint alarm draws ants on the top-down maps only, and the side view, where the page starts, met just 2 contact situations in 300 s (PRD §46.3, §46.6).
+- **Choose:** the Recognition levers decide who a host takes for a stranger: `strangers` (stranger scent), `calm` (calming cue) and `odour` (fungal odour). They start at none, then one step, then the full range (PRD §50.12). `strangers` also moves the odds a host senses, since it counts only the strangers it perceives. `alarm` (Senses) bends how it smells alarm, `alarmLaid` (Trails) how much it lays.
+- **Counterplay and progression:** the colonies push back by stance: raiders and defenders fight, and an ant that fights outnumbered dies (PRD §46.3, §46.6). Unity is the fungus's win (PRD §21), and Recognition is the upgrade that reaches it.
+- **Cost:** the page decides the contact response by the local rule and asks Jev none of it; asked, it would be 1,641 tokens a question (PRD §48.5). The live checks cost $0.0023 and $0.0034 (PRD §46.6). The levers above ride the fungus lane's questions, ~708 tokens a situation (PRD §50.12).
+- **Risks:** a near-collapse in G′ (seed 19, 29 ants alive, PRD §46.4; `ja-hgq`), and more held carriers (`ja-uez`). The odour weapon, turned on, is lethal at full strength from the first second (`ja-lo8.16`, PRD §50.15). Whether calming or blending ends battles sooner is not measured; unity over seeds would show it.
+- **Owner decisions needed:** whether the contact response is asked live in the game; whether ants take up room in a cell (`ja-4ne`, PRD §46.5). The colony's stance is still scripted (`ja-k4k.6`).
+
 ## Sources
 
 - Lymbery, Webber & Didham 2023, "Complex battlefields favor strong soldiers over large armies in social animal warfare", *PNAS* 120:e2217973120: https://www.csiro.au/en/news/all/articles/2023/august/ant-warfare *(press release)* · https://phys.org/news/2023-08-ant-wars-native-species-invasive.pdf *(press)* · https://researchportal.murdoch.edu.au/esploro/outputs/journalArticle/Complex-battlefields-favor-strong-soldiers-over/991005601870307891 *(index page)*
