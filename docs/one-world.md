@@ -32,12 +32,14 @@ An ant in the curtain moves with today's side-view physics: the shaft, chambers,
 
 **The surface belongs to the plane alone.** The curtain starts one row below the ground. The ground strip along the top of the side view is drawn from the plane cells under the line, with whichever ants stand on them, so nothing is simulated twice.
 
-**A hole is the only way between the two.** An ant standing on a hole cell on the plane steps down into the curtain at *(s_hole, 0)*, and an ant climbing out of the shaft steps up onto the plane at the hole. The ground's crust is never dug (`#crust`, as today), so no other way exists. A second hole for a colony (polydomy, `queens-and-merging.md` open question 3) would be a later, deliberate act.
+**A hole is the only way between the two.** An ant standing on a hole cell on the plane steps down into the curtain at *(s_hole, 0)*, and an ant climbing out of the shaft steps up onto the plane at the hole. The curtain's top row is its crust and is never dug except at a hole. Today `#crust` is a soil cell touching sky; the curtain has no sky, so in one world the crust is simply the curtain's row 0. No other way between the layers exists. A second hole for a colony (polydomy, `queens-and-merging.md` open question 3) would be a later, deliberate act.
 
 **State.** Each ant carries a *layer* (plane or curtain) and its *x, y* in that layer. Each layer has its own copy of:
 - every colony's pheromones;
 - the occupancy grids that fights read;
 - its food: piles on the plane, buried pockets and chamber stores in the curtain.
+
+The fungus's own body, the mycelium it grows where it lands by a hole (`Fungus.root`, PRD §50.12), lies on the plane.
 
 Fights happen within a layer. Two ants in different layers never meet, except across a hole.
 
@@ -45,17 +47,19 @@ Fights happen within a layer. Two ants in different layers never meet, except ac
 
 ## 3. The line, and where a new nest may go
 
-**The transect** is the holes in order, V₀ … V_k, joined by straight segments on the hex grid. It extends a short margin (about 24 cells) past each end, so an end hole isn't drawn at the edge of the side view. The game starts with two nests, so the line starts as one segment, Ink to Amber.
+**The transect** is the holes in order, V₀ … V_k, joined by straight segments on the hex grid. It extends a margin past each end, so an end hole isn't drawn at the edge of the side view and an end colony has room to dig outward: about 64 cells (one chunk), with rock beyond. The mound no longer needs that room, because it lies on the plane (§4); U2 sets the margin from how far the side view's nests dig today. The game starts with two nests, so the line starts as one segment, Ink to Amber.
 
 **The founding rule** (the owner's, made precise). A colony may be founded at point *p* only when all of these hold:
-1. **Its nearest hole is an end** (V₀ or V_k). The owner's rule: no founding nearer an interior nest's hole, so the line always grows from an end and stays one unbranched strip.
-2. **The new segment doesn't fold back.** From that end to *p* it neither crosses the line nor comes within a clearance (about 12 cells) of it. Otherwise the curtain would pass under itself, and one surface cell would sit over two places underground.
-3. **It doesn't crowd a hole.** *p* is at least `HOLE_GAP` (8) from every hole, as `Game.addColony` already enforces.
+1. **Its nearest hole is an end** (V₀ or V_k). The owner's rule: no founding nearer an interior nest's hole, so the line always grows from an end and stays one unbranched strip. Ties are settled so a game replays exactly: a point as near an interior hole as an end is invalid, and a point as near both ends grows the line at V₀. With two nests both are ends, so the first founding may go beyond either.
+2. **The new segment doesn't fold back.** It may not turn back on the end segment by more than 120° (so the angle between them at the shared vertex is at least 60°). Away from that vertex (beyond the clearance) it neither crosses the line, the far end's margin included, nor comes within a clearance (about 12 cells) of it. Otherwise the curtain would pass under itself, and one surface cell would sit over two places underground.
+3. **It doesn't crowd a hole.** *p* is at least a hole gap from every hole, as a 2D distance. Today `Game.addColony` keeps `HOLE_GAP` (8) columns between holes in the side view and `NEST_GAP` (12) between nests top-down, and moves a founding rather than refusing it; one world uses one 2D gap. Rule 2's clearance already covers most of this.
 4. **It is on open ground** on the plane.
 
-**A landing that breaks the rule** (a queen's flight, `ja-lo8.9`; the lab's "found a colony" button) moves to the nearest valid point within the flight's radius. If none lies within it, **the flight fails**: the queen dies, as most real foundresses do, and the game says why ("no room beyond the line's ends within her flight"). Decided by the owner (§8); `new-queens.md` §3 says so too.
+**The line on the hex grid.** Column *s* of the curtain lies under *P(s)*, the plane cell holding the point at distance *s* along the line. *P* need not be one-to-one: along a slanted segment some cells sit over two columns, and the side view's ground strip draws them twice. U1 samples the line finely enough that neighbouring columns always map to the same or adjacent cells, and its property tests check that.
 
-**What growing the line does to the curtain.** The curtain is indexed by *s*, so what is dug underground keeps its place when the line grows. Only the surface cell above *s* changes, and only beyond the old end's margin. Growing at V₀ uses negative *s*, so nothing is renumbered; this fits the endless world's outward chunks (`ja-qpv`).
+**A landing that breaks the rule** (a queen's flight, `ja-lo8.9`, closed but not yet on main on 2026-11-08, whose landing rule U4 changes; the lab's "found a colony" button) moves to the nearest valid point within the flight's radius. If none lies within it, **the flight fails**: the queen dies, as most real foundresses do, and the game says why ("no room beyond the line's ends within her flight"). Decided by the owner (§8); `new-queens.md` §3 says so too.
+
+**What growing the line does to the curtain.** The curtain is indexed by *s*, so what is dug underground keeps its place when the line grows; growing at V₀ uses negative *s*, so nothing is renumbered, which fits the endless world's outward chunks (`ja-qpv`). What changes is the old end's margin: its range of *s* now runs along the new segment instead of straight on, so tunnels dug there keep their *s* but lie under different ground. Spoil and the midden are plane data and stay where they are. Beyond the old margin the curtain is new, undug ground.
 
 **A colony that falls keeps its vertex.** Its hole and tunnels stay. A later colony could take them over, which is the "abandonment" branch of `queens-and-merging.md` open question 3.
 
@@ -71,7 +75,7 @@ Most behaviour carries over unchanged. The new work is the seam between the two:
 - **Homing on the plane.** Use the side view's drifting vector (`#believe`, `#integrate`) in 2D, aimed at the hole. Today `#believe` keeps only the horizontal part (`b.y = goal.y`), and `#inOwnNest`, `#neighbour` and `#middenSide` measure only |x| to a hole. On the plane those become 2D distances. The vector resets inside the nest, as real ants' does ([nest-and-home: outside](nest-and-home.md#outside-home-is-the-hole)).
 - **The mound becomes surface data.** It becomes a spoil count per plane cell around the hole, a height field. Diggers carry pellets up the shaft and drop them on the plane. The side view draws the heap's cut through the curtain's sky rows. `heapMound` and the pellet pickers (`#pickLoose`, `takeLoose`) move to the plane, and the funnel that keeps every hole open becomes a ring on the plane.
 - **The midden** becomes a disc at the edge of the cleared ground, facing the nearest hole in 2D ([nest-and-home: places with jobs](nest-and-home.md#places-with-jobs)).
-- **The economy is the side view's: there is always a queen.** The larder and "every 4 food makes an ant" are retired from one world.
+- **The economy is the side view's: there is always a queen.** The larder stays, as the side view keeps it (the mode situation's `larder`, the queen laying while it holds), but it no longer turns into ants: "every 4 food makes an ant" is retired from one world.
 - **Raids** walk the plane to the target hole and go down its shaft. Today's side-view raid does the same thing in one dimension (`raidTarget`, `#aimRaids`, the scout's trail of PRD §49).
 - **The fungus** reads the ant's layer for its "ground" sense:
   - in the curtain: chamber or tunnel;
@@ -81,7 +85,7 @@ Most behaviour carries over unchanged. The new work is the seam between the two:
 
 **Jev's cost should not change.** The mode situation keeps its fields and their meaning. `homeTrail` is a trail level on the plane and a place in the curtain, as today in each map. Confirm with `colony-cost` when the colony code lands; any change to a situation, legend or question needs its new figure in the PR (CLAUDE.md).
 
-**Tick cost should stay close to today's.** The open map with 1,200 + 1,200 ants runs at 3.3–3.9 ms a tick (PRD §12, §14). The curtain is cheap, because scent only spreads along tunnels (5 awake chunks against 45 on the open map, PRD §14). Expect about 4–5 ms; measure it before switching the page.
+**Tick cost will rise; measure it.** The open map with 1,200 + 1,200 ants runs at 3.3–3.9 ms a tick (PRD §12, §14). The side view, which is what the curtain will run, is the slower of today's maps: 7.0–7.3 ms at 1,200 + 1,200 (PRD §36, §37), its nest life costing more than the open map's foraging. One world runs both, each for the ants in it, so budget about 7–9 ms and measure before switching the page (U6).
 
 ## 5. Two views of one game
 
@@ -106,12 +110,12 @@ The page keeps today's two maps until one world passes its own guards. U6 then t
 
 | Stage | What | Guard |
 |---|---|---|
-| U1 | `transect.ts`, pure: the line, *s* ↔ plane cell, signed *s*, `canFound` and `nearestValid` (the four rules of §3), crossing and clearance tests | unit tests, with property tests over random lines |
+| U1 | `transect.ts`, pure: the line, *s* ↔ plane cell, signed *s*, `canFound` and `nearestValid` (the four rules of §3, with their ties), the turn limit, crossing and clearance tests | unit tests, with property tests over random lines: neighbouring columns map to the same or adjacent cells; no valid founding makes the curtain overlap itself |
 | U2 | `generateOneWorld`: the plane from the open-map generator, the curtain from the side-view generator along the line. Both views drawn, with no simulation yet | map invariants: each hole is open on both layers; the curtain's ground row lies under *P(s)* |
 | U3 | colonies on two layers: per-ant layer, hole crossings, 2D homing, the mound and midden on the plane, the queen economy | a new golden master for one world; the old ones bit-exact |
-| U4 | founding on the line: `Game.addColony` checks `canFound`; the lab button becomes "found beyond ‹end nest›"; the queen's landing (`ja-lo8.9`); saves | save round-trip; founding property tests |
+| U4 | founding on the line: `Game.addColony` checks `canFound`; the lab button becomes "found beyond ‹end nest›"; the queen's landing (`ja-lo8.9`) moves to the nearest valid spot or fails; saves | save round-trip; founding property tests |
 | U5 | the page as one game in two views, linked (§5) | Playwright: switch views mid-game, follow an ant through a hole |
-| U6 | G1, a G-like whole-game guard on one world; assays A1–A10 rerun on the plane; the page's default switched; the Ground control's world switch retired | `npm run exp`, `test:slow` |
+| U6 | G1, a G-like whole-game guard on one world; assays A1–A10 rerun on the plane; tick cost measured (budget 7–9 ms at 1,200 + 1,200); the page's default switched; the Ground control's world switch retired | `npm run exp`, `test:slow`, the bench |
 
 A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.** No note gives a nearest-neighbour distance between nests or how far a founding queen flies, and the founding radius (§3) needs one. That needs primary sources, like every sense in the vision table.
 

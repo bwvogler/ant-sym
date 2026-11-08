@@ -223,6 +223,21 @@ export const GUIDE: GuideEntry[] = [
     ],
   },
   {
+    id: "evolution",
+    title: "The fungus's body, and its mutations",
+    swatch: ["var(--spore)"],
+    onScreen: "The Fungus panel: its mycelium by the hole and the fungus in its hosts, mutations to keep and how fast they come, and what each upgrade does next. On a followed ant's card, a lever your fungus can't yet pull as far as Jev wants shows what it gets and what it wanted.",
+    realAnts:
+      "Metarhizium lives for months in soil and around roots without an insect. Passed through groups of grooming ants for ten cycles, it evolved to make more spores and to carry less of the cue groomers detect. In experimental evolution, more replication buys far less than proportionally faster adaptation.",
+    inGame:
+      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep, and each level asks more than the last: its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
+    sources: [
+      { note: "fungus-body", anchor: "1-growth-without-a-host", label: "Growth without a host" },
+      { note: "fungus-body", anchor: "3-adapting-to-hosts", label: "Adapting to hosts" },
+      { note: "fungus-body", anchor: "4-grooming-and-the-queen", label: "Grooming and the queen" },
+    ],
+  },
+  {
     id: "unity",
     title: "One colony",
     onScreen: "The Unity bar in the Fungus panel. Ants' colours meet in between as their odours mix.",
@@ -247,6 +262,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "activation", title: "Activation", covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake." },
   { note: "raid-recruitment", title: "Raid recruitment", covers: "Scouts find a rival and recruit before a raid; encounters at a border recruit; a trail brings the fighters." },
   { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
+  { note: "fungus-body", title: "The fungus's body", covers: "A mycelium off the host, spores paid from its mass, adapting in hosts; grooming triggered by sensing the pathogen." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
   { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views (design, not built)." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },

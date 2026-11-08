@@ -82,7 +82,8 @@
 - A gyne leaves through the hole and flies. The sim has no air, so the flight is a jump to a landing site within a radius.
 - She founds a new colony there: a founding chamber, a first clutch raised on a fixed reserve (no larder needed), then the ordinary economy (nest slice 4).
 - The daughter starts at her mother's odour (kin), as she was raised in that nest.
-- **Not modelled:** males, mating, and the many queens that die after the flight. Most founding queens fail in nature. In the game a queen lands wherever the founding rule allows, at the nearest valid spot within her flight; when there is none (once the world is one surface and a curtain, a new nest goes only beyond an end of the line), the flight fails and the game says why ([one-world §3](one-world.md#3-the-line-and-where-a-new-nest-may-go)).
+- **Not modelled:** males and mating.
+- **Most founding queens fail in nature.** In the game a queen lands at the nearest spot the founding rule allows within her flight. Once the world is one surface and a curtain, a new nest goes only beyond an end of the line; when no such spot lies within her flight, she dies and the game says why ([one-world §3](one-world.md#3-the-line-and-where-a-new-nest-may-go)).
 
 ## 4. Where the fungus comes in
 

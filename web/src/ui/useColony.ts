@@ -3,6 +3,7 @@ import type { Colony, Mode, Stance } from "../colony/colony.ts";
 import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, GAME_REGROW, gameRng, type Outcome, type Unity } from "../colony/game.ts";
 import { chapterOf, type ChapterView } from "../colony/chapters.ts";
+import { UPGRADES } from "../colony/evolution.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
@@ -112,6 +113,33 @@ export interface ColonyStats {
   pace: number;
   /** where the player stands (chapters.ts) */
   chapter: ChapterView;
+  /** the game's fungus's body and evolution (ja-lo8.12); null before it lands, or in a lab game */
+  evolution: EvolutionStats | null;
+}
+
+/** The fungus's body and evolution, for its panel. */
+export interface EvolutionStats {
+  /** its mycelium's mass by the hole */
+  mass: number;
+  /** the load in its hosts, summed over every colony's ants and queens */
+  inHosts: number;
+  /** mutations to give (whole ones), and how many it makes a minute now: it mutates as fast as it grows */
+  mutations: number;
+  perMinute: number;
+  /** the level chosen of each upgrade, by id */
+  levels: Record<string, number>;
+}
+
+/** The game's fungus's body and evolution, read off the game. */
+function evolutionStats(game: Game): EvolutionStats | null {
+  const e = game.fungus.evolution;
+  if (!e) return null;
+  let inHosts = 0;
+  for (const c of game.colonies) {
+    for (let i = 0; i < c.n; i++) if (c.alive[i] && c.strain[i] === e.strain) inHosts += c.load[i] as number;
+    if (c.queen?.alive && c.queen.strain === e.strain) inHosts += c.queen.load;
+  }
+  return { mass: e.mass, inHosts, mutations: Math.floor(e.mutations), perMinute: 60 * e.rate, levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])) };
 }
 
 /** Ants in each mode, over every colony. */
@@ -218,6 +246,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           unity: game.unity(),
           pace,
           chapter: chapterFor(game),
+          evolution: evolutionStats(game),
         });
         lastStats = t;
       }
@@ -236,7 +265,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
 
   // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
   useEffect(() => {
-    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN);
+    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
   }, [game, controls.started]);
   /** A saved game, as it was: its world and settings, then its state (Game.load), playing. The player's state is the page's to put back. */
   const loadSave = useCallback((r: SaveRecord) => {
@@ -267,7 +296,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     [game, controls.brush, controls.strain],
   );
 
-  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start, loadSave, settings };
+  /** Give adaptations to the next level of upgrade `id` (evolution.UPGRADES); false when the fungus can't. */
+  const evolve = useCallback((id: string) => game.fungus.upgrade(id), [game]);
+
+  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start, loadSave, settings, evolve };
 }
 
 /** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */
