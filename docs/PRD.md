@@ -3793,7 +3793,7 @@ The founding radius stays open until the research bead (`ja-lp4.7`) gives a figu
 The owner asked whether the side view's undiggable crust could become an ant's own choice, and whether colonies could open new entrances (`ja-nzx`, `ja-4h2`, `ja-lp4.9`). `docs/entrances.md` holds the research:
 - Older, larger harvester colonies keep more entrances, funnelled into one entrance chamber (Gordon 2025).
 - Entrances are sealed at night and plugged by rivals.
-- A digger has gradients that tell depth: CO₂, moisture and temperature. Light matters only once the soil is open.
+- Soil CO₂, moisture and temperature change with depth, and diggers respond to CO₂ (in a leaf-cutter) and moisture in choice tests; no study shows ants reading depth from them. Light matters only once the soil is open.
 
 No source found says what makes a colony open a new entrance from inside.
 
@@ -3801,7 +3801,9 @@ No source found says what makes a colony open a new entrance from inside.
 - **The crust stays a mechanic.** It keeps the walkway from hanging and the hole from being cut off.
 - **`ja-4h2` is deferred.** The cues exist, but the response that would use them would be invented. It reopens on a source about what triggers a new entrance, or when another behaviour needs a depth sense (for example chamber placement, `ja-k4k.3`).
 - **No vision sense-table row yet.**
-- **Two ideas filed:** new entrances that scale with colony size, into one entrance chamber (noted on `ja-lp4.9`), and closing entrances at night (a new bead, needing day and night first).
+- **Two ideas filed:** new entrances that scale with colony size, into one entrance chamber (noted on `ja-lp4.9`), and closing entrances at night and plugging a rival's (`ja-lsu`, blocked by day and night, `ja-0qs`).
+
+**Review (agent):** corrected the light study's journal, the venting test's citation (Tschinkel 2013), placeholder titles, the fire-ant figure's source (Hays 1986), and an overclaim that ants read depth from the gradients; an untraceable claim on morning sealing was dropped and the evening sealing is sourced to a secondary page.
 
 **Search note.** Web searches on how long an insect-killing fungus survives sunlight (`ja-2qv`) were stopped by a safety filter this session; that research waits for a new session. This note's topic was not affected.
 
