@@ -248,6 +248,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "raid-recruitment", title: "Raid recruitment", covers: "Scouts find a rival and recruit before a raid; encounters at a border recruit; a trail brings the fighters." },
   { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
+  { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views (design, not built)." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];
 

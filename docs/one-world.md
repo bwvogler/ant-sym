@@ -1,0 +1,132 @@
+# One world: the surface and a curtain under the line between the holes
+
+Design note (not built). It answers the owner's request (2026-11-08) to make the top-down view and the side view two views of **one** game, and records the model chosen, the geometry rule that keeps it consistent, what changes in the code, and the order to build it in. Beads: epic `ja-lp4`; stages U1–U6 are `ja-lp4.1`–`ja-lp4.6`, and the research bead is `ja-lp4.7`. Decisions: PRD §51.
+
+## 1. Where we are
+
+The page has two separate games on two unrelated maps, and the Ground control switches between them by throwing the game away (ants, food, trails, the fungus).
+- **"Side view"** (`generateSideWorld`, 768 × 368 cells): a cross-section. Sky, a ground line one cell thick, soil and stones below. Two nests 340 columns apart, each a dug shaft and royal chamber. Foragers walk a one-cell walkway along the ground line.
+- **"From above"** (`generateWorld(seed, OPEN_WORLD)`, 512 × 368): the open surface. Rock and walkable ground, food in patches, two nests as discs about 140 apart. No soil, no queen.
+
+The split was never decided. It appeared in MR 13 (PRD §27) when the owner asked to see spoil carried above ground, and the surface map was kept so earlier numbers still reproduce. Since then the two have drifted:
+
+| Only the side view has | Only the top-down map has |
+|---|---|
+| the queen, brood, nurses, porters, undertakers (`#nestLife`, `#nurse`, `#port`) | a larder where every 4 food makes an ant (`foodPerAnt`) |
+| chambers, floor marks, road signs | 2D foraging: Deneubourg's trail choice, the food-trail cap (`foodCapTop`), carriers homing by trail and vector |
+| a drifting home vector (`#believe`, `#integrate`) | an exact nest position |
+| the mound as real soil, the midden | the faint-alarm pull; the bridge assay A1 |
+| the fungus's nest levers (`muddle`, `crown`) | |
+
+Each half is missing what the other has. The side view's foragers live on a line, which is not how ants forage. The top view's colonies have no nest, so nothing the fungus does underground can be seen there.
+
+## 2. The model: a plane and a curtain
+
+**The plane** is the surface, a 2D hex map like today's open map: rock, ground, food piles (which regrow, PRD §50.5), the mound and the midden. An ant on it moves with today's top-down physics. The top view shows the plane.
+
+**The curtain** is everything underground. It is one vertical 2D sheet that hangs under a line drawn through the nests' holes (§3), with coordinates *(s, depth)*:
+- *s* is distance along the line;
+- *depth* is rows below the ground.
+
+An ant in the curtain moves with today's side-view physics: the shaft, chambers, the queen and brood, porters, digging and floor marks. The side view shows the whole curtain, unrolled flat, so no tunnel is ever off-screen.
+
+**The surface belongs to the plane alone.** The curtain starts one row below the ground. The ground strip along the top of the side view is drawn from the plane cells under the line, with whichever ants stand on them, so nothing is simulated twice.
+
+**A hole is the only way between the two.** An ant standing on a hole cell on the plane steps down into the curtain at *(s_hole, 0)*, and an ant climbing out of the shaft steps up onto the plane at the hole. The ground's crust is never dug (`#crust`, as today), so no other way exists. A second hole for a colony (polydomy, `queens-and-merging.md` open question 3) would be a later, deliberate act.
+
+**State.** Each ant carries a *layer* (plane or curtain) and its *x, y* in that layer. Each layer has its own copy of:
+- every colony's pheromones;
+- the occupancy grids that fights read;
+- its food: piles on the plane, buried pockets and chamber stores in the curtain.
+
+Fights happen within a layer. Two ants in different layers never meet, except across a hole.
+
+**Why one sheet is honest enough.** Ground-nesting ants build what Tschinkel calls a "shish-kebab": a near-vertical shaft with flat chambers off it, about 1 cm high, largest near the top, with gaps that grow with depth ([nest-and-home: nest structure](nest-and-home.md#nest-structure)). A vertical sheet keeps that shape. It loses chambers that branch off sideways out of the plane. A full 3D volume was considered and set aside (owner, 2026-11-08): it costs depth-times the memory and tick time, needs 3D digging and homing, and its side view would be a cut that misses tunnels.
+
+## 3. The line, and where a new nest may go
+
+**The transect** is the holes in order, V₀ … V_k, joined by straight segments on the hex grid. It extends a short margin (about 24 cells) past each end, so an end hole isn't drawn at the edge of the side view. The game starts with two nests, so the line starts as one segment, Ink to Amber.
+
+**The founding rule** (the owner's, made precise). A colony may be founded at point *p* only when all of these hold:
+1. **Its nearest hole is an end** (V₀ or V_k). The owner's rule: no founding nearer an interior nest's hole, so the line always grows from an end and stays one unbranched strip.
+2. **The new segment doesn't fold back.** From that end to *p* it neither crosses the line nor comes within a clearance (about 12 cells) of it. Otherwise the curtain would pass under itself, and one surface cell would sit over two places underground.
+3. **It doesn't crowd a hole.** *p* is at least `HOLE_GAP` (8) from every hole, as `Game.addColony` already enforces.
+4. **It is on open ground** on the plane.
+
+**A landing that breaks the rule** (a queen's flight, `ja-lo8.9`; the lab's "found a colony" button) moves to the nearest valid point within the flight's radius. `new-queens.md` §3 keeps "the player's queen lands", so the search covers the whole radius beyond the nearer end. If even that finds nothing, the flight fails. Whether that is allowed is open question 2 in §8.
+
+**What growing the line does to the curtain.** The curtain is indexed by *s*, so what is dug underground keeps its place when the line grows. Only the surface cell above *s* changes, and only beyond the old end's margin. Growing at V₀ uses negative *s*, so nothing is renumbered; this fits the endless world's outward chunks (`ja-qpv`).
+
+**A colony that falls keeps its vertex.** Its hole and tunnels stay. A later colony could take them over, which is the "abandonment" branch of `queens-and-merging.md` open question 3.
+
+**Neighbours meet underground.** Adjacent nests are adjacent along *s*, so their tunnels can meet. Along the curtain the distance between two holes is the segment's length, the same as on the surface, so this is no shortcut. The note leaves it allowed (open question 1).
+
+## 4. What changes in the colony code
+
+**The switch moves from the map to the ant.** Today everything side-only switches on the map's kind: `#entrance`, `map.sky`, `map.hasSoil`, or a queen being present (`queens-and-merging.md` notes `queen !== null` as a side-view flag in about 20 places). In one world each of those becomes a check of the ant's own layer:
+- in the curtain: today's side-view code;
+- on the plane: today's top-down code.
+
+Most behaviour carries over unchanged. The new work is the seam between the two:
+- **Homing on the plane.** Use the side view's drifting vector (`#believe`, `#integrate`) in 2D, aimed at the hole. Today `#believe` keeps only the horizontal part (`b.y = goal.y`), and `#inOwnNest`, `#neighbour` and `#middenSide` measure only |x| to a hole. On the plane those become 2D distances. The vector resets inside the nest, as real ants' does ([nest-and-home: outside](nest-and-home.md#outside-home-is-the-hole)).
+- **The mound becomes surface data.** It becomes a spoil count per plane cell around the hole, a height field. Diggers carry pellets up the shaft and drop them on the plane. The side view draws the heap's cut through the curtain's sky rows. `heapMound` and the pellet pickers (`#pickLoose`, `takeLoose`) move to the plane, and the funnel that keeps every hole open becomes a ring on the plane.
+- **The midden** becomes a disc at the edge of the cleared ground, facing the nearest hole in 2D ([nest-and-home: places with jobs](nest-and-home.md#places-with-jobs)).
+- **The economy is the side view's: there is always a queen.** The larder and "every 4 food makes an ant" are retired from one world.
+- **Raids** walk the plane to the target hole and go down its shaft. Today's side-view raid does the same thing in one dimension (`raidTarget`, `#aimRaids`, the scout's trail of PRD §49).
+- **The fungus** reads the ant's layer for its "ground" sense:
+  - in the curtain: chamber or tunnel;
+  - on the plane: the home-scent ratio.
+
+  `muddle` and `crown` are always offered, because there is always a nest. One world asks under the side view's fungus context.
+
+**Jev's cost should not change.** The mode situation keeps its fields and their meaning. `homeTrail` is a trail level on the plane and a place in the curtain, as today in each map. Confirm with `colony-cost` when the colony code lands; any change to a situation, legend or question needs its new figure in the PR (CLAUDE.md).
+
+**Tick cost should stay close to today's.** The open map with 1,200 + 1,200 ants runs at 3.3–3.9 ms a tick (PRD §12, §14). The curtain is cheap, because scent only spreads along tunnels (5 awake chunks against 45 on the open map, PRD §14). Expect about 4–5 ms; measure it before switching the page.
+
+## 5. Two views of one game
+
+- **Ground becomes a camera switch,** "above" or "below", and no longer builds a new game.
+- **The top view** is the plane, with the line drawn dashed, the holes and each colony's mound disc. A label at each vertex names its nest.
+- **The side view** is the unrolled curtain.
+  - Each bend in the line is a faint vertical rule, labelled with the turn ("↱ 35°").
+  - The strip along the top is the plane under the line.
+  - Ants elsewhere on the surface aren't in this view.
+- **The two views are linked:**
+  - Clicking the line in the top view opens the side view at that *s*, and clicking the side view's ground strip opens the top view there.
+  - A followed ant can carry the camera across at the hole, as an option.
+  - Each view keeps its own camera (`camera.ts` is already pure) and minimap.
+- **On wide screens** both views might show at once, side by side or stacked (open question 3).
+- **The Learn drawer's Nest tab** always has a nest to show. The field guide gains an entry for the line and the curtain.
+
+The renderer reads `colony.map.rock` row by row today (`paintChunk`, `drawHexes`, the minimap). The side view needs one more step: a column *s* maps to the plane cell *P(s)* for its ground strip. Below ground the curtain is a plain grid, so it draws exactly as the side view does now.
+
+## 6. Building it: stages and guards
+
+The page keeps today's two maps until one world passes its own guards. The side view and the open map stay as test beds, and their golden masters stay bit-exact, until the last stage re-baselines the assays.
+
+| Stage | What | Guard |
+|---|---|---|
+| U1 | `transect.ts`, pure: the line, *s* ↔ plane cell, signed *s*, `canFound` and `nearestValid` (the four rules of §3), crossing and clearance tests | unit tests, with property tests over random lines |
+| U2 | `generateOneWorld`: the plane from the open-map generator, the curtain from the side-view generator along the line. Both views drawn, with no simulation yet | map invariants: each hole is open on both layers; the curtain's ground row lies under *P(s)* |
+| U3 | colonies on two layers: per-ant layer, hole crossings, 2D homing, the mound and midden on the plane, the queen economy | a new golden master for one world; the old ones bit-exact |
+| U4 | founding on the line: `Game.addColony` checks `canFound`; the lab button becomes "found beyond ‹end nest›"; the queen's landing (`ja-lo8.9`); saves | save round-trip; founding property tests |
+| U5 | the page as one game in two views, linked (§5) | Playwright: switch views mid-game, follow an ant through a hole |
+| U6 | G1, a G-like whole-game guard on one world; assays A1–A10 rerun on the plane; the page's default switched; the Ground control's world switch retired | `npm run exp`, `test:slow` |
+
+A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.** No note gives a nearest-neighbour distance between nests or how far a founding queen flies, and the founding radius (§3) needs one. That needs primary sources, like every sense in the vision table.
+
+## 7. What stays the same
+
+- The policy, its situations, the doctrines and the local rules.
+- The fungus's levers and its policy.
+- Recognition and odour.
+- The hex grid and its chunks.
+- Behaviour MRs 1–5.2 as built. Each was tuned on one map kind, and in one world it runs on the layer it was tuned for.
+
+## 8. Open questions for the owner
+
+1. **Underground meetings.** Should neighbouring colonies' tunnels be allowed to meet in the curtain, or should digging stop short of a neighbour's half of the segment?
+2. **A landing with nowhere to go.** Can a queen's flight fail when no valid point lies within her radius (as most real foundresses fail), or must the player's queen always land (`new-queens.md` §3)?
+3. **Wide screens.** Should they show both views at once, or keep the above/below switch?
+4. **After U6.** Do the legacy side and open maps stay on the page as lab options, or only in tests?
+5. **The founding radius.** This waits on the research bead.

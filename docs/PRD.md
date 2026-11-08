@@ -3594,3 +3594,17 @@ The owner's rule: **don't spend while answers are cached; ask Jev only for the s
 - **Details shows the budget** (spent of today's, and what is left) beside the run's own figures. Tests: a second run on the same day starts with what the first spent; a new day starts again; a reply from a replaced run counts; the store carries a restart.
 - The per-run caps stay in the ledger, with their old default, for any caller that asks for them.
 
+## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
+
+The owner asked for the top-down view and the side view to be two views of one game. The side view would be a cut along a line through the nests' holes, zig-zagging as nests are added, and a new nest may not be founded nearer an interior nest's hole, so the line always grows from an end. Today they are two unrelated games, and the Ground control throws the game away to switch (§27 created the split without choosing it).
+
+**Decisions (owner, 2026-11-08):**
+- **Underground is a curtain under the line, not a 3D volume.**
+  - The surface is a 2D plane with today's top-down physics.
+  - Everything underground lives in one vertical sheet under the line, with today's side-view physics, and the side view shows all of it.
+  - A hole is the only way between the two.
+  - A full 3D underground was set aside: depth-times the memory and tick cost, 3D digging and homing, and a side view that would miss tunnels.
+- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line, its segment from that end neither crosses the line nor comes within a clearance of it, it is `HOLE_GAP` from every hole, and the ground is open.
+- **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
+
+**Cost.** None yet. The mode situation keeps its fields, so one world should not change Jev's cost; U3 checks it with `colony-cost`.
