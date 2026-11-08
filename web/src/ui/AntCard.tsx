@@ -54,7 +54,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
         </h2>
         <span className="font-mono text-xs text-fg-2">
           {mode}
-          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
+          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s{col.queen ? ` · energy ${((col.energy[i] as number) * 100).toFixed(0)} %${(col.need[i] as number) >= 0.05 ? ` · feels hunger ${(col.need[i] as number).toFixed(2)}` : ""}` : ""} · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
         </span>
         <button type="button" className="ml-auto rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised" onClick={onClose}>
           Stop following

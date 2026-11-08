@@ -18,11 +18,13 @@ import { generateSideWorld, mulberry32 } from "../../world.ts";
 // at 3,600 s this branch has 152 workers (167 born, 125 dead of age); with a lifespan of 1,800 s, 20; with the food flow
 // as it was (food to a reception of any size, porters only from reception and stores, no forager handing on), 130, with
 // 30 larvae unfed for over two minutes beside 117 food in the nest (none on this branch until the last minute, when the
-// larder is down to 33: 2). `scripts/economy-bench.mjs` measures the full game.
+// larder is down to 33: 2). `scripts/economy-bench.mjs` measures the full game. With energy and hunger (ja-xu6.1, PRD
+// §50.13) adults eat too (38 food in the hour here): 158 workers (169 born, 121 dead of age), no larva stranded, none starved.
 
-test("an hour on: the founders have died of age and been replaced, food reached the larvae, and the colony holds its size", { timeout: 600_000 }, () => {
+/** An hour of the tests' small map, one colony of 110 on 0.3 of the map's food (world `w`, the game seeded w × 7919 + nudge). */
+function hour(w: number, nudge: number) {
   const ants = 110;
-  const map = generateSideWorld(2, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 });
+  const map = generateSideWorld(w, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 });
   let total = 0;
   for (let y = 0; y < map.size.h; y++)
     for (let x = 0; x < map.size.w; x++) {
@@ -31,7 +33,7 @@ test("an hour on: the founders have died of age and been replaced, food reached 
       total += v;
     }
   map.foodTotal = map.foodLeft = total;
-  const g = new Game(map, { antCount: ants, rival: false }, mulberry32(2 * 7919));
+  const g = new Game(map, { antCount: ants, rival: false }, mulberry32(w * 7919 + nudge));
   const c = g.player;
   // Food idle in the nest while larvae starve: larvae unfed for over two minutes (a larva is fed in about 6 s once food
   // lies by it), while the chambers hold enough to feed them.
@@ -42,10 +44,27 @@ test("an hour on: the founders have died of age and been replaced, food reached 
     const waiting = c.brood.items.filter((b) => b.stage === LARVA && b.t > 120 && !isFed(b)).length;
     if (c.larder >= waiting * LARVA_FOOD) stranded = Math.max(stranded, waiting);
   }
+  return { ants, c, stranded };
+}
+
+test("an hour on: the founders have died of age and been replaced, food reached the larvae, and the colony holds its size", { timeout: 600_000 }, () => {
+  const { ants, c, stranded } = hour(2, 0);
   // The turnover happened inside the hour: most founders (born up to half a lifespan before the start) are dead.
   assert.ok(LIFESPAN <= 3600, `a lifespan within the hour (${LIFESPAN} s)`);
   assert.ok(c.diedOld >= 0.6 * ants, `died of age: ${c.diedOld} of ${ants} founders`);
   assert.ok(c.births >= c.diedOld, `born ${c.births} against ${c.diedOld} dead of age`);
   assert.ok(stranded <= 5, `${stranded} larvae at once waited over two minutes, with food enough for them lying in the nest`);
   assert.ok(c.population >= ants, `alive at 3,600 s: ${c.population} (started with ${ants})`);
+  assert.equal(c.diedHungry, 0, "no worker starved");
+});
+
+test("ja-xu6: when the young run out, old ants feel the brood's hunger and carry food to it (world 4, seeding + 1: collapsed on main)", { timeout: 600_000 }, () => {
+  // On main this world collapsed: births stalled, the colony aged until no ant (the old never ported or nursed) carried
+  // food to the brood, and 44 larvae at once starved beside a full larder; 62 workers were left at 3,600 s. With energy
+  // and hunger felt by touch (ja-xu6.1, hunger.ts), the old answer it: 164 workers, at most 3 larvae waiting.
+  const { ants, c, stranded } = hour(4, 1);
+  assert.ok(c.births >= c.diedOld, `born ${c.births} against ${c.diedOld} dead of age`);
+  assert.ok(stranded <= 5, `${stranded} larvae at once waited over two minutes, with food enough for them lying in the nest`);
+  assert.ok(c.population >= ants, `alive at 3,600 s: ${c.population} (started with ${ants})`);
+  assert.equal(c.diedHungry, 0, "no worker starved");
 });

@@ -3559,3 +3559,51 @@ The owner's rule: **don't spend while answers are cached; ask Jev only for the s
 **Tests:** a new doctrine plays the local rule, is asked, and takes Jev's answer; with `canAsk` off the old words' answer plays, stale, and flipping it reconsiders once per change; a daughter's new words play the local rule; a new aim plays the fungus's local rule and lists the old aim's rows only while Jev can't answer.
 
 **No sim change.** The goldens are untouched; requests and contexts are byte-identical, so tokens per question are unchanged.
+
+### 50.13 Energy and hunger: old ants answer the brood's hunger (ja-xu6, ja-xu6.1, 2026-11-08)
+
+**The bug** (`ja-xu6`): in long side-view games, larvae starved beside a full larder. `#port` and `#nurse` refused every old ant (age band 2), so when births stalled the colony aged until nobody carried food to the brood or the queen, and births never restarted.
+
+**Owner's decision (2026-11-08):** fix it with a real body state, not a grace time. Adults and larvae both have energy, drained with time and activity and refilled by eating. Hunger is felt by touch.
+
+**Research** (web, 2026-11-08):
+- Hungry larvae beg with movements, more when starved in *Gnamptogenys striatula* and in *Formica fusca* and *F. exsecta* (not in *F. aquilonia*). Workers were not drawn to the odour of starved larvae, and starved and fed larvae did not differ in cuticular hydrocarbons (Peignier et al. 2019, *Front. Ecol. Evol.* 7:398, [frontiersin.org](https://www.frontiersin.org/article/10.3389/fevo.2019.00398/full)). So hunger is a contact cue, not a scent.
+- In *Myrmica rubra* a "gradient of hunger" runs from the foragers through the nurses to the larvae (cited there; the original not read).
+- Response thresholds (Bonabeau, Theraulaz & Deneubourg 1996, fungus-policy §3): an ant responds to a stimulus s with the chance s² / (s² + θ²); age only shifts θ.
+
+**Built** (`web/src/colony/hunger.ts`, `colony.ts #body`; the side view only, where a colony has a queen and brood; top-down maps are untouched):
+- **Adults.** `energy[i]` drains at 1/2,400 a second inside, twice that outside. Below 0.7 an ant tops itself up from food lying in its own nest within two cells (not in a brood chamber, whose food is the larvae's, nor the queen's stock of 8), at 8 meals from empty a unit, or takes food by mouth from the best-fed nestmate it touches (above 0.75: trophallaxis, energy passed, not made). At 0 it dies of hunger (`diedHungry`).
+- **Larvae.** `BroodItem.energy` drains at 1/600 a second. Food a nurse gives goes to its energy first, then to its growth; at 0 the larva dies (`broodStarved`), and its food leaves the economy.
+- **The queen.** Her own energy (1/3,600 a second); she eats from her chamber; at 0 she dies.
+- **Felt hunger.** Each tick a begging larva (below 0.8), a hungry adult (below 0.4) and a queen who can't lay for want of food are felt by the ants within one cell; each ant passes on 0.9 of what it felt last tick to those it touches. An ant's `need` rises toward the strongest it feels in 2 s and fades over 60 s.
+- **What need does.** An old ant ports and takes in brood with the chance respond(need, 0.3); the young and middle-aged as before. An ant feeling need (0.3 for the old, 0.1 for the others) follows the stores' floor marks to where food is kept, and there ports it on. Porters also bring a meal to the chamber a hungry adult is in (`#wanted`, the existing table: `ja-k4k.4`).
+- **Food conservation** gains the food eaten (`Colony.eaten`): map + jaws + larder + brood (1 + fed) + 4 a birth + eaten stays at what the map started with (food.test, economy-bench).
+- **Saves**: `SAVE_VERSION` 2 (energy, need, the queen's energy, brood energy).
+- **The follow card** shows an ant's energy and the hunger it feels.
+
+**What didn't work, measured** (the economy test's setup: 256 × 160, 110 ants, 0.3 food, 3,600 s, worlds 1–8 at seeding n = 0 and 1):
+- Eating only in the chamber an ant stands in: food piled up in stores nobody visits, and every adult starved by 2,400 s on world 1 (335 food left).
+- Letting adults eat the queen's stock: the crowd resting in the royal chamber (`ja-3po`) ate it, she stopped laying, and the colony aged out.
+- Following reception's marks to fetch: reception smells strongly and is usually empty; fetchers gathered there.
+- Draining from full to empty in 20 minutes, eating below 0.5: foragers on an emptied map starved before they got home (40–56 adults on three worlds).
+- A lower old-ant threshold (0.15), or need passed on at 0.95: the hunger response took foragers off the ground and nudged world 3 collapsed (60–80 adults starved). The dynamics are sensitive; need fading over 60 s rather than 30 was the one change that held everywhere.
+
+**Measured, the 16 worlds** (main → this branch; workers at 3,600 s, worst larvae stranded at once, i.e. unfed over 120 s while the larder could feed them):
+
+| World | n = 0 main | n = 0 now | n = 1 main | n = 1 now |
+|---|---|---|---|---|
+| 1 | 160, 0 | 161, 8 | **77, 15** | 161, 0 |
+| 2 | 161, 0 | 158, 0 | **45, 13** | 161, 0 |
+| 3 | 160, 0 | 161, 1 | 161, 0 | 158, 13 |
+| 4 | 152, 7 | 154, 3 | **62, 44** | 164, 3 |
+| 5 | 161, 0 | 164, 0 | 162, 1 | 149, 10 |
+| 6 | 164, 0 | 163, 0 | 164, 0 | 159, 0 |
+| 7 | 159, 0 | 156, 2 | 162, 0 | 148, 3 |
+| 8 | 162, 0 | 163, 0 | 162, 7 | 163, 0 |
+
+- **No collapse**: main lost three colonies to the death spiral (45–77 workers left); now every colony ends with 148 or more, births at least match deaths of age everywhere, and no worker starves.
+- Outside the test's bound (≤ 5 stranded, ≥ 110 workers): main 5 of 16, now 3 of 16, all on strandings in the last 20 minutes as this small map's food runs out (larder 7–73).
+- Adults eat 35–49 food an hour here (110–165 workers): about a fifth of a unit an ant-hour.
+- **Guard:** `slow/economy.test` gains world 4 at seeding n = 1 (collapsed on main), and both cases assert no worker starved.
+- **Golden masters re-recorded** (`GOLDEN_WRITE=1`): the side view (`tests/golden.json` "side view, seed 4", `tests/slow/golden.json` "side view war, seed 6") changes from the first tick, since founders now use energy and old ants' porting draws on the random stream. The top-down recording ("top-down war, seed 3") is bit-identical.
+- **Colony lane cost unchanged**: no legend, situation or question changed, so the shipped answers stand.

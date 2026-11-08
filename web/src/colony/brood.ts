@@ -22,13 +22,15 @@ export interface BroodItem {
   held: number;
   /** the chamber it lies in (counted in that chamber's brood), or −1 */
   chamber: number;
+  /** its energy, 0..1 (larvae; ja-xu6.1, hunger.ts): it drains while the larva waits, food goes to it before growth, and at 0 the larva dies */
+  energy: number;
 }
 
 export class Brood {
   readonly items: BroodItem[] = [];
 
   add(x: number, y: number, chamber: number): BroodItem {
-    const b: BroodItem = { x, y, stage: EGG, t: 0, fed: 0, held: -1, chamber };
+    const b: BroodItem = { x, y, stage: EGG, t: 0, fed: 0, held: -1, chamber, energy: 1 };
     this.items.push(b);
     return b;
   }

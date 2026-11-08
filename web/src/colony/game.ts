@@ -45,7 +45,7 @@ export interface GameParams {
 export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0 };
 
 /** Bump when what a save holds changes: an older save is refused, not misread. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony). */
 export const HOLE_GAP = 8;

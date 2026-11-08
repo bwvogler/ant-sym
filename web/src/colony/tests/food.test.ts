@@ -157,7 +157,7 @@ function drift(over?: Partial<Responses>, seconds = 300): { worst: number; g: Ga
     let s = map.foodLeft;
     for (const c of g.colonies) {
       for (let i = 0; i < c.n; i++) if (c.alive[i] && c.carrying[i]) s += 1;
-      s += c.larder + 4 * c.births;
+      s += c.larder + 4 * c.births + c.eaten;
       for (const b of c.brood.items) s += 1 + b.fed;
     }
     worst = Math.max(worst, Math.abs(s - map.foodTotal));
@@ -216,8 +216,9 @@ test("a larva eats what lies in its own chamber, not the royal chamber's", () =>
   c.feed(10); // in the royal chamber
   for (let k = 0; k < 30 * 30; k++) c.tick(1 / 30);
   assert.equal(larva.fed, 0, "the royal chamber's food is not its");
-  room.food += 3;
-  c.larder += 3;
+  // A little over LARVA_FOOD: after 30 s waiting, some of it goes to its energy first (ja-xu6.1).
+  room.food += 4;
+  c.larder += 4;
   for (let k = 0; k < 30 * 30; k++) c.tick(1 / 30);
   assert.equal(larva.stage, PUPA, "fed from its own, it pupated");
 });
