@@ -30,8 +30,6 @@ interface Props {
   onFrame: (fn: () => void) => () => void;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
-  /** a brush is chosen: dragging on the field paints at (x, y) in cells, the brush widened by `scale` */
-  onPaint: ((x: number, y: number, scale: number) => void) | null;
   followed: Followed | null;
   onFollow: (f: Followed | null) => void;
   /** with chamber labels on, a click on a chamber (no ant under it): colony k's chamber `id` (the Learn drawer's Nest tab) */
@@ -55,8 +53,6 @@ function odourColour(ink: [number, number, number], warn: [number, number, numbe
 
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
 const HEX_ZOOM = 12;
-/** At or above this zoom (device px per cell) a brush paints its own radius; zoomed further out it widens to match. */
-const BRUSH_ZOOM = 6;
 /** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
 const CLICK_SLOP_PX = 8;
 /** A click picks the nearest ant within this many CSS px. */
@@ -69,10 +65,10 @@ interface ChunkCanvas {
 }
 
 /** The pointer gesture under way; `moved` is how far it has travelled (device px), (sx, sy) where it started. */
-type Gesture = { kind: "pan" | "paint" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
+type Gesture = { kind: "pan" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
-export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, showHomeTrail, onPaint, followed, onFollow, onChamber }: Props) {
+export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, showHomeTrail, followed, onFollow, onChamber }: Props) {
   const colony = colonies[0] as Colony;
   const count = colonies.length;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -100,13 +96,12 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
   }, [followed]);
   useEffect(() => {
     followCb.current = onFollow;
-  }, [onPaint, onFollow]);
+  }, [onFollow]);
 
   // The map's size in world units (hexagon rows are R apart): what the camera fits and clamps to.
   const world = useMemo(() => worldExtent(colony.map), [colony]);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture>(NO_GESTURE);
-  const space = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -671,23 +666,17 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       fitted.current = c.zoom <= fitZoom(world, v) * 1.0001;
     };
     canvas.addEventListener("wheel", wheel, { passive: false });
-    // Space held for a pan drag is let go when the window loses focus, or it would stick "down" (its keyup goes elsewhere).
-    const blur = () => {
-      space.current = false;
-    };
-    window.addEventListener("blur", blur);
     return () => {
       off();
       ro.disconnect();
       mq.removeEventListener("change", retheme);
       canvas.removeEventListener("wheel", wheel);
-      window.removeEventListener("blur", blur);
     };
     // `count`: a colony founded mid-game is pushed onto the same array (Game.addColony)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colonies, count, fungus, onFrame, world]);
 
-  // ——— input: one pointer drags (pan, or paint with a brush), two pinch; a click picks an ant; the minimap jumps ———
+  // ——— input: one pointer drags (pans), two pinch; a click picks an ant; the minimap jumps ———
 
   const dpr = () => Math.min(2, window.devicePixelRatio || 1);
   const slop = () => CLICK_SLOP_PX * dpr();
@@ -721,12 +710,6 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     const r = minimapRect(world, view(), dpr());
     if (follow.current) unfollow();
     setCamera({ ...camera(), x: ((x - r.x) / r.w) * world.w, y: ((y - r.y) / r.h) * world.h });
-  };
-  const paintAt = (x: number, y: number) => {
-    if (!onPaint) return;
-    const c = camera();
-    const [wx, wy] = toWorld(c, view(), x, y);
-    onPaint(wx, wy, Math.min(6, Math.max(1, (BRUSH_ZOOM * dpr()) / c.zoom)));
   };
   /** The nearest ant (either colony) within PICK_PX of the point, or null. */
   const pick = (x: number, y: number): Followed | null => {
@@ -777,9 +760,6 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     if (e.button === 0 && inMini(x, y)) {
       gesture.current = { ...NO_GESTURE, ...start, kind: "mini" };
       jumpMini(x, y);
-    } else if (e.button === 0 && onPaint && !space.current) {
-      gesture.current = { ...NO_GESTURE, ...start, kind: "paint" };
-      paintAt(x, y);
     } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
   };
 
@@ -803,8 +783,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         // Crossing the slop, catch up from where the drag began, so the ground stays under the pointer.
         setCamera(was <= slop() ? pan(camera(), x - g.sx, y - g.sy) : pan(camera(), x - prev.x, y - prev.y));
       }
-    } else if (g.kind === "paint" && e.buttons & 1) paintAt(x, y);
-    else if (g.kind === "mini" && e.buttons & 1) jumpMini(x, y);
+    } else if (g.kind === "mini" && e.buttons & 1) jumpMini(x, y);
     pointers.current.set(e.pointerId, { x, y });
   };
 
@@ -828,11 +807,6 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
 
   const onKey = (e: KeyboardEvent<HTMLCanvasElement>) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return; // browser and system shortcuts (Ctrl+0, Ctrl+S, …) pass through
-    if (e.key === " ") {
-      space.current = e.type === "keydown";
-      e.preventDefault();
-      return;
-    }
     if (e.type !== "keydown") return;
     const v = view();
     const c = camera();
@@ -874,7 +848,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        className={`absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent ${onPaint ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
+        className={`absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-grab active:cursor-grabbing`}
         role="application"
         aria-label="colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it"
         onPointerDown={onDown}
@@ -883,9 +857,6 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         onPointerCancel={onUp}
         onKeyDown={onKey}
         onKeyUp={onKey}
-        onBlur={() => {
-          space.current = false;
-        }}
         onContextMenu={(e) => e.preventDefault()}
       />
       <div className="pointer-events-none absolute left-2 top-2 flex gap-1.5">

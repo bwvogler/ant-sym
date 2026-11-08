@@ -35,7 +35,7 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {
-  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start, loadSave, settings, evolve } = useColony();
+  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve } = useColony();
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend);
   const [details, setDetails] = useState(false);
@@ -62,7 +62,6 @@ export default function ColonyApp() {
     [loadSave, jev, update],
   );
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
-  const painting = controls.brush === "spores";
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-3 px-4 py-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -123,14 +122,6 @@ export default function ColonyApp() {
           </span>
         )}
         <span className="min-w-0 basis-full text-fg-2 sm:basis-0 sm:flex-1 sm:truncate">{goalLine(stats)}</span>
-        {painting && (
-          <span className="flex items-center gap-2 rounded-md border border-spore/40 bg-raised px-2 py-1 text-xs text-spore">
-            lab: spore brush on — drag to paint
-            <button type="button" className="underline-offset-2 hover:underline" onClick={() => update({ brush: "none" })}>
-              stop
-            </button>
-          </span>
-        )}
       </div>
 
       <div className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:flex-row">
@@ -142,7 +133,6 @@ export default function ColonyApp() {
               onFrame={onFrame}
               showFoodTrail={controls.showFoodTrail}
               showHomeTrail={controls.showHomeTrail}
-              onPaint={painting ? paint : null}
               followed={followed}
               onFollow={setFollowed}
               onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
@@ -152,9 +142,7 @@ export default function ColonyApp() {
             <AntCard followed={followed} colonies={game.colonies} fungus={game.fungus} explain={jev.explain} explainFungus={jev.explainFungus} onClose={() => setFollowed(null)} />
           ) : (
             <p className="text-xs text-fg-3">
-              {painting
-                ? "Dragging paints spores · pinch or wheel to zoom · space+drag or right-drag pans."
-                : "Drag to pan · wheel or pinch to zoom · tap an ant to follow it and see what the fungus does inside it · Learn explains what you see."}
+              Drag to pan · wheel or pinch to zoom · tap an ant to follow it and see what the fungus does inside it · Learn explains what you see.
             </p>
           )}
         </div>

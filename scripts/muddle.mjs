@@ -1,5 +1,5 @@
 // Offline: what does Lockpick's muddle cost a colony? The app's own setup (generateSideWorld(seed), Game with
-// mulberry32(seed * 7919)); at PAINT_AT seconds Lockpick is painted on both holes with the UI's spore brush (radius 3,
+// mulberry32(seed * 7919)); at PAINT_AT seconds Lockpick is painted on both holes with the app's old spore brush (radius 3,
 // spores 2, dose 0.15; STROKES events each, a short drag across the hole). Policy "local" (Lockpick soothes) or
 // "muddle" (every host muddles). Reports, per colony: food home, births, brood at the end and how much of it lies
 // outside any chamber (put down on the way), hosts at the end.
@@ -13,7 +13,7 @@ const args = process.argv.slice(2);
 const seed = Number(args[0] ?? 1);
 const policy = args[1] ?? "muddle";
 const [seconds = 300, ants = 300, strokes = 6, paintAt = 30] = args.slice(2).map(Number);
-const SPORES = { radius: 3, spores: 2, dose: 0.15 }; // web/src/ui/useColony.ts
+const SPORES = { radius: 3, spores: 2, dose: 0.15 }; // the old app brush: web/src/colony/game.ts BRUSH
 const LOCKPICK = STRAINS.findIndex((s) => s.id === "lockpick");
 const DT = 1 / 30;
 const map = generateSideWorld(seed);
