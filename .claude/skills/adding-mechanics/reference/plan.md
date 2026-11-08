@@ -96,6 +96,7 @@ A child's description names: the doc section, what code it retires, its gate (as
 ```sh
 git add docs/ .beads/issues.jsonl
 git commit -m "<Mechanic>: research note, PRD §<n>, beads (no code)"
+scripts/beads-sync.sh push   # share the new beads (CLAUDE.md)
 ```
 
 Then run `scripts/check-plan.sh docs/<note>.md <epic-id> --session <id>` and show the owner the plan.

@@ -310,7 +310,7 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 - **Gone** (§50.15): the spore brush and the strain choice, §5.1 levers 1–2. The fungus reaches ants only from where it lands. Lockpick and Bloom stay as lab and test presets.
 - **Counterplay:** §6 stands. Grooming is still scripted (`ja-k4k.12`). A colony's resistance climbs to 0.7–0.9 by 20 minutes, yet the fungus holds 100 % (§50.12).
 - **Cost** (§50.9, §50.11): ~708 real tokens per situation when the preset aims' answers were shipped (279 answers, $0.0083). Jev is asked only for situations with no cached answer, under one daily budget ($0.10, `JEV_DAILY_USD`); a game whose situations are all cached spends nothing. Per hour as a game asks is estimated only ($0.027–0.041/h, `fungus-cost.mjs`).
-- **Risks, still open:** lethal levers act at full strength from the first second (`ja-lo8.16`); whether colonies claw back, and whether other strains return as unlocks (`ja-lo8.10`); pins are not built, by the owner's wish (`ja-lo8.11`).
+- **Risks, still open:** lethal levers act at full strength from the first second on `main`; reach upgrades on the unmerged `claude/new-queens` branch hold them off (`ja-lo8.16`); whether colonies claw back, and whether other strains return as unlocks (`ja-lo8.10`); pins are not built, by the owner's wish (`ja-lo8.11`).
 - **Owner decisions needed:** none beyond those filed under `ja-lo8.10` (balance).
 
 ## Sources

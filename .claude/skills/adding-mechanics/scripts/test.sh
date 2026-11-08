@@ -29,6 +29,17 @@ check "relative path is resolved" deny "$(gate "web/src/a.ts" s1)"
 check "dot-dot cannot escape the gate" deny "$(gate "$repo/docs/../web/src/a.ts" s1)"
 check "outside the project is not ours" allow "$(gate "/etc/hosts" s1)"
 check "the gate remembers the session" s1 "$(cat "$repo/.git/mechanic-gate/last-session")"
+git -C "$repo" commit -q --allow-empty -m init
+git -C "$repo" worktree add -q "$repo/.claude/worktrees/x" 2>/dev/null
+check "a worktree inside the project is gated" deny "$(gate "$repo/.claude/worktrees/x/web/a.ts" s1)"
+git -C "$repo" worktree add -q "$tmp/sibling" 2>/dev/null
+check "a sibling worktree is gated" deny "$(gate "$tmp/sibling/web/a.ts" s1)"
+ln -s ../web "$repo/docs/lnk"
+check "a symlink into web/ is gated" deny "$(gate "$repo/docs/lnk/a.ts" s1)"
+check "case does not matter" deny "$(gate "$repo/Web/a.ts" s1)"
+check "a file outside any repository is allowed" allow "$(gate "$tmp/elsewhere/web/a.ts" s1)"
+rm "$repo/docs/lnk"
+git -C "$repo" worktree remove --force "$repo/.claude/worktrees/x" && git -C "$repo" worktree remove --force "$tmp/sibling" && rm -rf "$repo/.claude"
 check "garbage input fails open" 0 "$(echo 'not json' | "$here/gate.sh" >/dev/null 2>&1; echo $?)"
 
 # --- check-plan.sh -----------------------------------------------------------------------------------
@@ -90,7 +101,7 @@ check "children without acceptance fail" 1 "$(STUB_LOOSE=1 plan docs/foo.md ja-e
 grep -q "ja-e.1 ja-e.2" "$tmp/out"; check "and are named" 0 $?
 check "a failed check leaves the gate shut" deny "$(gate "$repo/web/src/a.ts" s4)"
 
-sed -i '/^## Play/,/^## Open/{/^## Open/!d}' "$repo/docs/foo.md"
+awk '/^## Play/{s=1; next} /^## Open/{s=0} !s' "$repo/docs/foo.md" >"$tmp/foo" && cat "$tmp/foo" >"$repo/docs/foo.md"
 check "uncommitted docs fail" 1 "$(plan docs/foo.md ja-e --session s5)"
 git -C "$repo" commit -qam "drop play"
 check "no Play section fails" 1 "$(plan docs/foo.md ja-e --session s5)"
@@ -99,6 +110,11 @@ check "a note outside docs/ fails" 1 "$(plan README.md ja-e --session s5)"
 
 check "usage error without an epic" 2 "$(plan docs/foo.md)"
 check "a waiver needs a reason" 2 "$(plan --waive)"
+check "--session needs a value (no hang)" 2 "$(cd "$repo" && perl -e "alarm 5; exec @ARGV" "$here/check-plan.sh" docs/foo.md ja-e --session >/dev/null 2>&1; echo $?)"
+check "--waive then a bare --session (no hang)" 2 "$(cd "$repo" && perl -e "alarm 5; exec @ARGV" "$here/check-plan.sh" --waive x --session >/dev/null 2>&1; echo $?)"
+check "not a mechanic opens the gate" 0 "$(plan --not-a-mechanic "a bug fix" --session s8)"
+check "for that session" allow "$(gate "$repo/web/src/a.ts" s8)"
+grep -q "not a mechanic: a bug fix" "$repo/.git/mechanic-gate/log"; check "and is logged as such" 0 $?
 check "a waiver opens the gate" 0 "$(plan --waive "owner: hotfix" --session s6)"
 check "for that session" allow "$(gate "$repo/web/src/a.ts" s6)"
 grep -q "waived: owner: hotfix" "$repo/.git/mechanic-gate/log"; check "and is logged" 0 $?

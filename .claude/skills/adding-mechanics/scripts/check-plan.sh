@@ -4,17 +4,22 @@
 #
 #   check-plan.sh docs/<note>.md <epic-id> [--session <id>]
 #   check-plan.sh --waive "<the owner's reason>" [--session <id>]
+#   check-plan.sh --not-a-mechanic "<why: a bug fix, tuning…>" [--session <id>]
 #
 # Without --session it uses the last session the gate blocked. Exit 0 = pass, 1 = something missing
 # (each listed), 2 = usage. It checks what a script can see; the owner still reviews the plan.
+# --waive and --not-a-mechanic open the gate without a check, and are logged in .git/mechanic-gate/log.
 set -u
 
-usage() { sed -n '5,6p' "$0" | sed 's/^# *//' >&2; exit 2; }
+usage() { sed -n '5,7p' "$0" | sed 's/^# *//' >&2; exit 2; }
 note="" epic="" waive="" session=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --waive) waive="${2:-}"; [ -n "$waive" ] || usage; shift 2 ;;
-    --session) session="${2:-}"; shift 2 ;;
+    --waive | --not-a-mechanic)
+      [ $# -ge 2 ] && [ -n "$2" ] || usage
+      if [ "$1" = --waive ]; then waive="waived: $2"; else waive="not a mechanic: $2"; fi
+      shift 2 ;;
+    --session) [ $# -ge 2 ] && [ -n "$2" ] || usage; session="$2"; shift 2 ;;
     -h | --help) usage ;;
     *) if [ -z "$note" ]; then note="$1"; elif [ -z "$epic" ]; then epic="$1"; else usage; fi; shift ;;
   esac
@@ -38,7 +43,7 @@ open_gate() {
 }
 
 if [ -n "$waive" ]; then
-  open_gate "waived: $waive"
+  open_gate "$waive"
   exit 0
 fi
 
@@ -57,7 +62,7 @@ if [ ! -f "$note" ]; then
   bad "$note does not exist"
 else
   if git ls-files --error-unmatch -- "$note" >/dev/null 2>&1; then ok "note tracked by git"; else bad "$note is not committed (git add + commit it)"; fi
-  links=$(awk '/^## ([0-9.]+ )?Sources/{s=1; next} /^## /{s=0} s' "$note" | grep -c 'https\?://' || true)
+  links=$(awk '/^## ([0-9.]+ )?Sources/{s=1; next} /^## /{s=0} s' "$note" | grep -cE 'https?://' || true)
   if [ "$links" -ge 2 ]; then ok "Sources: $links linked entries"; else bad "a '## Sources' section with at least two linked sources (found $links)"; fi
   if grep -qE '^\*\*(In the game|For the model)[^*]*:\*\*' "$note"; then ok "findings translated (In the game / For the model)"; else bad "at least one bold 'In the game:' paragraph turning a finding into a rule"; fi
   play=$(awk '/^## ([0-9.]+ )?Play/{s=1; next} /^## /{s=0} s && NF' "$note" | wc -l)
@@ -69,11 +74,11 @@ fi
 # 2. The index, the vision, the PRD.
 grep -q "($base)" docs/README.md && ok "docs/README.md links $base" || bad "a row for $base in docs/README.md's notes table"
 grep -q "$base" docs/vision.md && ok "docs/vision.md links $base" || warn "docs/vision.md does not link $base: fine unless it adds a sense or closes/opens a gap row"
-if grep -q "$base" docs/PRD.md && grep -q "$epic" docs/PRD.md; then ok "docs/PRD.md cites $base and $epic"; else bad "a PRD section that cites both $base and $epic"; fi
+if grep -qF "$base" docs/PRD.md && grep -qE "(^|[^.a-z0-9-])${epic//./\\.}([^.0-9a-z]|$)" docs/PRD.md; then ok "docs/PRD.md cites $base and $epic"; else bad "a PRD section that cites both $base and $epic"; fi
 
 # 3. The beads: an epic with children, each with a gate or acceptance.
-if ! command -v bd >/dev/null 2>&1; then
-  bad "bd is not installed, so the beads cannot be checked"
+if ! command -v bd >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+  bad "bd and jq are needed to check the beads"
 elif ! type=$(bd show "$epic" --json 2>/dev/null | jq -r '.[0].issue_type // empty') || [ -z "$type" ]; then
   bad "bead $epic not found"
 else
@@ -83,7 +88,7 @@ else
   if [ "$n" -ge 1 ]; then ok "$n child beads"; else bad "child beads under $epic, in build order"; fi
   loose=$(jq -r '.[] | select(((.acceptance_criteria // "") == "") and ((.description // "") | test("[Gg]ate|[Tt]arget|[Gg]uard|[Bb]udget|[Aa]cceptance") | not)) | .id' <<<"$kids")
   if [ -n "$loose" ]; then bad "acceptance (or a Gate/Target line) on: $(echo $loose)"; elif [ "$n" -ge 1 ]; then ok "every child has acceptance or a gate"; fi
-  deps=$(jq '[.[] | (.dependencies // [])[] | select(.type != "parent-child")] | length' <<<"$kids")
+  deps=$(jq '[.[] | (.dependencies // [])[] | select(.type == "blocks")] | length' <<<"$kids")
   [ "$n" -lt 2 ] || [ "$deps" -ge 1 ] || warn "no dependencies between the children: research and assays should block the build"
 fi
 

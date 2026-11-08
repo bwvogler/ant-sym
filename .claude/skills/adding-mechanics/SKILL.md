@@ -16,7 +16,7 @@ Mechanic asked for: **$ARGUMENTS**
 
 This repo adds mechanics in a fixed order, learned the hard way (see [reference/history.md](reference/history.md)): **biology first, then the translation to the game, then what it does for play, then docs and beads, and only then code.** Each stage below produces a written artifact; the next stage builds on it, not on memory.
 
-While this skill is active, a hook blocks edits under `web/` and `scripts/` until the plan passes its check (stage 5). Docs, beads and `.claude/` stay editable. That is deliberate: code written before the plan is the failure this skill exists to prevent.
+While this skill is active, a hook blocks edits under `web/` and `scripts/` (in any worktree of the repo) until the plan passes its check (stage 5). Docs, beads and `.claude/` stay editable. That is deliberate: code written before the plan is the failure this skill exists to prevent, so don't write those files another way (Bash, `sed`) while the gate is shut.
 
 Copy this checklist into your reply and tick it as you go:
 
@@ -39,7 +39,13 @@ Mechanic: <name>
   - `grep -n` the topic in `docs/PRD.md` and `docs/*.md`
   - `bd search <topic>`, `bd list --status=open`, and the `ja-k4k` (scripted gaps) epic
 - Read the code that does it today (`web/src/colony/`): which rule, which global read, which assay measures it (`experiment.ts`).
-- If the ask is really a bug fix or a tuning change, say so and stop: this skill is not for that.
+- If the ask is really a bug fix or a tuning change, say so, and open the gate for the rest of the session with the reason (it is logged):
+
+  ```sh
+  .claude/skills/adding-mechanics/scripts/check-plan.sh --not-a-mechanic "<why>" --session ${CLAUDE_SESSION_ID}
+  ```
+
+  Then carry on without this skill.
 
 ## 1. Research
 
@@ -97,7 +103,9 @@ If the owner explicitly says to skip the plan for a change (an urgent fix found 
 .claude/skills/adding-mechanics/scripts/check-plan.sh --waive "<reason the owner gave>" --session ${CLAUDE_SESSION_ID}
 ```
 
-Don't waive on your own judgement.
+Don't waive on your own judgement. (`--not-a-mechanic` in stage 0 is the one opening that is yours to make.)
+
+The check is written for new notes. The broad notes (`ant-communication`, `nest-and-home`, `fungus-policy`) and design notes such as `one-world` have their own shape and don't pass it; extend them, but put a new mechanic's research in a note or section that does.
 
 ## 6. Hand off to code
 
