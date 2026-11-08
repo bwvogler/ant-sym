@@ -100,6 +100,7 @@ for (const seed of seeds) {
       s += c.larder + 4 * c.births + (c.eaten ?? 0);
       for (const b of c.brood?.items ?? []) s += 1 + b.fed;
     }
+    s += g.royalFood?.() ?? 0; // new queens' bodies (ja-lo8.9)
     return s - map.foodTotal;
   };
   const t0 = performance.now();

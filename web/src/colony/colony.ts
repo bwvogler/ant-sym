@@ -433,7 +433,7 @@ export class Colony {
   founding = false;
   /**
    * A young colony (ja-lo8.10): from her founding until the first worker her workers reared (not a nanitic) ecloses, the
-   * queen still feeds the brood by her that no worker tends, as her nanitics are out foraging.
+   * queen still feeds the brood by her, as her nanitics are out foraging.
    */
   incipient = false;
   /** brood killed by the fungus's crown */
@@ -2822,12 +2822,14 @@ export class Colony {
         const food = foodOf(b);
         if (b.held < 0 && b.fed < food && pantry && pantry.food > 0) {
           // Fed by the nurses round it (the colony's own ants within two cells), from the food lying in its chamber:
-          // to its energy first, the rest to its growth. A young colony's queen feeds the brood by her that no worker tends:
-          // all of her first brood while she founds alone (ja-lo8.9), then what her nanitics, out foraging, leave (ja-lo8.10).
+          // to its energy first, the rest to its growth. A young colony's queen feeds the brood by her: all of her first
+          // brood while she founds alone (ja-lo8.9), then what her nanitics, out foraging, leave untended (ja-lo8.10).
           let nurses = this.friends ? this.#around(this.friends, b.x, b.y) : 2;
-          if ((this.founding || this.incipient) && nurses === 0 && q.alive) {
+          if ((this.founding || this.incipient) && q.alive) {
+            // She feeds as two nurses would, beside whatever workers are there (PR #54 review: one nanitic by the brood
+            // halved its feeding when she stood in only for none).
             cellOf(q.x, q.y);
-            if (hexDistance(b.x, b.y, CELL[0] as number, CELL[1] as number) <= 2) nurses = 2;
+            if (hexDistance(b.x, b.y, CELL[0] as number, CELL[1] as number) <= 2) nurses = Math.max(nurses, 2);
           }
           const lack = Math.max(0, (1 - b.energy) / LARVA_ENERGY_PER_FOOD);
           const take = Math.min(pantry.food, food - b.fed + lack, FEED_RATE * Math.min(1, nurses / 2) * dt);
@@ -2903,9 +2905,11 @@ export class Colony {
     return false;
   }
 
-  /** A gyne pupa ecloses as an alate (royal.ts) where it lay. Her food (her egg and what she was fed) leaves the colony's economy in her: her body. */
+  /**
+   * A gyne pupa ecloses as an alate (royal.ts) where it lay. Her food (her egg and what she was fed) becomes her body
+   * (Alate.food), held apart from the larder: it founds her daughter (Game.found) or is lost with her (Game.lose).
+   */
   #eclose(b: BroodItem): boolean {
-    this.eaten += 1 + b.fed;
     this.alates.push({ x: centreX(b.x, b.y), y: centreY(b.y), t: 0, step: 0, load: 0, strain: 0, resist: 0, food: 1 + b.fed });
     return true;
   }
@@ -2921,7 +2925,8 @@ export class Colony {
       a.t += dt;
       if (a.t < ALATE_WAIT) {
         // She fattens as she waits: the nestmates by her feed her from the chamber she is in, up to ALATE_RESERVE. What
-        // she takes leaves the colony's economy in her, as her body did (PR #47 review, S1).
+        // she takes goes from the larder into her body (PR #47 review, S1). Like larval feeding, it reads her chamber's
+        // food from the chamber table (ja-k4k.4).
         if (a.food < ALATE_RESERVE && this.map.chambers) {
           cellOf(a.x, a.y);
           const cx = CELL[0] as number;
@@ -2933,7 +2938,6 @@ export class Colony {
             if (take > 0) {
               a.food += take;
               this.#stock(room, -take);
-              this.eaten += take;
             }
           }
         }

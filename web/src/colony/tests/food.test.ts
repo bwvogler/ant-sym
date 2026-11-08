@@ -160,6 +160,7 @@ function drift(over?: Partial<Responses>, seconds = 300): { worst: number; g: Ga
       s += c.larder + 4 * c.births + c.eaten;
       for (const b of c.brood.items) s += 1 + b.fed;
     }
+    s += g.royalFood();
     worst = Math.max(worst, Math.abs(s - map.foodTotal));
   }
   return { worst, g };

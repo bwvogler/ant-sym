@@ -51,12 +51,13 @@ export interface GameParams {
 export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0, autoFound: true };
 
 /** Bump when what a save holds changes: an older save is refused, not misread. */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 /**
  * Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony).
  * A founding chamber reaches up to 7 columns from its hole (the shaft slants at most about 2.5 over its 14 rows, the
- * chamber's disc 4.5 more), so at 16 two never touch: at 8, daughters landing together shared a chamber (ja-lo8.10).
+ * chamber's disc 4.5 more), so at 16 two founding chambers never touch: at 8, daughters landing together shared one
+ * (ja-lo8.10). A grown nest digs further, and a daughter can still land against its outer chambers.
  */
 export const HOLE_GAP = 16;
 /** World units between two nests' centres at the least (top-down maps). */
@@ -301,10 +302,11 @@ export class Game {
     if (!this.flights.includes(f)) return -1;
     this.#dropFlight(f);
     const mother = this.colonies[f.mother];
-    if (!at || !mother || this.colonies.length >= MAX_COLONIES) return -1;
-    // Her reserve is her body (Flight.food), which left her mother's economy as she ate it (Colony.eaten): it comes back
-    // onto the map's books in her colony's larder, so the food in the world is unchanged (PR #47 review, S1).
-    this.map.foodTotal += f.food;
+    if (!at || !mother || this.colonies.length >= MAX_COLONIES) {
+      this.#lost(f);
+      return -1;
+    }
+    // Her reserve is her body (Flight.food), moved into her colony's larder: no food is made or lost (PR #47 review, S1).
     return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: f.food, ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}) });
   }
 
@@ -318,9 +320,27 @@ export class Game {
     return out;
   }
 
-  /** Flight f's queen is lost (she dies after the flight, as most do). */
+  /** Flight f's queen is lost (she dies after the flight, as most do). A flight no longer pending is left as it is. */
   lose(f: Flight): void {
+    if (!this.flights.includes(f)) return;
     this.#dropFlight(f);
+    this.#lost(f);
+  }
+
+  /** A lost queen's body leaves the world with her: booked to her mother colony's `eaten`, as food that left its economy. */
+  #lost(f: Flight): void {
+    (this.colonies[f.mother] ?? this.player).eaten += f.food;
+  }
+
+  /**
+   * Food held in new queens' bodies (ja-lo8.9): alates still in their nests, and flights waiting to found. Out of every
+   * larder, not yet eaten: the food books (map + jaws + larders + brood + 4 a birth + eaten) count it too.
+   */
+  royalFood(): number {
+    let s = 0;
+    for (const c of this.colonies) for (const a of c.alates) s += a.food;
+    for (const f of this.flights) s += f.food;
+    return s;
   }
 
   #dropFlight(f: Flight): void {
