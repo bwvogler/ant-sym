@@ -51,6 +51,20 @@ The paper hosts (link.springer.com, pmc.ncbi.nlm.nih.gov, groups.csail.mit.edu) 
 
 **For the model:** nothing ends a raid by decision. A raid lives while a scout's trail does; an ant that has been out and is home with no trail under it goes back to foraging, and a scout that finds nothing tires and comes home (the existing fatigue). A call-off that spreads by contact with raiders coming home empty has one summary line behind it, and is left out.
 
+## The trail points, the search finds
+
+Added for `ja-sf1`. As above, every claim was read in a search summary, not the paper, and is **unverified**.
+
+- **A scout's search is a run, then a search in a sector** (Topoff et al. 1987, above). A trail that ends where strangers were met says "this way", not "here".
+- **Mass recruiters keep a trail alive by re-laying it.** *Solenopsis* foragers lay the trail from the Dufour gland through the sting, and it draws workers out and orients them (Wilson 1962, *Animal Behaviour* 10). In a group-raiding ponerine, travel along the raid route got faster over time, apparently as raiders laid more on it (Hölldobler et al. 1996). *Polyergus* raiders use Dufour-gland recruitment signals (a 2005 study of *P. rufescens*; reviewed in Visicchio et al. 2001, not reached), and a review says raids are more than trail following, but odour trails play a part.
+- **Not found:** whether *Polyergus* raiders re-lay the column's trail, how fast it fades, or what raiders do where it ends.
+
+**For the model:**
+- A finder lays the trail from where it met strangers, which in A11 is about 25 cells short of their nest (the nests are 80 apart). Climbing it to the end, the recruits stopped at its strongest point and milled there.
+- Now a raider on the trail that finds nothing ahead as strong as underfoot leaves it and searches on as a scout does: out, away from home, without turning back to the trail until it is home (`raidOnward`). That happens mostly near home, where the trail is weak and patchy (a median 0.05–0.19 of the way out, the owner's probe in the review of #44), so the trail recruits and points the way, and the search does the rest. Allowed only at a strong trail end, it reached less (A11 gain 1.67 against 2.01, seeds 1–4).
+- If a searching raider meets strangers with no trail under it, it is a finder, and lays a trail home from there.
+- **Tried and dropped: raiders re-laying the trail** on their way home from strangers. It made the trail at the nest four times as strong and recruited no more ants and reached no further (A11 gain 1.19 against 1.24). Recruiting was never short: 81 % of the colony was recruited.
+
 ## Sources
 
 - Topoff, Bodini, Sherman & Goodloe 1987, "The role of scouting in slave raids by *Polyergus breviceps*", *Psyche* 94:261–270: https://groups.csail.mit.edu/mac/projects/psyche/94/94-261.html *(search summary only)*
@@ -61,3 +75,6 @@ The paper hosts (link.springer.com, pmc.ncbi.nlm.nih.gov, groups.csail.mit.edu) 
 - Wikipedia "Polyergus breviceps" and navajonature.org, *Polyergus breviceps* *(secondary; search summaries)*; the *Psyche* 94 issue (biodiversitylibrary.org/part/183861)
 - A 2018 agent-based army-ant raid model: "Directional raids by army ants as an adaption to patchily distributed food" *(search summary only)*
 - *Lasius niger* trail laying and starvation: *J. Exp. Biol.* 209:4224, "Starvation drives a threshold triggering communication" *(search summary only)*
+- Wilson 1962, "Chemical communication among workers of the fire ant *Solenopsis saevissima* (Fr. Smith)", parts 1 (the organization of mass-foraging) and 2 (an information analysis of the odour trail), *Animal Behaviour* 10 *(search summary only)*; a later fire-ant trail-pheromone paper citing it: https://core.ac.uk/download/17214254.pdf *(search summary only)*
+- Hölldobler et al. 1996, a group-raiding ponerine's raid route: https://www2.ib.unicamp.br/profs/pso/PDFS/Holldobler_et_al_1996.pdf *(search summary only)*
+- *Polyergus rufescens* Dufour-gland recruitment (2005) and the review of raid organisation, as summarised in https://www.zobodat.at/pdf/MyrmeNews_018_0033-0049.pdf and Lenoir et al. 2011, *Chemoecology* *(search summaries only)*
