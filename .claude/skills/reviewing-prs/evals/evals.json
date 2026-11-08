@@ -1,0 +1,83 @@
+{
+  "skill": "reviewing-prs",
+  "how_to_run": "In a fresh session per case, give the prompt and grade the transcript against `expect`. Run each scenario once with the skill and once with .claude/skills/reviewing-prs moved aside (the baseline), and compare. For scenarios, point at a real open PR and tell the session not to post (grade the comment it would post). Trigger cases: does Claude load the skill unprompted?",
+  "trigger": {
+    "should_trigger": [
+      "Review #57",
+      "Please review the latest PR",
+      "Anything new on the PRs?",
+      "Fixes are in",
+      "Is #41 ready to approve?",
+      "Check open PRs and approve what's ready please",
+      "They seem like they're waiting for a re-review",
+      "Load the reviewing-prs skill, role: helper. PR #47 head 3f2a… base main"
+    ],
+    "should_not_trigger": [
+      "Ants should carry corpses to a midden away from the nest",
+      "Fix the failing golden test after the merge",
+      "Tune restTime: sweep 10-60 s over seeds 1-10",
+      "Address the review comments on my PR #47",
+      "How much does an hour of the fungus lane cost?",
+      "Create a PR for this branch"
+    ]
+  },
+  "scenarios": [
+    {
+      "prompt": "Review PR #<n>",
+      "expect": [
+        "Fetches origin and lists the open PRs before reviewing",
+        "Compares the PR body's claims with git diff --stat and says whether they match",
+        "Runs bd show on each bead the PR body cites",
+        "Runs merge-check.sh with the other open PR numbers, not only against main",
+        "Uses absolute worktree paths under the scratchpad with ${S:?} and runs npm --prefix <wt>/web ci",
+        "Runs every command with env -u JEV_API_KEY",
+        "Does not run npm run test:slow, multi-seed sweeps or game runs over a minute; lists them under Not re-measured",
+        "Reports at least one mutation check with caught / not caught",
+        "Posts exactly one comment with a verdict line, numbered items with file:line, Merge mechanics, Not re-measured and the Claude Code footer",
+        "Does not submit a GitHub approval review and does not merge",
+        "Ends with worktrees removed, .beads/issues.jsonl reverted and git status clean",
+        "Gives the owner a short plain-language summary naming the one decision that is theirs"
+      ]
+    },
+    {
+      "prompt": "Review PR #<n> (a PR with over 1,000 changed lines)",
+      "expect": [
+        "Spawns exactly one background helper with the brief from reference/brief.md, including head and base SHAs and the claims to verify",
+        "The brief forbids posting, commits, pushes and bd changes, and asks for git worktree list at the end",
+        "Does not run npm test while the helper is running measurements",
+        "Re-reads each blocker the helper reports in the code before posting it",
+        "Removes any worktree the helper left behind"
+      ]
+    },
+    {
+      "prompt": "Fixes are in (after an earlier review of PR #<n> with items B1, S1, S2, N1)",
+      "expect": [
+        "Finds the earlier review comment and the SHA it reviewed",
+        "Lists the commits since that SHA",
+        "Leads the comment with a status table: each earlier item resolved / partly / not",
+        "Re-runs merge-check and the fast checks in full because main may have moved",
+        "Runs a mutation check on each claimed fix"
+      ]
+    },
+    {
+      "prompt": "(after a review raised a decision) Without a living rival, ideally we open a new block of generated terrain with another nest. These are just ideas to be added as beads",
+      "expect": [
+        "Runs bd search for duplicates before creating",
+        "Creates beads with bd create --silent (not by editing .beads/issues.jsonl) and links them with bd dep add where one depends on another",
+        "Runs scripts/beads-sync.sh push",
+        "Edits the PR review comment with '(Edited <date>: owner decided …)' rather than posting a new review",
+        "Leaves a short PR note naming the new bead ids, with the footer",
+        "Does not turn the idea into a requirement for the current PR"
+      ]
+    },
+    {
+      "prompt": "Review PR #<n> (changes the Jev ask path or caps)",
+      "expect": [
+        "Traces when a Jev request is actually sent (cache miss, page load, timer) before quoting any cost",
+        "States cost as misses × tokens per question × USD_PER_INPUT_TOKEN, not an hourly rate times always-on",
+        "Puts limits and defaults that shape spend or play to the owner as a Decision, with options, rather than prescribing one",
+        "Checks *_VERSION bumps when a legend, question or Touch changed"
+      ]
+    }
+  ]
+}
