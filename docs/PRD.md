@@ -4079,9 +4079,9 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 | Signal damped, before (seeds 1–2) | ~160 s | 28–31 | 28–31 | 5 | 4–10 |
 | Signal damped | 169 s (117–1,577) | 4 (1–9) | 4 (1–9) | 4 (1–5) | 13 (7–67) |
 | Scent damped, before (seeds 1–2) | 28–129 s | 47–69 | – | 5 | – |
-| Scent damped | 37 s (28–129) | 6.5 (4–11) | 6.5 (3–11) | 5 (3–5) | 29.5 (14–40) |
+| Scent damped | 37 s (28–129) | 7 (4–11) | 7 (3–11) | 5 (3–5) | 31 (14–52) |
 
-- **These rows are after #47's review (S1, §50.20):** a daughter founds on her mother's alate's body, fattened in the nest up to 24, not on 24 made from nothing. With the free 24 the first daughter had 26 (1–40) workers at 30 minutes (signal) and 33.5 (22–66) (scent); gynes were 4.5 and 6.5.
+- **These rows are after #47's review (S1, §50.20) and the young queen feeding beside a nanitic (re-measured; the signal arm is unchanged):** a daughter founds on her mother's alate's body, fattened in the nest up to 24, not on 24 made from nothing. With the free 24 the first daughter had 26 (1–40) workers at 30 minutes (signal) and 33.5 (22–66) (scent); gynes were 4.5 and 6.5.
 - **A daughter's first worker goes out 3–4 s after she ecloses** (nanitics), 56 s after the founding.
 - **Confirmed on seeds 11–20** (signal damped, with the free reserve): first gyne 206 s (109–302), gynes 3 (1–7), daughters 3 (1–5), the first daughter's workers at 30 min 19 (7–39).
 - **The colony cap still binds** with a lever forced for 30 minutes on most seeds (5 daughters). A player pulls a queen lever for a while, not a whole sitting; `MAX_COLONIES` stays 6. `ja-lo8.10` stays open for it, the colony's late claw-back and the lethal levers' costs.
