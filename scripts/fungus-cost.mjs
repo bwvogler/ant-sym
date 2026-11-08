@@ -14,14 +14,13 @@
 import { estimateTokens } from "../web/src/colony/colonyBrain.ts";
 import { FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, packFungusRequest, worthAsking, AIMS } from "../web/src/colony/fungusBrain.ts";
 import { STRAINS } from "../web/src/colony/fungus.ts";
-import { Game } from "../web/src/colony/game.ts";
+import { BRUSH as SPORES, Game } from "../web/src/colony/game.ts";
 import { centreX, centreY } from "../web/src/colony/hex.ts";
 import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const play = process.argv[2] ?? "lockpick";
 const [minutes = 5, ants = 600, seed = 1, strokes = 6] = process.argv.slice(3).map(Number);
-const SPORES = { radius: 3, spores: 2, dose: 0.15 }; // the old app brush: web/src/colony/game.ts BRUSH
 const DT = 1 / 30;
 const BATCH_EVERY = FUNGUS_GATHER_MS / 1000; // the lane lets a part-full request gather this long (colonyJev gatherMs)
 const aim = AIMS[0].text;

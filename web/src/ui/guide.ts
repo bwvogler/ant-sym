@@ -202,7 +202,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Real parasites change what an ant perceives, gives off and can do, not its plans. Rickia makes its hosts carry more of one alkane, and they are attacked less by strangers. Ophiocordyceps hosts lose their daily rhythm and communicate less. Grooming off Metarhizium passes low doses that immunise nestmates.",
     inGame:
-      "The fungus never chooses for an ant: each ant's policy decides from what it senses, and the fungus bends those senses and what the ant gives off (see the next entry). The game's fungus spreads like Garden (after the leafcutter's garden): its hosts carry its own odour. In the lab, Lockpick (after Rickia) hides and calms, and Bloom (after Metarhizium) spreads fast and is groomed off.",
+      "The fungus never chooses for an ant: each ant's policy decides from what it senses, and the fungus bends those senses and what the ant gives off (see the next entry). The game's fungus spreads like Garden (after the leafcutter's garden): its hosts carry its own odour. Two more strains exist in the code for experiments: Lockpick (after Rickia) hides and calms, and Bloom (after Metarhizium) spreads fast and is groomed off. Nothing in the game lays them.",
     sources: [
       { note: "fungus-policy", anchor: "3-what-real-parasites-do-to-ants", label: "What real parasites do to ants" },
       { note: "fungus-policy", anchor: "2-two-policies-and-the-perceived-state-between-them", label: "Two policies, and the perceived state between them" },

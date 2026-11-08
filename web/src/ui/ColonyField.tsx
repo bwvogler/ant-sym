@@ -807,7 +807,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
 
   const onKey = (e: KeyboardEvent<HTMLCanvasElement>) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return; // browser and system shortcuts (Ctrl+0, Ctrl+S, …) pass through
-    if (e.type !== "keydown") return;
+    if (e.key === " ") {
+      e.preventDefault(); // the focused field doesn't scroll the page
+      return;
+    }
     const v = view();
     const c = camera();
     const step = Math.min(v.w, v.h) * 0.15;
@@ -848,7 +851,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        className={`absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-grab active:cursor-grabbing`}
+        className="absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-grab active:cursor-grabbing"
         role="application"
         aria-label="colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it"
         onPointerDown={onDown}
@@ -856,7 +859,6 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         onPointerUp={onUp}
         onPointerCancel={onUp}
         onKeyDown={onKey}
-        onKeyUp={onKey}
         onContextMenu={(e) => e.preventDefault()}
       />
       <div className="pointer-events-none absolute left-2 top-2 flex gap-1.5">

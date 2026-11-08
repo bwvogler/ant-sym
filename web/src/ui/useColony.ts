@@ -102,7 +102,7 @@ export interface ColonyStats {
   pace: number;
   /** where the player stands (chapters.ts) */
   chapter: ChapterView;
-  /** the game's fungus's body and evolution (ja-lo8.12); null before it lands, or in a lab game */
+  /** the game's fungus's body and evolution (ja-lo8.12); null before it lands (a game built without Game.land's evolve, as tests do, has none) */
   evolution: EvolutionStats | null;
 }
 

@@ -8,14 +8,13 @@
 // Bloom's hosts in colony 1 over time, and both colonies' ants at the end.
 //
 // Usage: node scripts/crown.mjs [seed=1] [seconds=600] [ants=600] [strokes=6] [paintAt=60] [where=royal|hole]
-import { Game } from "../web/src/colony/game.ts";
+import { BRUSH as SPORES, Game } from "../web/src/colony/game.ts";
 import { INFECTED, STRAINS } from "../web/src/colony/fungus.ts";
 import { centreX, centreY } from "../web/src/colony/hex.ts";
 import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
 
 const [seed = 1, seconds = 600, ants = 600, strokes = 6, paintAt = 60] = process.argv.slice(2, 7).map(Number);
 const where = process.argv[7] ?? "royal";
-const SPORES = { radius: 3, spores: 2, dose: 0.15 }; // the old app brush: web/src/colony/game.ts BRUSH
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 const DT = 1 / 30;
 const map = generateSideWorld(seed);
