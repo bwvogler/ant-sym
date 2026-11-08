@@ -50,6 +50,8 @@
 - In *Aphaenogaster senilis*, larvae stay bipotent until the second instar, and workers could steer caste by feeding and by moving larvae along temperature gradients. Rearing temperature had no effect there, but orphaning did (Boulay et al. 2009).
 - Across social insects, well-fed larvae become queens (bumblebees: larval food decides size and caste).
 
+**In the game:** a colony knows it is large by what a nurse senses, not by counting its workers. The cue is the queen's mark perceived faint where the brood lies (§2); a well-fed larva in a chamber with food is the one that can become a gyne (§5). Season is left out until the sim has one (`ja-1vg`). The worker counts above are not read. **Design:** the threshold (`GYNE_MARK`) and what "fed" means. Not on `main` yet (`ja-lo8.9`); PRD §50 adopts the rule.
+
 ## 2. The queen holds it back
 
 **Through the workers: gyne larvae are killed while she is there.**
@@ -70,6 +72,8 @@
 - **The trigger is local.** The signal reaches only so far, and a big nest with brood chambers far from the royal chamber has corners where it is faint. That is a sensed proxy for "the colony is large", and it is how the sim should know size.
 - **The vision allows it.** It lets "a queen's output" and caste stay physiology, as long as the inputs are sensed ([vision](vision.md#the-goal)).
 
+**In the game:** the cue is the royal mark (`QUEEN_MARK`, laid by the queen in `#nestLife`), read by nurses within two cells of a larva. The response: below `GYNE_MARK` the nurses rear a gyne; where the mark is strong, a nurse beside a gyne larva culls it, at a rate (the execution above). The queen's hold on virgin queens (dealation, laying) is not modelled: a gyne leaves through the hole (§5). **Design:** the threshold, the two-cell reach and the cull rate. PRD §50 takes this rule; the gyne rearing is `ja-lo8.9`, not on `main`.
+
 ## 3. The flight and founding
 
 **Claustral founding** is the common mode in Formicinae, Dolichoderinae and Myrmicinae, which together hold about 80 % of known species (AntWiki, *secondary*):
@@ -84,6 +88,8 @@
 - The daughter starts at her mother's odour (kin), as she was raised in that nest.
 - **Not modelled:** males and mating.
 - **Most founding queens fail in nature.** In the game a queen lands at the nearest spot the founding rule allows within her flight. Once the world is one surface and a curtain, a new nest goes only beyond an end of the line; when no such spot lies within her flight, she dies and the game says why ([one-world §3](one-world.md#3-the-line-and-where-a-new-nest-may-go)).
+
+**In the game:** a gyne walks out through the nest and flies, a jump to a landing site within a radius, since the sim has no air. She founds at her mother's odour, so the daughter is kin and her mother does not raid her (`Game.addColony`, PRD §50.8). A queen carrying the evolving fungus roots a mycelium by her new hole, so a founded colony gets what the first one had (PRD §50.13). Under the one-world design, where no valid spot lies within her flight, she dies and the game says why ([one-world §3](one-world.md#3-the-line-and-where-a-new-nest-may-go), PRD §51). **Design:** the jump, its radius (research bead `ja-lp4.7`) and the founding clutch raised on a fixed reserve. Males and mating are not modelled.
 
 ## 4. Where the fungus comes in
 
@@ -112,6 +118,8 @@
 
 So the fungus's levers on queen-rearing are the player's only route to rewriting how ants behave. Both routes are built as player-reachable levers.
 
+**In the game:** a new queen picks up the fungus by contact on her way out, as any ant does (`Fungus.step`); there is no vertical transmission (PRD §50). The fungus has two levers on gyne rearing. *Queen signal* (emission, in the queen) multiplies the mark she lays, `QUEEN_MARK` × 0.1 / 0.4 / 1 / 1.5 / 2, lerped by her load; it is built (`levers.ts`, PRD §50.7) and held by the Royal upgrade. *Queen scent* (perception, in nurses) scales the mark a nurse reads; the owner's decision is that both are built (PRD §50), but it is not in `levers.ts` yet. A colony's policy changes only when a new queen is born, and the new words drive only her daughter colony (PRD §50). **Design:** both levers; no paper shows a fungus doing either.
+
 ## 5. What the sim needs (slices 7–9 of the epic)
 
 1. **The queen as a host.**
@@ -128,6 +136,16 @@ So the fungus's levers on queen-rearing are the player's only route to rewriting
    - the time to the first gyne with no fungus (dilution alone), with the queen-signal lever, and with the queen-scent lever;
    - how many gyne larvae are culled;
    - the time from landing to the daughter's first forager.
+
+## Play
+
+PRD §50 makes queen birth the game's middle: chapters 5 and 6 ("a new queen", "her colony", §50.4). Built so far: the queen as a host with *queen signal* (§50.7) and founding at runtime (§50.8, §50.13). Gyne rearing and the flight are `ja-lo8.9`, not on `main`.
+- **See:** the top bar's goal reads "Make the … colony raise a new queen". Once built: a gyne among the brood where the mark is faint, an alate walking out through the hole, and a new hole with its own colour and nest button (Jade, Rust …, §50.8). Learn has no gyne entry yet; "What the fungus senses, and its levers" cites §4 here.
+- **Choose:** *queen signal* in an infected queen, held by the Royal upgrade (1,000 then 4,000 mutations, side view only; `evolution.ts`), and *queen scent* in nurses, decided (§50) but not yet a lever. The aim's words decide which Jev pulls. At the birth the player rewrites the daughter's policy, the game's only route to changing how ants behave (§50).
+- **Counterplay and progression:** healthy nurses that read a strong mark cull gyne larvae, and the queen's eight groomers in the evolving game clear her (§50.12, `ja-k4k.12`). It sits late on the slope: the fungus first reaches a queen at 182–314 s (§50.14), and Royal is among the dearest upgrades. Queen births may stay rare (§50).
+- **Cost:** a queen is asked only her two levers, *fungus showing* and *queen signal*. Re-shipping answers with the queen task cost $0.0083 for 93 situations per preset aim (§50.7); the fungus lane runs at about 708 real tokens per situation (§50.9). *Queen scent* would add a score question to every nurse's situation: not measured. Gyne rearing and founding are local rules and cost nothing. A daughter on new words asks her doctrine's situations once, then plays them cached (§50.11).
+- **Risks:** a cliff: *queen signal* acts colony-wide, so damping it could make every brood chamber rear gynes at once. Runaway: each daughter carries a mycelium of its own (§50.13), and two patches hold twice as much, so mutations come faster with every founding. Famine: a gyne costs more food, and larvae already starve beside a full larder (`ja-xu6`, which blocks `ja-lo8.9`, §50.5). The `lifecycle` assay (§5) is what would show each: time to the first gyne, gynes culled, landing to first forager.
+- **Owner decisions needed:** none new. §50 settled the two levers, the rewrite at birth and the pace.
 
 ## Sources
 

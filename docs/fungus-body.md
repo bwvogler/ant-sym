@@ -46,6 +46,16 @@
 
 **In the game:** grooming is still scripted (every nestmate within reach, by colony, up to a cap), and the queen's larger cap (`queenGroomers`) is a stop-gap with no source behind its number. Making grooming a sensed response (the pathogen cue, recognition by odour, the retinue drawn by queen pheromone) is `ja-k4k.12`, a row in the [vision gap table](vision.md#where-the-code-is-today).
 
+## Play
+
+Built: PRD §50.12–14.
+- **See:** spores drawn on the ground by the hole, where foragers keep walking through them. The Fungus panel shows the mycelium, the fungus in ants, mutations a minute and each upgrade's next level; a notice says when there is one to keep. A followed host's card shows a held lever as what it runs, "(wants …)". The Learn entry is "The fungus's body, and its mutations" (`guide.ts`, `evolution`).
+- **Choose:** which mutations to keep. The body (Infectivity, Persistence, Mycelium, Fruiting body, Immune evasion) or reach (Stealth, Senses, Recognition, Trails, Royal), each a group of levers. By 20 minutes about half of everything is kept, so the order matters (§50.13). It is the slope every lever sits on, not a lever itself.
+- **Counterplay and progression:** groomers take more off a visible host than the weak strain passes on (four, a queen eight in the evolving game; still scripted, `ja-k4k.12`). Primed hosts resist, which Immune evasion answers. The slope: a first choice 12–21 s after the landing, a quarter of the colony at 156–241 s, the queen at 182–314 s; keeping nothing, never in 15 minutes (§50.14). The spore brush was removed because it skipped all of this (§50.15).
+- **Cost:** none. No request changed, reach acts after the answer, and an upgrade re-asks nothing (§50.12–14). The fungus lane stays at about 708 real tokens per situation (§50.9).
+- **Risks:** a cliff at the breakthrough, the choice that tips transmission over grooming (§50.12); watch the worst seed's time to a quarter in `scripts/progression.mjs`. Runaway after it: once the nest is held, the colony's resistance climbs to 0.7–0.9, yet the fungus keeps 100 % on every seed (§50.12). A free lever: crown and the odour weapon are held to no reach, so they act at full strength from the first second (`ja-lo8.16`).
+- **Owner decisions needed:** whether a colony should claw back once the nest is held, and whether Lockpick and Bloom come back as something the game unlocks (both `ja-lo8.10`, §50.12, §50.15); how the lethal levers are reached (`ja-lo8.16`).
+
 ## Sources
 
 - Hu G, St. Leger RJ (2002). Field studies using a recombinant mycoinsecticide (*Metarhizium anisopliae*) reveal that it is rhizosphere competent. *Appl Environ Microbiol* 68(12):6383–6387. DOI not confirmed: [PubMed search](https://pubmed.ncbi.nlm.nih.gov/?term=Hu+St+Leger+2002+Metarhizium+rhizosphere+competent)
