@@ -3291,7 +3291,7 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 - Jev's spend, caches, Stop and Resume;
 - infection, resistance and unity figures;
 - the world's settings (seed, ground, rival, ants, speed slider, trails);
-- the **lab**: the spore brush and strains, the fungus's menu, hide and cull, and each colony's doctrine, for experiments.
+- the **lab**: the fungus's menu, hide and cull, and each colony's doctrine, for experiments. (The spore brush and strain picker were here until §50.15.)
 
 **Learn** shows doctrines read-only. **Removed:** the lure and alarm brushes, which painted only the first colony's fields.
 
@@ -3660,7 +3660,7 @@ At 4× that is a few seconds of wall time, and the fungus started with every pow
 
 `tests/save.test.ts` now lands the fungus evolving, as the page does.
 
-**Beads:** `ja-lo8.12` (this), `ja-k4k.12` (grooming from sensed cues), `ja-260` (the brush's cost, still open: the lab brush is free), `ja-lo8.10` (balance: the colony clawing back).
+**Beads:** `ja-lo8.12` (this), `ja-k4k.12` (grooming from sensed cues), `ja-260` (the brush's cost: closed by §50.15, the brush removed), `ja-lo8.10` (balance: the colony clawing back).
 
 ### 50.13 Mutations that track growth, and parity for founded colonies (ja-lo8.12, 2026-11-07)
 
@@ -3742,6 +3742,24 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
 - **The rest is 10–30 s later than §50.13,** and the worst seed reaches a quarter of the colony at 241 s.
 
 **Tests:** 402 fast tests pass, including 15 in `evolution.test.ts`. Jev cost: unchanged.
+
+### 50.15 No spore brush (ja-260, 2026-11-08)
+
+**The problem.** The lab's spore brush (Details) dosed every ant under a stroke for free, in any game: one drag skipped the weak start, the mycelium and every upgrade (§50.12–14). `ja-260` asked for the brush to cost the fungus, or to be a choice.
+
+**Why not lock it after the landing.** Every game the app plays, started or loaded, lands an evolving fungus at once (`useColony`, `Game.land(…, { evolve: true })`). So there is never a game without one in which a brush could stay free, and a lock would remove the brush anyway.
+
+**Decision (owner):** remove the brush and its strain picker from the app. The fungus reaches the ants only from where it lands.
+
+- `Game.paintSpores` and `Fungus.paint` stay for tests and the scripts (`crown.mjs`, `muddle.mjs`, `fungus-cost.mjs`). The stroke they replay is `BRUSH` in `game.ts` (radius 3, spores 2, dose 0.15), moved from `useColony.ts`; the scripts import it.
+- Gone from the field: the paint gesture, and space+drag to pan while painting.
+- Gone from the lab: the brush and strain buttons. The lab keeps the fungus's menu, hide and cull, and the doctrines.
+- The other strains (Lockpick, Bloom) remain as `STRAINS` entries, used by tests and scripts (and still described in `policyText.ts` and the Learn guide). Nothing in the app lays them now; `ja-lo8.10` decides whether they come back as something the game unlocks.
+- The figures measured with "the UI brush" (§39, §49.4, §50.9) stand. Their harnesses replay the same stroke.
+
+**Tests and cost:** no sim change, so the golden masters and the fast tests stand as they were. Jev cost: unchanged.
+
+**Review (own agent):** nothing blocking. Fixed: the scripts import `BRUSH` instead of copying it; the Learn guide and two research notes (`fungus-policy.md`, `queens-and-merging.md`) no longer send readers to a brush or a lab strain picker; Space on the focused field is still kept from scrolling the page. Filed: the lethal levers (crown, odour weapon) are held to no reach, so a player who turns one on gets it at full strength from the first second (`ja-lo8.16`).
 
 ## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
 

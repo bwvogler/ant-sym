@@ -12,7 +12,7 @@ import { disc, rockAt, type WorldMap } from "./world.ts";
 // The fungus, pure: the player. It is spores on the ground and load inside ants
 // (docs/fungus-policy.md), and in the game a mycelium where it landed, which
 // grows and pays for the spores it puts out (evolution.ts, ja-lo8.12). This
-// module is how it gets there and how it moves (ja-t4d.1): the spore brush,
+// module is how it gets there and how it moves (ja-t4d.1): spores laid (paint),
 // contact transmission across colonies, and the colony's answer to it,
 // grooming, which clears visible load and primes the groomers against it.
 // It never touches an ant's choices: later slices bend what an infected ant
@@ -49,7 +49,7 @@ export function askedLevers(menu: ReadonlySet<string>, queen: boolean): string[]
 /** The menu the fungus starts with: every lever but the lethal ones. */
 export const DEFAULT_MENU: readonly string[] = LEVERS.filter((v) => !LETHAL_LEVERS.has(v.id)).map((v) => v.id);
 
-/** A strain: one trait set of the fungus. The brush paints with one; later organisms are other trait sets (§5.1). */
+/** A strain: one trait set of the fungus. A landing or paint lays one; later organisms are other trait sets (§5.1). */
 export interface Strain {
   id: string;
   name: string;
@@ -280,7 +280,7 @@ export class Fungus {
   }
 
   /**
-   * The spore brush: spores on every open cell within `radius` of (x, y), and a direct dose of
+   * Spores on every open cell within `radius` of (x, y) (a landing; tests' and scripts' brush), and a direct dose of
    * load into every living ant there, of either colony, with strain `strain`. An ant already
    * carrying another strain keeps it (first in holds the host); the dose still adds load.
    */
@@ -750,7 +750,7 @@ export class Fungus {
 
   /**
    * The levels a host of strain index `s` runs for these wanted levels: held to the fungus's reach (levers.hold) when it
-   * carries the evolving strain; another strain's host (a lab brush in an evolving game) runs them as they are. What the
+   * carries the evolving strain; another strain's host (painted in by a test or script) runs them as they are. What the
    * panel shows as enacted.
    */
   held(levels: LeverLevels, s: number): LeverLevels {
