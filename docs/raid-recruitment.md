@@ -65,6 +65,16 @@ Added for `ja-sf1`. As above, every claim was read in a search summary, not the 
 - If a searching raider meets strangers with no trail under it, it is a finder, and lays a trail home from there.
 - **Tried and dropped: raiders re-laying the trail** on their way home from strangers. It made the trail at the nest four times as strong and recruited no more ants and reached no further (A11 gain 1.19 against 1.24). Recruiting was never short: 81 % of the colony was recruited.
 
+## Play
+
+Built on top-down maps only (PRD §49, §49.7). The page starts in the side view, where raiders still walk at the rival's hole by its coordinates (§49.6, `ja-1a9`).
+- **See:** scouts leave the nest a few at a time (about 5 a second from ~500 at home), a finder runs home, and recruits stream out along its line and fan out into a search past where it fades. The raid trail itself is not drawn: the field shows the food and home trails, alarm and spores. There is no Learn entry of its own; "Strangers and battles" names the scout's trail in its scripted line (`ja-k4k.6`).
+- **Choose:** no lever reaches the raid trail. *Trail laid* scales the food trail only; the finder's lay uses `raidLay`. Levers do reach the finder's cue, meeting strangers: *stranger scent* (a host takes fewer ants for strangers) and *fungal odour* (colonies come to smell alike), both under the Recognition upgrade. *Time out* (Senses) sets how long a searching raider lasts before it tires. Whether a colony raids at all is its nature, a doctrine (§21).
+- **Counterplay and progression:** raids are the colonies' war on each other, and they kill the fungus's hosts. Recognition reaches one step for 10 mutations and the full range for 1,500 (`evolution.ts`), so calming a border comes early in the slope and ending the war comes late.
+- **Cost:** live checks with every lane cost $0.0105–0.0109 a run, about 250,000 input tokens for 300 s top-down (§49.4). `Touch.raid` goes to the `leave` lane only. `raidOnward` (§49.7) changed no question, so nothing was re-asked. A cached game spends nothing (§50.11). Per hour: not measured live (`colony-cost` estimates ~$0.121/h for all six response lanes, §49.4).
+- **Risks:** a cliff. Raids reach a queen within 20–60 minutes, and war ends a colony on one seed in three over 30 minutes at 4× (§50.4, §50.5, `ja-war`); a dead queen ends the fungus's route to new queens. The worst G′ seed is the number to watch (seed 19: 223 ants left, against 1 on `main`, §49.7). Under Jev's cached answers the colony stores 5–11 % less food (§49.7, not explained). The effect is invisible on the field, since the trail isn't drawn.
+- **Owner decisions needed:** whether the fungus should get a lever on raids (on the raid trail laid or perceived). None reaches it now, and the war was left alone (§50.5).
+
 ## Sources
 
 - Topoff, Bodini, Sherman & Goodloe 1987, "The role of scouting in slave raids by *Polyergus breviceps*", *Psyche* 94:261–270: https://groups.csail.mit.edu/mac/projects/psyche/94/94-261.html *(search summary only)*

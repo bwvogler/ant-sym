@@ -300,6 +300,19 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 
 **Still open:** the win condition — merged colonies (one alliance) versus lasting peace with exchange (§1). Leaning toward the unity meter as a score and "merged + no deaths for 60 s" as the clean ending, with the merge itself a consequence of perception (§4.B), not a fungus action. Revisit alongside MR 10's lifetime world, where nothing ends.
 
+## Play
+
+*Added 2026-11-08 (`ja-gvt`). The player's material is §5.1 (levers) and §6 (resistance and failure); this says what has changed since, from PRD §50.*
+
+- **The player is the fungus** (§50, §21). The aim is written in words; Jev sets a level for every lever, per situation the fungus senses in its host (§11, §50.3). The table stays out of sight, in Learn and Details; the field shows hosts acting (§50, §50.1).
+- **See:** the share of each colony infected, unity and the aim on the fungus panel; the followed ant's card lists what the fungus senses and the levers it pulls, a held lever with "(wants …)" (§50.1, §50.3, §50.12). Learn entries: The fungus; What the fungus senses, and its levers; The fungus's body, and its mutations; One colony.
+- **Choose, and progression** (§50.12–14): a weak strain lands by a hole and grows a mycelium. Growth gives mutations, which the player spends on Spread upgrades (Infectivity, Persistence, Mycelium, Fruiting body, Immune evasion) and Reach (Stealth, Senses, Recognition, Trails, Royal). Reach holds each lever toward "as is"; Jev is still asked the full range, so an upgrade re-asks nothing. Measured: a quarter of the colony at 169–216 s and the queen at 219–314 s (Unite, seeds 1–3, §50.14); keeping nothing, neither in 15 minutes.
+- **Gone** (§50.15): the spore brush and the strain choice, §5.1 levers 1–2. The fungus reaches ants only from where it lands. Lockpick and Bloom stay as lab and test presets.
+- **Counterplay:** §6 stands. Grooming is still scripted (`ja-k4k.12`). A colony's resistance climbs to 0.7–0.9 by 20 minutes, yet the fungus holds 100 % (§50.12).
+- **Cost** (§50.9, §50.11): ~708 real tokens per situation when the preset aims' answers were shipped (279 answers, $0.0083). Jev is asked only for situations with no cached answer, under one daily budget ($0.10, `JEV_DAILY_USD`); a game whose situations are all cached spends nothing. Per hour as a game asks is estimated only ($0.027–0.041/h, `fungus-cost.mjs`).
+- **Risks, still open:** lethal levers act at full strength from the first second on `main`; reach upgrades on the unmerged `claude/new-queens` branch hold them off (`ja-lo8.16`); whether colonies claw back, and whether other strains return as unlocks (`ja-lo8.10`); pins are not built, by the owner's wish (`ja-lo8.11`).
+- **Owner decisions needed:** none beyond those filed under `ja-lo8.10` (balance).
+
 ## Sources
 
 - [*Rickia wasmannii*, pacifying alkane and lowered aggression](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9935638/) · [link.springer.com](https://link.springer.com/10.1038/s42003-023-04541-7) · [pubmed.gov](https://www.pubmed.gov/36797462/)

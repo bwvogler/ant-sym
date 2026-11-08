@@ -127,6 +127,17 @@ A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.
 - The hex grid and its chunks.
 - Behaviour MRs 1–5.2 as built. Each was tuned on one map kind, and in one world it runs on the layer it was tuned for.
 
+## Play
+
+*Added 2026-11-08 (`ja-gvt`). The case for play of one world; nothing here is built (PRD §51, `ja-lp4`).*
+
+- **See:** one game in two views (§5). From above, 2D foraging, trails and raids round every colony's hole and mound; below, the curtain unrolled with every nest's chambers, queen and brood. Today each map shows only half (§1). The field guide gains an entry for the line and the curtain, and the Nest tab always has a nest (§5).
+- **Choose:** every lever means something in the same game. The nest levers (floor marks, queen signal, crown) are always offered (§4), beside 2D foraging, where the trail levers act on branching trails rather than on the side view's one-cell walkway (§1). Where to land matters more: the mycelium lives in the shaft's soil under the hole (§2, PRD §51), and its spores reach the plane only on ants and corpses.
+- **Counterplay and progression:** unchanged in kind (fungus-policy §6, PRD §50.12). The line shapes the late game: a daughter colony (chapters 5–6, PRD §50.4) may found only beyond an end, and a flight with nowhere to land fails (§3, §8); neighbours' tunnels may meet underground and fight by the contact response.
+- **Cost:** Jev's should not change, since the mode situation keeps its fields (§4); U3 confirms it with `colony-cost`. One world asks under the side view's fungus context, so the side view's shipped fungus answers apply on the surface too (PRD §50.9 notes a top-down game has none). Not measured.
+- **Risks:** tick cost, budget 7–9 ms at 1,200 + 1,200 ants against the open map's 3.3–3.9 ms (§4, PRD §51); at 4× the top bar's "running at" warning would show a shortfall (PRD §50.4). Legibility: ants elsewhere on the surface are not in the side view, and the mycelium is hidden underground. A founding rule the player can't read: the game must say why a flight failed (§3).
+- **Owner decisions needed:** none; the founding radius waits on research (`ja-lp4.7`), not a game call.
+
 ## 8. Decided, and still open
 
 **Decided (owner, 2026-11-08):**
