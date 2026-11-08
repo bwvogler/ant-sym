@@ -5,7 +5,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
-import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, DonorGrid, EAT_BELOW, ENERGY_PER_FOOD, feel, FeltGrid, LARVA_DRAIN, LARVA_ENERGY_PER_FOOD, PASS, QUEEN_BEG, QUEEN_DRAIN, NEED_FETCH, respond, SHARE_ABOVE, THETA_OLD } from "./hunger.ts";
+import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, DonorGrid, EAT_BELOW, ENERGY_PER_FOOD, feel, FeltGrid, LARVA_DRAIN, LARVA_ENERGY_PER_FOOD, PASS, QUEEN_BEG, QUEEN_DRAIN, QUEEN_WAIT, NEED_FETCH, respond, SHARE_ABOVE, THETA_OLD } from "./hunger.ts";
 import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
@@ -145,6 +145,8 @@ export interface Queen {
   signal: number;
   /** her energy, 0..1 (ja-xu6.1): drained with time, refilled from the food in her chamber; at 0 she dies */
   energy: number;
+  /** seconds since she last laid with no food in her chamber to lay with (ja-xu6.1): past QUEEN_WAIT she begs */
+  unfed: number;
 }
 
 /** The strategist's coarse view of its own colony: few values, so a stance can be cached per view too. */
@@ -719,7 +721,7 @@ export class Colony {
     this.#loaded = new Uint8Array(n);
     this.#putAt = new Int32Array(n).fill(-1);
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
-    if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers), load: 0, strain: 0, resist: 0, show: 1, signal: 1, energy: 1 };
+    if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers), load: 0, strain: 0, resist: 0, show: 1, signal: 1, energy: 1, unfed: 0 };
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -2560,8 +2562,12 @@ export class Colony {
       cellOf(q.x, q.y);
       const qx = CELL[0] as number;
       const qy = CELL[1] as number;
+      // She begs once she has gone QUEEN_WAIT without laying for want of food in her chamber (the death spiral's mark),
+      // not whenever her chamber is briefly bare (early on she lays two eggs a second: begging then jammed the tunnels
+      // with porters, A8 and G, PRD §50.13).
       const royal = ch.list[ch.at(qx, qy)];
-      if (!royal || royal.food < EGG_FOOD) felt.put(qx, qy, QUEEN_BEG);
+      q.unfed = !royal || royal.food < EGG_FOOD ? q.unfed + dt : 0;
+      felt.put(qx, qy, QUEEN_BEG * Math.min(1, Math.max(0, (q.unfed - QUEEN_WAIT) / QUEEN_WAIT)));
     }
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;

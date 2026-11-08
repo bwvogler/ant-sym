@@ -32,8 +32,10 @@ export const BEG_BELOW = 0.8;
 
 /** Energy the queen uses a second: an unfed queen dies in an hour. */
 export const QUEEN_DRAIN = 1 / 3600;
-/** How strongly a queen who can't lay for want of food begs. */
+/** How strongly a queen who can't lay for want of food begs, at most. */
 export const QUEEN_BEG = 0.8;
+/** Seconds a queen goes without laying for want of food before she begs (rising to QUEEN_BEG over as many again). */
+export const QUEEN_WAIT = 20;
 
 /** The share of what an ant felt that it passes on to the ants it touches. */
 export const PASS = 0.9;
