@@ -136,7 +136,7 @@ A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.
 - **Counterplay and progression:** unchanged in kind (fungus-policy §6, PRD §50.12). The line shapes the late game: a daughter colony (chapters 5–6, PRD §50.4) may found only beyond an end, and a flight with nowhere to land fails (§3, §8); neighbours' tunnels may meet underground and fight by the contact response.
 - **Cost:** Jev's should not change, since the mode situation keeps its fields (§4); U3 confirms it with `colony-cost`. One world asks under the side view's fungus context, so the side view's shipped fungus answers apply on the surface too (PRD §50.9 notes a top-down game has none). Not measured.
 - **Risks:** tick cost, budget 7–9 ms at 1,200 + 1,200 ants against the open map's 3.3–3.9 ms (§4, PRD §51); at 4× the top bar's "running at" warning would show a shortfall (PRD §50.4). Legibility: ants elsewhere on the surface are not in the side view, and the mycelium is hidden underground. A founding rule the player can't read: the game must say why a flight failed (§3).
-- **Owner decisions needed:** the founding radius, proposed in [nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game): how often may a flight from an interior nest fail?
+- **Owner decisions needed:** none. The founding radius is decided (§8).
 
 ## 8. Decided, and still open
 
@@ -145,6 +145,6 @@ A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.
 2. **A flight with nowhere to land fails.** When no valid point lies within her radius, the queen dies and the game says why (§3). This replaces "the player's queen lands" in `new-queens.md` §3.
 3. **Wide screens: the switch first.** U5 ships the above/below switch with linked clicks. Both views at once is a follow-up (`ja-lp4.8`).
 4. **The old maps become tests only after U6.** The side and open maps leave the page and stay as test beds until their assays are re-baselined.
+5. **The founding radius is 140 cells, the same as the flight** (`ja-lp4.10`; [nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game)). Measured: flight 140 with a 70-cell radius failed 51% of flights from end nests and 55% from interior ones; with 140, 6% and 28% (`scripts/flight-failure.mjs`, 300 seeds on the default plane). The hole gap and clearance stay 12. U4's assay on seeds 1–20, with the open map's rock, checks it; the endless world (`ja-qpv`) looks at it again, since the plane's edges drive most failures at a smaller radius.
 
-**Still open:**
-- **The founding radius.** Researched in [nest-spacing](nest-spacing.md) (`ja-lp4.7`): it proposes a flight of 140 cells (one neighbour gap) and a landing radius of 70, and keeps the hole gap and clearance at 12. Whether flights from interior nests may fail as often as that radius makes them is an owner call (nest-spacing §4, proposal 2), due before U4.
+**Still open:** nothing.
