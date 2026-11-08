@@ -468,8 +468,10 @@ export class Game {
         const tol = this.recognition.params.tolerance;
         if (!this.colonies.some((o, j) => j !== k && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
           c.stance = "forage";
+          c.raidable = false;
           return;
         }
+        c.raidable = true;
         // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
         this.#aimRaids(k);
         // On open ground each ant's stance is its own, from what it senses (docs/stance.md): nobody chooses one for the colony.

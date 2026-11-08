@@ -321,9 +321,9 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   };
   assert.equal(threatened(8), "defend", "near home");
   assert.equal(threatened(34), "forage", "far out");
-  // The colony's own stance is not read: a raid broadcast idles no one and recruits no one.
+  // The colony's own stance is not read: a defend broadcast makes no one defend (review of #53, N2).
   const b = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(14));
-  b.stance = "raid";
+  b.stance = "defend";
   put(b, 0, 20, 6);
   b.tick(1 / 30);
   assert.equal(b.touch(0, false).stance, "forage");
@@ -344,6 +344,51 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   for (let k = 0; k < 30 * 10; k++) g.tick(1 / 30);
   assert.ok((c.crowd[0] as number) >= c.params.crowdAt, `crowded: ${(c.crowd[0] as number).toFixed(1)} nestmates felt`);
   assert.equal(c.touch(0, false).crowd, "many");
+});
+
+test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at home, by degrees, never while carrying", () => {
+  // 40 ants at home on a strong raid trail, 40 out on one 30 cells away; recruited at raidRecruit (0.5/s here) for 1 s.
+  const g = new Game(worldFromArrays({ w: 60, h: 20 }, [nestAt(6, 10, 3), nestAt(56, 10, 3)]), { antCount: 80, rivalAnts: 5 }, mulberry32(21), { policy: () => "return", responses: responses({ leave: () => "wait" }), colony: { raidRecruit: 0.5, scoutRate: 0, raidScout: 0 } });
+  const c = g.player;
+  const home = (i: number) => i < 40;
+  const place = () => {
+    for (let i = 0; i < 80; i++) put(c, i, home(i) ? 6 : 36, 10);
+    for (const x of [6, 36])
+      for (let dx = -3; dx <= 3; dx++)
+        for (let y = 6; y <= 14; y++) {
+          const p = at(x + dx, y);
+          c.ph.deposit("raid", p.x, p.y, 2 - Math.max(0, c.ph.read("raid", p.x, p.y))); // held at strong
+        }
+  };
+  c.carrying[0] = 1; // a carrier at home: never recruited
+  for (let k = 0; k < 30; k++) {
+    place();
+    g.tick(1 / 30);
+  }
+  let atHome = 0;
+  let out = 0;
+  for (let i = 1; i < 80; i++) (home(i) ? (atHome += c.recruited[i] as number) : (out += c.recruited[i] as number));
+  assert.equal(out, 0, "not out at its work");
+  assert.equal(c.recruited[0], 0, "not while carrying");
+  // 39 at home over 1 s at 0.5/s: 1 − e^−0.5 ≈ 39 % expected (15); all at once would be 39.
+  assert.ok(atHome >= 6 && atHome <= 26, `by degrees: ${atHome} of 39 at home recruited in 1 s`);
+});
+
+test("no rival, no raid (review of #53 S1): with the rival beaten, a crowded home's raid answer and a raid trail recruit no one", () => {
+  const g = new Game(arena(), { antCount: 20, rivalAnts: 5 }, mulberry32(22), { policy: () => "return", colony: { scoutRate: 0, crowdAt: 2, raidScout: 5, raidRecruit: 5 } });
+  const [c, r] = g.colonies as [Colony, Colony];
+  for (let i = 0; i < r.n; i++) r.alive[i] = 0;
+  r.larder = 0;
+  for (let i = 0; i < 20; i++) put(c, i, 4, 6);
+  for (let k = 0; k < 30 * 8; k++) {
+    for (let y = 4; y <= 8; y++)
+      for (let x = 2; x <= 6; x++) c.ph.deposit("raid", at(x, y).x, at(x, y).y, 0.05);
+    g.tick(1 / 30);
+  }
+  let rec = 0;
+  for (let i = 0; i < c.n; i++) if (c.alive[i]) rec += c.recruited[i] as number;
+  assert.equal(c.raidable, false, "the game found no rival");
+  assert.equal(rec, 0, "nobody raids");
 });
 
 test("raid stance as a bias (behaviour MR 5.2): an ant with no trail carries on as a forager, a trail or a scout's errand makes it a raider, and it is a forager again once home", () => {

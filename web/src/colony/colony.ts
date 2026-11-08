@@ -326,6 +326,11 @@ export class Colony {
   /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
   responses: Responses = localResponses;
   stance: Stance = "forage";
+  /**
+   * whether a rival lives, as the game last found (review of #53, S1): where each ant's stance is its own, nobody raids without one. An
+   * interim rule until the world grows a new neighbour when none is left (ja-5hm). The game sets it every strategy tick.
+   */
+  raidable = true;
   /** the situation handed to a response, refilled for each call (#touch): a response reads it and does not keep it */
   /** the ant the shared Touch describes */
   #ti = 0;
@@ -3114,8 +3119,10 @@ export class Colony {
     // "raid" goes at raidScout: scouts are few (behaviour MR 5.2), and their trail brings the rest.
     const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : answer === "raid" ? this.params.raidScout : scout;
     if (!(this.#rng() < 1 - Math.exp(-rate * dt))) return false;
-    // "raid" (docs/stance.md): it goes out as a raid scout. Recruited, its stance is raid, and its mode policy is asked afresh as one.
-    if (answer === "raid" && this.params.stanceGate > 0 && this.params.raidGate > 0 && this.#entrance === null) {
+    // "raid" (docs/stance.md): it goes out as a raid scout. Recruited, its stance is raid, and its mode policy is asked afresh as one (it
+    // starts exploring: see the callers). Where it can't be recruited (the side view, raidGate
+    // 0, or no living rival: N3, S1) "raid" is a wait: it goes at raidScout, a scout like any other.
+    if (answer === "raid" && this.params.stanceGate > 0 && this.params.raidGate > 0 && this.#entrance === null && this.raidable) {
       this.recruited[i] = 1;
       this.#gone[i] = 0;
     }
@@ -3343,7 +3350,7 @@ export class Colony {
           // And it recruits by degrees: at raidRecruit a second on a strong trail, less on a faint one (thresholds differ between ants,
           // as Pheidole majors answer only intense recruitment). All at once, one scout's trail called the 150-200 ants idle at home,
           // and every raid was a war (G′ seeds 1-4: 880 lost against no raids' 170).
-          if (this.#raidSmelt(i) !== "none" && (!sgate || (homeNow && !this.carrying[i] && this.#rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, this.#raidLevel(i) / STRONG) * dt)))) {
+          if (this.#raidSmelt(i) !== "none" && (!sgate || (this.raidable && homeNow && !this.carrying[i] && this.#rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, this.#raidLevel(i) / STRONG) * dt)))) {
             this.recruited[i] = 1;
             this.#gone[i] = 0;
           } else if (!sgate && homeNow && !this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && this.#rng() < 1 - Math.exp(-p.raidScout * dt)) {
@@ -4124,7 +4131,8 @@ export class Colony {
       // - for the young and middle-aged, who work inside, it sent porters out and the queen starved on 1-2 of 4 worlds in
       //   the hour-long economy run (slow/economy.test).
       if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && !this.#isTired(i) && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i)) && (!gate || (!rolled && this.#leaves(i, dt, toEnemy !== null)))) {
-        this.mode[i] = p.arrive === "follow" ? FOLLOW : EXPLORE;
+        // A raid scout starts exploring, not on a food trail (review of #53, N6).
+        this.mode[i] = p.arrive === "follow" && !this.recruited[i] ? FOLLOW : EXPLORE;
         this.#asked[i] = -1;
         this.#restT[i] = 0;
       }
