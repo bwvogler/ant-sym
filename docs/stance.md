@@ -41,7 +41,7 @@ The paper hosts were mostly outside this session's network allowlist. As in `rai
   - whether a worker's own rate of meeting nestmates at home sends it out to scout for rivals;
   - what sets the timing of slave raids (the *Formica subintegra* hint, raids only once the host's sexuals mature, is another genus).
 
-**For the model:** a waiting ant at home that meets many nestmates (crowded) and few returning with food may go out as a raid scout. This is the fourth answer to the `leave` question, "raid", so the doctrine can raise or forbid it. It stands in for the old "larder full and colony large". The individual rule is a design choice: the sources show crowding and raids together at the colony level, not the worker's cue. Once out, a scout is a raider as before: it finds strangers, lays the raid trail, and the trail recruits (`raid-recruitment.md`).
+**For the model:** a waiting ant at home that meets many nestmates (crowded) and few returning with food may go out as a raid scout. This is the fourth answer to the `leave` question, "raid", so the doctrine can raise or forbid it. It stands in for the old "larder full and colony large". (`crowd` counts nestmates in the colony's count grid, not by odour: local, but the same shortcut as grooming in the vision gap table.) The individual rule is a design choice: the sources show crowding and raids together at the colony level, not the worker's cue. Once out, a scout is a raider as before: it finds strangers, lays the raid trail, and the trail recruits (`raid-recruitment.md`).
 
 ## Play
 

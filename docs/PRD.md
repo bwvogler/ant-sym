@@ -3880,12 +3880,13 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
   - **raid** once recruited.
   - **forage** otherwise.
 
-  What each stance does is unchanged. `Situation.stance` and `Touch.stance` keep their three values.
+  What each stance does is unchanged. `Situation.stance` and `Touch.stance` keep their three values. Defence lingers: 5 s of faint alarm near home keeps an ant defending for about 40 s (half-life 20 s, `defendAt` 1). That is the fading internal state, and is intended.
 - **No strategist on open ground.** The game loop skips it. Its 60 s intake average, 30 s loss decay and map scan are not read there. The side view keeps it (`ja-1a9`).
 - **Raid scouts go on a `leave` answer.** The answers are now/soon/wait/**raid**.
   - "raid" sends a waiting forager out at `raidScout` (1/90 s) as a raid scout.
   - `Touch.crowd` (few, many) is how crowded home is, felt by a waiting ant: nestmates in its cell and the six round it over 5 s, "many" from `crowdAt` 40.
   - Local rule: returns none and crowd many → raid.
+- **No raid without a living rival** (review of #53, S1). With none left, or only kin, the game clears `Colony.raidable`, and neither a "raid" answer nor a raid trail recruits; "raid" is then a wait. This is interim, until the world grows a neighbour (`ja-5hm`, `ja-506`).
 - **The raid trail recruits at home and by degrees.** An idle ant at home that smells it is recruited at `raidRecruit` (0.1/s) × the trail's level (up to strong).
 - **Why "by degrees":**
   - Recruiting anywhere ran away: G′ seed 1 had 773 of 899 ants raiding.
@@ -3919,7 +3920,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
   - crowd-only raids with recruitment all at once: about 880 lost;
   - `raidRecruit` 0.02: A11 8/10, worst seed 1.07.
 
-### 53.4 Jev (spent ≈ $0.022 of $0.10)
+### 53.4 Jev (spent ≈ $0.029 of $0.10)
 
 - **Legends** (colony v7, response v10; the stance lane is unchanged, for the side view):
   - Stance, on open ground, is the ant's own: "forage, the usual one; defend, only while it smells alarm or meets strangers close to its own nest; or raid, once recruited".
@@ -3928,19 +3929,24 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
 - **Two wordings were corrected after replays:**
   - **"crowd" tied only to raiding.** Cautious and Forage answered "wait" for a crowded home with many foragers coming back, and Warlike raided with food coming back. Cautious's replay stored 1,228 against main's 3,853. Now returns come first: a crowded home with none coming back is the one case left to the doctrine.
   - **A stance sentence leading with threat and defence.** Cautious answered "return" in 125 of 151 mode situations. Now forage is "the usual one".
-- **Live:** `colony-live.mjs all --top`, three full runs at $0.0065–0.0066, plus two leave-only runs and one Cautious mode run (about $0.0024).
+- **A third wording, after review of #53 (D1).** Cautious's mode answers kept rested ants at home with food ahead. A sentence now says caution means going home from danger, not staying home from food.
+- **Live:** `colony-live.mjs all --top`, four full runs at $0.0065–0.0066, plus two leave-only runs and one Cautious mode run (about $0.0024).
   - Real tokens per question: mode 202, leave 404, contact 262, trail 250.
   - Caches: `experiments/caches/stance-top-*.json` (7 / 4 / 10). The mode bundles are re-shipped from them (`precache.mjs --import`, 151 answers per doctrine); the stance bundles stand.
 - **Replays,** G′ seeds 1–6, the first colony; `main` is MR 5.2's caches replayed today. The local rule on this branch: 4,207 food, 648 lost.
 
-| Cache | Food | Lost | `main`: food | Lost |
-|---|---|---|---|---|
-| Forage | 3,955 (−9 %) | 481 | 4,363 | 824 |
-| Cautious | 2,234 (−42 %) | 150 | 3,853 | 592 |
-| Warlike | 3,467 (0 %) | 631 | 3,472 | 866 |
+| Cache | Food | Lost | Before the caution sentence: food | `main`: food | Lost |
+|---|---|---|---|---|---|
+| Forage | 4,018 | 502 | 3,955 | 4,363 | 824 |
+| Cautious | **3,595** | 91 | 2,234 | 3,853 | 592 |
+| Warlike | 3,093 | 641 | 3,467 | 3,472 | 866 |
 
 - **Losses fall under every doctrine.**
-- **Cautious's food loss is in its mode answers** (`ja-5vx`). With them removed it stores 4,801 (seeds 1–3); with MR 5.2's answers restored for the 15 situations where they differ, 3,645. For example, a rested ant at home with a faint food trail ahead is told to stay home. Those answers vary between recordings of the same doctrine.
+- **Cautious kept rested foragers at home under the second wording** (2,234 food). The cause was in its mode answers: with them removed it stored 4,801 (seeds 1–3); with MR 5.2's answers restored for the 15 situations where they differed, 3,645.
+  - The caution sentence brings it to 3,595, 7 % under `main`'s, with a sixth of its losses. Some sacrifice is the doctrine's (the owner's call on #53).
+  - Some of those situations stay ambiguous on open ground: a "return" situation doesn't say whether the ant is home or walking there.
+- **Warlike fell 11 %** between the two recordings (3,467 to 3,093), with the same losses. Its answer counts barely moved (fight 80 → 82), so that is taken as Jev's run-to-run variance, not the sentence.
+- **The shipped mode answers** are 151 per doctrine, from top-down caches (they were 290, from the side view and top-down). The side view, still on the broadcast stance, will miss more at first and ask live under the daily budget (§50.11).
 
 ### 53.5 Cost
 
