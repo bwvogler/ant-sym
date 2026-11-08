@@ -52,7 +52,7 @@ test("A9 strangers meet at food: few lost per food brought home", () => {
   }
 });
 
-// Behaviour MR 5.2 (PRD §49) with ja-sf1 (§49.7): raids by trail, raiders searching on past the trail's end. A11's trail gain is
+// Behaviour MR 5.2 (PRD §49) with ja-sf1 (§49.7): raids by trail, raiders leaving the trail to search on as scouts. A11's trail gain is
 // 2.04 median (1.32–4.40), 16/20 seeds at its mark of 1.5 (seeds 21–40: 1.84, 13/20); none is stuck.
 test("A11 raiders find the rival: none stuck, and the raid trail gains 1.5× on most seeds", () => {
   let passed = 0;

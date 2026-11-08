@@ -248,8 +248,9 @@ export interface ColonyParams {
   /** seconds of contact with strangers that make a scout a finder */
   findAt: number;
   /**
-   * a raider at the end of the raid trail (nothing stronger ahead) searches on, out and away from home, instead of climbing back
-   * to the end (1; 0: it mills there). The trail ends where a scout met strangers, often short of their nest (ja-sf1)
+   * a raider on the raid trail that finds nothing ahead as strong as underfoot leaves it and searches on, out and away from home,
+   * as a scout does (1; 0: it keeps climbing, and mills at the trail's end). It happens mostly near home, where the trail is
+   * weak and patchy: the trail recruits and points the way, and the search does the rest (ja-sf1, review of #44)
    */
   raidOnward: number;
   /**
@@ -509,7 +510,7 @@ export class Colony {
   recruited: Uint8Array;
   /** 1 once a recruited ant has been away from the nest: coming home then ends its raid */
   #gone: Uint8Array;
-  /** a raider past the end of the raid trail, searching on (ja-sf1) */
+  /** a raider that has left the raid trail to search on, until it is home (ja-sf1) */
   #pastEnd: Uint8Array;
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
@@ -3675,8 +3676,9 @@ export class Colony {
           const rf = Math.max(0, ph.read("raid", x + Math.cos(h) * d, y + Math.sin(h) * d));
           const rr = Math.max(0, ph.read("raid", x + Math.cos(h + a) * d, y + Math.sin(h + a) * d));
           const top = Math.max(rl, rf, rr);
-          // The trail's end: facing along it (the front sensor strongest), nothing ahead as strong as underfoot. Past it, a raider searches on (raidOnward) as a scout does
-          // (a run out, then a search), instead of turning back up to the end and milling there short of the strangers' nest.
+          // Nothing ahead as strong as underfoot, facing along the trail (the front sensor strongest): the raider leaves the trail and
+          // searches on (raidOnward) as a scout does (a run out, then a search), until home. Mostly near home, where the trail is weak
+          // and patchy (review of #44: a median 0.05–0.19 of the way out); gated on a strong end instead, A11 gained less (1.67, 2.01).
           if (p.raidOnward > 0 && rf >= FAINT && rf === top && this.#pastEnd[i] === 0 && rf < ph.read("raid", x, y)) this.#pastEnd[i] = 1;
           if (top >= FAINT && this.#pastEnd[i] === 0) h += climb(rl, rf, rr, p.turnRate * dt) + noise * p.wander * 0.25;
           else if (this.#pastEnd[i] === 1 && top >= FAINT) h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander * 0.25;

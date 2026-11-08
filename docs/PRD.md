@@ -3187,7 +3187,7 @@ Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; sea
 - **Stance** is still broadcast (`ja-k4k.6`).
 - **A rival-nest odour,** column marching, call-off: no sources reached.
 
-### 49.7 Raiders search on past the trail's end (ja-sf1, 2026-11-08)
+### 49.7 The trail points, the search finds (ja-sf1, 2026-11-08)
 
 **What was wrong.** A11 with probes for who is recruited, where, and where finds happen (seeds 1–20, the MR 5.2 code):
 - **Recruiting was never short.** 81 % of the colony was recruited (0.70–0.99), 43 % of them at home, and the trail was smelt at the nest's rim in 47 % of samples. 49.3's "only ants near the nest smell the trail" was wrong.
@@ -3196,10 +3196,11 @@ Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; sea
 - **Tried and dropped: a later find** (`findAt` 1, 2, 4 s): gain 1.70, 1.22, 1.00, the worst seed 0.70 at best.
 
 **What changed** (`raidOnward` 1):
-- A raider facing along the raid trail (its front sensor the strongest) with nothing ahead as strong as underfoot is past the trail's end. It searches on, out and away from home, as a scout does, and does not climb back to the end. The flag clears at home.
-- If it meets strangers there, with no trail under it, it is a finder, and lays a longer trail home.
+- A raider on the raid trail, facing along it (its front sensor the strongest), that finds nothing ahead as strong as underfoot leaves the trail and searches on, out and away from home, as a scout does. It ignores raid trails until it is home, where the flag clears; that includes a fresher, longer one another finder lays meanwhile.
+- **Where it fires** (the owner's probe, review of #44, seeds 1–3): mostly near home, a median 0.05–0.19 of the way out, 81–92 % of the times within 40 % of it. The lay fades with time since the find, so near the nest the trail is faint and patchy, and a dip ahead reads as nothing stronger. So the trail recruits and points the way, and the search does the rest. Allowed only where the trail underfoot is strong, as at a real end, A11 gained less: 1.67 against 2.01 (seeds 1–4).
+- If a searching raider meets strangers with no trail under it, it is a finder, and lays a trail home from there.
 - No new sense: it reads the same three sensors as the climb. No clock. Nothing an ant is asked changed, so Jev's keys and caches stand and nothing was spent.
-- Research: `docs/raid-recruitment.md`, "Past the trail's end" (a scout's run then sector search; trails kept by those who use them; all **unverified**).
+- Research: `docs/raid-recruitment.md`, "The trail points, the search finds" (a scout's run then sector search; trails kept by those who use them; all **unverified**).
 
 **A11** (raidOnward 1 against 0, the same code):
 
@@ -3210,7 +3211,7 @@ Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; sea
 
 `straight` (every ant at the coordinates) reaches 0.39; stuck stays 1 %. The slow suite now guards the mark (6 of seeds 1–10), no longer a todo.
 
-**A6, corrected.** 49.3's A6 (16/20, gain 1.82) is stale: the merge commit of #41 measures **3/20, gain 1.26**, and so does `main`. The number was taken before the owner's review moved unrecruited fighters off the coordinates, after which A6's attackers (all in fight, on a raid stance) went only as recruits, a few at a time, and no battle formed at the pass. A6 is about who reaches whom at a pass, not about finding the rival, so its attackers now all march at the defenders' hole (`raidGate` 0 in both its runs): **14/20, gain 1.74** (1.18–5.20); before MR 5.2, 9/10 and 2.36. raidOnward does not change it (6/20, 1.20 against 1.23, the old spec).
+**A6, corrected (an assay change, not this fix).** 49.3's A6 (16/20, gain 1.82) is stale: the merge commit of #41 measures **3/20, gain 1.26**, and so does `main`. The number was taken before the owner's review moved unrecruited fighters off the coordinates, after which A6's attackers (all in fight, on a raid stance) went only as recruits, a few at a time, and no battle formed at the pass. A6 is about who reaches whom at a pass, not about finding the rival, so its attackers now all march at the defenders' hole (`raidGate` 0 in both its runs): **14/20, gain 1.74** (1.18–5.20); before MR 5.2, 9/10 and 2.36. raidOnward does not change it (6/20, 1.20 against 1.23, the old spec).
 
 **A12** 20/20 (food 1.00 of the forage colony's), **A5, A9** 20/20: unchanged.
 

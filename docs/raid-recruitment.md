@@ -51,7 +51,7 @@ The paper hosts (link.springer.com, pmc.ncbi.nlm.nih.gov, groups.csail.mit.edu) 
 
 **For the model:** nothing ends a raid by decision. A raid lives while a scout's trail does; an ant that has been out and is home with no trail under it goes back to foraging, and a scout that finds nothing tires and comes home (the existing fatigue). A call-off that spreads by contact with raiders coming home empty has one summary line behind it, and is left out.
 
-## Past the trail's end
+## The trail points, the search finds
 
 Added for `ja-sf1`. As above, every claim was read in a search summary, not the paper, and is **unverified**.
 
@@ -60,8 +60,9 @@ Added for `ja-sf1`. As above, every claim was read in a search summary, not the 
 - **Not found:** whether *Polyergus* raiders re-lay the column's trail, how fast it fades, or what raiders do where it ends.
 
 **For the model:**
-- A finder lays the trail from where it met strangers, which in A11 is about 25 cells short of their nest (the nests are 80 apart). Climbing it, the recruits stopped at its strongest point, its end, and milled there.
-- Now a raider facing along the trail with nothing ahead as strong as underfoot is past the end, and searches on as a scout does: out, away from home, without turning back up the trail (`raidOnward`). If it meets strangers there with no trail under it, it is a finder, and lays a longer trail home.
+- A finder lays the trail from where it met strangers, which in A11 is about 25 cells short of their nest (the nests are 80 apart). Climbing it to the end, the recruits stopped at its strongest point and milled there.
+- Now a raider on the trail that finds nothing ahead as strong as underfoot leaves it and searches on as a scout does: out, away from home, without turning back to the trail until it is home (`raidOnward`). That happens mostly near home, where the trail is weak and patchy (a median 0.05–0.19 of the way out, the owner's probe in the review of #44), so the trail recruits and points the way, and the search does the rest. Allowed only at a strong trail end, it reached less (A11 gain 1.67 against 2.01, seeds 1–4).
+- If a searching raider meets strangers with no trail under it, it is a finder, and lays a trail home from there.
 - **Tried and dropped: raiders re-laying the trail** on their way home from strangers. It made the trail at the nest four times as strong and recruited no more ants and reached no further (A11 gain 1.19 against 1.24). Recruiting was never short: 81 % of the colony was recruited.
 
 ## Sources
