@@ -77,6 +77,8 @@ function marginCells(holes: readonly Cell[], end: End, margin: number): Int32Arr
 /** The line through `holes` (in order, at least one) with V₀ at column `s0`. */
 export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0?: number } = {}): Transect {
   if (holes.length === 0) throw new Error("makeTransect: no holes");
+  for (let i = 1; i < holes.length; i++)
+    if (holes[i]!.x === holes[i - 1]!.x && holes[i]!.y === holes[i - 1]!.y) throw new Error(`makeTransect: holes ${i - 1} and ${i} are the same cell`);
   const margin = opts.margin ?? MARGIN;
   const s0 = opts.s0 ?? 0;
   const parts: number[] = [];
@@ -99,7 +101,11 @@ export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0
   return { holes: holes.map((h) => ({ x: h.x, y: h.y })), sHole, sMin: s0 - margin, sMax: s + margin, margin, cells: Int32Array.from(parts) };
 }
 
-/** P(s): the plane cell over column s, into CELL[0], CELL[1] (no allocation); false when s is off the line. */
+/**
+ * P(s): the plane cell over column s, into CELL[0], CELL[1] (no allocation); false when s is off the line. The cell can
+ * lie off the generated plane (a margin running past its edge): read it through world.ts, where ground not generated
+ * reads as rock, as one-world §3 has beyond the line's ends.
+ */
 export function cellAt(t: Transect, s: number): boolean {
   if (!Number.isInteger(s) || s < t.sMin || s > t.sMax) return false;
   const i = s - t.sMin;
@@ -115,7 +121,11 @@ export function columnsOver(t: Transect, x: number, y: number): number[] {
   return out;
 }
 
-/** The line grown by a new hole beyond one end. Columns already on the line keep their cells, except the old end's margin. */
+/**
+ * The line grown by a new hole beyond one end. Columns already on the line keep their cells, except the old end's
+ * margin, which the new segment replaces. A line of one hole has no direction yet, so its first founding re-aims both
+ * margins: straight on from the new segment at either end.
+ */
 export function grow(t: Transect, end: End, cell: Cell): Transect {
   if (end === "end") return makeTransect([...t.holes, cell], { margin: t.margin, s0: t.sHole[0] });
   const v0 = t.holes[0]!;
@@ -193,16 +203,39 @@ function standing(t: Transect, end: End): Seg[] {
   return out;
 }
 
+/** 4 × the squared distance between two cells' centres: a whole number (half-cells across, rows of height √3/2 down), so ties are exact. */
+function dist4(ax: number, ay: number, bx: number, by: number): number {
+  const dx = 2 * (ax - bx) + (ay & 1) - (by & 1);
+  const dy = ay - by;
+  return dx * dx + 3 * dy * dy;
+}
+
+/** The parts of rule 2 that depend only on the line and the end it grows: built once per transect and end. */
+interface EndRule {
+  ex: number;
+  ey: number;
+  old: Seg[];
+}
+const endRules = new WeakMap<Transect, Partial<Record<End, EndRule>>>();
+
+function endRule(t: Transect, end: End): EndRule {
+  let have = endRules.get(t);
+  if (!have) endRules.set(t, (have = {}));
+  const got = have[end];
+  if (got) return got;
+  const [ex, ey] = outward(t.holes, end);
+  return (have[end] = { ex, ey, old: standing(t, end) });
+}
+
 /** Rule 2's verdict for a new segment from vertex (vx, vy) by (nx, ny), length nl: null when it holds. */
 function fold(t: Transect, end: End, vx: number, vy: number, nx: number, ny: number, nl: number): Refusal | null {
-  const [ex, ey] = outward(t.holes, end);
+  const { ex, ey, old } = endRule(t, end);
   const turn = Math.acos(Math.max(-1, Math.min(1, (ex * nx + ey * ny) / nl)));
   if (turn > MAX_TURN + 1e-12) return "turn";
   // The new segment and its margin to come run straight on from the vertex: one segment, from the edge of the
   // vertex's clearance (excused) to the margin's far end.
   const reach = nl + t.margin;
   const fresh: Seg = [vx + (nx / nl) * CLEARANCE, vy + (ny / nl) * CLEARANCE, vx + (nx / nl) * reach, vy + (ny / nl) * reach];
-  const old = standing(t, end);
   for (const b of old) if (meets(fresh, b)) return "crosses";
   // A hair of slack: at the 120° limit the clearance holds exactly, and rounding must not refuse it.
   for (const b of old) if (segSeg(fresh, b) < CLEARANCE - 1e-9) return "clearance";
@@ -211,57 +244,48 @@ function fold(t: Transect, end: End, vx: number, vy: number, nx: number, ny: num
 
 /**
  * Whether a colony may be founded with its hole at plane cell `p` (one-world §3), and at which end the line would grow.
- * The rules, in order:
- *  1. its nearest hole (2D, between cell centres) is an end: a tie with an interior hole is refused; a tie between the
- *     two ends grows at V₀;
+ * The rules:
+ *  1. its nearest hole (2D, between cell centres, compared exactly) is an end: a tie with an interior hole is refused;
+ *     a tie between the two ends grows at V₀;
  *  2. the new segment turns back on the end segment by at most 120°, and away from the shared vertex (beyond the
  *     clearance) neither it nor its margin to come crosses the line or comes within the clearance of it, the far end's
  *     margin included;
  *  3. `p` is at least HOLE_GAP_2D from every hole;
  *  4. `p` is open ground (`open`, e.g. world.ts's openCell(map)).
+ * They are checked 1, 3, 4, 2: the cheap ones first, and a spot crowding a hole is refused for that ("hole-gap"), not
+ * for the turn its nearness makes.
  */
 export function canFound(t: Transect, p: Cell, open: (x: number, y: number) => boolean): Founding {
   const h = t.holes;
   const k = h.length - 1;
-  const px = cx(p);
-  const py = cy(p);
   // 1. The nearest hole is an end.
   let best = Infinity;
-  for (const v of h) best = Math.min(best, Math.hypot(cx(v) - px, cy(v) - py));
-  for (let i = 1; i < k; i++) if (Math.hypot(cx(h[i]!) - px, cy(h[i]!) - py) === best) return { ok: false, reason: "interior" };
-  const end: End = Math.hypot(cx(h[0]!) - px, cy(h[0]!) - py) === best ? "start" : "end";
-  // 2. No folding back: the turn, then crossing and clearance.
+  for (const v of h) best = Math.min(best, dist4(v.x, v.y, p.x, p.y));
+  for (let i = 1; i < k; i++) if (dist4(h[i]!.x, h[i]!.y, p.x, p.y) === best) return { ok: false, reason: "interior" };
+  const end: End = dist4(h[0]!.x, h[0]!.y, p.x, p.y) === best ? "start" : "end";
+  // 3. Room from every hole: the nearest is `best` away.
+  if (best < 4 * HOLE_GAP_2D * HOLE_GAP_2D) return { ok: false, reason: "hole-gap" };
+  // 4. Open ground.
+  if (!open(p.x, p.y)) return { ok: false, reason: "ground" };
+  // 2. No folding back: the turn, then crossing and clearance. With one hole there is no line yet to fold back on.
+  if (k === 0) return { ok: true, end };
   const v = end === "start" ? h[0]! : h[k]!;
   const vx = cx(v);
   const vy = cy(v);
-  const nx = px - vx;
-  const ny = py - vy;
-  const nl = Math.hypot(nx, ny);
-  if (nl === 0) return { ok: false, reason: "hole-gap" };
-  // With one hole there is no line yet to fold back on: both its margins give way to the new segment.
-  const folded = k > 0 ? fold(t, end, vx, vy, nx, ny, nl) : null;
-  if (folded) return { ok: false, reason: folded };
-  // 3. Room from every hole.
-  for (const w of h) if (Math.hypot(cx(w) - px, cy(w) - py) < HOLE_GAP_2D) return { ok: false, reason: "hole-gap" };
-  // 4. Open ground.
-  if (!open(p.x, p.y)) return { ok: false, reason: "ground" };
-  return { ok: true, end };
+  const nx = cx(p) - vx;
+  const ny = cy(p) - vy;
+  const folded = fold(t, end, vx, vy, nx, ny, Math.hypot(nx, ny));
+  return folded ? { ok: false, reason: folded } : { ok: true, end };
 }
 
 /**
- * The cell nearest `p` (2D, then a fixed order, so a game replays) within `radius` steps where canFound holds, with the
- * end it grows; null when there is none (a flight with nowhere to land fails: one-world §3, §8).
+ * The cell nearest `p` (2D, exactly, then a fixed order, so a game replays) within `radius` steps where canFound holds,
+ * with the end it grows; null when there is none (a flight with nowhere to land fails: one-world §3, §8).
  */
 export function nearestValid(t: Transect, p: Cell, radius: number, open: (x: number, y: number) => boolean): { cell: Cell; end: End } | null {
   const offs = discOffsets(radius)[p.y & 1]!;
-  const px = cx(p);
-  const py = cy(p);
   const order: [number, number][] = [];
-  for (let i = 0; i < offs.length; i += 2) {
-    const x = p.x + offs[i]!;
-    const y = p.y + offs[i + 1]!;
-    order.push([Math.hypot(centreX(x, y) - px, centreY(y) - py), i]);
-  }
+  for (let i = 0; i < offs.length; i += 2) order.push([dist4(p.x + offs[i]!, p.y + offs[i + 1]!, p.x, p.y), i]);
   order.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   for (const [, i] of order) {
     const cell = { x: p.x + offs[i]!, y: p.y + offs[i + 1]! };

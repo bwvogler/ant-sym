@@ -51,7 +51,16 @@ export const CELL = new Int32Array(2);
 /** Find the cell at world (px, py): into CELL. Cube rounding of the fractional axial coordinates. */
 export function cellOf(px: number, py: number): void {
   const fr = py / R - 0.5;
-  const fq = px - 0.5 - fr / 2;
+  cubeRound(px - 0.5 - fr / 2, fr);
+}
+
+/** The axial q of cell (x, y): its column with the rows' half-cell shift taken out. */
+function axialQ(x: number, y: number): number {
+  return x - ((y - (y & 1)) >> 1);
+}
+
+/** The cell nearest fractional axial (fq, fr): into CELL. Round all three cube coordinates, then mend the worst. */
+function cubeRound(fq: number, fr: number): void {
   const fs = -fq - fr;
   let q = Math.round(fq);
   let r = Math.round(fr);
@@ -73,8 +82,8 @@ export function dirOf(h: number): number {
 
 /** Steps between two cells. */
 export function hexDistance(ax: number, ay: number, bx: number, by: number): number {
-  const aq = ax - ((ay - (ay & 1)) >> 1);
-  const bq = bx - ((by - (by & 1)) >> 1);
+  const aq = axialQ(ax, ay);
+  const bq = axialQ(bx, by);
   const dq = aq - bq;
   const dr = ay - by;
   return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
@@ -88,24 +97,14 @@ export function hexDistance(ax: number, ay: number, bx: number, by: number): num
 export function hexLine(ax: number, ay: number, bx: number, by: number): Int32Array {
   const n = hexDistance(ax, ay, bx, by);
   const out = new Int32Array(2 * (n + 1));
-  const aq = ax - ((ay - (ay & 1)) >> 1) + 1e-6;
+  const aq = axialQ(ax, ay) + 1e-6;
   const ar = ay + 2e-6;
-  const bq = bx - ((by - (by & 1)) >> 1);
+  const bq = axialQ(bx, by);
   for (let i = 0; i <= n; i++) {
     const t = n === 0 ? 0 : i / n;
-    const fq = aq + (bq - aq) * t;
-    const fr = ar + (by - ar) * t;
-    const fs = -fq - fr;
-    let q = Math.round(fq);
-    let r = Math.round(fr);
-    const s = Math.round(fs);
-    const dq = Math.abs(q - fq);
-    const dr = Math.abs(r - fr);
-    const ds = Math.abs(s - fs);
-    if (dq > dr && dq > ds) q = -r - s;
-    else if (dr > ds) r = -q - s;
-    out[2 * i] = q + ((r - (r & 1)) >> 1);
-    out[2 * i + 1] = r;
+    cubeRound(aq + (bq - aq) * t, ar + (by - ar) * t);
+    out[2 * i] = CELL[0]!;
+    out[2 * i + 1] = CELL[1]!;
   }
   return out;
 }

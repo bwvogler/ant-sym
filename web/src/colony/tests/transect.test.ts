@@ -65,6 +65,20 @@ test("rule 1: the nearest hole must be an end; a tie with an interior hole is re
   assert.deepEqual(canFound(two, { x: 40, y: 100 }, open), { ok: true, end: "start" });
 });
 
+test("rule 1's ties are exact on every row: equal distances in floating point are compared as whole numbers (PR #55 review)", () => {
+  // B and C equally far from p, 20 rows above and below it: Math.hypot of the centres differs in its last bit on some rows.
+  for (let y0 = 0; y0 < 200; y0++) {
+    const t = makeTransect([{ x: 100, y: y0 }, { x: 100, y: y0 + 40 }, { x: 100, y: y0 + 80 }]);
+    assert.deepEqual(canFound(t, { x: 140, y: y0 + 60 }, open), { ok: false, reason: "interior" }, `y0 = ${y0}`);
+  }
+  // And the ends: a point as far from Ink as from Amber grows at V₀ on every row.
+  for (let y0 = 0; y0 < 200; y0++) {
+    const t = makeTransect([{ x: 100, y: y0 }, { x: 100, y: y0 + 40 }]);
+    const f = canFound(t, { x: 180, y: y0 + 20 }, open);
+    assert.ok(!f.ok || f.end === "start", `y0 = ${y0}: a tie between the ends grows at V₀`);
+  }
+});
+
 test("rule 2, the turn: at most 120° back on the end segment", () => {
   const t = makeTransect([A, B]);
   // Measured from B, straight on is east. A spot 140° round is refused; one 110° round is allowed.
@@ -99,6 +113,8 @@ test("rules 3 and 4: a hole gap from every hole, on open ground", () => {
   assert.deepEqual(canFound(t, { x: 208, y: 100 }, open), { ok: false, reason: "hole-gap" });
   assert.deepEqual(canFound(t, { x: 212, y: 100 }, open), { ok: true, end: "end" });
   assert.deepEqual(canFound(t, B, open), { ok: false, reason: "hole-gap" });
+  // Behind Amber, on the line: refused for crowding the hole, the reason a player should read, not for the turn.
+  assert.deepEqual(canFound(t, { x: 195, y: 100 }, open), { ok: false, reason: "hole-gap" });
   const rock = (x: number, y: number) => !(x === 260 && y === 100);
   assert.deepEqual(canFound(t, { x: 260, y: 100 }, rock), { ok: false, reason: "ground" });
 });
@@ -108,8 +124,12 @@ test("one hole: no line to fold back on yet, so any open spot a hole gap away gr
   assert.deepEqual([t.sMin, t.sMax], [-MARGIN, MARGIN]);
   for (const p of [{ x: 160, y: 100 }, { x: 40, y: 100 }, { x: 100, y: 30 }]) assert.deepEqual(canFound(t, p, open), { ok: true, end: "start" });
   assert.deepEqual(canFound(t, { x: 105, y: 100 }, open), { ok: false, reason: "hole-gap" });
-  const g = grow(t, "start", { x: 160, y: 100 });
+  // Its first founding re-aims both margins straight on from the new segment: a lone hole has no direction yet.
+  const g = grow(t, "start", { x: 100, y: 30 });
   assert.equal(g.sHole[1], 0);
+  assert.deepEqual(at(g, 10), [100, 110], "past the old hole, the line runs on away from the new one");
+  assert.throws(() => makeTransect([A, A]), /same cell/);
+  assert.throws(() => grow(makeTransect([A, B]), "end", B), /same cell/);
 });
 
 test("nearestValid: the nearest allowed cell within the radius, or null when there is none", () => {
