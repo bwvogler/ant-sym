@@ -1,5 +1,5 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { type ColonyParams, FAINT, type Mode, type Policy, type Stance, type StancePolicy } from "./colony.ts";
+import { type ColonyParams, FAINT, MODES, type Mode, type Policy, type Stance, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
@@ -1020,6 +1020,77 @@ export const contact: Assay = {
 };
 
 /**
+ * A13 — defence from senses (docs/stance.md). One colony forages a pile 45 cells west of its nest; a war party of strangers
+ * (the rival, sent marching at the colony's hole: an experimental device) comes from the east. Defence is an individual's:
+ * the ants that sense a threat near home fight it, and foragers far off at the pile go on carrying (pavement ants: a
+ * threshold raised by encounters, Hoover et al. 2016; Pheidole: the fight moves closer to the nest as it grows). Score: food
+ * stored against the same seed with the war party sealed in rock (`foodShare`), the strangers killed per ant lost
+ * (`exchange`), and, sampled each second from 20 s, the colony's fighters within NEAR_HOME of its nest (`fightNear`) and its
+ * ants at the pile that are not fighting (`atPile`). Design mark: food at least DEFEND_FOOD of the control, and at least
+ * half the war party killed.
+ */
+export const DEFEND_FOOD = 0.8;
+export const NEAR_HOME = 15;
+function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams>): RunSpec {
+  const nest = at(60, 30);
+  const pile = at(15, 30);
+  let fightNear = 0;
+  let atPile = 0;
+  let samples = 0;
+  let next = 20;
+  return {
+    seed,
+    seconds: 300,
+    map: () => {
+      const a = new Arena(160, 60, true).pile(15, 30, 4, 300);
+      if (sealed) a.wall(140, 20, 158, 40).carve(145, 25, 155, 35);
+      return a.build([{ x: 60, y: 30, r: 3 }, { x: 150, y: 30, r: 3 }]);
+    },
+    game: { antCount: 200, rivalAnts: 80 },
+    sides: {
+      ...(colony ? { colony } : {}),
+      rivalPolicy: always<Mode>("fight"),
+      rivalStance: always<Stance>("raid"),
+      rival: { raidGate: 0, stanceGate: 0 },
+    },
+    probes: [
+      {
+        tick(game) {
+          if (game.time + 1e-9 < next) return;
+          next += 1;
+          const c = game.player;
+          for (let i = 0; i < c.n; i++) {
+            if (!c.alive[i]) continue;
+            const x = c.x[i] as number;
+            const y = c.y[i] as number;
+            const fighting = MODES[c.mode[i] as number] === "fight";
+            if (fighting && Math.hypot(x - nest.x, y - nest.y) <= NEAR_HOME) fightNear++;
+            if (!fighting && Math.hypot(x - pile.x, y - pile.y) <= 8) atPile++;
+          }
+          samples++;
+        },
+        summary: () => ({ fightNear: samples ? fightNear / samples : 0, atPile: samples ? atPile / samples : 0 }),
+      },
+    ],
+  };
+}
+export const defendHome: Assay = {
+  id: "defendHome",
+  title: "A13 defence from senses: the nest is defended, the far pile still worked",
+  target: `food stored ≥ ${DEFEND_FOOD * 100} % of the same colony's with no war party, and ≥ half the war party killed (design marks; docs/stance.md)`,
+  seconds: 300,
+  spec: (seed) => defendSpec(seed, false),
+  score: (r) => {
+    const stored = r.metrics["you.stored"] as number;
+    const control = runGame(defendSpec(r.seed, true)).result.metrics["you.stored"] as number;
+    const foodShare = control > 0 ? stored / control : NaN;
+    const killed = r.metrics["rival.losses"] as number;
+    const lost = r.metrics["you.losses"] as number;
+    return { stored, control, foodShare, killed, lost, exchange: killed / Math.max(1, lost), fightNear: r.metrics.fightNear as number, atPile: r.metrics.atPile as number, pass: foodShare >= DEFEND_FOOD && killed >= 40 ? 1 : 0 };
+  },
+};
+
+/**
  * A10 — faint alarm draws (behaviour MR 4, docs/combat.md: low doses attract, ten times more repel; Moser et al. 1968,
  * Lopes et al. 2022). A faint alarm is painted 30 cells from the nest of a colony with no food to find at 40 s, while
  * every ant still explores (later they tire and head home): the crowd within 4 cells of it over the next 10 s against
@@ -1147,4 +1218,4 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, faintAlarm, game, gameTop, nestFlow];
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, defendHome, faintAlarm, game, gameTop, nestFlow];
