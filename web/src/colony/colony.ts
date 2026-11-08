@@ -3120,6 +3120,18 @@ export class Colony {
     return true;
   }
 
+  /** Whether each ant's stance is its own, from what it senses (docs/stance.md: open ground, stanceGate on), not the colony's. */
+  get ownStances(): boolean {
+    return this.params.stanceGate > 0 && this.#entrance === null;
+  }
+
+  /** How many living ants act on each stance now (the HUD, where each ant's stance is its own). */
+  stanceCounts(): Record<Stance, number> {
+    const n: Record<Stance, number> = { forage: 0, defend: 0, raid: 0 };
+    for (let i = 0; i < this.n; i++) if (this.alive[i]) n[this.#stanceOf(i)]++;
+    return n;
+  }
+
   /**
    * The stance ant i acts on (behaviour MR 5.2): the colony's, except that a raid stance is a bias and not an order. An ant that has
    * smelt no raid trail and has not gone out as a scout carries on as a forager, so a raid stance never idles the colony.

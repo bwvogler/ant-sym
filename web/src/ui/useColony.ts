@@ -75,7 +75,8 @@ export interface SideStats {
   brood: [number, number, number];
   /** brood killed by the fungus's crown (nest slice 8) */
   broodKilled: number;
-  stance: Stance;
+  /** the colony's stance; where each ant's is its own (top-down, docs/stance.md), how many defend and raid */
+  stance: string;
   /** share of living ants carrying the fungus */
   infected: number;
   /** mean resistance (immune priming) over living ants */
@@ -132,7 +133,7 @@ function seenTogether(colonies: readonly Colony[]): number {
 
 function side(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, queenLoad: c.queen?.load ?? 0, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
+  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, queenLoad: c.queen?.load ?? 0, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.ownStances ? stanceText(c.stanceCounts()) : c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
@@ -276,4 +277,9 @@ function chapterFor(game: Game): ChapterView {
   const c = game.colonies[k] ?? game.player;
   const f = game.fungus.census(c);
   return chapterOf({ landed: game.landed !== null, colony: colonyName(k), hosts: f.infected, share: f.living ? f.infected / f.living : 0, queenInfected: game.revealed[k] === true, gynes: 0, daughters: 0 });
+}
+
+/** Each ant's own stance, counted (top-down): "3 defend · 12 raid", or "all forage". */
+function stanceText(n: Record<Stance, number>): string {
+  return n.defend || n.raid ? `${n.defend} defend · ${n.raid} raid` : "all forage";
 }

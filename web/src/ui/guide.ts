@@ -111,8 +111,8 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. At food, the ant that didn't start an encounter usually retreats. Fire-ant battles follow a roughly linear law, not Lanchester's square law; narrow, cluttered ground lets a few strong defenders hold off many attackers, open ground favours numbers.",
     inGame:
-      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, or drop its load and run. Without Jev: a carrier takes its load home, raiders and defenders fight, and on a forage stance the rest turn away. Fights are settled by the odds in the cells around, so in a narrow pass only the front ranks meet.",
-    scripted: { bead: "ja-k4k.6", reads: "the colony's stance (forage, defend, raid) comes from colony totals and is broadcast to every ant, and, on the side view, raids aim at the rival's hole by its coordinates (top-down, a scout's trail leads the raiders)" },
+      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, or drop its load and run. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the top-down map an ant defends only while it senses a threat near its own nest; far out it forages. Fights are settled by the odds in the cells around, so in a narrow pass only the front ranks meet.",
+    scripted: { bead: "ja-k4k.6", reads: "on the side view the colony's stance (forage, defend, raid) comes from colony totals and is broadcast to every ant, and raids aim at the rival's hole by its coordinates (top-down, each ant's stance is its own and a scout's trail leads the raiders)" },
     sources: [
       { note: "ant-communication", anchor: "3-rival-colonies", label: "Rival colonies" },
       { note: "combat", anchor: "meeting-a-stranger-fight-flee-or-drop-and-run", label: "Meeting a stranger" },
@@ -246,6 +246,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "tiredness", title: "Tiredness", covers: "When a forager gives up a search and how it recovers." },
   { note: "activation", title: "Activation", covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake." },
   { note: "raid-recruitment", title: "Raid recruitment", covers: "Scouts find a rival and recruit before a raid; encounters at a border recruit; a trail brings the fighters." },
+  { note: "stance", title: "Stance", covers: "Defence as an individual's threshold raised by alarm and encounters; hunger does not raise aggression; crowded colonies raid." },
   { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
