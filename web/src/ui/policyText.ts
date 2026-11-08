@@ -49,7 +49,7 @@ export function byRows<S, A extends string>(rows: readonly RuleRow<S, A>[], othe
 /** The fungus's local rule (fungalPolicy.ts localFungusRule) in words. */
 export const LOCAL_FUNGUS_RULES: string[] = [
   "Groomed, with “groomed hosts hide” on (Details → Lab): hide the fungus (fungus showing: hidden).",
-  "With “cull” on, a host fighting a foreigner: the odour weapon (lethal; only if it is on the menu).",
+  "With “cull” on, a host fighting a foreigner: the odour weapon (lethal; only if it is on the menu and, in the game, your fungus has kept the Odour weapon upgrade).",
   "Otherwise: what the strain was bred for: Garden carries the fungus's odour and tolerates strangers a little (blend); Lockpick calms (soothe); Bloom shares trails (share). Levers off the menu stay as they are.",
 ];
 

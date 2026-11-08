@@ -15,10 +15,16 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 | [activation.md](activation.md) | research + design (MR 5) | Foragers leave when they meet successful foragers coming home (Gordon; Pinter-Wollman 2013; Pless 2015); a leaky count of contacts with a threshold; patrollers start the day; the colony knows its food only as a rate. Basis for the `leave` response and the strategist's `intake`. |
 | [raid-recruitment.md](raid-recruitment.md) | research + design (MR 5.2) | Scouts find a rival nest and recruit before a raid (Polyergus; Temnothorax slave-makers); encounters at a border recruit (honeypot ants, weaver ants). Basis for the `raid` trail and the finder. |
 | [queens-and-merging.md](queens-and-merging.md) | research + design (not built) | Several queens, adoption, and orphaned colonies merging as a route to unification. |
-| [new-queens.md](new-queens.md) | research + design (built: `ja-lo8.7`, `ja-lo8.9`; PRD §50.17) | When a colony rears new queens (size, the queen's pheromone, workers culling gyne larvae); the nuptial flight and claustral founding; the fungus's two levers on queen birth. |
+| [entrances.md](entrances.md) | research (`ja-nzx`) | How many entrances colonies keep (more as they grow, into one entrance chamber: Gordon 2025), nightly sealing and plugging, and the depth cues a digger has (CO₂, moisture, temperature, light). Decision: the crust stays a mechanic; `ja-4h2` deferred. |
+| [one-world.md](one-world.md) | design (not built, `ja-lp4`) | The top-down and side views as two views of one game: the surface (a plane) and a curtain under the line through the nests' holes; a new nest only beyond an end of the line; what changes in the colony code; stages U1–U6. |
+| [new-queens.md](new-queens.md) | research + design (built: `ja-lo8.7`, `ja-lo8.9`; PRD §50.19) | When a colony rears new queens (size, the queen's pheromone, workers culling gyne larvae); the nuptial flight and claustral founding; the fungus's two levers on queen birth. |
 | [fungus-body.md](fungus-body.md) | research + design (built, `ja-lo8.12`) | What the fungus is made of and what its progress rests on: *Metarhizium* living off-host in soil, spores paid out of mycelium (design), adapting in its hosts over passages, diminishing returns; grooming triggered by sensing the pathogen. Basis for the mycelium at the landing and adaptations from growth in hosts. |
 
 The page's **Learn** drawer quotes these notes in its field guide (`web/src/ui/guide.ts`), linking their headings. `guide.test.ts` fails when a cited heading is renamed or a gap the guide calls scripted is closed: update the entry with the note.
+
+## Writing a new note
+
+A new mechanic starts with a note here. The `adding-mechanics` skill ([.claude/skills/adding-mechanics](../.claude/skills/adding-mechanics/SKILL.md)) has the template: findings that each end with **In the game:**, a **Play** section (what the player sees and chooses, the risks to play, the cost), open questions, and Sources under the convention below.
 
 ## Records
 

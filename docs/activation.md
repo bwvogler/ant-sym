@@ -72,6 +72,15 @@ The paper sites (journals.plos.org, pmc.ncbi.nlm.nih.gov, frontiersin.org) were 
 - **The strategist** reads `intake`, food stored per ant per second over the last 60 s, instead of the map's food left.
 - **The side view** is unchanged: a fresh forager still leaves the royal chamber at once (bead `ja-web`).
 
+## Play
+
+- **See:** on the top-down maps, rested foragers mill at the nest's rim and pour out once carriers come home with food; with none returning, a scout leaves now and then (PRD §48.3). The page starts on the side view, where a fresh forager still leaves at once (`ja-web`), so the player doesn't see it there. Learn has no guide entry for it; the Policy tab's small responses give the `leave` rule in words.
+- **Choose:** none. No lever bends the count of returns a waiting ant meets. Levers that change how many carriers come home (`food`, `trail`, `time`) may shift it at second hand; not measured.
+- **Counterplay and progression:** none: it is the colony's nature, and the fungus has no hold on it.
+- **Cost:** the page answers `leave` by the local rule and asks Jev none of it; asked live top-down it was 268 tokens a question (PRD §48.5). The strategist's stance lane reads `intake` at 193 tokens a question, and its answers for the preset doctrines are shipped (PRD §48.5, §50.2). The live check cost $0.0016.
+- **Risks:** a cliff in the scout rate: at 1/180 a second, G′'s worst seed fell to 5 ants alive (PRD §48.4). A legend that doesn't explain a few returns gets "wait", which cost the first colony 11–14 % of its G′ food (PRD §48.5).
+- **Owner decisions needed:** activation in the side view (`ja-web`) or through one world's surface (PRD §51); a Learn entry; whether the fungus should have a lever on this cue, which would need research first.
+
 ## Sources
 
 - Prabhakar, Dektar & Gordon 2012, "The regulation of ant colony foraging activity without spatial information", *PLoS Comput. Biol.* 8:e1002670: https://doaj.org/article/d90b7eebe8b04706ab40c82ac8658ca0 *(index page)* · https://pmc.ncbi.nlm.nih.gov/articles/PMC3426560 · https://engineering.stanford.edu/news/stanford-biologist-and-computer-scientist-discover-anternet *(press)*

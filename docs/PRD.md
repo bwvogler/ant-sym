@@ -3291,7 +3291,7 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 - Jev's spend, caches, Stop and Resume;
 - infection, resistance and unity figures;
 - the world's settings (seed, ground, rival, ants, speed slider, trails);
-- the **lab**: the spore brush and strains, the fungus's menu, hide and cull, and each colony's doctrine, for experiments.
+- the **lab**: the fungus's menu, hide and cull, and each colony's doctrine, for experiments. (The spore brush and strain picker were here until §50.15.)
 
 **Learn** shows doctrines read-only. **Removed:** the lure and alarm brushes, which painted only the first colony's fields.
 
@@ -3620,7 +3620,7 @@ At 4× that is a few seconds of wall time, and the fungus started with every pow
   - **The upgrades,** costed in adaptations, 1–4 a level:
     - Spread: Infectivity (0.12 → 0.15 → 0.23 → 0.3), Persistence (decay 0.03 → 0.012 → 0), Mycelium (capacity 30 → 60 → 120), Fruiting body (0.6 → 1.2 → 2 % of mass a second as spores), Immune evasion (0 → 35 → 70 % of primed resistance slipped past).
     - Reach: Stealth (showing), Senses (starts at one step), Recognition, Trails, Royal (the side view only).
-    - Lethal levers stay on the menu toggle. The 40 adaptations' worth is not all reached in 20 minutes, so what the player chooses matters.
+    - Lethal levers stay on the menu toggle. The 40 adaptations' worth is not all reached in 20 minutes, so what the player chooses matters. (Since §50.16 the lethal levers have upgrades too.)
 - **The minimum dose is a rate** (`FungusParams.minDose` 0.02/s): a clean ant takes no load from a rate below it, at any step. `clear` zeroes only a falling load. At the 0.1 s step this is the old behaviour, and every earlier test passed unchanged.
 - **The queen's retinue:** `queenGroomers` 8. It is a stop-gap; see `ja-k4k.12`. (Since §50.14, in the evolving game only.)
 - **The page.**
@@ -3662,7 +3662,7 @@ At 4× that is a few seconds of wall time, and the fungus started with every pow
 
 `tests/save.test.ts` now lands the fungus evolving, as the page does.
 
-**Beads:** `ja-lo8.12` (this), `ja-k4k.12` (grooming from sensed cues), `ja-260` (the brush's cost, still open: the lab brush is free), `ja-lo8.10` (balance: the colony clawing back).
+**Beads:** `ja-lo8.12` (this), `ja-k4k.12` (grooming from sensed cues), `ja-260` (the brush's cost: closed by §50.15, the brush removed), `ja-lo8.10` (balance: the colony clawing back).
 
 ### 50.13 Mutations that track growth, and parity for founded colonies (ja-lo8.12, 2026-11-07)
 
@@ -3745,8 +3745,121 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
 
 **Tests:** 402 fast tests pass, including 15 in `evolution.test.ts`. Jev cost: unchanged.
 
+### 50.15 No spore brush (ja-260, 2026-11-08)
 
-### 50.15 The local rule while new words are asked (ja-lo8.15, 2026-11-08)
+**The problem.** The lab's spore brush (Details) dosed every ant under a stroke for free, in any game: one drag skipped the weak start, the mycelium and every upgrade (§50.12–14). `ja-260` asked for the brush to cost the fungus, or to be a choice.
+
+**Why not lock it after the landing.** Every game the app plays, started or loaded, lands an evolving fungus at once (`useColony`, `Game.land(…, { evolve: true })`). So there is never a game without one in which a brush could stay free, and a lock would remove the brush anyway.
+
+**Decision (owner):** remove the brush and its strain picker from the app. The fungus reaches the ants only from where it lands.
+
+- `Game.paintSpores` and `Fungus.paint` stay for tests and the scripts (`crown.mjs`, `muddle.mjs`, `fungus-cost.mjs`). The stroke they replay is `BRUSH` in `game.ts` (radius 3, spores 2, dose 0.15), moved from `useColony.ts`; the scripts import it.
+- Gone from the field: the paint gesture, and space+drag to pan while painting.
+- Gone from the lab: the brush and strain buttons. The lab keeps the fungus's menu, hide and cull, and the doctrines.
+- The other strains (Lockpick, Bloom) remain as `STRAINS` entries, used by tests and scripts (and still described in `policyText.ts` and the Learn guide). Nothing in the app lays them now; `ja-lo8.10` decides whether they come back as something the game unlocks.
+- The figures measured with "the UI brush" (§39, §49.4, §50.9) stand. Their harnesses replay the same stroke.
+
+**Tests and cost:** no sim change, so the golden masters and the fast tests stand as they were. Jev cost: unchanged.
+
+**Review (own agent):** nothing blocking. Fixed: the scripts import `BRUSH` instead of copying it; the Learn guide and two research notes (`fungus-policy.md`, `queens-and-merging.md`) no longer send readers to a brush or a lab strain picker; Space on the focused field is still kept from scrolling the page. Filed: the lethal levers (crown, odour weapon) are held to no reach, so a player who turns one on gets it at full strength from the first second (`ja-lo8.16`).
+
+### 50.16 Lethal levers join the progression (ja-lo8.16, 2026-11-08)
+
+**The problem.** The review of #46 found the last free power. `Evolution.reach()` gave a reach only to levers some upgrade named, and no upgrade named the lethal levers (odour weapon, crown). So a player who put one on the menu got it at full strength from the first second, from Jev or from the local rule's cull, while every other lever was held to the reach the fungus had earned (§50.12).
+
+**Built.** Two reach upgrades, after Royal in `UPGRADES`, so that earlier indices and saves keep their meaning:
+
+| Upgrade | Lever | Steps | Cost | Where |
+|---|---|---|---|---|
+| Odour weapon | `weapon` | held off → free | 2,500 | every map |
+| Crown | `crown` | held off → free | 5,000 | the side view only (`nest`, as Royal) |
+
+- **Both are binary levers,** so reach 0 holds one as is (off) and reach 1 frees it. `hold` already did the rest. The hosts (`expressLevels`, which covers Jev's answers and the local rule) and the queen go through `Fungus.held`, so nothing else changed.
+- **Two gates, two meanings.** The menu chip is the player's permission, and the upgrade is the fungus's power. Both are needed.
+- **The page:**
+  - The Fungus panel lists both upgrades in the lethal red.
+  - A followed host shows a held lethal lever as "crown: off (wants on)", with the upgrade to keep, through the ant card's existing hint.
+  - The guide says so in its policy and evolution entries.
+- **Costs are first guesses,** placed among the strongest second levels (2,000–6,000, §50.13). Balance (`ja-lo8.10`) tunes them.
+- **Not held:** a game that does not evolve (the lab's landings, the assays, the tests), and a lab or test preset run with `express`.
+- **Saves:** a version-2 save without these levels loads them at 0 (held off), so `SAVE_VERSION` stays 2. A save from a game with a lethal lever on the menu therefore stops culling or killing queens once loaded, until the player keeps the upgrade.
+
+**Unchanged:**
+- **Jev cost:** no request changed, and reach acts after the answer, so `precache.test` stands.
+- **The golden masters:** they are bit-exact, since games that don't evolve have no reach.
+- **`scripts/progression.mjs`:** its figures stand. Its order buys neither upgrade, and its menu has no lethal lever.
+
+**Tests:**
+- 404 fast tests pass.
+- `evolution.test.ts` has a new test. It checks three things:
+  - every lever has a reach;
+  - weapon and crown start at 0;
+  - on a side world with both on the menu, a host's `estrange` and `regicide` stay 0 until each upgrade is kept, then rise. A game that doesn't evolve holds nothing.
+- It fails when the two upgrades start free.
+
+**Review (own agent): nothing blocking.** The hold covers every path where a lethal lever takes effect. Fixed:
+- **Copy.** The Learn drawer's local rule said the weapon works "only if it is on the menu"; it now also names the upgrade.
+- **Lethal lever on the menu but held off.**
+  - The Learn drawer's lever list now says "lethal, on, held off until you keep …".
+  - The lever chip's tooltip says the same.
+- **A lethal upgrade off the menu.**
+  - The panel marks it "(not on the menu)".
+  - The "mutations to keep" notice now ignores upgrades that would do nothing. It also ignores those the view hides, which was already true of Royal on the top-down view.
+- **A step-level test.** A policy that culls, run through `Fungus.step`, estranges no host until Odour weapon is kept. It fails if the step skips the hold.
+- **Nits.**
+  - The ant card's tooltip names a lethal lever as lethal, and says "its policy wants" rather than "Jev wants".
+  - The guide says "in the game", since the lab's own landings are not held.
+
+## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
+
+The owner asked for the top-down view and the side view to be two views of one game. The side view would be a cut along a line through the nests' holes, zig-zagging as nests are added, and a new nest may not be founded nearer an interior nest's hole, so the line always grows from an end. Today they are two unrelated games, and the Ground control throws the game away to switch (§27 created the split without choosing it).
+
+**Decisions (owner, 2026-11-08):**
+- **Underground is a curtain under the line, not a 3D volume.**
+  - The surface is a 2D plane with today's top-down physics.
+  - Everything underground lives in one vertical sheet under the line, with today's side-view physics, and the side view shows all of it.
+  - A hole is the only way between the two.
+  - A full 3D underground was set aside: depth-times the memory and tick cost, 3D digging and homing, and a side view that would miss tunnels.
+- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it, it is a 2D hole gap from every hole, and the ground is open.
+- **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
+
+**The note's open questions, answered (owner, 2026-11-08):**
+- **Tunnels of neighbouring colonies may meet** in the curtain; the contact response decides. A dig-stop rule would read another nest's position.
+- **A founding flight with no valid landing within her radius fails**, and the game says why. `new-queens.md` §3 is changed to match.
+- **Wide screens get the above/below switch first**; both views at once is a follow-up (`ja-lp4.8`).
+- **After U6 the old side and open maps leave the page**, kept as test beds until their assays are re-baselined.
+
+The founding radius stays open until the research bead (`ja-lp4.7`) gives a figure.
+
+**Cost.** None yet. The mode situation keeps its fields, so one world should not change Jev's cost; U3 checks it with `colony-cost`. Tick cost will rise toward the side view's 7.0–7.3 ms at 1,200 + 1,200 ants (§36, §37); U6 measures it before the page switches.
+
+**Review of #45 (agent, 2026-11-08):** the tick estimate (it had cited the old underground map, not the side view), the founding rule's clearance at the shared vertex and a minimum turn, ties, the hex rasterisation of the line, what growing the line does to the old end's margin, the larder (kept; it no longer makes ants), the 2D hole gap, the curtain's crust and margin, and where the fungus's mycelium lies were corrected in the note.
+
+**The mycelium lives in the soil (owner, 2026-11-08).** Not on the surface: the sun's UV would kill it. In one world it grows in the shaft's soil walls just under the hole, in the curtain, and ants pick it up brushing past; its spores reach the plane only on ants and corpses. Today's game roots it on the open cells by the hole, where ants walk (§50.12); `ja-yo3` moves it into the soil, with UV and habitat sources added to `fungus-body.md` first.
+
+## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
+
+The owner asked whether the side view's undiggable crust could become an ant's own choice, and whether colonies could open new entrances (`ja-nzx`, `ja-4h2`, `ja-lp4.9`). `docs/entrances.md` holds the research:
+- Older, larger harvester colonies keep more entrances, funnelled into one entrance chamber (Gordon 2025).
+- Entrances are sealed at night and plugged by rivals.
+- Soil CO₂, moisture and temperature change with depth, and diggers respond to CO₂ (in a leaf-cutter) and moisture in choice tests; no study shows ants reading depth from them. Light matters only once the soil is open.
+
+No source found says what makes a colony open a new entrance from inside.
+
+**Decisions:**
+- **The crust stays a mechanic.** It keeps the walkway from hanging and the hole from being cut off.
+- **`ja-4h2` is deferred.** The cues exist, but the response that would use them would be invented. It reopens on a source about what triggers a new entrance, or when another behaviour needs a depth sense (for example chamber placement, `ja-k4k.3`).
+- **No vision sense-table row yet.**
+- **Two ideas filed:** new entrances that scale with colony size, into one entrance chamber (noted on `ja-lp4.9`), and closing entrances at night and plugging a rival's (`ja-lsu`, blocked by day and night, `ja-0qs`).
+
+**Review (agent):** corrected the light study's journal, the venting test's citation (Tschinkel 2013), placeholder titles, the fire-ant figure's source (Hays 1986), and an overclaim that ants read depth from the gradients; an untraceable claim on morning sealing was dropped and the evening sealing is sourced to a secondary page.
+
+**Search note.** Web searches on how long an insect-killing fungus survives sunlight (`ja-2qv`) were stopped by a safety filter this session; that research waits for a new session. This note's topic was not affected.
+
+**Cost.** None: docs and beads only.
+
+
+### 50.17 The local rule while new words are asked (ja-lo8.15, 2026-11-08)
 
 **Decision** (owner, 2026-11-08, replacing §50.2's stale fallback where Jev can answer): "we don't use the old values, unless … jev is broken". After the fungus's aim or a colony's doctrine changes, a situation with no answer under the words in force plays the **local rule** until Jev's answer arrives. Answers under earlier words play only while Jev can't run: no server or key, the daily budget spent, the player's Stop, a failed start. A daughter colony (ja-lo8.9) is no different: her mother's answers never stand in for hers. Where Jev can't run, the pen doesn't open and she keeps her mother's words, so the mother's answers are her own.
 
@@ -3761,7 +3874,7 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
 
 **No sim change.** The goldens are untouched; requests and contexts are byte-identical, so tokens per question are unchanged.
 
-### 50.16 Energy and hunger: old ants answer the brood's hunger (ja-xu6, ja-xu6.1, 2026-11-08)
+### 50.18 Energy and hunger: old ants answer the brood's hunger (ja-xu6, ja-xu6.1, 2026-11-08)
 
 **The bug** (`ja-xu6`): in long side-view games, larvae starved beside a full larder. `#port` and `#nurse` refused every old ant (age band 2), so when births stalled the colony aged until nobody carried food to the brood or the queen, and births never restarted.
 
@@ -3820,13 +3933,13 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
 - **Colony lane cost unchanged**: no legend, situation or question changed, so the shipped answers stand.
 - **Checks**: `npm test` 395 pass (the homing test now samples only ants on the ground line, its stated case: a young porter underground searched round a wrongly believed chamber by its nest vector, which the test's surface-vector filter never meant); `test:slow` 16 pass and the same 3 TODOs, of which `ja-3po`'s porter-hold guard now passes (left a TODO until that bead is looked at).
 
-### 50.17 Slice 9: new queens, the flight, the queen's pen (ja-lo8.9, ja-lo8.9.1, 2026-11-08)
+### 50.19 Slice 9: new queens, the flight, the queen's pen (ja-lo8.9, ja-lo8.9.1, 2026-11-08)
 
 **What a player sees.** A colony whose nurses perceive the queen's scent faint rears new queens (gynes). Each ecloses as a winged alate, waits a minute in the nest among her nestmates, walks up and out, and flies. The game pauses. If the fungus is in her, her mother colony's queen was reached, and Jev can read new words, the **queen's pen** opens:
 - the player writes her doctrine (her mother's to start with; the presets as quick picks), the only time a colony's words change (PRD §50);
 - the player picks where she lands (east or west of the hole, 16–96 cells).
 
-Otherwise she founds on her mother's doctrine at once, and a notice says why. Her colony plays the local rule until Jev's answers to new words come (§50.15). Her mother keeps her own words.
+Otherwise she founds on her mother's doctrine at once, and a notice says why. Her colony plays the local rule until Jev's answers to new words come (§50.17). Her mother keeps her own words.
 
 **Research** ([new-queens](new-queens.md) §2–§3, primary sources there):
 - The mated queen holds queen-rearing back through the workers: nurses that sense her pheromone kill sexual larvae, and stop when she is gone (Klobuchar & Deslippe 2002).
@@ -3884,7 +3997,7 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 
 **Cost.**
 - **Fungus lane v8:** the new lever is in the legend and in every worker's question in the side view. Re-shipped (`node scripts/precache.mjs --lanes fungus`): 130 situations per preset aim, 390 answers for **$0.0126** (estimated $0.0114), about 770 real tokens per situation. Under the presets Jev leaves `queenScent` as it is in all but one situation: none of those aims is about queens.
-- As a game asks them (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1; these also carry §50.16's economy change):
+- As a game asks them (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1; these also carry §50.18's economy change):
 
   | Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
   |---|---|---|---|---|---|
@@ -3900,16 +4013,18 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 - Lint: 7 warnings, as on main.
 - End to end (Playwright, the dev server with no key, `/api/health` stubbed as having one so the pen's gate is open, no spend): an infected alate pauses the game and opens the pen; Cautious and Found starts Jade, founding, carrying the fungus, and play resumes. A clean alate founds on Ink's words with the notice, no pen. Dev builds put the game on `window.jevAnts` for such checks.
 
-### 50.18 Merging #43 and #44 into the new-queens branch (2026-11-08)
+### 50.20 Merging #43 and #44 into the new-queens branch (2026-11-08)
 
-`main` gained the fungus's progression (#43, `ja-lo8.12`: §50.12–50.14) and raids (#44) while §50.15–50.17 were built (they were numbered 50.12–50.14 on the branch). The merge:
-- **The royal body:** `#royalLoad` (the queen's and an alate's fungus, §50.17) takes #43's changes to the queen: resistance evaded by the evolving strain, the least dose, mutations from what is caught, the queen's retinue cap (in the evolving game only; an alate is groomed as any host), and the "clear only while falling" rule.
+`main` gained the fungus's progression (#43, `ja-lo8.12`: §50.12–50.14) and raids (#44) while §50.17–50.19 were built (they were numbered 50.12–50.14 on the branch). The merge:
+- **The royal body:** `#royalLoad` (the queen's and an alate's fungus, §50.19) takes #43's changes to the queen: resistance evaded by the evolving strain, the least dose, mutations from what is caught, the queen's retinue cap (in the evolving game only; an alate is groomed as any host), and the "clear only while falling" rule.
 - **A daughter's fungus** goes in #43's `Founding.fungus`, which was left for this slice. So a daughter queen carrying the evolving fungus also roots its mycelium by her hole, and counts as a host.
 - **The queen-scent lever is in the Royal upgrade** with the queen signal (`evolution.ts`): the evolving fungus earns both together, from none to the full range. Without that it would have had the new lever at full range from the start.
 - **Saves:** version 3 (#43 had made it 2).
 - **Checks:** `npm test` 418 pass; `test:slow` 16 pass, 2 TODOs (#43 resolved one); lint 7 warnings; golden masters as merged, bit-exact.
 
-### 50.19 Slice 10: balance (ja-lo8.10, 2026-11-08)
+**A second merge** (#45, #46, #48–#52): `main`'s §50.15 (no spore brush) and §50.16 (lethal levers) came first, so this branch's sections moved to §50.17–50.20. `docs/new-queens.md` now describes gyne rearing and the queen-scent lever as built, not as on an unmerged branch. No code conflicted except `useColony`'s stats type (both fields kept). `npm test` 420 pass; lint 7 warnings.
+
+### 50.21 Slice 10: balance (ja-lo8.10, 2026-11-08)
 
 **No end screen** (owner, 2026-11-08): after the daughter chapter the game stays open. Nothing to build.
 
@@ -3921,8 +4036,8 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 | 2 | 309 s | 346 s | 368 s | 100 % / 0.50 |
 | 3 | 231 s | 247 s | 270 s | 96 % / 0.44 |
 
-- **The queen is reached in 4½–6 minutes in the game.** The "about 20 s" of §50.17 is the lab's landing (an evolved strain at full strength, `lifecycle` assays), not play.
-- **`ja-260` is closed:** the game's spread costs the fungus (§50.12–50.13). The free spore brush is a lab tool in Details.
+- **The queen is reached in 4½–6 minutes in the game.** The "about 20 s" of §50.19 is the lab's landing (an evolved strain at full strength, `lifecycle` assays), not play.
+- **`ja-260` was closed by #46** (§50.15: the spore brush is gone), and the game's spread costs the fungus (§50.12–50.13).
 - **The colony now claws some back** (seed 1 fell from 100 % to 84 % in the last minute, seed 3 dipped to 65 %), which §50.12 left open. Not tuned further here.
 - **Royal**, the upgrade that reaches both queen levers, came 14th in the default order: seed 2 bought it at 753 s; seeds 1 and 3 had not by 900 s. A player who wants new queens buys it sooner.
 
@@ -3955,7 +4070,7 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 
 - **A daughter's first worker goes out 3–4 s after she ecloses** (nanitics), 56 s after the founding.
 - **Confirmed on seeds 11–20** (signal damped): first gyne 206 s (109–302), gynes 3 (1–7), daughters 3 (1–5), the first daughter's workers at 30 min 19 (7–39).
-- **The colony cap still binds** with a lever forced for 30 minutes on most seeds (5 daughters). A player pulls a queen lever for a while, not a whole sitting; `MAX_COLONIES` stays 6.
+- **The colony cap still binds** with a lever forced for 30 minutes on most seeds (5 daughters). A player pulls a queen lever for a while, not a whole sitting; `MAX_COLONIES` stays 6. `ja-lo8.10` stays open for it, the colony's late claw-back and the lethal levers' costs.
 
 **Golden masters bit-exact**: no gyne is reared, no colony founded, in them. The economy is unchanged for a world's own colony (`incipient` is a daughter's only).
 

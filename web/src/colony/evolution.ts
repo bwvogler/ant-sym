@@ -24,7 +24,8 @@
 //   upgrade re-asks nothing and costs no tokens.
 //
 // The start must lose to grooming in the nest (transmission under what four groomers take off a visible host), so that
-// what the player chooses is what takes it in. Lethal levers are not here: the player's menu still gates them (PRD §49).
+// what the player chooses is what takes it in. The lethal levers have upgrades too (ja-lo8.16, PRD §50.16): the player's
+// menu permits one, and the upgrade frees it, so no power comes free.
 
 import { LEVERS, type Reach } from "./levers.ts";
 
@@ -162,7 +163,35 @@ export const UPGRADES: readonly Upgrade[] = [
     reach: [0, 1, 2],
     nest: true,
   },
+  // The lethal levers (ja-lo8.16): on or off, so reach 0 holds one off and 1 frees it. The menu chip is the player's
+  // permission; the upgrade is the fungus's power to act on it. Until then a lethal lever on the menu runs as is.
+  {
+    id: "weapon",
+    kind: "reach",
+    name: "Odour weapon",
+    blurb: "whether a host can smell like nobody's, so its own colony and the others kill it (odour weapon, lethal): only once it is on the menu",
+    steps: ["held off", "free"],
+    costs: [2500],
+    levers: ["weapon"],
+    reach: [0, 1],
+  },
+  {
+    id: "crown",
+    kind: "reach",
+    name: "Crown",
+    blurb: "whether a host can kill the queen and the brood it tends, orphaning the colony (crown, lethal): only once it is on the menu",
+    steps: ["held off", "free"],
+    costs: [5000],
+    levers: ["crown"],
+    reach: [0, 1],
+    nest: true,
+  },
 ];
+
+/** The upgrade that widens lever `id` (every lever has one, ja-lo8.16). */
+export function upgradeFor(lever: string): Upgrade | undefined {
+  return UPGRADES.find((u) => u.levers?.includes(lever));
+}
 
 /** An upgrade by id. */
 export function upgrade(id: string): Upgrade {
@@ -294,7 +323,7 @@ export class Evolution {
     return out;
   }
 
-  /** Each lever's reach at the levels chosen; levers no upgrade names (the lethal ones) keep their full range. */
+  /** Each lever's reach at the levels chosen. Every lever has one (a test pins it), the lethal ones included (ja-lo8.16). */
   reach(): Reach {
     const out: Record<string, number> = {};
     for (const u of UPGRADES) if (u.levers && u.reach) for (const id of u.levers) out[id] = u.reach[this.level(u.id)] as number;

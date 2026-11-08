@@ -65,7 +65,7 @@ spend and time caps from the real `usage.input_tokens` of every reply.
   - The page ships Jev's answer to every ant and strategist situation under each preset doctrine (`web/public/precache/`, `scripts/precache.mjs`), so a first game asks Jev almost nothing. Answers are kept and keep playing when Jev can't run (no key, the spend cap reached, the Pages build); then no policy can be changed.
   - New words don't wipe the board: until Jev answers a situation under them, the earlier words' answer plays, dimmed in the ant card.
   - Each colony's doctrine is its nature, not yours to rewrite. You win when the colonies become one (*unified*) and lose if one falls.
-- **Details** (top right): the colonies' numbers, Jev's spend and caches (Stop and Resume), infection and unity, the world's settings, and the lab: the spore brush and its three strains, the fungus's menu, and each colony's doctrine for experiments.
+- **Details** (top right): the colonies' numbers, Jev's spend and caches (Stop and Resume), infection and unity, the world's settings, and the lab: the fungus's menu and each colony's doctrine, for experiments. There is no spore brush: the fungus reaches the ants only from where it lands (PRD §50.15).
 - **Learn** (top right): a field guide to what is on screen, with what real ants do and
   links to the research notes; the policy (the fungus's aim and menu, which you shape, and
   each colony's doctrine, which you can read), with how each decides and the exact request
