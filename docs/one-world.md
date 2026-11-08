@@ -32,14 +32,14 @@ An ant in the curtain moves with today's side-view physics: the shaft, chambers,
 
 **The surface belongs to the plane alone.** The curtain starts one row below the ground. The ground strip along the top of the side view is drawn from the plane cells under the line, with whichever ants stand on them, so nothing is simulated twice.
 
-**A hole is the only way between the two.** An ant standing on a hole cell on the plane steps down into the curtain at *(s_hole, 0)*, and an ant climbing out of the shaft steps up onto the plane at the hole. The curtain's top row is its crust and is never dug except at a hole. Today `#crust` is a soil cell touching sky; the curtain has no sky, so in one world the crust is simply the curtain's row 0. No other way between the layers exists. A second hole for a colony (polydomy, `queens-and-merging.md` open question 3) would be a later, deliberate act.
+**A hole is the only way between the two.** An ant standing on a hole cell on the plane steps down into the curtain at *(s_hole, 0)*, and an ant climbing out of the shaft steps up onto the plane at the hole. The curtain's top row is its crust and is never dug except at a hole. Today `#crust` is a soil cell touching sky; the curtain has no sky, so in one world the crust is simply the curtain's row 0. No other way between the layers exists. A second hole for a colony (polydomy, `queens-and-merging.md` open question 3) would be a later, deliberate act: breaking through as a sensed choice (`ja-4h2`), then new entrances in one world (`ja-lp4.9`).
 
 **State.** Each ant carries a *layer* (plane or curtain) and its *x, y* in that layer. Each layer has its own copy of:
 - every colony's pheromones;
 - the occupancy grids that fights read;
 - its food: piles on the plane, buried pockets and chamber stores in the curtain.
 
-The fungus's own body, the mycelium it grows where it lands by a hole (`Fungus.root`, PRD §50.12), lies on the plane.
+The fungus's own body, the mycelium it grows where it lands by a hole (`Fungus.root`, PRD §50.12), lies **in the curtain**: in the soil walls of the shaft just under the hole, not on the plane. *Metarhizium* lives in soil and around roots ([fungus-body §1](fungus-body.md#1-growth-without-a-host)), and the owner holds (2026-11-08) that sunlight's UV would kill exposed spores and hyphae; primary sources are pending (`ja-2qv`). Its mass lives in the wall's soil and it sporulates onto the shaft's open cells beside it, so ants pick spores up on every trip in and out. The landing's first spores fall by the hole; after that, its spores reach the plane only on the ants that carry them, and on corpses on the midden. Today's game roots it on the open cells by the hole, the ground ants walk on; that changes with it (`ja-yo3`).
 
 Fights happen within a layer. Two ants in different layers never meet, except across a hole.
 
