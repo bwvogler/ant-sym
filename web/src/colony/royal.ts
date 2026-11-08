@@ -42,6 +42,12 @@ export const GYNE_PANTRY = 2;
 /** A gyne grows this many times as long as a worker, as larva and as pupa (and is fed brood.ts GYNE_FOOD, 3× a worker's). */
 export const GYNE_TIME_X = 2;
 
+/**
+ * Gyne brood (a gyne larva or pupa) or an alate within this many cells keeps a larva from being reared as a gyne: the
+ * nurses there are already feeding a gyne (ja-lo8.10). Env override for tuning: GYNE_SPACING.
+ */
+export const GYNE_SPACING = 2;
+
 /** Seconds an alate stays in the nest after she ecloses before she walks out to fly (where she meets nestmates). */
 export const ALATE_WAIT = 60;
 /** Seconds an alate takes a cell as she walks out. */

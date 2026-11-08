@@ -33,13 +33,15 @@ export interface BroodItem {
   caste: number;
   /** seconds of the caste cue so far (royal.ts): toward a gyne while bipotent, toward a cull once a gyne */
   cue: number;
+  /** laid by a queen founding alone (ja-lo8.10): it ecloses as a nanitic, who forages from the start (colony.ts NANITIC_AGE) */
+  nanitic: boolean;
 }
 
 export class Brood {
   readonly items: BroodItem[] = [];
 
   add(x: number, y: number, chamber: number): BroodItem {
-    const b: BroodItem = { x, y, stage: EGG, t: 0, fed: 0, held: -1, chamber, energy: 1, caste: WORKER, cue: 0 };
+    const b: BroodItem = { x, y, stage: EGG, t: 0, fed: 0, held: -1, chamber, energy: 1, caste: WORKER, cue: 0, nanitic: false };
     this.items.push(b);
     return b;
   }

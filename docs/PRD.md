@@ -3908,3 +3908,57 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 - **The queen-scent lever is in the Royal upgrade** with the queen signal (`evolution.ts`): the evolving fungus earns both together, from none to the full range. Without that it would have had the new lever at full range from the start.
 - **Saves:** version 3 (#43 had made it 2).
 - **Checks:** `npm test` 418 pass; `test:slow` 16 pass, 2 TODOs (#43 resolved one); lint 7 warnings; golden masters as merged, bit-exact.
+
+### 50.19 Slice 10: balance (ja-lo8.10, 2026-11-08)
+
+**No end screen** (owner, 2026-11-08): after the daughter chapter the game stays open. Nothing to build.
+
+**Pace, re-measured on top of #43** (`node scripts/progression.mjs --seeds 1-3 --seconds 900 --evolve`, the Unite aim, the default buying order):
+
+| Seed | A quarter | Half | The queen | Share / resistance at 15 min |
+|---|---|---|---|---|
+| 1 | 222 s | 250 s | 308 s | 84 % / 0.41 |
+| 2 | 309 s | 346 s | 368 s | 100 % / 0.50 |
+| 3 | 231 s | 247 s | 270 s | 96 % / 0.44 |
+
+- **The queen is reached in 4½–6 minutes in the game.** The "about 20 s" of §50.17 is the lab's landing (an evolved strain at full strength, `lifecycle` assays), not play.
+- **`ja-260` is closed:** the game's spread costs the fungus (§50.12–50.13). The free spore brush is a lab tool in Details.
+- **The colony now claws some back** (seed 1 fell from 100 % to 84 % in the last minute, seed 3 dipped to 65 %), which §50.12 left open. Not tuned further here.
+- **Royal**, the upgrade that reaches both queen levers, came 14th in the default order: seed 2 bought it at 753 s; seeds 1 and 3 had not by 900 s. A player who wants new queens buys it sooner.
+
+**Three faults found, and fixed.**
+
+1. **The gyne flood.** With a queen lever forced, nearly every young larva in a chamber with food was reared as a gyne at once. Seed 1, signal damped: 24 of 39 larvae were gyne brood at 240 s, 28 gynes in all, every flight after the fifth lost to the colony cap. Rearing stopped only when the colony hit its cap and the queen stopped laying.
+   - **Fix:** nurses feeding a gyne rear no second beside her. A larva with gyne brood (a gyne larva or pupa) or an alate within `GYNE_SPACING` (2) cells takes no gyne cue (`Colony.#royalNear`).
+   - **Why:** queens develop where larvae get more food (*Myrmica*: Brian's size threshold; *M. brevispinosa*, caste through larval nutrition: [antwiki](https://antwiki.org/wiki/Caste_Determination), [Sex Ratios and Caste Allocation](https://antwiki.org/wiki/Sex_Ratios_and_Caste_Allocation)), and workers tell gyne larvae apart (they cull them: Klobuchar & Deslippe 2002). That nurses round a gyne have no food for a second is the game's own (**design**). An alternative, alates damping rearing with a pheromone of their own, has no support: fire-ant virgin queens make queen pheromone only after shedding their wings (Vargo 1999), and Argentine-ant virgins not at all.
+   - **Seed 1:** spacing 0 (as before), 2, 3, 5 gave 28, 3, 2, 2 gynes. Chosen: 2.
+2. **Daughters shared a chamber.** Holes were kept 8 columns apart (`HOLE_GAP`). A founding chamber reaches up to 7 columns from its hole (the shaft slants about 2.5 over 14 rows, the disc 4.5 more), so daughters that landed by the same default spot dug into each other. Seed 1: queens 2 and 4 laid into and ate from one chamber, and the larder and the chambers' food drifted apart.
+   - **Fix:** `HOLE_GAP` 16.
+   - **Test:** `royal.test`, "dig apart", over three worlds. It fails at 8 (seed 1: two chambers 8.5 apart).
+3. **Daughters didn't grow.**
+   - **The reserve:** 24 food buys 6 eggs (1 each) and 18 for their larvae; with larval energy that is barely enough. In a shared chamber it wasn't, and all 6 starved at 940 s.
+   - **The age bands:** her first workers eclosed young. With no forager, the colony brought in nothing for 10 minutes; a worker is old (foraging) only at 1,260 s of age.
+   - **Fix: nanitics.** Brood laid while the queen founds alone ecloses at `NANITIC_AGE` (the old band's start), so her first workers forage at once, and live shorter.
+   - **Why:** in incipient *Pogonomyrmex rugosus* colonies nanitics take on outside work, pushed out as later nanitics eclose into brood care ([escholarship](https://escholarship.org/content/qt37w2d1mh/qt37w2d1mh.pdf)). Foraging from the first hour is the game's own (**design**).
+   - **Fix: the young colony's queen nurses.** With her nanitics out, nobody fed the next brood. While her colony is `incipient` (from founding until the first worker her workers reared ecloses), the queen feeds the brood by her that no worker tends.
+   - **A rule for every queen strands larvae.** In a world's own colony it failed `slow/economy` (9 and 7 larvae stranded at once, against a bound of 8 and 5): the queen ate into her own laying stock. Hence `incipient`.
+
+**Measured** (the `lifecycle` assays, a solo 600-ant colony, a queen lever forced in every host from the start, 30 minutes; median (min–max) over seeds 1–10):
+
+| Arm | First gyne | Gynes | Flights | Daughters | First daughter's workers at 30 min |
+|---|---|---|---|---|---|
+| None (dilution only) | never | 0 | 0 | 0 | – |
+| Signal damped, before (seeds 1–2) | ~160 s | 28–31 | 28–31 | 5 | 4–10 |
+| Signal damped | 169 s (117–1,577) | 4.5 (1–8) | 4.5 (1–8) | 4.5 (1–5) | 26 (1–40) |
+| Scent damped, before (seeds 1–2) | 28–129 s | 47–69 | – | 5 | – |
+| Scent damped | 37 s (28–129) | 6.5 (4–12) | 6.5 (3–12) | 5 (3–5) | 33.5 (22–66) |
+
+- **A daughter's first worker goes out 3–4 s after she ecloses** (nanitics), 56 s after the founding.
+- **Confirmed on seeds 11–20** (signal damped): first gyne 206 s (109–302), gynes 3 (1–7), daughters 3 (1–5), the first daughter's workers at 30 min 19 (7–39).
+- **The colony cap still binds** with a lever forced for 30 minutes on most seeds (5 daughters). A player pulls a queen lever for a while, not a whole sitting; `MAX_COLONIES` stays 6.
+
+**Golden masters bit-exact**: no gyne is reared, no colony founded, in them. The economy is unchanged for a world's own colony (`incipient` is a daughter's only).
+
+**Checks:** `npm test` 421 pass (3 new in `royal.test`: gyne spacing; daughters dig apart; a daughter raises her first brood beside her sisters; nanitic and incipient asserts in the flight test); `test:slow` 16 pass, 2 TODOs; lint 7 warnings, as on main.
+
+**Cost:** unchanged. No legend, situation or question changed.

@@ -53,8 +53,12 @@ export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts:
 /** Bump when what a save holds changes: an older save is refused, not misread. */
 export const SAVE_VERSION = 3;
 
-/** Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony). */
-export const HOLE_GAP = 8;
+/**
+ * Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony).
+ * A founding chamber reaches up to 7 columns from its hole (the shaft slants at most about 2.5 over its 14 rows, the
+ * chamber's disc 4.5 more), so at 16 two never touch: at 8, daughters landing together shared a chamber (ja-lo8.10).
+ */
+export const HOLE_GAP = 16;
 /** World units between two nests' centres at the least (top-down maps). */
 export const NEST_GAP = 12;
 /** Columns from her mother's hole a flown queen lands by default (Game.landing), and at most (the pen's radius). */
@@ -349,6 +353,7 @@ export class Game {
       // from now on (ja-lo8.9.1); what the fungus put in her is given below (Founding.fungus). (Not when a save founds
       // her again: what she has then is poured back over her, and her chamber isn't there yet.)
       c.founding = true;
+      c.incipient = true;
       c.feed(f.reserve ?? FOUNDING_RESERVE);
       c.odourAim = driftAim(f.odour, this.recognition.params.tolerance);
     }
