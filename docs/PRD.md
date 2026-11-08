@@ -3939,3 +3939,114 @@ Each rule has a mutation that fails a test: drop `met` from `unified`, the quiet
   - **N5:** the save run-on test does not hash unity.
 
 **Cost.** None (no Jev change).
+
+## 54. Each ant's own stance (top-down; ja-k4k.6, ja-d8e, 2026-11-08)
+
+Research basis: `docs/stance.md`. Every figure was read in a search summary, not the paper, so all are **unverified**.
+- **Defence is an individual's threshold.** A pavement-ant worker fights a stranger once an internal state passes a threshold, raised by recent encounters (Hoover et al. 2016; Bubak et al. 2016: octopamine and serotonin). *Pheidole* defence moves closer to the nest as the threat grows.
+- **Hunger does not raise aggression.** Sugar-starved Argentine ants grew less aggressive (Grover et al. 2007); starved and fed colonies were no different (Thomas et al. 2005).
+- **Crowded colonies raid.** Fire-ant brood raiding rose from 0 % to 68.5 % with colony density (Tschinkel et al. 1995). The denser side wins boundary disputes.
+
+### 54.1 What was there
+
+- **A colony-level strategist.** Every 5 s it chose one stance (forage, defend or raid) and told every ant. It read:
+  - food brought home, averaged over 60 s;
+  - deaths in fights, fading over 30 s;
+  - a map scan for strangers near the nest;
+  - size against the cap, and the larder.
+- **Its rule** raided when no food came in, which had no source behind it, or when the larder was full and the colony large.
+- **"Defend"** sent every ant that smelt alarm to fight, wherever it was, and sent every waiting forager out.
+
+### 54.2 What changed (open ground; `stanceGate` 1)
+
+- **Each ant's stance is its own** (`#stanceOf`):
+  - **defend** while its `threat` is past `defendAt` (1) within `homeGround` (10) of its nest. Threat is seconds of alarm smelt or strangers in reach, leaking with a 20 s half-life.
+  - **raid** once recruited.
+  - **forage** otherwise.
+
+  What each stance does is unchanged. `Situation.stance` and `Touch.stance` keep their three values. Defence lingers: 5 s of faint alarm near home keeps an ant defending for about 40 s (half-life 20 s, `defendAt` 1). That is the fading internal state, and is intended.
+- **No strategist on open ground.** The game loop skips it. Its 60 s intake average, 30 s loss decay and map scan are not read there. The side view keeps it (`ja-1a9`).
+- **Raid scouts go on a `leave` answer.** The answers are now/soon/wait/**raid**.
+  - "raid" sends a waiting forager out at `raidScout` (1/90 s) as a raid scout.
+  - `Touch.crowd` (few, many) is how crowded home is, felt by a waiting ant: nestmates in its cell and the six round it over 5 s, "many" from `crowdAt` 40.
+  - Local rule: returns none and crowd many → raid.
+- **No raid without a living rival** (review of #53, S1). With none left, or only kin, the game clears `Colony.raidable`, and neither a "raid" answer nor a raid trail recruits; "raid" is then a wait. This is interim, until the world grows a neighbour (`ja-5hm`, `ja-506`).
+- **The raid trail recruits at home and by degrees.** An idle ant at home that smells it is recruited at `raidRecruit` (0.1/s) × the trail's level (up to strong).
+- **Why "by degrees":**
+  - Recruiting anywhere ran away: G′ seed 1 had 773 of 899 ants raiding.
+  - Recruiting all at once at home made every raid a war: one scout's trail called the 150–200 ants idle there. On G′ seeds 1–4 that lost about 880 ants, against 170 with no raids and main's 800, whatever `crowdAt` (6–80).
+  - Ants differ in threshold (*Pheidole* majors answer only intense recruitment).
+- **Assays.**
+  - A11, A12 and A9 set raiding through the leave response (`RAIDING`, `NEVER_RAID`).
+  - A6's two sides keep the broadcast (`stanceGate` 0): with their own stance, defenders 40 cells from home turned away from the pass.
+  - New A13 `defendHome`: a war party marches on a colony that forages a far pile.
+- **HUD:** top-down, the side stats show how many ants defend and raid.
+
+### 54.3 Results (local rule)
+
+| | This MR | `main` |
+|---|---|---|
+| G′ seeds 1–20: ants alive (median, worst) | **900, 507** | 892, 223 |
+| G′ food stored (median, worst) | **4,406**, 1,912 | 4,274, 1,816 |
+| G′ ants lost (median, worst) | **441**, 870 | 848, 1,113 |
+| Rival: food / lost | 4,536 / 438 | 4,179 / 828 |
+| A11 seeds 1–20 (pass, gain median, worst) | **20/20, 2.65, 1.64** | 16/20, 2.04, 1.32 |
+| A11 seeds 21–40 | **20/20, 3.01, 1.59** | 13/20, 1.84, 0.97 |
+| A13 (pass; food against no war party; against the broadcast) | 15/20; 0.63; broadcast 0.62 | 1/10 at the original mark |
+| A6 (broadcast, the march) | 14/20, gain 1.74 | 14/20, 1.74 |
+| A1–A5b, A9, A12 | as `main`: 20/20 each; A2b 19/20 (seed 15 fails on `main` too) | |
+| A10 | 5/20 (ja-je8) | |
+
+- **No G′ seed ends with fewer ants than on `main`.** Seed 5 stores 13 % less food (4,339 against 5,012).
+- **A13's first mark** (food at least 0.8 of the no-war-party control) failed under both stances: an 80-strong war party forced to fight costs a 200-ant colony 120–130 ants whoever defends. The mark is now relative to the broadcast stance. Defenders near home: 0.27 on average sampled, against the broadcast's whole colony.
+- **Tried:**
+  - a default that never raids: G′ seeds 1–4 lost about 170 ants;
+  - crowd-only raids with recruitment all at once: about 880 lost;
+  - `raidRecruit` 0.02: A11 8/10, worst seed 1.07.
+
+### 54.4 Jev (spent ≈ $0.029 of $0.10)
+
+- **Legends** (colony v7, response v10; the stance lane is unchanged, for the side view):
+  - Stance, on open ground, is the ant's own: "forage, the usual one; defend, only while it smells alarm or meets strangers close to its own nest; or raid, once recruited".
+  - `crowd` is sent to the leave lane with the returns. The leave question gains "raid".
+  - The leave lane's key adds `crowd`.
+- **Two wordings were corrected after replays:**
+  - **"crowd" tied only to raiding.** Cautious and Forage answered "wait" for a crowded home with many foragers coming back, and Warlike raided with food coming back. Cautious's replay stored 1,228 against main's 3,853. Now returns come first: a crowded home with none coming back is the one case left to the doctrine.
+  - **A stance sentence leading with threat and defence.** Cautious answered "return" in 125 of 151 mode situations. Now forage is "the usual one".
+- **A third wording, after review of #53 (D1).** Cautious's mode answers kept rested ants at home with food ahead. A sentence now says caution means going home from danger, not staying home from food.
+- **Live:** `colony-live.mjs all --top`, four full runs at $0.0065–0.0066, plus two leave-only runs and one Cautious mode run (about $0.0024).
+  - Real tokens per question: mode 202, leave 404, contact 262, trail 250.
+  - Caches: `experiments/caches/stance-top-*.json` (7 / 4 / 10). The mode bundles are re-shipped from them (`precache.mjs --import`, 151 answers per doctrine); the stance bundles stand.
+- **Replays,** G′ seeds 1–6, the first colony; `main` is MR 5.2's caches replayed today. The local rule on this branch: 4,207 food, 648 lost.
+
+| Cache | Food | Lost | Before the caution sentence: food | `main`: food | Lost |
+|---|---|---|---|---|---|
+| Forage | 4,018 | 502 | 3,955 | 4,363 | 824 |
+| Cautious | **3,595** | 91 | 2,234 | 3,853 | 592 |
+| Warlike | 3,093 | 641 | 3,467 | 3,472 | 866 |
+
+- **Losses fall under every doctrine.**
+- **Cautious kept rested foragers at home under the second wording** (2,234 food). The cause was in its mode answers: with them removed it stored 4,801 (seeds 1–3); with MR 5.2's answers restored for the 15 situations where they differed, 3,645.
+  - The caution sentence brings it to 3,595, 7 % under `main`'s, with a sixth of its losses. Some sacrifice is the doctrine's (the owner's call on #53).
+  - Some of those situations stay ambiguous on open ground: a "return" situation doesn't say whether the ant is home or walking there.
+- **Warlike fell 11 %** between the two recordings (3,467 to 3,093), with the same losses. Its answer counts barely moved (fight 80 → 82), so that is taken as Jev's run-to-run variance, not the sentence.
+- **The shipped mode answers** are 151 per doctrine, from top-down caches (they were 290, from the side view and top-down). The side view, still on the broadcast stance, will miss more at first and ask live under the daily budget (§50.11).
+
+### 54.5 Cost
+
+Offline estimates (`colony-cost`), on this branch against `main` on the same machine:
+
+| | This branch | `main` |
+|---|---|---|
+| Top-down, mode lane | ~$0.024/h (no stance lane) | ~$0.030/h |
+| Top-down, the six response lanes | ~$0.020/h | ~$0.015/h |
+| Side view, mode | ~671 tok/q, ~$0.102/h | ~652 tok/q, ~$0.099/h |
+| Side view, response lanes | ~$0.127/h | ~$0.117/h |
+
+The longer legends cost a few per cent; the top-down stance lane is gone. The estimates were taken before the last two wording changes, which are within a sentence of them.
+
+### 54.6 Left out
+
+- **The side view** keeps the strategist and raids by coordinates (`ja-1a9`; `ja-k4k.6` stays open for it).
+- **A fight-recruitment signal** (pavement ants' escalation): alarm already draws defenders.
+- **Brood need** as a raid cue (`ja-gkl`).
