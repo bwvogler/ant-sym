@@ -367,7 +367,10 @@ test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at ho
   }
   let atHome = 0;
   let out = 0;
-  for (let i = 1; i < 80; i++) (home(i) ? (atHome += c.recruited[i] as number) : (out += c.recruited[i] as number));
+  for (let i = 1; i < 80; i++) {
+    if (home(i)) atHome += c.recruited[i] as number;
+    else out += c.recruited[i] as number;
+  }
   assert.equal(out, 0, "not out at its work");
   assert.equal(c.recruited[0], 0, "not while carrying");
   // 39 at home over 1 s at 0.5/s: 1 − e^−0.5 ≈ 39 % expected (15); all at once would be 39.
