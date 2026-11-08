@@ -24,21 +24,21 @@
     {
       "lane": "mode",
       "doctrine": "cautious",
-      "context": "colony-v7-0db56476",
+      "context": "colony-v7-5acb0536",
       "file": "mode-cautious.json",
       "answers": 151
     },
     {
       "lane": "mode",
       "doctrine": "forage",
-      "context": "colony-v7-2064b853",
+      "context": "colony-v7-fd7d1c93",
       "file": "mode-forage.json",
       "answers": 151
     },
     {
       "lane": "mode",
       "doctrine": "warlike",
-      "context": "colony-v7-91d9147b",
+      "context": "colony-v7-923dab3b",
       "file": "mode-warlike.json",
       "answers": 151
     },
