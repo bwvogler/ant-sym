@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GYNE, GYNE_FOOD, LARVA, PUPA, WORKER } from "../brood.ts";
-import { Colony, NANITIC_AGE } from "../colony.ts";
+import { Colony, NANITIC_AGE, T_PUPA } from "../colony.ts";
 import { Game, FOUNDING_RESERVE } from "../game.ts";
 import { INFECTED, STRAINS } from "../fungus.ts";
 import { driftAim } from "../recognition.ts";
@@ -313,4 +313,79 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
   const d = g.colonies[1]!;
   assert.ok(g.founded[0]!.reserve! > 1 && g.founded[0]!.reserve! <= ALATE_RESERVE, `her reserve, her body: ${g.founded[0]!.reserve}`);
   assert.ok(d.larder <= ALATE_RESERVE);
+});
+
+/** A daughter colony past founding (her first nanitic out), on a wide map; her workers held far off on the ground each tick. */
+function youngColony() {
+  const map = generateSideWorld(2, { ...SMALL, size: { w: 400, h: 160 } });
+  const g = new Game(map, { antCount: 30, rival: false, autoFound: false }, mulberry32(2 * 7919));
+  g.found(fly(g));
+  const d = g.colonies[1]!;
+  for (let k = 0; k < 30 * 150 && d.founding; k++) g.tick(DT);
+  assert.equal(d.founding, false, "her first worker eclosed");
+  const ch = map.chambers!;
+  cellOf(d.queen!.x, d.queen!.y);
+  const [qx, qy] = [CELL[0] as number, CELL[1] as number];
+  const room = ch.list[ch.at(qx, qy)]!;
+  const away = () => {
+    // Her nanitics are out foraging: none within two cells of her brood.
+    for (let i = 0; i < d.n; i++)
+      if (d.alive[i]) {
+        d.x[i] = d.nest.entrance!.x + 40;
+        d.y[i] = d.nest.entrance!.y;
+      }
+  };
+  return { g, d, room, qx, qy, away };
+}
+
+test("a young colony's queen feeds the brood by her that no worker tends; once a worker her workers reared ecloses, she stops", () => {
+  // PR #54 review, S1: the queen nursing while `incipient` is what lets a daughter grow past her nanitics.
+  const { g, d, room, qx, qy, away } = youngColony();
+  d.brood.items.length = 0;
+  const larva = d.brood.add(qx, qy, room.id);
+  room.brood++;
+  larva.stage = LARVA;
+  room.food += 6;
+  d.larder += 6;
+  g.map.foodTotal += 6;
+  assert.equal(d.incipient, true);
+  for (let k = 0; k < 30 * 2; k++) {
+    away();
+    g.tick(DT);
+  }
+  const fed = larva.fed;
+  assert.ok(fed > 0.2, `fed by the queen: ${fed}`);
+  // A worker reared by her workers (not a nanitic) ecloses: the colony is no longer young, and the queen nurses no more.
+  const pupa = d.brood.add(qx, qy, room.id);
+  room.brood++;
+  pupa.stage = PUPA;
+  pupa.t = T_PUPA;
+  pupa.fed = 3;
+  for (let k = 0; k < 3; k++) {
+    away();
+    g.tick(DT);
+  }
+  assert.equal(d.brood.items.includes(pupa), false, "it eclosed");
+  assert.equal(d.incipient, false);
+  for (let k = 0; k < 30 * 2; k++) {
+    away();
+    g.tick(DT);
+  }
+  assert.ok(Math.abs(larva.fed - fed) < 0.02, `unfed once she is not young: ${fed} then ${larva.fed}`);
+});
+
+test("a nanitic eclosing leaves the colony young", () => {
+  const { g, d, room, qx, qy, away } = youngColony();
+  const pupa = d.brood.add(qx, qy, room.id);
+  room.brood++;
+  pupa.stage = PUPA;
+  pupa.t = T_PUPA;
+  pupa.fed = 3;
+  pupa.nanitic = true;
+  for (let k = 0; k < 3; k++) {
+    away();
+    g.tick(DT);
+  }
+  assert.equal(d.brood.items.includes(pupa), false, "it eclosed");
+  assert.equal(d.incipient, true);
 });

@@ -4081,6 +4081,8 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 - **Confirmed on seeds 11–20** (signal damped, with the free reserve): first gyne 206 s (109–302), gynes 3 (1–7), daughters 3 (1–5), the first daughter's workers at 30 min 19 (7–39).
 - **The colony cap still binds** with a lever forced for 30 minutes on most seeds (5 daughters). A player pulls a queen lever for a while, not a whole sitting; `MAX_COLONIES` stays 6. `ja-lo8.10` stays open for it, the colony's late claw-back and the lethal levers' costs.
 
+**Review of 59eb236** (PR #54): S1, the young queen's nursing had no test that its removal fails. Two tests now pin it (`royal.test`): in a daughter whose nanitics are all out, a larva by the queen is fed while the colony is `incipient` and not once a worker her workers reared ecloses; a nanitic eclosing leaves the colony young. Dropping `incipient` from the nursing rule, or never clearing it, each fails them. N1 (a stale "env override" comment) went in the merge with #47. N2–N4 are as described: the founding queen now stands in for absent nurses rather than adding to them (the same while she is alone), `#royalNear` scans the brood (fine at today's sizes), and `incipient` can outlive a dead queen harmlessly.
+
 **Golden masters bit-exact**: no gyne is reared, no colony founded, in them. The economy is unchanged for a world's own colony (`incipient` is a daughter's only).
 
 **Checks:** `npm test` 421 pass (3 new in `royal.test`: gyne spacing; daughters dig apart; a daughter raises her first brood beside her sisters; nanitic and incipient asserts in the flight test); `test:slow` 16 pass, 2 TODOs; lint 7 warnings, as on main.
