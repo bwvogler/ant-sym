@@ -51,7 +51,16 @@ export const CELL = new Int32Array(2);
 /** Find the cell at world (px, py): into CELL. Cube rounding of the fractional axial coordinates. */
 export function cellOf(px: number, py: number): void {
   const fr = py / R - 0.5;
-  const fq = px - 0.5 - fr / 2;
+  cubeRound(px - 0.5 - fr / 2, fr);
+}
+
+/** The axial q of cell (x, y): its column with the rows' half-cell shift taken out. */
+function axialQ(x: number, y: number): number {
+  return x - ((y - (y & 1)) >> 1);
+}
+
+/** The cell nearest fractional axial (fq, fr): into CELL. Round all three cube coordinates, then mend the worst. */
+function cubeRound(fq: number, fr: number): void {
   const fs = -fq - fr;
   let q = Math.round(fq);
   let r = Math.round(fr);
@@ -73,11 +82,33 @@ export function dirOf(h: number): number {
 
 /** Steps between two cells. */
 export function hexDistance(ax: number, ay: number, bx: number, by: number): number {
-  const aq = ax - ((ay - (ay & 1)) >> 1);
-  const bq = bx - ((by - (by & 1)) >> 1);
+  const aq = axialQ(ax, ay);
+  const bq = axialQ(bx, by);
   const dq = aq - bq;
   const dr = ay - by;
   return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
+}
+
+/**
+ * The cells of the straight line from cell (ax, ay) to cell (bx, by), both included, as flat x, y pairs: one cell per
+ * step, so `hexDistance + 1` cells and each a neighbour of the last. A lerp in cube coordinates, rounded (Red Blob Games'
+ * line drawing), with the same small nudge on both ends, so a line along cell edges always rounds the same way and the
+ * line from b to a is the line from a to b reversed.
+ */
+export function hexLine(ax: number, ay: number, bx: number, by: number): Int32Array {
+  const n = hexDistance(ax, ay, bx, by);
+  const out = new Int32Array(2 * (n + 1));
+  const aq = axialQ(ax, ay) + 1e-6;
+  const ar = ay + 2e-6;
+  const bq = axialQ(bx, by) + 1e-6;
+  const br = by + 2e-6;
+  for (let i = 0; i <= n; i++) {
+    const t = n === 0 ? 0 : i / n;
+    cubeRound(aq + (bq - aq) * t, ar + (br - ar) * t);
+    out[2 * i] = CELL[0]!;
+    out[2 * i + 1] = CELL[1]!;
+  }
+  return out;
 }
 
 const discs = new Map<number, Int16Array[]>();
