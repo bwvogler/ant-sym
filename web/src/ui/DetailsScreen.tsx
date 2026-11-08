@@ -132,9 +132,11 @@ function JevCard({ jev }: Props) {
   const run = jev.state.run;
   const choices = jev.state.hits + jev.state.misses;
   const perHour = run && run.elapsedSeconds > 5 ? (run.usd / run.elapsedSeconds) * 3600 : null;
+  /** today's spend against the server's overall budget (PR #42 review S8) */
+  const budget = jev.budget;
   return (
     <Card label="colony jev" title={<>Jev <Help to={{ tab: "policy", id: "mode" }} label="how Jev decides" /></>}>
-      <p className="mt-1 text-xs text-fg-3">Jev answers each situation once, under each colony's doctrine and your aim, and every ant in that situation takes the answer. The preset doctrines and aims ship with their answers; Jev runs when you write words of your own, and asks only the situations they have no answer for yet. When it can't run, the game plays the answers it already gave, and no policy can be changed.</p>
+      <p className="mt-1 text-xs text-fg-3">Jev answers each situation once, under each colony's doctrine and your aim, and every ant in that situation takes the answer. Answers are kept: the page ships some, and Jev is asked only for a situation that has none yet under the words in force, so a game that meets only answered situations spends nothing. What Jev costs is capped by a daily budget. When it can't run, the game plays the answers it already gave, and no policy can be changed.</p>
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
         {running ? (
           <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised" onClick={jev.stop} title="Stop asking Jev: cached answers keep playing, and policies can't be changed until it runs again">
@@ -145,13 +147,15 @@ function JevCard({ jev }: Props) {
             Resume Jev
           </button>
         )}
-        <div className="min-w-[8rem]">
+        <div className="min-w-[8rem]" aria-label="today's budget">
           <div className="flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-semibold tabular-nums text-fg">{run ? usd(run.usd) : "$0.0000"}</span>
-            <span className="text-xs text-fg-3">{run ? `of $${run.caps.capUsd.toFixed(2)}` : "this run"}</span>
+            <span className="font-mono text-2xl font-semibold tabular-nums text-fg">{budget ? usd(budget.spentUsd) : "$0.0000"}</span>
+            <span className="text-xs text-fg-3">{budget?.usdPerDay != null ? `of $${budget.usdPerDay.toFixed(2)} today` : "today"}</span>
           </div>
-          <Bar value={run && run.caps.capUsd > 0 ? Math.min(1, run.usd / run.caps.capUsd) : 0} warnAt={NEAR_CAP} />
+          <Bar value={budget?.usdPerDay ? Math.min(1, budget.spentUsd / budget.usdPerDay) : 0} warnAt={NEAR_CAP} />
+          {budget?.remainingUsd != null && <span className="text-xs text-fg-3">{usd(budget.remainingUsd)} left</span>}
         </div>
+        <Stat label="this run" value={run ? usd(run.usd) : "—"} />
         <Stat label="avg $ / hour" value={perHour === null ? "—" : `$${perHour.toFixed(3)}`} />
         <Stat label="tokens" value={run ? run.inputTokens.toLocaleString() : "—"} />
         <Stat label="situations asked" value={String(jev.state.asked)} />

@@ -6,7 +6,7 @@ const server = { hasBackend: true, hasKey: true };
 const caps = { capUsd: 0.1, capSeconds: 1800 };
 const off: JevStatus = { phase: "off", run: null, lastError: null };
 const running: JevStatus = { phase: "running", run: { stopReason: null, caps }, lastError: null };
-const stopped = (stopReason: "user" | "spend-cap" | "time-cap" | "formed" | null, lastError: string | null = null): JevStatus => ({ phase: "stopped", run: { stopReason, caps }, lastError });
+const stopped = (stopReason: "user" | "spend-cap" | "time-cap" | "formed" | "budget" | null, lastError: string | null = null): JevStatus => ({ phase: "stopped", run: { stopReason, caps }, lastError });
 
 test("policies can change whenever Jev could run: running, starting, idle, or after a time cap (PR #42 review S6)", () => {
   assert.equal(policyLock(server, running), null);
@@ -30,6 +30,10 @@ test("each lock says why, and the cap reads in dollars", () => {
   assert.match(policyLock({ hasBackend: true, hasKey: false }, off)!, /JEV_API_KEY/);
   assert.match(policyLock(server, stopped("spend-cap"))!, /\$0\.10/);
   assert.match(policyLock(server, stopped("user"))!, /Resume/);
+  // The overall daily budget (PR #42 review S8): spent, nothing more is asked and the editors lock until tomorrow.
+  const spent: JevStatus = { phase: "stopped", run: { stopReason: "budget", caps, budget: { day: "2026-11-07", usdPerDay: 0.1, spentUsd: 0.1, remainingUsd: 0 } }, lastError: null };
+  assert.match(policyLock(server, spent)!, /daily budget \(\$0\.10\) is spent.*until tomorrow/);
+  assert.equal(shouldStart(server, spent, false), false, "a spent budget starts no run");
   assert.match(policyLock(server, { phase: "off", run: null, lastError: "start failed (500)" })!, /start failed \(500\)/);
 });
 

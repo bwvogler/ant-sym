@@ -10,9 +10,9 @@
 // hold in an ant, load passing on by contact. So **mutations** come at a fixed share of its growth (`MUTATION`), and a
 // fungus that grows fast mutates fast. Which mutations it keeps is the player's to choose: they give mutations to the
 // next level of an upgrade, and each level asks more than the one before. That choosing is the game's licence (owner,
-// PRD §50.12): real mutations are random and selection keeps what works, and real adaptation speeds up far less than
+// PRD §50.13): real mutations are random and selection keeps what works, and real adaptation speeds up far less than
 // replication does (docs/fungus-body.md §3). The rising costs stand in for that. The numbers are design, tuned on
-// `node scripts/progression.mjs` (PRD §50.11–12).
+// `node scripts/progression.mjs` (PRD §50.12–13).
 //
 // Upgrades are of two kinds:
 // - **Spread**, its body: infectivity (the strain's transmission), persistence (how little a host clears on its own),

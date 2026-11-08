@@ -1,4 +1,4 @@
-import { DEFAULT_CAPS, DEFAULT_IN_FLIGHT, USD_PER_INPUT_TOKEN, type RunCaps, type RunSummary, type StopReason } from "../shared/jev.ts";
+import { DEFAULT_CAPS, DEFAULT_IN_FLIGHT, USD_PER_INPUT_TOKEN, type Budget, type RunCaps, type RunSummary, type StopReason } from "../shared/jev.ts";
 
 // The spend ledger: one run at a time, real tokens only. The browser decides
 // *when* to stop for "formed"; the server enforces the spend and time caps so
@@ -35,9 +35,26 @@ export function reserveForBytes(bytes: number, ceiling = RESERVE_TOKENS): number
   return Math.min(ceiling, Math.max(1, Math.ceil(bytes / RESERVE_BYTES_PER_TOKEN)));
 }
 
+/** Where the day's spend outlives the server process (a file, for the dev server); absent, it lives in memory. */
+export interface BudgetStore {
+  load(): { day: string; tokens: number } | null;
+  save(v: { day: string; tokens: number }): void;
+}
+
+/** The UTC day of a clock reading, YYYY-MM-DD: the budget's unit. */
+export function dayOf(now: number): string {
+  return new Date(now).toISOString().slice(0, 10);
+}
+
 export interface LedgerOptions {
   maxInFlight?: number;
   reserveTokens?: number;
+  /**
+   * The overall budget (PR #42 review S8): dollars per UTC day across every run, every reply billed, including replies
+   * landing after their run ended. Absent: none (each run's own caps only).
+   */
+  dailyUsd?: number;
+  budgetStore?: BudgetStore;
   /** Injected so the time-cap timer can be driven by hand in tests. */
   timer?: Timer;
 }
@@ -71,7 +88,7 @@ export interface InFlightToken {
   reserved: number;
 }
 
-export type Admission = { ok: true } | { ok: false; reason: "not-running" | "spend-cap" | "time-cap" | "busy" };
+export type Admission = { ok: true } | { ok: false; reason: "not-running" | "spend-cap" | "time-cap" | "busy" | "budget" };
 
 export class Ledger {
   #caps: RunCaps = { ...DEFAULT_CAPS };
@@ -92,11 +109,42 @@ export class Ledger {
   readonly #maxInFlight: number;
   readonly #reserveTokens: number;
   readonly #timer: Timer;
+  readonly #dailyUsd: number;
+  readonly #store: BudgetStore | null;
+  /** the day the budget's figures are for, and the tokens billed on it, across runs */
+  #day = "";
+  #dayTokens = 0;
 
   constructor(opts: LedgerOptions = {}) {
     this.#maxInFlight = opts.maxInFlight ?? DEFAULT_IN_FLIGHT;
     this.#reserveTokens = opts.reserveTokens ?? RESERVE_TOKENS;
     this.#timer = opts.timer ?? realTimer;
+    this.#dailyUsd = opts.dailyUsd !== undefined && Number.isFinite(opts.dailyUsd) ? Math.max(0, opts.dailyUsd) : Infinity;
+    this.#store = opts.budgetStore ?? null;
+    const saved = this.#store?.load() ?? null;
+    if (saved && typeof saved.day === "string" && Number.isFinite(saved.tokens)) {
+      this.#day = saved.day;
+      this.#dayTokens = Math.max(0, saved.tokens);
+    }
+  }
+
+  /** A new day: the budget starts again. */
+  #roll(now: number): void {
+    const d = dayOf(now);
+    if (d === this.#day) return;
+    this.#day = d;
+    this.#dayTokens = 0;
+  }
+
+  /** Dollars billed today, across runs. */
+  get spentToday(): number {
+    return this.#dayTokens * USD_PER_INPUT_TOKEN;
+  }
+
+  #budget(now: number): Budget {
+    this.#roll(now);
+    const limited = Number.isFinite(this.#dailyUsd);
+    return { day: this.#day, usdPerDay: limited ? this.#dailyUsd : null, spentUsd: this.spentToday, remainingUsd: limited ? Math.max(0, this.#dailyUsd - this.spentToday) : null };
   }
 
   /** The ceiling held back per in-flight call whose size is not given. */
@@ -131,6 +179,9 @@ export class Ledger {
     this.#timer.clear(this.#timeCap);
     const capMs = this.#caps.capSeconds * 1000;
     this.#timeCap = this.#timer.set(() => this.stop("time-cap", now + capMs), capMs);
+    // Today's budget already spent: the run ends as it starts, and says why.
+    this.#roll(now);
+    if (this.spentToday >= this.#dailyUsd) return this.stop("budget", now);
     return this.summary(now);
   }
 
@@ -163,6 +214,11 @@ export class Ledger {
    */
   admit(now: number, reserveHint?: number): Admission {
     if (!this.running) return { ok: false, reason: "not-running" };
+    this.#roll(now);
+    if (this.spentToday >= this.#dailyUsd) {
+      this.stop("budget", now);
+      return { ok: false, reason: "budget" };
+    }
     if (this.usd >= this.#caps.capUsd) {
       this.stop("spend-cap", now);
       return { ok: false, reason: "spend-cap" };
@@ -173,10 +229,13 @@ export class Ledger {
     }
     if (this.#inFlight >= this.#maxInFlight) return { ok: false, reason: "busy" };
     const reserved = (this.#reservedInFlight + this.reserveFor(reserveHint)) * USD_PER_INPUT_TOKEN;
-    if (this.usd + reserved > this.#caps.capUsd) {
+    const overCap = this.usd + reserved > this.#caps.capUsd;
+    const overBudget = this.spentToday + reserved > this.#dailyUsd;
+    if (overCap || overBudget) {
       if (this.#inFlight > 0) return { ok: false, reason: "busy" };
-      this.stop("spend-cap", now);
-      return { ok: false, reason: "spend-cap" };
+      const reason = overBudget ? "budget" : "spend-cap";
+      this.stop(reason, now);
+      return { ok: false, reason };
     }
     return { ok: true };
   }
@@ -192,6 +251,11 @@ export class Ledger {
   /** Record a finished call. Tokens are the real usage.input_tokens of the reply. A token from an earlier run is ignored. */
   end(token: InFlightToken, result: CallResult): void {
     const tokens = Math.max(0, result.inputTokens);
+    if (!result.aborted && tokens > 0) {
+      // Billed, whichever run it belongs to: today's budget counts it.
+      this.#dayTokens += tokens;
+      this.#store?.save({ day: this.#day, tokens: this.#dayTokens });
+    }
     if (token.runId !== this.#runId) {
       // A call from a run that has since been replaced: its slot and reservation went with that run, but it was billed.
       if (!result.aborted) this.#sessionTokens += tokens;
@@ -239,6 +303,7 @@ export class Ledger {
       statuses: { ...this.#statuses },
       remainingUsd: Math.max(0, this.#caps.capUsd - this.usd),
       remainingSeconds: this.running ? Math.max(0, round(this.#caps.capSeconds - elapsed, 1)) : 0,
+      budget: this.#budget(now),
     };
   }
 }

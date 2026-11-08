@@ -1,4 +1,4 @@
-// Offline: how the fungus game paces (ja-lo8.12, PRD §50.11). The app's setup (side world, 600 + 600 ants, regrowth,
+// Offline: how the fungus game paces (ja-lo8.12, PRD §50.12). The app's setup (side world, 600 + 600 ants, regrowth,
 // gameRng(seed)), the landing by colony 0's hole, and the fungus policy from the page's shipped answers under a preset aim
 // (web/public/precache/fungus-<aim>.json; a situation not shipped plays the strain's default, as on the page while Jev
 // is asked). With --evolve the game's fungus starts weak and chooses upgrades as a player might: the first in the

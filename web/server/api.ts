@@ -1,9 +1,12 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
-import { DEFAULT_JEV_MODEL, type JevProxyReply, type JevRequest, type RunCaps } from "../shared/jev.ts";
+import { DAILY_BUDGET_USD, DEFAULT_JEV_MODEL, type JevProxyReply, type JevRequest, type RunCaps } from "../shared/jev.ts";
 import { HttpError, methodNotAllowed, readJsonBody, sendJson } from "./http.ts";
 import { DEFAULT_IN_FLIGHT, JevAbortError, JevClient, type JevCaller } from "./jev.ts";
-import { Ledger, reserveForBytes } from "./ledger.ts";
+import { Ledger, reserveForBytes, type BudgetStore } from "./ledger.ts";
 
 // The whole "backend": dev-server-only middleware on the Vite server, in the
 // shape of lingo-dojo / Atlas. Single-user, localhost, no auth by design. The
@@ -88,13 +91,47 @@ export interface Services {
   now: () => number;
 }
 
-/** The real services from the environment: key, in-flight width (JEV_IN_FLIGHT), one ledger sized to match. */
-export function buildServices(env: NodeJS.ProcessEnv): Services & { inFlight: number } {
+/** Where the dev server keeps the day's spend, so the budget holds across restarts: the repo's gitignored data/. */
+export const BUDGET_FILE = fileURLToPath(new URL("../../data/jev-budget.json", import.meta.url));
+
+/** The day's spend in a small JSON file. A missing or unreadable file is a fresh day; a failed write is only logged. */
+export function fileBudgetStore(path: string): BudgetStore {
+  return {
+    load: () => {
+      try {
+        return JSON.parse(readFileSync(path, "utf8")) as { day: string; tokens: number };
+      } catch {
+        return null;
+      }
+    },
+    save: (v) => {
+      try {
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, JSON.stringify(v));
+      } catch (e) {
+        console.warn(`[jev-ants] could not save the day's Jev spend: ${(e as Error).message}`);
+      }
+    },
+  };
+}
+
+/** The daily budget from JEV_DAILY_USD (dollars, ≥ 0), else DAILY_BUDGET_USD. */
+export function dailyBudget(env: NodeJS.ProcessEnv): number {
+  const v = Number(env.JEV_DAILY_USD);
+  return env.JEV_DAILY_USD !== undefined && env.JEV_DAILY_USD !== "" && Number.isFinite(v) && v >= 0 ? v : DAILY_BUDGET_USD;
+}
+
+/**
+ * The real services from the environment: key, in-flight width (JEV_IN_FLIGHT), one ledger sized to match, with the
+ * overall daily budget (JEV_DAILY_USD; PR #42 review S8) kept in BUDGET_FILE.
+ */
+export function buildServices(env: NodeJS.ProcessEnv, budgetFile = BUDGET_FILE): Services & { inFlight: number } {
   const apiKey = env.JEV_API_KEY ?? "";
   const asked = Number(env.JEV_IN_FLIGHT);
   const inFlight = Number.isFinite(asked) && asked !== 0 ? Math.max(1, Math.min(DEFAULT_IN_FLIGHT, Math.trunc(asked))) : DEFAULT_IN_FLIGHT;
   const client = apiKey ? new JevClient({ apiKey, maxSockets: inFlight }) : null;
-  return { client, ledger: new Ledger({ maxInFlight: inFlight }), now: () => Date.now(), inFlight };
+  const ledger = new Ledger({ maxInFlight: inFlight, dailyUsd: dailyBudget(env), budgetStore: fileBudgetStore(budgetFile) });
+  return { client, ledger, now: () => Date.now(), inFlight };
 }
 
 export function makeHandlers(svc: Services) {

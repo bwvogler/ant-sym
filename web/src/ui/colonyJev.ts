@@ -1,4 +1,4 @@
-import { DEFAULT_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
+import { GAME_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
 import { apiUrl } from "./backend.ts";
 import { localPolicy, localStance, MODES, STANCES, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
@@ -28,18 +28,15 @@ export interface ColonyJevOptions {
   intervalMs: number;
   /** milliseconds a gathering lane (the fungus's) lets its queue fill before sending a part-full request */
   gatherMs: number;
-  /**
-   * Words whose answers ship with the page (the preset doctrines and aims): a situation with no answer under them is
-   * never asked, even while a run is on. Jev is asked only for words the player wrote (owner, PR #42 review S6): under
-   * a preset, an unanswered situation plays an earlier answer or the local rule, free.
-   */
-  shipped: ReadonlySet<string>;
 }
 
-export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: FUNGUS_GATHER_MS, shipped: new Set() };
+export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: FUNGUS_GATHER_MS };
 
-/** The caps a colony run starts with: $0.10 and 30 minutes (the server's default too). */
-export const COLONY_CAPS: RunCaps = DEFAULT_CAPS;
+/**
+ * The caps a game's run starts with: none that bind (GAME_CAPS). A run stays open from the first miss until the page
+ * closes, and the server's overall daily budget is the ceiling on spend (PR #42 review S8).
+ */
+export const COLONY_CAPS: RunCaps = GAME_CAPS;
 
 /** Where cached answers outlive the page; injectable so tests need no localStorage. */
 export interface CacheStore {
@@ -190,6 +187,12 @@ export class ColonyJev {
   #listeners = new Set<Listener>();
   #state: ColonyJevState = { phase: "off", run: null, asked: 0, stancesAsked: 0, requests: 0, hits: 0, misses: 0, cached: 0, stancesCached: 0, doctrineCached: [], fungusAsked: 0, fungusCached: 0, failures: 0, lastError: null };
 
+  /**
+   * Called when a situation has no answer under the current words and no run is on (S7): the page starts one if Jev
+   * can run (policyLock.shouldStart). Called on every such miss, so it must be cheap.
+   */
+  wantsRun: (() => void) | null = null;
+
   constructor(opts: Partial<ColonyJevOptions> = {}, store: CacheStore | null = null) {
     this.opts = { ...DEFAULT_COLONY_JEV, ...opts };
     this.#store = store;
@@ -248,7 +251,8 @@ export class ColonyJev {
    * The answer for situation s in lane l: Jev's cached answer whenever there is one, run or no run (the fungus game,
    * ja-lo8.2: the game plays on what Jev already answered, and asks only when the player changes a policy); else an earlier
    * answer under words this lane had before (stale, ja-lo8.3); else the local rule. While a run is on, a situation with
-   * no current answer is queued to be asked, unless the lane's words are a shipped preset's (opts.shipped).
+   * no current answer is queued to be asked, under any words, preset or the player's own; while none is, the miss is
+   * told to `wantsRun`, which may start one (PR #42 review S7: spend nothing while every situation met is cached).
    */
   #lookup<S, A extends string>(l: Lane<S, A>, s: S): A {
     if (l.asks && !l.asks(s)) return l.local(s);
@@ -260,7 +264,8 @@ export class ColonyJev {
       else this.#state.misses++;
     }
     if (hit) return hit;
-    if (running && !this.opts.shipped.has(l.words) && !this.#asking.has(askKey(l.context, key)) && !l.queue.has(key)) {
+    if (!running) this.wantsRun?.();
+    if (running && !this.#asking.has(askKey(l.context, key)) && !l.queue.has(key)) {
       if (l.queue.size === 0) l.since = Date.now();
       l.queue.set(key, s);
     }
@@ -458,6 +463,11 @@ export class ColonyJev {
       // stop ends whatever run is current, so if a later Start has begun, that run is the later one's: leave it alone.
       if (startNo !== this.#starts) return;
       void fetch(apiUrl("api/run"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "stop" }) }).catch(() => {});
+      return;
+    }
+    if (run.running === false) {
+      // The server ended the run as it started: today's budget is spent (S8). Nothing is asked; the game plays on.
+      this.#set({ phase: "stopped", run });
       return;
     }
     this.#runSeq++;
