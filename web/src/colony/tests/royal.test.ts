@@ -5,7 +5,7 @@ import { Colony, NANITIC_AGE } from "../colony.ts";
 import { Game, FOUNDING_RESERVE } from "../game.ts";
 import { INFECTED, STRAINS } from "../fungus.ts";
 import { driftAim } from "../recognition.ts";
-import { ALATE_WAIT, CULL_CUE, GYNE_CUE, GYNE_SPACING, scentShare } from "../royal.ts";
+import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, GYNE_SPACING, scentShare, type Flight } from "../royal.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { digCell, generateSideWorld, mulberry32, OPEN, rockAt } from "../world.ts";
 
@@ -154,7 +154,7 @@ function flying(paint = false) {
     // Every ant dosed: the alate picks it up from the nestmates around her.
     for (let i = 0; i < c.n; i++) if (c.alive[i]) g.paintSpores(c.x[i] as number, c.y[i] as number, 0.5, 0, 0.8, garden);
   }
-  c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: ALATE_WAIT - 5, step: 0, load: 0, strain: 0, resist: 0 });
+  c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: ALATE_WAIT - 5, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
   return { g, c };
 }
 
@@ -211,17 +211,23 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
   const map = generateSideWorld(2, SMALL);
   const g = new Game(map, { antCount: 60, rival: false, autoFound: false }, mulberry32(2 * 7919));
   const c = g.player;
-  c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: ALATE_WAIT, step: 0, load: 0, strain: 0, resist: 0 });
-  c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: 0, step: 0, load: 0, strain: 0, resist: 0 });
+  c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: ALATE_WAIT, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
+  c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: 0, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
   for (let k = 0; k < 30 * 120 && !g.flights.length; k++) g.tick(DT);
   assert.equal(g.flights.length, 1);
   assert.equal(g.colonies.length, 1, "nothing founded yet");
   const site = g.landing(0);
   assert.ok(site, "a landing site");
   const saved = JSON.parse(JSON.stringify(g.save()));
-  const k = g.found(g.flights[0]!, site);
+  const f = g.flights[0]!;
+  const k = g.found(f, site);
   assert.equal(k, 1);
   assert.equal(g.flights.length, 0);
+  // A flight founds once: again, it is no longer pending (PR #47 review, S2).
+  const food = g.map.foodTotal;
+  assert.equal(g.found(f, site), -1);
+  assert.equal(g.colonies.length, 2);
+  assert.equal(g.map.foodTotal, food, "no second reserve");
   // The save from before: its flight is still waiting, and the second alate is still in the nest.
   const h = new Game(generateSideWorld(2, SMALL), { antCount: 60, rival: false, autoFound: false }, mulberry32(2 * 7919));
   h.load(saved);
@@ -244,11 +250,18 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
   assert.deepEqual(again.player.alates, g.player.alates);
 });
 
+/** A pending flight from colony 0, already as fat as an alate gets (Game.found takes only pending flights). */
+function fly(g: Game): Flight {
+  const f: Flight = { mother: 0, x: 0, y: 0, load: 0, strain: 0, at: g.time, food: ALATE_RESERVE };
+  g.flights.push(f);
+  return f;
+}
+
 test("daughters landing together dig apart: their founding chambers never touch, and each queen lies in her own (ja-lo8.10)", () => {
   for (const seed of [1, 2, 3]) {
     const map = generateSideWorld(seed, { ...SMALL, size: { w: 400, h: 160 } });
     const g = new Game(map, { antCount: 30, rival: false, autoFound: false }, mulberry32(seed * 7919));
-    for (let k = 0; k < 4; k++) assert.ok(g.found({ mother: 0, x: 0, y: 0, load: 0, strain: 0, at: 0 }) > 0, `seed ${seed}: daughter ${k} founded`);
+    for (let k = 0; k < 4; k++) assert.ok(g.found(fly(g)) > 0, `seed ${seed}: daughter ${k} founded`);
     const ch = g.map.chambers!;
     const nests = g.map.nests.filter((n) => n.entrance);
     // Founding chambers are discs of r + 1.5 round each nest's centre: apart by both radii, no cell is in both.
@@ -268,7 +281,36 @@ test("daughters landing together dig apart: their founding chambers never touch,
 test("a daughter raises her first brood on her own reserve, beside her sisters", () => {
   const map = generateSideWorld(2, { ...SMALL, size: { w: 400, h: 160 } });
   const g = new Game(map, { antCount: 30, rival: false, autoFound: false }, mulberry32(2 * 7919));
-  for (let k = 0; k < 3; k++) g.found({ mother: 0, x: 0, y: 0, load: 0, strain: 0, at: 0 });
+  for (let k = 0; k < 3; k++) g.found(fly(g));
   for (let k = 0; k < 30 * 150; k++) g.tick(DT);
   for (const d of g.colonies.slice(1)) assert.equal(d.founding, false, `nest ${d.params.nest}: a first worker`);
+});
+
+test("food is conserved through gynes, flights and foundings: an alate's body (her egg, her larval food, what she is fed waiting) is her daughter's reserve", () => {
+  // PR #47 review, S1: the reserve was 24 food from nowhere. Nurses that perceive no scent rear gynes; they fatten, fly and found.
+  const map = generateSideWorld(2, SMALL);
+  const g = new Game(map, { antCount: 60, rival: false }, mulberry32(2 * 7919));
+  const c = g.player;
+  let worst = 0;
+  const books = () => {
+    let s = map.foodLeft;
+    for (const d of g.colonies) {
+      for (let i = 0; i < d.n; i++) if (d.alive[i] && d.carrying[i]) s += 1;
+      s += d.larder + 4 * d.births + d.eaten;
+      for (const b of d.brood.items) s += 1 + b.fed;
+    }
+    return Math.abs(s - map.foodTotal);
+  };
+  let founded = -1;
+  for (let k = 0; k < 30 * 400 && (founded < 0 || g.time < founded + 30); k++) {
+    c.scentGain.fill(0.001);
+    g.tick(DT);
+    if (founded < 0 && g.colonies.length > 1) founded = g.time;
+    if (k % 30 === 0) worst = Math.max(worst, books());
+  }
+  assert.ok(founded > 0, "a daughter was founded");
+  assert.ok(worst < 1e-6, `food drifted by ${worst}`);
+  const d = g.colonies[1]!;
+  assert.ok(g.founded[0]!.reserve! > 1 && g.founded[0]!.reserve! <= ALATE_RESERVE, `her reserve, her body: ${g.founded[0]!.reserve}`);
+  assert.ok(d.larder <= ALATE_RESERVE);
 });

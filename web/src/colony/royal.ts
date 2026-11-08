@@ -44,10 +44,17 @@ export const GYNE_TIME_X = 2;
 
 /**
  * Gyne brood (a gyne larva or pupa) or an alate within this many cells keeps a larva from being reared as a gyne: the
- * nurses there are already feeding a gyne (ja-lo8.10). Env override for tuning: GYNE_SPACING.
+ * nurses there are already feeding a gyne (ja-lo8.10).
  */
 export const GYNE_SPACING = 2;
 
+/**
+ * The most food an alate carries out (her body: the egg, what she was fed as a larva, and what nestmates feed her while
+ * she waits), and so the most her daughter colony founds on (Game.found). Alates fatten in the nest before the flight.
+ */
+export const ALATE_RESERVE = 24;
+/** Food a second nestmates feed a waiting alate from the chamber she is in (two or more of them by her; fewer, less). */
+export const ALATE_FEED = 0.5;
 /** Seconds an alate stays in the nest after she ecloses before she walks out to fly (where she meets nestmates). */
 export const ALATE_WAIT = 60;
 /** Seconds an alate takes a cell as she walks out. */
@@ -65,6 +72,8 @@ export interface Alate {
   load: number;
   strain: number;
   resist: number;
+  /** her body, in food (up to ALATE_RESERVE): out of her mother's economy, it is what her daughter founds on */
+  food: number;
 }
 
 /** An alate that has flown from colony `mother`'s hole (Game takes it from Colony.flown). */
@@ -75,6 +84,8 @@ export interface Flight {
   load: number;
   strain: number;
   at: number;
+  /** her body, in food (Alate.food): her daughter's reserve */
+  food: number;
 }
 
 /**

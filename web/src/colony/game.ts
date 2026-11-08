@@ -8,7 +8,7 @@ import type { Responses } from "./responses.ts";
 import { foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { cellOf, CELL } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
-import type { Flight } from "./royal.ts";
+import { ALATE_RESERVE, type Flight } from "./royal.ts";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
 // The player is neither: the player is the fungus (fungus.ts). `player` and
@@ -63,8 +63,11 @@ export const HOLE_GAP = 16;
 export const NEST_GAP = 12;
 /** Columns from her mother's hole a flown queen lands by default (Game.landing), and at most (the pen's radius). */
 export const FLIGHT = { land: 48, radius: 96 };
-/** Food in a founding queen's chamber (ja-lo8.9): her body's reserve, for herself and her first brood (claustral founding). */
-export const FOUNDING_RESERVE = 24;
+/**
+ * Food in a founding queen's chamber at the most (ja-lo8.9): her body's reserve, for herself and her first brood
+ * (claustral founding). A flight founds on her own body (Flight.food), fattened in the nest up to this.
+ */
+export const FOUNDING_RESERVE = ALATE_RESERVE;
 /** Colonies on a map at the most: an alate that flies once there are this many is lost (most founding queens fail). */
 export const MAX_COLONIES = 6;
 
@@ -291,15 +294,18 @@ export class Game {
 
   /**
    * Found flight f's colony with its queen landed at (x, y) (default: landing()): a daughter of its mother (addColony
-   * with `mother`). Returns the new colony's index, or −1 when she is lost: no room, or MAX_COLONIES already.
+   * with `mother`). Returns the new colony's index, or −1 when she is lost: no room, MAX_COLONIES already, or f is not
+   * a pending flight (already founded or lost: PR #47 review, S2).
    */
   found(f: Flight, at: { x: number; y: number } | null = this.landing(f.mother)): number {
+    if (!this.flights.includes(f)) return -1;
     this.#dropFlight(f);
     const mother = this.colonies[f.mother];
     if (!at || !mother || this.colonies.length >= MAX_COLONIES) return -1;
-    // Her reserve is new food on the map (her body, which the mother's food count let go at her eclosion).
-    this.map.foodTotal += FOUNDING_RESERVE;
-    return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: FOUNDING_RESERVE, ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}) });
+    // Her reserve is her body (Flight.food), which left her mother's economy as she ate it (Colony.eaten): it comes back
+    // onto the map's books in her colony's larder, so the food in the world is unchanged (PR #47 review, S1).
+    this.map.foodTotal += f.food;
+    return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: f.food, ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}) });
   }
 
   /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
@@ -537,7 +543,7 @@ export class Game {
     this.colonies.forEach((c, k) => {
       if (!c.flown.length) return;
       for (const a of c.flown) {
-        const f: Flight = { mother: k, x: a.x, y: a.y, load: a.load, strain: a.strain, at: this.time };
+        const f: Flight = { mother: k, x: a.x, y: a.y, load: a.load, strain: a.strain, at: this.time, food: a.food };
         this.flights.push(f);
         if (this.params.autoFound) this.found(f);
       }
