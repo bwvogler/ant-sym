@@ -52,7 +52,7 @@ PR #<n> (<head sha7> on <base>) — <first review | re-review since <sha7>>
 - [ ] 4. Check: fast-checks.sh (tsc, test, lint vs main, build, goldens, versions)
 - [ ] 5. Verify: mutations, measurements, every blocker re-read in code
 - [ ] 6. Post: one review (COMMENT), body = whole review + footer, inline suggestions for one-liners
-- [ ] 7. Relay: owner summary; decisions → comment edit + beads
+- [ ] 7. Relay: owner summary; decisions → short PR comment + beads
 - [ ] 8. Clean up: worktrees gone, jsonl reverted, git status clean
 ```
 
