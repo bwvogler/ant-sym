@@ -80,6 +80,36 @@ export function hexDistance(ax: number, ay: number, bx: number, by: number): num
   return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
 }
 
+/**
+ * The cells of the straight line from cell (ax, ay) to cell (bx, by), both included, as flat x, y pairs: one cell per
+ * step, so `hexDistance + 1` cells and each a neighbour of the last. A lerp in cube coordinates, rounded (Red Blob Games'
+ * line drawing), with a fixed nudge off the start so a line along cell edges always rounds the same way.
+ */
+export function hexLine(ax: number, ay: number, bx: number, by: number): Int32Array {
+  const n = hexDistance(ax, ay, bx, by);
+  const out = new Int32Array(2 * (n + 1));
+  const aq = ax - ((ay - (ay & 1)) >> 1) + 1e-6;
+  const ar = ay + 2e-6;
+  const bq = bx - ((by - (by & 1)) >> 1);
+  for (let i = 0; i <= n; i++) {
+    const t = n === 0 ? 0 : i / n;
+    const fq = aq + (bq - aq) * t;
+    const fr = ar + (by - ar) * t;
+    const fs = -fq - fr;
+    let q = Math.round(fq);
+    let r = Math.round(fr);
+    const s = Math.round(fs);
+    const dq = Math.abs(q - fq);
+    const dr = Math.abs(r - fr);
+    const ds = Math.abs(s - fs);
+    if (dq > dr && dq > ds) q = -r - s;
+    else if (dr > ds) r = -q - s;
+    out[2 * i] = q + ((r - (r & 1)) >> 1);
+    out[2 * i + 1] = r;
+  }
+  return out;
+}
+
 const discs = new Map<number, Int16Array[]>();
 
 /**

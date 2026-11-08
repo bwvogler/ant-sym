@@ -3827,7 +3827,11 @@ The owner asked for the top-down view and the side view to be two views of one g
 - **Wide screens get the above/below switch first**; both views at once is a follow-up (`ja-lp4.8`).
 - **After U6 the old side and open maps leave the page**, kept as test beds until their assays are re-baselined.
 
-The founding radius stays open until the research bead (`ja-lp4.7`) gives a figure.
+**U1 built, and two geometry calls (owner, 2026-11-08, `ja-lp4.1`).** `web/src/colony/transect.ts` is the line: holes in order, signed *s*, P(s), `canFound` with its refusal reason, `nearestValid`, `grow`. Nothing in the game uses it yet, so behaviour and the golden masters are unchanged.
+- **Columns are hex steps.** A segment's columns are the hex line between its holes (`hexLine` in `hex.ts`), so neighbouring columns always lie over the same or adjacent cells; a segment is `hexDistance` columns, up to ~15% longer than the surface at a slant, never shorter.
+- **Rule 2 covers the new margin.** The new segment and the margin it will carry must both keep clear of the line, so a founding whose margin would fold back is refused.
+
+**The founding radius (research, `ja-lp4.7`).** `docs/nest-spacing.md`: mature harvester nests sit 9–14 m apart (one neighbour gap, the game's 140 cells); queens fly 5 gaps or more; spacing is made by young colonies dying near old ones (~8 m), not by where queens land. Proposed (design): `FLIGHT` 140 cells, `FLIGHT_RADIUS` 70; keep `HOLE_GAP_2D` and `CLEARANCE` at 12. Owner decision before U4: whether flights from interior nests may fail as often as a 70-cell radius makes them.
 
 **Cost.** None yet. The mode situation keeps its fields, so one world should not change Jev's cost; U3 checks it with `colony-cost`. Tick cost will rise toward the side view's 7.0–7.3 ms at 1,200 + 1,200 ants (§36, §37); U6 measures it before the page switches.
 

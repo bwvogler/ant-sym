@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CELL, cellOf, centreX, centreY, corners, DIR_ANGLE, dirOf, discOffsets, extent, hexDistance, nx, ny, R, SIDE } from "../hex.ts";
+import { CELL, cellOf, centreX, centreY, corners, DIR_ANGLE, dirOf, discOffsets, extent, hexDistance, hexLine, nx, ny, R, SIDE } from "../hex.ts";
 
 const near = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps;
 
@@ -70,4 +70,29 @@ test("corners are SIDE from the centre; the map's extent covers every cell's hex
   const e = extent(512, 368);
   assert.ok(near(e.w, 512.5));
   assert.ok(e.h > 367.5 * R + SIDE - 1e-9 && e.h < 368 * R + 1, `height ${e.h}`);
+});
+
+test("hexLine: both ends, one neighbour per step, hexDistance + 1 cells, each within a hexagon of the straight line", () => {
+  let seed = 11;
+  const rand = (n: number) => Math.floor(((seed = (seed * 16807) % 2147483647) / 2147483647) * (2 * n + 1)) - n;
+  for (let k = 0; k < 500; k++) {
+    const [ax, ay, bx, by] = [rand(80), rand(80), rand(80), rand(80)];
+    const line = hexLine(ax, ay, bx, by);
+    const n = hexDistance(ax, ay, bx, by);
+    assert.equal(line.length, 2 * (n + 1));
+    assert.deepEqual([line[0], line[1]], [ax, ay]);
+    assert.deepEqual([line[2 * n], line[2 * n + 1]], [bx, by]);
+    for (let i = 1; i <= n; i++) assert.equal(hexDistance(line[2 * i - 2]!, line[2 * i - 1]!, line[2 * i]!, line[2 * i + 1]!), 1, `step ${i} of (${ax}, ${ay}) → (${bx}, ${by})`);
+    // Each cell lies within a hexagon's reach of the straight line between the centres.
+    const [x1, y1, x2, y2] = [centreX(ax, ay), centreY(ay), centreX(bx, by), centreY(by)];
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    for (let i = 0; i <= n; i++) {
+      const px = centreX(line[2 * i]!, line[2 * i + 1]!);
+      const py = centreY(line[2 * i + 1]!);
+      const off = len === 0 ? 0 : Math.abs((x2 - x1) * (y1 - py) - (x1 - px) * (y2 - y1)) / len;
+      assert.ok(off <= SIDE + 1e-6, `cell ${i} is ${off} off the line`);
+    }
+  }
+  assert.deepEqual([...hexLine(3, 4, 3, 4)], [3, 4]);
+  assert.deepEqual([...hexLine(0, 0, 4, 0)], [0, 0, 1, 0, 2, 0, 3, 0, 4, 0]);
 });

@@ -265,7 +265,8 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "fungus-body", title: "The fungus's body", covers: "A mycelium off the host, spores paid from its mass, adapting in hosts; grooming triggered by sensing the pathogen." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
   { note: "entrances", title: "Entrances", covers: "How many entrances colonies keep, sealing them at night, and what a digger senses near the surface." },
-  { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views (design, not built)." },
+  { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views (design; the line’s geometry built)." },
+  { note: "nest-spacing", title: "Nest spacing", covers: "How far apart colonies sit, where young colonies survive, and how far a founding queen flies." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];
 
