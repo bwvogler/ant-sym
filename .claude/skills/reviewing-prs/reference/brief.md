@@ -40,4 +40,4 @@ confirm under a separate "Unverified" heading, saying what would confirm it.
 - Re-read every Blocker and Should-fix in the code yourself. Drop or downgrade what doesn't hold.
 - Check its mutation table on one row at least.
 - Check `git worktree list` matches what it said; remove anything it left.
-- Merge its verified findings with your merge mechanics and fast checks into one comment, and paste its whole report, each item marked ✓ / ✗ / ?, in the collapsed "Helper's report" block ([comment.md](comment.md)), so the discussion is on the PR.
+- Merge its verified findings with your merge mechanics and fast checks into one review, and paste its whole report, each item marked ✓ / ✗ / ?, in the collapsed "Helper's report" block ([comment.md](comment.md)), so the discussion is on the PR.

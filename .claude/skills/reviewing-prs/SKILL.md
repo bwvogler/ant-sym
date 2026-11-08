@@ -9,7 +9,7 @@ allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/merge-check.sh *), Bash(${CLAUDE
 
 PR(s): **$ARGUMENTS**
 
-A review here is finished when **one comment is posted on the PR** (or, for a helper, when the lead has a report it can paste), the owner has a plain-language summary with the one decision that is theirs, and the working tree is back as it was. Every rule below comes from a review that went right or wrong; [reference/history.md](reference/history.md) has the cases.
+A review here is finished when **one GitHub review is posted on the PR** (or, for a helper, when the lead has a report it can paste), the owner has a plain-language summary with the one decision that is theirs, and the working tree is back as it was. Every rule below comes from a review that went right or wrong; [reference/history.md](reference/history.md) has the cases.
 
 ## Roles
 
@@ -39,7 +39,7 @@ PR #<n> (<head sha7> on <base>) — <first review | re-review since <sha7>>
 - [ ] 3. Route: inline (< ~300 lines) or one helper + my fast checks
 - [ ] 4. Check: fast-checks.sh (tsc, test, lint vs main, build, goldens, versions)
 - [ ] 5. Verify: mutations, measurements, every blocker re-read in code
-- [ ] 6. Post: one comment, comment.md shape, footer
+- [ ] 6. Post: one review (COMMENT), body = whole review + footer, inline suggestions for one-liners
 - [ ] 7. Relay: owner summary; decisions → comment edit + beads
 - [ ] 8. Clean up: worktrees gone, jsonl reverted, git status clean
 ```
@@ -57,7 +57,7 @@ Helper, PR #<n> (<head sha7>)
 
 - `git fetch origin`; list open PRs (`mcp__github__list_pull_requests`, state open) with head and base branches. "Approve what's ready" means every open PR.
 - `scripts/beads-sync.sh start` so `bd` reads the shared database.
-- Re-review? Find your last comment on the PR (`mcp__github__pull_request_read`, get_comments) and the head SHA it reviewed. Review the commits since then, but re-run stages 2 and 4 in full: main moves.
+- Re-review? Find your last review (`mcp__github__pull_request_read`: get_reviews for review bodies, get_review_comments for inline threads and whether they're resolved, get_comments for older single-comment reviews, corrections and the owner's decisions) and the head SHA it reviewed. Review the commits since then, but re-run stages 2 and 4 in full: main moves.
 
 ## 1. Read
 
@@ -103,16 +103,18 @@ Typecheck, `npm test` pass/fail counts, lint warnings compared with main's count
 
 ## 6. Post
 
-One comment via `mcp__github__add_issue_comment` in the shape of [reference/comment.md](reference/comment.md): verdict line; Blockers / Should-fix / Decision for the owner / Nits, each with `file:line`, the evidence and a suggested fix; Mutation checks table; Merge mechanics; Checked and fine; Not re-measured (slow); footer. A re-review leads with each earlier item's status (resolved / partly / not) and the commits it covered.
+**One GitHub review per round**, submitted with event `COMMENT`: its body is the whole review, and one-line fixes also go on their lines as inline suggestions. Steps and templates are in [reference/comment.md](reference/comment.md#posting-the-review).
 
-- Approval is the comment's verdict line ("**Approve**", "**Approve with one should-fix**"). It is the owner's own repo; don't submit a GitHub review approval, and don't merge unless asked.
+- **The body is the record.** Verdict line; Blockers / Should-fix / Decision for the owner / Nits, each with `file:line`, the evidence and a suggested fix; Mutation checks table; Merge mechanics; Checked and fine; Not re-measured (slow); footer. A re-review leads with each earlier item's status (resolved / partly / not) and the commits it covered. Every finding is in the body, inline or not, so an agent that reads only the body misses nothing.
+- **Inline only for one-liners**: a fix that replaces one line (or a few adjacent lines) of the diff, as a `suggestion` block the author can apply. Each inline comment starts with its item number (`N2.`) and is listed in the body. Anything wider, unlocated or needing discussion (a missing test, a cross-file bug, a decision) stays in the body only.
+- Approval is the body's verdict line ("**Approve**", "**Approve with one should-fix**"), with event `COMMENT`, never `APPROVE` or `REQUEST_CHANGES`: it is the owner's own repo. Don't merge unless asked.
 - Decisions belong to the owner. Offer options with their cost; don't prescribe a design they didn't ask for (#42: "ship a full precache" was more than the owner wanted while the game is still changing).
-- If a posted comment turns out wrong, edit it (`mcp__github__update_issue_comment`) and mark the change "(Corrected: …)". Don't leave a wrong number standing or post a second competing review.
+- A submitted review's body can't be edited with the tools here. If something in it turns out wrong, post a short PR comment, "Correction to the review of <sha7>, item S2: …" (`mcp__github__add_issue_comment`), or reply on the inline thread (`mcp__github__add_reply_to_pull_request_comment`). Don't leave a wrong number standing or post a second competing review.
 
 ## 7. Relay
 
 - Tell the owner, in plain words: what the PR does, the verdict, what is left and on whom, the merge order, and the **one** decision that is theirs. No jargon they didn't use.
-- When the owner decides something, put it on the PR: edit your comment, "(Edited <date>: owner decided …)", so the author sees it where they look.
+- When the owner decides something, put it on the PR as a short comment, "Owner's decision on D1 (review of <sha7>): …", so the author sees it where they look. The next re-review carries it in its status table.
 - **Ideas and follow-ups become beads, not prose.** `bd search <words>` for a duplicate first; then `bd create --title=… --description=… --type=feature|task|bug --priority=N --silent`; `bd dep add <child> <parent>` for ordering; `scripts/beads-sync.sh push`. Add a one-line PR note naming the bead ids (#53: "no living rival" → ja-5hm, ja-506). A should-fix the owner accepts as later work gets a bead too.
 - A lasting preference about how reviews are done ("skip slow runs") goes to `bd remember`.
 

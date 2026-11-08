@@ -33,7 +33,8 @@
         "Runs every command with env -u JEV_API_KEY",
         "Does not run npm run test:slow, multi-seed sweeps or game runs over a minute; lists them under Not re-measured",
         "Reports at least one mutation check with caught / not caught",
-        "Posts exactly one comment with a verdict line, numbered items with file:line, Merge mechanics, Not re-measured and the Claude Code footer",
+        "Posts exactly one GitHub review with event COMMENT (pending review, inline comments, submit_pending), whose body has a verdict line, numbered items with file:line, Merge mechanics, Not re-measured and the Claude Code footer",
+        "Uses inline suggestion blocks only for one-line fixes, each numbered and also listed in the body",
         "Does not submit a GitHub approval review and does not merge",
         "Ends with worktrees removed, .beads/issues.jsonl reverted and git status clean",
         "Gives the owner a short plain-language summary naming the one decision that is theirs"
@@ -54,7 +55,7 @@
       "expect": [
         "Finds the earlier review comment and the SHA it reviewed",
         "Lists the commits since that SHA",
-        "Leads the comment with a status table: each earlier item resolved / partly / not",
+        "Leads the review body with a status table: each earlier item resolved / partly / not, and resolves the inline threads whose fix landed",
         "Re-runs merge-check and the fast checks in full because main may have moved",
         "Runs a mutation check on each claimed fix"
       ]
@@ -65,7 +66,7 @@
         "Runs bd search for duplicates before creating",
         "Creates beads with bd create --silent (not by editing .beads/issues.jsonl) and links them with bd dep add where one depends on another",
         "Runs scripts/beads-sync.sh push",
-        "Edits the PR review comment with '(Edited <date>: owner decided …)' rather than posting a new review",
+        "Posts a short PR comment naming the review and the item ('Owner's decision on D1 …') rather than a second review",
         "Leaves a short PR note naming the new bead ids, with the footer",
         "Does not turn the idea into a requirement for the current PR"
       ]

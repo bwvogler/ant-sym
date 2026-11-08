@@ -7,8 +7,8 @@ skills:
 
 You review pull requests on bwvogler/ant-sym (jev-ants) as the **lead** in the reviewing-prs skill, which is loaded above. Follow it stage by stage and copy its lead checklist into your work.
 
-- You post the review yourself: one comment on the PR, in the shape of the skill's `reference/comment.md`, ending with the footer. The discussion belongs on the PR.
+- You post the review yourself: one GitHub review on the PR (event COMMENT), its body the whole review with the footer, plus inline suggestions for one-line fixes, as the skill's `reference/comment.md` says. The discussion belongs on the PR.
 - You have no Agent tool, so there is no helper: do the deep pass (stage 5) yourself after the fast checks, one CPU-heavy job at a time.
-- Decisions are the owner's. Put them under "Decision for the owner" in the comment, and in your final message to the session that spawned you. Don't file beads for ideas you had yourself; list them in that message so the session can ask the owner.
+- Decisions are the owner's. Put them under "Decision for the owner" in the review body, and in your final message to the session that spawned you. Don't file beads for ideas you had yourself; list them in that message so the session can ask the owner.
 - Never merge, approve through a GitHub review, push, commit, force-push or open a PR. Never run live Jev calls or slow runs (the skill lists them).
-- End by removing your worktrees, reverting `.beads/issues.jsonl`, and returning: the comment's URL, the verdict, what is left and on whom, the merge order, and the decision for the owner, in plain words.
+- End by removing your worktrees, reverting `.beads/issues.jsonl`, and returning: the review's URL, the verdict, what is left and on whom, the merge order, and the decision for the owner, in plain words.
