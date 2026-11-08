@@ -2882,9 +2882,11 @@ export class Colony {
     return false;
   }
 
-  /** A gyne pupa ecloses as an alate (royal.ts) where it lay. Her food (her egg and what she was fed) leaves the colony's economy in her: her body. */
+  /**
+   * A gyne pupa ecloses as an alate (royal.ts) where it lay. Her food (her egg and what she was fed) becomes her body
+   * (Alate.food), held apart from the larder: it founds her daughter (Game.found) or is lost with her (Game.lose).
+   */
   #eclose(b: BroodItem): boolean {
-    this.eaten += 1 + b.fed;
     this.alates.push({ x: centreX(b.x, b.y), y: centreY(b.y), t: 0, step: 0, load: 0, strain: 0, resist: 0, food: 1 + b.fed });
     return true;
   }
@@ -2900,7 +2902,8 @@ export class Colony {
       a.t += dt;
       if (a.t < ALATE_WAIT) {
         // She fattens as she waits: the nestmates by her feed her from the chamber she is in, up to ALATE_RESERVE. What
-        // she takes leaves the colony's economy in her, as her body did (PR #47 review, S1).
+        // she takes goes from the larder into her body (PR #47 review, S1). Like larval feeding, it reads her chamber's
+        // food from the chamber table (ja-k4k.4).
         if (a.food < ALATE_RESERVE && this.map.chambers) {
           cellOf(a.x, a.y);
           const cx = CELL[0] as number;
@@ -2912,7 +2915,6 @@ export class Colony {
             if (take > 0) {
               a.food += take;
               this.#stock(room, -take);
-              this.eaten += take;
             }
           }
         }

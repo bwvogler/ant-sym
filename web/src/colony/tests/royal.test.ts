@@ -211,8 +211,13 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
   h.load(saved);
   assert.equal(h.flights.length, 1);
   assert.equal(h.player.alates.length, 1);
-  h.lose(h.flights[0]!);
+  const lost = h.flights[0]!;
+  const eaten = h.player.eaten;
+  h.lose(lost);
   assert.equal(h.flights.length, 0);
+  assert.equal(h.player.eaten, eaten + lost.food, "a lost queen's body leaves the world with her");
+  h.lose(lost);
+  assert.equal(h.player.eaten, eaten + lost.food, "once");
   assert.equal(h.colonies.length, 1);
   // A save with a daughter founds her again on load, as she was.
   for (let j = 0; j < 30 * 5; j++) g.tick(DT);
@@ -241,8 +246,10 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
       s += d.larder + 4 * d.births + d.eaten;
       for (const b of d.brood.items) s += 1 + b.fed;
     }
-    return Math.abs(s - map.foodTotal);
+    // New queens' bodies are food too, until they found (into a larder) or are lost (eaten). Founding raises nothing.
+    return Math.abs(s + g.royalFood() - map.foodTotal);
   };
+  const total = map.foodTotal;
   let founded = -1;
   for (let k = 0; k < 30 * 400 && (founded < 0 || g.time < founded + 30); k++) {
     c.scentGain.fill(0.001);
@@ -252,6 +259,7 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
   }
   assert.ok(founded > 0, "a daughter was founded");
   assert.ok(worst < 1e-6, `food drifted by ${worst}`);
+  assert.equal(map.foodTotal, total, "founding makes no food: her reserve is her body");
   const d = g.colonies[1]!;
   assert.ok(g.founded[0]!.reserve! > 1 && g.founded[0]!.reserve! <= ALATE_RESERVE, `her reserve, her body: ${g.founded[0]!.reserve}`);
   assert.ok(d.larder <= ALATE_RESERVE);
