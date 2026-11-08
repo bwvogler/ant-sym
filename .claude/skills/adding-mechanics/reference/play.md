@@ -29,7 +29,7 @@ Realism is the floor, not the point. A mechanic earns its place when it makes th
 Check the mechanic against the failure modes this project has hit:
 - **A cliff.** The landing took a whole colony in half a minute (§50.12). Look for thresholds where everything flips at once.
 - **A free lever.** One drag of the brush skipped the whole progression (§50.15).
-- **Invisible effects.** A rule that changes numbers but nothing on the field, or a lethal lever at full strength from the first second, as crown and the odour weapon were until their reach upgrades (`ja-lo8.16`).
+- **Invisible effects.** A rule that changes numbers but nothing on the field, or a lethal lever at full strength from the first second, as crown and the odour weapon were until their reach upgrades (`ja-lo8.16`, PRD §50.16).
 - **Runaway or famine.** Soothe everything and both colonies starve; runaway infection ends the game in a minute (`docs/fungus-policy.md` §6).
 - **Mills and loops.** Trails between two nests can loop (assay A3).
 - **Cost creep.** A new situation field that re-asks every cached answer.
