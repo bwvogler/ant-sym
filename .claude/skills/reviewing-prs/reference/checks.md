@@ -1,5 +1,7 @@
 # Review recipes
 
+Contents: [Worktree](#worktree) · [Fast checks](#fast-checks) · [Trial merge](#trial-merge) · [Mutation check](#mutation-check) · [Instrumenting](#instrumenting-a-suspected-bug) · [Assays and cache hits](#assays-and-jev-cache-hits) · [Like-for-like replay](#like-for-like-replay) · [Jev ask path and cost](#jev-ask-path-and-cost) · [Focus list](#focus-list)
+
 Commands that worked in past reviews. Run from the repo root unless a path says otherwise. Every command that runs code runs under `env -u JEV_API_KEY`.
 
 ## Worktree
@@ -60,6 +62,9 @@ Good mutations: drop a condition, flip a comparison, set a new constant to 0 or 
 |---|---|
 | `HOLE_GAP` 16 → 8 | `world.test` "holes 16 apart" |
 | drop `incipient` from nursing | **not caught** |
+| nudge only one end of `hexLine` | equivalent: rounds the same way both directions (not a gap) |
+
+**Before grading "not caught"**, check the mutant really behaves differently. Run original and mutant over many inputs (a scratch script calling both, or the tests' property generator) and count differing outputs. Zero differences means an equivalent mutation (drop it) or unreachable code (a nit: add a test that reaches it, or say in a code comment that it is defensive). Only a mutation that changes some output and that no test catches is a should-fix. (#55: `standing()`'s wider vertex cut changed 0 of ~18 million `canFound` verdicts: a nit, not a should-fix.)
 
 ## Instrumenting a suspected bug
 
@@ -70,7 +75,7 @@ Count it, don't argue it. In the scratch worktree only:
 ((globalThis as any).__probe ??= { rolls: 0, ticks: 0 }).rolls++;
 ```
 
-The simplest driver: print `globalThis.__probe` at the end of the assay's `score` in `experiment.ts` and run `npm run exp -- <assay> --seeds 1` (~7–15 s). For a custom driver, write a script file in the scratchpad (or `node --input-type=module -e '…'`; plain `-e` is CommonJS and has no top-level await, and its extra argv starts at `process.argv[1]`, not `[2]`). A trial fix measured the same way shows whether the fix does what it claims. Throw the worktree away after.
+The simplest driver: print `globalThis.__probe` at the end of the assay's `score` in `experiment.ts` and run `npm run exp -- <assay> --seeds 1` (~7–15 s). For a custom driver, write a script that imports the worktree's modules by absolute path (`await import("<W>/web/src/colony/game.ts")`; a relative import from the scratchpad finds nothing), or put a temporary file inside `$W/web/src/` and delete it before checking `git status` (or `node --input-type=module -e '…'`; plain `-e` is CommonJS and has no top-level await, and its extra argv starts at `process.argv[1]`, not `[2]`). A trial fix measured the same way shows whether the fix does what it claims. Throw the worktree away after.
 
 ## Assays and Jev cache hits
 

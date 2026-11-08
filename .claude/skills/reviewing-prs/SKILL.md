@@ -1,7 +1,8 @@
 ---
 name: reviewing-prs
-description: Reviews a pull request on bwvogler/ant-sym (jev-ants) and posts the review as one GitHub comment, with measured evidence, merge mechanics against main and the other open PRs, and the owner's decisions relayed into the PR and into beads. Use whenever the user asks to review a PR, re-review one, "check for updates", "anything new?", "fixes are in", "is #N ready", or "approve what's ready", including stacked PRs, and whenever a lead agent hands a subagent a PR to review (role: helper). Not for writing the fix itself or for designing a mechanic (that is adding-mechanics).
+description: "Reviews a pull request on bwvogler/ant-sym (jev-ants) and posts the review as one GitHub comment, with measured evidence, merge mechanics against main and the other open PRs, and the owner's decisions relayed into the PR and into beads. Use whenever the user asks to review a PR, re-review one, 'check for updates', 'anything new?', 'fixes are in', 'is #N ready', or 'approve what's ready', including stacked PRs, and whenever a lead agent hands a subagent a PR to review (role: helper). Not for writing the fix itself or for designing a mechanic (that is adding-mechanics)."
 argument-hint: "[PR number(s), or 'open'] [role: helper]"
+allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/merge-check.sh *), Bash(${CLAUDE_SKILL_DIR}/scripts/fast-checks.sh *)
 ---
 
 # Reviewing a PR
@@ -13,7 +14,7 @@ A review here is finished when **one comment is posted on the PR** (or, for a he
 ## Roles
 
 - **Lead** (default). Runs every stage and posts the comment. Owns what is posted: re-checks anything a helper reports before it goes out.
-- **Helper** (the lead passed "role: helper", usually via [reference/brief.md](reference/brief.md)). Does stages 1, 4 and 5 in its own worktree and returns a ready-to-paste report of **verified findings only**. A helper never posts, comments, commits, pushes, merges, or changes beads (`bd create/update/close/remember`); it may read them (`bd show`, `bd search`). It removes its worktree and reports `git worktree list` at the end.
+- **Helper** (the lead passed "role: helper", usually via [reference/brief.md](reference/brief.md)). Does stages 1 and 5 in its own worktree (stage 4 too, unless the brief says the lead ran it; then single test files only) and returns a ready-to-paste report of **verified findings only**. A helper never posts, comments, commits, pushes, merges, or changes beads (`bd create/update/close/remember`); it may read them (`bd show`, `bd search`). It removes its worktree and reports `git worktree list` at the end.
 
 ## Hard rules
 
@@ -28,7 +29,7 @@ A review here is finished when **one comment is posted on the PR** (or, for a he
 
 ## Checklist
 
-Copy this into your reply and tick it as you go:
+Copy this into your reply and tick it as you go (a helper copies the shorter one below it):
 
 ```
 PR #<n> (<head sha7> on <base>) — <first review | re-review since <sha7>>
@@ -41,6 +42,15 @@ PR #<n> (<head sha7> on <base>) — <first review | re-review since <sha7>>
 - [ ] 6. Post: one comment, comment.md shape, footer
 - [ ] 7. Relay: owner summary; decisions → comment edit + beads
 - [ ] 8. Clean up: worktrees gone, jsonl reverted, git status clean
+```
+
+```
+Helper, PR #<n> (<head sha7>)
+- [ ] 1. Read: claims, diff, cited beads (read-only)
+- [ ] 4. Check: only what the brief says the lead didn't run
+- [ ] 5. Verify: mutations, measurements, single test files
+- [ ] 8. Clean up: my worktree gone; report `git worktree list`
+- [ ] Report: brief.md's sections, verified only; no Merge mechanics (the lead adds it)
 ```
 
 ## 0. Sync
@@ -59,7 +69,7 @@ PR #<n> (<head sha7> on <base>) — <first review | re-review since <sha7>>
 ## 2. Merge
 
 ```sh
-.claude/skills/reviewing-prs/scripts/merge-check.sh <n> [--base <branch>] <other open PR numbers…>
+"${CLAUDE_SKILL_DIR}/scripts/merge-check.sh" <n> [--base <branch>] <other open PR numbers…>
 ```
 
 Pass the base branch and the other open PR numbers from stage 0 (git alone can't tell open PRs from closed). It fetches their heads, runs `git merge-tree` of this PR against main, its base and each other open PR, says whether a stacked base is in main yet, and lists files changed on both sides since the PR split from main. A conflict only in `.beads/issues.jsonl` is the bd export and doesn't count. Conflicts or not, read what main changed in files this PR touches: a clean textual merge can still break (#40 renamed `foodLeft` and broke #39's merged tree). When main changed shared code, trial-merge in a worktree and run the tests there ([checks.md](reference/checks.md#trial-merge)).
@@ -72,7 +82,7 @@ Pass the base branch and the other open PR numbers from stage 0 (git alone can't
 ## 4. Check
 
 ```sh
-.claude/skills/reviewing-prs/scripts/fast-checks.sh "$W"        # W = the PR head's worktree
+"${CLAUDE_SKILL_DIR}/scripts/fast-checks.sh" "$W"        # W = the PR head's worktree
 ```
 
 Typecheck, `npm test` pass/fail counts, lint warnings compared with main's count, `vite build`, the goldens and precache diffstat, and a hint when brain or legend files changed without a `*_VERSION` bump. Goldens must be bit-exact unless the PR says why they moved.
@@ -81,7 +91,10 @@ Typecheck, `npm test` pass/fail counts, lint warnings compared with main's count
 
 **Nothing is posted that was not checked.** Prefer a number to an adjective. Recipes are in [reference/checks.md](reference/checks.md).
 
-- **Mutation checks** for every fix and every new test: break the line the fix adds (or the condition the test guards), run that one test file, restore with `git checkout -- .`. Report a table: mutation → caught by / not caught. "Not caught" is a should-fix (#54: removing the young-queen nursing passed every test).
+- **Mutation checks** for every fix and every new test: break the line the fix adds (or the condition the test guards), run that one test file, restore with `git checkout -- .`. Report a table: mutation → caught by / not caught / equivalent. Before grading "not caught", check the mutant really behaves differently: run original and mutant over many inputs and count differing outputs ([checks.md](reference/checks.md#mutation-check)).
+  - No input gives a different output: **equivalent**, not a gap; drop it.
+  - The changed code is never reached: **unreachable**, a nit (add a test that reaches it, or say in a code comment that it is defensive).
+  - Some output changes and no test catches it: a **should-fix** (#54: removing the young-queen nursing passed every test).
 - **Measure suspected bugs**: instrument a counter through `globalThis` in a scratch worktree, run one seed (`npm run exp -- <assay> --seeds 1`, ~7–15 s), and report counts (#39: rolls per tick; #44: where the past-end trigger fired). A trial fix measured the same way shows the fix works.
 - **Jev cost and ask-path claims**: trace when a request is actually sent (cache miss only? on load? on a timer?) before quoting any rate. Read the "Jev's answers (cache hits…)" line. #42's first review multiplied a rate by an hour and was wrong: an open run costs nothing; only misses spend.
 - **Like-for-like comparisons only.** Same seed, same cache contents, same everything but the change. If the PR's cache differs from main's, graft the missing answers in and replay on main (#41: the Warlike loss predated the PR).
@@ -89,7 +102,7 @@ Typecheck, `npm test` pass/fail counts, lint warnings compared with main's count
 
 ## 6. Post
 
-One comment via `mcp__github__add_issue_comment` in the shape of [reference/comment.md](reference/comment.md): verdict line; Blockers / Should-fix / Decision for the owner / Nits, each with `file:line`, the evidence and a suggested fix; Merge mechanics; Checked and fine; Not re-measured (slow); footer. A re-review leads with each earlier item's status (resolved / partly / not) and the commits it covered.
+One comment via `mcp__github__add_issue_comment` in the shape of [reference/comment.md](reference/comment.md): verdict line; Blockers / Should-fix / Decision for the owner / Nits, each with `file:line`, the evidence and a suggested fix; Mutation checks table; Merge mechanics; Checked and fine; Not re-measured (slow); footer. A re-review leads with each earlier item's status (resolved / partly / not) and the commits it covered.
 
 - Approval is the comment's verdict line ("**Approve**", "**Approve with one should-fix**"). It is the owner's own repo; don't submit a GitHub review approval, and don't merge unless asked.
 - Decisions belong to the owner. Offer options with their cost; don't prescribe a design they didn't ask for (#42: "ship a full precache" was more than the owner wanted while the game is still changing).

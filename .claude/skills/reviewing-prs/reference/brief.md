@@ -20,6 +20,7 @@ Focus (from reference/checks.md#focus-list, the ones this diff touches):
 Already known / ruled out (don't redo): <what the lead has checked>.
 
 Setup:
+  cd <repo root>     # optional: git worktree add works from any subdirectory
   S=<absolute scratchpad path>
   W="${S:?}/pr<n>h"; git worktree add --detach "$W" <head sha>; npm --prefix "$W/web" ci
 Every run under env -u JEV_API_KEY. Fast runs only: single test files, `npm run exp -- <assay> --seeds 1`,
@@ -27,6 +28,7 @@ no test:slow, no multi-seed sweeps, no game runs over a minute. One CPU-heavy jo
 Do not post, comment, commit, push, merge, or change beads. Do not touch files outside $W.
 At the end: git worktree remove --force "$W"; report `git worktree list`.
 
+Leave out Merge mechanics: the lead does stage 2 and adds it.
 Return a ready-to-paste report in reference/comment.md's sections (Blockers / Should-fix / Decision for the owner /
 Nits / Mutation checks / Checked and fine / Not re-measured). Verified findings only: each with file:line, the
 evidence (numbers, the command that produced them), and a suggested fix. Put anything you suspect but could not
