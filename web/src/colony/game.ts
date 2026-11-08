@@ -45,7 +45,7 @@ export interface GameParams {
 export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0 };
 
 /** Bump when what a save holds changes: an older save is refused, not misread. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony). */
 export const HOLE_GAP = 8;
@@ -59,6 +59,12 @@ export interface Founding {
   antCount: number;
   odour: number;
   maxAnts?: number;
+  /**
+   * The fungus the founding queen carries, if any (ja-lo8.9 passes it: she picks it up on her way out). A queen carrying
+   * the evolving fungus brings what the landing brought the first colony: it takes root by her new hole (ja-lo8.12), so a
+   * colony the world starts with has nothing a founded one can't get.
+   */
+  fungus?: { load: number; strain: number };
   /**
    * The nest as dug (Game.addColony records it). A save founds from it rather than digging again: a second dig would
    * draw from the restored game's random stream and could put the shaft elsewhere (PR #42 review, B1).
@@ -142,6 +148,9 @@ export const QUIET = 60;
 
 /** The fungus's landing (Game.land): this far past the hole (cells, along the ground), spores over this radius. */
 export const LANDING = { offset: 3, radius: 2, spores: 3 };
+
+/** The app's old spore brush, per paint event (removed, ja-260): radius in cells, spores laid per cell, load dosed into each ant under it. Scripts replay it. */
+export const BRUSH = { radius: 3, spores: 2, dose: 0.15 } as const;
 
 /**
  * The colony c would raid, of any number: the nearest (hole to hole, or nest to nest on a top-down map) that is not
@@ -260,6 +269,16 @@ export class Game {
     this.founded.push({ ...f, nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) } });
     this.#wire();
     this.#refresh();
+    const q = c.queen;
+    if (f.fungus && f.fungus.load > 0 && q) {
+      q.load = Math.min(1, f.fungus.load);
+      q.strain = f.fungus.strain;
+      this.fungus.hosts++;
+      if (this.fungus.evolution?.strain === f.fungus.strain) {
+        const at = this.#byHole(c);
+        this.fungus.root(at.x, at.y, LANDING.radius);
+      }
+    }
     return k;
   }
 
@@ -470,18 +489,28 @@ export class Game {
    * hole, where its ants walk out and back. No ant is dosed directly: the first hosts are ants that walk through it.
    * The top-down maps have no hole: it falls at the nest's rim. Lands once; returns where.
    */
-  land(k: number, strain: number, spores = LANDING.spores): { x: number; y: number } {
+  land(k: number, strain: number, { spores = LANDING.spores, evolve = false }: { spores?: number; evolve?: boolean } = {}): { x: number; y: number } {
     if (this.landed) return this.landed;
-    const c = this.colonies[k] ?? this.player;
-    const e = c.nest.entrance ?? { x: c.nest.x + c.nest.r, y: c.nest.y };
-    const x = e.x + LANDING.offset;
-    const y = e.y - (c.nest.entrance ? 0.5 : 0);
+    const { x, y } = this.#byHole(this.colonies[k] ?? this.player);
+    // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
+    if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
+    this.fungus.root(x, y, LANDING.radius);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
   }
 
-  /** The spore brush: spores on the ground within `radius` of (x, y), and a dose of load into every ant there, of any colony. */
+  /** Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim). */
+  #byHole(c: Colony): { x: number; y: number } {
+    const e = c.nest.entrance ?? { x: c.nest.x + c.nest.r, y: c.nest.y };
+    return { x: e.x + LANDING.offset, y: e.y - (c.nest.entrance ? 0.5 : 0) };
+  }
+
+  /**
+   * Spores on the ground within `radius` of (x, y), and a dose of load into every ant there, of any colony: the old
+   * spore brush (BRUSH), for tests and scripts. The app has no brush (ja-260): every game lands an evolving fungus, and
+   * a free stroke would skip its progression.
+   */
   paintSpores(x: number, y: number, radius: number, spores: number, dose: number, strain: number): void {
     this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain);
   }

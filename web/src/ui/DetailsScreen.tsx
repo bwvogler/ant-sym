@@ -2,20 +2,21 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SITUATIONS } from "../colony/colony.ts";
 import { DOCTRINES } from "../colony/colonyBrain.ts";
 import { LETHAL, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
+import { upgradeFor } from "../colony/evolution.ts";
 import type { Game } from "../colony/game.ts";
 import { DEFAULT_RECOGNITION } from "../colony/recognition.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import Help from "./Help.tsx";
 import { colonyName, colonyTone } from "./names.ts";
 import { seg } from "./styles.ts";
-import { MAX_SPEED, STRAINS, type ColonyControls, type ColonyStats, type Ground, type SideStats } from "./useColony.ts";
+import { MAX_SPEED, type ColonyControls, type ColonyStats, type Ground, type SideStats } from "./useColony.ts";
 import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
 
 // The Details screen (ja-lo8.2): everything the game does not need on its main screen. The colonies' numbers, Jev's
-// spend and caches, the unity and infection figures, the world's settings, and the lab: the spore brush, strains, the
-// fungus's menu and each colony's doctrine, for experiments rather than play. Opened from the top bar; Escape closes it.
+// spend and caches, the unity and infection figures, the world's settings, and the lab: the fungus's menu and each
+// colony's doctrine (the spore brush and strain picker went in ja-260), for experiments rather than play. Opened from the top bar; Escape closes it.
 
 type Jev = ReturnType<typeof useColonyJev>;
 
@@ -272,7 +273,7 @@ function World({ game, controls, update, stats, restart, newWorld }: Props) {
   );
 }
 
-/** For experiments, not play: the spore brush and strains, the fungus's menu, and each colony's doctrine. */
+/** For experiments, not play: the fungus's menu, and each colony's doctrine. */
 function Lab({ game, controls, update, stats, jev }: Props) {
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   const [showDoctrines, setShowDoctrines] = useState(false);
@@ -280,32 +281,7 @@ function Lab({ game, controls, update, stats, jev }: Props) {
   return (
     <Card label="lab" title="Lab" wide>
       <p className="mt-1 text-xs text-fg-3">For experiments rather than play: in the game the fungus lands by a nest and spreads through its hosts, and a colony's doctrine is its nature.</p>
-      <div className="mt-3 grid gap-4 lg:grid-cols-3">
-        <div>
-          <div className="flex items-center justify-between">
-            <span>Spore brush</span>
-            <div className="flex overflow-hidden rounded-md border border-line text-sm">
-              {(["none", "spores"] as const).map((b) => (
-                <button key={b} type="button" className={seg(controls.brush === b)} onClick={() => update({ brush: b })} title={b === "spores" ? "Drag on the field to inoculate: spores on the ground and a dose of the strain into the ants there, of either colony" : "Stop painting"}>
-                  {b === "none" ? "off" : "on"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mt-2 flex items-center justify-between">
-            <span>Strain</span>
-            <div className="flex overflow-hidden rounded-md border border-line text-sm">
-              {STRAINS.map((st, k) => (
-                <button key={st.id} type="button" className={seg(controls.strain === k)} onClick={() => update({ strain: k })} title={st.blurb}>
-                  {st.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="mt-1 text-xs text-fg-3">
-            {STRAINS[controls.strain]?.name}: {STRAINS[controls.strain]?.blurb}. {controls.brush === "spores" ? "Close Details and drag on the field to paint." : ""}
-          </p>
-        </div>
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
         <div aria-label="fungus menu">
           <span className="flex items-center gap-1.5">
             Levers the fungus may pull <Help to={{ tab: "policy", id: "fungus" }} label="the fungus's policy" />
@@ -465,6 +441,8 @@ export function LeverChips({ game, menu, locked, lock, onChange }: { game: Game;
           {LEVERS.filter((v) => v.kind === kind && (game.map.sky || !NEST_ONLY.has(v.id))).map((v) => {
             const on = menu.includes(v.id);
             const lethal = LETHAL.has(v.id);
+            // In the game a lethal lever on the menu does nothing until its upgrade is kept (ja-lo8.16).
+            const heldOff = lethal && game.fungus.evolution?.reach()[v.id] === 0;
             return (
               <button
                 key={v.id}
@@ -472,7 +450,7 @@ export function LeverChips({ game, menu, locked, lock, onChange }: { game: Game;
                 aria-pressed={on}
                 disabled={locked}
                 className={`rounded-md border px-2 py-0.5 font-mono disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
-                title={locked ? (lock ?? undefined) : v.blurb}
+                title={locked ? (lock ?? undefined) : heldOff ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Fungus panel).` : v.blurb}
                 onClick={() => onChange(on ? menu.filter((id) => id !== v.id) : [...menu, v.id])}
               >
                 {v.name}

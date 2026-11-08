@@ -7,7 +7,9 @@ import DetailsScreen from "./ui/DetailsScreen.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
-import { MAX_SPEED, useColony, type ColonyStats } from "./ui/useColony.ts";
+import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats } from "./ui/useColony.ts";
+import { UPGRADES, type Upgrade } from "./colony/evolution.ts";
+import { LETHAL_LEVERS } from "./colony/levers.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
 import type { Game } from "./colony/game.ts";
@@ -34,7 +36,7 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {
-  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start, loadSave, settings } = useColony();
+  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve } = useColony();
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend);
   const [details, setDetails] = useState(false);
@@ -45,7 +47,7 @@ export default function ColonyApp() {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
-  useNotices(stats, jev.lock, jev.state.phase);
+  useNotices(stats, jev.lock, jev.state.phase, controls.menu, controls.ground === "side");
   const games = useSaves(game, settings, { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull }, stats, controls.started);
   const continueFrom = useCallback(
     (r: SaveRecord) => {
@@ -61,7 +63,6 @@ export default function ColonyApp() {
     [loadSave, jev, update],
   );
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
-  const painting = controls.brush === "spores";
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-3 px-4 py-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -122,14 +123,6 @@ export default function ColonyApp() {
           </span>
         )}
         <span className="min-w-0 basis-full text-fg-2 sm:basis-0 sm:flex-1 sm:truncate">{goalLine(stats)}</span>
-        {painting && (
-          <span className="flex items-center gap-2 rounded-md border border-spore/40 bg-raised px-2 py-1 text-xs text-spore">
-            lab: spore brush on — drag to paint
-            <button type="button" className="underline-offset-2 hover:underline" onClick={() => update({ brush: "none" })}>
-              stop
-            </button>
-          </span>
-        )}
       </div>
 
       <div className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:flex-row">
@@ -141,7 +134,6 @@ export default function ColonyApp() {
               onFrame={onFrame}
               showFoodTrail={controls.showFoodTrail}
               showHomeTrail={controls.showHomeTrail}
-              onPaint={painting ? paint : null}
               followed={followed}
               onFollow={setFollowed}
               onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
@@ -151,14 +143,12 @@ export default function ColonyApp() {
             <AntCard followed={followed} colonies={game.colonies} fungus={game.fungus} explain={jev.explain} explainFungus={jev.explainFungus} onClose={() => setFollowed(null)} />
           ) : (
             <p className="text-xs text-fg-3">
-              {painting
-                ? "Dragging paints spores · pinch or wheel to zoom · space+drag or right-drag pans."
-                : "Drag to pan · wheel or pinch to zoom · tap an ant to follow it and see what the fungus does inside it · Learn explains what you see."}
+              Drag to pan · wheel or pinch to zoom · tap an ant to follow it and see what the fungus does inside it · Learn explains what you see.
             </p>
           )}
         </div>
         <aside className="flex w-full flex-col gap-3 lg:w-80">
-          <FungusPanel stats={stats} jev={jev} />
+          <FungusPanel stats={stats} jev={jev} evolve={evolve} side={controls.ground === "side"} menu={controls.menu} />
         </aside>
       </div>
     </main>
@@ -166,7 +156,7 @@ export default function ColonyApp() {
 }
 
 /** The fungus: where it is, how far the colonies have come together, and its aim, the player's words. */
-function FungusPanel({ stats, jev }: { stats: ColonyStats | null; jev: ReturnType<typeof useColonyJev> }) {
+function FungusPanel({ stats, jev, evolve, side, menu }: { stats: ColonyStats | null; jev: ReturnType<typeof useColonyJev>; evolve: (id: string) => boolean; side: boolean; menu: readonly string[] }) {
   const locked = jev.lock !== null;
   return (
     <section className="rounded-lg border border-line bg-panel p-4 text-sm text-fg-2" aria-label="fungus">
@@ -202,6 +192,7 @@ function FungusPanel({ stats, jev }: { stats: ColonyStats | null; jev: ReturnTyp
           )}
         </div>
       )}
+      {stats?.evolution && <Evolve e={stats.evolution} evolve={evolve} side={side} menu={menu} />}
       <div className="mt-4" aria-label="fungus aim">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5">
@@ -235,6 +226,67 @@ function FungusPanel({ stats, jev }: { stats: ColonyStats | null; jev: ReturnTyp
 }
 
 /** Sim time as m:ss (h:mm:ss past an hour). */
+/**
+ * The fungus's body and its mutations (ja-lo8.12): its mycelium and the fungus in its hosts, mutations to keep and how
+ * fast they come, and each upgrade's next level. Spread upgrades are the fungus's body; reach upgrades how far its
+ * levers may go.
+ */
+/** A lethal upgrade whose levers are all off the menu: keeping it would free nothing until the player turns one on (ja-lo8.16). */
+function idle(u: Upgrade, menu: readonly string[]): boolean {
+  return !!u.levers?.every((id) => LETHAL_LEVERS.has(id) && !menu.includes(id));
+}
+
+function Evolve({ e, evolve, side, menu }: { e: EvolutionStats; evolve: (id: string) => boolean; side: boolean; menu: readonly string[] }) {
+  return (
+    <div className="mt-4" aria-label="evolution">
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="flex items-center gap-1.5">
+          Body <Help to={{ tab: "guide", id: "evolution" }} label="the fungus's body and mutations" />
+        </span>
+        <span className="font-mono tabular-nums text-fg-2" title="its mycelium by the hole, and the fungus in its hosts">
+          mycelium {e.mass.toFixed(0)} · in ants {e.inHosts.toFixed(0)}
+        </span>
+      </div>
+      <div className="mt-2 flex items-baseline justify-between text-xs">
+        <span>Mutations</span>
+        <span className="font-mono tabular-nums">
+          <span className={e.mutations > 0 ? "text-spore" : "text-fg-3"}>{e.mutations.toLocaleString()}</span>
+          <span className="text-fg-3"> · +{e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min</span>
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-fg-3">Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep; each level asks more.</p>
+      <ul className="mt-2 flex flex-col gap-1" aria-label="upgrades">
+        {UPGRADES.filter((u) => side || !u.nest).map((u) => {
+          const level = e.levels[u.id] ?? 0;
+          const cost = u.costs[level];
+          const next = u.steps[level + 1];
+          return (
+            <li key={u.id} className="flex items-center justify-between gap-2 text-xs">
+              <span className="min-w-0 truncate" title={u.blurb}>
+                <span className={u.kind === "spread" ? "text-spore" : u.levers?.every((id) => LETHAL_LEVERS.has(id)) ? "text-err" : "text-accent"}>{u.name}</span> <span className="text-fg-3">{u.steps[level]}</span>
+                {idle(u, menu) && <span className="text-fg-3"> (not on the menu)</span>}
+              </span>
+              {cost === undefined ? (
+                <span className="shrink-0 text-fg-3">at its most</span>
+              ) : (
+                <button
+                  type="button"
+                  className="shrink-0 rounded-md border border-line px-2 py-0.5 text-fg hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={cost > e.mutations}
+                  onClick={() => evolve(u.id)}
+                  title={`${u.blurb}. Next: ${next}, for ${cost.toLocaleString()} mutation${cost === 1 ? "" : "s"}.`}
+                >
+                  {next} · {cost.toLocaleString()}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function clock(t: number): string {
   const s = Math.floor(t);
   const h = Math.floor(s / 3600);
@@ -253,7 +305,7 @@ function goalLine(stats: ColonyStats | null): string {
 }
 
 /** Notices for what changed: the game's outcome, and Jev's state where it locks the policies. */
-function useNotices(stats: ColonyStats | null, lock: string | null, phase: string): void {
+function useNotices(stats: ColonyStats | null, lock: string | null, phase: string, menu: readonly string[], side: boolean): void {
   const outcome = stats?.outcome ?? "playing";
   const seenOutcome = useRef(outcome);
   useEffect(() => {
@@ -270,6 +322,14 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
     seenChapter.current = chapter;
     if (!first && stats && chapter !== "land") pushToast(goalLine(stats), "good");
   }, [chapter, stats]);
+  // A mutation it can keep is worth a notice, once each time there was none it could afford (ja-lo8.12).
+  // Only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not).
+  const affordable = stats?.evolution ? UPGRADES.some((u) => (side || !u.nest) && !idle(u, menu) && (u.costs[stats.evolution!.levels[u.id] ?? 0] ?? Infinity) <= stats.evolution!.mutations) : false;
+  const couldAfford = useRef(affordable);
+  useEffect(() => {
+    if (affordable && !couldAfford.current) pushToast("The fungus has mutations to keep: choose where they go, in the Fungus panel.", "good");
+    couldAfford.current = affordable;
+  }, [affordable]);
   // Losing Jev mid-game (the cap, a stop) is worth a notice; the lock at page load is in the panel already.
   const wasRunning = useRef(false);
   useEffect(() => {

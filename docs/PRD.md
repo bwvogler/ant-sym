@@ -3291,7 +3291,7 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 - Jev's spend, caches, Stop and Resume;
 - infection, resistance and unity figures;
 - the world's settings (seed, ground, rival, ants, speed slider, trails);
-- the **lab**: the spore brush and strains, the fungus's menu, hide and cull, and each colony's doctrine, for experiments.
+- the **lab**: the fungus's menu, hide and cull, and each colony's doctrine, for experiments. (The spore brush and strain picker were here until §50.15.)
 
 **Learn** shows doctrines read-only. **Removed:** the lure and alarm brushes, which painted only the first colony's fields.
 
@@ -3594,15 +3594,276 @@ The owner's rule: **don't spend while answers are cached; ask Jev only for the s
 - **Details shows the budget** (spent of today's, and what is left) beside the run's own figures. Tests: a second run on the same day starts with what the first spent; a new day starts again; a reply from a replaced run counts; the store carries a restart.
 - The per-run caps stay in the ledger, with their old default, for any caller that asks for them.
 
+### 50.12 Infection difficulty and the fungus's progress: a body, adaptations and reach (ja-lo8.12, 2026-11-07)
 
-## 51. Each ant's own stance (top-down; ja-k4k.6, ja-d8e, 2026-11-08)
+**The problem, measured.** The landing alone (no ant dosed) took the whole colony and its queen within half a minute of sim, on every strain and seed (`scripts/progression.mjs`, side world, 600 + 600 ants, local rule plus the shipped answers of an aim):
+
+| Seeds 1–3, Unite | First host | A quarter | The queen |
+|---|---|---|---|
+| Garden as listed, the game before this | 2 s | 12–14 s | 19–25 s |
+
+At 4× that is a few seconds of wall time, and the fungus started with every power it would ever have. Infection was a cliff, not a slope. In a mixed nest, every ant settles at the same load once transmission beats what four groomers take off a visible host, so there was no middle. Below that threshold, a lone host could not infect anyone: `clear` zeroed a clean ant's first step, so the minimum dose depended on step size.
+
+**The owner's decisions.**
+- **Strength unlocks, Jev answers the full range.** Upgrades widen how far each group of levers may go. Jev is still asked every lever on its full scale, and the level is held only where it takes effect, so caches are never re-asked at an unlock.
+- **A grounded body, and adaptations from growth** rather than a currency: a real mycelium at the landing, and upgrades that come from fungus grown in hosts. A research note with primary sources comes first ([fungus-body.md](fungus-body.md)).
+- **The queen keeps a larger grooming cap (8) as a stop-gap,** and grooming, still scripted, is filed as a vision gap (`ja-k4k.12`, a new row in the gap table).
+
+**Built.**
+- **Reach** (`levers.hold`, `Fungus.held`). Each lever's level is pulled toward "as is" until it is within the lever's reach (0, 1 or 2 levels). It is applied in `expressLevels` and in the queen's step. A lab or test preset (`express`) is not held. `fungalKey` and the request are unchanged, and a test pins that.
+- **The fungus's body and evolution** (`colony/evolution.ts`, `Fungus.evolve`, `Fungus.root`, `Game.land(k, strain, { evolve: true })`, which only the page passes):
+  - **Its strain starts weak:** transmission 0.12, decay 0.03/s. In a crowded nest, four groomers take more off a visible host than it passes on.
+  - **A mycelium at the landing.** Its mass grows logistically (rate 0.03/s) up to the patch's capacity. It puts out a share of its mass a second as spores onto the landing cells, paid out of its mass, so it settles where growth meets sporulation. Foragers keep walking through it all game.
+  - **Adaptations from fungus grown in hosts:** load taken on from spores or by contact (`Evolution.replicate`). The mycelium's own growth gives spores, not adaptations. The n-th adaptation comes at growth 10 × (1.28ⁿ − 1)/0.28, so each takes 1.28× the growth of the last.
+  - **The upgrades,** costed in adaptations, 1–4 a level:
+    - Spread: Infectivity (0.12 → 0.15 → 0.23 → 0.3), Persistence (decay 0.03 → 0.012 → 0), Mycelium (capacity 30 → 60 → 120), Fruiting body (0.6 → 1.2 → 2 % of mass a second as spores), Immune evasion (0 → 35 → 70 % of primed resistance slipped past).
+    - Reach: Stealth (showing), Senses (starts at one step), Recognition, Trails, Royal (the side view only).
+    - Lethal levers stay on the menu toggle. The 40 adaptations' worth is not all reached in 20 minutes, so what the player chooses matters. (Since §50.16 the lethal levers have upgrades too.)
+- **The minimum dose is a rate** (`FungusParams.minDose` 0.02/s): a clean ant takes no load from a rate below it, at any step. `clear` zeroes only a falling load. At the 0.1 s step this is the old behaviour, and every earlier test passed unchanged.
+- **The queen's retinue:** `queenGroomers` 8. It is a stop-gap; see `ja-k4k.12`. (Since §50.14, in the evolving game only.)
+- **The page.**
+  - The Fungus panel shows the mycelium, the fungus in ants, adaptations to choose with a bar toward the next, and each upgrade's next level with a button.
+  - The ant card shows a held lever as what the host runs, plus "(wants …)" and the upgrade that would widen it.
+  - A notice says when there is an adaptation to choose, and the guide has an entry on the body and adaptations.
+  - `SAVE_VERSION` is 2: the fungus's save holds its evolution and its patch.
+
+**Measured** (same harness; the evolving fungus chooses the next upgrade in a fixed order as soon as it can; 20 minutes; the order fits each aim: Spread takes Stealth first, Unite last):
+
+| Aim | Seed | A quarter | Half | The queen | Adaptations at 20 min |
+|---|---|---|---|---|---|
+| Unite | 1 | 307 s | 372 s | 407 s | 29 |
+| Unite | 2 | 301 s | 315 s | 340 s | 29 |
+| Unite | 3 | 224 s | 257 s | 275 s | 29 |
+| Spread | 1 | 265 s | 293 s | 325 s | 28 |
+| Spread | 2 | 317 s | 332 s | 345 s | 29 |
+| Spread | 3 | 193 s | 219 s | 226 s | 29 |
+| Unite (confirm) | 11 | 360 s | 394 s | 400 s | 29 |
+| Unite (confirm) | 12 | 406 s | 425 s | 426 s | 29 |
+| Unite (confirm) | 13 | 281 s | 291 s | 336 s | 29 |
+| Unite, choosing nothing | 1–3 | never in 15 min | — | never | 4–5 waiting |
+
+- **The shape.** One adaptation arrives at the landing. Then a quiet two to three minutes follow while the trickle by the hole grows the next few. The breakthrough is the choice that tips transmission over grooming (Infectivity II, or Persistence with Infectivity I, or Stealth under an aim that hides). Then comes a run of choices as the nest fills, and a slower stream after that, about one a minute or two.
+- **The worst seed:** a quarter at 406 s and the queen at 426 s (about 1¾ minutes of wall time at 4×). The best: 193 s and 226 s. Before, the spread was 12–25 s.
+- **How the tuning got here.** Seed variance came from how many ants walk past the hole. A patch topped up to a fixed level from nothing, with income from carried load, varied 4× in early income between seeds (quarter at 27–295 s). A mycelium that pays for its spores, with adaptations from growth in hosts, narrowed it to the table's 193–406 s. The patch first starved to nothing when it kept a level topped up; spores as a share of mass settle instead.
+- **Not settled:** once the nest is held, the colony's resistance climbs to 0.7–0.9 by 20 minutes, but the fungus holds 100 % on every seed. Whether the colony should claw back is for `ja-lo8.10` (balance).
+
+**Jev cost: unchanged.** No legend, question, situation or brain version changed, and reach acts after the answer. So the fungus lane's ~708 real tokens per situation and its shipped answers stand (`precache.test` passes unchanged). An upgrade re-asks nothing.
+
+**Tests** (`tests/evolution.test.ts`, 7):
+- hold pulls toward as is, and leaves an unheld lever's range alone;
+- reach changes the host's gains but not the asked levers or the cache key;
+- adaptations come at rising thresholds and are given level by level, and a save round-trips;
+- the mycelium settles where growth meets sporulation, and its growth gives no adaptations;
+- the minimum dose means the same at a 0.1 s and a 0.02 s step;
+- the landing roots, sporulates and grows adaptations, and a lab landing has no body;
+- listed Garden takes over 90 % in 60 s, while the evolving one, choosing nothing, stays under half.
+
+`tests/save.test.ts` now lands the fungus evolving, as the page does.
+
+**Beads:** `ja-lo8.12` (this), `ja-k4k.12` (grooming from sensed cues), `ja-260` (the brush's cost: closed by §50.15, the brush removed), `ja-lo8.10` (balance: the colony clawing back).
+
+### 50.13 Mutations that track growth, and parity for founded colonies (ja-lo8.12, 2026-11-07)
+
+**The owner's direction.**
+- **The first colony must have nothing a founded colony couldn't get.**
+- **Adaptations should be mutation opportunities, and track growth rate.** "A little magical thinking in the interest of game joy" is allowed.
+- **Two ideas for later, filed as beads:** the mycelium finds food (`ja-lo8.13`), and the mycelium offers itself as food (`ja-lo8.14`).
+
+**Parity.**
+- **The colony side was already equal.** A founded colony (`Game.addColony`) gets the same as a colony the world starts with: the same params except its identity, the same cap, a queen, chambers, the same policies and responses, and the same wiring (grids, enemies, burials, raids).
+- **The one asymmetry was this slice's:** only the landing colony had a mycelium by its hole.
+- **Fix.** `Founding.fungus` carries the founding queen's fungus. When it is the evolving strain, the fungus roots a patch by her new hole, so the landing colony gets nothing a founded one can't. Each patch brings its own start (`BODY.start`) and room (capacity × patches). `ja-lo8.9` passes the fungus when it builds founding.
+- **A test pins both:** colony parity, and a patch only for a queen carrying the evolving fungus.
+
+**Mutations** (`MUTATION` 0.25 per unit of new fungus) replace §50.12's adaptations at rising thresholds:
+- **What counts:** every bit of new fungus is a chance to mutate. That is the mycelium growing on the ground, spores taking hold in an ant (no longer, since §50.14), and load passing on contact.
+- **So the rate tracks growth.** A fungus that grows fast mutates fast, and the panel shows mutations a minute (averaged over 20 s).
+- **The player keeps them,** giving mutations to an upgrade's next level. Each level asks more than the last: 2–10 for a first level, 300–1,500 for most second ones, 2,000–6,000 for the strongest. The rising costs stand in for selection and for adaptation's diminishing returns ([fungus-body §3](fungus-body.md#3-adapting-to-hosts)).
+- **The licence taken:** growth on the ground counts too, though the passage study ties adaptation to hosts.
+- **The harness picks like a player:** the first affordable upgrade in a priority order, so one it can't yet afford doesn't hold up a cheaper one.
+
+**Measured** (`scripts/progression.mjs`, 20 minutes):
+
+| Aim | Seeds | A quarter | The queen | Kept at 20 min |
+|---|---|---|---|---|
+| Unite | 1–3 | 155–206 s | 201–302 s | 14–16 upgrades |
+| Spread | 1–3 | 136–182 s | 169–212 s | 16–17 |
+| Unite (confirm) | 11–13 | 199–224 s | 216–244 s | 14–16 |
+| Unite, keeping nothing | 1–3 | never in 15 min | never | 53–63 mutations waiting |
+
+- **The rhythm:**
+  - a first choice within 3 s of the landing;
+  - one about every 30–60 s up to the breakthrough (two to three minutes in);
+  - then every one to three minutes as costs climb.
+
+  By 20 minutes about half of everything is kept (4,400–11,600 mutations earned, against 21,600 for all), so choices matter.
+- **Compared with §50.12's thresholds:** the breakthrough comes about a minute earlier, because the mycelium's growth now mutates too. The worst seed is still under four minutes to a quarter of the colony.
+
+**Jev: unchanged.** No request changed, and an upgrade re-asks nothing.
+
+**Tests:** `evolution.test.ts` now has 9:
+- mutations as a share of growth, with rising costs per level;
+- the rate settling at `MUTATION` × growth, and ten times the growth giving ten times the mutations;
+- two patches holding twice as much;
+- parity between first and founded colonies, and a patch for a carried fungus.
+
+### 50.14 Review of #43 (2026-11-08)
+
+The review approved once S1 and S2 were settled; both are fixed in code, with tests.
+
+- **S1: the queen's cap of 8 is the evolving game's only.**
+  - **Before,** `queenGroomers` changed every game's queen once she became a host. Side seed 1, 300 + 300 ants, Garden landed without evolving: her load at 90 s was 0.398 against `main`'s 0.510.
+  - **Now** a game that doesn't evolve grooms her with the usual cap (`groomers`, 4), so the lab, the assays and the earlier crown and regicide figures stand as measured.
+  - **Test:** not evolving, the cap is never read; evolving, it is.
+- **S2: mutations count only new fungus.**
+  - **The bug:** a host's gain from ground spores was credited as growth, though the mycelium had already been credited when it grew those spores. The landing's painted spores were never grown at all. About 20 % of early mutations were counted twice.
+  - **Now** only the contact share of a host's gain counts, since contact leaves the source its load.
+  - **Test:** contact counts exactly what it passed on; a lone ant on spores takes load and adds nothing.
+- **T1, T2:**
+  - **T1:** a test that the queen's levels are held (Stealth decides how far she hides).
+  - **T2:** a test that host mutations count, the same one as S2's.
+  - Both fail under the review's mutations (removing the queen's hold; deleting the worker's credit).
+- **Nits:**
+  - **N1:** a guard that every `#field` of `Fungus` is saved, derived on load or per-step scratch, as #42 did for `Colony`.
+  - **N2:** reach and immune evasion act only on hosts of the evolving strain; a lab brush's strain in an evolving game is as listed.
+  - **N3:** spores a full cell can't hold go back into the mycelium instead of being paid for and clipped.
+  - **N4:** a load with no evolution puts every strain back as listed.
+
+**Re-measured** (`scripts/progression.mjs`, as §50.13):
+
+| Aim | Seeds | A quarter | The queen | Kept at 20 min |
+|---|---|---|---|---|
+| Unite | 1–3 | 169–216 s | 219–314 s | 14–16 upgrades |
+| Spread | 1–3 | 156–193 s | 182–217 s | 17 |
+| Unite (confirm) | 11–13 | 218–241 s | 239–257 s | 14–16 |
+| Unite, keeping nothing | 1–3 | never in 15 min | never | 43–46 mutations waiting |
+
+- **The first choice** now comes 12–21 s after the landing, not at once: the landing's spores no longer count.
+- **The rest is 10–30 s later than §50.13,** and the worst seed reaches a quarter of the colony at 241 s.
+
+**Tests:** 402 fast tests pass, including 15 in `evolution.test.ts`. Jev cost: unchanged.
+
+### 50.15 No spore brush (ja-260, 2026-11-08)
+
+**The problem.** The lab's spore brush (Details) dosed every ant under a stroke for free, in any game: one drag skipped the weak start, the mycelium and every upgrade (§50.12–14). `ja-260` asked for the brush to cost the fungus, or to be a choice.
+
+**Why not lock it after the landing.** Every game the app plays, started or loaded, lands an evolving fungus at once (`useColony`, `Game.land(…, { evolve: true })`). So there is never a game without one in which a brush could stay free, and a lock would remove the brush anyway.
+
+**Decision (owner):** remove the brush and its strain picker from the app. The fungus reaches the ants only from where it lands.
+
+- `Game.paintSpores` and `Fungus.paint` stay for tests and the scripts (`crown.mjs`, `muddle.mjs`, `fungus-cost.mjs`). The stroke they replay is `BRUSH` in `game.ts` (radius 3, spores 2, dose 0.15), moved from `useColony.ts`; the scripts import it.
+- Gone from the field: the paint gesture, and space+drag to pan while painting.
+- Gone from the lab: the brush and strain buttons. The lab keeps the fungus's menu, hide and cull, and the doctrines.
+- The other strains (Lockpick, Bloom) remain as `STRAINS` entries, used by tests and scripts (and still described in `policyText.ts` and the Learn guide). Nothing in the app lays them now; `ja-lo8.10` decides whether they come back as something the game unlocks.
+- The figures measured with "the UI brush" (§39, §49.4, §50.9) stand. Their harnesses replay the same stroke.
+
+**Tests and cost:** no sim change, so the golden masters and the fast tests stand as they were. Jev cost: unchanged.
+
+**Review (own agent):** nothing blocking. Fixed: the scripts import `BRUSH` instead of copying it; the Learn guide and two research notes (`fungus-policy.md`, `queens-and-merging.md`) no longer send readers to a brush or a lab strain picker; Space on the focused field is still kept from scrolling the page. Filed: the lethal levers (crown, odour weapon) are held to no reach, so a player who turns one on gets it at full strength from the first second (`ja-lo8.16`).
+
+### 50.16 Lethal levers join the progression (ja-lo8.16, 2026-11-08)
+
+**The problem.** The review of #46 found the last free power. `Evolution.reach()` gave a reach only to levers some upgrade named, and no upgrade named the lethal levers (odour weapon, crown). So a player who put one on the menu got it at full strength from the first second, from Jev or from the local rule's cull, while every other lever was held to the reach the fungus had earned (§50.12).
+
+**Built.** Two reach upgrades, after Royal in `UPGRADES`, so that earlier indices and saves keep their meaning:
+
+| Upgrade | Lever | Steps | Cost | Where |
+|---|---|---|---|---|
+| Odour weapon | `weapon` | held off → free | 2,500 | every map |
+| Crown | `crown` | held off → free | 5,000 | the side view only (`nest`, as Royal) |
+
+- **Both are binary levers,** so reach 0 holds one as is (off) and reach 1 frees it. `hold` already did the rest. The hosts (`expressLevels`, which covers Jev's answers and the local rule) and the queen go through `Fungus.held`, so nothing else changed.
+- **Two gates, two meanings.** The menu chip is the player's permission, and the upgrade is the fungus's power. Both are needed.
+- **The page:**
+  - The Fungus panel lists both upgrades in the lethal red.
+  - A followed host shows a held lethal lever as "crown: off (wants on)", with the upgrade to keep, through the ant card's existing hint.
+  - The guide says so in its policy and evolution entries.
+- **Costs are first guesses,** placed among the strongest second levels (2,000–6,000, §50.13). Balance (`ja-lo8.10`) tunes them.
+- **Not held:** a game that does not evolve (the lab's landings, the assays, the tests), and a lab or test preset run with `express`.
+- **Saves:** a version-2 save without these levels loads them at 0 (held off), so `SAVE_VERSION` stays 2. A save from a game with a lethal lever on the menu therefore stops culling or killing queens once loaded, until the player keeps the upgrade.
+
+**Unchanged:**
+- **Jev cost:** no request changed, and reach acts after the answer, so `precache.test` stands.
+- **The golden masters:** they are bit-exact, since games that don't evolve have no reach.
+- **`scripts/progression.mjs`:** its figures stand. Its order buys neither upgrade, and its menu has no lethal lever.
+
+**Tests:**
+- 404 fast tests pass.
+- `evolution.test.ts` has a new test. It checks three things:
+  - every lever has a reach;
+  - weapon and crown start at 0;
+  - on a side world with both on the menu, a host's `estrange` and `regicide` stay 0 until each upgrade is kept, then rise. A game that doesn't evolve holds nothing.
+- It fails when the two upgrades start free.
+
+**Review (own agent): nothing blocking.** The hold covers every path where a lethal lever takes effect. Fixed:
+- **Copy.** The Learn drawer's local rule said the weapon works "only if it is on the menu"; it now also names the upgrade.
+- **Lethal lever on the menu but held off.**
+  - The Learn drawer's lever list now says "lethal, on, held off until you keep …".
+  - The lever chip's tooltip says the same.
+- **A lethal upgrade off the menu.**
+  - The panel marks it "(not on the menu)".
+  - The "mutations to keep" notice now ignores upgrades that would do nothing. It also ignores those the view hides, which was already true of Royal on the top-down view.
+- **A step-level test.** A policy that culls, run through `Fungus.step`, estranges no host until Odour weapon is kept. It fails if the step skips the hold.
+- **Nits.**
+  - The ant card's tooltip names a lethal lever as lethal, and says "its policy wants" rather than "Jev wants".
+  - The guide says "in the game", since the lab's own landings are not held.
+
+## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
+
+The owner asked for the top-down view and the side view to be two views of one game. The side view would be a cut along a line through the nests' holes, zig-zagging as nests are added, and a new nest may not be founded nearer an interior nest's hole, so the line always grows from an end. Today they are two unrelated games, and the Ground control throws the game away to switch (§27 created the split without choosing it).
+
+**Decisions (owner, 2026-11-08):**
+- **Underground is a curtain under the line, not a 3D volume.**
+  - The surface is a 2D plane with today's top-down physics.
+  - Everything underground lives in one vertical sheet under the line, with today's side-view physics, and the side view shows all of it.
+  - A hole is the only way between the two.
+  - A full 3D underground was set aside: depth-times the memory and tick cost, 3D digging and homing, and a side view that would miss tunnels.
+- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it, it is a 2D hole gap from every hole, and the ground is open.
+- **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
+
+**The note's open questions, answered (owner, 2026-11-08):**
+- **Tunnels of neighbouring colonies may meet** in the curtain; the contact response decides. A dig-stop rule would read another nest's position.
+- **A founding flight with no valid landing within her radius fails**, and the game says why. `new-queens.md` §3 is changed to match.
+- **Wide screens get the above/below switch first**; both views at once is a follow-up (`ja-lp4.8`).
+- **After U6 the old side and open maps leave the page**, kept as test beds until their assays are re-baselined.
+
+The founding radius stays open until the research bead (`ja-lp4.7`) gives a figure.
+
+**Cost.** None yet. The mode situation keeps its fields, so one world should not change Jev's cost; U3 checks it with `colony-cost`. Tick cost will rise toward the side view's 7.0–7.3 ms at 1,200 + 1,200 ants (§36, §37); U6 measures it before the page switches.
+
+**Review of #45 (agent, 2026-11-08):** the tick estimate (it had cited the old underground map, not the side view), the founding rule's clearance at the shared vertex and a minimum turn, ties, the hex rasterisation of the line, what growing the line does to the old end's margin, the larder (kept; it no longer makes ants), the 2D hole gap, the curtain's crust and margin, and where the fungus's mycelium lies were corrected in the note.
+
+**The mycelium lives in the soil (owner, 2026-11-08).** Not on the surface: the sun's UV would kill it. In one world it grows in the shaft's soil walls just under the hole, in the curtain, and ants pick it up brushing past; its spores reach the plane only on ants and corpses. Today's game roots it on the open cells by the hole, where ants walk (§50.12); `ja-yo3` moves it into the soil, with UV and habitat sources added to `fungus-body.md` first.
+
+## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
+
+The owner asked whether the side view's undiggable crust could become an ant's own choice, and whether colonies could open new entrances (`ja-nzx`, `ja-4h2`, `ja-lp4.9`). `docs/entrances.md` holds the research:
+- Older, larger harvester colonies keep more entrances, funnelled into one entrance chamber (Gordon 2025).
+- Entrances are sealed at night and plugged by rivals.
+- Soil CO₂, moisture and temperature change with depth, and diggers respond to CO₂ (in a leaf-cutter) and moisture in choice tests; no study shows ants reading depth from them. Light matters only once the soil is open.
+
+No source found says what makes a colony open a new entrance from inside.
+
+**Decisions:**
+- **The crust stays a mechanic.** It keeps the walkway from hanging and the hole from being cut off.
+- **`ja-4h2` is deferred.** The cues exist, but the response that would use them would be invented. It reopens on a source about what triggers a new entrance, or when another behaviour needs a depth sense (for example chamber placement, `ja-k4k.3`).
+- **No vision sense-table row yet.**
+- **Two ideas filed:** new entrances that scale with colony size, into one entrance chamber (noted on `ja-lp4.9`), and closing entrances at night and plugging a rival's (`ja-lsu`, blocked by day and night, `ja-0qs`).
+
+**Review (agent):** corrected the light study's journal, the venting test's citation (Tschinkel 2013), placeholder titles, the fire-ant figure's source (Hays 1986), and an overclaim that ants read depth from the gradients; an untraceable claim on morning sealing was dropped and the evening sealing is sourced to a secondary page.
+
+**Search note.** Web searches on how long an insect-killing fungus survives sunlight (`ja-2qv`) were stopped by a safety filter this session; that research waits for a new session. This note's topic was not affected.
+
+**Cost.** None: docs and beads only.
+
+## 53. Each ant's own stance (top-down; ja-k4k.6, ja-d8e, 2026-11-08)
 
 Research basis: `docs/stance.md`. Every figure was read in a search summary, not the paper, so all are **unverified**.
 - **Defence is an individual's threshold.** A pavement-ant worker fights a stranger once an internal state passes a threshold, raised by recent encounters (Hoover et al. 2016; Bubak et al. 2016: octopamine and serotonin). *Pheidole* defence moves closer to the nest as the threat grows.
 - **Hunger does not raise aggression.** Sugar-starved Argentine ants grew less aggressive (Grover et al. 2007); starved and fed colonies were no different (Thomas et al. 2005).
 - **Crowded colonies raid.** Fire-ant brood raiding rose from 0 % to 68.5 % with colony density (Tschinkel et al. 1995). The denser side wins boundary disputes.
 
-### 51.1 What was there
+### 53.1 What was there
 
 - **A colony-level strategist.** Every 5 s it chose one stance (forage, defend or raid) and told every ant. It read:
   - food brought home, averaged over 60 s;
@@ -3612,7 +3873,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
 - **Its rule** raided when no food came in, which had no source behind it, or when the larder was full and the colony large.
 - **"Defend"** sent every ant that smelt alarm to fight, wherever it was, and sent every waiting forager out.
 
-### 51.2 What changed (open ground; `stanceGate` 1)
+### 53.2 What changed (open ground; `stanceGate` 1)
 
 - **Each ant's stance is its own** (`#stanceOf`):
   - **defend** while its `threat` is past `defendAt` (1) within `homeGround` (10) of its nest. Threat is seconds of alarm smelt or strangers in reach, leaking with a 20 s half-life.
@@ -3636,7 +3897,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
   - New A13 `defendHome`: a war party marches on a colony that forages a far pile.
 - **HUD:** top-down, the side stats show how many ants defend and raid.
 
-### 51.3 Results (local rule)
+### 53.3 Results (local rule)
 
 | | This MR | `main` |
 |---|---|---|
@@ -3658,7 +3919,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
   - crowd-only raids with recruitment all at once: about 880 lost;
   - `raidRecruit` 0.02: A11 8/10, worst seed 1.07.
 
-### 51.4 Jev (spent ≈ $0.022 of $0.10)
+### 53.4 Jev (spent ≈ $0.022 of $0.10)
 
 - **Legends** (colony v7, response v10; the stance lane is unchanged, for the side view):
   - Stance, on open ground, is the ant's own: "forage, the usual one; defend, only while it smells alarm or meets strangers close to its own nest; or raid, once recruited".
@@ -3681,7 +3942,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
 - **Losses fall under every doctrine.**
 - **Cautious's food loss is in its mode answers** (`ja-5vx`). With them removed it stores 4,801 (seeds 1–3); with MR 5.2's answers restored for the 15 situations where they differ, 3,645. For example, a rested ant at home with a faint food trail ahead is told to stay home. Those answers vary between recordings of the same doctrine.
 
-### 51.5 Cost
+### 53.5 Cost
 
 Offline estimates (`colony-cost`), on this branch against `main` on the same machine:
 
@@ -3694,7 +3955,7 @@ Offline estimates (`colony-cost`), on this branch against `main` on the same mac
 
 The longer legends cost a few per cent; the top-down stance lane is gone. The estimates were taken before the last two wording changes, which are within a sentence of them.
 
-### 51.6 Left out
+### 53.6 Left out
 
 - **The side view** keeps the strategist and raids by coordinates (`ja-1a9`; `ja-k4k.6` stays open for it).
 - **A fight-recruitment signal** (pavement ants' escalation): alarm already draws defenders.

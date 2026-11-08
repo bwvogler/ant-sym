@@ -140,6 +140,33 @@ export function compose(levels: LeverLevels, menu?: ReadonlySet<string>): Levers
   return out;
 }
 
+/**
+ * How far each lever may go from "as is", by id: 0 holds it as is, 1 one level either way, 2 two (evolution.ts: the
+ * fungus earns its reach). A lever left out has its full range.
+ */
+export type Reach = Readonly<Record<string, number>>;
+
+/**
+ * Levels held to `reach`: each level pulled back toward its lever's "as is" until it is within reach (ja-lo8.12). Jev is
+ * asked every lever on its full scale and its answer is cached that way; reach acts only here, where levels take
+ * effect, so earning more reach changes no question and re-asks nothing. A level already within reach is unchanged,
+ * so levels with nothing held back come back as the same object.
+ */
+export function hold(levels: LeverLevels, reach: Reach | null): LeverLevels {
+  if (!reach) return levels;
+  let out: Record<string, number> | null = null;
+  for (const [id, level] of Object.entries(levels)) {
+    const r = reach[id];
+    if (r === undefined) continue;
+    const lever = LEVERS[leverIndex(id)] as Lever;
+    const held = lever.asIs + Math.max(-r, Math.min(r, level - lever.asIs));
+    if (held === level) continue;
+    out ??= { ...levels };
+    out[id] = held;
+  }
+  return out ?? levels;
+}
+
 /** The levers pulled away from "as is" in `levels`, in table order: what the panel lists. */
 export function pulled(levels: LeverLevels, menu?: ReadonlySet<string>): { lever: Lever; level: number }[] {
   const out: { lever: Lever; level: number }[] = [];

@@ -43,6 +43,31 @@ The paper hosts were mostly outside this session's network allowlist. As in `rai
 
 **For the model:** a waiting ant at home that meets many nestmates (crowded) and few returning with food may go out as a raid scout. This is the fourth answer to the `leave` question, "raid", so the doctrine can raise or forbid it. It stands in for the old "larder full and colony large". The individual rule is a design choice: the sources show crowding and raids together at the colony level, not the worker's cue. Once out, a scout is a raider as before: it finds strangers, lays the raid trail, and the trail recruits (`raid-recruitment.md`).
 
+## Play
+
+Built on top-down maps only (PRD §53). The page starts in the side view, which keeps the colony's strategist (`ja-1a9`).
+- **See:**
+  - A war party at a nest is met by the ants near it, while foragers far off keep carrying.
+  - Raids start small: a few scouts leave a crowded nest, and recruits follow a finder's trail by degrees, not in one wave.
+  - The Details side stats show how many ants defend and raid. The Learn drawer's mode senses say stance is the ant's own on open ground. The colony's stance section is now for the side view.
+- **Choose:** no new lever. The fungus already reaches the cues:
+  - *stranger scent* and *fungal odour* (Recognition) change who counts as a stranger, so who feels threatened;
+  - *soothe* quiets alarm, the other half of threat.
+
+  How readily a colony raids is still its doctrine (`leave` answers "raid" under Forage and Warlike, never under Cautious).
+- **Counterplay and progression:** wars are smaller and later (G′: half the ants lost against `main`), so colonies live longer and the fungus has more hosts and more time. That slows the cliff where a raid reaches a queen. Recognition reaches one step for 10 mutations and the full range for 1,500 (`evolution.ts`).
+- **Cost:**
+  - Live checks with every lane: $0.0066 a run top-down; mode about 200 real tokens a question, leave about 400.
+  - The top-down stance lane is gone (about $0.024/h for the mode lane, against $0.030 on `main`).
+  - A cached game spends nothing.
+- **Risks:**
+  - **Famine:** under Jev's Cautious answers foragers stay home (food −42 %, `ja-5vx`).
+  - **A cliff:** if the trail recruited everyone at once, every raid would be a war, as it was before graded recruitment (G′ about 880 lost against 170). The number to watch is G′'s worst seed (507 ants left, against `main`'s 223).
+  - **Invisible effects:** a defender looks like any fighter on the field.
+- **Owner decisions needed:**
+  - whether defenders should be drawn differently;
+  - whether the fungus should get a lever on the threat itself, beyond alarm and recognition.
+
 ## Left out
 
 - **The side view** keeps the colony-level strategist until its raids follow trails underground (`ja-1a9`).

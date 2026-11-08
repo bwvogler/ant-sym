@@ -3,6 +3,7 @@ import type { Colony, Mode, Stance } from "../colony/colony.ts";
 import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, GAME_REGROW, gameRng, type Outcome, type Unity } from "../colony/game.ts";
 import { chapterOf, type ChapterView } from "../colony/chapters.ts";
+import { UPGRADES } from "../colony/evolution.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
@@ -13,12 +14,9 @@ import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts
 // panel shows, the renderer reads the colonies' typed arrays every frame. A
 // new seed, ant count or rival setting is a new game on a fresh map.
 
-/**
- * The spore brush, a lab tool (Details): spores on the ground and a dose of the chosen strain into the ants there. The
- * lure and alarm brushes are gone (ja-lo8.2): they painted only the first colony's fields, a leftover from when the
- * player was that colony, and the fungus works through its hosts, not the player's hand.
- */
-export type Brush = "none" | "spores";
+// No brush: the fungus works through its hosts, not the player's hand. The lure and alarm brushes went in ja-lo8.2
+// (they painted only the first colony's fields); the spore brush went in ja-260, since every game lands an evolving
+// fungus and a free stroke skipped its progression. Game.paintSpores (and its BRUSH stroke) stays for tests and scripts.
 
 export interface ColonyControls {
   seed: number;
@@ -27,9 +25,6 @@ export interface ColonyControls {
   playing: boolean;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
-  brush: Brush;
-  /** which of the fungus's strains the spore brush paints (an index into STRAINS) */
-  strain: number;
   /** the fungus's menu: the levers the player has on (§5.1, lever 4; levers.ts) */
   menu: string[];
   /** the local rule's settings: hide groomed hosts; cull high-load fighters among strangers */
@@ -54,12 +49,7 @@ export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 /** The colony the fungus lands by. */
 export const LANDING_COLONY = 0;
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, brush: "none", strain: GAME_STRAIN, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side" };
-
-/** The spore brush, per paint event: radius in cells, spores laid per cell, and load dosed into each ant under it. */
-const SPORES = { radius: 3, spores: 2, dose: 0.15 } as const;
-
-export { STRAINS };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side" };
 
 /** One colony's line in the panel. */
 export interface SideStats {
@@ -113,6 +103,33 @@ export interface ColonyStats {
   pace: number;
   /** where the player stands (chapters.ts) */
   chapter: ChapterView;
+  /** the game's fungus's body and evolution (ja-lo8.12); null before it lands (a game built without Game.land's evolve, as tests do, has none) */
+  evolution: EvolutionStats | null;
+}
+
+/** The fungus's body and evolution, for its panel. */
+export interface EvolutionStats {
+  /** its mycelium's mass by the hole */
+  mass: number;
+  /** the load in its hosts, summed over every colony's ants and queens */
+  inHosts: number;
+  /** mutations to give (whole ones), and how many it makes a minute now: it mutates as fast as it grows */
+  mutations: number;
+  perMinute: number;
+  /** the level chosen of each upgrade, by id */
+  levels: Record<string, number>;
+}
+
+/** The game's fungus's body and evolution, read off the game. */
+function evolutionStats(game: Game): EvolutionStats | null {
+  const e = game.fungus.evolution;
+  if (!e) return null;
+  let inHosts = 0;
+  for (const c of game.colonies) {
+    for (let i = 0; i < c.n; i++) if (c.alive[i] && c.strain[i] === e.strain) inHosts += c.load[i] as number;
+    if (c.queen?.alive && c.queen.strain === e.strain) inHosts += c.queen.load;
+  }
+  return { mass: e.mass, inHosts, mutations: Math.floor(e.mutations), perMinute: 60 * e.rate, levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])) };
 }
 
 /** Ants in each mode, over every colony. */
@@ -219,6 +236,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           unity: game.unity(),
           pace,
           chapter: chapterFor(game),
+          evolution: evolutionStats(game),
         });
         lastStats = t;
       }
@@ -237,7 +255,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
 
   // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
   useEffect(() => {
-    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN);
+    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
   }, [game, controls.started]);
   /** A saved game, as it was: its world and settings, then its state (Game.load), playing. The player's state is the page's to put back. */
   const loadSave = useCallback((r: SaveRecord) => {
@@ -259,16 +277,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const update = useCallback((patch: Partial<ColonyControls>) => setControls((c) => ({ ...c, ...patch })), []);
   const restart = useCallback(() => setGeneration((g) => g + 1), []);
   const newWorld = useCallback(() => setControls((c) => ({ ...c, seed: 1 + Math.floor(Math.random() * 99_999) })), []);
-  /** Paint at (x, y) in cells; `scale` widens the brush (the field passes more when zoomed out, so a stroke stays a stroke on screen). */
-  const paint = useCallback(
-    (x: number, y: number, scale = 1) => {
-      if (controls.brush !== "spores") return;
-      game.paintSpores(x, y, SPORES.radius * scale, SPORES.spores, SPORES.dose, controls.strain);
-    },
-    [game, controls.brush, controls.strain],
-  );
+  /** Give adaptations to the next level of upgrade `id` (evolution.UPGRADES); false when the fungus can't. */
+  const evolve = useCallback((id: string) => game.fungus.upgrade(id), [game]);
 
-  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, paint, start, loadSave, settings };
+  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve };
 }
 
 /** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */

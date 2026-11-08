@@ -139,6 +139,18 @@ Each item says whether it touches the Jev situation (paid) or only steering and 
 
 No schema change here. If a later change adds a binary situation dimension (item 3, second form), the ant question space doubles to 2,592. From the MR 4 measurements, war situations met per doctrine would rise from ~460 toward ~900 at ~440 tokens each: still about $0.02 per doctrine, but measure it with `npm run colony-cost` before and after.
 
+## Play
+
+*Added 2026-11-08 (`ja-gvt`). A summary across the channels built since this note; the PRD sections hold the figures.*
+
+- **See:** food trails that build and fade as patches fill and empty; on top-down maps, followers taking the stronger branch (PRD §45.3), faint alarm drawing empty-jawed explorers and strong alarm repelling them (§46.3, top-down only), and raiders filing along a scout's trail (§49). The Learn entries are Food trail, Home trail, Tasting food, Choosing a branch, the "no entry" mark, Alarm, and Strangers and battles (`ui/guide.ts`); the last says raids are still partly scripted (`ja-k4k.6`).
+- **Choose:** the channels are the colonies' own, since no colony is the player's (§21). The player reaches them only through the fungus's levers (`levers.ts`). Perception: food scent, rival trails as food, home scent, alarm, stranger scent. Emission: trail laid, trail leaked to rivals, alarm laid, calming cue, fungal odour.
+- **Counterplay and progression:** colonies push back by grooming, rejection and fights (fungus-policy §6). Reach sets the slope (§50.12): Senses starts at one step; Recognition and Trails start at none and cost 10 mutations, then 1,500, for the full range (`evolution.ts`, §50.13). Silent fights or leaked trails are a mid-game power, not an opening one.
+- **Cost:** the page asks Jev only the mode and stance lanes; trail and contact run the local rule there (§45.6, §46.6). The mode lane cost ~451 tokens per question asked live, top-down (§12); later hourly figures are estimates (~$0.078/h side view, §49.4). A game whose situations are all cached spends nothing, under one $0.10 daily budget (§50.11).
+- **Risks:** mills between two nests when hosts read or leak rival trails (assay A3; fungus-policy §6 item 2), with the "no entry" mark built but shipped off (`ja-4n1`, §45.4). Invisible effects: a damped alarm shows only as fewer defenders gathering; fight losses per food (A9) would measure it.
+- **Still open:** the side view's raids still aim by coordinates (`ja-1a9`, §49.6); a route-memory trail and footprints both colonies read (§4 items 2–3) are not built.
+- **Owner decisions needed:** none.
+
 ## Sources
 
 - [Hölldobler & Wilson, *The Ants*, ch. 7 (AntWiki excerpt)](https://www.antwiki.org/wiki/The_Ants_Chapter_7) *(secondary)*
