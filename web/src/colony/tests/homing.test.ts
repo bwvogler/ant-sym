@@ -152,11 +152,15 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
   for (let t = 0; t < 30 * 60; t++) {
     g.tick(1 / 30);
     if (t % 30 === 0)
-      for (let i = 0; i < c.n; i++)
-        if (c.alive[i] && c.mode[i] === 2 && Math.abs(c.driftSurf[i]! * c.odoSurf[i]!) < 3) {
-          samples++;
-          if (c.search[i] !== 0) searching++;
-        }
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || c.mode[i] !== 2 || Math.abs(c.driftSurf[i]! * c.odoSurf[i]!) >= 3) continue;
+        // On the ground line only, where its surface vector is what it homes by: underground it homes by its nest vector,
+        // and a search there round a wrongly believed chamber is that vector's (a young porter, ja-xu6.1's runs).
+        c.antCell(i);
+        if (!isSky(g.map, CELL[0] as number, CELL[1] as number)) continue;
+        samples++;
+        if (c.search[i] !== 0) searching++;
+      }
   }
   assert.ok(samples > 1000, `${samples} samples`);
   assert.equal(searching, 0, `${searching} of ${samples} were searching`);
