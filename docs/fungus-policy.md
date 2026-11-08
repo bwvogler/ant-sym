@@ -28,7 +28,7 @@ Today a game ends at `won` or `lost`: one colony is gone (`game.ts` `outcome`). 
 | **Exchange** | food carried into the *other* colony's nest, or into a shared garden | new counter at the drop-off mechanic |
 | **Mixing** | share of each colony's ants within the tolerance of the other nest's odour | new, from the odour grid |
 
-**Unified** could be: nest odours within tolerance, and no fight deaths for 60 sim-s. A softer score (0–100 %) is the meter. Losing to war stays possible: if the colonies wipe each other out first, the fungus has lost its hosts.
+**Unified** could be: nest odours within tolerance, and no fight deaths for 60 sim-s. *Built that way, then (ja-i0f, PRD §53) also requiring that the colonies have met: a share of their ants in allied contact over the last minute, since colonies that never touch are quiet for free.* A softer score (0–100 %) is the meter. Losing to war stays possible: if the colonies wipe each other out first, the fungus has lost its hosts.
 
 ## 2. Two policies, and the perceived state between them
 

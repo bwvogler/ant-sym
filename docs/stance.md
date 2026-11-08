@@ -45,7 +45,7 @@ The paper hosts were mostly outside this session's network allowlist. As in `rai
 
 ## Play
 
-Built on top-down maps only (PRD §53). The page starts in the side view, which keeps the colony's strategist (`ja-1a9`).
+Built on top-down maps only (PRD §54). The page starts in the side view, which keeps the colony's strategist (`ja-1a9`).
 - **See:**
   - A war party at a nest is met by the ants near it, while foragers far off keep carrying.
   - Raids start small: a few scouts leave a crowded nest, and recruits follow a finder's trail by degrees, not in one wave.

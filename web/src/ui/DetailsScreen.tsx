@@ -3,7 +3,7 @@ import { SITUATIONS } from "../colony/colony.ts";
 import { DOCTRINES } from "../colony/colonyBrain.ts";
 import { LETHAL, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
 import { upgradeFor } from "../colony/evolution.ts";
-import type { Game } from "../colony/game.ts";
+import { MET, type Game } from "../colony/game.ts";
 import { DEFAULT_RECOGNITION } from "../colony/recognition.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import Help from "./Help.tsx";
@@ -199,9 +199,9 @@ function FungusNumbers({ stats }: Props) {
           </div>
           <Bar value={stats.unity.score} />
           <p className="mt-1 font-mono text-xs text-fg-3">
-            nests {stats.unity.gap.toFixed(2)} apart in odour · {stats.unity.deathsPerMinute.toFixed(0)} fight deaths/min · quiet {Math.min(999, Math.floor(stats.unity.quiet))} s · {Math.round(100 * stats.unity.mixing)}% mixed
+            nests {stats.unity.gap.toFixed(2)} apart in odour · {stats.unity.deathsPerMinute.toFixed(0)} fight deaths/min · quiet {Math.min(999, Math.floor(stats.unity.quiet))} s · {Math.round(100 * stats.unity.mixing)}% mixed · met {(100 * stats.unity.met).toFixed(1)}% (needs {100 * MET}%)
           </p>
-          <p className="mt-1 text-xs text-fg-3">One colony when the nests smell alike (within {DEFAULT_RECOGNITION.tolerance}) and nobody has died fighting for a minute. Ants are coloured by odour.</p>
+          <p className="mt-1 text-xs text-fg-3">One colony when the nests smell alike (within {DEFAULT_RECOGNITION.tolerance}), their ants have met (on average over the last minute, at least {100 * MET}% of each colony's ants touching another's, smelling alike; once one, it holds until a fight or the nests drift apart), and nobody has died fighting for a minute. Ants are coloured by odour.</p>
         </div>
       )}
     </Card>

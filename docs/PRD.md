@@ -828,6 +828,8 @@ The player is the fungus (§15). The page and the Jev client still framed the fi
 | underground | 2 | 0 / 0 | 107 s | 0 / 0 | 100 / 100 % |
 | underground | 3 | 0 / 0 | 107 s | 0 / 0 | 100 / 77 % |
 
+*Since §53 (ja-i0f): "unified" also needs the colonies to have met; the underground rows above were the bug.*
+
 - **On the open surface the result holds.** Garden unifies the colonies in about 3 minutes, and fight deaths fall from 374–506 per colony to 8–37.
 - **Underground, unity is vacuous for now.** In 10 minutes the two colonies never meet (no deaths even without the fungus). Garden still reaches "unified" at ~105 s, because the nests' odours converge and the minute is "quiet" with nobody in contact. Unity ("smell alike, nobody has died fighting for a minute") does not ask that the colonies have met. Filed: unified should also need allied contact, ants of both colonies meeting within tolerance (`ja-i0f`).
 - **Every test passes on the new default world.** One test was fragile and is fixed: `perception.test.ts`, where a healthy ant given 8 s on a 40-wide map reached the edge, bounced at random and (with #8's movement) stumbled onto the food. It now runs 4 s, the time the infected ant needs and before the healthy one can reach the edge.
@@ -3856,14 +3858,90 @@ No source found says what makes a colony open a new entrance from inside.
 
 **Cost.** None: docs and beads only.
 
-## 53. Each ant's own stance (top-down; ja-k4k.6, ja-d8e, 2026-11-08)
+## 53. Unity needs contact (ja-i0f, 2026-11-08)
+
+**Problem.** `Game.unity()` called the colonies one when their nests smelled alike (gap within tolerance) and nobody had died fighting for a minute. Nothing asked whether they had met. Colonies that never touch have a quiet minute for free, so the underground world "unified" at about 105 s with zero contact (§22).
+
+**The signal: `Unity.met`.**
+- An ant is in **allied contact** when an ant of another standing colony is in its cell or the six around it (that tick's occupancy grids, `battle.ts` `around`), and its own odour is within tolerance of that colony's nest odour. It smells like them: a meeting, not strangers.
+- Each colony keeps the share of its living ants in allied contact, faded over `QUIET` (60 s) like the fight-death count. `met` is the **least** of the standing colonies' shares, so every colony must have met someone: one pair meeting a lot cannot carry a third that never touched anyone.
+- It is read in `tick()` after odours move (`Game.#meet`). It reads only: no ant state and no random stream moves.
+
+**The rule.**
+- `unified` = gap ≤ tolerance, quiet ≥ 60 s, **`met` ≥ `MET` = 0.01**, and every colony standing.
+- **Latched once won.** When all of that holds, the game remembers it. Unity then stays while the nests stay alike and nobody dies fighting, even if contact fades. Kin forage at home (the strategist does not raid kin), so contact can fade after the win; without the latch the outcome would flap and toast "One colony" again each time. A fight death or the nests drifting apart clears the latch, and the colonies must then meet again. The latch arms only on the whole condition, so contact from before a fight does not re-arm it while the quiet minute is still owed.
+- Enough contact is about 1 % of each colony's ants on average over the fading minute, not a minute of it: with every ant in contact `met` passes the floor in under a second, and at a 3 % share in about 24 s.
+- The unity score is multiplied by `min(1, met / MET)` (1 once latched).
+- `Unity.alike` (gap within tolerance) lets the panel say "the nests smell alike, but the colonies have not met yet".
+- Details shows `met` beside the other unity figures.
+
+**Measured** (Garden painted on both nests, the easiest case; `met` as a share, and as ants on average; the side rows were measured with the pooled share before review, which can only be higher than the least colony's):
+
+| World | Seed | Ants | Peak `met` | Peak ants in contact | Unified (new rule) | Unified (old rule) |
+|---|---|---|---|---|---|---|
+| open 160×100 | 2 | 150 + 150 | 2.7 % at 300 s, rising | ~12 | 235 s | ~120 s |
+| side | 1 | 300 + 300 | 0.34 % | 2.7 | no (600 s) | ~120 s |
+| side | 2 | 300 + 300 | 0.10 % | 0.9 | no (600 s) | ~120 s |
+| side | 3 | 300 + 300 | 0.002 % | 0.02 | no (600 s) | ~120 s |
+
+On the side view the two colonies hardly touch: no fight deaths in ten minutes, and at most a few ants meeting. The old rule's two-minute "win" there was this bug.
+
+**Why the floor stays at 1 % (owner, 2026-11-08: "consider the ongoing work toward a unified world").**
+- One world (§51, `ja-lp4`) puts the colonies on one top-down plane, where they meet as they do on the open map and clear the floor.
+- Their tunnels may also meet in the curtain.
+- After U6 the old side and open maps leave the page.
+- So the side view's missing contact belongs to a map on its way out. It is no reason to lower the floor, and no new world bead.
+- The interim cost: until U6 switches the page, the side-view default can't be won by unity.
+- Follow-ups noted on the beads:
+  - U3 (`ja-lp4.3`) counts contact per layer, the plane and the curtain;
+  - U6 (`ja-lp4.6`) guards that Garden in both clears `MET` on one world.
+
+**Saves.** Each colony's contact and the latch are saved (`private.metBy`, `private.haveMet`). A save from before has neither and loads as not met, so the colonies must meet again before they can be one. `SAVE_VERSION` is unchanged.
+
+**Unchanged.**
+- The golden masters, bit-exact: `#meet` writes nothing an ant reads.
+- Jev cost: no legend, question or situation moved.
+- The assays' outcome metric (`experiment.ts`) can now read "playing" where it read "unified". `npm run exp` was not rerun (slow).
+
+**Tests** (`recognition.test.ts`):
+- the unity unit test: alike and quiet but not met is not one; a minute together is;
+- colonies that smell alike but are kept apart for two minutes are not one;
+- strangers in contact count for nothing;
+- `met` and the latch survive a save, and a save without them loads as not met;
+- the five-minute Garden game asserts `met ≥ MET`;
+- after review: alike and met but not yet quiet is not one; unity holds once won while the colonies keep apart, and breaks when the nests drift; a fight death breaks it while the nests stay alike, and old contact does not re-arm it; `met` is the least colony's share, not the pooled one; contact is the cell and the six around, not two cells off.
+
+Each rule has a mutation that fails a test: drop `met` from `unified`, the quiet gate, the latch, its clearing on a fight death or on drift, arming without the quiet, or the per-colony least.
+
+**Review (own agent, PR #56).** No correctness bug.
+- Confirmed:
+  - the occupancy grids are fresh where `#meet` reads them;
+  - nothing it does moves ant state or a random stream (goldens bit-exact);
+  - save/load works;
+  - it runs in every two-colony game;
+  - its cost is in the noise (5.3 against 5.0 ms a tick at 1,200 + 1,200 ants, every odour forced alike);
+  - no consumer breaks: the slow tests never read unity.
+- Fixed:
+  - **R1:** the quiet gate had lost its test;
+  - **R2:** unity flapped as contact faded after the win (now latched);
+  - **R3:** `met` was pooled, so with three colonies a pair meeting could carry one that never touched anyone (now the least colony's);
+  - **N2:** "a minute" of contact was the wrong claim.
+- Noted, not changed:
+  - **R4:** contact reads ant odour against the other nest, as `mixing` does, not ant against ant as fights do; unity's gap and quiet gates mask the difference;
+  - **N1:** ants killed in a tick's fights still count for that tick;
+  - **N4:** `Colony.met` is an unrelated per-ant field;
+  - **N5:** the save run-on test does not hash unity.
+
+**Cost.** None (no Jev change).
+
+## 54. Each ant's own stance (top-down; ja-k4k.6, ja-d8e, 2026-11-08)
 
 Research basis: `docs/stance.md`. Every figure was read in a search summary, not the paper, so all are **unverified**.
 - **Defence is an individual's threshold.** A pavement-ant worker fights a stranger once an internal state passes a threshold, raised by recent encounters (Hoover et al. 2016; Bubak et al. 2016: octopamine and serotonin). *Pheidole* defence moves closer to the nest as the threat grows.
 - **Hunger does not raise aggression.** Sugar-starved Argentine ants grew less aggressive (Grover et al. 2007); starved and fed colonies were no different (Thomas et al. 2005).
 - **Crowded colonies raid.** Fire-ant brood raiding rose from 0 % to 68.5 % with colony density (Tschinkel et al. 1995). The denser side wins boundary disputes.
 
-### 53.1 What was there
+### 54.1 What was there
 
 - **A colony-level strategist.** Every 5 s it chose one stance (forage, defend or raid) and told every ant. It read:
   - food brought home, averaged over 60 s;
@@ -3873,7 +3951,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
 - **Its rule** raided when no food came in, which had no source behind it, or when the larder was full and the colony large.
 - **"Defend"** sent every ant that smelt alarm to fight, wherever it was, and sent every waiting forager out.
 
-### 53.2 What changed (open ground; `stanceGate` 1)
+### 54.2 What changed (open ground; `stanceGate` 1)
 
 - **Each ant's stance is its own** (`#stanceOf`):
   - **defend** while its `threat` is past `defendAt` (1) within `homeGround` (10) of its nest. Threat is seconds of alarm smelt or strangers in reach, leaking with a 20 s half-life.
@@ -3898,7 +3976,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
   - New A13 `defendHome`: a war party marches on a colony that forages a far pile.
 - **HUD:** top-down, the side stats show how many ants defend and raid.
 
-### 53.3 Results (local rule)
+### 54.3 Results (local rule)
 
 | | This MR | `main` |
 |---|---|---|
@@ -3920,7 +3998,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
   - crowd-only raids with recruitment all at once: about 880 lost;
   - `raidRecruit` 0.02: A11 8/10, worst seed 1.07.
 
-### 53.4 Jev (spent ≈ $0.029 of $0.10)
+### 54.4 Jev (spent ≈ $0.029 of $0.10)
 
 - **Legends** (colony v7, response v10; the stance lane is unchanged, for the side view):
   - Stance, on open ground, is the ant's own: "forage, the usual one; defend, only while it smells alarm or meets strangers close to its own nest; or raid, once recruited".
@@ -3948,7 +4026,7 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
 - **Warlike fell 11 %** between the two recordings (3,467 to 3,093), with the same losses. Its answer counts barely moved (fight 80 → 82), so that is taken as Jev's run-to-run variance, not the sentence.
 - **The shipped mode answers** are 151 per doctrine, from top-down caches (they were 290, from the side view and top-down). The side view, still on the broadcast stance, will miss more at first and ask live under the daily budget (§50.11).
 
-### 53.5 Cost
+### 54.5 Cost
 
 Offline estimates (`colony-cost`), on this branch against `main` on the same machine:
 
@@ -3961,7 +4039,7 @@ Offline estimates (`colony-cost`), on this branch against `main` on the same mac
 
 The longer legends cost a few per cent; the top-down stance lane is gone. The estimates were taken before the last two wording changes, which are within a sentence of them.
 
-### 53.6 Left out
+### 54.6 Left out
 
 - **The side view** keeps the strategist and raids by coordinates (`ja-1a9`; `ja-k4k.6` stays open for it).
 - **A fight-recruitment signal** (pavement ants' escalation): alarm already draws defenders.
