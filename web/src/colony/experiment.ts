@@ -779,7 +779,10 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
     seconds: 180,
     map: () => a.build([{ x: 20, y: 20, r: 3 }, { x: 100, y: 20, r: 3 }]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
-    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid") },
+    // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
+    // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
+    // gain 1.26, 3/20 on main).
+    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid"), colony: { raidGate: 0 } },
   };
 }
 

@@ -4162,6 +4162,7 @@ export class Colony {
       lastDug: this.#lastDug,
       noGain: this.#noGain,
       gone: this.#gone,
+      pastEnd: this.#pastEnd,
       storedSeen: this.#storedSeen,
       returning: this.#returning,
       returned: this.#returned,
@@ -4235,6 +4236,7 @@ export class Colony {
     if ("lastDug" in r) this.#lastDug = fillLike(this.#lastDug, r.lastDug) as never;
     if ("noGain" in r) this.#noGain = fillLike(this.#noGain, r.noGain) as never;
     if ("gone" in r) this.#gone = fillLike(this.#gone, r.gone) as never;
+    if ("pastEnd" in r) this.#pastEnd = fillLike(this.#pastEnd, r.pastEnd) as never;
     if ("storedSeen" in r) this.#storedSeen = fillLike(this.#storedSeen, r.storedSeen) as never;
     if ("returning" in r) this.#returning = fillLike(this.#returning, r.returning) as never;
     if ("returned" in r) this.#returned = fillLike(this.#returned, r.returned) as never;
