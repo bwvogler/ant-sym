@@ -20,7 +20,10 @@ export interface Cell {
 export const MARGIN = 64;
 /** How near the line may come to itself away from a vertex, in cells (one-world §3 rule 2). */
 export const CLEARANCE = 12;
-/** The least 2D distance between holes (one-world §3 rule 3): today's NEST_GAP, one gap for one world. */
+/**
+ * The least 2D distance between holes (one-world §3 rule 3), between cell centres in world units: the same value and
+ * measure as game.ts's NEST_GAP between nests' centres (a test pins them equal), one gap for one world.
+ */
 export const HOLE_GAP_2D = 12;
 /** The sharpest turn back a new segment may make on the end segment (one-world §3 rule 2): 120°. */
 export const MAX_TURN = (2 * Math.PI) / 3;
@@ -81,6 +84,8 @@ export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0
     if (holes[i]!.x === holes[i - 1]!.x && holes[i]!.y === holes[i - 1]!.y) throw new Error(`makeTransect: holes ${i - 1} and ${i} are the same cell`);
   const margin = opts.margin ?? MARGIN;
   const s0 = opts.s0 ?? 0;
+  if (!Number.isInteger(margin) || margin < 0) throw new Error(`makeTransect: margin ${margin} is not a whole number of cells`);
+  if (!Number.isInteger(s0)) throw new Error(`makeTransect: s0 ${s0} is not a whole column`);
   const parts: number[] = [];
   const before = marginCells(holes, "start", margin);
   for (let i = before.length / 2 - 1; i >= 0; i--) parts.push(before[2 * i]!, before[2 * i + 1]!);
@@ -114,11 +119,23 @@ export function cellAt(t: Transect, s: number): boolean {
   return true;
 }
 
-/** Every column over plane cell (x, y), in order; empty when the line doesn't pass through it. */
-export function columnsOver(t: Transect, x: number, y: number): number[] {
-  const out: number[] = [];
-  for (let i = 0; i < t.cells.length / 2; i++) if (t.cells[2 * i] === x && t.cells[2 * i + 1] === y) out.push(t.sMin + i);
-  return out;
+const cellKey = (x: number, y: number): number => (y + 32768) * 131072 + (x + 32768);
+const byCell = new WeakMap<Transect, Map<number, number[]>>();
+
+/** Every column over plane cell (x, y), in order; empty when the line doesn't pass through it. Indexed once per line. */
+export function columnsOver(t: Transect, x: number, y: number): readonly number[] {
+  let index = byCell.get(t);
+  if (!index) {
+    index = new Map();
+    for (let i = 0; i < t.cells.length / 2; i++) {
+      const key = cellKey(t.cells[2 * i]!, t.cells[2 * i + 1]!);
+      const cols = index.get(key);
+      if (cols) cols.push(t.sMin + i);
+      else index.set(key, [t.sMin + i]);
+    }
+    byCell.set(t, index);
+  }
+  return index.get(cellKey(x, y)) ?? [];
 }
 
 /**
@@ -184,22 +201,29 @@ function standing(t: Transect, end: End): Seg[] {
   const fv = far === "start" ? h[0]! : h[k]!;
   const [ux, uy] = outward(h, far);
   segs.push([cx(fv), cy(fv), cx(fv) + ux * t.margin, cy(fv) + uy * t.margin]);
+  // Cut every part of the line within the clearance of the vertex: not only the end segment, since the one before it
+  // can pass as near as 12·sin 60° ≈ 10.4 when this hole was founded at the hole gap and the turn limit.
+  return segs.flatMap((sg) => outsideDisc(sg, vx, vy, CLEARANCE));
+}
+
+/** The parts of segment `sg` outside the disc of radius r round (ox, oy): none, one or two pieces. */
+function outsideDisc(sg: Seg, ox: number, oy: number, r: number): Seg[] {
+  const [x1, y1, x2, y2] = sg;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const a = dx * dx + dy * dy;
+  const b = 2 * ((x1 - ox) * dx + (y1 - oy) * dy);
+  const c = (x1 - ox) ** 2 + (y1 - oy) ** 2 - r * r;
+  const disc = b * b - 4 * a * c;
+  if (a === 0 || disc <= 0) return [sg];
+  const root = Math.sqrt(disc);
+  const t1 = (-b - root) / (2 * a);
+  const t2 = (-b + root) / (2 * a);
+  if (t2 <= 0 || t1 >= 1) return [sg];
+  const at = (t: number): [number, number] => [x1 + dx * t, y1 + dy * t];
   const out: Seg[] = [];
-  for (const sg of segs) {
-    // Cut the part of each segment within the clearance of the vertex. Only the end segment touches it: the rest of
-    // the line kept the clearance from it when this hole was founded.
-    const atStart = sg[0] === vx && sg[1] === vy;
-    const atEnd = sg[2] === vx && sg[3] === vy;
-    if (!atStart && !atEnd) {
-      out.push(sg);
-      continue;
-    }
-    const len = Math.hypot(sg[2] - sg[0], sg[3] - sg[1]);
-    if (len <= CLEARANCE) continue;
-    const f = CLEARANCE / len;
-    if (atStart) out.push([sg[0] + (sg[2] - sg[0]) * f, sg[1] + (sg[3] - sg[1]) * f, sg[2], sg[3]]);
-    else out.push([sg[0], sg[1], sg[2] - (sg[2] - sg[0]) * f, sg[3] - (sg[3] - sg[1]) * f]);
-  }
+  if (t1 > 0) out.push([x1, y1, ...at(t1)]);
+  if (t2 < 1) out.push([...at(t2), x2, y2]);
   return out;
 }
 
@@ -278,16 +302,38 @@ export function canFound(t: Transect, p: Cell, open: (x: number, y: number) => b
   return folded ? { ok: false, reason: folded } : { ok: true, end };
 }
 
+const rounds = new Map<string, Int16Array>();
+
 /**
- * The cell nearest `p` (2D, exactly, then a fixed order, so a game replays) within `radius` steps where canFound holds,
- * with the end it grows; null when there is none (a flight with nowhere to land fails: one-world §3, §8).
+ * Offsets (dx, dy pairs, flat) of every cell whose centre is within `radius` (world units) of a cell's on an even
+ * (parity 0) or odd row, nearest first, ties in discOffsets' order: a round disc, not a hexagon of steps. Cached.
+ */
+function roundDisc(radius: number, parity: number): Int16Array {
+  const key = `${radius}:${parity}`;
+  const have = rounds.get(key);
+  if (have) return have;
+  // A cell `radius` away is at most radius·2/√3 steps away (the long way round a hexagon).
+  const offs = discOffsets(Math.ceil((radius * 2) / Math.sqrt(3)))[parity]!;
+  const limit = 4 * radius * radius;
+  const order: [number, number][] = [];
+  for (let i = 0; i < offs.length; i += 2) {
+    const d = dist4(offs[i]!, parity + offs[i + 1]!, 0, parity);
+    if (d <= limit) order.push([d, i]);
+  }
+  order.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const out = Int16Array.from(order.flatMap(([, i]) => [offs[i]!, offs[i + 1]!]));
+  rounds.set(key, out);
+  return out;
+}
+
+/**
+ * The cell nearest `p` within `radius` of it (world units, as the crow flies: the same reach every way) where canFound
+ * holds, with the end it grows; nearest by exact distance, then a fixed order, so a game replays. Null when there is
+ * none (a flight with nowhere to land fails: one-world §3, §8).
  */
 export function nearestValid(t: Transect, p: Cell, radius: number, open: (x: number, y: number) => boolean): { cell: Cell; end: End } | null {
-  const offs = discOffsets(radius)[p.y & 1]!;
-  const order: [number, number][] = [];
-  for (let i = 0; i < offs.length; i += 2) order.push([dist4(p.x + offs[i]!, p.y + offs[i + 1]!, p.x, p.y), i]);
-  order.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  for (const [, i] of order) {
+  const offs = roundDisc(radius, p.y & 1);
+  for (let i = 0; i < offs.length; i += 2) {
     const cell = { x: p.x + offs[i]!, y: p.y + offs[i + 1]! };
     const f = canFound(t, cell, open);
     if (f.ok) return { cell, end: f.end };

@@ -92,17 +92,19 @@ export function hexDistance(ax: number, ay: number, bx: number, by: number): num
 /**
  * The cells of the straight line from cell (ax, ay) to cell (bx, by), both included, as flat x, y pairs: one cell per
  * step, so `hexDistance + 1` cells and each a neighbour of the last. A lerp in cube coordinates, rounded (Red Blob Games'
- * line drawing), with a fixed nudge off the start so a line along cell edges always rounds the same way.
+ * line drawing), with the same small nudge on both ends, so a line along cell edges always rounds the same way and the
+ * line from b to a is the line from a to b reversed.
  */
 export function hexLine(ax: number, ay: number, bx: number, by: number): Int32Array {
   const n = hexDistance(ax, ay, bx, by);
   const out = new Int32Array(2 * (n + 1));
   const aq = axialQ(ax, ay) + 1e-6;
   const ar = ay + 2e-6;
-  const bq = axialQ(bx, by);
+  const bq = axialQ(bx, by) + 1e-6;
+  const br = by + 2e-6;
   for (let i = 0; i <= n; i++) {
     const t = n === 0 ? 0 : i / n;
-    cubeRound(aq + (bq - aq) * t, ar + (by - ar) * t);
+    cubeRound(aq + (bq - aq) * t, ar + (br - ar) * t);
     out[2 * i] = CELL[0]!;
     out[2 * i + 1] = CELL[1]!;
   }

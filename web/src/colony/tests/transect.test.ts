@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CELL, centreX, centreY, hexDistance } from "../hex.ts";
-import { canFound, cellAt, CLEARANCE, columnsOver, grow, makeTransect, MARGIN, nearestValid, type Cell, type Transect } from "../transect.ts";
+import { NEST_GAP } from "../game.ts";
+import { canFound, cellAt, columnsOver, grow, HOLE_GAP_2D, makeTransect, MARGIN, nearestValid, type Cell, type Transect } from "../transect.ts";
 import { mulberry32 } from "../world.ts";
 
 const open = () => true;
@@ -130,6 +131,13 @@ test("one hole: no line to fold back on yet, so any open spot a hole gap away gr
   assert.deepEqual(at(g, 10), [100, 110], "past the old hole, the line runs on away from the new one");
   assert.throws(() => makeTransect([A, A]), /same cell/);
   assert.throws(() => grow(makeTransect([A, B]), "end", B), /same cell/);
+  assert.throws(() => makeTransect([A, B], { margin: 2.5 }), /margin/);
+  assert.throws(() => makeTransect([A, B], { margin: -1 }), /margin/);
+  assert.throws(() => makeTransect([A, B], { s0: 0.5 }), /s0/);
+});
+
+test("one gap for one world: HOLE_GAP_2D is game.ts's NEST_GAP", () => {
+  assert.equal(HOLE_GAP_2D, NEST_GAP);
 });
 
 test("nearestValid: the nearest allowed cell within the radius, or null when there is none", () => {
@@ -143,6 +151,16 @@ test("nearestValid: the nearest allowed cell within the radius, or null when the
   assert.deepEqual(nearestValid(t, { x: 204, y: 100 }, 20, open), r, "the same answer every time");
   // Midway along the line: nothing within 10 cells is allowed (it is nearest an end only by turning back over the line).
   assert.equal(nearestValid(t, { x: 150, y: 100 }, 10, open), null);
+  // The radius is round: a cell 65.8 straight down, 76 steps away (a hexagon of 70 steps reaches only ~60.6 that way),
+  // is found; a cell 71 due east, where 70 steps do reach 70, is not (PR #55 review).
+  const only = (c: Cell) => (x: number, y: number) => x === c.x && y === c.y;
+  const far = { x: 300, y: 76 };
+  const d = Math.hypot(centreX(far.x, far.y) - centreX(300, 0), centreY(far.y) - centreY(0));
+  assert.ok(d > 61 && d < 70 && hexDistance(300, 0, far.x, far.y) > 70, `${d}`);
+  const line = makeTransect([{ x: 100, y: 0 }, { x: 200, y: 0 }]);
+  assert.deepEqual(nearestValid(line, { x: 300, y: 0 }, 70, only(far))?.cell, far);
+  assert.equal(nearestValid(line, { x: 300, y: 0 }, 70, only({ x: 371, y: 0 })), null);
+  assert.deepEqual(nearestValid(line, { x: 300, y: 0 }, 71, only({ x: 371, y: 0 }))?.cell, { x: 371, y: 0 });
   // Nowhere open: the flight fails.
   assert.equal(nearestValid(t, { x: 260, y: 100 }, 10, () => false), null);
 });
@@ -189,7 +207,7 @@ test("property: over random lines, neighbouring columns lie over the same or nei
   }
 });
 
-test("property: no valid founding makes the curtain overlap itself (a cell over two columns only at a hole's bend)", () => {
+test("property: no valid founding makes the curtain overlap itself (a cell over two columns only right at a bend)", () => {
   let lines = 0;
   for (let seed = 1; seed <= 120; seed++) {
     const t = randomLine(seed, 6);
@@ -206,7 +224,8 @@ test("property: no valid founding makes the curtain overlap itself (a cell over 
       if (cols.length < 2) continue;
       const lo = Math.min(...cols);
       const hi = Math.max(...cols);
-      assert.ok(t.sHole.some((sv) => Math.abs(lo - sv) <= CLEARANCE && Math.abs(hi - sv) <= CLEARANCE), `seed ${seed}: one cell over columns ${cols.join(", ")}, away from every hole`);
+      // Measured on 600 random lines (PR #55 review): no cell sat over two columns at all; allow two either side of a bend.
+      assert.ok(t.sHole.some((sv) => Math.abs(lo - sv) <= 2 && Math.abs(hi - sv) <= 2), `seed ${seed}: one cell over columns ${cols.join(", ")}, away from every bend`);
     }
   }
   assert.ok(lines >= 100, `most random lines grew (${lines} of 120)`);

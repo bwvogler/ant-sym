@@ -94,5 +94,20 @@ test("hexLine: both ends, one neighbour per step, hexDistance + 1 cells, each wi
     }
   }
   assert.deepEqual([...hexLine(3, 4, 3, 4)], [3, 4]);
+  // The line from b to a is the line from a to b reversed, along cell edges too (PR #55 review).
+  for (let k = 0; k < 500; k++) {
+    const [ax, ay, bx, by] = [rand(60), rand(60), rand(60), rand(60)];
+    const fwd = hexLine(ax, ay, bx, by);
+    const back = hexLine(bx, by, ax, ay);
+    const n = fwd.length / 2;
+    for (let i = 0; i < n; i++) assert.deepEqual([back[2 * (n - 1 - i)], back[2 * (n - 1 - i) + 1]], [fwd[2 * i], fwd[2 * i + 1]], `(${ax}, ${ay}) ↔ (${bx}, ${by}) at ${i}`);
+  }
+  for (const [ax, ay, bx, by] of [[0, 0, 3, 6], [0, 0, 6, 4], [2, 1, -4, 9]]) {
+    const fwd = [...hexLine(ax, ay, bx, by)];
+    const back = [...hexLine(bx, by, ax, ay)];
+    const rev: number[] = [];
+    for (let i = back.length - 2; i >= 0; i -= 2) rev.push(back[i]!, back[i + 1]!);
+    assert.deepEqual(rev, fwd, `edge-aligned (${ax}, ${ay}) ↔ (${bx}, ${by})`);
+  }
   assert.deepEqual([...hexLine(0, 0, 4, 0)], [0, 0, 1, 0, 2, 0, 3, 0, 4, 0]);
 });
