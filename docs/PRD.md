@@ -3159,7 +3159,7 @@ Food +8 % and +12 %, losses the same. **The worst seed is worse:** seed 19 (ja-h
 
 - **Live:** `colony-live.mjs all --top`, about 250,000 input tokens a run, **$0.0105–0.0109** each (seven runs over the PR; the lane with a new sense is `leave`). Caches `experiments/caches/mr52-top-*.json`, versions 6 / 4 / 9.
 - **The first version asked a waiting raider as a returning forager** (review of #41, S1): both got one key and one answer. Now a recruited ant is asked as a raider (fight, with the raid trail) and a forager as a forager (return, with its returns), and the legend no longer tells Jev to override its doctrine.
-- **Replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,186 and 915):
+- **Replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,186 and 915) *(stale: `main` replays differently today; see 49.7)*:
 
 | | All lanes: food stored | Lost | `leave` and `stance` only (as MR 5's caches) | MR 5 (food) |
 |---|---|---|---|---|
@@ -3225,9 +3225,16 @@ Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; sea
 
 Food +5 %, losses +3 %. **The worst seed recovers:** seed 19 ends with 223 ants (`main`: 1; ja-hgq). Seeds 15 and 17 end with fewer (565 and 357 against 724 and 762).
 
-**Jev replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: REPLAY_LOCAL):
+**Jev replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,088 and 918 on this branch, 4,083 and 901 on `main`):
 
-REPLAY_TABLE
+| Cache | raidOnward: food stored | Lost | `main` today: food stored | Lost | Food against `main` |
+|---|---|---|---|---|---|
+| Forage | 4,128 | 846 | 4,363 | 824 | −5 % |
+| Cautious | 3,444 | 571 | 3,853 | 592 | −11 % |
+| Warlike | 3,219 | 850 | 3,472 | 866 | −7 % |
+
+- **Under Jev's cached answers the colony stores 5–11 % less** on seeds 1–6, with losses the same, though the local rule is level on those seeds and +5 % over seeds 1–20. Six seeds is a small sample, and all three caches point the same way, so it is recorded, not explained.
+- **49.4's replay figures are stale too:** `main` today replays Warlike at 3,472, not 1,994 (and Forage 4,363, not 5,069). They were taken before the owner's review fixes in #41, as A6 was.
 
 **Cost:** unchanged on every lane (no legend, question or brain version changed).
 
