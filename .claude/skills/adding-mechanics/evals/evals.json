@@ -1,0 +1,55 @@
+{
+  "skill": "adding-mechanics",
+  "how_to_run": "In a fresh session per case, give the prompt and grade the transcript against `expect`. Run each scenario once with the skill and once with .claude/skills/adding-mechanics moved aside (the baseline), and compare. Trigger cases: does Claude load the skill unprompted?",
+  "trigger": {
+    "should_trigger": [
+      "Ants should drag dead nestmates to a midden instead of the corpses vanishing",
+      "Can we make foragers recruit others with a tandem run when food is far away?",
+      "I want the fungus to be able to make an ant climb before it dies, like Ophiocordyceps",
+      "add trophallaxis so food spreads through the nest mouth to mouth",
+      "What would real ants do when two colonies' trails cross? I'd like that in the game",
+      "Let's give ants a sense of vibration so they can call nestmates to dig",
+      "New mechanic: queens of a colony that lost its queen get adopted by the neighbour",
+      "Workers should switch jobs by response thresholds rather than fixed ages"
+    ],
+    "should_not_trigger": [
+      "The side view drops to 4 fps with 1,200 ants, can you profile it?",
+      "Fix the failing golden test after the merge",
+      "Tune restTime: sweep 10-60 s over seeds 1-10",
+      "Rename the Details tab to Lab",
+      "Why does the Pages build show Jev as off?",
+      "Review PR #48",
+      "How much does an hour of the fungus lane cost?",
+      "The Learn drawer's link to trails.md#the-double-bridge is broken"
+    ]
+  },
+  "scenarios": [
+    {
+      "prompt": "Ants should carry corpses to a midden away from the nest, like real ants do.",
+      "expect": [
+        "Searches docs/ and beads first and finds the midden gap row in vision.md (ja-k4k.5) and 'corpse odour: not yet researched'",
+        "Researches corpse recognition (e.g. oleic acid / necrophoresis in Pogonomyrmex, Wilson et al. 1958) from primary sources before proposing code, marking unverified numbers",
+        "Translates it to a sensed cue (corpse odour) and proposes a sense-table row, not a rule that reads every nest's position",
+        "Writes a Play section (what the player sees; the fungus's lever, e.g. Bloom corpses on the midden)",
+        "Writes the note, README row, vision rows, a PRD stub and an epic with children (assay first) before editing web/",
+        "Runs check-plan.sh and asks the owner before building"
+      ]
+    },
+    {
+      "prompt": "Make it so the fungus can make infected ants walk up a stalk and die there (summiting).",
+      "expect": [
+        "Finds fungus-policy.md's existing catalogue (summit, ja-k4k.8) and extends it rather than writing a duplicate note",
+        "Distinguishes what the fungus senses (design, fungus-policy §11) from the host's choice; the fungus bends perception, the ant still chooses",
+        "Considers play: a visible, legible effect; progression (reach), counterplay (grooming, corpse removal); cost of any new fungal situation field",
+        "Plans beads and a PRD section before code"
+      ]
+    },
+    {
+      "prompt": "The forager leave threshold is too low, ants pour out. Bump it.",
+      "expect": [
+        "Recognises this as tuning an existing mechanic, not a new one, and does not run the full research workflow",
+        "Points to the assay (A5) and the tuning rule (worst seed over 1-10, confirm on 11-20)"
+      ]
+    }
+  ]
+}
