@@ -828,6 +828,8 @@ The player is the fungus (§15). The page and the Jev client still framed the fi
 | underground | 2 | 0 / 0 | 107 s | 0 / 0 | 100 / 100 % |
 | underground | 3 | 0 / 0 | 107 s | 0 / 0 | 100 / 77 % |
 
+*Since §53 (ja-i0f): "unified" also needs the colonies to have met; the underground rows above were the bug.*
+
 - **On the open surface the result holds.** Garden unifies the colonies in about 3 minutes, and fight deaths fall from 374–506 per colony to 8–37.
 - **Underground, unity is vacuous for now.** In 10 minutes the two colonies never meet (no deaths even without the fungus). Garden still reaches "unified" at ~105 s, because the nests' odours converge and the minute is "quiet" with nobody in contact. Unity ("smell alike, nobody has died fighting for a minute") does not ask that the colonies have met. Filed: unified should also need allied contact, ants of both colonies meeting within tolerance (`ja-i0f`).
 - **Every test passes on the new default world.** One test was fragile and is fixed: `perception.test.ts`, where a healthy ant given 8 s on a 40-wide map reached the edge, bounced at random and (with #8's movement) stumbled onto the food. It now runs 4 s, the time the infected ant needs and before the healthy one can reach the edge.
@@ -3856,3 +3858,56 @@ No source found says what makes a colony open a new entrance from inside.
 
 **Cost.** None: docs and beads only.
 
+## 53. Unity needs contact (ja-i0f, 2026-11-08)
+
+**Problem.** `Game.unity()` called the colonies one when their nests smelled alike (gap within tolerance) and nobody had died fighting for a minute. Nothing asked whether they had met. Colonies that never touch have a quiet minute for free, so the underground world "unified" at about 105 s with zero contact (§22).
+
+**The signal: `Unity.met`.**
+- An ant is in **allied contact** when an ant of another standing colony is in its cell or the six around it (that tick's occupancy grids, `battle.ts` `around`), and its own odour is within tolerance of that colony's nest odour. It smells like them: a meeting, not strangers.
+- `met` is the share of living ants in allied contact, faded over `QUIET` (60 s) like the fight-death count.
+- It is read in `tick()` after odours move (`Game.#meet`). It reads only: no ant state and no random stream moves.
+
+**The rule.**
+- `unified` = gap ≤ tolerance, quiet ≥ 60 s, **`met` ≥ `MET` = 0.01**, and every colony standing.
+- The unity score is multiplied by `min(1, met / MET)`.
+- `Unity.alike` (gap within tolerance) lets the panel say "the nests smell alike, but the colonies have not met yet".
+- Details shows `met` beside the other unity figures.
+
+**Measured** (Garden painted on both nests, the easiest case; `met` as a share, and as ants on average):
+
+| World | Seed | Ants | Peak `met` | Peak ants in contact | Unified (new rule) | Unified (old rule) |
+|---|---|---|---|---|---|---|
+| open 160×100 | 2 | 150 + 150 | 3.3 % at 300 s, rising | ~10 | 231 s | ~120 s |
+| side | 1 | 300 + 300 | 0.34 % | 2.7 | no (600 s) | ~120 s |
+| side | 2 | 300 + 300 | 0.10 % | 0.9 | no (600 s) | ~120 s |
+| side | 3 | 300 + 300 | 0.002 % | 0.02 | no (600 s) | ~120 s |
+
+On the side view the two colonies hardly touch: no fight deaths in ten minutes, and at most a few ants meeting. The old rule's two-minute "win" there was this bug.
+
+**Why the floor stays at 1 % (owner, 2026-11-08: "consider the ongoing work toward a unified world").**
+- One world (§51, `ja-lp4`) puts the colonies on one top-down plane, where they meet as they do on the open map and clear the floor.
+- Their tunnels may also meet in the curtain.
+- After U6 the old side and open maps leave the page.
+- So the side view's missing contact belongs to a map on its way out. It is no reason to lower the floor, and no new world bead.
+- The interim cost: until U6 switches the page, the side-view default can't be won by unity.
+- Follow-ups noted on the beads:
+  - U3 (`ja-lp4.3`) counts contact per layer, the plane and the curtain;
+  - U6 (`ja-lp4.6`) guards that Garden in both clears `MET` on one world.
+
+**Saves.** `met` is saved (`private.met`). A save from before has none and loads as 0, so the colonies must meet for a minute again before they can be one. `SAVE_VERSION` is unchanged.
+
+**Unchanged.**
+- The golden masters, bit-exact: `#meet` writes nothing an ant reads.
+- Jev cost: no legend, question or situation moved.
+- The assays' outcome metric (`experiment.ts`) can now read "playing" where it read "unified". `npm run exp` was not rerun (slow).
+
+**Tests** (`recognition.test.ts`):
+- the unity unit test: alike and quiet but not met is not one; a minute together is;
+- colonies that smell alike but are kept apart for two minutes are not one;
+- strangers in contact count for nothing;
+- `met` survives a save, and a save without it loads as 0;
+- the five-minute Garden game asserts `met ≥ MET`.
+
+Dropping `met` from `unified` fails the first two. 408 fast tests pass.
+
+**Cost.** None (no Jev change).

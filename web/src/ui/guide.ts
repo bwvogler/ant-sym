@@ -243,7 +243,7 @@ export const GUIDE: GuideEntry[] = [
     onScreen: "The Unity bar in the Fungus panel. Ants' colours meet in between as their odours mix.",
     realAnts:
       "Introduced Argentine ants form supercolonies whose nests smell alike and don't fight, across about 6,000 km of southern Europe. Orphaned army-ant colonies fused with a neighbour in 7 of 10 trials.",
-    inGame: "The colonies are one when their nests smell alike (within tolerance) and nobody has died fighting for a minute.",
+    inGame: "The colonies are one when their nests smell alike (within tolerance), their ants have met (over the last minute, some of each touching the other's while smelling alike), and nobody has died fighting for a minute.",
     sources: [
       { note: "fungus-policy", anchor: "1-what-unified-should-mean-measurably", label: "What “unified” should mean" },
       { note: "queens-and-merging", anchor: "2-what-ants-do", label: "Merging" },
