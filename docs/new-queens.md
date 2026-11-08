@@ -2,7 +2,7 @@
 
 *Part of the [research notes](README.md) behind the [vision](vision.md).*
 
-*Research and design note, 2026-11-07, for the fungus game (bead epic `ja-lo8`, slice 1 `ja-lo8.1`). **Built since:** the queen as a host and her signal lever (`ja-lo8.7`); her scent carried on the workers, gyne rearing and culling, the alate, the queen's pen and founding with a daughter's odour drift (`ja-lo8.9`, PRD §50.14, `web/src/colony/royal.ts`). As first written, docs only. The game needs:*
+*Research and design note, 2026-11-07, for the fungus game (bead epic `ja-lo8`, slice 1 `ja-lo8.1`). **Built since:** the queen as a host and her signal lever (`ja-lo8.7`); her scent carried on the workers, gyne rearing and culling, the alate, the queen's pen and founding with a daughter's odour drift (`ja-lo8.9`, PRD §50.17, `web/src/colony/royal.ts`). As first written, docs only. The game needs:*
 - *new queens to be born,*
 - *each to found a daughter colony,*
 - *the fungus to have a lever on when that happens.*

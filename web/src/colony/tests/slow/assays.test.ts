@@ -52,23 +52,16 @@ test("A9 strangers meet at food: few lost per food brought home", () => {
   }
 });
 
-// Behaviour MR 5.2 (PRD §49): raids by trail. A11's trail gain is 1.24 (0.89–2.75) and 7/20 seeds reach its mark of 1.5; guarded as
-// what holds today: none is stuck and the trail never hurts. The mark itself is a todo (ja-sf1).
-test("A11 raiders find the rival: none stuck, and the raid trail does not hurt", () => {
-  const gains: number[] = [];
+// Behaviour MR 5.2 (PRD §49) with ja-sf1 (§49.7): raids by trail, raiders leaving the trail to search on as scouts. A11's trail gain is
+// 2.04 median (1.32–4.40), 16/20 seeds at its mark of 1.5 (seeds 21–40: 1.84, 13/20); none is stuck.
+test("A11 raiders find the rival: none stuck, and the raid trail gains 1.5× on most seeds", () => {
+  let passed = 0;
   for (let seed = 1; seed <= 10; seed++) {
     const m = runAssay(raidFind, seed).metrics;
     assert.ok((m.stuck as number) <= 0.1, `seed ${seed}: stuck ${m.stuck}`);
-    gains.push(m.gain as number);
+    passed += m.pass as number;
   }
-  gains.sort((a, b) => a - b);
-  assert.ok((gains[5] as number) >= 1, `median gain ${gains[5]}`);
-});
-
-test("A11 the raid trail gains 1.5× on most seeds", { todo: "ja-sf1: gain 1.24 median, 7/20 seeds" }, () => {
-  let passed = 0;
-  for (let seed = 1; seed <= 10; seed++) passed += runAssay(raidFind, seed).metrics.pass as number;
-  assert.ok(passed >= 6, `${passed}/10`);
+  assert.ok(passed >= 6, `${passed}/10 at the mark`);
 });
 
 // Behaviour MR 5.2 (PRD §49.3): A12 passes 20/20 (food stored 1.00 of the forage colony's, worst 0.99); the first version, with raiders

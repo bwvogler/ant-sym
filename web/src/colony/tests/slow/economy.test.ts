@@ -19,7 +19,7 @@ import { generateSideWorld, mulberry32 } from "../../world.ts";
 // as it was (food to a reception of any size, porters only from reception and stores, no forager handing on), 130, with
 // 30 larvae unfed for over two minutes beside 117 food in the nest (none on this branch until the last minute, when the
 // larder is down to 33: 2). `scripts/economy-bench.mjs` measures the full game. With energy and hunger (ja-xu6.1, PRD
-// §50.13) adults eat too (38 food in the hour here): 148 workers (159 born, 121 dead of age), 6 larvae once stranded, none starved.
+// §50.16) adults eat too (38 food in the hour here): 148 workers (159 born, 121 dead of age), 6 larvae once stranded, none starved.
 
 /** An hour of the tests' small map, one colony of 110 on 0.3 of the map's food (world `w`, the game seeded w × 7919 + nudge). */
 function hour(w: number, nudge: number) {

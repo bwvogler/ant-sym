@@ -71,11 +71,15 @@ export interface Founding {
   antCount: number;
   odour: number;
   maxAnts?: number;
-  /** a daughter (ja-lo8.9): her mother's colony index; she founds alone on `reserve` food, carrying the fungus `load` of `strain` */
+  /** a daughter (ja-lo8.9): her mother's colony index; she founds alone on `reserve` food (and carries `fungus`, below) */
   mother?: number;
   reserve?: number;
-  load?: number;
-  strain?: number;
+  /**
+   * The fungus the founding queen carries, if any (ja-lo8.9 passes it: she picks it up on her way out). A queen carrying
+   * the evolving fungus brings what the landing brought the first colony: it takes root by her new hole (ja-lo8.12), so a
+   * colony the world starts with has nothing a founded one can't get.
+   */
+  fungus?: { load: number; strain: number };
   /**
    * The nest as dug (Game.addColony records it). A save founds from it rather than digging again: a second dig would
    * draw from the restored game's random stream and could put the shaft elsewhere (PR #42 review, B1).
@@ -288,7 +292,7 @@ export class Game {
     if (!at || !mother || this.colonies.length >= MAX_COLONIES) return -1;
     // Her reserve is new food on the map (her body, which the mother's food count let go at her eclosion).
     this.map.foodTotal += FOUNDING_RESERVE;
-    return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: FOUNDING_RESERVE, load: f.load, strain: f.strain });
+    return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: FOUNDING_RESERVE, ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}) });
   }
 
   /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
@@ -341,13 +345,11 @@ export class Game {
     this.map.nests.push(nest);
     const c = new Colony(this.map, { antCount: f.antCount, maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)), nest: at, odour: f.odour, tolerance: this.recognition.params.tolerance }, this.#rng, localPolicy, localStance);
     if (f.mother !== undefined && c.queen && !f.nest) {
-      // A daughter (ja-lo8.9): her queen founds alone on her reserve, carrying what the fungus put in her, at her
-      // mother's odour, which drifts away from it from now on (ja-lo8.9.1). (Not when a save founds her again: what she
-      // has then is poured back over her, and her chamber isn't there yet.)
+      // A daughter (ja-lo8.9): her queen founds alone on her reserve, at her mother's odour, which drifts away from it
+      // from now on (ja-lo8.9.1); what the fungus put in her is given below (Founding.fungus). (Not when a save founds
+      // her again: what she has then is poured back over her, and her chamber isn't there yet.)
       c.founding = true;
       c.feed(f.reserve ?? FOUNDING_RESERVE);
-      c.queen.load = f.load ?? 0;
-      c.queen.strain = f.strain ?? 0;
       c.odourAim = driftAim(f.odour, this.recognition.params.tolerance);
     }
     this.colonies.push(c);
@@ -355,6 +357,16 @@ export class Game {
     this.founded.push({ ...f, nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) } });
     this.#wire();
     this.#refresh();
+    const q = c.queen;
+    if (f.fungus && f.fungus.load > 0 && q) {
+      q.load = Math.min(1, f.fungus.load);
+      q.strain = f.fungus.strain;
+      this.fungus.hosts++;
+      if (this.fungus.evolution?.strain === f.fungus.strain) {
+        const at = this.#byHole(c);
+        this.fungus.root(at.x, at.y, LANDING.radius);
+      }
+    }
     return k;
   }
 
@@ -573,15 +585,21 @@ export class Game {
    * hole, where its ants walk out and back. No ant is dosed directly: the first hosts are ants that walk through it.
    * The top-down maps have no hole: it falls at the nest's rim. Lands once; returns where.
    */
-  land(k: number, strain: number, spores = LANDING.spores): { x: number; y: number } {
+  land(k: number, strain: number, { spores = LANDING.spores, evolve = false }: { spores?: number; evolve?: boolean } = {}): { x: number; y: number } {
     if (this.landed) return this.landed;
-    const c = this.colonies[k] ?? this.player;
-    const e = c.nest.entrance ?? { x: c.nest.x + c.nest.r, y: c.nest.y };
-    const x = e.x + LANDING.offset;
-    const y = e.y - (c.nest.entrance ? 0.5 : 0);
+    const { x, y } = this.#byHole(this.colonies[k] ?? this.player);
+    // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
+    if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
+    this.fungus.root(x, y, LANDING.radius);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
+  }
+
+  /** Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim). */
+  #byHole(c: Colony): { x: number; y: number } {
+    const e = c.nest.entrance ?? { x: c.nest.x + c.nest.r, y: c.nest.y };
+    return { x: e.x + LANDING.offset, y: e.y - (c.nest.entrance ? 0.5 : 0) };
   }
 
   /** The spore brush: spores on the ground within `radius` of (x, y), and a dose of load into every ant there, of any colony. */

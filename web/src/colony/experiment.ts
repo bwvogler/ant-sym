@@ -1,5 +1,5 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import type { ColonyParams, Mode, Policy, Stance, StancePolicy } from "./colony.ts";
+import { type ColonyParams, FAINT, type Mode, type Policy, type Stance, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
@@ -780,7 +780,10 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
     seconds: 180,
     map: () => a.build([{ x: 20, y: 20, r: 3 }, { x: 100, y: 20, r: 3 }]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
-    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid") },
+    // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
+    // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
+    // gain 1.26, 3/20 on main).
+    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid"), colony: { raidGate: 0 } },
   };
 }
 
@@ -836,11 +839,35 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
   let first = NaN;
   let stuck = 0;
   let outside = 0;
+  // Diagnosis (ja-sf1): who is recruited, where, and what the trail at the nest is.
+  let prev: Uint8Array | null = null;
+  let prevRep: Uint8Array | null = null;
+  const ever = new Set<number>();
+  let atHome = 0;
+  let finds = 0;
+  let findDist = 0;
+  let nestRaid = 0;
+  let nestSmelt = 0;
+  let samples = 0;
   return {
     tick(game) {
       const c = game.player;
+      if (!prev || prev.length !== c.n) {
+        prev = new Uint8Array(c.n);
+        prevRep = new Uint8Array(c.n);
+      }
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
+        if (c.recruited[i] && !prev[i] && !ever.has(i)) {
+          ever.add(i);
+          if (Math.hypot((c.x[i] as number) - own.x, (c.y[i] as number) - own.y) <= c.nest.r) atHome++;
+        }
+        if (c.reporting[i] && !(prevRep as Uint8Array)[i]) {
+          finds++;
+          findDist += Math.hypot((c.x[i] as number) - rival.x, (c.y[i] as number) - rival.y);
+        }
+        prev[i] = c.recruited[i] as number;
+        (prevRep as Uint8Array)[i] = c.reporting[i] as number;
         // Raiders only: on a raid stance an ant not recruited carries on as a forager (behaviour MR 5.2); raidGate 0 sends all.
         if ((c.recruited[i] || c.params.raidGate <= 0) && Math.hypot((c.x[i] as number) - rival.x, (c.y[i] as number) - rival.y) <= RAID_REACH) {
           reached.add(i);
@@ -849,6 +876,12 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
       }
       if (game.time + 1e-9 < nextAt) return;
       nextAt += 20;
+      // The raid trail at the nest's rim, toward the rival (where recruits would smell it).
+      let best = 0;
+      for (let k = -2; k <= 2; k++) best = Math.max(best, c.ph.read("raid", own.x + c.nest.r + 1, own.y + k));
+      nestRaid += best;
+      if (best >= FAINT) nestSmelt++;
+      samples++;
       for (let i = 0; i < c.n; i++) {
         const x = c.x[i] as number;
         const y = c.y[i] as number;
@@ -861,7 +894,31 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
       }
     },
     summary(game) {
-      return { reached: reached.size / Math.max(1, game.player.params.antCount), stuck: outside ? stuck / outside : NaN, firstReach: first };
+      const n = Math.max(1, game.player.params.antCount);
+      let hit = 0;
+      let dead = 0;
+      let deadHit = 0;
+      for (const i of ever) {
+        if (reached.has(i)) hit++;
+        if (!game.player.alive[i]) {
+          dead++;
+          if (reached.has(i)) deadHit++;
+        }
+      }
+      return {
+        reached: reached.size / n,
+        stuck: outside ? stuck / outside : NaN,
+        firstReach: first,
+        recruited: ever.size / n,
+        recruitedAtHome: ever.size ? atHome / ever.size : NaN,
+        recruitsReaching: ever.size ? hit / ever.size : NaN,
+        finds,
+        findDist: finds ? findDist / finds : NaN,
+        recruitsDead: ever.size ? dead / ever.size : NaN,
+        deadReached: dead ? deadHit / dead : NaN,
+        nestRaid: samples ? nestRaid / samples : 0,
+        nestSmelt: samples ? nestSmelt / samples : 0,
+      };
     },
   };
 }
@@ -890,7 +947,8 @@ export const raidFind: Assay = {
     const straight = runGame(raidFindSpec(r.seed, { raidGate: 0 })).result.metrics.reached as number; // main: at the rival hole's coordinates
     const gain = deaf > 0 ? reached / deaf : NaN;
     const stuck = r.metrics.stuck as number;
-    return { reached, deaf, straight, gain, stuck, firstReach: r.metrics.firstReach as number, pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0 };
+    const m = r.metrics;
+    return { reached, deaf, straight, gain, stuck, firstReach: m.firstReach as number, recruited: m.recruited as number, recruitedAtHome: m.recruitedAtHome as number, recruitsReaching: m.recruitsReaching as number, finds: m.finds as number, findDist: m.findDist as number, recruitsDead: m.recruitsDead as number, deadReached: m.deadReached as number, nestRaid: m.nestRaid as number, nestSmelt: m.nestSmelt as number, pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0 };
   },
 };
 

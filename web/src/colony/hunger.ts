@@ -1,4 +1,4 @@
-// Energy and hunger, pure (ja-xu6.1, owner 2026-11-08; docs/PRD.md §50.13). In the side view, where a colony has a
+// Energy and hunger, pure (ja-xu6.1, owner 2026-11-08; docs/PRD.md §50.16). In the side view, where a colony has a
 // queen and brood, every adult, larva and the queen has energy (0..1) that drains with time and is refilled by eating.
 // An adult that runs out dies of hunger, and so does a larva.
 //

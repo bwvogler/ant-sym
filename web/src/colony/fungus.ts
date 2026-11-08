@@ -3,13 +3,15 @@ import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony } from "./colony.ts";
 import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, TASKS, encodeFungal, localFungusRule, type Arousal, type FungalSituation, type FungusPolicy, type FungusRule, type Place, type Touch } from "./fungalPolicy.ts";
-import { compose, decodeLevels, LETHAL_LEVERS, leverFor, LEVERS, NEST_LEVERS, presetOf, PRESETS, type LeverLevels, type Preset } from "./levers.ts";
+import { Evolution, type EvolutionSave } from "./evolution.ts";
+import { compose, decodeLevels, hold, LETHAL_LEVERS, leverFor, LEVERS, NEST_LEVERS, presetOf, PRESETS, type LeverLevels, type Preset, type Reach } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
 import { disc, rockAt, type WorldMap } from "./world.ts";
 
-// The fungus, pure: the player. It has no body on the map of its own, only
-// spores on the ground and load inside ants (docs/fungus-policy.md). This
+// The fungus, pure: the player. It is spores on the ground and load inside ants
+// (docs/fungus-policy.md), and in the game a mycelium where it landed, which
+// grows and pays for the spores it puts out (evolution.ts, ja-lo8.12). This
 // module is how it gets there and how it moves (ja-t4d.1): the spore brush,
 // contact transmission across colonies, and the colony's answer to it,
 // grooming, which clears visible load and primes the groomers against it.
@@ -88,10 +90,21 @@ export interface FungusParams {
   grooming: number;
   /** most nestmates that groom one host at once */
   groomers: number;
+  /**
+   * most that groom a queen at once in the evolving game: her retinue tends her closely, so a fungus in her is groomed
+   * harder than in a worker (ja-lo8.12, a stop-gap: ja-k4k.12). A lab or test game grooms her as any host (`groomers`).
+   */
+  queenGroomers: number;
   /** resistance gained per second at full visible load on the nestmates around (immune priming, Konrad et al. 2012) */
   priming: number;
-  /** below this a host is clean again */
+  /** below this a host whose load is falling is clean again */
   clear: number;
+  /**
+   * the least a clean ant must take per second to be infected at all: a minimum infectious dose, as a rate so that it
+   * means the same at any step (ja-lo8.12; before, `clear` zeroed a clean ant's first step, so the dose it asked for
+   * grew as the step shrank)
+   */
+  minDose: number;
   /** seconds between steps when the game advances the fungus (Game.tick) */
   interval: number;
   /** a host counts as groomed when its nestmates take load off it at this rate per second or more */
@@ -100,7 +113,7 @@ export interface FungusParams {
   borderRatio: number;
 }
 
-export const DEFAULT_FUNGUS: FungusParams = { pickup: 0.3, sporeDecay: 0.03, maxSpores: 6, grooming: 0.12, groomers: 4, priming: 0.02, clear: 0.002, interval: 0.1, groomedAt: 0.05, borderRatio: 2 };
+export const DEFAULT_FUNGUS: FungusParams = { pickup: 0.3, sporeDecay: 0.03, maxSpores: 6, grooming: 0.12, groomers: 4, queenGroomers: 8, priming: 0.02, clear: 0.002, minDose: 0.02, interval: 0.1, groomedAt: 0.05, borderRatio: 2 };
 
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
 export const DORMANT_SHOW = 0.25;
@@ -197,13 +210,30 @@ export interface Census {
 export class Fungus {
   readonly map: WorldMap;
   params: FungusParams;
-  readonly strains: readonly Strain[];
+  /** the strains, copied: an evolving fungus (evolution) sets its own strain's spread traits */
+  readonly strains: Strain[];
+  /** the game's fungus evolving (evolution.ts, ja-lo8.12); null in the lab and the tests, where every strain is as listed */
+  #evolution: Evolution | null = null;
+  /** the strains as listed, for putting them back when there is no evolution */
+  readonly #listed: readonly Strain[];
+  /** how far each lever may go (levers.hold), from the evolution; null: every lever's full range */
+  #reach: Reach | null = null;
+  /** the share of a host's primed resistance that counts against the evolving strain: 1 less its immune evasion */
+  #evade = 1;
   /** spores on the ground, per cell */
   readonly spores = new ChunkLayer((n) => new Float32Array(n), 0);
   /** the strain of the spores on each cell (the last one painted there) */
   readonly sporeStrain = new ChunkLayer((n) => new Uint8Array(n), 0);
   /** cells holding spores, as y * w + x */
   readonly #sporeCells = new Set<number>();
+  /**
+   * The evolving fungus's base (ja-lo8.12): the cells it landed on, as y * w + x. Its mycelium grows there and puts out
+   * spores onto them, paid for out of its mass (evolution.ts): a trickle of foragers walks through them all game,
+   * whether or not the fungus has a hold in the nest.
+   */
+  #base: number[] = [];
+  /** fungus the evolving strain made in hosts this step (load passed on by contact) */
+  #made = 0;
   /** everyone's load, for transmission */
   readonly #all = new LoadGrid();
   /** each colony's visible load, for grooming's priming */
@@ -234,7 +264,8 @@ export class Fungus {
   constructor(map: WorldMap, params: Partial<FungusParams> = {}, strains: readonly Strain[] = STRAINS) {
     this.map = map;
     this.params = { ...DEFAULT_FUNGUS, ...params };
-    this.strains = strains;
+    this.#listed = strains.map((s) => ({ ...s }));
+    this.strains = strains.map((s) => ({ ...s }));
     this.menu = this.#menu; // through the setter: the nest's interventions only where there is a nest
   }
 
@@ -318,6 +349,9 @@ export class Fungus {
     });
 
     let hosts = 0;
+    // Fungus the evolving strain makes in hosts this step (load passed on by contact): what it mutates from.
+    const evolving = this.#evolution ? this.#evolution.strain : -1;
+    this.#made = 0;
     const taken = this.#taken;
     taken.length = 0;
     const nb = this.#nb;
@@ -354,10 +388,16 @@ export class Fungus {
         const groundGain = p.pickup * ground;
         if (groundGain > 0) taken.push(cx, cy, groundGain * dt);
 
-        const susceptible = (1 - r) * (1 - l);
-        const gain = (contactGain + groundGain) * susceptible * dt;
-        let strain = s;
-        if (l === 0 && gain > 0) strain = contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
+        // The strain coming in: the host's own, or for a clean ant whichever reaches it most. Only the evolving strain's
+        // immune evasion slips past resistance (PR #43 review, N2: a lab strain in an evolving game is as listed).
+        const into = l > 0 ? s : contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
+        const susceptible = (1 - r * (into === evolving ? this.#evade : 1)) * (1 - l);
+        let gain = (contactGain + groundGain) * susceptible * dt;
+        if (l === 0 && gain < p.minDose * dt) gain = 0;
+        const strain = l === 0 && gain > 0 ? into : s;
+        // New fungus is what contact passes on (the source keeps its load); spores picked up from the ground are fungus
+        // moved, already counted when the mycelium grew them (PR #43 review, S2).
+        if (gain > 0 && strain === evolving) this.#made += (gain * contactGain) / (contactGain + groundGain);
 
         // Grooming by nestmates around (at most p.groomers of them), and the host's own clearing.
         const mates = Math.max(0, nb.own - 1);
@@ -370,7 +410,7 @@ export class Fungus {
         }
 
         let nl = Math.min(1, Math.max(0, l + gain - loss));
-        if (nl < p.clear) nl = 0;
+        if (nl < p.clear && nl <= l) nl = 0;
         c.load[i] = nl;
         c.strain[i] = nl > 0 ? strain : 0;
         if (nl > 0) {
@@ -399,9 +439,9 @@ export class Fungus {
 
     // Each colony's queen, read against the same grids.
     colonies.forEach((c, k) => {
-      if (this.#stepQueen(c, k, grids, dt, rec)) hosts++;
+      if (this.#stepQueen(c, k, grids, dt, rec, evolving)) hosts++;
       // Alates (ja-lo8.9) pick it up from the nestmates they pass as they wait and walk out; it does nothing in them yet.
-      for (const al of c.alates) this.#royalLoad(al, 1, k, grids, dt, false);
+      for (const al of c.alates) this.#royalLoad(al, 1, k, grids, dt, false, evolving, this.params.groomers);
     });
 
     // Spores taken, then the ground fades.
@@ -420,6 +460,30 @@ export class Fungus {
         this.#sporeCells.delete(key);
       } else this.spores.set(x, y, v);
     }
+    // The evolving fungus's body (evolution.ts): what it grew in hosts, and its mycelium growing on its patch and
+    // putting out spores there, spread evenly over its cells and paid for out of its mass.
+    const e = this.#evolution;
+    if (e) {
+      const before = e.growth;
+      e.replicate(this.#made);
+      if (this.#base.length) {
+        const each = e.grow(dt) / this.#base.length;
+        let unplaced = 0;
+        for (const key of this.#base) {
+          const x = key % w;
+          const y = (key - x) / w;
+          const v = this.spores.get(x, y);
+          const put = Math.max(0, Math.min(each, p.maxSpores - v));
+          unplaced += each - put;
+          this.spores.set(x, y, v + put);
+          this.sporeStrain.set(x, y, e.strain);
+          this.#sporeCells.add(key);
+        }
+        // Spores a full cell can't hold stay mycelium (PR #43 review, N3: they were paid for, then clipped away).
+        if (unplaced > 0) e.refund(unplaced);
+      }
+      e.pace(e.growth - before, dt);
+    }
     this.hosts = hosts;
   }
 
@@ -429,10 +493,13 @@ export class Fungus {
    * does in her, from what it senses there (task "queen", place "queen"): how much of it she shows, and how much of her
    * royal mark she lays. Returns whether she is a host after the step.
    */
-  #stepQueen(c: Colony, k: number, grids: readonly CountGrid[], dt: number, rec: Recognition | null): boolean {
+  #stepQueen(c: Colony, k: number, grids: readonly CountGrid[], dt: number, rec: Recognition | null, evolving: number): boolean {
     const q = c.queen;
     if (!q || !q.alive) return false;
-    const mates = this.#royalLoad(q, q.show, k, grids, dt, true);
+    // Her retinue's larger cap is the evolving game's stop-gap (ja-k4k.12); a lab or test game grooms her as any host
+    // (PR #43 review, S1: every game's queen dynamics were otherwise changed).
+    const groomers = this.#evolution ? this.params.queenGroomers : this.params.groomers;
+    const mates = this.#royalLoad(q, q.show, k, grids, dt, true, evolving, groomers);
     if (mates < 0) return false;
     if (q.load === 0) {
       q.show = 1;
@@ -453,9 +520,9 @@ export class Fungus {
       place: "queen",
       task: "queen",
       carrying: "nothing",
-      groomed: p.grooming * st.visibility * Math.min(p.groomers, mates) >= p.groomedAt,
+      groomed: p.grooming * st.visibility * Math.min(groomers, mates) >= p.groomedAt,
     };
-    const v = compose(this.choose(sit, q.strain), this.#menu);
+    const v = compose(this.held(this.choose(sit, q.strain), q.strain), this.#menu);
     q.show = v.show;
     q.signal = 1 + (v.queenSignal - 1) * nl;
     return true;
@@ -464,10 +531,11 @@ export class Fungus {
   /**
    * The fungus's load in a royal body (the queen, ja-lo8.7; an alate, ja-lo8.9), stepped as an ant's is: load from the
    * ants around her and the spores under her, less what the nestmates around her groom off (× `show`) and what clears
-   * on its own. `inGrid`: her own load is in the load grid (the queen's is; an alate's isn't). Sets her load and strain;
-   * returns her groomers (the nestmates around her), or −1 when nothing reached her and she carries none.
+   * on its own. `inGrid`: her own load is in the load grid (the queen's is; an alate's isn't). `evolving`: the game's
+   * fungus's strain (its resistance evaded, its gains counted: ja-lo8.12); `groomers`: the most nestmates that groom her.
+   * Sets her load and strain; returns the nestmates around her, or −1 when nothing reached her and she carries none.
    */
-  #royalLoad(b: { x: number; y: number; load: number; strain: number; resist: number }, show: number, k: number, grids: readonly CountGrid[], dt: number, inGrid: boolean): number {
+  #royalLoad(b: { x: number; y: number; load: number; strain: number; resist: number }, show: number, k: number, grids: readonly CountGrid[], dt: number, inGrid: boolean, evolving: number, groomers: number): number {
     const p = this.params;
     const { w, h } = this.map.size;
     cellOf(b.x, b.y);
@@ -491,14 +559,16 @@ export class Fungus {
     }
     const groundGain = p.pickup * ground;
     if (groundGain > 0) this.#taken.push(cx, cy, groundGain * dt);
-    const gain = (contactGain + groundGain) * (1 - b.resist) * (1 - l) * dt;
-    let strain = b.strain;
-    if (l === 0 && gain > 0) strain = contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
+    const into = l > 0 ? b.strain : contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
+    let gain = (contactGain + groundGain) * (1 - b.resist * (into === evolving ? this.#evade : 1)) * (1 - l) * dt;
+    if (l === 0 && gain < p.minDose * dt) gain = 0;
+    const strain = l === 0 && gain > 0 ? into : b.strain;
+    if (gain > 0 && strain === evolving) this.#made += (gain * contactGain) / (contactGain + groundGain);
     const st = this.strains[strain] as Strain;
     const mates = nb.own; // the nestmates around her: her groomers
-    const loss = l > 0 ? (p.grooming * st.visibility * show * Math.min(p.groomers, mates) + st.decay) * l * dt : 0;
+    const loss = l > 0 ? (p.grooming * st.visibility * show * Math.min(groomers, mates) + st.decay) * l * dt : 0;
     let nl = Math.min(1, Math.max(0, l + gain - loss));
-    if (nl < p.clear) nl = 0;
+    if (nl < p.clear && nl <= l) nl = 0;
     b.load = nl;
     b.strain = nl > 0 ? strain : 0;
     return mates;
@@ -660,6 +730,78 @@ export class Fungus {
     this.menu = menu;
   }
 
+  /** The game's fungus evolving (ja-lo8.12), or null: every strain as listed, every lever its full range. */
+  get evolution(): Evolution | null {
+    return this.#evolution;
+  }
+
+  /**
+   * Strain `strain` becomes the game's fungus and starts to evolve from its weakest (evolution.ts): its spread traits
+   * and every lever's reach come from what it has bought from then on. Once only: a fungus already evolving keeps on.
+   */
+  evolve(strain: number): Evolution {
+    this.#evolution ??= new Evolution(Math.max(0, Math.min(this.strains.length - 1, Math.floor(strain))));
+    this.#evolved();
+    return this.#evolution;
+  }
+
+  /**
+   * The evolving fungus takes root on the open cells within `radius` of (x, y) (Game.land): its base, which keeps
+   * sporulating at the evolution's `spores` level. Nothing without an evolution.
+   */
+  root(x: number, y: number, radius: number): void {
+    if (!this.#evolution) return;
+    const { w } = this.map.size;
+    const have = new Set(this.#base);
+    disc(this.map, x, y, radius, (cx, cy) => {
+      if (!rockAt(this.map, cx, cy) && !have.has(cy * w + cx)) this.#base.push(cy * w + cx);
+    });
+    this.#evolution.root();
+  }
+
+  /** Cells of the fungus's base (root). */
+  get base(): readonly number[] {
+    return this.#base;
+  }
+
+  /** Buy the next level of upgrade `id` (evolution.UPGRADES) with the fungus's biomass; false when it can't. */
+  upgrade(id: string): boolean {
+    if (!this.#evolution?.buy(id)) return false;
+    this.#evolved();
+    return true;
+  }
+
+  /**
+   * The levels a host of strain index `s` runs for these wanted levels: held to the fungus's reach (levers.hold) when it
+   * carries the evolving strain; another strain's host (a lab brush in an evolving game) runs them as they are. What the
+   * panel shows as enacted.
+   */
+  held(levels: LeverLevels, s: number): LeverLevels {
+    return this.#evolution && s === this.#evolution.strain ? hold(levels, this.#reach) : levels;
+  }
+
+  /** The evolution's traits onto its strain, and its reach and evasion onto every host from the next step. */
+  #evolved(): void {
+    const e = this.#evolution;
+    if (!e) {
+      // No evolution (a load of a save without one): every strain as listed again (PR #43 review, N4).
+      this.strains.forEach((s, k) => {
+        const listed = this.#listed[k] as Strain;
+        s.transmission = listed.transmission;
+        s.decay = listed.decay;
+      });
+      this.#reach = null;
+      this.#evade = 1;
+      return;
+    }
+    const t = e.traits();
+    const s = this.strains[e.strain] as Strain;
+    s.transmission = t.transmission;
+    s.decay = t.decay;
+    this.#evade = 1 - t.evasion;
+    this.#reach = e.reach();
+  }
+
   /** The local rule with the player's settings. */
   local(s: FungalSituation): string {
     return localFungusRule(this.rule)(s);
@@ -700,10 +842,14 @@ export class Fungus {
   }
 
   /**
-   * Run these levels in ant i of colony c at load l: each lever on `menu` at its level (levers.compose), the host's
-   * perception and emission the lerp from as-is to those values by l. `expr` names the preset they are, or CUSTOM.
+   * Run these levels in ant i of colony c at load l: each lever on `menu` at its level held to the fungus's reach
+   * (levers.hold, levers.compose), the host's perception and emission the lerp from as-is to those values by l. `expr`
+   * names the preset they are, as held, or CUSTOM.
    */
-  expressLevels(c: Colony, i: number, levels: LeverLevels, l: number, menu: ReadonlySet<string> | null = this.#menu): void {
+  expressLevels(c: Colony, i: number, wanted: LeverLevels, l: number, menu: ReadonlySet<string> | null = this.#menu): void {
+    // Held to the fungus's reach (ja-lo8.12) in a host of the evolving strain, except where a lab or test runs a preset
+    // whatever the menu says.
+    const levels = menu ? this.held(wanted, c.strain[i] as number) : wanted;
     c.expr[i] = presetOf(levels, menu ?? undefined);
     if (l <= 0) {
       c.asIs(i);
@@ -755,7 +901,7 @@ export class Fungus {
 
   /** The fungus's state for a save (save.ts): the ground's spores, its settings, its menu and clock. Its policy is the page's to wire. */
   saveState(): Record<string, unknown> {
-    return { spores: encode(this.spores), sporeStrain: encode(this.sporeStrain), sporeCells: encode(this.#sporeCells), hosts: this.hosts, rule: encode(this.rule), params: encode(this.params), menu: encode(this.#menu), clock: this.#clock };
+    return { spores: encode(this.spores), sporeStrain: encode(this.sporeStrain), sporeCells: encode(this.#sporeCells), hosts: this.hosts, rule: encode(this.rule), params: encode(this.params), menu: encode(this.#menu), clock: this.#clock, evolution: this.#evolution?.save() ?? null, base: [...this.#base] };
   }
 
   loadState(r: Record<string, unknown>): void {
@@ -764,8 +910,12 @@ export class Fungus {
     fillLike(this.#sporeCells, r.sporeCells);
     this.hosts = r.hosts as number;
     this.rule = decode(r.rule) as FungusRule;
-    this.params = decode(r.params) as FungusParams;
+    this.params = { ...DEFAULT_FUNGUS, ...(decode(r.params) as Partial<FungusParams>) };
     this.menu = decode(r.menu) as Set<string>;
     this.#clock = r.clock as number;
+    const e = r.evolution as EvolutionSave | null | undefined;
+    this.#evolution = e ? Evolution.load(e) : null;
+    this.#base = [...((r.base as number[] | undefined) ?? [])];
+    this.#evolved();
   }
 }
