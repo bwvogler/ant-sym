@@ -3787,3 +3787,25 @@ The founding radius stays open until the research bead (`ja-lp4.7`) gives a figu
 **Review of #45 (agent, 2026-11-08):** the tick estimate (it had cited the old underground map, not the side view), the founding rule's clearance at the shared vertex and a minimum turn, ties, the hex rasterisation of the line, what growing the line does to the old end's margin, the larder (kept; it no longer makes ants), the 2D hole gap, the curtain's crust and margin, and where the fungus's mycelium lies were corrected in the note.
 
 **The mycelium lives in the soil (owner, 2026-11-08).** Not on the surface: the sun's UV would kill it. In one world it grows in the shaft's soil walls just under the hole, in the curtain, and ants pick it up brushing past; its spores reach the plane only on ants and corpses. Today's game roots it on the open cells by the hole, where ants walk (§50.12); `ja-yo3` moves it into the soil, with UV and habitat sources added to `fungus-body.md` first.
+
+## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
+
+The owner asked whether the side view's undiggable crust could become an ant's own choice, and whether colonies could open new entrances (`ja-nzx`, `ja-4h2`, `ja-lp4.9`). `docs/entrances.md` holds the research:
+- Older, larger harvester colonies keep more entrances, funnelled into one entrance chamber (Gordon 2025).
+- Entrances are sealed at night and plugged by rivals.
+- Soil CO₂, moisture and temperature change with depth, and diggers respond to CO₂ (in a leaf-cutter) and moisture in choice tests; no study shows ants reading depth from them. Light matters only once the soil is open.
+
+No source found says what makes a colony open a new entrance from inside.
+
+**Decisions:**
+- **The crust stays a mechanic.** It keeps the walkway from hanging and the hole from being cut off.
+- **`ja-4h2` is deferred.** The cues exist, but the response that would use them would be invented. It reopens on a source about what triggers a new entrance, or when another behaviour needs a depth sense (for example chamber placement, `ja-k4k.3`).
+- **No vision sense-table row yet.**
+- **Two ideas filed:** new entrances that scale with colony size, into one entrance chamber (noted on `ja-lp4.9`), and closing entrances at night and plugging a rival's (`ja-lsu`, blocked by day and night, `ja-0qs`).
+
+**Review (agent):** corrected the light study's journal, the venting test's citation (Tschinkel 2013), placeholder titles, the fire-ant figure's source (Hays 1986), and an overclaim that ants read depth from the gradients; an untraceable claim on morning sealing was dropped and the evening sealing is sourced to a secondary page.
+
+**Search note.** Web searches on how long an insect-killing fungus survives sunlight (`ja-2qv`) were stopped by a safety filter this session; that research waits for a new session. This note's topic was not affected.
+
+**Cost.** None: docs and beads only.
+
