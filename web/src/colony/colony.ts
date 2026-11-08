@@ -6,7 +6,7 @@ import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambe
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
 import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, DonorGrid, EAT_BELOW, ENERGY_PER_FOOD, feel, FeltGrid, LARVA_DRAIN, LARVA_ENERGY_PER_FOOD, PASS, QUEEN_BEG, QUEEN_DRAIN, QUEEN_WAIT, NEED_FETCH, respond, SHARE_ABOVE, THETA_OLD } from "./hunger.ts";
-import { type Alate, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
+import { type Alate, ALATE_FEED, ALATE_RESERVE, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
@@ -2882,10 +2882,10 @@ export class Colony {
     return false;
   }
 
-  /** A gyne pupa ecloses as an alate (royal.ts) where it lay. Her food (her egg and what she was fed) leaves the colony's economy in her. */
+  /** A gyne pupa ecloses as an alate (royal.ts) where it lay. Her food (her egg and what she was fed) leaves the colony's economy in her: her body. */
   #eclose(b: BroodItem): boolean {
     this.eaten += 1 + b.fed;
-    this.alates.push({ x: centreX(b.x, b.y), y: centreY(b.y), t: 0, step: 0, load: 0, strain: 0, resist: 0 });
+    this.alates.push({ x: centreX(b.x, b.y), y: centreY(b.y), t: 0, step: 0, load: 0, strain: 0, resist: 0, food: 1 + b.fed });
     return true;
   }
 
@@ -2898,7 +2898,26 @@ export class Colony {
     for (let k = this.alates.length - 1; k >= 0; k--) {
       const a = this.alates[k] as Alate;
       a.t += dt;
-      if (a.t < ALATE_WAIT) continue;
+      if (a.t < ALATE_WAIT) {
+        // She fattens as she waits: the nestmates by her feed her from the chamber she is in, up to ALATE_RESERVE. What
+        // she takes leaves the colony's economy in her, as her body did (PR #47 review, S1).
+        if (a.food < ALATE_RESERVE && this.map.chambers) {
+          cellOf(a.x, a.y);
+          const cx = CELL[0] as number;
+          const cy = CELL[1] as number;
+          const room = this.map.chambers.list[this.map.chambers.at(cx, cy)];
+          if (room && room.colony === this.params.nest && room.food > 0) {
+            const nurses = this.friends ? this.#around(this.friends, cx, cy) : 2;
+            const take = Math.min(room.food, ALATE_RESERVE - a.food, ALATE_FEED * Math.min(1, nurses / 2) * dt);
+            if (take > 0) {
+              a.food += take;
+              this.#stock(room, -take);
+              this.eaten += take;
+            }
+          }
+        }
+        continue;
+      }
       a.step -= dt;
       while (a.step <= 0) {
         a.step += ALATE_STEP;

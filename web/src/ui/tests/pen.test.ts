@@ -7,7 +7,7 @@ import { penGate } from "../pen.ts";
 // The queen's pen (ja-lo8.9): the only time a colony's words change. It opens for a new queen with the fungus in her,
 // from a colony whose queen the fungus reached, while Jev can read new words; else she founds on her mother's doctrine.
 
-const flight = (load: number): Flight => ({ mother: 1, x: 0, y: 0, load, strain: 0, at: 10 });
+const flight = (load: number): Flight => ({ mother: 1, x: 0, y: 0, load, strain: 0, at: 10, food: 24 });
 
 test("the pen opens only for a queen with you in her, from a colony whose queen you reached, while Jev can read words", () => {
   assert.deepEqual(penGate(flight(INFECTED), [false, true], null, "Amber"), { open: true });

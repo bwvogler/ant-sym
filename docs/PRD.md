@@ -3249,13 +3249,13 @@ The page was a sim with everything on one screen. The owner asked for a game, to
   - The player writes an aim in words. Jev sets a **level for every lever**, per situation the fungus senses inside its host. The answer is no longer one bundle: the owner wants to pull many levers at once, interpreted from natural language.
   - The levers bend what the host **perceives** and what it **gives off** ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)).
   - The senses may be finer than before. The fungus's own load is dropped as a sense, and the host's mode was never one.
-- **Answers fill in as situations come up.** When the aim changes, old answers stay in force, dimmed, until each situation's new answer arrives. Nothing re-asks the whole table, and nothing is pre-asked.
+- **Answers fill in as situations come up.** When the aim changes, old answers stay in force, dimmed, until each situation's new answer arrives. *(Superseded where Jev can answer by §50.17: the local rule plays until the new answer arrives; the old answers play only while Jev can't run.)* Nothing re-asks the whole table, and nothing is pre-asked.
 - **The table stays out of sight.** It and per-cell pins are available in Learn and Details, not on the main screen, so the main screen keeps some magic.
 - **One fungus.** The three strains become lab presets.
 - **Colony policy is hidden until the fungus infects a queen.**
   - After that, a colony's policy changes **only when a new queen is born**: a free rewrite, at that moment only.
   - The new words drive **only her offspring**, in the **daughter colony she founds**.
-  - Her ants act on her mother's answers, dimmed, until their own arrive.
+  - Her ants act on her mother's answers, dimmed, until their own arrive. *(Superseded by §50.17: on new words her ants play the local rule until their answers arrive; her mother's answers play only while Jev can't run.)*
 - **How the new queen gets the fungus.** She picks it up by contact on her way out of the nest. No vertical transmission ([new-queens §4](new-queens.md#4-where-the-fungus-comes-in)).
 - **The fungus's lever on queen birth** must be a real lever in the catalogue. There are two: *queen signal* (emission, in the queen) and *queen scent* (perception, in nurses). Both are design, and both are built.
 - **Pace.**
@@ -4023,3 +4023,11 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 - **Checks:** `npm test` 418 pass; `test:slow` 16 pass, 2 TODOs (#43 resolved one); lint 7 warnings; golden masters as merged, bit-exact.
 
 **A second merge** (#45, #46, #48–#52): `main`'s §50.15 (no spore brush) and §50.16 (lethal levers) came first, so this branch's sections moved to §50.17–50.20. `docs/new-queens.md` now describes gyne rearing and the queen-scent lever as built, not as on an unmerged branch. No code conflicted except `useColony`'s stats type (both fields kept). `npm test` 420 pass; lint 7 warnings.
+
+**Review of 959d1fe** (PR #47):
+- **S1, the reserve was made from nothing.** A daughter founded on 24 food while her eclosion wrote off at most 10 (her egg and `GYNE_FOOD` 9), and `foodTotal` was raised by 24 to balance. Now her body is the reserve: an alate ecloses carrying `1 + fed`, and while she waits the nestmates by her feed her from the chamber she is in (`ALATE_FEED` 0.5 a second, by up to two nurses) up to `ALATE_RESERVE` 24. What she takes leaves the colony's economy in her (`eaten`); `found()` puts exactly her body back on the books (`foodTotal += f.food`) as her colony's larder. A lost queen's body stays gone. Alates fatten in the nest before the flight in the real thing too; the rate and the cap are design. In small test worlds alates leave with 6–16 food, so a daughter can found leaner than before.
+  - **Test:** food is conserved (drift under 1e-6) through gynes reared, alates fattened, flights and foundings (`royal.test`). Deleting the `foodTotal` line, the write-off at eclosion, or the write-off while fattening each fails it.
+- **S2, `found()` twice founded twice.** It now refuses a flight that is not pending (−1, nothing added); tested.
+- **S3, `#wanted` reads every adult's energy.** Accepted for now and noted on `ja-k4k.4`, whose job is to replace `#wanted` with sensed signals.
+- **N3:** the toast for a queen lost to `MAX_COLONIES` says so, not "no room to land". **N4:** §50.2's two superseded bullets are marked.
+- **N1, N2, N5 stay:** a held larva still drains (not triggered in 60 s), the laying gate doesn't count larval upkeep (tuning, with `ja-xu6.2`), and the gyne's food cue reads the chamber's food as larval feeding does (`ja-k4k.4`).

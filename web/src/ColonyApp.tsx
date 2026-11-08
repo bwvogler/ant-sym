@@ -12,7 +12,7 @@ import { UPGRADES, type Upgrade } from "./colony/evolution.ts";
 import { LETHAL_LEVERS } from "./colony/levers.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
-import type { Game } from "./colony/game.ts";
+import { type Game, MAX_COLONIES } from "./colony/game.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo } from "./ui/backend.ts";
 import { useBackend } from "./ui/useBackend.ts";
@@ -71,7 +71,13 @@ export default function ColonyApp() {
   const gate = flight ? penGate(flight, game.revealed, jev.lock, colonyName(flight.mother)) : null;
   const settle = useCallback(
     (f: Flight, k: number) => {
-      if (k < 0) pushToast(`A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`, "warn");
+      if (k < 0)
+        pushToast(
+          game.colonies.length >= MAX_COLONIES
+            ? `A new queen from ${colonyName(f.mother)} flew, but the map already holds ${MAX_COLONIES} colonies: she was lost.`
+            : `A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`,
+          "warn",
+        );
       if (!game.flights.length) update({ playing: true });
     },
     [game, update],
