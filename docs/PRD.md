@@ -3654,3 +3654,39 @@ At 4× that is a few seconds of wall time, and the fungus started with every pow
 - the rate settling at `MUTATION` × growth, and ten times the growth giving ten times the mutations;
 - two patches holding twice as much;
 - parity between first and founded colonies, and a patch for a carried fungus.
+
+### 50.14 Review of #43 (2026-11-08)
+
+The review approved once S1 and S2 were settled; both are fixed in code, with tests.
+
+- **S1: the queen's cap of 8 is the evolving game's only.**
+  - **Before,** `queenGroomers` changed every game's queen once she became a host. Side seed 1, 300 + 300 ants, Garden landed without evolving: her load at 90 s was 0.398 against `main`'s 0.510.
+  - **Now** a game that doesn't evolve grooms her with the usual cap (`groomers`, 4), so the lab, the assays and the earlier crown and regicide figures stand as measured.
+  - **Test:** not evolving, the cap is never read; evolving, it is.
+- **S2: mutations count only new fungus.**
+  - **The bug:** a host's gain from ground spores was credited as growth, though the mycelium had already been credited when it grew those spores. The landing's painted spores were never grown at all. About 20 % of early mutations were counted twice.
+  - **Now** only the contact share of a host's gain counts, since contact leaves the source its load.
+  - **Test:** contact counts exactly what it passed on; a lone ant on spores takes load and adds nothing.
+- **T1, T2:**
+  - **T1:** a test that the queen's levels are held (Stealth decides how far she hides).
+  - **T2:** a test that host mutations count, the same one as S2's.
+  - Both fail under the review's mutations (removing the queen's hold; deleting the worker's credit).
+- **Nits:**
+  - **N1:** a guard that every `#field` of `Fungus` is saved, derived on load or per-step scratch, as #42 did for `Colony`.
+  - **N2:** reach and immune evasion act only on hosts of the evolving strain; a lab brush's strain in an evolving game is as listed.
+  - **N3:** spores a full cell can't hold go back into the mycelium instead of being paid for and clipped.
+  - **N4:** a load with no evolution puts every strain back as listed.
+
+**Re-measured** (`scripts/progression.mjs`, as §50.13):
+
+| Aim | Seeds | A quarter | The queen | Kept at 20 min |
+|---|---|---|---|---|
+| Unite | 1–3 | 169–216 s | 219–314 s | 14–16 upgrades |
+| Spread | 1–3 | 156–193 s | 182–217 s | 17 |
+| Unite (confirm) | 11–13 | 218–241 s | 239–257 s | 14–16 |
+| Unite, keeping nothing | 1–3 | never in 15 min | never | 43–46 mutations waiting |
+
+- **The first choice** now comes 12–21 s after the landing, not at once: the landing's spores no longer count.
+- **The rest is 10–30 s later than §50.13,** and the worst seed reaches a quarter of the colony at 241 s.
+
+**Tests:** 402 fast tests pass, including 15 in `evolution.test.ts`. Jev cost: unchanged.
