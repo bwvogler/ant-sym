@@ -443,7 +443,7 @@ Each lever is a gain on one channel. The policy sets a **level** for every lever
 | fungus showing | the host hides the fungus: groomed less | — | visibility (`DORMANT_SHOW`) | stealth against potency (§6) |
 | queen signal | the queen gives off less of her mark: nurses rear gynes | — | new: scales `QUEEN_MARK`, in a queen only | design ([new-queens §4](new-queens.md#4-where-the-fungus-comes-in)) |
 
-**Lethal levers.** They are off unless the player turns them on, and are never asked while off.
+**Lethal levers.** They are off unless the player turns them on, and are never asked while off. In the evolving game, a lethal lever that is on the menu is still held off until the fungus keeps its upgrade (Odour weapon, Crown; PRD §50.16).
 - **odour weapon:** `estrange` (B6), the host's own colony takes it for a stranger;
 - **crown:** `regicide`, the host kills the queen and brood it tends.
 

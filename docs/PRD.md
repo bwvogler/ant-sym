@@ -3618,7 +3618,7 @@ At 4× that is a few seconds of wall time, and the fungus started with every pow
   - **The upgrades,** costed in adaptations, 1–4 a level:
     - Spread: Infectivity (0.12 → 0.15 → 0.23 → 0.3), Persistence (decay 0.03 → 0.012 → 0), Mycelium (capacity 30 → 60 → 120), Fruiting body (0.6 → 1.2 → 2 % of mass a second as spores), Immune evasion (0 → 35 → 70 % of primed resistance slipped past).
     - Reach: Stealth (showing), Senses (starts at one step), Recognition, Trails, Royal (the side view only).
-    - Lethal levers stay on the menu toggle. The 40 adaptations' worth is not all reached in 20 minutes, so what the player chooses matters.
+    - Lethal levers stay on the menu toggle. The 40 adaptations' worth is not all reached in 20 minutes, so what the player chooses matters. (Since §50.16 the lethal levers have upgrades too.)
 - **The minimum dose is a rate** (`FungusParams.minDose` 0.02/s): a clean ant takes no load from a rate below it, at any step. `clear` zeroes only a falling load. At the 0.1 s step this is the old behaviour, and every earlier test passed unchanged.
 - **The queen's retinue:** `queenGroomers` 8. It is a stop-gap; see `ja-k4k.12`. (Since §50.14, in the evolving game only.)
 - **The page.**
@@ -3760,6 +3760,53 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
 **Tests and cost:** no sim change, so the golden masters and the fast tests stand as they were. Jev cost: unchanged.
 
 **Review (own agent):** nothing blocking. Fixed: the scripts import `BRUSH` instead of copying it; the Learn guide and two research notes (`fungus-policy.md`, `queens-and-merging.md`) no longer send readers to a brush or a lab strain picker; Space on the focused field is still kept from scrolling the page. Filed: the lethal levers (crown, odour weapon) are held to no reach, so a player who turns one on gets it at full strength from the first second (`ja-lo8.16`).
+
+### 50.16 Lethal levers join the progression (ja-lo8.16, 2026-11-08)
+
+**The problem.** The review of #46 found the last free power. `Evolution.reach()` gave a reach only to levers some upgrade named, and no upgrade named the lethal levers (odour weapon, crown). So a player who put one on the menu got it at full strength from the first second, from Jev or from the local rule's cull, while every other lever was held to the reach the fungus had earned (§50.12).
+
+**Built.** Two reach upgrades, after Royal in `UPGRADES`, so that earlier indices and saves keep their meaning:
+
+| Upgrade | Lever | Steps | Cost | Where |
+|---|---|---|---|---|
+| Odour weapon | `weapon` | held off → free | 2,500 | every map |
+| Crown | `crown` | held off → free | 5,000 | the side view only (`nest`, as Royal) |
+
+- **Both are binary levers,** so reach 0 holds one as is (off) and reach 1 frees it. `hold` already did the rest. The hosts (`expressLevels`, which covers Jev's answers and the local rule) and the queen go through `Fungus.held`, so nothing else changed.
+- **Two gates, two meanings.** The menu chip is the player's permission, and the upgrade is the fungus's power. Both are needed.
+- **The page:**
+  - The Fungus panel lists both upgrades in the lethal red.
+  - A followed host shows a held lethal lever as "crown: off (wants on)", with the upgrade to keep, through the ant card's existing hint.
+  - The guide says so in its policy and evolution entries.
+- **Costs are first guesses,** placed among the strongest second levels (2,000–6,000, §50.13). Balance (`ja-lo8.10`) tunes them.
+- **Not held:** a game that does not evolve (the lab's landings, the assays, the tests), and a lab or test preset run with `express`.
+- **Saves:** a version-2 save without these levels loads them at 0 (held off), so `SAVE_VERSION` stays 2. A save from a game with a lethal lever on the menu therefore stops culling or killing queens once loaded, until the player keeps the upgrade.
+
+**Unchanged:**
+- **Jev cost:** no request changed, and reach acts after the answer, so `precache.test` stands.
+- **The golden masters:** they are bit-exact, since games that don't evolve have no reach.
+- **`scripts/progression.mjs`:** its figures stand. Its order buys neither upgrade, and its menu has no lethal lever.
+
+**Tests:**
+- 404 fast tests pass.
+- `evolution.test.ts` has a new test. It checks three things:
+  - every lever has a reach;
+  - weapon and crown start at 0;
+  - on a side world with both on the menu, a host's `estrange` and `regicide` stay 0 until each upgrade is kept, then rise. A game that doesn't evolve holds nothing.
+- It fails when the two upgrades start free.
+
+**Review (own agent): nothing blocking.** The hold covers every path where a lethal lever takes effect. Fixed:
+- **Copy.** The Learn drawer's local rule said the weapon works "only if it is on the menu"; it now also names the upgrade.
+- **Lethal lever on the menu but held off.**
+  - The Learn drawer's lever list now says "lethal, on, held off until you keep …".
+  - The lever chip's tooltip says the same.
+- **A lethal upgrade off the menu.**
+  - The panel marks it "(not on the menu)".
+  - The "mutations to keep" notice now ignores upgrades that would do nothing. It also ignores those the view hides, which was already true of Royal on the top-down view.
+- **A step-level test.** A policy that culls, run through `Fungus.step`, estranges no host until Odour weapon is kept. It fails if the step skips the hold.
+- **Nits.**
+  - The ant card's tooltip names a lethal lever as lethal, and says "its policy wants" rather than "Jev wants".
+  - The guide says "in the game", since the lab's own landings are not held.
 
 ## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
 
