@@ -3568,7 +3568,7 @@ At 4× that is a few seconds of wall time, and the fungus started with every pow
     - Reach: Stealth (showing), Senses (starts at one step), Recognition, Trails, Royal (the side view only).
     - Lethal levers stay on the menu toggle. The 40 adaptations' worth is not all reached in 20 minutes, so what the player chooses matters.
 - **The minimum dose is a rate** (`FungusParams.minDose` 0.02/s): a clean ant takes no load from a rate below it, at any step. `clear` zeroes only a falling load. At the 0.1 s step this is the old behaviour, and every earlier test passed unchanged.
-- **The queen's retinue:** `queenGroomers` 8. It is a stop-gap; see `ja-k4k.12`.
+- **The queen's retinue:** `queenGroomers` 8. It is a stop-gap; see `ja-k4k.12`. (Since §50.14, in the evolving game only.)
 - **The page.**
   - The Fungus panel shows the mycelium, the fungus in ants, adaptations to choose with a bar toward the next, and each upgrade's next level with a button.
   - The ant card shows a held lever as what the host runs, plus "(wants …)" and the upgrade that would widen it.
@@ -3624,7 +3624,7 @@ At 4× that is a few seconds of wall time, and the fungus started with every pow
 - **A test pins both:** colony parity, and a patch only for a queen carrying the evolving fungus.
 
 **Mutations** (`MUTATION` 0.25 per unit of new fungus) replace §50.12's adaptations at rising thresholds:
-- **What counts:** every bit of new fungus is a chance to mutate. That is the mycelium growing on the ground, spores taking hold in an ant, and load passing on contact.
+- **What counts:** every bit of new fungus is a chance to mutate. That is the mycelium growing on the ground, spores taking hold in an ant (no longer, since §50.14), and load passing on contact.
 - **So the rate tracks growth.** A fungus that grows fast mutates fast, and the panel shows mutations a minute (averaged over 20 s).
 - **The player keeps them,** giving mutations to an upgrade's next level. Each level asks more than the last: 2–10 for a first level, 300–1,500 for most second ones, 2,000–6,000 for the strongest. The rising costs stand in for selection and for adaptation's diminishing returns ([fungus-body §3](fungus-body.md#3-adapting-to-hosts)).
 - **The licence taken:** growth on the ground counts too, though the passage study ties adaptation to hosts.

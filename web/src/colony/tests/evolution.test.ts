@@ -9,6 +9,7 @@ import { Game } from "../game.ts";
 import { hold, LEVERS } from "../levers.ts";
 import { generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../world.ts";
 import { put } from "./hexmaps.ts";
+import { readFileSync } from "node:fs";
 import type { FungalSituation } from "../fungalPolicy.ts";
 
 // The fungus's body and evolution (ja-lo8.12): reach holds levels where they take effect and nowhere else, mutations
@@ -52,6 +53,7 @@ test("hold: a level is pulled back toward as is until it is within reach; levers
 test("reach acts where levels take effect: Jev's question and cache key do not change, the host's gains do", () => {
   const map = arena();
   const c = placed(map, [[10, 6]]);
+  c.strain[0] = GARDEN; // a host of the strain that evolves
   const f = new Fungus(map);
   const before = f.asked;
   const sit: FungalSituation = { arousal: "calm", touch: "none", place: "outside", task: "forager", carrying: "nothing", groomed: false };
@@ -62,7 +64,9 @@ test("reach acts where levels take effect: Jev's question and cache key do not c
   // Jev wants food scent strongly boosted (×2.5); the fungus starts with Senses at one step (×1.5).
   f.expressLevels(c, 0, { food: 4 }, 1);
   assert.ok(Math.abs((c.gainFood[0] as number) - 1.5) < 1e-9, `held to one step: ${c.gainFood[0]}`);
-  assert.deepEqual(f.held({ food: 4, odour: 2 }), { food: 3, odour: 0 }, "and Recognition starts at none");
+  assert.deepEqual(f.held({ food: 4, odour: 2 }, GARDEN), { food: 3, odour: 0 }, "and Recognition starts at none");
+  const LOCKPICK = STRAINS.findIndex((x) => x.id === "lockpick");
+  assert.deepEqual(f.held({ food: 4 }, LOCKPICK), { food: 4 }, "another strain's host (a lab brush) is not held (PR #43 review, N2)");
   const e = f.evolution!;
   e.replicate(upgrade("senses").costs[0]! / MUTATION);
   assert.ok(f.upgrade("senses"), "the mutations for the Senses' full range");
@@ -214,4 +218,103 @@ test("a weak start loses in the nest: Garden as listed takes a quarter of the co
   assert.ok(listed > 0.9, `listed Garden: ${listed.toFixed(2)}`);
   assert.ok(weak < 0.5, `evolving, choosing nothing: ${weak.toFixed(2)}`);
   void INFECTED;
+});
+
+test("the queen's levels are held too: Stealth decides how far she can hide (PR #43 review, T1)", () => {
+  const g = new Game(generateSideWorld(1), { antCount: 100, rivalAnts: 100 }, mulberry32(7919));
+  g.land(0, GARDEN, { evolve: true });
+  const f = g.fungus;
+  const q = g.colonies[0]!.queen!;
+  f.policy = () => "dormant"; // hide: showing at its lowest level
+  const settle = () => {
+    q.load = 0.5;
+    q.strain = GARDEN;
+    f.hosts = Math.max(1, f.hosts);
+    for (let k = 0; k < 4; k++) g.tick(1 / 30);
+  };
+  settle();
+  assert.equal(q.show, 1, "Stealth at none: she shows as she is");
+  f.evolution!.replicate(1e6);
+  assert.ok(f.upgrade("stealth") && f.upgrade("stealth"));
+  settle();
+  assert.equal(q.show, 0.25, "Stealth at its most: hidden");
+});
+
+test("mutations from hosts: load passed on by contact counts, spores picked up from the ground do not (PR #43 review, S2, T2)", () => {
+  const map = arena();
+  // Contact: a full host beside a clean ant, no ground spores, no mycelium.
+  const f = new Fungus(map, { grooming: 0, priming: 0 });
+  f.evolve(GARDEN);
+  f.strains[GARDEN]!.decay = 0; // so the load it ends with is all it took on
+  const c = placed(map, [
+    [10, 6],
+    [11, 6],
+  ]);
+  c.load[0] = 1;
+  c.strain[0] = GARDEN;
+  f.hosts = 1;
+  run(f, [c], 3);
+  assert.ok((c.load[1] as number) > 0.05);
+  assert.ok(Math.abs(f.evolution!.growth - (c.load[1] as number)) < 1e-6, `what contact passed on: ${f.evolution!.growth} vs ${c.load[1]}`);
+  // Ground: a lone ant on spores takes load, and nothing new is made.
+  const g = new Fungus(map, { grooming: 0, priming: 0 });
+  g.evolve(GARDEN);
+  const d = placed(map, [[20, 6]]);
+  g.paint([d], d.x[0] as number, d.y[0] as number, 1, 3, 0, GARDEN); // spores under it, no dose
+  run(g, [d], 3);
+  assert.ok((d.load[0] as number) > 0.05, `it took load off the ground: ${d.load[0]}`);
+  assert.equal(g.evolution!.growth, 0, "moved, not made");
+});
+
+test("the queen's larger grooming cap is the evolving game's: a lab or test game's queen is groomed as before (PR #43 review, S1)", () => {
+  const queenAt = (queenGroomers: number, evolve: boolean) => {
+    const g = new Game(generateSideWorld(1), { antCount: 300, rivalAnts: 300, fungus: { queenGroomers } }, mulberry32(7919));
+    g.land(0, GARDEN, { evolve });
+    if (evolve) {
+      // Garden as listed, so the fungus reaches her in a short run.
+      g.fungus.strains[GARDEN]!.transmission = 0.3;
+      g.fungus.strains[GARDEN]!.decay = 0;
+    }
+    for (let k = 0; k < 30 * 45; k++) g.tick(1 / 30);
+    return g.colonies[0]!.queen!.load;
+  };
+  assert.equal(queenAt(8, false), queenAt(4, false), "not evolving: the cap is not read");
+  const four = queenAt(4, true);
+  const eight = queenAt(8, true);
+  assert.ok(four > 0 && eight !== four, `evolving: the cap is read (${four.toFixed(3)} vs ${eight.toFixed(3)})`);
+});
+
+test("spores a full patch can't hold stay mycelium (PR #43 review, N3)", () => {
+  // A ground that holds no spores at all: every spore the mycelium puts out is one it can't lay.
+  const g = new Game(generateSideWorld(1), { antCount: 50, rivalAnts: 50, fungus: { maxSpores: 0 } }, mulberry32(7919));
+  g.land(0, GARDEN, { evolve: true });
+  const e = g.fungus.evolution!;
+  e.mass = 50; // above what one patch holds: it does not grow, so its mass moves only by spores
+  for (let k = 0; k < 90; k++) g.tick(1 / 30);
+  assert.ok(Math.abs(e.mass - 50) < 1e-9, `nothing paid for spores that could not be laid: ${e.mass}`);
+});
+
+test("a load with no evolution puts every strain back as listed (PR #43 review, N4)", () => {
+  const map = arena();
+  const f = new Fungus(map);
+  f.evolve(GARDEN);
+  assert.notEqual(f.strains[GARDEN]!.transmission, STRAINS[GARDEN]!.transmission);
+  f.loadState(new Fungus(map).saveState());
+  assert.equal(f.evolution, null);
+  assert.equal(f.strains[GARDEN]!.transmission, STRAINS[GARDEN]!.transmission);
+  assert.equal(f.strains[GARDEN]!.decay, STRAINS[GARDEN]!.decay);
+});
+
+test("the fungus's save holds every private field it declares, or the field is derived or scratch (PR #43 review, N1)", () => {
+  // As save.test.ts does for Colony: a new #field must be saved, or named here as derived on load or per-step scratch.
+  const src = readFileSync(new URL("../fungus.ts", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("export class Fungus "));
+  const declared = new Set<string>();
+  for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
+  const saved = { evolution: "evolution", base: "base", sporeCells: "sporeCells", menu: "menu", clock: "clock" } as Record<string, string>;
+  const derived = ["reach", "evade", "listed"];
+  const scratch = ["made", "all", "visible", "taken", "nb"];
+  assert.deepEqual([...declared].sort(), [...Object.keys(saved), ...derived, ...scratch].sort(), "every declared #field is accounted for");
+  const keys = Object.keys(new Fungus(arena()).saveState());
+  for (const [field, key] of Object.entries(saved)) assert.ok(keys.includes(key), `#${field} is saved as ${key}`);
 });

@@ -6,8 +6,9 @@
 // second, paid out of that mass (design: the literature found gives no conversion). So the mycelium settles where
 // growth meets sporulation, and a thicker fruiting body means more spores from a smaller mycelium.
 //
-// **Its evolution.** Every bit of new fungus is a chance to mutate: its mycelium growing on the ground, spores taking
-// hold in an ant, load passing on by contact. So **mutations** come at a fixed share of its growth (`MUTATION`), and a
+// **Its evolution.** Every bit of new fungus is a chance to mutate: its mycelium growing on the ground, and load
+// passing on by contact in its hosts (the source keeps its load). Spores an ant picks up are fungus moved, not made:
+// counted once, when the mycelium grew them. So **mutations** come at a fixed share of its growth (`MUTATION`), and a
 // fungus that grows fast mutates fast. Which mutations it keeps is the player's to choose: they give mutations to the
 // next level of an upgrade, and each level asks more than the one before. That choosing is the game's licence (owner,
 // PRD §50.13): real mutations are random and selection keeps what works, and real adaptation speeds up far less than
@@ -269,7 +270,12 @@ export class Evolution {
     return spores;
   }
 
-  /** Fungus grown in hosts (load they took on, from spores or by contact): it counts toward mutations. */
+  /** Spores its patch could not hold go back into the mycelium's mass. */
+  refund(spores: number): void {
+    this.mass += spores * BODY.sporeMass;
+  }
+
+  /** Fungus grown in hosts (load passed on by contact): it counts toward mutations. */
   replicate(load: number): void {
     this.growth += load;
   }

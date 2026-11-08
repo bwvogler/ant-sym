@@ -103,7 +103,7 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
   const wanted = decided ? fungus.resolve(decided.answer, s) : {};
   const levers = decided ? pulled(wanted, fungus.menu) : [];
   // What the host runs: Jev's levels held to the fungus's reach (ja-lo8.12).
-  const held = fungus.held(wanted);
+  const held = fungus.held(wanted, s);
   const stale = decided?.by === "stale";
   return (
     <>
