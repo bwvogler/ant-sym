@@ -254,6 +254,35 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
   assert.equal(reported, 0, "no finder on a raid trail");
 });
 
+test("raids by trail (ja-sf1): a raider at the end of the raid trail searches on past it; with raidOnward 0 it mills at the end", () => {
+  // A wide raid gradient rising east from x 8 and ending at x 20, where a scout met strangers; the field goes on to the east.
+  // The share of 30 s each of five raiders spends well past the end.
+  const past = (raidOnward: number) => {
+    let s = 0;
+    for (let seed = 1; seed <= 5; seed++) {
+      const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidOnward }, mulberry32(seed));
+      c.stance = "raid";
+      put(c, 0, 12, 10);
+      c.heading[0] = 0; // facing east, up the trail
+      for (let k = 0; k < 30 * 30; k++) {
+        if (k % 30 === 0)
+          for (let y = 1; y <= 18; y++)
+            for (let x = 8; x <= 20; x++) {
+              const p = at(x, y);
+              c.ph.deposit("raid", p.x, p.y, 0.1 * (x - 6)); // kept fresh: the end stays where it is
+            }
+        c.tick(1 / 30);
+        if ((c.x[0] as number) > at(26, 10).x) s += 1 / (30 * 30);
+      }
+    }
+    return s;
+  };
+  const mills = past(0);
+  const on = past(1);
+  assert.ok(mills < 0.05, `raidOnward 0: it stays at the trail's end (${mills.toFixed(2)} raider-runs past it)`);
+  assert.ok(on > 0.5, `raidOnward 1: past the end it searches on (${on.toFixed(2)} raider-runs past it)`);
+});
+
 test("raid stance as a bias (behaviour MR 5.2): an ant with no trail carries on as a forager, a trail or a scout's errand makes it a raider, and it is a forager again once home", () => {
   const colony = (raidScout: number) => {
     const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout }, mulberry32(8));

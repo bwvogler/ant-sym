@@ -248,6 +248,11 @@ export interface ColonyParams {
   /** seconds of contact with strangers that make a scout a finder */
   findAt: number;
   /**
+   * a raider at the end of the raid trail (nothing stronger ahead) searches on, out and away from home, instead of climbing back
+   * to the end (1; 0: it mills there). The trail ends where a scout met strangers, often short of their nest (ja-sf1)
+   */
+  raidOnward: number;
+  /**
    * on a raid stance, an ant at home with no raid trail under it goes out to look for the rival at this rate per second (a scout:
    * a spontaneous rate, like `scoutRate`; the rest of the colony carries on foraging until a scout's trail reaches them)
    */
@@ -274,7 +279,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -504,6 +509,8 @@ export class Colony {
   recruited: Uint8Array;
   /** 1 once a recruited ant has been away from the nest: coming home then ends its raid */
   #gone: Uint8Array;
+  /** a raider past the end of the raid trail, searching on (ja-sf1) */
+  #pastEnd: Uint8Array;
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
   #storedSeen = 0;
@@ -720,6 +727,7 @@ export class Colony {
     this.reporting = new Uint8Array(n);
     this.recruited = new Uint8Array(n);
     this.#gone = new Uint8Array(n);
+    this.#pastEnd = new Uint8Array(n);
     this.quality = new Float32Array(n).fill(1);
     this.#tired = new Uint8Array(n);
     this.detour = new Float32Array(n);
@@ -824,6 +832,7 @@ export class Colony {
     this.reporting[i] = 0;
     this.recruited[i] = 0;
     this.#gone[i] = 0;
+    this.#pastEnd[i] = 0;
     this.quality[i] = 1;
     this.#tired[i] = 0;
     this.detour[i] = 0;
@@ -3259,7 +3268,11 @@ export class Colony {
           this.recruited[i] = 0;
           this.#gone[i] = 0;
         }
-      } else if (this.recruited[i] === 1) this.recruited[i] = 0;
+        if (homeNow || this.recruited[i] === 0) this.#pastEnd[i] = 0;
+      } else if (this.recruited[i] === 1) {
+        this.recruited[i] = 0;
+        this.#pastEnd[i] = 0;
+      }
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
       // this step (its trip is over: see `arrive`).
       // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
@@ -3661,7 +3674,12 @@ export class Colony {
           const rl = Math.max(0, ph.read("raid", x + Math.cos(h - a) * d, y + Math.sin(h - a) * d));
           const rf = Math.max(0, ph.read("raid", x + Math.cos(h) * d, y + Math.sin(h) * d));
           const rr = Math.max(0, ph.read("raid", x + Math.cos(h + a) * d, y + Math.sin(h + a) * d));
-          if (Math.max(rl, rf, rr) >= FAINT) h += climb(rl, rf, rr, p.turnRate * dt) + noise * p.wander * 0.25;
+          const top = Math.max(rl, rf, rr);
+          // The trail's end: facing along it (the front sensor strongest), nothing ahead as strong as underfoot. Past it, a raider searches on (raidOnward) as a scout does
+          // (a run out, then a search), instead of turning back up to the end and milling there short of the strangers' nest.
+          if (p.raidOnward > 0 && rf >= FAINT && rf === top && this.#pastEnd[i] === 0 && rf < ph.read("raid", x, y)) this.#pastEnd[i] = 1;
+          if (top >= FAINT && this.#pastEnd[i] === 0) h += climb(rl, rf, rr, p.turnRate * dt) + noise * p.wander * 0.25;
+          else if (this.#pastEnd[i] === 1 && top >= FAINT) h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
           else h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander;
         } else if (!rgate && this.stance === "raid" && this.raidTarget && !detouring) {
           // At the rival hole's coordinates: the side view, or raidGate 0 (review of #41: an ant not recruited, put in FIGHT by Jev's
