@@ -3760,3 +3760,28 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
 **Tests and cost:** no sim change, so the golden masters and the fast tests stand as they were. Jev cost: unchanged.
 
 **Review (own agent):** nothing blocking. Fixed: the scripts import `BRUSH` instead of copying it; the Learn guide and two research notes (`fungus-policy.md`, `queens-and-merging.md`) no longer send readers to a brush or a lab strain picker; Space on the focused field is still kept from scrolling the page. Filed: the lethal levers (crown, odour weapon) are held to no reach, so a player who turns one on gets it at full strength from the first second (`ja-lo8.16`).
+
+## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
+
+The owner asked for the top-down view and the side view to be two views of one game. The side view would be a cut along a line through the nests' holes, zig-zagging as nests are added, and a new nest may not be founded nearer an interior nest's hole, so the line always grows from an end. Today they are two unrelated games, and the Ground control throws the game away to switch (§27 created the split without choosing it).
+
+**Decisions (owner, 2026-11-08):**
+- **Underground is a curtain under the line, not a 3D volume.**
+  - The surface is a 2D plane with today's top-down physics.
+  - Everything underground lives in one vertical sheet under the line, with today's side-view physics, and the side view shows all of it.
+  - A hole is the only way between the two.
+  - A full 3D underground was set aside: depth-times the memory and tick cost, 3D digging and homing, and a side view that would miss tunnels.
+- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it, it is a 2D hole gap from every hole, and the ground is open.
+- **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
+
+**The note's open questions, answered (owner, 2026-11-08):**
+- **Tunnels of neighbouring colonies may meet** in the curtain; the contact response decides. A dig-stop rule would read another nest's position.
+- **A founding flight with no valid landing within her radius fails**, and the game says why. `new-queens.md` §3 is changed to match.
+- **Wide screens get the above/below switch first**; both views at once is a follow-up (`ja-lp4.8`).
+- **After U6 the old side and open maps leave the page**, kept as test beds until their assays are re-baselined.
+
+The founding radius stays open until the research bead (`ja-lp4.7`) gives a figure.
+
+**Cost.** None yet. The mode situation keeps its fields, so one world should not change Jev's cost; U3 checks it with `colony-cost`. Tick cost will rise toward the side view's 7.0–7.3 ms at 1,200 + 1,200 ants (§36, §37); U6 measures it before the page switches.
+
+**Review of #45 (agent, 2026-11-08):** the tick estimate (it had cited the old underground map, not the side view), the founding rule's clearance at the shared vertex and a minimum turn, ties, the hex rasterisation of the line, what growing the line does to the old end's margin, the larder (kept; it no longer makes ants), the 2D hole gap, the curtain's crust and margin, and the fungus's mycelium on the plane were corrected in the note.
