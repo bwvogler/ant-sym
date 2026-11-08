@@ -181,3 +181,14 @@ Each is a bead under the epic. Each measures something before it merges.
 | 7 | The midden | corpses cleared; boundary effect on raids |
 | 8 | The fungus on the new home: chamber-mark levers, nest `ground`, queen and brood infection | unity and deaths against the side view's own baseline, PRD §29's rerun of PRD §22 |
 | 9 | Design for the species framework (`ja-8fd`): several queens, adoption, an orphaned colony merging (a unification route) | design note |
+
+## Play
+
+*Added 2026-11-08 (`ja-gvt`). A summary across slices 0–9 as built (PRD §29–§39) and the fungus game since (§50).*
+
+- **See:** only in the side view. A shaft and chambers dug as the colony grows, tinted by role; the queen and brood; porters carrying food down from reception; corpses carried to the midden; the mound (§31–§36). The field's Labels button names each chamber, and Learn's Nest tab lists them (§47). Learn entries: Home trail, Chambers, Finding the way inside, The queen, Brood, Jobs by age, Mound and midden; five call out what is still scripted (`ja-k4k.1`–`.5`). Top-down maps have no nest, only a disc.
+- **Choose:** the nest is where the fungus lands, by a hole, and where its mycelium grows (§50.4, §50.12). It adds the side-view-only levers (`levers.ts`, `nest: true`): floor marks (at the extreme brood and store swap), queen signal (in a queen: the route to new queens, §50.7) and the lethal crown, off until turned on and its Crown upgrade kept (§50.16). Reaching a queen reveals her colony's doctrine and ends a chapter (§50.4, §50.7).
+- **Counterplay and progression:** a queen is groomed by up to 8 nestmates in the evolving game, a stop-gap (§50.12, §50.14, `ja-k4k.12`); the dead go to the midden. Floor marks sit under Senses (one step at first, the full range for 300 mutations); queen signal under Royal (none at first, then 1,000 and 4,000). Measured: the fungus reaches the queen at 219–314 s under Unite, seeds 1–3 (§50.14), against 19–25 s before (§50.12).
+- **Cost:** §5's colony figures are estimates; the colony lane on the side view is not measured live. The one real figure is the fungus lane's ~708 tokens per situation when its side-view answers were shipped (§50.9). A game whose situations are all cached spends nothing (§50.11).
+- **Risks:** a free lever, closed: crown acted at full strength from the first second, and is now held off until the fungus keeps the Crown upgrade (5,000) (`ja-lo8.16`, PRD §50.16). Famine: long games run colonies down, and larvae starve beside a full larder (§50.4, `ja-xu6`). Legibility: the nest shows only in the side view until one world (`ja-lp4`, PRD §51).
+- **Owner decisions needed:** none.

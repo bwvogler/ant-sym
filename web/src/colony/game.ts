@@ -166,6 +166,9 @@ export const QUIET = 60;
 /** The fungus's landing (Game.land): this far past the hole (cells, along the ground), spores over this radius. */
 export const LANDING = { offset: 3, radius: 2, spores: 3 };
 
+/** The app's old spore brush, per paint event (removed, ja-260): radius in cells, spores laid per cell, load dosed into each ant under it. Scripts replay it. */
+export const BRUSH = { radius: 3, spores: 2, dose: 0.15 } as const;
+
 /**
  * The colony c would raid, of any number: the nearest (hole to hole, or nest to nest on a top-down map) that is not
  * beaten and does not smell like kin (nest odours more than `tolerance` apart); null if there is none.
@@ -602,7 +605,11 @@ export class Game {
     return { x: e.x + LANDING.offset, y: e.y - (c.nest.entrance ? 0.5 : 0) };
   }
 
-  /** The spore brush: spores on the ground within `radius` of (x, y), and a dose of load into every ant there, of any colony. */
+  /**
+   * Spores on the ground within `radius` of (x, y), and a dose of load into every ant there, of any colony: the old
+   * spore brush (BRUSH), for tests and scripts. The app has no brush (ja-260): every game lands an evolving fungus, and
+   * a free stroke would skip its progression.
+   */
   paintSpores(x: number, y: number, radius: number, spores: number, dose: number, strain: number): void {
     this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain);
   }

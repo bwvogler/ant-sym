@@ -7,21 +7,20 @@
 // from its size (colonyBrain.estimateTokens), as colony-cost does; the ledger counts the real ones live.
 //
 // Plays: lockpick (painted on both holes), bloom (on colony 1's hole), bloom-crown (the same, crown on the menu, and
-// crowning wherever a host is by the queen or in a chamber: crown.mjs's policy), garden (on both royal chambers). Each paint is the UI's
+// crowning wherever a host is by the queen or in a chamber: crown.mjs's policy), garden (on both royal chambers). Each paint is the app's old
 // spore brush (radius 3, spores 2, dose 0.15), STROKES events in a short drag, at 30 s.
 //
 // Usage: node scripts/fungus-cost.mjs [play=lockpick] [minutes=5] [ants=600] [seed=1] [strokes=6]
 import { estimateTokens } from "../web/src/colony/colonyBrain.ts";
 import { FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, packFungusRequest, worthAsking, AIMS } from "../web/src/colony/fungusBrain.ts";
 import { STRAINS } from "../web/src/colony/fungus.ts";
-import { Game } from "../web/src/colony/game.ts";
+import { BRUSH as SPORES, Game } from "../web/src/colony/game.ts";
 import { centreX, centreY } from "../web/src/colony/hex.ts";
 import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const play = process.argv[2] ?? "lockpick";
 const [minutes = 5, ants = 600, seed = 1, strokes = 6] = process.argv.slice(3).map(Number);
-const SPORES = { radius: 3, spores: 2, dose: 0.15 }; // web/src/ui/useColony.ts
 const DT = 1 / 30;
 const BATCH_EVERY = FUNGUS_GATHER_MS / 1000; // the lane lets a part-full request gather this long (colonyJev gatherMs)
 const aim = AIMS[0].text;

@@ -2612,7 +2612,7 @@ export class Colony {
       qy = CELL[1] as number;
       // She begs once she has gone QUEEN_WAIT without laying for want of food in her chamber (the death spiral's mark),
       // not whenever her chamber is briefly bare (early on she lays two eggs a second: begging then jammed the tunnels
-      // with porters, A8 and G, PRD §50.16).
+      // with porters, A8 and G, PRD §50.18).
       const royal = ch.list[ch.at(qx, qy)];
       q.unfed = !royal || royal.food < EGG_FOOD ? q.unfed + dt : 0;
       felt.put(qx, qy, QUEEN_BEG * Math.min(1, Math.max(0, (q.unfed - QUEEN_WAIT) / QUEEN_WAIT)));

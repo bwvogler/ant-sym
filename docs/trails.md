@@ -48,6 +48,15 @@ Research note for behaviour MR 3 (bead `ja-3ml`, PRD §45). Before MR 3 every fo
 - **"No entry"** is built: a channel with t½ ≈ 27 s, a `noEntry` response, and a follower discount (`noEntryAvoid`). It ships off: the marks it laid landed on live trails and cost A2a more than they gained on A3 (bead `ja-4n1`).
 - **Which journeys lay trail:** only carriers lay food trail (*Lasius*). Outbound laying by followers was measured and didn't help A1 (0.50, with a wide spread).
 
+## Play
+
+- **See:** on the top-down maps the green food trail narrows onto the short branch of a fork and onto the richer of two piles (PRD §45.5: A1 0.97, A2b 0.94). The page starts on the side view, where trails don't fork and choice by strength doesn't run (PRD §45.3), and every game map's food is fair, so taste never shows (PRD §45.2). "No entry" ships off and isn't drawn (PRD §45.4). Learn has entries for the food trail, the home trail, tasting food, choosing a branch and the "no entry" mark.
+- **Choose:** four levers reach trails. `food` (food scent) and `rival` (rival trails as food) bend what a host smells, one step from the start (Senses). `trail` (trail laid) and `leak` (trail leaked to rivals) bend what it lays, from nothing until the Trails upgrade (PRD §50.12). No lever bends taste or "no entry".
+- **Counterplay and progression:** the colonies have no answer to a loud or leaked trail; whether they need one is not measured. The laying levers wait behind an upgrade, so the start stays weak (PRD §50.12).
+- **Cost:** the page answers the trail response by the local rule and asks Jev none of it; asked, it would be 829 tokens a question (PRD §48.5). The live checks cost $0.0036 and $0.0007 (PRD §45.6). The trail levers ride the fungus lane's questions, ~708 tokens a situation (PRD §50.12).
+- **Risks:** strong trails brought midfield battles where two colonies' routes cross: G′ losses +46 % (PRD §45.5, `ja-hgq`). `leak` and `rival` steer colonies onto each other's routes, the same crossing; not measured. Amplification can lock onto the poorer pile (A2b, one seed at 0.11, PRD §45.5). Mills round spent food are broken only by tiredness (A3).
+- **Owner decisions needed:** whether trail choice reaches the game through one world's surface (PRD §51); whether game maps get food of mixed quality; whether "no entry" stays off (`ja-4n1`).
+
 ## Sources
 
 - Goss, Aron, Deneubourg & Pasteels 1989, "Self-organized shortcuts in the Argentine ant", *Naturwissenschaften* 76:579–581: https://link.springer.com/article/10.1007/BF00462870 *(index page)*

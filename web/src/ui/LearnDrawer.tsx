@@ -7,6 +7,7 @@ import { decodeLevels, pulled, PRESETS } from "../colony/levers.ts";
 import { askedIn } from "../colony/fungusBrain.ts";
 import { LeverChips } from "./DetailsScreen.tsx";
 import type { Game } from "../colony/game.ts";
+import { upgradeFor } from "../colony/evolution.ts";
 import { AIMS } from "../colony/fungusBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
@@ -484,7 +485,7 @@ function FungusExplainer(props: Props) {
         <ul className="mt-1.5 flex flex-col gap-1 text-[13px]">
           {LEVERS.filter((v) => menu.has(v.id) || v.kind === "lethal").map((v) => (
             <li key={v.id} className={menu.has(v.id) ? "" : "opacity-60"}>
-              <span className={`font-mono text-xs ${v.kind === "perceive" ? "text-spore" : v.kind === "lethal" ? "text-err" : "text-accent"}`}>{v.name}</span> <span className="text-xs text-fg-3">({v.kind === "perceive" ? "what it perceives" : v.kind === "emit" ? "what it gives off" : menu.has(v.id) ? "lethal, on" : "lethal, off"})</span> — {v.blurb}. <span className="text-xs text-fg-3">{v.words.join(" · ")}</span>
+              <span className={`font-mono text-xs ${v.kind === "perceive" ? "text-spore" : v.kind === "lethal" ? "text-err" : "text-accent"}`}>{v.name}</span> <span className="text-xs text-fg-3">({v.kind === "perceive" ? "what it perceives" : v.kind === "emit" ? "what it gives off" : menu.has(v.id) ? (props.game.fungus.evolution?.reach()[v.id] === 0 ? `lethal, on, held off until you keep ${upgradeFor(v.id)?.name ?? "its upgrade"}` : "lethal, on") : "lethal, off"})</span> — {v.blurb}. <span className="text-xs text-fg-3">{v.words.join(" · ")}</span>
             </li>
           ))}
         </ul>

@@ -202,7 +202,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Real parasites change what an ant perceives, gives off and can do, not its plans. Rickia makes its hosts carry more of one alkane, and they are attacked less by strangers. Ophiocordyceps hosts lose their daily rhythm and communicate less. Grooming off Metarhizium passes low doses that immunise nestmates.",
     inGame:
-      "The fungus never chooses for an ant: each ant's policy decides from what it senses, and the fungus bends those senses and what the ant gives off (see the next entry). The game's fungus spreads like Garden (after the leafcutter's garden): its hosts carry its own odour. In the lab, Lockpick (after Rickia) hides and calms, and Bloom (after Metarhizium) spreads fast and is groomed off.",
+      "The fungus never chooses for an ant: each ant's policy decides from what it senses, and the fungus bends those senses and what the ant gives off (see the next entry). The game's fungus spreads like Garden (after the leafcutter's garden): its hosts carry its own odour. Two more strains exist in the code for experiments: Lockpick (after Rickia) hides and calms, and Bloom (after Metarhizium) spreads fast and is groomed off. Nothing in the game lays them.",
     sources: [
       { note: "fungus-policy", anchor: "3-what-real-parasites-do-to-ants", label: "What real parasites do to ants" },
       { note: "fungus-policy", anchor: "2-two-policies-and-the-perceived-state-between-them", label: "Two policies, and the perceived state between them" },
@@ -216,7 +216,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "A fungus lives in and on its host's body. What it could read there is the host's body: amines that rise with fighting, the cuticle it touches, the juvenile hormone that tracks a worker's task. That a fungus reads these is the game's design; what parasites do with them, changing what a host perceives and gives off, is real (Rickia's alkane, Ophiocordyceps's lost rhythm).",
     inGame:
-      "Your aim, in words, is read by Jev, which sets a level for every lever in each situation the fungus senses: perception levers (food, rival trails, home, alarm, stranger scent, floor marks, time out) and emission levers (trail laid, trail leaked, alarm laid, calming cue, fungal odour, showing). Lethal levers stay off until you turn them on. The ant still decides, from what it now perceives.",
+      "Your aim, in words, is read by Jev, which sets a level for every lever in each situation the fungus senses: perception levers (food, rival trails, home, alarm, stranger scent, floor marks, time out) and emission levers (trail laid, trail leaked, alarm laid, calming cue, fungal odour, showing). Lethal levers stay off until you turn them on, and in the game even then do nothing until your fungus earns them (the Odour weapon and Crown upgrades). The ant still decides, from what it now perceives.",
     sources: [
       { note: "fungus-policy", anchor: "11-what-the-fungus-senses-inside-an-ant-and-its-levers", label: "What the fungus senses inside an ant, and its levers" },
       { note: "new-queens", anchor: "4-where-the-fungus-comes-in", label: "Where the fungus comes in (queen birth)" },
@@ -230,7 +230,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Metarhizium lives for months in soil and around roots without an insect. Passed through groups of grooming ants for ten cycles, it evolved to make more spores and to carry less of the cue groomers detect. In experimental evolution, more replication buys far less than proportionally faster adaptation.",
     inGame:
-      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep, and each level asks more than the last: its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
+      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep, and each level asks more than the last: its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go, the lethal ones included: a lethal lever you put on the menu stays held off until you keep its upgrade. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
     sources: [
       { note: "fungus-body", anchor: "1-growth-without-a-host", label: "Growth without a host" },
       { note: "fungus-body", anchor: "3-adapting-to-hosts", label: "Adapting to hosts" },
@@ -264,6 +264,8 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "fungus-policy", title: "The fungus policy", covers: "What real parasites do to ants, and the levers the fungus pulls." },
   { note: "fungus-body", title: "The fungus's body", covers: "A mycelium off the host, spores paid from its mass, adapting in hosts; grooming triggered by sensing the pathogen." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
+  { note: "entrances", title: "Entrances", covers: "How many entrances colonies keep, sealing them at night, and what a digger senses near the surface." },
+  { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views (design, not built)." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];
 

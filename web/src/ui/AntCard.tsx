@@ -138,7 +138,7 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
               <span
                 key={lever.id}
                 className={`rounded bg-raised px-1.5 py-0.5 font-mono ${lever.kind === "perceive" ? "text-spore" : lever.kind === "lethal" ? "text-err" : "text-accent"} ${stale ? "opacity-50" : ""}`}
-                title={`${lever.kind === "perceive" ? "what it perceives" : "what it gives off"}: ${lever.blurb}${by ? `. Jev wants ${lever.words[level]}; your fungus reaches ${lever.words[runs]}: adapt ${by.name} to go further.` : ""}`}
+                title={`${lever.kind === "perceive" ? "what it perceives" : lever.kind === "lethal" ? "lethal" : "what it gives off"}: ${lever.blurb}${by ? `. Its policy wants ${lever.words[level]}; your fungus reaches ${lever.words[runs]}: keep ${by.name} to go further.` : ""}`}
               >
                 {lever.name}: {lever.words[runs]}
                 {by && <span className="text-fg-3"> (wants {lever.words[level]})</span>}
