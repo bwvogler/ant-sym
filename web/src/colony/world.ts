@@ -749,6 +749,15 @@ export const SIDE_WORLD: SideWorldOptions = {
   chamberDepth: 14,
 };
 
+/**
+ * The side view's ground at world (wx, wy), `depth` rows below the ground line: stones from a few rows down, more of them
+ * deeper; cavities only well below the ground line; soil elsewhere. One world's curtain digs its ground by the same rule.
+ */
+export function groundCell(seed: number, depth: number, wx: number, wy: number, cut: number, scut: number): Terrain {
+  const stone = depth > 3 && heightAt(seed, wx, wy) + 0.06 * Math.min(1, depth / 200) > cut;
+  return stone ? ROCK : depth > 8 && chamberAt(seed, wx, wy) >= scut ? OPEN : SOIL;
+}
+
 /** The ground line's row at column x: gentle rise and fall (value noise over ~40 columns, rough over ~9). */
 export function groundRow(seed: number, o: { surface: number; relief: number }, x: number): number {
   const n = 0.75 * noiseAt(seed, 6, x, 0, 40) + 0.25 * noiseAt(seed, 7, x, 0, 9);
@@ -781,12 +790,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
         rock.set(x, y, AIR);
         continue;
       }
-      const depth = y - g;
-      const wx = centreX(x, y);
-      const wy = centreY(y);
-      // Stones from a few rows down, more of them deeper; cavities only well below the ground line.
-      const stone = depth > 3 && heightAt(seed, wx, wy) + 0.06 * Math.min(1, depth / 200) > cut;
-      rock.set(x, y, stone ? ROCK : depth > 8 && chamberAt(seed, wx, wy) >= scut ? OPEN : SOIL);
+      rock.set(x, y, groundCell(seed, y - g, centreX(x, y), centreY(y), cut, scut));
     }
   // The walkway: sky cells touching the ground.
   for (let y = 0; y < size.h; y++) for (let x = 0; x < size.w; x++) if (sky.get(x, y) === 1 && grounded(map, x, y)) rock.set(x, y, OPEN);

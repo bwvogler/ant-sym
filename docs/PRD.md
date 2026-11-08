@@ -3838,7 +3838,7 @@ The owner asked for the top-down view and the side view to be two views of one g
 - **The curtain** is laid out as a side view: 40 rows of sky; a ground strip copied from the plane under the line (`refreshStrip`; never simulated); the crust, open only at the holes; and 300 rows of the side view's ground, with each nest's shaft and royal chamber dug by `foundNest`.
 - **Stable under growth.** Its ground goes by *s* and the row, and each nest by its own hole, so a column keeps its ground when the line grows.
 - **The preview** is at `?world=one`: above and below, no ants. Nothing else on the page changes, and nothing in the game uses it yet, so behaviour and the golden masters are unchanged; `generateOneWorld` has its own golden.
-- **The margin stays 64.** Measured with `scripts/dig-spread.mjs` (the page's side-view game, 600 ants a colony, seeds 1–3): after 600 s the farthest cell a colony had dug lay 34, 51 and 36 columns from its hole, with the 99th percentile at 29–44.
+- **The margin stays 64.** Measured with `scripts/dig-spread.mjs` (the page's side-view game, 600 ants a colony, seeds 1–3): after 600 s the farthest cell dug outward past an end hole (west of the westmost, east of the eastmost) lay 34, 51 and 36 columns beyond it, with the 99th percentile at 30–46.
 
 **The founding radius (research, `ja-lp4.7`).** `docs/nest-spacing.md`: mature harvester nests sit 9–14 m apart (one neighbour gap, the game's 140 cells); queens fly 5 gaps or more; spacing is made by young colonies dying near old ones (~8 m), not by where queens land. Design: `FLIGHT` 140 cells; keep `HOLE_GAP_2D` and `CLEARANCE` at 12.
 

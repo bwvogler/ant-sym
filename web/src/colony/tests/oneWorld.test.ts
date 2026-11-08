@@ -103,37 +103,68 @@ test("buried food lies below the crust, reachable from the first nest; the strip
   }
 });
 
-test("the curtain's ground keeps its place when the line grows at V₀: stones and cavities go by s, not by storage column", () => {
+/** Every shared column of two curtains has the same ground, except in the 64-column pocket blocks within reach of `sNew`. */
+function sameGround(seed: number, a: OneWorld["curtain"], la: OneWorld["line"], b: OneWorld["curtain"], lb: OneWorld["line"], sNew: number): number {
+  // A new nest pushes aside the pockets near it, and with them the rest of their block's draws; its shaft and chamber
+  // lie within a few columns of its hole. Pockets keep 16 + radius + 1 ≤ 21 from a nest.
+  const lo = Math.floor((sNew - 30) / 64) * 64;
+  const hi = (Math.floor((sNew + 30) / 64) + 1) * 64;
+  let compared = 0;
+  for (let s = Math.max(la.sMin, lb.sMin); s <= Math.min(la.sMax, lb.sMax); s++) {
+    if (s >= lo && s < hi) continue;
+    for (let y = CRUST; y < a.size.h; y++) {
+      assert.equal(b.rock.get(colOf(lb, s), y), a.rock.get(colOf(la, s), y), `seed ${seed}: column ${s}, row ${y}`);
+      compared++;
+    }
+  }
+  return compared;
+}
+
+test("the curtain's ground keeps its place when the line grows, at either end: it goes by s, not by storage column", () => {
   for (const seed of [1, 2, 3]) {
     const { plane, curtain, line } = world(seed);
+    const open = openCell(plane);
     const v0 = line.holes[0]!;
-    const f = nearestValid(line, { x: v0.x - 60, y: v0.y + 40 }, 140, openCell(plane));
-    assert.ok(f && f.end === "start", `seed ${seed}: a founding beyond Ink`);
-    const grown = grow(line, f.end, f.cell);
-    const after = generateCurtain(seed, plane, grown);
-    assert.ok(colOf(grown, 0) > colOf(line, 0), "storage moved: growing at V₀ lowers sMin");
-    // Compare every shared column away from the new hole (its shaft, chamber and the pockets it pushes aside).
-    const sNew = grown.sHole[0]!;
-    let compared = 0;
-    for (let s = Math.max(line.sMin, grown.sMin); s <= Math.min(line.sMax, grown.sMax); s++) {
-      if (Math.abs(s - sNew) < 64 + 40) continue;
-      for (let y = CRUST; y < curtain.size.h; y++) {
-        assert.equal(after.rock.get(colOf(grown, s), y), curtain.rock.get(colOf(line, s), y), `seed ${seed}: column ${s}, row ${y}`);
-        compared++;
-      }
-    }
-    assert.ok(compared > 100 * CURTAIN_DEPTH, `seed ${seed}: ${compared} cells compared`);
+    const atStart = nearestValid(line, { x: v0.x - 60, y: v0.y + 40 }, 140, open);
+    assert.ok(atStart && atStart.end === "start", `seed ${seed}: a founding beyond Ink`);
+    const before = grow(line, "start", atStart.cell);
+    // The new colony (2) takes the first hole; Ink (0) and Amber (1) keep their nests and royal chambers.
+    const c1 = generateCurtain(seed, plane, before, [2, 0, 1]);
+    assert.ok(colOf(before, 0) > colOf(line, 0), "storage moved: growing at V₀ lowers sMin");
+    assert.ok(sameGround(seed, curtain, line, c1, before, before.sHole[0]!) > 100 * CURTAIN_DEPTH);
+    c1.nests.forEach((n, k) => {
+      cellOf(n.entrance!.x, n.entrance!.y);
+      assert.equal(sOf(before, CELL[0]!), k === 2 ? before.sHole[0] : line.sHole[k], `seed ${seed}: colony ${k}'s nest is at its own hole`);
+    });
+    assert.equal(c1.nest, c1.nests[0], "the player's nest is still Ink's");
+    assert.deepEqual(c1.chambers!.list.filter((c) => c.role === "royal").map((c) => c.colony).sort(), [0, 1, 2]);
+    const inkChamber = c1.chambers!.list.find((c) => c.role === "royal" && c.colony === 0)!;
+    cellOf(c1.nests[0]!.x, c1.nests[0]!.y);
+    assert.equal(c1.chambers!.cell.get(CELL[0]!, CELL[1]!), inkChamber.id + 1, `seed ${seed}: Ink's chamber is colony 0's`);
+    // Then grow at the far end: the ground stays put there too (pockets near the end don't move with sMax).
+    const vk = before.holes[before.holes.length - 1]!;
+    const atEnd = nearestValid(before, { x: vk.x + 60, y: vk.y - 40 }, 140, open);
+    if (!atEnd || atEnd.end !== "end") continue;
+    const after = grow(before, "end", atEnd.cell);
+    const c2 = generateCurtain(seed, plane, after, [2, 0, 1, 3]);
+    assert.ok(sameGround(seed, c1, before, c2, after, after.sHole[after.sHole.length - 1]!) > 100 * CURTAIN_DEPTH);
   }
+  assert.throws(() => generateCurtain(1, world(1).plane, world(1).line, [0, 0]), /must number/);
 });
 
 test("refreshStrip copies the plane again: food taken on the plane leaves the strip", () => {
-  const { plane, curtain, line } = generateOneWorld(1);
-  let hit = -1;
-  for (let s = line.sMin; s <= line.sMax && hit < 0; s++) {
-    cellAt(line, s);
-    if (plane.food.get(CELL[0]!, CELL[1]!) > 0) hit = s;
+  // The first seed with food under its line (most have some).
+  let found: { w: OneWorld; s: number } | null = null;
+  for (let seed = 1; seed <= 20 && !found; seed++) {
+    const w = generateOneWorld(seed);
+    for (let s = w.line.sMin; s <= w.line.sMax && !found; s++) {
+      cellAt(w.line, s);
+      if (w.plane.food.get(CELL[0]!, CELL[1]!) > 0) found = { w, s };
+    }
   }
-  if (hit < 0) return; // no food under this line: nothing to show
+  assert.ok(found, "some seed in 1–20 has food under its line");
+  const { plane, curtain, line } = found.w;
+  const hit = found.s;
   cellAt(line, hit);
   plane.food.set(CELL[0]!, CELL[1]!, 0);
   assert.ok(curtain.food.get(colOf(line, hit), STRIP) > 0);
@@ -159,9 +190,9 @@ test("golden: generateOneWorld is pinned (the line, and the curtain's terrain, s
   };
   // Any change to generateOneWorld, generateWorld under it, the line or the curtain's rules shows here, and must be meant.
   const want: Record<number, number[]> = {
-    1: [1842500005, 993339350, 811853696, 2398851589, 4279881073, 10296],
-    2: [1969913797, 4077823617, 2937589818, 4279595470, 1334540775, 8232],
-    3: [2052465902, 1883093818, 2937589818, 1384646397, 2374244746, 7896],
+    1: [1842500005, 4138175917, 811853696, 3889898540, 4279881073, 8820],
+    2: [1969913797, 1550110699, 2937589818, 4254924357, 1334540775, 7620],
+    3: [2052465902, 3679783049, 2937589818, 3535099281, 2374244746, 7368],
   };
   const got: Record<number, number[]> = {};
   for (const seed of [1, 2, 3]) {

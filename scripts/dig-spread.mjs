@@ -1,7 +1,9 @@
 // Offline, no key: how far a side-view colony digs sideways from its hole, to size one world's margin (the curtain past
 // each end hole: docs/one-world.md §3, "U2 sets the margin from how far the side view's nests dig today"). Runs the
 // page's side-view game (600 ants a colony, GAME_REGROW, both colonies on the local rule) and, at each checkpoint,
-// takes every cell an ant has dug (dugAt > −∞, below ground) and its column distance from the nearest hole.
+// takes every cell an ant has dug (dugAt > −∞, below ground). The margin bounds digging outward past an end hole, so
+// the figure that sizes it is "outward": cells beyond the outer hole on either side (west of the westmost, east of the
+// eastmost), by their column distance from it. "Any" pools every dug cell by its nearest hole, for reference.
 //
 // Usage: node scripts/dig-spread.mjs [seeds=1-3] [seconds=600] [ants=600]
 import { Game, GAME_REGROW, gameRng } from "../web/src/colony/game.ts";
@@ -22,6 +24,9 @@ function spread(map) {
     return CELL[0];
   });
   const d = [];
+  const out = [];
+  const west = Math.min(...holes);
+  const east = Math.max(...holes);
   map.dugAt.forEach((cx, cy, arr) => {
     for (let i = 0; i < arr.length; i++) {
       if (arr[i] === -Infinity) continue;
@@ -29,11 +34,16 @@ function spread(map) {
       const y = (cy << 6) + (i >> 6);
       if (map.sky?.get(x, y) === 1) continue;
       d.push(Math.min(...holes.map((h) => Math.abs(x - h))));
+      if (x < west) out.push(west - x);
+      else if (x > east) out.push(x - east);
     }
   });
-  d.sort((a, b) => a - b);
-  const q = (p) => (d.length ? d[Math.min(d.length - 1, Math.floor(p * d.length))] : 0);
-  return `${d.length} cells dug; columns from the nearest hole: median ${q(0.5)}, p95 ${q(0.95)}, p99 ${q(0.99)}, max ${d.length ? d[d.length - 1] : 0}`;
+  const stats = (a) => {
+    a.sort((x, y) => x - y);
+    const q = (p) => (a.length ? a[Math.min(a.length - 1, Math.floor(p * a.length))] : 0);
+    return `median ${q(0.5)}, p95 ${q(0.95)}, p99 ${q(0.99)}, max ${a.length ? a[a.length - 1] : 0}`;
+  };
+  return `${d.length} cells dug; outward past the end holes (${out.length} cells): ${stats(out)}; any, from the nearest hole: ${stats(d)}`;
 }
 
 for (let seed = lo; seed <= hi; seed++) {

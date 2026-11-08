@@ -20,12 +20,11 @@ import { CELL, cellOf, centreX, centreY } from "./hex.ts";
 import { cellAt, makeTransect, type Transect } from "./transect.ts";
 import {
   AIR,
-  chamberAt,
   disc,
   foundNest,
   generateWorld,
+  groundCell,
   hash4,
-  heightAt,
   mulberry32,
   OPEN,
   OPEN_WORLD,
@@ -35,7 +34,6 @@ import {
   rockCut,
   setRock,
   SIDE_WORLD,
-  SOIL,
   soilCut,
   worldFromArrays,
   type Nest,
@@ -96,8 +94,16 @@ const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
  * The curtain under `line` (one-world §2): the side view's ground rules, laid along the line instead of along a straight
  * ground line, with each nest's shaft and royal chamber dug from its hole, buried food in pockets, and the plane under
  * the line copied into the ground strip.
+ *
+ * `colonies[k]` is the colony whose hole is the line's k-th (default: k). The curtain's nests are indexed by colony, as
+ * every map's are (Colony's `nest` param), so a colony keeps its nest and royal chamber when the line grows at V₀ and
+ * the holes renumber; `nest` is colony 0's, the player's.
+ *
+ * Food: `foodTotal` and `foodLeft` count the buried food only. The strip's food is the plane's, shown here; the plane
+ * counts it, and nothing should take it from the curtain (U3 routes the surface to the plane).
  */
-export function generateCurtain(seed: number, plane: WorldMap, line: Transect): WorldMap {
+export function generateCurtain(seed: number, plane: WorldMap, line: Transect, colonies: readonly number[] = line.holes.map((_, k) => k)): WorldMap {
+  if (colonies.length !== line.holes.length || [...colonies].sort((a, b) => a - b).some((c, i) => c !== i)) throw new Error(`generateCurtain: colonies ${colonies.join(", ")} must number the ${line.holes.length} holes 0…${line.holes.length - 1}`);
   const w = line.sMax - line.sMin + 1;
   const h = CRUST + CURTAIN_DEPTH;
   const size = { w, h };
@@ -107,51 +113,46 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect): 
   const rock = new Uint8Array(w * h);
   for (let y = 0; y < h; y++)
     for (let col = 0; col < w; col++) {
-      const i = y * w + col;
-      if (y <= STRIP) {
-        rock[i] = AIR; // the strip is written from the plane below, once the nests are dug
-        continue;
-      }
-      // The side view's ground (generateSideWorld), by the line's column s and the row: stones from a few rows down,
-      // more of them deeper; cavities only well below the crust.
-      const depth = y - CRUST;
-      const s = sOf(line, col);
-      const wx = centreX(s, y);
-      const wy = centreY(y);
-      const stone = depth > 3 && heightAt(gs, wx, wy) + 0.06 * Math.min(1, depth / 200) > cut;
-      rock[i] = stone ? ROCK : depth > 8 && chamberAt(gs, wx, wy) >= scut ? OPEN : SOIL;
+      // The sky and the strip are written by refreshStrip, below.
+      if (y <= STRIP) continue;
+      // The side view's ground, by the line's column s and the row (not the storage column), below the crust.
+      rock[y * w + col] = groundCell(gs, y - CRUST, centreX(sOf(line, col), y), centreY(y), cut, scut);
     }
   const curtain = worldFromArrays(size, [{ x: 0, y: 0, r: 3 }], { rock, seed });
   curtain.sky = new ChunkLayer((n) => new Uint8Array(n), 0);
-  for (let y = 0; y <= STRIP; y++) for (let col = 0; col < w; col++) curtain.sky.set(col, y, 1);
   curtain.loose = new ChunkLayer((n) => new Uint8Array(n), 0);
   curtain.moundCells = 0;
   curtain.chambers = new Chambers();
-  refreshStrip(curtain, plane, line);
+  refreshStrip(curtain, plane, line); // sky above the crust first: the nest digger finds the ground by it
 
   // Each nest: a hole in the crust at its column, a slanted shaft and a royal chamber, dug as the side view digs them.
   // Each draws its shaft's slant from its own stream, keyed by its hole, so a nest is dug the same when the line grows.
-  const nests: Nest[] = line.sHole.map((s, k) => foundNest(curtain, colOf(line, s), k, mulberry32(hash4(seed, 81, line.holes[k]!.x, line.holes[k]!.y))));
+  const nests: Nest[] = [];
+  line.sHole.forEach((s, k) => {
+    const hole = line.holes[k]!;
+    nests[colonies[k]!] = foundNest(curtain, colOf(line, s), colonies[k]!, mulberry32(hash4(seed, 81, hole.x, hole.y)));
+  });
   curtain.nest = nests[0]!;
   curtain.nests = nests;
   const nearNest = (x: number, y: number, d: number) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || Math.hypot(x - n.entrance!.x, y - n.entrance!.y) < d);
 
-  // Food below ground: pockets in the soil, as the side view's, keyed by blocks of the line's columns (s) so they stay
-  // put when the line grows.
+  // Food below ground: pockets in the soil, as the side view's, keyed by blocks of the line's columns (s). Whether a pocket
+  // is placed depends only on its block, its depth and the nests near it, never on where the line ends, so a column keeps
+  // its pockets when the line grows; a pocket past the line's end is cut off by the map's edge.
   const o = SIDE_WORLD;
   for (let by = 0; by < Math.ceil(h / 64); by++)
-    for (let bs = Math.floor(line.sMin / 64); bs <= Math.floor(line.sMax / 64); bs++) {
+    // Blocks just past either end too: a pocket centred there (radius up to 4) can reach into the line's columns.
+    for (let bs = Math.floor((line.sMin - 5) / 64); bs <= Math.floor((line.sMax + 5) / 64); bs++) {
       const r = mulberry32(hash4(seed, 79, bs, by));
       const count = Math.floor(o.patchesPerChunk) + (r() < o.patchesPerChunk % 1 ? 1 : 0);
       for (let p = 0; p < count; p++) {
         for (let tries = 0; tries < 12; tries++) {
           const row = by * 64 + Math.floor(r() * 64);
           const s = bs * 64 + Math.floor(r() * 64);
-          if (s < line.sMin || s > line.sMax || row >= h - 3 || row < CRUST + 10) continue;
-          const col = colOf(line, s);
-          const x = centreX(col, row);
-          const y = centreY(row);
           const radius = 2 + r() * 2;
+          if (row >= h - 3 || row < CRUST + 10) continue;
+          const x = centreX(colOf(line, s), row);
+          const y = centreY(row);
           if (nearNest(x, y, o.foodMinDist + radius + 1)) continue;
           disc(curtain, x, y, radius, (fx, fy) => {
             if (fy < CRUST + 4) return;

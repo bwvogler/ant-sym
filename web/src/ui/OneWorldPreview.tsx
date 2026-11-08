@@ -13,12 +13,17 @@ type View = "above" | "below";
  */
 export default function OneWorldPreview() {
   const [seed, setSeed] = useState(() => previewSeed(window.location.search));
+  // What is typed in the seed box: free to be empty while typing; a new world is made on Enter or leaving the box.
+  const [seedText, setSeedText] = useState(String(seed));
   const [view, setView] = useState<View>("below");
   const world = useMemo(() => generateOneWorld(seed), [seed]);
-  const above = useMemo(() => stillLife(world.plane), [world]);
-  const below = useMemo(() => stillLife(world.curtain), [world]);
-  const shown = view === "above" ? above : below;
   const map = view === "above" ? world.plane : world.curtain;
+  const shown = useMemo(() => stillLife(map), [map]);
+  const applySeed = () => {
+    const n = Number(seedText);
+    if (Number.isInteger(n) && n >= 1) setSeed(n);
+    else setSeedText(String(seed));
+  };
 
   // ColonyField redraws when told a frame passed; with nothing running, tell it every animation frame.
   const listeners = useRef(new Set<() => void>());
@@ -52,7 +57,15 @@ export default function OneWorldPreview() {
         </div>
         <label className="flex items-center gap-2">
           <span className="text-fg-2">Seed</span>
-          <input type="number" min={1} value={seed} onChange={(e) => setSeed(Math.max(1, Math.floor(Number(e.target.value)) || 1))} className="w-20 rounded-md border border-line bg-panel px-2 py-1" />
+          <input
+            type="number"
+            min={1}
+            value={seedText}
+            onChange={(e) => setSeedText(e.target.value)}
+            onBlur={applySeed}
+            onKeyDown={(e) => e.key === "Enter" && applySeed()}
+            className="w-20 rounded-md border border-line bg-panel px-2 py-1"
+          />
         </label>
       </header>
       <p className="text-fg-2">
