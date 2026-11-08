@@ -259,9 +259,16 @@ export interface ColonyParams {
    * strategist chooses one stance for every ant, as on the side view
    */
   stanceGate: number;
+  /** seconds of threat (alarm smelt, strangers in reach; leaking, THREAT_HALF) that make an ant on home ground defend (docs/stance.md) */
+  defendAt: number;
+  /** how far from its nest an ant is on home ground, by its home vector (world units) */
+  homeGround: number;
+  /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
+  crowdAt: number;
   /**
-   * on a raid stance, an ant at home with no raid trail under it goes out to look for the rival at this rate per second (a scout:
-   * a spontaneous rate, like `scoutRate`; the rest of the colony carries on foraging until a scout's trail reaches them)
+   * the rate per second an ant at home goes out to look for the rival: answering `leave` "raid" (each ant's own stance,
+   * docs/stance.md), or, where the colony's stance is broadcast, on a raid stance with no raid trail under it (a scout: a
+   * spontaneous rate, like `scoutRate`; the rest carry on foraging until a scout's trail reaches them)
    */
   raidScout: number;
   /**
@@ -286,7 +293,7 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 6, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -326,7 +333,7 @@ export class Colony {
   #alarmSmelt: Trail = "none";
   /** the odds the ant whose sensors were last read met, with strangers in reach (else none) */
   #oddsNow: Odds = "none";
-  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", returns: "none" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
+  #t: Touch = Object.defineProperty({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", returns: "none", crowd: "few" } as Touch, "place", { get: () => this.place(this.#ti), enumerable: true });
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   x: Float32Array;
@@ -509,6 +516,10 @@ export class Colony {
   foes: Float32Array;
   /** 1 while the ant goes home to tell of the strangers it found, laying the raid trail (behaviour MR 5.2) */
   reporting: Uint8Array;
+  /** seconds of alarm smelt or strangers in reach, leaking with a half-life of THREAT_HALF: a defender's threshold state (docs/stance.md) */
+  threat: Float32Array;
+  /** nestmates round a waiting ant at home, felt over CROWD_HALF (docs/stance.md: a crowded colony raids) */
+  crowd: Float32Array;
   /**
    * 1 while this ant acts on the colony's raid stance (behaviour MR 5.2): it smelt a scout's raid trail, or went out as a scout.
    * Every other ant carries on as a forager. Cleared when it is home again with no trail under it.
@@ -518,6 +529,8 @@ export class Colony {
   #gone: Uint8Array;
   /** a raider that has left the raid trail to search on, until it is home (ja-sf1) */
   #pastEnd: Uint8Array;
+  /** 1 while the ant is on home ground with its threat past defendAt: its stance is defend (docs/stance.md) */
+  #defending: Uint8Array;
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
   #storedSeen = 0;
@@ -731,10 +744,13 @@ export class Colony {
     this.fatigue = new Float32Array(n);
     this.met = new Float32Array(n);
     this.foes = new Float32Array(n);
+    this.threat = new Float32Array(n);
+    this.crowd = new Float32Array(n);
     this.reporting = new Uint8Array(n);
     this.recruited = new Uint8Array(n);
     this.#gone = new Uint8Array(n);
     this.#pastEnd = new Uint8Array(n);
+    this.#defending = new Uint8Array(n);
     this.quality = new Float32Array(n).fill(1);
     this.#tired = new Uint8Array(n);
     this.detour = new Float32Array(n);
@@ -836,10 +852,13 @@ export class Colony {
     this.fatigue[i] = 0;
     this.met[i] = 0;
     this.foes[i] = 0;
+    this.threat[i] = 0;
+    this.crowd[i] = 0;
     this.reporting[i] = 0;
     this.recruited[i] = 0;
     this.#gone[i] = 0;
     this.#pastEnd[i] = 0;
+    this.#defending[i] = 0;
     this.quality[i] = 1;
     this.#tired[i] = 0;
     this.detour[i] = 0;
@@ -960,6 +979,7 @@ export class Colony {
     const met = this.met[i] as number;
     t.returns = few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
     t.raid = this.#raidSmelt(i);
+    t.crowd = (this.crowd[i] as number) >= this.params.crowdAt ? "many" : "few";
     return t;
   }
 
@@ -3089,8 +3109,15 @@ export class Colony {
     // answer rests on the raid trail and not on food returns (review of #41).
     const asked = this.params.raidGate > 0 && this.#entrance === null && this.#stanceOf(i) === "raid" ? FIGHT : mode;
     const answer = this.responses.leave(this.touch(i, enemy, asked, "none"));
-    const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : scout;
-    return this.#rng() < 1 - Math.exp(-rate * dt);
+    // "raid" goes at raidScout: scouts are few (behaviour MR 5.2), and their trail brings the rest.
+    const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : answer === "raid" ? this.params.raidScout : scout;
+    if (!(this.#rng() < 1 - Math.exp(-rate * dt))) return false;
+    // "raid" (docs/stance.md): it goes out as a raid scout. Recruited, its stance is raid, and its mode policy is asked afresh as one.
+    if (answer === "raid" && this.params.stanceGate > 0 && this.params.raidGate > 0 && this.#entrance === null) {
+      this.recruited[i] = 1;
+      this.#gone[i] = 0;
+    }
+    return true;
   }
 
   /**
@@ -3098,6 +3125,8 @@ export class Colony {
    * smelt no raid trail and has not gone out as a scout carries on as a forager, so a raid stance never idles the colony.
    */
   #stanceOf(i: number): Stance {
+    // Top-down, each ant's own (docs/stance.md): defend while it senses a threat on home ground, raid once recruited, else forage.
+    if (this.params.stanceGate > 0 && this.#entrance === null) return this.#defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
     return this.stance === "raid" && this.recruited[i] === 0 && this.params.raidGate > 0 && this.#entrance === null ? "forage" : this.stance;
   }
 
@@ -3122,6 +3151,21 @@ export class Colony {
     const dx = (this.x[i] as number) - this.nest.x;
     const dy = (this.y[i] as number) - this.nest.y;
     return dx * dx + dy * dy < this.nest.r * this.nest.r;
+  }
+
+  /** Nestmates in cell (cx, cy) and the six round it, as the colony's count grid has them (docs/stance.md: crowding). */
+  #nestmatesAround(cx: number, cy: number): number {
+    const f = this.nestmates;
+    if (!f) return 0;
+    const { w, h } = this.map.size;
+    const o = discOffsets(1)[cy & 1] as Int16Array;
+    let s = 0;
+    for (let k = 0; k < o.length; k += 2) {
+      const x = cx + (o[k] as number);
+      const y = cy + (o[k + 1] as number);
+      if (x >= 0 && y >= 0 && x < w && y < h) s += f.get(x, y);
+    }
+    return s;
   }
 
   /** Last tick's returns with food in cell (cx, cy) and the six round it (behaviour MR 5). */
@@ -3227,6 +3271,10 @@ export class Colony {
     // Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`.
     const rgate = p.raidGate > 0 && this.#entrance === null;
     const foeLeak = rgate ? Math.exp((-dt * Math.LN2) / FOES_HALF) : 1;
+    // Each ant's own stance (docs/stance.md): its threat leaks like `foes`; a waiting ant feels its home's crowd over CROWD_HALF.
+    const sgate = p.stanceGate > 0 && this.#entrance === null;
+    const threatLeak = sgate ? Math.exp((-dt * Math.LN2) / THREAT_HALF) : 1;
+    const crowdKeep = sgate ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1;
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       if (map.sky) this.#unbury(i);
@@ -3256,17 +3304,25 @@ export class Colony {
         this.foes[i] = (this.foes[i] as number) * foeLeak + (toEnemy === null ? 0 : dt);
         if (this.reporting[i] === 1 && this.#atNestTop(i)) this.reporting[i] = 0;
       }
+      // Defence is the ant's own (docs/stance.md): alarm smelt or strangers in reach raise its threat, which fades; past defendAt,
+      // on home ground (within homeGround of its nest by its home vector), it defends. Far out, it forages as before.
+      if (sgate) {
+        const felt = toEnemy !== null || this.#alarmSmelt !== "none";
+        const th = (this.threat[i] as number) * threatLeak + (felt ? dt : 0);
+        this.threat[i] = th;
+        this.#defending[i] = th >= p.defendAt && Math.hypot((this.x[i] as number) - this.nest.x, (this.y[i] as number) - this.nest.y) <= p.homeGround ? 1 : 0;
+      }
       // Raid stance (behaviour MR 5.2): a raid is a bias, not an order. An ant is recruited by smelling a scout's raid trail, or goes out
       // as a scout at raidScout when it is home with empty jaws; the others forage. A recruited ant's raid ends when it comes home
       // with no trail under it: no trail was laid for it, or the trail has faded.
-      if (rgate && this.stance === "raid") {
+      if (rgate && (sgate || this.stance === "raid")) {
         const homeNow = this.#atNestTop(i);
         if (!homeNow) this.#gone[i] = 1;
         if (this.recruited[i] === 0) {
           if (this.#raidSmelt(i) !== "none") {
             this.recruited[i] = 1;
             this.#gone[i] = 0;
-          } else if (homeNow && !this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && this.#rng() < 1 - Math.exp(-p.raidScout * dt)) {
+          } else if (!sgate && homeNow && !this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && this.#rng() < 1 - Math.exp(-p.raidScout * dt)) {
             this.recruited[i] = 1;
             this.#gone[i] = 0;
             this.mode[i] = FIGHT; // out it goes
@@ -3931,6 +3987,11 @@ export class Colony {
         if (atNest && !carrying) m += this.#returnsAround(CELL[0] as number, CELL[1] as number);
         this.met[i] = m;
       }
+      // How crowded home is (docs/stance.md), felt by a waiting ant: nestmates in its cell and the six round it, but itself.
+      if (sgate) {
+        const c = this.crowd[i] as number;
+        this.crowd[i] = atNest && !carrying ? c * crowdKeep + (this.#nestmatesAround(CELL[0] as number, CELL[1] as number) - 1) * (1 - crowdKeep) : c * crowdKeep;
+      }
       // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
       const cellKey = (CELL[1] as number) * 65536 + (CELL[0] as number);
       if (this.#putAt[i] !== cellKey) this.#putAt[i] = -1;
@@ -4171,6 +4232,7 @@ export class Colony {
       noGain: this.#noGain,
       gone: this.#gone,
       pastEnd: this.#pastEnd,
+      defending: this.#defending,
       storedSeen: this.#storedSeen,
       returning: this.#returning,
       returned: this.#returned,
@@ -4245,6 +4307,7 @@ export class Colony {
     if ("noGain" in r) this.#noGain = fillLike(this.#noGain, r.noGain) as never;
     if ("gone" in r) this.#gone = fillLike(this.#gone, r.gone) as never;
     if ("pastEnd" in r) this.#pastEnd = fillLike(this.#pastEnd, r.pastEnd) as never;
+    if ("defending" in r) this.#defending = fillLike(this.#defending, r.defending) as never;
     if ("storedSeen" in r) this.#storedSeen = fillLike(this.#storedSeen, r.storedSeen) as never;
     if ("returning" in r) this.#returning = fillLike(this.#returning, r.returning) as never;
     if ("returned" in r) this.#returned = fillLike(this.#returned, r.returned) as never;
@@ -4330,6 +4393,10 @@ export const INTAKE_PLENTY = 0.01;
 export const MET_HALF = 20;
 /** half-life (s) of a scout's count of seconds in contact with strangers (behaviour MR 5.2) */
 export const FOES_HALF = 20;
+/** half-life (s) of an ant's threat (docs/stance.md: the fading internal state behind a defender's threshold) */
+export const THREAT_HALF = 20;
+/** half-life (s) over which a waiting ant feels how crowded home is (docs/stance.md) */
+export const CROWD_HALF = 5;
 /** "many" returns: this many times the colony's leaveGate */
 export const RETURNS_MANY = 4;
 /** leave answered "now": the rate per second a waiting forager goes out (one left 3–8 s after a rise in contacts: Pinter-Wollman et al. 2013) */

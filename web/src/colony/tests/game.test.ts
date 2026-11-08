@@ -3,8 +3,8 @@ import { CELL, cellOf } from "../hex.ts";
 import { at, nestAt, put } from "./hexmaps.ts";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../battle.ts";
-import { Colony, localPolicy, localStance, type Situation, type StanceSituation } from "../colony.ts";
-import { localResponses } from "../responses.ts";
+import { Colony, localPolicy, localStance, MODES, type Situation, type StanceSituation } from "../colony.ts";
+import { localResponses, responses } from "../responses.ts";
 import { Game } from "../game.ts";
 import { decode } from "../save.ts";
 import { foodIn, generateWorld, mulberry32, OPEN_WORLD, reachable, worldFromArrays, type WorldMap } from "../world.ts";
@@ -130,7 +130,7 @@ test("a fighting ant goes for the enemy it can see", () => {
   assert.ok((c.y[0] as number) > at(20, 6).y + 0.3, `it turned south toward the enemy: y ${c.y[0]}`);
 });
 
-test("the game: both colonies forage and grow, they meet and fight, stances are chosen, and food is never made or lost", () => {
+test("the game: both colonies forage and grow, they meet and fight, no strategist on open ground, and food is never made or lost", () => {
   const map = generateWorld(1, OPEN_WORLD);
   const g = new Game(map, { antCount: 300, rivalAnts: 300 }, mulberry32(11));
   for (let k = 0; k < 30 * 150; k++) g.tick(1 / 30);
@@ -138,7 +138,7 @@ test("the game: both colonies forage and grow, they meet and fight, stances are 
   assert.ok(you.stored > 100 && rival.stored > 50, `stored ${you.stored} / ${rival.stored}`);
   assert.ok(you.births > 0 && rival.births > 0, "both grew");
   assert.ok(you.losses + rival.losses > 0, "they fought");
-  assert.ok(g.strategyChoices >= 2 * 29, "a stance every 5 s for each colony");
+  assert.equal(g.strategyChoices, 0, "on open ground each ant's stance is its own (docs/stance.md): no colony stance is chosen");
   let carried = 0;
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.carrying[i]! ? 1 : 0;
   assert.equal(Math.round(you.foodLeft + you.stored + rival.stored + carried), map.foodTotal, "food is conserved");
@@ -307,9 +307,48 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
   assert.equal(pastEnd(), 0, "home clears it");
 });
 
+test("each ant's own stance (docs/stance.md): alarm near home makes it defend, the same far out doesn't; 'raid' makes a scout; a crowded home is felt", () => {
+  // Alarm round one ant, kept up for 2 s: on home ground (within homeGround of its nest) it defends; 30 cells out it forages.
+  const threatened = (cx: number) => {
+    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, wander: 0 }, mulberry32(13), () => "return");
+    put(c, 0, cx, 6);
+    for (let k = 0; k < 60; k++) {
+      put(c, 0, cx, 6);
+      c.paint("alarm", c.x[0] as number, c.y[0] as number, 4, 2);
+      c.tick(1 / 30);
+    }
+    return c.touch(0, false).stance;
+  };
+  assert.equal(threatened(8), "defend", "near home");
+  assert.equal(threatened(34), "forage", "far out");
+  // The colony's own stance is not read: a raid broadcast idles no one and recruits no one.
+  const b = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(14));
+  b.stance = "raid";
+  put(b, 0, 20, 6);
+  b.tick(1 / 30);
+  assert.equal(b.touch(0, false).stance, "forage");
+
+  // A waiting forager whose leave answer is "raid" goes out as a raid scout.
+  const r = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, scoutRate: 0 }, mulberry32(15));
+  r.responses = responses({ leave: () => "raid" });
+  put(r, 0, 4, 6);
+  r.mode[0] = MODES.indexOf("return");
+  for (let k = 0; k < 30 * 30 && r.recruited[0] === 0; k++) r.tick(1 / 30);
+  assert.equal(r.recruited[0], 1, "recruited by its own answer");
+  assert.equal(r.touch(0, false).stance, "raid");
+
+  // Twenty ants waiting at home: each feels the others round it.
+  const g = new Game(arena(), { antCount: 20, rivalAnts: 1 }, mulberry32(16), { policy: () => "return", responses: responses({ leave: () => "wait" }), colony: { scoutRate: 0 } });
+  const c = g.player;
+  for (let i = 0; i < 20; i++) put(c, i, 4, 6);
+  for (let k = 0; k < 30 * 10; k++) g.tick(1 / 30);
+  assert.ok((c.crowd[0] as number) >= c.params.crowdAt, `crowded: ${(c.crowd[0] as number).toFixed(1)} nestmates felt`);
+  assert.equal(c.touch(0, false).crowd, "many");
+});
+
 test("raid stance as a bias (behaviour MR 5.2): an ant with no trail carries on as a forager, a trail or a scout's errand makes it a raider, and it is a forager again once home", () => {
   const colony = (raidScout: number) => {
-    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout }, mulberry32(8));
+    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout, stanceGate: 0 }, mulberry32(8)); // the colony's stance, as on the side view
     c.stance = "raid";
     put(c, 0, 4, 6);
     return c;

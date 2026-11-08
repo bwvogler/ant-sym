@@ -453,6 +453,8 @@ export class Game {
         }
         // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
         this.#aimRaids(k);
+        // On open ground each ant's stance is its own, from what it senses (docs/stance.md): nobody chooses one for the colony.
+        if (c.params.stanceGate > 0 && !this.map.sky) return;
         // A stance is part of every ant's situation: a change re-asks the ants by itself.
         c.stance = c.stancePolicy(c.stanceSituation(this.enemiesNearNest(k) > 0));
         this.strategyChoices++;
