@@ -3864,20 +3864,22 @@ No source found says what makes a colony open a new entrance from inside.
 
 **The signal: `Unity.met`.**
 - An ant is in **allied contact** when an ant of another standing colony is in its cell or the six around it (that tick's occupancy grids, `battle.ts` `around`), and its own odour is within tolerance of that colony's nest odour. It smells like them: a meeting, not strangers.
-- `met` is the share of living ants in allied contact, faded over `QUIET` (60 s) like the fight-death count.
+- Each colony keeps the share of its living ants in allied contact, faded over `QUIET` (60 s) like the fight-death count. `met` is the **least** of the standing colonies' shares, so every colony must have met someone: one pair meeting a lot cannot carry a third that never touched anyone.
 - It is read in `tick()` after odours move (`Game.#meet`). It reads only: no ant state and no random stream moves.
 
 **The rule.**
 - `unified` = gap ≤ tolerance, quiet ≥ 60 s, **`met` ≥ `MET` = 0.01**, and every colony standing.
-- The unity score is multiplied by `min(1, met / MET)`.
+- **Latched once won.** When all of that holds, the game remembers it. Unity then stays while the nests stay alike and nobody dies fighting, even if contact fades. Kin forage at home (the strategist does not raid kin), so contact can fade after the win; without the latch the outcome would flap and toast "One colony" again each time. A fight death or the nests drifting apart clears the latch, and the colonies must then meet again. The latch arms only on the whole condition, so contact from before a fight does not re-arm it while the quiet minute is still owed.
+- Enough contact is about 1 % of each colony's ants on average over the fading minute, not a minute of it: with every ant in contact `met` passes the floor in under a second, and at a 3 % share in about 24 s.
+- The unity score is multiplied by `min(1, met / MET)` (1 once latched).
 - `Unity.alike` (gap within tolerance) lets the panel say "the nests smell alike, but the colonies have not met yet".
 - Details shows `met` beside the other unity figures.
 
-**Measured** (Garden painted on both nests, the easiest case; `met` as a share, and as ants on average):
+**Measured** (Garden painted on both nests, the easiest case; `met` as a share, and as ants on average; the side rows were measured with the pooled share before review, which can only be higher than the least colony's):
 
 | World | Seed | Ants | Peak `met` | Peak ants in contact | Unified (new rule) | Unified (old rule) |
 |---|---|---|---|---|---|---|
-| open 160×100 | 2 | 150 + 150 | 3.3 % at 300 s, rising | ~10 | 231 s | ~120 s |
+| open 160×100 | 2 | 150 + 150 | 2.7 % at 300 s, rising | ~12 | 235 s | ~120 s |
 | side | 1 | 300 + 300 | 0.34 % | 2.7 | no (600 s) | ~120 s |
 | side | 2 | 300 + 300 | 0.10 % | 0.9 | no (600 s) | ~120 s |
 | side | 3 | 300 + 300 | 0.002 % | 0.02 | no (600 s) | ~120 s |
@@ -3894,7 +3896,7 @@ On the side view the two colonies hardly touch: no fight deaths in ten minutes, 
   - U3 (`ja-lp4.3`) counts contact per layer, the plane and the curtain;
   - U6 (`ja-lp4.6`) guards that Garden in both clears `MET` on one world.
 
-**Saves.** `met` is saved (`private.met`). A save from before has none and loads as 0, so the colonies must meet for a minute again before they can be one. `SAVE_VERSION` is unchanged.
+**Saves.** Each colony's contact and the latch are saved (`private.metBy`, `private.haveMet`). A save from before has neither and loads as not met, so the colonies must meet again before they can be one. `SAVE_VERSION` is unchanged.
 
 **Unchanged.**
 - The golden masters, bit-exact: `#meet` writes nothing an ant reads.
@@ -3905,9 +3907,29 @@ On the side view the two colonies hardly touch: no fight deaths in ten minutes, 
 - the unity unit test: alike and quiet but not met is not one; a minute together is;
 - colonies that smell alike but are kept apart for two minutes are not one;
 - strangers in contact count for nothing;
-- `met` survives a save, and a save without it loads as 0;
-- the five-minute Garden game asserts `met ≥ MET`.
+- `met` and the latch survive a save, and a save without them loads as not met;
+- the five-minute Garden game asserts `met ≥ MET`;
+- after review: alike and met but not yet quiet is not one; unity holds once won while the colonies keep apart, and breaks when the nests drift; a fight death breaks it while the nests stay alike, and old contact does not re-arm it; `met` is the least colony's share, not the pooled one; contact is the cell and the six around, not two cells off.
 
-Dropping `met` from `unified` fails the first two. 408 fast tests pass.
+Each rule has a mutation that fails a test: drop `met` from `unified`, the quiet gate, the latch, its clearing on a fight death or on drift, arming without the quiet, or the per-colony least.
+
+**Review (own agent, PR #56).** No correctness bug.
+- Confirmed:
+  - the occupancy grids are fresh where `#meet` reads them;
+  - nothing it does moves ant state or a random stream (goldens bit-exact);
+  - save/load works;
+  - it runs in every two-colony game;
+  - its cost is in the noise (5.3 against 5.0 ms a tick at 1,200 + 1,200 ants, every odour forced alike);
+  - no consumer breaks: the slow tests never read unity.
+- Fixed:
+  - **R1:** the quiet gate had lost its test;
+  - **R2:** unity flapped as contact faded after the win (now latched);
+  - **R3:** `met` was pooled, so with three colonies a pair meeting could carry one that never touched anyone (now the least colony's);
+  - **N2:** "a minute" of contact was the wrong claim.
+- Noted, not changed:
+  - **R4:** contact reads ant odour against the other nest, as `mixing` does, not ant against ant as fights do; unity's gap and quiet gates mask the difference;
+  - **N1:** ants killed in a tick's fights still count for that tick;
+  - **N4:** `Colony.met` is an unrelated per-ant field;
+  - **N5:** the save run-on test does not hash unity.
 
 **Cost.** None (no Jev change).

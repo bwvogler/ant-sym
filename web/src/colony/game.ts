@@ -90,7 +90,7 @@ export interface GameSave {
   raids: number[];
   fungus: Record<string, unknown>;
   recognition: Record<string, unknown>;
-  private: { fightDeaths: number; lastFightDeath: number; met?: number; nextStrategy: number; regrowClock: number; rng: number | null; regrowRng: number | null };
+  private: { fightDeaths: number; lastFightDeath: number; metBy?: number[]; haveMet?: boolean; nextStrategy: number; regrowClock: number; rng: number | null; regrowRng: number | null };
 }
 
 /** The game's regrowth (GameParams.regrow): a pile eaten bare is half back in about 20 minutes. */
@@ -135,15 +135,16 @@ export interface Unity {
   /** share of living ants, both colonies, within the tolerance of the other nest's odour */
   mixing: number;
   /**
-   * share of living ants, all colonies, in allied contact (an ant of another colony in its cell or the six around, whose
-   * nest it smells like), averaged over about the last minute (ja-i0f): whether the colonies have met as allies at all
+   * allied contact (ja-i0f): each colony's share of living ants with an ant of another colony in its cell or the six
+   * around whose nest it smells like, averaged over about the last minute; the least of the standing colonies' (every
+   * one must have met someone). Whether the colonies have met as allies at all.
    */
   met: number;
   /** the nests smell alike (gap within the tolerance): all unity still needs is the meeting and the quiet */
   alike: boolean;
   /** 0..1: how far the nests have come to smell alike, × how long it has been quiet (a minute is whole), × how far they have met (MET is whole) */
   score: number;
-  /** the nests smell alike, the colonies have met (met ≥ MET), and nobody has died fighting for a minute */
+  /** the nests smell alike, every colony has met (met ≥ MET, held since unless a fight or drift broke it), and nobody has died fighting for a minute */
   unified: boolean;
 }
 
@@ -203,8 +204,14 @@ export class Game {
   /** fight deaths, fading over ~60 s, and when the last one was */
   #fightDeaths = 0;
   #lastFightDeath = 0;
-  /** allied contact, fading over ~60 s (Unity.met) */
-  #met = 0;
+  /** each colony's allied contact, fading over ~60 s (Unity.met is the least of the standing colonies') */
+  #metBy: number[] = [];
+  /**
+   * Unity's latch (review of #56, R2): set once unity holds whole (the nests alike, a quiet minute, every standing colony
+   * met: Unity.met ≥ MET), and cleared only by a fight death or the nests drifting apart. Kin forage at home, so contact can fade after
+   * the colonies are one; without the latch the outcome would flap and toast each time it came back.
+   */
+  #haveMet = false;
   #nextStrategy = 0;
   #rng: () => number;
   /** the ground's food piles as the world began (cell index, units), for regrowth; null when food does not regrow */
@@ -432,7 +439,7 @@ export class Game {
     const quiet = this.time - this.#lastFightDeath;
     // Every colony still standing (ja-lo8.8: any number of them); with two, as it always was.
     const live = this.colonies.length > 2 ? this.colonies.filter((c) => !Game.beaten(c)) : this.colonies;
-    const met = this.#met;
+    const met = this.#metNow(live);
     if (live.length < 2) return { gap: 0, deathsPerMinute, quiet, mixing: 0, met, alike: false, score: 0, unified: false };
     const tol = this.recognition.params.tolerance;
     // The widest gap between any two nests' odours: one colony when even that is within tolerance.
@@ -449,29 +456,42 @@ export class Game {
         if (live.some((other) => other !== c && Math.abs(o - other.nestOdour) <= tol)) near++;
       }
     const recognition = Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
-    const unified = gap <= tol && quiet >= QUIET && met >= MET && live.every((c) => !Game.beaten(c));
-    return { gap, deathsPerMinute, quiet, mixing: living ? near / living : 0, met, alike: gap <= tol, score: recognition * Math.min(1, quiet / QUIET) * Math.min(1, met / MET), unified };
+    const unified = gap <= tol && quiet >= QUIET && (met >= MET || this.#haveMet) && live.every((c) => !Game.beaten(c));
+    return { gap, deathsPerMinute, quiet, mixing: living ? near / living : 0, met, alike: gap <= tol, score: recognition * Math.min(1, quiet / QUIET) * (this.#haveMet ? 1 : Math.min(1, met / MET)), unified };
+  }
+
+  /** Unity.met: the least allied contact among `live` colonies (each must have met someone; review of #56, R3). */
+  #metNow(live: readonly Colony[]): number {
+    if (live.length < 2) return 0;
+    let m = Infinity;
+    for (const c of live) m = Math.min(m, this.#metBy[this.colonies.indexOf(c)] ?? 0);
+    return m;
   }
 
   /**
-   * Allied contact this tick (Unity.met, ja-i0f): the share of living ants, every standing colony, with an ant of another
-   * standing colony in reach (its cell and the six around, from the occupancy grids this tick) whose nest odour its own
-   * is within tolerance of: a meeting, not strangers. Folded into a ~60 s fading average. Reads only; no ant's state or
-   * random stream moves, so it changes nothing an ant does.
+   * Allied contact this tick (Unity.met, ja-i0f), per colony: the share of its living ants with an ant of another
+   * standing colony in reach (its cell and the six around, from this tick's occupancy grids) whose nest odour its own
+   * is within tolerance of: a meeting, not strangers. Each folded into a ~60 s fading average. Odour against the other
+   * nest, as Unity.mixing reads it, not ant against ant as fights do (battle.ts): unity also needs the gap within
+   * tolerance and a quiet minute, which mask the difference. Ants killed in this tick's fights are still on the grids
+   * (as for grooming), a tick's worth in a minute's average. Reads only: no ant's state or random stream moves.
    */
   #meet(dt: number): void {
     const live: number[] = [];
     this.colonies.forEach((c, k) => {
       if (!Game.beaten(c)) live.push(k);
     });
-    let share = 0;
-    if (live.length >= 2) {
-      const tol = this.recognition.params.tolerance;
-      const size = this.map.size;
-      let living = 0;
-      let allied = 0;
-      for (const k of live) {
-        const c = this.colonies[k] as Colony;
+    const keep = Math.exp(-dt / QUIET);
+    const tol = this.recognition.params.tolerance;
+    const size = this.map.size;
+    let gap = 0;
+    for (let a = 0; a < live.length; a++)
+      for (let b = a + 1; b < live.length; b++) gap = Math.max(gap, Math.abs((this.colonies[live[a] as number] as Colony).nestOdour - (this.colonies[live[b] as number] as Colony).nestOdour));
+    this.colonies.forEach((c, k) => {
+      let share = 0;
+      if (live.length >= 2 && live.includes(k)) {
+        let living = 0;
+        let allied = 0;
         for (let i = 0; i < c.n; i++) {
           if (!c.alive[i]) continue;
           living++;
@@ -480,8 +500,7 @@ export class Game {
           let cy = -1;
           for (const d of live) {
             if (d === k) continue;
-            const other = this.colonies[d] as Colony;
-            if (Math.abs(o - other.nestOdour) > tol) continue;
+            if (Math.abs(o - (this.colonies[d] as Colony).nestOdour) > tol) continue;
             if (cx < 0) {
               c.antCell(i);
               cx = Math.min(size.w - 1, Math.max(0, CELL[0] as number));
@@ -493,11 +512,13 @@ export class Game {
             }
           }
         }
+        share = living ? allied / living : 0;
       }
-      share = living ? allied / living : 0;
-    }
-    const keep = Math.exp(-dt / QUIET);
-    this.#met = this.#met * keep + share * (1 - keep);
+      this.#metBy[k] = (this.#metBy[k] ?? 0) * keep + share * (1 - keep);
+    });
+    if (live.length < 2 || gap > tol) this.#haveMet = false;
+    // Armed only when unity holds whole (the quiet too): contact from before a fight does not re-arm it while the quiet is owed.
+    else if (this.time - this.#lastFightDeath >= QUIET && this.#metNow(live.map((k) => this.colonies[k] as Colony)) >= MET) this.#haveMet = true;
   }
 
   tick(dt: number): void {
@@ -512,6 +533,7 @@ export class Game {
       if (died > 0) {
         this.#fightDeaths += died;
         this.#lastFightDeath = this.time;
+        this.#haveMet = false;
       }
       // Odours: the gestalt at each nest, and blending where the fungus runs it.
       this.recognition.advance(this.colonies, dt);
@@ -627,7 +649,7 @@ export class Game {
       raids: this.colonies.map((c) => this.colonies.findIndex((o) => o.ph === c.raidMarks)),
       fungus: this.fungus.saveState(),
       recognition: this.recognition.saveState(),
-      private: { fightDeaths: this.#fightDeaths, lastFightDeath: this.#lastFightDeath, met: this.#met, nextStrategy: this.#nextStrategy, regrowClock: this.#regrowClock, rng: (this.#rng as Partial<Rng>).state ?? null, regrowRng: this.#regrowRng?.state ?? null },
+      private: { fightDeaths: this.#fightDeaths, lastFightDeath: this.#lastFightDeath, metBy: [...this.#metBy], haveMet: this.#haveMet, nextStrategy: this.#nextStrategy, regrowClock: this.#regrowClock, rng: (this.#rng as Partial<Rng>).state ?? null, regrowRng: this.#regrowRng?.state ?? null },
     };
   }
 
@@ -654,8 +676,9 @@ export class Game {
     const p = saved.private;
     this.#fightDeaths = p.fightDeaths;
     this.#lastFightDeath = p.lastFightDeath;
-    // Saves before ja-i0f carry no contact: the colonies must meet for a minute again before they can be one.
-    this.#met = p.met ?? 0;
+    // Saves before ja-i0f carry no contact: the colonies must meet again (MET over the fading minute) before they can be one.
+    this.#metBy = [...(p.metBy ?? [])];
+    this.#haveMet = p.haveMet ?? false;
     this.#nextStrategy = p.nextStrategy;
     this.#regrowClock = p.regrowClock;
     if (p.rng !== null && "state" in this.#rng) (this.#rng as Rng).state = p.rng;

@@ -201,7 +201,7 @@ function FungusNumbers({ stats }: Props) {
           <p className="mt-1 font-mono text-xs text-fg-3">
             nests {stats.unity.gap.toFixed(2)} apart in odour · {stats.unity.deathsPerMinute.toFixed(0)} fight deaths/min · quiet {Math.min(999, Math.floor(stats.unity.quiet))} s · {Math.round(100 * stats.unity.mixing)}% mixed · met {(100 * stats.unity.met).toFixed(1)}% (needs {100 * MET}%)
           </p>
-          <p className="mt-1 text-xs text-fg-3">One colony when the nests smell alike (within {DEFAULT_RECOGNITION.tolerance}), their ants have met (at least {100 * MET}% of them touching the other colony's, smelling alike, over the last minute), and nobody has died fighting for a minute. Ants are coloured by odour.</p>
+          <p className="mt-1 text-xs text-fg-3">One colony when the nests smell alike (within {DEFAULT_RECOGNITION.tolerance}), their ants have met (on average over the last minute, at least {100 * MET}% of each colony's ants touching another's, smelling alike; once one, it holds until a fight or the nests drift apart), and nobody has died fighting for a minute. Ants are coloured by odour.</p>
         </div>
       )}
     </Card>

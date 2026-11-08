@@ -203,21 +203,22 @@ function smellAs(g: Game, oa: number, ob: number): [Colony, Colony] {
   return [a, b];
 }
 
-/** Tick a game for `seconds`, putting every ant of both colonies back at cell (x, y) of the arena, or each at its own nest, before each tick. */
-function hold(g: Game, seconds: number, where: [number, number] | "apart"): void {
+/**
+ * Tick a game for `seconds`, putting every ant of both colonies back before each tick: all at cell (x, y) of the arena,
+ * each colony at its own end ("apart"), or colony j at cells[j]. `each` runs before every tick too (odours held).
+ */
+function hold(g: Game, seconds: number, where: [number, number] | "apart" | [[number, number], [number, number]], each?: () => void): void {
   for (let k = 0; k < Math.round(seconds * 30); k++) {
+    each?.();
     g.colonies.forEach((c, j) => {
-      for (let i = 0; i < c.n; i++) {
-        if (!c.alive[i]) continue;
-        if (where === "apart") put(c, i, j === 0 ? 2 : 37, 6);
-        else put(c, i, where[0], where[1]);
-      }
+      const at: [number, number] = where === "apart" ? [j === 0 ? 2 : 37, 6] : Array.isArray(where[0]) ? (where as [[number, number], [number, number]])[j] as [number, number] : (where as [number, number]);
+      for (let i = 0; i < c.n; i++) if (c.alive[i]) put(c, i, at[0], at[1]);
     });
     g.tick(1 / 30);
   }
 }
 
-test("unity: the nests' odour gap, the quiet and the meeting; unified when they smell alike, have met, and nobody has died fighting for a minute", () => {
+test("unity: the nests' odour gap, the quiet and the meeting; unified when they smell alike, have met (MET over the fading minute), and nobody has died fighting for a minute", () => {
   const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   const u0 = g.unity();
   assert.equal(u0.gap, 1);
@@ -231,7 +232,7 @@ test("unity: the nests' odour gap, the quiet and the meeting; unified when they 
   assert.equal(alike.mixing, 1, "every ant within tolerance of the other nest");
   assert.equal(alike.unified, false, "they smell alike and it has been quiet, but nobody has met (ja-i0f)");
   assert.equal(alike.score, 0, "no meeting, no unity");
-  // Both colonies in one cell for a minute: a meeting, not a fight (they smell alike).
+  // Both colonies in one cell: a meeting, not a fight (they smell alike).
   hold(g, QUIET, [20, 6]);
   smellAs(g, 0.45, 0.6);
   const u = g.unity();
@@ -240,6 +241,96 @@ test("unity: the nests' odour gap, the quiet and the meeting; unified when they 
   assert.equal(u.score, 1);
   assert.equal(u.unified, true);
   assert.equal(g.outcome(), "unified");
+  // The quiet still counts (review of #56, R1): alike and met, but a fight death 10 s ago is no peace.
+  const q = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  smellAs(q, 0.45, 0.6);
+  q.time = 10;
+  hold(q, 20, [20, 6]);
+  smellAs(q, 0.45, 0.6);
+  const early = q.unity();
+  assert.ok(early.met >= MET && early.alike, "alike and met");
+  assert.ok(early.quiet < QUIET, `quiet only ${early.quiet.toFixed(0)} s (the game began at 0: no death, but not yet a minute)`);
+  assert.equal(early.unified, false, "not quiet long enough");
+});
+
+test("unity, once won, holds while the colonies keep apart: kin forage at home (review of #56, R2)", () => {
+  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const same = () => void smellAs(g, 0.45, 0.6);
+  same();
+  g.time = QUIET + 1;
+  hold(g, 5, [20, 6], same);
+  assert.equal(g.outcome(), "unified");
+  hold(g, 4 * QUIET, "apart", same);
+  const u = g.unity();
+  assert.ok(u.met < MET, `contact has faded: met ${u.met.toFixed(4)}`);
+  assert.equal(u.unified, true, "still one colony: nothing broke it");
+  assert.equal(u.score, 1);
+  // The nests drifting apart breaks it, and it must be met again.
+  smellAs(g, 0.1, 0.9);
+  hold(g, 1 / 30, "apart");
+  same();
+  assert.equal(g.unity().unified, false, "drifted apart: no longer one");
+  hold(g, 1 / 30, "apart", same);
+  assert.equal(g.unity().unified, false, "alike again, but they have not met since");
+});
+
+test("unity: a fight death breaks the latch, and the colonies must meet again", () => {
+  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const same = () => void smellAs(g, 0.45, 0.6);
+  same();
+  g.time = QUIET + 1;
+  // A brief meeting: just over the floor (1 − e^(−0.8/60) ≈ 0.013).
+  hold(g, 0.8, [20, 6], same);
+  assert.equal(g.outcome(), "unified");
+  // The nests still alike, but the ants strangers to each other, together, until someone dies fighting: only the death
+  // can break the latch here (the nests never drift apart).
+  const [a, b] = g.colonies as [Colony, Colony];
+  const strangers = () => {
+    a.nestOdour = 0.45;
+    b.nestOdour = 0.6;
+    for (let i = 0; i < a.n; i++) a.odour[i] = 0.05;
+    for (let i = 0; i < b.n; i++) b.odour[i] = 0.95;
+  };
+  for (let k = 0; k < 30 * 30 && g.unity().deathsPerMinute === 0; k++) {
+    hold(g, 1 / 30, [20, 6], strangers);
+    assert.ok(g.unity().alike, "the nests never drift apart");
+  }
+  assert.ok(g.unity().deathsPerMinute > 0, "a fight death");
+  // Alike again and long quiet, but kept apart: by the time the quiet minute is owed no more, the contact from before
+  // the fight has faded under the floor, and nothing re-made the meeting.
+  hold(g, 5 * QUIET, "apart", same);
+  const u = g.unity();
+  assert.ok(u.quiet >= QUIET && u.alike && u.met < MET, `quiet ${u.quiet.toFixed(0)} s, met ${u.met.toFixed(4)}`);
+  assert.equal(u.unified, false, "the fight broke it; they have not met since");
+});
+
+test("unity: every colony must have met, not just most of the ants (review of #56, R3)", () => {
+  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const [a, b] = smellAs(g, 0.45, 0.6);
+  // All of a's ants share a cell with one of b's; b's other four stay home. Pooled, 6 of 10 ants are in contact; per
+  // colony a's share is 1 and b's 1/5, and unity reads the least.
+  for (let k = 0; k < 30 * QUIET; k++) {
+    for (let i = 0; i < a.n; i++) if (a.alive[i]) put(a, i, 20, 6);
+    let first = true;
+    for (let i = 0; i < b.n; i++)
+      if (b.alive[i]) {
+        put(b, i, first ? 20 : 37, 6);
+        first = false;
+      }
+    g.tick(1 / 30);
+  }
+  const met = g.unity().met;
+  const keep = 1 - Math.exp(-1);
+  assert.ok(Math.abs(met - 0.2 * keep) < 0.02, `met ${met.toFixed(3)}: b's share (1/5) over the fading minute, not the pooled 6/10`);
+});
+
+test("unity: contact is the cell and the six around, not two cells off", () => {
+  const near = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  hold(near, 5, [[20, 6], [21, 6]], () => void smellAs(near, 0.45, 0.6));
+  assert.ok(near.unity().met > 0, "a neighbouring cell is contact");
+  const far = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  hold(far, 5, [[20, 6], [22, 6]], () => void smellAs(far, 0.45, 0.6));
+  assert.equal(far.unity().met, 0, "two cells off is not");
 });
 
 test("unity needs contact: colonies that smell alike but never meet are not one (ja-i0f, the underground repro in miniature)", () => {
@@ -263,20 +354,25 @@ test("unity: strangers in contact are not a meeting", () => {
   assert.equal(g.unity().met, 0);
 });
 
-test("unity: the meeting is saved, and a save from before it loads as not met", () => {
+test("unity: the meeting and its latch are saved, and a save from before them loads as not met", () => {
   const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   smellAs(g, 0.45, 0.6);
+  g.time = QUIET + 1;
   hold(g, 10, [20, 6]);
   const met = g.unity().met;
   assert.ok(met > 0);
+  assert.equal(g.unity().unified, true);
   const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
   const back = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   back.load(saved);
   assert.equal(back.unity().met, met);
-  delete (saved.private as { met?: number }).met;
+  assert.equal(back.unity().unified, true);
+  delete (saved.private as { metBy?: number[] }).metBy;
+  delete (saved.private as { haveMet?: boolean }).haveMet;
   const old = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   old.load(saved);
   assert.equal(old.unity().met, 0);
+  assert.equal(old.unity().unified, false);
 });
 
 test("a colony whose nest smells like ours is no rival: the strategist forages instead of raiding kin", () => {
