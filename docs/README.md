@@ -16,6 +16,7 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 | [raid-recruitment.md](raid-recruitment.md) | research + design (MR 5.2) | Scouts find a rival nest and recruit before a raid (Polyergus; Temnothorax slave-makers); encounters at a border recruit (honeypot ants, weaver ants). Basis for the `raid` trail and the finder. |
 | [queens-and-merging.md](queens-and-merging.md) | research + design (not built) | Several queens, adoption, and orphaned colonies merging as a route to unification. |
 | [new-queens.md](new-queens.md) | research + design (not built, `ja-lo8`) | When a colony rears new queens (size, the queen's pheromone, workers culling gyne larvae); the nuptial flight and claustral founding; the fungus's two levers on queen birth. |
+| [fungus-body.md](fungus-body.md) | research + design (built, `ja-lo8.12`) | What the fungus is made of and what its progress rests on: *Metarhizium* living off-host in soil, spores paid out of mycelium (design), adapting in its hosts over passages, diminishing returns; grooming triggered by sensing the pathogen. Basis for the mycelium at the landing and adaptations from growth in hosts. |
 
 The page's **Learn** drawer quotes these notes in its field guide (`web/src/ui/guide.ts`), linking their headings. `guide.test.ts` fails when a cited heading is renamed or a gap the guide calls scripted is closed: update the entry with the note.
 
