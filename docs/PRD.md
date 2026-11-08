@@ -3274,6 +3274,8 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 - **Daughters.** `setDoctrineFor(k, words, inherit)` makes a lane fall back on other words instead: a daughter colony on her mother's doctrine (ja-lo8.9).
 - **Nothing is asked all at once.**
 
+**Superseded where Jev can answer** (§50.12, 2026-11-08): new words play the local rule until their answers arrive; the earlier answers act only while Jev can't run, and `inherit` is gone.
+
 **No sim change.** The goldens are untouched. Requests and contexts are byte-identical, so there are no new tokens per question.
 
 ### 50.3 Slice 4: fungus v2: senses inside the ant, a level for every lever (ja-lo8.4, 2026-11-07)
@@ -3542,3 +3544,18 @@ The owner's rule: **don't spend while answers are cached; ask Jev only for the s
 - **Details shows the budget** (spent of today's, and what is left) beside the run's own figures. Tests: a second run on the same day starts with what the first spent; a new day starts again; a reply from a replaced run counts; the store carries a restart.
 - The per-run caps stay in the ledger, with their old default, for any caller that asks for them.
 
+
+### 50.12 The local rule while new words are asked (ja-lo8.15, 2026-11-08)
+
+**Decision** (owner, 2026-11-08, replacing §50.2's stale fallback where Jev can answer): "we don't use the old values, unless … jev is broken". After the fungus's aim or a colony's doctrine changes, a situation with no answer under the words in force plays the **local rule** until Jev's answer arrives. Answers under earlier words play only while Jev can't run: no server or key, the daily budget spent, the player's Stop, a failed start. A daughter colony (ja-lo8.9) is no different: her mother's answers never stand in for hers. Where Jev can't run, the pen doesn't open and she keeps her mother's words, so the mother's answers are her own.
+
+**Built:**
+- `ColonyJev.canAsk` (default true), set by `useColonyJev` to `policyLock(...) === null`. A change makes every colony reconsider at once; the fungus re-reads its policy every step.
+- `#lookup` and `#explain` use the fallback contexts only while `canAsk` is false. The follow card then says "by the local rule, while Jev is asked" (or "the strain's default" for the fungus) instead of a dimmed earlier answer.
+- `fungusAnswers()` lists the earlier aim's rows, dimmed, only while they play.
+- `setDoctrineFor(k, words)` loses `inherit`.
+- Wording in the ant card, Learn's answer table and the guide.
+
+**Tests:** a new doctrine plays the local rule, is asked, and takes Jev's answer; with `canAsk` off the old words' answer plays, stale, and flipping it reconsiders once per change; a daughter's new words play the local rule; a new aim plays the fungus's local rule and lists the old aim's rows only while Jev can't answer.
+
+**No sim change.** The goldens are untouched; requests and contexts are byte-identical, so tokens per question are unchanged.

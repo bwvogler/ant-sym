@@ -20,9 +20,10 @@ import { loadPrecache } from "./precache.ts";
 //
 // Jev in the fungus game (ja-lo8.2; PR #42 review S6–S8): spend nothing while answers are cached, and ask Jev only for
 // the situations that aren't. The page plays the answers it ships and those Jev gave before; a situation with no answer
-// under the current words (preset or the player's own) starts a run (ColonyJev.wantsRun), which stays open until the
-// page closes, under the server's overall daily budget. While Jev can't run, `lock` says why, and the page's policy
-// editors are disabled (policyLock.ts).
+// under the current words (preset or the player's own) plays the local rule while it is asked, and starts a run
+// (ColonyJev.wantsRun), which stays open until the page closes, under the server's overall daily budget. While Jev can't
+// run, `lock` says why, the page's policy editors are disabled (policyLock.ts), and answers under earlier words play
+// where the current ones have none (ColonyJev.canAsk, ja-lo8.15).
 
 /** Estimated input tokens per situation, from the size of a full request (the ledger counts the real ones). */
 export const TOKENS_PER_SITUATION = tokensPerQuestion("mode", DOCTRINES[0]!.text);
@@ -86,7 +87,9 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
   useEffect(() => {
     lockRef.current = lock;
     startRef.current = shouldStart(backend, state, starting);
-  }, [lock, backend, state, starting]);
+    // While Jev can answer, a miss plays the local rule until the answer comes; earlier words' answers only while it can't (ja-lo8.15).
+    jev.canAsk = lock === null;
+  }, [jev, lock, backend, state, starting]);
   const resumable = canResume(backend, state, starting);
   // A situation with no answer under the current words, and no run on: start one (S7). Called on every such miss, from
   // the game's tick, so it only checks a ref, and starts after the tick.

@@ -89,7 +89,7 @@ interface Lane<S, A extends string> {
   batch?: number;
   /**
    * Whether the lane lets its queue fill for opts.gatherMs before it sends less than a full batch (absent: send every
-   * cycle). The fungus's legend is most of a small request, and its hosts play stale or default levels meanwhile (ja-lo8.4).
+   * cycle). The fungus's legend is most of a small request, and its hosts play the local rule meanwhile (ja-lo8.4, ja-lo8.15).
    */
   gather?: boolean;
   /** when the queue last went from empty to not (Date.now()), for `gather` */
@@ -100,8 +100,8 @@ interface Lane<S, A extends string> {
   context: string;
   /**
    * The contexts this lane asked under before, newest first (at most FALLBACKS): while the current words have no
-   * answer for a situation, the newest earlier answer acts, marked stale, and the situation is asked again (the
-   * fungus game, ja-lo8.3: old answers dim and fill in as they come, nothing is re-asked all at once).
+   * answer for a situation and Jev can't answer (canAsk false), the newest earlier answer acts, marked stale (ja-lo8.3);
+   * while it can, the local rule acts until the answer arrives (owner, 2026-11-08, ja-lo8.15).
    */
   fallback: string[];
   queue: Map<string, S>;
@@ -110,7 +110,7 @@ interface Lane<S, A extends string> {
 /** How many earlier contexts a lane falls back on. */
 export const FALLBACKS = 3;
 
-/** Who decided: Jev's answer under the current words; an earlier answer while it is asked again (stale); the local rule while it is asked; the local rule. */
+/** Who decided: Jev's answer under the current words; an earlier answer while Jev can't answer (stale); the local rule while it is asked; the local rule. */
 export type DecidedBy = "jev" | "stale" | "waiting" | "local";
 
 /** In-flight questions are per context: a situation asked under one doctrine is still unasked under another. */
@@ -193,6 +193,25 @@ export class ColonyJev {
    */
   wantsRun: (() => void) | null = null;
 
+  /** Whether Jev can answer new words now (see canAsk). */
+  #canAsk = true;
+
+  /**
+   * Whether Jev can answer new words now (the page sets it from policyLock: true when there is no lock). While it can, a
+   * situation with no answer under the words in force plays the local rule until Jev's answer arrives. Answers under
+   * earlier words play only while it can't (no server or key, the budget spent, Stop, a failed start). Owner,
+   * 2026-11-08, ja-lo8.15. A change makes every ant reconsider at once.
+   */
+  get canAsk(): boolean {
+    return this.#canAsk;
+  }
+
+  set canAsk(v: boolean) {
+    if (v === this.#canAsk) return;
+    this.#canAsk = v;
+    this.#reconsider();
+  }
+
   constructor(opts: Partial<ColonyJevOptions> = {}, store: CacheStore | null = null) {
     this.opts = { ...DEFAULT_COLONY_JEV, ...opts };
     this.#store = store;
@@ -249,8 +268,8 @@ export class ColonyJev {
 
   /**
    * The answer for situation s in lane l: Jev's cached answer whenever there is one, run or no run (the fungus game,
-   * ja-lo8.2: the game plays on what Jev already answered, and asks only when the player changes a policy); else an earlier
-   * answer under words this lane had before (stale, ja-lo8.3); else the local rule. While a run is on, a situation with
+   * ja-lo8.2: the game plays on what Jev already answered); else the local rule while Jev is asked (ja-lo8.15), or, while
+   * Jev can't answer (canAsk false), an earlier answer under words this lane had before (stale, ja-lo8.3). While a run is on, a situation with
    * no current answer is queued to be asked, under any words, preset or the player's own; while none is, the miss is
    * told to `wantsRun`, which may start one (PR #42 review S7: spend nothing while every situation met is cached).
    */
@@ -269,7 +288,7 @@ export class ColonyJev {
       if (l.queue.size === 0) l.since = Date.now();
       l.queue.set(key, s);
     }
-    return this.#earlier(l, key) ?? l.local(s);
+    return (this.#canAsk ? null : this.#earlier(l, key)) ?? l.local(s);
   }
 
   /** Who decides, in lane l, situation s right now (DecidedBy). Counts and queues nothing. */
@@ -279,7 +298,7 @@ export class ColonyJev {
     const key = l.key(s);
     const hit = this.#cache(l).get(key);
     if (hit) return { answer: hit, by: "jev" };
-    const earlier = this.#earlier(l, key);
+    const earlier = this.#canAsk ? null : this.#earlier(l, key);
     if (earlier) return { answer: earlier, by: "stale" };
     if (this.#state.phase !== "running") return { answer: local, by: "local" };
     return { answer: local, by: l.queue.has(key) || this.#asking.has(askKey(l.context, key)) ? "waiting" : "local" };
@@ -314,7 +333,8 @@ export class ColonyJev {
 
   /**
    * The fungus's answers so far, for the Learn drawer's table (ja-lo8.4): each situation answered under the current aim
-   * with the levers asked now, and, where it has none yet, the newest earlier aim's answer, marked stale. Read only.
+   * with the levers asked now, and, while Jev can't answer (canAsk false: they are what plays), where it has none yet, the
+   * newest earlier aim's answer, marked stale. Read only.
    */
   fungusAnswers(): { key: string; answer: string; stale: boolean }[] {
     const l = this.#fungal;
@@ -322,8 +342,9 @@ export class ColonyJev {
     const current = (key: string) => askedIn(key).join(",") === this.#asked({ task: key.split("|")[3] } as FungalSituation).join(",");
     const out = new Map<string, { key: string; answer: string; stale: boolean }>();
     for (const [key, answer] of this.#cache(l).entries()) if (current(key)) out.set(key, { key, answer, stale: false });
-    for (const c of l.fallback)
-      for (const [key, answer] of this.#cache(l, c).entries()) if (!out.has(key) && current(key)) out.set(key, { key, answer, stale: true });
+    if (!this.#canAsk)
+      for (const c of l.fallback)
+        for (const [key, answer] of this.#cache(l, c).entries()) if (!out.has(key) && current(key)) out.set(key, { key, answer, stale: true });
     return [...out.values()];
   }
 
@@ -356,14 +377,13 @@ export class ColonyJev {
 
   /**
    * New words for a lane: its own cache (free if used before), and a fresh queue. The words it had become its newest
-   * fallback (`inherit`, if given, instead: a daughter colony starts on her mother's answers). Returns whether the
-   * context changed.
+   * fallback, played only while Jev can't answer (canAsk). Returns whether the context changed.
    */
-  #recontext<S, A extends string>(l: Lane<S, A>, words: string, inherit?: string): boolean {
+  #recontext<S, A extends string>(l: Lane<S, A>, words: string): boolean {
     l.words = words;
     const context = l.contextOf(words);
     if (context === l.context) return false;
-    const before = inherit === undefined ? l.context : l.contextOf(inherit);
+    const before = l.context;
     l.fallback = [before, ...l.fallback.filter((c) => c !== before)].filter((c) => c !== context).slice(0, FALLBACKS);
     l.context = context;
     l.queue.clear();
@@ -430,15 +450,15 @@ export class ColonyJev {
   /**
    * A new doctrine for colony k: its own caches (free if used before, by either colony), and its ants reconsider under
    * it. A colony that has no doctrine of its own follows the first colony's, now as well as at the next game (ja-6yj).
-   * Until the new words are answered, its ants act on the old words' answers, stale; `inherit` names other words to
-   * fall back on instead (a daughter colony on her mother's doctrine, ja-lo8.9).
+   * Until the new words are answered, its ants play the local rule (the old words' answers only while Jev can't answer,
+   * canAsk). A daughter colony (ja-lo8.9) is no different: her mother's answers never stand in for hers.
    */
-  setDoctrineFor(k: number, text: string, inherit?: string): void {
+  setDoctrineFor(k: number, text: string): void {
     this.#doctrines[k] = text;
     this.#driven.forEach((d, j) => {
       if (j !== k && !(k === 0 && this.#doctrines[j] === undefined)) return;
-      const a = this.#recontext(d.modes, text, inherit);
-      const b = this.#recontext(d.stances, text, inherit);
+      const a = this.#recontext(d.modes, text);
+      const b = this.#recontext(d.stances, text);
       if (a || b) d.colony.reconsider();
     });
   }
