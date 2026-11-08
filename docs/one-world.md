@@ -39,7 +39,7 @@ An ant in the curtain moves with today's side-view physics: the shaft, chambers,
 - the occupancy grids that fights read;
 - its food: piles on the plane, buried pockets and chamber stores in the curtain.
 
-The fungus's own body, the mycelium it grows where it lands by a hole (`Fungus.root`, PRD §50.12), lies on the plane.
+The fungus's own body, the mycelium it grows where it lands by a hole (`Fungus.root`, PRD §50.12), lies **in the curtain**: in the soil walls of the shaft just under the hole, not on the plane. *Metarhizium* lives in soil and around roots ([fungus-body §1](fungus-body.md#1-growth-without-a-host)), and sunlight's UV kills exposed spores and hyphae (owner, 2026-11-08; sources to add to `fungus-body.md` under `ja-yo3`). Ants pick it up where they brush the shaft's walls, on every trip in and out; its spores reach the plane only on the ants that carry them, and on corpses on the midden. Today's game roots it on the open cells by the hole, the ground ants walk on; that changes with it (`ja-yo3`).
 
 Fights happen within a layer. Two ants in different layers never meet, except across a hole.
 
