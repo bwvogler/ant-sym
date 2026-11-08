@@ -3657,3 +3657,45 @@ Research basis: `docs/stance.md`. Every figure was read in a search summary, not
   - a default that never raids: G′ seeds 1–4 lost about 170 ants;
   - crowd-only raids with recruitment all at once: about 880 lost;
   - `raidRecruit` 0.02: A11 8/10, worst seed 1.07.
+
+### 51.4 Jev (spent ≈ $0.022 of $0.10)
+
+- **Legends** (colony v7, response v10; the stance lane is unchanged, for the side view):
+  - Stance, on open ground, is the ant's own: "forage, the usual one; defend, only while it smells alarm or meets strangers close to its own nest; or raid, once recruited".
+  - `crowd` is sent to the leave lane with the returns. The leave question gains "raid".
+  - The leave lane's key adds `crowd`.
+- **Two wordings were corrected after replays:**
+  - **"crowd" tied only to raiding.** Cautious and Forage answered "wait" for a crowded home with many foragers coming back, and Warlike raided with food coming back. Cautious's replay stored 1,228 against main's 3,853. Now returns come first: a crowded home with none coming back is the one case left to the doctrine.
+  - **A stance sentence leading with threat and defence.** Cautious answered "return" in 125 of 151 mode situations. Now forage is "the usual one".
+- **Live:** `colony-live.mjs all --top`, three full runs at $0.0065–0.0066, plus two leave-only runs and one Cautious mode run (about $0.0024).
+  - Real tokens per question: mode 202, leave 404, contact 262, trail 250.
+  - Caches: `experiments/caches/stance-top-*.json` (7 / 4 / 10). The mode bundles are re-shipped from them (`precache.mjs --import`, 151 answers per doctrine); the stance bundles stand.
+- **Replays,** G′ seeds 1–6, the first colony; `main` is MR 5.2's caches replayed today. The local rule on this branch: 4,207 food, 648 lost.
+
+| Cache | Food | Lost | `main`: food | Lost |
+|---|---|---|---|---|
+| Forage | 3,955 (−9 %) | 481 | 4,363 | 824 |
+| Cautious | 2,234 (−42 %) | 150 | 3,853 | 592 |
+| Warlike | 3,467 (0 %) | 631 | 3,472 | 866 |
+
+- **Losses fall under every doctrine.**
+- **Cautious's food loss is in its mode answers** (`ja-5vx`). With them removed it stores 4,801 (seeds 1–3); with MR 5.2's answers restored for the 15 situations where they differ, 3,645. For example, a rested ant at home with a faint food trail ahead is told to stay home. Those answers vary between recordings of the same doctrine.
+
+### 51.5 Cost
+
+Offline estimates (`colony-cost`), on this branch against `main` on the same machine:
+
+| | This branch | `main` |
+|---|---|---|
+| Top-down, mode lane | ~$0.024/h (no stance lane) | ~$0.030/h |
+| Top-down, the six response lanes | ~$0.020/h | ~$0.015/h |
+| Side view, mode | ~671 tok/q, ~$0.102/h | ~652 tok/q, ~$0.099/h |
+| Side view, response lanes | ~$0.127/h | ~$0.117/h |
+
+The longer legends cost a few per cent; the top-down stance lane is gone. The estimates were taken before the last two wording changes, which are within a sentence of them.
+
+### 51.6 Left out
+
+- **The side view** keeps the strategist and raids by coordinates (`ja-1a9`; `ja-k4k.6` stays open for it).
+- **A fight-recruitment signal** (pavement ants' escalation): alarm already draws defenders.
+- **Brood need** as a raid cue (`ja-gkl`).
