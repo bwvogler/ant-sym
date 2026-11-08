@@ -77,7 +77,8 @@ Pass the base branch and the other open PR numbers from stage 0 (git alone can't
 ## 3. Route
 
 - **Small** (under ~300 changed lines, no new mechanic): review inline.
-- **Large**: spawn **one** background general-purpose agent with the filled-in [reference/brief.md](reference/brief.md). While it runs, do stages 1, 2 and the fast checks yourself, sequentially, and **do not repeat its work**. Don't run `npm test` while it is running measurements; run yours before you spawn it or after it reports.
+- **Large**: spawn **one** background general-purpose agent with the filled-in [reference/brief.md](reference/brief.md). While it runs, do stages 1, 2 and the fast checks yourself, sequentially, and **do not repeat its work**. Don't run `npm test` while it is running measurements; run yours before you spawn it or after it reports. Its whole report goes on the PR in the review's collapsed "Helper's report" block, each item marked confirmed, didn't hold, or not checked ([comment.md](reference/comment.md)).
+- **No Agent tool** (you are yourself a subagent, e.g. `pr-reviewer`): do the deep pass yourself after the fast checks, one job at a time.
 
 ## 4. Check
 
