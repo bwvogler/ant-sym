@@ -3,6 +3,16 @@ name: reviewing-prs
 description: "Reviews a pull request on bwvogler/ant-sym (jev-ants) and posts the review as one GitHub comment, with measured evidence, merge mechanics against main and the other open PRs, and the owner's decisions relayed into the PR and into beads. Use whenever the user asks to review a PR, re-review one, 'check for updates', 'anything new?', 'fixes are in', 'is #N ready', or 'approve what's ready', including stacked PRs, and whenever a lead agent hands a subagent a PR to review (role: helper). Not for writing the fix itself or for designing a mechanic (that is adding-mechanics)."
 argument-hint: "[PR number(s), or 'open'] [role: helper]"
 allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/merge-check.sh *), Bash(${CLAUDE_SKILL_DIR}/scripts/fast-checks.sh *)
+hooks:
+  PreToolUse:
+    - matcher: "Bash|mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write|mcp__github__merge_pull_request|mcp__github__enable_pr_auto_merge"
+      hooks:
+        - type: command
+          command: "\"$CLAUDE_PROJECT_DIR\"/.claude/skills/reviewing-prs/scripts/guard.sh"
+  Stop:
+    - hooks:
+        - type: command
+          command: "\"$CLAUDE_PROJECT_DIR\"/.claude/skills/reviewing-prs/scripts/stop-check.sh"
 ---
 
 # Reviewing a PR
@@ -17,6 +27,8 @@ A review here is finished when **one GitHub review is posted on the PR** (or, fo
 - **Helper** (the lead passed "role: helper", usually via [reference/brief.md](reference/brief.md)). Does stages 1 and 5 in its own worktree (stage 4 too, unless the brief says the lead ran it; then single test files only) and returns a ready-to-paste report of **verified findings only**. A helper never posts, comments, commits, pushes, merges, or changes beads (`bd create/update/close/remember`); it may read them (`bd show`, `bd search`). It removes its worktree and reports `git worktree list` at the end.
 
 ## Hard rules
+
+Hooks enforce some of these once the skill is invoked (and stay on for the rest of the session; `pr-reviewer` agents carry them too). `scripts/guard.sh` refuses a GitHub post without the footer or naming a model, a review submitted as APPROVE or REQUEST_CHANGES, and a worktree path that is relative, right under `/` or built on an unguarded variable; it asks the owner before a merge and before slow or paid runs. `scripts/stop-check.sh` stops you finishing once while a detached worktree or a changed `.beads/issues.jsonl` is left. A refusal says how to fix the call: fix it, don't route around it. Their tests: `scripts/test.sh`.
 
 - `env -u JEV_API_KEY` on every command that runs the game, tests or scripts. No live Jev calls; spend is real and the owner decides it.
 - Worktrees at **absolute** paths under the scratchpad, with the variable guarded: `W="${S:?}/pr57"`. An empty `$S` once put a worktree at `/r53m`.
