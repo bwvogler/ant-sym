@@ -47,7 +47,7 @@ test("hold: a level is pulled back toward as is until it is within reach; levers
   const within = { food: 3, crown: 1 };
   assert.equal(hold(within, { food: 1 }), within, "nothing held back: the same object");
   assert.equal(hold(within, null), within);
-  assert.deepEqual(hold({ crown: 1 }, { food: 0 }), { crown: 1 }, "a lever with no reach (lethal) keeps its range");
+  assert.deepEqual(hold({ crown: 1 }, { food: 0 }), { crown: 1 }, "a lever the reach leaves out keeps its range");
 });
 
 test("reach acts where levels take effect: Jev's question and cache key do not change, the host's gains do", () => {
@@ -75,6 +75,36 @@ test("reach acts where levels take effect: Jev's question and cache key do not c
   // A lab helper runs a preset whatever the menu and the reach say.
   f.express(c, 0, 2, 1); // share: food 3
   assert.ok(Math.abs((c.gainFood[0] as number) - 1.5) < 1e-9);
+});
+
+test("every lever has a reach, the lethal ones included: crown and odour weapon are held off until their upgrade (ja-lo8.16)", () => {
+  const reach = new Evolution(GARDEN).reach();
+  for (const v of LEVERS) assert.ok(reach[v.id] !== undefined, `${v.id}: some upgrade names it`);
+  assert.equal(reach.weapon, 0, "the odour weapon starts held off");
+  assert.equal(reach.crown, 0, "and so does crown");
+  const map = generateSideWorld(1); // crown acts only where there is a nest: the top-down menu drops it
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(1));
+  c.strain[0] = GARDEN;
+  const f = new Fungus(map);
+  f.configure({ hide: false, cull: false }, ["weapon", "crown"]); // the player has put both on the menu
+  f.evolve(GARDEN);
+  assert.deepEqual(f.held({ weapon: 1, crown: 1 }, GARDEN), { weapon: 0, crown: 0 }, "on the menu, but not yet free");
+  f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
+  assert.equal(c.estrange[0], 0, "so the host smells like itself");
+  assert.equal(c.regicide[0], 0, "and spares the queen");
+  const e = f.evolution!;
+  e.replicate((upgrade("weapon").costs[0]! + upgrade("crown").costs[0]!) / MUTATION);
+  assert.ok(f.upgrade("weapon"), "the mutations for the odour weapon");
+  f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
+  assert.ok((c.estrange[0] as number) > 0, "freed: the host smells like nobody's");
+  assert.equal(c.regicide[0], 0, "crown still held");
+  assert.ok(f.upgrade("crown"), "the mutations for crown");
+  f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
+  assert.ok((c.regicide[0] as number) > 0, "freed: the host kills the queen it tends");
+  // A game that doesn't evolve (the lab, the assays) has no reach: the lethal levers run as the menu says.
+  const lab = new Fungus(map);
+  lab.configure({ hide: false, cull: false }, ["crown"]);
+  assert.deepEqual(lab.held({ crown: 1 }, GARDEN), { crown: 1 });
 });
 
 test("mutations: a fixed share of growth, kept level by level, each level of an upgrade asking more than the last", () => {

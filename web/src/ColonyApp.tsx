@@ -9,6 +9,7 @@ import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats } from "./ui/useColony.ts";
 import { UPGRADES } from "./colony/evolution.ts";
+import { LETHAL_LEVERS } from "./colony/levers.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
 import type { Game } from "./colony/game.ts";
@@ -257,7 +258,7 @@ function Evolve({ e, evolve, side }: { e: EvolutionStats; evolve: (id: string) =
           return (
             <li key={u.id} className="flex items-center justify-between gap-2 text-xs">
               <span className="min-w-0 truncate" title={u.blurb}>
-                <span className={u.kind === "spread" ? "text-spore" : "text-accent"}>{u.name}</span> <span className="text-fg-3">{u.steps[level]}</span>
+                <span className={u.kind === "spread" ? "text-spore" : u.levers?.every((id) => LETHAL_LEVERS.has(id)) ? "text-err" : "text-accent"}>{u.name}</span> <span className="text-fg-3">{u.steps[level]}</span>
               </span>
               {cost === undefined ? (
                 <span className="shrink-0 text-fg-3">at its most</span>
