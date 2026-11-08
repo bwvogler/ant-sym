@@ -24,23 +24,23 @@
     {
       "lane": "mode",
       "doctrine": "cautious",
-      "context": "colony-v6-df2615cf",
+      "context": "colony-v7-0db56476",
       "file": "mode-cautious.json",
-      "answers": 290
+      "answers": 151
     },
     {
       "lane": "mode",
       "doctrine": "forage",
-      "context": "colony-v6-b40a2370",
+      "context": "colony-v7-2064b853",
       "file": "mode-forage.json",
-      "answers": 290
+      "answers": 151
     },
     {
       "lane": "mode",
       "doctrine": "warlike",
-      "context": "colony-v6-7209a8aa",
+      "context": "colony-v7-91d9147b",
       "file": "mode-warlike.json",
-      "answers": 290
+      "answers": 151
     },
     {
       "lane": "stance",
@@ -65,7 +65,7 @@
     }
   ],
   "versions": {
-    "colony": 6,
+    "colony": 7,
     "stance": 4,
     "fungus": 7
   }

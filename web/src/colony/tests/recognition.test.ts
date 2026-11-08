@@ -218,8 +218,11 @@ test("unity: the nests' odour gap and the quiet; unified when they smell alike a
 test("a colony whose nest smells like ours is no rival: the strategist forages instead of raiding kin", () => {
   const g = new Game(arena(), { antCount: 5, rivalAnts: 5, strategyEvery: 1 }, mulberry32(2));
   const [a, b] = g.colonies as [Colony, Colony];
-  // A strategist that would always raid a rival.
-  for (const c of [a, b]) c.stancePolicy = () => "raid";
+  // A strategist that would always raid a rival (the colony's stance, told to every ant: on open ground only with stanceGate 0).
+  for (const c of [a, b]) {
+    c.stancePolicy = () => "raid";
+    c.params.stanceGate = 0;
+  }
   g.tick(1 / 30);
   assert.equal(a.stance, "raid", "strangers: raid");
   a.nestOdour = 0.45;

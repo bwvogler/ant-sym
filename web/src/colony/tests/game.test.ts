@@ -222,7 +222,7 @@ test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside go
 test("raids by trail (review of #41): a raider with no enemy near climbs the raid trail; a finder is not made on the trail", () => {
   // One raider out on an open field, a raid gradient rising to the east, and nothing else: it walks up the gradient.
   const m = arena();
-  const c = new Colony(m, { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(4));
+  const c = new Colony(m, { antCount: 1, maxAnts: 1, nest: 0, stanceGate: 0 }, mulberry32(4)); // a raid stance told to every ant: the climb alone
   c.stance = "raid";
   for (let y = 1; y <= 10; y++)
     for (let x = 8; x <= 38; x++) {
@@ -261,7 +261,7 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
   const past = (raidOnward: number) => {
     let s = 0;
     for (let seed = 1; seed <= 5; seed++) {
-      const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidOnward }, mulberry32(seed));
+      const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidOnward, stanceGate: 0 }, mulberry32(seed));
       c.stance = "raid";
       put(c, 0, 12, 10);
       c.heading[0] = 0; // facing east, up the trail
@@ -285,7 +285,7 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
 
   // Home again, it is done with that trail end (review of #44, N2): its flag clears, even with a raid trail at home keeping it
   // recruited (else it would never climb a trail again).
-  const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0 }, mulberry32(1));
+  const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, stanceGate: 0 }, mulberry32(1));
   c.stance = "raid";
   const pastEnd = () => (decode((c.saveState().private as Record<string, unknown>).pastEnd) as Uint8Array)[0];
   const lay = () => {
@@ -329,7 +329,7 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   assert.equal(b.touch(0, false).stance, "forage");
 
   // A waiting forager whose leave answer is "raid" goes out as a raid scout.
-  const r = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, scoutRate: 0 }, mulberry32(15));
+  const r = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, scoutRate: 0, raidScout: 10 }, mulberry32(15));
   r.responses = responses({ leave: () => "raid" });
   put(r, 0, 4, 6);
   r.mode[0] = MODES.indexOf("return");
@@ -338,7 +338,7 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   assert.equal(r.touch(0, false).stance, "raid");
 
   // Twenty ants waiting at home: each feels the others round it.
-  const g = new Game(arena(), { antCount: 20, rivalAnts: 1 }, mulberry32(16), { policy: () => "return", responses: responses({ leave: () => "wait" }), colony: { scoutRate: 0 } });
+  const g = new Game(arena(), { antCount: 20, rivalAnts: 1 }, mulberry32(16), { policy: () => "return", responses: responses({ leave: () => "wait" }), colony: { scoutRate: 0, crowdAt: 6 } });
   const c = g.player;
   for (let i = 0; i < 20; i++) put(c, i, 4, 6);
   for (let k = 0; k < 30 * 10; k++) g.tick(1 / 30);
