@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SITUATIONS } from "../colony/colony.ts";
 import { DOCTRINES } from "../colony/colonyBrain.ts";
 import { LETHAL, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
+import { upgradeFor } from "../colony/evolution.ts";
 import type { Game } from "../colony/game.ts";
 import { DEFAULT_RECOGNITION } from "../colony/recognition.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
@@ -440,6 +441,8 @@ export function LeverChips({ game, menu, locked, lock, onChange }: { game: Game;
           {LEVERS.filter((v) => v.kind === kind && (game.map.sky || !NEST_ONLY.has(v.id))).map((v) => {
             const on = menu.includes(v.id);
             const lethal = LETHAL.has(v.id);
+            // In the game a lethal lever on the menu does nothing until its upgrade is kept (ja-lo8.16).
+            const heldOff = lethal && game.fungus.evolution?.reach()[v.id] === 0;
             return (
               <button
                 key={v.id}
@@ -447,7 +450,7 @@ export function LeverChips({ game, menu, locked, lock, onChange }: { game: Game;
                 aria-pressed={on}
                 disabled={locked}
                 className={`rounded-md border px-2 py-0.5 font-mono disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
-                title={locked ? (lock ?? undefined) : v.blurb}
+                title={locked ? (lock ?? undefined) : heldOff ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Fungus panel).` : v.blurb}
                 onClick={() => onChange(on ? menu.filter((id) => id !== v.id) : [...menu, v.id])}
               >
                 {v.name}

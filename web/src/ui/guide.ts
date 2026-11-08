@@ -216,7 +216,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "A fungus lives in and on its host's body. What it could read there is the host's body: amines that rise with fighting, the cuticle it touches, the juvenile hormone that tracks a worker's task. That a fungus reads these is the game's design; what parasites do with them, changing what a host perceives and gives off, is real (Rickia's alkane, Ophiocordyceps's lost rhythm).",
     inGame:
-      "Your aim, in words, is read by Jev, which sets a level for every lever in each situation the fungus senses: perception levers (food, rival trails, home, alarm, stranger scent, floor marks, time out) and emission levers (trail laid, trail leaked, alarm laid, calming cue, fungal odour, showing). Lethal levers stay off until you turn them on, and even then do nothing until your fungus earns them (the Odour weapon and Crown upgrades). The ant still decides, from what it now perceives.",
+      "Your aim, in words, is read by Jev, which sets a level for every lever in each situation the fungus senses: perception levers (food, rival trails, home, alarm, stranger scent, floor marks, time out) and emission levers (trail laid, trail leaked, alarm laid, calming cue, fungal odour, showing). Lethal levers stay off until you turn them on, and in the game even then do nothing until your fungus earns them (the Odour weapon and Crown upgrades). The ant still decides, from what it now perceives.",
     sources: [
       { note: "fungus-policy", anchor: "11-what-the-fungus-senses-inside-an-ant-and-its-levers", label: "What the fungus senses inside an ant, and its levers" },
       { note: "new-queens", anchor: "4-where-the-fungus-comes-in", label: "Where the fungus comes in (queen birth)" },

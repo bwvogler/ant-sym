@@ -107,6 +107,26 @@ test("every lever has a reach, the lethal ones included: crown and odour weapon 
   assert.deepEqual(lab.held({ crown: 1 }, GARDEN), { crown: 1 });
 });
 
+test("the game's step holds a lethal answer too: a policy that culls estranges no host until Odour weapon is kept (PR #51 review)", () => {
+  const map = arena();
+  const c = placed(map, [[10, 6]]);
+  c.load[0] = 1;
+  c.strain[0] = GARDEN;
+  const f = new Fungus(map);
+  f.configure({ hide: false, cull: true }, ["weapon"]);
+  f.policy = () => "cull"; // every situation answered with the odour weapon, as the local rule does in a fight
+  f.evolve(GARDEN);
+  f.hosts = 1; // load set by hand: tell the step there is a host to step
+  run(f, [c], 0.2);
+  assert.ok((c.load[0] as number) > 0.5, "still a host");
+  assert.ok((c.fungal[0] as number) >= 0, "the step read its situation and expressed its policy's answer");
+  assert.equal(c.estrange[0], 0, "held off through the step");
+  f.evolution!.replicate(upgrade("weapon").costs[0]! / MUTATION);
+  assert.ok(f.upgrade("weapon"));
+  run(f, [c], 0.2);
+  assert.ok((c.estrange[0] as number) > 0, `freed: ${c.estrange[0]}`);
+});
+
 test("mutations: a fixed share of growth, kept level by level, each level of an upgrade asking more than the last", () => {
   for (const u of UPGRADES) for (let k = 1; k < u.costs.length; k++) assert.ok(u.costs[k]! > u.costs[k - 1]!, `${u.id}: level ${k + 1} asks more`);
   const e = new Evolution(GARDEN);

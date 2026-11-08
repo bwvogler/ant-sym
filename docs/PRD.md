@@ -3780,7 +3780,7 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
   - The guide says so in its policy and evolution entries.
 - **Costs are first guesses,** placed among the strongest second levels (2,000–6,000, §50.13). Balance (`ja-lo8.10`) tunes them.
 - **Not held:** a game that does not evolve (the lab's landings, the assays, the tests), and a lab or test preset run with `express`.
-- **Saves:** a version-2 save without these levels loads them at 0 (held off), so `SAVE_VERSION` stays 2.
+- **Saves:** a version-2 save without these levels loads them at 0 (held off), so `SAVE_VERSION` stays 2. A save from a game with a lethal lever on the menu therefore stops culling or killing queens once loaded, until the player keeps the upgrade.
 
 **Unchanged:**
 - **Jev cost:** no request changed, and reach acts after the answer, so `precache.test` stands.
@@ -3794,6 +3794,19 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
   - weapon and crown start at 0;
   - on a side world with both on the menu, a host's `estrange` and `regicide` stay 0 until each upgrade is kept, then rise. A game that doesn't evolve holds nothing.
 - It fails when the two upgrades start free.
+
+**Review (own agent): nothing blocking.** The hold covers every path where a lethal lever takes effect. Fixed:
+- **Copy.** The Learn drawer's local rule said the weapon works "only if it is on the menu"; it now also names the upgrade.
+- **Lethal lever on the menu but held off.**
+  - The Learn drawer's lever list now says "lethal, on, held off until you keep …".
+  - The lever chip's tooltip says the same.
+- **A lethal upgrade off the menu.**
+  - The panel marks it "(not on the menu)".
+  - The "mutations to keep" notice now ignores upgrades that would do nothing. It also ignores those the view hides, which was already true of Royal on the top-down view.
+- **A step-level test.** A policy that culls, run through `Fungus.step`, estranges no host until Odour weapon is kept. It fails if the step skips the hold.
+- **Nits.**
+  - The ant card's tooltip names a lethal lever as lethal, and says "its policy wants" rather than "Jev wants".
+  - The guide says "in the game", since the lab's own landings are not held.
 
 ## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
 

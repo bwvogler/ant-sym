@@ -188,6 +188,11 @@ export const UPGRADES: readonly Upgrade[] = [
   },
 ];
 
+/** The upgrade that widens lever `id` (every lever has one, ja-lo8.16). */
+export function upgradeFor(lever: string): Upgrade | undefined {
+  return UPGRADES.find((u) => u.levers?.includes(lever));
+}
+
 /** An upgrade by id. */
 export function upgrade(id: string): Upgrade {
   const u = UPGRADES.find((x) => x.id === id);
