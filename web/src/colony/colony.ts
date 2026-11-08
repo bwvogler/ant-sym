@@ -1170,7 +1170,10 @@ export class Colony {
       const ty = stepY(cy, d);
       if (rockAt(this.map, tx, ty) !== OPEN || isSky(this.map, tx, ty)) continue;
       const v = store.get(tx, ty);
-      if (v > bestV) ((bestV = v), (best = d));
+      if (v > bestV) {
+        bestV = v;
+        best = d;
+      }
     }
     return best;
   }
