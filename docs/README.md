@@ -21,6 +21,10 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 
 The page's **Learn** drawer quotes these notes in its field guide (`web/src/ui/guide.ts`), linking their headings. `guide.test.ts` fails when a cited heading is renamed or a gap the guide calls scripted is closed: update the entry with the note.
 
+## Writing a new note
+
+A new mechanic starts with a note here. The `adding-mechanics` skill ([.claude/skills/adding-mechanics](../.claude/skills/adding-mechanics/SKILL.md)) has the template: findings that each end with **In the game:**, a **Play** section (what the player sees and chooses, the risks to play, the cost), open questions, and Sources under the convention below.
+
 ## Records
 
 - [PRD.md](PRD.md) is the decision log. It holds every product decision, why it was made, and the measured Jev numbers, milestone by milestone. §1–8 are the removed picture mode.
