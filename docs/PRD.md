@@ -3135,11 +3135,11 @@ Research basis: `docs/raid-recruitment.md`. Every figure in it was read in a sea
 
 **A11, raiders find the rival round a pocket of wall** (200 ants against 80 defenders, 300 s; seeds 1–20). Reported over the ants recruited to the raid:
 - **With the trail:** 0.19 of the colony's ants reach the rival's nest (0.12–0.32) as raiders; **with no trail laid** (`raidLay` 0: scouts alone) 0.14 (0.10–0.17); `raidGate` 0, every ant sent at the coordinates (`straight`): 0.39 (0.28–0.53).
-- **Gain** 1.24 median (0.89–2.75); the mark (at least 1.5× and at most 10 % stuck) passes 7/20 seeds. Stuck: 1 %. The clock version gained 1.67 (12/20). Only ants that pass near the nest, or are there, smell the trail, and most of a colony in an arena with no food is out exploring. A stronger lay (`raidLay` 3, 8) did not help (the trail smears), and nor did recruiting by contact with a finder coming home (tried, dropped). Filed as ja-sf1.
+- **Gain** 1.24 median (0.89–2.75); the mark (at least 1.5× and at most 10 % stuck) passes 7/20 seeds. Stuck: 1 %. The clock version gained 1.67 (12/20). Only ants that pass near the nest, or are there, smell the trail, and most of a colony in an arena with no food is out exploring. A stronger lay (`raidLay` 3, 8) did not help (the trail smears), and nor did recruiting by contact with a finder coming home (tried, dropped). Filed as ja-sf1. *The diagnosis was wrong: see 49.7.*
 
 **A12, a raid no one can find** (new; the first colony forced onto a raid stance, the rival sealed in rock, a food pile to forage; 900 s): food stored against the same colony on a forage stance **1.00, 20/20** (0.99 worst). On the first version (waiting raiders) it stored 10 of 7,400.
 
-**A6 few against many through a pass** (seeds 1–20): pass 16/20, gain 1.82 (1.16–2.88) (`main`: 9/10, 2.36; the clock version 1.70).
+**A6 few against many through a pass** (seeds 1–20): pass 16/20, gain 1.82 (1.16–2.88) (`main`: 9/10, 2.36; the clock version 1.70). *Stale: the merged code measures 3/20, 1.26; see 49.7.*
 
 **A1–A5b, A9** (seeds 1–10): pass 10/10 each, as before (no raids in them).
 
@@ -3159,7 +3159,7 @@ Food +8 % and +12 %, losses the same. **The worst seed is worse:** seed 19 (ja-h
 
 - **Live:** `colony-live.mjs all --top`, about 250,000 input tokens a run, **$0.0105–0.0109** each (seven runs over the PR; the lane with a new sense is `leave`). Caches `experiments/caches/mr52-top-*.json`, versions 6 / 4 / 9.
 - **The first version asked a waiting raider as a returning forager** (review of #41, S1): both got one key and one answer. Now a recruited ant is asked as a raider (fight, with the raid trail) and a forager as a forager (return, with its returns), and the legend no longer tells Jev to override its doctrine.
-- **Replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,186 and 915):
+- **Replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,186 and 915) *(stale: `main` replays differently today; see 49.7)*:
 
 | | All lanes: food stored | Lost | `leave` and `stance` only (as MR 5's caches) | MR 5 (food) |
 |---|---|---|---|---|
@@ -3186,6 +3186,58 @@ Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; sea
 - **Food or loot at a rival's entrance** (ja-um8's deferred note from MR 2) needs brood and prey carrying: `ja-gkl`.
 - **Stance** is still broadcast (`ja-k4k.6`).
 - **A rival-nest odour,** column marching, call-off: no sources reached.
+
+### 49.7 The trail points, the search finds (ja-sf1, 2026-11-08)
+
+**What was wrong.** A11 with probes for who is recruited, where, and where finds happen (seeds 1–20, the MR 5.2 code):
+- **Recruiting was never short.** 81 % of the colony was recruited (0.70–0.99), 43 % of them at home, and the trail was smelt at the nest's rim in 47 % of samples. 49.3's "only ants near the nest smell the trail" was wrong.
+- **The trail ends short of the nest.** A finder lays it from where it first met strangers: 25 cells from the rival's nest (17–34; the nests are 80 apart). Recruits climbed it to its end, its strongest point, and stayed there; 20 % of them ever came within reach of the nest, and 32 % died.
+- **Tried and dropped: raiders re-laying the trail** on their way home from strangers (the fire-ant and ponerine picture, `docs/raid-recruitment.md`). The trail at the nest's rim was four times as strong (0.81 against 0.20) and smelt in 73 % of samples; reach did not move (gain 1.19).
+- **Tried and dropped: a later find** (`findAt` 1, 2, 4 s): gain 1.70, 1.22, 1.00, the worst seed 0.70 at best.
+
+**What changed** (`raidOnward` 1):
+- A raider on the raid trail, facing along it (its front sensor the strongest), that finds nothing ahead as strong as underfoot leaves the trail and searches on, out and away from home, as a scout does. It ignores raid trails until it is home, where the flag clears; that includes a fresher, longer one another finder lays meanwhile.
+- **Where it fires** (the owner's probe, review of #44, seeds 1–3): mostly near home, a median 0.05–0.19 of the way out, 81–92 % of the times within 40 % of it. The lay fades with time since the find, so near the nest the trail is faint and patchy, and a dip ahead reads as nothing stronger. So the trail recruits and points the way, and the search does the rest. Allowed only where the trail underfoot is strong, as at a real end, A11 gained less: 1.67 against 2.01 (seeds 1–4).
+- If a searching raider meets strangers with no trail under it, it is a finder, and lays a trail home from there.
+- No new sense: it reads the same three sensors as the climb. No clock. Nothing an ant is asked changed, so Jev's keys and caches stand and nothing was spent.
+- Research: `docs/raid-recruitment.md`, "The trail points, the search finds" (a scout's run then sector search; trails kept by those who use them; all **unverified**).
+
+**A11** (raidOnward 1 against 0, the same code):
+
+| | Gain (median, range) | Seeds at the mark | Reach | Recruits that reach |
+|---|---|---|---|---|
+| Seeds 1–20 | **2.04** (1.32–4.40) against 1.33 (0.48–2.90) | **16/20** against 7/20 | 0.28 against 0.17 | 0.34 against 0.21 |
+| Seeds 21–40 | **1.84** (0.97–5.10) against 1.55 (0.69–4.29) | **13/20** against 11/20 | 0.26 against 0.19 | 0.32 against 0.25 |
+
+`straight` (every ant at the coordinates) reaches 0.39; stuck stays 1 %. The slow suite now guards the mark (6 of seeds 1–10), no longer a todo.
+
+**A6, corrected (an assay change, not this fix).** 49.3's A6 (16/20, gain 1.82) is stale: the merge commit of #41 measures **3/20, gain 1.26**, and so does `main`. The number was taken before the owner's review moved unrecruited fighters off the coordinates, after which A6's attackers (all in fight, on a raid stance) went only as recruits, a few at a time, and no battle formed at the pass. A6 is about who reaches whom at a pass, not about finding the rival, so its attackers now all march at the defenders' hole (`raidGate` 0 in both its runs): **14/20, gain 1.74** (1.18–5.20); before MR 5.2, 9/10 and 2.36. raidOnward does not change it (6/20, 1.20 against 1.23, the old spec).
+
+**A12** 20/20 (food 1.00 of the forage colony's), **A5, A9** 20/20: unchanged.
+
+**G′, seeds 1–20** (first colony; medians, worst in brackets):
+
+| | raidOnward | `main` |
+|---|---|---|
+| Ants alive at the end | 892 (223) | 895 (1) |
+| Food stored | 4,274 (1,816) | 4,085 (1,491) |
+| Ants lost | 848 | 826 |
+| Rival: food stored / lost | 4,179 / 828 | 4,110 / 773 |
+
+Food +5 %, losses +3 %. **The worst seed recovers:** seed 19 ends with 223 ants (`main`: 1; ja-hgq). Seeds 15 and 17 end with fewer (565 and 357 against 724 and 762).
+
+**Jev replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,088 and 918 on this branch, 4,083 and 901 on `main`):
+
+| Cache | raidOnward: food stored | Lost | `main` today: food stored | Lost | Food against `main` |
+|---|---|---|---|---|---|
+| Forage | 4,128 | 846 | 4,363 | 824 | −5 % |
+| Cautious | 3,444 | 571 | 3,853 | 592 | −11 % |
+| Warlike | 3,219 | 850 | 3,472 | 866 | −7 % |
+
+- **Under Jev's cached answers the colony stores 5–11 % less** on seeds 1–6, with losses the same, though the local rule is level on those seeds and +5 % over seeds 1–20. Six seeds is a small sample, and all three caches point the same way, so it is recorded, not explained.
+- **49.4's replay figures are stale too:** `main` today replays Warlike at 3,472, not 1,994 (and Forage 4,363, not 5,069). They were taken before the owner's review fixes in #41, as A6 was.
+
+**Cost:** unchanged on every lane (no legend, question or brain version changed).
 
 ## 50. The fungus game: decisions (ja-lo8, 2026-11-06 / 07)
 

@@ -6,6 +6,7 @@ import { CountGrid, occupancy, resolveFights } from "../battle.ts";
 import { Colony, localPolicy, localStance, type Situation, type StanceSituation } from "../colony.ts";
 import { localResponses } from "../responses.ts";
 import { Game } from "../game.ts";
+import { decode } from "../save.ts";
 import { foodIn, generateWorld, mulberry32, OPEN_WORLD, reachable, worldFromArrays, type WorldMap } from "../world.ts";
 
 /** A bare 40×12 field with two nests, no food. */
@@ -252,6 +253,58 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
     if (a.reporting[0]) reported++;
   }
   assert.equal(reported, 0, "no finder on a raid trail");
+});
+
+test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the raid trail searches on; with raidOnward 0 it mills at the end", () => {
+  // A wide raid gradient rising east from x 8 and ending at x 20, where a scout met strangers; the field goes on to the east.
+  // The share of 30 s each of five raiders spends well past the end.
+  const past = (raidOnward: number) => {
+    let s = 0;
+    for (let seed = 1; seed <= 5; seed++) {
+      const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidOnward }, mulberry32(seed));
+      c.stance = "raid";
+      put(c, 0, 12, 10);
+      c.heading[0] = 0; // facing east, up the trail
+      for (let k = 0; k < 30 * 30; k++) {
+        if (k % 30 === 0)
+          for (let y = 1; y <= 18; y++)
+            for (let x = 8; x <= 20; x++) {
+              const p = at(x, y);
+              c.ph.deposit("raid", p.x, p.y, 0.1 * (x - 6)); // kept fresh: the end stays where it is
+            }
+        c.tick(1 / 30);
+        if ((c.x[0] as number) > at(26, 10).x) s += 1 / (30 * 30);
+      }
+    }
+    return s;
+  };
+  const mills = past(0);
+  const on = past(1);
+  assert.ok(mills < 0.05, `raidOnward 0: it stays at the trail's end (${mills.toFixed(2)} raider-runs past it)`);
+  assert.ok(on > 0.5, `raidOnward 1: past the end it searches on (${on.toFixed(2)} raider-runs past it)`);
+
+  // Home again, it is done with that trail end (review of #44, N2): its flag clears, even with a raid trail at home keeping it
+  // recruited (else it would never climb a trail again).
+  const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0 }, mulberry32(1));
+  c.stance = "raid";
+  const pastEnd = () => (decode((c.saveState().private as Record<string, unknown>).pastEnd) as Uint8Array)[0];
+  const lay = () => {
+    for (let y = 1; y <= 18; y++)
+      for (let x = 1; x <= 20; x++) {
+        const p = at(x, y);
+        c.ph.deposit("raid", p.x, p.y, 0.1 * (x + 2));
+      }
+  };
+  lay();
+  put(c, 0, 12, 10);
+  c.heading[0] = 0; // up the trail, to its end
+  for (let k = 0; k < 30 * 3 && pastEnd() === 0; k++) c.tick(1 / 30);
+  assert.equal(pastEnd(), 1, "past the end");
+  lay();
+  put(c, 0, 4, 10); // home, on the trail
+  c.tick(1 / 30);
+  assert.equal(c.recruited[0], 1, "still recruited: a trail at home");
+  assert.equal(pastEnd(), 0, "home clears it");
 });
 
 test("raid stance as a bias (behaviour MR 5.2): an ant with no trail carries on as a forager, a trail or a scout's errand makes it a raider, and it is a forager again once home", () => {
