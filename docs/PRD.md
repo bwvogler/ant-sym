@@ -3594,3 +3594,66 @@ The owner's rule: **don't spend while answers are cached; ask Jev only for the s
 - **Details shows the budget** (spent of today's, and what is left) beside the run's own figures. Tests: a second run on the same day starts with what the first spent; a new day starts again; a reply from a replaced run counts; the store carries a restart.
 - The per-run caps stay in the ledger, with their old default, for any caller that asks for them.
 
+
+## 51. Each ant's own stance (top-down; ja-k4k.6, ja-d8e, 2026-11-08)
+
+Research basis: `docs/stance.md`. Every figure was read in a search summary, not the paper, so all are **unverified**.
+- **Defence is an individual's threshold.** A pavement-ant worker fights a stranger once an internal state passes a threshold, raised by recent encounters (Hoover et al. 2016; Bubak et al. 2016: octopamine and serotonin). *Pheidole* defence moves closer to the nest as the threat grows.
+- **Hunger does not raise aggression.** Sugar-starved Argentine ants grew less aggressive (Grover et al. 2007); starved and fed colonies were no different (Thomas et al. 2005).
+- **Crowded colonies raid.** Fire-ant brood raiding rose from 0 % to 68.5 % with colony density (Tschinkel et al. 1995). The denser side wins boundary disputes.
+
+### 51.1 What was there
+
+- **A colony-level strategist.** Every 5 s it chose one stance (forage, defend or raid) and told every ant. It read:
+  - food brought home, averaged over 60 s;
+  - deaths in fights, fading over 30 s;
+  - a map scan for strangers near the nest;
+  - size against the cap, and the larder.
+- **Its rule** raided when no food came in, which had no source behind it, or when the larder was full and the colony large.
+- **"Defend"** sent every ant that smelt alarm to fight, wherever it was, and sent every waiting forager out.
+
+### 51.2 What changed (open ground; `stanceGate` 1)
+
+- **Each ant's stance is its own** (`#stanceOf`):
+  - **defend** while its `threat` is past `defendAt` (1) within `homeGround` (10) of its nest. Threat is seconds of alarm smelt or strangers in reach, leaking with a 20 s half-life.
+  - **raid** once recruited.
+  - **forage** otherwise.
+
+  What each stance does is unchanged. `Situation.stance` and `Touch.stance` keep their three values.
+- **No strategist on open ground.** The game loop skips it. Its 60 s intake average, 30 s loss decay and map scan are not read there. The side view keeps it (`ja-1a9`).
+- **Raid scouts go on a `leave` answer.** The answers are now/soon/wait/**raid**.
+  - "raid" sends a waiting forager out at `raidScout` (1/90 s) as a raid scout.
+  - `Touch.crowd` (few, many) is how crowded home is, felt by a waiting ant: nestmates in its cell and the six round it over 5 s, "many" from `crowdAt` 40.
+  - Local rule: returns none and crowd many → raid.
+- **The raid trail recruits at home and by degrees.** An idle ant at home that smells it is recruited at `raidRecruit` (0.1/s) × the trail's level (up to strong).
+- **Why "by degrees":**
+  - Recruiting anywhere ran away: G′ seed 1 had 773 of 899 ants raiding.
+  - Recruiting all at once at home made every raid a war: one scout's trail called the 150–200 ants idle there. On G′ seeds 1–4 that lost about 880 ants, against 170 with no raids and main's 800, whatever `crowdAt` (6–80).
+  - Ants differ in threshold (*Pheidole* majors answer only intense recruitment).
+- **Assays.**
+  - A11, A12 and A9 set raiding through the leave response (`RAIDING`, `NEVER_RAID`).
+  - A6's two sides keep the broadcast (`stanceGate` 0): with their own stance, defenders 40 cells from home turned away from the pass.
+  - New A13 `defendHome`: a war party marches on a colony that forages a far pile.
+- **HUD:** top-down, the side stats show how many ants defend and raid.
+
+### 51.3 Results (local rule)
+
+| | This MR | `main` |
+|---|---|---|
+| G′ seeds 1–20: ants alive (median, worst) | **900, 507** | 892, 223 |
+| G′ food stored (median, worst) | **4,406**, 1,912 | 4,274, 1,816 |
+| G′ ants lost (median, worst) | **441**, 870 | 848, 1,113 |
+| Rival: food / lost | 4,536 / 438 | 4,179 / 828 |
+| A11 seeds 1–20 (pass, gain median, worst) | **20/20, 2.65, 1.64** | 16/20, 2.04, 1.32 |
+| A11 seeds 21–40 | **20/20, 3.01, 1.59** | 13/20, 1.84, 0.97 |
+| A13 (pass; food against no war party; against the broadcast) | 15/20; 0.63; broadcast 0.62 | 1/10 at the original mark |
+| A6 (broadcast, the march) | 14/20, gain 1.74 | 14/20, 1.74 |
+| A1–A5b, A9, A12 | as `main`: 20/20 each; A2b 19/20 (seed 15 fails on `main` too) | |
+| A10 | 5/20 (ja-je8) | |
+
+- **No G′ seed ends with fewer ants than on `main`.** Seed 5 stores 13 % less food (4,339 against 5,012).
+- **A13's first mark** (food at least 0.8 of the no-war-party control) failed under both stances: an 80-strong war party forced to fight costs a 200-ant colony 120–130 ants whoever defends. The mark is now relative to the broadcast stance. Defenders near home: 0.27 on average sampled, against the broadcast's whole colony.
+- **Tried:**
+  - a default that never raids: G′ seeds 1–4 lost about 170 ants;
+  - crowd-only raids with recruitment all at once: about 880 lost;
+  - `raidRecruit` 0.02: A11 8/10, worst seed 1.07.
