@@ -3607,4 +3607,12 @@ The owner asked for the top-down view and the side view to be two views of one g
 - **The founding rule.** A colony may be founded only where its nearest hole is an end of the line, its segment from that end neither crosses the line nor comes within a clearance of it, it is `HOLE_GAP` from every hole, and the ground is open.
 - **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
 
+**The note's open questions, answered (owner, 2026-11-08):**
+- **Tunnels of neighbouring colonies may meet** in the curtain; the contact response decides. A dig-stop rule would read another nest's position.
+- **A founding flight with no valid landing within her radius fails**, and the game says why. `new-queens.md` §3 is changed to match.
+- **Wide screens get the above/below switch first**; both views at once is a follow-up (`ja-lp4.8`).
+- **After U6 the old side and open maps leave the page**, kept as test beds until their assays are re-baselined.
+
+The founding radius stays open until the research bead (`ja-lp4.7`) gives a figure.
+
 **Cost.** None yet. The mode situation keeps its fields, so one world should not change Jev's cost; U3 checks it with `colony-cost`.

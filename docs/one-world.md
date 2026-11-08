@@ -53,13 +53,13 @@ Fights happen within a layer. Two ants in different layers never meet, except ac
 3. **It doesn't crowd a hole.** *p* is at least `HOLE_GAP` (8) from every hole, as `Game.addColony` already enforces.
 4. **It is on open ground** on the plane.
 
-**A landing that breaks the rule** (a queen's flight, `ja-lo8.9`; the lab's "found a colony" button) moves to the nearest valid point within the flight's radius. `new-queens.md` §3 keeps "the player's queen lands", so the search covers the whole radius beyond the nearer end. If even that finds nothing, the flight fails. Whether that is allowed is open question 2 in §8.
+**A landing that breaks the rule** (a queen's flight, `ja-lo8.9`; the lab's "found a colony" button) moves to the nearest valid point within the flight's radius. If none lies within it, **the flight fails**: the queen dies, as most real foundresses do, and the game says why ("no room beyond the line's ends within her flight"). Decided by the owner (§8); `new-queens.md` §3 says so too.
 
 **What growing the line does to the curtain.** The curtain is indexed by *s*, so what is dug underground keeps its place when the line grows. Only the surface cell above *s* changes, and only beyond the old end's margin. Growing at V₀ uses negative *s*, so nothing is renumbered; this fits the endless world's outward chunks (`ja-qpv`).
 
 **A colony that falls keeps its vertex.** Its hole and tunnels stay. A later colony could take them over, which is the "abandonment" branch of `queens-and-merging.md` open question 3.
 
-**Neighbours meet underground.** Adjacent nests are adjacent along *s*, so their tunnels can meet. Along the curtain the distance between two holes is the segment's length, the same as on the surface, so this is no shortcut. The note leaves it allowed (open question 1).
+**Neighbours meet underground.** Adjacent nests are adjacent along *s*, so their tunnels can meet. Along the curtain the distance between two holes is the segment's length, the same as on the surface, so this is no shortcut. **Allowed** (§8): strangers who meet in the curtain fight or flee by the same contact response as on the surface (`combat.md`). A rule stopping diggers short of a neighbour would read another nest's position, which the vision counts as a gap.
 
 ## 4. What changes in the colony code
 
@@ -95,14 +95,14 @@ Most behaviour carries over unchanged. The new work is the seam between the two:
   - Clicking the line in the top view opens the side view at that *s*, and clicking the side view's ground strip opens the top view there.
   - A followed ant can carry the camera across at the hole, as an option.
   - Each view keeps its own camera (`camera.ts` is already pure) and minimap.
-- **On wide screens** both views might show at once, side by side or stacked (open question 3).
+- **On wide screens**, U5 ships the switch alone. Both views at once (side by side or stacked) is a follow-up, `ja-lp4.8` (§8).
 - **The Learn drawer's Nest tab** always has a nest to show. The field guide gains an entry for the line and the curtain.
 
 The renderer reads `colony.map.rock` row by row today (`paintChunk`, `drawHexes`, the minimap). The side view needs one more step: a column *s* maps to the plane cell *P(s)* for its ground strip. Below ground the curtain is a plain grid, so it draws exactly as the side view does now.
 
 ## 6. Building it: stages and guards
 
-The page keeps today's two maps until one world passes its own guards. The side view and the open map stay as test beds, and their golden masters stay bit-exact, until the last stage re-baselines the assays.
+The page keeps today's two maps until one world passes its own guards. U6 then takes them off the page (§8). The side view and the open map stay as test beds, with their golden masters bit-exact, until their assays are re-baselined on one world.
 
 | Stage | What | Guard |
 |---|---|---|
@@ -123,10 +123,13 @@ A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.
 - The hex grid and its chunks.
 - Behaviour MRs 1–5.2 as built. Each was tuned on one map kind, and in one world it runs on the layer it was tuned for.
 
-## 8. Open questions for the owner
+## 8. Decided, and still open
 
-1. **Underground meetings.** Should neighbouring colonies' tunnels be allowed to meet in the curtain, or should digging stop short of a neighbour's half of the segment?
-2. **A landing with nowhere to go.** Can a queen's flight fail when no valid point lies within her radius (as most real foundresses fail), or must the player's queen always land (`new-queens.md` §3)?
-3. **Wide screens.** Should they show both views at once, or keep the above/below switch?
-4. **After U6.** Do the legacy side and open maps stay on the page as lab options, or only in tests?
-5. **The founding radius.** This waits on the research bead.
+**Decided (owner, 2026-11-08):**
+1. **Underground meetings are allowed.** Neighbouring colonies' tunnels may meet in the curtain; the contact response decides what happens (§3).
+2. **A flight with nowhere to land fails.** When no valid point lies within her radius, the queen dies and the game says why (§3). This replaces "the player's queen lands" in `new-queens.md` §3.
+3. **Wide screens: the switch first.** U5 ships the above/below switch with linked clicks. Both views at once is a follow-up (`ja-lp4.8`).
+4. **The old maps become tests only after U6.** The side and open maps leave the page and stay as test beds until their assays are re-baselined.
+
+**Still open:**
+- **The founding radius.** It waits on the research bead (`ja-lp4.7`): nest spacing and how far a founding queen flies.
