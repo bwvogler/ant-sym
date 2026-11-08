@@ -45,10 +45,12 @@ export interface Levers {
   show: number;
   /** a queen's royal mark laid × this (ja-lo8.7): damped, her signal is faint, and nurses come to rear new queens (docs/new-queens.md §4) */
   queenSignal: number;
+  /** how strongly the host perceives the queen's scent it and its nestmates carry (ja-lo8.9): damped, nurses take her signal for faint and rear new queens (docs/new-queens.md §4) */
+  queenScent: number;
 }
 
 /** The world as it is. */
-export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0, estrange: 0, marks: 1, swap: 0, regicide: 0, show: 1, queenSignal: 1 };
+export const AS_IS: Levers = { food: 1, home: 1, alarm: 1, foreignFood: 0, clock: 1, calm: 0, tolerance: 0, mask: 0, lay: 1, crossLay: 0, quiet: 0, estrange: 0, marks: 1, swap: 0, regicide: 0, show: 1, queenSignal: 1, queenScent: 1 };
 
 export type LeverKind = "perceive" | "emit" | "lethal";
 
@@ -89,6 +91,7 @@ export const LEVERS: readonly Lever[] = [
   { id: "strangers", kind: "perceive", name: "stranger scent", blurb: "how strange other colonies' ants smell to the host: damped, they smell like nestmates and it fights fewer of them; boosted, it takes more ants for strangers", brief: "how strange other colonies' ants smell (damped: fights fewer)", words: ["strongly damp (strangers smell like nestmates)", "damp", "as is", "boost", "strongly boost"], values: five("tolerance", [0.3, 0.15, 0, -0.1, -0.2]), asIs: 2 },
   { id: "marks", kind: "perceive", name: "floor marks", blurb: "how strongly the host smells the nest's floor marks: damped, it loses its way inside, and at the extreme brood and store smell alike", brief: "how well it reads the nest's floor marks (-2: lost inside)", words: ["strongly damp (lost inside; brood and store swapped)", "damp", "as is", "boost", "strongly boost"], values: [{ marks: 0.3, swap: 1 }, { marks: 0.6 }, { marks: 1 }, { marks: 1.5 }, { marks: 2 }], asIs: 2, nest: true },
   { id: "time", kind: "perceive", name: "time out", blurb: "how long a search feels to the host: longer, it tires slowly and ranges far; shorter, it tires fast and stays home", brief: "how long a search feels (damped: tires slowly, ranges far)", words: ["much longer (tires slowly)", "longer", "as is", "shorter", "much shorter (tires fast)"], values: five("clock", [2.5, 1.6, 1, 0.7, 0.5]), asIs: 2 },
+  { id: "queenScent", kind: "perceive", name: "queen scent", blurb: "how strongly the host perceives the queen's scent that nestmates carry from her: damped, nurses take her for faint or gone, and rear new queens from the brood they tend", brief: "how strongly it perceives the queen's scent (damped: nurses rear new queens)", words: ["strongly damp", "damp", "as is", "boost", "strongly boost"], values: five("queenScent", [0.1, 0.3, 1, 1.5, 2]), asIs: 2, nest: true },
   // Emission: what the host gives off.
   { id: "trail", kind: "emit", name: "trail laid", blurb: "how much trail the host lays: damped, a quiet host leaves little; boosted, loud trails", brief: "how much trail it lays", words: ["strongly damp", "damp", "as is", "boost", "strongly boost"], values: five("lay", [0.2, 0.6, 1, 1.5, 2.5]), asIs: 2 },
   { id: "leak", kind: "emit", name: "trail leaked to rivals", blurb: "carrying food, the host also lays its food trail into other colonies' fields: it shows them where food is", brief: "it lays its food trail into other colonies' fields too", words: ["as is (none)", "some", "all of it"], values: five("crossLay", [0, 0.5, 1]), asIs: 0 },

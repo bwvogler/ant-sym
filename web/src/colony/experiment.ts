@@ -3,9 +3,10 @@ import type { ColonyParams, Mode, Policy, Stance, StancePolicy } from "./colony.
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
+import { STRAINS } from "./fungus.ts";
 import { localResponses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
-import { dropFood, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import { dropFood, isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -1089,4 +1090,61 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, faintAlarm, game, gameTop, nestFlow];
+/**
+ * New queens (ja-lo8.9, royal.ts), on the first colony of a solo side-view game: when the fungus reaches the queen,
+ * when the first gyne is reared, how many are culled, when the first alate flies, and when the first daughter's first
+ * worker ecloses and first goes out. `arm` forces one of the fungus's queen levers in every host from the start, so
+ * the rearing is measured apart from how fast the fungus spreads: "signal" the queen's signal at "damp" (0.4), "scent"
+ * every worker's perception of her scent at "damp" (0.3); "none" forces nothing (the fungus lands and plays the local
+ * rule, which pulls neither: dilution alone).
+ */
+export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
+  const at: Record<string, number> = { queen: NaN, gyne: NaN, flight: NaN, daughter: NaN, daughterWorker: NaN, daughterOut: NaN };
+  const first = (k: string, t: number) => {
+    if (Number.isNaN(at[k] as number)) at[k] = t;
+  };
+  return {
+    tick(game) {
+      const c = game.player;
+      if (arm === "signal" && c.queen) c.queen.signal = 0.4;
+      if (arm === "scent") c.scentGain.fill(0.3);
+      const t = game.time;
+      if (game.revealed[0]) first("queen", t);
+      if (c.gynes > 0) first("gyne", t);
+      if (c.flights > 0) first("flight", t);
+      const k = game.lineage(0)[1];
+      const d = k === undefined ? undefined : game.colonies[k];
+      if (!d) return;
+      first("daughter", t);
+      if (!d.founding) first("daughterWorker", t);
+      if (Number.isNaN(at.daughterOut as number))
+        for (let i = 0; i < d.n; i++)
+          if (d.alive[i] && isSky(game.map, Math.floor(d.x[i] as number), Math.floor((d.y[i] as number) / R))) {
+            first("daughterOut", t);
+            break;
+          }
+    },
+    summary(game) {
+      const c = game.player;
+      return { ...Object.fromEntries(Object.entries(at).map(([k, v]) => [`t.${k}`, v])), gynes: c.gynes, culled: c.gynesCulled, flights: c.flights, daughters: game.lineage(0).length - 1 };
+    },
+  };
+}
+
+function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
+  const id = arm === "none" ? "lifecycle" : `lifecycle-${arm}`;
+  return {
+    id,
+    title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}`,
+    target: "report only (design, docs/new-queens.md §5): times to the queen, the first gyne, the first flight, and the daughter's first worker and forager; gynes, culls",
+    seconds: 1800,
+    spec: (seed) => ({ seed, seconds: 1800, game: { antCount: 600, rival: false }, events: [{ at: 0, kind: "call", run: (g) => void g.land(0, STRAINS.findIndex((x) => x.id === "garden")) }], probes: [lifecycleProbe(arm)] }),
+    score: (r) => Object.fromEntries(["t.queen", "t.gyne", "t.flight", "t.daughterWorker", "t.daughterOut", "gynes", "culled", "flights"].map((k) => [k, r.metrics[k] as number])),
+  };
+}
+
+export const lifecycle = lifecycleAssay("none");
+export const lifecycleSignal = lifecycleAssay("signal");
+export const lifecycleScent = lifecycleAssay("scent");
+
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, faintAlarm, game, gameTop, nestFlow, lifecycle, lifecycleSignal, lifecycleScent];

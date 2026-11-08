@@ -103,6 +103,21 @@ export const TOLERANCE = 0.35;
 
 export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: TOLERANCE, nestDrift: 0.03, interval: 0.1 };
 
+/** Seconds for a daughter colony's odour to drift most of the way from her mother's (ja-lo8.9.1, Colony.odourAim). */
+export const ODOUR_DRIFT = 500;
+
+/**
+ * Where a daughter's odour drifts to from her mother's (ja-lo8.9.1): 1.5 tolerances away, toward the middle of the odour
+ * range, so the two smell like strangers within a sitting unless the fungus's odour levers hold them together. Split
+ * colonies of Aphaenogaster senilis differed in body odour within 5 days and could not be reunited by day 20
+ * (bioRxiv 614719); how far and how fast here are the game's own (design).
+ */
+export function driftAim(mother: number, tolerance: number): number {
+  const d = 1.5 * tolerance;
+  return mother <= 0.5 ? Math.min(1, mother + d) : Math.max(0, mother - d);
+}
+
+
 /**
  * Every colony's ants, by odour band, each counted as (1 − calm) of an enemy. `look(odour, tolerance)`
  * picks the bands that are strangers to that odour; get / any / strangers then count only those. It
@@ -239,7 +254,8 @@ export class Recognition {
         }
       if (masked) break;
     }
-    if (!masked && !this.#moving) return;
+    const drifting = colonies.some((c) => !Number.isNaN(c.odourAim) && Math.abs(c.odourAim - c.nestOdour) > 1e-6);
+    if (!masked && !this.#moving && !drifting) return;
     const drift = 1 - Math.exp(-this.params.nestDrift * dt);
     let moving = false;
     // Nests first, from the odours before the step: each drifts toward the mean of the ants at it.
@@ -271,6 +287,15 @@ export class Recognition {
         if (Math.abs(d) > 1e-9) moving = true;
         c.nestOdour = Math.min(1, Math.max(0, c.nestOdour + d));
       }
+    }
+    // A daughter's nest drifts away from her mother's odour (ja-lo8.9.1), toward its own aim.
+    if (drifting) {
+      const k = 1 - Math.exp(-dt / ODOUR_DRIFT);
+      for (const c of colonies)
+        if (!Number.isNaN(c.odourAim) && Math.abs(c.odourAim - c.nestOdour) > 1e-6) {
+          c.nestOdour += (c.odourAim - c.nestOdour) * k;
+          moving = true;
+        }
     }
     // Then every ant: its nest's odour, with its fungal share of the fungus's own.
     for (const c of colonies) {

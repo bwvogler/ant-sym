@@ -28,7 +28,7 @@ This is the budget the policy may draw on. Each row points to the research secti
 | Path integration | a home vector whose error grows by about 10 % of distance | outside; resets inside the nest | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole) |
 | Landmarks and entrance odour | corrects the vector near home | near the hole | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole) |
 | Floor marks ("road signs") | which chamber this is; turns at decision points | local, underground | [nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs) |
-| Queen pheromone | where the queen is; whether the colony has a queen | within the nest | [nest-and-home §1](nest-and-home.md#the-queen), [queens-and-merging §2](queens-and-merging.md#2-what-ants-do) |
+| Queen pheromone | where the queen is; whether the colony has a queen; faint in a big nest, so new queens are reared | within the nest; carried on workers and passed by contact | [nest-and-home §1](nest-and-home.md#the-queen), [queens-and-merging §2](queens-and-merging.md#2-what-ants-do), [new-queens §2](new-queens.md#2-the-queen-holds-it-back) |
 | Brood | dig here, tend here | local | [nest-and-home §1](nest-and-home.md#nest-structure) |
 | Own body | age, hunger, load, fatigue | internal | [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants) (response thresholds) |
 
@@ -62,8 +62,8 @@ This is the budget the policy may draw on. Each row points to the research secti
 
 **Today** (`fungus.ts`, `fungalPolicy.ts`, `levers.ts`; since `ja-lo8.4`). The fungus senses its host's body and sets a level for every lever, per fungal situation ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)):
 - **What it senses:** arousal (perceived alarm, strangers close), touch (a nestmate or a foreigner on the cuticle), place (the substrate underfoot, the queen's mark), task (age band, standing in for juvenile hormone), carrying and grooming. Neither the host's mode nor a chamber's owner is read.
-- **On perception:** gains on food, rival trails, home, alarm, stranger scent and floor marks, and the felt time out.
-- **On emission:** trail laid, trail leaked to other colonies, alarm laid, a calming cue, the fungus's own odour, and how much of the fungus shows to groomers.
+- **On perception:** gains on food, rival trails, home, alarm, stranger scent, floor marks and the queen's scent (`ja-lo8.9`), and the felt time out.
+- **On emission:** trail laid, trail leaked to other colonies, alarm laid, a calming cue, the fungus's own odour, how much of the fungus shows to groomers, and, in a queen, how much of her signal she gives off (`ja-lo8.7`).
 - **Lethal, off until the player turns them on:** the odour weapon, and `crown`, which passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
 - **Its own effectors:** spores on the ground, contact spread, and Bloom corpses on the midden that sporulate.
 

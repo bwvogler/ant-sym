@@ -400,6 +400,8 @@ export class Fungus {
     // Each colony's queen, read against the same grids.
     colonies.forEach((c, k) => {
       if (this.#stepQueen(c, k, grids, dt, rec)) hosts++;
+      // Alates (ja-lo8.9) pick it up from the nestmates they pass as they wait and walk out; it does nothing in them yet.
+      for (const al of c.alates) this.#royalLoad(al, 1, k, grids, dt, false);
     });
 
     // Spores taken, then the ground fades.
@@ -430,44 +432,21 @@ export class Fungus {
   #stepQueen(c: Colony, k: number, grids: readonly CountGrid[], dt: number, rec: Recognition | null): boolean {
     const q = c.queen;
     if (!q || !q.alive) return false;
-    const p = this.params;
-    const { w, h } = this.map.size;
-    cellOf(q.x, q.y);
-    const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
-    const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
-    const l = q.load;
-    const ground = this.spores.get(cx, cy);
-    const near = this.#all.any(cx - 1, cy - 1, cx + 1, cy + 1);
-    if (l === 0 && ground === 0 && !near) return false;
-    const vis = this.#visible[k] as LoadGrid;
-    this.#gather(cx, cy, k, grids, vis, near, false);
-    const nb = this.#nb;
-    let contactGain = 0;
-    let contactStrain = q.strain;
-    if (near) {
-      const load = nb.load - l; // her own load is in the grid; the ants around her are not her
-      if (load > NOTHING && nb.ants > 0) {
-        contactStrain = this.#all.strainAt(nb.topX, nb.topY);
-        contactGain = (this.strains[contactStrain] as Strain).transmission * Math.min(1, load / nb.ants);
-      }
-    }
-    const groundGain = p.pickup * ground;
-    if (groundGain > 0) this.#taken.push(cx, cy, groundGain * dt);
-    const gain = (contactGain + groundGain) * (1 - q.resist) * (1 - l) * dt;
-    let strain = q.strain;
-    if (l === 0 && gain > 0) strain = contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
-    const st = this.strains[strain] as Strain;
-    const mates = nb.own; // the nestmates around her: her groomers
-    const loss = l > 0 ? (p.grooming * st.visibility * q.show * Math.min(p.groomers, mates) + st.decay) * l * dt : 0;
-    let nl = Math.min(1, Math.max(0, l + gain - loss));
-    if (nl < p.clear) nl = 0;
-    q.load = nl;
-    q.strain = nl > 0 ? strain : 0;
-    if (nl === 0) {
+    const mates = this.#royalLoad(q, q.show, k, grids, dt, true);
+    if (mates < 0) return false;
+    if (q.load === 0) {
       q.show = 1;
       q.signal = 1;
       return false;
     }
+    const p = this.params;
+    const nl = q.load;
+    const st = this.strains[q.strain] as Strain;
+    const nb = this.#nb;
+    const { w, h } = this.map.size;
+    cellOf(q.x, q.y);
+    const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+    const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
     const sit: FungalSituation = {
       arousal: "calm",
       touch: this.#touch(c, cx, cy, nb.ants, rec, null),
@@ -476,10 +455,53 @@ export class Fungus {
       carrying: "nothing",
       groomed: p.grooming * st.visibility * Math.min(p.groomers, mates) >= p.groomedAt,
     };
-    const v = compose(this.choose(sit, strain), this.#menu);
+    const v = compose(this.choose(sit, q.strain), this.#menu);
     q.show = v.show;
     q.signal = 1 + (v.queenSignal - 1) * nl;
     return true;
+  }
+
+  /**
+   * The fungus's load in a royal body (the queen, ja-lo8.7; an alate, ja-lo8.9), stepped as an ant's is: load from the
+   * ants around her and the spores under her, less what the nestmates around her groom off (× `show`) and what clears
+   * on its own. `inGrid`: her own load is in the load grid (the queen's is; an alate's isn't). Sets her load and strain;
+   * returns her groomers (the nestmates around her), or −1 when nothing reached her and she carries none.
+   */
+  #royalLoad(b: { x: number; y: number; load: number; strain: number; resist: number }, show: number, k: number, grids: readonly CountGrid[], dt: number, inGrid: boolean): number {
+    const p = this.params;
+    const { w, h } = this.map.size;
+    cellOf(b.x, b.y);
+    const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+    const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
+    const l = b.load;
+    const ground = this.spores.get(cx, cy);
+    const near = this.#all.any(cx - 1, cy - 1, cx + 1, cy + 1);
+    if (l === 0 && ground === 0 && !near) return -1;
+    const vis = this.#visible[k] as LoadGrid;
+    this.#gather(cx, cy, k, grids, vis, near, false);
+    const nb = this.#nb;
+    let contactGain = 0;
+    let contactStrain = b.strain;
+    if (near) {
+      const load = nb.load - (inGrid ? l : 0); // her own load, if it is in the grid, is not the ants around her
+      if (load > NOTHING && nb.ants > 0) {
+        contactStrain = this.#all.strainAt(nb.topX, nb.topY);
+        contactGain = (this.strains[contactStrain] as Strain).transmission * Math.min(1, load / nb.ants);
+      }
+    }
+    const groundGain = p.pickup * ground;
+    if (groundGain > 0) this.#taken.push(cx, cy, groundGain * dt);
+    const gain = (contactGain + groundGain) * (1 - b.resist) * (1 - l) * dt;
+    let strain = b.strain;
+    if (l === 0 && gain > 0) strain = contactGain >= groundGain ? contactStrain : this.sporeStrain.get(cx, cy);
+    const st = this.strains[strain] as Strain;
+    const mates = nb.own; // the nestmates around her: her groomers
+    const loss = l > 0 ? (p.grooming * st.visibility * show * Math.min(p.groomers, mates) + st.decay) * l * dt : 0;
+    let nl = Math.min(1, Math.max(0, l + gain - loss));
+    if (nl < p.clear) nl = 0;
+    b.load = nl;
+    b.strain = nl > 0 ? strain : 0;
+    return mates;
   }
 
   /**
@@ -704,6 +726,7 @@ export class Fungus {
     c.estrange[i] = v.estrange * Math.min(1, l / HIGH_LOAD);
     c.gainMarks[i] = 1 + (v.marks - 1) * l;
     c.swapMarks[i] = v.swap * l;
+    c.scentGain[i] = 1 + (v.queenScent - 1) * l;
     // Regicide grows with the load, like the perception levers: the spores a host passes to the queen and brood it tends
     // (review of #27: from a high load only, grooming took every host below it within seconds, and no queen died).
     c.regicide[i] = v.regicide * l;

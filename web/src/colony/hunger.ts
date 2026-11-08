@@ -91,9 +91,9 @@ export class FeltGrid {
     return x < 0 || y < 0 ? 0 : this.layer.get(x, y);
   }
 
-  /** The strongest felt within one cell of (x, y): its own cell and its six neighbours. */
-  near(x: number, y: number): number {
-    const o = discOffsets(1)[y & 1] as Int16Array;
+  /** The strongest felt within `r` cells of (x, y) (one: its own cell and its six neighbours). */
+  near(x: number, y: number, r = 1): number {
+    const o = discOffsets(r)[y & 1] as Int16Array;
     let m = 0;
     for (let k = 0; k < o.length; k += 2) {
       const v = this.get(x + (o[k] as number), y + (o[k + 1] as number));

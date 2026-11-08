@@ -3,11 +3,12 @@ import { CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } 
 import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
-import { Recognition, type RecognitionParams } from "./recognition.ts";
+import { driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { cellOf, CELL } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
+import type { Flight } from "./royal.ts";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
 // The player is neither: the player is the fungus (fungus.ts). `player` and
@@ -40,17 +41,28 @@ export interface GameParams {
    * at their deficit ÷ this many seconds each. 0: never (the lab, the goldens and the assays).
    */
   regrow: number;
+  /**
+   * An alate that flies (ja-lo8.9) founds her colony at once, at the default landing site (Game.landing): the lab, the
+   * assays and the tests. The page sets it off: it pauses, shows the queen's pen, and calls found() or lose() itself.
+   */
+  autoFound: boolean;
 }
 
-export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0 };
+export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0, autoFound: true };
 
 /** Bump when what a save holds changes: an older save is refused, not misread. */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony). */
 export const HOLE_GAP = 8;
 /** World units between two nests' centres at the least (top-down maps). */
 export const NEST_GAP = 12;
+/** Columns from her mother's hole a flown queen lands by default (Game.landing), and at most (the pen's radius). */
+export const FLIGHT = { land: 48, radius: 96 };
+/** Food in a founding queen's chamber (ja-lo8.9): her body's reserve, for herself and her first brood (claustral founding). */
+export const FOUNDING_RESERVE = 24;
+/** Colonies on a map at the most: an alate that flies once there are this many is lost (most founding queens fail). */
+export const MAX_COLONIES = 6;
 
 /** A colony added mid-game (Game.addColony): where, how many ants, its odour. */
 export interface Founding {
@@ -59,6 +71,11 @@ export interface Founding {
   antCount: number;
   odour: number;
   maxAnts?: number;
+  /** a daughter (ja-lo8.9): her mother's colony index; she founds alone on `reserve` food, carrying the fungus `load` of `strain` */
+  mother?: number;
+  reserve?: number;
+  load?: number;
+  strain?: number;
   /**
    * The nest as dug (Game.addColony records it). A save founds from it rather than digging again: a second dig would
    * draw from the restored game's random stream and could put the shaft elsewhere (PR #42 review, B1).
@@ -77,6 +94,8 @@ export interface GameSave {
   revealed: boolean[];
   /** colonies added mid-game (Game.addColony), in order */
   founded?: Founding[];
+  /** alates flown and not yet founded or lost (Game.flights) */
+  flights?: Flight[];
   params: unknown;
   map: unknown;
   colonies: Record<string, unknown>[];
@@ -235,6 +254,72 @@ export class Game {
   /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
   founded: Founding[] = [];
 
+  /** Alates that have flown (ja-lo8.9) and wait for the page to found or lose them (GameParams.autoFound off). */
+  flights: Flight[] = [];
+
+  /**
+   * Where a queen flown from colony `mother` lands by default: FLIGHT.land columns from its hole, on whichever side
+   * has the room (the free column nearest there: addColony keeps HOLE_GAP from every hole), on the ground line; null
+   * when the map has no room within FLIGHT.radius, or no sky (top-down maps don't fly queens).
+   */
+  landing(mother: number): { x: number; y: number } | null {
+    return this.landingAt(mother, 1, FLIGHT.land) ?? this.landingAt(mother, -1, FLIGHT.land);
+  }
+
+  /** The landing site `distance` columns east (side 1) or west (−1) of colony `mother`'s hole: the free column nearest there, within FLIGHT.radius; null if none (or no sky). */
+  landingAt(mother: number, side: 1 | -1, distance: number): { x: number; y: number } | null {
+    const m = this.colonies[mother];
+    const e = m?.nest.entrance;
+    if (!m || !e || !this.map.sky) return null;
+    cellOf(e.x, e.y);
+    const col = CELL[0] as number;
+    const row = CELL[1] as number;
+    const c = this.#freeColumnOrNull(col + side * distance);
+    return c !== null && Math.abs(c - col) <= FLIGHT.radius ? { x: centreX(c, row), y: centreY(row) } : null;
+  }
+
+  /**
+   * Found flight f's colony with its queen landed at (x, y) (default: landing()): a daughter of its mother (addColony
+   * with `mother`). Returns the new colony's index, or −1 when she is lost: no room, or MAX_COLONIES already.
+   */
+  found(f: Flight, at: { x: number; y: number } | null = this.landing(f.mother)): number {
+    this.#dropFlight(f);
+    const mother = this.colonies[f.mother];
+    if (!at || !mother || this.colonies.length >= MAX_COLONIES) return -1;
+    // Her reserve is new food on the map (her body, which the mother's food count let go at her eclosion).
+    this.map.foodTotal += FOUNDING_RESERVE;
+    return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: FOUNDING_RESERVE, load: f.load, strain: f.strain });
+  }
+
+  /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
+  lineage(k: number): number[] {
+    const own = this.colonies.length - this.founded.length;
+    const out = [k];
+    this.founded.forEach((f, j) => {
+      if (f.mother !== undefined && out.includes(f.mother)) out.push(own + j);
+    });
+    return out;
+  }
+
+  /** Flight f's queen is lost (she dies after the flight, as most do). */
+  lose(f: Flight): void {
+    this.#dropFlight(f);
+  }
+
+  #dropFlight(f: Flight): void {
+    const k = this.flights.indexOf(f);
+    if (k >= 0) this.flights.splice(k, 1);
+  }
+
+  /** The column nearest `col` clear of every hole, or null when there is none. */
+  #freeColumnOrNull(col: number): number | null {
+    try {
+      return this.#freeColumn(col);
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * A new colony mid-game (ja-lo8.8; a daughter queen's, ja-lo8.9): in the side view a hole dug in the column under x
    * with a shaft and a founding chamber, as the world's own nests are dug (world.foundNest); top-down a nest's disc at
@@ -255,6 +340,16 @@ export class Game {
     } else nest = { ...this.#freeSpot(f.x, f.y), r: 3 };
     this.map.nests.push(nest);
     const c = new Colony(this.map, { antCount: f.antCount, maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)), nest: at, odour: f.odour, tolerance: this.recognition.params.tolerance }, this.#rng, localPolicy, localStance);
+    if (f.mother !== undefined && c.queen && !f.nest) {
+      // A daughter (ja-lo8.9): her queen founds alone on her reserve, carrying what the fungus put in her, at her
+      // mother's odour, which drifts away from it from now on (ja-lo8.9.1). (Not when a save founds her again: what she
+      // has then is poured back over her, and her chamber isn't there yet.)
+      c.founding = true;
+      c.feed(f.reserve ?? FOUNDING_RESERVE);
+      c.queen.load = f.load ?? 0;
+      c.queen.strain = f.strain ?? 0;
+      c.odourAim = driftAim(f.odour, this.recognition.params.tolerance);
+    }
     this.colonies.push(c);
     this.#grids.push(new CountGrid());
     this.founded.push({ ...f, nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) } });
@@ -418,6 +513,16 @@ export class Game {
   tick(dt: number): void {
     this.time += dt;
     for (const c of this.colonies) c.tick(dt);
+    // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
+    this.colonies.forEach((c, k) => {
+      if (!c.flown.length) return;
+      for (const a of c.flown) {
+        const f: Flight = { mother: k, x: a.x, y: a.y, load: a.load, strain: a.strain, at: this.time };
+        this.flights.push(f);
+        if (this.params.autoFound) this.found(f);
+      }
+      c.flown.length = 0;
+    });
     const fungal = this.fungus.due(dt);
     // Occupancy is needed every tick with a rival (fights, recognition), underground (crowded digging, backfill), or when the fungus steps.
     if (this.colonies.length > 1 || fungal || this.map.hasSoil) this.#refresh();
@@ -489,7 +594,7 @@ export class Game {
    * only from brood: no workers and no pupa or fully fed larva left (eggs and hungry larvae need nurses), whatever the queen or the larder.
    */
   static beaten(c: Colony): boolean {
-    if (c.queen) return c.population === 0 && !c.brood.items.some((b) => b.stage === PUPA || (b.stage === LARVA && isFed(b)));
+    if (c.queen) return !(c.founding && c.queen.alive) && c.population === 0 && !c.brood.items.some((b) => b.stage === PUPA || (b.stage === LARVA && isFed(b)));
     return c.population === 0 && c.larder < c.params.foodPerAnt;
   }
 
@@ -504,7 +609,9 @@ export class Game {
 
   outcome(): Outcome {
     if (this.fallen() >= 0) return "fallen";
-    return this.rival && this.unity().unified ? "unified" : "playing";
+    // One colony is the world's own colonies made one (daughters count once there are two: they must be held too); a
+    // solo world with a kin daughter is not a unification (ja-lo8.9).
+    return this.colonies.length - this.founded.length > 1 && this.unity().unified ? "unified" : "playing";
   }
 
   // ——— saving (save.ts, ja-lo8.6) ———
@@ -524,6 +631,7 @@ export class Game {
       regrown: this.regrown,
       revealed: [...this.revealed],
       founded: this.founded.map((f) => JSON.parse(JSON.stringify(f)) as Founding),
+      flights: this.flights.map((f) => ({ ...f })),
       params: encode(this.params),
       map: encode(map),
       colonies: this.colonies.map((c) => c.saveState()),
@@ -545,6 +653,7 @@ export class Game {
     this.landed = decode(saved.landed) as Game["landed"];
     this.regrown = saved.regrown;
     this.revealed = [...(saved.revealed ?? [])];
+    this.flights = (saved.flights ?? []).map((f) => ({ ...f }));
     this.params = decode(saved.params) as GameParams;
     fillLike(this.map, saved.map);
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));

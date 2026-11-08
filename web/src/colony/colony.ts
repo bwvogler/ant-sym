@@ -1,11 +1,12 @@
 import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
 import { type Channel, type ChannelParams, DEFAULT_CHANNELS, type Mark, MARKS, Pheromones } from "./pheromone.ts";
-import { Brood, EGG, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
+import { Brood, EGG, foodOf, GYNE, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
 import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, DonorGrid, EAT_BELOW, ENERGY_PER_FOOD, feel, FeltGrid, LARVA_DRAIN, LARVA_ENERGY_PER_FOOD, PASS, QUEEN_BEG, QUEEN_DRAIN, QUEEN_WAIT, NEED_FETCH, respond, SHARE_ABOVE, THETA_OLD } from "./hunger.ts";
+import { type Alate, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
@@ -147,6 +148,8 @@ export interface Queen {
   energy: number;
   /** seconds since she last laid with no food in her chamber to lay with (ja-xu6.1): past QUEEN_WAIT she begs */
   unfed: number;
+  /** her scent not yet passed on (ja-lo8.9, royal.ts): it builds while no ant touches her, up to SCENT_HELD seconds' worth */
+  held: number;
 }
 
 /** The strategist's coarse view of its own colony: few values, so a stance can be cached per view too. */
@@ -298,7 +301,7 @@ export function channelParams(over: Partial<Record<Channel, Partial<ChannelParam
 }
 
 /** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices) and the policies. */
-const COLONY_SKIP: ReadonlySet<string> = new Set(["map", "nest", "policy", "stancePolicy", "responses", "onBury", "enemies", "foreign", "friends", "nestmates", "raidTarget", "raidNest", "raidMarks", "others", "felt", "donors"]);
+const COLONY_SKIP: ReadonlySet<string> = new Set(["map", "nest", "policy", "stancePolicy", "responses", "onBury", "enemies", "foreign", "friends", "nestmates", "raidTarget", "raidNest", "raidMarks", "others", "felt", "donors", "scentSum", "perceived"]);
 
 export class Colony {
   readonly map: WorldMap;
@@ -409,6 +412,19 @@ export class Colony {
   broodStarved = 0;
   /** food eaten: by adults and the queen, by larvae for their energy, and the food in larvae that starved (it leaves the economy) */
   eaten = 0;
+  /** larvae reared as gynes (ja-lo8.9, royal.ts); gyne larvae culled by nurses who perceived the queen's scent strong */
+  gynes = 0;
+  gynesCulled = 0;
+  /** winged virgin queens in the nest, from gyne pupae: they wait, then walk out to fly (royal.ts) */
+  alates: Alate[] = [];
+  /** alates that have flown from the hole since the game last took them (Game.tick), and how many have, ever */
+  flown: Alate[] = [];
+  flights = 0;
+  /**
+   * A queen founding alone (ja-lo8.9: a daughter colony, Game.found): she feeds her first brood herself, from the reserve
+   * in her chamber, until her first worker ecloses. Such a colony isn't beaten while she lives (Game.beaten).
+   */
+  founding = false;
   /** brood killed by the fungus's crown */
   broodKilled = 0;
   // Food flow (nest slice 5; with a queen): food lies in chambers; foragers bring it to reception, porters carry it on.
@@ -559,6 +575,10 @@ export class Colony {
   energy: Float32Array;
   /** the hunger it feels by touch: begging larvae, a hungry queen, need passed on by nestmates (hunger.ts). Draws old ants to carry food inside. */
   need: Float32Array;
+  /** the queen's scent it carries (ja-lo8.9, royal.ts): picked up touching her, shared by contact, fading. The side view only. */
+  scent: Float32Array;
+  /** how strongly it perceives that scent (the fungus's queen-scent lever: 1 as it is) */
+  scentGain: Float32Array;
   // Recognition (recognition.ts): who is a stranger is a matter of odour, not of colony.
   /** the ant's odour, 0..1: a blend of cuticular hydrocarbons; strangers are ants whose odour differs by more than a tolerance */
   odour: Float32Array;
@@ -616,12 +636,18 @@ export class Colony {
   enemies: CellCounts | null = null;
   /** the colony's odour: the nest's gestalt, which ants at the nest relax toward and newborns take */
   nestOdour: number;
+  /** where a daughter colony's nest odour drifts to from her mother's (ja-lo8.9.1, recognition.ts driftAim); NaN: it doesn't drift */
+  odourAim = NaN;
   /** another colony's scent, for ants whose perception reads it: the one this colony would raid, its nearest rival (set by the game; null with no rival) */
   foreign: Pheromones | null = null;
   /** what can be felt by touch on each cell this tick (hunger.ts): begging larvae, a hungry queen, need passed on; rebuilt every tick, not saved */
   felt = new FeltGrid();
   /** the best-fed ant on each cell this tick, for food shared by mouth (hunger.ts); rebuilt every tick, not saved */
   donors = new DonorGrid();
+  /** what the ants on each cell carry of the queen's scent, for the mean they share by contact (royal.ts); rebuilt every tick, not saved */
+  scentSum = new SumGrid();
+  /** the strongest queen's scent perceived on each cell this tick (scent × scentGain): what nurses rear gynes by; rebuilt every tick, not saved */
+  perceived = new FeltGrid();
   /** this colony's own ants per cell, kept by the game each tick underground; null on its own */
   friends: CellCounts | null = null;
   /** this colony's ants per cell (the game's occupancy), for the odds an ant senses by touch on meeting strangers (MR 4) */
@@ -721,7 +747,7 @@ export class Colony {
     this.#loaded = new Uint8Array(n);
     this.#putAt = new Int32Array(n).fill(-1);
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
-    if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers), load: 0, strain: 0, resist: 0, show: 1, signal: 1, energy: 1, unfed: 0 };
+    if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers), load: 0, strain: 0, resist: 0, show: 1, signal: 1, energy: 1, unfed: 0, held: 0 };
     this.#spoilTo = new Float32Array(n).fill(NaN);
     this.#spoilSide = new Int8Array(n);
     this.#spoilT = new Float32Array(n);
@@ -757,6 +783,8 @@ export class Colony {
     this.energy = new Float32Array(n).fill(1);
     this.need = new Float32Array(n);
     this.#feltLast = new Float32Array(n);
+    this.scent = new Float32Array(n);
+    this.scentGain = new Float32Array(n).fill(1);
     this.nestOdour = this.params.odour;
     this.odour = new Float32Array(n).fill(this.params.odour);
     this.tolerance = new Float32Array(n).fill(this.params.tolerance);
@@ -788,6 +816,8 @@ export class Colony {
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
     for (let k = 0; k < this.params.antCount; k++) this.#place(k);
+    // The founders carry the colony's steady share of the queen's scent (else every nurse perceives none at the start).
+    if (this.queen) this.scent.fill(scentShare(this.params.antCount), 0, this.params.antCount);
     // The founding workers are of all ages (from birth to half a lifespan), so they don't all die at once.
     if (this.queen) for (let k = 0; k < this.params.antCount; k++) this.age[k] = this.#rng() * 0.5 * (this.lifespan[k] as number);
   }
@@ -847,6 +877,8 @@ export class Colony {
     this.energy[i] = 1;
     this.need[i] = 0;
     this.#feltLast[i] = 0;
+    this.scent[i] = 0;
+    this.scentGain[i] = 1;
     this.foes[i] = 0;
     this.reporting[i] = 0;
     this.recruited[i] = 0;
@@ -934,6 +966,7 @@ export class Colony {
     this.swapMarks[i] = 0;
     this.regicide[i] = 0;
     this.show[i] = 1;
+    this.scentGain[i] = 1;
   }
 
   /** Whether ant i holds brood in its jaws (a nurse carrying an egg, larva or pupa): what the fungus in it senses as `carrying`. */
@@ -2553,15 +2586,20 @@ export class Colony {
    */
   #body(dt: number): void {
     const ch = this.map.chambers;
-    const { felt, donors, energy } = this;
+    const { felt, donors, energy, scent, scentSum, perceived } = this;
     felt.reset();
     donors.reset();
+    scentSum.reset();
+    perceived.reset();
     for (const b of this.brood.items) if (b.stage === LARVA && b.held < 0) felt.put(b.x, b.y, begOf(b.energy));
     const q = this.queen;
+    let qx = -1;
+    let qy = -1;
+    let touching = 0; // ants within one cell of the queen: her scent is split among them
     if (q && q.alive && ch) {
       cellOf(q.x, q.y);
-      const qx = CELL[0] as number;
-      const qy = CELL[1] as number;
+      qx = CELL[0] as number;
+      qy = CELL[1] as number;
       // She begs once she has gone QUEEN_WAIT without laying for want of food in her chamber (the death spiral's mark),
       // not whenever her chamber is briefly bare (early on she lays two eggs a second: begging then jammed the tunnels
       // with porters, A8 and G, PRD §50.13).
@@ -2599,16 +2637,35 @@ export class Colony {
       }
       energy[i] = e;
       if (!under) continue;
+      scentSum.add(cx, cy, scent[i] as number);
+      if (qx >= 0 && hexDistance(cx, cy, qx, qy) <= 1) touching++;
       felt.put(cx, cy, Math.max(PASS * (this.#feltLast[i] as number), adultBegOf(e)));
       if (e > SHARE_ABOVE) donors.put(cx, cy, i, energy);
+    }
+    // The queen's scent (ja-lo8.9, royal.ts): it fades; underground it moves toward the mean the ants within one cell
+    // carry, and the ants touching her share her supply, × her signal.
+    const fade = Math.exp(-dt / SCENT_FADE);
+    const share = 1 - Math.exp(-dt / SCENT_SHARE);
+    let supply = 0;
+    if (q && q.alive && qx >= 0) {
+      q.held = Math.min(SCENT_SUPPLY * q.signal * SCENT_HELD, q.held + SCENT_SUPPLY * q.signal * dt);
+      if (touching > 0) {
+        supply = q.held / touching;
+        q.held = 0;
+      }
     }
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       let now = 0;
+      let sc = (scent[i] as number) * fade;
       if (this.#under[i] === 1) {
         this.antCell(i);
         const cx = CELL[0] as number;
         const cy = CELL[1] as number;
+        const m = scentSum.mean(cx, cy);
+        if (!Number.isNaN(m)) sc += (m - sc) * share;
+        if (supply > 0 && hexDistance(cx, cy, qx, qy) <= 1) sc += supply;
+        perceived.put(cx, cy, sc * (this.scentGain[i] as number));
         const e = energy[i] as number;
         if (e < EAT_BELOW) {
           // Food by mouth from the best-fed nestmate it touches: half the gap between them, keeping the giver above SHARE_ABOVE.
@@ -2623,6 +2680,7 @@ export class Colony {
         }
         now = felt.near(cx, cy);
       }
+      scent[i] = sc;
       this.#feltLast[i] = now;
       this.need[i] = feel(this.need[i] as number, now, dt);
     }
@@ -2745,12 +2803,17 @@ export class Colony {
         // It uses energy as it waits (ja-xu6.1): unfed for long, it begs (#body), and at 0 it dies.
         b.energy -= LARVA_DRAIN * dt;
         const pantry = b.chamber >= 0 ? ch.list[b.chamber] : undefined;
-        if (b.held < 0 && b.fed < LARVA_FOOD && pantry && pantry.food > 0) {
+        const food = foodOf(b);
+        if (b.held < 0 && b.fed < food && pantry && pantry.food > 0) {
           // Fed by the nurses round it (the colony's own ants within two cells), from the food lying in its chamber:
-          // to its energy first, the rest to its growth.
-          const nurses = this.friends ? this.#around(this.friends, b.x, b.y) : 2;
+          // to its energy first, the rest to its growth. A queen founding alone feeds her first brood herself (ja-lo8.9).
+          let nurses = this.friends ? this.#around(this.friends, b.x, b.y) : 2;
+          if (this.founding && q.alive) {
+            cellOf(q.x, q.y);
+            if (hexDistance(b.x, b.y, CELL[0] as number, CELL[1] as number) <= 2) nurses += 2;
+          }
           const lack = Math.max(0, (1 - b.energy) / LARVA_ENERGY_PER_FOOD);
-          const take = Math.min(pantry.food, LARVA_FOOD - b.fed + lack, FEED_RATE * Math.min(1, nurses / 2) * dt);
+          const take = Math.min(pantry.food, food - b.fed + lack, FEED_RATE * Math.min(1, nurses / 2) * dt);
           const toEnergy = Math.min(take, lack);
           b.energy += toEnergy * LARVA_ENERGY_PER_FOOD;
           this.eaten += toEnergy;
@@ -2765,13 +2828,84 @@ export class Colony {
           this.brood.items.splice(k, 1);
           continue;
         }
-        if (isFed(b) && b.t >= T_LARVA) {
+        if (b.held < 0 && this.#caste(b, pantry, dt)) {
+          // Culled: nurses who perceived the queen's scent strong killed a gyne larva; its food leaves the economy.
+          if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
+          this.eaten += 1 + b.fed;
+          this.gynesCulled++;
+          this.brood.items.splice(k, 1);
+          continue;
+        }
+        if (isFed(b) && b.t >= T_LARVA * (b.caste === GYNE ? GYNE_TIME_X : 1)) {
           b.stage = PUPA;
           b.t = 0;
         }
-      } else if (b.stage === PUPA && b.t >= T_PUPA && b.held < 0 && this.spawn(centreX(b.x, b.y), centreY(b.y))) {
+      } else if (b.stage === PUPA && b.t >= T_PUPA * (b.caste === GYNE ? GYNE_TIME_X : 1) && b.held < 0 && (b.caste === GYNE ? this.#eclose(b) : this.spawn(centreX(b.x, b.y), centreY(b.y)))) {
         if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
         this.brood.items.splice(k, 1);
+        if (b.caste !== GYNE) this.founding = false; // her first worker: the colony feeds its brood from now on
+      }
+    }
+    if (this.alates.length) this.#alatesOut(dt);
+  }
+
+  /**
+   * Caste (ja-lo8.9, royal.ts), for larva b lying in chamber `pantry`, from the queen's scent as the nurses within two
+   * cells perceive it. Bipotent (its first BIPOTENT seconds), well fed, with food lying by it, and every nurse perceiving
+   * the scent faint (below GYNE_MARK) for GYNE_CUE seconds: it is reared as a gyne. A gyne larva by a nurse perceiving it
+   * strong (CULL_MARK) for CULL_CUE seconds is culled: returns true. A queen founding alone rears no gynes.
+   */
+  #caste(b: BroodItem, pantry: Chamber | undefined, dt: number): boolean {
+    const felt = this.perceived.near(b.x, b.y, 2);
+    if (b.caste === GYNE) {
+      b.cue = felt >= CULL_MARK ? b.cue + dt : Math.max(0, b.cue - dt);
+      return b.cue >= CULL_CUE;
+    }
+    if (!this.founding && b.t < BIPOTENT && felt > 0 && felt < GYNE_MARK && b.energy >= GYNE_ENERGY && pantry && pantry.food >= GYNE_PANTRY) {
+      b.cue += dt;
+      if (b.cue >= GYNE_CUE) {
+        b.caste = GYNE;
+        b.cue = 0;
+        this.gynes++;
+      }
+    } else b.cue = 0;
+    return false;
+  }
+
+  /** A gyne pupa ecloses as an alate (royal.ts) where it lay. Her food (her egg and what she was fed) leaves the colony's economy in her. */
+  #eclose(b: BroodItem): boolean {
+    this.eaten += 1 + b.fed;
+    this.alates.push({ x: centreX(b.x, b.y), y: centreY(b.y), t: 0, step: 0, load: 0, strain: 0, resist: 0 });
+    return true;
+  }
+
+  /**
+   * Alates (ja-lo8.9): each waits ALATE_WAIT in the nest, among her nestmates (the fungus can reach her there), then walks
+   * up and out along the tunnels a cell every ALATE_STEP, and flies at the hole: into `flown`, for the game to found
+   * with (Game.tick).
+   */
+  #alatesOut(dt: number): void {
+    for (let k = this.alates.length - 1; k >= 0; k--) {
+      const a = this.alates[k] as Alate;
+      a.t += dt;
+      if (a.t < ALATE_WAIT) continue;
+      a.step -= dt;
+      while (a.step <= 0) {
+        a.step += ALATE_STEP;
+        cellOf(a.x, a.y);
+        const cx = CELL[0] as number;
+        const cy = CELL[1] as number;
+        const d = isSky(this.map, cx, cy) ? -1 : this.#climbOut(cx, cy);
+        if (d < 0) {
+          this.alates.splice(k, 1);
+          this.flown.push(a);
+          this.flights++;
+          break;
+        }
+        const tx = stepX(cx, cy, d);
+        const ty = stepY(cy, d);
+        a.x = centreX(tx, ty);
+        a.y = centreY(ty);
       }
     }
   }

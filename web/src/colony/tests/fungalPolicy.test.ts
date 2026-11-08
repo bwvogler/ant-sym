@@ -113,7 +113,7 @@ test("the gate: whatever a policy answers, a host pulls only levers on the menu;
   assert.equal(f.menu.has("crown"), false);
   assert.ok(!f.menu.has("marks"), "no nest on a top-down map: floor marks are off it");
   const asked = f.asked;
-  assert.deepEqual(asked, DEFAULT_MENU.filter((id) => id !== "marks" && id !== "queenSignal"), "a worker's levers on a top-down map: no nest, no queen");
+  assert.deepEqual(asked, DEFAULT_MENU.filter((id) => id !== "marks" && id !== "queenSignal" && id !== "queenScent"), "a worker's levers on a top-down map: no nest, no queen");
   const levels = Object.fromEntries(asked.map((id) => [id, 0]));
   f.policy = () => encodeLevels(levels, asked);
   assert.deepEqual(f.choose(sit(), ID("garden")), levels, "Jev's levels, read over the levers asked");
@@ -250,7 +250,7 @@ test("cull bites from a high load: at 0.7 its own nestmates already take it for 
 });
 
 test("the fungus lane's request: the aim, a score per lever on the menu for each host, read back to levels; nothing else is taken", () => {
-  const asked = DEFAULT_MENU.filter((id) => id !== "marks" && id !== "queenSignal");
+  const asked = DEFAULT_MENU.filter((id) => id !== "marks" && id !== "queenSignal" && id !== "queenScent");
   const req = packFungusRequest(
     [
       { id: "h0", situation: sit(), asked },

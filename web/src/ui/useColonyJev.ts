@@ -114,6 +114,19 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
     [jev, draftDoctrine],
   );
 
+  /**
+   * A daughter colony k's words as she founds (ja-lo8.9): the player's, from the queen's pen (which opens only while
+   * Jev can read them), or her mother's (no pen: not a change of policy, so not held back by the lock; the mother's
+   * answers are cached under the same words).
+   */
+  const foundWith = useCallback(
+    (k: number, d: DoctrineChoice) => {
+      draftDoctrine(k, { ...d });
+      jev.setDoctrineFor(k, d.text);
+    },
+    [jev, draftDoctrine],
+  );
+
   const explain = useCallback((s: Situation, k: number) => jev.explain(s, k), [jev]);
   const explainFungus = useCallback((s: FungalSituation) => jev.explainFungus(s), [jev]);
   const setAim = useCallback(
@@ -143,5 +156,5 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
   /** today's spend against the server's daily budget: the last run's figure, else the one the page loaded with */
   const budget = state.run?.budget ?? backend?.budget ?? null;
 
-  return { state, budget, start, stop, lock, resumable, fungusAnswers, restore, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus };
+  return { state, budget, start, stop, lock, resumable, fungusAnswers, restore, doctrines, setDoctrine, draftDoctrine, foundWith, explain, aim, setAim, draftAim: setAimState, explainFungus };
 }

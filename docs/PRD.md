@@ -3618,3 +3618,83 @@ The owner's rule: **don't spend while answers are cached; ask Jev only for the s
 - **Golden masters re-recorded** (`GOLDEN_WRITE=1`): the side view (`tests/golden.json` "side view, seed 4", `tests/slow/golden.json` "side view war, seed 6") changes from the first tick, since founders now use energy and old ants' porting draws on the random stream. The top-down recording ("top-down war, seed 3") is bit-identical.
 - **Colony lane cost unchanged**: no legend, situation or question changed, so the shipped answers stand.
 - **Checks**: `npm test` 395 pass (the homing test now samples only ants on the ground line, its stated case: a young porter underground searched round a wrongly believed chamber by its nest vector, which the test's surface-vector filter never meant); `test:slow` 16 pass and the same 3 TODOs, of which `ja-3po`'s porter-hold guard now passes (left a TODO until that bead is looked at).
+
+### 50.14 Slice 9: new queens, the flight, the queen's pen (ja-lo8.9, ja-lo8.9.1, 2026-11-08)
+
+**What a player sees.** A colony whose nurses perceive the queen's scent faint rears new queens (gynes). Each ecloses as a winged alate, waits a minute in the nest among her nestmates, walks up and out, and flies. The game pauses. If the fungus is in her, her mother colony's queen was reached, and Jev can read new words, the **queen's pen** opens:
+- the player writes her doctrine (her mother's to start with; the presets as quick picks), the only time a colony's words change (PRD §50);
+- the player picks where she lands (east or west of the hole, 16–96 cells).
+
+Otherwise she founds on her mother's doctrine at once, and a notice says why. Her colony plays the local rule until Jev's answers to new words come (§50.12). Her mother keeps her own words.
+
+**Research** ([new-queens](new-queens.md) §2–§3, primary sources there):
+- The mated queen holds queen-rearing back through the workers: nurses that sense her pheromone kill sexual larvae, and stop when she is gone (Klobuchar & Deslippe 2002).
+- A large nest dilutes her signal; larvae stay bipotent early (Boulay et al. 2009).
+- Founding is claustral: the queen raises a first brood of nanitics alone on her body's reserve.
+- A daughter's odour drifts from her mother's: split *Aphaenogaster senilis* colonies differed in body odour within 5 days and could not be reunited by day 20 (bioRxiv 614719).
+
+The thresholds, rates and the drift's size and speed are the game's own (design).
+
+**Built** (`web/src/colony/royal.ts`; `colony.ts #body`, `#caste`, `#eclose`, `#alatesOut`; `game.ts` flights and `found`; the side view only):
+- **The queen's scent, carried on the ants.** Her royal mark lies on her chamber's floor and doesn't spread, so what reaches far brood is carried.
+  - She gives `SCENT_SUPPLY` (4 a second) × her signal to the ants within one cell of her, split among them. While nobody touches her she holds up to 20 s of it for the next ant.
+  - Each ant's `scent[i]` fades (100 s) and moves toward the mean of the ants within one cell (8 s): shared by contact.
+  - The supply is split, so a colony carries `SCENT_SUPPLY × SCENT_FADE / N` an ant. Measured: 2.4 at 165 ants, 0.45 at 900. The signal dilutes as the nest grows, with no count read.
+  - Founders start at that share.
+- **Caste** (`BroodItem.caste`), from the scent the nurses within two cells perceive (`scent × scentGain`, their strongest).
+  - **Reared as a gyne:** a larva in its first 10 s (bipotent), well fed (energy 0.9 or more), with 2 food lying in its chamber, and every nurse round it perceiving the scent below `GYNE_MARK` (0.4) for 4 s.
+  - **Culled:** a gyne larva by a nurse perceiving it at `CULL_MARK` (0.8) or more for 10 s. Its food leaves the economy (`eaten`).
+  - **Cost:** a gyne is fed 3× a worker's food (9) and takes twice as long as larva and pupa.
+  - No colony founding alone rears gynes.
+- **The alate** (`Colony.alates`), an entity apart from the workers' arrays, like the queen. She takes no ant slot and no job.
+  - She waits `ALATE_WAIT` (60 s), then walks out along the tunnels a cell every 0.4 s (`#climbOut`'s field), and flies at the hole: into `Colony.flown`, then `Game.flights`.
+  - Her egg and food leave her mother's economy with her. The fungus steps her load as it does the queen's (`Fungus.#royalLoad`, shared now): from the nestmates she passes, groomed off by them. No lever is asked in her.
+- **Founding** (`Game.found`, `Founding.mother / reserve / load / strain`).
+  - `addColony` with no workers. Her chamber holds `FOUNDING_RESERVE` (24 food, new on the map) and her queen carries the fungus the alate did.
+  - While `Colony.founding` she feeds her first brood herself (2 nurses' worth within two cells) and isn't beaten. Her first worker ends it.
+  - `autoFound` (on by default: the lab, the assays, the tests) founds at once at `landing()`, 48 columns from the hole on the side with room. The page turns it off, pauses, and founds through the pen.
+  - `MAX_COLONIES` (6, the page's colony names): an alate that flies past it is lost, as most founding queens are.
+- **Odour drift** (`ja-lo8.9.1`). The daughter starts at her mother's nest odour and drifts (`Colony.odourAim`, `recognition.ts driftAim`) 1.5 tolerances away toward the middle of the odour range, with a 500 s time constant. They become strangers in about 9 minutes, unless the fungus's odour levers (stranger scent, fungal odour) hold them together. No new lever (owner, 2026-11-08).
+- **The queen-scent lever** (`queenScent`, perception, nest only, workers). Its levels are 0.1, 0.3, 1, 1.5, 2 on `scentGain`, lerped by load as the other perception levers are. This is the second route of new-queens §4: it works before the queen is reached.
+- **Chapters:** `gynes` and `daughters` now read the landed colony's lineage (`Game.lineage`): its gynes and its daughters, theirs, and so on.
+- **The pen's gate** is pure (`ui/pen.ts penGate`): load at `INFECTED`, `revealed[mother]`, and `policyLock` null.
+- **Outcome:** "unified" now needs two of the world's own colonies (a solo world with a kin daughter isn't one colony). With two, daughters count in `unity()`: the fungus must hold them too.
+- **Saves:** `SAVE_VERSION` 3 (alates, flights, scent, castes, the founding flag, `odourAim`). A save founds its daughters again from `Founding.nest`, then pours their state back over them.
+
+**Measured.**
+- **Scent and thresholds** (probe, side view, seed 1–2): a healthy 900-ant colony's larvae perceive 0.52–0.82 (none below `GYNE_MARK`); a 165-ant colony's 2–6. No gyne was reared in 30–40 minutes of either.
+- **The lifecycle assays** (new: `lifecycle`, `lifecycle-signal`, `lifecycle-scent`; solo, 600 ants, the fungus landed, 1,800 s, seeds 1–2; the lever arms force it in every ant from the start, to measure rearing apart from spread):
+
+  | Arm | First gyne | First flight | Daughter's first worker | Her first forager out | Gynes | Culled | Daughters |
+  |---|---|---|---|---|---|---|---|
+  | none (dilution alone) | – | – | – | – | 0 | 0 | 0 |
+  | queen signal 0.4 | 158–170 s | 296–311 s | 351–366 s | 386–901 s | 28–31 | 0–1 | 5 (cap) |
+  | queen scent 0.3 | 28–129 s | 172–271 s | 227–327 s | 777–868 s | 47–69 | 0 | 5 (cap) |
+
+- **For slice 10's balance** (`ja-lo8.10`):
+  - a damped colony rears dozens of gynes, most lost past the cap;
+  - daughters stay small (4–10 workers after 25 minutes);
+  - the queen counts as reached about 20 s after landing (load 0.05; she lies 16 rows under the hole). That predates this slice: measured the same on the previous commit.
+- **Golden masters bit-exact**: `tests/golden.json` and `tests/slow/golden.json` unchanged. No gyne is reared and no fungus painted in them; the scent is computed but read only by caste, and no random number is drawn for it.
+
+**Gaps against the vision.**
+- **Caste is a scripted choice**, not the colony policy's: `#caste` reads only local cues (the perceived scent within two cells, the larva's energy). But it reads the food lying in the larva's chamber from the chamber table, as larval feeding already does (`ja-k4k.4`).
+- **The alate's walk out** uses the whole-nest distance field (`#climbOut`, `ja-k4k.2`).
+
+**Cost.**
+- **Fungus lane v8:** the new lever is in the legend and in every worker's question in the side view. Re-shipped (`node scripts/precache.mjs --lanes fungus`): 130 situations per preset aim, 390 answers for **$0.0126** (estimated $0.0114), about 770 real tokens per situation. Under the presets Jev leaves `queenScent` as it is in all but one situation: none of those aims is about queens.
+- As a game asks them (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1; these also carry §50.13's economy change):
+
+  | Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+  |---|---|---|---|---|---|
+  | Garden | 85 | 15 | 852 | 0.0030 | 0.037 |
+  | Lockpick | 79 | 28 | 1,026 | 0.0034 | 0.041 |
+  | Bloom | 146 | 28 | 868 | 0.0053 | 0.064 |
+
+- **Colony lanes:** unchanged. A daughter on her mother's words plays the cached answers; on new words, a daughter asks what she meets under them (a doctrine change's cost, as before).
+
+**Checks.**
+- `npm test`: all pass, 7 new (`royal.test`, `ui/tests/pen.test`).
+- `test:slow`: 16 pass, the same 3 TODOs.
+- Lint: 7 warnings, as on main.
+- End to end (Playwright, the dev server with no key, `/api/health` stubbed as having one so the pen's gate is open, no spend): an infected alate pauses the game and opens the pen; Cautious and Found starts Jade, founding, carrying the fungus, and play resumes. A clean alate founds on Ink's words with the notice, no pen. Dev builds put the game on `window.jevAnts` for such checks.

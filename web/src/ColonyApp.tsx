@@ -21,6 +21,9 @@ import Help from "./ui/Help.tsx";
 import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
 import { pushToast } from "./ui/toasts.ts";
+import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
+import { penGate } from "./ui/pen.ts";
+import type { Flight } from "./colony/royal.ts";
 
 // The game's main screen (ja-lo8.2): the field, a slim top bar, and the fungus, the player. You shape the fungus's
 // policy in words (its aim); Jev reads them and decides what the fungus does in each host it lives in.
@@ -59,6 +62,38 @@ export default function ColonyApp() {
       pushToast(`Back where you were: ${describe(r)}.`, "good");
     },
     [loadSave, jev, update],
+  );
+  // A new queen has flown (ja-lo8.9): the game is paused for her. The pen opens if the fungus is in her, her mother's
+  // queen was reached and Jev can read new words; else she founds on her mother's doctrine at once, and a notice says why.
+  const flight: Flight | null = stats && stats.flights > 0 ? (game.flights[0] ?? null) : null;
+  const gate = flight ? penGate(flight, game.revealed, jev.lock, colonyName(flight.mother)) : null;
+  const settle = useCallback(
+    (f: Flight, k: number) => {
+      if (k < 0) pushToast(`A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`, "warn");
+      if (!game.flights.length) update({ playing: true });
+    },
+    [game, update],
+  );
+  useEffect(() => {
+    if (!flight || !gate || gate.open) return;
+    const k = game.found(flight);
+    if (k >= 0) {
+      jev.foundWith(k, jev.doctrines[flight.mother] ?? jev.doctrines[0]!);
+      pushToast(`${gate.reason} Her colony is ${colonyName(k)}.`, "info");
+    }
+    settle(flight, k);
+  }, [flight, gate, game, jev, settle]);
+  const foundHers = useCallback(
+    (d: { id: string; text: string }, at: Landing) => {
+      if (!flight) return;
+      const k = game.found(flight, game.landingAt(flight.mother, at.side, at.distance) ?? game.landing(flight.mother));
+      if (k >= 0) {
+        jev.foundWith(k, d);
+        pushToast(`${colonyName(k)} is founded, on your words.`, "good");
+      }
+      settle(flight, k);
+    },
+    [flight, game, jev, settle],
   );
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   const painting = controls.brush === "spores";
@@ -100,6 +135,7 @@ export default function ColonyApp() {
       />
       <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} saves={games} onLoad={(r) => (continueFrom(r), closeDetails())} />
       <Toasts />
+      {flight && gate?.open && <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} />}
       {!controls.started && <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm" aria-label="game bar">
