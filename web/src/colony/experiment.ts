@@ -794,7 +794,9 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
     // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
     // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
     // gain 1.26, 3/20 on main).
-    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid"), colony: { raidGate: 0, stanceGate: 0 } },
+    // Both sides keep the colony's stance (stanceGate 0, docs/stance.md): A6 is about who reaches whom at a pass, and with each
+    // ant's own stance the defenders 40 cells from home turned away from the pass instead of holding it (gain 1.64 against 1.95).
+    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid"), colony: { raidGate: 0, stanceGate: 0 }, rival: { stanceGate: 0 } },
   };
 }
 

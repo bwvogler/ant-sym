@@ -3331,7 +3331,9 @@ export class Colony {
         const homeNow = this.#atNestTop(i);
         if (!homeNow) this.#gone[i] = 1;
         if (this.recruited[i] === 0) {
-          if (this.#raidSmelt(i) !== "none") {
+          // Where each ant's stance is its own, the trail recruits at home (docs/stance.md; Polyergus scouts recruit the workers at their
+          // own nest): an ant out at its work crosses it and carries on. Recruiting anywhere ran away: G′ seed 1, 773 of 899 raiding.
+          if (this.#raidSmelt(i) !== "none" && (!sgate || (homeNow && !this.carrying[i]))) {
             this.recruited[i] = 1;
             this.#gone[i] = 0;
           } else if (!sgate && homeNow && !this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && this.#rng() < 1 - Math.exp(-p.raidScout * dt)) {
