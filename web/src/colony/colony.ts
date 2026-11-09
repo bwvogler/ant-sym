@@ -6,7 +6,7 @@ import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambe
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import { TOLERANCE } from "./recognition.ts";
 import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, DonorGrid, EAT_BELOW, ENERGY_PER_FOOD, feel, FeltGrid, LARVA_DRAIN, LARVA_ENERGY_PER_FOOD, PASS, QUEEN_BEG, QUEEN_DRAIN, QUEEN_WAIT, NEED_FETCH, respond, SHARE_ABOVE, THETA_OLD } from "./hunger.ts";
-import { type Alate, ALATE_FEED, ALATE_RESERVE, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
+import { type Alate, ALATE_FEED, ALATE_RESERVE, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_SPACING, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 
@@ -451,6 +451,11 @@ export class Colony {
    * in her chamber, until her first worker ecloses. Such a colony isn't beaten while she lives (Game.beaten).
    */
   founding = false;
+  /**
+   * A young colony (ja-lo8.10): from her founding until the first worker her workers reared (not a nanitic) ecloses, the
+   * queen still feeds the brood by her, as her nanitics are out foraging.
+   */
+  incipient = false;
   /** brood killed by the fungus's crown */
   broodKilled = 0;
   // Food flow (nest slice 5; with a queen): food lies in chambers; foragers bring it to reception, porters carry it on.
@@ -1111,7 +1116,7 @@ export class Colony {
   }
 
   /** A new ant at the nest, in the first free slot (at world (x, y) if given: where its pupa lay); false when the colony is at its cap. */
-  spawn(x?: number, y?: number): boolean {
+  spawn(x?: number, y?: number, age = 0): boolean {
     const i = this.alive.indexOf(0);
     if (i < 0) return false;
     this.#place(i);
@@ -1119,6 +1124,7 @@ export class Colony {
       this.x[i] = x;
       this.y[i] = y;
     }
+    if (age > 0) this.age[i] = age;
     this.births++;
     return true;
   }
@@ -2832,7 +2838,7 @@ export class Colony {
         this.#stock(royalC, -EGG_FOOD); // she eats from what lies in her chamber
         due += LARVA_FOOD;
         const at = ch.at(qx, qy);
-        this.brood.add(qx, qy, at);
+        this.brood.add(qx, qy, at).nanitic = this.founding;
         if (at >= 0) ch.list[at]!.brood++;
       }
     }
@@ -2849,11 +2855,14 @@ export class Colony {
         const food = foodOf(b);
         if (b.held < 0 && b.fed < food && pantry && pantry.food > 0) {
           // Fed by the nurses round it (the colony's own ants within two cells), from the food lying in its chamber:
-          // to its energy first, the rest to its growth. A queen founding alone feeds her first brood herself (ja-lo8.9).
+          // to its energy first, the rest to its growth. A young colony's queen feeds the brood by her: all of her first
+          // brood while she founds alone (ja-lo8.9), then what her nanitics, out foraging, leave untended (ja-lo8.10).
           let nurses = this.friends ? this.#around(this.friends, b.x, b.y) : 2;
-          if (this.founding && q.alive) {
+          if ((this.founding || this.incipient) && q.alive) {
+            // She feeds as two nurses would, beside whatever workers are there (PR #54 review: one nanitic by the brood
+            // halved its feeding when she stood in only for none).
             cellOf(q.x, q.y);
-            if (hexDistance(b.x, b.y, CELL[0] as number, CELL[1] as number) <= 2) nurses += 2;
+            if (hexDistance(b.x, b.y, CELL[0] as number, CELL[1] as number) <= 2) nurses = Math.max(nurses, 2);
           }
           const lack = Math.max(0, (1 - b.energy) / LARVA_ENERGY_PER_FOOD);
           const take = Math.min(pantry.food, food - b.fed + lack, FEED_RATE * Math.min(1, nurses / 2) * dt);
@@ -2883,10 +2892,13 @@ export class Colony {
           b.stage = PUPA;
           b.t = 0;
         }
-      } else if (b.stage === PUPA && b.t >= T_PUPA * (b.caste === GYNE ? GYNE_TIME_X : 1) && b.held < 0 && (b.caste === GYNE ? this.#eclose(b) : this.spawn(centreX(b.x, b.y), centreY(b.y)))) {
+      } else if (b.stage === PUPA && b.t >= T_PUPA * (b.caste === GYNE ? GYNE_TIME_X : 1) && b.held < 0 && (b.caste === GYNE ? this.#eclose(b) : this.spawn(centreX(b.x, b.y), centreY(b.y), b.nanitic ? NANITIC_AGE : 0))) {
         if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
         this.brood.items.splice(k, 1);
-        if (b.caste !== GYNE) this.founding = false; // her first worker: the colony feeds its brood from now on
+        if (b.caste !== GYNE) {
+          this.founding = false; // her first worker: the colony feeds its brood from now on
+          if (!b.nanitic) this.incipient = false; // the first her workers reared: the queen nurses no more
+        }
       }
     }
     if (this.alates.length) this.#alatesOut(dt);
@@ -2904,7 +2916,7 @@ export class Colony {
       b.cue = felt >= CULL_MARK ? b.cue + dt : Math.max(0, b.cue - dt);
       return b.cue >= CULL_CUE;
     }
-    if (!this.founding && b.t < BIPOTENT && felt > 0 && felt < GYNE_MARK && b.energy >= GYNE_ENERGY && pantry && pantry.food >= GYNE_PANTRY) {
+    if (!this.founding && b.t < BIPOTENT && felt > 0 && felt < GYNE_MARK && b.energy >= GYNE_ENERGY && pantry && pantry.food >= GYNE_PANTRY && !this.#royalNear(b.x, b.y)) {
       b.cue += dt;
       if (b.cue >= GYNE_CUE) {
         b.caste = GYNE;
@@ -2912,6 +2924,17 @@ export class Colony {
         this.gynes++;
       }
     } else b.cue = 0;
+    return false;
+  }
+
+  /** Whether gyne brood (a gyne larva or pupa) or an alate lies within GYNE_SPACING cells of (x, y): its nurses are feeding a gyne already. */
+  #royalNear(x: number, y: number): boolean {
+    if (GYNE_SPACING <= 0) return false;
+    for (const o of this.brood.items) if (o.caste === GYNE && o.stage !== EGG && hexDistance(x, y, o.x, o.y) <= GYNE_SPACING) return true;
+    for (const a of this.alates) {
+      cellOf(a.x, a.y);
+      if (hexDistance(x, y, CELL[0] as number, CELL[1] as number) <= GYNE_SPACING) return true;
+    }
     return false;
   }
 
@@ -4846,6 +4869,13 @@ const RECEPTION_MIN = 4;
 const CHAMBER_SCAN = 5;
 /** A worker's mean lifespan, seconds (each 0.7–1.3× it): an orphaned colony dwindles as its workers age out. */
 export const LIFESPAN = 3600;
+/**
+ * A nanitic's age at eclosion (ja-lo8.10): the first workers a queen founding alone rears (brood.ts `nanitic`) eclose
+ * old, so they forage from the start; with nobody bringing food in, the queen's colony grows no further until they do.
+ * In incipient Pogonomyrmex rugosus colonies nanitics take on outside work, pushed out as later nanitics eclose into
+ * brood care (escholarship.org/content/qt37w2d1mh). That they forage at once, and so live shorter, is the game's own.
+ */
+export const NANITIC_AGE = MIDDLE * LIFESPAN;
 /** The queen's royal mark per second; her death rate per stranger at her side. */
 const QUEEN_MARK = 10;
 const QUEEN_FIGHT = 1;

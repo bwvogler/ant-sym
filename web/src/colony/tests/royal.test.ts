@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GYNE, GYNE_FOOD, LARVA, WORKER } from "../brood.ts";
-import { Colony } from "../colony.ts";
+import { GYNE, GYNE_FOOD, LARVA, PUPA, WORKER } from "../brood.ts";
+import { Colony, NANITIC_AGE, T_PUPA } from "../colony.ts";
 import { Game, FOUNDING_RESERVE, MET, QUIET } from "../game.ts";
 import { INFECTED, STRAINS } from "../fungus.ts";
 import { driftAim } from "../recognition.ts";
-import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, scentShare, type Flight } from "../royal.ts";
+import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, GYNE_SPACING, scentShare, type Flight } from "../royal.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { digCell, generateSideWorld, mulberry32, OPEN, rockAt } from "../world.ts";
 
@@ -104,6 +104,35 @@ test("a young, well-fed larva whose nurses perceive the queen's scent faint is r
   }
 });
 
+test("nurses feeding a gyne rear no second beside her: gyne brood or an alate within GYNE_SPACING keeps a larva a worker (ja-lo8.10)", () => {
+  assert.ok(GYNE_SPACING >= 1);
+  // A gyne pupa (no longer fed, never culled) exactly GYNE_SPACING cells along the row blocks it; one cell further doesn't.
+  for (const [dx, want] of [
+    [GYNE_SPACING, WORKER],
+    [GYNE_SPACING + 1, GYNE],
+  ] as const) {
+    const { c, larva, hold } = nursery(0.001);
+    const pupa = c.brood.add(larva.x + dx, larva.y, larva.chamber);
+    c.map.chambers!.list[larva.chamber]!.brood++;
+    pupa.stage = PUPA;
+    pupa.caste = GYNE;
+    for (let k = 0; k < 30 * (GYNE_CUE + 2); k++) {
+      hold();
+      c.tick(DT);
+    }
+    assert.equal(larva.caste, want, `gyne pupa ${dx} cells off: caste ${larva.caste}`);
+  }
+  // An alate waiting by it blocks it too.
+  const { c, larva, hold } = nursery(0.001);
+  c.alates.push({ x: centreX(larva.x + 1, larva.y), y: centreY(larva.y), t: 0, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
+  for (let k = 0; k < 30 * (GYNE_CUE + 2); k++) {
+    hold();
+    c.tick(DT);
+  }
+  assert.equal(larva.caste, WORKER, "kept a worker beside an alate");
+  assert.equal(c.gynes, 0);
+});
+
 test("a gyne larva is fed three times a worker's food; nurses who perceive the scent strong cull it", () => {
   const { c, larva, hold } = nursery(10, GYNE);
   for (let k = 0; k < 30 * (CULL_CUE + 2); k++) {
@@ -168,6 +197,12 @@ test("an alate waits, walks out along the tunnels and flies; she founds a daught
   for (let k = 0; k < 30 * 150 && d.founding; k++) g.tick(DT);
   assert.equal(d.founding, false, "her first worker eclosed");
   assert.ok(d.population >= 1);
+  // Her first workers are nanitics: they eclose old, so they forage from the start (ja-lo8.10).
+  for (let i = 0; i < d.n; i++) if (d.alive[i]) assert.equal(d.band(i), 2, `nanitic ${i}: age ${d.age[i]}`);
+  assert.ok(NANITIC_AGE > 0);
+  // Her colony is young: with her nanitics out, she still feeds the brood by her that no worker tends; a world's own colony never is.
+  assert.equal(d.incipient, true);
+  assert.equal(c.incipient, false);
   // Her colony's odour drifts from her mother's until they are strangers.
   for (let k = 0; k < 30 * 600; k++) g.tick(DT);
   assert.ok(Math.abs(d.nestOdour - c.nestOdour) > g.recognition.params.tolerance, `apart: ${d.nestOdour.toFixed(2)} vs ${c.nestOdour.toFixed(2)}`);
@@ -242,8 +277,45 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
     again.tick(DT);
   }
   const [a, b] = [g.colonies[1]!, again.colonies[1]!];
-  assert.deepEqual([b.founding, b.population, b.nestOdour, b.odourAim, b.brood.items.length], [a.founding, a.population, a.nestOdour, a.odourAim, a.brood.items.length]);
+  assert.deepEqual([b.founding, b.incipient, b.population, b.nestOdour, b.odourAim, b.brood.items.length], [a.founding, a.incipient, a.population, a.nestOdour, a.odourAim, a.brood.items.length]);
+  assert.equal(b.incipient, true, "a young daughter stays young across a save (PR #54 review, N7)");
   assert.deepEqual(again.player.alates, g.player.alates);
+});
+
+/** A pending flight from colony 0, already as fat as an alate gets (Game.found takes only pending flights). */
+function fly(g: Game): Flight {
+  const f: Flight = { mother: 0, x: 0, y: 0, load: 0, strain: 0, at: g.time, food: ALATE_RESERVE };
+  g.flights.push(f);
+  return f;
+}
+
+test("daughters landing together dig apart: their founding chambers never touch, and each queen lies in her own (ja-lo8.10)", () => {
+  for (const seed of [1, 2, 3]) {
+    const map = generateSideWorld(seed, { ...SMALL, size: { w: 400, h: 160 } });
+    const g = new Game(map, { antCount: 30, rival: false, autoFound: false }, mulberry32(seed * 7919));
+    for (let k = 0; k < 4; k++) assert.ok(g.found(fly(g)) > 0, `seed ${seed}: daughter ${k} founded`);
+    const ch = g.map.chambers!;
+    const nests = g.map.nests.filter((n) => n.entrance);
+    // Founding chambers are discs of r + 1.5 round each nest's centre: apart by both radii, no cell is in both.
+    for (let a = 0; a < nests.length; a++)
+      for (let b = a + 1; b < nests.length; b++) {
+        const [p, q] = [nests[a]!, nests[b]!];
+        assert.ok(Math.hypot(p.x - q.x, p.y - q.y) > p.r + q.r + 3, `seed ${seed}: chambers of nests ${a} and ${b} at ${p.x.toFixed(1)} and ${q.x.toFixed(1)}`);
+      }
+    for (const d of g.colonies.slice(1)) {
+      cellOf(d.queen!.x, d.queen!.y);
+      const room = ch.list[ch.at(CELL[0] as number, CELL[1] as number)];
+      assert.ok(room && room.colony === d.params.nest && room.role === "royal", `seed ${seed}: queen of nest ${d.params.nest} in ${room?.colony}'s ${room?.role}`);
+    }
+  }
+});
+
+test("a daughter raises her first brood on her own reserve, beside her sisters", () => {
+  const map = generateSideWorld(2, { ...SMALL, size: { w: 400, h: 160 } });
+  const g = new Game(map, { antCount: 30, rival: false, autoFound: false }, mulberry32(2 * 7919));
+  for (let k = 0; k < 3; k++) g.found(fly(g));
+  for (let k = 0; k < 30 * 150; k++) g.tick(DT);
+  for (const d of g.colonies.slice(1)) assert.equal(d.founding, false, `nest ${d.params.nest}: a first worker`);
 });
 
 test("food is conserved through gynes, flights and foundings: an alate's body (her egg, her larval food, what she is fed waiting) is her daughter's reserve", () => {
@@ -264,7 +336,9 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
   };
   const total = map.foodTotal;
   let founded = -1;
-  for (let k = 0; k < 30 * 400 && (founded < 0 || g.time < founded + 30); k++) {
+  // Until the daughter is no longer young (ja-lo8.10): through her nanitics and the queen's nursing too (PR #54 review).
+  const young = () => g.colonies.length > 1 && (g.colonies[1]!.founding || g.colonies[1]!.incipient);
+  for (let k = 0; k < 30 * 600 && (founded < 0 || young() || g.time < founded + 30); k++) {
     c.scentGain.fill(0.001);
     g.tick(DT);
     if (founded < 0 && g.colonies.length > 1) founded = g.time;
@@ -276,6 +350,100 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
   const d = g.colonies[1]!;
   assert.ok(g.founded[0]!.reserve! > 1 && g.founded[0]!.reserve! <= ALATE_RESERVE, `her reserve, her body: ${g.founded[0]!.reserve}`);
   assert.ok(d.larder <= ALATE_RESERVE);
+});
+
+/** A daughter colony past founding (her first nanitic out), on a wide map; her workers held far off on the ground each tick. */
+function youngColony() {
+  const map = generateSideWorld(2, { ...SMALL, size: { w: 400, h: 160 } });
+  const g = new Game(map, { antCount: 30, rival: false, autoFound: false }, mulberry32(2 * 7919));
+  g.found(fly(g));
+  const d = g.colonies[1]!;
+  for (let k = 0; k < 30 * 150 && d.founding; k++) g.tick(DT);
+  assert.equal(d.founding, false, "her first worker eclosed");
+  const ch = map.chambers!;
+  cellOf(d.queen!.x, d.queen!.y);
+  const [qx, qy] = [CELL[0] as number, CELL[1] as number];
+  const room = ch.list[ch.at(qx, qy)]!;
+  const away = () => {
+    // Her nanitics are out foraging: none within two cells of her brood.
+    for (let i = 0; i < d.n; i++)
+      if (d.alive[i]) {
+        d.x[i] = d.nest.entrance!.x + 40;
+        d.y[i] = d.nest.entrance!.y;
+      }
+  };
+  return { g, d, room, qx, qy, away };
+}
+
+test("a young colony's queen feeds the brood by her that no worker tends; once a worker her workers reared ecloses, she stops", () => {
+  // PR #54 review, S1: the queen nursing while `incipient` is what lets a daughter grow past her nanitics.
+  const { g, d, room, qx, qy, away } = youngColony();
+  d.brood.items.length = 0;
+  const larva = d.brood.add(qx, qy, room.id);
+  room.brood++;
+  larva.stage = LARVA;
+  room.food += 6;
+  d.larder += 6;
+  g.map.foodTotal += 6;
+  assert.equal(d.incipient, true);
+  for (let k = 0; k < 30 * 2; k++) {
+    away();
+    g.tick(DT);
+  }
+  const fed = larva.fed;
+  assert.ok(fed > 0.2, `fed by the queen: ${fed}`);
+  // A worker reared by her workers (not a nanitic) ecloses: the colony is no longer young, and the queen nurses no more.
+  const pupa = d.brood.add(qx, qy, room.id);
+  room.brood++;
+  pupa.stage = PUPA;
+  pupa.t = T_PUPA;
+  pupa.fed = 3;
+  for (let k = 0; k < 3; k++) {
+    away();
+    g.tick(DT);
+  }
+  assert.equal(d.brood.items.includes(pupa), false, "it eclosed");
+  assert.equal(d.incipient, false);
+  for (let k = 0; k < 30 * 2; k++) {
+    away();
+    g.tick(DT);
+  }
+  assert.ok(Math.abs(larva.fed - fed) < 0.02, `unfed once she is not young: ${fed} then ${larva.fed}`);
+});
+
+test("a young colony's queen feeds as two nurses beside a nanitic: one worker by the brood doesn't halve its feeding", () => {
+  const { g, d, room, qx, qy, away } = youngColony();
+  d.brood.items.length = 0;
+  const larva = d.brood.add(qx, qy, room.id);
+  room.brood++;
+  larva.stage = LARVA;
+  room.food += 6;
+  d.larder += 6;
+  g.map.foodTotal += 6;
+  const one = d.alive.indexOf(1);
+  for (let k = 0; k < 30 * 2; k++) {
+    away();
+    d.x[one] = d.queen!.x; // one nanitic stays by the brood
+    d.y[one] = d.queen!.y;
+    g.tick(DT);
+  }
+  assert.ok(larva.fed > 0.8, `fed at the full rate: ${larva.fed}`);
+});
+
+test("a nanitic eclosing leaves the colony young", () => {
+  const { g, d, room, qx, qy, away } = youngColony();
+  const pupa = d.brood.add(qx, qy, room.id);
+  room.brood++;
+  pupa.stage = PUPA;
+  pupa.t = T_PUPA;
+  pupa.fed = 3;
+  pupa.nanitic = true;
+  for (let k = 0; k < 3; k++) {
+    away();
+    g.tick(DT);
+  }
+  assert.equal(d.brood.items.includes(pupa), false, "it eclosed");
+  assert.equal(d.incipient, true);
 });
 
 test("a queen founding alone doesn't hold unity at nothing: a colony with no ants has nobody to meet (ja-i0f, PR #47 review)", () => {

@@ -43,6 +43,12 @@ export const GYNE_PANTRY = 2;
 export const GYNE_TIME_X = 2;
 
 /**
+ * Gyne brood (a gyne larva or pupa) or an alate within this many cells keeps a larva from being reared as a gyne: the
+ * nurses there are already feeding a gyne (ja-lo8.10).
+ */
+export const GYNE_SPACING = 2;
+
+/**
  * The most food an alate carries out (her body: the egg, what she was fed as a larva, and what nestmates feed her while
  * she waits), and so the most her daughter colony founds on (Game.found). Alates fatten in the nest before the flight.
  */
