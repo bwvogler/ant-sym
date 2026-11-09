@@ -3915,9 +3915,9 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
   - No colony founding alone rears gynes.
 - **The alate** (`Colony.alates`), an entity apart from the workers' arrays, like the queen. She takes no ant slot and no job.
   - She waits `ALATE_WAIT` (60 s), then walks out along the tunnels a cell every 0.4 s (`#climbOut`'s field), and flies at the hole: into `Colony.flown`, then `Game.flights`.
-  - Her egg and food leave her mother's economy with her. The fungus steps her load as it does the queen's (`Fungus.#royalLoad`, shared now): from the nestmates she passes, groomed off by them. No lever is asked in her.
+  - Her egg and food become her body (`Alate.food`), held apart from the larder and fattened while she waits, up to `ALATE_RESERVE` (§50.20). The fungus steps her load as it does the queen's (`Fungus.#royalLoad`, shared now): from the nestmates she passes, groomed off by them. No lever is asked in her.
 - **Founding** (`Game.found`, `Founding.mother / reserve / load / strain`).
-  - `addColony` with no workers. Her chamber holds `FOUNDING_RESERVE` (24 food, new on the map) and her queen carries the fungus the alate did.
+  - `addColony` with no workers. Her chamber holds her body (`Flight.food`, at most 24), moved off the books' royal line into her larder, not new on the map (§50.20), and her queen carries the fungus the alate did.
   - While `Colony.founding` she feeds her first brood herself (2 nurses' worth within two cells) and isn't beaten. Her first worker ends it.
   - `autoFound` (on by default: the lab, the assays, the tests) founds at once at `landing()`, 48 columns from the hole on the side with room. The page turns it off, pauses, and founds through the pen.
   - `MAX_COLONIES` (6, the page's colony names): an alate that flies past it is lost, as most founding queens are.
@@ -3996,6 +3996,8 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 - **S1, a founding daughter held unity at 0.** `Unity.met` is the least allied-contact share over the standing colonies, and a queen founding alone stands (`Game.beaten`) with no ants, so her share of 0 made `met` and the score 0 until her first workers met someone. A colony with no ants is now left out of `met` (`#metNow`): it has nobody to meet. Tested: two colonies that have met keep `met` over `MET` when a daughter founds; counting her fails it.
 - **N1:** a books check while a flight waits for the page (`autoFound` off): dropping the flights from `royalFood()` now fails it.
 - **N2:** `found()` with a site that has no room after all (`addColony` throws "no room") loses the queen and books her body, instead of dropping the flight with its body unbooked.
+
+**Review of edc4088** (`pr-reviewer`): the PR body brought up to date (S4); §50.19's two lines on the reserve corrected (N6); a test for `found()` with no room for a hole (N7); the unity filter's comment says it leaves out any colony with no ants (a founding queen, or a colony whose workers all died), not only a founding one (N8); the alate's fattening reading her chamber's food from the chamber table is listed in `vision.md`'s food-flow row and on `ja-k4k.4` (N9).
 
 ### 50.21 Slice 10: balance (ja-lo8.10, 2026-11-08)
 

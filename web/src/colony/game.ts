@@ -592,7 +592,8 @@ export class Game {
   /** Unity.met: the least allied contact among `live` colonies (each must have met someone; review of #56, R3). */
   #metNow(live: readonly Colony[]): number {
     if (live.length < 2) return 0;
-    // A colony with no ants (a queen founding alone, ja-lo8.9) has nobody to meet with: unity waits on those that can.
+    // A colony with no ants has nobody to meet with: a queen founding alone (ja-lo8.9), or one whose workers have all
+    // died while she lives. Unity waits on the colonies that can meet (PR #47 review, N8).
     const meeting = live.filter((c) => c.population > 0);
     if (meeting.length < 2) return 0;
     let m = Infinity;
