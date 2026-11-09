@@ -23,12 +23,12 @@ A review here is finished when **one GitHub review is posted on the PR** (or, fo
 
 ## Roles
 
-- **Lead** (default). Runs every stage and posts the comment. Owns what is posted: re-checks anything a helper reports before it goes out.
+- **Lead** (default). Runs every stage and posts the review. Owns what is posted: re-checks anything a helper reports before it goes out.
 - **Helper** (the lead passed "role: helper", usually via [reference/brief.md](reference/brief.md)). Does stages 1 and 5 in its own worktree (stage 4 too, unless the brief says the lead ran it; then single test files only) and returns a ready-to-paste report of **verified findings only**. A helper never posts, comments, commits, pushes, merges, or changes beads (`bd create/update/close/remember`); it may read them (`bd show`, `bd search`). It removes its worktree and reports `git worktree list` at the end.
 
 ## Hard rules
 
-Hooks enforce some of these once the skill is invoked (and stay on for the rest of the session; `pr-reviewer` agents carry them too). `scripts/guard.sh` refuses a GitHub post without the footer or naming a model, a review submitted as APPROVE or REQUEST_CHANGES, and a worktree path that is relative, right under `/` or built on an unguarded variable; it asks the owner before a merge and before slow or paid runs. `scripts/stop-check.sh` stops you finishing once while a detached worktree or a changed `.beads/issues.jsonl` is left. A refusal says how to fix the call: fix it, don't route around it. Their tests: `scripts/test.sh`.
+Hooks enforce some of these once the skill is invoked in a session, and stay on for the rest of it. **They don't guard subagents:** inside a `pr-reviewer` or helper agent neither the agent file's hooks nor invoking the skill made them fire (tested 2026-11-09), so a subagent keeps these rules by following them, and the lead checks its clean-up. `scripts/guard.sh` refuses a GitHub post without the footer or naming a model, a review submitted as APPROVE or REQUEST_CHANGES, and a worktree path that is relative, right under `/` or built on an unguarded variable; it asks the owner before a merge and before slow or paid runs. `scripts/stop-check.sh` stops you finishing once while a detached worktree or a changed `.beads/issues.jsonl` is left. A refusal says how to fix the call: fix it, don't route around it. Their tests: `scripts/test.sh`.
 
 - `env -u JEV_API_KEY` on every command that runs the game, tests or scripts. No live Jev calls; spend is real and the owner decides it.
 - Worktrees at **absolute** paths under the scratchpad, with the variable guarded: `W="${S:?}/pr57"`. An empty `$S` once put a worktree at `/r53m`.
@@ -111,7 +111,7 @@ Typecheck, `npm test` pass/fail counts, lint warnings compared with main's count
 - **Measure suspected bugs**: instrument a counter through `globalThis` in a scratch worktree, run one seed (`npm run exp -- <assay> --seeds 1`, ~7–15 s), and report counts (#39: rolls per tick; #44: where the past-end trigger fired). A trial fix measured the same way shows the fix works.
 - **Jev cost and ask-path claims**: trace when a request is actually sent (cache miss only? on load? on a timer?) before quoting any rate. Read the "Jev's answers (cache hits…)" line. #42's first review multiplied a rate by an hour and was wrong: an open run costs nothing; only misses spend.
 - **Like-for-like comparisons only.** Same seed, same cache contents, same everything but the change. If the PR's cache differs from main's, graft the missing answers in and replay on main (#41: the Warlike loss predated the PR).
-- **A helper's blockers**: open the file and read each one yourself before it goes in the comment.
+- **A helper's blockers**: open the file and read each one yourself before it goes in the review.
 
 ## 6. Post
 

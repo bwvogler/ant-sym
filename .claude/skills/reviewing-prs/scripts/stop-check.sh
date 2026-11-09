@@ -17,7 +17,7 @@ top=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) || exit 0
 
 problems=""
 left=$(git -C "$top" worktree list --porcelain 2>/dev/null |
-  awk '/^worktree /{p=substr($0,10)} /^detached$/{print p}')
+  awk '/^worktree /{p=substr($0,10); n++} /^detached$/ && n > 1 {print p}')   # n = 1 is the main checkout
 if [ -n "$left" ]; then
   problems="Scratch worktrees are still there (remove each with git worktree remove --force <path>, then check git worktree list; skip this if a helper you started is still using one):
 $(printf '%s\n' "$left" | sed 's/^/  /')"

@@ -28,15 +28,22 @@ git fetch -q origin $refs || { echo "fetch failed" >&2; exit 1; }
 head="refs/pr/$n"
 echo "PR #$n head $(git rev-parse --short "$head"), base $base ($(git rev-parse --short "origin/$base")), main $(git rev-parse --short origin/main)"
 
-# merge <label> <ours> <theirs>: one line, clean or the conflicted files.
+# The files this PR itself changes (against its base, so a stacked PR doesn't claim its base's files).
+mine=$(git diff --name-only "$(git merge-base "origin/$base" "$head")" "$head" | sort)
+
+# merge <label> <ours> <theirs>: one line, clean or the conflicted files. Merging two PR heads also
+# replays each one's differences from main; conflicts in files this PR doesn't change are the other
+# PR's with main, not this PR's, so they are counted apart.
 merge() {
-  local out files real note
+  local out files real note theirs
   if out=$(git merge-tree --write-tree --name-only --no-messages "$2" "$3" 2>&1); then
     echo "  $1: clean"
   else
-    files=$(echo "$out" | sed -n '2,$p' | sed '/^$/d' | sort -u)
-    real=$(echo "$files" | grep -v '^\.beads/issues\.jsonl$' | tr '\n' ' ')
-    note=""; echo "$files" | grep -q '^\.beads/issues\.jsonl$' && note=" (+ .beads/issues.jsonl, the bd export: not a real conflict)"
+    files=$(echo "$out" | sed -n '2,$p' | sed '/^$/d' | grep -v '^\.beads/issues\.jsonl$' | sort -u)
+    real=$(comm -12 <(echo "$files") <(echo "$mine") | sed '/^$/d' | tr '\n' ' ')
+    theirs=$(comm -23 <(echo "$files") <(echo "$mine") | sed '/^$/d' | wc -l | tr -d ' ')
+    note=""; echo "$out" | grep -q '^\.beads/issues\.jsonl$' && note=" (+ .beads/issues.jsonl, the bd export: not a real conflict)"
+    [ "$theirs" -gt 0 ] && note="$note (+ $theirs in files this PR doesn't change: the other side's own conflicts, not this PR's)"
     if [ -n "$real" ]; then echo "  $1: CONFLICTS in $real$note"; else echo "  $1: clean$note"; fi
   fi
 }

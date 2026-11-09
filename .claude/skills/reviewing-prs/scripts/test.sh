@@ -62,6 +62,25 @@ check "live run asks" ask "$(guard Bash "$(bash_ 'node scripts/colony-live.mjs a
 check "precache import passes" allow "$(guard Bash "$(bash_ 'node scripts/precache.mjs --import experiments/caches/a.json')")"
 check "precache live asks" ask "$(guard Bash "$(bash_ 'node scripts/precache.mjs')")"
 
+# Every slow / paid rule, and the review #58 cases (S1, S3, N1, N4, N5).
+check "merge with auto-merge asks" ask "$(guard mcp__github__enable_pr_auto_merge '{"pullNumber":5}')"
+check "node --test on slow/ asks" ask "$(guard Bash "$(bash_ 'cd web && node --test src/colony/tests/slow/economy.test.ts')")"
+check "reading a slow test passes" allow "$(guard Bash "$(bash_ 'grep -n seed web/src/colony/tests/slow/economy.test.ts')")"
+check "goldens diffstat passes" allow "$(guard Bash "$(bash_ 'git diff --stat HEAD -- web/src/colony/tests/slow/golden.json')")"
+check "exp with default seeds asks" ask "$(guard Bash "$(bash_ 'env -u JEV_API_KEY npm run exp -- raidFind')")"
+check "exp with a seed list asks" ask "$(guard Bash "$(bash_ 'npm run exp -- raidFind --seeds 1,2,3')")"
+check "experiment.mjs one seed passes" allow "$(guard Bash "$(bash_ 'node scripts/experiment.mjs pass --seeds=3 --seconds 60')")"
+for s in side-bench colony-bench economy-bench floor-bench roomy-bench bakeoff progression crown raids muddle raid-food ablate; do
+  check "$s asks" ask "$(guard Bash "$(bash_ "env -u JEV_API_KEY node scripts/$s.mjs")")"
+done
+check "npm run colony-bench asks" ask "$(guard Bash "$(bash_ 'npm run colony-bench')")"
+check "reading a bench passes" allow "$(guard Bash "$(bash_ 'sed -n 1,20p scripts/crown.mjs')")"
+check "probe asks" ask "$(guard Bash "$(bash_ 'node scripts/probe.mjs 20 100')")"
+check "npm run colony-cost --side asks" ask "$(guard Bash "$(bash_ 'npm run colony-cost -- --side')")"
+check "worktree: -b with nothing after it ends (no hang)" allow "$(guard Bash "$(bash_ 'git worktree add -b')")"
+check "worktree: guarded chain" allow "$(guard Bash "$(bash_ 'S="${T:?}/scratch"; W="$S/pr57"; git worktree add --detach "$W" HEAD')")"
+check "worktree: unguarded chain" deny "$(guard Bash "$(bash_ 'S="$T/scratch"; W="$S/pr57"; git worktree add --detach "$W" HEAD')")"
+
 # --- stop-check.sh --------------------------------------------------------------------------------------
 repo="$tmp/repo"
 mkdir -p "$repo/.beads"
@@ -82,6 +101,9 @@ check "jsonl export blocks" block "$(stop false)"
 git -C "$repo" checkout -q -- .beads/issues.jsonl
 git -C "$repo" worktree add -q -b side "$tmp/wt2" HEAD
 check "a named-branch worktree is not ours" allow "$(stop false)"
+git -C "$repo" worktree remove --force "$tmp/wt2"
+git -C "$repo" checkout -q --detach
+check "a detached main checkout is not a scratch worktree" allow "$(stop false)"
 
 echo "reviewing-prs hooks: $pass passed, $fail failed"
 [ "$fail" = 0 ]

@@ -51,7 +51,8 @@ For each fix and each new test: find the line that makes it work, break it, run 
 
 ```sh
 cd "$W"
-sed -i 's/if ((this.founding || this.incipient) \&\& nurses === 0/if (this.founding \&\& nurses === 0/' web/src/colony/colony.ts
+perl -pi -e 's/if \(\(this\.founding \|\| this\.incipient\) && nurses === 0/if (this.founding && nurses === 0/' web/src/colony/colony.ts   # perl -pi works on macOS and Linux; sed -i doesn't
+git diff --stat                                        # check the mutation actually changed the file
 (cd web && env -u JEV_API_KEY node --test --test-timeout=60000 src/colony/tests/royal.test.ts 2>&1 | grep -E '^# (pass|fail)')
 git checkout -- .
 ```

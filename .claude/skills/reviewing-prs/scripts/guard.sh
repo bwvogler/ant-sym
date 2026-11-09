@@ -7,7 +7,8 @@
 #   merging a PR   - only when the owner asked in this session                                    -> ask
 #   git worktree add - the path must be absolute, not right under /, and an unguarded "$S/..." is
 #                    refused (an empty $S once put a worktree at /r53m)                          -> deny
-#   slow or paid runs - test:slow, multi-seed sweeps, the benches, live Jev scripts              -> ask
+#   slow or paid runs - test:slow, sweeps (exp's default is 10 seeds), long game scripts, the
+#                    benches, live Jev scripts; only when run, not when read                      -> ask
 # Inline review comments (add_comment_to_pending_review) are checked for model names only: the footer
 # goes on the review body. The deny reason says how to fix the call, so it reads as guidance.
 # Fails open: without jq or readable input it allows the call rather than wedge the session.
@@ -73,7 +74,7 @@ case "$tool" in
       set -f; set -- $rest; set +f
       while [ $# -gt 0 ]; do
         case "$1" in
-          -b | -B | --reason) shift 2 ;;
+          -b | -B | --reason) shift; [ $# -gt 0 ] && shift ;;   # the option's value, if any
           -*) shift ;;
           *) path=$1; break ;;
         esac
@@ -89,21 +90,37 @@ case "$tool" in
         /*) bad="it sits right under / (an empty variable does that: /r53m)" ;;
         *) bad="it is relative; use an absolute path under the scratchpad" ;;
       esac
-      # W="$S/pr57" in the same command hides the same fault behind "$W".
-      if [ -z "$bad" ] && printf '%s' "$cmd" | grep -Eq '[A-Za-z_]+="?(\$[A-Za-z_]+|\$\{[A-Za-z_]+\})/'; then
-        bad="a path variable is set from an unguarded one (X=\"\$S/...\"); write X=\"\${S:?}/...\""
+      # W="$S/pr57" in the same command hides the same fault behind "$W". Fine when S itself was set
+      # from a guarded value in the same command (S="${T:?}/x"; W="$S/pr57").
+      if [ -z "$bad" ]; then
+        for v in $(printf '%s' "$cmd" | grep -oE '[A-Za-z_][A-Za-z_0-9]*="?(\$[A-Za-z_][A-Za-z_0-9]*|\$\{[A-Za-z_][A-Za-z_0-9]*\})/' |
+          sed -E 's/.*=\"?\$\{?([A-Za-z_][A-Za-z_0-9]*)\}?\/$/\1/'); do
+          printf '%s' "$cmd" | grep -Eq "(^|[;&| ])$v=\"?\\\$\{[A-Za-z_][A-Za-z_0-9]*:\?" && continue
+          bad="a path variable is set from an unguarded one (X=\"\$$v/...\"); write X=\"\${$v:?}/...\""
+          break
+        done
       fi
       [ -n "$bad" ] && decide deny "reviewing-prs: worktree path '$path' refused: $bad. Example: W=\"\${S:?}/pr57\"; git worktree add --detach \"\$W\" refs/pr/57"
     fi
 
+    # Slow or paid runs, only when run (node / npm run), not when a file is read or grepped. Option A
+    # (owner, 2026-11-09): a list of the slow scripts, extended as scripts are added.
+    run='(node|npm run|npx)[^;|&]*'
+    on() { printf '%s' "$cmd" | grep -Eq "$1"; }
     slow=""
-    printf '%s' "$cmd" | grep -Eq 'test:slow|tests/slow/' && slow="the slow test suite"
-    printf '%s' "$cmd" | grep -Eq -- '--seeds[ =]+[0-9]+-[0-9]+' && slow="a multi-seed sweep"
-    printf '%s' "$cmd" | grep -Eq 'run exp -- all|experiment\.mjs all' && slow="every assay"
-    printf '%s' "$cmd" | grep -Eq '(side|colony|economy|floor|roomy)-bench|bakeoff\.mjs|progression\.mjs' && slow="a bench run"
-    printf '%s' "$cmd" | grep -Eq 'colony-cost(\.mjs)?[^;|&]*--side' && slow="colony-cost --side"
-    printf '%s' "$cmd" | grep -Eq 'colony-live|probe\.mjs' && slow="a live Jev run (spends money)"
-    if printf '%s' "$cmd" | grep -Eq 'precache\.mjs' && ! printf '%s' "$cmd" | grep -Eq -- '--import'; then
+    on 'npm run test:slow|node --test[^;|&]*tests/slow/' && slow="the slow test suite"
+    exp=$(printf '%s' "$cmd" | grep -oE '(npm run exp|node [^;|&]*experiment\.mjs)[^;|&]*' | head -1)
+    if [ -n "$exp" ]; then
+      if printf '%s' "$exp" | grep -Eq '(--|experiment\.mjs) +all( |$)'; then slow="every assay"
+      elif ! printf '%s' "$exp" | grep -Eq -- '--seeds[ =]+[0-9]+( |$)'; then
+        slow="a multi-seed sweep (npm run exp runs seeds 1-10 unless given one seed: --seeds 1)"
+      fi
+    fi
+    on "$run"'((side|colony|economy|floor|roomy)-bench|bakeoff|progression|crown|raids|muddle|raid-food|ablate)(\.mjs)?( |$)' && slow="a bench or long game run"
+    on "$run"'colony-cost(\.mjs)?[^;|&]*--side' && slow="colony-cost --side"
+    on "$run"'(colony-live|probe)\.mjs' && slow="a live Jev run (spends money)"
+    pre=$(printf '%s' "$cmd" | grep -oE "$run"'precache\.mjs[^;|&]*' | head -1)
+    if [ -n "$pre" ] && ! printf '%s' "$pre" | grep -q -- '--import'; then
       slow="precache.mjs without --import (asks Jev live, spends money)"
     fi
     [ -n "$slow" ] && decide ask "reviewing-prs: $slow. Reviews skip slow and paid runs unless the owner asked; list it under 'Not re-measured (slow)' instead. Approve only if you asked for it."

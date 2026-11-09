@@ -1,6 +1,6 @@
 # Where the rules came from
 
-Reviews of PRs #39–#54 (November 2026). Each rule in SKILL.md is here because it caught something, or because skipping it cost a correction.
+Reviews of PRs #39–#55 and #58, this skill's own (November 2026). Each rule in SKILL.md is here because it caught something, or because skipping it cost a correction.
 
 ## What worked
 
@@ -14,6 +14,7 @@ Reviews of PRs #39–#54 (November 2026). Each rule in SKILL.md is here because 
 - **#55: a trial run of this skill.** A helper followed the skill on #55 and reported its gaps: it told helpers both to run fast-checks (the full `npm test`) and to run single test files only; its report asked for Merge mechanics a helper doesn't do; and "not caught is a should-fix" was too strict. Nudging one end of `hexLine` was an equivalent mutation, and `standing()`'s wider cut changed 0 of ~18 million verdicts (unreachable on grid cells). The skill now has a helper checklist and the equivalent / unreachable grades.
 - **Review format (owner's choice, 2026-11-08).** Reviews moved from one PR comment to one GitHub review: the body stays the whole review (it worked for fixing agents: ranked, one event, numbered items that carry into re-reviews), and one-line fixes also go inline as `suggestion` blocks the author can apply.
 - **Hooks for the rules that slipped (owner's go-ahead, 2026-11-08).** The footer, no model names, COMMENT-only reviews, guarded worktree paths, asking before merges and slow or paid runs, and the stage-8 clean-up are checked by `guard.sh` and `stop-check.sh`, because each was broken at least once while it was only written down.
+- **#58: the skill reviewed itself.** A `pr-reviewer` agent found a 10-seed sweep the guard let through (`npm run exp` defaults to seeds 1–10), merge-check blaming a PR for other PRs' conflicts with main, five guard rules no test covered, and an endless loop on `git worktree add -b`. While fixing them, a mutation loop built on `sed -E` changed nothing (`|` in an extended regex matches the empty string) and every test "passed": check that a mutation really changed the file (`git diff --stat`) before trusting a pass.
 - **Structure.** One comment, numbered items, Merge mechanics and Not re-measured always present, then a plain-language summary to the owner with the one decision that's theirs. Re-reviews as a status table.
 
 ## What went wrong
