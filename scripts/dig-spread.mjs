@@ -49,9 +49,10 @@ function spread(map) {
 
 for (let seed = lo; seed <= hi; seed++) {
   const game = new Game(generateSideWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW }, gameRng(seed));
-  let t = 0;
+  // Ticks counted as whole numbers: summing DT as a float drifts, and a checkpoint would land a tick early or late.
+  let tick = 0;
   for (const at of checkpoints) {
-    for (; t < at; t += DT) game.tick(DT);
+    for (; tick < Math.round(at / DT); tick++) game.tick(DT);
     console.log(`seed ${seed}, ${at} s: ${spread(game.map)}`);
   }
 }

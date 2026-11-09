@@ -2,22 +2,36 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { generateOneWorld, type OneWorld } from "../colony/oneWorld.ts";
 import { worldExtent, type WorldMap } from "../colony/world.ts";
 import ColonyField from "./ColonyField.tsx";
+import { useFrameBus } from "./frameBus.ts";
 import { parseSeed, previewSeed, stillLife, withSeed } from "./oneWorldView.ts";
 import { seg } from "./styles.ts";
 
 type View = "above" | "below";
 
-/** The last world made: StrictMode runs state initialisers twice in development, and one world is enough to make. */
-let last: OneWorld | null = null;
+/**
+ * The last few seeds' worlds, or null for a seed that made none: going back to a seed, and StrictMode running state
+ * initialisers twice in development, make nothing again. Oldest out first.
+ */
+const made = new Map<number, OneWorld | null>();
+const KEEP = 4;
 
-/** The one world of `seed`, or null if it can't be made (generateOneWorld throws). */
+/** The one world of `seed`, or null if it can't be made (generateOneWorld throws; logged, so a bug isn't taken for a seed). */
 function tryWorld(seed: number): OneWorld | null {
-  if (last?.seed === seed) return last;
+  if (made.has(seed)) return made.get(seed)!;
+  let world: OneWorld | null = null;
   try {
-    return (last = generateOneWorld(seed));
-  } catch {
-    return null;
+    world = generateOneWorld(seed);
+  } catch (e) {
+    console.error(`one world: seed ${seed}`, e);
   }
+  made.set(seed, world);
+  if (made.size > KEEP) made.delete(made.keys().next().value!);
+  return world;
+}
+
+/** Point the address at `seed`, keeping the rest of it: a reload or a shared link opens the world shown. */
+function showSeed(seed: number): void {
+  history.replaceState(null, "", withSeed(window.location.search, seed) + window.location.hash);
 }
 
 /** The world the page opens on: the address's seed, or seed 1 when it has none or that seed makes no world (and why). */
@@ -51,14 +65,16 @@ export default function OneWorldPreview() {
   const [seedText, setSeedText] = useState(String(seed));
   const [failed, setFailed] = useState<string | null>(start.failed);
   // The address names the world shown, so a reload or a shared link opens it.
-  useEffect(() => history.replaceState(null, "", withSeed(window.location.search, start.world.seed)), [start]);
+  useEffect(() => showSeed(start.world.seed), [start]);
   const [view, setView] = useState<View>("below");
   const map = view === "above" ? world.plane : world.curtain;
   const shown = stillLifeOf(map);
   const applySeed = () => {
     const n = parseSeed(seedText);
-    if (n === null || n === seed) {
-      setFailed(n === null && seedText.trim() !== "" ? `"${seedText}" is no seed (a whole number from 1); still showing seed ${seed}.` : null);
+    // The current seed again (as leaving the box after a reset does): nothing changes, and a notice stays to be read.
+    if (n === seed) return;
+    if (n === null) {
+      if (seedText.trim() !== "") setFailed(`"${seedText}" is no seed (a whole number from 1); still showing seed ${seed}.`);
       return setSeedText(String(seed));
     }
     const next = tryWorld(n);
@@ -69,23 +85,23 @@ export default function OneWorldPreview() {
     setFailed(null);
     setWorld(next);
     setSeedText(String(n));
-    history.replaceState(null, "", withSeed(window.location.search, n)); // reload or share: the same world
+    showSeed(n);
   };
 
   // ColonyField redraws when told a frame passed. Nothing runs here, so a frame is asked for only when the picture can
   // change: a drag, a pinch, a click, the wheel or a key moving the camera, the field resizing, the theme switching
   // (ColonyField draws once itself when it mounts). Hovering changes nothing, so it draws nothing.
-  const listeners = useRef(new Set<() => void>());
+  const { onFrame, fire } = useFrameBus();
   const pending = useRef(0);
   const poke = useMemo(
     () => () => {
       if (pending.current) return;
       pending.current = requestAnimationFrame(() => {
         pending.current = 0;
-        for (const fn of listeners.current) fn();
+        fire();
       });
     },
-    [],
+    [fire],
   );
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -100,13 +116,6 @@ export default function OneWorldPreview() {
       pending.current = 0;
     };
   }, [poke]);
-  const onFrame = useMemo(
-    () => (fn: () => void) => {
-      listeners.current.add(fn);
-      return () => listeners.current.delete(fn);
-    },
-    [],
-  );
 
   const ext = worldExtent(map);
   return (
