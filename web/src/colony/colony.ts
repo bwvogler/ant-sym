@@ -490,11 +490,18 @@ export class Colony {
   odoSurf: Float32Array;
   /** distance walked underground since the in-nest memory reset (in the chamber) */
   odoNest: Float32Array;
-  /** this trip's drift on the surface and in the nest, per unit walked (Gaussian, σ = PI_DRIFT) */
+  /** this trip's drift on the surface and in the nest, per unit walked (Gaussian, σ = PI_DRIFT); on one world's plane, driftSurf is the x part */
   driftSurf: Float32Array;
+  /**
+   * One world's plane (U3b, docs/one-world.md §4): the surface drift's y part. Each part is drawn with σ = PI_DRIFT/√2 at
+   * its own hole, so the vector's error is PI_DRIFT × distance (RMS) in 2D, as the side view's is across the ground.
+   */
+  driftSurfY: Float32Array;
   driftNest: Float32Array;
-  /** cells added to the believed goal while searching round it (it got there and found nothing): grows, alternating sides */
+  /** cells added to the believed goal while searching round it (it got there and found nothing): grows, alternating sides; on one world's plane, the loop's reach */
   search: Float32Array;
+  /** one world's plane: the direction of the search's current point from where the vector ran out (a quarter turn more each time) */
+  searchA: Float32Array;
   /** 1 while the ant is underground (the last tick), so coming up out of the hole is seen */
   #under: Uint8Array;
   /** the side view: a homing ant following the ground's surface round spoil to the hole: the nearness (#holeMetric) it must beat to let go; NaN = not following */
@@ -900,8 +907,10 @@ export class Colony {
     this.odoSurf = new Float32Array(n);
     this.odoNest = new Float32Array(n);
     this.driftSurf = new Float32Array(n);
+    this.driftSurfY = new Float32Array(n);
     this.driftNest = new Float32Array(n);
     this.search = new Float32Array(n);
+    this.searchA = new Float32Array(n);
     this.#under = new Uint8Array(n);
     this.#groundMin = new Float64Array(n).fill(NaN); // float64: compared with the metric itself (float32 rounding let the ant "beat" it on the cell it was set at)
     this.#groundT = new Uint16Array(n);
@@ -1283,8 +1292,10 @@ export class Colony {
     this.odoSurf[i] = 0;
     this.odoNest[i] = 0;
     this.driftSurf[i] = 0;
+    this.driftSurfY[i] = 0;
     this.driftNest[i] = 0;
     this.search[i] = 0;
+    this.searchA[i] = 0;
     this.#under[i] = 1;
     this.layer[i] = this.home; // born in the nest, on its layer
     this.#goalKind[i] = 0; // born underground: home is the chamber
@@ -1911,6 +1922,7 @@ export class Colony {
   #homeAfresh(i: number): void {
     this.#chamberCell[i] = -1; // a chamber face it was walking up to is no longer its business (review of slice 2)
     this.search[i] = 0; // a search left over from the last trip home
+    this.searchA[i] = 0;
     this.#groundMin[i] = NaN;
     this.detour[i] = 0;
     this.bumps[i] = 0;
@@ -2502,11 +2514,13 @@ export class Colony {
   }
 
   /**
-   * Where ant i believes `goal` is (the side view; on the top-down maps, exactly where it is). Its home vector puts the
-   * goal drift × distance walked off to one side, plus its search offset; depth is exact (gravity). Local cues snap it to
-   * the real goal: the hole within HOLE_SIGHT (seen, and its smell), the chamber in clear view within NEST_SIGHT.
+   * Where ant i believes `goal` is (the side view and one world's plane; on the top-down maps, exactly where it is). Its
+   * home vector puts the goal drift × distance walked off to one side, plus its search offset; depth is exact (gravity).
+   * Local cues snap it to the real goal: the hole within HOLE_SIGHT (seen, and its smell), the chamber in clear view within
+   * NEST_SIGHT. On the plane the same in 2D (#believePlane).
    */
   #believe(i: number, goal: Nest): Nest {
+    if (this.line !== null && this.#cur === PLANE) return this.#believePlane(i, goal);
     if (!this.#entrance) return goal;
     const x = this.x[i] as number;
     const y = this.y[i] as number;
@@ -2529,15 +2543,49 @@ export class Colony {
   }
 
   /**
+   * One world's plane (U3b, docs/one-world.md §4): where ant i believes its hole (`goal`, the plane nest) is. Its vector,
+   * started afresh up out of that hole (#crossUp), puts it odoSurf × (driftSurf, driftSurfY) off, plus the search's point
+   * (search's reach at angle searchA), never past the plane's edges. Within HOLE_SIGHT of the hole (seen, and the
+   * entrance's smell), or within NEST_SIGHT with a clear line to it, the belief is the hole itself.
+   */
+  #believePlane(i: number, goal: Nest): Nest {
+    const x = this.x[i] as number;
+    const y = this.y[i] as number;
+    const d = Math.hypot(x - goal.x, y - goal.y);
+    if (d < HOLE_SIGHT || (d < NEST_SIGHT && this.#clearTo(x, y, goal.x, goal.y))) return goal;
+    const odo = this.odoSurf[i] as number;
+    const s = this.search[i] as number;
+    const a = this.searchA[i] as number;
+    const b = this.#belief;
+    // Never past the plane's edges (as the side view's ground's ends): the search is centred on the point it can reach.
+    const lo = EDGE;
+    const hx = this.map.size.w - EDGE;
+    const hy = this.map.size.h * R - EDGE;
+    b.x = Math.max(lo, Math.min(hx, Math.max(lo, Math.min(hx, goal.x + odo * (this.driftSurf[i] as number))) + s * Math.cos(a)));
+    b.y = Math.max(lo, Math.min(hy, Math.max(lo, Math.min(hy, goal.y + odo * (this.driftSurfY[i] as number))) + s * Math.sin(a)));
+    b.r = goal.r;
+    return b;
+  }
+
+  /**
    * Ant i got to where it believed its goal was and found nothing: it searches, in loops of growing size to either side
    * (Wehner's systematic search). The loops keep widening for as long as it searches (Müller & Wehner 1994: centred on
    * where the vector ran out, they grow without limit in time), up to the whole ground; capped at 80 cells, a carrier
-   * whose vector was off by more than about 86 never found its hole (review of #20).
+   * whose vector was off by more than about 86 never found its hole (review of #20). On one world's plane, the loops go
+   * round where the vector ran out: each next point a quarter turn on, the first ahead of the ant, each loop of four
+   * SEARCH_GROW times wider (a game choice: the sources give no 2D geometry; docs/nest-and-home.md §3.1). No random draw
+   * there. It also searches on where it can get no nearer its point (SEARCH_STALL), and the home trail leads it (tick).
    */
   #searchOn(i: number): void {
     const s = this.search[i] as number;
-    const most = this.map.size.w;
-    this.search[i] = s === 0 ? SEARCH_START * (this.#rng() < 0.5 ? -1 : 1) : Math.max(-most, Math.min(most, -s * SEARCH_GROW));
+    if (this.line !== null && this.#cur === PLANE) {
+      const { w, h } = this.map.size;
+      this.searchA[i] = s === 0 ? (this.heading[i] as number) : (this.searchA[i] as number) + Math.PI / 2;
+      this.search[i] = s === 0 ? SEARCH_START : Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
+    } else {
+      const most = this.map.size.w;
+      this.search[i] = s === 0 ? SEARCH_START * (this.#rng() < 0.5 ? -1 : 1) : Math.max(-most, Math.min(most, -s * SEARCH_GROW));
+    }
     this.wall[i] = 0;
     this.mx[i] = NaN;
     // Progress is judged toward the goal it now believes in.
@@ -4139,7 +4187,8 @@ export class Colony {
    * Ant i climbs out of the hole at curtain cell (cx, cy) (or beside it) onto the plane, at that hole's cell: any hole
    * (lost in a rival's tunnels, it climbs out there; a raider leaves a rival's shaft). Spoil is put down there (soilOut, as
    * top-down: nothing piles up until U3c's mound), and a corpse is buried there (until U3c's midden: the game paints a
-   * sporulating host's spores on the plane, onBury). Its vector home resets at its own hole, as #integrate's does.
+   * sporulating host's spores on the plane, onBury). Its vector home resets at its own hole only, as #integrate's does
+   * (its search, as every crossing's: #crossed).
    * Its heading is the caller's to write.
    */
   #crossUp(i: number, cx: number, cy: number): void {
@@ -4173,9 +4222,13 @@ export class Colony {
     this.y[i] = centreY(hc.py);
     this.#under[i] = 0;
     this.#goalKind[i] = 1;
-    this.odoSurf[i] = 0;
-    if (k === this.params.nest) this.driftSurf[i] = gauss(this.#rng) * PI_DRIFT;
-    this.search[i] = 0;
+    if (k === this.params.nest) {
+      // Up out of its own hole the vector starts afresh, pointing at it, with this trip's drift in 2D (U3b). Up out of a
+      // rival's it runs on, its error standing (the side view's rule, #integrate; review of #20).
+      this.odoSurf[i] = 0;
+      this.driftSurf[i] = gauss(this.#rng) * PI_DRIFT_2D;
+      this.driftSurfY[i] = gauss(this.#rng) * PI_DRIFT_2D;
+    }
     this.#lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
     this.#crossed(i);
     this.crossedUp++;
@@ -4506,6 +4559,10 @@ export class Colony {
           this.bestD[i] = near;
           this.stallT[i] = 0;
         }
+        // One world's plane (U3b): no nearer where it believes the hole is for SEARCH_STALL seconds (the spot is in rock, or
+        // walled off: following the wall, one went round the plane's edge), it has got as near as the ground lets it, and
+        // searches on as if it had got there.
+        if (nest !== goal && (this.stallT[i] as number) > SEARCH_STALL && this.line !== null && this.#cur === PLANE) this.#searchOn(i);
         if (this.#entrance && (this.wall[i] !== 0 || detouring)) {
           // On the ground line it homes cell by cell (see #walkTunnel): no walls to follow, no detour to wander (an
           // explorer's detour, run up bumping round, used to carry on once it had food, and walk it away from the hole).
@@ -4567,8 +4624,13 @@ export class Colony {
           } else {
             // Where it believed home was, and nothing there (the side view's drifting vector): search round it.
             if (nest !== goal && Math.hypot(nest.x - x, nest.y - y) < 1) this.#searchOn(i);
-            h += climb(hl, hf, hr, p.turnRate * dt * 0.25) + noise * p.wander * 0.25;
-            h = turnToward(h, toNest, p.turnRate * dt * 0.8);
+            // On one world's plane, searching (its vector ran out where no hole was) with the home trail under its antennae,
+            // the trail leads, with the share of its turning a carrier gives a food trail (homeTrail): route cues and scent
+            // first, the vector the fallback (docs/trails.md). Led by its loops alone, colonies delivered up to 44 % less food
+            // than U3a's in the spike (one-world §4, U3b as built).
+            const lead = this.search[i] !== 0 && this.line !== null && this.#cur === PLANE && Math.max(hl, hf, hr) >= FAINT ? p.homeTrail : 0;
+            h += climb(hl, hf, hr, p.turnRate * dt * (lead || 0.25)) + noise * p.wander * 0.25;
+            h = turnToward(h, toNest, p.turnRate * dt * 0.8 * (1 - lead));
           }
         } else {
           const t0 = this.followT[i] as number;
@@ -5177,6 +5239,9 @@ export class Colony {
       // One world: on the plane, at a hole's cell. Its own: in, if it is going in (#wantsIn). Another colony's: a raider
       // goes down that shaft (one-world §4). Crossing is where it stands; it reads nothing else.
       if (this.line !== null && this.#cur === PLANE) {
+        // Path integration on the plane (U3b): it counts its way out, as #integrate does on the side view's ground; once it
+        // heads home the vector is fixed.
+        if (this.mode[i] !== RETURN) this.odoSurf[i] = (this.odoSurf[i] as number) + Math.hypot((this.x[i] as number) - x0, (this.y[i] as number) - y0);
         this.antCell(i);
         const k = this.#holeAt(CELL[0] as number, CELL[1] as number);
         if (k >= 0 && (k === p.nest ? this.#wantsIn(i, this.mode[i] as number) : this.mode[i] === FIGHT && this.#stanceOf(i) === "raid")) {
@@ -5415,10 +5480,14 @@ const GAIN = 0.5;
 const NEST_SIGHT = 8;
 /** Path integration's drift (σ, per unit walked): the error is ~10 % of the distance walked (Wehner 2006; docs/nest-and-home.md §1). */
 export const PI_DRIFT = 0.1;
+/** One world's plane: each part (x, y) of the 2D drift, so its length's RMS is PI_DRIFT (U3b). */
+const PI_DRIFT_2D = PI_DRIFT / Math.SQRT2;
 /** Within this (world units) across the ground of the hole (and twice it up or down: the crater) an ant sees it and smells the entrance: its vector no longer matters. */
 export const HOLE_SIGHT = 6;
 /** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one SEARCH_GROW times wider, to at most the map's width. */
 const SEARCH_START = 3;
+/** One world's plane: seconds a homing ant may get no nearer its belief before it searches on (the spot is in rock, or walled off). */
+const SEARCH_STALL = 3;
 // Zoning by age (nest slice 6): see band, #mayGoOut, #digs.
 /** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
 export const YOUNG = 0.15;
@@ -5552,6 +5621,8 @@ const GROUND_LOOK = 16;
 /** Seconds on a strong nest trail for the in-nest memory's error to fall to 1/e. */
 const ROAD_SIGN = 2;
 const SEARCH_GROW = 1.6;
+/** One world's plane: the search's reach grows SEARCH_GROW times a loop, a full turn of four points a quarter turn apart. */
+const SEARCH_GROW_2D = Math.sqrt(Math.sqrt(SEARCH_GROW));
 /** A believed hole is never nearer the map's side than this (world units): the walkway's end columns' centres are within 1 of it, so an ant there counts as at its belief. */
 const EDGE = 0.75;
 /** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */
