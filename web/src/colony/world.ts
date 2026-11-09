@@ -1,6 +1,6 @@
 import { Chambers } from "./chambers.ts";
 import { CHUNK, CHUNK_BITS, ChunkLayer, local } from "./chunks.ts";
-import { CELL, cellOf, centreX, centreY, E, extent, hexDistance, NE, NW, nx, ny, R, W } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, discOffsets, E, extent, hexDistance, NE, NW, nx, ny, R, W } from "./hex.ts";
 
 // The colonies' world, pure: a procedural map from a seed, kept in 64×64
 // chunks (chunks.ts). Rock comes from three octaves of hashed value noise:
@@ -92,9 +92,15 @@ export interface WorldMap {
   /**
    * The side view: cells of loose soil on the map (heapMound adds one, takeLoose takes one). The mound is every colony's:
    * ants pick up whichever spoil they meet, so only this total is a count of cells (a colony's own count went negative
-   * when it took more of a rival's spoil than of its own: review of MR 15).
+   * when it took more of a rival's spoil than of its own: review of MR 15). One world's plane: pellets in `spoil`.
    */
   moundCells?: number;
+  /**
+   * One world's plane (U3c, docs/one-world.md §4): the mound as a height field, pellets of spoil heaped per cell
+   * (heapPlane adds one, takePlane takes one). Spoil doesn't change walking: it is a height to draw and to pick from, and
+   * food on a heaped cell stays on top. Allocated by generateOneWorld; absent on every other map.
+   */
+  spoil?: ChunkLayer<Uint16Array>;
   /** the side view: the nests' chambers (nest slice 2): which cells are chambers, and each chamber's floor */
   chambers?: Chambers;
   /** when each cell was last dug open by an ant (simulated seconds; −Infinity = never): fresh digging is the live frontier, not filled back (BACKFILL.young) */
@@ -1033,6 +1039,93 @@ export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number,
   map.moundCells = (map.moundCells ?? 0) + 1;
   updateSurface(map, x, y);
   return [x, y];
+}
+
+/** One world's plane: how far (cells) heapPlane looks round where a pellet is dropped for a cell with room, when that one has none. */
+export const SPOIL_SEARCH = 16;
+
+/**
+ * One world's plane (U3c, docs/one-world.md §4): heap a pellet of spoil dropped at cell (x, y), as a 2D sandpile (the side
+ * view's heapMound on the plane). It slides to its lowest neighbour (outward from the nearest hole on a tie, then the first
+ * way round) while that one is a level or more lower: at most a level a cell, ≈41°, the angle of repose of damp soil. Round
+ * every hole in `holes` (plane cells, every nest's), a cell holds at most (hex distance to the hole − 1) levels: a ring whose
+ * inner side slopes down into the hole at that same angle, a crater with the hole open at its bottom, so no mound ever
+ * buries a way in, a rival's included. It is the sandpile's physics, as the side view's funnel is, not an ant's choice.
+ * Only open ground takes spoil, and food on a heaped cell stays on top. Where (x, y) has no room (rock, the crater, off
+ * the plane) it lands on the nearest cell that has, within SPOIL_SEARCH. Returns the cell heaped, or null if none had room.
+ */
+export function heapPlane(map: WorldMap, x: number, y: number, holes: readonly { x: number; y: number }[]): [number, number] | null {
+  const spoil = map.spoil;
+  if (!spoil) return null;
+  // The most a cell may hold: none on rock or off the plane; within a hole's ring, a level less than its distance from it.
+  const cap = (cx: number, cy: number): number => {
+    if (!inBounds(map, cx, cy) || rockAt(map, cx, cy) !== OPEN) return 0;
+    let c = 0xffff;
+    for (const h of holes) c = Math.min(c, hexDistance(cx, cy, h.x, h.y) - 1);
+    return c;
+  };
+  const room = (cx: number, cy: number): boolean => spoil.get(cx, cy) < cap(cx, cy);
+  // From the hole nearest (cx, cy): the tie-break outward.
+  const fromHole = (cx: number, cy: number): number => {
+    let d = Infinity;
+    for (const h of holes) d = Math.min(d, hexDistance(cx, cy, h.x, h.y));
+    return d;
+  };
+  let cx = x;
+  let cy = y;
+  if (!room(cx, cy)) {
+    const offs = discOffsets(SPOIL_SEARCH)[cy & 1] as Int16Array;
+    let found = false;
+    for (let k = 2; k < offs.length; k += 2) {
+      const tx = cx + (offs[k] as number);
+      const ty = cy + (offs[k + 1] as number);
+      if (room(tx, ty)) {
+        cx = tx;
+        cy = ty;
+        found = true;
+        break;
+      }
+    }
+    if (!found) return null;
+  }
+  for (let guard = 0; guard < 0xffff; guard++) {
+    const here = spoil.get(cx, cy);
+    let bx = -1;
+    let by = -1;
+    let bh = here; // a neighbour must be a level lower or more: below here − 1 + 1
+    let bd = -1;
+    for (let d = 0; d < 6; d++) {
+      const tx = nx(cx, cy, d);
+      const ty = ny(cy, d);
+      if (!room(tx, ty)) continue;
+      const th = spoil.get(tx, ty);
+      if (th > here - 1) continue;
+      const td = fromHole(tx, ty);
+      if (th < bh || (th === bh && td > bd)) {
+        bx = tx;
+        by = ty;
+        bh = th;
+        bd = td;
+      }
+    }
+    if (bx < 0) break;
+    cx = bx;
+    cy = by;
+  }
+  spoil.set(cx, cy, spoil.get(cx, cy) + 1);
+  map.moundCells = (map.moundCells ?? 0) + 1;
+  return [cx, cy];
+}
+
+/** One world's plane: take a pellet of spoil off cell (x, y) (an ant picks one up). False if it holds none. */
+export function takePlane(map: WorldMap, x: number, y: number): boolean {
+  const spoil = map.spoil;
+  if (!spoil) return false;
+  const h = spoil.get(x, y);
+  if (h <= 0) return false;
+  spoil.set(x, y, h - 1);
+  map.moundCells = (map.moundCells ?? 0) - 1;
+  return true;
 }
 
 /**
