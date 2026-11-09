@@ -324,7 +324,7 @@ export class Game {
       });
       // Undertakers put the dead on the midden: a host of a strain that sporulates (Bloom) puts spores on the ground there;
       // other strains die with their host (nest slices 7–8).
-      // On the layer it is buried on: one world buries at the hole on the plane (until U3c's midden there).
+      // On the layer it is buried on: one world's midden is on the plane (U3c).
       c.onBury = (d, layer = 0) => {
         if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates) this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
       };

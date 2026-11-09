@@ -8,13 +8,24 @@
 // The fungus isn't landed (the page lands it when Start is pressed): this is how far healthy colonies dig. Whether an
 // infection changes that is for U3's re-measurement on one world.
 //
-// Usage: node scripts/dig-spread.mjs [seeds=1-3] [seconds=600] [ants=600]
+// --one (U3c, docs/one-world.md §3, §6): one world instead, generateOneWorld(seed) with gameRng(seed), the fungus landed at
+// the start as the page lands it when Start is pressed (useColony: game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true }),
+// Garden on colony 0). The cells are the curtain's, the holes its nests' entrance columns, and "outward" is along the
+// curtain past the end holes (west of the westmost column, east of the eastmost): the margin past each end hole.
+//
+// Usage: node scripts/dig-spread.mjs [--one] [seeds=1-3] [seconds=600] [ants=600]
 import { CHUNK, CHUNK_BITS } from "../web/src/colony/chunks.ts";
 import { Game, GAME_REGROW, gameRng } from "../web/src/colony/game.ts";
+import { STRAINS } from "../web/src/colony/fungus.ts";
 import { CELL, cellOf } from "../web/src/colony/hex.ts";
+import { generateOneWorld } from "../web/src/colony/oneWorld.ts";
 import { generateSideWorld } from "../web/src/colony/world.ts";
 
-const [range = "1-3", secs = "600", antArg = "600"] = process.argv.slice(2);
+const one = process.argv.includes("--one");
+const [range = "1-3", secs = "600", antArg = "600"] = process.argv.slice(2).filter((a) => a !== "--one");
+// The page's landing (web/src/ui/useColony.ts: LANDING_COLONY, GAME_STRAIN), written out here: that module is React's.
+const LANDING_COLONY = 0;
+const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 const [lo, hi = lo] = range.split("-").map(Number);
 const seconds = Number(secs);
 const ants = Number(antArg);
@@ -51,11 +62,15 @@ function spread(map) {
 }
 
 for (let seed = lo; seed <= hi; seed++) {
-  const game = new Game(generateSideWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW }, gameRng(seed));
+  const game = new Game(one ? generateOneWorld(seed) : generateSideWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW }, gameRng(seed));
+  if (one) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
+  // One world: the curtain, where the digging is (game.map is the plane).
+  const dug = one ? game.world.curtain : game.map;
   // Ticks counted as whole numbers: summing DT as a float drifts, and a checkpoint would land a tick early or late.
   let tick = 0;
   for (const at of checkpoints) {
     for (; tick < Math.round(at / DT); tick++) game.tick(DT);
-    console.log(`seed ${seed}, ${at} s: ${spread(game.map)}`);
+    const pops = one ? ` (ants ${game.colonies.map((c) => c.population).join(" / ")}, infected ${game.colonies.map((c) => c.load.filter((v, i) => c.alive[i] && v > 0).length).join(" / ")})` : "";
+    console.log(`seed ${seed}${one ? " (one world)" : ""}, ${at} s: ${spread(dug)}${pops}`);
   }
 }

@@ -3,7 +3,7 @@
 // sheet hanging under the line through the nests' holes (transect.ts), laid out as a side view so today's renderer,
 // nest digger and chambers work on it unchanged:
 //
-//   rows 0 … CURTAIN_SKY − 1   sky (AIR): room for the mound's cut (one-world §4)
+//   rows 0 … CURTAIN_SKY − 1   sky (AIR): room for the mound's cut (one-world §4; the mound itself is the plane's `spoil`)
 //   row  CURTAIN_SKY            the ground strip: a copy of the plane under the line, P(s) column by column. The
 //                               surface belongs to the plane alone; this row is only how the side view shows it, and
 //                               refreshStrip copies it again (nothing is simulated twice, one-world §2). The sky and
@@ -85,6 +85,9 @@ export function generateOneWorld(seed: number, opts: { plane?: Partial<WorldOpti
     return { x: CELL[0]!, y: CELL[1]! };
   });
   const line = makeTransect(holes);
+  // The mound is the plane's (U3c): a height field of spoil, empty at the start.
+  plane.spoil = new ChunkLayer((n) => new Uint16Array(n), 0);
+  plane.moundCells = 0;
   return { seed, plane, line, curtain: generateCurtain(seed, plane, line) };
 }
 

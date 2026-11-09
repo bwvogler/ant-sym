@@ -4,7 +4,7 @@ import { CURTAIN, LIFESPAN, MIDDLE, MODES, PLANE, type Colony, type HoleCell, ty
 import { decodeFungal } from "../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../fungus.ts";
 import { Game, gameRng, isOneWorld, type GameSave } from "../game.ts";
-import { CELL, cellOf, centreX, centreY } from "../hex.ts";
+import { CELL, cellOf, centreX, centreY, hexDistance } from "../hex.ts";
 import { generateOneWorld, type OneWorld } from "../oneWorld.ts";
 import { decode, encode } from "../save.ts";
 import { generateSideWorld, rockAt, OPEN } from "../world.ts";
@@ -123,25 +123,32 @@ test("one world: the young never go out, pushed back down the shaft", () => {
   }
 });
 
-test("one world: spoil carried up the shaft is put down at the hole on the plane (soilOut)", () => {
+test("one world: spoil carried up the shaft goes out onto the plane with its carrier, and is heaped there, not at the hole (U3c)", () => {
   const g = game();
   const c = g.player;
   ages(c, 0);
   const i = 0;
   c.age[i] = ageOf(1);
-  const at = curtainHole(own(c));
+  const h = own(c);
+  const at = curtainHole(h);
   c.putAnt(i, CURTAIN, at.x, at.y);
   c.pellet[i] = 1;
   c.mode[i] = RETURN;
   const out = c.soilOut;
-  run(g, 1);
+  for (let k = 0; k < 30 && c.layer[i] !== PLANE; k++) g.tick(DT);
   assert.equal(c.layer[i], PLANE, "it went up");
-  assert.equal(c.pellet[i], 0, "and put the pellet down");
-  assert.equal(c.soilOut, out + 1);
+  assert.equal(c.pellet[i], 1, "still carrying it");
+  assert.equal(c.soilOut, out, "nothing put down at the hole");
   assert.equal(c.crossedUp, 1);
+  for (let k = 0; k < Math.round(20 / DT) && c.pellet[i]; k++) g.tick(DT);
+  assert.equal(c.pellet[i], 0, "put down out on the plane");
+  assert.equal(c.soilOut, out + 1);
+  const plane = g.world!.plane;
+  assert.equal(plane.moundCells, 1, "one pellet × SWELL heaped");
+  assert.equal(plane.spoil!.get(h.px, h.py), 0, "none on the hole");
 });
 
-test("one world: a corpse carried up is buried at the hole, and a sporulating host's spores lie there on the plane", () => {
+test("one world: a corpse carried up goes to the plane's midden, not the hole, and a sporulating host's spores lie there (U3c)", () => {
   const g = game();
   const c = g.player;
   ages(c, 0);
@@ -156,17 +163,22 @@ test("one world: a corpse carried up is buried at the hole, and a sporulating ho
   assert.equal(c.corpses.length, 1, "it lies where it fell, underground");
   const i = 0;
   c.age[i] = ageOf(1);
-  for (let k = 0; k < Math.round(30 / DT) && c.buried === 0; k++) {
+  for (let k = 0; k < Math.round(60 / DT) && c.buried === 0; k++) {
     if (!c.carriesCorpse(i) && c.layer[i] === CURTAIN) {
       c.putAnt(i, CURTAIN, at.x, at.y + 1);
       c.mode[i] = EXPLORE;
     }
     g.tick(DT);
   }
-  assert.equal(c.buried, 1, "buried within 30 s");
+  assert.equal(c.buried, 1, "on the midden within 60 s");
   assert.equal(c.corpses.length, 0);
   assert.equal(c.layer[i], PLANE);
-  assert.ok(g.fungus.spores.get(h.px, h.py) > 0, "spores on the plane at the hole");
+  const key = [...c.midden.keys()][0]!;
+  const mx = key % 65536;
+  const my = Math.floor(key / 65536);
+  assert.ok(hexDistance(mx, my, h.px, h.py) >= 6, `the midden is out from the hole (${hexDistance(mx, my, h.px, h.py)} cells)`);
+  assert.ok(g.fungus.spores.get(mx, my) > 0, "spores on the plane at the midden");
+  assert.equal(g.fungus.spores.get(h.px, h.py), 0, "none at the hole");
 });
 
 test("one world: a carrier on the plane goes down its hole, and its food is stored", () => {
