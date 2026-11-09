@@ -80,7 +80,7 @@ export default function OneWorldPreview() {
   const applySeed = () => {
     const n = parseSeed(seedText);
     // The current seed again (as leaving the box after a reset does): nothing changes, and a notice stays to be read.
-    if (n === seed) return;
+    if (n === seed) return setSeedText(String(seed)); // "03" or "3.0": shown as the seed it is
     if (n === null) {
       if (seedText.trim() !== "") setFailed(`"${seedText}" is no seed (a whole number from 1); still showing seed ${seed}.`);
       return setSeedText(String(seed));

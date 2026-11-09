@@ -36,7 +36,7 @@ interface Props {
   onChamber?: (k: number, id: number) => void;
   /**
    * Nothing runs (the one-world preview): `onFrame` may never fire, so the field draws itself, once a frame at most, when
-   * its camera, size, theme or labels change. A running game leaves it off: its frames draw everything.
+   * its camera, size, theme, labels or trail layers change. A running game leaves it off: its frames draw everything.
    */
   still?: boolean;
 }
@@ -98,6 +98,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
   const fitted = useRef(true);
   useEffect(() => {
     layers.current = { food: showFoodTrail, home: showHomeTrail };
+    redraw.current();
   }, [showFoodTrail, showHomeTrail]);
   useEffect(() => {
     follow.current = followed;

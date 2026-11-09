@@ -741,6 +741,11 @@ export function keepReachableFood(map: WorldMap, from: readonly { x: number; y: 
   map.foodLeft = total;
 }
 
+/** Whether world (x, y) lies within `d` of a side-view nest's chamber or its entrance: how far food keeps from nests. */
+export function nearNests(nests: readonly Nest[]): (x: number, y: number, d: number) => boolean {
+  return (x, y, d) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || Math.hypot(x - n.entrance!.x, y - n.entrance!.y) < d);
+}
+
 /**
  * Food below ground (the side view's, the curtain's): one block's pockets, `patchesPerChunk` on average, from the block's
  * own stream `r`. Each pocket gets 12 tries; `at()` draws a try's centre cell, or null when it lies where no pocket goes
@@ -863,7 +868,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   }
   map.nest = nests[0] as Nest;
   map.nests = nests;
-  const nearNest = (x: number, y: number, d: number) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || Math.hypot(x - n.entrance!.x, y - n.entrance!.y) < d);
+  const nearNest = nearNests(nests);
 
   // Food on the ground: piles 3–6 cells wide on the walkway, per 64 columns (seeds and bits, as harvester ants forage).
   for (let cx = 0; cx < Math.ceil(size.w / CHUNK); cx++) {
@@ -988,7 +993,7 @@ export function groundTop(map: WorldMap, x: number): number {
  * Returns the cell heaped, or null if there is no room on that side (the sky's top, the map's edge).
  */
 export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number, holes: readonly number[] = [ex], from?: number): [number, number] | null {
-  if (!map.sky || !map.loose) return null;
+  if (!map.sky || !map.loose || map.surfaceRows) return null; // the curtain: the mound is the plane's (one-world §4)
   const tops = holes.map((h) => groundTop(map, h));
   // Room in column c: on the map, no hole's column, and below every funnel's slope up from its hole.
   const ok = (c: number) => {
@@ -1020,7 +1025,7 @@ export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number,
     else break;
   }
   const y = groundTop(map, x) - 1;
-  if (y < Math.max(1, map.surfaceRows ?? 0)) return null; // the sky's top; the curtain's surface is the plane's (one-world §4)
+  if (y < 1) return null;
   moveFoodCell(map, x, y, x, y - 1);
   map.rock.set(x, y, SOIL);
   map.sky.set(x, y, 0);

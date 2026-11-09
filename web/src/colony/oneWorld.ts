@@ -28,6 +28,7 @@ import {
   hash4,
   keepReachableFood,
   mulberry32,
+  nearNests,
   OPEN,
   OPEN_WORLD,
   ROCK,
@@ -141,7 +142,7 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
   }
   curtain.nest = nests[0]!;
   curtain.nests = nests;
-  const nearNest = (x: number, y: number, d: number) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || Math.hypot(x - n.entrance!.x, y - n.entrance!.y) < d);
+  const nearNest = nearNests(nests);
 
   // Food below ground: pockets in the soil, as the side view's, keyed by blocks of the line's columns (s). Whether a pocket
   // is placed depends only on its block, its depth and the nests near it, never on where the line ends, so a column keeps
