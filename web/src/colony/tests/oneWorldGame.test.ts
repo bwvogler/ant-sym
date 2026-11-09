@@ -6,6 +6,7 @@ import { NEST_ONLY, STRAINS } from "../fungus.ts";
 import { Game, gameRng, isOneWorld, type GameSave } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { generateOneWorld, type OneWorld } from "../oneWorld.ts";
+import { decode, encode } from "../save.ts";
 import { generateSideWorld, rockAt, OPEN } from "../world.ts";
 
 // One world's game (ja-lp4.3, U3a; docs/one-world.md §2, §4): colonies on the plane and the curtain, crossing at their
@@ -222,6 +223,7 @@ test("one world: a raider on the rival's hole goes down the rival's shaft", () =
   assert.equal(c.recruited[i], 1, "still a raider");
   run(g, 2);
   assert.equal(c.recruited[i], 1, "a raider keeps its stance underground");
+  assert.equal(c.layer[i], CURTAIN, "and raids on down there, not back up the shaft");
 });
 
 test("one world: rivals on different layers at the same spot never fight; on the same layer they do", () => {
@@ -339,6 +341,195 @@ test("one world: food and ants are conserved over 90 s, and no ant underground i
     up += c.carriedUp;
   });
   assert.equal(plane.foodTotal - plane.foodLeft, carried + down - up, "the plane's food taken is in jaws on it or went down a hole");
+});
+
+// The fungus step and the nest odour, per layer (review of #59, S1). Ants are put back in place each tick, as above.
+
+/** Clean ants 1–5 of the player's on the plane at (x, y), every tick for 3 s while `each` sets up the source; their summed load. */
+const planeLoad = (g: Game, x: number, y: number, each: () => void): number => {
+  const c = g.player;
+  run(g, 3, () => {
+    each();
+    g.fungus.hosts = 1; // a load set by hand leaves the fungus idle: the step runs only with a host
+    for (let i = 1; i < 6; i++) c.putAnt(i, PLANE, x, y);
+  });
+  let s = 0;
+  for (let i = 1; i < 6; i++) s += c.load[i] as number;
+  return s;
+};
+
+test("one world: a host in the curtain passes nothing to the ants on the plane over it; on the plane it does", () => {
+  const load = (hostLayer: number): number => {
+    const g = game();
+    const c = g.player;
+    ages(c, 0);
+    const spot = g.world!.curtain.nests[0]!; // the player's chamber
+    return planeLoad(g, spot.x, spot.y, () => {
+      c.putAnt(0, hostLayer, spot.x, spot.y);
+      c.load[0] = 0.8;
+      c.strain[0] = GARDEN;
+    });
+  };
+  assert.equal(load(CURTAIN), 0, "a layer apart: the load grid and each ant's step are the layer's");
+  assert.ok(load(PLANE) > 0.1, "the control: on the plane beside them, they pick it up");
+});
+
+test("one world: a loaded queen passes nothing to the ants on the plane over her", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const q = c.queen!;
+  const loaded = planeLoad(g, q.x, q.y, () => {
+    q.load = 0.8;
+    q.strain = GARDEN;
+  });
+  assert.equal(loaded, 0, "she is in the load grid of her home layer only");
+});
+
+test("one world: spores on the plane over the queen don't reach her", () => {
+  const g = game();
+  const q = g.player.queen!;
+  run(g, 3, () => g.paintSpores(q.x, q.y, 2, 3, 0, GARDEN));
+  cellOf(q.x, q.y);
+  assert.ok(g.fungus.spores.get(CELL[0] as number, CELL[1] as number) > 0, "spores on the plane at her x, y");
+  assert.equal(q.load, 0, "she is stepped on her home layer only");
+});
+
+test("one world: the nest odour drifts toward the ants in the royal chamber, not those on the plane over it", () => {
+  const moved = (layer: number): number => {
+    const g = game();
+    const c = g.player;
+    const q = c.queen!;
+    const before = c.nestOdour;
+    run(g, 10, () => {
+      for (let i = 0; i < 10; i++) {
+        c.putAnt(i, layer, q.x, q.y);
+        c.odour[i] = before < 0.5 ? before + 0.4 : before - 0.4; // strangers' odour
+      }
+    });
+    return Math.abs(c.nestOdour - before);
+  };
+  assert.equal(moved(PLANE), 0, "a layer apart: the nest's odour stays");
+  assert.ok(moved(CURTAIN) > 0.01, "the control: in the royal chamber, it drifts toward them");
+});
+
+// The crossing guards play reaches (review of #59, S2). Private state an ant can't be given by the public API is set
+// through the colony's own save and restore (saveState / loadState): no test hook.
+
+/** The colony's private fields `keys`, decoded; `edit` changes them, and they are put back. */
+const editPrivate = (c: Colony, keys: readonly string[], edit: (r: Record<string, unknown>) => void): void => {
+  const saved = c.saveState().private as Record<string, unknown>;
+  const r: Record<string, unknown> = {};
+  for (const k of keys) r[k] = decode(saved[k]);
+  edit(r);
+  c.loadState({ fields: {}, private: Object.fromEntries(keys.map((k) => [k, encode(r[k])])) });
+};
+/**
+ * Ants `ants` of colony c at the top of a shaft (curtain point `at`) facing up, put there again every half second they are still in the
+ * curtain (it takes them a few ticks to step up: put back every tick, nobody would reach the surface), for 3 s; `set`
+ * runs before each tick.
+ */
+const atTop = (g: Game, c: Colony, at: { x: number; y: number }, ants: readonly number[], set: () => void): void => {
+  for (let k = 0; k < Math.round(3 / DT); k++) {
+    if (k % 15 === 0)
+      for (const i of ants)
+        if (c.layer[i] === CURTAIN) {
+          c.putAnt(i, CURTAIN, at.x, at.y);
+          c.heading[i] = -Math.PI / 2;
+        }
+    set();
+    g.tick(DT);
+  }
+};
+/** The player's royal chamber in the curtain. */
+const royalOf = (g: Game, c: Colony): number => g.world!.curtain.chambers!.list.find((r) => r.role === "royal" && r.colony === c.params.nest)!.id;
+
+test("one world: an old ant holding brood, and an old porter, at the top of a shaft are turned back down it", () => {
+  // At the top of the rival's shaft: lost in another nest's tunnels, a homing ant heads for the hole and climbs out (#goal),
+  // so only this guard keeps brood and moved food in. (At its own, it homes to its chamber and is turned back for that.)
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const rival = c.holeCells[1] as HoleCell;
+  const at = curtainHole(rival);
+  const royal = royalOf(g, c);
+  // Ant 0 holds an egg on its way to the royal chamber, as a nurse picks one up (#nurse).
+  cellOf(at.x, at.y);
+  const egg = c.brood.add(CELL[0] as number, CELL[1] as number, -1);
+  egg.held = 0;
+  // Ant 1 is a porter, taking food between chambers (#becomePorter): its food is already the colony's.
+  c.carrying[1] = 1;
+  c.mode[1] = RETURN;
+  editPrivate(c, ["holdsBrood", "broodTo", "porter", "portTo", "inJaws"], (r) => {
+    (r.holdsBrood as Uint8Array)[0] = 1;
+    (r.broodTo as Int16Array)[0] = royal;
+    (r.porter as Uint8Array)[1] = 1;
+    (r.portTo as Int16Array)[1] = royal;
+    r.inJaws = (r.inJaws as number) + 1;
+  });
+  // An old explorer with them as the control: it goes out.
+  const free = 2;
+  for (const i of [0, 1, free]) c.age[i] = ageOf(2);
+  atTop(g, c, at, [0, 1, free], () => {
+    c.mode[free] = EXPLORE;
+  });
+  assert.equal(c.layer[free], PLANE, "the control: an old explorer in their place climbs out");
+  assert.ok(c.holdsBrood(0), "still holding the egg");
+  assert.equal(c.layer[0], CURTAIN, "brood stays in");
+  assert.equal(c.item(1), "food", "still porting");
+  assert.equal(c.layer[1], CURTAIN, "food moved between chambers stays in");
+  assert.equal(c.crossedUp, 1, "nobody else went up");
+});
+
+test("one world: a carrier homing to its chamber at the top of the shaft is turned back, not let out", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const i = 0;
+  c.age[i] = ageOf(2);
+  c.fatigue[i] = 2 * c.params.patience; // tired: its policy keeps it homing
+  atTop(g, c, curtainHole(own(c)), [i], () => {
+    c.carrying[i] = 1;
+    c.mode[i] = RETURN;
+  });
+  assert.equal(c.layer[i], CURTAIN);
+  assert.equal(c.crossedUp, 0, "a homing ant never climbs out of its own nest");
+});
+
+test("one world: a defender that goes down its hole no longer defends below", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const i = 0;
+  c.age[i] = ageOf(2);
+  const p = planeHole(own(c));
+  c.putAnt(i, PLANE, p.x + 1.5, p.y);
+  c.carrying[i] = 1; // going in (#wantsIn)
+  c.mode[i] = RETURN;
+  let defended = false;
+  for (let k = 0; k < 30 && c.layer[i] === PLANE; k++) {
+    c.threat[i] = 5 * c.params.defendAt; // it has felt a threat on home ground
+    g.tick(DT);
+    if (c.layer[i] === PLANE && c.stanceCounts().defend === 1) defended = true;
+  }
+  assert.ok(defended, "it defended on the plane");
+  assert.equal(c.layer[i], CURTAIN, "and went in");
+  run(g, 2);
+  assert.equal(c.stanceCounts().defend, 0, "below, where nothing sets it, its defence is cleared");
+});
+
+test("one world: an ant that dies on the plane leaves no corpse underground; one that dies underground does", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const p = planeHole(own(c));
+  c.putAnt(0, PLANE, p.x + 6, p.y);
+  c.kill(0, false);
+  assert.equal(c.corpses.length, 0, "the dead on the plane leave no corpse");
+  const at = curtainHole(own(c));
+  c.putAnt(1, CURTAIN, at.x, at.y + 4);
+  c.kill(1, false);
+  assert.equal(c.corpses.length, 1, "the control: underground, the dead lie where they fall");
 });
 
 test("one world: saving, loading and founding refuse until U4", () => {
