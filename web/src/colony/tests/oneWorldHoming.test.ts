@@ -196,3 +196,33 @@ test("plane: a belief past the plane's edge is held at the edge, and the carrier
   assert.ok(nearEdge < 1.5, `it went to the edge, where its belief is held (within ${nearEdge.toFixed(2)})`);
   assert.ok(t > 0, "down its hole within 90 s");
 });
+
+/** Ant 0 of c, homing, searching (reach 3), facing `heading`, ticks for `seconds` (or until it goes down); where it ended up. */
+function searchingRun(g: Game, c: Colony, heading: number, seconds: number): { x: number; y: number } {
+  c.search[0] = 3;
+  c.searchA[0] = 0;
+  c.heading[0] = heading;
+  c.bestD[0] = Infinity;
+  c.stallT[0] = 0;
+  c.fatigue[0] = 2 * c.params.patience; // tired: its policy keeps it in return
+  for (let k = 0; k < Math.round(seconds / DT) && c.layer[0] === PLANE; k++) g.tick(DT);
+  return { x: c.x[0] as number, y: c.y[0] as number };
+}
+
+test("plane: a searching carrier with the home trail under its antennae follows the trail, not its vector (review of #60)", () => {
+  // Led by its loops alone, colonies delivered up to 44 % less in the spike (one-world §4, U3b as built).
+  const g = game();
+  const c = g.player;
+  const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
+  // 24 east of the hole along open row 32, facing west, on a home trail that runs from it to the hole; it believes the hole
+  // 40 east (walked 200, drifting (0.2, 0)), behind it, and is searching there (its next point 43 east).
+  const S = { x: H.x + 24, y: H.y };
+  for (let x = H.x; x <= S.x + 2; x += 0.5) assert.ok(open(g, x, H.y), `row ${H.y} is open at x ${x}`);
+  for (let x = H.x; x <= S.x + 2; x += 0.5) c.paint("home", x, H.y, 1.5, 40, PLANE);
+  carrier(g, S.x, S.y, 200, 0.2, 0);
+  const end = searchingRun(g, c, Math.PI, 1.5);
+  // At its speed (7) it walks ~10 in 1.5 s: along the trail, it ends well west of where it started, still out of sight of
+  // the hole (the snap is not what moved it): 10 west. Steered by its vector it turns round within a second: 6 east.
+  assert.ok(Math.hypot(end.x - H.x, end.y - H.y) > NEST_SIGHT, `still out of sight of the hole (${(end.x - H.x).toFixed(1)} east of it)`);
+  assert.ok(end.x < S.x - 6, `it followed the trail west (${(end.x - S.x).toFixed(1)} from where it started)`);
+});

@@ -2573,14 +2573,17 @@ export class Colony {
    * where the vector ran out, they grow without limit in time), up to the whole ground; capped at 80 cells, a carrier
    * whose vector was off by more than about 86 never found its hole (review of #20). On one world's plane, the loops go
    * round where the vector ran out: each next point a quarter turn on, the first ahead of the ant, each loop of four
-   * SEARCH_GROW times wider (a game choice: the sources give no 2D geometry; docs/nest-and-home.md §3.1). No random draw
-   * there. It also searches on where it can get no nearer its point (SEARCH_STALL), and the home trail leads it (tick).
+   * SEARCH_GROW times wider. That simplifies the sources' 2D geometry: their loops grow but start and end at the search's
+   * centre (Müller & Wehner 1994, from its abstract; modelled by Waldner & Merkle 2018), where this spiral circles the
+   * centre and never goes back to it (docs/nest-and-home.md §1, §3.1; centred loops are ja-lp4.11). No random draw there.
+   * It also searches on whenever it gets no nearer its point for SEARCH_STALL seconds, and the home trail leads it (tick).
    */
   #searchOn(i: number): void {
     const s = this.search[i] as number;
     if (this.line !== null && this.#cur === PLANE) {
       const { w, h } = this.map.size;
       this.searchA[i] = s === 0 ? (this.heading[i] as number) : (this.searchA[i] as number) + Math.PI / 2;
+      // A safety cap at the plane's longer side: games don't reach it (no search passed 100 cells in seeds 1–3, review of #60).
       this.search[i] = s === 0 ? SEARCH_START : Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
     } else {
       const most = this.map.size.w;
@@ -4559,9 +4562,11 @@ export class Colony {
           this.bestD[i] = near;
           this.stallT[i] = 0;
         }
-        // One world's plane (U3b): no nearer where it believes the hole is for SEARCH_STALL seconds (the spot is in rock, or
-        // walled off: following the wall, one went round the plane's edge), it has got as near as the ground lets it, and
-        // searches on as if it had got there.
+        // One world's plane (U3b): any returner no nearer where it believes the hole is for SEARCH_STALL seconds searches on as
+        // if it had got there. That is what unblocks a belief in rock or walled off (following the wall, one went round the
+        // plane's edge), but most firings are away from the belief: on seed 1 (120 s) 596, 81 % more than 10 cells from it,
+        // 92 cutting short a walk round rock (review of #60). Narrower versions delivered about the same (seeds 1–3), so
+        // it stays a general "search sooner when blocked" rule.
         if (nest !== goal && (this.stallT[i] as number) > SEARCH_STALL && this.line !== null && this.#cur === PLANE) this.#searchOn(i);
         if (this.#entrance && (this.wall[i] !== 0 || detouring)) {
           // On the ground line it homes cell by cell (see #walkTunnel): no walls to follow, no detour to wander (an
@@ -4624,11 +4629,12 @@ export class Colony {
           } else {
             // Where it believed home was, and nothing there (the side view's drifting vector): search round it.
             if (nest !== goal && Math.hypot(nest.x - x, nest.y - y) < 1) this.#searchOn(i);
-            // On one world's plane, searching (its vector ran out where no hole was) with the home trail under its antennae,
-            // the trail leads, with the share of its turning a carrier gives a food trail (homeTrail): route cues and scent
-            // first, the vector the fallback (docs/trails.md). Led by its loops alone, colonies delivered up to 44 % less food
-            // than U3a's in the spike (one-world §4, U3b as built).
-            const lead = this.search[i] !== 0 && this.line !== null && this.#cur === PLANE && Math.max(hl, hf, hr) >= FAINT ? p.homeTrail : 0;
+            // On one world's plane, searching (its vector ran out where no hole was) with the home trail under its antennae and
+            // its hole not yet in sight (in sight, it steers for the hole itself: review of #60), the trail leads, with the share
+            // of its turning a carrier gives a food trail (homeTrail): route cues and scent first, the vector the fallback
+            // (docs/trails.md). Led by its loops alone, colonies delivered up to 44 % less food than U3a's in the spike
+            // (one-world §4, U3b as built).
+            const lead = nest !== goal && this.search[i] !== 0 && this.line !== null && this.#cur === PLANE && Math.max(hl, hf, hr) >= FAINT ? p.homeTrail : 0;
             h += climb(hl, hf, hr, p.turnRate * dt * (lead || 0.25)) + noise * p.wander * 0.25;
             h = turnToward(h, toNest, p.turnRate * dt * 0.8 * (1 - lead));
           }
@@ -5486,7 +5492,7 @@ const PI_DRIFT_2D = PI_DRIFT / Math.SQRT2;
 export const HOLE_SIGHT = 6;
 /** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one SEARCH_GROW times wider, to at most the map's width. */
 const SEARCH_START = 3;
-/** One world's plane: seconds a homing ant may get no nearer its belief before it searches on (the spot is in rock, or walled off). */
+/** One world's plane: seconds a homing ant may get no nearer its belief before it searches on, wherever it is (see tick: it unblocks beliefs in rock, and fires far from the belief too). */
 const SEARCH_STALL = 3;
 // Zoning by age (nest slice 6): see band, #mayGoOut, #digs.
 /** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
