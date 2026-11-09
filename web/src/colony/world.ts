@@ -79,6 +79,14 @@ export interface WorldMap {
    * later the mound); the rest is AIR (solid, never dug, drawn as sky). updateSurface keeps it so as ground changes.
    */
   sky?: ChunkLayer<Uint8Array>;
+  /**
+   * The one-world curtain (oneWorld.ts): its rows 0 … surfaceRows − 1, the sky over its ground strip and the strip, are
+   * drawn from the plane, not derived from the ground under them: updateSurface leaves them be, nothing fills them, no
+   * spoil is heaped there (the mound is the plane's, one-world §4), and no search passes through them. No cell in them
+   * is soil, so none is dug. The crust under them is soil touching their sky, which ants leave (colony.ts #crust) as
+   * they leave today's ground line. Absent elsewhere.
+   */
+  surfaceRows?: number;
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
   loose?: ChunkLayer<Uint8Array>;
   /**
@@ -286,7 +294,7 @@ export function dig(map: WorldMap, x: number, y: number): boolean {
 
 /** Fill open integer cell (x, y) back with soil (a pellet dropped into a dead end) at time t; false if it isn't open ground on the map. */
 export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
-  if (!inBounds(map, x, y) || rockAt(map, x, y) !== OPEN) return false;
+  if (!inBounds(map, x, y) || y < (map.surfaceRows ?? 0) || rockAt(map, x, y) !== OPEN) return false;
   map.rock.set(x, y, SOIL);
   map.digHeading.set(x, y, 0);
   map.filledAt.set(x, y, t);
@@ -339,10 +347,11 @@ function grounded(map: WorldMap, x: number, y: number): boolean {
 export function updateSurface(map: WorldMap, x: number, y: number): void {
   const sky = map.sky;
   if (!sky) return;
+  const top = map.surfaceRows ?? 0;
   for (let d = -1; d < 6; d++) {
     const ax = d < 0 ? x : nx(x, y, d);
     const ay = d < 0 ? y : ny(y, d);
-    if (!inBounds(map, ax, ay) || sky.get(ax, ay) !== 1) continue;
+    if (ay < top || !inBounds(map, ax, ay) || sky.get(ax, ay) !== 1) continue;
     const t = map.rock.get(ax, ay);
     if (t !== OPEN && t !== AIR) continue;
     map.rock.set(ax, ay, grounded(map, ax, ay) ? OPEN : AIR);
@@ -515,23 +524,31 @@ export function flat<A extends Uint8Array | Float32Array>(map: WorldMap, layer: 
 export type Through = "open" | "diggable";
 
 function passable(map: WorldMap, x: number, y: number, through: Through): boolean {
+  if (y < (map.surfaceRows ?? 0)) return false; // the curtain's surface is the plane's: no way round underground through it
   const t = rockAt(map, x, y);
   return through === "open" ? t === OPEN : t === OPEN || t === SOIL;
 }
 
 /** Cells reachable from world (x, y) through the six neighbours (walking through open ground, or digging through soil too), as a flat array over the map: the whole-map oracle. */
 export function reachable(map: WorldMap, x: number, y: number, through: Through = "open"): Uint8Array {
+  return reachableFrom(map, [{ x, y }], through);
+}
+
+/** Cells reachable from any of world points `from`, as `reachable`: one search, every point a start. */
+export function reachableFrom(map: WorldMap, from: readonly { x: number; y: number }[], through: Through = "open"): Uint8Array {
   const { w, h } = map.size;
   const seen = new Uint8Array(w * h);
-  cellOf(x, y);
-  const sx = CELL[0] as number;
-  const sy = CELL[1] as number;
-  if (!passable(map, sx, sy, through)) return seen;
   const queue = new Int32Array(w * h);
   let head = 0;
   let tail = 0;
-  queue[tail++] = sy * w + sx;
-  seen[sy * w + sx] = 1;
+  for (const p of from) {
+    cellOf(p.x, p.y);
+    const sx = CELL[0] as number;
+    const sy = CELL[1] as number;
+    if (!inBounds(map, sx, sy) || seen[sy * w + sx] || !passable(map, sx, sy, through)) continue;
+    queue[tail++] = sy * w + sx;
+    seen[sy * w + sx] = 1;
+  }
   while (head < tail) {
     const c = queue[head++] as number;
     const cx = c % w;
@@ -701,18 +718,65 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
       }
     }
   // Clearing ground under a patch can open new ground but never closes any; food stays reachable (by digging, underground).
-  reach = reachable(map, nest.x, nest.y, dg);
+  keepReachableFood(map, [nest], dg);
+  return map;
+}
+
+/**
+ * Keep only the food an ant from one of `from` (world points: the nests) can reach, walking or, with "diggable", digging;
+ * the rest is taken off the map. Food above row `fromRow` is neither checked nor counted. Sets foodTotal and foodLeft.
+ */
+export function keepReachableFood(map: WorldMap, from: readonly { x: number; y: number }[], through: Through, fromRow = 0): void {
+  const { w, h } = map.size;
+  const reach = reachableFrom(map, from, through);
   let total = 0;
-  for (let y = 0; y < size.h; y++)
-    for (let x = 0; x < size.w; x++) {
-      const v = food.get(x, y);
+  for (let y = fromRow; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const v = map.food.get(x, y);
       if (!v) continue;
-      if (!reach[y * size.w + x]) food.set(x, y, 0);
+      if (!reach[y * w + x]) map.food.set(x, y, 0);
       else total += v;
     }
   map.foodTotal = total;
   map.foodLeft = total;
-  return map;
+}
+
+/** Whether world (x, y) lies within `d` of a nest or its entrance (side view): how far food keeps from nests. */
+export function nearNests(nests: readonly Nest[]): (x: number, y: number, d: number) => boolean {
+  return (x, y, d) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || (n.entrance !== undefined && Math.hypot(x - n.entrance.x, y - n.entrance.y) < d));
+}
+
+/**
+ * Food below ground (the side view's, the curtain's): one block's pockets, `patchesPerChunk` on average, from the block's
+ * own stream `r`. Each pocket gets 12 tries; `at()` draws a try's centre cell, or null when it lies where no pocket goes
+ * (too shallow, off the map). A pocket is 2–4 cells round, keeps `foodMinDist` from the nests (`nearNest`), and opens no
+ * cell above row `floor(x)` of its column.
+ */
+export function buryPockets(
+  map: WorldMap,
+  o: WorldOptions,
+  r: () => number,
+  at: () => readonly [number, number] | null,
+  floor: (x: number) => number,
+  nearNest: (x: number, y: number, d: number) => boolean,
+): void {
+  const count = Math.floor(o.patchesPerChunk) + (r() < o.patchesPerChunk % 1 ? 1 : 0);
+  for (let p = 0; p < count; p++) {
+    for (let tries = 0; tries < 12; tries++) {
+      const cell = at();
+      if (!cell) continue;
+      const x = centreX(cell[0], cell[1]);
+      const y = centreY(cell[1]);
+      const radius = 2 + r() * 2;
+      if (nearNest(x, y, o.foodMinDist + radius + 1)) continue;
+      disc(map, x, y, radius, (fx, fy) => {
+        if (fy < floor(fx)) return;
+        setRock(map, fx, fy, OPEN);
+        map.food.set(fx, fy, o.foodPerCell);
+      });
+      break;
+    }
+  }
 }
 
 /** Side-view options: a cross-section, sky above a ground line `surface` rows down, `relief` rows of rise and fall. */
@@ -749,6 +813,15 @@ export const SIDE_WORLD: SideWorldOptions = {
   chamberDepth: 14,
 };
 
+/**
+ * The side view's ground at world (wx, wy), `depth` rows below the ground line: stones from a few rows down, more of them
+ * deeper; cavities only well below the ground line; soil elsewhere. One world's curtain digs its ground by the same rule.
+ */
+export function groundCell(seed: number, depth: number, wx: number, wy: number, cut: number, scut: number): Terrain {
+  const stone = depth > 3 && heightAt(seed, wx, wy) + 0.06 * Math.min(1, depth / 200) > cut;
+  return stone ? ROCK : depth > 8 && chamberAt(seed, wx, wy) >= scut ? OPEN : SOIL;
+}
+
 /** The ground line's row at column x: gentle rise and fall (value noise over ~40 columns, rough over ~9). */
 export function groundRow(seed: number, o: { surface: number; relief: number }, x: number): number {
   const n = 0.75 * noiseAt(seed, 6, x, 0, 40) + 0.25 * noiseAt(seed, 7, x, 0, 9);
@@ -781,12 +854,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
         rock.set(x, y, AIR);
         continue;
       }
-      const depth = y - g;
-      const wx = centreX(x, y);
-      const wy = centreY(y);
-      // Stones from a few rows down, more of them deeper; cavities only well below the ground line.
-      const stone = depth > 3 && heightAt(seed, wx, wy) + 0.06 * Math.min(1, depth / 200) > cut;
-      rock.set(x, y, stone ? ROCK : depth > 8 && chamberAt(seed, wx, wy) >= scut ? OPEN : SOIL);
+      rock.set(x, y, groundCell(seed, y - g, centreX(x, y), centreY(y), cut, scut));
     }
   // The walkway: sky cells touching the ground.
   for (let y = 0; y < size.h; y++) for (let x = 0; x < size.w; x++) if (sky.get(x, y) === 1 && grounded(map, x, y)) rock.set(x, y, OPEN);
@@ -800,7 +868,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   }
   map.nest = nests[0] as Nest;
   map.nests = nests;
-  const nearNest = (x: number, y: number, d: number) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || Math.hypot(x - n.entrance!.x, y - n.entrance!.y) < d);
+  const nearNest = nearNests(nests);
 
   // Food on the ground: piles 3–6 cells wide on the walkway, per 64 columns (seeds and bits, as harvester ants forage).
   for (let cx = 0; cx < Math.ceil(size.w / CHUNK); cx++) {
@@ -825,37 +893,15 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   for (let cy = 0; cy < Math.ceil(size.h / CHUNK); cy++)
     for (let cx = 0; cx < Math.ceil(size.w / CHUNK); cx++) {
       const r = mulberry32(hash4(seed, 77, cx, cy));
-      const count = Math.floor(o.patchesPerChunk) + (r() < o.patchesPerChunk % 1 ? 1 : 0);
-      for (let p = 0; p < count; p++) {
-        for (let tries = 0; tries < 12; tries++) {
-          const row = (cy << CHUNK_BITS) + Math.floor(r() * CHUNK);
-          const col = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
-          if (col >= size.w || row >= size.h - 3 || row < (ground[col] as number) + 10) continue;
-          const x = centreX(col, row);
-          const y = centreY(row);
-          const radius = 2 + r() * 2;
-          if (nearNest(x, y, o.foodMinDist + radius + 1)) continue;
-          disc(map, x, y, radius, (fx, fy) => {
-            if (fy < (ground[fx] as number) + 4) return;
-            setRock(map, fx, fy, 0);
-            food.set(fx, fy, o.foodPerCell);
-          });
-          break;
-        }
-      }
+      const at = () => {
+        const row = (cy << CHUNK_BITS) + Math.floor(r() * CHUNK);
+        const col = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
+        return col >= size.w || row >= size.h - 3 || row < (ground[col] as number) + 10 ? null : ([col, row] as const);
+      };
+      buryPockets(map, o, r, at, (fx) => (ground[fx] as number) + 4, nearNest);
     }
   // Only food the player's ants can reach, walking or digging (the walkway and the soil are one ground).
-  const reach = reachable(map, map.nest.x, map.nest.y, "diggable");
-  let total = 0;
-  for (let y = 0; y < size.h; y++)
-    for (let x = 0; x < size.w; x++) {
-      const v = food.get(x, y);
-      if (!v) continue;
-      if (!reach[y * size.w + x]) food.set(x, y, 0);
-      else total += v;
-    }
-  map.foodTotal = total;
-  map.foodLeft = total;
+  keepReachableFood(map, [map.nest], "diggable");
   return map;
 }
 
@@ -947,7 +993,7 @@ export function groundTop(map: WorldMap, x: number): number {
  * Returns the cell heaped, or null if there is no room on that side (the sky's top, the map's edge).
  */
 export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number, holes: readonly number[] = [ex], from?: number): [number, number] | null {
-  if (!map.sky || !map.loose) return null;
+  if (!map.sky || !map.loose || map.surfaceRows) return null; // the curtain: the mound is the plane's (one-world §4)
   const tops = holes.map((h) => groundTop(map, h));
   // Room in column c: on the map, no hole's column, and below every funnel's slope up from its hole.
   const ok = (c: number) => {
