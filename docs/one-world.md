@@ -111,7 +111,7 @@ Most behaviour carries over unchanged. The new work is the seam between the two:
 - **On wide screens**, U5 ships the switch alone. Both views at once (side by side or stacked) is a follow-up, `ja-lp4.8` (§8).
 - **The Learn drawer's Nest tab** always has a nest to show. The field guide gains an entry for the line and the curtain.
 
-The renderer reads `colony.map.rock` row by row today (`paintChunk`, `drawHexes`, the minimap). The side view needs one more step: a column *s* maps to the plane cell *P(s)* for its ground strip. Below ground the curtain is a plain grid, so it draws exactly as the side view does now.
+The renderer reads `colony.map.rock` row by row today (`paintChunk`, `drawHexes`, the minimap). The side view needs one more step: a column *s* maps to the plane cell *P(s)* for its ground strip, read from the plane as it is drawn (decided, §8). Below ground the curtain is a plain grid, so it draws exactly as the side view does now.
 
 ## 6. Building it: stages and guards
 
@@ -155,5 +155,7 @@ A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.
 3. **Wide screens: the switch first.** U5 ships the above/below switch with linked clicks. Both views at once is a follow-up (`ja-lp4.8`).
 4. **The old maps become tests only after U6.** The side and open maps leave the page and stay as test beds until their assays are re-baselined.
 5. **The founding radius is 140 cells, the same as the flight** (`ja-lp4.10`; [nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game)). Measured: flight 140 with a 70-cell radius failed 51% of flights from end nests and 55% from interior ones; with 140, 6% and 28% (`scripts/flight-failure.mjs`, 300 seeds on the default plane). The hole gap and clearance stay 12. U4's assay on seeds 1–20, with the open map's rock, checks it; the endless world (`ja-qpv`) looks at it again, since the plane's edges drive most failures at a smaller radius.
+6. **The ground strip is drawn, not stored** (2026-11-09). The side view draws its top strip straight from the plane cells under the line when it renders; the curtain stops keeping a copy, so nothing underground can change the surface or take its food twice. U2 built the copy behind guards (`surfaceRows`); U3 keeps underground ants off it until U5's renderer draws the strip from the plane and the copy goes.
+7. **The crust stays soil** (2026-11-09). Diggers leave it by the side view's own rule (soil touching the sky, `#crust`), as on today's ground, and the mycelium can grow in the shaft's soil wall just under the hole (§2). It is not made rock.
 
 **Still open:** nothing.
