@@ -1,0 +1,362 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { CURTAIN, LIFESPAN, MIDDLE, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../colony.ts";
+import { decodeFungal } from "../fungalPolicy.ts";
+import { NEST_ONLY, STRAINS } from "../fungus.ts";
+import { Game, gameRng, isOneWorld, type GameSave } from "../game.ts";
+import { CELL, cellOf, centreX, centreY } from "../hex.ts";
+import { generateOneWorld, type OneWorld } from "../oneWorld.ts";
+import { generateSideWorld, rockAt, OPEN } from "../world.ts";
+
+// One world's game (ja-lp4.3, U3a; docs/one-world.md §2, §4): colonies on the plane and the curtain, crossing at their
+// holes. A small plane (160 × 100) keeps it quick; seed 7's has two nests well inside it.
+
+const DT = 1 / 30;
+const SEED = 7;
+const EXPLORE = MODES.indexOf("explore");
+const RETURN = MODES.indexOf("return");
+const FIGHT = MODES.indexOf("fight");
+const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
+const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
+
+const small = (seed = SEED): OneWorld => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } });
+const game = (ants = 10, seed = SEED, regrow = 0): Game => new Game(small(seed), { antCount: ants, rivalAnts: ants, regrow }, gameRng(seed));
+const run = (g: Game, seconds: number, each?: () => void): void => {
+  for (let k = 0; k < Math.round(seconds / DT); k++) {
+    g.tick(DT);
+    each?.();
+  }
+};
+const own = (c: Colony): HoleCell => c.holeCells[c.params.nest] as HoleCell;
+const curtainHole = (h: HoleCell) => ({ x: centreX(h.col, h.row), y: centreY(h.row) });
+const planeHole = (h: HoleCell) => ({ x: centreX(h.px, h.py), y: centreY(h.py) });
+/** An age in band b (0 young, 1 middle-aged, 2 old) that every founder's lifespan outlasts. */
+const ageOf = (b: 0 | 1 | 2) => [0.05, (0.15 + MIDDLE) / 2, 0.5][b]! * LIFESPAN;
+const ages = (c: Colony, b: 0 | 1 | 2) => {
+  for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(b);
+};
+/** Every curtain ant below the surface rows (the sky and ground strip are the plane's). */
+const underground = (g: Game): boolean => {
+  const top = g.world!.curtain.surfaceRows!;
+  return g.colonies.every((c) => {
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i] || c.layer[i] !== CURTAIN) continue;
+      cellOf(c.x[i]!, c.y[i]!);
+      if ((CELL[1] as number) < top) return false;
+    }
+    return true;
+  });
+};
+
+test("one world: two layers, home the curtain, a queen, every ant underground, holes on both layers by colony", () => {
+  const w = small();
+  assert.ok(isOneWorld(w));
+  assert.equal(w.plane.nests.length, 2, "two nests on the small plane");
+  const g = new Game(w, { antCount: 150, rivalAnts: 150 }, gameRng(SEED));
+  assert.equal(g.map, w.plane);
+  assert.deepEqual(g.layers, [w.plane, w.curtain]);
+  assert.equal(g.colonies.length, 2);
+  g.colonies.forEach((c, k) => {
+    assert.equal(c.layers.length, 2);
+    assert.equal(c.home, CURTAIN);
+    assert.deepEqual(c.layers.map((L) => L.map), g.layers, "a colony's layers are the game's, in order");
+    assert.equal(c.map, w.curtain, "between ticks the home layer is bound");
+    assert.equal((c.layers[PLANE] as Layer).nest, w.plane.nests[k]);
+    assert.equal((c.layers[CURTAIN] as Layer).nest, w.curtain.nests[k]);
+    assert.equal((c.layers[PLANE] as Layer).entrance, null, "no hole into the plane");
+    assert.ok((c.layers[CURTAIN] as Layer).entrance);
+    assert.ok(c.queen?.alive, "a queen in the royal chamber");
+    assert.equal(c.population, 150);
+    for (let i = 0; i < c.n; i++) if (c.alive[i]) assert.equal(c.layer[i], CURTAIN, `ant ${i} starts underground`);
+    // The hole table, by colony: the curtain's entrance and the plane cell over its column, which is the plane nest's.
+    assert.equal(c.holeCells.length, 2);
+    c.holeCells.forEach((h, j) => {
+      const e = w.curtain.nests[j]!.entrance!;
+      cellOf(e.x, e.y);
+      assert.deepEqual([h.col, h.row], [CELL[0], CELL[1]], `hole ${j}: the curtain's entrance`);
+      cellOf(w.plane.nests[j]!.x, w.plane.nests[j]!.y);
+      assert.deepEqual([h.px, h.py], [CELL[0], CELL[1]], `hole ${j}: over it, the plane nest's cell`);
+      assert.equal(rockAt(w.plane, h.px, h.py), OPEN);
+    });
+  });
+  assert.ok(underground(g));
+});
+
+test("one world: an old explorer at the top of the shaft climbs out onto its hole on the plane", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0); // the rest stay in
+  const h = own(c);
+  const at = curtainHole(h);
+  const i = 0;
+  c.age[i] = ageOf(2);
+  c.putAnt(i, CURTAIN, at.x, at.y);
+  c.mode[i] = EXPLORE;
+  c.heading[i] = -Math.PI / 2;
+  let out = -1;
+  for (let k = 0; k < Math.round(20 / DT) && out < 0; k++) {
+    g.tick(DT);
+    if (c.layer[i] === PLANE) out = k;
+  }
+  assert.ok(out >= 0, "it went out within 20 s");
+  const p = planeHole(h);
+  assert.deepEqual([c.x[i], c.y[i]], [Math.fround(p.x), Math.fround(p.y)], "onto its hole's cell");
+  assert.equal(c.crossedUp, 1, "nobody else went up");
+});
+
+test("one world: the young never go out, pushed back down the shaft", () => {
+  const g = game();
+  for (const c of g.colonies) {
+    ages(c, 0);
+    // Half of them at the top of their shaft, facing up.
+    const at = curtainHole(own(c));
+    for (let i = 0; i < 5; i++) {
+      c.putAnt(i, CURTAIN, at.x, at.y);
+      c.heading[i] = -Math.PI / 2;
+    }
+  }
+  run(g, 20, () => assert.ok(underground(g), "no curtain ant on the surface rows"));
+  for (const c of g.colonies) {
+    assert.equal(c.crossedUp, 0);
+    for (let i = 0; i < c.n; i++) if (c.alive[i]) assert.equal(c.layer[i], CURTAIN);
+  }
+});
+
+test("one world: spoil carried up the shaft is put down at the hole on the plane (soilOut)", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const i = 0;
+  c.age[i] = ageOf(1);
+  const at = curtainHole(own(c));
+  c.putAnt(i, CURTAIN, at.x, at.y);
+  c.pellet[i] = 1;
+  c.mode[i] = RETURN;
+  const out = c.soilOut;
+  run(g, 1);
+  assert.equal(c.layer[i], PLANE, "it went up");
+  assert.equal(c.pellet[i], 0, "and put the pellet down");
+  assert.equal(c.soilOut, out + 1);
+  assert.equal(c.crossedUp, 1);
+});
+
+test("one world: a corpse carried up is buried at the hole, and a sporulating host's spores lie there on the plane", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const h = own(c);
+  const at = curtainHole(h);
+  // A Bloom host dies at the top of the shaft; a middle-aged undertaker beside it takes it out.
+  const dead = 1;
+  c.putAnt(dead, CURTAIN, at.x, at.y);
+  c.load[dead] = 1;
+  c.strain[dead] = BLOOM;
+  c.kill(dead, false);
+  assert.equal(c.corpses.length, 1, "it lies where it fell, underground");
+  const i = 0;
+  c.age[i] = ageOf(1);
+  for (let k = 0; k < Math.round(30 / DT) && c.buried === 0; k++) {
+    if (!c.carriesCorpse(i) && c.layer[i] === CURTAIN) {
+      c.putAnt(i, CURTAIN, at.x, at.y + 1);
+      c.mode[i] = EXPLORE;
+    }
+    g.tick(DT);
+  }
+  assert.equal(c.buried, 1, "buried within 30 s");
+  assert.equal(c.corpses.length, 0);
+  assert.equal(c.layer[i], PLANE);
+  assert.ok(g.fungus.spores.get(h.px, h.py) > 0, "spores on the plane at the hole");
+});
+
+test("one world: a carrier on the plane goes down its hole, and its food is stored", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0); // no other foragers
+  const i = 0;
+  c.age[i] = ageOf(2);
+  const p = planeHole(own(c));
+  c.putAnt(i, PLANE, p.x + 1.5, p.y);
+  c.carrying[i] = 1;
+  c.mode[i] = RETURN;
+  for (let k = 0; k < 30 && c.layer[i] === PLANE; k++) g.tick(DT);
+  assert.equal(c.layer[i], CURTAIN, "in within a second");
+  assert.equal(c.carriedDown, 1);
+  assert.equal(c.crossedDown, 1);
+  assert.equal(c.carrying[i], 1, "still carrying, on its way to the chambers");
+  for (let k = 0; k < Math.round(60 / DT) && c.stored === 0; k++) g.tick(DT);
+  assert.equal(c.stored, 1, "stored within a minute");
+  assert.ok(underground(g));
+});
+
+test("one world: a returner with empty jaws goes down its hole too", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const i = 0;
+  c.age[i] = ageOf(2);
+  c.fatigue[i] = 2 * c.params.patience; // tired: its policy keeps it homing
+  const p = planeHole(own(c));
+  c.putAnt(i, PLANE, p.x - 1.5, p.y);
+  c.mode[i] = RETURN;
+  for (let k = 0; k < 60 && c.layer[i] === PLANE; k++) g.tick(DT);
+  assert.equal(c.layer[i], CURTAIN);
+  assert.equal(c.crossedDown, 1);
+  assert.equal(c.carriedDown, 0);
+});
+
+test("one world: a raider on the rival's hole goes down the rival's shaft", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const rival = c.holeCells[1] as HoleCell;
+  const i = 0;
+  c.age[i] = ageOf(2);
+  const p = planeHole(rival);
+  c.putAnt(i, PLANE, p.x, p.y);
+  c.mode[i] = FIGHT;
+  c.recruited[i] = 1;
+  g.tick(DT);
+  assert.equal(c.layer[i], CURTAIN, "down the shaft");
+  const at = curtainHole(rival);
+  assert.deepEqual([c.x[i], c.y[i]], [Math.fround(at.x), Math.fround(at.y)], "at the rival's hole, underground");
+  assert.equal(c.recruited[i], 1, "still a raider");
+  run(g, 2);
+  assert.equal(c.recruited[i], 1, "a raider keeps its stance underground");
+});
+
+test("one world: rivals on different layers at the same spot never fight; on the same layer they do", () => {
+  const fight = (sameLayer: boolean): number => {
+    const g = game(20);
+    const spot = g.world!.curtain.nests[0]!; // the player's chamber, open in the curtain
+    for (let k = 0; k < 30; k++) {
+      g.colonies.forEach((c, n) => {
+        for (let i = 0; i < c.n; i++) if (c.alive[i]) c.putAnt(i, n === 0 || sameLayer ? CURTAIN : PLANE, spot.x, spot.y);
+      });
+      g.tick(DT);
+    }
+    return g.colonies.reduce((s, c) => s + c.losses, 0);
+  };
+  assert.equal(fight(false), 0, "a layer apart: no fight");
+  assert.ok(fight(true) > 0, "the control: same layer, they fight");
+});
+
+test("one world: scent laid on one layer is not on the other", () => {
+  const g = game();
+  const c = g.player;
+  const p = planeHole(own(c));
+  const plane = (c.layers[PLANE] as Layer).ph;
+  const curtain = (c.layers[CURTAIN] as Layer).ph;
+  c.paint("alarm", p.x + 6, p.y, 2, 5, PLANE);
+  assert.ok(plane.read("alarm", p.x + 6, p.y) > 0);
+  assert.equal(curtain.read("alarm", p.x + 6, p.y), 0);
+  const chamber = g.world!.curtain.nests[0]!;
+  c.paint("home", chamber.x, chamber.y, 2, 5); // home: the curtain
+  assert.ok(curtain.read("home", chamber.x, chamber.y) > 0);
+  assert.equal(plane.read("home", chamber.x, chamber.y), 0);
+  // And ants lay on the layer they are on: after a minute's foraging the plane holds food and home trail.
+  run(g, 60);
+  assert.ok(plane.live("home"), "home trail on the plane");
+});
+
+test("one world: allied contact is counted per layer", () => {
+  const met = (sameLayer: boolean): number => {
+    const g = game(20);
+    const [a, b] = g.colonies as [Colony, Colony];
+    // Kin: one odour, so they meet as allies (and don't fight).
+    b.nestOdour = a.nestOdour;
+    b.odour.fill(a.nestOdour);
+    const spot = g.world!.curtain.nests[0]!;
+    for (let k = 0; k < 60; k++) {
+      g.colonies.forEach((c, n) => {
+        for (let i = 0; i < c.n; i++) if (c.alive[i]) c.putAnt(i, n === 0 || sameLayer ? CURTAIN : PLANE, spot.x, spot.y);
+      });
+      g.tick(DT);
+    }
+    return g.unity().met;
+  };
+  assert.equal(met(false), 0, "a layer apart, nobody meets");
+  assert.ok(met(true) > 0, "together, they do");
+});
+
+test("one world: the landing is on the plane by the hole, its spores dose only the ants on the plane, and the fungus reads each layer's ground", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const nest = (c.layers[PLANE] as Layer).nest;
+  const landed = g.land(0, GARDEN);
+  assert.ok(Math.abs(landed.x - (nest.x + nest.r + 3)) < 1e-9 && landed.y === nest.y, "by the rim of the disc round the hole");
+  cellOf(landed.x, landed.y);
+  assert.ok(g.fungus.spores.get(CELL[0] as number, CELL[1] as number) > 0, "spores on the plane");
+  // A brush on the plane at a spot where one ant stands on the plane, another under it in the curtain.
+  const p = planeHole(own(c));
+  const spot = { x: p.x + 10, y: p.y };
+  c.putAnt(0, PLANE, spot.x, spot.y);
+  c.putAnt(1, CURTAIN, spot.x, spot.y);
+  g.paintSpores(spot.x, spot.y, 2, 3, 0.5, GARDEN);
+  assert.ok((c.load[0] as number) > 0, "the plane ant is dosed");
+  assert.equal(c.load[1], 0, "the curtain ant is not");
+  // The fungus in a host reads the ground of the layer it is on: the plane's open ground, the curtain's chamber.
+  const chamber = g.world!.curtain.nests[0]!;
+  c.putAnt(1, CURTAIN, chamber.x, chamber.y);
+  c.load[1] = 0.5;
+  c.strain[1] = GARDEN;
+  for (let k = 0; k < 30; k++) {
+    c.putAnt(0, PLANE, spot.x, spot.y);
+    c.putAnt(1, CURTAIN, chamber.x, chamber.y);
+    g.tick(DT);
+  }
+  assert.ok((c.fungal[0] as number) >= 0 && (c.fungal[1] as number) >= 0, "both chose");
+  assert.equal(decodeFungal(c.fungal[0] as number).place, "outside");
+  assert.notEqual(decodeFungal(c.fungal[1] as number).place, "outside");
+  // The nest's levers are offered: one world always has a nest.
+  assert.ok(g.fungus.hasNest);
+  g.fungus.menu = NEST_ONLY;
+  assert.deepEqual([...g.fungus.menu].sort(), [...NEST_ONLY].sort());
+});
+
+test("one world: food and ants are conserved over 90 s, and no ant underground is ever on the surface rows", () => {
+  const g = game(150);
+  const plane = g.world!.plane;
+  const start = g.colonies.map((c) => c.population);
+  run(g, 90, () => assert.ok(underground(g)));
+  let carried = 0;
+  let down = 0;
+  let up = 0;
+  g.colonies.forEach((c, k) => {
+    let onPlane = 0;
+    let inCurtain = 0;
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i]) continue;
+      if (c.layer[i] === PLANE) {
+        onPlane++;
+        carried += c.carrying[i] as number;
+      } else inCurtain++;
+    }
+    assert.equal(c.population, start[k]! + c.births - c.losses - c.diedOld - c.diedHungry, `colony ${k}: born less dead`);
+    assert.equal(onPlane + inCurtain, c.population);
+    assert.ok(c.crossedUp > 0 && c.carriedDown > 0, `colony ${k} forages on the plane`);
+    down += c.carriedDown;
+    up += c.carriedUp;
+  });
+  assert.equal(plane.foodTotal - plane.foodLeft, carried + down - up, "the plane's food taken is in jaws on it or went down a hole");
+});
+
+test("one world: saving, loading and founding refuse until U4", () => {
+  const g = game();
+  assert.throws(() => g.save(), /one world: U4/);
+  assert.throws(() => g.load({} as GameSave), /one world: U4/);
+  assert.throws(() => g.addColony({ x: 10, y: 10, antCount: 0, odour: 0 }), /one world: U4/);
+});
+
+test("a game on one map: each colony has one layer and every ant is on it", () => {
+  const g = new Game(generateSideWorld(1), { antCount: 30, rivalAnts: 30 }, gameRng(1));
+  assert.equal(g.world, null);
+  assert.equal(g.layers.length, 1);
+  run(g, 2);
+  for (const c of g.colonies) {
+    assert.equal(c.layers.length, 1);
+    assert.equal(c.line, null);
+    assert.deepEqual(c.holeCells, []);
+    assert.ok(c.layer.every((l) => l === 0));
+  }
+});

@@ -4994,7 +4994,14 @@ export class Colony {
         if (this.#mayCrossUp(i)) {
           cellOf(x0, y0);
           this.#crossUp(i, CELL[0] as number, CELL[1] as number);
-        } else h = this.#pointDown(i, x0, y0, h);
+        } else {
+          h = this.#pointDown(i, x0, y0, h);
+          // It has touched the surface, as the side view's young step onto the ground before they are put back: its floor
+          // marks start afresh at the next chamber (#layMark). Laying on, the young turned back at the hole marked the
+          // shaft's top with brood and royal, which drew more young there (#toBrood): in the spike up to 13 were held
+          // there for minutes.
+          this.#lastRole[i] = 0;
+        }
         this.heading[i] = h;
         continue;
       } else {
