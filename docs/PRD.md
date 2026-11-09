@@ -4050,7 +4050,7 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 
 **Golden masters bit-exact**: no gyne is reared, no colony founded, in them. The economy is unchanged for a world's own colony (`incipient` is a daughter's only).
 
-**Checks:** `npm test` passes, with 7 new tests in `royal.test` for this slice: gyne spacing (with its edge and an alate); daughters dig apart; a daughter raises her first brood beside her sisters; the young queen feeds while `incipient` and stops after; she feeds at full rate beside a nanitic; a nanitic eclosing leaves the colony young; and nanitic and `incipient` asserts in the flight test. The food-conservation test now runs until the first daughter is no longer young, through her nanitics and the queen's nursing; `test:slow` 16 pass, 2 TODOs; lint 7 warnings, as on main.
+**Checks:** `npm test` passes, with 6 new tests in `royal.test` for this slice: gyne spacing (with its edge and an alate); daughters dig apart; a daughter raises her first brood beside her sisters; the young queen feeds while `incipient` and stops after; she feeds at full rate beside a nanitic; a nanitic eclosing leaves the colony young; and nanitic and `incipient` asserts in the flight test. The food-conservation test now runs until the first daughter is no longer young, through her nanitics and the queen's nursing; `test:slow` 16 pass, 2 TODOs; lint 7 warnings, as on main.
 
 **Cost:** unchanged. No legend, situation or question changed.
 

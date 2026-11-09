@@ -277,7 +277,8 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
     again.tick(DT);
   }
   const [a, b] = [g.colonies[1]!, again.colonies[1]!];
-  assert.deepEqual([b.founding, b.population, b.nestOdour, b.odourAim, b.brood.items.length], [a.founding, a.population, a.nestOdour, a.odourAim, a.brood.items.length]);
+  assert.deepEqual([b.founding, b.incipient, b.population, b.nestOdour, b.odourAim, b.brood.items.length], [a.founding, a.incipient, a.population, a.nestOdour, a.odourAim, a.brood.items.length]);
+  assert.equal(b.incipient, true, "a young daughter stays young across a save (PR #54 review, N7)");
   assert.deepEqual(again.player.alates, g.player.alates);
 });
 
