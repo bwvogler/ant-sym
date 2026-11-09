@@ -34,10 +34,12 @@ export function withSeed(search: string, seed: number): string {
 }
 
 /**
- * A map to draw and nothing to run: one colony of no ants per nest, and a fungus with no spores. Each colony smells as
- * the game starts it (game.ts): Ink at odour 0, Amber at 1, so the renderer tells their nests apart.
+ * A map to draw and nothing to run: one colony of no ants per nest, and a fungus with no spores. The colonies' odours
+ * spread evenly from 0 to 1, so the renderer tells their nests apart: with two, Ink at 0 and Amber at 1, as the game
+ * starts them (game.ts).
  */
 export function stillLife(map: WorldMap): { colonies: Colony[]; fungus: Fungus } {
-  const colonies = map.nests.map((_, k) => new Colony(map, { antCount: 0, nest: k, odour: Math.min(k, 1) }, mulberry32(k + 1)));
+  const n = map.nests.length;
+  const colonies = map.nests.map((_, k) => new Colony(map, { antCount: 0, nest: k, odour: n > 1 ? k / (n - 1) : 0 }, mulberry32(k + 1)));
   return { colonies, fungus: new Fungus(map) };
 }

@@ -38,4 +38,7 @@ test("stillLife: a colony of no ants per nest on each layer, so both maps draw w
   assert.ok(stillLife(w.plane).colonies.every((c) => c.queen === null));
   // Each colony smells as the game starts it, so the renderer draws Ink's and Amber's nests apart.
   assert.deepEqual(stillLife(w.curtain).colonies.map((c) => c.nestOdour), [0, 1]);
+  // With more nests (a grown line), the odours spread so each is drawn apart.
+  const grown = { ...w.curtain, nests: [...w.curtain.nests, w.curtain.nests[0]!] };
+  assert.deepEqual(stillLife(grown).colonies.map((c) => c.nestOdour), [0, 0.5, 1]);
 });

@@ -529,17 +529,24 @@ function passable(map: WorldMap, x: number, y: number, through: Through): boolea
 
 /** Cells reachable from world (x, y) through the six neighbours (walking through open ground, or digging through soil too), as a flat array over the map: the whole-map oracle. */
 export function reachable(map: WorldMap, x: number, y: number, through: Through = "open"): Uint8Array {
+  return reachableFrom(map, [{ x, y }], through);
+}
+
+/** Cells reachable from any of world points `from`, as `reachable`: one search, every point a start. */
+export function reachableFrom(map: WorldMap, from: readonly { x: number; y: number }[], through: Through = "open"): Uint8Array {
   const { w, h } = map.size;
   const seen = new Uint8Array(w * h);
-  cellOf(x, y);
-  const sx = CELL[0] as number;
-  const sy = CELL[1] as number;
-  if (!passable(map, sx, sy, through)) return seen;
   const queue = new Int32Array(w * h);
   let head = 0;
   let tail = 0;
-  queue[tail++] = sy * w + sx;
-  seen[sy * w + sx] = 1;
+  for (const p of from) {
+    cellOf(p.x, p.y);
+    const sx = CELL[0] as number;
+    const sy = CELL[1] as number;
+    if (!inBounds(map, sx, sy) || seen[sy * w + sx] || !passable(map, sx, sy, through)) continue;
+    queue[tail++] = sy * w + sx;
+    seen[sy * w + sx] = 1;
+  }
   while (head < tail) {
     const c = queue[head++] as number;
     const cx = c % w;
@@ -719,11 +726,7 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
  */
 export function keepReachableFood(map: WorldMap, from: readonly { x: number; y: number }[], through: Through, fromRow = 0): void {
   const { w, h } = map.size;
-  const reach = new Uint8Array(w * h);
-  for (const p of from) {
-    const r = reachable(map, p.x, p.y, through);
-    for (let i = 0; i < r.length; i++) reach[i]! |= r[i]!;
-  }
+  const reach = reachableFrom(map, from, through);
   let total = 0;
   for (let y = fromRow; y < h; y++)
     for (let x = 0; x < w; x++) {

@@ -133,10 +133,12 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
   // Spacing is founding's: the game's two holes lie ~140 apart, but holes HOLE_GAP_2D (12) apart can get royal chambers
   // that merge, as in the side view today (ja-tjo, before U4 founds on the curtain).
   const nests: Nest[] = [];
-  line.sHole.forEach((s, k) => {
+  // Dug in colony order, so each royal chamber's id is the same whichever end the line grew at.
+  for (let c = 0; c < colonies.length; c++) {
+    const k = colonies.indexOf(c);
     const hole = line.holes[k]!;
-    nests[colonies[k]!] = foundNest(curtain, colOf(line, s), colonies[k]!, mulberry32(hash4(seed, 81, hole.x, hole.y)));
-  });
+    nests[c] = foundNest(curtain, colOf(line, line.sHole[k]!), c, mulberry32(hash4(seed, 81, hole.x, hole.y)));
+  }
   curtain.nest = nests[0]!;
   curtain.nests = nests;
   const nearNest = (x: number, y: number, d: number) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || Math.hypot(x - n.entrance!.x, y - n.entrance!.y) < d);

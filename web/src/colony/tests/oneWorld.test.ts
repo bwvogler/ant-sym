@@ -140,6 +140,9 @@ test("the curtain's ground keeps its place when the line grows, at either end: i
     assert.equal(c1.nest, c1.nests[0], "the player's nest is still Ink's");
     assert.deepEqual(c1.chambers!.list.filter((c) => c.role === "royal").map((c) => c.colony).sort(), [0, 1, 2]);
     const inkChamber = c1.chambers!.list.find((c) => c.role === "royal" && c.colony === 0)!;
+    // Chamber ids go by colony too: each colony's royal chamber keeps its id when the line grows at V₀.
+    for (const c of c1.chambers!.list.filter((ch) => ch.role === "royal")) assert.equal(c.id, c.colony, `seed ${seed}: colony ${c.colony}'s royal chamber id`);
+    assert.equal(inkChamber.id, curtain.chambers!.list.find((c) => c.role === "royal" && c.colony === 0)!.id);
     cellOf(c1.nests[0]!.x, c1.nests[0]!.y);
     assert.equal(c1.chambers!.cell.get(CELL[0]!, CELL[1]!), inkChamber.id + 1, `seed ${seed}: Ink's chamber is colony 0's`);
     // Then grow at the far end: the ground stays put there too (pockets near the end don't move with sMax).

@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { generateOneWorld } from "../colony/oneWorld.ts";
+import { generateOneWorld, type OneWorld } from "../colony/oneWorld.ts";
 import { worldExtent, type WorldMap } from "../colony/world.ts";
 import ColonyField from "./ColonyField.tsx";
 import { parseSeed, previewSeed, stillLife, withSeed } from "./oneWorldView.ts";
 import { seg } from "./styles.ts";
 
 type View = "above" | "below";
+
+/** The one world of `seed`, or null if it can't be made (generateOneWorld throws). */
+function tryWorld(seed: number): OneWorld | null {
+  try {
+    return generateOneWorld(seed);
+  } catch {
+    return null;
+  }
+}
 
 /** Each layer's stub colonies, made the first time it is shown and kept while its world lives: toggling builds nothing. */
 const lives = new WeakMap<WorldMap, ReturnType<typeof stillLife>>();
@@ -20,17 +29,26 @@ function stillLifeOf(map: WorldMap): ReturnType<typeof stillLife> {
  * together and drawn read-only. No ants, no simulation: U3 puts colonies on both layers, U5 makes this the game's page.
  */
 export default function OneWorldPreview() {
-  const [seed, setSeed] = useState(() => previewSeed(window.location.search));
+  // The world is made when a seed is applied, not while rendering: a seed that fails to make one leaves the last world
+  // and the address as they were, and says so.
+  const [world, setWorld] = useState(() => tryWorld(previewSeed(window.location.search)) ?? generateOneWorld(1));
+  const seed = world.seed;
   // What is typed in the seed box: free to be empty while typing; a new world is made on Enter or leaving the box.
   const [seedText, setSeedText] = useState(String(seed));
+  const [failed, setFailed] = useState<string | null>(null);
   const [view, setView] = useState<View>("below");
-  const world = useMemo(() => generateOneWorld(seed), [seed]);
   const map = view === "above" ? world.plane : world.curtain;
   const shown = stillLifeOf(map);
   const applySeed = () => {
     const n = parseSeed(seedText);
-    if (n === null) return setSeedText(String(seed));
-    setSeed(n);
+    if (n === null || n === seed) return setSeedText(String(seed));
+    const next = tryWorld(n);
+    if (!next) {
+      setFailed(`Seed ${n} makes no world; still showing seed ${seed}.`);
+      return setSeedText(String(seed));
+    }
+    setFailed(null);
+    setWorld(next);
     setSeedText(String(n));
     history.replaceState(null, "", withSeed(window.location.search, n)); // reload or share: the same world
   };
@@ -97,6 +115,7 @@ export default function OneWorldPreview() {
           />
         </label>
       </header>
+      {failed && <p className="text-warn">{failed}</p>}
       <p className="text-fg-2">
         {view === "above"
           ? `The surface: ${world.plane.size.w}×${world.plane.size.h} cells of rock, ground and food, the nests' holes on it. The line through the holes runs ${world.line.sMax - world.line.sMin + 1} cells, ${world.line.margin} past each end.`
@@ -111,6 +130,8 @@ export default function OneWorldPreview() {
         onPointerUpCapture={poke}
         onWheelCapture={poke}
         onKeyDownCapture={poke}
+        onKeyUpCapture={poke}
+        onClickCapture={poke}
       >
         <ColonyField key={`${seed}-${view}`} colonies={shown.colonies} fungus={shown.fungus} onFrame={onFrame} showFoodTrail={false} showHomeTrail={false} followed={null} onFollow={() => {}} />
       </div>
