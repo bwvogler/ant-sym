@@ -352,4 +352,17 @@ test("one world: a corpse the ant puts down at will (carry 'put down') goes on t
   assert.ok(!c.corpses.includes(b), "off the ground");
   assert.equal(c.buried, buried + 1, "on the midden");
   assert.equal(c.midden.size, middens + 1);
+  // Far enough out by its vector but on the mound (spoil underfoot): it lies there.
+  const d = upWith(3, 2);
+  c.putAnt(2, PLANE, hole.x, hole.y + 12);
+  const [dx, dy] = cellOfAnt(c, 2);
+  heapPlane(g.world!.plane, dx, dy, holesOf(c));
+  assert.ok(g.world!.plane.spoil!.get(dx, dy) > 0, "on the mound");
+  c.responses = putDown;
+  g.tick(DT);
+  c.responses = localResponses;
+  assert.ok(!c.carriesCorpse(2), "put down");
+  assert.ok(c.corpses.includes(d), "it lies there");
+  assert.equal(c.buried, buried + 1, "not on the midden");
+  assert.equal(c.midden.size, middens + 1);
 });
