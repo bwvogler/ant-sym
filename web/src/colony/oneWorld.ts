@@ -47,7 +47,7 @@ export const CURTAIN_SKY = 40;
 export const STRIP = CURTAIN_SKY;
 /** The curtain's row 0, its crust: solid except at a hole. */
 export const CRUST = CURTAIN_SKY + 1;
-/** Rows of ground below the crust: as deep as the side view's ground (its 368 rows less ~64 of sky). */
+/** Rows of ground below the crust: about as deep as the side view's ground (its 368 rows under a ground line at row 64 ± 5: 299–309). */
 export const CURTAIN_DEPTH = 300;
 
 /** The plane, the curtain under the line, and the line itself. */

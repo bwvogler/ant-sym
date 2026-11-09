@@ -5,6 +5,9 @@
 // the figure that sizes it is "outward": cells beyond the outer hole on either side (west of the westmost, east of the
 // eastmost), by their column distance from it. "Any" pools every dug cell by its nearest hole, for reference.
 //
+// The fungus isn't landed (the page lands it when Start is pressed): this is how far healthy colonies dig. Whether an
+// infection changes that is for U3's re-measurement on one world.
+//
 // Usage: node scripts/dig-spread.mjs [seeds=1-3] [seconds=600] [ants=600]
 import { CHUNK, CHUNK_BITS } from "../web/src/colony/chunks.ts";
 import { Game, GAME_REGROW, gameRng } from "../web/src/colony/game.ts";

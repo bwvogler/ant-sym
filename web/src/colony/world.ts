@@ -81,9 +81,10 @@ export interface WorldMap {
   sky?: ChunkLayer<Uint8Array>;
   /**
    * The one-world curtain (oneWorld.ts): its rows 0 … surfaceRows − 1, the sky over its ground strip and the strip, are
-   * drawn from the plane, not derived from the ground under them: updateSurface leaves them be, nothing fills them and
-   * no spoil is heaped there (the mound is the plane's, one-world §4). Digging can't reach them: none is soil. Absent
-   * elsewhere.
+   * drawn from the plane, not derived from the ground under them: updateSurface leaves them be, nothing fills them, no
+   * spoil is heaped there (the mound is the plane's, one-world §4), and no search passes through them. No cell in them
+   * is soil, so none is dug. The crust under them is soil touching their sky, which ants leave (colony.ts #crust) as
+   * they leave today's ground line. Absent elsewhere.
    */
   surfaceRows?: number;
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */

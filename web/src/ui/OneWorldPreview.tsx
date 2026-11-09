@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { generateOneWorld, type OneWorld } from "../colony/oneWorld.ts";
 import { worldExtent, type WorldMap } from "../colony/world.ts";
 import ColonyField from "./ColonyField.tsx";
-import { useFrameBus } from "./frameBus.ts";
 import { parseSeed, previewSeed, stillLife, withSeed } from "./oneWorldView.ts";
 import { seg } from "./styles.ts";
 
 type View = "above" | "below";
+
+/** Nothing runs here, so no frames: ColonyField, told it is still, draws itself when its camera, size or theme change. */
+const noFrames = () => () => {};
 
 /**
  * The last few seeds' worlds, or null for a seed that made none: going back to a seed, and StrictMode running state
@@ -17,7 +19,12 @@ const KEEP = 4;
 
 /** The one world of `seed`, or null if it can't be made (generateOneWorld throws; logged, so a bug isn't taken for a seed). */
 function tryWorld(seed: number): OneWorld | null {
-  if (made.has(seed)) return made.get(seed)!;
+  if (made.has(seed)) {
+    const hit = made.get(seed)!;
+    made.delete(seed); // the newest again: the least recently shown goes first
+    made.set(seed, hit);
+    return hit;
+  }
   let world: OneWorld | null = null;
   try {
     world = generateOneWorld(seed);
@@ -40,7 +47,8 @@ function opening(search: string): { world: OneWorld; failed: string | null } {
   const seed = previewSeed(search);
   const world = tryWorld(seed);
   if (world) return { world, failed: asked === null || parseSeed(asked) !== null ? null : `"${asked}" is no seed (a whole number from 1); showing seed 1.` };
-  return { world: tryWorld(1)!, failed: `Seed ${seed} makes no world; showing seed 1.` };
+  // Seed 1 failing too is a broken generator, not a seed: let it throw to the page's error boundary.
+  return { world: tryWorld(1) ?? generateOneWorld(1), failed: `Seed ${seed} makes no world; showing seed 1.` };
 }
 
 /** Each layer's stub colonies, made the first time it is shown and kept while its world lives: toggling builds nothing. */
@@ -88,35 +96,6 @@ export default function OneWorldPreview() {
     showSeed(n);
   };
 
-  // ColonyField redraws when told a frame passed. Nothing runs here, so a frame is asked for only when the picture can
-  // change: a drag, a pinch, a click, the wheel or a key moving the camera, the field resizing, the theme switching
-  // (ColonyField draws once itself when it mounts). Hovering changes nothing, so it draws nothing.
-  const { onFrame, fire } = useFrameBus();
-  const pending = useRef(0);
-  const poke = useMemo(
-    () => () => {
-      if (pending.current) return;
-      pending.current = requestAnimationFrame(() => {
-        pending.current = 0;
-        fire();
-      });
-    },
-    [fire],
-  );
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const ro = new ResizeObserver(poke);
-    if (box.current) ro.observe(box.current);
-    const mq = matchMedia("(prefers-color-scheme: dark)");
-    mq.addEventListener("change", poke);
-    return () => {
-      ro.disconnect();
-      mq.removeEventListener("change", poke);
-      cancelAnimationFrame(pending.current);
-      pending.current = 0;
-    };
-  }, [poke]);
-
   const ext = worldExtent(map);
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-3 p-4 text-sm text-fg">
@@ -149,19 +128,8 @@ export default function OneWorldPreview() {
           ? `The surface: ${world.plane.size.w}×${world.plane.size.h} cells of rock, ground and food, the nests' holes on it. The line through the holes runs ${world.line.sMax - world.line.sMin + 1} cells, ${world.line.margin} past each end.`
           : "Everything underground, under the line through the holes, unrolled flat: the strip along the top is the surface under the line, then the crust, broken only at each hole, its shaft and royal chamber, and soil, stones and buried food below."}
       </p>
-      <div
-        ref={box}
-        className="relative"
-        style={{ aspectRatio: `${ext.w} / ${ext.h}` }}
-        onPointerDownCapture={poke}
-        onPointerMoveCapture={(e) => e.buttons !== 0 && poke()}
-        onPointerUpCapture={poke}
-        onWheelCapture={poke}
-        onKeyDownCapture={poke}
-        onKeyUpCapture={poke}
-        onClickCapture={poke}
-      >
-        <ColonyField key={`${seed}-${view}`} colonies={shown.colonies} fungus={shown.fungus} onFrame={onFrame} showFoodTrail={false} showHomeTrail={false} followed={null} onFollow={() => {}} />
+      <div className="relative" style={{ aspectRatio: `${ext.w} / ${ext.h}` }}>
+        <ColonyField key={`${seed}-${view}`} colonies={shown.colonies} fungus={shown.fungus} onFrame={noFrames} still showFoodTrail={false} showHomeTrail={false} followed={null} onFollow={() => {}} />
       </div>
     </main>
   );

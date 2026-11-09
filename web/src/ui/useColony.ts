@@ -4,7 +4,6 @@ import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, GAME_REGROW, gameRng, type Outcome, type Unity } from "../colony/game.ts";
 import { chapterOf, type ChapterView } from "../colony/chapters.ts";
 import { UPGRADES } from "../colony/evolution.ts";
-import { useFrameBus } from "./frameBus.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
@@ -190,7 +189,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   }, [game, controls.hide, controls.cull, controls.menu]);
   const [stats, setStats] = useState<ColonyStats | null>(null);
   const [fps, setFps] = useState(0);
-  const { onFrame, fire: fireFrame } = useFrameBus();
+  const frameListeners = useRef(new Set<() => void>());
 
   useEffect(() => {
     let raf = 0;
@@ -247,12 +246,12 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         frames = 0;
         fpsAt = t;
       }
-      fireFrame();
+      for (const fn of frameListeners.current) fn();
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [game, colony, controls.playing, controls.speed, fireFrame]);
+  }, [game, colony, controls.playing, controls.speed]);
 
   // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
   useEffect(() => {
@@ -271,6 +270,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** The start screen's Start: this seed, playing, the fungus lands. */
   const start = useCallback((seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })), []);
 
+  const onFrame = useCallback((fn: () => void) => {
+    frameListeners.current.add(fn);
+    return () => void frameListeners.current.delete(fn);
+  }, []);
   const update = useCallback((patch: Partial<ColonyControls>) => setControls((c) => ({ ...c, ...patch })), []);
   const restart = useCallback(() => setGeneration((g) => g + 1), []);
   const newWorld = useCallback(() => setControls((c) => ({ ...c, seed: 1 + Math.floor(Math.random() * 99_999) })), []);
