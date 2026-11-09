@@ -1,0 +1,337 @@
+{
+ "one world, seed 7": [
+  {
+   "t": 10,
+   "food": [
+    "6d36efd0",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 0,
+     "births": 0,
+     "losses": 0,
+     "decisions": 1539,
+     "population": 150,
+     "ants": "db5782ef",
+     "fields": [
+      "28ab1ed6",
+      "899c572c"
+     ],
+     "crossedUp": 63,
+     "crossedDown": 0
+    },
+    {
+     "stored": 0,
+     "births": 0,
+     "losses": 0,
+     "decisions": 2287,
+     "population": 150,
+     "ants": "be3c4f27",
+     "fields": [
+      "1a0574d4",
+      "7438727f"
+     ],
+     "crossedUp": 93,
+     "crossedDown": 0
+    }
+   ]
+  },
+  {
+   "t": 20,
+   "food": [
+    "2a5b7887",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 5,
+     "births": 0,
+     "losses": 0,
+     "decisions": 3963,
+     "population": 150,
+     "ants": "351431ff",
+     "fields": [
+      "80e581ae",
+      "2054a06f"
+     ],
+     "crossedUp": 97,
+     "crossedDown": 8
+    },
+    {
+     "stored": 9,
+     "births": 0,
+     "losses": 0,
+     "decisions": 5706,
+     "population": 150,
+     "ants": "be31dda8",
+     "fields": [
+      "ac6c4f54",
+      "fd7a2af7"
+     ],
+     "crossedUp": 100,
+     "crossedDown": 13
+    }
+   ]
+  },
+  {
+   "t": 30,
+   "food": [
+    "be24925a",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 21,
+     "births": 0,
+     "losses": 1,
+     "decisions": 6681,
+     "population": 149,
+     "ants": "9bea85f9",
+     "fields": [
+      "8fab290f",
+      "ad548b25"
+     ],
+     "crossedUp": 117,
+     "crossedDown": 28
+    },
+    {
+     "stored": 58,
+     "births": 0,
+     "losses": 0,
+     "decisions": 8068,
+     "population": 150,
+     "ants": "67f26f37",
+     "fields": [
+      "13cec51",
+      "b5c5f313"
+     ],
+     "crossedUp": 136,
+     "crossedDown": 66
+    }
+   ]
+  },
+  {
+   "t": 40,
+   "food": [
+    "adce7640",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 30,
+     "births": 0,
+     "losses": 2,
+     "decisions": 8509,
+     "population": 148,
+     "ants": "c67494a4",
+     "fields": [
+      "5dd32491",
+      "941b954e"
+     ],
+     "crossedUp": 120,
+     "crossedDown": 30
+    },
+    {
+     "stored": 110,
+     "births": 0,
+     "losses": 0,
+     "decisions": 10597,
+     "population": 150,
+     "ants": "df795150",
+     "fields": [
+      "85e08790",
+      "2d3dbb09"
+     ],
+     "crossedUp": 179,
+     "crossedDown": 116
+    }
+   ]
+  },
+  {
+   "t": 50,
+   "food": [
+    "4bdc1ad9",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 30,
+     "births": 0,
+     "losses": 2,
+     "decisions": 10043,
+     "population": 148,
+     "ants": "9dc52bcd",
+     "fields": [
+      "565706e5",
+      "7708ee5a"
+     ],
+     "crossedUp": 133,
+     "crossedDown": 45
+    },
+    {
+     "stored": 158,
+     "births": 0,
+     "losses": 0,
+     "decisions": 13107,
+     "population": 150,
+     "ants": "f6096eb",
+     "fields": [
+      "8dfea3d6",
+      "d0e89a82"
+     ],
+     "crossedUp": 224,
+     "crossedDown": 165
+    }
+   ]
+  },
+  {
+   "t": 60,
+   "food": [
+    "b260539",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 85,
+     "births": 0,
+     "losses": 2,
+     "decisions": 12371,
+     "population": 148,
+     "ants": "3a211ccb",
+     "fields": [
+      "b57877ee",
+      "fda2172f"
+     ],
+     "crossedUp": 166,
+     "crossedDown": 103
+    },
+    {
+     "stored": 209,
+     "births": 0,
+     "losses": 1,
+     "decisions": 15898,
+     "population": 149,
+     "ants": "9dfc39f1",
+     "fields": [
+      "4af64e0e",
+      "2aa07014"
+     ],
+     "crossedUp": 271,
+     "crossedDown": 214
+    }
+   ]
+  },
+  {
+   "t": 70,
+   "food": [
+    "7beb466b",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 100,
+     "births": 0,
+     "losses": 3,
+     "decisions": 14082,
+     "population": 147,
+     "ants": "710474b2",
+     "fields": [
+      "b0862873",
+      "26793f47"
+     ],
+     "crossedUp": 189,
+     "crossedDown": 120
+    },
+    {
+     "stored": 244,
+     "births": 0,
+     "losses": 1,
+     "decisions": 18323,
+     "population": 149,
+     "ants": "55dde531",
+     "fields": [
+      "a8075151",
+      "bc78570b"
+     ],
+     "crossedUp": 312,
+     "crossedDown": 247
+    }
+   ]
+  },
+  {
+   "t": 80,
+   "food": [
+    "a801e636",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 121,
+     "births": 3,
+     "losses": 3,
+     "decisions": 15649,
+     "population": 150,
+     "ants": "baea6a71",
+     "fields": [
+      "7569bd9b",
+      "708a6c91"
+     ],
+     "crossedUp": 205,
+     "crossedDown": 152
+    },
+    {
+     "stored": 270,
+     "births": 6,
+     "losses": 2,
+     "decisions": 20875,
+     "population": 154,
+     "ants": "fd28ecb7",
+     "fields": [
+      "f8303e7d",
+      "d7526ada"
+     ],
+     "crossedUp": 346,
+     "crossedDown": 273
+    }
+   ]
+  },
+  {
+   "t": 90,
+   "food": [
+    "6491888b",
+    "d1b6cc8b"
+   ],
+   "colonies": [
+    {
+     "stored": 159,
+     "births": 7,
+     "losses": 3,
+     "decisions": 17274,
+     "population": 154,
+     "ants": "6e38738e",
+     "fields": [
+      "b8ebe8c1",
+      "9da790d3"
+     ],
+     "crossedUp": 224,
+     "crossedDown": 186
+    },
+    {
+     "stored": 279,
+     "births": 20,
+     "losses": 2,
+     "decisions": 23709,
+     "population": 168,
+     "ants": "97e9437f",
+     "fields": [
+      "d939409c",
+      "d443b051"
+     ],
+     "crossedUp": 361,
+     "crossedDown": 283
+    }
+   ]
+  }
+ ]
+}

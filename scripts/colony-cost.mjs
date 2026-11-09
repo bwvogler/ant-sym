@@ -10,31 +10,34 @@
 //
 // --side plays the side view (the nest, its chambers and in-nest situations: PRD §32), as the app sets it up
 // (generateSideWorld(seed), Game with gameRng(seed), as the page builds it); without it, the top-down map (generateWorld) with
-// the rng this script always used, so earlier figures reproduce.
+// the rng this script always used, so earlier figures reproduce. --one plays one world (generateOneWorld(seed), gameRng(seed);
+// docs/one-world.md), its alarm painted on the plane: each ant keeps its own stance and no ant is asked `leave` there.
 //
 // The ant's response lanes (get, carry, drop, trail: colonyBrain.RESPONSE_HOOKS)
 // are estimated too, as if each were asked like the modes; they are not asked
 // by the page yet, so they are reported apart and not in the session's total.
 //
-// Usage: node scripts/colony-cost.mjs [--side] [minutes=10] [ants=600] [seed=1]
-import { localPolicy, localStance } from "../web/src/colony/colony.ts";
+// Usage: node scripts/colony-cost.mjs [--side | --one] [minutes=10] [ants=600] [seed=1]
+import { localPolicy, localStance, PLANE } from "../web/src/colony/colony.ts";
 import { DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, responseKey, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
 import { localResponses, responses } from "../web/src/colony/responses.ts";
 import { Game, gameRng } from "../web/src/colony/game.ts";
+import { generateOneWorld } from "../web/src/colony/oneWorld.ts";
 import { generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const side = process.argv.includes("--side");
+const one = process.argv.includes("--one");
 const [minutes = 10, ants = 600, seed = 1] = process.argv
   .slice(2)
-  .filter((a) => a !== "--side")
+  .filter((a) => a !== "--side" && a !== "--one")
   .map(Number);
 const USD = USD_PER_INPUT_TOKEN;
 const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
-const map = side ? generateSideWorld(seed) : generateWorld(seed);
-const extent = worldExtent(map);
+const world = one ? generateOneWorld(seed) : side ? generateSideWorld(seed) : generateWorld(seed);
+const extent = worldExtent(one ? world.plane : world);
 let doctrine = DOCTRINES[0].text;
 let tokens = 0;
 let requests = 0;
@@ -81,7 +84,7 @@ function lane(key, pack, contextOf, local, acc = null) {
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
 const hooks = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, lane((t) => responseKey(h, t), (items, d) => packResponseRequest(h, items, d), (d) => responseContext(h, d), localResponses[h], { tokens: 0, requests: 0, questions: 0 })]));
-const game = new Game(map, { antCount: ants, rivalAnts: ants }, side ? gameRng(seed) : mulberry32(seed + 7), {
+const game = new Game(world, { antCount: ants, rivalAnts: ants }, side || one ? gameRng(seed) : mulberry32(seed + 7), {
   policy: modes.policy,
   stance: stances.policy,
   responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
@@ -114,7 +117,7 @@ for (const d of plan) {
       next = t + BATCH_EVERY;
     }
     // The fungus paints a blot of alarm somewhere every ~20 s.
-    if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12); // world units: rows are R apart
+    if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12, ...(one ? [PLANE] : [])); // world units: rows are R apart
   }
   flush();
   phases.push({ name: d.name, newSituations: modes.seen(policyContext(doctrine)) - before.modes, newStances: stances.seen(stanceContext(doctrine)) - before.stances, tokens: tokens - before.tokens, requests: requests - before.requests });
@@ -122,7 +125,7 @@ for (const d of plan) {
 
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
 const r = game.rival;
-console.log(`game cost, offline (${side ? "side view" : "top-down"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
+console.log(`game cost, offline (${one ? "one world" : side ? "side view" : "top-down"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
 console.log(`you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`);
 console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations; ${game.strategyChoices / game.colonies.length} stance choices each\n`);
 for (const p of phases) console.log(`  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`);
