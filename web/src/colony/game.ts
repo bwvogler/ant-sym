@@ -1,6 +1,7 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, localPolicy, localStance, type ColonyParams, type Layer, type Policy, type StancePolicy } from "./colony.ts";
+import { Colony, localPolicy, localStance, PLANE, type ColonyParams, type Layer, type Policy, type StancePolicy } from "./colony.ts";
+import type { OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
@@ -9,6 +10,16 @@ import { foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMa
 import { cellOf, CELL } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
+
+export { CURTAIN, PLANE } from "./colony.ts";
+
+/** Whether `m` is one world (oneWorld.ts: the plane, the curtain and the line), not a single map. */
+export function isOneWorld(m: WorldMap | OneWorld): m is OneWorld {
+  return "plane" in m && "curtain" in m && "line" in m;
+}
+
+/** What a one-world game refuses until U4 (docs/one-world.md §6): founding mid-game, saving and loading. */
+const ONE_WORLD_U4 = "one world: U4";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
 // The player is neither: the player is the fungus (fungus.ts). `player` and
@@ -199,12 +210,12 @@ export const BRUSH = { radius: 3, spores: 2, dose: 0.15 } as const;
  * beaten and does not smell like kin (nest odours more than `tolerance` apart); null if there is none.
  */
 export function nearestRival(c: Colony, colonies: readonly Colony[], tolerance: number): Colony | null {
-  const at = c.nest.entrance ?? c.nest;
+  const at = holeOf(c);
   let target: Colony | null = null;
   let best = Infinity;
   for (const o of colonies) {
     if (o === c || Game.beaten(o) || Math.abs(o.nestOdour - c.nestOdour) <= tolerance) continue;
-    const e = o.nest.entrance ?? o.nest;
+    const e = holeOf(o);
     const d = Math.hypot(e.x - at.x, e.y - at.y);
     if (d < best) {
       best = d;
@@ -214,8 +225,17 @@ export function nearestRival(c: Colony, colonies: readonly Colony[], tolerance: 
   return target;
 }
 
+/** Colony c's hole: its entrance in the side view, its nest top-down, and in one world its hole on the plane (layer 0's nest). */
+function holeOf(c: Colony): { x: number; y: number } {
+  const n = (c.layers[0] as Layer).nest;
+  return n.entrance ?? n;
+}
+
 export class Game {
+  /** the map: in one world the plane, the surface (its food piles regrow there, and the fungus lands there) */
   readonly map: WorldMap;
+  /** one world (oneWorld.ts), or null: a game on one map */
+  readonly world: OneWorld | null;
   /**
    * The maps the game is played on, each a layer (one world, ja-lp4.3: the plane and the curtain); every other game has
    * one, its `map`. Each layer has its own occupancy grids and recognition: ants meet, fight and pass the fungus on only
@@ -261,23 +281,35 @@ export class Game {
    */
   revealed: boolean[] = [];
 
-  constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Sides = {}) {
+  /**
+   * A game on one map, or on one world (docs/one-world.md §2): the plane (layer PLANE) and the curtain (CURTAIN). There
+   * every colony's home is the curtain, its nest, queen and brood, where every ant starts; it forages on the plane, and
+   * its ants cross between the two at the holes.
+   */
+  constructor(world: WorldMap | OneWorld, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Sides = {}) {
+    const one = isOneWorld(world) ? world : null;
+    const map = one ? one.plane : (world as WorldMap);
+    // The colonies' home map: the curtain in one world, where their nests are.
+    const home = one ? one.curtain : map;
+    const layered = one ? { plane: one.plane, line: one.line } : null;
+    this.world = one;
     this.map = map;
-    this.layers = [map];
+    this.layers = one ? [one.plane, one.curtain] : [map];
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
     this.recognition = new Recognition(this.params.recognition);
-    this.#recs = [this.recognition];
+    this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(this.params.recognition)));
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
-    const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
+    const mine = new Colony(home, { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance, layered);
     if (player.responses) mine.responses = player.responses;
     this.colonies = [mine];
-    if (this.params.rival && map.nests.length > 1)
-      this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 }, rng, player.rivalPolicy ?? localPolicy, player.rivalStance ?? localStance));
+    if (this.params.rival && home.nests.length > 1)
+      this.colonies.push(new Colony(home, { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 }, rng, player.rivalPolicy ?? localPolicy, player.rivalStance ?? localStance, layered));
     if (player.rivalResponses && this.colonies[1]) this.colonies[1].responses = player.rivalResponses;
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
-    this.fungus = new Fungus(map, this.params.fungus);
+    // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
+    this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
@@ -292,8 +324,9 @@ export class Game {
       });
       // Undertakers put the dead on the midden: a host of a strain that sporulates (Bloom) puts spores on the ground there;
       // other strains die with their host (nest slices 7–8).
-      c.onBury = (d) => {
-        if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates) this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain);
+      // On the layer it is buried on: one world buries at the hole on the plane (until U3c's midden there).
+      c.onBury = (d, layer = 0) => {
+        if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates) this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
       };
       if (this.colonies.length > 1) {
         this.layers.forEach((_, l) => {
@@ -414,6 +447,7 @@ export class Game {
    * raided), grids. Returns its index.
    */
   addColony(f: Founding): number {
+    if (this.world) throw new Error(ONE_WORLD_U4);
     const k = this.colonies.length;
     // The new nest's index in map.nests, which holds the world's nests whether or not a colony lives in each (with the
     // rival off, nest 1 is the world's unused second nest): never the colony's index (PR #42 review, B2).
@@ -566,23 +600,30 @@ export class Game {
     });
   }
 
-  /** Strangers (to the nest's odour, at the healthy tolerance) within `nestWatch` (world units) of colony k's nest, and of its entrance in the side view. */
+  /**
+   * Strangers (to the nest's odour, at the healthy tolerance) within `nestWatch` (world units) of colony k's nest, and of
+   * its entrance in the side view; in one world, on each layer round that layer's nest (the plane's disc, the curtain's
+   * chamber and entrance), each layer's recognition counting the ants on it.
+   */
   enemiesNearNest(k: number): number {
     const c = this.colonies[k] as Colony;
-    const rec = this.#recs[0] as Recognition;
-    rec.look(c.nestOdour, rec.params.tolerance);
-    const { w, h } = (this.layers[0] as WorldMap).size;
-    const r = this.params.nestWatch;
     let s = 0;
-    for (let y = Math.max(0, Math.floor((c.nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((c.nest.y + r) / R)); y++)
-      for (let x = Math.max(0, Math.floor(c.nest.x - r - 1)); x <= Math.min(w - 1, Math.ceil(c.nest.x + r)); x++)
-        if (Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) <= r) s += rec.get(x, y);
-    // The side view: the entrance too (it is above the chamber, out of that watch), unless the two overlap.
-    const en = c.nest.entrance;
-    if (en && Math.hypot(en.x - c.nest.x, en.y - c.nest.y) > r)
-      for (let y = Math.max(0, Math.floor((en.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((en.y + r) / R)); y++)
-        for (let x = Math.max(0, Math.floor(en.x - r - 1)); x <= Math.min(w - 1, Math.ceil(en.x + r)); x++)
-          if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - c.nest.x, centreY(y) - c.nest.y) > r) s += rec.get(x, y);
+    this.layers.forEach((m, l) => {
+      const rec = this.#recs[l] as Recognition;
+      const nest = (c.layers[l] as Layer).nest;
+      rec.look(c.nestOdour, rec.params.tolerance);
+      const { w, h } = m.size;
+      const r = this.params.nestWatch;
+      for (let y = Math.max(0, Math.floor((nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((nest.y + r) / R)); y++)
+        for (let x = Math.max(0, Math.floor(nest.x - r - 1)); x <= Math.min(w - 1, Math.ceil(nest.x + r)); x++)
+          if (Math.hypot(centreX(x, y) - nest.x, centreY(y) - nest.y) <= r) s += rec.get(x, y);
+      // The side view: the entrance too (it is above the chamber, out of that watch), unless the two overlap.
+      const en = nest.entrance;
+      if (en && Math.hypot(en.x - nest.x, en.y - nest.y) > r)
+        for (let y = Math.max(0, Math.floor((en.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((en.y + r) / R)); y++)
+          for (let x = Math.max(0, Math.floor(en.x - r - 1)); x <= Math.min(w - 1, Math.ceil(en.x + r)); x++)
+            if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - nest.x, centreY(y) - nest.y) > r) s += rec.get(x, y);
+    });
     return s;
   }
 
@@ -700,7 +741,7 @@ export class Game {
     });
     const fungal = this.fungus.due(dt);
     // Occupancy is needed every tick with a rival (fights, recognition), underground (crowded digging, backfill), or when the fungus steps.
-    if (this.colonies.length > 1 || fungal || this.map.hasSoil) this.#refresh();
+    if (this.colonies.length > 1 || fungal || this.layers.some((m) => m.hasSoil)) this.#refresh();
     this.#fightDeaths *= Math.exp(-dt / QUIET);
     if (this.colonies.length > 1) {
       // Fights on each layer, among the ants there.
@@ -777,8 +818,10 @@ export class Game {
 
   /** Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim). */
   #byHole(c: Colony): { x: number; y: number } {
-    const e = c.nest.entrance ?? { x: c.nest.x + c.nest.r, y: c.nest.y };
-    return { x: e.x + LANDING.offset, y: e.y - (c.nest.entrance ? 0.5 : 0) };
+    // One world: on the plane, by the rim of the disc round its hole (layer 0's nest), as top-down.
+    const nest = this.world ? (c.layers[PLANE] as Layer).nest : c.nest;
+    const e = nest.entrance ?? { x: nest.x + nest.r, y: nest.y };
+    return { x: e.x + LANDING.offset, y: e.y - (nest.entrance ? 0.5 : 0) };
   }
 
   /**
@@ -823,6 +866,7 @@ export class Game {
    * ui/saves.ts keeps the seed, view and settings beside it).
    */
   save(): GameSave {
+    if (this.world) throw new Error(ONE_WORLD_U4);
     const map = Object.fromEntries(Object.entries(this.map).filter(([k]) => k !== "nests" && k !== "nest"));
     return {
       version: SAVE_VERSION,
@@ -845,6 +889,7 @@ export class Game {
 
   /** A save back into this game, built afresh from the same world and settings (Game.save). */
   load(saved: GameSave): void {
+    if (this.world) throw new Error(ONE_WORLD_U4);
     if (saved.version !== SAVE_VERSION) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
     // Colonies founded mid-game first, as they were: then everything (the map as dug among it) is poured back over them.
     for (const f of saved.founded ?? []) this.addColony(f);

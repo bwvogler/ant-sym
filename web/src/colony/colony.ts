@@ -9,6 +9,8 @@ import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, Donor
 import { type Alate, ALATE_FEED, ALATE_RESERVE, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_SPACING, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { cellAt, type Transect } from "./transect.ts";
+import { sOf } from "./oneWorld.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -355,6 +357,21 @@ export type Wiring = Partial<Pick<Layer, "enemies" | "nestmates" | "friends" | "
 /** A layer's own copy of its state, held while another layer is bound (see Colony.layers). */
 type LayerSlots = { -readonly [K in keyof Layer]: Layer[K] };
 
+/** One world's layers (docs/one-world.md §2): the plane, the surface, is layer 0; the curtain, underground, layer 1 (a colony's home there). */
+export const PLANE = 0;
+export const CURTAIN = 1;
+
+/**
+ * One nest's hole on both layers (one world): its cell in the curtain (the crust's open cell, under the line) and the
+ * plane cell over it, P(s) for that column s. The only way between the layers (one-world §2).
+ */
+export interface HoleCell {
+  col: number;
+  row: number;
+  px: number;
+  py: number;
+}
+
 /** Where a layer's view keeps its slots: a key only this module holds. */
 const SLOTS = Symbol("slots");
 
@@ -392,7 +409,7 @@ function gatesFor(p: ColonyParams, open: boolean, dt: number): Gates {
 }
 
 /** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices), the layers (the maps and scents again) and the policies. */
-const COLONY_SKIP: ReadonlySet<string> = new Set(["map", "nest", "layers", "home", "policy", "stancePolicy", "responses", "onBury", "enemies", "foreign", "friends", "nestmates", "raidTarget", "raidNest", "raidMarks", "others", "felt", "donors", "scentSum", "perceived"]);
+const COLONY_SKIP: ReadonlySet<string> = new Set(["map", "nest", "layers", "home", "line", "holeCells", "policy", "stancePolicy", "responses", "onBury", "enemies", "foreign", "friends", "nestmates", "raidTarget", "raidNest", "raidMarks", "others", "felt", "donors", "scentSum", "perceived"]);
 
 export class Colony {
   /** the map, the colony's scent and its nest on the layer being stepped; between ticks, the home layer's */
@@ -414,6 +431,10 @@ export class Colony {
   layer: Uint8Array;
   /** the layer bound now (#bind): `home` between ticks */
   #cur = 0;
+  /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map */
+  readonly line: Transect | null = null;
+  /** one world: every nest's hole on both layers (HoleCell), indexed by colony as the maps' nests are; empty elsewhere */
+  holeCells: HoleCell[] = [];
   params: ColonyParams;
   policy: Policy;
   stancePolicy: StancePolicy;
@@ -559,8 +580,8 @@ export class Colony {
   readonly corpses: Corpse[] = [];
   /** the midden: corpses buried per cell (packed y × 65536 + x), a count rather than a list growing all game (review of #26) */
   readonly midden = new Map<number, number>();
-  /** called with each corpse as it is put on the midden (the game: a sporulating strain's spores there) */
-  onBury: ((k: Corpse) => void) | null = null;
+  /** called with each corpse as it is put on the midden (the game: a sporulating strain's spores there), and the layer it lies on (absent: layer 0) */
+  onBury: ((k: Corpse, layer?: number) => void) | null = null;
   /** Whether ant i carries a corpse (drawn as one, not as soil). */
   carriesCorpse(i: number): boolean {
     return this.#corpse[i] === 1;
@@ -808,7 +829,11 @@ export class Colony {
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   #s = new Float64Array(9);
 
-  constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
+  /**
+   * A colony on `map`. In one world (`world`, docs/one-world.md §2) `map` is the curtain, its home, where its nest, queen
+   * and brood are and every ant starts; the plane is its second layer, where it forages (layers: PLANE, CURTAIN).
+   */
+  constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance, world: { plane: WorldMap; line: Transect } | null = null) {
     this.map = map;
     this.params = { ...DEFAULT_COLONY, ...params };
     if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
@@ -828,8 +853,23 @@ export class Colony {
     if (this.#entrance === null && this.params.channels.food?.max === undefined) chans.food = { ...chans.food, max: this.params.foodCapTop };
     this.ph = new Pheromones(map, chans);
     const slots = {} as LayerSlots;
+    if (world) {
+      // One world: home is the curtain, bound now and between ticks.
+      this.home = CURTAIN;
+      this.#cur = CURTAIN;
+    }
     this.#store(slots);
-    this.layers = [Colony.#view(this, 0, slots)];
+    if (world) {
+      // The plane: its nest is the disc round the hole (no entrance: the hole is the way in, not a nest to dig), and the
+      // colony's scent there has the top-down food cap, as on any open ground. Its Pheromones draws no random numbers.
+      const top = channelParams(this.params.channels);
+      if (this.params.channels.food?.max === undefined) top.food = { ...top.food, max: this.params.foodCapTop };
+      const nest = world.plane.nests[this.params.nest];
+      if (!nest) throw new Error(`one world: the plane has no nest ${this.params.nest}`);
+      const plane: LayerSlots = { map: world.plane, ph: new Pheromones(world.plane, top), nest, entrance: null, entranceCol: 0, entranceRow: 0, holes: [], outDist: null, outCells: [], outVersion: -1, outAt: -Infinity, enemies: null, nestmates: null, friends: null, foreign: null, raidMarks: null, raidTarget: null, raidNest: null, others: [] };
+      this.layers = [Colony.#view(this, PLANE, plane), Colony.#view(this, CURTAIN, slots)];
+      this.line = world.line;
+    } else this.layers = [Colony.#view(this, 0, slots)];
     this.seeHoles();
     const n = this.params.maxAnts;
     this.n = n;
@@ -948,6 +988,7 @@ export class Colony {
     this.#question = new Int16Array(n).fill(-1);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
+    if (world) (this.layers[PLANE] as Layer).ph.phase((this.params.nest % 2) * 0.5);
     for (let k = 0; k < this.params.antCount; k++) this.#place(k);
     // The founders carry the colony's steady share of the queen's scent (else every nurse perceives none at the start).
     if (this.queen) this.scent.fill(scentShare(this.params.antCount), 0, this.params.antCount);
@@ -962,6 +1003,19 @@ export class Colony {
    * review, S3).
    */
   seeHoles(): void {
+    // One world: each nest's hole on both layers, by colony (the maps' nests are), the plane cell over its column.
+    const line = this.line;
+    if (line) {
+      const curtain = (this.layers[this.home] as Layer).map;
+      this.holeCells = curtain.nests.map((n) => {
+        const e = n.entrance ?? n;
+        cellOf(e.x, e.y);
+        const col = CELL[0] as number;
+        const row = CELL[1] as number;
+        cellAt(line, sOf(line, col));
+        return { col, row, px: CELL[0] as number, py: CELL[1] as number };
+      });
+    }
     // On every layer with a hole into it (the side view's map; one world's curtain).
     for (const L of this.layers) {
       if (!L.entrance) continue;
@@ -1716,8 +1770,9 @@ export class Colony {
       if (this.#soil[i] !== SOIL_DUG) this.looseLost++;
       else this.soilLost++;
     }
-    // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7).
-    if (this.queen) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, died: this.time, load: this.load[i] as number, strain: this.strain[i] as number });
+    // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7). One world:
+    // only underground, the nest's layer; the dead on the plane leave no corpse, as top-down (the midden is U3c's).
+    if (this.queen && this.layer[i] === this.home) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, died: this.time, load: this.load[i] as number, strain: this.strain[i] as number });
     this.#clearPellet(i);
     this.alive[i] = 0;
     this.carrying[i] = 0;
@@ -1740,9 +1795,12 @@ export class Colony {
     return { dug, loose };
   }
 
-  /** Food left on the map. */
+  /** Food left on the map; in one world, on both its layers: the plane's piles and the curtain's buried pockets (the strip's food is the plane's, counted there). */
   get foodLeft(): number {
-    return this.map.foodLeft;
+    if (this.layers.length === 1) return this.map.foodLeft;
+    let s = 0;
+    for (const L of this.layers) s += L.map.foodLeft;
+    return s;
   }
 
   /** Every ant asks its policy again on its next tick: a new doctrine, or fresh answers from Jev, take effect at once. */
@@ -1912,7 +1970,7 @@ export class Colony {
     // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
     const carryingOut = mode === RETURN && this.pellet[i] === 1 && this.#entrance !== null && !Number.isNaN(this.#spoilTo[i] as number);
     // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
-    const raiding = mode === FIGHT && this.#entrance !== null && this.stance === "raid" && this.raidTarget !== null;
+    const raiding = mode === FIGHT && this.#entrance !== null && this.#stanceOf(i) === "raid" && this.raidTarget !== null;
     const onSky = isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number));
     // Homing underground with the hole still its goal: in at another hole than its own (see #goal). It climbs back out.
     const climbing = mode === RETURN && this.#entrance !== null && !onSky && this.#goalKind[i] === 1 && this.pellet[i] === 0;
@@ -3874,8 +3932,9 @@ export class Colony {
    * smelt no raid trail and has not gone out as a scout carries on as a forager, so a raid stance never idles the colony.
    */
   #stanceOf(i: number): Stance {
-    // Top-down, each ant's own (docs/stance.md): defend while it senses a threat on home ground, raid once recruited, else forage.
-    if (this.params.stanceGate > 0 && this.#entrance === null) return this.#defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
+    // Top-down, each ant's own (docs/stance.md): defend while it senses a threat on home ground, raid once recruited, else
+    // forage. In one world on both layers (the owner's choice, ja-lp4.3): a raider keeps its stance down a rival's shaft.
+    if (this.params.stanceGate > 0 && (this.#entrance === null || this.line !== null)) return this.#defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
     return this.stance === "raid" && this.recruited[i] === 0 && this.params.raidGate > 0 && this.#entrance === null ? "forage" : this.stance;
   }
 
@@ -4130,7 +4189,8 @@ export class Colony {
           this.#gone[i] = 0;
         }
         if (homeNow || this.recruited[i] === 0) this.#pastEnd[i] = 0;
-      } else if (this.recruited[i] === 1) {
+      } else if (this.recruited[i] === 1 && this.line === null) {
+        // (In one world a raider keeps its stance underground, where nothing recruits: its raid ends at home on the plane.)
         this.recruited[i] = 0;
         this.#pastEnd[i] = 0;
       }
@@ -4159,11 +4219,12 @@ export class Colony {
       // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
       // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
       let goal = this.#goal(i, pellet);
-      // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant.
-      if (nursing && goal === this.nest) goal = this.#chamberGoal(this.#broodTo[i] as number);
+      // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant. Only
+      // where there is a hole into the layer: one world's plane has no chambers (its carriers home to the hole: #crossDown).
+      if (nursing && goal === this.nest && this.#entrance) goal = this.#chamberGoal(this.#broodTo[i] as number);
       // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
       // its food to (a forager: reception, or the royal chamber until there is one).
-      else if (carrying && this.queen && goal === this.nest) goal = this.#chamberGoal(this.#foodTo(i));
+      else if (carrying && this.queen && goal === this.nest && this.#entrance) goal = this.#chamberGoal(this.#foodTo(i));
       let nest = goal;
       const x0 = this.x[i] as number;
       const y0 = this.y[i] as number;
@@ -4515,11 +4576,11 @@ export class Colony {
         // A calm ant (the fungus's cue) does not charge.
         // A raider in the side view walks on to the raided nest, cell by cell, past the alarm of fights behind it: steering
         // freely up the alarm left raiders in the pits by the rival's mound, 12–13 columns short of its hole (none got in).
-        const sideRaid = this.stance === "raid" && this.raidTarget !== null && this.#entrance !== null;
+        const sideRaid = this.#stanceOf(i) === "raid" && this.raidTarget !== null && this.#entrance !== null;
         if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - (this.calm[i] as number)));
         else if (Math.max(al, af, ar) >= FAINT && !sideRaid) h += climb(al, af, ar, p.turnRate * dt);
         else if (sideRaid && ((this.detour[i] = 0), this.#walkTunnel(i, FIGHT, p.speed * dt))) h = this.#towardTarget(i);
-        else if (this.stance === "raid" && this.raidTarget && this.#entrance && this.#under[i]) {
+        else if (this.#stanceOf(i) === "raid" && this.raidTarget && this.#entrance && this.#under[i]) {
           // A raider in a chamber (no tunnel: free steering): out of its own nest by its hole, or on into the rival's.
           // Steering straight at the rival's hole through soil left nearly every raider bumping inside its own nest.
           this.antCell(i);
