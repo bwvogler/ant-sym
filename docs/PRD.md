@@ -3990,7 +3990,13 @@ The thresholds, rates and the drift's size and speed are the game's own (design)
 - **N3:** the toast for a queen lost to `MAX_COLONIES` says so, not "no room to land". **N4:** §50.2's two superseded bullets are marked.
 - **N1, N2, N5 stay:** a held larva still drains (not triggered in 60 s), the laying gate doesn't count larval upkeep (tuning, with `ja-xu6.2`), and the gyne's food cue reads the chamber's food as larval feeding does (`ja-k4k.4`).
 
-**A third merge** (#53, each ant's own stance, top-down): `CLAUDE.md`'s cost line takes #53's colony figures and this branch's fungus figures; `colony.ts` keeps both #53's stance gate and the side view's energy step in `tick`; the assay list keeps #53's `defendHome` and the three lifecycle assays.
+**A third merge** (#53, each ant's own stance, top-down): `CLAUDE.md`'s cost line takes #53's colony figures and this branch's fungus figures; `colony.ts` keeps both #53's stance gate and the side view's energy step in `tick`; the assay list keeps #53's `defendHome` and the three lifecycle assays. `tests/golden.json` took both sides' entries (#53's top-down, this branch's side view) and passes as merged.
+
+**Review of 718ec15** (a review agent):
+- **S1, a founding daughter held unity at 0.** `Unity.met` is the least allied-contact share over the standing colonies, and a queen founding alone stands (`Game.beaten`) with no ants, so her share of 0 made `met` and the score 0 until her first workers met someone. A colony with no ants is now left out of `met` (`#metNow`): it has nobody to meet. Tested: two colonies that have met keep `met` over `MET` when a daughter founds; counting her fails it.
+- **N1:** a books check while a flight waits for the page (`autoFound` off): dropping the flights from `royalFood()` now fails it.
+- **N2:** `found()` with a site that has no room after all (`addColony` throws "no room") loses the queen and books her body, instead of dropping the flight with its body unbooked.
+
 
 ## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
 
