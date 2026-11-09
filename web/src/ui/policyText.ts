@@ -16,9 +16,9 @@ export interface RuleRow<S, A extends string> {
 /** localPolicy (colony.ts), row by row: the first row that holds decides. */
 export const LOCAL_MODE_RULES: RuleRow<Situation, Mode>[] = [
   { when: "it is tired (searched long outside without finding food)", then: "return", test: (s) => s.tired },
-  { when: "the colony raids and the ant is exploring or fighting", then: "fight", test: (s) => s.stance === "raid" && (s.mode === "explore" || s.mode === "fight") },
-  { when: "the colony defends and there is alarm scent ahead", then: "fight", test: (s) => s.stance === "defend" && s.alarm !== "none" },
-  { when: "it was fighting, and its colony is not raiding", then: "return", test: (s) => s.mode === "fight" },
+  { when: "its stance is raid (on open ground: a raid trail or its own errand recruited it) and it is exploring or fighting", then: "fight", test: (s) => s.stance === "raid" && (s.mode === "explore" || s.mode === "fight") },
+  { when: "its stance is defend (on open ground: it senses a threat near its nest) and there is alarm scent ahead", then: "fight", test: (s) => s.stance === "defend" && s.alarm !== "none" },
+  { when: "it was fighting, and its stance is not raid", then: "return", test: (s) => s.mode === "fight" },
   { when: "a strong food trail lies ahead", then: "follow", test: (s) => s.foodTrail === "strong" },
   { when: "no food trail lies ahead", then: "explore", test: (s) => s.foodTrail === "none" },
 ];
@@ -60,6 +60,6 @@ export const LOCAL_RESPONSE_RULES: [hook: string, rule: string][] = [
   ["drop", "Put food down where it goes."],
   ["trail", "Carrying food: lay the food trail, more for richer food. Walking out: lay the home trail. Porters, soil and corpse carriers: nothing."],
   ["alarm", "Strong alarm repels every ant but fighters and diggers. On the top-down maps a faint one draws an explorer with empty jaws to look, and a follower keeps to its trail."],
-  ["contact", "Strangers in reach: an ant carrying something takes it home; raiding, defending, or already sent to fight, it fights; otherwise, on a forage stance, it turns away and goes home."],
-  ["leave", "Rested and waiting at home (top-down maps): many nestmates coming home with food, go now; a few, go soon; none, wait, and only now and then go out to scout. A colony that defends sends its foragers out whatever comes back. On a raid stance an ant raids only once a scout's raid trail has reached it, or it has gone out as a scout; the others carry on foraging."],
+  ["contact", "Strangers in reach: an ant carrying something takes it home; raiding, defending, or already sent to fight, it fights; otherwise, foraging, it turns away and goes home."],
+  ["leave", "Rested and waiting at home (top-down maps): many nestmates coming home with food, go now; a few, go soon; none, and home crowded, now and then go out as a raid scout; none, wait, and only now and then go out to scout. An ant that defends goes out whatever comes back. A raider waits for a scout's raid trail, and goes on it."],
 ];

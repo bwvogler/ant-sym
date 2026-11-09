@@ -69,7 +69,7 @@ test("silent fights: a quiet host lays no alarm, so a skirmish recruits fewer de
   const skirmish = (quiet: number) => {
     const cells: [number, number][] = [[20, 6], [20, 6], [20, 6]];
     for (let x = 14; x <= 26; x += 2) cells.push([x, 3], [x, 9]);
-    const mine = new Colony(map, { antCount: cells.length, maxAnts: cells.length, nest: 0, odour: 0, wander: 0 }, mulberry32(8), localPolicy);
+    const mine = new Colony(map, { antCount: cells.length, maxAnts: cells.length, nest: 0, odour: 0, wander: 0, stanceGate: 0 }, mulberry32(8), localPolicy);
     cells.forEach(([x, y], i) => {
       mine.x[i] = x + 0.5;
       mine.y[i] = y + 0.5;

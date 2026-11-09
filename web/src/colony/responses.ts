@@ -78,12 +78,20 @@ export interface Touch {
    * doesn't recruit raiders by trail (raidGate 0, or the side view) reads "strong", so its raiders leave as they did.
    */
   raid: "none" | "faint" | "strong";
+  /**
+   * how crowded home is, felt by a waiting ant (docs/stance.md: nestmates in its cell and the six round it, over a few seconds):
+   * few or many; "few" where each ant's stance is not its own (the side view)
+   */
+  crowd: "few" | "many";
 }
 
 export type Returns = "none" | "few" | "many";
 
-/** How soon a rested forager waiting at home goes out (behaviour MR 5): now, soon, or wait (only a scout goes). */
-export const LEAVE = ["now", "soon", "wait"] as const;
+/**
+ * How soon a rested forager waiting at home goes out (behaviour MR 5): now, soon, or wait (only a scout goes); or raid (docs/stance.md):
+ * out, soon, as a raid scout looking for the rival.
+ */
+export const LEAVE = ["now", "soon", "wait", "raid"] as const;
 export type Leave = (typeof LEAVE)[number];
 
 export type Odds = "none" | "outnumbered" | "even" | "outnumbering";
@@ -165,7 +173,8 @@ export const localResponses: Responses = {
   // Pinter-Wollman et al. 2013); with none, it waits, and only scouts go. A fighting stance doesn't wait for food.
   // A raider (mode fight) home on a raid stance goes on a scout's trail (behaviour MR 5.2); a forager answers its returns, and a
   // colony that raids or defends sends it out whatever comes back (MR 5).
-  leave: (t) => (t.mode === "fight" ? (t.stance === "raid" && t.raid === "none" ? "wait" : "now") : t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : "wait"),
+  // Each ant's own stance (docs/stance.md): a crowded home with no food coming back sends a waiting forager out as a raid scout.
+  leave: (t) => (t.mode === "fight" ? (t.stance === "raid" && t.raid === "none" ? "wait" : "now") : t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : t.crowd === "many" ? "raid" : "wait"),
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */

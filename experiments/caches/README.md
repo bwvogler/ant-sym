@@ -16,3 +16,6 @@ The MR 3.1 caches no longer replay after MR 3 (asked under response version 4), 
 
 `mr2-forage.json` is the ablation's "all of Jev's answers" input: the cache MR 2's live check wrote, which MR 3.1's live check later overwrote in `experiments/out/`.
 | `mr52-top-forage.json`, `mr52-top-cautious.json`, `mr52-top-warlike.json` | 2026-11-06, MR 5.2, each doctrine, top-down (`--top`), seed 1, 600 + 600, 300 s: every lane (mode answers included, the first top-down ones), the leave lane with the raid trail | 6 / 4 / 9 | until the next stance or response version | PRD §49.4: `npm run exp -- gameTop --seeds 1-6 --policy cache:experiments/caches/mr52-top-forage.json` |
+| `stance-top-forage.json`, `stance-top-cautious.json`, `stance-top-warlike.json` | 2026-11-08, stance from senses (ja-k4k.6, ja-d8e), each doctrine, top-down (`--top`), seed 1, 600 + 600, 300 s: every lane; the leave lane with `crowd` and the "raid" answer, each ant's own stance; re-asked after the review of #53 under the caution sentence; $0.0066 | 7 / 4 / 10 | until the next colony or response version | PRD §54: `npm run exp -- gameTop --seeds 1-6 --policy cache:experiments/caches/stance-top-forage.json` |
+
+The mr52 caches no longer replay after the stance MR (colony version 7, response version 10).

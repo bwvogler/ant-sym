@@ -12,7 +12,7 @@ import { UPGRADES, type Upgrade } from "./colony/evolution.ts";
 import { LETHAL_LEVERS } from "./colony/levers.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
-import { type Game, MAX_COLONIES } from "./colony/game.ts";
+import { MAX_COLONIES, MET, type Game } from "./colony/game.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo } from "./ui/backend.ts";
 import { useBackend } from "./ui/useBackend.ts";
@@ -230,6 +230,7 @@ function FungusPanel({ stats, jev, evolve, side, menu }: { stats: ColonyStats | 
                 <span className="font-mono tabular-nums text-fg">{Math.round(100 * stats.unity.score)}%</span>
               </div>
               <Bar value={stats.unity.score} thin />
+              {stats.unity.alike && stats.unity.met < MET && <p className="mt-1 text-xs text-fg-3">The nests smell alike, but the colonies have not met yet.</p>}
             </div>
           )}
         </div>
@@ -341,7 +342,7 @@ function clock(t: number): string {
 function goalLine(stats: ColonyStats | null): string {
   if (!stats) return "";
   if (stats.outcome === "fallen") return `The ${colonyName(stats.fallen)} colony is gone: there is no one left to unite it with.`;
-  if (stats.outcome === "unified") return "One colony: the nests smell alike and nobody has died fighting for a minute.";
+  if (stats.outcome === "unified") return "One colony: the nests smell alike, their ants have met, and nobody has died fighting for a minute.";
   const c = stats.chapter;
   return `${c.step < 7 ? `${c.step}. ` : ""}${c.goal}${c.progress > 0 && c.progress < 1 ? ` (${Math.round(100 * c.progress)}%)` : ""}`;
 }
