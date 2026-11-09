@@ -1,10 +1,10 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { type ColonyParams, FAINT, type Mode, type Policy, type Stance, type StancePolicy } from "./colony.ts";
+import { type ColonyParams, FAINT, MODES, type Mode, type Policy, type Stance, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
-import { localResponses, type Responses } from "./responses.ts";
+import { localResponses, responses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
 import { dropFood, isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
@@ -416,6 +416,18 @@ const always =
   (): T =>
     v;
 
+/**
+ * Each ant's own stance (docs/stance.md): a colony whose waiting foragers go out as raid scouts whenever no food comes back
+ * (what a raid stance did before), and one whose never do (a forage stance).
+ */
+export const RAIDING = responses({ leave: (t) => (t.mode !== "fight" && t.stance === "forage" && t.returns === "none" ? "raid" : localResponses.leave(t)) });
+export const NEVER_RAID = responses({
+  leave: (t) => {
+    const a = localResponses.leave(t);
+    return a === "raid" ? "wait" : a;
+  },
+});
+
 const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
 
 /** Food a colony must bring home for a bridge run to count: a share measured on almost no traffic says nothing (ja-dez). */
@@ -783,7 +795,9 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
     // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
     // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
     // gain 1.26, 3/20 on main).
-    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid"), colony: { raidGate: 0 } },
+    // Both sides keep the colony's stance (stanceGate 0, docs/stance.md): A6 is about who reaches whom at a pass, and with each
+    // ant's own stance the defenders 40 cells from home turned away from the pass instead of holding it (gain 1.64 against 1.95).
+    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid"), colony: { raidGate: 0, stanceGate: 0 }, rival: { stanceGate: 0 } },
   };
 }
 
@@ -931,7 +945,7 @@ function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
     seconds: 300,
     map: () => a.build([{ x: 20, y: 30, r: 3 }, { x: 100, y: 30, r: 3 }]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
-    sides: { stance: always<Stance>("raid"), ...(colony ? { colony } : {}) },
+    sides: { stance: always<Stance>("raid"), responses: RAIDING, rivalResponses: NEVER_RAID, ...(colony ? { colony } : {}) },
     probes: [raidProbe(own, rival)],
   };
 }
@@ -974,7 +988,7 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
       return a.build([{ x: 50, y: 50, r: 3 }, { x: 91, y: 91, r: 3 }]);
     },
     game: { antCount: 300, rivalAnts: 30 },
-    sides: { stance: always<Stance>(stance) },
+    sides: { stance: always<Stance>(stance), responses: stance === "raid" ? RAIDING : NEVER_RAID },
     probes: [outingProbe(nest, { Late: [720, 900] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
   };
 }
@@ -1010,13 +1024,87 @@ export const contact: Assay = {
     seconds: 300,
     map: () => new Arena(120, 60, true).pile(60, 30, 4, 200).build([{ x: 12, y: 30, r: 3 }, { x: 108, y: 30, r: 3 }]),
     game: { antCount: 200, rivalAnts: 200 },
-    sides: { stance: always<Stance>("forage"), rivalStance: always<Stance>("forage") },
+    sides: { stance: always<Stance>("forage"), rivalStance: always<Stance>("forage"), responses: NEVER_RAID, rivalResponses: NEVER_RAID },
   }),
   score: (r) => {
     const lost = (r.metrics["you.losses"] as number) + (r.metrics["rival.losses"] as number);
     const home = (r.metrics["you.stored"] as number) + (r.metrics["rival.stored"] as number);
     const per100 = home > 0 ? (100 * lost) / home : Infinity;
     return { lostPer100Food: per100, foodHomeBoth: home, pass: per100 <= CONTACT_LOSSES ? 1 : 0 };
+  },
+};
+
+/**
+ * A13 — defence from senses (docs/stance.md). One colony forages a pile 45 cells west of its nest; a war party of strangers
+ * (the rival, sent marching at the colony's hole: an experimental device) comes from the east. Defence is an individual's:
+ * the ants that sense a threat near home fight it, and foragers far off at the pile go on carrying (pavement ants: a
+ * threshold raised by encounters, Hoover et al. 2016; Pheidole: the fight moves closer to the nest as it grows). Score: food
+ * stored against the same seed with the war party sealed in rock (`foodShare`), the strangers killed per ant lost
+ * (`exchange`), and, sampled each second from 20 s, the colony's fighters within NEAR_HOME of its nest (`fightNear`) and its
+ * ants at the pile that are not fighting (`atPile`). `broadcast` is the same battle with the colony's stance chosen by its
+ * strategist and told to every ant (stanceGate 0, as before). Design mark: food at least DEFEND_FOOD of the broadcast's
+ * share, and at least half the war party killed. (An absolute mark of 0.8 of the control failed under both: an 80-strong
+ * war party forced to fight costs a 200-ant colony 120-130 ants whoever defends.)
+ */
+export const DEFEND_FOOD = 0.9;
+export const NEAR_HOME = 15;
+function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams>): RunSpec {
+  const nest = at(60, 30);
+  const pile = at(15, 30);
+  let fightNear = 0;
+  let atPile = 0;
+  let samples = 0;
+  let next = 20;
+  return {
+    seed,
+    seconds: 300,
+    map: () => {
+      const a = new Arena(160, 60, true).pile(15, 30, 4, 300);
+      if (sealed) a.wall(140, 20, 158, 40).carve(145, 25, 155, 35);
+      return a.build([{ x: 60, y: 30, r: 3 }, { x: 150, y: 30, r: 3 }]);
+    },
+    game: { antCount: 200, rivalAnts: 80 },
+    sides: {
+      ...(colony ? { colony } : {}),
+      rivalPolicy: always<Mode>("fight"),
+      rivalStance: always<Stance>("raid"),
+      rival: { raidGate: 0, stanceGate: 0 },
+    },
+    probes: [
+      {
+        tick(game) {
+          if (game.time + 1e-9 < next) return;
+          next += 1;
+          const c = game.player;
+          for (let i = 0; i < c.n; i++) {
+            if (!c.alive[i]) continue;
+            const x = c.x[i] as number;
+            const y = c.y[i] as number;
+            const fighting = MODES[c.mode[i] as number] === "fight";
+            if (fighting && Math.hypot(x - nest.x, y - nest.y) <= NEAR_HOME) fightNear++;
+            if (!fighting && Math.hypot(x - pile.x, y - pile.y) <= 8) atPile++;
+          }
+          samples++;
+        },
+        summary: () => ({ fightNear: samples ? fightNear / samples : 0, atPile: samples ? atPile / samples : 0 }),
+      },
+    ],
+  };
+}
+export const defendHome: Assay = {
+  id: "defendHome",
+  title: "A13 defence from senses: the nest is defended, the far pile still worked",
+  target: `food (against the same colony with no war party) ≥ ${DEFEND_FOOD * 100} % of the broadcast stance's, and ≥ half the war party killed (design marks; docs/stance.md)`,
+  seconds: 300,
+  spec: (seed) => defendSpec(seed, false),
+  score: (r) => {
+    const stored = r.metrics["you.stored"] as number;
+    const control = runGame(defendSpec(r.seed, true)).result.metrics["you.stored"] as number;
+    const foodShare = control > 0 ? stored / control : NaN;
+    const killed = r.metrics["rival.losses"] as number;
+    const lost = r.metrics["you.losses"] as number;
+    const broadcast = (runGame(defendSpec(r.seed, false, { stanceGate: 0 })).result.metrics["you.stored"] as number) / Math.max(1, control);
+    return { stored, control, foodShare, broadcast, killed, lost, exchange: killed / Math.max(1, lost), fightNear: r.metrics.fightNear as number, atPile: r.metrics.atPile as number, pass: foodShare >= DEFEND_FOOD * broadcast && killed >= 40 ? 1 : 0 };
   },
 };
 
@@ -1205,4 +1293,4 @@ export const lifecycle = lifecycleAssay("none");
 export const lifecycleSignal = lifecycleAssay("signal");
 export const lifecycleScent = lifecycleAssay("scent");
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, faintAlarm, game, gameTop, nestFlow, lifecycle, lifecycleSignal, lifecycleScent];
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, defendHome, faintAlarm, game, gameTop, nestFlow, lifecycle, lifecycleSignal, lifecycleScent];

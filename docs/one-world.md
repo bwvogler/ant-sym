@@ -1,6 +1,6 @@
 # One world: the surface and a curtain under the line between the holes
 
-Design note (not built). It answers the owner's request (2026-11-08) to make the top-down view and the side view two views of **one** game, and records the model chosen, the geometry rule that keeps it consistent, what changes in the code, and the order to build it in. Beads: epic `ja-lp4`; stages U1–U6 are `ja-lp4.1`–`ja-lp4.6`, and the research bead is `ja-lp4.7`. Decisions: PRD §51.
+Design note. U1, the line's geometry, is built (`web/src/colony/transect.ts`); the rest is not. It answers the owner's request (2026-11-08) to make the top-down view and the side view two views of **one** game, and records the model chosen, the geometry rule that keeps it consistent, what changes in the code, and the order to build it in. Beads: epic `ja-lp4`; stages U1–U6 are `ja-lp4.1`–`ja-lp4.6`, and the research bead is `ja-lp4.7`. Decisions: PRD §51.
 
 ## 1. Where we are
 
@@ -51,11 +51,11 @@ Fights happen within a layer. Two ants in different layers never meet, except ac
 
 **The founding rule** (the owner's, made precise). A colony may be founded at point *p* only when all of these hold:
 1. **Its nearest hole is an end** (V₀ or V_k). The owner's rule: no founding nearer an interior nest's hole, so the line always grows from an end and stays one unbranched strip. Ties are settled so a game replays exactly: a point as near an interior hole as an end is invalid, and a point as near both ends grows the line at V₀. With two nests both are ends, so the first founding may go beyond either.
-2. **The new segment doesn't fold back.** It may not turn back on the end segment by more than 120° (so the angle between them at the shared vertex is at least 60°). Away from that vertex (beyond the clearance) it neither crosses the line, the far end's margin included, nor comes within a clearance (about 12 cells) of it. Otherwise the curtain would pass under itself, and one surface cell would sit over two places underground.
+2. **The new segment doesn't fold back.** It may not turn back on the end segment by more than 120° (so the angle between them at the shared vertex is at least 60°). Away from that vertex (beyond the clearance) neither it nor the margin it will carry past the new hole crosses the line, the far end's margin included, or comes within a clearance (about 12 cells) of it (owner, 2026-11-08: the new margin is curtain too). The clearance is excused on both sides of the vertex, which makes it agree exactly with the 120° limit. Otherwise the curtain would pass under itself, and one surface cell would sit over two places underground.
 3. **It doesn't crowd a hole.** *p* is at least a hole gap from every hole, as a 2D distance. Today `Game.addColony` keeps `HOLE_GAP` (8) columns between holes in the side view and `NEST_GAP` (12) between nests top-down, and moves a founding rather than refusing it; one world uses one 2D gap. Rule 2's clearance already covers most of this.
 4. **It is on open ground** on the plane.
 
-**The line on the hex grid.** Column *s* of the curtain lies under *P(s)*, the plane cell holding the point at distance *s* along the line. *P* need not be one-to-one: along a slanted segment some cells sit over two columns, and the side view's ground strip draws them twice. U1 samples the line finely enough that neighbouring columns always map to the same or adjacent cells, and its property tests check that.
+**The line on the hex grid.** Column *s* of the curtain lies under *P(s)*, a plane cell on the line. Columns are hex steps (owner, 2026-11-08): a segment's columns are the hex line between its two holes, one column per step, so neighbouring columns always lie over the same or adjacent cells. Columns spaced 1 apart along the line could not promise that: two points 1 apart fall in cells 2 steps apart wherever the line clips a hex corner. A segment is therefore `hexDistance` columns long, the same as its length running east–west and up to ~15% longer at a slant, never shorter, so the curtain is no shortcut. A cell sits over two columns only right at a bend. U1's property tests check both over random lines.
 
 **A landing that breaks the rule** (a queen's flight, `ja-lo8.9`, closed but not yet on main on 2026-11-08, whose landing rule U4 changes; the lab's "found a colony" button) moves to the nearest valid point within the flight's radius. If none lies within it, **the flight fails**: the queen dies, as most real foundresses do, and the game says why ("no room beyond the line's ends within her flight"). Decided by the owner (§8); `new-queens.md` §3 says so too.
 
@@ -110,12 +110,12 @@ The page keeps today's two maps until one world passes its own guards. U6 then t
 
 | Stage | What | Guard |
 |---|---|---|
-| U1 | `transect.ts`, pure: the line, *s* ↔ plane cell, signed *s*, `canFound` and `nearestValid` (the four rules of §3, with their ties), the turn limit, crossing and clearance tests | unit tests, with property tests over random lines: neighbouring columns map to the same or adjacent cells; no valid founding makes the curtain overlap itself |
+| U1 (built) | `transect.ts`, pure: the line, *s* ↔ plane cell, signed *s*, `canFound` and `nearestValid` (the four rules of §3, with their ties), the turn limit, crossing and clearance tests | unit tests, with property tests over random lines: neighbouring columns map to the same or adjacent cells; no valid founding makes the curtain overlap itself |
 | U2 | `generateOneWorld`: the plane from the open-map generator, the curtain from the side-view generator along the line. Both views drawn, with no simulation yet | map invariants: each hole is open on both layers; the curtain's ground row lies under *P(s)* |
-| U3 | colonies on two layers: per-ant layer, hole crossings, 2D homing, the mound and midden on the plane, the queen economy | a new golden master for one world; the old ones bit-exact |
+| U3 | colonies on two layers: per-ant layer, hole crossings, 2D homing, the mound and midden on the plane, the queen economy; unity's allied contact (`Game.#meet`, PRD §53) counted per layer | a new golden master for one world; the old ones bit-exact |
 | U4 | founding on the line: `Game.addColony` checks `canFound`; the lab button becomes "found beyond ‹end nest›"; the queen's landing (`ja-lo8.9`) moves to the nearest valid spot or fails; saves | save round-trip; founding property tests |
 | U5 | the page as one game in two views, linked (§5) | Playwright: switch views mid-game, follow an ant through a hole |
-| U6 | G1, a G-like whole-game guard on one world; assays A1–A10 rerun on the plane; tick cost measured (budget 7–9 ms at 1,200 + 1,200); the page's default switched; the Ground control's world switch retired | `npm run exp`, `test:slow`, the bench |
+| U6 | G1, a G-like whole-game guard on one world (and unity reachable: Garden in both clears `MET`, PRD §53); assays A1–A10 rerun on the plane; tick cost measured (budget 7–9 ms at 1,200 + 1,200); the page's default switched; the Ground control's world switch retired | `npm run exp`, `test:slow`, the bench |
 
 A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.** No note gives a nearest-neighbour distance between nests or how far a founding queen flies, and the founding radius (§3) needs one. That needs primary sources, like every sense in the vision table.
 
@@ -136,7 +136,7 @@ A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.
 - **Counterplay and progression:** unchanged in kind (fungus-policy §6, PRD §50.12). The line shapes the late game: a daughter colony (chapters 5–6, PRD §50.4) may found only beyond an end, and a flight with nowhere to land fails (§3, §8); neighbours' tunnels may meet underground and fight by the contact response.
 - **Cost:** Jev's should not change, since the mode situation keeps its fields (§4); U3 confirms it with `colony-cost`. One world asks under the side view's fungus context, so the side view's shipped fungus answers apply on the surface too (PRD §50.9 notes a top-down game has none). Not measured.
 - **Risks:** tick cost, budget 7–9 ms at 1,200 + 1,200 ants against the open map's 3.3–3.9 ms (§4, PRD §51); at 4× the top bar's "running at" warning would show a shortfall (PRD §50.4). Legibility: ants elsewhere on the surface are not in the side view, and the mycelium is hidden underground. A founding rule the player can't read: the game must say why a flight failed (§3).
-- **Owner decisions needed:** none; the founding radius waits on research (`ja-lp4.7`), not a game call.
+- **Owner decisions needed:** none. The founding radius is decided (§8).
 
 ## 8. Decided, and still open
 
@@ -145,6 +145,6 @@ A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.
 2. **A flight with nowhere to land fails.** When no valid point lies within her radius, the queen dies and the game says why (§3). This replaces "the player's queen lands" in `new-queens.md` §3.
 3. **Wide screens: the switch first.** U5 ships the above/below switch with linked clicks. Both views at once is a follow-up (`ja-lp4.8`).
 4. **The old maps become tests only after U6.** The side and open maps leave the page and stay as test beds until their assays are re-baselined.
+5. **The founding radius is 140 cells, the same as the flight** (`ja-lp4.10`; [nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game)). Measured: flight 140 with a 70-cell radius failed 51% of flights from end nests and 55% from interior ones; with 140, 6% and 28% (`scripts/flight-failure.mjs`, 300 seeds on the default plane). The hole gap and clearance stay 12. U4's assay on seeds 1–20, with the open map's rock, checks it; the endless world (`ja-qpv`) looks at it again, since the plane's edges drive most failures at a smaller radius.
 
-**Still open:**
-- **The founding radius.** It waits on the research bead (`ja-lp4.7`): nest spacing and how far a founding queen flies.
+**Still open:** nothing.

@@ -286,7 +286,7 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         <Section id="mode" ping={props.ping} title="How an ant chooses what to do" focus={props.focus}>
           <ModeExplainer {...props} />
         </Section>
-        <Section id="stance" ping={props.ping} title="How the colony picks its stance" focus={props.focus}>
+        <Section id="stance" ping={props.ping} title="How the colony picks its stance (side view)" focus={props.focus}>
           <StanceExplainer />
         </Section>
         <Section id="fungus" ping={props.ping} title="How the fungus chooses what to do to a host" focus={props.focus}>
@@ -410,11 +410,15 @@ function ModeExplainer(props: Props) {
           ["homeTrail", HOMES.join(" · "), "home scent ahead on the ground; underground, the chamber it stands in"],
           ["alarm", TRAILS.join(" · "), "alarm scent just ahead"],
           ["enemy", "none · near", "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)"],
-          ["stance", STANCES.join(" · "), "what the colony as a whole is doing"],
+          ["stance", STANCES.join(" · "), "on open ground, the ant's own: defend while it senses a threat near its nest, raid once recruited; underground, what the colony as a whole is doing"],
         ]}
         note={
           <>
-            Stance is the one field no ant senses: the colony broadcasts it (a vision gap,{" "}
+            On open ground stance is the ant's own, from what it senses (
+            <a className="underline" href={docUrl("stance")} target="_blank" rel="noreferrer">
+              docs/stance.md
+            </a>
+            ). Underground it is the one field no ant senses: the colony broadcasts it (a vision gap,{" "}
             <a className="underline" href={docUrl("vision", "where-the-code-is-today")} target="_blank" rel="noreferrer">
               ja-k4k.6
             </a>
@@ -444,7 +448,7 @@ function StanceExplainer() {
           ["intake", "none · some · plenty", "food its foragers brought home lately, for its size"],
           ["larder", "low · full", "food stored beyond what new ants need"],
         ]}
-        note="The strategist is not an ant: it reads colony totals. Its food is the rate foragers bring it home (behaviour MR 5), not what is left on the map; the stance is still broadcast, and on the side view raids still aim at the rival's hole by its coordinates (ja-k4k.6); on the top-down map a scout that meets strangers lays a trail home and the fighters follow it (behaviour MR 5.2)."
+        note="The side view only: on the top-down map there is no strategist, and each ant's stance is its own (docs/stance.md). The strategist is not an ant: it reads colony totals. Its food is the rate foragers bring it home (behaviour MR 5), not what is left on the map; the stance is broadcast, and raids aim at the rival's hole by its coordinates (ja-k4k.6, ja-1a9)."
       />
       <Choices items={STANCES.map((m) => [m, STANCE_CRITERIA[m].replace(/^\w+: /, "")])} />
       <RuleTable rows={LOCAL_STANCE_RULES} otherwise={`Otherwise: ${LOCAL_STANCE_OTHERWISE}.`} />
