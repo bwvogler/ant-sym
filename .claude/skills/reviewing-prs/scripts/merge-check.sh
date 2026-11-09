@@ -35,15 +35,22 @@ mine=$(git diff --name-only "$(git merge-base "origin/$base" "$head")" "$head" |
 # replays each one's differences from main; conflicts in files this PR doesn't change are the other
 # PR's with main, not this PR's, so they are counted apart.
 merge() {
-  local out files real note theirs
+  local out files real note theirs yours
   if out=$(git merge-tree --write-tree --name-only --no-messages "$2" "$3" 2>&1); then
     echo "  $1: clean"
   else
     files=$(echo "$out" | sed -n '2,$p' | sed '/^$/d' | grep -v '^\.beads/issues\.jsonl$' | sort -u)
-    real=$(comm -12 <(echo "$files") <(echo "$mine") | sed '/^$/d' | tr '\n' ' ')
-    theirs=$(comm -23 <(echo "$files") <(echo "$mine") | sed '/^$/d' | wc -l | tr -d ' ')
+    # This PR's conflicts: files both this PR and the other side changed themselves (for another PR,
+    # its own changes against main; files only main changed are that side's conflict with main).
+    real=$(comm -12 <(echo "$files") <(echo "$mine"))
+    case "$2" in refs/pr/*)   # another PR: keep only files it changed itself, not ones only main changed
+      yours=$(git diff --name-only "$(git merge-base origin/main "$2")" "$2" | sort)
+      real=$(echo "$real" | comm -12 - <(echo "$yours")) ;;
+    esac
+    real=$(echo "$real" | sed '/^$/d' | tr '\n' ' ' | sed 's/ $//')
+    theirs=$(( $(echo "$files" | sed '/^$/d' | wc -l) - $(printf '%s' "$real" | wc -w) ))
     note=""; echo "$out" | grep -q '^\.beads/issues\.jsonl$' && note=" (+ .beads/issues.jsonl, the bd export: not a real conflict)"
-    [ "$theirs" -gt 0 ] && note="$note (+ $theirs in files this PR doesn't change: the other side's own conflicts, not this PR's)"
+    [ "$theirs" -gt 0 ] && note="$note (+ $theirs in files this PR doesn't change: its base's or the other side's conflicts, not this PR's)"
     if [ -n "$real" ]; then echo "  $1: CONFLICTS in $real$note"; else echo "  $1: clean$note"; fi
   fi
 }

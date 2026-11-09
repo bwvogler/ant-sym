@@ -103,20 +103,23 @@ case "$tool" in
       [ -n "$bad" ] && decide deny "reviewing-prs: worktree path '$path' refused: $bad. Example: W=\"\${S:?}/pr57\"; git worktree add --detach \"\$W\" refs/pr/57"
     fi
 
-    # Slow or paid runs, only when run (node / npm run), not when a file is read or grepped. Option A
+    # Slow or paid runs, only when run (node / npm … run / npx), not when a file is read or grepped. Option A
     # (owner, 2026-11-09): a list of the slow scripts, extended as scripts are added.
-    run='(node|npm run|npx)[^;|&]*'
+    # A command word starts the line or follows ; & | ( or $( and may carry env / timeout in front;
+    # npm may carry options (npm --prefix "$W/web" run x). Text inside quotes (grep "npm run exp") isn't one.
+    P='(^|[;&|(]|\$\()[[:space:]]*(env( +-u +[A-Za-z_]+| +[A-Za-z_][A-Za-z_0-9]*=[^ ]*)* +)?(timeout +[0-9]+[a-z]? +)?'
+    run="${P}"'(node|npm[^;|&]* run|npx)[^;|&]*'
     on() { printf '%s' "$cmd" | grep -Eq "$1"; }
     slow=""
-    on 'npm run test:slow|node --test[^;|&]*tests/slow/' && slow="the slow test suite"
-    exp=$(printf '%s' "$cmd" | grep -oE '(npm run exp|node [^;|&]*experiment\.mjs)[^;|&]*' | head -1)
+    on "${P}"'(npm[^;|&]* run test:slow|node --test[^;|&]*tests/slow/)' && slow="the slow test suite"
+    exp=$(printf '%s' "$cmd" | grep -oE "${P}"'(npm[^;|&]* run exp|node [^;|&]*experiment\.mjs)[^;|&]*' | head -1)
     if [ -n "$exp" ]; then
       if printf '%s' "$exp" | grep -Eq '(--|experiment\.mjs) +all( |$)'; then slow="every assay"
       elif ! printf '%s' "$exp" | grep -Eq -- '--seeds[ =]+[0-9]+( |$)'; then
         slow="a multi-seed sweep (npm run exp runs seeds 1-10 unless given one seed: --seeds 1)"
       fi
     fi
-    on "$run"'((side|colony|economy|floor|roomy)-bench|bakeoff|progression|crown|raids|muddle|raid-food|ablate)(\.mjs)?( |$)' && slow="a bench or long game run"
+    on "$run"'((side|colony|economy|floor|roomy)-bench|bakeoff|progression|crown|raids|muddle|raid-food|ablate)(\.mjs)?([^A-Za-z0-9_.-]|$)' && slow="a bench or long game run"
     on "$run"'colony-cost(\.mjs)?[^;|&]*--side' && slow="colony-cost --side"
     on "$run"'(colony-live|probe)\.mjs' && slow="a live Jev run (spends money)"
     pre=$(printf '%s' "$cmd" | grep -oE "$run"'precache\.mjs[^;|&]*' | head -1)
