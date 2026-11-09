@@ -11,11 +11,14 @@ export function isOneWorldPreview(search: string): boolean {
   return new URLSearchParams(search).get("world") === "one";
 }
 
-/** A seed typed or in the query: a whole number from 1, or null. */
+/** The largest seed: the generators read a seed as 32 bits, so a larger one would draw a smaller one's world. */
+export const MAX_SEED = 0xffffffff;
+
+/** A seed typed or in the query: a whole number from 1 to MAX_SEED, or null. */
 export function parseSeed(text: string | null): number | null {
   if (text === null || text.trim() === "") return null;
   const n = Number(text);
-  return Number.isInteger(n) && n > 0 ? n : null;
+  return Number.isInteger(n) && n > 0 && n <= MAX_SEED ? n : null;
 }
 
 /** The seed in the query (`?world=one&seed=4`), or 1. */

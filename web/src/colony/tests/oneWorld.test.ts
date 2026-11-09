@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CELL, cellOf } from "../hex.ts";
 import { colOf, CRUST, CURTAIN_DEPTH, generateCurtain, generateOneWorld, refreshStrip, sOf, STRIP, type OneWorld } from "../oneWorld.ts";
 import { cellAt, grow, nearestValid } from "../transect.ts";
-import { AIR, digCell, flat, foundNest, mulberry32, openCell, OPEN, reachable, ROCK, rockAt, SOIL, type WorldMap } from "../world.ts";
+import { AIR, digCell, fillCell, flat, foundNest, heapMound, mulberry32, openCell, OPEN, reachable, ROCK, rockAt, SOIL, type WorldMap } from "../world.ts";
 
 const SEEDS = [1, 2, 3, 4, 5, 6];
 const worlds = new Map<number, OneWorld>();
@@ -194,6 +194,10 @@ test("digging below never re-derives the sky and the strip: they are the plane's
     // And the crust dug beside a hole, as U3's diggers may.
     const h = colOf(line, line.sHole[0]!);
     for (const col of [h - 1, h + 1]) if (curtain.rock.get(col, CRUST) === SOIL) digCell(curtain, col, CRUST);
+    // Nothing fills the strip, and no spoil is heaped on it: the mound is the plane's (one-world §4).
+    assert.equal(fillCell(curtain, h, STRIP), false);
+    assert.equal(heapMound(curtain, h, 1, 0), null);
+    assert.equal(heapMound(curtain, h, -1, 0), null);
     assert.deepEqual(snap(), before, `seed ${seed}: the sky and the strip are unchanged`);
   }
 });

@@ -14,7 +14,9 @@ test("the preview opens on ?world=one only, with the seed from the query or 1", 
   assert.equal(previewSeed("?world=one&seed=x"), 1);
   assert.equal(previewSeed("?world=one&seed="), 1);
   assert.equal(parseSeed("7"), 7);
-  for (const bad of ["", " ", "0", "1.5", "-3", "x", null]) assert.equal(parseSeed(bad), null, `${bad}`);
+  assert.equal(parseSeed("4294967295"), 4294967295);
+  // Past 32 bits a seed would wrap to a smaller one's world (4294967297 draws seed 1's), so it isn't one.
+  for (const bad of ["", " ", "0", "1.5", "-3", "x", "4294967296", "4294967297", "1e21", null]) assert.equal(parseSeed(bad), null, `${bad}`);
   // The seed goes back into the query, so a reload or a shared link opens the same world.
   assert.equal(withSeed("?world=one", 7), "?world=one&seed=7");
   assert.equal(withSeed("?world=one&seed=2", 9), "?world=one&seed=9");

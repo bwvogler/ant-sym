@@ -81,7 +81,9 @@ export interface WorldMap {
   sky?: ChunkLayer<Uint8Array>;
   /**
    * The one-world curtain (oneWorld.ts): its rows 0 … surfaceRows − 1, the sky over its ground strip and the strip, are
-   * drawn from the plane, not derived from the ground under them, so updateSurface leaves them be. Absent elsewhere.
+   * drawn from the plane, not derived from the ground under them: updateSurface leaves them be, nothing fills them and
+   * no spoil is heaped there (the mound is the plane's, one-world §4). Digging can't reach them: none is soil. Absent
+   * elsewhere.
    */
   surfaceRows?: number;
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
@@ -291,7 +293,7 @@ export function dig(map: WorldMap, x: number, y: number): boolean {
 
 /** Fill open integer cell (x, y) back with soil (a pellet dropped into a dead end) at time t; false if it isn't open ground on the map. */
 export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
-  if (!inBounds(map, x, y) || rockAt(map, x, y) !== OPEN) return false;
+  if (!inBounds(map, x, y) || y < (map.surfaceRows ?? 0) || rockAt(map, x, y) !== OPEN) return false;
   map.rock.set(x, y, SOIL);
   map.digHeading.set(x, y, 0);
   map.filledAt.set(x, y, t);
@@ -1013,7 +1015,7 @@ export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number,
     else break;
   }
   const y = groundTop(map, x) - 1;
-  if (y < 1) return null;
+  if (y < Math.max(1, map.surfaceRows ?? 0)) return null; // the sky's top; the curtain's surface is the plane's (one-world §4)
   moveFoodCell(map, x, y, x, y - 1);
   map.rock.set(x, y, SOIL);
   map.sky.set(x, y, 0);

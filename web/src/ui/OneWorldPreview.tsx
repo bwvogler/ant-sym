@@ -36,8 +36,8 @@ export default function OneWorldPreview() {
   };
 
   // ColonyField redraws when told a frame passed. Nothing runs here, so a frame is asked for only when the picture can
-  // change: the pointer or the wheel moving the camera, the field resizing, the theme switching (ColonyField draws once
-  // itself when it mounts).
+  // change: a drag, a pinch, a click, the wheel or a key moving the camera, the field resizing, the theme switching
+  // (ColonyField draws once itself when it mounts). Hovering changes nothing, so it draws nothing.
   const listeners = useRef(new Set<() => void>());
   const pending = useRef(0);
   const poke = useMemo(
@@ -107,9 +107,10 @@ export default function OneWorldPreview() {
         className="relative"
         style={{ aspectRatio: `${ext.w} / ${ext.h}` }}
         onPointerDownCapture={poke}
-        onPointerMoveCapture={poke}
+        onPointerMoveCapture={(e) => e.buttons !== 0 && poke()}
         onPointerUpCapture={poke}
         onWheelCapture={poke}
+        onKeyDownCapture={poke}
       >
         <ColonyField key={`${seed}-${view}`} colonies={shown.colonies} fungus={shown.fungus} onFrame={onFrame} showFoodTrail={false} showHomeTrail={false} followed={null} onFollow={() => {}} />
       </div>
