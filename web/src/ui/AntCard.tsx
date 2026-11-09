@@ -28,7 +28,7 @@ interface Props {
   onClose: () => void;
 }
 
-const BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under its colony's doctrine", stale: "Jev's answer under its earlier doctrine, while the new one is asked", waiting: "the local rule, while Jev is asked", local: "the local rule" };
+const BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under its colony's doctrine", stale: "Jev's answer under its earlier doctrine: Jev can't answer the new one now", waiting: "the local rule, while Jev is asked", local: "the local rule" };
 
 export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose }: Props) {
   const [, setTick] = useState(0);
@@ -55,7 +55,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
         </h2>
         <span className="font-mono text-xs text-fg-2">
           {mode}
-          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
+          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s{col.queen ? ` · energy ${((col.energy[i] as number) * 100).toFixed(0)} %${(col.need[i] as number) >= 0.05 ? ` · feels hunger ${(col.need[i] as number).toFixed(2)}` : ""}` : ""} · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
         </span>
         <button type="button" className="ml-auto rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised" onClick={onClose}>
           Stop following
@@ -72,7 +72,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
             </button>
           ))}
           <span className="text-fg-3">→</span>
-          <span className={`rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent ${decided?.by === "stale" ? "opacity-50" : ""}`} title={decided?.by === "stale" ? "stale: the answer under the earlier words, until Jev answers the new ones" : undefined}>
+          <span className={`rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent ${decided?.by === "stale" ? "opacity-50" : ""}`} title={decided?.by === "stale" ? "stale: Jev can't answer now, so the answer under the earlier words plays" : undefined}>
             {mode}
           </span>
           <span className="text-fg-3">{decided ? `by ${BY[decided.by]}` : ""}</span>
@@ -89,7 +89,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
 }
 
 /** What the fungus is doing to ant i: what it senses there, and the levers it pulls (fungus-policy §11). */
-const FUNGUS_BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under your aim", stale: "Jev's answer under your earlier aim, while the new one is asked", waiting: "the strain's default, while Jev is asked", local: "the strain's default" };
+const FUNGUS_BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under your aim", stale: "Jev's answer under your earlier aim: Jev can't answer the new one now", waiting: "the strain's default, while Jev is asked", local: "the strain's default" };
 
 function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: Fungus; explain: Props["explainFungus"] }) {
   const load = col.load[i] as number;

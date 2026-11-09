@@ -513,14 +513,14 @@ function FungusExplainer(props: Props) {
   );
 }
 
-/** Jev's answers so far, one row per situation met: the senses, then the levers pulled. Stale rows (an earlier aim's) are dimmed. */
+/** Jev's answers so far, one row per situation met: the senses, then the levers pulled. Stale rows (an earlier aim's, listed only while Jev can't answer and they play) are dimmed. */
 function AnswerTable({ rows }: { rows: { key: string; answer: string; stale: boolean }[] }) {
   if (rows.length === 0) return <p className="mt-1.5 text-xs text-fg-3">Nothing answered yet: rows fill in as hosts meet situations.</p>;
   const sorted = [...rows].sort((a, b) => (a.key < b.key ? -1 : 1));
   return (
     <div className="mt-1.5 flex flex-col gap-1 text-[12px]">
       <p className="text-xs text-fg-3">
-        {rows.filter((r) => !r.stale).length} answered under this aim{rows.some((r) => r.stale) ? `, ${rows.filter((r) => r.stale).length} dimmed: an earlier aim's, until Jev answers again` : ""}.
+        {rows.filter((r) => !r.stale).length} answered under this aim{rows.some((r) => r.stale) ? `, ${rows.filter((r) => r.stale).length} dimmed: an earlier aim's, played while Jev can't answer` : ""}.
       </p>
       {sorted.map((r) => {
         const senses = r.key.split("|").slice(0, 6);

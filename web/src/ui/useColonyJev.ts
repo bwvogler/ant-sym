@@ -20,9 +20,10 @@ import { loadPrecache } from "./precache.ts";
 //
 // Jev in the fungus game (ja-lo8.2; PR #42 review S6–S8): spend nothing while answers are cached, and ask Jev only for
 // the situations that aren't. The page plays the answers it ships and those Jev gave before; a situation with no answer
-// under the current words (preset or the player's own) starts a run (ColonyJev.wantsRun), which stays open until the
-// page closes, under the server's overall daily budget. While Jev can't run, `lock` says why, and the page's policy
-// editors are disabled (policyLock.ts).
+// under the current words (preset or the player's own) plays the local rule while it is asked, and starts a run
+// (ColonyJev.wantsRun), which stays open until the page closes, under the server's overall daily budget. While Jev can't
+// run, `lock` says why, the page's policy editors are disabled (policyLock.ts), and answers under earlier words play
+// where the current ones have none (ColonyJev.canAsk, ja-lo8.15).
 
 /** Estimated input tokens per situation, from the size of a full request (the ledger counts the real ones). */
 export const TOKENS_PER_SITUATION = tokensPerQuestion("mode", DOCTRINES[0]!.text);
@@ -86,7 +87,9 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
   useEffect(() => {
     lockRef.current = lock;
     startRef.current = shouldStart(backend, state, starting);
-  }, [lock, backend, state, starting]);
+    // While Jev can answer, a miss plays the local rule until the answer comes; earlier words' answers only while it can't (ja-lo8.15).
+    jev.canAsk = lock === null;
+  }, [jev, lock, backend, state, starting]);
   const resumable = canResume(backend, state, starting);
   // A situation with no answer under the current words, and no run on: start one (S7). Called on every such miss, from
   // the game's tick, so it only checks a ref, and starts after the tick.
@@ -106,6 +109,19 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
     (k: number, d: DoctrineChoice) => {
       if (lockRef.current !== null) return;
       draftDoctrine(k, d);
+      jev.setDoctrineFor(k, d.text);
+    },
+    [jev, draftDoctrine],
+  );
+
+  /**
+   * A daughter colony k's words as she founds (ja-lo8.9): the player's, from the queen's pen (which opens only while
+   * Jev can read them), or her mother's (no pen: not a change of policy, so not held back by the lock; the mother's
+   * answers are cached under the same words).
+   */
+  const foundWith = useCallback(
+    (k: number, d: DoctrineChoice) => {
+      draftDoctrine(k, { ...d });
       jev.setDoctrineFor(k, d.text);
     },
     [jev, draftDoctrine],
@@ -140,5 +156,5 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
   /** today's spend against the server's daily budget: the last run's figure, else the one the page loaded with */
   const budget = state.run?.budget ?? backend?.budget ?? null;
 
-  return { state, budget, start, stop, lock, resumable, fungusAnswers, restore, doctrines, setDoctrine, draftDoctrine, explain, aim, setAim, draftAim: setAimState, explainFungus };
+  return { state, budget, start, stop, lock, resumable, fungusAnswers, restore, doctrines, setDoctrine, draftDoctrine, foundWith, explain, aim, setAim, draftAim: setAimState, explainFungus };
 }

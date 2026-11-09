@@ -103,6 +103,8 @@ export interface ColonyStats {
   pace: number;
   /** where the player stands (chapters.ts) */
   chapter: ChapterView;
+  /** new queens flown and waiting to found (Game.flights): the game pauses for them (ja-lo8.9) */
+  flights: number;
   /** the game's fungus's body and evolution (ja-lo8.12); null before it lands (a game built without Game.land's evolve, as tests do, has none) */
   evolution: EvolutionStats | null;
 }
@@ -164,7 +166,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const pending = useRef<SaveRecord | null>(null);
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
-    const build = () => new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW }, gameRng(controls.seed, generation));
+    const build = () => new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW, autoFound: false }, gameRng(controls.seed, generation));
     const g = build();
     const r = pending.current;
     if (r && r.settings.seed === controls.seed && r.settings.ground === controls.ground && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
@@ -210,7 +212,15 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       if (controls.playing) {
         const total = dt * controls.speed;
         const steps = Math.max(1, Math.ceil(total / MAX_STEP));
-        for (let k = 0; k < steps; k++) game.tick(total / steps);
+        for (let k = 0; k < steps; k++) {
+          game.tick(total / steps);
+          // A new queen has flown (ja-lo8.9): the game waits for the page to found her (the queen's pen, or her mother's words).
+          if (game.flights.length) {
+            setControls((c) => ({ ...c, playing: false }));
+            lastStats = 0;
+            break;
+          }
+        }
       }
       if (t - paceAt.wall >= 1000) {
         pace = ((game.time - paceAt.sim) * 1000) / (t - paceAt.wall);
@@ -236,6 +246,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           unity: game.unity(),
           pace,
           chapter: chapterFor(game),
+          flights: game.flights.length,
           evolution: evolutionStats(game),
         });
         lastStats = t;
@@ -253,6 +264,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     return () => cancelAnimationFrame(raf);
   }, [game, colony, controls.playing, controls.speed]);
 
+  // Dev builds only: the game on window, for end-to-end checks (Playwright); not in the Pages build.
+  useEffect(() => {
+    if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) (window as unknown as { jevAnts?: { game: Game } }).jevAnts = { game };
+  }, [game]);
   // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
   useEffect(() => {
     if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
@@ -288,7 +303,10 @@ function chapterFor(game: Game): ChapterView {
   const k = game.landed?.colony ?? LANDING_COLONY;
   const c = game.colonies[k] ?? game.player;
   const f = game.fungus.census(c);
-  return chapterOf({ landed: game.landed !== null, colony: colonyName(k), hosts: f.infected, share: f.living ? f.infected / f.living : 0, queenInfected: game.revealed[k] === true, gynes: 0, daughters: 0 });
+  const line = game.lineage(k);
+  const gynes = line.reduce((n, j) => n + (game.colonies[j]?.gynes ?? 0), 0);
+  const daughters = line.length - 1;
+  return chapterOf({ landed: game.landed !== null, colony: colonyName(k), hosts: f.infected, share: f.living ? f.infected / f.living : 0, queenInfected: game.revealed[k] === true, gynes, daughters });
 }
 
 /** Each ant's own stance, counted (top-down): "3 defend · 12 raid", or "all forage". */

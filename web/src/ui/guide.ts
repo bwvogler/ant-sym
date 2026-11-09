@@ -212,7 +212,7 @@ export const GUIDE: GuideEntry[] = [
     id: "fungus-senses",
     title: "What the fungus senses, and its levers",
     swatch: ["var(--spore)"],
-    onScreen: "Follow an infected ant: its card lists what the fungus senses inside it (arousal, touch, place, task, carrying, groomed) and the levers it pulls there, each at a level. Dimmed ones are an earlier aim's, until Jev answers the new one.",
+    onScreen: "Follow an infected ant: its card lists what the fungus senses inside it (arousal, touch, place, task, carrying, groomed) and the levers it pulls there, each at a level. Until Jev answers a new aim, the fungus plays its default there; dimmed levers are an earlier aim's, played only while Jev can't answer.",
     realAnts:
       "A fungus lives in and on its host's body. What it could read there is the host's body: amines that rise with fighting, the cuticle it touches, the juvenile hormone that tracks a worker's task. That a fungus reads these is the game's design; what parasites do with them, changing what a host perceives and gives off, is real (Rickia's alkane, Ophiocordyceps's lost rhythm).",
     inGame:

@@ -82,6 +82,10 @@ test("crown (lethal, off by default): a host by the queen kills her and the broo
   cellOf(c.queen!.x, c.queen!.y);
   const larva = c.brood.add(CELL[0] as number, CELL[1] as number, map.chambers!.at(CELL[0] as number, CELL[1] as number));
   larva.stage = LARVA;
+  // Nothing to feed it, so it stays a larva while the crown works (fed, it pupated and hatched first on some draws): no
+  // founding stock, and no second ant to forage.
+  c.feed(-c.larder);
+  c.kill(1);
   c.x[0] = c.queen!.x;
   c.y[0] = c.queen!.y;
   const f = new Fungus(map);

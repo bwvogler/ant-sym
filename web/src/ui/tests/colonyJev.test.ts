@@ -209,7 +209,7 @@ test("busy puts the situations back in the queue; a failure cools down instead o
   assert.equal(j2.state.phase, "running", "a failure is not the end of the run");
 });
 
-test("a new doctrine: until Jev answers it, the old doctrine's answers act, stale, and each is asked again (ja-lo8.3)", async () => {
+test("a new doctrine: until Jev answers it, the local rule acts and each situation is asked; the old words' answers never stand in (ja-lo8.15)", async () => {
   const sent = scriptFetch(answerAll("fight"));
   const store = memoryStore();
   const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
@@ -220,31 +220,61 @@ test("a new doctrine: until Jev answers it, the old doctrine's answers act, stal
   j.setDoctrine(DOCTRINES[0]!.text);
   j.attach(c);
   j.setDoctrine(DOCTRINES[1]!.text);
-  assert.equal(c.policy(s), old, "the old words' answer, not the local rule");
-  assert.equal(j.explain(s).by, "stale");
+  assert.equal(c.policy(s), localPolicy(s), "the local rule, not the old words' answer");
+  assert.equal(j.explain(s).by, "local");
   await j.start();
-  assert.equal(c.policy(s), old, "still stale while it is asked");
+  assert.equal(c.policy(s), localPolicy(s), "still the local rule while it is asked");
+  assert.equal(j.explain(s).by, "waiting");
   await tick(60);
   assert.ok(sent.flat().length > 0, "the situation was asked under the new words");
-  assert.equal(c.policy(s), "fight", "the new answer replaces it");
+  assert.equal(c.policy(s), "fight", "the new answer takes over");
   assert.equal(j.explain(s).by, "jev");
 });
 
-test("a daughter colony falls back on her mother's doctrine, not on the words her lane had before (inherit)", () => {
+test("while Jev can't answer, the old words' answers act, stale; a change of canAsk makes the colonies reconsider (ja-lo8.3, ja-lo8.15)", () => {
+  scriptFetch(answerAll("fight"));
+  const store = memoryStore();
+  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const old: Mode = localPolicy(s) === "return" ? "follow" : "return";
+  store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), old]]);
+  const j = make(store);
+  const c = colony();
+  let reconsidered = 0;
+  const reconsider = c.reconsider.bind(c);
+  c.reconsider = () => {
+    reconsidered++;
+    reconsider();
+  };
+  j.setDoctrine(DOCTRINES[0]!.text);
+  j.attach(c);
+  j.setDoctrine(DOCTRINES[1]!.text);
+  reconsidered = 0;
+  j.canAsk = false;
+  assert.equal(reconsidered, 1, "the colony reconsiders when Jev stops being able to answer");
+  assert.equal(c.policy(s), old, "the old words' answer, not the local rule");
+  assert.equal(j.explain(s).by, "stale");
+  j.canAsk = false;
+  assert.equal(reconsidered, 1, "no change, no reconsidering");
+  j.canAsk = true;
+  assert.equal(reconsidered, 2);
+  assert.equal(c.policy(s), localPolicy(s));
+});
+
+test("a daughter colony's new words play the local rule, never another doctrine's answers (ja-lo8.15)", () => {
   scriptFetch(answerAll("fight"));
   const store = memoryStore();
   const s: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
   const mother = DOCTRINES[2]!.text;
   const motherSays: Mode = localPolicy(s) === "return" ? "follow" : "return";
   store.data.set(policyContext(mother), [[situationKey(s), motherSays]]);
-  store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), "fight"]]);
   const j = make(store);
   const c = colony();
-  j.setDoctrine(DOCTRINES[0]!.text);
+  j.setDoctrine(mother);
   j.attach(c);
-  j.setDoctrineFor(0, "Her own words.", mother);
   assert.equal(c.policy(s), motherSays);
-  assert.equal(j.explain(s).by, "stale");
+  j.setDoctrineFor(0, "Her own words.");
+  assert.equal(c.policy(s), localPolicy(s));
+  assert.equal(j.explain(s).by, "local");
 });
 
 test("answers shipped with the page are seeded under the ones this browser already has, and only valid ones", () => {
@@ -641,6 +671,29 @@ test("a stored fungus answer is kept only if it has a level for each lever its k
   j.attachFungus(g.fungus);
   j.setAim("Stored aim.");
   assert.equal(j.state.fungusCached, 1, "kept the full answer, dropped the malformed one");
+});
+
+test("a new aim plays the fungus's local rule until Jev answers; the earlier aim's answers play, and are listed, only while Jev can't answer (ja-lo8.15)", () => {
+  scriptFetch(answerAll("fight"));
+  const store = memoryStore();
+  const j = make(store);
+  const g = infectedGame();
+  j.attach(g.player);
+  const asked = g.fungus.asked;
+  store.data.set(fungusContext("Old aim.", g.map.sky ? "side" : "top"), [[fungalKey(GARDEN, asked), encodeLevels({}, asked)]]);
+  j.attachFungus(g.fungus);
+  j.setAim("Old aim.");
+  assert.equal(j.explainFungus(GARDEN).by, "jev");
+  j.setAim("New aim.");
+  assert.equal(j.explainFungus(GARDEN).by, "local", "the local rule, not the old aim's levels");
+  assert.deepEqual(j.fungusAnswers(), [], "nothing under the new aim, and the old aim's rows don't play");
+  j.canAsk = false;
+  assert.equal(j.explainFungus(GARDEN).by, "stale");
+  assert.deepEqual(
+    j.fungusAnswers().map((r) => r.stale),
+    [true],
+    "the old aim's row, dimmed, while it plays",
+  );
 });
 
 test("dispose while Start is on the wire: no run opens, nothing is asked, and the server's run is stopped (ja-7tf)", async () => {

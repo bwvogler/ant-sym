@@ -3251,13 +3251,13 @@ The page was a sim with everything on one screen. The owner asked for a game, to
   - The player writes an aim in words. Jev sets a **level for every lever**, per situation the fungus senses inside its host. The answer is no longer one bundle: the owner wants to pull many levers at once, interpreted from natural language.
   - The levers bend what the host **perceives** and what it **gives off** ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)).
   - The senses may be finer than before. The fungus's own load is dropped as a sense, and the host's mode was never one.
-- **Answers fill in as situations come up.** When the aim changes, old answers stay in force, dimmed, until each situation's new answer arrives. Nothing re-asks the whole table, and nothing is pre-asked.
+- **Answers fill in as situations come up.** When the aim changes, old answers stay in force, dimmed, until each situation's new answer arrives. *(Superseded where Jev can answer by §50.17: the local rule plays until the new answer arrives; the old answers play only while Jev can't run.)* Nothing re-asks the whole table, and nothing is pre-asked.
 - **The table stays out of sight.** It and per-cell pins are available in Learn and Details, not on the main screen, so the main screen keeps some magic.
 - **One fungus.** The three strains become lab presets.
 - **Colony policy is hidden until the fungus infects a queen.**
   - After that, a colony's policy changes **only when a new queen is born**: a free rewrite, at that moment only.
   - The new words drive **only her offspring**, in the **daughter colony she founds**.
-  - Her ants act on her mother's answers, dimmed, until their own arrive.
+  - Her ants act on her mother's answers, dimmed, until their own arrive. *(Superseded by §50.17: on new words her ants play the local rule until their answers arrive; her mother's answers play only while Jev can't run.)*
 - **How the new queen gets the fungus.** She picks it up by contact on her way out of the nest. No vertical transmission ([new-queens §4](new-queens.md#4-where-the-fungus-comes-in)).
 - **The fungus's lever on queen birth** must be a real lever in the catalogue. There are two: *queen signal* (emission, in the queen) and *queen scent* (perception, in nurses). Both are design, and both are built.
 - **Pace.**
@@ -3327,6 +3327,8 @@ The game's rule follows: a fed larva where nurses perceive a faint queen's mark 
 - **Display.** The ant card shows it faded, "by Jev's answer under its earlier doctrine (aim), while the new one is asked".
 - **Daughters.** `setDoctrineFor(k, words, inherit)` makes a lane fall back on other words instead: a daughter colony on her mother's doctrine (ja-lo8.9).
 - **Nothing is asked all at once.**
+
+**Superseded where Jev can answer** (§50.12, 2026-11-08): new words play the local rule until their answers arrive; the earlier answers act only while Jev can't run, and `inherit` is gone.
 
 **No sim change.** The goldens are untouched. Requests and contexts are byte-identical, so there are no new tokens per question.
 
@@ -3810,6 +3812,194 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
   - The ant card's tooltip names a lethal lever as lethal, and says "its policy wants" rather than "Jev wants".
   - The guide says "in the game", since the lab's own landings are not held.
 
+### 50.17 The local rule while new words are asked (ja-lo8.15, 2026-11-08)
+
+**Decision** (owner, 2026-11-08, replacing §50.2's stale fallback where Jev can answer): "we don't use the old values, unless … jev is broken". After the fungus's aim or a colony's doctrine changes, a situation with no answer under the words in force plays the **local rule** until Jev's answer arrives. Answers under earlier words play only while Jev can't run: no server or key, the daily budget spent, the player's Stop, a failed start. A daughter colony (ja-lo8.9) is no different: her mother's answers never stand in for hers. Where Jev can't run, the pen doesn't open and she keeps her mother's words, so the mother's answers are her own.
+
+**Built:**
+- `ColonyJev.canAsk` (default true), set by `useColonyJev` to `policyLock(...) === null`. A change makes every colony reconsider at once; the fungus re-reads its policy every step.
+- `#lookup` and `#explain` use the fallback contexts only while `canAsk` is false. The follow card then says "by the local rule, while Jev is asked" (or "the strain's default" for the fungus) instead of a dimmed earlier answer.
+- `fungusAnswers()` lists the earlier aim's rows, dimmed, only while they play.
+- `setDoctrineFor(k, words)` loses `inherit`.
+- Wording in the ant card, Learn's answer table and the guide.
+
+**Tests:** a new doctrine plays the local rule, is asked, and takes Jev's answer; with `canAsk` off the old words' answer plays, stale, and flipping it reconsiders once per change; a daughter's new words play the local rule; a new aim plays the fungus's local rule and lists the old aim's rows only while Jev can't answer.
+
+**No sim change.** The goldens are untouched; requests and contexts are byte-identical, so tokens per question are unchanged.
+
+### 50.18 Energy and hunger: old ants answer the brood's hunger (ja-xu6, ja-xu6.1, 2026-11-08)
+
+**The bug** (`ja-xu6`): in long side-view games, larvae starved beside a full larder. `#port` and `#nurse` refused every old ant (age band 2), so when births stalled the colony aged until nobody carried food to the brood or the queen, and births never restarted.
+
+**Owner's decision (2026-11-08):** fix it with a real body state, not a grace time. Adults and larvae both have energy, drained with time and activity and refilled by eating. Hunger is felt by touch.
+
+**Research** (web, 2026-11-08):
+- Hungry larvae beg with movements, more when starved in *Gnamptogenys striatula* and in *Formica fusca* and *F. exsecta* (not in *F. aquilonia*). Workers were not drawn to the odour of starved larvae, and starved and fed larvae did not differ in cuticular hydrocarbons (Peignier et al. 2019, *Front. Ecol. Evol.* 7:398, [frontiersin.org](https://www.frontiersin.org/article/10.3389/fevo.2019.00398/full)). So hunger is a contact cue, not a scent.
+- In *Myrmica rubra* a "gradient of hunger" runs from the foragers through the nurses to the larvae (cited there; the original not read).
+- Response thresholds (Bonabeau, Theraulaz & Deneubourg 1996, fungus-policy §3): an ant responds to a stimulus s with the chance s² / (s² + θ²); age only shifts θ.
+
+**Built** (`web/src/colony/hunger.ts`, `colony.ts #body`; the side view only, where a colony has a queen and brood; top-down maps are untouched):
+- **Adults.** `energy[i]` drains at 1/2,400 a second inside, twice that outside. Below 0.7 an ant tops itself up from food lying in its own nest within two cells (not in a brood chamber, whose food is the larvae's, nor the queen's stock of 8), at 8 meals from empty a unit, or takes food by mouth from the best-fed nestmate it touches (above 0.75: trophallaxis, energy passed, not made). At 0 it dies of hunger (`diedHungry`).
+- **Larvae.** `BroodItem.energy` drains at 1/600 a second. Food a nurse gives goes to its energy first, then to its growth; at 0 the larva dies (`broodStarved`), and its food leaves the economy.
+- **The queen.** Her own energy (1/3,600 a second); she eats from her chamber; at 0 she dies.
+- **Felt hunger.** Each tick a begging larva (below 0.8), a hungry adult (below 0.4) and a queen who has gone 20 s without laying for want of food are felt by the ants within one cell; each ant passes on 0.9 of what it felt last tick to those it touches. An ant's `need` rises toward the strongest it feels in 2 s and fades over 60 s.
+- **What need does.** An old ant ports and takes in brood with the chance respond(need, 0.3); the young and middle-aged as before. An ant feeling need (0.3 for the old, 0.1 for the others) follows the stores' floor marks to where food is kept, and there ports it on. Porters also bring a meal to the chamber a hungry adult is in (`#wanted`, the existing table: `ja-k4k.4`).
+- **Food conservation** gains the food eaten (`Colony.eaten`): map + jaws + larder + brood (1 + fed) + 4 a birth + eaten stays at what the map started with (food.test, economy-bench).
+- **Saves**: `SAVE_VERSION` 2 (energy, need, the queen's energy and how long she has gone unfed, brood energy).
+- **The follow card** shows an ant's energy and the hunger it feels.
+
+**What didn't work, measured** (the economy test's setup: 256 × 160, 110 ants, 0.3 food, 3,600 s, worlds 1–8 at seeding n = 0 and 1):
+- Eating only in the chamber an ant stands in: food piled up in stores nobody visits, and every adult starved by 2,400 s on world 1 (335 food left).
+- Letting adults eat the queen's stock: the crowd resting in the royal chamber (`ja-3po`) ate it, she stopped laying, and the colony aged out.
+- Following reception's marks to fetch: reception smells strongly and is usually empty; fetchers gathered there.
+- Draining from full to empty in 20 minutes, eating below 0.5: foragers on an emptied map starved before they got home (40–56 adults on three worlds).
+- A lower old-ant threshold (0.15), or need passed on at 0.95: the hunger response took foragers off the ground and nudged world 3 collapsed (60–80 adults starved). The dynamics are sensitive; need fading over 60 s rather than 30 was the one change that held everywhere.
+
+**The queen's begging, the last change.** At first she begged whenever her chamber held less than an egg's food. Early on she lays two eggs a second, so that was nearly always, and it drew old ants into porting and jammed the tunnels on some seeds: G seed 3 had 95 foragers holding food over 120 s, A8 seeds 1 and 7 had 74 and 173 porters (main's worst: 3 and 14). With her begging off (or after a 60 s wait) the jams went on those seeds, but with the 60 s wait two nudged economy worlds collapsed again (65 and 92 workers): in the spiral there is no brood to beg, and only her signal draws the old in. She now begs once she has gone `QUEEN_WAIT` (20 s) without laying for want of food, rising to full over as long again.
+
+**Measured, the 16 worlds** (main → this branch; workers at 3,600 s, worst larvae stranded at once, i.e. unfed over 120 s while the larder could feed them):
+
+| World | n = 0 main | n = 0 now | n = 1 main | n = 1 now |
+|---|---|---|---|---|
+| 1 | 160, 0 | 160, 1 | **77, 15** | 161, 1 |
+| 2 | 161, 0 | 148, 6 | **45, 13** | 129, 7 (25 adults starved) |
+| 3 | 160, 0 | 159, 2 | 161, 0 | 152, 14 |
+| 4 | 152, 7 | 156, 5 | **62, 44** | 134, 23 |
+| 5 | 161, 0 | 163, 0 | 162, 1 | 160, 0 |
+| 6 | 164, 0 | 159, 0 | 164, 0 | 161, 2 |
+| 7 | 159, 0 | 159, 2 | 162, 0 | 134, 20 |
+| 8 | 162, 0 | 164, 0 | 162, 7 | 164, 0 |
+
+- **No collapse**: main lost three colonies to the death spiral (45–77 workers left); now the lowest is 129, and births at least match deaths of age everywhere.
+- **Outside the test's bound** (≤ 5 stranded, ≥ 110 workers): main 5 of 16, now 5 of 16 too, but on strandings alone, late in the hour as this small map's food runs out. World 2 at n = 0 went from 0 to 6: `slow/economy.test`'s bound is loosened from 5 to 8 for it, and bead `ja-xu6.2` is to bring it back.
+- Adults eat 34–54 food an hour here (110–165 workers): about a fifth of a unit an ant-hour. Hunger killed adults on two nudged worlds (25 and 5).
+- **Guard:** `slow/economy.test` gains world 1 at seeding n = 1 (77 workers and 15 stranded on main; 161 and 1 now), and both cases assert no worker starved.
+
+**Assays, seeds 1–10** (side view; main → now):
+- G, the side-view game: pass 9/10 → **10/10**. Worst foragers holding food over 120 s 3 → 2; worst porters 8 → 6. Food home, median: Ink 2,199 → 2,377 (2,133–2,377 between the 5th and 6th seed).
+- A8, nest flow: worst porters holding food over 120 s 14 → 35 (seed 7; the others 0–1); larvae starved 0.5 median both ways.
+- A11 and A12: identical (top-down maps).
+
+**The two-hour game** (600 + 600 ants, regrowth on as the page plays, seeds 1–2; measured before the queen's begging was delayed): the war (`ja-war`) decides it, as on main. Seed 1: on main Ink fell to 572 workers with 129 unfed larvae at 3,600 s; now Ink held 852–892 throughout, but Amber was wiped out by the war by 3,600 s (on main she survived at 425). Seed 2: Ink lost to the war both ways; Amber 783 → 797.
+
+- **Golden masters re-recorded** (`GOLDEN_WRITE=1`): the side view (`tests/golden.json` "side view, seed 4", `tests/slow/golden.json` "side view war, seed 6") changes from the first tick, since founders now use energy and old ants' porting draws on the random stream. The top-down recording ("top-down war, seed 3") is bit-identical.
+- **Colony lane cost unchanged**: no legend, situation or question changed, so the shipped answers stand.
+- **Checks**: `npm test` 395 pass (the homing test now samples only ants on the ground line, its stated case: a young porter underground searched round a wrongly believed chamber by its nest vector, which the test's surface-vector filter never meant); `test:slow` 16 pass and the same 3 TODOs, of which `ja-3po`'s porter-hold guard now passes (left a TODO until that bead is looked at).
+
+### 50.19 Slice 9: new queens, the flight, the queen's pen (ja-lo8.9, ja-lo8.9.1, 2026-11-08)
+
+**What a player sees.** A colony whose nurses perceive the queen's scent faint rears new queens (gynes). Each ecloses as a winged alate, waits a minute in the nest among her nestmates, walks up and out, and flies. The game pauses. If the fungus is in her, her mother colony's queen was reached, and Jev can read new words, the **queen's pen** opens:
+- the player writes her doctrine (her mother's to start with; the presets as quick picks), the only time a colony's words change (PRD §50);
+- the player picks where she lands (east or west of the hole, 16–96 cells).
+
+Otherwise she founds on her mother's doctrine at once, and a notice says why. Her colony plays the local rule until Jev's answers to new words come (§50.17). Her mother keeps her own words.
+
+**Research** ([new-queens](new-queens.md) §2–§3, primary sources there):
+- The mated queen holds queen-rearing back through the workers: nurses that sense her pheromone kill sexual larvae, and stop when she is gone (Klobuchar & Deslippe 2002).
+- A large nest dilutes her signal; larvae stay bipotent early (Boulay et al. 2009).
+- Founding is claustral: the queen raises a first brood of nanitics alone on her body's reserve.
+- A daughter's odour drifts from her mother's: split *Aphaenogaster senilis* colonies differed in body odour within 5 days and could not be reunited by day 20 (bioRxiv 614719).
+
+The thresholds, rates and the drift's size and speed are the game's own (design).
+
+**Built** (`web/src/colony/royal.ts`; `colony.ts #body`, `#caste`, `#eclose`, `#alatesOut`; `game.ts` flights and `found`; the side view only):
+- **The queen's scent, carried on the ants.** Her royal mark lies on her chamber's floor and doesn't spread, so what reaches far brood is carried.
+  - She gives `SCENT_SUPPLY` (4 a second) × her signal to the ants within one cell of her, split among them. While nobody touches her she holds up to 20 s of it for the next ant.
+  - Each ant's `scent[i]` fades (100 s) and moves toward the mean of the ants within one cell (8 s): shared by contact.
+  - The supply is split, so a colony carries `SCENT_SUPPLY × SCENT_FADE / N` an ant. Measured: 2.4 at 165 ants, 0.45 at 900. The signal dilutes as the nest grows, with no count read.
+  - Founders start at that share.
+- **Caste** (`BroodItem.caste`), from the scent the nurses within two cells perceive (`scent × scentGain`, their strongest).
+  - **Reared as a gyne:** a larva in its first 10 s (bipotent), well fed (energy 0.9 or more), with 2 food lying in its chamber, and every nurse round it perceiving the scent below `GYNE_MARK` (0.4) for 4 s.
+  - **Culled:** a gyne larva by a nurse perceiving it at `CULL_MARK` (0.8) or more for 10 s. Its food leaves the economy (`eaten`).
+  - **Cost:** a gyne is fed 3× a worker's food (9) and takes twice as long as larva and pupa.
+  - No colony founding alone rears gynes.
+- **The alate** (`Colony.alates`), an entity apart from the workers' arrays, like the queen. She takes no ant slot and no job.
+  - She waits `ALATE_WAIT` (60 s), then walks out along the tunnels a cell every 0.4 s (`#climbOut`'s field), and flies at the hole: into `Colony.flown`, then `Game.flights`.
+  - Her egg and food become her body (`Alate.food`), held apart from the larder and fattened while she waits, up to `ALATE_RESERVE` (§50.20). The fungus steps her load as it does the queen's (`Fungus.#royalLoad`, shared now): from the nestmates she passes, groomed off by them. No lever is asked in her.
+- **Founding** (`Game.found`, `Founding.mother / reserve / load / strain`).
+  - `addColony` with no workers. Her chamber holds her body (`Flight.food`, at most 24), moved off the books' royal line into her larder, not new on the map (§50.20), and her queen carries the fungus the alate did.
+  - While `Colony.founding` she feeds her first brood herself (2 nurses' worth within two cells) and isn't beaten. Her first worker ends it.
+  - `autoFound` (on by default: the lab, the assays, the tests) founds at once at `landing()`, 48 columns from the hole on the side with room. The page turns it off, pauses, and founds through the pen.
+  - `MAX_COLONIES` (6, the page's colony names): an alate that flies past it is lost, as most founding queens are.
+- **Odour drift** (`ja-lo8.9.1`). The daughter starts at her mother's nest odour and drifts (`Colony.odourAim`, `recognition.ts driftAim`) 1.5 tolerances away toward the middle of the odour range, with a 500 s time constant. They become strangers in about 9 minutes, unless the fungus's odour levers (stranger scent, fungal odour) hold them together. No new lever (owner, 2026-11-08).
+- **The queen-scent lever** (`queenScent`, perception, nest only, workers). Its levels are 0.1, 0.3, 1, 1.5, 2 on `scentGain`, lerped by load as the other perception levers are. This is the second route of new-queens §4: it works before the queen is reached.
+- **Chapters:** `gynes` and `daughters` now read the landed colony's lineage (`Game.lineage`): its gynes and its daughters, theirs, and so on.
+- **The pen's gate** is pure (`ui/pen.ts penGate`): load at `INFECTED`, `revealed[mother]`, and `policyLock` null.
+- **Outcome:** "unified" now needs two of the world's own colonies (a solo world with a kin daughter isn't one colony). With two, daughters count in `unity()`: the fungus must hold them too.
+- **Saves:** `SAVE_VERSION` 3 (alates, flights, scent, castes, the founding flag, `odourAim`). A save founds its daughters again from `Founding.nest`, then pours their state back over them.
+
+**Measured.**
+- **Scent and thresholds** (probe, side view, seed 1–2): a healthy 900-ant colony's larvae perceive 0.52–0.82 (none below `GYNE_MARK`); a 165-ant colony's 2–6. No gyne was reared in 30–40 minutes of either.
+- **The lifecycle assays** (new: `lifecycle`, `lifecycle-signal`, `lifecycle-scent`; solo, 600 ants, the fungus landed, 1,800 s, seeds 1–2; the lever arms force it in every ant from the start, to measure rearing apart from spread):
+
+  | Arm | First gyne | First flight | Daughter's first worker | Her first forager out | Gynes | Culled | Daughters |
+  |---|---|---|---|---|---|---|---|
+  | none (dilution alone) | – | – | – | – | 0 | 0 | 0 |
+  | queen signal 0.4 | 158–170 s | 296–311 s | 351–366 s | 386–901 s | 28–31 | 0–1 | 5 (cap) |
+  | queen scent 0.3 | 28–129 s | 172–271 s | 227–327 s | 777–868 s | 47–69 | 0 | 5 (cap) |
+
+- **For slice 10's balance** (`ja-lo8.10`):
+  - a damped colony rears dozens of gynes, most lost past the cap;
+  - daughters stay small (4–10 workers after 25 minutes);
+  - the queen counts as reached about 20 s after landing (load 0.05; she lies 16 rows under the hole). That predates this slice: measured the same on the previous commit.
+- **Golden masters bit-exact**: `tests/golden.json` and `tests/slow/golden.json` unchanged. No gyne is reared and no fungus painted in them; the scent is computed but read only by caste, and no random number is drawn for it.
+
+**Gaps against the vision.**
+- **Caste is a scripted choice**, not the colony policy's: `#caste` reads only local cues (the perceived scent within two cells, the larva's energy). But it reads the food lying in the larva's chamber from the chamber table, as larval feeding already does (`ja-k4k.4`).
+- **The alate's walk out** uses the whole-nest distance field (`#climbOut`, `ja-k4k.2`).
+
+**Cost.**
+- **Fungus lane v8:** the new lever is in the legend and in every worker's question in the side view. Re-shipped (`node scripts/precache.mjs --lanes fungus`): 130 situations per preset aim, 390 answers for **$0.0126** (estimated $0.0114), about 770 real tokens per situation. Under the presets Jev leaves `queenScent` as it is in all but one situation: none of those aims is about queens.
+- As a game asks them (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1; these also carry §50.18's economy change):
+
+  | Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+  |---|---|---|---|---|---|
+  | Garden | 85 | 15 | 852 | 0.0030 | 0.037 |
+  | Lockpick | 79 | 28 | 1,026 | 0.0034 | 0.041 |
+  | Bloom | 146 | 28 | 868 | 0.0053 | 0.064 |
+
+- **Colony lanes:** unchanged. A daughter on her mother's words plays the cached answers; on new words, a daughter asks what she meets under them (a doctrine change's cost, as before).
+
+**Checks.**
+- `npm test`: all pass, 7 new (`royal.test`, `ui/tests/pen.test`).
+- `test:slow`: 16 pass, the same 3 TODOs.
+- Lint: 7 warnings, as on main.
+- End to end (Playwright, the dev server with no key, `/api/health` stubbed as having one so the pen's gate is open, no spend): an infected alate pauses the game and opens the pen; Cautious and Found starts Jade, founding, carrying the fungus, and play resumes. A clean alate founds on Ink's words with the notice, no pen. Dev builds put the game on `window.jevAnts` for such checks.
+
+### 50.20 Merging #43 and #44 into the new-queens branch (2026-11-08)
+
+`main` gained the fungus's progression (#43, `ja-lo8.12`: §50.12–50.14) and raids (#44) while §50.17–50.19 were built (they were numbered 50.12–50.14 on the branch). The merge:
+- **The royal body:** `#royalLoad` (the queen's and an alate's fungus, §50.19) takes #43's changes to the queen: resistance evaded by the evolving strain, the least dose, mutations from what is caught, the queen's retinue cap (in the evolving game only; an alate is groomed as any host), and the "clear only while falling" rule.
+- **A daughter's fungus** goes in #43's `Founding.fungus`, which was left for this slice. So a daughter queen carrying the evolving fungus also roots its mycelium by her hole, and counts as a host.
+- **The queen-scent lever is in the Royal upgrade** with the queen signal (`evolution.ts`): the evolving fungus earns both together, from none to the full range. Without that it would have had the new lever at full range from the start.
+- **Saves:** version 3 (#43 had made it 2).
+- **Checks:** `npm test` 418 pass; `test:slow` 16 pass, 2 TODOs (#43 resolved one); lint 7 warnings; golden masters as merged, bit-exact.
+
+**A second merge** (#45, #46, #48–#52): `main`'s §50.15 (no spore brush) and §50.16 (lethal levers) came first, so this branch's sections moved to §50.17–50.20. `docs/new-queens.md` now describes gyne rearing and the queen-scent lever as built, not as on an unmerged branch. No code conflicted except `useColony`'s stats type (both fields kept). `npm test` 420 pass; lint 7 warnings.
+
+**Review of 959d1fe** (PR #47):
+- **S1, the reserve was made from nothing.** A daughter founded on 24 food while her eclosion wrote off at most 10 (her egg and `GYNE_FOOD` 9), and `foodTotal` was raised by 24 to balance. Now her body is the reserve, and it has its own place on the books:
+  - an alate ecloses carrying `1 + fed` (`Alate.food`); while she waits, the nestmates by her feed her from the chamber she is in (`ALATE_FEED` 0.5 a second, by up to two nurses) up to `ALATE_RESERVE` 24, out of the larder into her body;
+  - `Game.found()` moves her body into her colony's larder and changes no total; a lost queen's body (`lose()`, no room, `MAX_COLONIES`) is booked to her mother colony's `eaten`;
+  - the food books are map + jaws + larders + brood + 4 a birth + eaten + `Game.royalFood()` (alates' and pending flights' bodies), in `food.test`, `royal.test` and `economy-bench`.
+  - Alates fatten in the nest before the flight in the real thing too; the rate and the cap are design. Like larval feeding, fattening reads her chamber's food from the chamber table (`ja-k4k.4`). In small test worlds alates leave with 6–16 food, so a daughter can found leaner than before.
+  - **Test:** food is conserved through gynes reared, alates fattened, flights and foundings, and `foodTotal` doesn't move (`royal.test`); a lost queen's body is booked once. Founding on 24 rather than her body, an alate with no body, fattening that takes nothing from the room, or a lost body not booked each fails it. (A first version raised `foodTotal` at founding, so the books balanced even with the reserve put back to 24; a review agent caught that, and the body's own place on the books fixes it.)
+  - **Saves:** `SAVE_VERSION` 4, so a save from before alates had a body is refused rather than read with an undefined one.
+- **S2, `found()` twice founded twice.** It now refuses a flight that is not pending (−1, nothing added); tested.
+- **S3, `#wanted` reads every adult's energy.** Accepted for now and noted on `ja-k4k.4`, whose job is to replace `#wanted` with sensed signals.
+- **N3:** the toast for a queen lost to `MAX_COLONIES` says so, not "no room to land". **N4:** §50.2's two superseded bullets are marked.
+- **N1, N2, N5 stay:** a held larva still drains (not triggered in 60 s), the laying gate doesn't count larval upkeep (tuning, with `ja-xu6.2`), and the gyne's food cue reads the chamber's food as larval feeding does (`ja-k4k.4`).
+
+**A third merge** (#53, each ant's own stance, top-down): `CLAUDE.md`'s cost line takes #53's colony figures and this branch's fungus figures; `colony.ts` keeps both #53's stance gate and the side view's energy step in `tick`; the assay list keeps #53's `defendHome` and the three lifecycle assays. `tests/golden.json` took both sides' entries (#53's top-down, this branch's side view) and passes as merged.
+
+**Review of 718ec15** (a review agent):
+- **S1, a founding daughter held unity at 0.** `Unity.met` is the least allied-contact share over the standing colonies, and a queen founding alone stands (`Game.beaten`) with no ants, so her share of 0 made `met` and the score 0 until her first workers met someone. A colony with no ants is now left out of `met` (`#metNow`): it has nobody to meet. Tested: two colonies that have met keep `met` over `MET` when a daughter founds; counting her fails it.
+- **N1:** a books check while a flight waits for the page (`autoFound` off): dropping the flights from `royalFood()` now fails it.
+- **N2:** `found()` with a site that has no room after all (`addColony` throws "no room") loses the queen and books her body, instead of dropping the flight with its body unbooked.
+
+**Review of edc4088** (`pr-reviewer`): the PR body brought up to date (S4); §50.19's two lines on the reserve corrected (N6); a test for `found()` with no room for a hole (N7); the unity filter's comment says it leaves out any colony with no ants (a founding queen, or a colony whose workers all died), not only a founding one (N8); the alate's fattening reading her chamber's food from the chamber table is listed in `vision.md`'s food-flow row and on `ja-k4k.4` (N9).
+
+
 ## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
 
 The owner asked for the top-down view and the side view to be two views of one game. The side view would be a cut along a line through the nests' holes, zig-zagging as nests are added, and a new nest may not be founded nearer an interior nest's hole, so the line always grows from an end. Today they are two unrelated games, and the Ground control throws the game away to switch (§27 created the split without choosing it).
@@ -3870,6 +4060,7 @@ No source found says what makes a colony open a new entrance from inside.
 **Search note.** Web searches on how long an insect-killing fungus survives sunlight (`ja-2qv`) were stopped by a safety filter this session; that research waits for a new session. This note's topic was not affected.
 
 **Cost.** None: docs and beads only.
+
 
 ## 53. Unity needs contact (ja-i0f, 2026-11-08)
 

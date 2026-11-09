@@ -42,7 +42,7 @@ test("the side view's colony has a queen; the top-down maps keep the larder, wit
 test("queen to worker: she lays while there is food; an egg becomes a larva, is fed, pupates, and a worker is born where the pupa lay", () => {
   const map = bare(2);
   const c = new Colony(map, { antCount: 20, maxAnts: 30 }, mulberry32(2), () => "explore");
-  c.feed(8); // two workers' worth
+  c.feed(8.5); // two workers' worth, and a little for the larvae's upkeep as they wait (ja-xu6.1)
   let firstBirth = -1;
   const stages = new Set<number>();
   let pupae: string[] = [];
@@ -66,7 +66,7 @@ test("queen to worker: she lays while there is food; an egg becomes a larva, is 
   assert.ok(stages.has(EGG) && stages.has(LARVA) && stages.has(PUPA), `stages seen ${[...stages]}`);
   assert.equal(c.births, 2, "two workers from eight food");
   assert.ok(firstBirth >= T_EGG + T_LARVA + T_PUPA - 1, `no worker sooner than egg + larva + pupa: ${firstBirth.toFixed(1)} s`);
-  assert.ok(c.larder < 1e-6, `the larder went into them: ${c.larder}`);
+  assert.ok(c.larder < 0.5, `the larder went into them: ${c.larder}`);
 });
 
 test("nurses take eggs from the queen to a brood chamber", () => {
@@ -173,7 +173,7 @@ test("a larva is fed before it pupates: with no food for it, it stays a larva", 
   b.t = 1000;
   for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
   assert.equal(b.stage, LARVA, "unfed");
-  c.feed(3);
+  c.feed(4); // its 3, and a little for the energy it used waiting (ja-xu6.1: food goes to its energy first)
   for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
   assert.notEqual(b.stage, LARVA, "fed, it pupated");
 });

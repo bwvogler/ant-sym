@@ -540,6 +540,29 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             ctx.globalAlpha = 1;
           }
         }
+        // Alates (ja-lo8.9): new queens, smaller than the queen, with wings, as they wait and walk out to fly.
+        for (const al of col.alates) {
+          if (!inView(al.x, al.y)) continue;
+          const [x, y] = toScreen(c, v, al.x, al.y);
+          const ar = Math.max(2.5, len * 0.7);
+          ctx.beginPath();
+          ctx.ellipse(x, y, ar * 1.3, ar * 0.7, 0, 0, Math.PI * 2);
+          ctx.fillStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(x - ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, -0.5, 0, Math.PI * 2);
+          ctx.ellipse(x + ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, 0.5, 0, Math.PI * 2);
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = theme.paper;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          if (al.load > 0) {
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(1.5, ar * 0.45), 0, Math.PI * 2);
+            ctx.fillStyle = theme.spore;
+            ctx.fill();
+          }
+        }
         ctx.lineCap = "round";
         ctx.lineWidth = Math.max(1, len * 0.3);
         ctx.globalAlpha = 0.85;

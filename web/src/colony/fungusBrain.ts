@@ -10,9 +10,9 @@ import { decodeLevels, encodeLevels, LEVERS, scale } from "./levers.ts";
 // levers the player's menu has on, so every answer is something the fungus can do.
 
 /** Bump when the fungal situation, the legend or the questions change: old cached answers no longer apply. */
-export const FUNGUS_BRAIN_VERSION = 7;
+export const FUNGUS_BRAIN_VERSION = 8;
 
-/** Fungal situations to a request: each carries a question per lever (up to 15), so fewer than the ants' 100. */
+/** Fungal situations to a request: each carries a question per lever (up to 16), so fewer than the ants' 100. */
 export const FUNGUS_BATCH = 50;
 
 /**
