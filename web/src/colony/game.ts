@@ -332,7 +332,14 @@ export class Game {
       return -1;
     }
     // Her reserve is her body (Flight.food), moved into her colony's larder: no food is made or lost (PR #47 review, S1).
-    return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: f.food, ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}) });
+    // No room for her hole after all (landing sites are free columns, so only by a caller's own site): she is lost.
+    try {
+      return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: f.food, ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}) });
+    } catch (e) {
+      if (!(e instanceof Error && e.message.includes("no room"))) throw e;
+      this.#lost(f);
+      return -1;
+    }
   }
 
   /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
@@ -585,8 +592,11 @@ export class Game {
   /** Unity.met: the least allied contact among `live` colonies (each must have met someone; review of #56, R3). */
   #metNow(live: readonly Colony[]): number {
     if (live.length < 2) return 0;
+    // A colony with no ants (a queen founding alone, ja-lo8.9) has nobody to meet with: unity waits on those that can.
+    const meeting = live.filter((c) => c.population > 0);
+    if (meeting.length < 2) return 0;
     let m = Infinity;
-    for (const c of live) m = Math.min(m, this.#metBy[this.colonies.indexOf(c)] ?? 0);
+    for (const c of meeting) m = Math.min(m, this.#metBy[this.colonies.indexOf(c)] ?? 0);
     return m;
   }
 

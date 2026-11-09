@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GYNE, GYNE_FOOD, LARVA, PUPA, WORKER } from "../brood.ts";
 import { Colony, NANITIC_AGE, T_PUPA } from "../colony.ts";
-import { Game, FOUNDING_RESERVE } from "../game.ts";
+import { Game, FOUNDING_RESERVE, MET, QUIET } from "../game.ts";
 import { INFECTED, STRAINS } from "../fungus.ts";
 import { driftAim } from "../recognition.ts";
 import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, GYNE_SPACING, scentShare, type Flight } from "../royal.ts";
@@ -226,6 +226,7 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
   const c = g.player;
   c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: ALATE_WAIT, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
   c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: 0, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
+  map.foodTotal += 2 * ALATE_RESERVE; // the two alates' bodies, put in by hand, on the books
   for (let k = 0; k < 30 * 120 && !g.flights.length; k++) g.tick(DT);
   assert.equal(g.flights.length, 1);
   assert.equal(g.colonies.length, 1, "nothing founded yet");
@@ -242,8 +243,20 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
   assert.equal(g.colonies.length, 2);
   assert.equal(g.map.foodTotal, food, "no second reserve");
   // The save from before: its flight is still waiting, and the second alate is still in the nest.
+  // While a flight waits for the page, her body is on the books in it (Game.royalFood), not in any larder.
+  const books = (x: Game) => {
+    let t = x.map.foodLeft + x.royalFood();
+    for (const d of x.colonies) {
+      for (let i = 0; i < d.n; i++) if (d.alive[i] && d.carrying[i]) t += 1;
+      t += d.larder + 4 * d.births + d.eaten;
+      for (const b of d.brood.items) t += 1 + b.fed;
+    }
+    return t;
+  };
   const h = new Game(generateSideWorld(2, SMALL), { antCount: 60, rival: false, autoFound: false }, mulberry32(2 * 7919));
   h.load(saved);
+  assert.ok(h.flights[0]!.food > 0);
+  assert.ok(Math.abs(books(h) - h.map.foodTotal) < 1e-6, `books with a flight pending: ${books(h)} vs ${h.map.foodTotal}`);
   assert.equal(h.flights.length, 1);
   assert.equal(h.player.alates.length, 1);
   const lost = h.flights[0]!;
@@ -322,7 +335,9 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
   };
   const total = map.foodTotal;
   let founded = -1;
-  for (let k = 0; k < 30 * 400 && (founded < 0 || g.time < founded + 30); k++) {
+  // Until the daughter is no longer young (ja-lo8.10): through her nanitics and the queen's nursing too (PR #54 review).
+  const young = () => g.colonies.length > 1 && (g.colonies[1]!.founding || g.colonies[1]!.incipient);
+  for (let k = 0; k < 30 * 600 && (founded < 0 || young() || g.time < founded + 30); k++) {
     c.scentGain.fill(0.001);
     g.tick(DT);
     if (founded < 0 && g.colonies.length > 1) founded = g.time;
@@ -428,4 +443,34 @@ test("a nanitic eclosing leaves the colony young", () => {
   }
   assert.equal(d.brood.items.includes(pupa), false, "it eclosed");
   assert.equal(d.incipient, true);
+});
+
+test("a queen founding alone doesn't hold unity at nothing: a colony with no ants has nobody to meet (ja-i0f, PR #47 review)", () => {
+  const map = generateSideWorld(1, { ...SMALL, size: { w: 400, h: 160 }, nestCount: 2 });
+  const g = new Game(map, { antCount: 20, rivalAnts: 20, autoFound: false }, mulberry32(7));
+  const [a, b] = g.colonies as [Colony, Colony];
+  const e = a.nest.entrance!;
+  const meet = (seconds: number) => {
+    for (let k = 0; k < Math.round(seconds * 30); k++) {
+      for (const c of [a, b]) {
+        c.nestOdour = 0.5;
+        for (let i = 0; i < c.n; i++)
+          if (c.alive[i]) {
+            c.odour[i] = 0.5;
+            c.x[i] = e.x;
+            c.y[i] = e.y;
+          }
+      }
+      g.tick(DT);
+    }
+  };
+  meet(QUIET);
+  const before = g.unity().met;
+  assert.ok(before >= MET, `the two met: ${before}`);
+  g.flights.push({ mother: 0, x: e.x, y: e.y, load: 0, strain: 0, at: g.time, food: ALATE_RESERVE });
+  assert.ok(g.found(g.flights[0]!) > 1);
+  const d = g.colonies[2]!;
+  assert.ok(d.founding && d.population === 0);
+  meet(2);
+  assert.ok(g.unity().met >= MET, `with a daughter founding: met ${g.unity().met}`);
 });
