@@ -2,8 +2,10 @@
 // crossing at their holes, on the local rule with no fungus landed, and prints a line a minute per colony: its ants on
 // each layer, crossings each way, food carried down, stored, births, brood, deaths; the longest any carrier (or homing
 // ant) has stayed inside its plane disc without going down, and the longest a young ant (band 0, which may not go out)
-// and a middle-aged one (band 1) have stayed by the hole underground, within two cells of it. It checks the economy
-// runs (food reaches the chambers, the queen lays, ants are born) and that nobody is stuck at a hole.
+// and a middle-aged one (band 1) have stayed by the hole underground, within two cells of it. Homing on the plane (U3b,
+// ja-lp4.3.2): the longest a carrier took from turning home (picking food up, on the plane) to going down its hole, and
+// the share of homing trips ended down the hole that searched on the way (its belief missed: `search` non-zero). It checks
+// the economy runs (food reaches the chambers, the queen lays, ants are born) and that nobody is stuck at a hole.
 //
 // Usage: node scripts/one-world-spike.mjs [seeds=1-3] [seconds=300] [ants=300]
 import { GAME_REGROW, Game, gameRng } from "../web/src/colony/game.ts";
@@ -24,6 +26,9 @@ for (let seed = lo; seed <= hi; seed++) {
   // Per colony and ant slot (by its generation): seconds in a row inside the plane disc going in, or by the hole underground.
   const inDisc = game.colonies.map((c) => ({ gen: new Uint32Array(c.n), t: new Float32Array(c.n), most: 0 }));
   const atHole = game.colonies.map((c) => ({ gen: new Uint32Array(c.n), t: new Float32Array(c.n), most: [0, 0] }));
+  // Per colony and ant slot: on the plane, seconds since it turned home (carrying, or in return), whether it carried food
+  // and whether it searched this trip; the layer it was on last tick, so a trip that ends down the hole is seen.
+  const trip = game.colonies.map((c) => ({ gen: new Uint32Array(c.n), t: new Float32Array(c.n), food: new Uint8Array(c.n), searched: new Uint8Array(c.n), was: new Uint8Array(c.n).fill(1), most: 0, trips: 0, searchTrips: 0 }));
   console.log(`seed ${seed}: plane ${world.plane.size.w}×${world.plane.size.h}, curtain ${world.curtain.size.w}×${world.curtain.size.h}, holes ${game.player.holeCells.map((h) => `(${h.px},${h.py})↔col ${h.col}`).join(", ")}`);
   for (let k = 1; k <= Math.round(seconds / DT); k++) {
     game.tick(DT);
@@ -32,13 +37,31 @@ for (let seed = lo; seed <= hi; seed++) {
       const own = c.holeCells[c.params.nest];
       const D = inDisc[ci];
       const H = atHole[ci];
+      const T = trip[ci];
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         if (D.gen[i] !== c.gen[i]) {
           // A new ant in this slot: its clocks start afresh.
-          D.gen[i] = H.gen[i] = c.gen[i];
-          D.t[i] = H.t[i] = 0;
+          D.gen[i] = H.gen[i] = T.gen[i] = c.gen[i];
+          D.t[i] = H.t[i] = T.t[i] = 0;
+          T.food[i] = T.searched[i] = 0;
+          T.was[i] = 1;
         }
+        if (c.layer[i] === 1 && T.was[i] === 0 && T.t[i] > 0) {
+          // Down the hole this tick: the trip home is over.
+          T.trips++;
+          if (T.searched[i]) T.searchTrips++;
+          if (T.food[i] && T.t[i] > T.most) T.most = T.t[i];
+        }
+        if (c.layer[i] === 0 && (c.carrying[i] === 1 || c.mode[i] === 2)) {
+          T.t[i] += DT;
+          if (c.carrying[i]) T.food[i] = 1;
+          if (c.search[i] !== 0) T.searched[i] = 1;
+        } else {
+          T.t[i] = 0;
+          T.food[i] = T.searched[i] = 0;
+        }
+        T.was[i] = c.layer[i];
         const x = c.x[i];
         const y = c.y[i];
         if (c.layer[i] === 0) {
@@ -84,7 +107,8 @@ for (let seed = lo; seed <= hi; seed++) {
             ` up ${c.crossedUp} down ${c.crossedDown} carriedDown ${c.carriedDown} up-with-food ${c.carriedUp} carrying ${carrying}` +
             ` | stored ${c.stored} larder ${c.larder.toFixed(1)} births ${c.births} brood ${larvae} queen ${c.queen?.alive ? "alive" : "dead"}` +
             ` | lost ${c.losses} old ${c.diedOld} hungry ${c.diedHungry} | soilOut ${c.soilOut} buried ${c.buried}` +
-            ` | longest in disc ${inDisc[ci].most.toFixed(1)} s, young at hole ${atHole[ci].most[0].toFixed(1)} s, middle ${atHole[ci].most[1].toFixed(1)} s`,
+            ` | longest in disc ${inDisc[ci].most.toFixed(1)} s, young at hole ${atHole[ci].most[0].toFixed(1)} s, middle ${atHole[ci].most[1].toFixed(1)} s` +
+            ` | home trips ${trip[ci].trips}, searched ${trip[ci].trips ? ((100 * trip[ci].searchTrips) / trip[ci].trips).toFixed(1) : "0.0"}%, longest carrier home ${trip[ci].most.toFixed(1)} s`,
         );
       });
     }

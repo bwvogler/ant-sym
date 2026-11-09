@@ -106,6 +106,27 @@ Most behaviour carries over unchanged. The new work is the seam between the two:
 - **Two fixes the spike forced.** A returner homing to its chamber no longer climbs out at the top of the shaft and goes straight back down (up to 68 carriers a colony did, in 300 s). A young ant turned back at the hole forgets its last chamber, as the side view's young do on the ground: laying on, they marked the shaft's top with brood and royal and drew more young there (up to 13, some for minutes).
 - **Measured:** Jev's mode lane costs what the side view's does per situation; ticks run at 5.5 ms mean at 600 + 600 ants (PRD §51).
 
+**U3b as built (2026-11-09, `ja-lp4.3.2`).** On the plane a homing ant steers by its own drifting vector, not by the hole. The side view and the surface map are unchanged (their golden masters bit-exact); the one-world golden was re-recorded.
+- **The 2D drift.** Coming up out of its own hole, an ant starts its vector afresh and draws this trip's drift in 2D: `driftSurf` (x) and `driftSurfY` (y), each with σ = `PI_DRIFT`/√2, so the error's RMS is 10 % of the way out, as across the side view's ground. Up out of a rival's hole nothing resets (before, any hole zeroed the odometer).
+- **The odometer.** On the plane it counts the path walked while not returning; once the ant heads home the vector is fixed, as `#integrate` does in the side view.
+- **The snap.** Within `HOLE_SIGHT` (6) of its hole, or within `NEST_SIGHT` (8) with a clear line to it, the ant sees the hole and smells the entrance, and steers for the hole itself. Otherwise it steers for hole + distance × drift, held inside the plane's edges. Everything that steered by the nest now reads that belief: the progress check, the food trail's cone, home-trail climbing, Bug2 at walls.
+- **The search, in 2D loops (a game choice: the sources give no 2D geometry).** Where the belief turns out empty, the ant visits points round it, a quarter turn apart, the first straight ahead; each loop of four is 1.6 times wider than the last. No random draw. An ant that gets no nearer its belief for 3 s (`SEARCH_STALL`) searches on as if it had reached it.
+- **Two fixes the spike forced.**
+  - A belief in rock was never reached, so the search never started: about half the carriers still out at the end of seed 3 had one (and in a test, one followed the wall round the plane's whole edge). That is the stall rule.
+  - With its loops alone, colonies delivered up to 44 % less food than U3a's. Now a searching ant with the home trail under its antennae gives the trail `homeTrail`'s share (0.8) of its turning, as a carrier on a food trail does ([trails](trails.md): route cues and scent first, the vector the fallback).
+- **The spike** (`scripts/one-world-spike.mjs`, seeds 1–3, 300 + 300 ants, 300 s), U3a → U3b, colonies 0 / 1:
+
+  | Seed | Stored | Carried down | Births | Up / down |
+  |---|---|---|---|---|
+  | 1 | 1,341 → 1,000 / 1,091 → 1,130 | 1,344 → 1,000 (−26 %) / 1,095 → 1,133 (+3 %) | 155 → 153 / 155 → 153 | 1,644/1,464 → 1,241/1,085 / 1,253/1,206 → 1,370/1,223 |
+  | 2 | 746 → 789 / 626 → 604 | 750 → 795 (+6 %) / 627 → 605 (−4 %) | 147 → 150 / 132 → 125 | 962/881 → 1,116/965 / 1,047/862 → 992/785 |
+  | 3 | 767 → 705 / 560 → 402 | 771 → 706 (−8 %) / 561 → 403 (−28 %) | 149 → 152 / 131 → 91 | 1,071/960 → 1,051/855 / 717/621 → 642/537 |
+
+  - 19–44 % of the trips that ended down the hole searched on the way.
+  - The longest a carrier took from picking food up to going down was 104–230 s (U3a: 57–187 s).
+  - On seeds 4–6, deliveries changed by −19 % to +3 %.
+  - The worst colony, seed 3's second, also had 31 % fewer births.
+
 ## 5. Two views of one game
 
 - **Ground becomes a camera switch,** "above" or "below", and no longer builds a new game.
@@ -132,8 +153,8 @@ The page keeps today's two maps until one world passes its own guards. U6 then t
 | U1 (built) | `transect.ts`, pure: the line, *s* ↔ plane cell, signed *s*, `canFound` and `nearestValid` (the four rules of §3, with their ties), the turn limit, crossing and clearance tests | unit tests, with property tests over random lines: neighbouring columns map to the same or adjacent cells; no valid founding makes the curtain overlap itself |
 | U2 (built) | `generateOneWorld`: the plane from the open-map generator, the curtain from the side-view generator along the line. Both views drawn, with no simulation yet (`?world=one`) | map invariants: each hole is open on both layers; the curtain's ground row lies under *P(s)* |
 | U3a (built) | colonies on two layers: per-ant layer, hole crossings, pheromones, fights, recognition, contact and the fungus per layer, the queen economy; unity's allied contact (`Game.#meet`, PRD §53) counted per layer (§4, "U3a as built") | a new golden master for one world (`oneWorldGolden.test.ts`); the old ones bit-exact; `oneWorldGame.test.ts` |
-| U3b | 2D homing on the plane: the side view's drifting vector (`#believe`, `#integrate`) aimed at the hole; 2D `#inOwnNest`, `#neighbour`, `#middenSide` | the one-world golden re-recorded, said in the PR; the old ones bit-exact |
-| U3c | the mound as a spoil height field on the plane, the midden disc; then dig spread, Jev's cost and tick time measured again on one world | as U3b; `dig-spread.mjs`, `colony-cost --one`, `colony-bench --one` |
+| U3b (built) | 2D homing on the plane: the side view's drifting vector (`#believe`, `#integrate`) aimed at the hole, with a 2D search (§4, "U3b as built") | the one-world golden re-recorded, said in the PR; the old ones bit-exact; `oneWorldHoming.test.ts` |
+| U3c | the mound as a spoil height field on the plane, the midden disc; own-nest, neighbour and midden side from the ant's own vector (`ja-k4k.5`), not other nests' positions; then dig spread, Jev's cost and tick time measured again on one world | as U3b; `dig-spread.mjs`, `colony-cost --one`, `colony-bench --one` |
 | U4 | founding on the line: `Game.addColony` checks `canFound`; the lab button becomes "found beyond ‹end nest›"; the queen's landing (`ja-lo8.9`) moves to the nearest valid spot or fails; saves | save round-trip; founding property tests |
 | U5 | the page as one game in two views, linked (§5) | Playwright: switch views mid-game, follow an ant through a hole |
 | U6 | G1, a G-like whole-game guard on one world (and unity reachable: Garden in both clears `MET`, PRD §53); assays A1–A10 rerun on the plane; tick cost measured (budget 7–9 ms at 1,200 + 1,200); the page's default switched; the Ground control's world switch retired | `npm run exp`, `test:slow`, the bench |
