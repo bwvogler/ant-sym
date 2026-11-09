@@ -7,13 +7,26 @@ import { seg } from "./styles.ts";
 
 type View = "above" | "below";
 
+/** The last world made: StrictMode runs state initialisers twice in development, and one world is enough to make. */
+let last: OneWorld | null = null;
+
 /** The one world of `seed`, or null if it can't be made (generateOneWorld throws). */
 function tryWorld(seed: number): OneWorld | null {
+  if (last?.seed === seed) return last;
   try {
-    return generateOneWorld(seed);
+    return (last = generateOneWorld(seed));
   } catch {
     return null;
   }
+}
+
+/** The world the page opens on: the address's seed, or seed 1 when it has none or that seed makes no world (and why). */
+function opening(search: string): { world: OneWorld; failed: string | null } {
+  const asked = new URLSearchParams(search).get("seed");
+  const seed = previewSeed(search);
+  const world = tryWorld(seed);
+  if (world) return { world, failed: asked === null || parseSeed(asked) !== null ? null : `"${asked}" is no seed (a whole number from 1); showing seed 1.` };
+  return { world: tryWorld(1)!, failed: `Seed ${seed} makes no world; showing seed 1.` };
 }
 
 /** Each layer's stub colonies, made the first time it is shown and kept while its world lives: toggling builds nothing. */
@@ -31,17 +44,23 @@ function stillLifeOf(map: WorldMap): ReturnType<typeof stillLife> {
 export default function OneWorldPreview() {
   // The world is made when a seed is applied, not while rendering: a seed that fails to make one leaves the last world
   // and the address as they were, and says so.
-  const [world, setWorld] = useState(() => tryWorld(previewSeed(window.location.search)) ?? generateOneWorld(1));
+  const [start] = useState(() => opening(window.location.search));
+  const [world, setWorld] = useState(start.world);
   const seed = world.seed;
   // What is typed in the seed box: free to be empty while typing; a new world is made on Enter or leaving the box.
   const [seedText, setSeedText] = useState(String(seed));
-  const [failed, setFailed] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(start.failed);
+  // The address names the world shown, so a reload or a shared link opens it.
+  useEffect(() => history.replaceState(null, "", withSeed(window.location.search, start.world.seed)), [start]);
   const [view, setView] = useState<View>("below");
   const map = view === "above" ? world.plane : world.curtain;
   const shown = stillLifeOf(map);
   const applySeed = () => {
     const n = parseSeed(seedText);
-    if (n === null || n === seed) return setSeedText(String(seed));
+    if (n === null || n === seed) {
+      setFailed(n === null && seedText.trim() !== "" ? `"${seedText}" is no seed (a whole number from 1); still showing seed ${seed}.` : null);
+      return setSeedText(String(seed));
+    }
     const next = tryWorld(n);
     if (!next) {
       setFailed(`Seed ${n} makes no world; still showing seed ${seed}.`);

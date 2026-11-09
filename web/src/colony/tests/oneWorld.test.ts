@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CELL, cellOf } from "../hex.ts";
+import { CELL, cellOf, NE, NW, nx, ny } from "../hex.ts";
 import { colOf, CRUST, CURTAIN_DEPTH, generateCurtain, generateOneWorld, refreshStrip, sOf, STRIP, type OneWorld } from "../oneWorld.ts";
 import { cellAt, grow, nearestValid } from "../transect.ts";
-import { AIR, digCell, fillCell, flat, foundNest, heapMound, mulberry32, openCell, OPEN, reachable, ROCK, rockAt, SOIL, type WorldMap } from "../world.ts";
+import { AIR, digCell, fillCell, flat, foundNest, heapMound, isSky, mulberry32, openCell, OPEN, reachable, ROCK, rockAt, SOIL, type WorldMap } from "../world.ts";
 
 const SEEDS = [1, 2, 3, 4, 5, 6];
 const worlds = new Map<number, OneWorld>();
@@ -81,6 +81,8 @@ test("the crust is solid except at the holes: the only way between the layers (o
       if (holes.has(col)) continue;
       assert.notEqual(curtain.rock.get(col, CRUST), OPEN, `seed ${seed}: crust open at column ${sOf(line, col)}`);
       assert.equal(curtain.sky!.get(col, CRUST), 0);
+      // It touches the strip's sky, so the side view's #crust rule (colony.ts) keeps diggers off it, as on today's ground.
+      assert.ok([NW, NE].some((d) => isSky(curtain, nx(col, CRUST, d), ny(CRUST, d))), `seed ${seed}: crust at column ${sOf(line, col)} touches the sky`);
     }
   }
 });
@@ -194,7 +196,8 @@ test("digging below never re-derives the sky and the strip: they are the plane's
     assert.ok(at >= 0, `seed ${seed}: open ground beside rock on the strip`);
     foundNest(curtain, at, 2, mulberry32(seed));
     assert.equal(curtain.rock.get(at, CRUST), OPEN, "the new hole is dug through the crust");
-    // And the crust dug beside a hole, as U3's diggers may.
+    // And the crust dug beside a hole: ants never dig it (every crust cell touches the strip's sky, so colony.ts's #crust
+    // rule keeps them off, tested below), but a direct dig still leaves the strip alone.
     const h = colOf(line, line.sHole[0]!);
     for (const col of [h - 1, h + 1]) if (curtain.rock.get(col, CRUST) === SOIL) digCell(curtain, col, CRUST);
     // Nothing fills the strip, and no spoil is heaped on it: the mound is the plane's (one-world §4).

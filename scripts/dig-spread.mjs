@@ -6,6 +6,7 @@
 // eastmost), by their column distance from it. "Any" pools every dug cell by its nearest hole, for reference.
 //
 // Usage: node scripts/dig-spread.mjs [seeds=1-3] [seconds=600] [ants=600]
+import { CHUNK, CHUNK_BITS } from "../web/src/colony/chunks.ts";
 import { Game, GAME_REGROW, gameRng } from "../web/src/colony/game.ts";
 import { CELL, cellOf } from "../web/src/colony/hex.ts";
 import { generateSideWorld } from "../web/src/colony/world.ts";
@@ -30,8 +31,8 @@ function spread(map) {
   map.dugAt.forEach((cx, cy, arr) => {
     for (let i = 0; i < arr.length; i++) {
       if (arr[i] === -Infinity) continue;
-      const x = (cx << 6) + (i & 63);
-      const y = (cy << 6) + (i >> 6);
+      const x = (cx << CHUNK_BITS) + (i & (CHUNK - 1));
+      const y = (cy << CHUNK_BITS) + (i >> CHUNK_BITS);
       if (map.sky?.get(x, y) === 1) continue;
       d.push(Math.min(...holes.map((h) => Math.abs(x - h))));
       if (x < west) out.push(west - x);

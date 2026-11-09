@@ -523,6 +523,7 @@ export function flat<A extends Uint8Array | Float32Array>(map: WorldMap, layer: 
 export type Through = "open" | "diggable";
 
 function passable(map: WorldMap, x: number, y: number, through: Through): boolean {
+  if (y < (map.surfaceRows ?? 0)) return false; // the curtain's surface is the plane's: no way round underground through it
   const t = rockAt(map, x, y);
   return through === "open" ? t === OPEN : t === OPEN || t === SOIL;
 }
