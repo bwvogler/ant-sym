@@ -5,7 +5,7 @@ import { Colony } from "../colony.ts";
 import { Game, FOUNDING_RESERVE, MET, QUIET } from "../game.ts";
 import { INFECTED, STRAINS } from "../fungus.ts";
 import { driftAim } from "../recognition.ts";
-import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, scentShare } from "../royal.ts";
+import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, scentShare, type Flight } from "../royal.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { digCell, generateSideWorld, mulberry32, OPEN, rockAt } from "../world.ts";
 
@@ -306,4 +306,18 @@ test("a queen founding alone doesn't hold unity at nothing: a colony with no ant
   assert.ok(d.founding && d.population === 0);
   meet(2);
   assert.ok(g.unity().met >= MET, `with a daughter founding: met ${g.unity().met}`);
+});
+
+test("a queen landing where no hole fits is lost, and her body booked to her mother: found() returns −1 (PR #47 review, N7)", () => {
+  // 24 columns: no column is HOLE_GAP from both edges and from the mother's hole.
+  const map = generateSideWorld(2, { size: { w: 24, h: 80 }, nestGap: 120, surface: 20, nestCount: 1 });
+  const g = new Game(map, { antCount: 10, rival: false, autoFound: false }, mulberry32(3));
+  const f: Flight = { mother: 0, x: 0, y: 0, load: 0, strain: 0, at: 0, food: 10 };
+  g.flights.push(f);
+  const e = g.player.nest.entrance!;
+  const eaten = g.player.eaten;
+  assert.equal(g.found(f, { x: e.x, y: e.y }), -1);
+  assert.equal(g.flights.length, 0, "no longer pending");
+  assert.equal(g.colonies.length, 1);
+  assert.equal(g.player.eaten, eaten + f.food, "her body left the world with her");
 });
