@@ -17,6 +17,8 @@ const DT = 1 / 30;
 const RETURN = MODES.indexOf("return");
 const FIGHT = MODES.indexOf("fight");
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
+/** colony.ts's MIDDEN_MARK (private): the mark a corpse put on the midden lays on its cell at once. */
+const MIDDEN_MARK = 20;
 
 /** An all-open plane of w × h cells with an empty spoil layer. */
 function openPlane(w: number, h: number): WorldMap {
@@ -206,11 +208,18 @@ test("one world: a spoil or corpse carrier on its own hole cell on the plane doe
     c.heading[i] = face;
   }
   const down = c.crossedDown;
+  const out = c.soilOut;
+  const buried = c.buried;
   for (let k = 0; k < Math.round(5 / DT); k++) {
     g.tick(DT);
     for (const i of [0, 1, 2, 3, u]) if (c.pellet[i]) assert.equal(c.layer[i], PLANE, `ant ${i}, carrying out, is still on the plane`);
   }
   assert.equal(c.crossedDown, down, "none went down");
+  // And each walked its load out and put it down within the 5 s: the spoil set there by hand too (its walk out starts at
+  // once: the pre-check before the mode choice, #carryOut).
+  for (const i of [0, 1, 2, 3, u]) assert.equal(c.pellet[i], 0, `ant ${i} put its load down`);
+  assert.equal(c.soilOut, out + 4, "the four pellets heaped on the plane");
+  assert.equal(c.buried, buried + 1, "the corpse on the midden");
 });
 
 test("one world: a corpse carried up goes on the midden, off the mound and at least MIDDEN_MIN from home by the undertaker's vector; its mark and a Bloom host's spores are there", () => {
@@ -258,7 +267,9 @@ test("one world: a corpse carried up goes on the midden, off the mound and at le
   assert.ok(hexDistance(mx, my, h.px, h.py) >= reach - 2, `past the mound (${hexDistance(mx, my, h.px, h.py)} cells out; the mound reaches ${reach})`);
   assert.equal(rockAt(plane, mx, my), OPEN);
   const midden = (L: number) => (c.layers[L] as Layer).ph.fields.midden;
-  assert.ok(midden(PLANE).get(mx, my) > 0, "the plane's midden mark there");
+  // The full mark at once where it was put down (#dropPlane), not only the tenth a second it keeps laying (#middenSmell).
+  const mark = midden(PLANE).get(mx, my);
+  assert.ok(mark >= 0.9 * MIDDEN_MARK, `the plane's midden mark there (${mark.toFixed(2)}, MIDDEN_MARK ${MIDDEN_MARK})`);
   let curtainMark = 0;
   midden(CURTAIN).forEach((_, __, a) => (curtainMark += a.reduce((s, v) => s + v, 0)));
   assert.equal(curtainMark, 0, "and none in the curtain");

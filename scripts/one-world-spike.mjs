@@ -11,8 +11,10 @@
 // its corpses on the midden and their median distance from the hole.
 //
 // Usage: node scripts/one-world-spike.mjs [seeds=1-3] [seconds=300] [ants=300]
+import { CHUNK, CHUNK_BITS } from "../web/src/colony/chunks.ts";
 import { GAME_REGROW, Game, gameRng } from "../web/src/colony/game.ts";
 import { CELL, cellOf, hexDistance } from "../web/src/colony/hex.ts";
+import { generateOneWorld } from "../web/src/colony/oneWorld.ts";
 
 /** Colony c's mound and midden on the plane: spoil nearer its hole than any other's, and its midden's corpses. */
 function moundOf(plane, c) {
@@ -25,8 +27,8 @@ function moundOf(plane, c) {
     for (let j = 0; j < a.length; j++) {
       const h = a[j];
       if (!h) continue;
-      const x = cx * 64 + (j & 63);
-      const y = cy * 64 + (j >> 6);
+      const x = cx * CHUNK + (j & (CHUNK - 1));
+      const y = cy * CHUNK + (j >> CHUNK_BITS);
       const d = hexDistance(x, y, own.px, own.py);
       if (holes.some((o) => hexDistance(x, y, o.px, o.py) < d)) continue;
       cells++;
@@ -40,7 +42,6 @@ function moundOf(plane, c) {
   md.sort((a, b) => a - b);
   return { pellets: far.length, cells, top, radius: far.length ? far[Math.floor(0.95 * (far.length - 1))] : 0, midden: md.length, middenAt: md.length ? md[Math.floor((md.length - 1) / 2)] : NaN };
 }
-import { generateOneWorld } from "../web/src/colony/oneWorld.ts";
 
 const [range = "1-3", secs = "300", antArg = "300"] = process.argv.slice(2);
 const [lo, hi = lo] = range.split("-").map(Number);
