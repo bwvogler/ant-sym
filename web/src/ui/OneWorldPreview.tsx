@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { generateOneWorld } from "../colony/oneWorld.ts";
-import { worldExtent } from "../colony/world.ts";
+import { worldExtent, type WorldMap } from "../colony/world.ts";
 import ColonyField from "./ColonyField.tsx";
-import { previewSeed, stillLife } from "./oneWorldView.ts";
+import { parseSeed, previewSeed, stillLife, withSeed } from "./oneWorldView.ts";
 import { seg } from "./styles.ts";
 
 type View = "above" | "below";
+
+/** Each layer's stub colonies, made the first time it is shown and kept while its world lives: toggling builds nothing. */
+const lives = new WeakMap<WorldMap, ReturnType<typeof stillLife>>();
+function stillLifeOf(map: WorldMap): ReturnType<typeof stillLife> {
+  let life = lives.get(map);
+  if (!life) lives.set(map, (life = stillLife(map)));
+  return life;
+}
 
 /**
  * One world, previewed (U2, ja-lp4.2; docs/one-world.md): the plane from above and the curtain from the side, generated
@@ -18,22 +26,43 @@ export default function OneWorldPreview() {
   const [view, setView] = useState<View>("below");
   const world = useMemo(() => generateOneWorld(seed), [seed]);
   const map = view === "above" ? world.plane : world.curtain;
-  const shown = useMemo(() => stillLife(map), [map]);
+  const shown = stillLifeOf(map);
   const applySeed = () => {
-    const n = Number(seedText);
-    if (Number.isInteger(n) && n >= 1) setSeed(n);
-    else setSeedText(String(seed));
+    const n = parseSeed(seedText);
+    if (n === null) return setSeedText(String(seed));
+    setSeed(n);
+    setSeedText(String(n));
+    history.replaceState(null, "", withSeed(window.location.search, n)); // reload or share: the same world
   };
 
-  // ColonyField redraws when told a frame passed; with nothing running, tell it every animation frame.
+  // ColonyField redraws when told a frame passed. Nothing runs here, so a frame is asked for only when the picture can
+  // change: the pointer or the wheel moving the camera, the field resizing, the theme switching (ColonyField draws once
+  // itself when it mounts).
   const listeners = useRef(new Set<() => void>());
+  const pending = useRef(0);
+  const poke = useMemo(
+    () => () => {
+      if (pending.current) return;
+      pending.current = requestAnimationFrame(() => {
+        pending.current = 0;
+        for (const fn of listeners.current) fn();
+      });
+    },
+    [],
+  );
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    let id = requestAnimationFrame(function frame() {
-      for (const fn of listeners.current) fn();
-      id = requestAnimationFrame(frame);
-    });
-    return () => cancelAnimationFrame(id);
-  }, []);
+    const ro = new ResizeObserver(poke);
+    if (box.current) ro.observe(box.current);
+    const mq = matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", poke);
+    return () => {
+      ro.disconnect();
+      mq.removeEventListener("change", poke);
+      cancelAnimationFrame(pending.current);
+      pending.current = 0;
+    };
+  }, [poke]);
   const onFrame = useMemo(
     () => (fn: () => void) => {
       listeners.current.add(fn);
@@ -73,7 +102,15 @@ export default function OneWorldPreview() {
           ? `The surface: ${world.plane.size.w}×${world.plane.size.h} cells of rock, ground and food, the nests' holes on it. The line through the holes runs ${world.line.sMax - world.line.sMin + 1} cells, ${world.line.margin} past each end.`
           : "Everything underground, under the line through the holes, unrolled flat: the strip along the top is the surface under the line, then the crust, broken only at each hole, its shaft and royal chamber, and soil, stones and buried food below."}
       </p>
-      <div className="relative" style={{ aspectRatio: `${ext.w} / ${ext.h}` }}>
+      <div
+        ref={box}
+        className="relative"
+        style={{ aspectRatio: `${ext.w} / ${ext.h}` }}
+        onPointerDownCapture={poke}
+        onPointerMoveCapture={poke}
+        onPointerUpCapture={poke}
+        onWheelCapture={poke}
+      >
         <ColonyField key={`${seed}-${view}`} colonies={shown.colonies} fungus={shown.fungus} onFrame={onFrame} showFoodTrail={false} showHomeTrail={false} followed={null} onFollow={() => {}} />
       </div>
     </main>

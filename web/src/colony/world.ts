@@ -79,6 +79,11 @@ export interface WorldMap {
    * later the mound); the rest is AIR (solid, never dug, drawn as sky). updateSurface keeps it so as ground changes.
    */
   sky?: ChunkLayer<Uint8Array>;
+  /**
+   * The one-world curtain (oneWorld.ts): its rows 0 … surfaceRows − 1, the sky over its ground strip and the strip, are
+   * drawn from the plane, not derived from the ground under them, so updateSurface leaves them be. Absent elsewhere.
+   */
+  surfaceRows?: number;
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
   loose?: ChunkLayer<Uint8Array>;
   /**
@@ -339,10 +344,11 @@ function grounded(map: WorldMap, x: number, y: number): boolean {
 export function updateSurface(map: WorldMap, x: number, y: number): void {
   const sky = map.sky;
   if (!sky) return;
+  const top = map.surfaceRows ?? 0;
   for (let d = -1; d < 6; d++) {
     const ax = d < 0 ? x : nx(x, y, d);
     const ay = d < 0 ? y : ny(y, d);
-    if (!inBounds(map, ax, ay) || sky.get(ax, ay) !== 1) continue;
+    if (ay < top || !inBounds(map, ax, ay) || sky.get(ax, ay) !== 1) continue;
     const t = map.rock.get(ax, ay);
     if (t !== OPEN && t !== AIR) continue;
     map.rock.set(ax, ay, grounded(map, ax, ay) ? OPEN : AIR);
@@ -701,18 +707,64 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
       }
     }
   // Clearing ground under a patch can open new ground but never closes any; food stays reachable (by digging, underground).
-  reach = reachable(map, nest.x, nest.y, dg);
+  keepReachableFood(map, [nest], dg);
+  return map;
+}
+
+/**
+ * Keep only the food an ant from one of `from` (world points: the nests) can reach, walking or, with "diggable", digging;
+ * the rest is taken off the map. Food above row `fromRow` is neither checked nor counted. Sets foodTotal and foodLeft.
+ */
+export function keepReachableFood(map: WorldMap, from: readonly { x: number; y: number }[], through: Through, fromRow = 0): void {
+  const { w, h } = map.size;
+  const reach = new Uint8Array(w * h);
+  for (const p of from) {
+    const r = reachable(map, p.x, p.y, through);
+    for (let i = 0; i < r.length; i++) reach[i]! |= r[i]!;
+  }
   let total = 0;
-  for (let y = 0; y < size.h; y++)
-    for (let x = 0; x < size.w; x++) {
-      const v = food.get(x, y);
+  for (let y = fromRow; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const v = map.food.get(x, y);
       if (!v) continue;
-      if (!reach[y * size.w + x]) food.set(x, y, 0);
+      if (!reach[y * w + x]) map.food.set(x, y, 0);
       else total += v;
     }
   map.foodTotal = total;
   map.foodLeft = total;
-  return map;
+}
+
+/**
+ * Food below ground (the side view's, the curtain's): one block's pockets, `patchesPerChunk` on average, from the block's
+ * own stream `r`. Each pocket gets 12 tries; `at()` draws a try's centre cell, or null when it lies where no pocket goes
+ * (too shallow, off the map). A pocket is 2–4 cells round, keeps `foodMinDist` from the nests (`nearNest`), and opens no
+ * cell above row `floor(x)` of its column.
+ */
+export function buryPockets(
+  map: WorldMap,
+  o: WorldOptions,
+  r: () => number,
+  at: () => readonly [number, number] | null,
+  floor: (x: number) => number,
+  nearNest: (x: number, y: number, d: number) => boolean,
+): void {
+  const count = Math.floor(o.patchesPerChunk) + (r() < o.patchesPerChunk % 1 ? 1 : 0);
+  for (let p = 0; p < count; p++) {
+    for (let tries = 0; tries < 12; tries++) {
+      const cell = at();
+      if (!cell) continue;
+      const x = centreX(cell[0], cell[1]);
+      const y = centreY(cell[1]);
+      const radius = 2 + r() * 2;
+      if (nearNest(x, y, o.foodMinDist + radius + 1)) continue;
+      disc(map, x, y, radius, (fx, fy) => {
+        if (fy < floor(fx)) return;
+        setRock(map, fx, fy, OPEN);
+        map.food.set(fx, fy, o.foodPerCell);
+      });
+      break;
+    }
+  }
 }
 
 /** Side-view options: a cross-section, sky above a ground line `surface` rows down, `relief` rows of rise and fall. */
@@ -829,37 +881,15 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   for (let cy = 0; cy < Math.ceil(size.h / CHUNK); cy++)
     for (let cx = 0; cx < Math.ceil(size.w / CHUNK); cx++) {
       const r = mulberry32(hash4(seed, 77, cx, cy));
-      const count = Math.floor(o.patchesPerChunk) + (r() < o.patchesPerChunk % 1 ? 1 : 0);
-      for (let p = 0; p < count; p++) {
-        for (let tries = 0; tries < 12; tries++) {
-          const row = (cy << CHUNK_BITS) + Math.floor(r() * CHUNK);
-          const col = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
-          if (col >= size.w || row >= size.h - 3 || row < (ground[col] as number) + 10) continue;
-          const x = centreX(col, row);
-          const y = centreY(row);
-          const radius = 2 + r() * 2;
-          if (nearNest(x, y, o.foodMinDist + radius + 1)) continue;
-          disc(map, x, y, radius, (fx, fy) => {
-            if (fy < (ground[fx] as number) + 4) return;
-            setRock(map, fx, fy, 0);
-            food.set(fx, fy, o.foodPerCell);
-          });
-          break;
-        }
-      }
+      const at = () => {
+        const row = (cy << CHUNK_BITS) + Math.floor(r() * CHUNK);
+        const col = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
+        return col >= size.w || row >= size.h - 3 || row < (ground[col] as number) + 10 ? null : ([col, row] as const);
+      };
+      buryPockets(map, o, r, at, (fx) => (ground[fx] as number) + 4, nearNest);
     }
   // Only food the player's ants can reach, walking or digging (the walkway and the soil are one ground).
-  const reach = reachable(map, map.nest.x, map.nest.y, "diggable");
-  let total = 0;
-  for (let y = 0; y < size.h; y++)
-    for (let x = 0; x < size.w; x++) {
-      const v = food.get(x, y);
-      if (!v) continue;
-      if (!reach[y * size.w + x]) food.set(x, y, 0);
-      else total += v;
-    }
-  map.foodTotal = total;
-  map.foodLeft = total;
+  keepReachableFood(map, [map.nest], "diggable");
   return map;
 }
 

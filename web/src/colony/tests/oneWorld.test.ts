@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CELL, cellOf } from "../hex.ts";
 import { colOf, CRUST, CURTAIN_DEPTH, generateCurtain, generateOneWorld, refreshStrip, sOf, STRIP, type OneWorld } from "../oneWorld.ts";
 import { cellAt, grow, nearestValid } from "../transect.ts";
-import { AIR, flat, openCell, OPEN, reachable, ROCK, rockAt, type WorldMap } from "../world.ts";
+import { AIR, digCell, flat, foundNest, mulberry32, openCell, OPEN, reachable, ROCK, rockAt, SOIL, type WorldMap } from "../world.ts";
 
 const SEEDS = [1, 2, 3, 4, 5, 6];
 const worlds = new Map<number, OneWorld>();
@@ -85,10 +85,11 @@ test("the crust is solid except at the holes: the only way between the layers (o
   }
 });
 
-test("buried food lies below the crust, reachable from the first nest; the strip's food is the plane's, not counted", () => {
+test("buried food lies below the crust, reachable from some nest; the strip's food is the plane's, not counted", () => {
   for (const seed of SEEDS) {
     const { curtain } = world(seed);
-    const reach = reachable(curtain, curtain.nest.x, curtain.nest.y, "diggable");
+    const reach = new Uint8Array(curtain.size.w * curtain.size.h);
+    for (const n of curtain.nests) reachable(curtain, n.x, n.y, "diggable").forEach((v, i) => (reach[i]! |= v));
     let total = 0;
     for (let y = CRUST; y < curtain.size.h; y++)
       for (let x = 0; x < curtain.size.w; x++) {
@@ -172,6 +173,31 @@ test("refreshStrip copies the plane again: food taken on the plane leaves the st
   assert.equal(curtain.food.get(colOf(line, hit), STRIP), 0);
 });
 
+test("digging below never re-derives the sky and the strip: they are the plane's (the curtain's surfaceRows)", () => {
+  for (const seed of [1, 2, 3]) {
+    const { plane, line } = world(seed);
+    const curtain = generateCurtain(seed, plane, line);
+    assert.equal(curtain.surfaceRows, CRUST);
+    const snap = () => {
+      const out: number[] = [];
+      for (let y = 0; y < CRUST; y++) for (let x = 0; x < curtain.size.w; x++) out.push(curtain.rock.get(x, y), curtain.sky!.get(x, y), curtain.food.get(x, y));
+      return out;
+    };
+    const before = snap();
+    // A nest founded on the curtain (U4's addColony) away from the holes, where the strip over it has rock beside open ground.
+    let at = -1;
+    for (let col = 2; col < curtain.size.w - 2 && at < 0; col++)
+      if (curtain.rock.get(col, STRIP) === OPEN && curtain.rock.get(col + 1, STRIP) === ROCK && line.sHole.every((s) => Math.abs(colOf(line, s) - col) > 30)) at = col;
+    assert.ok(at >= 0, `seed ${seed}: open ground beside rock on the strip`);
+    foundNest(curtain, at, 2, mulberry32(seed));
+    assert.equal(curtain.rock.get(at, CRUST), OPEN, "the new hole is dug through the crust");
+    // And the crust dug beside a hole, as U3's diggers may.
+    const h = colOf(line, line.sHole[0]!);
+    for (const col of [h - 1, h + 1]) if (curtain.rock.get(col, CRUST) === SOIL) digCell(curtain, col, CRUST);
+    assert.deepEqual(snap(), before, `seed ${seed}: the sky and the strip are unchanged`);
+  }
+});
+
 test("one nest makes a line of one hole; more than two is founding's job (U4)", () => {
   const solo = generateOneWorld(2, { plane: { nestCount: 1 } });
   assert.equal(solo.line.holes.length, 1);
@@ -190,9 +216,9 @@ test("golden: generateOneWorld is pinned (the line, and the curtain's terrain, s
   };
   // Any change to generateOneWorld, generateWorld under it, the line or the curtain's rules shows here, and must be meant.
   const want: Record<number, number[]> = {
-    1: [1842500005, 4138175917, 811853696, 3889898540, 4279881073, 8820],
-    2: [1969913797, 1550110699, 2937589818, 4254924357, 1334540775, 7620],
-    3: [2052465902, 3679783049, 2937589818, 3535099281, 2374244746, 7368],
+    1: [1842500005, 858815152, 811853696, 1989952978, 4279881073, 9036],
+    2: [1969913797, 933686833, 2937589818, 3257117935, 1334540775, 7116],
+    3: [2052465902, 3976829474, 2937589818, 4056070497, 2374244746, 7080],
   };
   const got: Record<number, number[]> = {};
   for (const seed of [1, 2, 3]) {

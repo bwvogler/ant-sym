@@ -11,14 +11,30 @@ export function isOneWorldPreview(search: string): boolean {
   return new URLSearchParams(search).get("world") === "one";
 }
 
-/** The seed in the query (`?world=one&seed=4`), or 1. */
-export function previewSeed(search: string): number {
-  const n = Number(new URLSearchParams(search).get("seed"));
-  return Number.isInteger(n) && n > 0 ? n : 1;
+/** A seed typed or in the query: a whole number from 1, or null. */
+export function parseSeed(text: string | null): number | null {
+  if (text === null || text.trim() === "") return null;
+  const n = Number(text);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-/** A map to draw and nothing to run: one colony of no ants per nest, and a fungus with no spores. */
+/** The seed in the query (`?world=one&seed=4`), or 1. */
+export function previewSeed(search: string): number {
+  return parseSeed(new URLSearchParams(search).get("seed")) ?? 1;
+}
+
+/** The query with its seed set to `seed`, everything else kept: the address to share or reload. */
+export function withSeed(search: string, seed: number): string {
+  const q = new URLSearchParams(search);
+  q.set("seed", String(seed));
+  return `?${q}`;
+}
+
+/**
+ * A map to draw and nothing to run: one colony of no ants per nest, and a fungus with no spores. Each colony smells as
+ * the game starts it (game.ts): Ink at odour 0, Amber at 1, so the renderer tells their nests apart.
+ */
 export function stillLife(map: WorldMap): { colonies: Colony[]; fungus: Fungus } {
-  const colonies = map.nests.map((_, k) => new Colony(map, { antCount: 0, nest: k }, mulberry32(k + 1)));
+  const colonies = map.nests.map((_, k) => new Colony(map, { antCount: 0, nest: k, odour: Math.min(k, 1) }, mulberry32(k + 1)));
   return { colonies, fungus: new Fungus(map) };
 }

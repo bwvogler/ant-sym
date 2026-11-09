@@ -36,9 +36,9 @@ An ant in the curtain moves with today's side-view physics: the shaft, chambers,
 
 **The curtain as built (U2).** `oneWorld.ts` lays the curtain out as a side view, so today's renderer, nest digger and chambers work on it unchanged:
 - **Rows 0–39: sky.** This is room for the mound's cut (§4).
-- **Row 40: the ground strip.** It is a copy of the plane under the line, cell P(s) at column *s*. `refreshStrip` copies it again; it is never simulated.
+- **Row 40: the ground strip.** It is a copy of the plane under the line, cell P(s) at column *s*. `refreshStrip` copies it again; it is never simulated. The sky and the strip are the map's `surfaceRows`: digging below (a hole, a nest founded later, the crust by a hole) never re-derives them, so they stay what the plane says.
 - **Row 41 (`CRUST`): the crust**, depth 0 in this note's terms. It is open only at a hole. A hole is plane cell `line.holes[k]` ↔ curtain cell (`colOf(line, sHole[k])`, `CRUST`).
-- **Food:** the curtain's `foodTotal` and `foodLeft` count only its buried food. The strip shows the plane's food, which the plane counts; nothing should take food from the strip (U3 routes the surface to the plane).
+- **Food:** the curtain's `foodTotal` and `foodLeft` count only its buried food, the pockets some colony can reach from its nest. The strip shows the plane's food, which the plane counts; nothing should take food from the strip (U3 routes the surface to the plane).
 - **Below that: 300 rows of soil, stones, cavities and buried food**, by the side view's rules.
 
 Its storage column is *s* − *s*_min. The ground is a function of *s* and the row, and each nest's dig of its own hole, so a column keeps its ground when the line grows. Growing at V₀ shifts the storage (U4).
