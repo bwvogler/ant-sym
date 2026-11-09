@@ -1,6 +1,6 @@
 import { decode, encode } from "./save.ts";
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
-import type { Colony } from "./colony.ts";
+import type { Colony, Layer } from "./colony.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
 
 // Recognition, pure (ja-t4d.3, docs/fungus-policy.md §4.B). Who is an enemy
@@ -149,22 +149,22 @@ export class Recognition {
     this.params = { ...DEFAULT_RECOGNITION, ...params };
   }
 
-  /** Rebuild the bands from every living ant. */
-  build(colonies: readonly Colony[]): void {
+  /** Rebuild the bands from every living ant, or (one world, ja-lp4.3) every living ant on layer `layer`, on its map. */
+  build(colonies: readonly Colony[], layer = -1): void {
     for (const g of this.bins) g.reset();
     if (this.#calmed) for (const g of this.#everyone) g.reset();
     let calmed = false;
     for (const c of colonies) {
-      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (c.calm[i] as number) > 0) calmed = true;
+      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (layer < 0 || c.layer[i] === layer) && (c.calm[i] as number) > 0) calmed = true;
       if (calmed) break;
     }
     this.#calmed = calmed;
     let occupied = 0;
     let everyone = 0;
     for (const c of colonies) {
-      const { w, h } = c.map.size;
+      const { w, h } = (layer < 0 ? c.map : (c.layers[layer] as Layer).map).size;
       for (let i = 0; i < c.n; i++) {
-        if (!c.alive[i]) continue;
+        if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
         const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
         const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
@@ -260,15 +260,17 @@ export class Recognition {
     let moving = false;
     // Nests first, from the odours before the step: each drifts toward the mean of the ants at it.
     for (const c of colonies) {
-      const { nest } = c;
+      // The nest is on the home layer (one world: the curtain), and so are the ants at it.
+      const home = c.layers[c.home] as Layer;
+      const { nest } = home;
       const r2 = nest.r * nest.r;
       let at = 0;
       let sum = 0;
       // In the side view with a queen, the ants in the colony's royal chambers (nest slice 8: the founding disc, r 3,
       // held few of them once the royal chamber had widened); else the ants within the nest's disc.
-      const ch = c.queen ? c.map.chambers : null;
+      const ch = c.queen ? home.map.chambers : null;
       for (let i = 0; i < c.n; i++) {
-        if (!c.alive[i]) continue;
+        if (!c.alive[i] || c.layer[i] !== c.home) continue;
         if (ch) {
           cellOf(c.x[i] as number, c.y[i] as number);
           const k = ch.at(CELL[0] as number, CELL[1] as number);

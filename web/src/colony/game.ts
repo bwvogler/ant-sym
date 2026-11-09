@@ -1,6 +1,6 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, localPolicy, localStance, type ColonyParams, type Policy, type StancePolicy } from "./colony.ts";
+import { Colony, localPolicy, localStance, type ColonyParams, type Layer, type Policy, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
@@ -216,16 +216,25 @@ export function nearestRival(c: Colony, colonies: readonly Colony[], tolerance: 
 
 export class Game {
   readonly map: WorldMap;
+  /**
+   * The maps the game is played on, each a layer (one world, ja-lp4.3: the plane and the curtain); every other game has
+   * one, its `map`. Each layer has its own occupancy grids and recognition: ants meet, fight and pass the fungus on only
+   * where they are.
+   */
+  readonly layers: WorldMap[];
   readonly colonies: Colony[];
   /** the player: spores on the ground and load in the ants of every colony */
   readonly fungus: Fungus;
-  /** who is a stranger to whom, by odour: the enemy view every ant and every fight reads */
+  /** who is a stranger to whom, by odour: the enemy view every ant and every fight reads (layer 0's; it also steps every colony's odours) */
   readonly recognition: Recognition;
+  /** each layer's recognition, built from the ants on it: `recognition` is layer 0's */
+  #recs: Recognition[];
   params: GameParams;
   time = 0;
   /** stance choices made by strategists */
   strategyChoices = 0;
-  #grids: CountGrid[];
+  /** each layer's occupancy, per colony: [layer][colony] */
+  #grids: CountGrid[][];
   /** fight deaths, fading over ~60 s, and when the last one was */
   #fightDeaths = 0;
   #lastFightDeath = 0;
@@ -254,9 +263,11 @@ export class Game {
 
   constructor(map: WorldMap, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Sides = {}) {
     this.map = map;
+    this.layers = [map];
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
     this.recognition = new Recognition(this.params.recognition);
+    this.#recs = [this.recognition];
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
     const mine = new Colony(map, { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance);
@@ -265,7 +276,7 @@ export class Game {
     if (this.params.rival && map.nests.length > 1)
       this.colonies.push(new Colony(map, { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 }, rng, player.rivalPolicy ?? localPolicy, player.rivalStance ?? localStance));
     if (player.rivalResponses && this.colonies[1]) this.colonies[1].responses = player.rivalResponses;
-    this.#grids = this.colonies.map(() => new CountGrid());
+    this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     this.fungus = new Fungus(map, this.params.fungus);
     this.#wire();
     this.#refresh();
@@ -276,16 +287,22 @@ export class Game {
   #wire(): void {
     this.colonies.forEach((c, k) => {
       c.seeHoles();
-      if (this.map.hasSoil) c.friends = this.#grids[k] as CountGrid;
+      this.layers.forEach((m, l) => {
+        if (m.hasSoil) c.wire(l, { friends: (this.#grids[l] as CountGrid[])[k] as CountGrid });
+      });
       // Undertakers put the dead on the midden: a host of a strain that sporulates (Bloom) puts spores on the ground there;
       // other strains die with their host (nest slices 7–8).
       c.onBury = (d) => {
         if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates) this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain);
       };
       if (this.colonies.length > 1) {
-        c.enemies = this.recognition;
-        c.nestmates = this.#grids[k] as CountGrid;
-        c.others = this.colonies.filter((o) => o !== c).map((o) => o.nest);
+        this.layers.forEach((_, l) => {
+          c.wire(l, {
+            enemies: this.#recs[l] as Recognition,
+            nestmates: (this.#grids[l] as CountGrid[])[k] as CountGrid,
+            others: this.colonies.filter((o) => o !== c).map((o) => (o.layers[l] as Layer).nest),
+          });
+        });
         this.#aimRaids(k);
       }
     });
@@ -419,7 +436,7 @@ export class Game {
       c.odourAim = driftAim(f.odour, this.recognition.params.tolerance);
     }
     this.colonies.push(c);
-    this.#grids.push(new CountGrid());
+    for (const g of this.#grids) g.push(new CountGrid());
     this.founded.push({ ...f, nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) } });
     this.#wire();
     this.#refresh();
@@ -516,14 +533,18 @@ export class Game {
     if (target) this.#aimAt(c, target);
   }
 
-  /** Colony c's raids, and the rival trail its bent ants read, at colony `target`. */
+  /** Colony c's raids, and the rival trail its bent ants read, at colony `target`: on each layer, its nest and scent there. */
   #aimAt(c: Colony, target: Colony): void {
-    const other = target.nest;
-    c.raidTarget = other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other; // side view: in at their hole
-    c.raidNest = other.entrance ? other : null; // and then down to their chamber
-    c.raidMarks = target.ph;
-    // Only ants whose perception the fungus has bent read it (Colony.foreignFood): the colony they'd raid, the nearest rival.
-    c.foreign = target.ph;
+    this.layers.forEach((_, l) => {
+      const { nest: other, ph } = target.layers[l] as Layer;
+      c.wire(l, {
+        raidTarget: other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other, // side view: in at their hole
+        raidNest: other.entrance ? other : null, // and then down to their chamber
+        raidMarks: ph,
+        // Only ants whose perception the fungus has bent read it (Colony.foreignFood): the colony they'd raid, the nearest rival.
+        foreign: ph,
+      });
+    });
   }
 
   /** The first colony (Ink on the page). Not the player's: the player is the fungus. */
@@ -536,18 +557,21 @@ export class Game {
     return this.colonies[1] ?? null;
   }
 
-  /** Occupancy per colony, and every ant by odour band: built from the ants, never by scanning the map. */
+  /** Occupancy per colony, and every ant by odour band, on each layer: built from the ants, never by scanning the map. */
   #refresh(): void {
-    this.colonies.forEach((c, k) => occupancy(c, this.#grids[k] as CountGrid));
-    if (this.colonies.length > 1) this.recognition.build(this.colonies);
+    const one = this.layers.length === 1;
+    this.#grids.forEach((grids, l) => {
+      this.colonies.forEach((c, k) => occupancy(c, grids[k] as CountGrid, one ? -1 : l));
+      if (this.colonies.length > 1) (this.#recs[l] as Recognition).build(this.colonies, one ? -1 : l);
+    });
   }
 
   /** Strangers (to the nest's odour, at the healthy tolerance) within `nestWatch` (world units) of colony k's nest, and of its entrance in the side view. */
   enemiesNearNest(k: number): number {
     const c = this.colonies[k] as Colony;
-    const rec = this.recognition;
+    const rec = this.#recs[0] as Recognition;
     rec.look(c.nestOdour, rec.params.tolerance);
-    const { w, h } = this.map.size;
+    const { w, h } = (this.layers[0] as WorldMap).size;
     const r = this.params.nestWatch;
     let s = 0;
     for (let y = Math.max(0, Math.floor((c.nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((c.nest.y + r) / R)); y++)
@@ -616,7 +640,10 @@ export class Game {
     });
     const keep = Math.exp(-dt / QUIET);
     const tol = this.recognition.params.tolerance;
-    const size = this.map.size;
+    const one = this.layers.length === 1;
+    // Each ant meets the ants on its own layer: its grids and map.
+    let l = 0;
+    let size = (this.layers[0] as WorldMap).size;
     let gap = 0;
     for (let a = 0; a < live.length; a++)
       for (let b = a + 1; b < live.length; b++) gap = Math.max(gap, Math.abs((this.colonies[live[a] as number] as Colony).nestOdour - (this.colonies[live[b] as number] as Colony).nestOdour));
@@ -636,10 +663,14 @@ export class Game {
             if (Math.abs(o - (this.colonies[d] as Colony).nestOdour) > tol) continue;
             if (cx < 0) {
               c.antCell(i);
+              if (!one) {
+                l = c.layer[i] as number;
+                size = (this.layers[l] as WorldMap).size;
+              }
               cx = Math.min(size.w - 1, Math.max(0, CELL[0] as number));
               cy = Math.min(size.h - 1, Math.max(0, CELL[1] as number));
             }
-            if (around(this.#grids[d] as CountGrid, size, cx, cy, 1) > 0) {
+            if (around((this.#grids[l] as CountGrid[])[d] as CountGrid, size, cx, cy, 1) > 0) {
               allied++;
               break;
             }
@@ -672,7 +703,12 @@ export class Game {
     if (this.colonies.length > 1 || fungal || this.map.hasSoil) this.#refresh();
     this.#fightDeaths *= Math.exp(-dt / QUIET);
     if (this.colonies.length > 1) {
-      const died = resolveFights(this.colonies, this.#grids, dt, this.#rng, this.params.fight, this.recognition).reduce((x, y) => x + y, 0);
+      // Fights on each layer, among the ants there.
+      const one = this.layers.length === 1;
+      let died = 0;
+      this.#grids.forEach((grids, l) => {
+        died += resolveFights(this.colonies, grids, dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, one ? -1 : l).reduce((x, y) => x + y, 0);
+      });
       if (died > 0) {
         this.#fightDeaths += died;
         this.#lastFightDeath = this.time;
@@ -690,7 +726,11 @@ export class Game {
     this.colonies.forEach((c, k) => {
       if (!this.revealed[k] && c.queen && c.queen.load >= INFECTED) this.revealed[k] = true;
     });
-    if (this.fungus.active) this.fungus.advance(this.colonies, this.#grids, dt, this.colonies.length > 1 ? this.recognition : null);
+    if (this.fungus.active) {
+      const recs = this.colonies.length > 1 ? this.#recs : null;
+      if (this.layers.length === 1) this.fungus.advance(this.colonies, this.#grids[0] as CountGrid[], dt, recs ? (recs[0] as Recognition) : null);
+      else this.fungus.advanceLayers(this.colonies, this.#grids, dt, recs);
+    }
     if (this.time >= this.#nextStrategy) {
       this.#nextStrategy = this.time + this.params.strategyEvery;
       this.colonies.forEach((c, k) => {
@@ -708,7 +748,7 @@ export class Game {
         // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
         this.#aimRaids(k);
         // On open ground each ant's stance is its own, from what it senses (docs/stance.md): nobody chooses one for the colony.
-        if (c.params.stanceGate > 0 && !this.map.sky) return;
+        if (c.ownStances) return;
         // A stance is part of every ant's situation: a change re-asks the ants by itself.
         c.stance = c.stancePolicy(c.stanceSituation(this.enemiesNearNest(k) > 0));
         this.strategyChoices++;

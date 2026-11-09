@@ -361,10 +361,13 @@ test("the fungus's save holds every private field it declares, or the field is d
   const body = src.slice(src.indexOf("export class Fungus "));
   const declared = new Set<string>();
   for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
-  const saved = { evolution: "evolution", base: "base", sporeCells: "sporeCells", menu: "menu", clock: "clock" } as Record<string, string>;
+  const saved = { evolution: "evolution", menu: "menu", clock: "clock" } as Record<string, string>;
   const derived = ["reach", "evade", "listed"];
-  const scratch = ["made", "all", "visible", "taken", "nb"];
-  assert.deepEqual([...declared].sort(), [...Object.keys(saved), ...derived, ...scratch].sort(), "every declared #field is accounted for");
+  const scratch = ["made", "nb"];
+  // Each map's spores, base and step grids (ja-lp4.3): layer 0's spore cells and base are saved; its grids are per-step scratch.
+  const layered = { layers: ["sporeCells", "base"] } as Record<string, string[]>;
+  assert.deepEqual([...declared].sort(), [...Object.keys(saved), ...Object.keys(layered), ...derived, ...scratch].sort(), "every declared #field is accounted for");
   const keys = Object.keys(new Fungus(arena()).saveState());
   for (const [field, key] of Object.entries(saved)) assert.ok(keys.includes(key), `#${field} is saved as ${key}`);
+  for (const [field, ks] of Object.entries(layered)) for (const key of ks) assert.ok(keys.includes(key), `#${field} is saved as ${key}`);
 });
