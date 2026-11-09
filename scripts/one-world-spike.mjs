@@ -5,11 +5,41 @@
 // and a middle-aged one (band 1) have stayed by the hole underground, within two cells of it. Homing on the plane (U3b,
 // ja-lp4.3.2): the longest a carrier took from turning home (picking food up, on the plane) to going down its hole, and
 // the share of homing trips ended down the hole that searched on the way (its belief missed: `search` non-zero). It checks
-// the economy runs (food reaches the chambers, the queen lays, ants are born) and that nobody is stuck at a hole.
+// the economy runs (food reaches the chambers, the queen lays, ants are born) and that nobody is stuck at a hole. The mound
+// and the midden on the plane (U3c, ja-lp4.3.3): per colony, the spoil on the plane nearer its hole than any other (pellets,
+// the cells they cover, the tallest, and the mound's radius: the 95th percentile of their distance from the hole, in cells),
+// its corpses on the midden and their median distance from the hole.
 //
 // Usage: node scripts/one-world-spike.mjs [seeds=1-3] [seconds=300] [ants=300]
 import { GAME_REGROW, Game, gameRng } from "../web/src/colony/game.ts";
 import { CELL, cellOf, hexDistance } from "../web/src/colony/hex.ts";
+
+/** Colony c's mound and midden on the plane: spoil nearer its hole than any other's, and its midden's corpses. */
+function moundOf(plane, c) {
+  const holes = c.holeCells;
+  const own = holes[c.params.nest];
+  const far = [];
+  let cells = 0;
+  let top = 0;
+  plane.spoil?.forEach((cx, cy, a) => {
+    for (let j = 0; j < a.length; j++) {
+      const h = a[j];
+      if (!h) continue;
+      const x = cx * 64 + (j & 63);
+      const y = cy * 64 + (j >> 6);
+      const d = hexDistance(x, y, own.px, own.py);
+      if (holes.some((o) => hexDistance(x, y, o.px, o.py) < d)) continue;
+      cells++;
+      top = Math.max(top, h);
+      for (let n = 0; n < h; n++) far.push(d);
+    }
+  });
+  far.sort((a, b) => a - b);
+  const md = [];
+  for (const [key, n] of c.midden) for (let k = 0; k < n; k++) md.push(hexDistance(key % 65536, Math.floor(key / 65536), own.px, own.py));
+  md.sort((a, b) => a - b);
+  return { pellets: far.length, cells, top, radius: far.length ? far[Math.floor(0.95 * (far.length - 1))] : 0, midden: md.length, middenAt: md.length ? md[Math.floor((md.length - 1) / 2)] : NaN };
+}
 import { generateOneWorld } from "../web/src/colony/oneWorld.ts";
 
 const [range = "1-3", secs = "300", antArg = "300"] = process.argv.slice(2);
@@ -102,16 +132,18 @@ for (let seed = lo; seed <= hi; seed++) {
           }
         }
         const larvae = c.brood.items.length;
+        const m = moundOf(world.plane, c);
         console.log(
           `  t=${String(t).padStart(3)} c${ci}: ants ${String(c.population).padStart(3)} (plane ${String(plane).padStart(3)}, curtain ${String(curtain).padStart(3)}, at hole ${pinned})` +
             ` up ${c.crossedUp} down ${c.crossedDown} carriedDown ${c.carriedDown} up-with-food ${c.carriedUp} carrying ${carrying}` +
             ` | stored ${c.stored} larder ${c.larder.toFixed(1)} births ${c.births} brood ${larvae} queen ${c.queen?.alive ? "alive" : "dead"}` +
             ` | lost ${c.losses} old ${c.diedOld} hungry ${c.diedHungry} | soilOut ${c.soilOut} buried ${c.buried}` +
+            ` | mound ${m.pellets} pellets on ${m.cells} cells, top ${m.top}, radius ${m.radius} (95 %), spread ${c.looseDropped}, down to fill ${c.looseDown} | midden ${m.midden} at ${m.middenAt} cells` +
             ` | longest in disc ${inDisc[ci].most.toFixed(1)} s, young at hole ${atHole[ci].most[0].toFixed(1)} s, middle ${atHole[ci].most[1].toFixed(1)} s` +
             ` | home trips ${trip[ci].trips}, searched ${trip[ci].trips ? ((100 * trip[ci].searchTrips) / trip[ci].trips).toFixed(1) : "0.0"}%, longest carrier home ${trip[ci].most.toFixed(1)} s`,
         );
       });
     }
   }
-  console.log(`  plane food ${world.plane.foodLeft}/${world.plane.foodTotal} (regrown ${game.regrown}); ${((performance.now() - t0) / 1000).toFixed(0)} s wall`);
+  console.log(`  plane food ${world.plane.foodLeft}/${world.plane.foodTotal} (regrown ${game.regrown}); plane spoil ${world.plane.moundCells} pellets; ${((performance.now() - t0) / 1000).toFixed(0)} s wall`);
 }
