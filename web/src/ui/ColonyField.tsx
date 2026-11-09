@@ -34,6 +34,11 @@ interface Props {
   onFollow: (f: Followed | null) => void;
   /** with chamber labels on, a click on a chamber (no ant under it): colony k's chamber `id` (the Learn drawer's Nest tab) */
   onChamber?: (k: number, id: number) => void;
+  /**
+   * Nothing runs (the one-world preview): `onFrame` may never fire, so the field draws itself, once a frame at most, when
+   * its camera, size, theme, labels or trail layers change. A running game leaves it off: its frames draw everything.
+   */
+  still?: boolean;
 }
 
 function cssVar(name: string): string {
@@ -68,15 +73,18 @@ interface ChunkCanvas {
 type Gesture = { kind: "pan" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
-export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, showHomeTrail, followed, onFollow, onChamber }: Props) {
+export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, showHomeTrail, followed, onFollow, onChamber, still = false }: Props) {
   const colony = colonies[0] as Colony;
   const count = colonies.length;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** chamber names drawn on the side view's nests (the Labels button); a click on a chamber then inspects it */
   const [labels, setLabels] = useState(false);
   const labelsOn = useRef(labels);
+  /** A still field's redraw (see `still`); nothing in a running game, whose frames draw. */
+  const redraw = useRef<() => void>(() => {});
   useEffect(() => {
     labelsOn.current = labels;
+    redraw.current();
   }, [labels]);
   const layers = useRef({ food: showFoodTrail, home: showHomeTrail });
   const cam = useRef<Camera | null>(null);
@@ -90,6 +98,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
   const fitted = useRef(true);
   useEffect(() => {
     layers.current = { food: showFoodTrail, home: showHomeTrail };
+    redraw.current();
   }, [showFoodTrail, showHomeTrail]);
   useEffect(() => {
     follow.current = followed;
@@ -157,6 +166,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         chamber: rgb(cssVar("--mound")),
       };
       miniAt = -Infinity;
+      redraw.current();
     };
     retheme();
     const mq = matchMedia("(prefers-color-scheme: dark)");
@@ -170,6 +180,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
+        redraw.current();
       }
     };
     const ro = new ResizeObserver(fitCanvas);
@@ -652,6 +663,15 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       }
     };
     const off = onFrame(draw);
+    let pendingDraw = 0;
+    if (still)
+      redraw.current = () => {
+        if (pendingDraw) return;
+        pendingDraw = requestAnimationFrame(() => {
+          pendingDraw = 0;
+          draw();
+        });
+      };
     draw();
 
     // The wheel zooms around the pointer; it needs a non-passive listener to keep the page from scrolling.
@@ -664,17 +684,20 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       cam.current = c;
       zoomedIn.current = c.zoom > fitZoom(world, v) * 1.05;
       fitted.current = c.zoom <= fitZoom(world, v) * 1.0001;
+      redraw.current();
     };
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => {
       off();
+      cancelAnimationFrame(pendingDraw);
+      redraw.current = () => {};
       ro.disconnect();
       mq.removeEventListener("change", retheme);
       canvas.removeEventListener("wheel", wheel);
     };
     // `count`: a colony founded mid-game is pushed onto the same array (Game.addColony)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colonies, count, fungus, onFrame, world]);
+  }, [colonies, count, fungus, onFrame, world, still]);
 
   // ——— input: one pointer drags (pans), two pinch; a click picks an ant; the minimap jumps ———
 
@@ -690,6 +713,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     const fz = fitZoom(world, view());
     zoomedIn.current = cam.current.zoom > fz * 1.05;
     fitted.current = cam.current.zoom <= fz * 1.0001;
+    redraw.current();
   };
   /** Stop following now: the ref at once (a rAF draw must not re-centre on the ant first), the parent's state after. */
   const unfollow = () => {

@@ -3833,6 +3833,13 @@ The owner asked for the top-down view and the side view to be two views of one g
 - **Columns are hex steps.** A segment's columns are the hex line between its holes (`hexLine` in `hex.ts`), so neighbouring columns always lie over the same or adjacent cells; a segment is `hexDistance` columns, up to ~15% longer than the surface at a slant, never shorter.
 - **Rule 2 covers the new margin.** The new segment and the margin it will carry must both keep clear of the line, so a founding whose margin would fold back is refused.
 
+**U2 built (`ja-lp4.2`, 2026-11-08).** `web/src/colony/oneWorld.ts`: `generateOneWorld(seed)` returns the plane, the curtain and the line.
+- **The plane** is `generateWorld(seed, OPEN_WORLD)`, unchanged. Its nests' holes, in order, make the line.
+- **The curtain** is laid out as a side view: 40 rows of sky; a ground strip copied from the plane under the line (`refreshStrip`; never simulated); the crust, open only at the holes; and 300 rows of the side view's ground, with each nest's shaft and royal chamber dug by `foundNest`.
+- **Stable under growth.** Its ground goes by *s* and the row, and each nest by its own hole, so a column keeps its ground when the line grows.
+- **The preview** is at `?world=one`: above and below, no ants. Nothing else on the page changes, and nothing in the game uses it yet, so behaviour and the golden masters are unchanged; `generateOneWorld` has its own golden.
+- **The margin stays 64.** Measured with `scripts/dig-spread.mjs` (the page's side-view game with no fungus landed, 600 ants a colony, seeds 1–3): after 600 s the farthest cell dug outward past an end hole (west of the westmost, east of the eastmost) lay 34, 51 and 36 columns beyond it, with the 99th percentile at 30–46.
+
 **The founding radius (research, `ja-lp4.7`).** `docs/nest-spacing.md`: mature harvester nests sit 9–14 m apart (one neighbour gap, the game's 140 cells); queens fly 5 gaps or more; spacing is made by young colonies dying near old ones (~8 m), not by where queens land. Design: `FLIGHT` 140 cells; keep `HOLE_GAP_2D` and `CLEARANCE` at 12.
 
 **The founding radius is 140 (owner, 2026-11-08, `ja-lp4.10`).** Proposed at 70, but measured: flight 140 with a 70-cell radius failed 51% of flights from end nests and 55% from interior ones; with 140, 6% and 28% (`scripts/flight-failure.mjs`, 300 seeds on the default plane). At 70 failure is noise, half of all flights wherever the nest; at 140 it shows the line growing from its ends. Queens should die mostly of contact after landing, as real foundresses do, not of geometry. U4's assay rechecks it with rock; the endless world (`ja-qpv`) looks at it again without the plane's edges.
