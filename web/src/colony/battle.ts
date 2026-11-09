@@ -1,5 +1,5 @@
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
-import { ENEMY, type Colony } from "./colony.ts";
+import { ENEMY, type Colony, type Layer } from "./colony.ts";
 import { CELL, discOffsets } from "./hex.ts";
 import type { Recognition } from "./recognition.ts";
 import type { WorldSize } from "./world.ts";
@@ -68,12 +68,12 @@ export class CountGrid {
   }
 }
 
-/** Ants per cell, one grid per colony. */
-export function occupancy(colony: Colony, out: CountGrid): CountGrid {
+/** Ants per cell, one grid per colony: of the ants on layer `layer` (one world, ja-lp4.3), or every ant (−1: the colony's one map). */
+export function occupancy(colony: Colony, out: CountGrid, layer = -1): CountGrid {
   out.reset();
-  const { w, h } = colony.map.size;
+  const { w, h } = (layer < 0 ? colony.map : (colony.layers[layer] as Layer).map).size;
   for (let i = 0; i < colony.n; i++) {
-    if (!colony.alive[i]) continue;
+    if (!colony.alive[i] || (layer >= 0 && colony.layer[i] !== layer)) continue;
     colony.antCell(i);
     out.add(Math.min(w - 1, Math.max(0, CELL[0] as number)), Math.min(h - 1, Math.max(0, CELL[1] as number)));
   }
@@ -94,14 +94,18 @@ export function around(grid: CountGrid, size: WorldSize, cx: number, cy: number,
 
 /**
  * Resolve one dt of fighting between colonies; `grids[k]` is colony k's occupancy. With `rec` (built this
- * tick), enemies are strangers by odour; without it, every ant of another colony. Returns the deaths per colony.
+ * tick), enemies are strangers by odour; without it, every ant of another colony. With `layer` (one world, ja-lp4.3),
+ * only the ants on that layer fight, on its map, and their alarm goes into their colony's scent there; the grids and
+ * `rec` must be that layer's. Returns the deaths per colony.
  */
-export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT, rec: Recognition | null = null): number[] {
+export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT, rec: Recognition | null = null, layer = -1): number[] {
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
-    const size = c.map.size;
+    const on = layer < 0 ? null : (c.layers[layer] as Layer);
+    const size = (on ?? c).map.size;
+    const ph = (on ?? c).ph;
     for (let i = 0; i < c.n; i++) {
-      if (!c.alive[i]) continue;
+      if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
       c.antCell(i);
       const cx = Math.min(size.w - 1, Math.max(0, CELL[0] as number));
       const cy = Math.min(size.h - 1, Math.max(0, CELL[1] as number));
@@ -123,7 +127,7 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       // How loudly is its raiseAlarm response (locally: always, × 1).
       if (enemies >= ENEMY) {
         const loud = (1 - (c.quiet[i] as number)) * c.responses.raiseAlarm(c.touch(i, true));
-        if (loud > 0) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
+        if (loud > 0) ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
       }
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
     }

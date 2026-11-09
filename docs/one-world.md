@@ -1,6 +1,6 @@
 # One world: the surface and a curtain under the line between the holes
 
-Design note. U1, the line's geometry, and U2, the world's generation, are built (`web/src/colony/transect.ts`, `oneWorld.ts`; previewed at `?world=one`); the rest is not. It answers the owner's request (2026-11-08) to make the top-down view and the side view two views of **one** game, and records the model chosen, the geometry rule that keeps it consistent, what changes in the code, and the order to build it in. Beads: epic `ja-lp4`; stages U1–U6 are `ja-lp4.1`–`ja-lp4.6`, and the research bead is `ja-lp4.7`. Decisions: PRD §51.
+Design note. U1, the line's geometry, U2, the world's generation, and U3a, colonies on both layers, are built (`web/src/colony/transect.ts`, `oneWorld.ts`, the layers in `colony.ts` and `game.ts`; the map previewed at `?world=one`, the game run only by tests and scripts); the rest is not. It answers the owner's request (2026-11-08) to make the top-down view and the side view two views of **one** game, and records the model chosen, the geometry rule that keeps it consistent, what changes in the code, and the order to build it in. Beads: epic `ja-lp4`; stages U1–U6 are `ja-lp4.1`–`ja-lp4.6`, and the research bead is `ja-lp4.7`. Decisions: PRD §51.
 
 ## 1. Where we are
 
@@ -96,6 +96,16 @@ Most behaviour carries over unchanged. The new work is the seam between the two:
 
 **Tick cost will rise; measure it.** The open map with 1,200 + 1,200 ants runs at 3.3–3.9 ms a tick (PRD §12, §14). The side view, which is what the curtain will run, is the slower of today's maps: 7.0–7.3 ms at 1,200 + 1,200 (PRD §36, §37), its nest life costing more than the open map's foraging. One world runs both, each for the ants in it, so budget about 7–9 ms and measure before switching the page (U6).
 
+**U3a as built (2026-11-09, `ja-lp4.3`).** Colonies live on both layers; homing, the mound and the midden are still the old ones (U3b, U3c).
+- **Layer contexts.** A colony keeps one context per layer (map, pheromones, nest, entrance and the game's wiring) and binds the ant's own before stepping it, so each side-only switch is now per ant. A one-map game has one layer and never rebinds, so the old golden masters stay bit-exact.
+- **Up.** A curtain ant can step into the surface rows only at an open crust hole. It climbs out if it holds no brood, is no porter, and carries spoil or a corpse, or is of an age to go out and not homing to its chamber. Otherwise it is turned back down the shaft. It lands on that hole's plane cell, whichever colony's hole it is.
+- **Down.** On the plane, every ant going in (carrying food, or homing) goes down its own hole at the hole's cell. Food carried down counts as a return at the hole, and the side view's code takes it on to reception. A raider at a rival's hole goes down that shaft.
+- **The strip guard.** The curtain's sky and ground strip are the plane's (§8 item 6). Underground ants never stand there: the sense reads those rows as solid, unburying never moves an ant into them, and a test checks every tick.
+- **Per layer:** the occupancy grids, recognition, fights, unity's allied contact (`Game.#meet`) and the fungus's spores and "ground" sense. Two ants on different layers never meet.
+- **The spike** (`scripts/one-world-spike.mjs`, seeds 1–3, 300 + 300 ants, 300 s): food reaches the chambers (560–1,341 stored a colony), births are 131–155 (every colony at or near its cap of 450), the plane's food falls by 4.6–7.4%, carriers leave the hole's disc within 0.5 s, and the young stay by the hole at most 3.5 s.
+- **Two fixes the spike forced.** A returner homing to its chamber no longer climbs out at the top of the shaft and goes straight back down (up to 68 carriers a colony did, in 300 s). A young ant turned back at the hole forgets its last chamber, as the side view's young do on the ground: laying on, they marked the shaft's top with brood and royal and drew more young there (up to 13, some for minutes).
+- **Measured:** Jev's mode lane costs what the side view's does per situation; ticks run at 5.5 ms mean at 600 + 600 ants (PRD §51).
+
 ## 5. Two views of one game
 
 - **Ground becomes a camera switch,** "above" or "below", and no longer builds a new game.
@@ -121,7 +131,9 @@ The page keeps today's two maps until one world passes its own guards. U6 then t
 |---|---|---|
 | U1 (built) | `transect.ts`, pure: the line, *s* ↔ plane cell, signed *s*, `canFound` and `nearestValid` (the four rules of §3, with their ties), the turn limit, crossing and clearance tests | unit tests, with property tests over random lines: neighbouring columns map to the same or adjacent cells; no valid founding makes the curtain overlap itself |
 | U2 (built) | `generateOneWorld`: the plane from the open-map generator, the curtain from the side-view generator along the line. Both views drawn, with no simulation yet (`?world=one`) | map invariants: each hole is open on both layers; the curtain's ground row lies under *P(s)* |
-| U3 | colonies on two layers: per-ant layer, hole crossings, 2D homing, the mound and midden on the plane, the queen economy; unity's allied contact (`Game.#meet`, PRD §53) counted per layer | a new golden master for one world; the old ones bit-exact |
+| U3a (built) | colonies on two layers: per-ant layer, hole crossings, pheromones, fights, recognition, contact and the fungus per layer, the queen economy; unity's allied contact (`Game.#meet`, PRD §53) counted per layer (§4, "U3a as built") | a new golden master for one world (`oneWorldGolden.test.ts`); the old ones bit-exact; `oneWorldGame.test.ts` |
+| U3b | 2D homing on the plane: the side view's drifting vector (`#believe`, `#integrate`) aimed at the hole; 2D `#inOwnNest`, `#neighbour`, `#middenSide` | the one-world golden re-recorded, said in the PR; the old ones bit-exact |
+| U3c | the mound as a spoil height field on the plane, the midden disc; then dig spread, Jev's cost and tick time measured again on one world | as U3b; `dig-spread.mjs`, `colony-cost --one`, `colony-bench --one` |
 | U4 | founding on the line: `Game.addColony` checks `canFound`; the lab button becomes "found beyond ‹end nest›"; the queen's landing (`ja-lo8.9`) moves to the nearest valid spot or fails; saves | save round-trip; founding property tests |
 | U5 | the page as one game in two views, linked (§5) | Playwright: switch views mid-game, follow an ant through a hole |
 | U6 | G1, a G-like whole-game guard on one world (and unity reachable: Garden in both clears `MET`, PRD §53); assays A1–A10 rerun on the plane; tick cost measured (budget 7–9 ms at 1,200 + 1,200); the page's default switched; the Ground control's world switch retired | `npm run exp`, `test:slow`, the bench |
@@ -157,5 +169,12 @@ A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.
 5. **The founding radius is 140 cells, the same as the flight** (`ja-lp4.10`; [nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game)). Measured: flight 140 with a 70-cell radius failed 51% of flights from end nests and 55% from interior ones; with 140, 6% and 28% (`scripts/flight-failure.mjs`, 300 seeds on the default plane). The hole gap and clearance stay 12. U4's assay on seeds 1–20, with the open map's rock, checks it; the endless world (`ja-qpv`) looks at it again, since the plane's edges drive most failures at a smaller radius.
 6. **The ground strip is drawn, not stored** (2026-11-09). The side view draws its top strip straight from the plane cells under the line when it renders; the curtain stops keeping a copy, so nothing underground can change the surface or take its food twice. U2 built the copy behind guards (`surfaceRows`); U3 keeps underground ants off it until U5's renderer draws the strip from the plane and the copy goes.
 7. **The crust stays soil** (2026-11-09). Diggers leave it by the side view's own rule (soil touching the sky, `#crust`), as on today's ground, and the mycelium can grow in the shaft's soil wall just under the hole (§2). It is not made rock.
+
+8. **U3 is three PRs** (2026-11-09): U3a, U3b and U3c (§6).
+9. **Every returner goes down its hole** (2026-11-09), as harvester ants do ([activation](activation.md): returners go in; foragers wait in a chamber just inside). On the plane an ant carrying food or homing goes down at its own hole's cell.
+10. **Activation moves inside later** (2026-11-09, `ja-web`). The wait just inside the hole is its own stage after U3. Until then rested foragers go straight back out, as in the side view today, so one world never asks the `leave` lane. Raid scouts start only from `leave` = raid, so raids stay off until then; `ja-web` blocks U6, so one world never ships without them.
+11. **Each ant's own stance, on both layers** (2026-11-09). The strategist and the stance lane are skipped in one world, as top-down today.
+12. **All workers start underground** (2026-11-09), in the curtain with the queen and brood.
+13. **Spoil and corpses go out at the hole, for now** (2026-11-09). Spoil carried up is dropped at the hole and counted (`soilOut`), as top-down today. A corpse carried up is buried at the hole (a sporulating host's spores land on the plane there). U3c's mound and midden replace both.
 
 **Still open:** nothing.

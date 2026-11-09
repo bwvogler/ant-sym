@@ -156,7 +156,7 @@ export class ColonyJev {
     valid: validLevels,
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
     asks: (s) => worthAsking(this.#asked(s)),
-    contextOf: (aim) => fungusContext(aim, this.#fungus?.map.sky ? "side" : "top"),
+    contextOf: (aim) => fungusContext(aim, this.#fungus?.hasNest ? "side" : "top"),
     words: "",
     batch: FUNGUS_BATCH,
     gather: true,

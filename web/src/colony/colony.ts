@@ -9,6 +9,8 @@ import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, Donor
 import { type Alate, ALATE_FEED, ALATE_RESERVE, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_SPACING, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
 import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, isSky, markFork, OPEN, openCell, takeLoose, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { cellAt, type Transect } from "./transect.ts";
+import { sOf } from "./oneWorld.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -321,13 +323,118 @@ export function channelParams(over: Partial<Record<Channel, Partial<ChannelParam
   return out;
 }
 
-/** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices) and the policies. */
-const COLONY_SKIP: ReadonlySet<string> = new Set(["map", "nest", "policy", "stancePolicy", "responses", "onBury", "enemies", "foreign", "friends", "nestmates", "raidTarget", "raidNest", "raidMarks", "others", "felt", "donors", "scentSum", "perceived"]);
-
-export class Colony {
+/**
+ * One map a colony lives on, and what goes with it (one world, docs/one-world.md §2, §4): the map, the colony's scent on
+ * it, its nest there and the hole into it (the curtain's; none on the plane or a top-down map), every nest's hole column,
+ * the cached way out to the hole (#outField), and what the game wires per map: the strangers and nestmates per cell, the
+ * other nests, the raid aims and the rival's scent. A colony on one map (every game but one world) has one.
+ */
+export interface Layer {
   readonly map: WorldMap;
   readonly ph: Pheromones;
   readonly nest: Nest;
+  readonly entrance: Nest | null;
+  readonly entranceCol: number;
+  readonly entranceRow: number;
+  holes: number[];
+  outDist: Int32Array | null;
+  outCells: number[];
+  outVersion: number;
+  outAt: number;
+  enemies: CellCounts | null;
+  nestmates: CellCounts | null;
+  friends: CellCounts | null;
+  foreign: Pheromones | null;
+  raidMarks: Pheromones | null;
+  raidTarget: Nest | null;
+  raidNest: Nest | null;
+  others: Nest[];
+}
+
+/** What the game wires into a colony per layer (Colony.wire). */
+export type Wiring = Partial<Pick<Layer, "enemies" | "nestmates" | "friends" | "foreign" | "raidMarks" | "raidTarget" | "raidNest" | "others">>;
+
+/** A layer's own copy of its state, held while another layer is bound (see Colony.layers). */
+type LayerSlots = { -readonly [K in keyof Layer]: Layer[K] };
+
+/** One world's layers (docs/one-world.md §2): the plane, the surface, is layer 0; the curtain, underground, layer 1 (a colony's home there). */
+export const PLANE = 0;
+export const CURTAIN = 1;
+
+/**
+ * One nest's hole on both layers (one world): its cell in the curtain (the crust's open cell, under the line) and the
+ * plane cell over it, P(s) for that column s. The only way between the layers (one-world §2).
+ */
+export interface HoleCell {
+  col: number;
+  row: number;
+  px: number;
+  py: number;
+}
+
+/** Where a layer's view keeps its slots: a key only this module holds. */
+const SLOTS = Symbol("slots");
+
+type LayerView = Layer & { readonly [SLOTS]: LayerSlots };
+
+/** One layer's gates for a tick (Colony.tick): whether it gates leaving, raids by trail and each ant's own stance, and their leaks. */
+interface Gates {
+  gate: boolean;
+  metLeak: number;
+  rgate: boolean;
+  foeLeak: number;
+  sgate: boolean;
+  threatLeak: number;
+  crowdKeep: number;
+}
+
+/**
+ * A layer's gates for a tick of dt, open ground's only (`open`: no hole into the layer). Activation (behaviour MR 5):
+ * `met` leaks over MET_HALF. Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`. Each
+ * ant's own stance (docs/stance.md): its threat leaks like `foes`; a waiting ant feels its home's crowd over CROWD_HALF.
+ */
+function gatesFor(p: ColonyParams, open: boolean, dt: number): Gates {
+  const gate = p.leaveGate > 0 && open;
+  const rgate = p.raidGate > 0 && open;
+  const sgate = p.stanceGate > 0 && open;
+  return {
+    gate,
+    metLeak: gate ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1,
+    rgate,
+    foeLeak: rgate ? Math.exp((-dt * Math.LN2) / FOES_HALF) : 1,
+    sgate,
+    threatLeak: sgate ? Math.exp((-dt * Math.LN2) / THREAT_HALF) : 1,
+    crowdKeep: sgate ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1,
+  };
+}
+
+/** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices), the layers (the maps and scents again) and the policies. */
+const COLONY_SKIP: ReadonlySet<string> = new Set(["map", "nest", "layers", "home", "line", "holeCells", "policy", "stancePolicy", "responses", "onBury", "enemies", "foreign", "friends", "nestmates", "raidTarget", "raidNest", "raidMarks", "others", "felt", "donors", "scentSum", "perceived"]);
+
+export class Colony {
+  /** the map, the colony's scent and its nest on the layer being stepped; between ticks, the home layer's */
+  map: WorldMap;
+  ph: Pheromones;
+  nest: Nest;
+  /**
+   * The maps this colony lives on (Layer): one, but in one world two (the plane and the curtain). The bound layer's state
+   * (the one being stepped; between ticks, home) lives in the colony's own fields, which every step reads (this.map,
+   * this.#entrance, this.enemies, …); each other layer's lives in its slots, where #bind put it on leaving. Each entry is
+   * a view that reads and writes whichever holds the value now, so a field set either way (wire, or `c.enemies = …` as
+   * tests do) is never stale on the other: at any moment each value has one copy. On one layer nothing is ever swapped,
+   * and the view only reads and writes the colony's own fields.
+   */
+  readonly layers: Layer[];
+  /** the layer the nest is on (the queen, brood and chambers; where ants are born): 0, but the curtain in one world */
+  home = 0;
+  /** the layer each ant is on (all `home` on a colony with one) */
+  layer: Uint8Array;
+  /** the layer bound now (#bind): `home` between ticks */
+  #cur = 0;
+  /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map */
+  readonly line: Transect | null = null;
+  /** one world: every nest's hole on both layers (HoleCell), indexed by colony as the maps' nests are; empty elsewhere */
+  holeCells: HoleCell[] = [];
   params: ColonyParams;
   policy: Policy;
   stancePolicy: StancePolicy;
@@ -473,8 +580,8 @@ export class Colony {
   readonly corpses: Corpse[] = [];
   /** the midden: corpses buried per cell (packed y × 65536 + x), a count rather than a list growing all game (review of #26) */
   readonly midden = new Map<number, number>();
-  /** called with each corpse as it is put on the midden (the game: a sporulating strain's spores there) */
-  onBury: ((k: Corpse) => void) | null = null;
+  /** called with each corpse as it is put on the midden (the game: a sporulating strain's spores there), and the layer it lies on (absent: layer 0) */
+  onBury: ((k: Corpse, layer?: number) => void) | null = null;
   /** Whether ant i carries a corpse (drawn as one, not as soil). */
   carriesCorpse(i: number): boolean {
     return this.#corpse[i] === 1;
@@ -489,8 +596,14 @@ export class Colony {
   #loaded: Uint8Array;
   /** the cell (packed y × 65536 + x) where ant i last put a load down, while it still stands there; else −1 */
   #putAt: Int32Array;
-  /** corpses carried to the midden */
+  /** corpses carried to the midden (one world: buried at the hole, on the plane) */
   buried = 0;
+  /** one world: ants that climbed out onto the plane, and went down into the curtain */
+  crossedUp = 0;
+  crossedDown = 0;
+  /** one world: food carried down a hole (home), and food carried up one (a carrier lost in a rival's tunnels, climbing out) */
+  carriedDown = 0;
+  carriedUp = 0;
   /** where this ant believes its goal is, this tick (a scratch: no allocation per ant) */
   #belief: Nest = { x: 0, y: 0, r: 0 };
   /** the side view: the entrance as a small nest to head for (null on the top-down maps) */
@@ -722,7 +835,11 @@ export class Colony {
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   #s = new Float64Array(9);
 
-  constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance) {
+  /**
+   * A colony on `map`. In one world (`world`, docs/one-world.md §2) `map` is the curtain, its home, where its nest, queen
+   * and brood are and every ant starts; the plane is its second layer, where it forages (layers: PLANE, CURTAIN).
+   */
+  constructor(map: WorldMap, params: Partial<ColonyParams> = {}, rng: () => number = Math.random, policy: Policy = localPolicy, stancePolicy: StancePolicy = localStance, world: { plane: WorldMap; line: Transect } | null = null) {
     this.map = map;
     this.params = { ...DEFAULT_COLONY, ...params };
     if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
@@ -732,7 +849,6 @@ export class Colony {
       cellOf(this.nest.entrance.x, this.nest.entrance.y);
       this.#entranceCol = CELL[0] as number;
       this.#entranceRow = CELL[1] as number;
-      this.seeHoles();
     }
     this.policy = policy;
     this.stancePolicy = stancePolicy;
@@ -742,8 +858,28 @@ export class Colony {
     const chans = channelParams(this.params.channels);
     if (this.#entrance === null && this.params.channels.food?.max === undefined) chans.food = { ...chans.food, max: this.params.foodCapTop };
     this.ph = new Pheromones(map, chans);
+    const slots = {} as LayerSlots;
+    if (world) {
+      // One world: home is the curtain, bound now and between ticks.
+      this.home = CURTAIN;
+      this.#cur = CURTAIN;
+    }
+    this.#store(slots);
+    if (world) {
+      // The plane: its nest is the disc round the hole (no entrance: the hole is the way in, not a nest to dig), and the
+      // colony's scent there has the top-down food cap, as on any open ground. Its Pheromones draws no random numbers.
+      const top = channelParams(this.params.channels);
+      if (this.params.channels.food?.max === undefined) top.food = { ...top.food, max: this.params.foodCapTop };
+      const nest = world.plane.nests[this.params.nest];
+      if (!nest) throw new Error(`one world: the plane has no nest ${this.params.nest}`);
+      const plane: LayerSlots = { map: world.plane, ph: new Pheromones(world.plane, top), nest, entrance: null, entranceCol: 0, entranceRow: 0, holes: [], outDist: null, outCells: [], outVersion: -1, outAt: -Infinity, enemies: null, nestmates: null, friends: null, foreign: null, raidMarks: null, raidTarget: null, raidNest: null, others: [] };
+      this.layers = [Colony.#view(this, PLANE, plane), Colony.#view(this, CURTAIN, slots)];
+      this.line = world.line;
+    } else this.layers = [Colony.#view(this, 0, slots)];
+    this.seeHoles();
     const n = this.params.maxAnts;
     this.n = n;
+    this.layer = new Uint8Array(n);
     this.x = new Float32Array(n);
     this.y = new Float32Array(n);
     this.heading = new Float32Array(n);
@@ -858,6 +994,7 @@ export class Colony {
     this.#question = new Int16Array(n).fill(-1);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
+    if (world) (this.layers[PLANE] as Layer).ph.phase((this.params.nest % 2) * 0.5);
     for (let k = 0; k < this.params.antCount; k++) this.#place(k);
     // The founders carry the colony's steady share of the queen's scent (else every nurse perceives none at the start).
     if (this.queen) this.scent.fill(scentShare(this.params.antCount), 0, this.params.antCount);
@@ -872,13 +1009,212 @@ export class Colony {
    * review, S3).
    */
   seeHoles(): void {
-    if (!this.#entrance) return;
-    this.#holes = [];
-    for (const n of this.map.nests ?? [this.nest])
-      if (n.entrance) {
-        cellOf(n.entrance.x, n.entrance.y);
-        this.#holes.push(CELL[0] as number);
-      }
+    // One world: each nest's hole on both layers, by colony (the maps' nests are), the plane cell over its column.
+    const line = this.line;
+    if (line) {
+      const curtain = (this.layers[this.home] as Layer).map;
+      this.holeCells = curtain.nests.map((n) => {
+        const e = n.entrance ?? n;
+        cellOf(e.x, e.y);
+        const col = CELL[0] as number;
+        const row = CELL[1] as number;
+        cellAt(line, sOf(line, col));
+        return { col, row, px: CELL[0] as number, py: CELL[1] as number };
+      });
+    }
+    // On every layer with a hole into it (the side view's map; one world's curtain).
+    for (const L of this.layers) {
+      if (!L.entrance) continue;
+      const holes: number[] = [];
+      for (const n of L.map.nests ?? [L.nest])
+        if (n.entrance) {
+          cellOf(n.entrance.x, n.entrance.y);
+          holes.push(CELL[0] as number);
+        }
+      L.holes = holes;
+    }
+  }
+
+  /**
+   * Layer l as `layers` shows it: each field read from the colony while l is bound, else from l's slots (see `layers`).
+   * Static, so the getters reach the colony's private fields without aliasing `this`.
+   */
+  static #view(c: Colony, l: number, s: LayerSlots): LayerView {
+    return {
+      [SLOTS]: s,
+      get map() {
+        return c.#cur === l ? c.map : s.map;
+      },
+      get ph() {
+        return c.#cur === l ? c.ph : s.ph;
+      },
+      get nest() {
+        return c.#cur === l ? c.nest : s.nest;
+      },
+      get entrance() {
+        return c.#cur === l ? c.#entrance : s.entrance;
+      },
+      get entranceCol() {
+        return c.#cur === l ? c.#entranceCol : s.entranceCol;
+      },
+      get entranceRow() {
+        return c.#cur === l ? c.#entranceRow : s.entranceRow;
+      },
+      get holes() {
+        return c.#cur === l ? c.#holes : s.holes;
+      },
+      set holes(v) {
+        if (c.#cur === l) c.#holes = v;
+        else s.holes = v;
+      },
+      get outDist() {
+        return c.#cur === l ? c.#outDist : s.outDist;
+      },
+      set outDist(v) {
+        if (c.#cur === l) c.#outDist = v;
+        else s.outDist = v;
+      },
+      get outCells() {
+        return c.#cur === l ? c.#outCells : s.outCells;
+      },
+      set outCells(v) {
+        if (c.#cur === l) c.#outCells = v;
+        else s.outCells = v;
+      },
+      get outVersion() {
+        return c.#cur === l ? c.#outVersion : s.outVersion;
+      },
+      set outVersion(v) {
+        if (c.#cur === l) c.#outVersion = v;
+        else s.outVersion = v;
+      },
+      get outAt() {
+        return c.#cur === l ? c.#outAt : s.outAt;
+      },
+      set outAt(v) {
+        if (c.#cur === l) c.#outAt = v;
+        else s.outAt = v;
+      },
+      get enemies() {
+        return c.#cur === l ? c.enemies : s.enemies;
+      },
+      set enemies(v) {
+        if (c.#cur === l) c.enemies = v;
+        else s.enemies = v;
+      },
+      get nestmates() {
+        return c.#cur === l ? c.nestmates : s.nestmates;
+      },
+      set nestmates(v) {
+        if (c.#cur === l) c.nestmates = v;
+        else s.nestmates = v;
+      },
+      get friends() {
+        return c.#cur === l ? c.friends : s.friends;
+      },
+      set friends(v) {
+        if (c.#cur === l) c.friends = v;
+        else s.friends = v;
+      },
+      get foreign() {
+        return c.#cur === l ? c.foreign : s.foreign;
+      },
+      set foreign(v) {
+        if (c.#cur === l) c.foreign = v;
+        else s.foreign = v;
+      },
+      get raidMarks() {
+        return c.#cur === l ? c.raidMarks : s.raidMarks;
+      },
+      set raidMarks(v) {
+        if (c.#cur === l) c.raidMarks = v;
+        else s.raidMarks = v;
+      },
+      get raidTarget() {
+        return c.#cur === l ? c.raidTarget : s.raidTarget;
+      },
+      set raidTarget(v) {
+        if (c.#cur === l) c.raidTarget = v;
+        else s.raidTarget = v;
+      },
+      get raidNest() {
+        return c.#cur === l ? c.raidNest : s.raidNest;
+      },
+      set raidNest(v) {
+        if (c.#cur === l) c.raidNest = v;
+        else s.raidNest = v;
+      },
+      get others() {
+        return c.#cur === l ? c.others : s.others;
+      },
+      set others(v) {
+        if (c.#cur === l) c.others = v;
+        else s.others = v;
+      },
+    };
+  }
+
+  /** The bound layer's state, from the colony's fields into slots `s`. */
+  #store(s: LayerSlots): void {
+    s.map = this.map;
+    s.ph = this.ph;
+    s.nest = this.nest;
+    s.entrance = this.#entrance;
+    s.entranceCol = this.#entranceCol;
+    s.entranceRow = this.#entranceRow;
+    s.holes = this.#holes;
+    s.outDist = this.#outDist;
+    s.outCells = this.#outCells;
+    s.outVersion = this.#outVersion;
+    s.outAt = this.#outAt;
+    s.enemies = this.enemies;
+    s.nestmates = this.nestmates;
+    s.friends = this.friends;
+    s.foreign = this.foreign;
+    s.raidMarks = this.raidMarks;
+    s.raidTarget = this.raidTarget;
+    s.raidNest = this.raidNest;
+    s.others = this.others;
+  }
+
+  /** Slots `s` into the colony's fields: their layer is the bound one now. */
+  #load(s: LayerSlots): void {
+    this.map = s.map;
+    this.ph = s.ph;
+    this.nest = s.nest;
+    this.#entrance = s.entrance;
+    this.#entranceCol = s.entranceCol;
+    this.#entranceRow = s.entranceRow;
+    this.#holes = s.holes;
+    this.#outDist = s.outDist;
+    this.#outCells = s.outCells;
+    this.#outVersion = s.outVersion;
+    this.#outAt = s.outAt;
+    this.enemies = s.enemies;
+    this.nestmates = s.nestmates;
+    this.friends = s.friends;
+    this.foreign = s.foreign;
+    this.raidMarks = s.raidMarks;
+    this.raidTarget = s.raidTarget;
+    this.raidNest = s.raidNest;
+    this.others = s.others;
+  }
+
+  /**
+   * Bind layer l: the colony's fields become l's (its map, scent, nest, hole, cached way out, wiring), the bound layer's
+   * put back in its slots first. Every switch on the map's kind then reads the layer of the ant being stepped. A colony on
+   * one layer never swaps: it returns at once.
+   */
+  #bind(l: number): void {
+    if (this.layers.length === 1 || l === this.#cur) return;
+    this.#store((this.layers[this.#cur] as LayerView)[SLOTS]);
+    this.#cur = l;
+    this.#load((this.layers[l] as LayerView)[SLOTS]);
+  }
+
+  /** The game's wiring for layer l (Game.#wire, #aimAt): into the colony's fields while l is bound, else into l's slots. */
+  wire(l: number, patch: Wiring): void {
+    Object.assign(this.layers[l] as Layer, patch);
   }
 
   #royalFloor(ch: Chambers): { x: number; y: number } {
@@ -950,6 +1286,7 @@ export class Colony {
     this.driftNest[i] = 0;
     this.search[i] = 0;
     this.#under[i] = 1;
+    this.layer[i] = this.home; // born in the nest, on its layer
     this.#goalKind[i] = 0; // born underground: home is the chamber
     this.#groundMin[i] = NaN;
     this.#chamberCell[i] = -1;
@@ -1031,6 +1368,19 @@ export class Colony {
    * is now. `enemy` comes from the caller (the tick's enemy look, or the fights).
    */
   touch(i: number, enemy: boolean, mode: number = this.mode[i] as number, item: Item = this.item(i), offered: Item = "none"): Touch {
+    const l = this.layer[i] as number;
+    if (l === this.#cur) return this.#touchOn(i, enemy, mode, item, offered);
+    const was = this.#cur;
+    this.#bind(l);
+    try {
+      return this.#touchOn(i, enemy, mode, item, offered);
+    } finally {
+      this.#bind(was);
+    }
+  }
+
+  /** touch, with ant i's layer bound. */
+  #touchOn(i: number, enemy: boolean, mode: number, item: Item, offered: Item): Touch {
     const t = this.#t;
     t.mode = MODES[mode] as Mode;
     t.carrying = item;
@@ -1061,6 +1411,19 @@ export class Colony {
    * Leaves the shared CELL as it found it.
    */
   place(i: number): Where {
+    const l = this.layer[i] as number;
+    if (l === this.#cur) return this.#placeOn(i);
+    const was = this.#cur;
+    this.#bind(l);
+    try {
+      return this.#placeOn(i);
+    } finally {
+      this.#bind(was);
+    }
+  }
+
+  /** place, with ant i's layer bound. */
+  #placeOn(i: number): Where {
     const keepX = CELL[0] as number;
     const keepY = CELL[1] as number;
     let p: Where;
@@ -1117,6 +1480,18 @@ export class Colony {
 
   /** A new ant at the nest, in the first free slot (at world (x, y) if given: where its pupa lay); false when the colony is at its cap. */
   spawn(x?: number, y?: number, age = 0): boolean {
+    if (this.#cur === this.home) return this.#spawnHome(x, y, age);
+    const was = this.#cur;
+    this.#bind(this.home);
+    try {
+      return this.#spawnHome(x, y, age);
+    } finally {
+      this.#bind(was);
+    }
+  }
+
+  /** spawn, with the home layer bound. */
+  #spawnHome(x: number | undefined, y: number | undefined, age: number): boolean {
     const i = this.alive.indexOf(0);
     if (i < 0) return false;
     this.#place(i);
@@ -1365,6 +1740,19 @@ export class Colony {
 
   /** Ant i dies where it stands; food it carried drops on that cell (a soil pellet is just lost; brood it carried lies there). `lost`: a loss to the strategist (a fight), not old age. */
   kill(i: number, lost = true): void {
+    const l = this.layer[i] as number;
+    if (l === this.#cur) return this.#killOn(i, lost);
+    const was = this.#cur;
+    this.#bind(l);
+    try {
+      this.#killOn(i, lost);
+    } finally {
+      this.#bind(was);
+    }
+  }
+
+  /** kill, with ant i's layer bound. */
+  #killOn(i: number, lost: boolean): void {
     if (!this.alive[i]) return;
     if (this.#holdsBrood[i]) this.#dropBrood(i);
     if (this.carrying[i] && this.#porter[i]) {
@@ -1388,8 +1776,9 @@ export class Colony {
       if (this.#soil[i] !== SOIL_DUG) this.looseLost++;
       else this.soilLost++;
     }
-    // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7).
-    if (this.queen) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, died: this.time, load: this.load[i] as number, strain: this.strain[i] as number });
+    // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7). One world:
+    // only underground, the nest's layer; the dead on the plane leave no corpse, as top-down (the midden is U3c's).
+    if (this.queen && this.layer[i] === this.home) this.corpses.push({ x: CELL[0] as number, y: CELL[1] as number, held: -1, died: this.time, load: this.load[i] as number, strain: this.strain[i] as number });
     this.#clearPellet(i);
     this.alive[i] = 0;
     this.carrying[i] = 0;
@@ -1412,9 +1801,12 @@ export class Colony {
     return { dug, loose };
   }
 
-  /** Food left on the map. */
+  /** Food left on the map; in one world, on both its layers: the plane's piles and the curtain's buried pockets (the strip's food is the plane's, counted there). */
   get foodLeft(): number {
-    return this.map.foodLeft;
+    if (this.layers.length === 1) return this.map.foodLeft;
+    let s = 0;
+    for (const L of this.layers) s += L.map.foodLeft;
+    return s;
   }
 
   /** Every ant asks its policy again on its next tick: a new doctrine, or fresh answers from Jev, take effect at once. */
@@ -1422,8 +1814,20 @@ export class Colony {
     this.#asked.fill(-1);
   }
 
-  /** The fungus's brush: lay `amount` of a trail on every open cell within `radius` of (x, y). */
-  paint(channel: Channel, x: number, y: number, radius: number, amount: number): void {
+  /** The fungus's brush: lay `amount` of a trail on every open cell within `radius` of (x, y), on layer `layer` (home by default). */
+  paint(channel: Channel, x: number, y: number, radius: number, amount: number, layer: number = this.home): void {
+    if (layer === this.#cur) return this.#paintOn(channel, x, y, radius, amount);
+    const was = this.#cur;
+    this.#bind(layer);
+    try {
+      this.#paintOn(channel, x, y, radius, amount);
+    } finally {
+      this.#bind(was);
+    }
+  }
+
+  /** paint, with its layer bound. */
+  #paintOn(channel: Channel, x: number, y: number, radius: number, amount: number): void {
     const { size } = this.map;
     for (let cy = Math.max(0, Math.floor((y - radius) / R - 1)); cy <= Math.min(size.h - 1, Math.ceil((y + radius) / R)); cy++)
       for (let cx = Math.max(0, Math.floor(x - radius - 1)); cx <= Math.min(size.w - 1, Math.ceil(x + radius)); cx++) {
@@ -1482,7 +1886,8 @@ export class Colony {
     cellOf(sx, sy);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
-    if (rockAt(map, cx, cy) !== OPEN) {
+    // One world's curtain: its surface rows (the sky and the ground strip) are the plane's, solid to an ant underground.
+    if (rockAt(map, cx, cy) !== OPEN || cy < (map.surfaceRows ?? 0)) {
       s[slot] = s[slot + 3] = s[slot + 6] = -1;
       return;
     }
@@ -1572,7 +1977,7 @@ export class Colony {
     // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
     const carryingOut = mode === RETURN && this.pellet[i] === 1 && this.#entrance !== null && !Number.isNaN(this.#spoilTo[i] as number);
     // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
-    const raiding = mode === FIGHT && this.#entrance !== null && this.stance === "raid" && this.raidTarget !== null;
+    const raiding = mode === FIGHT && this.#entrance !== null && this.#stanceOf(i) === "raid" && this.raidTarget !== null;
     const onSky = isSky(map, fresh ? hx : (this.gx[i] as number), fresh ? hy : (this.gy[i] as number));
     // Homing underground with the hole still its goal: in at another hole than its own (see #goal). It climbs back out.
     const climbing = mode === RETURN && this.#entrance !== null && !onSky && this.#goalKind[i] === 1 && this.pellet[i] === 0;
@@ -2291,6 +2696,18 @@ export class Colony {
 
   /** Put `n` food at home: in the royal chamber (with a queen: food lies in chambers), else in the larder. */
   feed(n: number): void {
+    if (this.#cur === this.home) return this.#feedHome(n);
+    const was = this.#cur;
+    this.#bind(this.home);
+    try {
+      this.#feedHome(n);
+    } finally {
+      this.#bind(was);
+    }
+  }
+
+  /** feed, with the home layer bound. */
+  #feedHome(n: number): void {
     const ch = this.map.chambers;
     if (!this.queen || !ch) {
       this.larder += n;
@@ -2596,6 +3013,7 @@ export class Colony {
 
   /** Lay `amount` of midden mark on the ground at column `col`, and tapering over MIDDEN_SPREAD columns either side. */
   #markMidden(col: number, amount: number): void {
+    if (this.map.surfaceRows !== undefined) return; // one world's curtain: the midden is the plane's (U3c), never its ground strip
     for (let dx = -MIDDEN_SPREAD; dx <= MIDDEN_SPREAD; dx++) {
       const x = col + dx;
       if (x < 0 || x >= this.map.size.w) continue;
@@ -3156,10 +3574,12 @@ export class Colony {
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
     if (rockAt(this.map, cx, cy) === OPEN) return;
+    // Never up into one world's surface rows (the plane's: #crossUp is the only way there).
+    const surface = this.map.surfaceRows ?? 0;
     for (const d of [4, 5, 3, 0, 2, 1]) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (rockAt(this.map, tx, ty) !== OPEN) continue;
+      if (rockAt(this.map, tx, ty) !== OPEN || ty < surface) continue;
       this.x[i] = centreX(tx, ty);
       this.y[i] = centreY(ty);
       this.gx[i] = NO_CELL;
@@ -3169,7 +3589,7 @@ export class Colony {
     // Buried deeper (several heaps in one tick), or left in the air (the mound taken from under it): up or down its
     // column to the ground line.
     const top = groundTop(this.map, cx) - 1;
-    if (top >= 0 && top !== cy && rockAt(this.map, cx, top) === OPEN) {
+    if (top >= surface && top !== cy && rockAt(this.map, cx, top) === OPEN) {
       this.x[i] = centreX(cx, top);
       this.y[i] = centreY(top);
       this.gx[i] = NO_CELL;
@@ -3507,7 +3927,7 @@ export class Colony {
 
   /** Whether each ant's stance is its own, from what it senses (docs/stance.md: open ground, stanceGate on), not the colony's. */
   get ownStances(): boolean {
-    return this.params.stanceGate > 0 && this.#entrance === null;
+    return this.params.stanceGate > 0 && this.layers.some((L) => L.entrance === null);
   }
 
   /** How many living ants act on each stance now (the HUD, where each ant's stance is its own). */
@@ -3522,8 +3942,9 @@ export class Colony {
    * smelt no raid trail and has not gone out as a scout carries on as a forager, so a raid stance never idles the colony.
    */
   #stanceOf(i: number): Stance {
-    // Top-down, each ant's own (docs/stance.md): defend while it senses a threat on home ground, raid once recruited, else forage.
-    if (this.params.stanceGate > 0 && this.#entrance === null) return this.#defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
+    // Top-down, each ant's own (docs/stance.md): defend while it senses a threat on home ground, raid once recruited, else
+    // forage. In one world on both layers (the owner's choice, ja-lp4.3): a raider keeps its stance down a rival's shaft.
+    if (this.params.stanceGate > 0 && (this.#entrance === null || this.line !== null)) return this.#defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
     return this.stance === "raid" && this.recruited[i] === 0 && this.params.raidGate > 0 && this.#entrance === null ? "forage" : this.stance;
   }
 
@@ -3646,12 +4067,195 @@ export class Colony {
     return heading;
   }
 
+  /**
+   * Ant i, not to go out, has stepped from (x0, y0) up out of the hole onto the ground: back, and pointed down the shaft
+   * (its deepest open neighbour underground), the walker aimed at that cell. Only turning it round left it in the hole,
+   * which is no tunnel, steering at random into the sky again and again (review of slice 6: ants pinned there up to
+   * 45 s, a tenth to a fifth of their time). Returns its heading, h as it was if there is no way down but back.
+   */
+  #pointDown(i: number, x0: number, y0: number, h: number): number {
+    const map = this.map;
+    this.x[i] = x0;
+    this.y[i] = y0;
+    cellOf(x0, y0);
+    const bx = CELL[0] as number;
+    const by = CELL[1] as number;
+    let down = -1;
+    let deepest = -Infinity;
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(bx, by, d);
+      const ty = stepY(by, d);
+      if (rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty) && centreY(ty) > deepest) ((deepest = centreY(ty)), (down = d));
+    }
+    if (down >= 0) {
+      h = DIR_ANGLE[down] as number;
+      this.gdir[i] = down;
+      this.gx[i] = stepX(bx, by, down);
+      this.gy[i] = stepY(by, down);
+    } else {
+      h += Math.PI;
+      this.gx[i] = NO_CELL;
+    }
+    this.#cellAtX[i] = NaN; // its cell is worked out afresh
+    return h;
+  }
+
+  // ——— one world: crossing at the holes (docs/one-world.md §2, ja-lp4.3) ———
+
+  /**
+   * Whether ant i, in `mode`, is going in: carrying food, or homing (the owner's choice: every returner goes down its own
+   * hole, as harvester ants do; docs/activation.md). Its own load and mode only.
+   */
+  #wantsIn(i: number, mode: number): boolean {
+    return this.carrying[i] === 1 || mode === RETURN;
+  }
+
+  /** Whether ant i is one world's, on the plane, and going in (#wantsIn): false at once on any other game. */
+  #inbound(i: number, mode: number): boolean {
+    return this.line !== null && this.#cur === PLANE && this.#wantsIn(i, mode);
+  }
+
+  /**
+   * Whether ant i, at the top of a shaft, may climb out onto the plane: not with brood in its jaws, not a porter (food
+   * moved between chambers stays in), and with spoil or a corpse to put out, or of an age to go out (#mayGoOut) and not
+   * homing to its chamber (#goal: a carrier just in at its hole, or a returner, whose walker turned up the shaft;
+   * crossing, each went straight back down: in the spike, up to 68 carriers a colony in 300 s). One lost in another
+   * nest's tunnels heads for the hole, and climbs out.
+   */
+  #mayCrossUp(i: number): boolean {
+    if (this.#holdsBrood[i] === 1 || this.#porter[i] === 1) return false;
+    if (this.pellet[i] === 1) return true;
+    return this.#mayGoOut(i) && !(this.mode[i] === RETURN && this.#goalKind[i] === 0);
+  }
+
+  /** The colony (an index into holeCells) whose hole is plane cell (px, py), or −1. */
+  #holeAt(px: number, py: number): number {
+    const hs = this.holeCells;
+    for (let k = 0; k < hs.length; k++) if ((hs[k] as HoleCell).px === px && (hs[k] as HoleCell).py === py) return k;
+    return -1;
+  }
+
+  /**
+   * Ant i climbs out of the hole at curtain cell (cx, cy) (or beside it) onto the plane, at that hole's cell: any hole
+   * (lost in a rival's tunnels, it climbs out there; a raider leaves a rival's shaft). Spoil is put down there (soilOut, as
+   * top-down: nothing piles up until U3c's mound), and a corpse is buried there (until U3c's midden: the game paints a
+   * sporulating host's spores on the plane, onBury). Its vector home resets at its own hole, as #integrate's does.
+   * Its heading is the caller's to write.
+   */
+  #crossUp(i: number, cx: number, cy: number): void {
+    const hs = this.holeCells;
+    let k = 0;
+    let best = Infinity;
+    for (let n = 0; n < hs.length; n++) {
+      const d = hexDistance(cx, cy, (hs[n] as HoleCell).col, (hs[n] as HoleCell).row);
+      if (d < best) {
+        best = d;
+        k = n;
+      }
+    }
+    const hc = hs[k] as HoleCell;
+    if (this.pellet[i]) {
+      if (this.#corpse[i]) {
+        for (let n = this.corpses.length - 1; n >= 0; n--) {
+          const d = this.corpses[n] as Corpse;
+          if (d.held !== i) continue;
+          this.corpses.splice(n, 1);
+          this.buried++;
+          this.onBury?.({ ...d, held: -1, x: hc.px, y: hc.py }, PLANE);
+        }
+      } else if (this.#soil[i] !== SOIL_DUG) this.looseDropped++;
+      else this.soilOut++;
+      this.#clearPellet(i);
+      this.since[i] = 0;
+    } else if (this.carrying[i]) this.carriedUp++;
+    this.layer[i] = PLANE;
+    this.x[i] = centreX(hc.px, hc.py);
+    this.y[i] = centreY(hc.py);
+    this.#under[i] = 0;
+    this.#goalKind[i] = 1;
+    this.odoSurf[i] = 0;
+    if (k === this.params.nest) this.driftSurf[i] = gauss(this.#rng) * PI_DRIFT;
+    this.search[i] = 0;
+    this.#lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
+    this.#crossed(i);
+    this.crossedUp++;
+  }
+
+  /**
+   * Ant i, on the plane at colony k's hole, goes down it: into the curtain at that hole (the crust's open cell), heading
+   * down. With food it is home with it (a return at the hole, which the waiting ants round it meet where the gate is
+   * open), and the side view's code takes it on to reception and the chambers.
+   */
+  #crossDown(i: number, k: number, gate: boolean): void {
+    const hc = this.holeCells[k] as HoleCell;
+    if (this.carrying[i]) {
+      this.carriedDown++;
+      if (gate) {
+        const key = hc.py * 65536 + hc.px;
+        this.#returning.set(key, (this.#returning.get(key) ?? 0) + 1);
+      }
+    }
+    this.layer[i] = CURTAIN;
+    this.x[i] = centreX(hc.col, hc.row);
+    this.y[i] = centreY(hc.row);
+    this.heading[i] = Math.PI / 2;
+    this.#under[i] = 1;
+    this.search[i] = 0;
+    this.#goalKind[i] = 1;
+    this.#defending[i] = 0;
+    this.#crossed(i);
+    this.crossedDown++;
+  }
+
+  /** Ant i has changed layer: what it held of the old map (walls, cells, faces, targets, its cell cache) is dropped, as #place starts an ant. */
+  #crossed(i: number): void {
+    this.#homeAfresh(i);
+    this.gx[i] = NO_CELL;
+    this.byCell[i] = 0;
+    this.digT[i] = 0;
+    this.digAim[i] = NaN;
+    this.hugT[i] = 0;
+    this.loopX[i] = NO_CELL;
+    this.followT[i] = 0;
+    this.#noTunnel[i] = -1;
+    this.#looked[i] = -1;
+    this.#cameFrom[i] = -1;
+    this.#lastDug[i] = -1;
+    this.#putAt[i] = -1;
+    this.#chamberCell[i] = -1;
+    this.#staleWalk[i] = 0;
+    this.#spoilTo[i] = NaN;
+    this.#cellAtX[i] = NaN;
+    this.#groundRef[i] = NaN;
+    this.#restT[i] = 0;
+  }
+
+  /**
+   * Put living ant i on layer `layer` at world (x, y), as if it had crossed there (tests: one world's crossings). Out of
+   * the nest's layer it is on the surface (`#under` 0), on it underground.
+   */
+  putAnt(i: number, layer: number, x: number, y: number): void {
+    this.layer[i] = layer;
+    this.x[i] = x;
+    this.y[i] = y;
+    this.#under[i] = layer === this.home && this.#entranceOf(layer) ? 1 : 0;
+    this.#goalKind[i] = 1;
+    this.#crossed(i);
+  }
+
+  /** Whether layer l has a hole into it (the side view's map, one world's curtain). */
+  #entranceOf(l: number): boolean {
+    return (this.layers[l] as Layer).entrance !== null;
+  }
+
   /** Advance by dt seconds: ants decide (when their situation changed), steer, lay trail, move; then the fields evaporate and spread, and stored food becomes ants. */
   tick(dt: number): void {
     const p = this.params;
     const rng = this.#rng;
-    const { map, ph } = this;
-    const home = this.nest;
+    // The layer being stepped (between ticks, and here, home): rebound below for each ant on another layer.
+    let { map, ph } = this;
+    let home = this.nest;
+    const multi = this.layers.length > 1;
     const a = p.sensorAngle;
     const ca = Math.cos(a);
     const sa = Math.sin(a);
@@ -3661,26 +4265,28 @@ export class Colony {
     const got = this.stored - this.#storedSeen;
     this.#storedSeen = this.stored;
     this.intakeRate += (got / dt - this.intakeRate) * (1 - Math.exp(-dt / INTAKE_WINDOW));
+    // The gates (activation, raids by trail, each ant's own stance) are open ground's, where there is no hole into the
+    // layer (gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
+    const layerGates = multi ? this.layers.map((L) => gatesFor(p, L.entrance === null, dt)) : null;
+    let { gate, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates?.[this.#cur] ?? gatesFor(p, this.#entrance === null, dt);
     // Activation (behaviour MR 5): last tick's returns with food are what the waiting foragers round them meet this tick.
-    const gate = p.leaveGate > 0 && this.#entrance === null;
-    if (gate) {
+    if (gate || layerGates?.some((g) => g.gate)) {
       const seen = this.#returned;
       this.#returned = this.#returning;
       this.#returning = seen;
       seen.clear();
     }
-    const metLeak = gate ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1;
-    // Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`.
-    const rgate = p.raidGate > 0 && this.#entrance === null;
-    const foeLeak = rgate ? Math.exp((-dt * Math.LN2) / FOES_HALF) : 1;
     // Energy and felt hunger (ja-xu6.1): the side view, where there is a queen and brood.
     if (this.queen) this.#body(dt);
-    // Each ant's own stance (docs/stance.md): its threat leaks like `foes`; a waiting ant feels its home's crowd over CROWD_HALF.
-    const sgate = p.stanceGate > 0 && this.#entrance === null;
-    const threatLeak = sgate ? Math.exp((-dt * Math.LN2) / THREAT_HALF) : 1;
-    const crowdKeep = sgate ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1;
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
+      // An ant on another layer than the one bound: bind its own (a colony on one layer never does).
+      if (multi && this.layer[i] !== this.#cur) {
+        this.#bind(this.layer[i] as number);
+        ({ map, ph } = this);
+        home = this.nest;
+        ({ gate, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.#cur]!);
+      }
       if (map.sky) this.#unbury(i);
       let h = this.heading[i] as number;
       // Three sensors (left, front, right), each read on every channel at once.
@@ -3741,7 +4347,8 @@ export class Colony {
           this.#gone[i] = 0;
         }
         if (homeNow || this.recruited[i] === 0) this.#pastEnd[i] = 0;
-      } else if (this.recruited[i] === 1) {
+      } else if (this.recruited[i] === 1 && this.line === null) {
+        // (In one world a raider keeps its stance underground, where nothing recruits: its raid ends at home on the plane.)
         this.recruited[i] = 0;
         this.#pastEnd[i] = 0;
       }
@@ -3770,11 +4377,12 @@ export class Colony {
       // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
       // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
       let goal = this.#goal(i, pellet);
-      // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant.
-      if (nursing && goal === this.nest) goal = this.#chamberGoal(this.#broodTo[i] as number);
+      // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant. Only
+      // where there is a hole into the layer: one world's plane has no chambers (its carriers home to the hole: #crossDown).
+      if (nursing && goal === this.nest && this.#entrance) goal = this.#chamberGoal(this.#broodTo[i] as number);
       // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
       // its food to (a forager: reception, or the royal chamber until there is one).
-      else if (carrying && this.queen && goal === this.nest) goal = this.#chamberGoal(this.#foodTo(i));
+      else if (carrying && this.queen && goal === this.nest && this.#entrance) goal = this.#chamberGoal(this.#foodTo(i));
       let nest = goal;
       const x0 = this.x[i] as number;
       const y0 = this.y[i] as number;
@@ -3816,7 +4424,8 @@ export class Colony {
         situation0 = before - mode * MODE_STRIDE;
         // Waiting at home (behaviour MR 5): where the colony gates leaving, a forager home in "return" is asked `leave`
         // (below), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
-        waiting = gate && mode === RETURN && !enemy && this.#atNestTop(i);
+        // (Not one world's ants going in on the plane: they go down the hole, and one world never asks `leave`.)
+        waiting = gate && mode === RETURN && !enemy && this.#atNestTop(i) && !this.#inbound(i, mode);
         if (before !== this.#asked[i] && !waiting) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.#stanceOf(i) }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
@@ -4126,11 +4735,11 @@ export class Colony {
         // A calm ant (the fungus's cue) does not charge.
         // A raider in the side view walks on to the raided nest, cell by cell, past the alarm of fights behind it: steering
         // freely up the alarm left raiders in the pits by the rival's mound, 12–13 columns short of its hole (none got in).
-        const sideRaid = this.stance === "raid" && this.raidTarget !== null && this.#entrance !== null;
+        const sideRaid = this.#stanceOf(i) === "raid" && this.raidTarget !== null && this.#entrance !== null;
         if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - (this.calm[i] as number)));
         else if (Math.max(al, af, ar) >= FAINT && !sideRaid) h += climb(al, af, ar, p.turnRate * dt);
         else if (sideRaid && ((this.detour[i] = 0), this.#walkTunnel(i, FIGHT, p.speed * dt))) h = this.#towardTarget(i);
-        else if (this.stance === "raid" && this.raidTarget && this.#entrance && this.#under[i]) {
+        else if (this.#stanceOf(i) === "raid" && this.raidTarget && this.#entrance && this.#under[i]) {
           // A raider in a chamber (no tunnel: free steering): out of its own nest by its hole, or on into the rival's.
           // Steering straight at the rival's hole through soil left nearly every raider bumping inside its own nest.
           this.antCell(i);
@@ -4223,6 +4832,14 @@ export class Colony {
         const dx = home.x - (this.x[i] as number);
         const dy = home.y - (this.y[i] as number);
         if (dx * dx + dy * dy > WAIT_RIM * WAIT_RIM * home.r * home.r) h = Math.atan2(dy, dx);
+      }
+      // One world: going in, within the disc round its hole, it makes straight for the hole's cell. Steering for the
+      // nest's centre at the turn rate, it circled the hole it was over.
+      if (this.#inbound(i, mode)) {
+        const hc = this.holeCells[p.nest] as HoleCell;
+        const dx = centreX(hc.px, hc.py) - (this.x[i] as number);
+        const dy = centreY(hc.py) - (this.y[i] as number);
+        if (dx * dx + dy * dy < home.r * home.r) h = Math.atan2(dy, dx);
       }
       // Move; rock or the edge turns the ant back somewhere random.
       // Rounded to float32 first, as stored: checked in float64, 192.999996 is open ground, and stored as
@@ -4370,6 +4987,23 @@ export class Colony {
           this.bumps[i] = Math.min(5, (this.bumps[i] as number) + 1);
           if (mode !== RETURN) this.detour[i] = Math.max(this.detour[i] as number, 0.5 * 2 ** Math.floor(this.bumps[i] as number) * (0.5 + rng()));
         }
+      } else if (map.surfaceRows !== undefined && ly < map.surfaceRows) {
+        // One world's curtain: a step up out of a hole (the crust is open nowhere else) is onto the surface, the plane's.
+        // Up it goes if it may (#mayCrossUp); else it is pointed back down the shaft, as the side view's young are. Either
+        // way its step ends here.
+        if (this.#mayCrossUp(i)) {
+          cellOf(x0, y0);
+          this.#crossUp(i, CELL[0] as number, CELL[1] as number);
+        } else {
+          h = this.#pointDown(i, x0, y0, h);
+          // It has touched the surface, as the side view's young step onto the ground before they are put back: its floor
+          // marks start afresh at the next chamber (#layMark). Laying on, the young turned back at the hole marked the
+          // shaft's top with brood and royal, which drew more young there (#toBrood): in the spike up to 13 were held
+          // there for minutes.
+          this.#lastRole[i] = 0;
+        }
+        this.heading[i] = h;
+        continue;
       } else {
         this.digT[i] = 0; // the face it was digging opened (another ant dug it), or it turned off it (its aim stays: it is walking up to the face)
         this.x[i] = nx;
@@ -4420,6 +5054,11 @@ export class Colony {
         if ((onGround && (this.#spoilSide[i] as number) * (col - this.#entranceCol) >= (this.#spoilTo[i] as number)) || (this.#spoilT[i] as number) > (this.#corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) this.#dropOut(i, col);
         // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
         // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
+      } else if (pellet && atEntrance && this.#soil[i] !== SOIL_FILL && this.line !== null) {
+        // One world: the spoil (or the dead) goes up the hole onto the plane, where it is put down (#crossUp).
+        this.#crossUp(i, this.#entranceCol, this.#entranceRow);
+        this.heading[i] = h;
+        continue;
       } else if (pellet && atEntrance && this.#soil[i] !== SOIL_FILL) {
         // Up and out of the hole: it carries the pellet on out along the ground to drop it, farther as the mound grows
         // (MOUND_REACH at most; more of them farther out, √ of a uniform draw), so the mound spreads as a disc, its area
@@ -4469,7 +5108,8 @@ export class Colony {
         this.since[i] = 0;
         // Home and resting in "return" (its policy said so, or a cached answer did: ja-qnx): after REST seconds it is
         // asked afresh as an explorer, once it is no longer tired (fatigue rests it first: ja-q47).
-        if (mode === RETURN && !carrying && !pellet && !this.#isTired(i) && (this.#restT[i] = (this.#restT[i] as number) + dt) > REST && (!gate || ((rolled = true), this.#leaves(i, dt, toEnemy !== null)))) {
+        // (One world's returners on the plane don't rest at the hole: they go in, #crossDown.)
+        if (mode === RETURN && !carrying && !pellet && !this.#isTired(i) && !this.#inbound(i, mode) && (this.#restT[i] = (this.#restT[i] as number) + dt) > REST && (!gate || ((rolled = true), this.#leaves(i, dt, toEnemy !== null)))) {
           this.mode[i] = EXPLORE;
           this.#asked[i] = -1;
           this.#restT[i] = 0;
@@ -4508,7 +5148,8 @@ export class Colony {
       // - in any chamber, it left the young off the queen's side (zoning.test);
       // - for the young and middle-aged, who work inside, it sent porters out and the queen starved on 1-2 of 4 worlds in
       //   the hour-long economy run (slow/economy.test).
-      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && !this.#isTired(i) && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i)) && (!gate || (!rolled && this.#leaves(i, dt, toEnemy !== null)))) {
+      // (One world: a returner's trip ends inside, as the side view's does; on the plane it is still going in.)
+      if (p.arrive !== "return" && this.mode[i] === RETURN && !carrying && !pellet && !nursing && !this.#isTired(i) && !this.#inbound(i, RETURN) && (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i)) && (!gate || (!rolled && this.#leaves(i, dt, toEnemy !== null)))) {
         // A raid scout starts exploring, not on a food trail (review of #53, N6).
         this.mode[i] = p.arrive === "follow" && !this.recruited[i] ? FOLLOW : EXPLORE;
         this.#asked[i] = -1;
@@ -4519,33 +5160,7 @@ export class Colony {
         // back down (carriers aside: soil goes out to the mound; food is on its way in).
         if (this.queen && this.#under[i] && !carrying && !pellet && !this.#mayGoOut(i)) {
           this.antCell(i);
-          if (isSky(map, CELL[0] as number, CELL[1] as number)) {
-            // Back, and pointed down the shaft (its deepest open neighbour underground), the walker aimed at that cell: only
-            // turning it round left it in the hole, which is no tunnel, steering at random into the sky again and again
-            // (review of slice 6: ants pinned there up to 45 s, a tenth to a fifth of their time).
-            this.x[i] = x0;
-            this.y[i] = y0;
-            cellOf(x0, y0);
-            const bx = CELL[0] as number;
-            const by = CELL[1] as number;
-            let down = -1;
-            let deepest = -Infinity;
-            for (let d = 0; d < 6; d++) {
-              const tx = stepX(bx, by, d);
-              const ty = stepY(by, d);
-              if (rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty) && centreY(ty) > deepest) ((deepest = centreY(ty)), (down = d));
-            }
-            if (down >= 0) {
-              h = DIR_ANGLE[down] as number;
-              this.gdir[i] = down;
-              this.gx[i] = stepX(bx, by, down);
-              this.gy[i] = stepY(by, down);
-            } else {
-              h += Math.PI;
-              this.gx[i] = NO_CELL;
-            }
-            this.#cellAtX[i] = NaN; // its cell is worked out afresh
-          }
+          if (isSky(map, CELL[0] as number, CELL[1] as number)) h = this.#pointDown(i, x0, y0, h);
         }
         this.#integrate(i, x0, y0, atNest);
         // Road signs: underground, a strong nest trail where it stands tells it where it is, and its memory's error fades
@@ -4559,8 +5174,20 @@ export class Colony {
           this.#undertake(i, dt, toEnemy === null);
         }
       }
+      // One world: on the plane, at a hole's cell. Its own: in, if it is going in (#wantsIn). Another colony's: a raider
+      // goes down that shaft (one-world §4). Crossing is where it stands; it reads nothing else.
+      if (this.line !== null && this.#cur === PLANE) {
+        this.antCell(i);
+        const k = this.#holeAt(CELL[0] as number, CELL[1] as number);
+        if (k >= 0 && (k === p.nest ? this.#wantsIn(i, this.mode[i] as number) : this.mode[i] === FIGHT && this.#stanceOf(i) === "raid")) {
+          this.#crossDown(i, k, gate);
+          continue;
+        }
+      }
       this.heading[i] = h;
     }
+    // Colony-wide work from here on is the home layer's (the nest, its count of ants in and out, its brood).
+    if (multi) this.#bind(this.home);
     if (this.#entrance) {
       let under = 0;
       let out = 0;
@@ -4568,7 +5195,8 @@ export class Colony {
       this.inNest = under;
       this.outside = out;
     }
-    ph.advance(dt);
+    // Every layer's fields evaporate and spread (on one layer, `ph`'s).
+    for (const L of this.layers) L.ph.advance(dt);
     // Growth: in the side view, the queen and brood (#nestLife); elsewhere the larder turns into ants while there is room.
     if (this.queen) {
       this.#nestLife(dt);
@@ -4588,6 +5216,7 @@ export class Colony {
     return {
       fields: saveFields(this, COLONY_SKIP),
       private: encodeSave({
+      cur: this.#cur,
       ti: this.#ti,
       alarmAnt: this.#alarmAnt,
       alarmSmelt: this.#alarmSmelt,
@@ -4664,6 +5293,7 @@ export class Colony {
   loadState(saved: Record<string, unknown>): void {
     loadFields(this, saved.fields as Record<string, unknown>);
     const r = saved.private as Record<string, unknown>;
+    if ("cur" in r) this.#cur = fillLike(this.#cur, r.cur) as never;
     if ("ti" in r) this.#ti = fillLike(this.#ti, r.ti) as never;
     if ("alarmAnt" in r) this.#alarmAnt = fillLike(this.#alarmAnt, r.alarmAnt) as never;
     if ("alarmSmelt" in r) this.#alarmSmelt = fillLike(this.#alarmSmelt, r.alarmSmelt) as never;
