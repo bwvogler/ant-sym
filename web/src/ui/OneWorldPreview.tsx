@@ -112,8 +112,8 @@ export default function OneWorldPreview() {
         <label className="flex items-center gap-2">
           <span className="text-fg-2">Seed</span>
           <input
-            type="number"
-            min={1}
+            type="text"
+            inputMode="numeric"
             value={seedText}
             onChange={(e) => setSeedText(e.target.value)}
             onBlur={applySeed}

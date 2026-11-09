@@ -741,9 +741,9 @@ export function keepReachableFood(map: WorldMap, from: readonly { x: number; y: 
   map.foodLeft = total;
 }
 
-/** Whether world (x, y) lies within `d` of a side-view nest's chamber or its entrance: how far food keeps from nests. */
+/** Whether world (x, y) lies within `d` of a nest or its entrance (side view): how far food keeps from nests. */
 export function nearNests(nests: readonly Nest[]): (x: number, y: number, d: number) => boolean {
-  return (x, y, d) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || Math.hypot(x - n.entrance!.x, y - n.entrance!.y) < d);
+  return (x, y, d) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || (n.entrance !== undefined && Math.hypot(x - n.entrance.x, y - n.entrance.y) < d));
 }
 
 /**
