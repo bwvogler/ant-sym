@@ -3847,6 +3847,14 @@ export class Colony {
     return Math.hypot((this.x[i] as number) - bx, (this.y[i] as number) - by);
   }
 
+  /**
+   * One world's plane (U3c): whether ant i, at plane cell (cx, cy), is out on its midden ring: at least MIDDEN_MIN from
+   * home by its own vector, and off the mound (no spoil underfoot, which it can feel). With the plane bound.
+   */
+  #onMiddenRing(i: number, cx: number, cy: number): boolean {
+    return this.#fromHomePlane(i) >= MIDDEN_MIN && (this.map.spoil?.get(cx, cy) ?? 0) === 0;
+  }
+
   /** One world: every nest's hole on the plane (its cell), whose ring no mound fills (heapPlane). */
   #planeHoles(): { x: number; y: number }[] {
     return this.holeCells.map((h) => ({ x: h.px, y: h.py }));
@@ -3858,20 +3866,25 @@ export class Colony {
    * counts it: a dug pellet is soil brought out (soilOut), every whole cell of it × SWELL heaped; a loose one is one back
    * on the mound. A corpse goes on the midden there (U3c's stopgap: a ring set by the ant's own vector; one pile by corpse
    * scent is a follow-up), marked on the plane's scent, and a sporulating host's spores land there (onBury).
+   * `atWill`: put down by the ant's own answer (carry "put down", contact "drop and run"), not at the end of its walk out.
+   * Then a corpse goes on the midden only out on its ring (#onMiddenRing); anywhere else it lies on the plane, unmarked,
+   * as a corpse whose carrier died there does (owner, 2026-11-09, review of #61 D1).
    */
-  #dropPlane(i: number): void {
+  #dropPlane(i: number, atWill = false): void {
     this.antCell(i);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
     if (this.#corpse[i]) {
+      const midden = !atWill || this.#onMiddenRing(i, cx, cy);
       for (let n = this.corpses.length - 1; n >= 0; n--) {
         const k = this.corpses[n] as Corpse;
         if (k.held !== i) continue;
-        this.corpses.splice(n, 1);
         k.held = -1;
         k.x = cx;
         k.y = cy;
         k.layer = PLANE;
+        if (!midden) continue; // it lies here
+        this.corpses.splice(n, 1);
         const key = cy * 65536 + cx;
         this.midden.set(key, (this.midden.get(key) ?? 0) + 1);
         this.#markMiddenPlane(cx, cy, MIDDEN_MARK);
@@ -3997,7 +4010,7 @@ export class Colony {
       }
       this.carrying[i] = 0;
     } else if (this.pellet[i]) {
-      if (this.line !== null && this.#cur === PLANE) this.#dropPlane(i); // one world's plane: spoil heaped, a corpse on the midden, where it stands
+      if (this.line !== null && this.#cur === PLANE) this.#dropPlane(i, true); // one world's plane: spoil heaped where it stands, a corpse on the midden if out on its ring
       else if (!this.#entrance) {
         // Top-down: a pellet is only a count: put down at the nest it is soil out (as the nest branch counts it), elsewhere lost.
         const dx = (this.x[i] as number) - this.nest.x;

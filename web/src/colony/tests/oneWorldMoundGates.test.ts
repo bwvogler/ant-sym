@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, LIFESPAN, MIDDLE, MODES, PLANE, type Colony, type HoleCell } from "../colony.ts";
+import { CURTAIN, LIFESPAN, MIDDLE, MODES, PLANE, type Colony, type Corpse, type HoleCell } from "../colony.ts";
+import { localResponses, type Responses } from "../responses.ts";
 import { Game, gameRng } from "../game.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance } from "../hex.ts";
 import { generateOneWorld, type OneWorld } from "../oneWorld.ts";
@@ -308,4 +309,47 @@ test("one world: an explorer spreads spoil only from a flank; off a flat mound t
   assert.ok(onTop > 30000, `explorers walked the plateau (${onTop} ant-ticks)`);
   assert.ok(fills >= 3, `${fills} pellets taken off it to backfill: they were asking`);
   assert.equal(spreads, 0, `${spreads} picked up to spread off a flat top`);
+});
+
+test("one world: a corpse the ant puts down at will (carry 'put down') goes on the midden only out on its ring; near its hole it lies there", () => {
+  // Owner (2026-11-09, review of #61 D1): Jev's "put down" or "drop and run" for an undertaker on the plane makes a
+  // midden only where its walk out would have (at least MIDDEN_MIN from home by its own vector, off the mound); anywhere
+  // else the corpse lies on the plane, unmarked, as one whose carrier died there.
+  const g = quiet();
+  const c = g.player;
+  const hole = planeHole(own(c));
+  const putDown: Responses = { ...localResponses, carry: () => "put down" };
+  const upWith = (dead: number, u: number): Corpse => {
+    undertaken(g, c, dead, u);
+    for (let k = 0; k < Math.round(10 / DT) && c.layer[u] !== PLANE; k++) g.tick(DT);
+    assert.equal(c.layer[u], PLANE, `undertaker ${u} came up with it`);
+    return c.corpses.find((k) => k.held === u)!;
+  };
+  // At its hole: it lies there.
+  const a = upWith(5, 4);
+  const [ax, ay] = cellOfAnt(c, 4);
+  const middens = c.midden.size;
+  const buried = c.buried;
+  c.responses = putDown;
+  g.tick(DT);
+  c.responses = localResponses;
+  assert.ok(!c.carriesCorpse(4), "put down");
+  assert.equal(a.held, -1);
+  assert.equal(a.layer, PLANE);
+  assert.ok(Math.abs(a.x - ax) <= 1 && Math.abs(a.y - ay) <= 1, "where it stood");
+  assert.ok(c.corpses.includes(a), "it lies there");
+  assert.equal(c.midden.size, middens, "no midden at its hole");
+  assert.equal(c.buried, buried);
+  // Out on its ring (12 east of the hole, off the mound): on the midden.
+  const b = upWith(7, 6);
+  c.putAnt(6, PLANE, hole.x + 12, hole.y);
+  const [bx, by] = cellOfAnt(c, 6);
+  assert.equal(g.world!.plane.spoil!.get(bx, by), 0, "off the mound");
+  c.responses = putDown;
+  g.tick(DT);
+  c.responses = localResponses;
+  assert.ok(!c.carriesCorpse(6), "put down");
+  assert.ok(!c.corpses.includes(b), "off the ground");
+  assert.equal(c.buried, buried + 1, "on the midden");
+  assert.equal(c.midden.size, middens + 1);
 });
