@@ -7,7 +7,7 @@ import DetailsScreen from "./ui/DetailsScreen.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
-import { hasNests, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { buildGame, hasNests, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import { CURTAIN, PLANE } from "./colony/colony.ts";
 import { UPGRADES, type Upgrade } from "./colony/evolution.ts";
 import { LETHAL_LEVERS } from "./colony/levers.ts";
@@ -27,6 +27,7 @@ import { pushToast } from "./ui/toasts.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
 import type { DoctrineChoice } from "./ui/useColonyJev.ts";
+import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
 import type { Flight } from "./colony/royal.ts";
 
 // The game's main screen (ja-lo8.2): the field, a slim top bar, and the fungus, the player. You shape the fungus's
@@ -198,7 +199,9 @@ export default function ColonyApp() {
   }, [penFor, flight, oneWorld, game, foundOn]);
   // Dev builds only: the game and the page's views on window, for the Playwright guard (scripts/e2e-one-world.mjs); not
   // in the Pages build. follow(k, i) follows an ant; view() and camera(view) read where each view looks; fly(mother)
-  // sends a new queen from that colony with the fungus in her and opens her pen, Jev or not.
+  // sends a new queen from that colony with the fungus in her and opens her pen, Jev or not. With the game paused,
+  // nextCrossing(maxSeconds, minTicks) rehearses on a copy which curtain ant comes up next, and on which fixed step (rehearse.ts),
+  // and step(n) takes the game itself n of those steps: the guard follows that ant through its hole for certain.
   useEffect(() => {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
     (window as unknown as { jevAnts?: unknown }).jevAnts = {
@@ -210,6 +213,10 @@ export default function ColonyApp() {
         return true;
       },
       view: () => controls.view,
+      nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(settings), maxSeconds, minTicks),
+      step: (n = 1) => {
+        for (let t = 0; t < n; t++) game.tick(REHEARSE_DT);
+      },
       camera: (v: View) => field.current?.camera(v === "above" ? PLANE : CURTAIN) ?? null,
       fly: (mother = 0) => {
         const m = game.colonies[mother];
@@ -220,6 +227,7 @@ export default function ColonyApp() {
         return true;
       },
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, controls.view, setFollowed]);
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   return (

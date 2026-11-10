@@ -6,7 +6,8 @@
 //  1. a one-world game, seed fixed (Start, then Details → Ground → one world): it opens above;
 //  2. above, below, above mid-game: each view keeps its own camera;
 //  3. a click on the line above shows below at that column; a click on the strip below shows above at P(s);
-//  4. an ant followed through a hole (the dev hook's follow) carries the camera across: the view switches and centres on it;
+//  4. an ant followed through a hole carries the camera across: the view switches and centres on it (the ant is the one a
+//     rehearsal on a copy of the game, through the dev hook, says comes up next: no waiting on chance);
 //  5. the queen's pen: a flight forced by the dev hook (fly) opens it above; a click on the view below founds nothing; a
 //     click outside her flight is refused, and a click inside founds her colony where the preview (Game.settleAt) said;
 //     "Let her fly", by the keyboard, sends the next one on her own flight; and with the hook's flight gone, a queen who
@@ -307,91 +308,70 @@ try {
 
   // ——— 4. An ant followed through a hole carries the camera across ———
   console.log("4. follow an ant through a hole");
+  // No waiting on chance: with the page paused, the dev hook rehearses on a copy of the game which curtain ant comes up
+  // next (no sooner than LEAD steps on) and on which fixed step (rehearse.ts: a save reloads bit-exact), steps the game
+  // itself to LEAD steps before that, and the guard follows that ant from below while the page steps the game one fixed
+  // step a frame: it must come up on the very step rehearsed.
+  const LEAD = 20;
   await page.getByRole("button", { name: "below", exact: true }).click();
   await until(async () => (await view()) === "below", "below");
-  await page.getByRole("button", { name: "4×", exact: true }).click();
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  check((await page.getByRole("button", { name: "Play", exact: true }).count()) === 1, "the game is paused");
   check((await page.getByRole("button", { name: "Carry across" }).getAttribute("aria-pressed")) === "true", "carry across is on by default");
-  // Each frame, the page records the followed ant (its layer and place), the view and the top view's camera: the guard
-  // reads the frame where the ant is up and the view has come with it (an ant can step back down within a poll).
-  // Only a try whose ant was given up (8 s, still below) counts against the twelve; one that came up before the field had
-  // taken the follow, or died, is tried again, within a minute and a half in all.
-  let carried = null;
-  let gaveUp = 0;
-  const deadline = Date.now() + 90_000;
-  for (let tries = 0; !carried && gaveUp < 12 && Date.now() < deadline; tries++) {
-    // Each try from the side view (an ant given up may have carried the camera up and back).
-    if ((await view()) !== "below") {
-      await page.getByRole("button", { name: "below", exact: true }).click();
-      await until(async () => (await view()) === "below", "below");
-    }
-    // A curtain ant in its shaft, a little below its hole (one right at it is often up before the field has taken the
-    // follow), by the dev hook; then the game runs until it comes up (or it is given up).
-    const picked = await page.evaluate((tries) => {
-      const { game } = window.jevAnts;
-      const R = Math.sqrt(3) / 2;
-      let best = null;
-      game.colonies.forEach((col, k) => {
-        const hc = col.holeCells[col.params.nest];
-        if (!hc) return;
-        const hx = hc.col + 0.5 + 0.5 * (hc.row & 1);
-        const hy = (hc.row + 0.5) * R;
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || col.layer[i] !== 1) continue;
-          const dx = Math.abs(col.x[i] - hx);
-          const below = col.y[i] - hy;
-          if (dx > 4 || below < 3 || below > 25) continue; // in the shaft, 3 to 25 below the crust
-          const d = below + ((i * 7919 + tries * 104729) % 97) / 10; // a different ant each try
-          if (!best || d < best.d) best = { k, i, d };
-        }
-      });
-      if (!best || !window.jevAnts.follow(best.k, best.i)) return null;
+  let next = null;
+  for (let n = 0; n < 4 && !next; n++) {
+    const r0 = Date.now();
+    next = await page.evaluate((lead) => window.jevAnts.nextCrossing(20, lead), LEAD);
+    console.log(`  ..  rehearsal ${n + 1}: ${next ? `colony ${next.k}'s ant ${next.i} comes up on step ${next.ticks}` : "none within 20 s"} (${Date.now() - r0} ms)`);
+    if (!next) await page.evaluate(() => window.jevAnts.step(300)); // ten seconds on, and again
+  }
+  check(next !== null, "a rehearsal found a curtain ant that comes up");
+  const lead = LEAD; // the rehearsal's crossing is LEAD steps on at the least
+  await page.evaluate((n) => window.jevAnts.step(n), next.ticks - lead);
+  check(await page.evaluate(({ k, i, gen }) => window.jevAnts.game.colonies[k].gen[i] === gen && window.jevAnts.game.colonies[k].layer[i] === 1 && window.jevAnts.follow(k, i), next), "the ant, still below, is followed");
+  // Each frame the page records the ant, the view and the top view's camera; after fifteen frames seen from below (the
+  // field has taken the follow) it steps the game one fixed step a frame, LEAD and forty more.
+  await page.evaluate(
+    ({ k, i, steps }) => {
       const trail = (window.__trail = []);
+      let stepped = 0;
       const loop = () => {
         if (window.__trail !== trail) return;
-        const col = window.jevAnts.game.colonies[best.k];
-        trail.push({ layer: col.layer[best.i], alive: col.alive[best.i], view: window.jevAnts.view(), cam: window.jevAnts.camera("above"), x: col.x[best.i], y: col.y[best.i] });
+        const col = window.jevAnts.game.colonies[k];
+        trail.push({ stepped, layer: col.layer[i], alive: col.alive[i], view: window.jevAnts.view(), cam: window.jevAnts.camera("above"), x: col.x[i], y: col.y[i] });
+        if (trail.length > 15 && stepped < steps) {
+          window.jevAnts.step(1);
+          stepped++;
+        }
         requestAnimationFrame(loop);
       };
       requestAnimationFrame(loop);
-      return best;
-    }, tries);
-    if (!picked) {
-      await sleep(300); // no ant in a shaft just now
-      continue;
-    }
-    carried = await until(
-      () =>
-        page.evaluate(() => {
-          const t = window.__trail;
-          if (t.some((f) => !f.alive)) return "dead";
-          const up = t.findIndex((f) => f.layer === 0);
-          if (up < 0) return null;
-          // Seen from below before it came up (else the view came up some other way: an ant given up before, try again).
-          // (a dozen frames, so the field had taken the follow: an ant that comes up before it has is no crossing it saw).
-          if (t.slice(0, up).filter((f) => f.layer === 1 && f.view === "below").length < 12) return "retry";
-          // On the ant: where the camera centred on it is (clamped at the plane's edges), give or take a frame's step
-          // (this loop may run before the page draws in a frame).
-          const onAnt = (f) => {
-            const e = window.__clampCam("above", f.x, f.y, f.cam.zoom);
-            return Math.abs(f.cam.x - e.x) <= 1.5 && Math.abs(f.cam.y - e.y) <= 1.5;
-          };
-          const on = t.slice(up).find((f) => f.layer === 0 && f.view === "above" && f.cam && onAnt(f));
-          if (on) return { first: t[0], up: t[up], on, frames: t.length };
-          // Up for 2 s and the view never on it: the carry failed (what the frames held, to say so).
-          return t.length - up > 120 ? { stuck: t.slice(up, up + 4).concat(t.slice(-2)) } : null;
-        }),
-      "the followed ant's crossing",
-      8000,
-      50,
-    ).catch(() => null);
-    if (carried?.stuck) throw new Error(`the followed ant came up, but the view did not come with it: ${JSON.stringify(carried.stuck)}`);
-    if (carried === null) gaveUp++;
-    else if (carried === "dead" || carried === "retry") carried = null;
-  }
+    },
+    { k: next.k, i: next.i, steps: lead + 40 },
+  );
+  const carried = await until(
+    () =>
+      page.evaluate(() => {
+        const t = window.__trail;
+        const up = t.findIndex((f) => f.layer === 0);
+        if (up < 0) return t.length > 0 && t[t.length - 1].stepped >= 60 ? { never: true } : null;
+        // On the ant: where the camera centred on it is (clamped at the plane's edges), give or take a frame's step.
+        const onAnt = (f) => {
+          const e = window.__clampCam("above", f.x, f.y, f.cam.zoom);
+          return Math.abs(f.cam.x - e.x) <= 1.5 && Math.abs(f.cam.y - e.y) <= 1.5;
+        };
+        const on = t.slice(up).find((f) => f.layer === 0 && f.view === "above" && f.cam && onAnt(f));
+        if (on) return { below: t.slice(0, up).filter((f) => f.layer === 1 && f.view === "below").length, up: t[up], on };
+        // Up for 2 s of frames and the view never on it: the carry failed.
+        return t.length - up > 120 ? { stuck: t.slice(up, up + 4).concat(t.slice(-2)) } : null;
+      }),
+    "the followed ant's crossing",
+    20_000,
+    50,
+  );
   await page.evaluate(() => (window.__trail = null));
-  await page.getByRole("button", { name: "Pause", exact: true }).click();
-  check(carried !== null, "a followed ant went up through a hole, from the side view");
+  if (carried.never) throw new Error("the rehearsed ant never came up: the game did not play what its copy played");
+  if (carried.stuck) throw new Error(`the followed ant came up, but the view did not come with it: ${JSON.stringify(carried.stuck)}`);
+  check(carried.up.stepped === lead && carried.below >= 15, `the followed ant went up through a hole on the step rehearsed (${carried.up.stepped} of ${lead}), seen from below`);
   check(true, `the view came above with it, the camera on the ant (${carried.on.cam.x.toFixed(1)}, ${carried.on.cam.y.toFixed(1)}) ~ (${carried.on.x.toFixed(1)}, ${carried.on.y.toFixed(1)}), zoom kept ×${carried.on.cam.zoom.toFixed(2)}`);
 
   // ——— 5. The queen's pen: a click on the top view ———
