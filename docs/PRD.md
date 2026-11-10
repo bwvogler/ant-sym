@@ -28,7 +28,7 @@ The table is the original interview, with later reversals marked *(now: …)*. T
 | Look | **Ink on warm paper**: lingo-dojo palette. Light: ink ants on `#f6f4ef`; dark: pale ants on charcoal. One jade accent for the overseer box and selected things. Ants are 2 px oriented ticks. | More ants = darker reads naturally as a pen drawing. Reuses an existing, tested token scheme. |
 | Controls (v1) | Text input + image upload with live target-grid preview; ant count, sim speed, Jev/local toggle; Jev telemetry panel; overlays (deficit heatmap, overseer box, pheromone trails). | All chosen. |
 | End state | Overseer "formed" badge; **Scatter** button; **Morph** (type a new target while formed and ants walk to it). GIF recording deferred to a later milestone. | Scatter is the replay moment. Morph is cheap once the target is just a grid. |
-| Deployment | Local first (port **38500**, key from `JEV_API_KEY` in the shell), server written so it can be hosted later with per-visitor budgets. | Same shape as lingo-dojo / travel-guide. |
+| Deployment | Local first (port **38500**, key from `JEV_API_KEY` in the shell), server written so it can be hosted later with per-visitor budgets. *Hosted since 2026-11-05: Pages for `main` and each PR, Jev through a Cloudflare Worker behind a passphrase and a $2/day cap, one shared ledger rather than per-visitor budgets (docs/hosting.md).* | Same shape as lingo-dojo / travel-guide. |
 | Process | Beads (prefix `ja`) + one PR per milestone with agent review before merge. | House convention. |
 | Repo | Public, `scalefreegan/jev-ants`, MIT *(now `bwvogler/ant-sym`)*. | Showcase piece. |
 

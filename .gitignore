@@ -19,3 +19,7 @@ exports/
 
 # Experiment output (scripts/experiment.mjs, scripts/colony-live.mjs)
 experiments/out/
+
+# Cloudflare Worker (web/worker): wrangler state and local secrets
+.wrangler/
+.dev.vars

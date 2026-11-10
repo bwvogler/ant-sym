@@ -93,7 +93,8 @@ export function headersFor(apiKey: string, req: JevRequest, bodyBytes: number): 
   return h;
 }
 
-function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
+/** setTimeout as a promise that rejects with JevAbortError when `signal` fires. */
+export function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new JevAbortError());
     const t = setTimeout(() => {

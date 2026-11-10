@@ -23,6 +23,7 @@ export interface JevStatus {
 export function policyLock(b: Backend | null, s: JevStatus, starting = false): string | null {
   if (b === null) return "Checking for the Jev server…";
   if (!b.hasBackend) return "No Jev server in this build: the game plays the answers Jev already gave, and policies can't be changed.";
+  if (b.needsPass) return "Jev is hosted for this page behind a passphrase: enter it above to change policies. Until then the game plays the answers Jev already gave.";
   if (!b.hasKey) return "JEV_API_KEY is not set in the server's environment: the game plays the answers Jev already gave, and policies can't be changed.";
   if (s.phase === "running" || starting) return null;
   if (s.phase === "stopped") {
@@ -47,7 +48,7 @@ export function shouldStart(b: Backend | null, s: JevStatus, starting: boolean):
   return !starting && s.phase !== "running" && policyLock(b, s, starting) === null;
 }
 
-/** Whether the player can start Jev by hand (Details → Resume): a server and key, and no run on or starting. */
+/** Whether the player can start Jev by hand (Details → Resume): a server and key (unlocked, when hosted), and no run on or starting. */
 export function canResume(b: Backend | null, s: JevStatus, starting: boolean): boolean {
-  return !!b?.hasBackend && b.hasKey && s.phase !== "running" && !starting;
+  return !!b?.hasBackend && b.hasKey && !b.needsPass && s.phase !== "running" && !starting;
 }

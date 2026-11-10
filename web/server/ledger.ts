@@ -114,6 +114,12 @@ export class Ledger {
   /** the day the budget's figures are for, and the tokens billed on it, across runs */
   #day = "";
   #dayTokens = 0;
+  /**
+   * Tokens reserved by every call still out, whatever run it belongs to. A new run forgets the old run's reservations
+   * (#reservedInFlight) but not these: calls it aborted may still be billed, so the budget must keep holding room for
+   * them until they end (PR #66 review S1).
+   */
+  #dayReserved = 0;
 
   constructor(opts: LedgerOptions = {}) {
     this.#maxInFlight = opts.maxInFlight ?? DEFAULT_IN_FLIGHT;
@@ -230,9 +236,9 @@ export class Ledger {
     if (this.#inFlight >= this.#maxInFlight) return { ok: false, reason: "busy" };
     const reserved = (this.#reservedInFlight + this.reserveFor(reserveHint)) * USD_PER_INPUT_TOKEN;
     const overCap = this.usd + reserved > this.#caps.capUsd;
-    const overBudget = this.spentToday + reserved > this.#dailyUsd;
+    const overBudget = this.spentToday + (this.#dayReserved + this.reserveFor(reserveHint)) * USD_PER_INPUT_TOKEN > this.#dailyUsd;
     if (overCap || overBudget) {
-      if (this.#inFlight > 0) return { ok: false, reason: "busy" };
+      if (this.#inFlight > 0 || (overBudget && this.#dayReserved > 0)) return { ok: false, reason: "busy" };
       const reason = overBudget ? "budget" : "spend-cap";
       this.stop(reason, now);
       return { ok: false, reason };
@@ -245,12 +251,14 @@ export class Ledger {
     this.#inFlight++;
     const reserved = this.reserveFor(reserveHint);
     this.#reservedInFlight += reserved;
+    this.#dayReserved += reserved;
     return { runId: this.#runId, reserved };
   }
 
   /** Record a finished call. Tokens are the real usage.input_tokens of the reply. A token from an earlier run is ignored. */
   end(token: InFlightToken, result: CallResult): void {
     const tokens = Math.max(0, result.inputTokens);
+    this.#dayReserved = Math.max(0, this.#dayReserved - token.reserved);
     if (!result.aborted && tokens > 0) {
       // Billed, whichever run it belongs to: today's budget counts it.
       this.#dayTokens += tokens;

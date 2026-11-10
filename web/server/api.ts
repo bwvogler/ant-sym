@@ -3,10 +3,13 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
-import { DAILY_BUDGET_USD, DEFAULT_JEV_MODEL, type JevProxyReply, type JevRequest, type RunCaps } from "../shared/jev.ts";
+import type { RunCaps } from "../shared/jev.ts";
 import { HttpError, methodNotAllowed, readJsonBody, sendJson } from "./http.ts";
-import { DEFAULT_IN_FLIGHT, JevAbortError, JevClient, type JevCaller } from "./jev.ts";
-import { Ledger, reserveForBytes, type BudgetStore } from "./ledger.ts";
+import { DEFAULT_IN_FLIGHT, JevClient } from "./jev.ts";
+import { Ledger, type BudgetStore } from "./ledger.ts";
+import { dailyBudget, healthReply, jevReply, runReply, type Reply, type Services } from "./replies.ts";
+
+export { dailyBudget, healthReply, isJevResponse, jevReply, runReply, validateJevRequest, type Reply, type Services } from "./replies.ts";
 
 // The whole "backend": dev-server-only middleware on the Vite server, in the
 // shape of lingo-dojo / Atlas. Single-user, localhost, no auth by design. The
@@ -53,44 +56,6 @@ export function wrap(fn: Handler): Handler {
   };
 }
 
-/** Shape-check a Jev request from the browser. The server owns the model default; the browser never names the key. */
-export function validateJevRequest(raw: unknown): JevRequest {
-  const r = raw as Partial<JevRequest> | null;
-  if (!r || typeof r !== "object") throw new HttpError(400, "body must be a Jev request object");
-  if (r.state === undefined) throw new HttpError(400, "state is required");
-  if (!r.questions || typeof r.questions !== "object" || Object.keys(r.questions).length === 0) {
-    throw new HttpError(400, "questions must be a non-empty object");
-  }
-  for (const [name, q] of Object.entries(r.questions)) {
-    if (!q || typeof q !== "object" || !["noul", "choice", "score", "box"].includes((q as { type: string }).type)) {
-      throw new HttpError(400, `question ${name} has no valid type`);
-    }
-    // A choice among nothing has no answer: billed every time, never cached, and upstream may fail the whole batch on it.
-    const c = (q as { type: string; criteria?: unknown }).criteria;
-    if ((q as { type: string }).type === "choice" && (!c || typeof c !== "object" || Object.keys(c).length === 0)) {
-      throw new HttpError(400, `question ${name} is a choice with no options`);
-    }
-  }
-  return {
-    model: typeof r.model === "string" && r.model ? r.model : DEFAULT_JEV_MODEL,
-    state: r.state,
-    questions: r.questions,
-    ...(r.assets ? { assets: r.assets } : {}),
-  };
-}
-
-/** A 200 from upstream must carry an answers object to count as an answer. */
-export function isJevResponse(body: unknown): boolean {
-  const b = body as { answers?: unknown } | null;
-  return !!b && typeof b === "object" && !!b.answers && typeof b.answers === "object";
-}
-
-export interface Services {
-  client: JevCaller | null;
-  ledger: Ledger;
-  now: () => number;
-}
-
 /** Where the dev server keeps the day's spend, so the budget holds across restarts: the repo's gitignored data/. */
 export const BUDGET_FILE = fileURLToPath(new URL("../../data/jev-budget.json", import.meta.url));
 
@@ -115,12 +80,6 @@ export function fileBudgetStore(path: string): BudgetStore {
   };
 }
 
-/** The daily budget from JEV_DAILY_USD (dollars, ≥ 0), else DAILY_BUDGET_USD. */
-export function dailyBudget(env: NodeJS.ProcessEnv): number {
-  const v = Number(env.JEV_DAILY_USD);
-  return env.JEV_DAILY_USD !== undefined && env.JEV_DAILY_USD !== "" && Number.isFinite(v) && v >= 0 ? v : DAILY_BUDGET_USD;
-}
-
 /**
  * The real services from the environment: key, in-flight width (JEV_IN_FLIGHT), one ledger sized to match, with the
  * overall daily budget (JEV_DAILY_USD; PR #42 review S8) kept in BUDGET_FILE.
@@ -135,49 +94,20 @@ export function buildServices(env: NodeJS.ProcessEnv, budgetFile = BUDGET_FILE):
 }
 
 export function makeHandlers(svc: Services) {
-  const health: Handler = (_req, res) => sendJson(res, 200, { ok: true, hasKey: svc.client !== null, run: svc.ledger.summary(svc.now()) });
+  const send = (res: ServerResponse, r: Reply) => sendJson(res, r.status, r.body);
+
+  const health: Handler = (_req, res) => send(res, healthReply(svc));
 
   const run: Handler = async (req, res) => {
-    if (req.method === "GET") return sendJson(res, 200, svc.ledger.summary(svc.now()));
+    if (req.method === "GET") return send(res, runReply(svc, "GET", {}));
     if (req.method !== "POST") return methodNotAllowed(res, "GET, POST");
-    const body = await readJsonBody<{ action?: string; caps?: Partial<RunCaps> }>(req);
-    if (body.action === "start") return sendJson(res, 200, svc.ledger.start(body.caps ?? {}, svc.now()));
-    if (body.action === "stop") return sendJson(res, 200, svc.ledger.stop("user", svc.now()));
-    if (body.action === "formed") return sendJson(res, 200, svc.ledger.stop("formed", svc.now()));
-    throw new HttpError(400, "action must be start, stop or formed");
+    send(res, runReply(svc, "POST", await readJsonBody<{ action?: string; caps?: Partial<RunCaps> }>(req)));
   };
 
   const jev: Handler = async (req, res) => {
     if (req.method !== "POST") return methodNotAllowed(res, "POST");
     if (!svc.client) throw new HttpError(503, "JEV_API_KEY is not set in the server's environment");
-    const request = validateJevRequest(await readJsonBody(req));
-    // Reserve from this request's own size, so a big call cannot hide under a small one's room.
-    const reserve = reserveForBytes(Buffer.byteLength(JSON.stringify(request)));
-    const gate = svc.ledger.admit(svc.now(), reserve);
-    if (!gate.ok) {
-      // 429 "busy" is temporary: the pool is full or what is in flight might
-      // use up the rest of the cap. 409 means the run is over (or never
-      // started). The reply carries the summary so the client learns which
-      // without another trip.
-      return sendJson(res, gate.reason === "busy" ? 429 : 409, { error: gate.reason, run: svc.ledger.summary(svc.now()) });
-    }
-    const token = svc.ledger.begin(reserve);
-    const signal = svc.ledger.signal;
-    let result: Awaited<ReturnType<JevCaller["ask"]>>;
-    try {
-      result = await svc.client.ask(request, signal);
-    } catch (e) {
-      const aborted = e instanceof JevAbortError || signal.aborted;
-      // An aborted call never got a reply: its cost is unknown, so it is counted apart, not as a free request.
-      svc.ledger.end(token, { status: 0, ms: 0, inputTokens: 0, aborted });
-      if (aborted) return sendJson(res, 409, { error: "stopped", run: svc.ledger.summary(svc.now()) });
-      throw new HttpError(502, `jev unreachable: ${(e as Error).message}`);
-    }
-    // A 200 without answers is not an answer; keep the status for the ledger but say so.
-    const body = result.status === 200 && !isJevResponse(result.body) ? { error: "upstream reply had no answers", upstream: result.body } : result.body;
-    svc.ledger.end(token, result);
-    const reply: JevProxyReply = { ...result, body: body as JevProxyReply["body"], run: svc.ledger.summary(svc.now()) };
-    sendJson(res, 200, reply);
+    send(res, await jevReply(svc, await readJsonBody(req)));
   };
 
   return { health, run, jev };

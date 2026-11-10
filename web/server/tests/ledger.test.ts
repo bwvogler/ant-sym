@@ -292,3 +292,19 @@ test("the budget reserves for calls in flight, as the spend cap does, and surviv
   assert.ok(Math.abs(restarted.summary(DAY + HOUR).budget!.spentUsd - 10_000 * USD_PER_INPUT_TOKEN) < 1e-12, "a restarted server knows today's spend");
   assert.equal(new Ledger().summary(DAY).budget!.usdPerDay, null, "no budget unless one is set");
 });
+
+test("a new run keeps holding the budget for calls still out from the run it replaced (PR #66 review S1)", () => {
+  // $0.001 a day is 23,809 tokens. Restarting runs used to drop the old run's reservations, so start + call, over and
+  // over, let every call out at once whatever the day had left.
+  const l = new Ledger({ maxInFlight: 5, dailyUsd: 0.001 });
+  const out = [];
+  for (let i = 0; i < 4; i++) {
+    l.start(GAME, DAY);
+    if (l.admit(DAY, 10_000).ok) out.push(l.begin(10_000));
+  }
+  assert.equal(out.length, 2, "two calls of 10,000 fit under 23,809 tokens; the third waits, though each start was a new run");
+  l.start(GAME, DAY);
+  assert.deepEqual(l.admit(DAY, 10_000), { ok: false, reason: "busy" }, "calls still out: wait, the run goes on");
+  for (const t of out) l.end(t, { status: 200, ms: 1, inputTokens: 1_000 });
+  assert.deepEqual(l.admit(DAY, 10_000), { ok: true }, "once they land, what they really cost is all that counts");
+});

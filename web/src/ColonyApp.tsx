@@ -15,8 +15,9 @@ import StartScreen from "./ui/StartScreen.tsx";
 import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
 import { FOUNDING_RESERVE, MAX_COLONIES, MET, type Game } from "./colony/game.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
-import { isDemo } from "./ui/backend.ts";
-import { useBackend } from "./ui/useBackend.ts";
+import { isDemo, passphrase } from "./ui/backend.ts";
+import PassNote from "./ui/PassNote.tsx";
+import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import { AIMS } from "./colony/fungusBrain.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
@@ -274,6 +275,7 @@ export default function ColonyApp() {
       {flight && gate?.open && !circle && <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} />}
       {!controls.started && <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />}
 
+      {backend?.needsPass && <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} />}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm" aria-label="game bar">
         <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={() => update({ playing: !controls.playing })}>
           {controls.playing ? "Pause" : "Play"}
