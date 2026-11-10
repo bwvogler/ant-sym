@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CELL, centreX, centreY, hexDistance } from "../hex.ts";
-import { NEST_GAP } from "../game.ts";
+import { generateOneWorld } from "../oneWorld.ts";
 import { canFound, cellAt, columnsOver, grow, HOLE_GAP_2D, makeTransect, MARGIN, nearestValid, type Cell, type Transect } from "../transect.ts";
-import { mulberry32 } from "../world.ts";
+import { disc, foundNest, hash4, mulberry32, type Nest } from "../world.ts";
 
 const open = () => true;
 const at = (t: Transect, s: number): [number, number] => {
@@ -111,8 +111,9 @@ test("rule 2, crossing and clearance: the new segment and its margin keep clear 
 
 test("rules 3 and 4: a hole gap from every hole, on open ground", () => {
   const t = makeTransect([A, B]);
-  assert.deepEqual(canFound(t, { x: 208, y: 100 }, open), { ok: false, reason: "hole-gap" });
-  assert.deepEqual(canFound(t, { x: 212, y: 100 }, open), { ok: true, end: "end" });
+  // On Amber's row a cell is its column difference away: the gap is refused a cell short, and allowed at the gap.
+  assert.deepEqual(canFound(t, { x: B.x + HOLE_GAP_2D - 1, y: 100 }, open), { ok: false, reason: "hole-gap" });
+  assert.deepEqual(canFound(t, { x: B.x + HOLE_GAP_2D, y: 100 }, open), { ok: true, end: "end" });
   assert.deepEqual(canFound(t, B, open), { ok: false, reason: "hole-gap" });
   // Behind Amber, on the line: refused for crowding the hole, the reason a player should read, not for the turn.
   assert.deepEqual(canFound(t, { x: 195, y: 100 }, open), { ok: false, reason: "hole-gap" });
@@ -136,8 +137,53 @@ test("one hole: no line to fold back on yet, so any open spot a hole gap away gr
   assert.throws(() => makeTransect([A, B], { s0: 0.5 }), /s0/);
 });
 
-test("one gap for one world: HOLE_GAP_2D is game.ts's NEST_GAP", () => {
-  assert.equal(HOLE_GAP_2D, NEST_GAP);
+test("the hole gap keeps founded royal chambers apart: HOLE_GAP_2D (16, ja-tjo) less both shafts' slant is wider than both chambers", () => {
+  // The owner's number (2026-11-09), and why it is enough: foundNest's shaft slants to a random side and its royal chamber
+  // is a disc round the shaft's foot. Two holes the gap apart whose shafts slant toward each other must still leave a
+  // column between their chambers.
+  assert.equal(HOLE_GAP_2D, 16);
+  const { curtain } = generateOneWorld(1, { plane: { size: { w: 160, h: 100 } } });
+  let slant = 0;
+  let reach = 0;
+  for (const [k, v] of [0.1, 0.9].entries()) {
+    const s = 60 + 40 * k;
+    const n = foundNest(curtain, s, 10 + k, () => v);
+    slant = Math.max(slant, Math.abs(n.x - n.entrance!.x));
+    const royal = curtain.chambers!.list.find((c) => c.colony === 10 + k)!;
+    for (let y = royal.y0; y <= royal.y1; y++) for (let x = royal.x0; x <= royal.x1; x++) if (curtain.chambers!.at(x, y) === royal.id) reach = Math.max(reach, Math.abs(centreX(x, y) - n.x));
+  }
+  assert.equal(slant, 3, "the shaft's foot is 3 columns off its hole");
+  assert.ok(reach >= 3.5 && reach <= 4.5, `the chamber reaches ${reach} either side of the foot`);
+  assert.ok(HOLE_GAP_2D - 2 * slant - 2 * reach >= 1, `at ${HOLE_GAP_2D}, ${HOLE_GAP_2D - 2 * slant - 2 * reach} columns between two chambers at the worst`);
+});
+
+test("ja-tjo's assay: on the curtains of seeds 1–20, nests founded HOLE_GAP_2D apart along s never share a royal chamber cell (4 sites a seed)", () => {
+  let pairs = 0;
+  let merged = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const { curtain, line } = generateOneWorld(seed);
+    // Four sites along the curtain, clear of the world's own two nests and of each other: a chamber lies within 8 columns
+    // of its hole, so a pair at s and s + gap digs only in s − 8 … s + gap + 8.
+    const sites: number[] = [];
+    for (let s = line.sMin + 10; s + HOLE_GAP_2D <= line.sMax - 10 && sites.length < 4; s++)
+      if (line.sHole.every((h) => s + HOLE_GAP_2D + 8 < h - 8 || s - 8 > h + 8) && sites.every((o) => s - 8 > o + HOLE_GAP_2D + 8)) sites.push(s);
+    assert.equal(sites.length, 4, `seed ${seed}: four sites`);
+    sites.forEach((s, j) => {
+      // Each nest's slant from its own stream, keyed by its column, as founding keys it by its hole.
+      const a = foundNest(curtain, s, 10 + 2 * j, mulberry32(hash4(seed, 81, s, 0)));
+      const b = foundNest(curtain, s + HOLE_GAP_2D, 11 + 2 * j, mulberry32(hash4(seed, 81, s + HOLE_GAP_2D, 0)));
+      const cells = (n: Nest) => {
+        const out = new Set<number>();
+        disc(curtain, n.x, n.y, n.r + 1.5, (x, y) => out.add(y * 4096 + x + 2048));
+        return out;
+      };
+      const ca = cells(a);
+      pairs++;
+      if ([...cells(b)].some((k) => ca.has(k))) merged++;
+    });
+  }
+  assert.equal(pairs, 80);
+  assert.equal(merged, 0, `${merged} of ${pairs} pairs share a royal chamber`);
 });
 
 test("nearestValid: the nearest allowed cell within the radius, or null when there is none", () => {
@@ -146,8 +192,8 @@ test("nearestValid: the nearest allowed cell within the radius, or null when the
   const r = nearestValid(t, { x: 204, y: 100 }, 20, open);
   assert.ok(r);
   assert.equal(r.end, "end");
-  assert.ok(Math.hypot(centreX(r.cell.x, r.cell.y) - centreX(B.x, B.y), centreY(r.cell.y) - centreY(B.y)) >= 12);
-  assert.ok(Math.hypot(centreX(r.cell.x, r.cell.y) - centreX(204, 100), centreY(r.cell.y) - centreY(100)) <= 8.5);
+  assert.ok(Math.hypot(centreX(r.cell.x, r.cell.y) - centreX(B.x, B.y), centreY(r.cell.y) - centreY(B.y)) >= HOLE_GAP_2D);
+  assert.ok(Math.hypot(centreX(r.cell.x, r.cell.y) - centreX(204, 100), centreY(r.cell.y) - centreY(100)) <= HOLE_GAP_2D - 4 + 0.5);
   assert.deepEqual(nearestValid(t, { x: 204, y: 100 }, 20, open), r, "the same answer every time");
   // Midway along the line: nothing within 10 cells is allowed (it is nearest an end only by turning back over the line).
   assert.equal(nearestValid(t, { x: 150, y: 100 }, 10, open), null);

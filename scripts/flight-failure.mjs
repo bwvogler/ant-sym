@@ -6,8 +6,9 @@
 // somewhat higher.
 //
 // Measured 2026-11-08 (ja-lp4.10), 300 seeds: flight 140 with radius 70 failed 51% from end nests and 55% from interior
-// ones; radius 140, 6% and 28% (chosen); radius 210, 1% and 7%. Rerun when the plane changes size (the endless world,
-// ja-qpv, removes the edges that drive most failures at radius 70).
+// ones; radius 140, 6% and 28% (chosen); radius 210, 1% and 7%. Rerun 2026-11-10 at HOLE_GAP_2D 16 (ja-tjo; it was 12):
+// 51%/55%, 7%/28%, 1%/7%; flight 210 with radius 70, 79%/66%, with 140, 47%/45% (unchanged from 12). Rerun when the
+// plane changes size (the endless world, ja-qpv, removes the edges that drive most failures at radius 70).
 //
 // Usage: node scripts/flight-failure.mjs [seeds=300] [width=512] [height=368]
 import { CELL, cellOf, centreX, centreY } from "../web/src/colony/hex.ts";

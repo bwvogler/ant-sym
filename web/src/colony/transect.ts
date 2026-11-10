@@ -21,10 +21,12 @@ export const MARGIN = 64;
 /** How near the line may come to itself away from a vertex, in cells (one-world §3 rule 2). */
 export const CLEARANCE = 12;
 /**
- * The least 2D distance between holes (one-world §3 rule 3), between cell centres in world units: the same value and
- * measure as game.ts's NEST_GAP between nests' centres (a test pins them equal), one gap for one world.
+ * The least 2D distance between holes (one-world §3 rule 3), between cell centres in world units. 16 (owner,
+ * 2026-11-09; ja-tjo): a founded nest's shaft slants 3 columns to a random side and its royal chamber is a disc of
+ * radius 4.5, so two holes 16 apart along the curtain keep their chambers apart (16 − 2 × 3 > 2 × 4.5), as the side
+ * view's HOLE_GAP does. At 12, 25 of 80 founding pairs shared a royal chamber. A test pins it against the dig.
  */
-export const HOLE_GAP_2D = 12;
+export const HOLE_GAP_2D = 16;
 /** The sharpest turn back a new segment may make on the end segment (one-world §3 rule 2): 120°. */
 export const MAX_TURN = (2 * Math.PI) / 3;
 
@@ -202,7 +204,8 @@ function standing(t: Transect, end: End): Seg[] {
   const [ux, uy] = outward(h, far);
   segs.push([cx(fv), cy(fv), cx(fv) + ux * t.margin, cy(fv) + uy * t.margin]);
   // Cut every part of the line within the clearance of the vertex: not only the end segment, since the one before it
-  // can pass as near as 12·sin 60° ≈ 10.4 when this hole was founded at the hole gap and the turn limit.
+  // can pass near it when this hole was founded close to the last at the turn limit (at a hole gap of 12, as near as
+  // 12·sin 60° ≈ 10.4; at today's 16, 13.9: kept, so the rule doesn't hang on the gap).
   return segs.flatMap((sg) => outsideDisc(sg, vx, vy, CLEARANCE));
 }
 

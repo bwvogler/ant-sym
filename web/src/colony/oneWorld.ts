@@ -125,8 +125,8 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
 
   // Each nest: a hole in the crust at its column, a slanted shaft and a royal chamber, dug as the side view digs them.
   // Each draws its shaft's slant from its own stream, keyed by its hole, so a nest is dug the same when the line grows.
-  // Spacing is founding's: the game's two holes lie ~140 apart, but holes HOLE_GAP_2D (12) apart can get royal chambers
-  // that merge, as in the side view today (ja-tjo, before U4 founds on the curtain).
+  // Spacing is founding's: the game's two holes lie ~140 apart, and founding keeps HOLE_GAP_2D (16) between holes, at
+  // which two founded royal chambers never share a cell (ja-tjo; at 12, 25 of 80 pairs did).
   const nests: Nest[] = [];
   // Dug in colony order, so each royal chamber's id is the same whichever end the line grew at.
   for (let c = 0; c < colonies.length; c++) {
