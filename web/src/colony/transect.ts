@@ -123,6 +123,25 @@ export function cellAt(t: Transect, s: number): boolean {
   return true;
 }
 
+/**
+ * The line's signed turn at interior vertex j (hole V_j, 0 < j < k), in degrees: how far the segment out of V_j turns from
+ * the one into it, between the holes' centres. Positive turns right as seen from above (the plane's y runs down the
+ * screen: clockwise), negative left; 0 straight on, never past ±180. NaN at an end, or off the line. For the side view's
+ * labels at each bend ("↱ 35°", one-world §5).
+ */
+export function turnAt(t: Transect, j: number): number {
+  const h = t.holes;
+  if (!Number.isInteger(j) || j <= 0 || j >= h.length - 1) return NaN;
+  const a = h[j - 1]!;
+  const v = h[j]!;
+  const b = h[j + 1]!;
+  const ux = cx(v) - cx(a);
+  const uy = cy(v) - cy(a);
+  const wx = cx(b) - cx(v);
+  const wy = cy(b) - cy(v);
+  return (Math.atan2(ux * wy - uy * wx, ux * wx + uy * wy) * 180) / Math.PI;
+}
+
 const cellKey = (x: number, y: number): number => (y + 32768) * 131072 + (x + 32768);
 const byCell = new WeakMap<Transect, Map<number, number[]>>();
 

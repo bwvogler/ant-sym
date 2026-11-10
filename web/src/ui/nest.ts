@@ -57,7 +57,8 @@ export function nestView(col: Colony): NestView | null {
   const ground = col.nest.entrance ? rowOf(col.nest.entrance.y) : 0;
   const ants = new Map<number, number>();
   for (let i = 0; i < col.n; i++) {
-    if (!col.alive[i]) continue;
+    // Only ants on the nest's layer (one world: the curtain; an ant on the plane over a chamber is not in it).
+    if (!col.alive[i] || col.layer[i] !== col.home) continue;
     cellOf(col.x[i] as number, col.y[i] as number);
     const id = chambers.at(CELL[0] as number, CELL[1] as number);
     if (id >= 0) ants.set(id, (ants.get(id) ?? 0) + 1);

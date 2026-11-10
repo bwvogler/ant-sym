@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CELL, centreX, centreY, hexDistance } from "../hex.ts";
 import { generateOneWorld } from "../oneWorld.ts";
-import { canFound, cellAt, columnsOver, grow, HOLE_GAP_2D, makeTransect, MARGIN, nearestValid, type Cell, type Transect } from "../transect.ts";
+import { canFound, cellAt, columnsOver, grow, HOLE_GAP_2D, makeTransect, MARGIN, nearestValid, turnAt, type Cell, type Transect } from "../transect.ts";
 import { disc, foundNest, hash4, mulberry32, type Nest } from "../world.ts";
 
 const open = () => true;
@@ -25,6 +25,31 @@ test("two holes east–west: one column per step, V₀ at s = 0, a straight marg
   assert.equal(cellAt(t, 0.5), false);
   assert.deepEqual(columnsOver(t, 150, 100), [50]);
   assert.deepEqual(columnsOver(t, 150, 101), []);
+});
+
+test("turnAt: the signed turn at each interior vertex, in degrees: right (clockwise on the plane, y down) positive, left negative, NaN at the ends", () => {
+  // East to V₁, then on: straight, south-east (right), north-east (left), and back south-west (a sharp right).
+  const C = { x: 200, y: 100 };
+  const deg = (dx: number, dy: number) => (Math.atan2(dy, dx) * 180) / Math.PI;
+  for (const [b, sign] of [
+    [{ x: 300, y: 100 }, 0],
+    [{ x: 260, y: 160 }, 1],
+    [{ x: 260, y: 40 }, -1],
+    [{ x: 160, y: 180 }, 1],
+  ] as const) {
+    const t = makeTransect([A, C, b]);
+    const want = deg(centreX(b.x, b.y) - centreX(C.x, C.y), centreY(b.y) - centreY(C.y)) - deg(centreX(C.x, C.y) - centreX(A.x, A.y), 0);
+    const got = turnAt(t, 1);
+    assert.ok(Math.abs(got - want) < 1e-9, `${got} for ${want}`);
+    assert.equal(Math.sign(got), sign);
+    assert.ok(Number.isNaN(turnAt(t, 0)) && Number.isNaN(turnAt(t, 2)), "no turn at an end");
+  }
+  // The same bend walked the other way turns the other way.
+  const fwd = makeTransect([A, C, { x: 260, y: 160 }]);
+  const back = makeTransect([{ x: 260, y: 160 }, C, A]);
+  assert.ok(Math.abs(turnAt(fwd, 1) + turnAt(back, 1)) < 1e-9);
+  // Two holes: no interior vertex.
+  assert.ok(Number.isNaN(turnAt(makeTransect([A, C]), 1)));
 });
 
 test("a slanted segment is hexDistance columns long: never shorter than the surface, at most ~15% longer", () => {

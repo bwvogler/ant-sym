@@ -320,6 +320,20 @@ test("one world: allied contact is counted per layer", () => {
   assert.ok(met(true) > 0, "together, they do");
 });
 
+test("one world: sporesOn reads each layer's spores (layer 0's are the public ones), for the renderer", () => {
+  const g = game();
+  const h = own(g.player);
+  const at = curtainHole(h);
+  g.fungus.paint([], at.x, at.y, 1.5, 3, 0, GARDEN, CURTAIN);
+  assert.equal(g.fungus.sporesOn(PLANE)!.spores, g.fungus.spores);
+  assert.equal(g.fungus.sporesOn(PLANE)!.sporeStrain, g.fungus.sporeStrain);
+  const [x, y] = [h.col, h.row]; // the hole, open
+  assert.ok(g.fungus.sporesOn(CURTAIN)!.spores.get(x, y) > 0, "the curtain's spores are on layer 1");
+  assert.equal(g.fungus.sporesOn(CURTAIN)!.sporeStrain.get(x, y), GARDEN);
+  assert.equal(g.fungus.spores.get(x, y), 0, "and not on the plane's");
+  assert.equal(g.fungus.sporesOn(2), null);
+});
+
 test("one world: the landing is on the plane by the hole, its spores dose only the ants on the plane, and the fungus reads each layer's ground", () => {
   const g = game();
   const c = g.player;

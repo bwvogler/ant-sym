@@ -309,6 +309,15 @@ export class Fungus {
     this.menu = this.#menu; // through the setter: the nest's interventions only where there is a nest
   }
 
+  /**
+   * Map `layer`'s spores and their strain (one world: 0 the plane, 1 the curtain), for the renderer: layer 0's are the
+   * public `spores` and `sporeStrain`. Read only; null for a layer the fungus has no map for.
+   */
+  sporesOn(layer: number): { readonly spores: ChunkLayer<Float32Array>; readonly sporeStrain: ChunkLayer<Uint8Array> } | null {
+    const L = this.#layers[layer];
+    return L ? { spores: L.spores, sporeStrain: L.sporeStrain } : null;
+  }
+
   /** Whether there is anything for a step to do: spores on the ground or load in any ant. */
   get active(): boolean {
     if (this.hosts > 0) return true;
