@@ -5933,6 +5933,9 @@ export function angleDiff(a: number, b: number): number {
  * row, sky: the side view draws the plane there, one-world §8 item 6), where a step from the hole under it is a crossing
  * up onto the plane (tick). The strip touches the curtain's open cells only at the holes, the crust being solid elsewhere,
  * so it reads as the walkway over a hole, as the side view's ground does. On every other map, open ground alone.
+ * openAt and #walkTunnel need it (an ant at a hole's top must see the way up). #upOut, the scent walk and #towardHole use
+ * it only to agree with openAt: none meets the strip today (PR #64 review N1: 0 disagreements with the open check, seeds
+ * 1-3, 300 s), since a step into it crosses up at once.
  */
 export function walkable(map: WorldMap, x: number, y: number): boolean {
   const t = rockAt(map, x, y);
