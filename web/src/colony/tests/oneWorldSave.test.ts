@@ -45,10 +45,10 @@ function restore(saved: GameSave, make: () => Game): Game {
   return g;
 }
 
-/** Spores in the curtain, a few rows down colony c's shaft (the fungus's second map). */
+/** Spores in the curtain, a few rows down colony c's shaft (the fungus's second map), below the gate (ja-web: the foragers held at the top of the shaft took up spores painted there before the save). */
 function sporesBelow(g: Game, c: Colony): void {
   const h = c.holeCells[c.params.nest]!;
-  g.fungus.paint([], centreX(h.col, CRUST + 3), centreY(CRUST + 3), 2, 3, 0, GARDEN, CURTAIN);
+  g.fungus.paint([], centreX(h.col, CRUST + 6), centreY(CRUST + 6), 2, 3, 0, GARDEN, CURTAIN);
 }
 
 /**

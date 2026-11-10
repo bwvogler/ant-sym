@@ -31,13 +31,14 @@ const open = (g: Game, x: number, y: number): boolean => {
   return rockAt(g.world!.plane, CELL[0] as number, CELL[1] as number) === OPEN;
 };
 
-/** Old ant i of c, at the top of hole h's shaft and heading up, climbs out onto the plane (within 20 s). */
+/** Old ant i of c, at the top of hole h's shaft and heading up, with a pass through the gate there (ja-web), climbs out onto the plane (within 20 s). */
 function climbOut(g: Game, c: Colony, i: number, h: HoleCell): void {
   const at = curtainHole(h);
   c.age[i] = OLD;
   c.carrying[i] = 0;
   c.putAnt(i, CURTAIN, at.x, at.y);
   c.mode[i] = EXPLORE;
+  c.leaveOk[i] = 1;
   c.heading[i] = -Math.PI / 2;
   for (let k = 0; k < Math.round(20 / DT) && c.layer[i] !== PLANE; k++) g.tick(DT);
   assert.equal(c.layer[i], PLANE, "it climbed out");

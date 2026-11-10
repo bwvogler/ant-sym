@@ -245,7 +245,8 @@ export interface ColonyParams {
    * Activation (behaviour MR 5, docs/activation.md): encounters with nestmates coming home with food, in the ant's
    * leaky count `met`, from which a waiting forager senses returns as "few" (RETURNS_MANY times as many: "many"). A
    * rested forager home with empty jaws is then asked `leave` instead of going straight out. 0 = off: it goes straight
-   * out. Top-down maps only. 1 (PRD §48.4: G′ seeds 1–20 lost 5.2 % fewer ants for 2.9 % less food home; A5 passes).
+   * out. Top-down maps, and one world, where an outgoing forager is held at the gate at the top of its shaft (ja-web,
+   * PRD §48.6). 1 (PRD §48.4: G′ seeds 1–20 lost 5.2 % fewer ants for 2.9 % less food home; A5 passes).
    */
   leaveGate: number;
   /**
@@ -392,6 +393,10 @@ type LayerView = Layer & { readonly [SLOTS]: LayerSlots };
 /** One layer's gates for a tick (Colony.tick): whether it gates leaving, raids by trail and each ant's own stance, and their leaks. */
 interface Gates {
   gate: boolean;
+  /** one world's curtain (ja-web): outgoing foragers are held at the top of their own shaft (the gate) and asked `leave` there */
+  hold: boolean;
+  /** whether `met` leaks on this layer: where the colony gates leaving (one world: on both layers, so it fades on a trip out too) */
+  leak: boolean;
   metLeak: number;
   rgate: boolean;
   foeLeak: number;
@@ -404,19 +409,26 @@ interface Gates {
  * A layer's gates for a tick of dt, open ground's only (`open`: no hole into the layer). Activation (behaviour MR 5):
  * `met` leaks over MET_HALF. Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`. Each
  * ant's own stance (docs/stance.md): its threat leaks like `foes`; a waiting ant feels its home's crowd over CROWD_HALF.
+ * One world (`one`, ja-web): nobody waits on the plane, where every returner goes down its hole; activation is the
+ * curtain's, at the top of each shaft (`hold`), where the waiting ant feels its crowd too. Raids by trail and each ant's
+ * own stance stay the plane's.
  */
-function gatesFor(p: ColonyParams, open: boolean, dt: number): Gates {
-  const gate = p.leaveGate > 0 && open;
+function gatesFor(p: ColonyParams, open: boolean, one: boolean, dt: number): Gates {
+  const gate = p.leaveGate > 0 && open && !one;
+  const hold = p.leaveGate > 0 && one && !open;
+  const leak = p.leaveGate > 0 && (open || one);
   const rgate = p.raidGate > 0 && open;
   const sgate = p.stanceGate > 0 && open;
   return {
     gate,
-    metLeak: gate ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1,
+    hold,
+    leak,
+    metLeak: leak ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1,
     rgate,
     foeLeak: rgate ? Math.exp((-dt * Math.LN2) / FOES_HALF) : 1,
     sgate,
     threatLeak: sgate ? Math.exp((-dt * Math.LN2) / THREAT_HALF) : 1,
-    crowdKeep: sgate ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1,
+    crowdKeep: sgate || hold ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1,
   };
 }
 
@@ -701,6 +713,12 @@ export class Colony {
    * Every other ant carries on as a forager. Cleared when it is home again with no trail under it.
    */
   recruited: Uint8Array;
+  /**
+   * One world (ja-web): 1 while this ant has a pass through the gate at the top of its shaft: it came down its hole with
+   * food, and goes back out unprompted (a successful forager never waits, PRD §48), or its `leave` said go. Cleared when
+   * it climbs out.
+   */
+  leaveOk: Uint8Array;
   /** 1 once a recruited ant has been away from the nest: coming home then ends its raid */
   #gone: Uint8Array;
   /** a raider that has left the raid trail to search on, until it is home (ja-sf1) */
@@ -716,6 +734,20 @@ export class Colony {
    */
   #returning = new Map<number, number>();
   #returned = new Map<number, number>();
+  /**
+   * One world (ja-web): carriers that came down the colony's hole with food this tick, and last tick's, which every ant
+   * held at the top of the shaft meets (each carrier walks down past all of them). Not by cell: the returns above are
+   * keyed by cell with no layer. A count for the whole hole stands for an encounter only while the gate is the top
+   * WAIT_STEPS cells of one shaft; if the gate grows, or a side tunnel opens near the top, key it by cell (PR #68 N3).
+   */
+  #holeIn = 0;
+  #holeSeen = 0;
+  /** one world (ja-web): ants held at the gate at the top of the shaft, last tick */
+  gateHeld = 0;
+  /** raid scouts sent out (`leave` answered "raid", or a scout on a broadcast raid stance), finders that went home to tell, and ants a raid trail recruited: counters, read by the assays */
+  raidScouts = 0;
+  finds = 0;
+  recruits = 0;
   /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; read only while it carries food (left as it was after delivery) */
   quality: Float32Array;
   /** 1 from when fatigue passes patience until it has rested to nothing: a tired forager rests fully, not just under the line */
@@ -968,6 +1000,7 @@ export class Colony {
     this.crowd = new Float32Array(n);
     this.reporting = new Uint8Array(n);
     this.recruited = new Uint8Array(n);
+    this.leaveOk = new Uint8Array(n);
     this.#gone = new Uint8Array(n);
     this.#pastEnd = new Uint8Array(n);
     this.#defending = new Uint8Array(n);
@@ -1288,6 +1321,7 @@ export class Colony {
     this.crowd[i] = 0;
     this.reporting[i] = 0;
     this.recruited[i] = 0;
+    this.leaveOk[i] = 0;
     this.#gone[i] = 0;
     this.#pastEnd[i] = 0;
     this.#defending[i] = 0;
@@ -1458,7 +1492,8 @@ export class Colony {
       this.antCell(i);
       const cx = CELL[0] as number;
       const cy = CELL[1] as number;
-      p = !this.#inOwnNest(cx, cy) ? "out" : this.#perceivedPlace(i, this.#placeAt(cx, cy)) ? "chamber" : "tunnel";
+      // (One world, ja-web: at the gate at the top of its shaft it is at its nest's mouth, as on open ground.)
+      p = !this.#inOwnNest(cx, cy) ? "out" : this.#atGate(i) ? "hole" : this.#perceivedPlace(i, this.#placeAt(cx, cy)) ? "chamber" : "tunnel";
     } else {
       const dx = (this.x[i] as number) - this.nest.x;
       const dy = (this.y[i] as number) - this.nest.y;
@@ -4159,7 +4194,9 @@ export class Colony {
     const mode = RETURN;
     // On a raid stance, where the colony recruits by trail, every ant at home is a raider to be: asked in mode fight, so its
     // answer rests on the raid trail and not on food returns (review of #41).
-    const asked = this.params.raidGate > 0 && this.#entrance === null && this.#stanceOf(i) === "raid" ? FIGHT : mode;
+    // (One world, ja-web: at the gate at the top of its shaft too, where the stance is the ant's own.)
+    const own = this.#entrance === null || this.line !== null;
+    const asked = this.params.raidGate > 0 && own && this.#stanceOf(i) === "raid" ? FIGHT : mode;
     const answer = this.responses.leave(this.touch(i, enemy, asked, "none"));
     // "raid" goes at raidScout: scouts are few (behaviour MR 5.2), and their trail brings the rest.
     const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : answer === "raid" ? this.params.raidScout : scout;
@@ -4167,9 +4204,10 @@ export class Colony {
     // "raid" (docs/stance.md): it goes out as a raid scout. Recruited, its stance is raid, and its mode policy is asked afresh as one (it
     // starts exploring: see the callers). Where it can't be recruited (the side view, raidGate
     // 0, or no living rival: N3, S1) "raid" is a wait: it goes at raidScout, a scout like any other.
-    if (answer === "raid" && this.params.stanceGate > 0 && this.params.raidGate > 0 && this.#entrance === null && this.raidable) {
+    if (answer === "raid" && this.params.stanceGate > 0 && this.params.raidGate > 0 && own && this.raidable) {
       this.recruited[i] = 1;
       this.#gone[i] = 0;
+      this.raidScouts++;
     }
     return true;
   }
@@ -4202,12 +4240,15 @@ export class Colony {
    * `leave` with, and what keeps it recruited. "strong" where the colony doesn't recruit raiders by trail.
    */
   #raidSmelt(i: number): "none" | "faint" | "strong" {
-    if (this.params.raidGate <= 0 || this.#entrance !== null) return "strong";
+    if (this.params.raidGate <= 0) return "strong";
+    // One world (ja-web): at the gate at the top of its shaft, the plane's trail where it ends, at its hole.
+    if (this.#entrance !== null) return this.#atGate(i) ? trailLevel(this.#holeRaid()) : "strong";
     return trailLevel(this.#raidLevel(i));
   }
 
-  /** The raid trail's level ant i smells: strongest of its cell and its three sensors. */
+  /** The raid trail's level ant i smells: strongest of its cell and its three sensors (one world's curtain: at its hole, #holeRaid). */
   #raidLevel(i: number): number {
+    if (this.#entrance !== null) return this.line !== null ? this.#holeRaid() : 0;
     if (!this.ph.live("raid")) return 0;
     const x = this.x[i] as number;
     const y = this.y[i] as number;
@@ -4223,6 +4264,97 @@ export class Colony {
     const dx = (this.x[i] as number) - this.nest.x;
     const dy = (this.y[i] as number) - this.nest.y;
     return dx * dx + dy * dy < this.nest.r * this.nest.r;
+  }
+
+  // ——— one world: the gate at the top of the shaft (ja-web, PRD §48.6) ———
+
+  /**
+   * Whether ant i, in the curtain, is held at the gate at the top of its own shaft: an old forager going out (exploring or
+   * following, or a recruited raider), its jaws empty, not a finder going home to tell, with no pass (`leaveOk`), at the
+   * gate (#atGate). Porters, and ants carrying spoil, a corpse or brood, are never held.
+   */
+  #holdsAt(i: number): boolean {
+    const m = this.mode[i];
+    return this.leaveOk[i] === 0 && (m === EXPLORE || m === FOLLOW || (m === FIGHT && this.recruited[i] === 1)) && !this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && !this.#porter[i] && !this.reporting[i] && this.band(i) === 2 && this.#atGate(i);
+  }
+
+  /**
+   * Whether ant i is at the gate: one world's curtain, within WAIT_STEPS steps of its own hole along its own tunnels (the
+   * way-out field, #outField), where it senses its place as "hole". Leaves the shared CELL as it found it.
+   */
+  #atGate(i: number): boolean {
+    if (this.line === null || this.#entrance === null) return false;
+    // Deeper than WAIT_STEPS rows below the hole, it can't be (most of the nest: no field read).
+    if ((this.y[i] as number) > centreY(this.#entranceRow + WAIT_STEPS) + R) return false;
+    const keepX = CELL[0] as number;
+    const keepY = CELL[1] as number;
+    this.antCell(i);
+    const d = this.#outDistAt(CELL[0] as number, CELL[1] as number);
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    return d >= 0 && d <= WAIT_STEPS;
+  }
+
+  /** Steps from cell (cx, cy) to this colony's hole along its tunnels (#outField), or −1: off the map, or not joined to it. */
+  #outDistAt(cx: number, cy: number): number {
+    const { w, h } = this.map.size;
+    const { x0 } = this.map;
+    return cx >= x0 && cy >= 0 && cx < x0 + w && cy < h ? (this.#outField()[cy * w + cx - x0] as number) : -1;
+  }
+
+  /**
+   * The plane's raid trail where it ends at this colony's hole: strongest of the hole's cell and the six round it. What an
+   * ant held at the gate smells of it (a finder lays it home to the hole, and recruits at its own entrance: Topoff et al.
+   * 1987, docs/raid-recruitment.md).
+   */
+  #holeRaid(): number {
+    const L = this.layers[PLANE] as Layer;
+    const ph = L.ph;
+    if (!ph.live("raid")) return 0;
+    const hc = this.holeCells[this.params.nest] as HoleCell;
+    const f = ph.fields.raid;
+    const o = discOffsets(1)[hc.py & 1] as Int16Array;
+    let best = 0;
+    for (let k = 0; k < o.length; k += 2) {
+      const x = hc.px + (o[k] as number);
+      const y = hc.py + (o[k + 1] as number);
+      if (inBounds(L.map, x, y)) best = Math.max(best, f.get(x, y));
+    }
+    return best;
+  }
+
+  /**
+   * Ant i, held at the gate, mills among the top cells of its shaft: cell by cell, to an open neighbour at the gate (within
+   * WAIT_STEPS of the hole) at random. Sets its target cell (as #walkTunnel does); false if no cell there is open.
+   */
+  #mill(i: number, step: number): boolean {
+    const map = this.map;
+    this.antCell(i);
+    const hx = CELL[0] as number;
+    const hy = CELL[1] as number;
+    const gx = this.gx[i] as number;
+    const gy = this.gy[i] as number;
+    const fresh = gx === NO_CELL || hexDistance(gx, gy, hx, hy) > 1 || this.#outDistAt(gx, gy) < 0 || this.#outDistAt(gx, gy) > WAIT_STEPS;
+    if (!fresh && Math.hypot(centreX(gx, gy) - (this.x[i] as number), centreY(gy) - (this.y[i] as number)) > step) return true;
+    const cx = fresh ? hx : gx;
+    const cy = fresh ? hy : gy;
+    const ways = MILL_WAYS;
+    let n = 0;
+    for (let d = 0; d < 6; d++) {
+      const tx = stepX(cx, cy, d);
+      const ty = stepY(cy, d);
+      const k = this.#outDistAt(tx, ty);
+      if (k >= 0 && k <= WAIT_STEPS && rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty)) ways[n++] = d;
+    }
+    if (n === 0) {
+      this.gx[i] = NO_CELL;
+      return false;
+    }
+    const d = ways[Math.floor(this.#rng() * n)] as number;
+    this.gdir[i] = d;
+    this.gx[i] = stepX(cx, cy, d);
+    this.gy[i] = stepY(cy, d);
+    return true;
   }
 
   /** Nestmates in cell (cx, cy) and the six round it, as the colony's count grid has them (docs/stance.md: crowding). */
@@ -4376,6 +4508,8 @@ export class Colony {
   #mayCrossUp(i: number): boolean {
     if (this.#holdsBrood[i] === 1 || this.#porter[i] === 1) return false;
     if (this.pellet[i] === 1) return true;
+    // Held at the gate at the top of its own shaft (ja-web): not until it has a pass.
+    if (this.params.leaveGate > 0 && this.#holdsAt(i)) return false;
     return this.#mayGoOut(i) && !(this.mode[i] === RETURN && this.#goalKind[i] === 0);
   }
 
@@ -4423,6 +4557,7 @@ export class Colony {
       this.driftSurfY[i] = gauss(this.#rng) * PI_DRIFT_2D;
     }
     this.#lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
+    this.leaveOk[i] = 0; // its pass through the gate is used (ja-web)
     this.#crossed(i);
     if (this.pellet[i]) this.#carryOut(i);
     this.crossedUp++;
@@ -4430,18 +4565,27 @@ export class Colony {
 
   /**
    * Ant i, on the plane at colony k's hole, goes down it: into the curtain at that hole (the crust's open cell), heading
-   * down. With food it is home with it (a return at the hole, which the waiting ants round it meet where the gate is
-   * open), and the side view's code takes it on to reception and the chambers.
+   * down. With food it is home with it, and the side view's code takes it on to reception and the chambers. Where the
+   * colony gates leaving (ja-web), at its own hole: a carrier is a return the ants held at the top of the shaft meet next
+   * tick, and has a pass back out (a successful forager never waits, PRD §48); a rested, empty forager's trip ends here,
+   * just inside, and it is held at the gate at once (the owner's choice, 2026-11-10: it doesn't go down first).
    */
-  #crossDown(i: number, k: number, gate: boolean): void {
+  #crossDown(i: number, k: number): void {
     const hc = this.holeCells[k] as HoleCell;
+    const p = this.params;
+    const gated = k === p.nest && p.leaveGate > 0;
     if (this.carrying[i]) {
       this.carriedDown++;
-      if (gate) {
-        const key = cellKey(hc.px, hc.py);
-        this.#returning.set(key, (this.#returning.get(key) ?? 0) + 1);
+      if (gated) {
+        this.#holeIn++;
+        this.leaveOk[i] = 1;
       }
+    } else if (gated && p.arrive !== "return" && this.mode[i] === RETURN && !this.pellet[i] && this.band(i) === 2 && !this.#isTired(i)) {
+      this.mode[i] = p.arrive === "follow" && !this.recruited[i] ? FOLLOW : EXPLORE;
+      this.#asked[i] = -1;
+      this.#restT[i] = 0;
     }
+    this.reporting[i] = 0; // a finder has told: its trail ends here, at the hole (ja-web)
     this.layer[i] = CURTAIN;
     this.x[i] = centreX(hc.col, hc.row);
     this.y[i] = centreY(hc.row);
@@ -4514,8 +4658,9 @@ export class Colony {
     this.intakeRate += (got / dt - this.intakeRate) * (1 - Math.exp(-dt / INTAKE_WINDOW));
     // The gates (activation, raids by trail, each ant's own stance) are open ground's, where there is no hole into the
     // layer (gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
-    const layerGates = multi ? this.layers.map((L) => gatesFor(p, L.entrance === null, dt)) : null;
-    let { gate, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates?.[this.#cur] ?? gatesFor(p, this.#entrance === null, dt);
+    const one = this.line !== null;
+    const layerGates = multi ? this.layers.map((L) => gatesFor(p, L.entrance === null, one, dt)) : null;
+    let { gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates?.[this.#cur] ?? gatesFor(p, this.#entrance === null, one, dt);
     // Activation (behaviour MR 5): last tick's returns with food are what the waiting foragers round them meet this tick.
     if (gate || layerGates?.some((g) => g.gate)) {
       const seen = this.#returned;
@@ -4523,6 +4668,12 @@ export class Colony {
       this.#returning = seen;
       seen.clear();
     }
+    // One world (ja-web): last tick's carriers down the hole are what the ants held at its top meet this tick.
+    if (layerGates?.some((g) => g.hold)) {
+      this.#holeSeen = this.#holeIn;
+      this.#holeIn = 0;
+    }
+    let heldNow = 0;
     // Energy and felt hunger (ja-xu6.1): the side view, where there is a queen and brood.
     if (this.queen) this.#body(dt);
     for (let i = 0; i < this.n; i++) {
@@ -4532,7 +4683,7 @@ export class Colony {
         this.#bind(this.layer[i] as number);
         ({ map, ph } = this);
         home = this.nest;
-        ({ gate, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.#cur]!);
+        ({ gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.#cur]!);
       }
       if (map.sky) this.#unbury(i);
       let h = this.heading[i] as number;
@@ -4557,9 +4708,18 @@ export class Colony {
       const ar = sn[8] as number;
       const toEnemy = this.#enemyHeading(i);
       this.#oddsNow = toEnemy === null ? "none" : this.#odds(i);
+      // One world (ja-web): an outgoing forager at the top of its own shaft, its jaws empty and with no pass, is held at the
+      // gate there (#holdsAt): it waits as a forager home on open ground does, and is asked `leave` (below). With a
+      // stranger near it isn't waiting: it isn't asked, and it fights or flees in the shaft as anywhere; but the gate still
+      // bars the way out (#mayCrossUp asks #holdsAt, which doesn't look for strangers), so it doesn't climb out without a
+      // pass. Intended: a stranger at the top of the shaft is met there, not left behind.
+      const held = hold && toEnemy === null && this.#holdsAt(i);
+      if (held) heldNow++;
       if (rgate) {
         this.foes[i] = (this.foes[i] as number) * foeLeak + (toEnemy === null ? 0 : dt);
-        if (this.reporting[i] === 1 && this.#atNestTop(i)) this.reporting[i] = 0;
+        // (One world, ja-web: a finder lays its trail on to its hole, and is done telling once it goes down it, #crossDown:
+        // ended at the disc round the hole, the trail never reached the ants held at the top of the shaft.)
+        if (this.reporting[i] === 1 && this.line === null && this.#atNestTop(i)) this.reporting[i] = 0;
       }
       // Defence is the ant's own (docs/stance.md): alarm smelt or strangers in reach raise its threat, which fades; past defendAt,
       // on home ground (within homeGround of its nest by its home vector), it defends. Far out, it forages as before.
@@ -4584,10 +4744,12 @@ export class Colony {
           if (this.#raidSmelt(i) !== "none" && (!sgate || (this.raidable && homeNow && !this.carrying[i] && this.#rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, this.#raidLevel(i) / STRONG) * dt)))) {
             this.recruited[i] = 1;
             this.#gone[i] = 0;
+            this.recruits++;
           } else if (!sgate && homeNow && !this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && this.#rng() < 1 - Math.exp(-p.raidScout * dt)) {
             this.recruited[i] = 1;
             this.#gone[i] = 0;
             this.mode[i] = FIGHT; // out it goes
+            this.raidScouts++;
           }
         } else if (homeNow && this.#gone[i] === 1 && this.#raidSmelt(i) === "none") {
           this.recruited[i] = 0;
@@ -4595,9 +4757,17 @@ export class Colony {
         }
         if (homeNow || this.recruited[i] === 0) this.#pastEnd[i] = 0;
       } else if (this.recruited[i] === 1 && this.line === null) {
-        // (In one world a raider keeps its stance underground, where nothing recruits: its raid ends at home on the plane.)
+        // (In one world a raider keeps its stance underground: its raid ends at home on the plane.)
         this.recruited[i] = 0;
         this.#pastEnd[i] = 0;
+      }
+      // One world (ja-web): an ant held at the gate smells the plane's raid trail where it ends, at its own hole (#raidSmelt:
+      // a finder recruits at its own entrance, Topoff et al. 1987), and is recruited by it by degrees, as an idle ant at
+      // home on open ground is.
+      if (held && this.recruited[i] === 0 && p.raidGate > 0 && p.stanceGate > 0 && this.raidable && this.#raidSmelt(i) !== "none" && rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, this.#raidLevel(i) / STRONG) * dt)) {
+        this.recruited[i] = 1;
+        this.#gone[i] = 0;
+        this.recruits++;
       }
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
       // this step (its trip is over: see `arrive`).
@@ -4624,6 +4794,7 @@ export class Colony {
         this.reporting[i] = 1;
         this.since[i] = 0;
         this.#homeAfresh(i);
+        this.finds++;
       }
       const reporting = this.reporting[i] === 1;
       // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
@@ -4676,8 +4847,17 @@ export class Colony {
         situation0 = before - mode * MODE_STRIDE;
         // Waiting at home (behaviour MR 5): where the colony gates leaving, a forager home in "return" is asked `leave`
         // (below), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
-        // (Not one world's ants going in on the plane: they go down the hole, and one world never asks `leave`.)
-        waiting = gate && mode === RETURN && !enemy && this.#atNestTop(i) && !this.#inbound(i, mode);
+        // One world (ja-web): nobody waits on the plane (every returner goes down its hole); an ant held at the gate at the
+        // top of its shaft waits, and rolls `leave` once a step, asked as a returning forager (as a raider if recruited).
+        // A yes is its pass: it climbs out, and its mode policy is asked afresh next step.
+        waiting = held || (gate && mode === RETURN && !enemy && this.#atNestTop(i) && !this.#inbound(i, mode));
+        if (held) {
+          rolled = true;
+          if (this.#leaves(i, dt, false)) {
+            this.leaveOk[i] = 1;
+            this.#asked[i] = -1;
+          }
+        }
         if (before !== this.#asked[i] && !waiting) {
           mode = MODES.indexOf(this.policy({ mode: MODES[mode] as Mode, tired, foodTrail: food, homeTrail: home, alarm, enemy: enemy ? "near" : "none", stance: this.#stanceOf(i) }));
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
@@ -4739,7 +4919,12 @@ export class Colony {
         this.wall[i] = 0;
         this.mx[i] = NaN;
       }
-      if (outward) {
+      if (held && this.leaveOk[i] === 0) {
+        // One world (ja-web): held at the gate, it mills among the top cells of its shaft (#mill), where the carriers come
+        // down past it.
+        if (this.#mill(i, p.speed * dt)) h = this.#towardTarget(i);
+        else h += noise * p.wander;
+      } else if (outward) {
         // Out on its heading; a bump turned it (below), and while it wanders after one, it wanders.
         if (detouring) h += noise * p.wander;
         else h = turnToward(h, this.#spoilA[i] as number, p.turnRate * dt) + noise * p.wander * 0.25;
@@ -5104,7 +5289,7 @@ export class Colony {
       // WAIT_RIM of the radius it turns back in. Wandering out of the nest, it was asked its mode, and the mode policy
       // sent it out exploring with nothing coming in; kept to half the radius, it never met a carrier, who puts its food
       // down on reaching the rim, so only scouts went out.
-      if (waiting) {
+      if (waiting && gate) {
         const dx = home.x - (this.x[i] as number);
         const dy = home.y - (this.y[i] as number);
         if (dx * dx + dy * dy > WAIT_RIM * WAIT_RIM * home.r * home.r) h = Math.atan2(dy, dx);
@@ -5306,15 +5491,18 @@ export class Colony {
       // with food beside it (its cell and the six round it) once, in a count that leaks away; only successful returns
       // count. Counted as seconds of contact instead, a carrier, which turns round the moment its food is down, was met
       // for a tick: the count stayed under the threshold, and only scouts went out.
-      if (gate) {
+      // One world (ja-web): held at the gate, it meets every carrier that came down the hole last tick (#holeSeen): each
+      // walks down the shaft past all of them. Its count leaks on both layers, so a wait's count fades on its trip out.
+      if (leak) {
         let m = (this.met[i] as number) * metLeak;
-        if (atNest && !carrying) m += this.#returnsAround(CELL[0] as number, CELL[1] as number);
+        if (gate ? atNest && !carrying : held) m += gate ? this.#returnsAround(CELL[0] as number, CELL[1] as number) : this.#holeSeen;
         this.met[i] = m;
       }
       // How crowded home is (docs/stance.md), felt by a waiting ant: nestmates in its cell and the six round it, but itself.
-      if (sgate) {
+      // (One world, ja-web: by an ant held at the gate, at the top of its shaft.)
+      if (sgate || hold) {
         const c = this.crowd[i] as number;
-        this.crowd[i] = atNest && !carrying ? c * crowdKeep + (this.#nestmatesAround(CELL[0] as number, CELL[1] as number) - 1) * (1 - crowdKeep) : c * crowdKeep;
+        this.crowd[i] = (sgate ? atNest && !carrying : held) ? c * crowdKeep + (this.#nestmatesAround(CELL[0] as number, CELL[1] as number) - 1) * (1 - crowdKeep) : c * crowdKeep;
       }
       // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
       const here = cellKey(CELL[0] as number, CELL[1] as number);
@@ -5476,12 +5664,13 @@ export class Colony {
         this.antCell(i);
         const k = this.#holeAt(CELL[0] as number, CELL[1] as number);
         if (k >= 0 && (k === p.nest ? this.#wantsIn(i, this.mode[i] as number) : this.mode[i] === FIGHT && this.#stanceOf(i) === "raid")) {
-          this.#crossDown(i, k, gate);
+          this.#crossDown(i, k);
           continue;
         }
       }
       this.heading[i] = h;
     }
+    this.gateHeld = heldNow;
     // Colony-wide work from here on is the home layer's (the nest, its count of ants in and out, its brood).
     if (multi) this.#bind(this.home);
     if (this.#entrance) {
@@ -5575,6 +5764,8 @@ export class Colony {
       storedSeen: this.#storedSeen,
       returning: this.#returning,
       returned: this.#returned,
+      holeIn: this.#holeIn,
+      holeSeen: this.#holeSeen,
       tired: this.#tired,
       asked: this.#asked,
       question: this.#question,
@@ -5655,6 +5846,8 @@ export class Colony {
     if ("storedSeen" in r) this.#storedSeen = fillLike(this.#storedSeen, r.storedSeen) as never;
     if ("returning" in r) this.#returning = fillLike(this.#returning, r.returning) as never;
     if ("returned" in r) this.#returned = fillLike(this.#returned, r.returned) as never;
+    if ("holeIn" in r) this.#holeIn = fillLike(this.#holeIn, r.holeIn) as never;
+    if ("holeSeen" in r) this.#holeSeen = fillLike(this.#holeSeen, r.holeSeen) as never;
     if ("tired" in r) this.#tired = fillLike(this.#tired, r.tired) as never;
     if ("asked" in r) this.#asked = fillLike(this.#asked, r.asked) as never;
     if ("question" in r) this.#question = fillLike(this.#question, r.question) as never;
@@ -5768,6 +5961,13 @@ export const LEAVE_NOW = 1;
 export const LEAVE_SOON = 0.2;
 /** how far out a waiting forager mills, as a share of the nest's radius (behaviour MR 5) */
 export const WAIT_RIM = 0.9;
+/**
+ * One world (ja-web): the gate is the top of the ant's own shaft, cells within this many steps of its hole along its
+ * tunnels. An outgoing forager is held there, milling, until it is asked out (`leave`) or has a pass.
+ */
+export const WAIT_STEPS = 3;
+/** #mill's scratch: the ways open from a cell (no allocation per step) */
+const MILL_WAYS = new Int8Array(6);
 // The queen and brood (nest slice 4): see #nestLife, #nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
 /** Food in an egg, and fed to a larva before it pupates. */
 const EGG_FOOD = 1;

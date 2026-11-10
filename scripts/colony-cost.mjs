@@ -11,7 +11,8 @@
 // --side plays the side view (the nest, its chambers and in-nest situations: PRD §32), as the app sets it up
 // (generateSideWorld(seed), Game with gameRng(seed), as the page builds it); without it, the top-down map (generateWorld) with
 // the rng this script always used, so earlier figures reproduce. --one plays one world (generateOneWorld(seed), gameRng(seed);
-// docs/one-world.md), its alarm painted on the plane: each ant keeps its own stance and no ant is asked `leave` there.
+// docs/one-world.md), its alarm painted on the plane: each ant keeps its own stance, and `leave` is asked of the foragers
+// held at the gate at the top of their shafts (ja-web, PRD §48.6), so the leave lane is counted like the others.
 //
 // The ant's response lanes (get, carry, drop, trail: colonyBrain.RESPONSE_HOOKS)
 // are estimated too, as if each were asked like the modes; they are not asked
