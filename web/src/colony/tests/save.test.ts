@@ -1,9 +1,13 @@
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Game, type GameSave } from "../game.ts";
+import { CURTAIN, LAYER_STATE, PLANE, type Layer } from "../colony.ts";
+import { Game, gameRng, type GameSave } from "../game.ts";
 import { hashGame } from "./saveHash.ts";
 import { STRAINS } from "../fungus.ts";
+import { CRUST, generateOneWorld } from "../oneWorld.ts";
+import { encode } from "../save.ts";
+import { centreX, centreY } from "../hex.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, type WorldMap } from "../world.ts";
 
 // Saving a game (ja-lo8.6): run, save, restore into a game built afresh from the same world and settings, run on. The
@@ -128,4 +132,46 @@ test("a colony's save holds every private field it declares (but its random stre
   assert.ok(declared.size > 50, `found the declarations (${declared.size})`);
   assert.deepEqual([...declared].filter((k) => !saved.includes(k)).sort(), [], "declared but not saved");
   assert.deepEqual(saved.filter((k) => !declared.has(k)).sort(), [], "saved but not declared");
+});
+
+test("every Layer key is saved per layer (LAYER_STATE) or built again: by the constructor and the world, or wired by the game", () => {
+  // A colony keeps the bound layer's state in its own fields and every other layer's in that layer's slots (one world):
+  // a key that carries state from tick to tick and is not in LAYER_STATE would be lost on the plane at every load.
+  const src = readFileSync(new URL("../colony.ts", import.meta.url), "utf8");
+  const start = src.indexOf("export interface Layer {");
+  const body = src.slice(start, src.indexOf("\n}\n", start));
+  const declared = [...body.matchAll(/^ {2}(?:readonly )?(\w+):/gm)].map((m) => m[1]!);
+  const built = ["map", "nest", "entrance", "entranceCol", "entranceRow"]; // the constructor, from the world
+  const wired = ["enemies", "nestmates", "friends", "foreign", "raidMarks", "raidTarget", "raidNest", "others"]; // Game.#wire, #aimAt
+  assert.equal(declared.length, 19, `found the declarations (${declared.join(", ")})`);
+  assert.deepEqual([...declared].sort(), [...LAYER_STATE, ...built, ...wired].sort(), "every key is saved or built again, and no key is both");
+});
+
+test("a one-world colony's save holds every layer's own state, and the fungus's every map's spores: loaded into a fresh game, each reads as it was", () => {
+  const world = () => generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } });
+  const g = new Game(world(), { antCount: 40, rivalAnts: 40 }, gameRng(7));
+  const h = g.player.holeCells[g.player.params.nest]!;
+  g.fungus.paint([], centreX(h.col, CRUST + 3), centreY(CRUST + 3), 2, 3, 0, GARDEN, CURTAIN);
+  run(g, 20);
+  const fresh = new Game(world(), { antCount: 40, rivalAnts: 40 }, gameRng(7));
+  const layerState = (L: Layer) => JSON.stringify(Object.fromEntries(LAYER_STATE.map((k) => [k, encode(L[k])])));
+  g.colonies.forEach((c, k) => {
+    const s = JSON.parse(JSON.stringify(c.saveState())) as { layers?: unknown[] };
+    assert.equal(s.layers?.length, 2, "two layers saved");
+    assert.equal(s.layers![CURTAIN], null, "the bound layer's (home) is in its fields");
+    assert.ok(c.layers[PLANE]!.ph.total("home") > 0, "the plane has trails (the test's own check)");
+    const into = fresh.colonies[k]!;
+    assert.notEqual(layerState(into.layers[PLANE]!), layerState(c.layers[PLANE]!), "a fresh game's plane differs (the test's own check)");
+    into.loadState(s as Record<string, unknown>);
+    for (const l of [PLANE, CURTAIN]) assert.equal(layerState(into.layers[l]!), layerState(c.layers[l]!), `colony ${k}, layer ${l}`);
+  });
+  const spores = JSON.parse(JSON.stringify(g.fungus.saveState())) as Record<string, unknown>;
+  assert.equal((spores.layers as unknown[]).length, 1, "the curtain's spores, past layer 0's");
+  assert.ok(g.fungus.sporeCells > 0);
+  fresh.fungus.loadState(spores);
+  assert.deepEqual(JSON.parse(JSON.stringify(fresh.fungus.saveState())), spores);
+  assert.equal(fresh.fungus.sporeCells, g.fungus.sporeCells);
+  // A colony saved with another layer bound is another game's: refused, not poured over the wrong layer.
+  const s = g.player.saveState();
+  assert.throws(() => fresh.player.loadState({ ...s, private: { ...(s.private as object), cur: PLANE } }), /layer 0 bound/);
 });

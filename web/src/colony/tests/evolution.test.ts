@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy } from "../battle.ts";
 import { Colony } from "../colony.ts";
 import { BODY, Evolution, MUTATION, UPGRADES, upgrade } from "../evolution.ts";
-import { Fungus, INFECTED, STRAINS, type Strain } from "../fungus.ts";
+import { Fungus, INFECTED, SPORE_LAYER_STATE, STRAINS, type Strain } from "../fungus.ts";
 import { fungalKey } from "../fungusBrain.ts";
 import { Game } from "../game.ts";
 import { hold, LEVERS } from "../levers.ts";
@@ -370,4 +370,13 @@ test("the fungus's save holds every private field it declares, or the field is d
   const keys = Object.keys(new Fungus(arena()).saveState());
   for (const [field, key] of Object.entries(saved)) assert.ok(keys.includes(key), `#${field} is saved as ${key}`);
   for (const [field, ks] of Object.entries(layered)) for (const key of ks) assert.ok(keys.includes(key), `#${field} is saved as ${key}`);
+  // Each map past the first (one world, U4b): every SporeLayer key is saved per map (SPORE_LAYER_STATE), or is the map
+  // itself or a step's scratch, built again every step.
+  const start = src.indexOf("interface SporeLayer {");
+  const layerKeys = [...src.slice(start, src.indexOf("\n}\n", start)).matchAll(/^ {2}(?:readonly )?(\w+):/gm)].map((m) => m[1]!);
+  const perStep = ["map", "all", "visible", "taken"];
+  assert.deepEqual([...layerKeys].sort(), [...SPORE_LAYER_STATE, ...perStep].sort(), "every SporeLayer key is saved per map or built again");
+  const two = new Fungus([arena(), arena()]).saveState();
+  assert.deepEqual(Object.keys((two.layers as Record<string, unknown>[])[0]!).sort(), [...SPORE_LAYER_STATE].sort(), "a second map's keys");
+  assert.ok(!("layers" in new Fungus(arena()).saveState()), "one map: no layers, the shape as it was");
 });
