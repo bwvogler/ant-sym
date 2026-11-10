@@ -104,3 +104,20 @@ export function minimapRect(world: Extent, view: Viewport, dpr: number): { x: nu
   const h = (w * world.h) / world.w;
   return { x: view.w - w - margin, y: view.h - h - margin, w, h };
 }
+
+/** A place a view was asked to centre on (the field's centreOn): `span`, world units to fit across the view's shorter side. */
+export interface Aim {
+  x: number;
+  y: number;
+  span?: number;
+}
+
+/**
+ * The camera a view draws with: c, or, while it holds an aim, centred on the aim (at c's zoom, or zoomed to its span),
+ * clamped to the map in this view. The aim is kept and clamped afresh each frame: a view's box takes its shape a frame or
+ * two after a switch, and a camera clamped once in the passing box would keep that box's centre.
+ */
+export function aimed(c: Camera, aim: Aim | null, world: Extent, view: Viewport): Camera {
+  if (!aim) return clamp(c, world, view);
+  return clamp({ x: aim.x, y: aim.y, zoom: aim.span ? Math.min(view.w, view.h) / aim.span : c.zoom }, world, view);
+}

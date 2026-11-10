@@ -7,7 +7,7 @@ import { type OneWorld, STRIP } from "../colony/oneWorld.ts";
 import { BINS, binOf } from "../colony/recognition.ts";
 import { cellAt, columnsOver, turnAt } from "../colony/transect.ts";
 import { AIR, OPEN, rockAt, SOIL, type WorldMap, worldExtent } from "../colony/world.ts";
-import { type Camera, clamp, type Extent, fit, fitZoom, fromMinimap, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
+import { aimed, type Aim, type Camera, clamp, type Extent, fit, fitZoom, fromMinimap, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import type { PenCircle, Settle } from "./pen.ts";
@@ -92,7 +92,16 @@ interface ViewCam {
   fitted: boolean;
   /** whether the view is zoomed in past the whole map (the minimap shows, and takes clicks) */
   zoomedIn: boolean;
+  /**
+   * Where the page asked the view to centre (FieldApi.centreOn; `span`: world units across the box's shorter side): kept,
+   * and the camera clamped round it in whatever box the view is drawn in (the box takes the view's shape a frame or two
+   * after a switch), until the player moves the camera or a follow takes it. Without it a frame drawn in the passing box
+   * clamped the place away for good.
+   */
+  aim: Aim | null;
 }
+
+const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
 
 /** The camera key of a game on one map (one world's are PLANE and CURTAIN). */
 const ONE_MAP = -1;
@@ -169,7 +178,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
   /** The shown view's camera. */
   const vc = (): ViewCam => {
     let s = cams.current.get(shown.current);
-    if (!s) cams.current.set(shown.current, (s = { cam: null, fitted: true, zoomedIn: false }));
+    if (!s) cams.current.set(shown.current, (s = NEW_CAM()));
     return s;
   };
   /** The shown view's map: one world's plane or curtain, or the game's one map (the colony's, between ticks). */
@@ -774,7 +783,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       if (f && !fcol) {
         follow.current = null;
         followCb.current(null);
-      } else if (f && fcol && fHere && s.cam) s.cam = { ...s.cam, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
+      } else if (f && fcol && fHere && s.cam) {
+        s.cam = { ...s.cam, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
+        s.aim = null;
+      }
       // One world: the followed ant went through a hole, out of the view (its layer changed, not the view): the page is
       // told, and may carry the camera across (U5.2). Where it was last seen here stays marked ("gone below").
       if (f && fcol && lv >= 0) {
@@ -784,7 +796,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         antLayer.current = { f, layer };
         if (fHere) lastSeen.current = { f, lv, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
       } else antLayer.current = null;
-      const c = clamp(s.fitted || !s.cam ? fit(ext, v) : s.cam, ext, v);
+      const c = s.fitted || !s.cam ? clamp(fit(ext, v), ext, v) : aimed(s.cam, s.aim, ext, v);
       s.cam = c;
       s.zoomedIn = c.zoom > fitZoom(ext, v) * 1.05;
       ctx.fillStyle = theme.paper;
@@ -1128,6 +1140,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       const we = extent();
       const c = zoomBy(s.cam ?? fit(we, v), we, v, (e.clientX - r.left) * k, (e.clientY - r.top) * k, Math.exp(-e.deltaY * 0.0015));
       s.cam = c;
+      s.aim = null;
       s.zoomedIn = c.zoom > fitZoom(we, v) * 1.05;
       s.fitted = c.zoom <= fitZoom(we, v) * 1.0001;
     };
@@ -1159,6 +1172,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     const we = extent();
     const cam = clamp(c, we, viewport());
     s.cam = cam;
+    s.aim = null;
     const fz = fitZoom(we, viewport());
     s.zoomedIn = cam.zoom > fz * 1.05;
     s.fitted = cam.zoom <= fz * 1.0001;
@@ -1173,13 +1187,14 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         // Looking elsewhere in the view shown ends a follow (as a drag does); a follow carried to the other view goes on.
         if (v === shown.current && follow.current) unfollow();
         let s = cams.current.get(v);
-        if (!s) cams.current.set(v, (s = { cam: null, fitted: true, zoomedIn: false }));
+        if (!s) cams.current.set(v, (s = NEW_CAM()));
         const we = extentOf(mapOf(v));
         const vp = viewport();
         const now = cams.current.get(shown.current)?.cam?.zoom ?? fitZoom(we, vp);
         const zoom = how.span ? Math.min(vp.w, vp.h) / how.span : how.close ? Math.max(now, LINK_ZOOM * dpr()) : now;
-        // Not clamped here: the frame clamps it to the box it is drawn in (the box takes the view's shape as it switches).
+        // Not clamped here: each frame clamps round the aim in the box it is drawn in (ViewCam.aim).
         s.cam = { x, y, zoom };
+        s.aim = { x, y, ...(how.span ? { span: how.span } : {}) };
         const fz = fitZoom(we, vp);
         s.fitted = false;
         s.zoomedIn = zoom > fz * 1.05;
