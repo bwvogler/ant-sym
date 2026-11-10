@@ -355,6 +355,17 @@ export interface Layer {
 /** What the game wires into a colony per layer (Colony.wire). */
 export type Wiring = Partial<Pick<Layer, "enemies" | "nestmates" | "friends" | "foreign" | "raidMarks" | "raidTarget" | "raidNest" | "others">>;
 
+/**
+ * The Layer keys that carry state from tick to tick, which a save keeps for every layer but the bound one (whose values
+ * are the colony's own fields, saved with them): its scent, the holes it sees and its cached way out. Every other key
+ * is built again: the map, nest and entrance by the constructor and the world, the rest wired by the game (Game.#wire,
+ * #aimAt). tests/save.test.ts holds every key to one list or the other.
+ *
+ * On today's plane only `ph` changes: it has no entrance, so `seeHoles` leaves its `holes` empty and its way out
+ * (`outDist` … `outAt`) is never worked out. Those are saved for completeness, and no test reaches them (#63's review, N3).
+ */
+export const LAYER_STATE = ["ph", "holes", "outDist", "outCells", "outVersion", "outAt"] as const satisfies readonly (keyof Layer)[];
+
 /** A layer's own copy of its state, held while another layer is bound (see Colony.layers). */
 type LayerSlots = { -readonly [K in keyof Layer]: Layer[K] };
 
@@ -5495,6 +5506,8 @@ export class Colony {
   saveState(): Record<string, unknown> {
     return {
       fields: saveFields(this, COLONY_SKIP),
+      // One world (U4b): each layer's own state but the bound one's (null: in `fields` and `private`), by LAYER_STATE.
+      ...(this.layers.length > 1 ? { layers: this.layers.map((L, l) => (l === this.#cur ? null : Object.fromEntries(LAYER_STATE.map((k) => [k, encodeSave(L[k])])))) } : {}),
       private: encodeSave({
       cur: this.#cur,
       ti: this.#ti,
@@ -5572,9 +5585,11 @@ export class Colony {
 
   /** A saved state back into this colony (saveState), in place where it can be: a fresh colony of the same world and params. */
   loadState(saved: Record<string, unknown>): void {
-    loadFields(this, saved.fields as Record<string, unknown>);
     const r = saved.private as Record<string, unknown>;
-    if ("cur" in r) this.#cur = fillLike(this.#cur, r.cur) as never;
+    // `fields` and the private fields hold the bound layer's scent, map state and way out: the same layer must be bound
+    // here (between ticks it is home, so this only fails for another game's colony).
+    if ("cur" in r && r.cur !== this.#cur) throw new Error(`save: a colony saved with layer ${String(r.cur)} bound, here ${this.#cur}`);
+    loadFields(this, saved.fields as Record<string, unknown>);
     if ("ti" in r) this.#ti = fillLike(this.#ti, r.ti) as never;
     if ("alarmAnt" in r) this.#alarmAnt = fillLike(this.#alarmAnt, r.alarmAnt) as never;
     if ("alarmSmelt" in r) this.#alarmSmelt = fillLike(this.#alarmSmelt, r.alarmSmelt) as never;
@@ -5644,6 +5659,21 @@ export class Colony {
     if ("want" in r) this.#want = fillLike(this.#want, r.want) as never;
     if ("enRouteTo" in r) this.#enRouteTo = fillLike(this.#enRouteTo, r.enRouteTo) as never;
     if ("portViewAt" in r) this.#portViewAt = fillLike(this.#portViewAt, r.portViewAt) as never;
+    // Every other layer's own state (one world), in place through its view: its slots, since it is not bound.
+    const layers = saved.layers as (Record<string, unknown> | null)[] | undefined;
+    if (layers) {
+      if (layers.length !== this.layers.length) throw new Error(`save: a colony saved on ${layers.length} layers, here ${this.layers.length}`);
+      layers.forEach((x, l) => {
+        if (!x) return;
+        const L = this.layers[l] as unknown as Record<string, unknown>;
+        // In place where it can be (the scent loads itself; its view has no setter for it), else through the view's setter.
+        for (const k of LAYER_STATE)
+          if (k in x) {
+            const v = fillLike(L[k], x[k]);
+            if (v !== L[k]) L[k] = v;
+          }
+      });
+    }
   }
 }
 

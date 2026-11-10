@@ -88,6 +88,32 @@ export class SumGrid {
     for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++) for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by) > 0) return true;
     return false;
   }
+
+  /** The sums for a save (Recognition.saveBands): each touched cell in order, as x, y, sum (a float32, exact in JSON). */
+  saveState(): number[] {
+    const t = this.#touched;
+    const out: number[] = [];
+    for (let k = 0; k < t.length; k += 2) out.push(t[k] as number, t[k + 1] as number, this.layer.get(t[k] as number, t[k + 1] as number));
+    return out;
+  }
+
+  /**
+   * A saved state back (saveState): reset, then each cell, and its block's sum added up again. Every value added is
+   * positive and a block is only ever tested above 0, so a sum in another order reads the same.
+   */
+  loadState(saved: readonly number[]): void {
+    this.reset();
+    for (let k = 0; k < saved.length; k += 3) {
+      const x = saved[k] as number;
+      const y = saved[k + 1] as number;
+      const v = saved[k + 2] as number;
+      this.#touched.push(x, y);
+      this.layer.set(x, y, v);
+      const bx = x >> BLOCK_BITS;
+      const by = y >> BLOCK_BITS;
+      this.#blocks.set(bx, by, this.#blocks.get(bx, by) + v);
+    }
+  }
 }
 
 export interface RecognitionParams {
@@ -328,4 +354,31 @@ export class Recognition {
     this.#moving = r.moving as boolean;
     this.#lookOdour = NaN; // the look cache is made afresh
   }
+
+  /**
+   * The bands as last built (build), for a save (Game.save, U4b): the game builds them before fights and the next tick's
+   * steps read them, ants killed since included, so a load must not build them again from the living. `#everyone` only
+   * while some ant was calmed: otherwise it is empty. In today's games the saved `#everyone` can't change play (only
+   * Fungus.#touch reads it, after the same tick's build): it is saved for completeness, and no test reaches it (#63's review, N3).
+   */
+  saveBands(): BandsSave {
+    return { bins: this.bins.map((g) => g.saveState()), everyone: this.#calmed ? this.#everyone.map((g) => g.saveState()) : null, occupied: this.#occupied, occupiedEveryone: this.#occupiedEveryone };
+  }
+
+  loadBands(b: BandsSave): void {
+    this.bins.forEach((g, k) => g.loadState(b.bins[k] ?? []));
+    this.#everyone.forEach((g, k) => (b.everyone ? g.loadState(b.everyone[k] ?? []) : g.reset()));
+    this.#calmed = b.everyone !== null;
+    this.#occupied = b.occupied;
+    this.#occupiedEveryone = b.occupiedEveryone;
+    this.#lookOdour = NaN; // the bands changed: the next look rebuilds its mask, as after a build
+  }
+}
+
+/** A Recognition's bands in a save (saveBands): each band's cells (SumGrid.saveState), the calmed count's when built, and which bands hold anyone. */
+export interface BandsSave {
+  bins: number[][];
+  everyone: number[][] | null;
+  occupied: number;
+  occupiedEveryone: number;
 }

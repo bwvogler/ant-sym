@@ -1,9 +1,13 @@
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ChunkLayer } from "../chunks.ts";
-import { Game, type GameSave } from "../game.ts";
+import { CURTAIN, LAYER_STATE, PLANE, type Layer } from "../colony.ts";
+import { Game, gameRng, type GameSave } from "../game.ts";
+import { gridsFromLiving, hashGame } from "./saveHash.ts";
 import { STRAINS } from "../fungus.ts";
+import { CRUST, generateOneWorld } from "../oneWorld.ts";
+import { encode } from "../save.ts";
+import { centreX, centreY } from "../hex.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, type WorldMap } from "../world.ts";
 
 // Saving a game (ja-lo8.6): run, save, restore into a game built afresh from the same world and settings, run on. The
@@ -12,43 +16,6 @@ import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, type WorldMap
 
 const DT = 1 / 30;
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
-
-function fnv(h: number, bytes: Uint8Array): number {
-  for (const b of bytes) {
-    h ^= b;
-    h = Math.imul(h, 0x01000193);
-  }
-  return h;
-}
-
-/** A hash of everything the sim holds that can be read from outside. */
-function hashGame(g: Game): string {
-  let h = 0x811c9dc5;
-  const view = (a: ArrayBufferView) => (h = fnv(h, new Uint8Array(a.buffer, a.byteOffset, a.byteLength)));
-  const text = (v: unknown) => (h = fnv(h, new TextEncoder().encode(JSON.stringify(v))));
-  const layer = (l: ChunkLayer<Uint8Array | Uint16Array | Float32Array>) => l.forEach((cx, cy, a) => (view(new Int32Array([cx, cy])), view(a)));
-  const walk = (o: object) => {
-    for (const [, v] of Object.entries(o)) {
-      if (ArrayBuffer.isView(v)) view(v);
-      else if (v instanceof ChunkLayer) layer(v);
-    }
-  };
-  text([g.time, g.strategyChoices, g.regrown, g.map.foodLeft, g.map.foodTotal, g.map.dug, g.map.filled]);
-  walk(g.map);
-  if (g.map.chambers) {
-    layer(g.map.chambers.cell);
-    text(g.map.chambers.list);
-  }
-  for (const c of g.colonies) {
-    walk(c);
-    for (const l of Object.values(c.ph.fields)) layer(l);
-    text([c.stored, c.births, c.losses, c.decisions, c.larder, c.stance, c.queen, c.brood.items, c.corpses]);
-    // Its private fields too, as its save holds them: the hash above sees only what can be read from outside.
-    text(c.saveState().private);
-  }
-  layer(g.fungus.spores);
-  return (h >>> 0).toString(16);
-}
 
 function build(view: "side" | "top", seed: number): Game {
   const map: WorldMap = view === "side" ? generateSideWorld(seed) : generateWorld(seed, { ...OPEN_WORLD, size: { w: 160, h: 100 } });
@@ -89,6 +56,65 @@ for (const view of ["side", "top"] as const)
     assert.ok(again.fungus.sporeCells > 0 && (again.fungus.evolution?.growth ?? 0) > 0);
   });
 
+/**
+ * Run g a tick at a time until a tick has a fight death (Unity.deathsPerMinute rises: it only fades otherwise), at most
+ * `seconds`; returns whether one did.
+ */
+function runToFightDeath(g: Game, seconds: number): boolean {
+  let last = g.unity().deathsPerMinute;
+  for (let k = 0; k < Math.round(seconds / DT); k++) {
+    g.tick(DT);
+    const d = g.unity().deathsPerMinute;
+    if (d > last) return true;
+    last = d;
+  }
+  return false;
+}
+
+/**
+ * The game of the fight-tick test: the top-down map's two colonies meet within seconds; in the side view a stranger
+ * colony is founded by the first's hole (`found`: a game a save is loaded into re-founds it from the save).
+ */
+function fighting(view: "side" | "top", found = true): Game {
+  if (view === "top") return build("top", 3);
+  const g = new Game(generateSideWorld(3), { antCount: 60, rivalAnts: 60, regrow: 600 }, mulberry32(3 * 7919));
+  const e = g.player.nest.entrance!;
+  if (found) g.addColony({ x: e.x + 24, y: e.y, antCount: 40, odour: 1 });
+  return g;
+}
+
+for (const view of ["side", "top"] as const)
+  test(`a save on a tick with a fight death runs on exactly (${view} view): the grids and bands are saved, not built again`, () => {
+    // Game.tick builds the occupancy grids and recognition bands before fights, and the next tick's steps read them, the
+    // ants killed since included. A load that built them again from the living diverged on the first tick (U4b).
+    const whole = fighting(view);
+    assert.ok(runToFightDeath(whole, 20), "a fight death within 20 s (the test's own check)");
+    const saved = JSON.parse(JSON.stringify(whole.save())) as GameSave;
+    const at = hashGame(whole);
+    whole.tick(DT);
+    const next = hashGame(whole);
+    run(whole, 3);
+    const unbroken = hashGame(whole);
+
+    const again = fighting(view, false);
+    again.load(saved);
+    assert.equal(hashGame(again), at, "restored: the state as saved");
+    again.tick(DT);
+    assert.equal(hashGame(again), next, "the first tick after: as unbroken");
+    run(again, 3);
+    assert.equal(hashGame(again), unbroken, "run on: as if never saved");
+
+    // With the grids built again from the living (as a load did before U4b) the same save diverges: this tick really is
+    // one that needs them.
+    const twin = fighting(view, false);
+    twin.load(saved);
+    const rebuilt = fighting(view, false);
+    rebuilt.load({ ...saved, grids: gridsFromLiving(twin) });
+    rebuilt.tick(DT);
+    run(rebuilt, 3);
+    assert.notEqual(hashGame(rebuilt), unbroken, "rebuilt from the living, the run differs");
+  });
+
 test("a save of another version is refused", () => {
   const g = build("top", 2);
   const s = g.save();
@@ -109,4 +135,81 @@ test("a colony's save holds every private field it declares (but its random stre
   assert.ok(declared.size > 50, `found the declarations (${declared.size})`);
   assert.deepEqual([...declared].filter((k) => !saved.includes(k)).sort(), [], "declared but not saved");
   assert.deepEqual(saved.filter((k) => !declared.has(k)).sort(), [], "saved but not declared");
+});
+
+test("every Layer key is saved per layer (LAYER_STATE) or built again: by the constructor and the world, or wired by the game", () => {
+  // A colony keeps the bound layer's state in its own fields and every other layer's in that layer's slots (one world):
+  // a key that carries state from tick to tick and is not in LAYER_STATE would be lost on the plane at every load.
+  const src = readFileSync(new URL("../colony.ts", import.meta.url), "utf8");
+  const start = src.indexOf("export interface Layer {");
+  const body = src.slice(start, src.indexOf("\n}\n", start));
+  const declared = [...body.matchAll(/^ {2}(?:readonly )?(\w+):/gm)].map((m) => m[1]!);
+  const built = ["map", "nest", "entrance", "entranceCol", "entranceRow"]; // the constructor, from the world
+  const wired = ["enemies", "nestmates", "friends", "foreign", "raidMarks", "raidTarget", "raidNest", "others"]; // Game.#wire, #aimAt
+  assert.equal(declared.length, 19, `found the declarations (${declared.join(", ")})`);
+  assert.deepEqual([...declared].sort(), [...LAYER_STATE, ...built, ...wired].sort(), "every key is saved or built again, and no key is both");
+});
+
+test("a one-world colony's save holds every layer's own state, and the fungus's every map's spores: loaded into a fresh game, each reads as it was", () => {
+  const world = () => generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } });
+  const g = new Game(world(), { antCount: 40, rivalAnts: 40 }, gameRng(7));
+  const h = g.player.holeCells[g.player.params.nest]!;
+  g.fungus.paint([], centreX(h.col, CRUST + 3), centreY(CRUST + 3), 2, 3, 0, GARDEN, CURTAIN);
+  run(g, 20);
+  const fresh = new Game(world(), { antCount: 40, rivalAnts: 40 }, gameRng(7));
+  const layerState = (L: Layer) => JSON.stringify(Object.fromEntries(LAYER_STATE.map((k) => [k, encode(L[k])])));
+  g.colonies.forEach((c, k) => {
+    const s = JSON.parse(JSON.stringify(c.saveState())) as { layers?: unknown[] };
+    assert.equal(s.layers?.length, 2, "two layers saved");
+    assert.equal(s.layers![CURTAIN], null, "the bound layer's (home) is in its fields");
+    assert.ok(c.layers[PLANE]!.ph.total("home") > 0, "the plane has trails (the test's own check)");
+    const into = fresh.colonies[k]!;
+    assert.notEqual(layerState(into.layers[PLANE]!), layerState(c.layers[PLANE]!), "a fresh game's plane differs (the test's own check)");
+    into.loadState(s as Record<string, unknown>);
+    for (const l of [PLANE, CURTAIN]) assert.equal(layerState(into.layers[l]!), layerState(c.layers[l]!), `colony ${k}, layer ${l}`);
+  });
+  const spores = JSON.parse(JSON.stringify(g.fungus.saveState())) as Record<string, unknown>;
+  assert.equal((spores.layers as unknown[]).length, 1, "the curtain's spores, past layer 0's");
+  assert.ok(g.fungus.sporeCells > 0);
+  fresh.fungus.loadState(spores);
+  assert.deepEqual(JSON.parse(JSON.stringify(fresh.fungus.saveState())), spores);
+  assert.equal(fresh.fungus.sporeCells, g.fungus.sporeCells);
+  // A colony saved with another layer bound is another game's: refused, not poured over the wrong layer.
+  const s = g.player.saveState();
+  assert.throws(() => fresh.player.loadState({ ...s, private: { ...(s.private as object), cur: PLANE } }), /layer 0 bound/);
+});
+
+test("the game's save holds every private field it declares, or the field is built again on load", () => {
+  // As for Colony and Fungus: a new #field in Game must be saved, or named here as rebuilt on load. Public fields are
+  // saved by name in Game.save, and one is left out on purpose: `lastLoss`, the page's notice of the last queen lost,
+  // which nothing in play reads (#63's review, N2).
+  const src = readFileSync(new URL("../game.ts", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("export class Game "));
+  const declared = new Set<string>();
+  for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
+  const inPrivate = ["fightDeaths", "lastFightDeath", "metBy", "haveMet", "nextStrategy", "regrowClock", "rng", "regrowRng"];
+  // The occupancy grids and every layer's recognition bands are GameSave.grids (layer 0's recognition is `recognition` too).
+  const inGrids = ["grids", "recs"];
+  const derived = ["piles"]; // the food piles as the world began: from the fresh world
+  assert.deepEqual([...declared].sort(), [...inPrivate, ...inGrids, ...derived].sort(), "every declared #field is accounted for");
+  const s = build("top", 2).save();
+  assert.deepEqual(Object.keys(s.private).sort(), [...inPrivate].sort());
+  assert.deepEqual(Object.keys(s.grids).sort(), ["bands", "counts"]);
+});
+
+test("a single-map save's shape: the game's keys with the grids, colony saves as fields and private, the fungus's keys, one layer of grids", () => {
+  // A single-map game saves none of one world's parts (`world`, a colony's or the fungus's `layers`): held here by name.
+  const game = ["colonies", "flights", "founded", "fungus", "grids", "landed", "map", "params", "private", "raids", "recognition", "regrown", "revealed", "strategyChoices", "time", "version"];
+  const fungus = ["base", "clock", "evolution", "hosts", "menu", "params", "rule", "sporeCells", "sporeStrain", "spores"];
+  for (const view of ["top", "side"] as const) {
+    const g = build(view, 5);
+    g.land(0, GARDEN, { evolve: true });
+    run(g, 1);
+    const s = g.save();
+    assert.deepEqual(Object.keys(s).sort(), game, `${view}: the game's keys`);
+    for (const c of s.colonies) assert.deepEqual(Object.keys(c).sort(), ["fields", "private"], `${view}: a colony's keys`);
+    assert.deepEqual(Object.keys(s.fungus).sort(), fungus, `${view}: the fungus's keys`);
+    assert.deepEqual(Object.keys(s.grids).sort(), ["bands", "counts"]);
+    assert.equal(s.grids.counts.length, 1, `${view}: one layer`);
+  }
 });

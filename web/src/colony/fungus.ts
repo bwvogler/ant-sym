@@ -208,6 +208,13 @@ export interface Census {
 }
 
 /**
+ * The SporeLayer keys a save keeps for each map past the first (Fungus.saveState's `layers`); the rest are the map itself,
+ * or built every step. `base` there can't change in today's games (every `root` is on layer 0, so the curtain's base
+ * stays empty): it is saved for completeness, and no test reaches it (#63's review, N3).
+ */
+export const SPORE_LAYER_STATE = ["spores", "sporeStrain", "sporeCells", "base"] as const;
+
+/**
  * One map's share of the fungus (one world, ja-lp4.3): the ground's spores on it and the cells holding them, the evolving
  * fungus's base there, and what a step builds over the ants on it (everyone's load, each colony's visible load, the
  * spores taken). One world has two (the plane and the curtain); every other game one, whose spores are the fungus's own
@@ -1022,7 +1029,10 @@ export class Fungus {
   /** The fungus's state for a save (save.ts): the ground's spores, its settings, its menu and clock. Its policy is the page's to wire. */
   saveState(): Record<string, unknown> {
     const L = this.#layers[0] as SporeLayer;
-    return { spores: encode(this.spores), sporeStrain: encode(this.sporeStrain), sporeCells: encode(L.sporeCells), hosts: this.hosts, rule: encode(this.rule), params: encode(this.params), menu: encode(this.#menu), clock: this.#clock, evolution: this.#evolution?.save() ?? null, base: [...L.base] };
+    const out: Record<string, unknown> = { spores: encode(this.spores), sporeStrain: encode(this.sporeStrain), sporeCells: encode(L.sporeCells), hosts: this.hosts, rule: encode(this.rule), params: encode(this.params), menu: encode(this.#menu), clock: this.#clock, evolution: this.#evolution?.save() ?? null, base: [...L.base] };
+    // One world (U4b): every other map's spores, their cells and the base there (SPORE_LAYER_STATE), from layer 1 on.
+    if (this.#layers.length > 1) out.layers = this.#layers.slice(1).map((M) => ({ spores: encode(M.spores), sporeStrain: encode(M.sporeStrain), sporeCells: encode(M.sporeCells), base: [...M.base] }));
+    return out;
   }
 
   loadState(r: Record<string, unknown>): void {
@@ -1038,6 +1048,16 @@ export class Fungus {
     const e = r.evolution as EvolutionSave | null | undefined;
     this.#evolution = e ? Evolution.load(e) : null;
     L.base = [...((r.base as number[] | undefined) ?? [])];
+    const layers = r.layers as Record<string, unknown>[] | undefined;
+    if (layers) {
+      if (layers.length !== this.#layers.length - 1) throw new Error(`save: the fungus saved on ${layers.length + 1} maps, here ${this.#layers.length}`);
+      layers.forEach((x, k) => {
+        const M = this.#layers[k + 1] as SporeLayer;
+        for (const key of SPORE_LAYER_STATE)
+          if (key === "base") M.base = [...((x.base as number[] | undefined) ?? [])];
+          else fillLike(M[key], x[key]);
+      });
+    }
     this.#evolved();
   }
 }
