@@ -942,10 +942,11 @@ export class Game {
   /**
    * Spores on the ground within `radius` of (x, y), and a dose of load into every ant there, of any colony: the old
    * spore brush (BRUSH), for tests and scripts. The app has no brush (ja-260): every game lands an evolving fungus, and
-   * a free stroke would skip its progression.
+   * a free stroke would skip its progression. In one world on map `layer` (PLANE, the default, or CURTAIN), dosing only
+   * the ants on it.
    */
-  paintSpores(x: number, y: number, radius: number, spores: number, dose: number, strain: number): void {
-    this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain);
+  paintSpores(x: number, y: number, radius: number, spores: number, dose: number, strain: number, layer = 0): void {
+    this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain, layer);
   }
 
   /**

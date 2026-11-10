@@ -3,9 +3,14 @@
 // across seeds, with how many seeds passed the assay's mark. Runs (one per
 // assay, combination and seed) go to a pool of worker threads.
 //
-// Usage: node scripts/experiment.mjs <assay ...|all> [--seeds 1-10] [--seconds N]
+// Usage: node scripts/experiment.mjs <assay ...|all> [--one] [--seeds 1-10] [--seconds N]
 //          [--set colony.deposit=2,4,8] [--set game.fight.rate=1,2] [--json out.json] [--jobs N]
 //          [--policy cache:<file>]
+//
+// --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
+// with a hole at each nest and the curtain under the line through them (oneArena); A8 in the curtain; G1 (game1), the
+// whole one-world game. The ids are the legacy ones; those not rerun yet (ONE_PENDING: A5, A5b, A11, A12) are listed
+// with why. Without --one, `game1` still names G1.
 //
 // --set takes a dotted path under colony / rival / game and a comma list of
 // values; several --set flags run their cross product. Pheromone channels are
@@ -68,6 +73,7 @@ async function main() {
   let json;
   let jobs = availableParallelism();
   let policy = null;
+  let one = false;
   const sets = [];
   for (let k = 0; k < args.length; k++) {
     const a = args[k];
@@ -76,14 +82,28 @@ async function main() {
     else if (a === "--json") json = args[++k];
     else if (a === "--jobs") jobs = Number(args[++k]);
     else if (a === "--policy") policy = args[++k];
+    else if (a === "--one") one = true;
     else if (a === "--set") {
       const [path, values] = args[++k].split("=");
       sets.push({ path, values: values.split(",").map(parse) });
     } else if (a.startsWith("--")) fail(`unknown option ${a}`);
     else ids.push(a);
   }
-  const { ASSAYS } = await import("../web/src/colony/experiment.ts");
-  const chosen = ids.length === 0 || ids.includes("all") ? ASSAYS : ids.map((id) => ASSAYS.find((x) => x.id === id) ?? fail(`no assay "${id}" (have: ${ASSAYS.map((x) => x.id).join(", ")})`));
+  const { ASSAYS, ONE_ASSAYS, ONE_PENDING } = await import("../web/src/colony/experiment.ts");
+  // Each chosen assay with the list it is run from (the worker finds it there): one world's, or the legacy ones (G1 only in one world's).
+  const list = one ? ONE_ASSAYS : ASSAYS;
+  const pending = [];
+  const pick = (id) => {
+    const a = list.find((x) => x.id === id) ?? (one ? null : ONE_ASSAYS.find((x) => x.id === id && !ASSAYS.some((y) => y.id === id)));
+    if (a) return { assay: a, one: one || !ASSAYS.includes(a) };
+    if (one && ONE_PENDING[id]) pending.push(id);
+    else fail(`no assay "${id}"${one ? " on one world" : ""} (have: ${[...list, ...(one ? [] : ONE_ASSAYS.filter((x) => !ASSAYS.some((y) => y.id === x.id)))].map((x) => x.id).join(", ")})`);
+    return null;
+  };
+  const all = ids.length === 0 || ids.includes("all");
+  if (all && one) pending.push(...Object.keys(ONE_PENDING));
+  const picked = all ? list.map((a) => ({ assay: a, one })) : ids.map(pick).filter(Boolean);
+  const chosen = picked.map((p) => p.assay);
   const cs = combos(sets);
   if (policy) {
     if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file>`);
@@ -98,9 +118,9 @@ async function main() {
   }
 
   // One job per assay, combination and seed; the longest assays first, so the pool ends together.
-  const secondsOf = (id) => ASSAYS.find((x) => x.id === id).seconds;
+  const secondsOf = (id) => chosen.find((x) => x.id === id).seconds;
   const queue = [];
-  for (const assay of chosen) for (const [ci, c] of cs.entries()) for (const seed of seeds) queue.push({ id: assay.id, ci, o: c.o, seed, seconds, policy });
+  for (const { assay, one: inOne } of picked) for (const [ci, c] of cs.entries()) for (const seed of seeds) queue.push({ id: assay.id, one: inOne, ci, o: c.o, seed, seconds, policy });
   queue.sort((a, b) => secondsOf(b.id) - secondsOf(a.id));
   const results = new Map(); // `${id}|${ci}` → runs
   const t0 = performance.now();
@@ -125,12 +145,17 @@ async function main() {
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   };
   const fmt = (v) => (Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
-  const all = [];
+  const out = [];
+  for (const id of pending) {
+    const title = ASSAYS.find((x) => x.id === id)?.title ?? id;
+    console.log(`\n## ${title} (one world)\n\nNot run on one world: ${ONE_PENDING[id]}.`);
+    out.push({ assay: id, pending: ONE_PENDING[id] });
+  }
   for (const assay of chosen) {
     console.log(`\n## ${assay.title}\n\nTarget: ${assay.target}. Seeds ${seeds[0]}–${seeds.at(-1)}, ${seconds ?? assay.seconds} s.\n`);
     for (const [ci, { label, o }] of cs.entries()) {
       const runs = (results.get(`${assay.id}|${ci}`) ?? []).sort((a, b) => a.seed - b.seed);
-      all.push({ assay: assay.id, label, overrides: o, runs });
+      out.push({ assay: assay.id, label, overrides: o, runs });
       const keys = Object.keys(runs[0].metrics).filter((k) => k !== "pass");
       const passes = runs.filter((r) => r.metrics.pass === 1).length;
       const hasPass = runs.some((r) => "pass" in r.metrics);
@@ -158,7 +183,7 @@ async function main() {
     }
   }
   console.error(`${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`);
-  if (json) writeFileSync(json, JSON.stringify(all, null, 1));
+  if (json) writeFileSync(json, JSON.stringify(out, null, 1));
 }
 
 function inWorker(job) {
@@ -179,8 +204,8 @@ function loadCache(file) {
 }
 
 async function work() {
-  const { id, o, seed, seconds, policy } = workerData;
-  const { ASSAYS, runAssay } = await import("../web/src/colony/experiment.ts");
+  const { id, one, o, seed, seconds, policy } = workerData;
+  const { ASSAYS, ONE_ASSAYS, runAssay } = await import("../web/src/colony/experiment.ts");
   const lookups = {};
   const count = (lane, hit) => {
     const l = (lookups[lane] ??= { hit: 0, miss: 0 });
@@ -202,7 +227,7 @@ async function work() {
     brains.responses = responsesFromAnswers(cache.responses ?? {}, undefined, count);
   }
   const run = runAssay(
-    ASSAYS.find((x) => x.id === id),
+    (one ? ONE_ASSAYS : ASSAYS).find((x) => x.id === id),
     seed,
     { ...o, ...brains },
     seconds,
