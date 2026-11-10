@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clamp, fit, fitZoom, fromMinimap, MAX_ZOOM, minimapRect, pan, toScreen, toWorld, visible, zoomAt, zoomBy } from "../camera.ts";
+import { aimed, clamp, fit, fitZoom, fromMinimap, MAX_ZOOM, minimapRect, pan, toScreen, toWorld, visible, zoomAt, zoomBy } from "../camera.ts";
 
 const world = { w: 512, h: 320 };
 const view = { w: 1000, h: 500 };
@@ -88,4 +88,19 @@ test("a map whose columns start below 0 (one world's curtain, x0 < 0): fit, clam
   assert.ok(near(fromMinimap(curtain, view, 1, r.x + r.w, r.y + r.h)[0], 236));
   const rw = minimapRect(world, view, 1);
   assert.deepEqual(fromMinimap(world, view, 1, rw.x, rw.y), [0, 0], "a map from 0 is unchanged");
+});
+
+test("an aim is clamped afresh in each view it is drawn in, not from the last clamp", () => {
+  const map = { w: 512, h: 320 };
+  const aim = { x: 250, y: 100 };
+  const c = { x: 0, y: 0, zoom: 2 };
+  // Drawn first in a tall box (the whole height fits: centred on it), then in the box the view settles in.
+  const tall = aimed(c, aim, map, { w: 900, h: 700 });
+  assert.equal(tall.y, 160);
+  const settled = aimed(tall, aim, map, { w: 900, h: 560 });
+  assert.deepEqual(settled, clamp({ x: 250, y: 100, zoom: 2 }, map, { w: 900, h: 560 }));
+  assert.equal(settled.y, 140, "as near the aim as the box allows");
+  // Without an aim the camera is only clamped; with a span, zoomed to fit it across the shorter side.
+  assert.deepEqual(aimed(tall, null, map, { w: 900, h: 560 }), clamp(tall, map, { w: 900, h: 560 }));
+  assert.equal(aimed({ ...c, zoom: 3 }, { x: 250, y: 160, span: 280 }, map, { w: 900, h: 560 }).zoom, 2);
 });

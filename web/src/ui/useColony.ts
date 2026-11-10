@@ -57,7 +57,7 @@ export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 /** The colony the fungus lands by. */
 export const LANDING_COLONY = 0;
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side", view: "below" };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side", view: "above" };
 
 /** One colony's line in the panel. */
 export interface SideStats {
@@ -163,6 +163,12 @@ function side(c: Colony, fungus: Fungus): SideStats {
   return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, queenLoad: c.queen?.load ?? 0, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.ownStances ? stanceText(c.stanceCounts()) : c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
 }
 
+/** A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load). */
+export function buildGame(s: GameSettings): Game {
+  const map = s.ground === "open" ? generateWorld(s.seed, OPEN_WORLD) : s.ground === "one" ? generateOneWorld(s.seed) : generateSideWorld(s.seed);
+  return new Game(map, { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false }, gameRng(s.seed, s.generation));
+}
+
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
 const MAX_STEP = 1 / 30;
 
@@ -174,8 +180,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const pending = useRef<SaveRecord | null>(null);
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
-    const map = () => (controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : controls.ground === "one" ? generateOneWorld(controls.seed) : generateSideWorld(controls.seed));
-    const build = () => new Game(map(), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW, autoFound: false }, gameRng(controls.seed, generation));
+    const build = () => buildGame({ seed: controls.seed, ground: controls.ground, antCount: controls.antCount, rival: controls.rival, generation });
     const g = build();
     const r = pending.current;
     if (r && r.settings.seed === controls.seed && r.settings.ground === controls.ground && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
@@ -275,10 +280,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     return () => cancelAnimationFrame(raf);
   }, [game, colony, controls.playing, controls.speed]);
 
-  // Dev builds only: the game on window, for end-to-end checks (Playwright); not in the Pages build.
-  useEffect(() => {
-    if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) (window as unknown as { jevAnts?: { game: Game } }).jevAnts = { game };
-  }, [game]);
+  // The dev hook (window.jevAnts, the game and the page's views) is the page's: ColonyApp.
   // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
   useEffect(() => {
     if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });

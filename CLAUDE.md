@@ -26,6 +26,7 @@ npm --prefix web install
 npm run dev                    # http://localhost:38500
 npm test                       # node --test, 60 s per file
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
+npm run e2e                    # one world in Chromium (scripts/e2e-one-world.mjs): switch views, linked clicks, follow through a hole, the pen by a click; ~20 s; uses the machine's playwright, spends nothing
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
 npm run exp -- all --seeds 1-10   # behaviour assays (web/src/colony/experiment.ts), offline; --set sweeps, --policy cache:<file> replays Jev
 node scripts/colony-live.mjs all --budget 0.10   # live: Jev against the local rule per lane; saves replayable caches (experiments/out/)
