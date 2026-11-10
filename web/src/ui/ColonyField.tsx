@@ -170,6 +170,12 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
   const crossCb = useRef(onCross);
   /** the followed ant's layer when last drawn: a change is a crossing (a new follow starts afresh) */
   const antLayer = useRef<{ f: Followed; layer: number } | null>(null);
+  /**
+   * The layer the page was last asked to show for the followed ant (onCross), until the view shown is it: a crossing is
+   * judged against the view on its way, not the one still drawn. An ant flicking up and down a hole within the frame or
+   * two the switch takes otherwise left the view on the wrong side of it (the e2e guard caught one in twenty runs).
+   */
+  const carryTo = useRef<number | null>(null);
   /** where the followed ant was last seen on the shown view, while it is on the other layer (carry off: "gone below") */
   const lastSeen = useRef<{ f: Followed; lv: number; x: number; y: number } | null>(null);
   const penRef = useRef(pen);
@@ -792,10 +798,17 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       if (f && fcol && lv >= 0) {
         const layer = fcol.layer[f.i] as number;
         const was = antLayer.current;
-        if (was && was.f === f && was.layer !== layer && layer !== lv) crossCb.current?.(layer, fcol.x[f.i] as number, fcol.y[f.i] as number);
+        if (carryTo.current === lv || !was || was.f !== f) carryTo.current = null;
+        if (was && was.f === f && was.layer !== layer && layer !== (carryTo.current ?? lv)) {
+          carryTo.current = layer;
+          crossCb.current?.(layer, fcol.x[f.i] as number, fcol.y[f.i] as number);
+        }
         antLayer.current = { f, layer };
         if (fHere) lastSeen.current = { f, lv, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
-      } else antLayer.current = null;
+      } else {
+        antLayer.current = null;
+        carryTo.current = null;
+      }
       const c = s.fitted || !s.cam ? clamp(fit(ext, v), ext, v) : aimed(s.cam, s.aim, ext, v);
       s.cam = c;
       s.zoomedIn = c.zoom > fitZoom(ext, v) * 1.05;
