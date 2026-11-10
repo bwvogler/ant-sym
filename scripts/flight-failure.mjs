@@ -10,13 +10,35 @@
 // 51%/55%, 7%/28%, 1%/7%; flight 210 with radius 70, 79%/66%, with 140, 47%/45% (unchanged from 12). Rerun when the
 // plane changes size (the endless world, ja-qpv, removes the edges that drive most failures at radius 70).
 //
-// Usage: node scripts/flight-failure.mjs [seeds=300] [width=512] [height=368]
+// --rock (measured 2026-11-10, seeds 1–20): flight 140 fails 53%/56% from end/interior nests at radius 70, 8%/27% at
+// 140, 0%/6% at 210; flight 210, 76%/69% and 44%/45%.
+// --rock: the founding-radius assay one-world §8 item 5 asks for (U4a): each seed's own plane, generateWorld(seed,
+// OPEN_WORLD) as one world's is, with its rock (open = openCell(plane), the plane's edge included), and the line through
+// its two nests' holes, as generateOneWorld makes it. Default seeds 1–20.
+//
+// Usage: node scripts/flight-failure.mjs [--rock] [seeds=300 (20 with --rock)] [width=512] [height=368]
 import { CELL, cellOf, centreX, centreY } from "../web/src/colony/hex.ts";
 import { grow, makeTransect, nearestValid } from "../web/src/colony/transect.ts";
-import { mulberry32 } from "../web/src/colony/world.ts";
+import { generateWorld, mulberry32, OPEN_WORLD, openCell } from "../web/src/colony/world.ts";
 
-const [seeds = 300, W = 512, H = 368] = process.argv.slice(2).map(Number);
-const open = (x, y) => x >= 4 && y >= 4 && x < W - 4 && y < H - 4;
+const rock = process.argv.includes("--rock");
+const args = process.argv.slice(2).filter((a) => a !== "--rock").map(Number);
+const [seeds = rock ? 20 : 300, W = 512, H = 368] = args;
+const box = (x, y) => x >= 4 && y >= 4 && x < W - 4 && y < H - 4;
+let open = box;
+
+/** The seed's own plane, and its line through its nests' holes (generateOneWorld's), with --rock; else the bare box. */
+function start(seed) {
+  if (!rock) return makeTransect([{ x: mid.x - 70, y: mid.y }, { x: mid.x + 70, y: mid.y }]);
+  const plane = generateWorld(seed, { ...OPEN_WORLD, size: { w: W, h: H } });
+  open = openCell(plane);
+  return makeTransect(
+    plane.nests.map((n) => {
+      cellOf(n.x, n.y);
+      return { x: CELL[0], y: CELL[1] };
+    }),
+  );
+}
 
 function fly(t, from, rng, dist, radius) {
   const a = rng() * 2 * Math.PI;
@@ -30,7 +52,7 @@ for (const [dist, radius] of [[140, 70], [140, 140], [140, 210], [210, 70], [210
   let holes = 0;
   for (let seed = 1; seed <= seeds; seed++) {
     const rng = mulberry32(seed);
-    let t = makeTransect([{ x: mid.x - 70, y: mid.y }, { x: mid.x + 70, y: mid.y }]);
+    let t = start(seed);
     for (let i = 0; i < 12 && t.holes.length < 6; i++) {
       const f = fly(t, t.holes[Math.floor(rng() * t.holes.length)], rng, dist, radius);
       if (f) t = grow(t, f.end, f.cell);
