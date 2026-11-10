@@ -95,3 +95,23 @@ test("a click at the edge of the reach, any way round a line cell, still finds t
     assert.notEqual(near, null, `${d.toFixed(3)} from column ${s}'s cell`);
   }
 });
+
+test("a click exactly between two line cells gives the lower column", () => {
+  // A line running east–west: neighbouring columns on one row, whose centres are exactly 1 apart, so the point midway
+  // is exactly as near each (and either way round the click's own cell).
+  const flat = makeTransect([
+    { x: 40, y: 50 },
+    { x: 90, y: 50 },
+  ]);
+  let pairs = 0;
+  for (let s = flat.sHole[0]!; s < flat.sHole[1]!; s++) {
+    const a = planePoint(flat, s)!;
+    const b = planePoint(flat, s + 1)!;
+    if (a.y !== b.y) continue;
+    for (const dy of [0, 0.3, -0.3]) {
+      assert.equal(columnNear(flat, (a.x + b.x) / 2, a.y + dy), s, `between columns ${s} and ${s + 1}, ${dy} off the row`);
+      pairs++;
+    }
+  }
+  assert.ok(pairs >= 90, `${pairs} ties`);
+});
