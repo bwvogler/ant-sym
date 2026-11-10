@@ -249,6 +249,24 @@ export const GUIDE: GuideEntry[] = [
       { note: "queens-and-merging", anchor: "2-what-ants-do", label: "Merging" },
     ],
   },
+  {
+    id: "one-world",
+    title: "The line and the curtain",
+    onScreen:
+      "One world (Details → Ground → one world) is one game seen two ways. Above: the surface from above, where ants forage, with the mound and the midden; a dashed line runs through the nests' holes, each named. Below: the ground under that line, unrolled flat, with every nest's shaft and chambers; the strip along its top is the surface under the line, with the ants standing on it, and a faint rule marks each bend of the line (“↱ 35°”). Click the line above to look below there, or the strip below to look above; a followed ant that goes through a hole takes the camera with it (Carry across).",
+    realAnts:
+      "A ground-nesting ant's nest is descending shafts with flat chambers off them (Tschinkel's “shish-kebab”), largest near the top: one vertical sheet keeps that shape. A founding queen flies, then walks to a nest site on foot, and most founding queens fail.",
+    inGame:
+      "Ants live on two layers: the plane, with the top-down maps' movement, and the curtain, a vertical sheet hung under the line, with the side view's; a hole is the only way between them. A new nest goes only beyond an end of the line, so the line stays one strip: its hole must be nearest an end hole, at least 16 from every hole, on open ground joined to the rest, and the new segment may not turn back more than 120° or come within 12 cells of the line. A new queen flies up to 140 from her mother's hole (with you in her, where you click on the top view, which shows where she would settle) and walks to the nearest spot the rule allows within 140 of where she landed; with none, she is lost, and the notice says why.",
+    sources: [
+      { note: "one-world", anchor: "2-the-model-a-plane-and-a-curtain", label: "The model: a plane and a curtain" },
+      { note: "one-world", anchor: "3-the-line-and-where-a-new-nest-may-go", label: "The line, and where a new nest may go" },
+      { note: "one-world", anchor: "5-two-views-of-one-game", label: "Two views of one game" },
+      { note: "nest-and-home", anchor: "nest-structure", label: "Nest structure" },
+      { note: "nest-spacing", anchor: "3-how-far-a-founding-queen-flies", label: "How far a founding queen flies" },
+      { note: "new-queens", anchor: "3-the-flight-and-founding", label: "The flight and founding" },
+    ],
+  },
 ];
 
 /** The research notes, for the guide's footer (docs/README.md's table). */
@@ -266,7 +284,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "fungus-body", title: "The fungus's body", covers: "A mycelium off the host, spores paid from its mass, adapting in hosts; grooming triggered by sensing the pathogen." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
   { note: "entrances", title: "Entrances", covers: "How many entrances colonies keep, sealing them at night, and what a digger senses near the surface." },
-  { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views, above and below (Details → Ground → one world; the page’s default stays the side view until U6)." },
+  { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views, above and below (Details → Ground → one world; the page’s default stays the side view until U6). The views are linked, and a one-world game opens above." },
   { note: "nest-spacing", title: "Nest spacing", covers: "How far apart colonies sit, where young colonies survive, and how far a founding queen flies." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];

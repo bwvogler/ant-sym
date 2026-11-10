@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { CHUNK, type ChunkLayer } from "../colony/chunks.ts";
 import { type Colony, CURTAIN, keyX, keyY, moundRadius, PLANE } from "../colony/colony.ts";
 import { CELL, cellOf, centreX, centreY, R, SIDE } from "../colony/hex.ts";
@@ -7,8 +7,10 @@ import { type OneWorld, STRIP } from "../colony/oneWorld.ts";
 import { BINS, binOf } from "../colony/recognition.ts";
 import { cellAt, columnsOver, turnAt } from "../colony/transect.ts";
 import { AIR, OPEN, rockAt, SOIL, type WorldMap, worldExtent } from "../colony/world.ts";
-import { type Camera, clamp, type Extent, fit, fitZoom, fromMinimap, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
+import { aimed, type Aim, type Camera, clamp, type Extent, fit, fitZoom, fromMinimap, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
+import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
+import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 
@@ -27,6 +29,9 @@ import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 // dashed through the holes, each hole named, and the mound; below, the curtain unrolled, with the ground strip drawn
 // from the plane cells under the line (P(s)), the mound's cut stacked on it and the plane's ants standing there, and a
 // faint rule at each bend. Each view keeps its own camera; only the ants, corpses and scent of the view's layer show.
+// The views are linked (U5.2): a click on the line above, or on the strip below, asks the page for the other view there
+// (onLink); a followed ant that goes through a hole is reported (onCross), and the page may carry the camera across. In
+// the queen's pen the top view shows her flight's circle and, under the pointer, where she would settle.
 
 interface Props {
   /** every colony on the map: the first drawn in ink, the second in the warn tone, the ones founded later by their odour (ja-lo8.8) */
@@ -45,6 +50,39 @@ interface Props {
   world?: OneWorld | null;
   /** which of one world's layers to show: PLANE (above) or CURTAIN (below); ignored without `world` */
   view?: number;
+  /**
+   * One world: a click (no ant under it) on the line in the top view, or on the side view's strip or the sky over it,
+   * asks for the other view (PLANE or CURTAIN) centred on (x, y) there: the strip at that column below, P(s) above.
+   */
+  onLink?: (view: number, x: number, y: number) => void;
+  /** One world: the followed ant has gone through a hole, out of the shown view, onto layer `view` at (x, y). */
+  onCross?: (view: number, x: number, y: number) => void;
+  /** the field's cameras, for the page (centreOn: a linked click, an ant carried across) and the dev hook */
+  api?: RefObject<FieldApi | null>;
+  /** one world's queen's pen: her flight's circle on the plane, where she would settle, and a click to found there */
+  pen?: FieldPen | null;
+  /** more buttons in the field's corner (the page's: carry across) */
+  tools?: ReactNode;
+}
+
+/** What the page may ask of the field's cameras. */
+export interface FieldApi {
+  /**
+   * Centre view `view`'s camera (PLANE, CURTAIN, or the one map's) on world (x, y): it is the camera that view opens
+   * with. At the shown view's zoom; `close`: at least LINK_ZOOM, so the place shows; `span`: zoomed so that many world
+   * units fit across the box's shorter side.
+   */
+  centreOn: (view: number, x: number, y: number, how?: { close?: boolean; span?: number }) => void;
+  /** view `view`'s camera as last drawn (null before it was shown or centred) */
+  camera: (view: number) => Camera | null;
+}
+
+/** The pen on the field (one world's top view). */
+export interface FieldPen extends PenCircle {
+  /** where she would settle from plane point p, or why not (pen.ts penSettle) */
+  preview: (p: { x: number; y: number }) => Settle;
+  /** a click on the plane at p */
+  onPick: (p: { x: number; y: number }) => void;
 }
 
 /** One view's camera: kept per view, so switching between above and below resets neither. */
@@ -54,7 +92,16 @@ interface ViewCam {
   fitted: boolean;
   /** whether the view is zoomed in past the whole map (the minimap shows, and takes clicks) */
   zoomedIn: boolean;
+  /**
+   * Where the page asked the view to centre (FieldApi.centreOn; `span`: world units across the box's shorter side): kept,
+   * and the camera clamped round it in whatever box the view is drawn in (the box takes the view's shape a frame or two
+   * after a switch), until the player moves the camera or a follow takes it. Without it a frame drawn in the passing box
+   * clamped the place away for good.
+   */
+  aim: Aim | null;
 }
+
+const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
 
 /** The camera key of a game on one map (one world's are PLANE and CURTAIN). */
 const ONE_MAP = -1;
@@ -86,6 +133,8 @@ const HEX_ZOOM = 12;
 const CLICK_SLOP_PX = 8;
 /** A click picks the nearest ant within this many CSS px. */
 const PICK_PX = 14;
+/** A linked click opens the other view at least this close (CSS px a cell, as `n` goes to a nest). */
+const LINK_ZOOM = 8;
 /** No chunk column: drawHexes' "none yet" (−1 is a real chunk column on one world's curtain). */
 const NO_CHUNK = -0x80000000;
 
@@ -99,7 +148,7 @@ interface ChunkCanvas {
 type Gesture = { kind: "pan" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
-export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, showHomeTrail, followed, onFollow, onChamber, world = null, view = CURTAIN }: Props) {
+export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, showHomeTrail, followed, onFollow, onChamber, world = null, view = CURTAIN, onLink, onCross, api, pen = null, tools }: Props) {
   const colony = colonies[0] as Colony;
   const count = colonies.length;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -118,10 +167,24 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
   /** the nest `n` went to last: it cycles through the colonies' nests */
   const nestTurn = useRef(0);
   const followCb = useRef(onFollow);
+  const crossCb = useRef(onCross);
+  /** the followed ant's layer when last drawn: a change is a crossing (a new follow starts afresh) */
+  const antLayer = useRef<{ f: Followed; layer: number } | null>(null);
+  /**
+   * The layer the page was last asked to show for the followed ant (onCross), until the view shown is it: a crossing is
+   * judged against the view on its way, not the one still drawn. An ant flicking up and down a hole within the frame or
+   * two the switch takes otherwise left the view on the wrong side of it (the e2e guard caught one in twenty runs).
+   */
+  const carryTo = useRef<number | null>(null);
+  /** where the followed ant was last seen on the shown view, while it is on the other layer (carry off: "gone below") */
+  const lastSeen = useRef<{ f: Followed; lv: number; x: number; y: number } | null>(null);
+  const penRef = useRef(pen);
+  /** the pointer over the canvas (device px), for the pen's preview; null when it left */
+  const hover = useRef<[number, number] | null>(null);
   /** The shown view's camera. */
   const vc = (): ViewCam => {
     let s = cams.current.get(shown.current);
-    if (!s) cams.current.set(shown.current, (s = { cam: null, fitted: true, zoomedIn: false }));
+    if (!s) cams.current.set(shown.current, (s = NEW_CAM()));
     return s;
   };
   /** The shown view's map: one world's plane or curtain, or the game's one map (the colony's, between ticks). */
@@ -144,6 +207,12 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
   useEffect(() => {
     followCb.current = onFollow;
   }, [onFollow]);
+  useEffect(() => {
+    crossCb.current = onCross;
+  }, [onCross]);
+  useEffect(() => {
+    penRef.current = pen;
+  }, [pen]);
 
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture>(NO_GESTURE);
@@ -495,7 +564,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     };
 
     /** Text with a paper halo, centred at screen (x, y). */
-    const label = (text: string, x: number, y: number, px: number, alpha = 1) => {
+    const label = (text: string, x: number, y: number, px: number, alpha = 1, fill = theme.ink) => {
       ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -505,7 +574,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       ctx.globalAlpha = 0.85 * alpha;
       ctx.strokeText(text, x, y);
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = theme.ink;
+      ctx.fillStyle = fill;
       ctx.fillText(text, x, y);
       ctx.globalAlpha = 1;
       ctx.textAlign = "start";
@@ -635,6 +704,78 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       }
     };
 
+    /** The last preview under the pointer: the pen asked once per cell (and side of the circle's edge), not every frame. */
+    let penSeen: { pen: FieldPen; key: string; at: Settle } | null = null;
+    /**
+     * One world's queen's pen, on the top view: her flight's circle round her mother's hole and, under the pointer,
+     * the cell she would settle on (the new segment of the line dashed to it from the end it grows) or why she can't.
+     */
+    const drawPen = (w: OneWorld, pn: FieldPen, c: Camera, v: Viewport, d: number) => {
+      const [cx, cy] = toScreen(c, v, pn.x, pn.y);
+      ctx.beginPath();
+      ctx.arc(cx, cy, pn.r * c.zoom, 0, Math.PI * 2);
+      ctx.fillStyle = theme.accent;
+      ctx.globalAlpha = 0.06;
+      ctx.fill();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = theme.accent;
+      ctx.lineWidth = 2 * d;
+      ctx.setLineDash([8 * d, 6 * d]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      const hp = hover.current;
+      if (!hp) return;
+      const [wx, wy] = toWorld(c, v, hp[0], hp[1]);
+      cellOf(wx, wy);
+      const key = `${CELL[0]},${CELL[1]},${Math.hypot(wx - pn.x, wy - pn.y) <= pn.r}`;
+      if (!penSeen || penSeen.pen !== pn || penSeen.key !== key) penSeen = { pen: pn, key, at: pn.preview({ x: wx, y: wy }) };
+      const at = penSeen.at;
+      const px = Math.round(12 * d);
+      if (!at.ok) {
+        // Kept inside the field: the reason is read near the pointer, whichever edge it is at.
+        ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+        const half = ctx.measureText(at.reason).width / 2 + 6 * d;
+        const lx = half * 2 >= v.w ? v.w / 2 : Math.max(half, Math.min(v.w - half, hp[0]));
+        label(at.reason, lx, Math.max(px, hp[1] - 18 * d), px, 1, theme.warn);
+        return;
+      }
+      const tx = centreX(at.cell.x, at.cell.y);
+      const ty = centreY(at.cell.y);
+      const [sx, sy] = toScreen(c, v, tx, ty);
+      const holes = w.line.holes;
+      const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
+      const [ex, ey] = toScreen(c, v, centreX(e.x, e.y), centreY(e.y));
+      ctx.strokeStyle = theme.accent;
+      ctx.lineWidth = Math.max(1.5, d * 1.5);
+      ctx.setLineDash([6 * d, 5 * d]);
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(sx, sy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // From where she lands to where she settles, when she walks on.
+      if (Math.hypot(sx - hp[0], sy - hp[1]) > 4 * d) {
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = d;
+        ctx.beginPath();
+        ctx.moveTo(hp[0], hp[1]);
+        ctx.lineTo(sx, sy);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      const rr = Math.max(6 * d, c.zoom * 1.2);
+      ctx.beginPath();
+      ctx.arc(sx, sy, rr, 0, Math.PI * 2);
+      ctx.lineWidth = 2 * d;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.max(2.5 * d, 0.6 * c.zoom), 0, Math.PI * 2);
+      ctx.fillStyle = theme.accent;
+      ctx.fill();
+      label("her hole", sx, sy - rr - px, px);
+    };
+
     const draw = () => {
       bind();
       const v: Viewport = { w: canvas.width, h: canvas.height };
@@ -648,8 +789,27 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       if (f && !fcol) {
         follow.current = null;
         followCb.current(null);
-      } else if (f && fcol && fHere && s.cam) s.cam = { ...s.cam, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
-      const c = clamp(s.fitted || !s.cam ? fit(ext, v) : s.cam, ext, v);
+      } else if (f && fcol && fHere && s.cam) {
+        s.cam = { ...s.cam, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
+        s.aim = null;
+      }
+      // One world: the followed ant went through a hole, out of the view (its layer changed, not the view): the page is
+      // told, and may carry the camera across (U5.2). Where it was last seen here stays marked ("gone below").
+      if (f && fcol && lv >= 0) {
+        const layer = fcol.layer[f.i] as number;
+        const was = antLayer.current;
+        if (carryTo.current === lv || !was || was.f !== f) carryTo.current = null;
+        if (was && was.f === f && was.layer !== layer && layer !== (carryTo.current ?? lv)) {
+          carryTo.current = layer;
+          crossCb.current?.(layer, fcol.x[f.i] as number, fcol.y[f.i] as number);
+        }
+        antLayer.current = { f, layer };
+        if (fHere) lastSeen.current = { f, lv, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
+      } else {
+        antLayer.current = null;
+        carryTo.current = null;
+      }
+      const c = s.fitted || !s.cam ? clamp(fit(ext, v), ext, v) : aimed(s.cam, s.aim, ext, v);
       s.cam = c;
       s.zoomedIn = c.zoom > fitZoom(ext, v) * 1.05;
       ctx.fillStyle = theme.paper;
@@ -934,7 +1094,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         ctx.textBaseline = "alphabetic";
       }
 
-      // The followed ant: a jade ring (in one world, while it is on the view's layer).
+      // The followed ant: a jade ring (in one world, while it is on the view's layer). Gone through a hole: a dashed ring
+      // where it was last seen here, saying where it went.
       if (f && fcol && fHere) {
         const [x, y] = toScreen(c, v, fcol.x[f.i] as number, fcol.y[f.i] as number);
         ctx.beginPath();
@@ -942,7 +1103,20 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2 * d;
         ctx.stroke();
+      } else if (f && fcol && lastSeen.current?.f === f && lastSeen.current.lv === lv) {
+        const [x, y] = toScreen(c, v, lastSeen.current.x, lastSeen.current.y);
+        const r = Math.max(9 * d, c.zoom * 1.6);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2 * d;
+        ctx.setLineDash([4 * d, 4 * d]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        label(fcol.layer[f.i] === CURTAIN ? "gone below" : "gone up", x, y - r - 10 * d, Math.round(12 * d));
       }
+      const pn = penRef.current;
+      if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);
 
       // Zoomed in: the minimap, with the view's rectangle.
       if (c.zoom > fitZoom(ext, v) * 1.05) {
@@ -979,6 +1153,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       const we = extent();
       const c = zoomBy(s.cam ?? fit(we, v), we, v, (e.clientX - r.left) * k, (e.clientY - r.top) * k, Math.exp(-e.deltaY * 0.0015));
       s.cam = c;
+      s.aim = null;
       s.zoomedIn = c.zoom > fitZoom(we, v) * 1.05;
       s.fitted = c.zoom <= fitZoom(we, v) * 1.0001;
     };
@@ -1010,9 +1185,53 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     const we = extent();
     const cam = clamp(c, we, viewport());
     s.cam = cam;
+    s.aim = null;
     const fz = fitZoom(we, viewport());
     s.zoomedIn = cam.zoom > fz * 1.05;
     s.fitted = cam.zoom <= fz * 1.0001;
+  };
+  /** View `v`'s map: one world's plane or curtain, or the game's one map. */
+  const mapOf = (v: number): WorldMap => (world ? (v === PLANE ? world.plane : world.curtain) : colony.map);
+  // The page's handle on the cameras: a view opens where it is asked (a linked click, an ant carried across).
+  useEffect(() => {
+    if (!api) return;
+    api.current = {
+      centreOn: (v, x, y, how = {}) => {
+        // Looking elsewhere in the view shown ends a follow (as a drag does); a follow carried to the other view goes on.
+        if (v === shown.current && follow.current) unfollow();
+        let s = cams.current.get(v);
+        if (!s) cams.current.set(v, (s = NEW_CAM()));
+        const we = extentOf(mapOf(v));
+        const vp = viewport();
+        const now = cams.current.get(shown.current)?.cam?.zoom ?? fitZoom(we, vp);
+        const zoom = how.span ? Math.min(vp.w, vp.h) / how.span : how.close ? Math.max(now, LINK_ZOOM * dpr()) : now;
+        // Not clamped here: each frame clamps round the aim in the box it is drawn in (ViewCam.aim).
+        s.cam = { x, y, zoom };
+        s.aim = { x, y, ...(how.span ? { span: how.span } : {}) };
+        const fz = fitZoom(we, vp);
+        s.fitted = false;
+        s.zoomedIn = zoom > fz * 1.05;
+      },
+      camera: (v) => cams.current.get(v)?.cam ?? null,
+    };
+    return () => {
+      api.current = null;
+    };
+  });
+  /** A click on nothing in one world: on the line above, the side view at its column; on the strip below (or the sky over it), the top view at P(s). */
+  const link = (x: number, y: number) => {
+    if (!world || !onLink) return;
+    const [wx, wy] = toWorld(camera(), viewport(), x, y);
+    if (shown.current === PLANE) {
+      const s = columnNear(world.line, wx, wy);
+      if (s === null) return;
+      const q = stripPoint(s);
+      onLink(CURTAIN, q.x, q.y);
+    } else {
+      const s = stripColumn(world.line, wx, wy);
+      const q = s === null ? null : planePoint(world.line, s);
+      if (q) onLink(PLANE, q.x, q.y);
+    }
   };
   /** Stop following now: the ref at once (a rAF draw must not re-centre on the ant first), the parent's state after. */
   const unfollow = () => {
@@ -1090,9 +1309,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
   };
 
   const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
+    const [x, y] = devicePoint(e);
+    hover.current = [x, y];
     const prev = pointers.current.get(e.pointerId);
     if (!prev) return;
-    const [x, y] = devicePoint(e);
     const g = gesture.current;
     if (g.kind === "pinch" && pointers.current.size >= 2) {
       let other = prev;
@@ -1118,12 +1338,18 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     const p = pointers.current.get(e.pointerId);
     pointers.current.delete(e.pointerId);
     if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
-      const f = pick(p.x, p.y);
-      follow.current = f;
-      onFollow(f);
-      if (!f && labelsOn.current && onChamber) {
-        const hit = chamberAt(p.x, p.y);
-        if (hit) onChamber(hit.k, hit.id);
+      const pn = penRef.current;
+      if (world && pn && shown.current === PLANE) {
+        // The queen's pen: a click on the top view is where she flies (the page founds there, or says why not).
+        const [wx, wy] = toWorld(camera(), viewport(), p.x, p.y);
+        pn.onPick({ x: wx, y: wy });
+      } else {
+        const f = pick(p.x, p.y);
+        follow.current = f;
+        onFollow(f);
+        const hit = !f && labelsOn.current && onChamber ? chamberAt(p.x, p.y) : null;
+        if (hit) onChamber!(hit.k, hit.id);
+        else if (!f) link(p.x, p.y);
       }
     }
     if (pointers.current.size === 0) gesture.current = NO_GESTURE;
@@ -1181,11 +1407,12 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         tabIndex={0}
         className="absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-grab active:cursor-grabbing"
         role="application"
-        aria-label="colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it"
+        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
+        onPointerLeave={() => (hover.current = null)}
         onKeyDown={onKey}
         onContextMenu={(e) => e.preventDefault()}
       />
@@ -1198,6 +1425,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             {colonyName(k)} nest
           </button>
         ))}
+        {tools}
         {(world ? (view === PLANE ? world.plane : world.curtain) : colony.map).chambers && (
           <button type="button" className={labels ? button.replace("border-line", "border-accent").replace("text-fg-2", "text-accent") : button} aria-pressed={labels} onClick={() => setLabels((on) => !on)} title="Name each chamber by its role; click a chamber to inspect it in Learn">
             Labels

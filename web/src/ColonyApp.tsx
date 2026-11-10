@@ -2,18 +2,18 @@ import { worldExtent, type WorldMap } from "./colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntCard from "./ui/AntCard.tsx";
-import ColonyField from "./ui/ColonyField.tsx";
+import ColonyField, { type FieldApi, type FieldPen } from "./ui/ColonyField.tsx";
 import DetailsScreen from "./ui/DetailsScreen.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
-import { hasNests, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { buildGame, hasNests, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import { CURTAIN, PLANE } from "./colony/colony.ts";
 import { UPGRADES, type Upgrade } from "./colony/evolution.ts";
 import { LETHAL_LEVERS } from "./colony/levers.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
-import { MAX_COLONIES, MET, type Game } from "./colony/game.ts";
+import { FOUNDING_RESERVE, MAX_COLONIES, MET, type Game } from "./colony/game.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo } from "./ui/backend.ts";
 import { useBackend } from "./ui/useBackend.ts";
@@ -25,7 +25,9 @@ import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
 import { pushToast } from "./ui/toasts.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
-import { penGate } from "./ui/pen.ts";
+import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
+import type { DoctrineChoice } from "./ui/useColonyJev.ts";
+import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
 import type { Flight } from "./colony/royal.ts";
 
 // The game's main screen (ja-lo8.2): the field, a slim top bar, and the fungus, the player. You shape the fungus's
@@ -70,6 +72,25 @@ export default function ColonyApp() {
   }, [oneWorld, controls.view, setView]);
   // The map the field shows: its aspect is the box's.
   const shownMap = oneWorld ? (controls.view === "above" ? oneWorld.plane : oneWorld.curtain) : colony.map;
+  // The views linked (one-world §5, U5.2): the field's cameras, a click across, and an ant followed through a hole.
+  const field = useRef<FieldApi | null>(null);
+  /** Show `view` (PLANE or CURTAIN) centred on (x, y) there; `close`: near enough to see the place (a linked click). */
+  const showAt = useCallback(
+    (view: number, x: number, y: number, close = false) => {
+      field.current?.centreOn(view, x, y, { close });
+      setView(view === PLANE ? "above" : "below");
+    },
+    [setView],
+  );
+  const onLink = useCallback((view: number, x: number, y: number) => showAt(view, x, y, true), [showAt]);
+  /** Carry the camera across with a followed ant that goes through a hole (on by default); off, the camera holds. */
+  const [carry, setCarry] = useState(true);
+  const onCross = useCallback(
+    (view: number, x: number, y: number) => {
+      if (carry) showAt(view, x, y);
+    },
+    [carry, showAt],
+  );
   const games = useSaves(game, settings, { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull }, stats, controls.started);
   const continueFrom = useCallback(
     (r: SaveRecord) => {
@@ -87,7 +108,9 @@ export default function ColonyApp() {
   // A new queen has flown (ja-lo8.9): the game is paused for her. The pen opens if the fungus is in her, her mother's
   // queen was reached and Jev can read new words; else she founds on her mother's doctrine at once, and a notice says why.
   const flight: Flight | null = stats && stats.flights > 0 ? (game.flights[0] ?? null) : null;
-  const gate = flight ? penGate(flight, game.revealed, jev.lock, colonyName(flight.mother)) : null;
+  // `devPen` (dev builds only, set by the dev hook's fly(): the Playwright guard) opens the pen without Jev.
+  const [devPen, setDevPen] = useState(false);
+  const gate = flight ? penGate(flight, game.revealed, devPen ? null : jev.lock, colonyName(flight.mother)) : null;
   const settle = useCallback(
     (f: Flight, k: number) => {
       // Lost: the game says why (Game.lastLoss; one world's founding rule, docs/one-world.md §3).
@@ -101,7 +124,10 @@ export default function ColonyApp() {
               : `A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`,
           "warn",
         );
-      if (!game.flights.length) update({ playing: true });
+      if (!game.flights.length) {
+        update({ playing: true });
+        setDevPen(false); // the dev hook's pen was for that flight only
+      }
     },
     [game, update],
   );
@@ -114,18 +140,97 @@ export default function ColonyApp() {
     }
     settle(flight, k);
   }, [flight, gate, game, jev, settle]);
-  const foundHers = useCallback(
-    (d: { id: string; text: string }, at: Landing) => {
-      if (!flight) return;
-      const k = game.found(flight, game.landingAt(flight.mother, at.side, at.distance) ?? game.landing(flight.mother));
+  /** Found flight f's colony at `at` on the player's words `d` (the queen's pen). */
+  const foundOn = useCallback(
+    (f: Flight, d: DoctrineChoice, at: { x: number; y: number } | null) => {
+      const k = game.found(f, at);
       if (k >= 0) {
         jev.foundWith(k, d);
         pushToast(`${colonyName(k)} is founded, on your words.`, "good");
       }
-      settle(flight, k);
+      settle(f, k);
     },
-    [flight, game, jev, settle],
+    [game, jev, settle],
   );
+  const foundHers = useCallback(
+    (d: DoctrineChoice, at: Landing) => {
+      if (flight) foundOn(flight, d, game.landingAt(flight.mother, at.side, at.distance) ?? game.landing(flight.mother));
+    },
+    [flight, game, foundOn],
+  );
+  // One world's pen (owner, 2026-11-10): she flies where the player clicks on the top view, within her flight of her
+  // mother's hole. The page shows the top view, round her circle; the field previews where she would settle
+  // (Game.settleAt, on the ground kept while the line is the same: penGround) and a click there founds her colony.
+  const penOpen = flight !== null && gate?.open === true;
+  const circle = penOpen && oneWorld && flight ? flightCircle(game, flight) : null;
+  const penWords = useRef<DoctrineChoice>({ id: "", text: "" });
+  /** "Let her fly": her own flight from her mother's hole (Game.landing), on the pen's words: no pointer needed. */
+  const onFly = useCallback(
+    (d: DoctrineChoice) => {
+      if (flight) foundOn(flight, d, game.landing(flight.mother));
+    },
+    [flight, game, foundOn],
+  );
+  const onWords = useCallback((d: DoctrineChoice) => {
+    penWords.current = d;
+  }, []);
+  const penFor = circle ? `${circle.x},${circle.y},${flight?.at}` : null;
+  useEffect(() => {
+    if (!circle) return;
+    setFollowed(null); // the pen's circle, not an ant, is what the top view shows
+    field.current?.centreOn(PLANE, circle.x, circle.y, { span: 2.6 * circle.r });
+    setView("above");
+    // Once as the pen opens (its circle's place and the flight say which).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [penFor, setView, setFollowed]);
+  const pen: FieldPen | null = useMemo(() => {
+    if (!circle || !flight || !oneWorld) return null;
+    const mother = colonyName(flight.mother);
+    return {
+      ...circle,
+      preview: (p) => penSettle(circle, p, mother, (q) => (game.colonies.length >= MAX_COLONIES ? { ok: false, reason: `the map already holds ${MAX_COLONIES} colonies` } : game.settleAt(q, penGround(oneWorld)))),
+      onPick: (p) => {
+        if (!withinFlight(circle, p)) return pushToast(`She can't fly that far: click within ${circle.r} of ${mother}'s hole.`, "warn");
+        if (!penWords.current.text) return pushToast("Write her doctrine first.", "warn");
+        foundOn(flight, penWords.current, p);
+      },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [penFor, flight, oneWorld, game, foundOn]);
+  // Dev builds only: the game and the page's views on window, for the Playwright guard (scripts/e2e-one-world.mjs); not
+  // in the Pages build. follow(k, i) follows an ant; view() and camera(view) read where each view looks; fly(mother)
+  // sends a new queen from that colony with the fungus in her and opens her pen, Jev or not. With the game paused,
+  // nextCrossing(maxSeconds, minTicks) rehearses on a copy which curtain ant comes up next, and on which fixed step (rehearse.ts),
+  // and step(n) takes the game itself n of those steps: the guard follows that ant through its hole for certain.
+  // Keyless only: the copy shares the game's policies, so with JEV_API_KEY set a miss in the copy would ask Jev (a run, real
+  // spend, skewed hit counts). npm run e2e starts Vite without the key (PR #65 review N6).
+  useEffect(() => {
+    if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
+    (window as unknown as { jevAnts?: unknown }).jevAnts = {
+      game,
+      follow: (k: number, i: number) => {
+        const c = game.colonies[k];
+        if (!c || !c.alive[i]) return false;
+        setFollowed({ k, i, gen: c.gen[i] as number });
+        return true;
+      },
+      view: () => controls.view,
+      nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(settings), maxSeconds, minTicks),
+      step: (n = 1) => {
+        for (let t = 0; t < n; t++) game.tick(REHEARSE_DT);
+      },
+      camera: (v: View) => field.current?.camera(v === "above" ? PLANE : CURTAIN) ?? null,
+      fly: (mother = 0) => {
+        const m = game.colonies[mother];
+        if (!m) return false;
+        setDevPen(true);
+        game.revealed[mother] = true;
+        game.flights.push({ mother, x: m.nest.x, y: m.nest.y, load: 1, strain: game.fungus.evolution?.strain ?? 0, at: game.time, food: FOUNDING_RESERVE });
+        return true;
+      },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, controls.view, setFollowed]);
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-3 px-4 py-4">
@@ -165,7 +270,8 @@ export default function ColonyApp() {
       />
       <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} saves={games} onLoad={(r) => (continueFrom(r), closeDetails())} />
       <Toasts />
-      {flight && gate?.open && <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} />}
+      {/* The side view's pen, over the field (and one world's, were her mother to have no hole: she lands by herself). */}
+      {flight && gate?.open && !circle && <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} />}
       {!controls.started && <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm" aria-label="game bar">
@@ -213,6 +319,23 @@ export default function ColonyApp() {
               onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
               world={oneWorld}
               view={controls.view === "above" ? PLANE : CURTAIN}
+              onLink={onLink}
+              onCross={onCross}
+              api={field}
+              pen={pen}
+              tools={
+                oneWorld && (
+                  <button
+                    type="button"
+                    className={`pointer-events-auto rounded-md border bg-panel/90 px-2 py-1 text-xs shadow-sm hover:bg-raised ${carry ? "border-accent text-accent" : "border-line text-fg-2"}`}
+                    aria-pressed={carry}
+                    onClick={() => setCarry((on) => !on)}
+                    title="A followed ant that goes through a hole takes the camera with it, to the other view"
+                  >
+                    Carry across
+                  </button>
+                )
+              }
             />
           </div>
           {followed ? (
@@ -224,6 +347,9 @@ export default function ColonyApp() {
           )}
         </div>
         <aside className="flex w-full flex-col gap-3 lg:w-80">
+          {flight && gate?.open && oneWorld && circle && (
+            <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} place={{ radius: circle.r, onWords, onFly }} />
+          )}
           <FungusPanel stats={stats} jev={jev} evolve={evolve} side={nests} menu={controls.menu} />
         </aside>
       </div>
