@@ -7,7 +7,8 @@ import DetailsScreen from "./ui/DetailsScreen.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
-import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats } from "./ui/useColony.ts";
+import { hasNests, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { CURTAIN, PLANE } from "./colony/colony.ts";
 import { UPGRADES, type Upgrade } from "./colony/evolution.ts";
 import { LETHAL_LEVERS } from "./colony/levers.ts";
 import StartScreen from "./ui/StartScreen.tsx";
@@ -50,7 +51,25 @@ export default function ColonyApp() {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
-  useNotices(stats, jev.lock, jev.state.phase, controls.menu, controls.ground === "side");
+  const nests = hasNests(controls.ground);
+  useNotices(stats, jev.lock, jev.state.phase, controls.menu, nests);
+  // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too. The game is the same either way.
+  const oneWorld = game.world;
+  const setView = useCallback((view: View) => update({ view }), [update]);
+  useEffect(() => {
+    if (!oneWorld) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "v" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      setView(controls.view === "above" ? "below" : "above");
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [oneWorld, controls.view, setView]);
+  // The map the field shows: its aspect is the box's.
+  const shownMap = oneWorld ? (controls.view === "above" ? oneWorld.plane : oneWorld.curtain) : colony.map;
   const games = useSaves(game, settings, { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull }, stats, controls.started);
   const continueFrom = useCallback(
     (r: SaveRecord) => {
@@ -71,11 +90,15 @@ export default function ColonyApp() {
   const gate = flight ? penGate(flight, game.revealed, jev.lock, colonyName(flight.mother)) : null;
   const settle = useCallback(
     (f: Flight, k: number) => {
+      // Lost: the game says why (Game.lastLoss; one world's founding rule, docs/one-world.md §3).
+      const why = k < 0 && game.lastLoss?.flight === f ? game.lastLoss.reason : null;
       if (k < 0)
         pushToast(
           game.colonies.length >= MAX_COLONIES
             ? `A new queen from ${colonyName(f.mother)} flew, but the map already holds ${MAX_COLONIES} colonies: she was lost.`
-            : `A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`,
+            : why
+              ? `A new queen from ${colonyName(f.mother)} was lost: ${why}.`
+              : `A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`,
           "warn",
         );
       if (!game.flights.length) update({ playing: true });
@@ -137,7 +160,7 @@ export default function ColonyApp() {
         setRule={(r) => update(r)}
         retune={`A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`}
         demo={isDemo(backend)}
-        sideView={controls.ground === "side"}
+        hasNests={nests}
         onSideView={() => update({ ground: "side" })}
       />
       <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} saves={games} onLoad={(r) => (continueFrom(r), closeDetails())} />
@@ -156,6 +179,15 @@ export default function ColonyApp() {
             </button>
           ))}
         </div>
+        {oneWorld && (
+          <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="view">
+            {(["above", "below"] as const).map((v) => (
+              <button key={v} type="button" className={seg(controls.view === v)} onClick={() => setView(v)} aria-pressed={controls.view === v} title={v === "above" ? "The surface from above: foraging, trails, the mound and the line through the holes (v)" : "Underground: the curtain under the line, unrolled, with every nest (v)"}>
+                {v}
+              </button>
+            ))}
+          </div>
+        )}
         <span className="font-mono tabular-nums text-fg-2" title="sim time">
           {clock(stats?.time ?? 0)}
         </span>
@@ -169,7 +201,7 @@ export default function ColonyApp() {
 
       <div className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:flex-row">
         <div className="flex min-w-0 flex-col gap-3 lg:flex-1">
-          <div className="relative" style={{ aspectRatio: `${worldExtent(colony.map).w} / ${worldExtent(colony.map).h}` }}>
+          <div className="relative" style={{ aspectRatio: `${worldExtent(shownMap).w} / ${worldExtent(shownMap).h}` }}>
             <ColonyField
               colonies={game.colonies}
               fungus={game.fungus}
@@ -179,6 +211,8 @@ export default function ColonyApp() {
               followed={followed}
               onFollow={setFollowed}
               onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
+              world={oneWorld}
+              view={controls.view === "above" ? PLANE : CURTAIN}
             />
           </div>
           {followed ? (
@@ -190,7 +224,7 @@ export default function ColonyApp() {
           )}
         </div>
         <aside className="flex w-full flex-col gap-3 lg:w-80">
-          <FungusPanel stats={stats} jev={jev} evolve={evolve} side={controls.ground === "side"} menu={controls.menu} />
+          <FungusPanel stats={stats} jev={jev} evolve={evolve} side={nests} menu={controls.menu} />
         </aside>
       </div>
     </main>

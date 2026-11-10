@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SITUATIONS } from "../colony/colony.ts";
 import { DOCTRINES } from "../colony/colonyBrain.ts";
 import { LETHAL, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
@@ -231,21 +231,29 @@ function World({ game, controls, update, stats, restart, newWorld }: Props) {
         </button>
       </div>
       <p className="mt-2 text-xs text-fg-3">
-        {size.w}×{size.h} cells {controls.ground === "side" ? "seen from the side: sky, the ground line, soil and stones to dig," : "seen from above: rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food.{" "}
-        {controls.ground === "side" ? "The queen lays eggs while there is food; larvae fed by nurses become new ants." : "Every 4 food stored is a new ant."}
+        {game.world ? (
+          <>
+            One world: the surface, {size.w}×{size.h} cells seen from above (rock, ground and {game.map.foodTotal.toLocaleString()} units of food), and the ground under the line through the holes, {game.world.curtain.size.w}×{game.world.curtain.size.h} cells unrolled below it, where the nests are dug. Above and below (v) are two views of one game. The queen lays eggs while there is food; larvae fed by nurses become new ants.
+          </>
+        ) : (
+          <>
+            {size.w}×{size.h} cells {controls.ground === "side" ? "seen from the side: sky, the ground line, soil and stones to dig," : "seen from above: rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food.{" "}
+            {controls.ground === "side" ? "The queen lays eggs while there is food; larvae fed by nurses become new ants." : "Every 4 food stored is a new ant."}
+          </>
+        )}
       </p>
       <div className="mt-2 flex items-center justify-between">
         <span>Ground</span>
         <div className="flex overflow-hidden rounded-md border border-line text-sm">
-          {(["side", "open"] as Ground[]).map((g) => (
+          {(["side", "open", "one"] as Ground[]).map((g) => (
             <button
               key={g}
               type="button"
               className={seg(controls.ground === g)}
               onClick={() => update({ ground: g })}
-              title={g === "side" ? "A cross-section: ants forage on the ground line, dig their nest below it and carry the soil up to a mound" : "The open surface from above: rock and walkable ground"}
+              title={g === "side" ? "A cross-section: ants forage on the ground line, dig their nest below it and carry the soil up to a mound" : g === "open" ? "The open surface from above: rock and walkable ground" : "The surface and the ground under the line between the holes: one game, seen from above or below (v)"}
             >
-              {g === "side" ? "side view" : "from above"}
+              {g === "side" ? "side view" : g === "open" ? "from above" : "one world"}
             </button>
           ))}
         </div>
@@ -278,7 +286,12 @@ function Lab({ game, controls, update, stats, jev }: Props) {
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   const [showDoctrines, setShowDoctrines] = useState(false);
   // Why the last lab founding beyond an end founded nothing (one world: no room within the radius), until the next try.
-  const [foundNote, setFoundNote] = useState<string | null>(null);
+  // Kept with a token for its game: a new game (another world, a restart, a load) shows no note, the last one being about
+  // the old line (a token, not the game, so an old game is not kept alive by this state).
+  const gameToken = useMemo(() => ({ game: game.map.seed }), [game]);
+  const [note, setNote] = useState<{ token: object; text: string | null } | null>(null);
+  const foundNote = note && note.token === gameToken ? note.text : null;
+  const setFoundNote = (text: string | null) => setNote({ token: gameToken, text });
   const locked = jev.lock !== null;
   return (
     <Card label="lab" title="Lab" wide>
@@ -450,7 +463,7 @@ export function LeverChips({ game, menu, locked, lock, onChange }: { game: Game;
         <div key={kind} className="flex flex-wrap items-center gap-1">
           <span className="w-16 text-fg-3">{kind === "perceive" ? "perceives" : kind === "emit" ? "gives off" : "lethal"}</span>
           {/* the nest's levers (floor marks, crown) only where there is a nest */}
-          {LEVERS.filter((v) => v.kind === kind && (game.map.sky || !NEST_ONLY.has(v.id))).map((v) => {
+          {LEVERS.filter((v) => v.kind === kind && (game.fungus.hasNest || !NEST_ONLY.has(v.id))).map((v) => {
             const on = menu.includes(v.id);
             const lethal = LETHAL.has(v.id);
             // In the game a lethal lever on the menu does nothing until its upgrade is kept (ja-lo8.16).
