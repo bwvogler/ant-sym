@@ -436,6 +436,23 @@ export class Game {
     }
   }
 
+  /**
+   * One world: where a founding at plane point p (world units) puts its hole, without founding it: the cell nearest p
+   * within FOUND_RADIUS where the founding rule allows a hole (transect.ts nearestValid; rule 4's open ground is the
+   * plane's main open ground, oneWorld.ts mainGround: never a pocket sealed off by rock, D1 of #62), with the end of the
+   * line it grows; or why not (NO_ROOM). addColony founds where this says, and the queen's pen previews it (U5.2), so the
+   * two can't disagree. Pure: it changes nothing. `ground` is mainGround(world), worked out afresh by default (~14 ms on
+   * the default plane); a caller asking many times (the pen, under the pointer) passes one it keeps while the line is the
+   * same. Not one world: refused.
+   */
+  settleAt(p: { x: number; y: number }, ground?: (x: number, y: number) => boolean): { ok: true; cell: Cell; end: End } | { ok: false; reason: string } {
+    const world = this.world;
+    if (!world) return { ok: false, reason: "one world only" };
+    cellOf(p.x, p.y);
+    const s = nearestValid(world.line, { x: CELL[0] as number, y: CELL[1] as number }, FOUND_RADIUS, ground ?? mainGround(world));
+    return s ? { ok: true, cell: s.cell, end: s.end } : { ok: false, reason: NO_ROOM };
+  }
+
   /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
   lineage(k: number): number[] {
     const own = this.colonies.length - this.founded.length;
@@ -505,9 +522,15 @@ export class Game {
     if (world) {
       // A save's re-founding (f.nest) grows the line where the founding went (f.spot), as it was then: no search again.
       if (f.nest && !f.spot) throw new Error("addColony: a save's founding needs its spot (one world)");
-      cellOf(f.x, f.y);
-      // Rule 4's open ground is the plane's main open ground (mainGround): never a pocket sealed off by rock (D1, #62).
-      spot = f.nest ? f.spot : (nearestValid(world.line, { x: CELL[0] as number, y: CELL[1] as number }, FOUND_RADIUS, mainGround(world)) ?? undefined);
+      if (f.nest) {
+        cellOf(f.x, f.y); // (as before settleAt: the scratch cell left where it was)
+        spot = f.spot;
+      } else {
+        // Where she settles: the same reading the queen's pen previews (settleAt), so the two can't disagree.
+        const s = this.settleAt(f);
+        if (!s.ok) throw new Error(`addColony: ${s.reason}`);
+        spot = { cell: s.cell, end: s.end };
+      }
       if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
       const was = { x0: world.curtain.x0, w: world.curtain.size.w };
       at = growWorld(world, spot.end, spot.cell);
