@@ -737,7 +737,8 @@ export class Colony {
   /**
    * One world (ja-web): carriers that came down the colony's hole with food this tick, and last tick's, which every ant
    * held at the top of the shaft meets (each carrier walks down past all of them). Not by cell: the returns above are
-   * keyed by cell with no layer.
+   * keyed by cell with no layer. A count for the whole hole stands for an encounter only while the gate is the top
+   * WAIT_STEPS cells of one shaft; if the gate grows, or a side tunnel opens near the top, key it by cell (PR #68 N3).
    */
   #holeIn = 0;
   #holeSeen = 0;
@@ -4708,7 +4709,10 @@ export class Colony {
       const toEnemy = this.#enemyHeading(i);
       this.#oddsNow = toEnemy === null ? "none" : this.#odds(i);
       // One world (ja-web): an outgoing forager at the top of its own shaft, its jaws empty and with no pass, is held at the
-      // gate there (#holdsAt): it waits as a forager home on open ground does, and is asked `leave` (below).
+      // gate there (#holdsAt): it waits as a forager home on open ground does, and is asked `leave` (below). With a
+      // stranger near it isn't waiting: it isn't asked, and it fights or flees in the shaft as anywhere; but the gate still
+      // bars the way out (#mayCrossUp asks #holdsAt, which doesn't look for strangers), so it doesn't climb out without a
+      // pass. Intended: a stranger at the top of the shaft is met there, not left behind.
       const held = hold && toEnemy === null && this.#holdsAt(i);
       if (held) heldNow++;
       if (rgate) {

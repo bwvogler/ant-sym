@@ -118,6 +118,13 @@ test("one world: a rested forager is held at the top of its shaft until carriers
   }
   assert.ok(left >= 0 && left < 10, `out ${left.toFixed(1)} s after the carriers began coming down`);
   assert.ok(c.crossedUp > out);
+  // The carriers stop: a forager new to the gate meets no returns there (each tick's count is last tick's carriers, not
+  // every carrier ever), and waits.
+  run(g, 2);
+  const j = 7;
+  toGate(c, j);
+  run(g, 10, () => assert.equal(c.layer[j], CURTAIN, "the next forager waits"));
+  assert.ok(c.met[j]! < c.params.leaveGate, `it has met no returns (met ${c.met[j]!.toFixed(2)})`);
 });
 
 test("one world: a forager deaf to returns stays at the gate while carriers come down, and leaves only as a scout", () => {
@@ -366,4 +373,41 @@ test("one world: a porter and a spoil carrier at the top of the shaft are never 
   });
   assert.ok(porting > 30, `it ported a while (${porting} ticks)`);
   assert.equal(c.layer[1], PLANE, "the spoil went out");
+});
+
+test("one world: a crowded gate with no returns sends raid scouts out (crowd is felt at the gate)", () => {
+  const g = game(30);
+  const c = g.player;
+  c.params.raidScout = 1;
+  c.params.crowdAt = 10;
+  for (let i = 0; i < 20; i++) toGate(c, i);
+  run(g, 20);
+  assert.ok(c.raidScouts > 0, `raid scouts: ${c.raidScouts}`);
+});
+
+test("one world: a recruited raider in fight at the gate is held until `leave` says go", () => {
+  const g = game();
+  const c = g.player;
+  c.responses = responses({ leave: () => "wait" });
+  toGate(c, 0);
+  c.recruited[0] = 1;
+  c.mode[0] = FIGHT;
+  run(g, 10, () => assert.equal(c.layer[0], CURTAIN, "held"));
+  assert.equal(c.crossedUp, 0);
+});
+
+test("one world: a middle-aged forager at the top of its shaft is not held at the gate (only the old are; ja-lp4.6.8 revisits it)", () => {
+  const g = game();
+  const c = g.player;
+  toGate(c, 0);
+  c.age[0] = ageOf(1);
+  let held = 0;
+  run(
+    g,
+    20,
+    () => (held += c.gateHeld),
+    () => c.layer[0] === PLANE,
+  );
+  assert.equal(held, 0, "never held");
+  assert.equal(c.layer[0], PLANE, "it goes out with no returns and no scouts");
 });
