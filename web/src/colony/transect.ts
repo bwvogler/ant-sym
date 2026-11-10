@@ -144,6 +144,8 @@ export function turnAt(t: Transect, j: number): number {
 
 const cellKey = (x: number, y: number): number => (y + 32768) * 131072 + (x + 32768);
 const byCell = new WeakMap<Transect, Map<number, number[]>>();
+/** No columns: one shared array, so a miss allocates nothing (the renderer asks for every plane ant, every frame). */
+const NONE: readonly number[] = Object.freeze([]);
 
 /** Every column over plane cell (x, y), in order; empty when the line doesn't pass through it. Indexed once per line. */
 export function columnsOver(t: Transect, x: number, y: number): readonly number[] {
@@ -158,7 +160,7 @@ export function columnsOver(t: Transect, x: number, y: number): readonly number[
     }
     byCell.set(t, index);
   }
-  return index.get(cellKey(x, y)) ?? [];
+  return index.get(cellKey(x, y)) ?? NONE;
 }
 
 /**
