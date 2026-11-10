@@ -9,7 +9,7 @@
 //
 // --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
 // with a hole at each nest and the curtain under the line through them (oneArena); A8 in the curtain; G1 (game1), the
-// whole one-world game. The ids are the legacy ones; those not rerun yet (ONE_PENDING: A5, A5b, A11, A12) are listed
+// whole one-world game. The ids are the legacy ones; those not rerun yet (ONE_PENDING: A11, A12) are listed
 // with why. Without --one, `game1` still names G1.
 //
 // --set takes a dotted path under colony / rival / game and a comma list of

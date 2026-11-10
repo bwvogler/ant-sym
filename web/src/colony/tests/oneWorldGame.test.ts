@@ -93,6 +93,7 @@ test("one world: an old explorer at the top of the shaft climbs out onto its hol
   c.age[i] = ageOf(2);
   c.putAnt(i, CURTAIN, at.x, at.y);
   c.mode[i] = EXPLORE;
+  c.leaveOk[i] = 1; // a pass through the gate at the top of the shaft (ja-web): this test is the crossing's
   c.heading[i] = -Math.PI / 2;
   let out = -1;
   for (let k = 0; k < Math.round(20 / DT) && out < 0; k++) {
@@ -121,6 +122,7 @@ test("one world: the strip over a hole is sky, and a walker stepping up into it 
   c.age[i] = ageOf(2);
   c.putAnt(i, CURTAIN, at.x, at.y);
   c.mode[i] = EXPLORE;
+  c.leaveOk[i] = 1; // a pass through the gate (ja-web)
   c.heading[i] = -Math.PI / 2;
   // Its first steps up from the hole's centre land in the sky over it: a crossing, though the cell is not open ground.
   let out = -1;

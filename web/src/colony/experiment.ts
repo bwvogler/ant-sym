@@ -1365,9 +1365,51 @@ export function onPlane(spec: RunSpec, opts: OneArenaOptions = {}): RunSpec {
   };
 }
 
-/** An arena assay rerun on one world's plane (onPlane), its probes counting the plane's ants, its paint on the plane. */
-function onPlaneAssay(a: Assay): Assay {
-  return { ...a, title: `${a.title} (one world)`, spec: (seed) => onPlane(a.spec(seed)) };
+/** An arena assay rerun on one world's plane (onPlane), its probes counting the plane's ants, its paint on the plane; `probes` added to its own. */
+function onPlaneAssay(a: Assay, probes: () => Probe[] = () => []): Assay {
+  return {
+    ...a,
+    title: `${a.title} (one world)`,
+    spec: (seed) => {
+      const s = onPlane(a.spec(seed));
+      return { ...s, probes: [...(s.probes ?? []), ...probes()] };
+    },
+  };
+}
+
+/**
+ * One world (ja-web): the ants each colony holds at the gate at the top of its shaft (Colony.gateHeld), sampled every
+ * second: the mean and the most, per colony (`you.heldMean`, `you.heldMax`), and their mean share of the colony's
+ * living ants (`you.heldShare`).
+ */
+export function gateProbe(): Probe {
+  const sum: number[] = [];
+  const most: number[] = [];
+  const share: number[] = [];
+  let samples = 0;
+  let nextAt = 1;
+  return {
+    tick(game) {
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 1;
+      samples++;
+      game.colonies.forEach((c, k) => {
+        sum[k] = (sum[k] ?? 0) + c.gateHeld;
+        most[k] = Math.max(most[k] ?? 0, c.gateHeld);
+        const alive = c.population;
+        share[k] = (share[k] ?? 0) + (alive > 0 ? c.gateHeld / alive : 0);
+      });
+    },
+    summary() {
+      const m: Record<string, number> = {};
+      sum.forEach((v, k) => {
+        m[`${sideName(k)}.heldMean`] = samples ? v / samples : 0;
+        m[`${sideName(k)}.heldMax`] = most[k] ?? 0;
+        m[`${sideName(k)}.heldShare`] = samples ? (share[k] ?? 0) / samples : 0;
+      });
+      return m;
+    },
+  };
 }
 
 /**
@@ -1381,16 +1423,22 @@ export const game1: Assay = {
   title: "G1 the one-world game (with A7: foragers holding food)",
   target: "≤ 2 foragers holding food over 120 s per colony at any 10-s sample, both layers (slow/side.test's bound); food carried down, births, crossings and porters reported",
   seconds: 600,
-  spec: (seed) => ({ seed, seconds: 600, map: (s) => generateOneWorld(s), game: { antCount: 600, rivalAnts: 600 }, probes: [heldProbe(PLANE, "Plane")] }),
+  spec: (seed) => ({ seed, seconds: 600, map: (s) => generateOneWorld(s), game: { antCount: 600, rivalAnts: 600 }, probes: [heldProbe(PLANE, "Plane"), gateProbe()] }),
   score: (r, g) => {
     const m: Record<string, number> = {};
     const both = (k: string) => Math.max(r.metrics[`you.${k}`] ?? 0, r.metrics[`rival.${k}`] ?? 0);
     g.colonies.forEach((c, k) => {
       const side = sideName(k);
       m[`${side}.carriedDown`] = c.carriedDown;
+      m[`${side}.births`] = c.births;
       m[`${side}.crossedUp`] = c.crossedUp;
       m[`${side}.crossedDown`] = c.crossedDown;
       m[`${side}.portTrips`] = c.portTrips;
+      // Raids (ja-web): scouts sent out on `leave` = raid, finders home to tell, ants the raid trail recruited.
+      m[`${side}.raidScouts`] = c.raidScouts;
+      m[`${side}.finds`] = c.finds;
+      m[`${side}.recruits`] = c.recruits;
+      m[`${side}.heldMean`] = r.metrics[`${side}.heldMean`] as number;
     });
     const worst = both("maxHeld");
     return { ...m, maxHeld: worst, maxHeldPlane: both("maxHeldPlane"), maxPorting: both("maxPorting"), pass: worst <= 2 ? 1 : 0 };
@@ -1401,19 +1449,15 @@ export const game1: Assay = {
 const nestFlowOne: Assay = { ...nestFlow, title: `${nestFlow.title} (one world)`, spec: (seed) => ({ ...nestFlow.spec(seed), map: (s) => generateOneWorld(s) }) };
 
 /**
- * The assays rerun on one world (`experiment.mjs --one`): A1, A2a, A2b, A3, A4, A6, A9 and A10 on their arenas made the
- * plane (onPlane), A8 in the curtain, and G1. Same ids as the legacy ones, so `--one bridge` is A1 on the plane.
+ * The assays rerun on one world (`experiment.mjs --one`): A1, A2a, A2b, A3, A4, A5, A5b, A6, A9 and A10 on their arenas
+ * made the plane (onPlane), A8 in the curtain, and G1. Same ids as the legacy ones, so `--one bridge` is A1 on the plane.
+ * A5 and A5b (ja-web) count outside on the plane, past the disc round the hole, and report the ants held at the gate
+ * at the top of the shaft (gateProbe).
  */
-export const ONE_ASSAYS: Assay[] = [...[bridge, twin, richPoor, deplete, alarm].map(onPlaneAssay), { ...passAssay(onPlane), title: `${pass.title} (one world)` }, onPlaneAssay(open), onPlaneAssay(contact), onPlaneAssay(faintAlarm), nestFlowOne, game1];
+export const ONE_ASSAYS: Assay[] = [...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)), ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])), { ...passAssay(onPlane), title: `${pass.title} (one world)` }, onPlaneAssay(open), onPlaneAssay(contact), onPlaneAssay(faintAlarm), nestFlowOne, game1];
 
-/**
- * Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). One world never asks `leave` until
- * activation moves inside the hole (`ja-web`, docs/one-world.md §8 item 10): rested foragers go straight back out, and raid
- * scouts start only from `leave` = raid.
- */
+/** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). */
 export const ONE_PENDING: Record<string, string> = {
-  regulate: "needs `ja-web`: activation (the leave lane) is not in one world yet",
-  regulateStop: "needs `ja-web`: activation (the leave lane) is not in one world yet",
-  raidFind: "U6b, after `ja-web`: raid scouts start only from leave = raid",
-  raidStop: "U6b, after `ja-web`: raid scouts start only from leave = raid",
+  raidFind: "U6b: raids by trail on one world (raid scouts start from leave = raid at the gate, ja-web)",
+  raidStop: "U6b: raids by trail on one world (raid scouts start from leave = raid at the gate, ja-web)",
 };
