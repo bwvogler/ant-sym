@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clamp, fit, fitZoom, MAX_ZOOM, minimapRect, pan, toScreen, toWorld, visible, zoomAt, zoomBy } from "../camera.ts";
+import { clamp, fit, fitZoom, fromMinimap, MAX_ZOOM, minimapRect, pan, toScreen, toWorld, visible, zoomAt, zoomBy } from "../camera.ts";
 
 const world = { w: 512, h: 320 };
 const view = { w: 1000, h: 500 };
@@ -69,4 +69,23 @@ test("zoomBy stops at the limits instead of panning (zooming in at MAX_ZOOM near
   const z = zoomBy(mid, world, view, 700, 200, 1.5);
   const [ax, ay] = toWorld(z, view, 700, 200);
   assert.ok(near(ax, wx) && near(ay, wy), "inside the range it still keeps the point under the pointer");
+});
+
+test("a map whose columns start below 0 (one world's curtain, x0 < 0): fit, clamp and the minimap keep to it, not to 0…w", () => {
+  const curtain = { x0: -64, w: 300, h: 320 };
+  const c = fit(curtain, view);
+  assert.equal(c.x, -64 + 150, "centred on the map, not on w / 2");
+  const v = visible(c, view);
+  assert.ok(v.x0 <= -64 && v.x1 >= 236, "the whole map in view");
+  // Zoomed in at the far west, the view stops at the map's first column, not at 0.
+  const z = clamp({ x: -500, y: 160, zoom: 10 }, curtain, view);
+  assert.ok(near(visible(z, view).x0, -64), `the view's west edge is the map's (${visible(z, view).x0})`);
+  const e = clamp({ x: 500, y: 160, zoom: 10 }, curtain, view);
+  assert.ok(near(visible(e, view).x1, 236), "and its east edge");
+  // A click on the minimap's west edge jumps to the map's first column.
+  const r = minimapRect(curtain, view, 1);
+  assert.ok(near(fromMinimap(curtain, view, 1, r.x, r.y)[0], -64));
+  assert.ok(near(fromMinimap(curtain, view, 1, r.x + r.w, r.y + r.h)[0], 236));
+  const rw = minimapRect(world, view, 1);
+  assert.deepEqual(fromMinimap(world, view, 1, rw.x, rw.y), [0, 0], "a map from 0 is unchanged");
 });

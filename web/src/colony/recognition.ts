@@ -2,6 +2,7 @@ import { decode, encode } from "./save.ts";
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony, Layer } from "./colony.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
+import { clampCol, inBounds, type Bounds } from "./world.ts";
 
 // Recognition, pure (ja-t4d.3, docs/fungus-policy.md §4.B). Who is an enemy
 // is no longer "an ant of another colony" but "an ant whose odour differs
@@ -162,11 +163,12 @@ export class Recognition {
     let occupied = 0;
     let everyone = 0;
     for (const c of colonies) {
-      const { w, h } = (layer < 0 ? c.map : (c.layers[layer] as Layer).map).size;
+      const map = layer < 0 ? c.map : (c.layers[layer] as Layer).map;
+      const h = map.size.h;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
-        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const cx = clampCol(map, CELL[0] as number);
         const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         const b = binOf(c.odour[i] as number);
         if (calmed) {
@@ -208,11 +210,11 @@ export class Recognition {
   }
 
   /**
-   * Strangers in the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to w × h, to the odour last looked at: weighted by
+   * Strangers in the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to `map`, to the odour last looked at: weighted by
    * (1 − calm), as a fight counts them, or with `byOdour` each counted once, calmed or not (who smells
    * different, which calming does not change: what the fungus senses as contact).
    */
-  around(cx: number, cy: number, w: number, h: number, r = 1, byOdour = false): number {
+  around(cx: number, cy: number, map: Bounds, r = 1, byOdour = false): number {
     const everyone = byOdour && this.#calmed;
     const bins = everyone ? this.#everyone : this.bins;
     let s = 0;
@@ -224,7 +226,7 @@ export class Recognition {
       for (let k = 0; k < o.length; k += 2) {
         const x = cx + (o[k] as number);
         const y = cy + (o[k + 1] as number);
-        if (x >= 0 && y >= 0 && x < w && y < h) s += g.get(x, y);
+        if (inBounds(map, x, y)) s += g.get(x, y);
       }
     }
     return s;

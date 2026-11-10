@@ -107,7 +107,7 @@ export class SumGrid {
   }
 
   add(x: number, y: number, v: number): void {
-    if (x < 0 || y < 0) return;
+    if (y < 0) return; // a column may be negative (one world's curtain starts at the line's sMin); a row never is
     const c = this.count.get(x, y);
     if (c === 0) this.#touched.push(x, y);
     this.count.set(x, y, c + 1);
@@ -122,7 +122,7 @@ export class SumGrid {
     for (let k = 0; k < o.length; k += 2) {
       const ax = x + (o[k] as number);
       const ay = y + (o[k + 1] as number);
-      if (ax < 0 || ay < 0) continue;
+      if (ay < 0) continue;
       s += this.sum.get(ax, ay);
       n += this.count.get(ax, ay);
     }

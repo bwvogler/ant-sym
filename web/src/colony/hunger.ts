@@ -81,14 +81,14 @@ export class FeltGrid {
 
   /** `v` felt on cell (x, y): kept if it is the strongest there. */
   put(x: number, y: number, v: number): void {
-    if (v <= 0 || x < 0 || y < 0) return;
+    if (v <= 0 || y < 0) return; // a column may be negative (one world's curtain starts at the line's sMin); a row never is
     const old = this.layer.get(x, y);
     if (old === 0) this.#touched.push(x, y);
     if (v > old) this.layer.set(x, y, v);
   }
 
   get(x: number, y: number): number {
-    return x < 0 || y < 0 ? 0 : this.layer.get(x, y);
+    return y < 0 ? 0 : this.layer.get(x, y);
   }
 
   /** The strongest felt within `r` cells of (x, y) (one: its own cell and its six neighbours). */
@@ -127,7 +127,7 @@ export class DonorGrid {
 
   /** Ant i (energy[i]) on cell (x, y): kept if it is the best-fed there. */
   put(x: number, y: number, i: number, energy: ArrayLike<number>): void {
-    if (x < 0 || y < 0) return;
+    if (y < 0) return; // a column may be negative (one world's curtain); a row never is
     const old = this.layer.get(x, y);
     if (old === 0) this.#touched.push(x, y);
     if (old === 0 || (energy[i] as number) > (energy[old - 1] as number)) this.layer.set(x, y, i + 1);
@@ -140,7 +140,7 @@ export class DonorGrid {
     for (let k = 0; k < o.length; k += 2) {
       const ax = x + (o[k] as number);
       const ay = y + (o[k + 1] as number);
-      if (ax < 0 || ay < 0) continue;
+      if (ay < 0) continue;
       const v = this.layer.get(ax, ay) - 1;
       if (v >= 0 && (best < 0 || (energy[v] as number) > (energy[best] as number))) best = v;
     }

@@ -210,14 +210,24 @@ test("one world: a spoil or corpse carrier on its own hole cell on the plane doe
   const down = c.crossedDown;
   const out = c.soilOut;
   const buried = c.buried;
+  // Each is checked until it first puts its load down: after that, a pellet it picks off the mound to fill with goes down
+  // its hole, as it should (U3c's pickers), which a change of the random stream can make happen within the 5 s (U4a).
+  const carrying = new Set([0, 1, 2, 3, u]);
+  let downWhileCarrying = 0;
   for (let k = 0; k < Math.round(5 / DT); k++) {
+    const was = c.crossedDown;
     g.tick(DT);
-    for (const i of [0, 1, 2, 3, u]) if (c.pellet[i]) assert.equal(c.layer[i], PLANE, `ant ${i}, carrying out, is still on the plane`);
+    for (const i of [...carrying]) {
+      if (!c.pellet[i]) carrying.delete(i);
+      else assert.equal(c.layer[i], PLANE, `ant ${i}, carrying out, is still on the plane`);
+    }
+    if (carrying.size > 0) downWhileCarrying += c.crossedDown - was;
   }
-  assert.equal(c.crossedDown, down, "none went down");
+  assert.equal(downWhileCarrying, 0, "none went down while any was still carrying out");
+  assert.ok(c.crossedDown >= down);
   // And each walked its load out and put it down within the 5 s: the spoil set there by hand too (its walk out starts at
   // once: the pre-check before the mode choice, #carryOut).
-  for (const i of [0, 1, 2, 3, u]) assert.equal(c.pellet[i], 0, `ant ${i} put its load down`);
+  for (const i of [0, 1, 2, 3, u]) assert.ok(!carrying.has(i), `ant ${i} put its load down`);
   assert.equal(c.soilOut, out + 4, "the four pellets heaped on the plane");
   assert.equal(c.buried, buried + 1, "the corpse on the midden");
 });

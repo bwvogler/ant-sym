@@ -21,10 +21,14 @@ export const MARGIN = 64;
 /** How near the line may come to itself away from a vertex, in cells (one-world §3 rule 2). */
 export const CLEARANCE = 12;
 /**
- * The least 2D distance between holes (one-world §3 rule 3), between cell centres in world units: the same value and
- * measure as game.ts's NEST_GAP between nests' centres (a test pins them equal), one gap for one world.
+ * The least 2D distance between holes (one-world §3 rule 3), between cell centres in world units. 16 (owner,
+ * 2026-11-09; ja-tjo): a founded nest's shaft slants 3 columns to a random side and its royal chamber is a disc of
+ * radius 4.5, so two holes 16 apart along the curtain keep their chambers apart (16 − 2 × 3 > 2 × 4.5), as the side
+ * view's HOLE_GAP does. At 12, two founded royal chambers shared a cell in 15 of 80 pairs on one world's default
+ * curtains (seeds 1–20, transect.test.ts; ja-tjo's side-world count, chambers under 9 apart, was 25 of 80). A test pins it
+ * against the dig.
  */
-export const HOLE_GAP_2D = 12;
+export const HOLE_GAP_2D = 16;
 /** The sharpest turn back a new segment may make on the end segment (one-world §3 rule 2): 120°. */
 export const MAX_TURN = (2 * Math.PI) / 3;
 
@@ -53,9 +57,9 @@ const cy = (c: Cell): number => centreY(c.y);
 
 /**
  * The unit direction the line runs out of an end hole, straight on from its end segment; with one hole, west at the
- * start and east at the end.
+ * start and east at the end. (The lab's founding beyond an end aims along it: Game.foundBeyond.)
  */
-function outward(holes: readonly Cell[], end: End): [number, number] {
+export function outward(holes: readonly Cell[], end: End): [number, number] {
   const k = holes.length - 1;
   if (k === 0) return end === "start" ? [-1, 0] : [1, 0];
   const [a, b] = end === "start" ? [holes[1]!, holes[0]!] : [holes[k - 1]!, holes[k]!];
@@ -202,7 +206,8 @@ function standing(t: Transect, end: End): Seg[] {
   const [ux, uy] = outward(h, far);
   segs.push([cx(fv), cy(fv), cx(fv) + ux * t.margin, cy(fv) + uy * t.margin]);
   // Cut every part of the line within the clearance of the vertex: not only the end segment, since the one before it
-  // can pass as near as 12·sin 60° ≈ 10.4 when this hole was founded at the hole gap and the turn limit.
+  // can pass near it when this hole was founded close to the last at the turn limit (at a hole gap of 12, as near as
+  // 12·sin 60° ≈ 10.4; at today's 16, 13.9: kept, so the rule doesn't hang on the gap).
   return segs.flatMap((sg) => outsideDisc(sg, vx, vy, CLEARANCE));
 }
 
@@ -275,7 +280,8 @@ function fold(t: Transect, end: End, vx: number, vy: number, nx: number, ny: num
  *     clearance) neither it nor its margin to come crosses the line or comes within the clearance of it, the far end's
  *     margin included;
  *  3. `p` is at least HOLE_GAP_2D from every hole;
- *  4. `p` is open ground (`open`, e.g. world.ts's openCell(map)).
+ *  4. `p` is open ground (`open`): in a game, the plane's main open ground (oneWorld.ts mainGround: the open region
+ *     the world's holes share, not a pocket closed in by rock; owner, 2026-11-10, PR #62 review D1).
  * They are checked 1, 3, 4, 2: the cheap ones first, and a spot crowding a hole is refused for that ("hole-gap"), not
  * for the turn its nearness makes.
  */

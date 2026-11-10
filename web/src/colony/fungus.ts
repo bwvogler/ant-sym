@@ -7,7 +7,7 @@ import { Evolution, type EvolutionSave } from "./evolution.ts";
 import { compose, decodeLevels, hold, LETHAL_LEVERS, leverFor, LEVERS, NEST_LEVERS, presetOf, PRESETS, type LeverLevels, type Preset, type Reach } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
-import { disc, rockAt, type WorldMap } from "./world.ts";
+import { clampCol, disc, inBounds, rockAt, type WorldMap } from "./world.ts";
 
 // The fungus, pure: the player. It is spores on the ground and load inside ants
 // (docs/fungus-policy.md), and in the game a mycelium where it landed, which
@@ -217,9 +217,9 @@ interface SporeLayer {
   readonly map: WorldMap;
   readonly spores: ChunkLayer<Float32Array>;
   readonly sporeStrain: ChunkLayer<Uint8Array>;
-  /** cells holding spores, as y * w + x */
+  /** cells holding spores, as y * w + x − x0 (re-keyed by regrid when the map grows) */
   readonly sporeCells: Set<number>;
-  /** the evolving fungus's base on this map (see #grow), as y * w + x */
+  /** the evolving fungus's base on this map (see #grow), as y * w + x − x0 (sporeCells' keys too) */
   base: number[];
   /** everyone's load, for transmission */
   readonly all: LoadGrid;
@@ -326,13 +326,14 @@ export class Fungus {
     const L = this.#layers[layer] as SporeLayer;
     const { map } = L;
     const { w } = map.size;
+    const { x0 } = map;
     const s = Math.max(0, Math.min(this.strains.length - 1, Math.floor(strain)));
     const r2 = radius * radius;
     disc(map, x, y, radius, (cx, cy) => {
       if (rockAt(map, cx, cy)) return;
       L.spores.set(cx, cy, Math.min(this.params.maxSpores, L.spores.get(cx, cy) + spores));
       L.sporeStrain.set(cx, cy, s);
-      L.sporeCells.add(cy * w + cx);
+      L.sporeCells.add(cy * w + cx - x0);
     });
     const layered = this.#layers.length > 1;
     for (const c of colonies)
@@ -385,7 +386,9 @@ export class Fungus {
    */
   #stepLayer(L: SporeLayer, layer: number, colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null): number {
     const p = this.params;
-    const { w, h } = L.map.size;
+    const map = L.map;
+    const { w, h } = map.size;
+    const { x0 } = map;
     while (L.visible.length < colonies.length) L.visible.push(new LoadGrid());
 
     // Everyone's load before the step: what every ant reads.
@@ -398,7 +401,7 @@ export class Fungus {
         const l = c.load[i] as number;
         if (!c.alive[i] || l === 0 || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
-        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const cx = clampCol(map, CELL[0] as number);
         const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         const s = c.strain[i] as number;
         all.add(cx, cy, l, s);
@@ -408,7 +411,7 @@ export class Fungus {
       const q = c.queen;
       if (q && q.alive && q.load > 0 && (layer < 0 || layer === c.home)) {
         cellOf(q.x, q.y);
-        const qx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const qx = clampCol(map, CELL[0] as number);
         const qy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         all.add(qx, qy, q.load, q.strain);
         vis.add(qx, qy, q.load * ((this.strains[q.strain] as Strain).visibility * q.show), q.strain);
@@ -426,7 +429,7 @@ export class Fungus {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
-        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const cx = clampCol(map, CELL[0] as number);
         const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         const l = c.load[i] as number;
         const ground = L.spores.get(cx, cy);
@@ -519,8 +522,9 @@ export class Fungus {
     }
     const keep = Math.exp(-p.sporeDecay * dt);
     for (const key of L.sporeCells) {
-      const x = key % w;
-      const y = (key - x) / w;
+      const col = key % w;
+      const y = (key - col) / w;
+      const x = col + x0;
       const v = L.spores.get(x, y) * keep;
       if (v < SPORE_GONE) {
         L.spores.set(x, y, 0);
@@ -547,9 +551,11 @@ export class Fungus {
       let unplaced = 0;
       for (const L of this.#layers) {
         const { w } = L.map.size;
+        const { x0 } = L.map;
         for (const key of L.base) {
-          const x = key % w;
-          const y = (key - x) / w;
+          const col = key % w;
+          const y = (key - col) / w;
+          const x = col + x0;
           const v = L.spores.get(x, y);
           const put = Math.max(0, Math.min(each, p.maxSpores - v));
           unplaced += each - put;
@@ -587,9 +593,9 @@ export class Fungus {
     const nl = q.load;
     const st = this.strains[q.strain] as Strain;
     const nb = this.#nb;
-    const { w, h } = L.map.size;
+    const { h } = L.map.size;
     cellOf(q.x, q.y);
-    const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+    const cx = clampCol(L.map, CELL[0] as number);
     const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
     const sit: FungalSituation = {
       arousal: "calm",
@@ -614,9 +620,9 @@ export class Fungus {
    */
   #royalLoad(L: SporeLayer, b: { x: number; y: number; load: number; strain: number; resist: number }, show: number, k: number, grids: readonly CountGrid[], dt: number, inGrid: boolean, evolving: number, groomers: number): number {
     const p = this.params;
-    const { w, h } = L.map.size;
+    const { h } = L.map.size;
     cellOf(b.x, b.y);
-    const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+    const cx = clampCol(L.map, CELL[0] as number);
     const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
     const l = b.load;
     const ground = L.spores.get(cx, cy);
@@ -664,8 +670,7 @@ export class Fungus {
     if (rec) {
       const tol = rec.params.tolerance;
       rec.look(c.nestOdour, tol);
-      const { w, h } = L.map.size;
-      foreign = rec.around(cx, cy, w, h, 1, true);
+      foreign = rec.around(cx, cy, L.map, 1, true);
       if (own !== null && Math.abs(binCentre(binOf(own)) - c.nestOdour) > tol + STRANGER_EPS) foreign -= 1;
     }
     return foreign > 0.5 ? "foreigner" : others - foreign > 0.5 ? "nestmate" : "none";
@@ -753,13 +758,13 @@ export class Fungus {
       if (va) for (const d of around) nb.visible += va[o + d] as number;
       return;
     }
-    const { w, h } = L.map.size;
+    const map = L.map;
     let top = 0;
     const o = discOffsets(1)[cy & 1] as Int16Array;
     for (let q = 0; q < o.length; q += 2) {
       const x = cx + (o[q] as number);
       const y = cy + (o[q + 1] as number);
-      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      if (!inBounds(map, x, y)) continue;
       for (let j = 0; j < grids.length; j++) {
         const n = (grids[j] as CountGrid).get(x, y);
         nb.ants += n;
@@ -846,11 +851,32 @@ export class Fungus {
     const L = this.#layers[layer] as SporeLayer;
     const { map } = L;
     const { w } = map.size;
+    const { x0 } = map;
     const have = new Set(L.base);
     disc(map, x, y, radius, (cx, cy) => {
-      if (!rockAt(map, cx, cy) && !have.has(cy * w + cx)) L.base.push(cy * w + cx);
+      if (!rockAt(map, cx, cy) && !have.has(cy * w + cx - x0)) L.base.push(cy * w + cx - x0);
     });
     this.#evolution.root();
+  }
+
+  /**
+   * Map `layer` has grown (one world's curtain, when a colony is founded on the line: oneWorld.ts growWorld). Its spore
+   * cells and base are kept as y·w + x − x0, so they are re-keyed from its columns before, `was` (x0 and w then).
+   */
+  regrid(layer: number, was: { x0: number; w: number }): void {
+    const L = this.#layers[layer];
+    if (!L) return;
+    const { w } = L.map.size;
+    const { x0 } = L.map;
+    if (w === was.w && x0 === was.x0) return;
+    const rekey = (k: number) => {
+      const col = k % was.w;
+      return ((k - col) / was.w) * w + col + was.x0 - x0;
+    };
+    const cells = [...L.sporeCells];
+    L.sporeCells.clear();
+    for (const k of cells) L.sporeCells.add(rekey(k));
+    L.base = L.base.map(rekey);
   }
 
   /** Cells of the fungus's base (root) on `map` (layer 0). */

@@ -8,9 +8,8 @@ import { TOLERANCE } from "./recognition.ts";
 import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, DonorGrid, EAT_BELOW, ENERGY_PER_FOOD, feel, FeltGrid, LARVA_DRAIN, LARVA_ENERGY_PER_FOOD, PASS, QUEEN_BEG, QUEEN_DRAIN, QUEEN_WAIT, NEED_FETCH, respond, SHARE_ABOVE, THETA_OLD } from "./hunger.ts";
 import { type Alate, ALATE_FEED, ALATE_RESERVE, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_SPACING, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
-import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, heapPlane, isSky, markFork, OPEN, openCell, takeLoose, takePlane, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
+import { AIR, blocked, digCell, dropFood, fillCell, groundTop, heapMound, heapPlane, inBounds, isSky, markFork, OPEN, openCell, takeLoose, takePlane, rockAt, setTunnelHeading, SOIL, takeFork, takeFoodCell, qualityAt, tunnelHeading, type Nest, type WorldMap } from "./world.ts";
 import { cellAt, type Transect } from "./transect.ts";
-import { sOf } from "./oneWorld.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -433,8 +432,8 @@ export class Colony {
   layer: Uint8Array;
   /** the layer bound now (#bind): `home` between ticks */
   #cur = 0;
-  /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map */
-  readonly line: Transect | null = null;
+  /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map. The game sets it again when the line grows (Game.addColony) */
+  line: Transect | null = null;
   /** one world: every nest's hole on both layers (HoleCell), indexed by colony as the maps' nests are; empty elsewhere */
   holeCells: HoleCell[] = [];
   params: ColonyParams;
@@ -477,11 +476,11 @@ export class Colony {
   #cellY: Int32Array;
   #cellAtX: Float32Array;
   #cellAtY: Float32Array;
-  /** a cell where this free-walking ant last found no tunnel (packed y·65536 + x; −1 none): it needn't look again until it moves on */
+  /** a cell where this free-walking ant last found no tunnel (cellKey; NO_KEY none): it needn't look again until it moves on */
   #noTunnel: Int32Array;
   /** 1 while a pellet carrier is walking a stale branch to fill its end (see BACKFILL.enterStale) */
   #staleWalk: Uint8Array;
-  /** the cell (packed y·65536 + x) where this pellet carrier last looked for space to fill, this trip: once a cell is enough */
+  /** the cell (cellKey) where this pellet carrier last looked for space to fill, this trip: once a cell is enough */
   #looked: Int32Array;
   /** the side view: what each homing ant is heading for (0 the chamber, 1 the entrance); a change drops the wall it was following */
   #goalKind: Uint8Array;
@@ -518,7 +517,7 @@ export class Colony {
   /** the hole x (#holeX) groundMin was measured against */
   #groundRef: Float64Array;
   // Chambers (nest slice 2): the side view's nest is dug, not given.
-  /** the face this ant is digging for a chamber (packed y·65536 + x; −1 none), and for which: chamber id + 1, or 0 for a new one */
+  /** the face this ant is digging for a chamber (cellKey; NO_KEY none), and for which: chamber id + 1, or 0 for a new one */
   #chamberCell: Int32Array;
   #chamberFor: Int16Array;
   /** ants underground last tick (the side view): with the chambers' floor, how crowded the nest is */
@@ -587,7 +586,7 @@ export class Colony {
   // The midden (nest slice 7): corpses lie where workers die until an undertaker carries them out to the midden.
   /** the colony's dead not yet on the midden: where each lies (a cell), who carries it (−1 none), when it died, its fungus */
   readonly corpses: Corpse[] = [];
-  /** the midden: corpses buried per cell (packed y × 65536 + x), a count rather than a list growing all game (review of #26) */
+  /** the midden: corpses buried per cell (cellKey), a count rather than a list growing all game (review of #26) */
   readonly midden = new Map<number, number>();
   /** called with each corpse as it is put on the midden (the game: a sporulating strain's spores there), and the layer it lies on (absent: layer 0) */
   onBury: ((k: Corpse, layer?: number) => void) | null = null;
@@ -603,7 +602,7 @@ export class Colony {
   #corpse: Uint8Array;
   /** 1 while an ant carried a load at its last step (what ends its trip when the load is put down: `arrive`) */
   #loaded: Uint8Array;
-  /** the cell (packed y × 65536 + x) where ant i last put a load down, while it still stands there; else −1 */
+  /** the cell (cellKey) where ant i last put a load down, while it still stands there; else NO_KEY */
   #putAt: Int32Array;
   /** corpses carried to the midden (one world: buried at the hole, on the plane) */
   buried = 0;
@@ -701,7 +700,7 @@ export class Colony {
   intakeRate = 0;
   #storedSeen = 0;
   /**
-   * Foragers home with food, per cell where each put it down, keyed y × 65536 + x (behaviour MR 5): `#returning` fills
+   * Foragers home with food, per cell where each put it down, keyed by cellKey (behaviour MR 5): `#returning` fills
    * this tick, `#returned` holds last tick's, which the waiting ants round each one meet, once each.
    */
   #returning = new Map<number, number>();
@@ -905,9 +904,9 @@ export class Colony {
     this.#cellY = new Int32Array(n);
     this.#cellAtX = new Float32Array(n).fill(NaN);
     this.#cellAtY = new Float32Array(n).fill(NaN);
-    this.#noTunnel = new Int32Array(n).fill(-1);
+    this.#noTunnel = new Int32Array(n).fill(NO_KEY);
     this.#staleWalk = new Uint8Array(n);
-    this.#looked = new Int32Array(n).fill(-1);
+    this.#looked = new Int32Array(n).fill(NO_KEY);
     this.#goalKind = new Uint8Array(n);
     this.odoSurf = new Float32Array(n);
     this.odoNest = new Float32Array(n);
@@ -920,7 +919,7 @@ export class Colony {
     this.#groundMin = new Float64Array(n).fill(NaN); // float64: compared with the metric itself (float32 rounding let the ant "beat" it on the cell it was set at)
     this.#groundT = new Uint16Array(n);
     this.#groundRef = new Float64Array(n).fill(NaN);
-    this.#chamberCell = new Int32Array(n).fill(-1);
+    this.#chamberCell = new Int32Array(n).fill(NO_KEY);
     this.#chamberFor = new Int16Array(n);
     this.#lastRole = new Uint8Array(n);
     this.#sinceRole = new Float32Array(n);
@@ -934,7 +933,7 @@ export class Colony {
     this.#porter = new Uint8Array(n);
     this.#corpse = new Uint8Array(n);
     this.#loaded = new Uint8Array(n);
-    this.#putAt = new Int32Array(n).fill(-1);
+    this.#putAt = new Int32Array(n).fill(NO_KEY);
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
     if (this.#entrance && map.chambers) this.queen = { alive: true, ...this.#royalFloor(map.chambers), load: 0, strain: 0, resist: 0, show: 1, signal: 1, energy: 1, unfed: 0, held: 0 };
     this.#spoilTo = new Float32Array(n).fill(NaN);
@@ -942,8 +941,8 @@ export class Colony {
     this.#spoilT = new Float32Array(n);
     this.#spoilA = new Float32Array(n);
     this.#soil = new Uint8Array(n);
-    this.#cameFrom = new Int32Array(n).fill(-1);
-    this.#lastDug = new Int32Array(n).fill(-1);
+    this.#cameFrom = new Int32Array(n).fill(NO_KEY);
+    this.#lastDug = new Int32Array(n).fill(NO_KEY);
     this.#noGain = new Uint8Array(n);
     this.loopX = new Int32Array(n).fill(NO_CELL);
     this.loopY = new Int32Array(n);
@@ -1033,7 +1032,7 @@ export class Colony {
         cellOf(e.x, e.y);
         const col = CELL[0] as number;
         const row = CELL[1] as number;
-        cellAt(line, sOf(line, col));
+        cellAt(line, col); // the curtain's column is the line's s
         return { col, row, px: CELL[0] as number, py: CELL[1] as number };
       });
     }
@@ -1258,9 +1257,9 @@ export class Colony {
     this.mode[i] = EXPLORE;
     this.carrying[i] = 0;
     this.#clearPellet(i);
-    this.#looked[i] = -1;
-    this.#cameFrom[i] = -1;
-    this.#lastDug[i] = -1;
+    this.#looked[i] = NO_KEY;
+    this.#cameFrom[i] = NO_KEY;
+    this.#lastDug[i] = NO_KEY;
     this.digT[i] = 0;
     this.digAim[i] = NaN;
     this.hand[i] = this.#rng() < 0.5 ? -1 : 1;
@@ -1306,7 +1305,7 @@ export class Colony {
     this.layer[i] = this.home; // born in the nest, on its layer
     this.#goalKind[i] = 0; // born underground: home is the chamber
     this.#groundMin[i] = NaN;
-    this.#chamberCell[i] = -1;
+    this.#chamberCell[i] = NO_KEY;
     this.#lastRole[i] = 0; // born in the royal chamber: it lays royal once it has been there a tick
     this.#sinceRole[i] = 0;
     this.#restT[i] = 0;
@@ -1319,7 +1318,7 @@ export class Colony {
     this.#porter[i] = 0;
     this.#corpse[i] = 0;
     this.#loaded[i] = 0;
-    this.#putAt[i] = -1;
+    this.#putAt[i] = NO_KEY;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.untouched[i] = 0;
@@ -1672,13 +1671,14 @@ export class Colony {
   #climbOut(cx: number, cy: number): number {
     const f = this.#outField();
     const { w, h } = this.map.size;
-    const here = cx >= 0 && cy >= 0 && cx < w && cy < h ? (f[cy * w + cx] as number) : -1;
+    const { x0 } = this.map;
+    const here = cx >= x0 && cy >= 0 && cx < x0 + w && cy < h ? (f[cy * w + cx - x0] as number) : -1;
     if (here === 0) return -1;
     if (here > 0)
       for (const d of UP_FIRST) {
         const tx = stepX(cx, cy, d);
         const ty = stepY(cy, d);
-        if (tx >= 0 && ty >= 0 && tx < w && ty < h && f[ty * w + tx] === here - 1 && rockAt(this.map, tx, ty) === OPEN) return d;
+        if (tx >= x0 && ty >= 0 && tx < x0 + w && ty < h && f[ty * w + tx - x0] === here - 1 && rockAt(this.map, tx, ty) === OPEN) return d;
       }
     this.#holeX = (this.#entrance as Nest).x;
     return this.#towardHole(cx, cy, false);
@@ -1687,32 +1687,36 @@ export class Colony {
   /**
    * The side view: steps from each open cell underground to this colony's hole through the tunnels (−1: not joined to it).
    * Cached for the colony, and rebuilt when the ground has changed (cells dug or filled), at most every OUT_FIELD_EVERY
-   * seconds: a breadth-first walk over the nest's own tunnels, a few thousand cells.
+   * seconds, or at once when the map has grown (one world's curtain, Game.addColony): a breadth-first walk over the nest's
+   * own tunnels, a few thousand cells. Cell (x, y) is at y·w + x − x0.
    */
   #outField(): Int32Array {
     const map = this.map;
     const version = map.dug + map.filled;
-    const have = this.#outDist;
-    if (have && (this.#outVersion === version || this.time - this.#outAt < OUT_FIELD_EVERY)) return have;
     const { w, h } = map.size;
+    const { x0 } = map;
+    const kept = this.#outDist;
+    const have = kept && kept.length === w * h ? kept : null;
+    if (have && (this.#outVersion === version || this.time - this.#outAt < OUT_FIELD_EVERY)) return have;
     const dist = have ?? new Int32Array(w * h).fill(-1);
     this.#outDist = dist;
     const cells = this.#outCells;
-    for (const k of cells) dist[k] = -1;
+    if (have) for (const k of cells) dist[k] = -1;
     cells.length = 0;
-    const start = this.#entranceRow * w + this.#entranceCol;
+    const start = this.#entranceRow * w + this.#entranceCol - x0;
     dist[start] = 0;
     cells.push(start);
     for (let q = 0; q < cells.length; q++) {
       const k = cells[q] as number;
-      const x = k % w;
-      const y = (k - x) / w;
+      const col = k % w;
+      const y = (k - col) / w;
+      const x = col + x0;
       const d = (dist[k] as number) + 1;
       for (let dir = 0; dir < 6; dir++) {
         const tx = stepX(x, y, dir);
         const ty = stepY(y, dir);
-        if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
-        const t = ty * w + tx;
+        if (tx < x0 || ty < 0 || tx >= x0 + w || ty >= h) continue;
+        const t = ty * w + tx - x0;
         if ((dist[t] as number) >= 0 || rockAt(map, tx, ty) !== OPEN || isSky(map, tx, ty)) continue;
         dist[t] = d;
         cells.push(t);
@@ -1846,9 +1850,9 @@ export class Colony {
 
   /** paint, with its layer bound. */
   #paintOn(channel: Channel, x: number, y: number, radius: number, amount: number): void {
-    const { size } = this.map;
+    const { size, x0 } = this.map;
     for (let cy = Math.max(0, Math.floor((y - radius) / R - 1)); cy <= Math.min(size.h - 1, Math.ceil((y + radius) / R)); cy++)
-      for (let cx = Math.max(0, Math.floor(x - radius - 1)); cx <= Math.min(size.w - 1, Math.ceil(x + radius)); cx++) {
+      for (let cx = Math.max(x0, Math.floor(x - radius - 1)); cx <= Math.min(x0 + size.w - 1, Math.ceil(x + radius)); cx++) {
         const px = centreX(cx, cy);
         const py = centreY(cy);
         if (rockAt(this.map, cx, cy) || Math.hypot(px - x, py - y) > radius) continue;
@@ -1927,7 +1931,7 @@ export class Colony {
    * over from foraging would otherwise switch its home vector off, and bumps would keep renewing it.
    */
   #homeAfresh(i: number): void {
-    this.#chamberCell[i] = -1; // a chamber face it was walking up to is no longer its business (review of slice 2)
+    this.#chamberCell[i] = NO_KEY; // a chamber face it was walking up to is no longer its business (review of slice 2)
     this.search[i] = 0; // a search left over from the last trip home
     this.searchA[i] = 0;
     this.#groundMin[i] = NaN;
@@ -1991,7 +1995,7 @@ export class Colony {
       rockAt(map, this.gx[i] as number, this.gy[i] as number) === AIR; // sky (the ground under a walkway dug away) is no face to dig
     if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
     const hugging = mode === EXPLORE && (this.hugT[i] as number) > 0;
-    const packed = hy * 65536 + hx;
+    const packed = cellKey(hx, hy);
     // Homing on the ground line (side view) goes cell by cell to the hole wherever the walkway is, one cell
     // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
     const carryingOut = mode === RETURN && this.pellet[i] === 1 && this.#entrance !== null && !Number.isNaN(this.#spoilTo[i] as number);
@@ -2013,7 +2017,7 @@ export class Colony {
       if (fresh) this.#noTunnel[i] = packed;
       return false;
     }
-    this.#noTunnel[i] = -1;
+    this.#noTunnel[i] = NO_KEY;
     let dir = fresh ? dirOf(this.heading[i] as number) : (this.gdir[i] as number);
     const ent = this.#entrance;
     if (carryingOut) {
@@ -2270,7 +2274,7 @@ export class Colony {
 
   /** Ant i is going to dig cell (x, y) for a chamber: `forId` = its id + 1, or 0 for a new chamber there. */
   #aimChamber(i: number, x: number, y: number, forId: number): void {
-    this.#chamberCell[i] = y * 65536 + x;
+    this.#chamberCell[i] = cellKey(x, y);
     this.#chamberFor[i] = forId;
   }
 
@@ -2296,7 +2300,7 @@ export class Colony {
     for (let d = 0; d < 6; d++) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (ty * 65536 + tx === this.#lastDug[i]) continue; // the cell it just dug: not straight back in
+      if (cellKey(tx, ty) === this.#lastDug[i]) continue; // the cell it just dug: not straight back in
       if (this.time - map.dugAt.get(tx, ty) < backfill.young && !floorGround(map, tx, ty)) continue; // dug lately: the live frontier, not excess
       if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, backfill.maxOpen)) continue;
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
@@ -2414,9 +2418,9 @@ export class Colony {
     const f = this.ph.fields;
     // The way it came: the cell it looked from last, if that is beside it; else the way behind its heading.
     const from = this.#cameFrom[i] as number;
-    let bx = from & 0xffff;
-    let by = from >> 16;
-    if (from < 0 || hexDistance(bx, by, cx, cy) !== 1) {
+    let bx = keyX(from);
+    let by = keyY(from);
+    if (from === NO_KEY || hexDistance(bx, by, cx, cy) !== 1) {
       const back = dirOf((this.heading[i] as number) + Math.PI);
       bx = stepX(cx, cy, back);
       by = stepY(cy, back);
@@ -2483,7 +2487,8 @@ export class Colony {
   /** The side view: whether cell (cx, cy) is in this colony's nest: open ground underground joined to its hole (see #outField). */
   #ownTunnels(cx: number, cy: number): boolean {
     const { w, h } = this.map.size;
-    return cx >= 0 && cy >= 0 && cx < w && cy < h && (this.#outField()[cy * w + cx] as number) >= 0;
+    const { x0 } = this.map;
+    return cx >= x0 && cy >= 0 && cx < x0 + w && cy < h && (this.#outField()[cy * w + cx - x0] as number) >= 0;
   }
 
   /** The side view: whether world point (x, y) is at this colony's hole (its cell, or one beside it). */
@@ -2541,8 +2546,8 @@ export class Colony {
     // Never past the ground's ends: a belief off the map left a carrier at the map's edge for good, never reaching the
     // column where it would have searched (review of #20: 473 samples in six games had it off the map). The search is
     // centred on the end it can reach.
-    const lo = EDGE;
-    const hi = this.map.size.w - EDGE;
+    const lo = this.map.x0 + EDGE;
+    const hi = this.map.x0 + this.map.size.w - EDGE;
     b.x = Math.max(lo, Math.min(hi, Math.max(lo, Math.min(hi, goal.x + off)) + (this.search[i] as number)));
     b.y = goal.y;
     b.r = goal.r;
@@ -2566,9 +2571,10 @@ export class Colony {
     const b = this.#belief;
     // Never past the plane's edges (as the side view's ground's ends): the search is centred on the point it can reach.
     const lo = EDGE;
-    const hx = this.map.size.w - EDGE;
+    const lx = this.map.x0 + EDGE;
+    const hx = this.map.x0 + this.map.size.w - EDGE;
     const hy = this.map.size.h * R - EDGE;
-    b.x = Math.max(lo, Math.min(hx, Math.max(lo, Math.min(hx, goal.x + odo * (this.driftSurf[i] as number))) + s * Math.cos(a)));
+    b.x = Math.max(lx, Math.min(hx, Math.max(lx, Math.min(hx, goal.x + odo * (this.driftSurf[i] as number))) + s * Math.cos(a)));
     b.y = Math.max(lo, Math.min(hy, Math.max(lo, Math.min(hy, goal.y + odo * (this.driftSurfY[i] as number))) + s * Math.sin(a)));
     b.r = goal.r;
     return b;
@@ -3069,8 +3075,8 @@ export class Colony {
       if (left <= 0) break;
       const n = Math.min(left, count);
       left -= n;
-      if (this.line !== null) this.#markMiddenPlane(key % 65536, Math.floor(key / 65536), MIDDEN_MARK * dt * 0.1 * n);
-      else this.#markMidden(key % 65536, MIDDEN_MARK * dt * 0.1 * n);
+      if (this.line !== null) this.#markMiddenPlane(keyX(key), keyY(key), MIDDEN_MARK * dt * 0.1 * n);
+      else this.#markMidden(keyX(key), MIDDEN_MARK * dt * 0.1 * n);
     }
   }
 
@@ -3094,7 +3100,7 @@ export class Colony {
     if (this.map.surfaceRows !== undefined) return; // one world's curtain: the midden is the plane's (U3c), never its ground strip
     for (let dx = -MIDDEN_SPREAD; dx <= MIDDEN_SPREAD; dx++) {
       const x = col + dx;
-      if (x < 0 || x >= this.map.size.w) continue;
+      if (x < this.map.x0 || x >= this.map.x0 + this.map.size.w) continue;
       this.ph.depositCell("midden", x, groundTop(this.map, x) - 1, (amount * (MIDDEN_SPREAD + 1 - Math.abs(dx))) / (MIDDEN_SPREAD + 1));
     }
   }
@@ -3138,10 +3144,13 @@ export class Colony {
     perceived.reset();
     for (const b of this.brood.items) if (b.stage === LARVA && b.held < 0) felt.put(b.x, b.y, begOf(b.energy));
     const q = this.queen;
-    let qx = -1;
-    let qy = -1;
+    // Her cell, when she lives in a nest: a column can be negative (one world's curtain), so whether there is one is its own flag.
+    let queenHere = false;
+    let qx = 0;
+    let qy = 0;
     let touching = 0; // ants within one cell of the queen: her scent is split among them
     if (q && q.alive && ch) {
+      queenHere = true;
       cellOf(q.x, q.y);
       qx = CELL[0] as number;
       qy = CELL[1] as number;
@@ -3183,7 +3192,7 @@ export class Colony {
       energy[i] = e;
       if (!under) continue;
       scentSum.add(cx, cy, scent[i] as number);
-      if (qx >= 0 && hexDistance(cx, cy, qx, qy) <= 1) touching++;
+      if (queenHere && hexDistance(cx, cy, qx, qy) <= 1) touching++;
       felt.put(cx, cy, Math.max(PASS * (this.#feltLast[i] as number), adultBegOf(e)));
       if (e > SHARE_ABOVE) donors.put(cx, cy, i, energy);
     }
@@ -3192,7 +3201,7 @@ export class Colony {
     const fade = Math.exp(-dt / SCENT_FADE);
     const share = 1 - Math.exp(-dt / SCENT_SHARE);
     let supply = 0;
-    if (q && q.alive && qx >= 0) {
+    if (q && q.alive && queenHere) {
       q.held = Math.min(SCENT_SUPPLY * q.signal * SCENT_HELD, q.held + SCENT_SUPPLY * q.signal * dt);
       if (touching > 0) {
         supply = q.held / touching;
@@ -3678,7 +3687,7 @@ export class Colony {
   /** Whether ant i is in a cell it hasn't looked round yet this trip (leaves its cell in CELL; the cell it looked from before goes in #cameFrom). */
   #enteredCell(i: number): boolean {
     this.antCell(i);
-    const packed = (CELL[1] as number) * 65536 + (CELL[0] as number);
+    const packed = cellKey(CELL[0] as number, CELL[1] as number);
     if (this.#looked[i] === packed) return false;
     this.#cameFrom[i] = this.#looked[i] as number;
     this.#looked[i] = packed;
@@ -3796,7 +3805,7 @@ export class Colony {
         k.y = row;
         if (onMidden) {
           this.corpses.splice(n, 1);
-          const key = row * 65536 + col;
+          const key = cellKey(col, row);
           this.midden.set(key, (this.midden.get(key) ?? 0) + 1);
           this.#markMidden(col, MIDDEN_MARK);
           this.buried++;
@@ -3885,7 +3894,7 @@ export class Colony {
         k.layer = PLANE;
         if (!midden) continue; // it lies here
         this.corpses.splice(n, 1);
-        const key = cy * 65536 + cx;
+        const key = cellKey(cx, cy);
         this.midden.set(key, (this.midden.get(key) ?? 0) + 1);
         this.#markMiddenPlane(cx, cy, MIDDEN_MARK);
         this.buried++;
@@ -4006,7 +4015,7 @@ export class Colony {
         this.#portTo[i] = -1;
       } else {
         dropFood(this.map, this.x[i] as number, this.y[i] as number, 1, this.quality[i] as number);
-        this.#putAt[i] = cy * 65536 + cx;
+        this.#putAt[i] = cellKey(cx, cy);
       }
       this.carrying[i] = 0;
     } else if (this.pellet[i]) {
@@ -4207,13 +4216,13 @@ export class Colony {
   #nestmatesAround(cx: number, cy: number): number {
     const f = this.nestmates;
     if (!f) return 0;
-    const { w, h } = this.map.size;
+    const map = this.map;
     const o = discOffsets(1)[cy & 1] as Int16Array;
     let s = 0;
     for (let k = 0; k < o.length; k += 2) {
       const x = cx + (o[k] as number);
       const y = cy + (o[k + 1] as number);
-      if (x >= 0 && y >= 0 && x < w && y < h) s += f.get(x, y);
+      if (inBounds(map, x, y)) s += f.get(x, y);
     }
     return s;
   }
@@ -4224,7 +4233,7 @@ export class Colony {
     if (g.size === 0) return 0;
     const o = discOffsets(1)[cy & 1] as Int16Array;
     let s = 0;
-    for (let k = 0; k < o.length; k += 2) s += g.get((cy + (o[k + 1] as number)) * 65536 + cx + (o[k] as number)) ?? 0;
+    for (let k = 0; k < o.length; k += 2) s += g.get(cellKey(cx + (o[k] as number), cy + (o[k + 1] as number))) ?? 0;
     return s;
   }
 
@@ -4242,14 +4251,14 @@ export class Colony {
     this.antCell(i);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
-    const { w, h } = this.map.size;
+    const map = this.map;
     const o = discOffsets(1)[cy & 1] as Int16Array;
     let mine = 0;
     let them = 0;
     for (let k = 0; k < o.length; k += 2) {
       const x = cx + (o[k] as number);
       const y = cy + (o[k + 1] as number);
-      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      if (!inBounds(map, x, y)) continue;
       mine += f.get(x, y);
       them += g.get(x, y);
     }
@@ -4265,7 +4274,7 @@ export class Colony {
     if (!g) return null;
     // Strangers to this ant, as it perceives them: its own odour, its own tolerance.
     g.look?.(this.odour[i] as number, this.tolerance[i] as number);
-    const { w, h } = this.map.size;
+    const map = this.map;
     this.antCell(i);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
@@ -4280,7 +4289,7 @@ export class Colony {
     for (let k = 0; k < o.length; k += 2) {
       const x = cx + (o[k] as number);
       const y = cy + (o[k + 1] as number);
-      if (x < 0 || y < 0 || x >= w || y >= h || g.get(x, y) < ENEMY) continue;
+      if (!inBounds(map, x, y) || g.get(x, y) < ENEMY) continue;
       const dx = centreX(x, y) - ax;
       const dy = centreY(y) - ay;
       const d = dx * dx + dy * dy;
@@ -4416,7 +4425,7 @@ export class Colony {
     if (this.carrying[i]) {
       this.carriedDown++;
       if (gate) {
-        const key = hc.py * 65536 + hc.px;
+        const key = cellKey(hc.px, hc.py);
         this.#returning.set(key, (this.#returning.get(key) ?? 0) + 1);
       }
     }
@@ -4442,12 +4451,12 @@ export class Colony {
     this.hugT[i] = 0;
     this.loopX[i] = NO_CELL;
     this.followT[i] = 0;
-    this.#noTunnel[i] = -1;
-    this.#looked[i] = -1;
-    this.#cameFrom[i] = -1;
-    this.#lastDug[i] = -1;
-    this.#putAt[i] = -1;
-    this.#chamberCell[i] = -1;
+    this.#noTunnel[i] = NO_KEY;
+    this.#looked[i] = NO_KEY;
+    this.#cameFrom[i] = NO_KEY;
+    this.#lastDug[i] = NO_KEY;
+    this.#putAt[i] = NO_KEY;
+    this.#chamberCell[i] = NO_KEY;
     this.#staleWalk[i] = 0;
     this.#spoilTo[i] = NaN;
     this.#cellAtX[i] = NaN;
@@ -4710,7 +4719,7 @@ export class Colony {
       if (mode !== prevMode) {
         this.gx[i] = NO_CELL;
         this.digAim[i] = NaN;
-        this.#chamberCell[i] = -1; // a face aimed at as an explorer: stale once it does something else (review of slice 2)
+        this.#chamberCell[i] = NO_KEY; // a face aimed at as an explorer: stale once it does something else (review of slice 2)
       }
       const digging = (this.digT[i] as number) > 0;
       if (mode !== RETURN) {
@@ -5122,9 +5131,9 @@ export class Colony {
       else if (face === DIG_FACE && !digging && Number.isNaN(this.digAim[i] as number) && map.chambers && !this.crowded() && rng() > ROOMY_DIG) face = GLANCE; // (an aimed face passed ROOMY_DIG when it was chosen)
       // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say,
       // but not soil put back moments ago (see refilled: #17's hold on refilled cells).
-      if (face !== NO_FACE && this.#chamberCell[i] >= 0 && mode === EXPLORE && !carrying && !pellet) {
+      if (face !== NO_FACE && this.#chamberCell[i] !== NO_KEY && mode === EXPLORE && !carrying && !pellet) {
         cellOf(nx, ny);
-        if (this.#chamberCell[i] === (CELL[1] as number) * 65536 + (CELL[0] as number) && rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL && this.#digs(i) && this.crowded() && !refilled(map, CELL[0] as number, CELL[1] as number, this.time)) face = DIG_FACE;
+        if (this.#chamberCell[i] === cellKey(CELL[0] as number, CELL[1] as number) && rockAt(map, CELL[0] as number, CELL[1] as number) === SOIL && this.#digs(i) && this.crowded() && !refilled(map, CELL[0] as number, CELL[1] as number, this.time)) face = DIG_FACE;
       }
       if (face === DIG_FACE && map.sky) {
         cellOf(nx, ny);
@@ -5163,8 +5172,8 @@ export class Colony {
             this.gx[i] = NO_CELL;
           } else if (left <= 0 && digCell(map, fx, fy, this.time)) {
             // A chamber face: the cell joins its chamber (or founds a new one, if there is still room for one there).
-            if (this.#chamberCell[i] === fy * 65536 + fx && map.chambers) this.#chamberDug(i, fx, fy);
-            this.#chamberCell[i] = -1;
+            if (this.#chamberCell[i] === cellKey(fx, fy) && map.chambers) this.#chamberDug(i, fx, fy);
+            this.#chamberCell[i] = NO_KEY;
             // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
             const aim = this.digAim[i] as number;
             setTunnelHeading(map, fx, fy, Number.isNaN(aim) ? (DIR_ANGLE[crossedDir(map, this.x[i] as number, this.y[i] as number, nx, ny)] as number) + gauss(rng) * TUNNEL_DRIFT : aim);
@@ -5172,9 +5181,9 @@ export class Colony {
             this.soilDug++;
             this.pellet[i] = 1;
             this.since[i] = 0;
-            this.#lastDug[i] = fy * 65536 + fx;
-            this.#looked[i] = -1; // a new trip home: every cell on it is looked round afresh
-            this.#cameFrom[i] = -1;
+            this.#lastDug[i] = cellKey(fx, fy);
+            this.#looked[i] = NO_KEY; // a new trip home: every cell on it is looked round afresh
+            this.#cameFrom[i] = NO_KEY;
             this.#homeAfresh(i); // a fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it
             h += Math.PI;
           }
@@ -5292,9 +5301,9 @@ export class Colony {
         this.crowd[i] = atNest && !carrying ? c * crowdKeep + (this.#nestmatesAround(CELL[0] as number, CELL[1] as number) - 1) * (1 - crowdKeep) : c * crowdKeep;
       }
       // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
-      const cellKey = (CELL[1] as number) * 65536 + (CELL[0] as number);
-      if (this.#putAt[i] !== cellKey) this.#putAt[i] = -1;
-      if (!carrying && !pellet && this.#putAt[i] < 0 && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, "food")) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
+      const here = cellKey(CELL[0] as number, CELL[1] as number);
+      if (this.#putAt[i] !== here) this.#putAt[i] = NO_KEY;
+      if (!carrying && !pellet && this.#putAt[i] === NO_KEY && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, "food")) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
         this.quality[i] = qualityAt(map, CELL[0] as number, CELL[1] as number);
         this.#homeAfresh(i);
@@ -5363,7 +5372,7 @@ export class Colony {
           this.carrying[i] = 0;
           this.stored++;
           this.larder++;
-          if (gate) this.#returning.set(cellKey, (this.#returning.get(cellKey) ?? 0) + 1);
+          if (gate) this.#returning.set(here, (this.#returning.get(here) ?? 0) + 1);
           h += Math.PI;
         } else if (pellet && !ent && this.line === null) {
           // The soil goes on the mound: real ants dump it round the entrance, which is how mounds grow. (One world's plane:
@@ -5848,6 +5857,24 @@ export function wallSide(leftBlocked: boolean, rightBlocked: boolean, rng: () =>
 
 /** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
 const NO_CELL = -0x80000000;
+
+/**
+ * A cell as one number, y·65536 + x: the midden's and returns' keys, and an ant's remembered cells. A column may be
+ * negative (one world's curtain, whose columns start at the line's sMin), down to −32768; rows never are.
+ */
+export function cellKey(x: number, y: number): number {
+  return y * 65536 + x;
+}
+/** The row of a cellKey: right for negative columns too (a plain floor of k / 65536 would give the row above). */
+export function keyY(k: number): number {
+  return Math.floor((k + 32768) / 65536);
+}
+/** The column of a cellKey. */
+export function keyX(k: number): number {
+  return k - keyY(k) * 65536;
+}
+/** No cell: a key no cell takes (it would be row −32768). −1 was the old "none", but that is cell (−1, 0). */
+const NO_KEY = NO_CELL;
 /** What a pellet is (Colony #soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
 const SOIL_DUG = 0;
 const SOIL_LOOSE = 1;
