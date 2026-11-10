@@ -1,4 +1,4 @@
-import { worldExtent } from "./colony/world.ts";
+import { worldExtent, type WorldMap } from "./colony/world.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntCard from "./ui/AntCard.tsx";
@@ -201,7 +201,7 @@ export default function ColonyApp() {
 
       <div className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:flex-row">
         <div className="flex min-w-0 flex-col gap-3 lg:flex-1">
-          <div className="relative" style={{ aspectRatio: `${worldExtent(shownMap).w} / ${worldExtent(shownMap).h}` }}>
+          <div className="relative" style={{ aspectRatio: boxRatio(shownMap, game.world !== null) }}>
             <ColonyField
               colonies={game.colonies}
               fungus={game.fungus}
@@ -462,4 +462,14 @@ function useSaves(game: Game, settings: GameSettings, player: PlayerState, stats
     };
   }, [started, save]);
   return { list, save };
+}
+
+/**
+ * The field box's aspect: the shown map's. One world's curtain starts taller than it is wide (about 277 × 341 before a
+ * founding), which would run the box off the bottom of the screen, so a one-world box is never narrower than 5:4; the
+ * camera fits the map inside it (`camera.ts`).
+ */
+function boxRatio(map: WorldMap, oneWorld: boolean): string {
+  const { w, h } = worldExtent(map);
+  return oneWorld && w / h < 1.25 ? "5 / 4" : `${w} / ${h}`;
 }

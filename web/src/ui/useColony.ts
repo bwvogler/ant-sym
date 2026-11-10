@@ -244,7 +244,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         setStats({
           time: colony.time,
           stored: game.colonies.reduce((n, c) => n + c.stored, 0),
-          foodTotal: colony.map.foodTotal,
+          // One world: both layers' food, as colony.foodLeft counts it (the plane's and the curtain's buried food).
+          foodTotal: game.world ? game.world.plane.foodTotal + game.world.curtain.foodTotal : colony.map.foodTotal,
           foodLeft: colony.foodLeft,
           counts: sumCounts(game.colonies),
           choicesPerSecond: rate,
