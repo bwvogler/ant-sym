@@ -7,8 +7,11 @@
 //  2. above, below, above mid-game: each view keeps its own camera;
 //  3. a click on the line above shows below at that column; a click on the strip below shows above at P(s);
 //  4. an ant followed through a hole (the dev hook's follow) carries the camera across: the view switches and centres on it;
-//  5. the queen's pen: a flight forced by the dev hook (fly) opens it above; a click outside her flight is refused, and a
-//     click inside founds her colony where the preview (Game.settleAt) said.
+//  5. the queen's pen: a flight forced by the dev hook (fly) opens it above; a click on the view below founds nothing; a
+//     click outside her flight is refused, and a click inside founds her colony where the preview (Game.settleAt) said;
+//     "Let her fly", by the keyboard, sends the next one on her own flight; and with the hook's flight gone, a queen who
+//     flies while Jev can't read words opens no pen.
+// No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
 
 import { spawn } from "node:child_process";
@@ -147,27 +150,65 @@ try {
   const keys = async (...ks) => {
     await canvas.focus();
     for (const k of ks) await page.keyboard.press(k);
-    await sleep(120);
   };
+  // No fixed waits before a camera is read: the field's box takes the view's shape a frame or two after a switch, and
+  // the camera is clamped to it as it is drawn. A camera is read once it has held still (and the canvas with it) for a
+  // few polls, or once it is where it should be, worked out afresh from the canvas each poll.
+  /** View v's camera once it and the canvas have held still for three polls. */
+  const steadyCam = async (v) => {
+    let last = "";
+    let same = 0;
+    return until(
+      async () => {
+        const now = await page.evaluate((v) => {
+          const cv = document.querySelector("canvas");
+          return { cam: window.jevAnts.camera(v), w: cv.width, h: cv.height };
+        }, v);
+        const key = JSON.stringify(now);
+        same = key === last ? same + 1 : 0;
+        last = key;
+        return same >= 2 && now.cam ? now.cam : null;
+      },
+      `the ${v} camera to hold still`,
+      5000,
+      60,
+    );
+  };
+  /** Poll until view v's camera is where `expected()` says (worked out afresh each poll), or fail saying where it was. */
+  const camAt = async (v, expected, what) => {
+    let got = null;
+    let want = null;
+    const ok = await until(
+      async () => {
+        want = await expected();
+        got = await cam(v);
+        return got && sameCam(got, want);
+      },
+      what,
+      5000,
+      60,
+    ).catch(() => false);
+    const f = (c) => (c ? `${c.x.toFixed(1)}, ${c.y.toFixed(1)} ×${c.zoom.toFixed(2)}` : "none");
+    check(ok, `${what} (${f(got)}${ok ? "" : `; expected ${f(want)}`})`);
+    return got;
+  };
+  /** Poll until the field's label (its aria-label) says `re`. */
+  const labelSays = (re, what) => until(async () => re.test((await canvas.getAttribute("aria-label")) ?? ""), what, 3000).then(() => check(true, what));
   await keys("Equal", "Equal", "Equal", "ArrowLeft", "ArrowUp");
-  const above = await cam("above");
+  const above = await steadyCam("above");
   await page.getByRole("button", { name: "below", exact: true }).click();
   await until(async () => (await view()) === "below", "below");
-  await sleep(200);
-  check(/click the ground strip/.test((await canvas.getAttribute("aria-label")) ?? ""), "the field's label is the side view's");
+  await labelSays(/click the ground strip/, "the field's label is the side view's");
+  await steadyCam("below");
   await keys("Equal", "Equal", "Equal", "Equal", "ArrowRight", "ArrowDown", "ArrowDown");
-  const below = await cam("below");
-  check(below && above && (below.x !== above.x || below.zoom !== above.zoom), "below has a camera of its own");
+  const below = await steadyCam("below");
+  check(below.x !== above.x || below.zoom !== above.zoom, "below has a camera of its own");
   await page.getByRole("button", { name: "above", exact: true }).click();
   await until(async () => (await view()) === "above", "above again");
-  await sleep(200);
-  const above2 = await cam("above");
-  check(near(above2.x, above.x, 1e-6) && near(above2.y, above.y, 1e-6) && near(above2.zoom, above.zoom, 1e-6), `above kept its camera (${above.x.toFixed(1)}, ${above.y.toFixed(1)} ×${above.zoom.toFixed(2)})`);
+  await camAt("above", () => above, "above kept its camera");
   await page.keyboard.press("v");
   await until(async () => (await view()) === "below", "below by the key v");
-  await sleep(200);
-  const below2 = await cam("below");
-  check(near(below2.x, below.x, 1e-6) && near(below2.y, below.y, 1e-6) && near(below2.zoom, below.zoom, 1e-6), `below kept its camera (${below.x.toFixed(1)}, ${below.y.toFixed(1)} ×${below.zoom.toFixed(2)})`);
+  await camAt("below", () => below, "below kept its camera");
   await page.getByRole("button", { name: "above", exact: true }).click();
   await until(async () => (await view()) === "above", "above");
 
@@ -175,7 +216,24 @@ try {
   console.log("3. linked clicks");
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await keys("Digit0"); // the whole plane: the line in view
-  await sleep(200);
+  const whole = await steadyCam("above");
+  // Zoomed in on the middle of the line (a wheel there), so a spot on it clear of the ants' pick reach is easy to find.
+  const mid = await page.evaluate((c) => {
+    const line = window.jevAnts.game.world.line;
+    const cv = document.querySelector("canvas");
+    const r = cv.getBoundingClientRect();
+    const k = cv.width / r.width;
+    const i = Math.round((line.sHole[0] + line.sHole[1]) / 2) - line.sMin;
+    const cx = line.cells[2 * i];
+    const cy = line.cells[2 * i + 1];
+    const wx = cx + 0.5 + 0.5 * (cy & 1);
+    const wy = (cy + 0.5) * (Math.sqrt(3) / 2);
+    return { sx: r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k, sy: r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k };
+  }, whole);
+  await page.mouse.move(mid.sx, mid.sy);
+  await page.mouse.wheel(0, -400);
+  await page.mouse.wheel(0, -400);
+  await steadyCam("above");
   // Where on screen (CSS px) world (x, y) of a view lies, and whether an ant of that layer is under it (a click would follow it).
   const spot = await page.evaluate(() => {
     const { game } = window.jevAnts;
@@ -185,7 +243,7 @@ try {
     const cv = document.querySelector("canvas");
     const r = cv.getBoundingClientRect();
     const k = cv.width / r.width;
-    const reach = (14 * 1.5 * k) / c.zoom;
+    const reach = (14 * 1.2 * k) / c.zoom; // the field's pick reach (14 CSS px), and a margin
     const R = Math.sqrt(3) / 2;
     const clear = (wx, wy, layer) => {
       let d = Infinity;
@@ -213,12 +271,10 @@ try {
   await shot("link-above");
   await page.mouse.click(spot.sx, spot.sy);
   await until(async () => (await view()) === "below", "below after a click on the line");
-  await sleep(250);
   // Where the side view should look: the strip at s, clamped to the curtain in the box it is drawn in (camera.ts clamp).
   // The strip at s (centreX(s, STRIP): row 40 is even), at least the link's zoom (8 a cell at deviceScaleFactor 1).
-  const expectBelow = await expectCam(page, "below", spot.s + 0.5, 40.5 * (Math.sqrt(3) / 2), Math.max(spot.zoom, 8));
-  const atS = await cam("below");
-  check(sameCam(atS, expectBelow), `below centres on the strip at s = ${spot.s} (${atS.x.toFixed(1)}, ${atS.y.toFixed(1)} ×${atS.zoom.toFixed(2)})`);
+  const atS = await camAt("below", () => expectCam(page, "below", spot.s + 0.5, 40.5 * (Math.sqrt(3) / 2), Math.max(spot.zoom, 8)), `below centres on the strip at s = ${spot.s}`);
+  await steadyCam("below");
   await shot("link-below");
   // Back up: a click on the sky over the strip, a few columns along.
   const up = await page.evaluate(() => {
@@ -247,9 +303,7 @@ try {
   check(up !== null, "a spot on the sky over the strip");
   await page.mouse.click(up.sx, up.sy);
   await until(async () => (await view()) === "above", "above after a click on the strip");
-  await sleep(250);
-  const atP = await cam("above");
-  check(sameCam(atP, await expectCam(page, "above", up.x, up.y, atS.zoom)), `above centres on P(${up.s}) (${up.x.toFixed(1)}, ${up.y.toFixed(1)}), at the side view's zoom`);
+  await camAt("above", () => expectCam(page, "above", up.x, up.y, atS.zoom), `above centres on P(${up.s}) (${up.x.toFixed(1)}, ${up.y.toFixed(1)}), at the side view's zoom`);
 
   // ——— 4. An ant followed through a hole carries the camera across ———
   console.log("4. follow an ant through a hole");
@@ -260,14 +314,19 @@ try {
   check((await page.getByRole("button", { name: "Carry across" }).getAttribute("aria-pressed")) === "true", "carry across is on by default");
   // Each frame, the page records the followed ant (its layer and place), the view and the top view's camera: the guard
   // reads the frame where the ant is up and the view has come with it (an ant can step back down within a poll).
+  // Only a try whose ant was given up (8 s, still below) counts against the twelve; one that came up before the field had
+  // taken the follow, or died, is tried again, within a minute and a half in all.
   let carried = null;
-  for (let tries = 0; tries < 12 && !carried; tries++) {
+  let gaveUp = 0;
+  const deadline = Date.now() + 90_000;
+  for (let tries = 0; !carried && gaveUp < 12 && Date.now() < deadline; tries++) {
     // Each try from the side view (an ant given up may have carried the camera up and back).
     if ((await view()) !== "below") {
       await page.getByRole("button", { name: "below", exact: true }).click();
       await until(async () => (await view()) === "below", "below");
     }
-    // A curtain ant near its hole, by the dev hook; then the game runs until it comes up (or it is given up).
+    // A curtain ant in its shaft, a little below its hole (one right at it is often up before the field has taken the
+    // follow), by the dev hook; then the game runs until it comes up (or it is given up).
     const picked = await page.evaluate((tries) => {
       const { game } = window.jevAnts;
       const R = Math.sqrt(3) / 2;
@@ -279,7 +338,10 @@ try {
         const hy = (hc.row + 0.5) * R;
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || col.layer[i] !== 1) continue;
-          const d = Math.hypot(col.x[i] - hx, col.y[i] - hy) + ((i * 7919 + tries * 104729) % 97) / 40; // a different ant each try
+          const dx = Math.abs(col.x[i] - hx);
+          const below = col.y[i] - hy;
+          if (dx > 4 || below < 3 || below > 25) continue; // in the shaft, 3 to 25 below the crust
+          const d = below + ((i * 7919 + tries * 104729) % 97) / 10; // a different ant each try
           if (!best || d < best.d) best = { k, i, d };
         }
       });
@@ -294,7 +356,10 @@ try {
       requestAnimationFrame(loop);
       return best;
     }, tries);
-    if (!picked) continue;
+    if (!picked) {
+      await sleep(300); // no ant in a shaft just now
+      continue;
+    }
     carried = await until(
       () =>
         page.evaluate(() => {
@@ -321,7 +386,8 @@ try {
       50,
     ).catch(() => null);
     if (carried?.stuck) throw new Error(`the followed ant came up, but the view did not come with it: ${JSON.stringify(carried.stuck)}`);
-    if (carried === "dead" || carried === "retry") carried = null;
+    if (carried === null) gaveUp++;
+    else if (carried === "dead" || carried === "retry") carried = null;
   }
   await page.evaluate(() => (window.__trail = null));
   await page.getByRole("button", { name: "Pause", exact: true }).click();
@@ -340,16 +406,45 @@ try {
   check(/Click where she flies \(within 140 of Ink's hole\)/.test(await card.innerText()), "the pen says where to click");
   await until(async () => (await view()) === "above", "the pen shows the top view", 3000);
   check((await page.getByRole("button", { name: "Play", exact: true }).count()) === 1, "the game waits for her");
-  await sleep(300);
   const circle = await page.evaluate(() => {
     const m = window.jevAnts.game.colonies[0];
     const h = m.holeCells[m.params.nest];
     return { x: h.px + 0.5 + 0.5 * (h.py & 1), y: (h.py + 0.5) * (Math.sqrt(3) / 2) };
   });
-  const penCam = await cam("above");
   check((await page.getByRole("button", { name: "Stop following" }).count()) === 0, "the pen ends a follow");
-  const penAt = await expectCam(page, "above", circle.x, circle.y, penCam.zoom);
-  check(sameCam(penCam, penAt), `the top view looks at her flight's circle round Ink's hole (${penCam.x.toFixed(1)}, ${penCam.y.toFixed(1)} ×${penCam.zoom.toFixed(2)}; expected ${penAt.x.toFixed(1)}, ${penAt.y.toFixed(1)})`);
+  // The circle's centre, clamped to the plane in the box as it is now (at the zoom the pen chose to fit the circle).
+  await camAt("above", async () => expectCam(page, "above", circle.x, circle.y, (await cam("above")).zoom), "the top view looks at her flight's circle round Ink's hole");
+
+  // The pen takes clicks on the top view only: a click below, while it is open, founds nothing and refuses nothing.
+  await page.getByRole("button", { name: "below", exact: true }).click();
+  await until(async () => (await view()) === "below", "below, with the pen open");
+  await steadyCam("below");
+  const deep = await page.evaluate(() => {
+    const { game } = window.jevAnts;
+    const c = window.jevAnts.camera("below");
+    const cv = document.querySelector("canvas");
+    const r = cv.getBoundingClientRect();
+    const k = cv.width / r.width;
+    const R = Math.sqrt(3) / 2;
+    let best = null;
+    for (let sy = r.top + 60; sy < r.bottom - 30; sy += 12)
+      for (let sx = r.left + 30; sx < r.right - 200; sx += 12) {
+        const wx = c.x + ((sx - r.left) * k - cv.width / 2) / c.zoom;
+        const wy = c.y + ((sy - r.top) * k - cv.height / 2) / c.zoom;
+        if (wy < (41 + 6) * R) continue; // underground, well below the strip (a click on the strip or the sky links)
+        let d = Infinity;
+        for (const col of game.colonies) for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === 1) d = Math.min(d, Math.hypot(col.x[i] - wx, col.y[i] - wy));
+        if (!best || d > best.d) best = { sx, sy, d };
+      }
+    return best;
+  });
+  check(deep !== null, "a spot underground, clear of ants");
+  await page.mouse.click(deep.sx, deep.sy);
+  await sleep(600); // nothing should happen: give it time to
+  check((await page.evaluate(() => window.jevAnts.game.colonies.length)) === before && (await card.count()) === 1 && (await page.getByText("She can't fly that far").count()) === 0, "a click on the view below founds nothing while the pen is open");
+  await page.getByRole("button", { name: "above", exact: true }).click();
+  await until(async () => (await view()) === "above", "above again, with the pen open");
+  await steadyCam("above");
   // A point inside her flight where she would settle (Game.settleAt), and one outside it; both on screen.
   const pts = await page.evaluate(() => {
     const { game } = window.jevAnts;
@@ -399,6 +494,33 @@ try {
   await page.getByText("is founded, on your words").first().waitFor({ timeout: 3000 });
   check((await card.count()) === 0, "the pen is closed");
   check((await page.getByRole("button", { name: "Pause", exact: true }).count()) === 1, "the game plays on");
+
+  // "Let her fly", by the keyboard alone: her own flight (Game.landing), on the pen's words.
+  const before2 = await page.evaluate(() => window.jevAnts.game.colonies.length);
+  await page.evaluate(() => window.jevAnts.fly(0));
+  await card.waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: "Let her fly" }).focus();
+  await page.keyboard.press("Enter");
+  const flew = await until(
+    () =>
+      page.evaluate((n) => {
+        if (window.jevAnts.game.colonies.length > n) return "founded";
+        return /was lost/.test(document.querySelector("[role=status]")?.textContent ?? "") ? "lost" : null;
+      }, before2),
+    "her own flight",
+    3000,
+  );
+  check((await card.count()) === 0 && (await page.getByRole("button", { name: "Pause", exact: true }).count()) === 1, `"Let her fly" by the keyboard sends her on her own flight (${flew}), and the game plays on`);
+
+  // The dev hook's pen was for its flight alone: a queen flown now, with Jev unable to read words, opens no pen.
+  await page.evaluate(() => {
+    const g = window.jevAnts.game;
+    const m = g.colonies[0];
+    g.revealed[0] = true;
+    g.flights.push({ mother: 0, x: m.nest.x, y: m.nest.y, load: 1, strain: g.fungus.evolution?.strain ?? 0, at: g.time, food: 24 });
+  });
+  await until(() => page.evaluate(() => /can't read new words now|was lost/.test(document.querySelector("[role=status]")?.textContent ?? "") && window.jevAnts.game.flights.length === 0), "her founding on her mother's words", 5000);
+  check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
