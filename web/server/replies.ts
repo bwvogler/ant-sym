@@ -76,7 +76,9 @@ export async function jevReply(svc: Services, raw: unknown): Promise<Reply> {
   if (!svc.client) throw new HttpError(503, "JEV_API_KEY is not set in the server's environment");
   const request = validateJevRequest(raw);
   // Reserve from this request's own size, so a big call cannot hide under a small one's room.
-  const reserve = reserveForBytes(Buffer.byteLength(JSON.stringify(request)));
+  // Up to the ledger's own ceiling: the dev server's is the 64k context limit; the Worker's covers its largest body
+  // (PR #66 re-review), so a big request cannot reserve less than it might bill.
+  const reserve = reserveForBytes(Buffer.byteLength(JSON.stringify(request)), svc.ledger.reserveTokens);
   const gate = svc.ledger.admit(svc.now(), reserve);
   if (!gate.ok) {
     // 429 "busy" is temporary: the pool is full or what is in flight might

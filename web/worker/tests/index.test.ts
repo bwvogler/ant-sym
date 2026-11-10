@@ -126,3 +126,37 @@ test("the day's spend is written to Durable Object storage and a rebuilt object 
   const start = (await (await post(again, "/api/run", { action: "start" })).json()) as { running: boolean; stopReason: string };
   assert.deepEqual([start.running, start.stopReason], [false, "budget"]);
 });
+
+test("a large request reserves by its size, past the dev server's 64k ceiling, so it cannot slip under the day's cap", async () => {
+  stubUpstream(1_000);
+  const env = { JEV_API_KEY: KEY, JEV_DAILY_USD: "0.01" }; // 238,095 tokens
+  const { obj } = await ledgerObject(env);
+  const post = (path: string, body: unknown) => obj.fetch(new Request(`https://x${path}`, { method: "POST", body: JSON.stringify(body) }));
+  await post("/api/run", { action: "start" });
+  // ~500 KB reserves ~333k tokens: more than the day has, so it is refused, not sent. At a 64k ceiling it went out.
+  const big = { ...ask, state: { pad: "x".repeat(500_000) } };
+  const r = await post("/api/jev", big);
+  assert.equal(r.status, 409);
+  assert.equal(((await r.json()) as { error: string }).error, "budget");
+  assert.equal(upstream.length, 0);
+});
+
+test("a call already sent when a new run starts runs to its reply, and what it bills is stored (S3)", async () => {
+  const tokens = 5_000;
+  // Slower than the dev server's 1.5 s grace, and honouring abort as a real fetch would.
+  globalThis.fetch = ((_url: string, init: RequestInit) =>
+    new Promise((resolve, reject) => {
+      const t = setTimeout(() => resolve(Response.json({ answers: { q: { type: "noul", noul: 1 } }, usage: { input_tokens: tokens } })), 1_800);
+      init.signal?.addEventListener("abort", () => (clearTimeout(t), reject(init.signal?.reason)));
+    })) as typeof fetch;
+  const store = storage();
+  const { obj } = await ledgerObject({ JEV_API_KEY: KEY, JEV_DAILY_USD: "1" }, store);
+  const post = (path: string, body: unknown) => obj.fetch(new Request(`https://x${path}`, { method: "POST", body: JSON.stringify(body) }));
+  await post("/api/run", { action: "start" });
+  const call = post("/api/jev", ask);
+  await new Promise((r) => setTimeout(r, 50));
+  await post("/api/run", { action: "start" }); // aborts the first run's calls
+  const r = await call;
+  assert.equal(r.status, 200, "not cut off after a grace");
+  assert.equal((store.m.get("daily-spend") as { tokens: number }).tokens, tokens);
+});

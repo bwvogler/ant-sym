@@ -1,6 +1,6 @@
 import { DEFAULT_IN_FLIGHT } from "../shared/jev.ts";
 import { dailyBudget, type Services } from "../server/replies.ts";
-import { Ledger, type BudgetStore } from "../server/ledger.ts";
+import { Ledger, reserveForBytes, type BudgetStore } from "../server/ledger.ts";
 import { FetchJevClient } from "./fetchJev.ts";
 import { PASS_HEADER, corsHeaders, originAllowed, parseOrigins, passOk } from "./gate.ts";
 import { MAX_JSON_BODY, route } from "./routes.ts";
@@ -57,6 +57,11 @@ export default {
 };
 
 const SPEND_KEY = "daily-spend";
+/**
+ * The most one call may reserve against the day: what the largest body the Worker accepts could bill (~700k tokens,
+ * $0.029). The dev server's 64k (the context limit) let a body past ~96 KB reserve less than its size (PR #66 re-review).
+ */
+const RESERVE_CEILING = reserveForBytes(MAX_JSON_BODY, Infinity);
 /** Per attempt: the Jev client's deadline, and how long a stopped run's call may still take. */
 const CALL_DEADLINE_MS = 20_000;
 
@@ -83,7 +88,7 @@ export class JevLedger {
         // A stop never cuts off a call already sent: it runs to its reply or its deadline, so what Jev bills is counted
         // against the day (PR #66 review S1). The dev server's 1.5 s grace suits one local user; here it was a way past the cap.
         client: env.JEV_API_KEY ? new FetchJevClient({ apiKey: env.JEV_API_KEY, timeoutMs: CALL_DEADLINE_MS, abortGraceMs: CALL_DEADLINE_MS }) : null,
-        ledger: new Ledger({ maxInFlight: DEFAULT_IN_FLIGHT, timer, dailyUsd: dailyBudget(env as unknown as NodeJS.ProcessEnv), budgetStore: store }),
+        ledger: new Ledger({ maxInFlight: DEFAULT_IN_FLIGHT, timer, reserveTokens: RESERVE_CEILING, dailyUsd: dailyBudget(env as unknown as NodeJS.ProcessEnv), budgetStore: store }),
         now: () => Date.now(),
       };
     });
