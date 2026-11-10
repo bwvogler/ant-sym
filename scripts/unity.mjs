@@ -1,6 +1,6 @@
 // Offline, no key, no spend: is unity reachable (PRD §53, ja-i0f; docs/one-world.md U6a)? Garden, the strain whose hosts
 // carry its own odour, painted in both colonies at the start, by each royal chamber (in one world on the curtain, where
-// the nests are; in the side view by its chamber). Then the game runs as the page plays it (gameRng, regrowth on) and
+// the nests are; in the side view by its chamber). Then the game runs as the page plays it (gameRng, regrowth on, no founding by itself) and
 // this prints, per seed and size: the peak of Unity.met (the least colony's allied contact, a ~60 s fading share of its
 // living ants; MET = 0.01 is whole), when the outcome first read "unified", the nests' odour gap and the quiet at the end,
 // and where the allied contact happened: sampled each second, ants in allied contact (an ant of another colony whose
@@ -81,7 +81,7 @@ async function work() {
   const { generateOneWorld } = await import("../web/src/colony/oneWorld.ts");
   const { generateSideWorld } = await import("../web/src/colony/world.ts");
   const t0 = performance.now();
-  const game = new Game(one ? generateOneWorld(seed) : generateSideWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW }, gameRng(seed));
+  const game = new Game(one ? generateOneWorld(seed) : generateSideWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed));
   const garden = STRAINS.findIndex((s) => s.id === "garden");
   // By each royal chamber: the colony's nest on its home layer (one world: the curtain).
   for (const c of game.colonies) {

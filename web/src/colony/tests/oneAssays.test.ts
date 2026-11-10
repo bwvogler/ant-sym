@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE, type Colony, type Layer } from "../colony.ts";
-import { antsNear, Arena, at, cellRect, crossingProbe, heldProbe, nestFlowProbe, occupancyProbe, oneArena, onPlane, outingProbe, runGame, type RunSpec } from "../experiment.ts";
+import { antsNear, Arena, at, cellRect, crossingProbe, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, runGame, specMap, type RunResult, type RunSpec } from "../experiment.ts";
 import { STRAINS } from "../fungus.ts";
-import { Game, gameRng } from "../game.ts";
+import { Game, gameRng, isOneWorld } from "../game.ts";
 import { CELL, cellOf } from "../hex.ts";
-import { CRUST, generateCurtain, type OneWorld } from "../oneWorld.ts";
+import { CRUST, generateCurtain, generateOneWorld, type OneWorld } from "../oneWorld.ts";
 import { cellAt } from "../transect.ts";
 import { OPEN, rockAt } from "../world.ts";
 
@@ -53,9 +53,33 @@ test("oneArena: no buried food unless asked, so `stored` counts only food carrie
   assert.ok(ref.foodTotal > 0, "seed 5's curtain buries food");
   assert.equal(kept.curtain.foodTotal, ref.foodTotal);
   assert.equal(kept.curtain.foodLeft, ref.foodLeft);
-  // runGame's foodHome reads both layers' food; the plane's here.
-  const { result } = runGame(onPlane({ seed: 5, seconds: 1 / 30, map: arena, game: { antCount: 5, rival: false } }));
-  assert.equal(result.metrics["you.foodHome"], 0);
+  // runGame's foodHome is a share of both layers' food: the curtain's buried pockets kept here, so it counts.
+  const spec = onPlane({ seed: 5, seconds: 1 / 30, map: arena, game: { antCount: 5, rival: false }, events: [{ at: 0, kind: "call", run: (g) => void (g.player.stored = 10) }] }, { buried: true });
+  const { game, result } = runGame(spec);
+  const curtainFood = game.world!.curtain.foodTotal;
+  assert.ok(curtainFood > 0);
+  assert.equal(result.metrics["you.foodHome"], game.player.stored / (game.world!.plane.foodTotal + curtainFood));
+  // onPlane, like oneArena, buries nothing unless asked.
+  const bare = specMap(onPlane({ seed: 5, seconds: 1, map: arena }));
+  assert.ok(isOneWorld(bare) && bare.curtain.foodTotal === 0);
+});
+
+test("game1 (G1) scores the worst colony on both layers against the bound of 2", () => {
+  const g = new Game(generateOneWorld(1), { antCount: 5, rivalAnts: 5 }, gameRng(1));
+  const r = (metrics: Record<string, number>) => ({ seed: 1, metrics }) as unknown as RunResult;
+  assert.equal(game1.score(r({ "you.maxHeld": 2, "rival.maxHeld": 1, "you.maxHeldPlane": 0 }), g).pass, 1);
+  const s = game1.score(r({ "you.maxHeld": 1, "rival.maxHeld": 3, "rival.maxHeldPlane": 0 }), g);
+  assert.equal(s.pass, 0, "3 held in the rival's tunnels fail the bound");
+  assert.equal(s.maxHeld, 3);
+  assert.equal(s.maxHeldPlane, 0);
+});
+
+test("ONE_ASSAYS: every one runs on one world, A6's open-ground control too", () => {
+  for (const a of ONE_ASSAYS) {
+    assert.ok(isOneWorld(specMap(a.spec(1))), a.id);
+    if (a.control) assert.ok(isOneWorld(specMap(a.control(1))), `${a.id}'s control`);
+  }
+  assert.ok(ONE_ASSAYS.find((a) => a.id === "pass")?.control, "A6 runs its control");
 });
 
 /** Ant i of c put on `layer` at world (x, y): a probe reads only these fields. */

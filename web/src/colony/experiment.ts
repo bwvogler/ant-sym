@@ -399,6 +399,8 @@ export interface Assay {
   target: string;
   seconds: number;
   spec(seed: number): RunSpec;
+  /** the control run `score` makes beside it, when it makes one (A6: the same battle on open ground) */
+  control?(seed: number): RunSpec;
   /** the assay's own numbers from a run; `pass` is 1 or 0, or absent when there is no pass mark yet */
   score(result: RunResult, game: Game): Record<string, number>;
 }
@@ -841,15 +843,17 @@ const exchange = (r: RunResult) => {
 export const PASS_GAIN = 1.5;
 /** A6 on the arenas `remap` makes of its own (as they are, or one world's plane: onPlane), the open control too. */
 function passAssay(remap: (spec: RunSpec) => RunSpec): Assay {
+  const control = (s: number): RunSpec => remap(battleSpec(s, false));
   return {
     id: "pass",
     title: "A6 few against many through a 2-cell pass",
     target: `the defenders' exchange in the pass ≥ ${PASS_GAIN}× the same battle's on open ground (design mark; Lymbery et al. 2023)`,
     seconds: 180,
     spec: (s) => remap(battleSpec(s, true)),
+    control,
     score: (r) => {
       const e = exchange(r);
-      const o = exchange(runGame(remap(battleSpec(r.seed, false))).result);
+      const o = exchange(runGame(control(r.seed)).result);
       const gain = o.exchange > 0 ? e.exchange / o.exchange : NaN;
       return { ...e, openExchange: o.exchange, gain, pass: gain >= PASS_GAIN ? 1 : 0 };
     },
