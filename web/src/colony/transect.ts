@@ -55,9 +55,9 @@ const cy = (c: Cell): number => centreY(c.y);
 
 /**
  * The unit direction the line runs out of an end hole, straight on from its end segment; with one hole, west at the
- * start and east at the end.
+ * start and east at the end. (The lab's founding beyond an end aims along it: Game.foundBeyond.)
  */
-function outward(holes: readonly Cell[], end: End): [number, number] {
+export function outward(holes: readonly Cell[], end: End): [number, number] {
   const k = holes.length - 1;
   if (k === 0) return end === "start" ? [-1, 0] : [1, 0];
   const [a, b] = end === "start" ? [holes[1]!, holes[0]!] : [holes[k - 1]!, holes[k]!];

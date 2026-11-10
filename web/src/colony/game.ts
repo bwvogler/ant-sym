@@ -1,12 +1,13 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, localPolicy, localStance, PLANE, type ColonyParams, type Layer, type Policy, type StancePolicy } from "./colony.ts";
-import type { OneWorld } from "./oneWorld.ts";
+import { Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer, type Policy, type StancePolicy } from "./colony.ts";
+import { growWorld, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
-import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { clampCol, foundNest, isSky, mulberry32, openCell, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { type End, nearestValid, outward } from "./transect.ts";
 import { cellOf, CELL } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -18,7 +19,7 @@ export function isOneWorld(m: WorldMap | OneWorld): m is OneWorld {
   return "plane" in m && "curtain" in m && "line" in m;
 }
 
-/** What a one-world game refuses until U4 (docs/one-world.md §6): founding mid-game, saving and loading. */
+/** What a one-world game refuses until U4b (docs/one-world.md §6): saving and loading, and so a save's re-founding. */
 const ONE_WORLD_U4 = "one world: U4";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
@@ -75,6 +76,18 @@ export const HOLE_GAP = 16;
 export const NEST_GAP = 12;
 /** Columns from her mother's hole a flown queen lands by default (Game.landing), and at most (the pen's radius). */
 export const FLIGHT = { land: 48, radius: 96 };
+/**
+ * One world (U4a, docs/nest-spacing.md §4): how far a flown queen flies from her mother's hole on the plane (world
+ * units), in a direction drawn from the game's stream. 1 U, the gap between mature nests.
+ */
+export const FLIGHT_2D = 140;
+/**
+ * One world: how far nearestValid may move a founding to where the founding rule allows it (the founding radius, owner,
+ * 2026-11-08, ja-lp4.10): her walk after landing. None within it: the founding fails, and a flown queen is lost.
+ */
+export const FOUND_RADIUS = 140;
+/** Why a founding on the line fails (one world, docs/one-world.md §3): what the game says when a flight is lost for it. */
+export const NO_ROOM = "no room beyond the line's ends within her flight";
 /**
  * Food in a founding queen's chamber at the most (ja-lo8.9): her body's reserve, for herself and her first brood
  * (claustral founding). A flight founds on her own body (Flight.food), fattened in the nest up to this.
@@ -318,6 +331,8 @@ export class Game {
   /** Wire every colony to the game: its grids, burials, enemies, the other nests, its raids. Again whenever a colony is added. */
   #wire(): void {
     this.colonies.forEach((c, k) => {
+      // One world: the line as it stands (it grows with every founding), before the holes are read off it.
+      if (this.world) c.line = this.world.line;
       c.seeHoles();
       this.layers.forEach((m, l) => {
         if (m.hasSoil) c.wire(l, { friends: (this.#grids[l] as CountGrid[])[k] as CountGrid });
@@ -347,12 +362,24 @@ export class Game {
   /** Alates that have flown (ja-lo8.9) and wait for the page to found or lose them (GameParams.autoFound off). */
   flights: Flight[] = [];
 
+  /** The last flight whose queen was lost, and why (one world's "no room beyond the line's ends within her flight"): what the page says. */
+  lastLoss: { flight: Flight; reason: string } | null = null;
+
   /**
    * Where a queen flown from colony `mother` lands by default: FLIGHT.land columns from its hole, on whichever side
    * has the room (the free column nearest there: addColony keeps HOLE_GAP from every hole), on the ground line; null
-   * when the map has no room within FLIGHT.radius, or no sky (top-down maps don't fly queens).
+   * when the map has no room within FLIGHT.radius, or no sky (top-down maps don't fly queens). In one world (U4a):
+   * FLIGHT_2D from its hole on the plane, in a direction drawn from the game's stream; addColony then moves her to the
+   * nearest spot the founding rule allows within FOUND_RADIUS, or she is lost.
    */
   landing(mother: number): { x: number; y: number } | null {
+    if (this.world) {
+      const m = this.colonies[mother];
+      const h = m?.holeCells[m.params.nest];
+      if (!h) return null;
+      const a = this.#rng() * 2 * Math.PI;
+      return { x: centreX(h.px, h.py) + FLIGHT_2D * Math.cos(a), y: centreY(h.py) + FLIGHT_2D * Math.sin(a) };
+    }
     return this.landingAt(mother, 1, FLIGHT.land) ?? this.landingAt(mother, -1, FLIGHT.land);
   }
 
@@ -378,16 +405,17 @@ export class Game {
     this.#dropFlight(f);
     const mother = this.colonies[f.mother];
     if (!at || !mother || this.colonies.length >= MAX_COLONIES) {
-      this.#lost(f);
+      this.#lost(f, this.colonies.length >= MAX_COLONIES ? `${MAX_COLONIES} colonies already` : "no room to land within her flight");
       return -1;
     }
     // Her reserve is her body (Flight.food), moved into her colony's larder: no food is made or lost (PR #47 review, S1).
-    // No room for her hole after all (landing sites are free columns, so only by a caller's own site): she is lost.
+    // No room for her hole after all (side view: landing sites are free columns, so only by a caller's own site; one
+    // world: nowhere the founding rule allows within FOUND_RADIUS): she is lost, and the game says why.
     try {
       return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: f.food, ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}) });
     } catch (e) {
       if (!(e instanceof Error && e.message.includes("no room"))) throw e;
-      this.#lost(f);
+      this.#lost(f, e.message.replace(/^addColony: /, ""));
       return -1;
     }
   }
@@ -406,12 +434,13 @@ export class Game {
   lose(f: Flight): void {
     if (!this.flights.includes(f)) return;
     this.#dropFlight(f);
-    this.#lost(f);
+    this.#lost(f, "lost after her flight");
   }
 
-  /** A lost queen's body leaves the world with her: booked to her mother colony's `eaten`, as food that left its economy. */
-  #lost(f: Flight): void {
+  /** A lost queen's body leaves the world with her: booked to her mother colony's `eaten`, as food that left its economy. Why is kept (lastLoss). */
+  #lost(f: Flight, reason: string): void {
     (this.colonies[f.mother] ?? this.player).eaten += f.food;
+    this.lastLoss = { flight: f, reason };
   }
 
   /**
@@ -442,24 +471,43 @@ export class Game {
   /**
    * A new colony mid-game (ja-lo8.8; a daughter queen's, ja-lo8.9): in the side view a hole dug in the column under x
    * with a shaft and a founding chamber, as the world's own nests are dug (world.foundNest); top-down a nest's disc at
-   * (x, y). It starts with `antCount` workers and, in the side view, its queen, at odour `odour` (a daughter: her
-   * mother's, so the two are kin until they drift). Every colony is wired again: the other nests, raids (kin are not
-   * raided), grids. Returns its index.
+   * (x, y). In one world (U4a, docs/one-world.md §3) (x, y) is a point on the plane: the hole goes at the nearest cell
+   * within FOUND_RADIUS where the founding rule allows one (transect.ts nearestValid), the world grows there (oneWorld.ts
+   * growWorld: the line, the curtain, the nest on both layers), and the colony lives in the curtain with its plane above;
+   * none there throws an error saying "no room" (NO_ROOM), as the side view's does. It starts with `antCount` workers
+   * (in one world in the curtain, as every colony's do) and, in the side view and one world, its queen, at odour `odour`
+   * (a daughter: her mother's, so the two are kin until they drift). Every colony is wired again: the line, the other
+   * nests, raids (kin are not raided), grids. Returns its index.
    */
   addColony(f: Founding): number {
-    if (this.world) throw new Error(ONE_WORLD_U4);
     const k = this.colonies.length;
-    // The new nest's index in map.nests, which holds the world's nests whether or not a colony lives in each (with the
-    // rival off, nest 1 is the world's unused second nest): never the colony's index (PR #42 review, B2).
-    const at = this.map.nests.length;
+    const world = this.world;
+    let at: number;
     let nest: Nest;
-    if (f.nest) nest = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
-    else if (this.map.sky) {
+    if (world) {
+      // A save's re-founding (f.nest) is U4b's, with one-world saves.
+      if (f.nest) throw new Error(ONE_WORLD_U4);
       cellOf(f.x, f.y);
-      nest = foundNest(this.map, this.#freeColumn(CELL[0] as number), at, this.#rng);
-    } else nest = { ...this.#freeSpot(f.x, f.y), r: 3 };
-    this.map.nests.push(nest);
-    const c = new Colony(this.map, { antCount: f.antCount, maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)), nest: at, odour: f.odour, tolerance: this.recognition.params.tolerance }, this.#rng, localPolicy, localStance);
+      const spot = nearestValid(world.line, { x: CELL[0] as number, y: CELL[1] as number }, FOUND_RADIUS, openCell(world.plane));
+      if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
+      const was = { x0: world.curtain.x0, w: world.curtain.size.w };
+      at = growWorld(world, spot.end, spot.cell);
+      // The fungus keeps the curtain's spore cells as flat indices: re-keyed to its new columns.
+      this.fungus.regrid(CURTAIN, was);
+      nest = world.curtain.nests[at] as Nest;
+    } else {
+      // The new nest's index in map.nests, which holds the world's nests whether or not a colony lives in each (with the
+      // rival off, nest 1 is the world's unused second nest): never the colony's index (PR #42 review, B2).
+      at = this.map.nests.length;
+      if (f.nest) nest = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
+      else if (this.map.sky) {
+        cellOf(f.x, f.y);
+        nest = foundNest(this.map, this.#freeColumn(CELL[0] as number), at, this.#rng);
+      } else nest = { ...this.#freeSpot(f.x, f.y), r: 3 };
+      this.map.nests.push(nest);
+    }
+    const home = world ? world.curtain : this.map;
+    const c = new Colony(home, { antCount: f.antCount, maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)), nest: at, odour: f.odour, tolerance: this.recognition.params.tolerance }, this.#rng, localPolicy, localStance, world ? { plane: world.plane, line: world.line } : null);
     if (f.mother !== undefined && c.queen && !f.nest) {
       // A daughter (ja-lo8.9): her queen founds alone on her reserve, at her mother's odour, which drifts away from it
       // from now on (ja-lo8.9.1); what the fungus put in her is given below (Founding.fungus). (Not when a save founds
@@ -485,6 +533,20 @@ export class Game {
       }
     }
     return k;
+  }
+
+  /**
+   * The lab's founding in one world (U4a; the page reaches it from U5): a colony of `antCount` ants at the first
+   * colony's odour (kin), founded FLIGHT_2D past the line's `end` hole, straight on along its end segment, moved by
+   * addColony to the nearest spot the founding rule allows. Returns its index; throws "no room" when there is none.
+   */
+  foundBeyond(end: End, antCount = 30): number {
+    const world = this.world;
+    if (!world) throw new Error("foundBeyond: one world only (the side view's lab founds between the nests)");
+    const holes = world.line.holes;
+    const v = end === "start" ? holes[0]! : holes[holes.length - 1]!;
+    const [ux, uy] = outward(holes, end);
+    return this.addColony({ x: centreX(v.x, v.y) + FLIGHT_2D * ux, y: centreY(v.y) + FLIGHT_2D * uy, antCount, odour: this.player.nestOdour });
   }
 
   /**

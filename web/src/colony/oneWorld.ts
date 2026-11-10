@@ -18,7 +18,7 @@
 import { ChunkLayer } from "./chunks.ts";
 import { Chambers } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY } from "./hex.ts";
-import { cellAt, makeTransect, type Transect } from "./transect.ts";
+import { type Cell, cellAt, type End, grow, makeTransect, type Transect } from "./transect.ts";
 import {
   AIR,
   buryPockets,
@@ -31,6 +31,7 @@ import {
   nearNests,
   OPEN,
   OPEN_WORLD,
+  reachableFrom,
   ROCK,
   rockAt,
   rockCut,
@@ -58,7 +59,7 @@ export interface OneWorld {
   plane: WorldMap;
   /** everything underground, under the line, laid out as a side view (see the layout above) */
   curtain: WorldMap;
-  /** the holes in order and the plane cell over each curtain column */
+  /** the holes in order and the plane cell over each curtain column; a new line when the world grows (growWorld) */
   line: Transect;
 }
 
@@ -141,20 +142,92 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
   // Food below ground: pockets in the soil, as the side view's, keyed by blocks of the line's columns (s). Whether a pocket
   // is placed depends only on its block, its depth and the nests near it, never on where the line ends, so a column keeps
   // its pockets when the line grows; a pocket past the line's end is cut off by the map's edge.
+  buryAlong(curtain, seed, line.sMin, line.sMax, nearNest, () => CRUST + 4);
+  // Only food some colony can reach from its nest, walking or digging; the strip's food is the plane's, not counted here.
+  keepReachableFood(curtain, nests, "diggable", CRUST);
+  return curtain;
+}
+
+/**
+ * The curtain's buried food for columns lo … hi: every 64-column block of s that a pocket placed in it could reach (a
+ * pocket's radius is up to 4), each from its own stream, as the side view's ground places them. `floor(s)`: no cell of a
+ * pocket opens above that row of column s (Infinity: not at all, a column that keeps what it has).
+ */
+function buryAlong(curtain: WorldMap, seed: number, lo: number, hi: number, nearNest: (x: number, y: number, d: number) => boolean, floor: (s: number) => number): void {
+  const h = curtain.size.h;
   for (let by = 0; by < Math.ceil(h / 64); by++)
     // Blocks just past either end too: a pocket centred there (radius up to 4) can reach into the line's columns.
-    for (let bs = Math.floor((line.sMin - 5) / 64); bs <= Math.floor((line.sMax + 5) / 64); bs++) {
+    for (let bs = Math.floor((lo - 5) / 64); bs <= Math.floor((hi + 5) / 64); bs++) {
       const r = mulberry32(hash4(seed, 79, bs, by));
       const at = () => {
         const row = by * 64 + Math.floor(r() * 64);
         const s = bs * 64 + Math.floor(r() * 64);
         return row >= h - 3 || row < CRUST + 10 ? null : ([s, row] as const);
       };
-      buryPockets(curtain, SIDE_WORLD, r, at, () => CRUST + 4, nearNest);
+      buryPockets(curtain, SIDE_WORLD, r, at, floor, nearNest);
     }
-  // Only food some colony can reach from its nest, walking or digging; the strip's food is the plane's, not counted here.
-  keepReachableFood(curtain, nests, "diggable", CRUST);
-  return curtain;
+}
+
+/** The curtain's ground at column s, every row: sky over the strip (rows 0 … CRUST − 1, the strip's ground set by refreshStrip), then the side view's ground. */
+function curtainColumn(curtain: WorldMap, seed: number, s: number): void {
+  const cut = rockCut(SIDE_WORLD.rockiness);
+  const scut = soilCut(SIDE_WORLD.soil);
+  const gs = groundSeed(seed);
+  const sky = curtain.sky!;
+  for (let y = 0; y < CRUST; y++) {
+    curtain.rock.set(s, y, AIR);
+    sky.set(s, y, 1);
+  }
+  for (let y = CRUST; y < curtain.size.h; y++) curtain.rock.set(s, y, groundCell(gs, y - CRUST, centreX(s, y), centreY(y), cut, scut));
+}
+
+/**
+ * Grow one world by a new hole at plane cell `cell` beyond `end` (U4a, docs/one-world.md §3; Game.addColony), whose
+ * founding canFound has allowed. The line grows (transect.ts grow): every existing s keeps its place, and the curtain
+ * widens to the new line's columns (its x0 falls when it grows at V₀; nothing is renumbered). Its new columns get the
+ * curtain's ground by (seed, s, row), sky, and the buried food of their 64-column blocks; the old columns keep their dug
+ * state, rock and food. The strip is copied again wherever P(s) changed (the old end's margin now lies under the new
+ * segment). The new nest is dug on both layers, as generateOneWorld digs the world's own: a disc round the hole on the
+ * plane, a shaft and royal chamber from its hole in the curtain from the stream keyed by the hole, before the new
+ * columns' food, which keeps its distance from every nest. Only food a colony can reach in the new columns is kept and
+ * counted (foodTotal and foodLeft grow by it). Returns the new nest's index in both maps' nests.
+ */
+export function growWorld(world: OneWorld, end: End, cell: Cell): number {
+  const { seed, plane, curtain } = world;
+  const old = world.line;
+  const line = grow(old, end, cell);
+  const fresh = (s: number) => s < old.sMin || s > old.sMax;
+  curtain.x0 = line.sMin;
+  curtain.size = { w: line.sMax - line.sMin + 1, h: curtain.size.h };
+  for (let s = line.sMin; s <= line.sMax; s++) if (fresh(s)) curtainColumn(curtain, seed, s);
+  world.line = line;
+  refreshStrip(curtain, plane, line);
+  // The nest, on both layers: its index is the colony's that will live there (the maps' nests are indexed by colony).
+  const k = curtain.nests.length;
+  const sHole = line.sHole[end === "start" ? 0 : line.sHole.length - 1]!;
+  plane.nests.push({ x: centreX(cell.x, cell.y), y: centreY(cell.y), r: 3 });
+  curtain.nests.push(foundNest(curtain, sHole, k, mulberry32(hash4(seed, 81, cell.x, cell.y))));
+  // The new columns' food: their blocks' pockets, cut off at the old columns.
+  const nearNest = nearNests(curtain.nests);
+  const floor = (s: number) => (fresh(s) ? CRUST + 4 : Infinity);
+  if (line.sMin < old.sMin) buryAlong(curtain, seed, line.sMin, old.sMin - 1, nearNest, floor);
+  if (line.sMax > old.sMax) buryAlong(curtain, seed, old.sMax + 1, line.sMax, nearNest, floor);
+  // Only what some colony can reach, walking or digging, in the new columns.
+  const reach = reachableFrom(curtain, curtain.nests, "diggable");
+  const w = curtain.size.w;
+  let added = 0;
+  for (let s = line.sMin; s <= line.sMax; s++) {
+    if (!fresh(s)) continue;
+    for (let y = CRUST; y < curtain.size.h; y++) {
+      const v = curtain.food.get(s, y);
+      if (!v) continue;
+      if (!reach[y * w + s - line.sMin]) curtain.food.set(s, y, 0);
+      else added += v;
+    }
+  }
+  curtain.foodTotal += added;
+  curtain.foodLeft += added;
+  return k;
 }
 
 /**

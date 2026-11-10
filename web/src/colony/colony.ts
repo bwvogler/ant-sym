@@ -432,8 +432,8 @@ export class Colony {
   layer: Uint8Array;
   /** the layer bound now (#bind): `home` between ticks */
   #cur = 0;
-  /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map */
-  readonly line: Transect | null = null;
+  /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map. The game sets it again when the line grows (Game.addColony) */
+  line: Transect | null = null;
   /** one world: every nest's hole on both layers (HoleCell), indexed by colony as the maps' nests are; empty elsewhere */
   holeCells: HoleCell[] = [];
   params: ColonyParams;

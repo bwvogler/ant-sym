@@ -859,6 +859,26 @@ export class Fungus {
     this.#evolution.root();
   }
 
+  /**
+   * Map `layer` has grown (one world's curtain, when a colony is founded on the line: oneWorld.ts growWorld). Its spore
+   * cells and base are kept as y·w + x − x0, so they are re-keyed from its columns before, `was` (x0 and w then).
+   */
+  regrid(layer: number, was: { x0: number; w: number }): void {
+    const L = this.#layers[layer];
+    if (!L) return;
+    const { w } = L.map.size;
+    const { x0 } = L.map;
+    if (w === was.w && x0 === was.x0) return;
+    const rekey = (k: number) => {
+      const col = k % was.w;
+      return ((k - col) / was.w) * w + col + was.x0 - x0;
+    };
+    const cells = [...L.sporeCells];
+    L.sporeCells.clear();
+    for (const k of cells) L.sporeCells.add(rekey(k));
+    L.base = L.base.map(rekey);
+  }
+
   /** Cells of the fungus's base (root) on `map` (layer 0). */
   get base(): readonly number[] {
     return (this.#layers[0] as SporeLayer).base;
