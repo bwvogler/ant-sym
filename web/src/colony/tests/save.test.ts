@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ChunkLayer } from "../chunks.ts";
 import { Game, type GameSave } from "../game.ts";
+import { hashGame } from "./saveHash.ts";
 import { STRAINS } from "../fungus.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, type WorldMap } from "../world.ts";
 
@@ -12,43 +12,6 @@ import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, type WorldMap
 
 const DT = 1 / 30;
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
-
-function fnv(h: number, bytes: Uint8Array): number {
-  for (const b of bytes) {
-    h ^= b;
-    h = Math.imul(h, 0x01000193);
-  }
-  return h;
-}
-
-/** A hash of everything the sim holds that can be read from outside. */
-function hashGame(g: Game): string {
-  let h = 0x811c9dc5;
-  const view = (a: ArrayBufferView) => (h = fnv(h, new Uint8Array(a.buffer, a.byteOffset, a.byteLength)));
-  const text = (v: unknown) => (h = fnv(h, new TextEncoder().encode(JSON.stringify(v))));
-  const layer = (l: ChunkLayer<Uint8Array | Uint16Array | Float32Array>) => l.forEach((cx, cy, a) => (view(new Int32Array([cx, cy])), view(a)));
-  const walk = (o: object) => {
-    for (const [, v] of Object.entries(o)) {
-      if (ArrayBuffer.isView(v)) view(v);
-      else if (v instanceof ChunkLayer) layer(v);
-    }
-  };
-  text([g.time, g.strategyChoices, g.regrown, g.map.foodLeft, g.map.foodTotal, g.map.dug, g.map.filled]);
-  walk(g.map);
-  if (g.map.chambers) {
-    layer(g.map.chambers.cell);
-    text(g.map.chambers.list);
-  }
-  for (const c of g.colonies) {
-    walk(c);
-    for (const l of Object.values(c.ph.fields)) layer(l);
-    text([c.stored, c.births, c.losses, c.decisions, c.larder, c.stance, c.queen, c.brood.items, c.corpses]);
-    // Its private fields too, as its save holds them: the hash above sees only what can be read from outside.
-    text(c.saveState().private);
-  }
-  layer(g.fungus.spores);
-  return (h >>> 0).toString(16);
-}
 
 function build(view: "side" | "top", seed: number): Game {
   const map: WorldMap = view === "side" ? generateSideWorld(seed) : generateWorld(seed, { ...OPEN_WORLD, size: { w: 160, h: 100 } });
@@ -87,6 +50,62 @@ for (const view of ["side", "top"] as const)
     // The fungus is still in the game: its patch sporulating, and fungus grown in hosts so far (a weak start may have no
     // host at this moment: the colony grooms it out of the nest).
     assert.ok(again.fungus.sporeCells > 0 && (again.fungus.evolution?.growth ?? 0) > 0);
+  });
+
+/**
+ * Run g a tick at a time until a tick has a fight death (Unity.deathsPerMinute rises: it only fades otherwise), at most
+ * `seconds`; returns whether one did.
+ */
+function runToFightDeath(g: Game, seconds: number): boolean {
+  let last = g.unity().deathsPerMinute;
+  for (let k = 0; k < Math.round(seconds / DT); k++) {
+    g.tick(DT);
+    const d = g.unity().deathsPerMinute;
+    if (d > last) return true;
+    last = d;
+  }
+  return false;
+}
+
+/**
+ * The game of the fight-tick test: the top-down map's two colonies meet within seconds; in the side view a stranger
+ * colony is founded by the first's hole (`found`: a game a save is loaded into re-founds it from the save).
+ */
+function fighting(view: "side" | "top", found = true): Game {
+  if (view === "top") return build("top", 3);
+  const g = new Game(generateSideWorld(3), { antCount: 60, rivalAnts: 60, regrow: 600 }, mulberry32(3 * 7919));
+  const e = g.player.nest.entrance!;
+  if (found) g.addColony({ x: e.x + 24, y: e.y, antCount: 40, odour: 1 });
+  return g;
+}
+
+for (const view of ["side", "top"] as const)
+  test(`a save on a tick with a fight death runs on exactly (${view} view): the grids and bands are saved, not built again`, () => {
+    // Game.tick builds the occupancy grids and recognition bands before fights, and the next tick's steps read them, the
+    // ants killed since included. A load that built them again from the living diverged on the first tick (U4b).
+    const whole = fighting(view);
+    assert.ok(runToFightDeath(whole, 20), "a fight death within 20 s (the test's own check)");
+    const saved = JSON.parse(JSON.stringify(whole.save())) as GameSave;
+    const at = hashGame(whole);
+    whole.tick(DT);
+    const next = hashGame(whole);
+    run(whole, 3);
+    const unbroken = hashGame(whole);
+
+    const again = fighting(view, false);
+    again.load(saved);
+    assert.equal(hashGame(again), at, "restored: the state as saved");
+    again.tick(DT);
+    assert.equal(hashGame(again), next, "the first tick after: as unbroken");
+    run(again, 3);
+    assert.equal(hashGame(again), unbroken, "run on: as if never saved");
+
+    // Without the grids (as a version-4 save loads) the same save diverges: this tick really is one that needs them.
+    const rebuilt = fighting(view, false);
+    rebuilt.load({ ...saved, grids: undefined });
+    rebuilt.tick(DT);
+    run(rebuilt, 3);
+    assert.notEqual(hashGame(rebuilt), unbroken, "rebuilt from the living, the run differs");
   });
 
 test("a save of another version is refused", () => {

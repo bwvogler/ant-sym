@@ -66,6 +66,32 @@ export class CountGrid {
     for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++) for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by)) return true;
     return false;
   }
+
+  /**
+   * The counts for a save (Game.save, U4b): each touched cell in order, as x, y, count. A game's grids are built before
+   * fights and kept through the next tick's steps, so a load can't build them again from the ants (some died since).
+   */
+  saveState(): number[] {
+    const t = this.#touched;
+    const out: number[] = [];
+    for (let k = 0; k < t.length; k += 2) out.push(t[k] as number, t[k + 1] as number, this.layer.get(t[k] as number, t[k + 1] as number));
+    return out;
+  }
+
+  /** A saved state back (saveState): reset, then each cell and its block's sum as they were. */
+  loadState(saved: readonly number[]): void {
+    this.reset();
+    for (let k = 0; k < saved.length; k += 3) {
+      const x = saved[k] as number;
+      const y = saved[k + 1] as number;
+      const v = saved[k + 2] as number;
+      this.#touched.push(x, y);
+      this.layer.set(x, y, v);
+      const bx = x >> BLOCK_BITS;
+      const by = y >> BLOCK_BITS;
+      this.#blocks.set(bx, by, this.#blocks.get(bx, by) + v);
+    }
+  }
 }
 
 /** Ants per cell, one grid per colony: of the ants on layer `layer` (one world, ja-lp4.3), or every ant (−1: the colony's one map). */
