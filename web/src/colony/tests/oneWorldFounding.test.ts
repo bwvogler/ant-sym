@@ -7,7 +7,7 @@ import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { CRUST, generateCurtain, generateOneWorld, growWorld, STRIP, type OneWorld } from "../oneWorld.ts";
 import type { Flight } from "../royal.ts";
 import { cellAt, nearestValid } from "../transect.ts";
-import { disc, mulberry32, openCell, OPEN, reachable, reachableFrom, ROCK, rockAt, type WorldMap } from "../world.ts";
+import { AIR, disc, mulberry32, openCell, OPEN, reachable, reachableFrom, rockAt, type WorldMap } from "../world.ts";
 
 // Founding on the line (U4a, ja-lp4.4.1; docs/one-world.md §3): the world grows at an end, nothing already there moves,
 // and a queen with nowhere to land is lost with the reason. One world on the default plane, with its real rock.
@@ -102,11 +102,8 @@ function check(w: OneWorld, g: Game, label: string): void {
       assert.ok(cellAt(line, h.col) && CELL[0] === h.px && CELL[1] === h.py, `${label}: P(s) is the hole`);
     });
   }
-  // The strip is the plane under the line, the old end's margin (now under the new segment) included.
-  for (let s = line.sMin; s <= line.sMax; s++) {
-    cellAt(line, s);
-    if (curtain.rock.get(s, STRIP) !== (rockAt(plane, CELL[0]!, CELL[1]!) === OPEN ? OPEN : ROCK)) assert.fail(`${label}: the strip at column ${s} isn't P(s)'s ground`);
-  }
+  // The strip is sky over every column, the new ones included (the side view draws P(s) there); the holes are open under it.
+  for (let s = line.sMin; s <= line.sMax; s++) if (curtain.rock.get(s, STRIP) !== AIR || curtain.sky!.get(s, STRIP) !== 1 || curtain.food.get(s, STRIP) !== 0) assert.fail(`${label}: the strip at column ${s} isn't sky`);
   // Every hole joins the plane's main open ground (D1, PR #62): the region the world's own first hole is in, so no
   // colony is founded in a pocket sealed off by rock.
   const main = mainRegion(plane);
@@ -243,7 +240,7 @@ test("growth at V₀ and at V_k keeps every existing s in place, and the new col
         return line.sHole.indexOf(CELL[0]!);
       });
       const colonies = line.sHole.map((_, i) => order.indexOf(i));
-      const fresh = generateCurtain(seed, w.plane, line, colonies);
+      const fresh = generateCurtain(seed, line, colonies);
       for (let s = line.sMin; s <= line.sMax; s++) {
         if (s >= old.sMin && s <= old.sMax) continue;
         for (let y = 0; y < w.curtain.size.h; y++) if (w.curtain.rock.get(s, y) !== fresh.rock.get(s, y)) assert.fail(`seed ${seed}: new column ${s}, row ${y}: ${w.curtain.rock.get(s, y)}, generated ${fresh.rock.get(s, y)}`);

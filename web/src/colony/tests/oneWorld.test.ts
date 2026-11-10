@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CELL, cellOf, NE, NW, nx, ny } from "../hex.ts";
-import { CRUST, CURTAIN_DEPTH, generateCurtain, generateOneWorld, refreshStrip, STRIP, type OneWorld } from "../oneWorld.ts";
+import { CRUST, CURTAIN_DEPTH, generateCurtain, generateOneWorld, STRIP, type OneWorld } from "../oneWorld.ts";
 import { cellAt, grow, nearestValid } from "../transect.ts";
 import { AIR, digCell, fillCell, flat, foundNest, heapMound, inBounds, isSky, mulberry32, openCell, OPEN, reachable, ROCK, rockAt, SOIL, type WorldMap } from "../world.ts";
 import { cellKey, keyX, keyY } from "../colony.ts";
@@ -90,22 +90,23 @@ test("each hole is open on both layers, and its shaft leads on foot to the royal
   }
 });
 
-test("the ground strip lies under P(s): every column shows the plane cell over it, with sky above (U2's guard)", () => {
+test("the ground strip is sky, as the rows above it: the side view draws P(s) there, the curtain stores nothing of the surface (§8 item 6)", () => {
   for (const seed of SEEDS) {
-    const { plane, curtain, line } = world(seed);
+    const { curtain, line } = world(seed);
+    assert.equal(curtain.surfaceRows, CRUST);
     for (let s = line.sMin; s <= line.sMax; s++) {
-      const col = s;
-      cellAt(line, s);
-      const [px, py] = [CELL[0]!, CELL[1]!];
-      const open = rockAt(plane, px, py) === OPEN;
-      assert.equal(curtain.rock.get(col, STRIP), open ? OPEN : ROCK, `seed ${seed}: column ${s}'s strip is P(s)'s ground`);
-      assert.equal(curtain.food.get(col, STRIP), open ? plane.food.get(px, py) : 0, `seed ${seed}: column ${s}'s strip has P(s)'s food`);
-      assert.equal(curtain.sky!.get(col, STRIP), 1);
-      for (let y = 0; y < STRIP; y++) {
-        assert.equal(curtain.rock.get(col, y), AIR, `seed ${seed}: sky above column ${s}`);
-        assert.equal(curtain.sky!.get(col, y), 1);
+      for (let y = 0; y <= STRIP; y++) {
+        assert.equal(curtain.rock.get(s, y), AIR, `seed ${seed}: sky at column ${s}, row ${y}`);
+        assert.equal(curtain.sky!.get(s, y), 1);
+        assert.equal(curtain.food.get(s, y), 0, `seed ${seed}: no food in the sky at column ${s}, row ${y}: the surface's is the plane's`);
       }
     }
+    // The hole is open below the strip, and the strip's cell over it is the hole: P(sHole) is the hole's plane cell.
+    line.sHole.forEach((s, k) => {
+      assert.equal(rockAt(curtain, s, CRUST), OPEN, `seed ${seed}: hole ${k} open under the strip`);
+      cellAt(line, s);
+      assert.deepEqual([CELL[0], CELL[1]], [line.holes[k]!.x, line.holes[k]!.y], `seed ${seed}: the strip over hole ${k} is drawn from its plane cell`);
+    });
   }
 });
 
@@ -168,7 +169,7 @@ test("the curtain's ground keeps its place when the line grows, at either end: i
     assert.ok(atStart && atStart.end === "start", `seed ${seed}: a founding beyond Ink`);
     const before = grow(line, "start", atStart.cell);
     // The new colony (2) takes the first hole; Ink (0) and Amber (1) keep their nests and royal chambers.
-    const c1 = generateCurtain(seed, plane, before, [2, 0, 1]);
+    const c1 = generateCurtain(seed, before, [2, 0, 1]);
     // Growing at V₀ lowers the first column (x0), and every s keeps its storage column: s itself.
     assert.ok(c1.x0 < curtain.x0, "growing at V₀ lowers the curtain's x0");
     assert.equal(c1.x0, before.sMin);
@@ -190,36 +191,16 @@ test("the curtain's ground keeps its place when the line grows, at either end: i
     const atEnd = nearestValid(before, { x: vk.x + 60, y: vk.y - 40 }, 140, open);
     if (!atEnd || atEnd.end !== "end") continue;
     const after = grow(before, "end", atEnd.cell);
-    const c2 = generateCurtain(seed, plane, after, [2, 0, 1, 3]);
+    const c2 = generateCurtain(seed, after, [2, 0, 1, 3]);
     assert.ok(sameGround(seed, c1, before, c2, after, after.sHole[after.sHole.length - 1]!) > 100 * CURTAIN_DEPTH);
   }
-  assert.throws(() => generateCurtain(1, world(1).plane, world(1).line, [0, 0]), /must number/);
-});
-
-test("refreshStrip copies the plane again: food taken on the plane leaves the strip", () => {
-  // The first seed with food under its line (most have some).
-  let found: { w: OneWorld; s: number } | null = null;
-  for (let seed = 1; seed <= 20 && !found; seed++) {
-    const w = generateOneWorld(seed);
-    for (let s = w.line.sMin; s <= w.line.sMax && !found; s++) {
-      cellAt(w.line, s);
-      if (w.plane.food.get(CELL[0]!, CELL[1]!) > 0) found = { w, s };
-    }
-  }
-  assert.ok(found, "some seed in 1–20 has food under its line");
-  const { plane, curtain, line } = found.w;
-  const hit = found.s;
-  cellAt(line, hit);
-  plane.food.set(CELL[0]!, CELL[1]!, 0);
-  assert.ok(curtain.food.get(hit, STRIP) > 0);
-  refreshStrip(curtain, plane, line);
-  assert.equal(curtain.food.get(hit, STRIP), 0);
+  assert.throws(() => generateCurtain(1, world(1).line, [0, 0]), /must number/);
 });
 
 test("digging below never re-derives the sky and the strip: they are the plane's (the curtain's surfaceRows)", () => {
   for (const seed of [1, 2, 3]) {
-    const { plane, line } = world(seed);
-    const curtain = generateCurtain(seed, plane, line);
+    const { line } = world(seed);
+    const curtain = generateCurtain(seed, line);
     assert.equal(curtain.surfaceRows, CRUST);
     const snap = () => {
       const out: number[] = [];
@@ -227,15 +208,8 @@ test("digging below never re-derives the sky and the strip: they are the plane's
       return out;
     };
     const before = snap();
-    // A nest founded on the curtain (U4's addColony) away from the holes, where the strip over it has rock beside open ground.
-    let at = -1;
-    let found = false;
-    for (let col = curtain.x0 + 2; col < curtain.x0 + curtain.size.w - 2 && !found; col++)
-      if (curtain.rock.get(col, STRIP) === OPEN && curtain.rock.get(col + 1, STRIP) === ROCK && line.sHole.every((s) => Math.abs(s - col) > 30)) {
-        at = col;
-        found = true;
-      }
-    assert.ok(found, `seed ${seed}: open ground beside rock on the strip`);
+    // A nest founded on the curtain (U4's addColony) away from the holes.
+    const at = line.sHole[0]! + 40;
     foundNest(curtain, at, 2, mulberry32(seed));
     assert.equal(curtain.rock.get(at, CRUST), OPEN, "the new hole is dug through the crust");
     // And the crust dug beside a hole: ants never dig it (every crust cell touches the strip's sky, so colony.ts's #crust
@@ -268,10 +242,12 @@ test("golden: generateOneWorld is pinned (the line, and the curtain's terrain, s
   };
   // Any change to generateOneWorld, generateWorld under it, the line or the curtain's rules shows here, and must be meant.
   // U4a's x origin moved only the nests (the fifth: every curtain position is 64 lower, its column s, not s − sMin).
+  // U5.1's strip drawn, not stored, moved only the strip: the rock (sky, not P(s)'s ground) and seed 2's food (none on
+  // the strip); the sky, the nests and foodTotal are as they were.
   const want: Record<number, number[]> = {
-    1: [1842500005, 858815152, 811853696, 1989952978, 191380210, 9036],
-    2: [1969913797, 933686833, 2937589818, 3257117935, 2156429359, 7116],
-    3: [2052465902, 3976829474, 2937589818, 4056070497, 2006955693, 7080],
+    1: [1842500005, 164310650, 811853696, 1989952978, 191380210, 9036],
+    2: [1969913797, 4855636, 2937589818, 3952031626, 2156429359, 7116],
+    3: [2052465902, 3999756657, 2937589818, 4056070497, 2006955693, 7080],
   };
   const got: Record<number, number[]> = {};
   for (const seed of [1, 2, 3]) {
