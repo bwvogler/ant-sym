@@ -1,8 +1,8 @@
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
-import { ENEMY, type Colony } from "./colony.ts";
+import { ENEMY, type Colony, type Layer } from "./colony.ts";
 import { CELL, discOffsets } from "./hex.ts";
 import type { Recognition } from "./recognition.ts";
-import type { WorldSize } from "./world.ts";
+import { clampCol, inBounds, type Bounds } from "./world.ts";
 
 // Fights, pure. An ant with enemies in its own cell or the six around it is in a fight:
 // it lays alarm in its own colony's field (so allies smell it and, by stance
@@ -66,64 +66,99 @@ export class CountGrid {
     for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++) for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by)) return true;
     return false;
   }
+
+  /**
+   * The counts for a save (Game.save, U4b): each touched cell in order, as x, y, count. A game's grids are built before
+   * fights and kept through the next tick's steps, so a load can't build them again from the ants (some died since).
+   */
+  saveState(): number[] {
+    const t = this.#touched;
+    const out: number[] = [];
+    for (let k = 0; k < t.length; k += 2) out.push(t[k] as number, t[k + 1] as number, this.layer.get(t[k] as number, t[k + 1] as number));
+    return out;
+  }
+
+  /**
+   * A saved state back (saveState): reset, then each cell and its block's sum as they were. The block sums are restored
+   * for completeness only: `any` reads them, and only resolveFights without recognition calls it, which a Game never
+   * does, so no test reaches them (#63's review, N3).
+   */
+  loadState(saved: readonly number[]): void {
+    this.reset();
+    for (let k = 0; k < saved.length; k += 3) {
+      const x = saved[k] as number;
+      const y = saved[k + 1] as number;
+      const v = saved[k + 2] as number;
+      this.#touched.push(x, y);
+      this.layer.set(x, y, v);
+      const bx = x >> BLOCK_BITS;
+      const by = y >> BLOCK_BITS;
+      this.#blocks.set(bx, by, this.#blocks.get(bx, by) + v);
+    }
+  }
 }
 
-/** Ants per cell, one grid per colony. */
-export function occupancy(colony: Colony, out: CountGrid): CountGrid {
+/** Ants per cell, one grid per colony: of the ants on layer `layer` (one world, ja-lp4.3), or every ant (−1: the colony's one map). */
+export function occupancy(colony: Colony, out: CountGrid, layer = -1): CountGrid {
   out.reset();
-  const { w, h } = colony.map.size;
+  const map = layer < 0 ? colony.map : (colony.layers[layer] as Layer).map;
+  const h = map.size.h;
   for (let i = 0; i < colony.n; i++) {
-    if (!colony.alive[i]) continue;
+    if (!colony.alive[i] || (layer >= 0 && colony.layer[i] !== layer)) continue;
     colony.antCell(i);
-    out.add(Math.min(w - 1, Math.max(0, CELL[0] as number)), Math.min(h - 1, Math.max(0, CELL[1] as number)));
+    out.add(clampCol(map, CELL[0] as number), Math.min(h - 1, Math.max(0, CELL[1] as number)));
   }
   return out;
 }
 
 /** Sum of a grid over the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to the map. */
-export function around(grid: CountGrid, size: WorldSize, cx: number, cy: number, r = 1): number {
+export function around(grid: CountGrid, map: Bounds, cx: number, cy: number, r = 1): number {
   let s = 0;
   const o = discOffsets(r)[cy & 1] as Int16Array;
   for (let k = 0; k < o.length; k += 2) {
     const x = cx + (o[k] as number);
     const y = cy + (o[k + 1] as number);
-    if (x >= 0 && y >= 0 && x < size.w && y < size.h) s += grid.get(x, y);
+    if (inBounds(map, x, y)) s += grid.get(x, y);
   }
   return s;
 }
 
 /**
  * Resolve one dt of fighting between colonies; `grids[k]` is colony k's occupancy. With `rec` (built this
- * tick), enemies are strangers by odour; without it, every ant of another colony. Returns the deaths per colony.
+ * tick), enemies are strangers by odour; without it, every ant of another colony. With `layer` (one world, ja-lp4.3),
+ * only the ants on that layer fight, on its map, and their alarm goes into their colony's scent there; the grids and
+ * `rec` must be that layer's. Returns the deaths per colony.
  */
-export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT, rec: Recognition | null = null): number[] {
+export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT, rec: Recognition | null = null, layer = -1): number[] {
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
-    const size = c.map.size;
+    const on = layer < 0 ? null : (c.layers[layer] as Layer);
+    const map = (on ?? c).map;
+    const ph = (on ?? c).ph;
     for (let i = 0; i < c.n; i++) {
-      if (!c.alive[i]) continue;
+      if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
       c.antCell(i);
-      const cx = Math.min(size.w - 1, Math.max(0, CELL[0] as number));
-      const cy = Math.min(size.h - 1, Math.max(0, CELL[1] as number));
+      const cx = clampCol(map, CELL[0] as number);
+      const cy = Math.min(map.size.h - 1, Math.max(0, CELL[1] as number));
       let enemies = 0;
       if (rec) {
         rec.look(c.odour[i] as number, rec.params.tolerance);
-        enemies = rec.around(cx, cy, size.w, size.h) * (1 - (c.calm[i] as number));
+        enemies = rec.around(cx, cy, map) * (1 - (c.calm[i] as number));
         if (enemies < 1e-6) continue;
       } else {
         for (let j = 0; j < grids.length; j++) {
           const g = grids[j] as CountGrid;
-          if (j !== k && g.any(cx - 1, cy - 1, cx + 1, cy + 1)) enemies += around(g, size, cx, cy);
+          if (j !== k && g.any(cx - 1, cy - 1, cx + 1, cy + 1)) enemies += around(g, map, cx, cy);
         }
         if (enemies === 0) continue;
       }
-      const allies = Math.max(1, around(grids[k] as CountGrid, size, cx, cy));
+      const allies = Math.max(1, around(grids[k] as CountGrid, map, cx, cy));
       // A calmed encounter (under half an enemy) does not raise the alarm; with no fungus every enemy is whole.
       // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
       // How loudly is its raiseAlarm response (locally: always, × 1).
       if (enemies >= ENEMY) {
         const loud = (1 - (c.quiet[i] as number)) * c.responses.raiseAlarm(c.touch(i, true));
-        if (loud > 0) c.ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
+        if (loud > 0) ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
       }
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
     }

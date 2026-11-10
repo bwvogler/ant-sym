@@ -39,7 +39,19 @@ export interface JevProxyReply {
   run: RunSummary;
 }
 
-export type StopReason = "user" | "spend-cap" | "time-cap" | "formed";
+export type StopReason = "user" | "spend-cap" | "time-cap" | "formed" | "budget";
+
+/**
+ * The overall budget (PR #42 review S8): what Jev may cost per day, across every run and page load, kept by the server's
+ * ledger. `usdPerDay` and `remainingUsd` are null when no budget is set (the ledger's default, for tests).
+ */
+export interface Budget {
+  /** the UTC day the figures are for (YYYY-MM-DD) */
+  day: string;
+  usdPerDay: number | null;
+  spentUsd: number;
+  remainingUsd: number | null;
+}
 
 export interface RunCaps {
   /** Dollars this run may spend on Jev before the server refuses further calls. */
@@ -73,6 +85,8 @@ export interface RunSummary {
   statuses: Record<string, number>;
   remainingUsd: number;
   remainingSeconds: number;
+  /** today's spend against the overall budget (absent from servers before S8) */
+  budget?: Budget;
 }
 
 /**
@@ -84,6 +98,16 @@ export interface RunSummary {
  */
 export const DEFAULT_IN_FLIGHT = 5;
 export const USD_PER_INPUT_TOKEN = 0.042 / 1_000_000;
-/** A colony run is long and cheap: $0.10 and 30 minutes (about an hour of retuning costs $0.10–0.15, PRD §39). */
+/** A run's caps when none are asked for: $0.10 and 30 minutes (about an hour of retuning costs $0.10–0.15, PRD §39). */
 export const DEFAULT_CAPS: RunCaps = { capUsd: 0.1, capSeconds: 1800 };
+
+/**
+ * The game's runs (PR #42 review S8): no per-run caps that matter. An open run costs nothing (only uncached situations
+ * are asked), so a run stays open from the first miss until the page closes, and the overall daily budget is the
+ * ceiling on spend: DAILY_BUDGET_USD unless the server's JEV_DAILY_USD says otherwise.
+ */
+export const GAME_CAPS: RunCaps = { capUsd: 100, capSeconds: 86_400 };
+
+/** What Jev may cost per day, across runs and page loads, unless the server's JEV_DAILY_USD sets another figure. */
+export const DAILY_BUDGET_USD = 0.1;
 export const DEFAULT_JEV_MODEL = "jev-latest";

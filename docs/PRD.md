@@ -828,6 +828,8 @@ The player is the fungus (§15). The page and the Jev client still framed the fi
 | underground | 2 | 0 / 0 | 107 s | 0 / 0 | 100 / 100 % |
 | underground | 3 | 0 / 0 | 107 s | 0 / 0 | 100 / 77 % |
 
+*Since §53 (ja-i0f): "unified" also needs the colonies to have met; the underground rows above were the bug.*
+
 - **On the open surface the result holds.** Garden unifies the colonies in about 3 minutes, and fight deaths fall from 374–506 per colony to 8–37.
 - **Underground, unity is vacuous for now.** In 10 minutes the two colonies never meet (no deaths even without the fungus). Garden still reaches "unified" at ~105 s, because the nests' odours converge and the minute is "quiet" with nobody in contact. Unity ("smell alike, nobody has died fighting for a minute") does not ask that the colonies have met. Filed: unified should also need allied contact, ants of both colonies meeting within tolerance (`ja-i0f`).
 - **Every test passes on the new default world.** One test was fragile and is fixed: `perception.test.ts`, where a healthy ant given 8 s on a 40-wide map reached the edge, bounced at random and (with #8's movement) stumbled onto the food. It now runs 4 s, the time the infected ant needs and before the healthy one can reach the edge.
@@ -2782,3 +2784,1550 @@ Top-down, the final defaults. "main" is 47928ed, measured on the same seeds (rev
 | trail, if asked | 456 | 591; v6 613 |
 
 The response lanes would cost ~$0.074/h if asked (MR 3.1: ~$0.062/h). The page asks none of them.
+
+## 46. Meeting strangers: contact response, graded alarm, terrain (behaviour MR 4, ja-902, ja-dul, ja-qld, ja-hgq, 2026-11-05)
+
+Stacked on #37 (MR 3). Research basis: `docs/combat.md`:
+- Lymbery et al. 2023: narrow ground favours the smaller side;
+- graded alarm: low doses attract, high doses repel (*Atta*, Moser 1968; Lopes et al. 2022);
+- at food, the ant that didn't start an encounter usually retreats (Human & Gordon 1996).
+
+The paper sites were outside the allowlist; numbers there are marked unverified. "Baseline" below is 4e41ade: this branch with the new assays and no behaviour change, run with the same assay code (the side view as on main, the top-down as on #37).
+
+### 46.1 What was there
+
+- **Every ant with a stranger near fought** (`localPolicy`: `enemy: near` → fight): foragers, carriers and nurses alike.
+- **Alarm only repelled.** Fighters climbed it.
+- **ja-dul:** `avoid()` read rock and the map's edge (−1) as the least alarm, so ants steered into walls.
+- **Measured costs:**
+  - A9 (new): two foraging colonies sharing a pile lose 8.9 ants per 100 food brought home.
+  - G′: MR 3's midfield battles (ja-hgq).
+
+### 46.2 Assays (no behaviour change; commit 4e41ade)
+
+- **A4:** recovery is searched from the crowd's lowest point after the alarm (ja-qld).
+- **A6 re-specified: few against many.**
+  - 80 defenders against 200 attackers, and the pass must give the defenders at least 1.5× the same seed's open-ground exchange.
+  - The old A6 pitted equal armies and asked the pass to favour the defenders. Terrain shouldn't favour either side between equals, and it didn't (0.95 against 0.94).
+  - Lymbery's effect is about a smaller side against a larger one.
+- **A9 contact (new):** two colonies on a forage stance, nests at either end, one pile between. Mark: ≤ 4 lost per 100 food, half the baseline.
+- **A10 faint alarm (new):** a faint alarm painted 30 cells from the nest of a colony exploring with no food to find, at 40 s (by 120 s the explorers had tired and gone home). Mark: ≥ 2 more ants near it in the next 10 s.
+
+### 46.3 What MR 4 built
+
+- **ja-dul:** rock and the edge read as the most alarm, not the least.
+- **Graded alarm:**
+  - `Touch.alarm` is none, faint or strong. `alarmGain` may be negative: a pull, at `alarmDraw` (2) × turnRate. Locally, faint alarm draws an empty-jawed explorer.
+  - **Top-down only.**
+    - In the side view the drawn explorers crowded the tunnels and the ground line round fights: G seeds 1–20 passed 15/20 with the pull, 18/20 without.
+    - A follower keeps to its trail. Drawn too, at first, the trail's followers crowded every strong alarm's faint fringe, and A4 broke (crowd ×1.72 instead of scattering).
+  - Strong alarm repels as before. On the side view's ground line a carrier doesn't shy from it: it can't go round, only turn back, and it turned back from fights at its own hole (G seeds 4, 8: raids, 3 held).
+  - An ant meeting a stranger already raised alarm: `resolveFights` lays it for any ant with strangers in its cell or the six round it, whatever its mode.
+- **Contact response** (`contact` hook: fight | flee | drop and run):
+  - Asked every step while strangers are within the colony's enemy range.
+  - `Touch.odds` is outnumbered, even or outnumbering, by contact: nestmates against strangers in the ant's cell and the six round it (`Colony.nestmates`).
+  - **`localPolicy` no longer sends every ant with an enemy near to fight.** That is the contact response's now, and it sees the mode the policy chose.
+  - **Local rule:**
+    - a carrier takes its load home;
+    - raiders and defenders, and an ant its policy sent to fight, fight;
+    - on a forage stance every other ant turns away.
+  - **A fleeing ant without a load** runs straight away from the strangers while they are in reach. Once they are gone its mode policy is asked afresh, and locally it resumes foraging (review of #38: the PRD first said "then home", but the policy put it straight back on its trail). Homing alone, fleers often walked along or toward them.
+  - **A carrier flees by homing.** Turned straight away, on the ground line it walked away from its own hole (G seed 5, a raid: 3–5 held).
+  - **Tried and dropped:**
+    - Fighting while outnumbering, judged once: one moment's advantage committed an ant to the death (G′ seed 2: 1,742 of 1,894 deaths in fight mode, mid-map, both colonies foraging).
+    - Fighting while outnumbering, judged every step: one side always outnumbers somewhere, and its fighters cut down the other's fleers (G′ seeds 1–4: 7,482 lost, against 6,069 never fighting).
+    - Harm only from strangers that fight (`passive` 0.3 or 0): no better (G′ 8,411 at 0).
+- **Terrain: nothing to build.**
+  - With 80 defenders against 200, the pass already favours the few: exchange 0.57 against the open's 0.25 (seeds 1–6). Only a few attackers reach the defenders at once through it.
+  - A cap on how many of a side one cell brings to a fight only blunted numbers everywhere: open 0.26 → 0.69 at a cap of 1. Capping both sides cancelled out. The cap was dropped, and `battle.ts` is as on #37.
+- **Tests:**
+  - graded `alarmGain`, `contact` (local), the contact lane's packing and reading, and `avoid` at rock;
+  - `game.test`'s fighting ant: its policy's "fight" is honoured;
+  - `midden.test`'s raid: its bound is 15 raiders on the rival's side, not 20. The rival's foragers no longer charge out, and raiders die faster at its crowded hole (109 against 64 in that minute), so fewer are over there at once (17.5 against 49.9).
+
+### 46.4 Results (local rule)
+
+Measured after #38's review (S1: the contact response records the situation it answered, so a fleeing ant isn't flipped back onto its trail every other step). "Baseline" is 4e41ade run with the same assay code. A10's baseline was run under A10's final spec (de4017f's map and timing).
+
+| Assay | Baseline | MR 4 |
+|---|---|---|
+| A4 alarm | 10/10 / 10/10 | 10/10 (scatter 0.35) |
+| A6 few against many through a pass | 9/10 / 7/10, gain 2.36 | 9/10 (unchanged: geometry) |
+| A9 contact, lost per 100 food | 0/10, 8.9 / 0/10, 8.0 | **10/10, 0.88** (food home +28 %) |
+| A10 faint alarm | −1.8 (repelled) | +1.4 (drawn): 3/10 at the mark of 2 (ja-je8) |
+| A3, A2a, A1 (top-down trails) | 10/10 | 10/10 |
+| G side-view game | 18/20 | **18/20** |
+| G food home, first colony | 24,512 / 20,424 | 22,995 / 20,942 (−6 % / +3 %) |
+| G losses, both colonies | 3,731 / 3,163 | 3,440 / 3,367 |
+| A8 nest flow | 0.59 lowest | unchanged (one colony: no contact) |
+
+Where a cell shows two figures, they are seeds 1–10 / 11–20.
+
+**G′, the top-down game, both colonies** (review S3 asked for seeds 11–20):
+
+| G′ | Baseline 1–10 | MR 4 1–10 | Baseline 11–20 | MR 4 11–20 |
+|---|---|---|---|---|
+| losses | 19,698 | **17,073** (−13 %) | 20,191 | **17,099** (−15 %) |
+| ants alive at the end | 12,947 | **15,436** (+19 %) | 12,660 | **14,903** (+18 %) |
+| food home | 83,068 | 82,657 (−0.5 %) | 84,319 | 80,106 (−5 %) |
+| colonies fallen | 0 | 0 | 0 | 0 |
+| most held over 120 s, one seed | 67 | 117 (seed 4) | 153 | **248** (seed 11) |
+
+- **The smallest colonies (review S2):** the first colony's ants alive at the end.
+  - **Seed 4:** baseline 0, MR 4 **292**.
+  - **Seed 19:** baseline 0, MR 4 **29**: a collapse a few seconds later.
+  - Before MR 3 (main 47928ed) they ended with 370 and 84.
+- **ja-hgq** keeps these seeds open. MR 4 recovers about half of MR 3's extra losses (main before MR 3: 13,732 on seeds 1–10).
+- **Held carriers in G′** (ja-uez) rise on some seeds, worst on seed 11: 248 against 153.
+- **Side-bench** (`side-bench.mjs 1-6 600 600 2`; review S5):
+  - Food home 26,688 (main 25,985); ants stuck on the ground line 54 (main 10,253: main's seed-6 raider standstill is gone).
+  - **Porters held over 120 s at the end: 15** (main 0), 13 of them on seed 3, colony 0, in tunnels next to its nest.
+  - Not the cause, measured: alarm in tunnels (26 when carriers ignore it) and contact inside the nest (14 when ants defend it).
+  - Single-change variants clear seed 3 but jam another seed (seed 5, 13). Noted on ja-3po; the slow porter guard is still a todo.
+- **Tests:** `npm test` 336/336; `test:slow` 9 pass, 3 todo (A5; A10, ja-je8; the porter guard, ja-3po). It gates A1, A2a, A2b and A9 on seeds 1–2. `tsc -b` is clean.
+
+### 46.5 Ants take up room (ja-4ne, filed)
+
+The owner asked whether cells should hold only a few ants. Measured (seed 1): cells hold any number today.
+
+| Game | Ants per occupied cell | Most in one cell | Ants in cells of 10+ |
+|---|---|---|---|
+| Side view | 2.0–2.1 | 24–29 | 11–20 % |
+| Top-down | 1.5–1.6 | 9–17 | ≤ 7 % |
+
+The stacks are at choke points: the hole, the tunnels, the piles. Fewer ants would shorten the queues but not stop them. Physical exclusion is its own bead, with a research note on ant traffic first (Dussutour et al. 2004). It would make terrain-limited combat physical.
+
+### 46.6 The contact lane and the live check (2026-11-05)
+
+- **Legend v7** (`RESPONSE_BRAIN_VERSION` 7): alarm (none, faint, strong) and odds (outnumbered, even, outnumbering), sent to the contact lane only. Strangers in reach hurt any ant they touch; an ant fighting outnumbered dies; one that turns away lives to forage.
+- **The question:** fight, flee (home, keeping its load), or drop and run.
+- **Live:** `colony-live.mjs contact --top`, first asked for **$0.0023** (83 situations per doctrine). The side view meets only 2 contact situations in 300 s.
+- **Re-asked after #38's re-review (N1′), $0.0034.**
+  - The S1 fix made fight and return stick while strangers are near, so contact is now asked with `mode: fight` or `mode: return`. The first caches, collected while the mode reset to explore or follow every step, covered only 28–38 % of the replays' contact questions.
+  - A fresh run met 95 situations per doctrine, and a second round (`--from`) added 33, 25 and 19 more. The caches in `experiments/caches/mr4-top-*.json` now answer **100 %** of the contact questions the replays below ask.
+- **Agreement with the local rule** (95 situations each): Forage 68 %, Cautious 66 %, Warlike 52 %.
+  - Forage and Warlike send empty-jawed explorers on a forage stance to fight when even or outnumbering.
+  - Cautious has fighters flee from raids, and in the second round declines most fights (40 % agreement).
+- **Replayed** (Jev's answers for the first colony; seeds 1–6; G′ figures are both colonies' totals; contact answered from the cache 100 % of the time):
+
+| | Local | Forage | Cautious | Warlike |
+|---|---|---|---|---|
+| G′ food home | 53,092 | 52,892 | 50,173 | 51,264 |
+| G′ losses | 11,607 | 12,402 (+7 %) | 10,780 (−7 %) | 12,575 (+8 %) |
+| A9 lost per 100 food | 0.88 (6/6) | 2.27 (6/6) | 0.92 (6/6) | 3.49 (6/6) |
+
+  The doctrines that fight cost ants, as their doctrines ask.
+
+**Cost** (`colony-cost --side 5 600 1`):
+
+| Lane | main (MR 3), tokens per question | MR 4 |
+|---|---|---|
+| mode | ~657, $0.074/h | ~649, $0.074/h |
+| get, if asked | 1,020 | 1,203 |
+| carry, if asked | 750 | 894 |
+| drop, if asked | 1,078 | 1,180 |
+| trail, if asked | 613 (as §45.6 reported) | 738 |
+| contact, if asked | — | 1,405 (2 situations in the side view) |
+
+- The main column is the review's own measurement of main (ja-46w corrects §45.6's stale figures). All four lanes on main come to ~$0.078/h.
+- The legend's new sentences reach every response lane: all five would cost ~$0.096/h if asked. The page asks none of them.
+- Since #38's review the contact lane alone keys on alarm and odds (`colonyBrain.responseKey`). Before, every lane's key carried them, so identical requests in get, carry and trail landed under different keys.
+
+## 47. Learn: the research, the policy and the nest on the page (ja-epn, 2026-11-05)
+
+The page showed what happens but not why. The follow card named an ant's situation and who decided, and a few tooltips hinted at the rest. The research behind the senses lived only in `docs/`, the legend Jev reads was invisible, and chambers were unlabelled washes. The owner asked for ways to learn what you're seeing: the research, the policy and the nest structures.
+
+**Decisions (owner, 2026-11-05):**
+- **A Learn drawer, plus "?" buttons where things are.** A header button opens a drawer with three tabs. Each "?" opens it at the matching entry. The drawer's state is one small store (`ui/learn.ts`), so a "?" anywhere needs no callbacks threaded to it. The follow card's situation chips are links into it, and each choice has a "why?".
+- **The research as a field guide that links out.** Each entry covers one thing on screen in three parts: what you see, what real ants do (the notes' own claims) and how the game models it. Its sources link the notes' headings on GitHub, since the Pages build has no server to serve `docs/`. Full notes are not rendered in the page: they mix research with design detail meant for developers.
+- **Scripted behaviour is called out.** Where a behaviour is still a script reading something no ant can sense, the entry says so and names its vision gap (`ja-k4k.*`).
+- **The policy is editable there; the prompt is not.** A first version made each lane's legend editable. The owner's review: edit the *policy*, meaning each colony's doctrine and the fungus's aim, menu and hide/cull settings, and leave the rest of the prompt alone. The Policy tab is flat:
+  - The editors come first, bound to the same state as the side panel, so either place changes both. Edits commit on blur, as in the side panel.
+  - Then one level of collapsible sections explains how each decides: an ant's mode, the colony's stance, the fungus in a host, what Jev is sent (the legends, read only, with the exact request for the followed ant or a sample) and the small responses (local rule only).
+  - A "?" or "why?" opens the section it targets.
+- **The fungus has a policy too.** Jev picks, per fungal situation, what the fungus does to a host, under the player's aim and within the menu. With Jev off, each strain runs its default, within the menu and the hide/cull settings.
+- **Later, policy by inheritance (`ja-ygc`, owner's idea).** A living colony's doctrine would be fixed. A change would come only through a new queen sent out to found a colony, and only by some fraction of the mother's policy.
+
+**How it is built:**
+- **Field guide:** `ui/guide.ts` (16 entries) and its list of the notes. `tests/guide.test.ts` checks the guide against `docs/`:
+  - every cited note and heading exists, with anchors slugged as GitHub does;
+  - every note in the docs index is listed;
+  - every gap an entry calls scripted is still an open row in `vision.md`'s gap table.
+
+  So closing a gap or renaming a heading fails the test and names the entry to rewrite.
+- **The local rules in words:** `ui/policyText.ts` gives `localPolicy` and `localStance` as rows ("when …, then …"). `tests/policyText.test.ts` walks all 3,888 situations and every stance view and checks the rows give exactly the code's answers. The Policy tab highlights the row that decides the followed ant's situation.
+- **What Jev is sent** (`ui/prompt.ts`): the exact request for one situation from the same packers the client uses, and tokens per question at 100 situations to a request (the page's estimates always were). The brain modules and the Jev client are unchanged from main, apart from exporting `MODE_CRITERIA` and `STANCE_CRITERIA` and the `LaneName` type.
+- **Nest tab:** `ui/nest.ts` reads each nest from the chamber table: per chamber its role, depth below the ground line, cells (floor), the ants in it now, brood and food; plus the queen, the brood by stage, inside against out, and the midden. The tab says plainly that this is the player's view: an ant senses only the role of the chamber it stands in.
+- **Labels on the field:** a **Labels** button on the field (side view) names each chamber by its role. With labels on, a click on a chamber with no ant under it opens the Nest tab at that chamber's row.
+- **Shared colours:** the field's role, brood and home-trail colours moved to `ui/palette.ts`, so the swatches and the canvas share one source.
+
+**Cost.** None: the requests and their contexts are byte-identical (`colony-cost` unchanged: ~769 tokens per question on the top-down session, $0.022/h). A doctrine or aim edited in the drawer re-asks exactly as one edited in the side panel always has.
+
+**Not done:**
+- Rendering whole notes in the page.
+- Moving the camera to a chamber picked in the table.
+- Recording who decided at decision time rather than at render time (`ja-kxw`, still open).
+- Filed while doing this: `ja-px9`. `docs/nest-chemistry.md` is missing although `ja-k4k.9` is closed.
+
+## 48. Foragers go out because foragers come back (behaviour MR 5, ja-um8, 2026-11-05)
+
+Research basis: `docs/activation.md`.
+- In the red harvester ant, a forager waiting inside leaves on brief contacts with nestmates coming home with food (Gordon; Pinter-Wollman et al. 2013; Pless et al. 2015).
+  - Unsuccessful returns don't count.
+  - It leaves 3–8 s after a rise in contacts.
+  - With none returning, it waits about 3 min.
+- Models describe each ant as a leaky count of contacts with a threshold (Prabhakar et al. 2012; Davidson et al. 2016).
+- A colony knows its food only as this rate (Greene & Gordon 2007).
+
+The paper sites were outside the allowlist; numbers there are marked unverified. "Off" below is this branch with `leaveGate` 0, which matches `main` bit for bit.
+
+**Scope.** ja-um8 also planned raids that start from scouts' trails. They are split off as MR 5.2 (`ja-tu3`, which now blocks ja-jwy), since raids need their own research and assay.
+
+### 48.1 What was there
+
+- **On a top-down map, a rested forager reaching home with empty jaws went straight back out** (`arrive`). Only fatigue kept one inside, and only until rested.
+- **No ant knew whether others were finding food.**
+- **The strategist raided on `foodLeft`,** the map's food total, which no ant senses (vision gap "Stance and raids"). In a 600 s game the map never falls below 66 % of its food, so that rule never fired in G or G′.
+- **A5 failed on every seed:** on seeds 1–20, 0.48 of the colony was outside before food against 0.84 after (mark: at most half).
+
+### 48.2 Assays (no behaviour change; commit 61125a5)
+
+- **A5** also reports trips out per minute in each window, so a pass shows its cause.
+- **A5b, food stops (new):**
+  - food at 60 s, taken away at 240 s;
+  - mark: trips out per minute over 300–420 s at most half those over 150–240 s (Gordon 2002's removals);
+  - `main` already passes 20/20, since fatigue brings unsuccessful foragers home. It is a guard, not the target.
+
+### 48.3 What MR 5 built
+
+- **The cue** (`colony.ts`: `met`, `#returning`, `#returned`).
+  - Each ant keeps a leaky count (half-life 20 s, `MET_HALF`) of encounters with nestmates coming home with food.
+  - A forager that puts its food down at home meets the waiting ants in its cell and the six round it, once each.
+  - The `Touch` gains `returns`: none, few (at least `leaveGate`, 1), or many (4 or more).
+- **Waiting.** On a top-down map, a rested forager home in "return" with empty jaws is asked the new `leave` response instead of its mode policy. The mode policy sends any ant out that smells no food trail.
+  - **"now"** goes out at 1 per second (`LEAVE_NOW`).
+  - **"soon"** at 0.2 per second, about the papers' 3–8 s.
+  - **"wait"** stays in. Only a scout goes, at `scoutRate`, 1/90 per second: a waiting ant goes out on its own after 90 s on average, against Gordon's foragers waiting about 3 minutes with none returning. At 1/180, G′'s worst seed fell to 5 ants alive (§48.4).
+  - **One roll a step** (review of #39, S1): an ant home in "return" passes both the rest check and the trip's end in one step, and before the fix it rolled `leave` at each. Every rate ran at about twice its stated value; the numbers below are all after the fix.
+  - A waiting ant mills out to 0.9 of the nest's radius, where foragers come home.
+- **Local rule:** many, now; few, soon; none, wait. A raiding or defending colony doesn't wait.
+- **The strategist** reads `intake`, food stored per ant per second over the last 60 s, instead of `foodLeft`. "None" is below 0.0005, "plenty" from 0.01, and "some" until a minute has passed. `localStance` raids on no intake.
+  - In G and G′, seed 1, intake ran 0.002–0.017 per ant, so neither the old rule nor the new one fires in a 600 s game.
+  - A lone colony never consults the strategist, so the hour-long economy is untouched.
+- **Top-down maps only.** The side view is unchanged: G on seeds 1–10 is identical to `main` on every metric. Side-view activation is bead `ja-web`.
+- **Three wrong turns the measurements caught:**
+  1. **The mode policy sent waiting ants out:** the gate alone changed nothing.
+  2. **Ants kept to half the nest's radius never met a carrier,** who puts its food down at the rim. Ants that drifted out of the nest were asked their mode and left.
+  3. **Contact counted in seconds stayed under the threshold:** a carrier is met for a single tick. So only scouts went out, and with scouts at 1/30 per second, `leave` deaf to returns gave the same A5 and A5b.
+
+### 48.4 Results (local rule)
+
+**The cue does the work** (seeds 1–10, medians; "deaf" answers `leave` as if no returns were ever met):
+
+| | With returns | Deaf to returns |
+|---|---|---|
+| A5 outside before food | 0.14 | 0.14 |
+| A5 outside once food flows | 0.85 | 0.71 |
+| A5 food stored | 5,074 | 4,674 |
+| A5b outside while food flows | 0.82 | 0.62 |
+| A5b trips out per minute while food flows | 2,254 | 1,636 |
+| A5b food stored | 3,338 | 2,372 |
+
+A5's mark alone doesn't tell them apart: both pass 10/10.
+
+**A5 and A5b against off** (seeds 1–10):
+- **A5:** 10/10, against 0/20 on seeds 1–20 off. 0.14 outside before food against 0.48 off, and 0.85 once food flows.
+- **A5b:** 10/10. It stores 3,338, against 4,118 off: a waiting colony ramps up from a few scouts when food appears.
+- **A1–A4 and A9:** unchanged pass counts; food stored −0.2 % to +1.5 % (measured before S1's fix, at the same effective scout rate).
+- **A10:** unchanged, 3/10 (ja-je8).
+
+**G′, the top-down game, seeds 1–20** (both colonies' totals):
+
+| | Food home | Losses | Fewest ants alive (seed 19) | Second fewest | Most held over 120 s |
+|---|---|---|---|---|---|
+| Off | 162,763 | 34,172 | 29 | 257 | 248 |
+| MR 5 | 158,012 (−2.9 %) | 32,393 (−5.2 %) | 38 | 348 | 190 |
+
+- **Seeds 1–10:** food −5.2 %, losses −8.3 %.
+- **Seeds 11–20:** food −0.5 %, losses −2.1 %.
+- Seed 19 is ja-hgq's near-collapse on both.
+
+**Tuning** (G′ seeds 1–20, both colonies; one roll a step):
+
+| `leaveGate` | `scoutRate` | Food home | Losses | Fewest alive |
+|---|---|---|---|---|
+| 1 (chosen) | 1/90 | −2.9 % | −5.2 % | 38 |
+| 1 | 1/180 | −3.9 % | −7.4 % | 5 |
+
+Before the fix, with two rolls a step: `leaveGate` 1 against 2 at a stated 1/180 (about 1/90 in effect) gave −3.5 % against −4.3 % food and 58 against 48 alive at worst; at a stated 1/30, thresholds 1–4 gave −2.7 to −4.9 % food and 4–60 alive at worst.
+
+The 1/30 runs were measured while returns were still counted in seconds (third wrong turn above): there, returns made no difference.
+
+### 48.5 The leave lane and the live check (2026-11-05)
+
+- **Legend** (`RESPONSE_BRAIN_VERSION` 8):
+  - `returns` is sent to the `leave` lane only;
+  - the colony learns there is food to fetch only by meeting nestmates bringing it in, and even a few means there is food out there;
+  - with none returning, an ant that goes out is a scout;
+  - a raiding or defending colony needs its ants out whatever comes back.
+- **Stance legend v4:** intake replaces `foodLeft`.
+- **The question:** now, soon (in a few seconds), or wait.
+- **Live:** `colony-live.mjs leave,stance --top`, $0.0016 in all.
+  - The first legend didn't explain a few returns or a raid, so Jev answered "wait" to them. Agreement with the local rule was 17–50 %, and the replays cost the first colony 11–14 % of its G′ food. That run cost $0.0008.
+  - With the legend above (another $0.0008), agreement is Forage 75 %, Cautious 67 % and Warlike 92 %, over 12 situations each.
+  - Caches: `experiments/caches/mr5-top-*.json`.
+- **Replayed** (Jev's leave and stance answers for the first colony; seeds 1–6; after S1's fix):
+  - `leave` was answered from the cache 100 % of the time.
+  - `stance` was answered from the cache only 31–68 % of the time; the local rule answered the rest. So the doctrine columns are part Jev, part local rule (review of #39, N3).
+
+| | Local | Forage | Cautious | Warlike |
+|---|---|---|---|---|
+| G′ food home, first colony | 23,444 | 23,520 (+0.3 %) | 23,063 (−1.6 %) | 22,144 (−5.5 %) |
+| G′ losses, both | 10,216 | 9,831 (−3.8 %) | 10,375 (+1.6 %) | 10,507 (+2.8 %) |
+| A5 | 6/6 | 6/6 | 6/6 | 6/6 |
+
+Warlike raids more, as its doctrine asks. Before the fix the same caches replayed at +1.9 / +2.6 / −6.6 % food and +7 / +13 / +4 % losses (N4).
+
+**Cost** (`colony-cost --side 5 600 1`):
+
+| Lane | MR 4, tokens per question | MR 5 |
+|---|---|---|
+| mode | ~649, $0.074/h | ~651, $0.074/h |
+| get, if asked | 1,203 | 1,424 |
+| carry, if asked | 894 | 1,016 |
+| drop, if asked | 1,180 | 1,396 |
+| trail, if asked | 738 | 829 |
+| contact, if asked | 1,405 | 1,641 |
+| leave, if asked | — | never in the side view; 268 asked live, top-down |
+| stance | — | 193 asked live, top-down |
+
+- The legend's new sentences reach every response lane.
+- All six lanes would cost ~$0.109/h if asked, against ~$0.096/h for MR 4's five. The page asks none of them.
+
+## 49. Raiders follow a scout's trail (behaviour MR 5.2, ja-tu3, ja-jwy, 2026-11-06)
+
+Research basis: `docs/raid-recruitment.md`. Every figure in it was read in a search summary, not the paper (the hosts were outside the network allowlist), so all are **unverified**.
+- Slave-making ants send scouts first. Removing *Polyergus breviceps* scouts left raids on 2 of 11 days (Topoff et al. 1987). A scout that finds a host nest goes home and recruits at its own entrance, and a column follows. Whether raiders follow a scent trail is disputed; a trail plus sight fits.
+- At a border an encounter recruits: honeypot-ant tournaments by alarm and a trail, weaver ants by a sternal-gland attractant and a rectal-gland trail.
+- Not found: whether rivals follow each other's trails, how a scout senses a rival nest itself, when a raid is called off. So the finder's cue is the sense the game has (meeting strangers), and a rival-nest odour is not built.
+
+### 49.1 What was there
+
+- A raiding colony's fighters steered straight at `raidTarget`, the rival hole's coordinates. No ant senses those (vision gap "Stance and raids").
+- Bead ja-jwy said a straight line sticks behind rock. In the new assay A11 it doesn't on `main`: raiders get round a pocket of wall (39 % reach the rival, 1 % stuck), by the detour rule. So the change here is the sense, not a rescue from walls.
+
+### 49.2 What MR 5.2 built (top-down maps; `raidGate` 1)
+
+- **A raid stance is a bias, not an order.** The colony's stance is still broadcast, but an ant acts on it only if it is **recruited** (`recruited`, `#stanceOf`). Every other ant carries on as a forager, so a raid stance idles no one. An ant is recruited by:
+  - **smelling a scout's raid trail** (its cell and its three sensors, `#raidSense`), or
+  - **going out as a scout**: an ant at home with empty jaws rolls `raidScout` (1/90 per second) and goes out in mode fight.
+  A recruited ant's raid ends when it is home again with no raid trail under it (event-driven; `#gone` records that it went out). No waiting state and no clock: the raid ends when the trail fades or was never laid.
+  "Scouts" are not a few: `raidScout` applies to every empty-jawed ant at home, so with ~500 home about 5 a second go out, come back and are foragers again. A12 (1.00) says it costs the larder nothing.
+- **One sense of the raid trail** (`#raidSmelt`, review of #41 N1): the ant's cell and its three sensors, for recruiting, for `Touch.raid` and for keeping an ant recruited. Off the gate, "strong".
+- **No coordinates on top-down maps at all** (review of #41 S2): an ant not recruited but in mode fight (Jev's mode lane, or a contact) fell through to the old walk to `raidTarget` (232,682 ant-ticks in G′ seed 1 under the Warlike cache). That branch is now the side view's and `raidGate` 0's only.
+- **Legends** (review of #41 S1): `stance` is "what the colony asks of this ant: forage; defend; or raid, which an ant does only once a scout's raid trail has recruited it or it has gone out as a scout". `COLONY_BRAIN_VERSION` 6.
+- **A finder.** A recruited ant outside with empty jaws, no raid trail under it, and `findAt` (0.3) seconds of contact with strangers goes home (mode forced to "return", fleeing from them) and lays the new **`raid` channel** on the way: `raidLay` × `deposit`, 0.5 + seconds met (at most 3), falling with time since the find as the food trail does. Channel: evaporation 0.04, diffusion 0.3 (a fifth channel, as `noEntry` was a fourth; asleep until used).
+- **Fighters follow it.** A recruited ant with no enemy near climbs the raid trail; with none it walks out, away from its home trail, and wanders (a scout). Walking to the coordinates is gone on top-down maps; the side view keeps it (its raiders already walk the tunnels cell by cell).
+- **`Touch.stance` is the ant's own** (`#stanceOf`): forage for an ant not recruited, so Jev's mode and `leave` questions for it are a forager's. **`Touch.raid`** (none, faint, strong) is sent to the `leave` lane only, and only for a raider: a recruited ant home in mode return is asked in mode fight, with the raid trail; a forager in mode return, with its returns. Keys: `…|raid:…` and `…|returns:…`. `leave` locally: a raider goes on a trail and waits without one; a forager on a defend stance goes out whatever comes back, as in MR 5.
+- **Versions:** `RESPONSE_BRAIN_VERSION` 9. Mode and stance lanes unchanged.
+- **Side view and `raidGate` 0:** the same as `main`; the side-view golden is bit for bit, the top-down golden re-recorded.
+- **How it got here.** The first version made raiders wait at home for a trail. Waiting needs something to end it, and a stopwatch (`raidPatience`, 120 s) was the only thing a waiting ant had; the user rejected a clock, and the bias is the alternative. The clock version is in the history of PR #41 (commits `cba2721`–`2e7a4d3`). It reached more raiders (A11 gain 1.67), and it did not fix the replays.
+
+### 49.3 Results (local rule; stance as a bias)
+
+**A11, raiders find the rival round a pocket of wall** (200 ants against 80 defenders, 300 s; seeds 1–20). Reported over the ants recruited to the raid:
+- **With the trail:** 0.19 of the colony's ants reach the rival's nest (0.12–0.32) as raiders; **with no trail laid** (`raidLay` 0: scouts alone) 0.14 (0.10–0.17); `raidGate` 0, every ant sent at the coordinates (`straight`): 0.39 (0.28–0.53).
+- **Gain** 1.24 median (0.89–2.75); the mark (at least 1.5× and at most 10 % stuck) passes 7/20 seeds. Stuck: 1 %. The clock version gained 1.67 (12/20). Only ants that pass near the nest, or are there, smell the trail, and most of a colony in an arena with no food is out exploring. A stronger lay (`raidLay` 3, 8) did not help (the trail smears), and nor did recruiting by contact with a finder coming home (tried, dropped). Filed as ja-sf1. *The diagnosis was wrong: see 49.7.*
+
+**A12, a raid no one can find** (new; the first colony forced onto a raid stance, the rival sealed in rock, a food pile to forage; 900 s): food stored against the same colony on a forage stance **1.00, 20/20** (0.99 worst). On the first version (waiting raiders) it stored 10 of 7,400.
+
+**A6 few against many through a pass** (seeds 1–20): pass 16/20, gain 1.82 (1.16–2.88) (`main`: 9/10, 2.36; the clock version 1.70). *Stale: the merged code measures 3/20, 1.26; see 49.7.*
+
+**A1–A5b, A9** (seeds 1–10): pass 10/10 each, as before (no raids in them).
+
+**G′, the top-down game, seeds 1–20** (both colonies; medians and extremes, totals not kept):
+
+| | Bias | Coordinates (`main`) |
+|---|---|---|
+| First colony: ants alive at the end | 897 (3–900) | 855 (38–900) |
+| First colony: food stored | 4,431 (1,471–6,076) | 4,086 (1,337–5,780) |
+| First colony: ants lost | 865 (82–1,180) | 880 (131–1,260) |
+| Rival: food stored | 4,319 (2,082–5,870) | 3,860 |
+| Rival: ants lost | 847 (84–1,187) | 862 (123–1,186) |
+
+Food +8 % and +12 %, losses the same. **The worst seed is worse:** seed 19 (ja-hgq) ends with 3 ants against 38. The rival is full (900) and raids from 60 s on.
+
+### 49.4 Jev (at most $0.10)
+
+- **Live:** `colony-live.mjs all --top`, about 250,000 input tokens a run, **$0.0105–0.0109** each (seven runs over the PR; the lane with a new sense is `leave`). Caches `experiments/caches/mr52-top-*.json`, versions 6 / 4 / 9.
+- **The first version asked a waiting raider as a returning forager** (review of #41, S1): both got one key and one answer. Now a recruited ant is asked as a raider (fight, with the raid trail) and a forager as a forager (return, with its returns), and the legend no longer tells Jev to override its doctrine.
+- **Replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,186 and 915) *(stale: `main` replays differently today; see 49.7)*:
+
+| | All lanes: food stored | Lost | `leave` and `stance` only (as MR 5's caches) | MR 5 (food) |
+|---|---|---|---|---|
+| Forage | 5,069 (+21 %) | 825 | 4,860 (+16 %) | +0.3 % |
+| Cautious | 3,803 (−9 %) | 636 | 4,679 (+12 %) | −1.6 % |
+| Warlike | 1,994 (−52 %) | 859 | 3,521 (−16 %) | −5.5 % |
+
+- **Like for like.** MR 5's caches held only the `leave` and `stance` lanes (`experiments/caches/README.md`); this MR's were recorded with every lane, so Jev's mode, contact and trail answers are in them too. Stripped to the same two lanes (no spend), Forage and Cautious gain and Warlike loses 16 % (MR 5: −5.5 %). Most of Warlike's −52 % is Jev's mode and contact answers under a warlike doctrine (more ants sent to fight), not the raid trail.
+- **Warlike's mode answers cost about half the food top-down, on `main` too** (the owner's review of #41, G′ seed 1): the MR 5.2 Warlike cache answers `fight` for 84 of 145 forage situations; with its mode answers removed it stores 5,181 against the local rule's 5,278 (−2 %), and the same mode answers on `main` store 2,344 (−56 %). MR 3–5 never recorded top-down mode answers, so this is the first measure of it, not a regression (`ja-7je`).
+- **Why Cautious recovered.** In the waiting version a larder-full colony sat on a raid stance for good, its ants waiting or sent home by the doctrine's mode answers, and stored nothing more (a minute-by-minute trace of seed 1: 847 of 900 ants in mode return, 4–90 outside). As a bias, a raid stance leaves the foragers foraging.
+- **Warlike's all-lane loss is not the trail's:** with the old coordinates (`raidGate` 0) the same all-lane cache stores 1,860. A second Cautious recording agreed with the first on 272 of 290 mode answers, so it is not run-to-run noise either. What remains like for like is Warlike −16 % against MR 5's −5.5 % (`ja-7je`).
+- **Cost** (`colony-cost --side`): mode ~686 tokens per question, ~$0.078/h (MR 5: 651, $0.074), from the longer stance sentence in the legend; all six response lanes together ~$0.121/h (MR 5: $0.109).
+
+### 49.5 How a raid ends
+
+Research: `docs/raid-recruitment.md`, "How a raid ends" (all **unverified**; search summaries only): *Polyergus* raiders that mill about a host nest for a few minutes begin an incohesive retreat; nothing found says an order ends a raid; trails fade without reinforcement.
+- **In the model**, nothing ends a raid by decision. A raid lives while a scout's trail does: it is laid by finders, it fades (half-life about 17 s), and an ant home with none under it goes back to foraging. A scout that finds nothing tires (the existing fatigue, MR 3.1) and comes home.
+- **Tried and dropped: a patience clock.** A raider that waited `raidPatience` (120 s) at home stood down. It needed a stopwatch because the design had raiders wait; see 49.2. Clocks elsewhere in the code are filed: ja-d8e, ja-cgv, ja-79f, ja-9ve, ja-hy1.
+- **Left out:** a call-off that spreads by contact with raiders coming home empty (one summary line behind it); the strategist reading how many raiders idle (a colony-wide count no ant senses).
+
+### 49.6 Left out
+
+- **The side view** still raids by coordinates and tunnel; its trail needs the tunnels' own senses (`ja-1a9`).
+- **Food or loot at a rival's entrance** (ja-um8's deferred note from MR 2) needs brood and prey carrying: `ja-gkl`.
+- **Stance** is still broadcast (`ja-k4k.6`).
+- **A rival-nest odour,** column marching, call-off: no sources reached.
+
+### 49.7 The trail points, the search finds (ja-sf1, 2026-11-08)
+
+**What was wrong.** A11 with probes for who is recruited, where, and where finds happen (seeds 1–20, the MR 5.2 code):
+- **Recruiting was never short.** 81 % of the colony was recruited (0.70–0.99), 43 % of them at home, and the trail was smelt at the nest's rim in 47 % of samples. 49.3's "only ants near the nest smell the trail" was wrong.
+- **The trail ends short of the nest.** A finder lays it from where it first met strangers: 25 cells from the rival's nest (17–34; the nests are 80 apart). Recruits climbed it to its end, its strongest point, and stayed there; 20 % of them ever came within reach of the nest, and 32 % died.
+- **Tried and dropped: raiders re-laying the trail** on their way home from strangers (the fire-ant and ponerine picture, `docs/raid-recruitment.md`). The trail at the nest's rim was four times as strong (0.81 against 0.20) and smelt in 73 % of samples; reach did not move (gain 1.19).
+- **Tried and dropped: a later find** (`findAt` 1, 2, 4 s): gain 1.70, 1.22, 1.00, the worst seed 0.70 at best.
+
+**What changed** (`raidOnward` 1):
+- A raider on the raid trail, facing along it (its front sensor the strongest), that finds nothing ahead as strong as underfoot leaves the trail and searches on, out and away from home, as a scout does. It ignores raid trails until it is home, where the flag clears; that includes a fresher, longer one another finder lays meanwhile.
+- **Where it fires** (the owner's probe, review of #44, seeds 1–3): mostly near home, a median 0.05–0.19 of the way out, 81–92 % of the times within 40 % of it. The lay fades with time since the find, so near the nest the trail is faint and patchy, and a dip ahead reads as nothing stronger. So the trail recruits and points the way, and the search does the rest. Allowed only where the trail underfoot is strong, as at a real end, A11 gained less: 1.67 against 2.01 (seeds 1–4).
+- If a searching raider meets strangers with no trail under it, it is a finder, and lays a trail home from there.
+- No new sense: it reads the same three sensors as the climb. No clock. Nothing an ant is asked changed, so Jev's keys and caches stand and nothing was spent.
+- Research: `docs/raid-recruitment.md`, "The trail points, the search finds" (a scout's run then sector search; trails kept by those who use them; all **unverified**).
+
+**A11** (raidOnward 1 against 0, the same code):
+
+| | Gain (median, range) | Seeds at the mark | Reach | Recruits that reach |
+|---|---|---|---|---|
+| Seeds 1–20 | **2.04** (1.32–4.40) against 1.33 (0.48–2.90) | **16/20** against 7/20 | 0.28 against 0.17 | 0.34 against 0.21 |
+| Seeds 21–40 | **1.84** (0.97–5.10) against 1.55 (0.69–4.29) | **13/20** against 11/20 | 0.26 against 0.19 | 0.32 against 0.25 |
+
+`straight` (every ant at the coordinates) reaches 0.39; stuck stays 1 %. The slow suite now guards the mark (6 of seeds 1–10), no longer a todo.
+
+**A6, corrected (an assay change, not this fix).** 49.3's A6 (16/20, gain 1.82) is stale: the merge commit of #41 measures **3/20, gain 1.26**, and so does `main`. The number was taken before the owner's review moved unrecruited fighters off the coordinates, after which A6's attackers (all in fight, on a raid stance) went only as recruits, a few at a time, and no battle formed at the pass. A6 is about who reaches whom at a pass, not about finding the rival, so its attackers now all march at the defenders' hole (`raidGate` 0 in both its runs): **14/20, gain 1.74** (1.18–5.20); before MR 5.2, 9/10 and 2.36. raidOnward does not change it (6/20, 1.20 against 1.23, the old spec).
+
+**A12** 20/20 (food 1.00 of the forage colony's), **A5, A9** 20/20: unchanged.
+
+**G′, seeds 1–20** (first colony; medians, worst in brackets):
+
+| | raidOnward | `main` |
+|---|---|---|
+| Ants alive at the end | 892 (223) | 895 (1) |
+| Food stored | 4,274 (1,816) | 4,085 (1,491) |
+| Ants lost | 848 | 826 |
+| Rival: food stored / lost | 4,179 / 828 | 4,110 / 773 |
+
+Food +5 %, losses +3 %. **The worst seed recovers:** seed 19 ends with 223 ants (`main`: 1; ja-hgq). Seeds 15 and 17 end with fewer (565 and 357 against 724 and 762).
+
+**Jev replays** (G′ seeds 1–6, the first colony's food stored and ants lost; the local rule: 4,088 and 918 on this branch, 4,083 and 901 on `main`):
+
+| Cache | raidOnward: food stored | Lost | `main` today: food stored | Lost | Food against `main` |
+|---|---|---|---|---|---|
+| Forage | 4,128 | 846 | 4,363 | 824 | −5 % |
+| Cautious | 3,444 | 571 | 3,853 | 592 | −11 % |
+| Warlike | 3,219 | 850 | 3,472 | 866 | −7 % |
+
+- **Under Jev's cached answers the colony stores 5–11 % less** on seeds 1–6, with losses the same, though the local rule is level on those seeds and +5 % over seeds 1–20. Six seeds is a small sample, and all three caches point the same way, so it is recorded, not explained.
+- **49.4's replay figures are stale too:** `main` today replays Warlike at 3,472, not 1,994 (and Forage 4,363, not 5,069). They were taken before the owner's review fixes in #41, as A6 was.
+
+**Cost:** unchanged on every lane (no legend, question or brain version changed).
+
+## 50. The fungus game: decisions (ja-lo8, 2026-11-06 / 07)
+
+The page was a sim with everything on one screen. The owner asked for a game, to be built in ten stacked slices under the epic `ja-lo8` (slice beads `ja-lo8.1`–`.10`). These are the owner's decisions, from the plan's review.
+
+**The game.**
+- The player starts as a fungus that lands near a colony's entrance.
+- **The fungus policy is always the player's, and it is the game's main handle.**
+  - The player writes an aim in words. Jev sets a **level for every lever**, per situation the fungus senses inside its host. The answer is no longer one bundle: the owner wants to pull many levers at once, interpreted from natural language.
+  - The levers bend what the host **perceives** and what it **gives off** ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)).
+  - The senses may be finer than before. The fungus's own load is dropped as a sense, and the host's mode was never one.
+- **Answers fill in as situations come up.** When the aim changes, old answers stay in force, dimmed, until each situation's new answer arrives. *(Superseded where Jev can answer by §50.17: the local rule plays until the new answer arrives; the old answers play only while Jev can't run.)* Nothing re-asks the whole table, and nothing is pre-asked.
+- **The table stays out of sight.** It and per-cell pins are available in Learn and Details, not on the main screen, so the main screen keeps some magic.
+- **One fungus.** The three strains become lab presets.
+- **Colony policy is hidden until the fungus infects a queen.**
+  - After that, a colony's policy changes **only when a new queen is born**: a free rewrite, at that moment only.
+  - The new words drive **only her offspring**, in the **daughter colony she founds**.
+  - Her ants act on her mother's answers, dimmed, until their own arrive. *(Superseded by §50.17: on new words her ants play the local rule until their answers arrive; her mother's answers play only while Jev can't run.)*
+- **How the new queen gets the fungus.** She picks it up by contact on her way out of the nest. No vertical transmission ([new-queens §4](new-queens.md#4-where-the-fungus-comes-in)).
+- **The fungus's lever on queen birth** must be a real lever in the catalogue. There are two: *queen signal* (emission, in the queen) and *queen scent* (perception, in nurses). Both are design, and both are built.
+- **Pace.**
+  - The page defaults to a faster speed (4×) rather than a separate game clock, so every rate scales together and no sim constant changes.
+  - Queen births may stay rare.
+  - **Games are saved** (IndexedDB autosave, slots) and played over several sittings.
+- **Jev is always on** (superseded by §50.11: Jev is asked only for situations with no cached answer, under one daily budget).
+  - The page ships answers for the preset doctrines.
+  - When Jev cannot answer (no key, funds or cap spent, the Pages build), the game keeps playing on cached answers, but **no policy can be changed**, the fungus's or the ants'.
+- **Main screen and Details.** The main screen is decluttered. The colony table, Jev's figures, unity, infection, world settings and the lab tools move to a Details screen.
+
+**Research.** [new-queens.md](new-queens.md) (new):
+- colonies rear queens when large;
+- the queen's pheromone holds it back, and in fire ants workers kill sexual larvae while they sense it (Klobuchar & Deslippe 2002);
+- founding is claustral, on the queen's reserves.
+
+The game's rule follows: a fed larva where nurses perceive a faint queen's mark becomes a gyne, and one where they perceive a strong mark is culled.
+
+**Superseded.** `ja-ygc` (doctrine inherited by a fraction, through a founding queen) is superseded by the epic: a full rewrite, but only at a queen's birth.
+
+**Cost.** This section changes no request. Slice 4 (`ja-lo8.4`) changes the fungus lane's legend, situation and questions, and will report its tokens per question.
+
+### 50.1 Slice 2: the main screen, Details, Jev always on (ja-lo8.2, 2026-11-07)
+
+**The main screen** holds four things:
+- the field;
+- a top bar: Play/Pause, speeds 0.5–4×, sim time, and one line on where the game stands;
+- the fungus's panel: its share in each colony, unity, and its aim (presets and words);
+- the followed ant's card.
+
+**The Details screen** takes everything else:
+- the colony table and mode counts;
+- Jev's spend, caches, Stop and Resume;
+- infection, resistance and unity figures;
+- the world's settings (seed, ground, rival, ants, speed slider, trails);
+- the **lab**: the fungus's menu, hide and cull, and each colony's doctrine, for experiments. (The spore brush and strain picker were here until §50.15.)
+
+**Learn** shows doctrines read-only. **Removed:** the lure and alarm brushes, which painted only the first colony's fields.
+
+**Jev is always on** (`ui/policyLock.ts`, tested):
+- **When it starts.** The page starts a run once the server and its key are there, and starts a new one after a time cap. A spend cap or a Stop is final until the player presses Resume.
+- **Cached answers play whether or not a run is on.** `colonyJev.ts` `#lookup` no longer falls back to the local rule just because no run is on; only uncached situations use the local rule.
+- **What locks the policies:** the probe pending, no server, no key, a run starting, stopped or capped. While locked, every editor that sets words or the menu is disabled and says why, and `useColonyJev`'s setters refuse words. Losing Jev mid-game raises a notice (`ui/toasts.ts`).
+
+**Measured.**
+- A page load with a key started a run by itself: 17 requests and $0.0007 in 7 s.
+- With the key unset, the aim is disabled and the panel reads "JEV_API_KEY is not set…".
+- Desktop and phone layouts were checked with Playwright: no page errors, and no sideways scroll on the Details screen.
+
+**No behaviour change in the sim.** Goldens are untouched, and requests and their contexts are byte-identical, so the cost is unchanged.
+
+### 50.2 Slice 3: shipped answers, and stale answers that fill in (ja-lo8.3, 2026-11-07)
+
+**Shipped answers.** `scripts/precache.mjs` asked Jev every mode situation (3,888) and every strategist view (324) under each preset doctrine (Forage, Cautious, Warlike):
+- **Packing:** the browser's own packers, keys and contexts.
+- **Cost:** 129 requests, **$0.1046** in total (estimate $0.1245), 0 failed.
+- **Output:** 12,636 answers in `web/public/precache/`, 708 kB raw, about 11 kB gzipped per mode bundle.
+- **Loading:** at start the page fetches them once (`ui/precache.ts`) and seeds the client's caches (`ColonyJev.seed`), under any answer the browser already has. Only answers the lane's question allows are kept.
+- **Guard:** `tests/precache.test.ts` fails when a bundle's context or a brain version no longer matches the code.
+
+**Measured:**
+- **A fresh browser with a key:** 0 requests in 8 s, and 100 % of mode choices from the cache. Before, a page load made 17 requests in 7 s ($0.0007).
+- **The Pages build** (`vite preview` under `/ant-sym/`) plays 3,888 mode and 324 stance answers with no server, and says why policies are locked.
+
+**Stale answers fill in** (owner, PRD §50: "dim the old values and fill them in as they roll"):
+- **Earlier contexts.** Each lane keeps up to three earlier contexts. On a new doctrine or aim, a situation with no answer under the new words plays the newest earlier answer, and is queued to be asked again.
+- **Display.** The ant card shows it faded, "by Jev's answer under its earlier doctrine (aim), while the new one is asked".
+- **Daughters.** `setDoctrineFor(k, words, inherit)` makes a lane fall back on other words instead: a daughter colony on her mother's doctrine (ja-lo8.9).
+- **Nothing is asked all at once.**
+
+**Superseded where Jev can answer** (§50.12, 2026-11-08): new words play the local rule until their answers arrive; the earlier answers act only while Jev can't run, and `inherit` is gone.
+
+**No sim change.** The goldens are untouched. Requests and contexts are byte-identical, so there are no new tokens per question.
+
+### 50.3 Slice 4: fungus v2: senses inside the ant, a level for every lever (ja-lo8.4, 2026-11-07)
+
+**What changed** (fungus-policy §11):
+
+*The fungal situation*
+- **What it is now:** what the fungus senses inside its host:
+  - arousal: calm, alarmed or fighting, from what the host last perceived;
+  - touch: none, nestmate or foreigner;
+  - place: outside, tunnel, chamber, or by the queen (her royal mark underfoot; a nest's disc on top-down maps);
+  - task: the age band, nurse, inside or forager;
+  - carrying: nothing, food or brood;
+  - groomed.
+
+  That makes 648 situations.
+- **What is gone:** the host's mode, the fungus's load, the strain, and the chamber owner's `ground`. This closes `ja-k4k.7`. A test pins that a host's situation does not change with its mode.
+
+*The answer*
+- **Levels, not one intervention.** Each answer is a level per lever (`levers.ts`): 15 levers, of which 13 are non-lethal and on the menu by default (11 on top-down maps, with no floor marks). Jev is asked one `score` question per lever on the menu. The answer is cached as the levels in table order, so the key carries the levers asked.
+- **The menu is a set of levers.** Lethal levers (odour weapon, crown) are off until turned on, and never asked while off.
+- **Strains** keep their spread traits and a default preset, and lose their `allows` gating.
+- **Presets.** The old interventions are now presets: named sets of levels whose values are exactly the old bundles'. So the local rule (each strain's default, plus the hide and cull settings) plays as before.
+- **Goldens are unchanged:** they paint no spores.
+
+*Hiding*
+- Hiding is now the "fungus showing" lever (`Colony.show`, not lerped by load). It replaces `expr === 0` plus "dormant on the menu".
+- `expr` names the preset a host's levels are, or `CUSTOM` (255) for Jev's own mix.
+
+*The lane*
+- **Batching:** at most 50 hosts to a request (`FUNGUS_BATCH`). The lane waits up to 2 s for a part-full request to fill (`FUNGUS_GATHER_MS`, `ColonyJevOptions.gatherMs`), since the legend is most of a small request. Hosts play their stale or default levels meanwhile.
+- **The legend** names each lever in a few words (`brief`), about 807 estimated tokens. A first draft that spelled out every level's words was about 2,000.
+
+*The UI*
+- **The ant card** lists what the fungus senses, then the levers it pulls, with stale ones dimmed.
+- **Learn → "How the fungus works"** has a one-line diagram, the senses, the levers, the local rule, and a "Show the table" toggle. The table lists Jev's answers so far, lazily filled, with an earlier aim's answers dimmed.
+- **Lever chips** replace intervention chips, in Details and Learn.
+- **Pins are not built** (`ja-lo8.11`): the owner asked that the table stay out of sight anyway.
+
+**Cost (live):**
+- **A live check of 4 situations under "Unite":** 3,530 input tokens, 883 per situation, against an estimate of 3,358. Every score parsed.
+  - Jev pulled the fungal odour (some) and the calming cue (some) everywhere.
+  - Where hosts touched foreigners it also had them read rival trails partly and damped the alarm laid.
+  - It leaked trail where a forager carrying food met a foreigner.
+- **Shipped fungus answers.** `precache.mjs --lanes fungus` asked the 90 situations a recorded side-view game meets (Garden on both royal chambers, Lockpick at both holes, 300 s) under each preset aim. That is 270 answers for **$0.0082**, about 724 real tokens per situation at about 45 to a request.
+
+**Cost as a game asks** (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1):
+
+| Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+|---|---|---|---|---|---|
+| Garden | 91 | 23 | 842 | 0.0032 | 0.039 |
+| Lockpick | 58 | 15 | 847 | 0.0021 | 0.025 |
+| Bloom | 68 | 23 | 914 | 0.0026 | 0.031 |
+
+Before (§39): 44–81 situations and about 560 tokens per situation as asked, $0.001–0.002 a game. Asking every lever costs about 1.5× per situation, under a cent an hour more.
+
+### 50.4 Slice 5: start, 4×, the landing, goals (ja-lo8.5, 2026-11-07)
+
+**Built:**
+- **The start screen** (`ui/StartScreen.tsx`) explains what the player is and has a world seed and Start. The field waits behind it, paused.
+- **Start lands the fungus.** `Game.land(k, strain)` drops spores on the ground just past colony k's hole: 3 cells along, radius 2, 3 spores, and no ant dosed directly. The first hosts are ants that walk through it. The game's fungus is Garden.
+- **Every later game lands too.** Once started, New world and Restart also begin with the landing.
+- **Speed.** The page defaults to **4×**, the top bar offers 1–8×, and Details has a slider to 8×. No sim constant changed (owner, §50).
+- **"Running at N×".** The top bar shows it when the measured sim-seconds per wall-second fall below 85 % of the speed asked (`ColonyStats.pace`).
+- **Goals.** `colony/chapters.ts` (pure, tested) drives a goal line in the top bar and a notice when a chapter ends:
+  1. land;
+  2. a first host;
+  3. a quarter of the colony;
+  4. the queen;
+  5. a new queen;
+  6. her colony.
+
+  Chapters 4–6 wait on `ja-lo8.7` and `ja-lo8.9`.
+
+**Measured:**
+- **The landing:** the first host within 2 minutes (test). In the browser, Garden took the whole Ink colony about 80 s of sim after the landing, so chapter 3 passes almost at once. This is Garden's spread as built (`ja-260`, the fungus budget), and the goals wait on balance (`ja-lo8.10`).
+- **Speed:** 3.6–3.8× real against 4× asked, on a 4-core machine with three benchmarks running, with no "running at" warning.
+
+**The blocker: a 2-hour game runs every colony down.** `scripts/economy-bench.mjs`, 7,200 s (30 minutes at 4×), 600 + 600 ants, no fungus, local rule:
+
+| Seed | First queen lost | At 7,200 s |
+|---|---|---|
+| 1 | Ink, by 3,600 s | Ink gone; Amber 95 ants, its intake 0.07/s |
+| 2 | Ink, by 1,200 s | both gone: Amber's last ants aged out with 123 unfed larvae beside 325 food in its larder |
+| 3 | Amber, by 1,200 s | Amber gone; Ink 137 ants, falling |
+
+Three existing problems, each with its bead:
+- **War (`ja-war`).** About 1,000 ants of the losing colony die in fights, and raids reach a queen within 20–60 min.
+- **Surface food runs out (`ja-p0k`).** About three quarters of the map's food lies underground and is never foraged, so intake falls to 0 by 2,400 s.
+- **Feeding collapses (`ja-xu6`).** On seed 2, larvae starve beside a full larder once the young are gone.
+
+Since the queen and new queens are the game's middle chapters, slices 7–9 need colonies that last. The owner decides how (§50.5).
+
+### 50.5 Keeping colonies alive in long games: the owner's choice, and food that regrows (2026-11-07)
+
+**Decision** (owner, on §50.4's finding):
+- **Built now:** food regrows.
+- **Wanted, as beads if hard:** foraging underground food (`ja-p0k`) and fixing larvae that starve beside a full larder (`ja-xu6`). Both are behaviour MRs:
+  - `ja-xu6`'s cause is the age bar on porting and nursing (`#port`, `#nurse`: band 2 never). When births stall, nobody old moves food to the brood. Lifting the bar changes behaviour from the first minute, since founders start up to half a lifespan old, so goldens and assays have to be redone (`ja-k4k.1`).
+  - `ja-xu6` now blocks the queen-birth slice (`ja-lo8.9`).
+- **Left alone:** the war (`ja-war`).
+
+**Regrowth (`GameParams.regrow`, `GAME_REGROW` = 1,800 s).**
+- **What grows back:** the food piles the world began with on the ground (the side view's walkway; every pile top-down) grow back toward their first size. Each unit comes back with chance deficit ÷ 1,800 a second.
+- **Constraints:**
+  - whole units only, so no trace amounts that ants would smell;
+  - not under the mound;
+  - on its own random stream, so the game's draws are untouched;
+  - food that grows back is added to `map.foodTotal`, so food conservation still balances.
+- **Where it's on:** the page. Off by default, so goldens, assays and tests are unchanged (`tests/regrow.test.ts`).
+- **Ceiling:** about 7,000 units of ground food on seed 1's map, so at most about 4 food/s map-wide when it is all eaten.
+
+**Measured** (`REGROW=1800 node scripts/economy-bench.mjs <seed> 7200 600 2 1200`; no fungus; 7,200 s is 30 minutes at 4×; Ink / Amber workers):
+
+| Seed | Without regrowth | With regrowth |
+|---|---|---|
+| 1 | Ink gone; Amber 95 | **579 / 425**, both queens alive; intake 0.5–0.6/s each |
+| 2 | both gone | Ink's workers all died in war by 4,800 s (1,065 lost; queen alive, no brood that can finish); **Amber 783** |
+| 3 | Amber gone; Ink 137 | **858 / 381** at 6,000 s, both queens alive |
+
+Regrowth ends the starvation: a lone colony now holds steady. War still ends a colony on one seed in three (`ja-war`, left as is). On seed 1 Ink held 129 unfed larvae for about 20 minutes beside 263 food in its larder before recovering: that is `ja-xu6`.
+
+### 50.6 Slice 6: saving games (ja-lo8.6, 2026-11-07)
+
+**How a save works.**
+- **Contents.** `Game.save()` is the game as JSON:
+  - the map as dug and eaten;
+  - every colony, including all 64 of `Colony`'s private fields (save and load generated from their declarations);
+  - each colony's scent;
+  - the chamber table;
+  - the fungus and recognition;
+  - the game's clocks;
+  - its random streams. `mulberry32` now exposes its `state`, with identical sequences.
+- **Restore.** `Game.load()` pours a save into a game built afresh from the same world and settings, so every reference is wired as usual. Raid aims are saved as colony indices.
+- **Format.** `colony/save.ts` encodes typed arrays as base64, chunk layers as their chunks, and Maps and Sets as lists. An object with `saveState` / `loadState` saves itself. Getters are skipped.
+
+**The guard** (`tests/save.test.ts`, side and top-down, the fungus landed):
+1. Run 40 s, save, JSON round-trip, restore into a fresh game.
+2. Saving again reproduces the save field for field. A dropped field shows at once: a mutant that skips `#under` fails. `#restT` didn't, being all zeros at 40 s.
+3. Run on 20 s: every typed array, scent and map layer, the spores, the brood and the chambers hash as the unbroken run's.
+
+**On the page** (`ui/saves.ts`, IndexedDB; memory where IndexedDB can't open).
+- **What a record holds:** the save, the settings that rebuild the world (seed, view, ants, rival, Restart count), and the player's state (aim, doctrines, menu, hide and cull).
+- **Slots:** an autosave every 60 s and when the tab is hidden, plus two slots of the player's.
+- **Where:** the start screen offers **Continue** (the newest), and Details has a Saved games card (Save here, Load).
+- **Browser check:** saved at 0:48 of sim; after a page reload, Continue came back at 0:48, at chapter 4, with the fungus in all of Ink, and no page errors.
+
+**No sim change.** Goldens are bit-exact. Nothing is asked of Jev, so the cost is unchanged.
+
+### 50.7 Slice 7: the queen as a host (ja-lo8.7, 2026-11-07)
+
+**Built:**
+- **Her state.** `Colony.queen` (a `Queen`) gains load, strain, resistance, show and signal.
+- **Infection.** `Fungus.step` adds her to the load grids, so she is a source like any host. `#stepQueen` steps her as an ant is stepped:
+  - contact load from the ants around her, her attendants, at the strain's transmission;
+  - spores under her;
+  - grooming by the nestmates around her (up to the usual four).
+- **Her own situation:** task `queen`, place `queen`, calm, touched by nestmates or none. That adds a value to `task`: 864 situations.
+- **Her own levers:** "fungus showing", and the new emission lever **queen signal**. Its levels 0.1 / 0.4 / 1 / 1.5 / 2 multiply the royal mark she lays (`QUEEN_MARK × signal`, lerped by her load).
+  - **Per-host asking.** Levers carry `hosts` (workers, queen, both), so a queen is asked only her two and a worker never hers (`askedLevers`, per-situation keys).
+  - **What it is for.** Queen signal is the emission route to new queens (new-queens §4); the gyne rule that reads the mark comes with `ja-lo8.9`.
+- **The reveal.** `Game.revealed[k]` is set the first tick the fungus is in colony k's queen (load ≥ `INFECTED`) and never cleared. It is saved with the game.
+  - **What it opens:** chapter 4 ends, and Learn → Policy shows that colony's doctrine. Before, it reads "Closed to you: reach the … colony's queen". The "What Jev is sent" sample hides the words too.
+  - **The lab:** Details hides the colonies' doctrines behind a "Show" button.
+- **The fungus panel** shows the fungus in each queen.
+
+**Jev:**
+- `FUNGUS_BRAIN_VERSION` 6: the legend gains the queen task and the queen-signal lever.
+- Re-shipped fungus answers: 93 situations per preset aim, 3 of them a queen's, for **$0.0083**.
+  - Under Unite and Peace, Jev leaves a queen as she is.
+  - Under Spread, it dims how much of the fungus she shows.
+
+**Tests** (`tests/queenHost.test.ts`):
+- loaded attendants infect her and clean ones don't;
+- she is asked only her levers;
+- a strongly damped signal cuts her mark to under half;
+- the reveal fires once, stays, and survives a save.
+
+**Pace (to balance, `ja-lo8.10` / `ja-260`).** In the browser at 8×, Garden from the landing reached Ink's queen at 46 s of sim (about 6 s of wall time), so chapters 2–4 pass almost at once. The game needs a slower or costlier spread before it is a game.
+
+No change to the colony lanes: their requests are byte-identical, and the goldens are bit-exact (they paint no spores).
+
+### 50.8 Slice 8: several colonies at runtime (ja-lo8.8, 2026-11-07)
+
+**Built:**
+- **`Game.addColony({ x, y, antCount, odour })`.**
+  - In the side view it digs a hole in the column under x, with the world's own shaft and founding royal chamber (`world.foundNest`, exported from `digNest`). Top-down, it places a nest's disc.
+  - It adds a `Colony` of that many workers at that odour (its queen in the side view), then rewires every colony: grids, burials, enemies, the other nests, raids.
+  - **Kin.** A daughter at her mother's odour is kin, and is not raided by her.
+- **Saves.** `Game.founded` records each founding. A save re-founds them on a fresh map before pouring the state back, and stays bit-exact (`tests/addColony.test.ts`).
+- **Unity for any number of colonies.** The gap is the widest between any two standing nests' odours, and mixing counts ants within tolerance of another colony's nest. With two colonies it is the same as before.
+- **The page draws any number of colonies.**
+  - The field, the minimap, picking and the nest buttons (one per colony; `n` cycles them) take the colonies list.
+  - `Followed` carries a colony index (`k`).
+  - Names and tones go on past Ink and Amber: Jade, Rust, Slate, Moss.
+  - The Jev client re-attaches when a colony is pushed onto the game's list.
+- **Lab:** "Found a colony between the nests" (Details), until queens found colonies themselves (`ja-lo8.9`).
+
+**Checked:**
+- In the browser, Jade's hole, shaft, chamber and queen draw on the field, with its line in the fungus panel and its nest button.
+- In tests, a third colony's ants choose and live, and the other colonies know its nest.
+
+**Not done:** `Colony.foreign` stays "the nearest rival's trail", which already works for any number of colonies, rather than the strongest trail at the cell.
+
+### 50.9 Review fixes (PR #42, 2026-11-07)
+
+The PR's review found three blockers and six should-fix items; each is fixed on the branch with a test that fails without it.
+
+**Founding colonies** (`Game.addColony`):
+- **B1. A save restores the founded nest as dug.** A load re-dug each founded nest on the restored game's random stream, so a shaft could slant elsewhere (rng seed 13: x 411 instead of 417). `Founding.nest` records the nest as dug, and a load founds from it without digging.
+- **B2. Its own nest index.** The colony took index k in `map.nests`, which always holds the world's two nests: with the rival off it took the unused second nest. It now takes the index of the nest it pushed.
+- **S2. No shared holes.** A founding within `HOLE_GAP` (8) columns of a hole moves along to the nearest free column; top-down, `NEST_GAP` (12) between nests.
+- **S3. Every colony keeps every hole open.** `Colony.seeHoles()` runs on every rewire, so an older colony's mound never buries a founded hole.
+- A founded colony that falls no longer ends the game (`Game.fallen` reads the world's own colonies only).
+
+**Saves:**
+- **B3. An unreadable save never blanks the page.** Continue offers the newest save this version can read (`saves.newestReadable`); Details lists the others as from an older version, with Load disabled; a failed load plays a fresh game of the save's world with a notice; an error boundary round the app shows what broke and a Reload button.
+- **S1. The save test reads Colony's `#field` declarations** and requires the save to hold exactly those, bar its random stream; the run-on hash includes each colony's private state. Dropping `tired` from the save now fails it.
+
+**The fungus's touch is smell (S4).** `touch` was read from the colonies' occupancy grids, colony membership, which the fungus can't sense. It is now read from recognition's odour bands (`Recognition.around`, by odour, at the healthy tolerance, against the host colony's nest odour): as odours converge, a foreign ant that smells like home reads as a nestmate, and an estranged nestmate as a foreigner. The legend says so ("an ant that smells of another colony"): `FUNGUS_BRAIN_VERSION` 7.
+
+**Jev runs only when the player changes a policy (S6, the owner's decision; superseded by §50.11).** This replaced §50's "Jev is always on":
+- No run starts on page load or restarts at a time cap. A change of words, the fungus's aim or a colony's doctrine, starts one; the time cap ends it. Details → Resume still starts one by hand.
+- The policy editors are open whenever Jev could run: running, starting, never started, or after a time cap. The spend cap, the player's Stop, a failed start, and no server or key lock them, saying why.
+- The preset doctrines' and aims' words ship their answers and are never asked, even while a run is on (`ColonyJevOptions.shipped`): their unanswered situations play an earlier answer or the local rule, free. Restoring a save with words of the player's own starts a run.
+
+**Cost (S5).**
+- **Colony lanes:** unchanged (colony v5, stance v4).
+- **Fungus lane, v7.** Re-shipped answers: 93 situations per preset aim, 279 answers for **$0.0083**, about 708 real tokens per situation. As a game asks them (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1), now only under the player's own words:
+
+  | Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+  |---|---|---|---|---|---|
+  | Garden | 94 | 24 | 867 | 0.0034 | 0.041 |
+  | Lockpick | 60 | 16 | 877 | 0.0022 | 0.027 |
+  | Bloom | 72 | 30 | 1,017 | 0.0031 | 0.037 |
+
+  At v6 the same runs were 865–1,014. Under a preset aim and doctrines a game now asks nothing.
+
+**Left as filed:** the autosave's size (6.7 MB of JSON, ~260 ms in node at the page's defaults: a hitch every 60 s), a founded colony starting on Forage rather than its mother's doctrine (`ja-lo8.9`), and the fungus precache being side view only (a top-down game under a preset aim plays the local rule where nothing ships).
+
+### 50.10 Merging #41: shipping what the tests got (2026-11-07)
+
+#41 (behaviour MR 5.2) raised `COLONY_BRAIN_VERSION` to 6: one sentence of the mode legend, what the raid stance asks. Asking every mode situation again under the three presets would cost about $0.12 (117 requests). The owner's direction: don't precompute everything; ship what comes out of the tests.
+
+- `scripts/precache.mjs --import` ships the answers a live check already got (a `colony-live.mjs` cache), refusing any file asked under another context. Nothing is asked.
+- MR 5.2's live check (`experiments/caches/mr52-top-*.json`, top-down, seed 1, 300 s) holds 290 mode answers per doctrine under the current context, so the mode bundles now hold those 290 (of 3,888), for $0. The stance bundles (v4, unchanged) keep all 324.
+- `tests/precache.test.ts` now asks for a non-empty bundle of valid answers per preset, not every situation.
+- **What it costs in play.** Under S6 (§50.9) a preset's words are never asked, so a situation with no shipped answer plays the local rule. How many a game meets: in 600 s of 600 + 600 ants under the local rule, side world 1 met 330 mode situations, both side worlds 558, and the side and top-down worlds of seeds 1 and 2 together 834. The 290 shipped are top-down ones; most side-view situations in the nest play the local rule until a side-view live check is imported.
+- The merge also caught a field #41 added to `Colony` (`#gone`, a raider out on a raid) that the save left out: the S1 test (§50.9) failed on it, and it is now saved.
+
+### 50.11 Asking only for what isn't cached; one daily budget (PR #42 re-review S7, S8, 2026-11-07)
+
+The owner's rule: **don't spend while answers are cached; ask Jev only for the situations that aren't.** It replaces §50.9's S6 ("Jev runs only when the player changes a policy"; preset words never asked), which would have needed every situation pre-cached. The owner doesn't want a full precache while the game is in development.
+
+**S7, what is asked:**
+- The `shipped` exclusion is gone. A situation with no answer under the words in force, preset or the player's own, is asked, and its answer goes into the browser's cache. The shipped bundles are a head start, not a requirement.
+- With no run on, a miss calls `ColonyJev.wantsRun`. The page starts a run if Jev could run (`policyLock.shouldStart`): server and key there, not stopped by the player, the budget not spent. A page whose every situation met is cached starts no run and spends nothing.
+- On Pages (no API), presets play the shipped answers and the local rule, as before.
+- Measured by the re-review against the 290-answer import (180 s, seed 1, 600 + 600 ants): 50.8 % of side-view mode questions came from the shipped bundle (32 distinct situations missing), 97.2 % top-down (115 missing). Those few situations are now asked once and cached.
+
+**S8, one budget, not per-run caps:**
+- The caps date from the picture demo, where a run asked for as long as it was open. Here an open run costs nothing, so a time cap guarded nothing, and a per-run spend cap set no ceiling on total spend once runs start themselves.
+- The game's runs start with `GAME_CAPS` (no caps that bind), so a run stays open from the first miss until the page closes (its exit stops it).
+- The server's ledger keeps **one budget per UTC day across every run and page load**: `JEV_DAILY_USD`, default `DAILY_BUDGET_USD` $0.10. It counts every reply billed, including one landing after its run ended, and reserves for calls in flight as the spend cap does. The day's spend is kept in `data/jev-budget.json` (gitignored), so a restarted server knows it.
+- **When it is spent:** the run stops with reason `budget`, a new run ends as it starts, nothing more is asked, the game plays cached answers, stale answers and the local rule, and the policy editors lock with "Jev's daily budget ($0.10) is spent … until tomorrow".
+- **Details shows the budget** (spent of today's, and what is left) beside the run's own figures. Tests: a second run on the same day starts with what the first spent; a new day starts again; a reply from a replaced run counts; the store carries a restart.
+- The per-run caps stay in the ledger, with their old default, for any caller that asks for them.
+
+### 50.12 Infection difficulty and the fungus's progress: a body, adaptations and reach (ja-lo8.12, 2026-11-07)
+
+**The problem, measured.** The landing alone (no ant dosed) took the whole colony and its queen within half a minute of sim, on every strain and seed (`scripts/progression.mjs`, side world, 600 + 600 ants, local rule plus the shipped answers of an aim):
+
+| Seeds 1–3, Unite | First host | A quarter | The queen |
+|---|---|---|---|
+| Garden as listed, the game before this | 2 s | 12–14 s | 19–25 s |
+
+At 4× that is a few seconds of wall time, and the fungus started with every power it would ever have. Infection was a cliff, not a slope. In a mixed nest, every ant settles at the same load once transmission beats what four groomers take off a visible host, so there was no middle. Below that threshold, a lone host could not infect anyone: `clear` zeroed a clean ant's first step, so the minimum dose depended on step size.
+
+**The owner's decisions.**
+- **Strength unlocks, Jev answers the full range.** Upgrades widen how far each group of levers may go. Jev is still asked every lever on its full scale, and the level is held only where it takes effect, so caches are never re-asked at an unlock.
+- **A grounded body, and adaptations from growth** rather than a currency: a real mycelium at the landing, and upgrades that come from fungus grown in hosts. A research note with primary sources comes first ([fungus-body.md](fungus-body.md)).
+- **The queen keeps a larger grooming cap (8) as a stop-gap,** and grooming, still scripted, is filed as a vision gap (`ja-k4k.12`, a new row in the gap table).
+
+**Built.**
+- **Reach** (`levers.hold`, `Fungus.held`). Each lever's level is pulled toward "as is" until it is within the lever's reach (0, 1 or 2 levels). It is applied in `expressLevels` and in the queen's step. A lab or test preset (`express`) is not held. `fungalKey` and the request are unchanged, and a test pins that.
+- **The fungus's body and evolution** (`colony/evolution.ts`, `Fungus.evolve`, `Fungus.root`, `Game.land(k, strain, { evolve: true })`, which only the page passes):
+  - **Its strain starts weak:** transmission 0.12, decay 0.03/s. In a crowded nest, four groomers take more off a visible host than it passes on.
+  - **A mycelium at the landing.** Its mass grows logistically (rate 0.03/s) up to the patch's capacity. It puts out a share of its mass a second as spores onto the landing cells, paid out of its mass, so it settles where growth meets sporulation. Foragers keep walking through it all game.
+  - **Adaptations from fungus grown in hosts:** load taken on from spores or by contact (`Evolution.replicate`). The mycelium's own growth gives spores, not adaptations. The n-th adaptation comes at growth 10 × (1.28ⁿ − 1)/0.28, so each takes 1.28× the growth of the last.
+  - **The upgrades,** costed in adaptations, 1–4 a level:
+    - Spread: Infectivity (0.12 → 0.15 → 0.23 → 0.3), Persistence (decay 0.03 → 0.012 → 0), Mycelium (capacity 30 → 60 → 120), Fruiting body (0.6 → 1.2 → 2 % of mass a second as spores), Immune evasion (0 → 35 → 70 % of primed resistance slipped past).
+    - Reach: Stealth (showing), Senses (starts at one step), Recognition, Trails, Royal (the side view only).
+    - Lethal levers stay on the menu toggle. The 40 adaptations' worth is not all reached in 20 minutes, so what the player chooses matters. (Since §50.16 the lethal levers have upgrades too.)
+- **The minimum dose is a rate** (`FungusParams.minDose` 0.02/s): a clean ant takes no load from a rate below it, at any step. `clear` zeroes only a falling load. At the 0.1 s step this is the old behaviour, and every earlier test passed unchanged.
+- **The queen's retinue:** `queenGroomers` 8. It is a stop-gap; see `ja-k4k.12`. (Since §50.14, in the evolving game only.)
+- **The page.**
+  - The Fungus panel shows the mycelium, the fungus in ants, adaptations to choose with a bar toward the next, and each upgrade's next level with a button.
+  - The ant card shows a held lever as what the host runs, plus "(wants …)" and the upgrade that would widen it.
+  - A notice says when there is an adaptation to choose, and the guide has an entry on the body and adaptations.
+  - `SAVE_VERSION` is 2: the fungus's save holds its evolution and its patch.
+
+**Measured** (same harness; the evolving fungus chooses the next upgrade in a fixed order as soon as it can; 20 minutes; the order fits each aim: Spread takes Stealth first, Unite last):
+
+| Aim | Seed | A quarter | Half | The queen | Adaptations at 20 min |
+|---|---|---|---|---|---|
+| Unite | 1 | 307 s | 372 s | 407 s | 29 |
+| Unite | 2 | 301 s | 315 s | 340 s | 29 |
+| Unite | 3 | 224 s | 257 s | 275 s | 29 |
+| Spread | 1 | 265 s | 293 s | 325 s | 28 |
+| Spread | 2 | 317 s | 332 s | 345 s | 29 |
+| Spread | 3 | 193 s | 219 s | 226 s | 29 |
+| Unite (confirm) | 11 | 360 s | 394 s | 400 s | 29 |
+| Unite (confirm) | 12 | 406 s | 425 s | 426 s | 29 |
+| Unite (confirm) | 13 | 281 s | 291 s | 336 s | 29 |
+| Unite, choosing nothing | 1–3 | never in 15 min | — | never | 4–5 waiting |
+
+- **The shape.** One adaptation arrives at the landing. Then a quiet two to three minutes follow while the trickle by the hole grows the next few. The breakthrough is the choice that tips transmission over grooming (Infectivity II, or Persistence with Infectivity I, or Stealth under an aim that hides). Then comes a run of choices as the nest fills, and a slower stream after that, about one a minute or two.
+- **The worst seed:** a quarter at 406 s and the queen at 426 s (about 1¾ minutes of wall time at 4×). The best: 193 s and 226 s. Before, the spread was 12–25 s.
+- **How the tuning got here.** Seed variance came from how many ants walk past the hole. A patch topped up to a fixed level from nothing, with income from carried load, varied 4× in early income between seeds (quarter at 27–295 s). A mycelium that pays for its spores, with adaptations from growth in hosts, narrowed it to the table's 193–406 s. The patch first starved to nothing when it kept a level topped up; spores as a share of mass settle instead.
+- **Not settled:** once the nest is held, the colony's resistance climbs to 0.7–0.9 by 20 minutes, but the fungus holds 100 % on every seed. Whether the colony should claw back is for `ja-lo8.10` (balance).
+
+**Jev cost: unchanged.** No legend, question, situation or brain version changed, and reach acts after the answer. So the fungus lane's ~708 real tokens per situation and its shipped answers stand (`precache.test` passes unchanged). An upgrade re-asks nothing.
+
+**Tests** (`tests/evolution.test.ts`, 7):
+- hold pulls toward as is, and leaves an unheld lever's range alone;
+- reach changes the host's gains but not the asked levers or the cache key;
+- adaptations come at rising thresholds and are given level by level, and a save round-trips;
+- the mycelium settles where growth meets sporulation, and its growth gives no adaptations;
+- the minimum dose means the same at a 0.1 s and a 0.02 s step;
+- the landing roots, sporulates and grows adaptations, and a lab landing has no body;
+- listed Garden takes over 90 % in 60 s, while the evolving one, choosing nothing, stays under half.
+
+`tests/save.test.ts` now lands the fungus evolving, as the page does.
+
+**Beads:** `ja-lo8.12` (this), `ja-k4k.12` (grooming from sensed cues), `ja-260` (the brush's cost: closed by §50.15, the brush removed), `ja-lo8.10` (balance: the colony clawing back).
+
+### 50.13 Mutations that track growth, and parity for founded colonies (ja-lo8.12, 2026-11-07)
+
+**The owner's direction.**
+- **The first colony must have nothing a founded colony couldn't get.**
+- **Adaptations should be mutation opportunities, and track growth rate.** "A little magical thinking in the interest of game joy" is allowed.
+- **Two ideas for later, filed as beads:** the mycelium finds food (`ja-lo8.13`), and the mycelium offers itself as food (`ja-lo8.14`).
+
+**Parity.**
+- **The colony side was already equal.** A founded colony (`Game.addColony`) gets the same as a colony the world starts with: the same params except its identity, the same cap, a queen, chambers, the same policies and responses, and the same wiring (grids, enemies, burials, raids).
+- **The one asymmetry was this slice's:** only the landing colony had a mycelium by its hole.
+- **Fix.** `Founding.fungus` carries the founding queen's fungus. When it is the evolving strain, the fungus roots a patch by her new hole, so the landing colony gets nothing a founded one can't. Each patch brings its own start (`BODY.start`) and room (capacity × patches). `ja-lo8.9` passes the fungus when it builds founding.
+- **A test pins both:** colony parity, and a patch only for a queen carrying the evolving fungus.
+
+**Mutations** (`MUTATION` 0.25 per unit of new fungus) replace §50.12's adaptations at rising thresholds:
+- **What counts:** every bit of new fungus is a chance to mutate. That is the mycelium growing on the ground, spores taking hold in an ant (no longer, since §50.14), and load passing on contact.
+- **So the rate tracks growth.** A fungus that grows fast mutates fast, and the panel shows mutations a minute (averaged over 20 s).
+- **The player keeps them,** giving mutations to an upgrade's next level. Each level asks more than the last: 2–10 for a first level, 300–1,500 for most second ones, 2,000–6,000 for the strongest. The rising costs stand in for selection and for adaptation's diminishing returns ([fungus-body §3](fungus-body.md#3-adapting-to-hosts)).
+- **The licence taken:** growth on the ground counts too, though the passage study ties adaptation to hosts.
+- **The harness picks like a player:** the first affordable upgrade in a priority order, so one it can't yet afford doesn't hold up a cheaper one.
+
+**Measured** (`scripts/progression.mjs`, 20 minutes):
+
+| Aim | Seeds | A quarter | The queen | Kept at 20 min |
+|---|---|---|---|---|
+| Unite | 1–3 | 155–206 s | 201–302 s | 14–16 upgrades |
+| Spread | 1–3 | 136–182 s | 169–212 s | 16–17 |
+| Unite (confirm) | 11–13 | 199–224 s | 216–244 s | 14–16 |
+| Unite, keeping nothing | 1–3 | never in 15 min | never | 53–63 mutations waiting |
+
+- **The rhythm:**
+  - a first choice within 3 s of the landing;
+  - one about every 30–60 s up to the breakthrough (two to three minutes in);
+  - then every one to three minutes as costs climb.
+
+  By 20 minutes about half of everything is kept (4,400–11,600 mutations earned, against 21,600 for all), so choices matter.
+- **Compared with §50.12's thresholds:** the breakthrough comes about a minute earlier, because the mycelium's growth now mutates too. The worst seed is still under four minutes to a quarter of the colony.
+
+**Jev: unchanged.** No request changed, and an upgrade re-asks nothing.
+
+**Tests:** `evolution.test.ts` now has 9:
+- mutations as a share of growth, with rising costs per level;
+- the rate settling at `MUTATION` × growth, and ten times the growth giving ten times the mutations;
+- two patches holding twice as much;
+- parity between first and founded colonies, and a patch for a carried fungus.
+
+### 50.14 Review of #43 (2026-11-08)
+
+The review approved once S1 and S2 were settled; both are fixed in code, with tests.
+
+- **S1: the queen's cap of 8 is the evolving game's only.**
+  - **Before,** `queenGroomers` changed every game's queen once she became a host. Side seed 1, 300 + 300 ants, Garden landed without evolving: her load at 90 s was 0.398 against `main`'s 0.510.
+  - **Now** a game that doesn't evolve grooms her with the usual cap (`groomers`, 4), so the lab, the assays and the earlier crown and regicide figures stand as measured.
+  - **Test:** not evolving, the cap is never read; evolving, it is.
+- **S2: mutations count only new fungus.**
+  - **The bug:** a host's gain from ground spores was credited as growth, though the mycelium had already been credited when it grew those spores. The landing's painted spores were never grown at all. About 20 % of early mutations were counted twice.
+  - **Now** only the contact share of a host's gain counts, since contact leaves the source its load.
+  - **Test:** contact counts exactly what it passed on; a lone ant on spores takes load and adds nothing.
+- **T1, T2:**
+  - **T1:** a test that the queen's levels are held (Stealth decides how far she hides).
+  - **T2:** a test that host mutations count, the same one as S2's.
+  - Both fail under the review's mutations (removing the queen's hold; deleting the worker's credit).
+- **Nits:**
+  - **N1:** a guard that every `#field` of `Fungus` is saved, derived on load or per-step scratch, as #42 did for `Colony`.
+  - **N2:** reach and immune evasion act only on hosts of the evolving strain; a lab brush's strain in an evolving game is as listed.
+  - **N3:** spores a full cell can't hold go back into the mycelium instead of being paid for and clipped.
+  - **N4:** a load with no evolution puts every strain back as listed.
+
+**Re-measured** (`scripts/progression.mjs`, as §50.13):
+
+| Aim | Seeds | A quarter | The queen | Kept at 20 min |
+|---|---|---|---|---|
+| Unite | 1–3 | 169–216 s | 219–314 s | 14–16 upgrades |
+| Spread | 1–3 | 156–193 s | 182–217 s | 17 |
+| Unite (confirm) | 11–13 | 218–241 s | 239–257 s | 14–16 |
+| Unite, keeping nothing | 1–3 | never in 15 min | never | 43–46 mutations waiting |
+
+- **The first choice** now comes 12–21 s after the landing, not at once: the landing's spores no longer count.
+- **The rest is 10–30 s later than §50.13,** and the worst seed reaches a quarter of the colony at 241 s.
+
+**Tests:** 402 fast tests pass, including 15 in `evolution.test.ts`. Jev cost: unchanged.
+
+### 50.15 No spore brush (ja-260, 2026-11-08)
+
+**The problem.** The lab's spore brush (Details) dosed every ant under a stroke for free, in any game: one drag skipped the weak start, the mycelium and every upgrade (§50.12–14). `ja-260` asked for the brush to cost the fungus, or to be a choice.
+
+**Why not lock it after the landing.** Every game the app plays, started or loaded, lands an evolving fungus at once (`useColony`, `Game.land(…, { evolve: true })`). So there is never a game without one in which a brush could stay free, and a lock would remove the brush anyway.
+
+**Decision (owner):** remove the brush and its strain picker from the app. The fungus reaches the ants only from where it lands.
+
+- `Game.paintSpores` and `Fungus.paint` stay for tests and the scripts (`crown.mjs`, `muddle.mjs`, `fungus-cost.mjs`). The stroke they replay is `BRUSH` in `game.ts` (radius 3, spores 2, dose 0.15), moved from `useColony.ts`; the scripts import it.
+- Gone from the field: the paint gesture, and space+drag to pan while painting.
+- Gone from the lab: the brush and strain buttons. The lab keeps the fungus's menu, hide and cull, and the doctrines.
+- The other strains (Lockpick, Bloom) remain as `STRAINS` entries, used by tests and scripts (and still described in `policyText.ts` and the Learn guide). Nothing in the app lays them now; `ja-lo8.10` decides whether they come back as something the game unlocks.
+- The figures measured with "the UI brush" (§39, §49.4, §50.9) stand. Their harnesses replay the same stroke.
+
+**Tests and cost:** no sim change, so the golden masters and the fast tests stand as they were. Jev cost: unchanged.
+
+**Review (own agent):** nothing blocking. Fixed: the scripts import `BRUSH` instead of copying it; the Learn guide and two research notes (`fungus-policy.md`, `queens-and-merging.md`) no longer send readers to a brush or a lab strain picker; Space on the focused field is still kept from scrolling the page. Filed: the lethal levers (crown, odour weapon) are held to no reach, so a player who turns one on gets it at full strength from the first second (`ja-lo8.16`).
+
+### 50.16 Lethal levers join the progression (ja-lo8.16, 2026-11-08)
+
+**The problem.** The review of #46 found the last free power. `Evolution.reach()` gave a reach only to levers some upgrade named, and no upgrade named the lethal levers (odour weapon, crown). So a player who put one on the menu got it at full strength from the first second, from Jev or from the local rule's cull, while every other lever was held to the reach the fungus had earned (§50.12).
+
+**Built.** Two reach upgrades, after Royal in `UPGRADES`, so that earlier indices and saves keep their meaning:
+
+| Upgrade | Lever | Steps | Cost | Where |
+|---|---|---|---|---|
+| Odour weapon | `weapon` | held off → free | 2,500 | every map |
+| Crown | `crown` | held off → free | 5,000 | the side view only (`nest`, as Royal) |
+
+- **Both are binary levers,** so reach 0 holds one as is (off) and reach 1 frees it. `hold` already did the rest. The hosts (`expressLevels`, which covers Jev's answers and the local rule) and the queen go through `Fungus.held`, so nothing else changed.
+- **Two gates, two meanings.** The menu chip is the player's permission, and the upgrade is the fungus's power. Both are needed.
+- **The page:**
+  - The Fungus panel lists both upgrades in the lethal red.
+  - A followed host shows a held lethal lever as "crown: off (wants on)", with the upgrade to keep, through the ant card's existing hint.
+  - The guide says so in its policy and evolution entries.
+- **Costs are first guesses,** placed among the strongest second levels (2,000–6,000, §50.13). Balance (`ja-lo8.10`) tunes them.
+- **Not held:** a game that does not evolve (the lab's landings, the assays, the tests), and a lab or test preset run with `express`.
+- **Saves:** a version-2 save without these levels loads them at 0 (held off), so `SAVE_VERSION` stays 2. A save from a game with a lethal lever on the menu therefore stops culling or killing queens once loaded, until the player keeps the upgrade.
+
+**Unchanged:**
+- **Jev cost:** no request changed, and reach acts after the answer, so `precache.test` stands.
+- **The golden masters:** they are bit-exact, since games that don't evolve have no reach.
+- **`scripts/progression.mjs`:** its figures stand. Its order buys neither upgrade, and its menu has no lethal lever.
+
+**Tests:**
+- 404 fast tests pass.
+- `evolution.test.ts` has a new test. It checks three things:
+  - every lever has a reach;
+  - weapon and crown start at 0;
+  - on a side world with both on the menu, a host's `estrange` and `regicide` stay 0 until each upgrade is kept, then rise. A game that doesn't evolve holds nothing.
+- It fails when the two upgrades start free.
+
+**Review (own agent): nothing blocking.** The hold covers every path where a lethal lever takes effect. Fixed:
+- **Copy.** The Learn drawer's local rule said the weapon works "only if it is on the menu"; it now also names the upgrade.
+- **Lethal lever on the menu but held off.**
+  - The Learn drawer's lever list now says "lethal, on, held off until you keep …".
+  - The lever chip's tooltip says the same.
+- **A lethal upgrade off the menu.**
+  - The panel marks it "(not on the menu)".
+  - The "mutations to keep" notice now ignores upgrades that would do nothing. It also ignores those the view hides, which was already true of Royal on the top-down view.
+- **A step-level test.** A policy that culls, run through `Fungus.step`, estranges no host until Odour weapon is kept. It fails if the step skips the hold.
+- **Nits.**
+  - The ant card's tooltip names a lethal lever as lethal, and says "its policy wants" rather than "Jev wants".
+  - The guide says "in the game", since the lab's own landings are not held.
+
+### 50.17 The local rule while new words are asked (ja-lo8.15, 2026-11-08)
+
+**Decision** (owner, 2026-11-08, replacing §50.2's stale fallback where Jev can answer): "we don't use the old values, unless … jev is broken". After the fungus's aim or a colony's doctrine changes, a situation with no answer under the words in force plays the **local rule** until Jev's answer arrives. Answers under earlier words play only while Jev can't run: no server or key, the daily budget spent, the player's Stop, a failed start. A daughter colony (ja-lo8.9) is no different: her mother's answers never stand in for hers. Where Jev can't run, the pen doesn't open and she keeps her mother's words, so the mother's answers are her own.
+
+**Built:**
+- `ColonyJev.canAsk` (default true), set by `useColonyJev` to `policyLock(...) === null`. A change makes every colony reconsider at once; the fungus re-reads its policy every step.
+- `#lookup` and `#explain` use the fallback contexts only while `canAsk` is false. The follow card then says "by the local rule, while Jev is asked" (or "the strain's default" for the fungus) instead of a dimmed earlier answer.
+- `fungusAnswers()` lists the earlier aim's rows, dimmed, only while they play.
+- `setDoctrineFor(k, words)` loses `inherit`.
+- Wording in the ant card, Learn's answer table and the guide.
+
+**Tests:** a new doctrine plays the local rule, is asked, and takes Jev's answer; with `canAsk` off the old words' answer plays, stale, and flipping it reconsiders once per change; a daughter's new words play the local rule; a new aim plays the fungus's local rule and lists the old aim's rows only while Jev can't answer.
+
+**No sim change.** The goldens are untouched; requests and contexts are byte-identical, so tokens per question are unchanged.
+
+### 50.18 Energy and hunger: old ants answer the brood's hunger (ja-xu6, ja-xu6.1, 2026-11-08)
+
+**The bug** (`ja-xu6`): in long side-view games, larvae starved beside a full larder. `#port` and `#nurse` refused every old ant (age band 2), so when births stalled the colony aged until nobody carried food to the brood or the queen, and births never restarted.
+
+**Owner's decision (2026-11-08):** fix it with a real body state, not a grace time. Adults and larvae both have energy, drained with time and activity and refilled by eating. Hunger is felt by touch.
+
+**Research** (web, 2026-11-08):
+- Hungry larvae beg with movements, more when starved in *Gnamptogenys striatula* and in *Formica fusca* and *F. exsecta* (not in *F. aquilonia*). Workers were not drawn to the odour of starved larvae, and starved and fed larvae did not differ in cuticular hydrocarbons (Peignier et al. 2019, *Front. Ecol. Evol.* 7:398, [frontiersin.org](https://www.frontiersin.org/article/10.3389/fevo.2019.00398/full)). So hunger is a contact cue, not a scent.
+- In *Myrmica rubra* a "gradient of hunger" runs from the foragers through the nurses to the larvae (cited there; the original not read).
+- Response thresholds (Bonabeau, Theraulaz & Deneubourg 1996, fungus-policy §3): an ant responds to a stimulus s with the chance s² / (s² + θ²); age only shifts θ.
+
+**Built** (`web/src/colony/hunger.ts`, `colony.ts #body`; the side view only, where a colony has a queen and brood; top-down maps are untouched):
+- **Adults.** `energy[i]` drains at 1/2,400 a second inside, twice that outside. Below 0.7 an ant tops itself up from food lying in its own nest within two cells (not in a brood chamber, whose food is the larvae's, nor the queen's stock of 8), at 8 meals from empty a unit, or takes food by mouth from the best-fed nestmate it touches (above 0.75: trophallaxis, energy passed, not made). At 0 it dies of hunger (`diedHungry`).
+- **Larvae.** `BroodItem.energy` drains at 1/600 a second. Food a nurse gives goes to its energy first, then to its growth; at 0 the larva dies (`broodStarved`), and its food leaves the economy.
+- **The queen.** Her own energy (1/3,600 a second); she eats from her chamber; at 0 she dies.
+- **Felt hunger.** Each tick a begging larva (below 0.8), a hungry adult (below 0.4) and a queen who has gone 20 s without laying for want of food are felt by the ants within one cell; each ant passes on 0.9 of what it felt last tick to those it touches. An ant's `need` rises toward the strongest it feels in 2 s and fades over 60 s.
+- **What need does.** An old ant ports and takes in brood with the chance respond(need, 0.3); the young and middle-aged as before. An ant feeling need (0.3 for the old, 0.1 for the others) follows the stores' floor marks to where food is kept, and there ports it on. Porters also bring a meal to the chamber a hungry adult is in (`#wanted`, the existing table: `ja-k4k.4`).
+- **Food conservation** gains the food eaten (`Colony.eaten`): map + jaws + larder + brood (1 + fed) + 4 a birth + eaten stays at what the map started with (food.test, economy-bench).
+- **Saves**: `SAVE_VERSION` 2 (energy, need, the queen's energy and how long she has gone unfed, brood energy).
+- **The follow card** shows an ant's energy and the hunger it feels.
+
+**What didn't work, measured** (the economy test's setup: 256 × 160, 110 ants, 0.3 food, 3,600 s, worlds 1–8 at seeding n = 0 and 1):
+- Eating only in the chamber an ant stands in: food piled up in stores nobody visits, and every adult starved by 2,400 s on world 1 (335 food left).
+- Letting adults eat the queen's stock: the crowd resting in the royal chamber (`ja-3po`) ate it, she stopped laying, and the colony aged out.
+- Following reception's marks to fetch: reception smells strongly and is usually empty; fetchers gathered there.
+- Draining from full to empty in 20 minutes, eating below 0.5: foragers on an emptied map starved before they got home (40–56 adults on three worlds).
+- A lower old-ant threshold (0.15), or need passed on at 0.95: the hunger response took foragers off the ground and nudged world 3 collapsed (60–80 adults starved). The dynamics are sensitive; need fading over 60 s rather than 30 was the one change that held everywhere.
+
+**The queen's begging, the last change.** At first she begged whenever her chamber held less than an egg's food. Early on she lays two eggs a second, so that was nearly always, and it drew old ants into porting and jammed the tunnels on some seeds: G seed 3 had 95 foragers holding food over 120 s, A8 seeds 1 and 7 had 74 and 173 porters (main's worst: 3 and 14). With her begging off (or after a 60 s wait) the jams went on those seeds, but with the 60 s wait two nudged economy worlds collapsed again (65 and 92 workers): in the spiral there is no brood to beg, and only her signal draws the old in. She now begs once she has gone `QUEEN_WAIT` (20 s) without laying for want of food, rising to full over as long again.
+
+**Measured, the 16 worlds** (main → this branch; workers at 3,600 s, worst larvae stranded at once, i.e. unfed over 120 s while the larder could feed them):
+
+| World | n = 0 main | n = 0 now | n = 1 main | n = 1 now |
+|---|---|---|---|---|
+| 1 | 160, 0 | 160, 1 | **77, 15** | 161, 1 |
+| 2 | 161, 0 | 148, 6 | **45, 13** | 129, 7 (25 adults starved) |
+| 3 | 160, 0 | 159, 2 | 161, 0 | 152, 14 |
+| 4 | 152, 7 | 156, 5 | **62, 44** | 134, 23 |
+| 5 | 161, 0 | 163, 0 | 162, 1 | 160, 0 |
+| 6 | 164, 0 | 159, 0 | 164, 0 | 161, 2 |
+| 7 | 159, 0 | 159, 2 | 162, 0 | 134, 20 |
+| 8 | 162, 0 | 164, 0 | 162, 7 | 164, 0 |
+
+- **No collapse**: main lost three colonies to the death spiral (45–77 workers left); now the lowest is 129, and births at least match deaths of age everywhere.
+- **Outside the test's bound** (≤ 5 stranded, ≥ 110 workers): main 5 of 16, now 5 of 16 too, but on strandings alone, late in the hour as this small map's food runs out. World 2 at n = 0 went from 0 to 6: `slow/economy.test`'s bound is loosened from 5 to 8 for it, and bead `ja-xu6.2` is to bring it back.
+- Adults eat 34–54 food an hour here (110–165 workers): about a fifth of a unit an ant-hour. Hunger killed adults on two nudged worlds (25 and 5).
+- **Guard:** `slow/economy.test` gains world 1 at seeding n = 1 (77 workers and 15 stranded on main; 161 and 1 now), and both cases assert no worker starved.
+
+**Assays, seeds 1–10** (side view; main → now):
+- G, the side-view game: pass 9/10 → **10/10**. Worst foragers holding food over 120 s 3 → 2; worst porters 8 → 6. Food home, median: Ink 2,199 → 2,377 (2,133–2,377 between the 5th and 6th seed).
+- A8, nest flow: worst porters holding food over 120 s 14 → 35 (seed 7; the others 0–1); larvae starved 0.5 median both ways.
+- A11 and A12: identical (top-down maps).
+
+**The two-hour game** (600 + 600 ants, regrowth on as the page plays, seeds 1–2; measured before the queen's begging was delayed): the war (`ja-war`) decides it, as on main. Seed 1: on main Ink fell to 572 workers with 129 unfed larvae at 3,600 s; now Ink held 852–892 throughout, but Amber was wiped out by the war by 3,600 s (on main she survived at 425). Seed 2: Ink lost to the war both ways; Amber 783 → 797.
+
+- **Golden masters re-recorded** (`GOLDEN_WRITE=1`): the side view (`tests/golden.json` "side view, seed 4", `tests/slow/golden.json` "side view war, seed 6") changes from the first tick, since founders now use energy and old ants' porting draws on the random stream. The top-down recording ("top-down war, seed 3") is bit-identical.
+- **Colony lane cost unchanged**: no legend, situation or question changed, so the shipped answers stand.
+- **Checks**: `npm test` 395 pass (the homing test now samples only ants on the ground line, its stated case: a young porter underground searched round a wrongly believed chamber by its nest vector, which the test's surface-vector filter never meant); `test:slow` 16 pass and the same 3 TODOs, of which `ja-3po`'s porter-hold guard now passes (left a TODO until that bead is looked at).
+
+### 50.19 Slice 9: new queens, the flight, the queen's pen (ja-lo8.9, ja-lo8.9.1, 2026-11-08)
+
+**What a player sees.** A colony whose nurses perceive the queen's scent faint rears new queens (gynes). Each ecloses as a winged alate, waits a minute in the nest among her nestmates, walks up and out, and flies. The game pauses. If the fungus is in her, her mother colony's queen was reached, and Jev can read new words, the **queen's pen** opens:
+- the player writes her doctrine (her mother's to start with; the presets as quick picks), the only time a colony's words change (PRD §50);
+- the player picks where she lands (east or west of the hole, 16–96 cells).
+
+Otherwise she founds on her mother's doctrine at once, and a notice says why. Her colony plays the local rule until Jev's answers to new words come (§50.17). Her mother keeps her own words.
+
+**Research** ([new-queens](new-queens.md) §2–§3, primary sources there):
+- The mated queen holds queen-rearing back through the workers: nurses that sense her pheromone kill sexual larvae, and stop when she is gone (Klobuchar & Deslippe 2002).
+- A large nest dilutes her signal; larvae stay bipotent early (Boulay et al. 2009).
+- Founding is claustral: the queen raises a first brood of nanitics alone on her body's reserve.
+- A daughter's odour drifts from her mother's: split *Aphaenogaster senilis* colonies differed in body odour within 5 days and could not be reunited by day 20 (bioRxiv 614719).
+
+The thresholds, rates and the drift's size and speed are the game's own (design).
+
+**Built** (`web/src/colony/royal.ts`; `colony.ts #body`, `#caste`, `#eclose`, `#alatesOut`; `game.ts` flights and `found`; the side view only):
+- **The queen's scent, carried on the ants.** Her royal mark lies on her chamber's floor and doesn't spread, so what reaches far brood is carried.
+  - She gives `SCENT_SUPPLY` (4 a second) × her signal to the ants within one cell of her, split among them. While nobody touches her she holds up to 20 s of it for the next ant.
+  - Each ant's `scent[i]` fades (100 s) and moves toward the mean of the ants within one cell (8 s): shared by contact.
+  - The supply is split, so a colony carries `SCENT_SUPPLY × SCENT_FADE / N` an ant. Measured: 2.4 at 165 ants, 0.45 at 900. The signal dilutes as the nest grows, with no count read.
+  - Founders start at that share.
+- **Caste** (`BroodItem.caste`), from the scent the nurses within two cells perceive (`scent × scentGain`, their strongest).
+  - **Reared as a gyne:** a larva in its first 10 s (bipotent), well fed (energy 0.9 or more), with 2 food lying in its chamber, and every nurse round it perceiving the scent below `GYNE_MARK` (0.4) for 4 s.
+  - **Culled:** a gyne larva by a nurse perceiving it at `CULL_MARK` (0.8) or more for 10 s. Its food leaves the economy (`eaten`).
+  - **Cost:** a gyne is fed 3× a worker's food (9) and takes twice as long as larva and pupa.
+  - No colony founding alone rears gynes.
+- **The alate** (`Colony.alates`), an entity apart from the workers' arrays, like the queen. She takes no ant slot and no job.
+  - She waits `ALATE_WAIT` (60 s), then walks out along the tunnels a cell every 0.4 s (`#climbOut`'s field), and flies at the hole: into `Colony.flown`, then `Game.flights`.
+  - Her egg and food become her body (`Alate.food`), held apart from the larder and fattened while she waits, up to `ALATE_RESERVE` (§50.20). The fungus steps her load as it does the queen's (`Fungus.#royalLoad`, shared now): from the nestmates she passes, groomed off by them. No lever is asked in her.
+- **Founding** (`Game.found`, `Founding.mother / reserve / load / strain`).
+  - `addColony` with no workers. Her chamber holds her body (`Flight.food`, at most 24), moved off the books' royal line into her larder, not new on the map (§50.20), and her queen carries the fungus the alate did.
+  - While `Colony.founding` she feeds her first brood herself (2 nurses' worth within two cells) and isn't beaten. Her first worker ends it.
+  - `autoFound` (on by default: the lab, the assays, the tests) founds at once at `landing()`, 48 columns from the hole on the side with room. The page turns it off, pauses, and founds through the pen.
+  - `MAX_COLONIES` (6, the page's colony names): an alate that flies past it is lost, as most founding queens are.
+- **Odour drift** (`ja-lo8.9.1`). The daughter starts at her mother's nest odour and drifts (`Colony.odourAim`, `recognition.ts driftAim`) 1.5 tolerances away toward the middle of the odour range, with a 500 s time constant. They become strangers in about 9 minutes, unless the fungus's odour levers (stranger scent, fungal odour) hold them together. No new lever (owner, 2026-11-08).
+- **The queen-scent lever** (`queenScent`, perception, nest only, workers). Its levels are 0.1, 0.3, 1, 1.5, 2 on `scentGain`, lerped by load as the other perception levers are. This is the second route of new-queens §4: it works before the queen is reached.
+- **Chapters:** `gynes` and `daughters` now read the landed colony's lineage (`Game.lineage`): its gynes and its daughters, theirs, and so on.
+- **The pen's gate** is pure (`ui/pen.ts penGate`): load at `INFECTED`, `revealed[mother]`, and `policyLock` null.
+- **Outcome:** "unified" now needs two of the world's own colonies (a solo world with a kin daughter isn't one colony). With two, daughters count in `unity()`: the fungus must hold them too.
+- **Saves:** `SAVE_VERSION` 3 (alates, flights, scent, castes, the founding flag, `odourAim`). A save founds its daughters again from `Founding.nest`, then pours their state back over them.
+
+**Measured.**
+- **Scent and thresholds** (probe, side view, seed 1–2): a healthy 900-ant colony's larvae perceive 0.52–0.82 (none below `GYNE_MARK`); a 165-ant colony's 2–6. No gyne was reared in 30–40 minutes of either.
+- **The lifecycle assays** (new: `lifecycle`, `lifecycle-signal`, `lifecycle-scent`; solo, 600 ants, the fungus landed, 1,800 s, seeds 1–2; the lever arms force it in every ant from the start, to measure rearing apart from spread):
+
+  | Arm | First gyne | First flight | Daughter's first worker | Her first forager out | Gynes | Culled | Daughters |
+  |---|---|---|---|---|---|---|---|
+  | none (dilution alone) | – | – | – | – | 0 | 0 | 0 |
+  | queen signal 0.4 | 158–170 s | 296–311 s | 351–366 s | 386–901 s | 28–31 | 0–1 | 5 (cap) |
+  | queen scent 0.3 | 28–129 s | 172–271 s | 227–327 s | 777–868 s | 47–69 | 0 | 5 (cap) |
+
+- **For slice 10's balance** (`ja-lo8.10`):
+  - a damped colony rears dozens of gynes, most lost past the cap;
+  - daughters stay small (4–10 workers after 25 minutes);
+  - the queen counts as reached about 20 s after landing (load 0.05; she lies 16 rows under the hole). That predates this slice: measured the same on the previous commit.
+- **Golden masters bit-exact**: `tests/golden.json` and `tests/slow/golden.json` unchanged. No gyne is reared and no fungus painted in them; the scent is computed but read only by caste, and no random number is drawn for it.
+
+**Gaps against the vision.**
+- **Caste is a scripted choice**, not the colony policy's: `#caste` reads only local cues (the perceived scent within two cells, the larva's energy). But it reads the food lying in the larva's chamber from the chamber table, as larval feeding already does (`ja-k4k.4`).
+- **The alate's walk out** uses the whole-nest distance field (`#climbOut`, `ja-k4k.2`).
+
+**Cost.**
+- **Fungus lane v8:** the new lever is in the legend and in every worker's question in the side view. Re-shipped (`node scripts/precache.mjs --lanes fungus`): 130 situations per preset aim, 390 answers for **$0.0126** (estimated $0.0114), about 770 real tokens per situation. Under the presets Jev leaves `queenScent` as it is in all but one situation: none of those aims is about queens.
+- As a game asks them (`node scripts/fungus-cost.mjs`, estimated, 5 minutes, 600 + 600 ants, seed 1; these also carry §50.18's economy change):
+
+  | Play | Situations | Requests | Tokens / situation | $ / game | $ / h |
+  |---|---|---|---|---|---|
+  | Garden | 85 | 15 | 852 | 0.0030 | 0.037 |
+  | Lockpick | 79 | 28 | 1,026 | 0.0034 | 0.041 |
+  | Bloom | 146 | 28 | 868 | 0.0053 | 0.064 |
+
+- **Colony lanes:** unchanged. A daughter on her mother's words plays the cached answers; on new words, a daughter asks what she meets under them (a doctrine change's cost, as before).
+
+**Checks.**
+- `npm test`: all pass, 7 new (`royal.test`, `ui/tests/pen.test`).
+- `test:slow`: 16 pass, the same 3 TODOs.
+- Lint: 7 warnings, as on main.
+- End to end (Playwright, the dev server with no key, `/api/health` stubbed as having one so the pen's gate is open, no spend): an infected alate pauses the game and opens the pen; Cautious and Found starts Jade, founding, carrying the fungus, and play resumes. A clean alate founds on Ink's words with the notice, no pen. Dev builds put the game on `window.jevAnts` for such checks.
+
+### 50.20 Merging #43 and #44 into the new-queens branch (2026-11-08)
+
+`main` gained the fungus's progression (#43, `ja-lo8.12`: §50.12–50.14) and raids (#44) while §50.17–50.19 were built (they were numbered 50.12–50.14 on the branch). The merge:
+- **The royal body:** `#royalLoad` (the queen's and an alate's fungus, §50.19) takes #43's changes to the queen: resistance evaded by the evolving strain, the least dose, mutations from what is caught, the queen's retinue cap (in the evolving game only; an alate is groomed as any host), and the "clear only while falling" rule.
+- **A daughter's fungus** goes in #43's `Founding.fungus`, which was left for this slice. So a daughter queen carrying the evolving fungus also roots its mycelium by her hole, and counts as a host.
+- **The queen-scent lever is in the Royal upgrade** with the queen signal (`evolution.ts`): the evolving fungus earns both together, from none to the full range. Without that it would have had the new lever at full range from the start.
+- **Saves:** version 3 (#43 had made it 2).
+- **Checks:** `npm test` 418 pass; `test:slow` 16 pass, 2 TODOs (#43 resolved one); lint 7 warnings; golden masters as merged, bit-exact.
+
+**A second merge** (#45, #46, #48–#52): `main`'s §50.15 (no spore brush) and §50.16 (lethal levers) came first, so this branch's sections moved to §50.17–50.20. `docs/new-queens.md` now describes gyne rearing and the queen-scent lever as built, not as on an unmerged branch. No code conflicted except `useColony`'s stats type (both fields kept). `npm test` 420 pass; lint 7 warnings.
+
+**Review of 959d1fe** (PR #47):
+- **S1, the reserve was made from nothing.** A daughter founded on 24 food while her eclosion wrote off at most 10 (her egg and `GYNE_FOOD` 9), and `foodTotal` was raised by 24 to balance. Now her body is the reserve, and it has its own place on the books:
+  - an alate ecloses carrying `1 + fed` (`Alate.food`); while she waits, the nestmates by her feed her from the chamber she is in (`ALATE_FEED` 0.5 a second, by up to two nurses) up to `ALATE_RESERVE` 24, out of the larder into her body;
+  - `Game.found()` moves her body into her colony's larder and changes no total; a lost queen's body (`lose()`, no room, `MAX_COLONIES`) is booked to her mother colony's `eaten`;
+  - the food books are map + jaws + larders + brood + 4 a birth + eaten + `Game.royalFood()` (alates' and pending flights' bodies), in `food.test`, `royal.test` and `economy-bench`.
+  - Alates fatten in the nest before the flight in the real thing too; the rate and the cap are design. Like larval feeding, fattening reads her chamber's food from the chamber table (`ja-k4k.4`). In small test worlds alates leave with 6–16 food, so a daughter can found leaner than before.
+  - **Test:** food is conserved through gynes reared, alates fattened, flights and foundings, and `foodTotal` doesn't move (`royal.test`); a lost queen's body is booked once. Founding on 24 rather than her body, an alate with no body, fattening that takes nothing from the room, or a lost body not booked each fails it. (A first version raised `foodTotal` at founding, so the books balanced even with the reserve put back to 24; a review agent caught that, and the body's own place on the books fixes it.)
+  - **Saves:** `SAVE_VERSION` 4, so a save from before alates had a body is refused rather than read with an undefined one.
+- **S2, `found()` twice founded twice.** It now refuses a flight that is not pending (−1, nothing added); tested.
+- **S3, `#wanted` reads every adult's energy.** Accepted for now and noted on `ja-k4k.4`, whose job is to replace `#wanted` with sensed signals.
+- **N3:** the toast for a queen lost to `MAX_COLONIES` says so, not "no room to land". **N4:** §50.2's two superseded bullets are marked.
+- **N1, N2, N5 stay:** a held larva still drains (not triggered in 60 s), the laying gate doesn't count larval upkeep (tuning, with `ja-xu6.2`), and the gyne's food cue reads the chamber's food as larval feeding does (`ja-k4k.4`).
+
+**A third merge** (#53, each ant's own stance, top-down): `CLAUDE.md`'s cost line takes #53's colony figures and this branch's fungus figures; `colony.ts` keeps both #53's stance gate and the side view's energy step in `tick`; the assay list keeps #53's `defendHome` and the three lifecycle assays. `tests/golden.json` took both sides' entries (#53's top-down, this branch's side view) and passes as merged.
+
+**Review of 718ec15** (a review agent):
+- **S1, a founding daughter held unity at 0.** `Unity.met` is the least allied-contact share over the standing colonies, and a queen founding alone stands (`Game.beaten`) with no ants, so her share of 0 made `met` and the score 0 until her first workers met someone. A colony with no ants is now left out of `met` (`#metNow`): it has nobody to meet. Tested: two colonies that have met keep `met` over `MET` when a daughter founds; counting her fails it.
+- **N1:** a books check while a flight waits for the page (`autoFound` off): dropping the flights from `royalFood()` now fails it.
+- **N2:** `found()` with a site that has no room after all (`addColony` throws "no room") loses the queen and books her body, instead of dropping the flight with its body unbooked.
+
+**Review of edc4088** (`pr-reviewer`): the PR body brought up to date (S4); §50.19's two lines on the reserve corrected (N6); a test for `found()` with no room for a hole (N7); the unity filter's comment says it leaves out any colony with no ants (a founding queen, or a colony whose workers all died), not only a founding one (N8); the alate's fattening reading her chamber's food from the chamber table is listed in `vision.md`'s food-flow row and on `ja-k4k.4` (N9).
+
+### 50.21 Slice 10: balance (ja-lo8.10, 2026-11-08)
+
+**No end screen** (owner, 2026-11-08): after the daughter chapter the game stays open. Nothing to build.
+
+**Pace, re-measured on top of #43** (`node scripts/progression.mjs --seeds 1-3 --seconds 900 --evolve`, the Unite aim, the default buying order):
+
+| Seed | A quarter | Half | The queen | Share / resistance at 15 min |
+|---|---|---|---|---|
+| 1 | 222 s | 250 s | 308 s | 84 % / 0.41 |
+| 2 | 309 s | 346 s | 368 s | 100 % / 0.50 |
+| 3 | 231 s | 247 s | 270 s | 96 % / 0.44 |
+
+- **The queen is reached in 4½–6 minutes in the game.** The "about 20 s" of §50.19 is the lab's landing (an evolved strain at full strength, `lifecycle` assays), not play.
+- **`ja-260` was closed by #46** (§50.15: the spore brush is gone), and the game's spread costs the fungus (§50.12–50.13).
+- **The colony now claws some back** (seed 1 fell from 100 % to 84 % in the last minute, seed 3 dipped to 65 %), which §50.12 left open. Not tuned further here.
+- **Royal**, the upgrade that reaches both queen levers, came 14th in the default order: seed 2 bought it at 753 s; seeds 1 and 3 had not by 900 s. A player who wants new queens buys it sooner.
+
+**Three faults found, and fixed.**
+
+1. **The gyne flood.** With a queen lever forced, nearly every young larva in a chamber with food was reared as a gyne at once. Seed 1, signal damped: 24 of 39 larvae were gyne brood at 240 s, 28 gynes in all, every flight after the fifth lost to the colony cap. Rearing stopped only when the colony hit its cap and the queen stopped laying.
+   - **Fix:** nurses feeding a gyne rear no second beside her. A larva with gyne brood (a gyne larva or pupa) or an alate within `GYNE_SPACING` (2) cells takes no gyne cue (`Colony.#royalNear`).
+   - **Why:** queens develop where larvae get more food (*Myrmica*: Brian's size threshold; *M. brevispinosa*, caste through larval nutrition: [antwiki](https://antwiki.org/wiki/Caste_Determination), [Sex Ratios and Caste Allocation](https://antwiki.org/wiki/Sex_Ratios_and_Caste_Allocation)), and workers tell gyne larvae apart (they cull them: Klobuchar & Deslippe 2002). That nurses round a gyne have no food for a second is the game's own (**design**). An alternative, alates damping rearing with a pheromone of their own, has no support: fire-ant virgin queens make queen pheromone only after shedding their wings (Vargo 1999), and Argentine-ant virgins not at all.
+   - **Seed 1:** spacing 0 (as before), 2, 3, 5 gave 28, 3, 2, 2 gynes. Chosen: 2.
+2. **Daughters shared a chamber.** Holes were kept 8 columns apart (`HOLE_GAP`). A founding chamber reaches up to 7 columns from its hole (the shaft slants about 2.5 over 14 rows, the disc 4.5 more), so daughters that landed by the same default spot dug into each other. Seed 1: queens 2 and 4 laid into and ate from one chamber, and the larder and the chambers' food drifted apart.
+   - **Fix:** `HOLE_GAP` 16. **Owner, 2026-11-09 (PR #54 review, D1):** keep 16. This fixes the side-view half of `ja-tjo`; one world's founding (`HOLE_GAP_2D` 12) stays there. #47 and #54 ship back to back (#47 as a merge commit, then #54 retargeted to `main`), so the 8-column gap never goes live with gynes.
+   - **Test:** `royal.test`, "dig apart", over three worlds. It fails at 8 (seed 1: two chambers 8.5 apart).
+3. **Daughters didn't grow.**
+   - **The reserve:** 24 food buys 6 eggs (1 each) and 18 for their larvae; with larval energy that is barely enough. In a shared chamber it wasn't, and all 6 starved at 940 s.
+   - **The age bands:** her first workers eclosed young. With no forager, the colony brought in nothing for 10 minutes; a worker is old (foraging) only at 1,260 s of age.
+   - **Fix: nanitics.** Brood laid while the queen founds alone ecloses at `NANITIC_AGE` (the old band's start), so her first workers forage at once, and live shorter.
+   - **Why:** in incipient *Pogonomyrmex rugosus* colonies nanitics take on outside work, pushed out as later nanitics eclose into brood care ([escholarship](https://escholarship.org/content/qt37w2d1mh/qt37w2d1mh.pdf)). Foraging from the first hour is the game's own (**design**).
+   - **Fix: the young colony's queen nurses.** With her nanitics out, nobody fed the next brood. While her colony is `incipient` (from founding until the first worker her workers reared ecloses), the queen feeds the brood by her that no worker tends.
+   - **A rule for every queen strands larvae.** In a world's own colony it failed `slow/economy` (9 and 7 larvae stranded at once, against a bound of 8 and 5): the queen ate into her own laying stock. Hence `incipient`.
+
+**Measured** (the `lifecycle` assays, a solo 600-ant colony, a queen lever forced in every host from the start, 30 minutes; median (min–max) over seeds 1–10):
+
+| Arm | First gyne | Gynes | Flights | Daughters | First daughter's workers at 30 min |
+|---|---|---|---|---|---|
+| None (dilution only) | never | 0 | 0 | 0 | – |
+| Signal damped, before (seeds 1–2) | ~160 s | 28–31 | 28–31 | 5 | 4–10 |
+| Signal damped | 169 s (117–1,577) | 4 (1–9) | 4 (1–9) | 4 (1–5) | 13 (7–67) |
+| Scent damped, before (seeds 1–2) | 28–129 s | 47–69 | – | 5 | – |
+| Scent damped | 37 s (28–129) | 7 (4–11) | 7 (3–11) | 5 (3–5) | 31 (14–52) |
+
+- **These rows are after #47's review (S1, §50.20) and the young queen feeding beside a nanitic (re-measured; the signal arm is unchanged):** a daughter founds on her mother's alate's body, fattened in the nest up to 24, not on 24 made from nothing. With the free 24 the first daughter had 26 (1–40) workers at 30 minutes (signal) and 33.5 (22–66) (scent); gynes were 4.5 and 6.5.
+- **A daughter's first worker goes out 3–4 s after she ecloses** (nanitics), 56 s after the founding.
+- **Confirmed on seeds 11–20** (signal damped, with the free reserve): first gyne 206 s (109–302), gynes 3 (1–7), daughters 3 (1–5), the first daughter's workers at 30 min 19 (7–39).
+- **The colony cap still binds** with a lever forced for 30 minutes on most seeds (5 daughters). A player pulls a queen lever for a while, not a whole sitting; `MAX_COLONIES` stays 6. `ja-lo8.10` stays open for it, the colony's late claw-back and the lethal levers' costs.
+
+**Review of 59eb236** (PR #54): S1, the young queen's nursing had no test that its removal fails. Two tests now pin it (`royal.test`): in a daughter whose nanitics are all out, a larva by the queen is fed while the colony is `incipient` and not once a worker her workers reared ecloses; a nanitic eclosing leaves the colony young. Dropping `incipient` from the nursing rule, or never clearing it, each fails them. N1 (a stale "env override" comment) went in the merge with #47. A review agent then found: one nanitic beside the brood halved its feeding (the queen stood in only when no worker was there); she now feeds as two nurses beside any (`Math.max`), tested. `incipient`, like `founding`, is a colony-wide fact the queen can't sense: a vision gap row and `ja-k4k.13`. The alate branch of `#royalNear` and the spacing edge (gyne brood exactly `GYNE_SPACING` away blocks, one further doesn't) are now tested; the `HOLE_GAP` comment no longer claims a daughter can't land against a grown nest's outer chambers. N2–N4 are as described: the founding queen now stands in for absent nurses rather than adding to them (the same while she is alone), `#royalNear` scans the brood (fine at today's sizes), and `incipient` can outlive a dead queen harmlessly.
+
+**Golden masters bit-exact**: no gyne is reared, no colony founded, in them. The economy is unchanged for a world's own colony (`incipient` is a daughter's only).
+
+**Checks:** `npm test` passes, with 6 new tests in `royal.test` for this slice: gyne spacing (with its edge and an alate); daughters dig apart; a daughter raises her first brood beside her sisters; the young queen feeds while `incipient` and stops after; she feeds at full rate beside a nanitic; a nanitic eclosing leaves the colony young; and nanitic and `incipient` asserts in the flight test. The food-conservation test now runs until the first daughter is no longer young, through her nanitics and the queen's nursing; `test:slow` 16 pass, 2 TODOs; lint 7 warnings, as on main.
+
+**Cost:** unchanged. No legend, situation or question changed.
+
+**A third merge** (#53, each ant's own stance, top-down): `CLAUDE.md`'s cost line takes #53's colony figures and this branch's fungus figures; `colony.ts` keeps both #53's stance gate and the side view's energy step in `tick`; the assay list keeps #53's `defendHome` and the three lifecycle assays.
+
+## 51. One world: the surface and a curtain under the line between the holes (design, ja-lp4, 2026-11-08)
+
+The owner asked for the top-down view and the side view to be two views of one game. The side view would be a cut along a line through the nests' holes, zig-zagging as nests are added, and a new nest may not be founded nearer an interior nest's hole, so the line always grows from an end. Today they are two unrelated games, and the Ground control throws the game away to switch (§27 created the split without choosing it).
+
+**Decisions (owner, 2026-11-08):**
+- **Underground is a curtain under the line, not a 3D volume.**
+  - The surface is a 2D plane with today's top-down physics.
+  - Everything underground lives in one vertical sheet under the line, with today's side-view physics, and the side view shows all of it.
+  - A hole is the only way between the two.
+  - A full 3D underground was set aside: depth-times the memory and tick cost, 3D digging and homing, and a side view that would miss tunnels.
+- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it, it is a 2D hole gap from every hole, and the ground is open.
+- **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
+
+**The note's open questions, answered (owner, 2026-11-08):**
+- **Tunnels of neighbouring colonies may meet** in the curtain; the contact response decides. A dig-stop rule would read another nest's position.
+- **A founding flight with no valid landing within her radius fails**, and the game says why. `new-queens.md` §3 is changed to match.
+- **Wide screens get the above/below switch first**; both views at once is a follow-up (`ja-lp4.8`).
+- **After U6 the old side and open maps leave the page**, kept as test beds until their assays are re-baselined.
+
+**U1 built, and two geometry calls (owner, 2026-11-08, `ja-lp4.1`).** `web/src/colony/transect.ts` is the line: holes in order, signed *s*, P(s), `canFound` with its refusal reason, `nearestValid`, `grow`. Nothing in the game uses it yet, so behaviour and the golden masters are unchanged.
+- **Columns are hex steps.** A segment's columns are the hex line between its holes (`hexLine` in `hex.ts`), so neighbouring columns always lie over the same or adjacent cells; a segment is `hexDistance` columns, up to ~15% longer than the surface at a slant, never shorter.
+- **Rule 2 covers the new margin.** The new segment and the margin it will carry must both keep clear of the line, so a founding whose margin would fold back is refused.
+
+**U2 built (`ja-lp4.2`, 2026-11-08).** `web/src/colony/oneWorld.ts`: `generateOneWorld(seed)` returns the plane, the curtain and the line.
+- **The plane** is `generateWorld(seed, OPEN_WORLD)`, unchanged. Its nests' holes, in order, make the line.
+- **The curtain** is laid out as a side view: 40 rows of sky; a ground strip copied from the plane under the line (`refreshStrip`; never simulated); the crust, open only at the holes; and 300 rows of the side view's ground, with each nest's shaft and royal chamber dug by `foundNest`.
+- **Stable under growth.** Its ground goes by *s* and the row, and each nest by its own hole, so a column keeps its ground when the line grows.
+- **The preview** is at `?world=one`: above and below, no ants. Nothing else on the page changes, and nothing in the game uses it yet, so behaviour and the golden masters are unchanged; `generateOneWorld` has its own golden.
+- **The margin stays 64.** Measured with `scripts/dig-spread.mjs` (the page's side-view game with no fungus landed, 600 ants a colony, seeds 1–3): after 600 s the farthest cell dug outward past an end hole (west of the westmost, east of the eastmost) lay 34, 51 and 36 columns beyond it, with the 99th percentile at 30–46.
+
+**The founding radius (research, `ja-lp4.7`).** `docs/nest-spacing.md`: mature harvester nests sit 9–14 m apart (one neighbour gap, the game's 140 cells); queens fly 5 gaps or more; spacing is made by young colonies dying near old ones (~8 m), not by where queens land. Design: `FLIGHT` 140 cells; keep `HOLE_GAP_2D` and `CLEARANCE` at 12 (the hole gap became 16 in U4a, owner 2026-11-09, `ja-tjo`).
+
+**The founding radius is 140 (owner, 2026-11-08, `ja-lp4.10`).** Proposed at 70, but measured: flight 140 with a 70-cell radius failed 51% of flights from end nests and 55% from interior ones; with 140, 6% and 28% (`scripts/flight-failure.mjs`, 300 seeds on the default plane). At 70 failure is noise, half of all flights wherever the nest; at 140 it shows the line growing from its ends. Queens should die mostly of contact after landing, as real foundresses do, not of geometry. U4's assay rechecks it with rock; the endless world (`ja-qpv`) looks at it again without the plane's edges.
+
+**Cost.** None yet. The mode situation keeps its fields, so one world should not change Jev's cost; U3 checks it with `colony-cost` (U3a did: below). Tick cost will rise toward the side view's 7.0–7.3 ms at 1,200 + 1,200 ants (§36, §37); U6 measures it before the page switches.
+
+**Review of #45 (agent, 2026-11-08):** the tick estimate (it had cited the old underground map, not the side view), the founding rule's clearance at the shared vertex and a minimum turn, ties, the hex rasterisation of the line, what growing the line does to the old end's margin, the larder (kept; it no longer makes ants), the 2D hole gap, the curtain's crust and margin, and where the fungus's mycelium lies were corrected in the note.
+
+**The mycelium lives in the soil (owner, 2026-11-08).** Not on the surface: the sun's UV would kill it. In one world it grows in the shaft's soil walls just under the hole, in the curtain, and ants pick it up brushing past; its spores reach the plane only on ants and corpses. Today's game roots it on the open cells by the hole, where ants walk (§50.12); `ja-yo3` moves it into the soil, with UV and habitat sources added to `fungus-body.md` first.
+
+**U3a built (`ja-lp4.3`, 2026-11-09).** A `Game` can run on one world: each ant on one layer, crossing only at the holes; pheromones, fights, recognition, allied contact and the fungus per layer; the queen economy; all workers start underground. The owner split U3 into three PRs, and decided that every returner goes down its hole, activation inside waits for `ja-web` (so one world never asks `leave`, and raids stay off until then), each ant keeps its own stance, and spoil and corpses go out at the hole until U3c (`one-world.md` §4, §8 items 8–13). The page still plays the two old maps. The old golden masters are bit-exact; one world has its own (`oneWorldGolden.test.ts`: seed 7's 160 × 100 plane, 150 + 150 ants, 90 s, about 7 s to run).
+- **Jev's cost** (`colony-cost --one`: seed 1, 600 + 600 ants, 10 sim-minutes, offline). The mode lane's request is the same size as the side view's: ~229 tokens a situation plus ~1,086 a request, in both. Batched as the page asks, ~783 tokens a question (the side view, run the same day: ~630), because fewer new situations arrive in each 0.3 s batch (1.9 a request, against 2.6). That is ~$0.074/h, against the side view's ~$0.156/h the same day: 122 distinct situations against 343, and no stance lane (0 stance choices). The leave lane asks nothing. The five other response lanes, if asked, would add ~$0.092/h.
+- **Tick time** (`colony-bench --one 600`: seed 1, 600 + 600 ants, 60 s, after a 5 s warm-up): mean 5.48 ms, median 5.11 ms, p90 7.98 ms; at the end 339/260 and 359/239 ants on the plane/in the curtain. A spot check; U6 measures 1,200 + 1,200 against the 7–9 ms budget.
+
+**U3b built (`ja-lp4.3.2`, 2026-11-09).** On the plane a homing ant steers by its own drifting home vector in 2D, started afresh only up out of its own hole, and snaps to the hole within sight of it. Where the vector ran out it searches in loops round that point, a quarter turn apart and 1.6 times wider each loop of four: a simplification of the sources' loops, which start and end at the search's centre (Müller & Wehner 1994; centred loops are `ja-lp4.11`). The spike forced two more rules: any returner on the plane that gets no nearer its belief for 3 s searches on, which unblocks beliefs in rock but also fires often far from the belief (seed 1, 120 s: 81 % of 596 firings more than 10 cells off; narrower versions delivered about the same, so it stays), and a searching ant follows the home trail under its antennae until its hole is in sight. Over seeds 1–3 food carried down changed by −28 % to +6 % against U3a (`one-world.md` §4, "U3b as built"). The owner moved 2D own-nest, neighbour and midden-side to U3c, from the ant's own vector (`ja-k4k.5`). No situation, legend or question changed, so Jev's cost is unchanged. The old golden masters are bit-exact; the one-world golden was re-recorded.
+
+**U3c built (`ja-lp4.3.3`, 2026-11-09).** The mound and the midden are on the plane (`one-world.md` §4, "U3c as built"). The mound is a height field of spoil per plane cell, heaped as a 2D sandpile at a level a cell (≈41°), with a ring round every hole (at most distance − 1 levels) that keeps it open. Spoil carried up the shaft is walked out on a heading drawn at the crossing and heaped where the carrier's own vector says it is far enough (the side view's draw, its reach grown as a disc's area rather than a strip's length); explorers pick pellets off its flanks to spread them farther out by vector, or take them down the hole to backfill, asked by the `get` response as in the side view. **The owner decided the midden's place (2026-11-09):** a ring set by the undertaker's own vector, the first cell off the mound at least 8 from home, not facing a rival's hole, which would read other nests' positions (`ja-k4k.5`); one pile found by corpse odour follows a research note. Its mark is laid on the plane, a Bloom host's spores land there, and rival raiders on the plane shy from it. A corpse put down at will (Jev's "put down" or "drop and run") counts as the midden only out on that ring; elsewhere it lies unmarked (owner, 2026-11-09). The old golden masters are bit-exact; the one-world golden was re-recorded.
+- **Spike** (`one-world-spike.mjs`, seeds 1–3, 300 + 300 ants, 300 s): food carried down changed by −25 % to +11 % against U3b, and over seeds 1–6 by +3.4 % in total (−13 % to +66 % on 4–6), the change of the random stream. Mounds of 216–450 pellets, 95 % within 10–21 cells of the hole, 2–3 levels high. No corpse reaches the midden in 300 s; on seed 1 over 2,400 s, 10 and 34 did, a median 13 and 16 cells out.
+- **Dig spread** (`dig-spread.mjs --one`, seeds 1–3, 600 + 600 ants, 600 s, Garden landed): at most 45, 46 and 49 columns dug past an end hole (p99 42–44), so the curtain's 64-column margin holds.
+- **Jev's cost** (`colony-cost --one`, seed 1): ~769 tokens a question, ~$0.092/h for the mode lane; U3b the same day ~753 and ~$0.082/h. No situation, legend or question changed; the difference is the situations each game visited (159 against 147).
+- **Tick time** (`colony-bench --one`, seed 1, 1,200 + 1,200 ants, 60 s): mean 12.78 ms (U3b the same day 12.05 ms): U3c adds about 6 %, and both are over U6's 7–9 ms budget.
+
+**U4a built (`ja-lp4.4.1`, 2026-11-10).** A colony can be founded on one world, beyond an end of the line, by the lab or by a queen's flight; saves stay refused until U4b (`ja-lp4.4.2`). The owner decided (2026-11-09) three things: U4 is two PRs; maps get an x origin, so the curtain is indexed by *s* and growing at V₀ renumbers nothing; and `HOLE_GAP_2D` goes from 12 to 16, which fixes one world's half of `ja-tjo` (on one world's default curtains, seeds 1–20, founded royal chambers shared a cell in 15 of 80 pairs at 12 and 0 of 80 at 16; `ja-tjo`'s own count on side worlds was 25 of 80 at 12). `one-world.md` §4, "U4a as built".
+- **Founding.** `Game.addColony` moves a founding to the nearest spot within 140 cells where the founding rule allows it, or refuses it: "no room beyond the line's ends within her flight". `growWorld` grows the line and the curtain, whose new columns get their own ground and buried food while the old keep theirs, and puts the nest on both layers (dug in the curtain; on the plane, which has no soil, nothing is dug). A founding's hole must join the plane's main open ground, not a pocket closed in by rock (owner, 2026-11-10, PR #62 review D1; one-world §3 rule 4, §8 item 15). A flight is 140 cells from the mother's hole in a direction from the game's stream; a queen with nowhere to land is lost, and `Game.lastLoss` says why. The lab's "Found beyond ‹end nest›" shows when the game is one world.
+- **The founding radius, rechecked** (`flight-failure.mjs --rock`, seeds 1–20, each plane's own rock): flight 140 with radius 140 fails 8 % of flights from end nests and 27 % from interior ones (the bare plane, 300 seeds, at gap 16: 7 % and 28 %), so 140 stands. With rule 4 as the main open ground (D1), 8 % and 28 %.
+- **Cost.** No situation, legend or question changed. `colony-cost --one` (seed 1): ~791 tokens a question, ~$0.101/h for the mode lane (160 situations; U3c ~$0.092/h, 159). Tick time (`colony-bench --one`, same machine): 12.38 → 12.71 ms mean, within noise; the side view's unchanged within noise. A founding costs ~30 ms once.
+- The old golden masters are bit-exact; the one-world golden was re-recorded once, for the x origin (every curtain position 64 lower).
+
+**U4b built (`ja-lp4.4.2`, 2026-11-10).** One-world games save and load (`one-world.md` §4, "U4b as built"). The owner decided three things: `SAVE_VERSION` goes to 5 and older saves are refused, not migrated (first a no-op migration from 4 with version-4 fixtures from main, dropped in the review of #63: nobody plays the game yet, so backward compatibility doesn't matter); the fight-tick save drift (`ja-7ej`: a save on a tick with a fight death diverged on reload, in every game, because load rebuilt the occupancy grids and recognition bands from the living) is fixed here, by saving them; and compressing saves waits for a measurement over ~20 MB. Measured at page scale (seed 1, 800 + 800 ants, 600 s): one world with a founding 17.1 MB (1.7 MB gzipped), the side view 8.8 MB, top-down 7.5 MB, so no compression yet. No situation, legend or question changed: Jev's cost is unchanged. The golden masters are bit-exact.
+
+**U5.1 built (`ja-lp4.5`, 2026-11-10).** One world is playable on the page: Details → Ground → "one world", with an above/below switch (and the key v) that moves the camera, not the game; the side view stays the page's default until U6. The owner decided (2026-11-10) that U5 is two PRs (U5.1 playable, U5.2 the views linked) and that in one world the player's queen will land where the player clicks on the top view (U5.2). `one-world.md` §5, "U5.1 as built".
+- **The strip is drawn, not stored** (`one-world.md` §8 item 6): the curtain's strip row is sky and `refreshStrip` is gone; a step from a hole into the surface rows is a crossing whatever the cell holds, and the side view's walkers read the strip over a hole as their walkway (`walkable`). The one-world golden was re-recorded once for it; the old golden masters are bit-exact.
+- **The renderer** draws one layer at a time: above, the plane with its mound, the line and each hole's name; below, the curtain with the strip and the mound's cut drawn from the plane under the line, the plane's ants on it, and a rule at each bend with its turn. Each view keeps its camera; the curtain's extent is read again when a founding widens it. `?world=one` is retired.
+- **Cost.** No situation, legend or question changed. `colony-cost --one` (seed 1, 600 + 600, 10 sim-minutes; main the same day): ~784 tokens a question, ~$0.095/h for the mode lane, 158 situations (main: ~791, ~$0.101/h, 160). `colony-bench --one` (1,200 + 1,200, 60 s): 9.76 and 10.29 ms mean against main's 10.36 and 10.44, within noise.
+
+## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
+
+The owner asked whether the side view's undiggable crust could become an ant's own choice, and whether colonies could open new entrances (`ja-nzx`, `ja-4h2`, `ja-lp4.9`). `docs/entrances.md` holds the research:
+- Older, larger harvester colonies keep more entrances, funnelled into one entrance chamber (Gordon 2025).
+- Entrances are sealed at night and plugged by rivals.
+- Soil CO₂, moisture and temperature change with depth, and diggers respond to CO₂ (in a leaf-cutter) and moisture in choice tests; no study shows ants reading depth from them. Light matters only once the soil is open.
+
+No source found says what makes a colony open a new entrance from inside.
+
+**Decisions:**
+- **The crust stays a mechanic.** It keeps the walkway from hanging and the hole from being cut off.
+- **`ja-4h2` is deferred.** The cues exist, but the response that would use them would be invented. It reopens on a source about what triggers a new entrance, or when another behaviour needs a depth sense (for example chamber placement, `ja-k4k.3`).
+- **No vision sense-table row yet.**
+- **Two ideas filed:** new entrances that scale with colony size, into one entrance chamber (noted on `ja-lp4.9`), and closing entrances at night and plugging a rival's (`ja-lsu`, blocked by day and night, `ja-0qs`).
+
+**Review (agent):** corrected the light study's journal, the venting test's citation (Tschinkel 2013), placeholder titles, the fire-ant figure's source (Hays 1986), and an overclaim that ants read depth from the gradients; an untraceable claim on morning sealing was dropped and the evening sealing is sourced to a secondary page.
+
+**Search note.** Web searches on how long an insect-killing fungus survives sunlight (`ja-2qv`) were stopped by a safety filter this session; that research waits for a new session. This note's topic was not affected.
+
+**Cost.** None: docs and beads only.
+
+
+## 53. Unity needs contact (ja-i0f, 2026-11-08)
+
+**Problem.** `Game.unity()` called the colonies one when their nests smelled alike (gap within tolerance) and nobody had died fighting for a minute. Nothing asked whether they had met. Colonies that never touch have a quiet minute for free, so the underground world "unified" at about 105 s with zero contact (§22).
+
+**The signal: `Unity.met`.**
+- An ant is in **allied contact** when an ant of another standing colony is in its cell or the six around it (that tick's occupancy grids, `battle.ts` `around`), and its own odour is within tolerance of that colony's nest odour. It smells like them: a meeting, not strangers.
+- Each colony keeps the share of its living ants in allied contact, faded over `QUIET` (60 s) like the fight-death count. `met` is the **least** of the standing colonies' shares, so every colony must have met someone: one pair meeting a lot cannot carry a third that never touched anyone.
+- It is read in `tick()` after odours move (`Game.#meet`). It reads only: no ant state and no random stream moves.
+
+**The rule.**
+- `unified` = gap ≤ tolerance, quiet ≥ 60 s, **`met` ≥ `MET` = 0.01**, and every colony standing.
+- **Latched once won.** When all of that holds, the game remembers it. Unity then stays while the nests stay alike and nobody dies fighting, even if contact fades. Kin forage at home (the strategist does not raid kin), so contact can fade after the win; without the latch the outcome would flap and toast "One colony" again each time. A fight death or the nests drifting apart clears the latch, and the colonies must then meet again. The latch arms only on the whole condition, so contact from before a fight does not re-arm it while the quiet minute is still owed.
+- Enough contact is about 1 % of each colony's ants on average over the fading minute, not a minute of it: with every ant in contact `met` passes the floor in under a second, and at a 3 % share in about 24 s.
+- The unity score is multiplied by `min(1, met / MET)` (1 once latched).
+- `Unity.alike` (gap within tolerance) lets the panel say "the nests smell alike, but the colonies have not met yet".
+- Details shows `met` beside the other unity figures.
+
+**Measured** (Garden painted on both nests, the easiest case; `met` as a share, and as ants on average; the side rows were measured with the pooled share before review, which can only be higher than the least colony's):
+
+| World | Seed | Ants | Peak `met` | Peak ants in contact | Unified (new rule) | Unified (old rule) |
+|---|---|---|---|---|---|---|
+| open 160×100 | 2 | 150 + 150 | 2.7 % at 300 s, rising | ~12 | 235 s | ~120 s |
+| side | 1 | 300 + 300 | 0.34 % | 2.7 | no (600 s) | ~120 s |
+| side | 2 | 300 + 300 | 0.10 % | 0.9 | no (600 s) | ~120 s |
+| side | 3 | 300 + 300 | 0.002 % | 0.02 | no (600 s) | ~120 s |
+
+On the side view the two colonies hardly touch: no fight deaths in ten minutes, and at most a few ants meeting. The old rule's two-minute "win" there was this bug.
+
+**Why the floor stays at 1 % (owner, 2026-11-08: "consider the ongoing work toward a unified world").**
+- One world (§51, `ja-lp4`) puts the colonies on one top-down plane, where they meet as they do on the open map and clear the floor.
+- Their tunnels may also meet in the curtain.
+- After U6 the old side and open maps leave the page.
+- So the side view's missing contact belongs to a map on its way out. It is no reason to lower the floor, and no new world bead.
+- The interim cost: until U6 switches the page, the side-view default can't be won by unity.
+- Follow-ups noted on the beads:
+  - U3 (`ja-lp4.3`) counts contact per layer, the plane and the curtain;
+  - U6 (`ja-lp4.6`) guards that Garden in both clears `MET` on one world.
+
+**Saves.** Each colony's contact and the latch are saved (`private.metBy`, `private.haveMet`). A save from before has neither and loads as not met, so the colonies must meet again before they can be one. `SAVE_VERSION` is unchanged.
+
+**Unchanged.**
+- The golden masters, bit-exact: `#meet` writes nothing an ant reads.
+- Jev cost: no legend, question or situation moved.
+- The assays' outcome metric (`experiment.ts`) can now read "playing" where it read "unified". `npm run exp` was not rerun (slow).
+
+**Tests** (`recognition.test.ts`):
+- the unity unit test: alike and quiet but not met is not one; a minute together is;
+- colonies that smell alike but are kept apart for two minutes are not one;
+- strangers in contact count for nothing;
+- `met` and the latch survive a save, and a save without them loads as not met;
+- the five-minute Garden game asserts `met ≥ MET`;
+- after review: alike and met but not yet quiet is not one; unity holds once won while the colonies keep apart, and breaks when the nests drift; a fight death breaks it while the nests stay alike, and old contact does not re-arm it; `met` is the least colony's share, not the pooled one; contact is the cell and the six around, not two cells off.
+
+Each rule has a mutation that fails a test: drop `met` from `unified`, the quiet gate, the latch, its clearing on a fight death or on drift, arming without the quiet, or the per-colony least.
+
+**Review (own agent, PR #56).** No correctness bug.
+- Confirmed:
+  - the occupancy grids are fresh where `#meet` reads them;
+  - nothing it does moves ant state or a random stream (goldens bit-exact);
+  - save/load works;
+  - it runs in every two-colony game;
+  - its cost is in the noise (5.3 against 5.0 ms a tick at 1,200 + 1,200 ants, every odour forced alike);
+  - no consumer breaks: the slow tests never read unity.
+- Fixed:
+  - **R1:** the quiet gate had lost its test;
+  - **R2:** unity flapped as contact faded after the win (now latched);
+  - **R3:** `met` was pooled, so with three colonies a pair meeting could carry one that never touched anyone (now the least colony's);
+  - **N2:** "a minute" of contact was the wrong claim.
+- Noted, not changed:
+  - **R4:** contact reads ant odour against the other nest, as `mixing` does, not ant against ant as fights do; unity's gap and quiet gates mask the difference;
+  - **N1:** ants killed in a tick's fights still count for that tick;
+  - **N4:** `Colony.met` is an unrelated per-ant field;
+  - **N5:** the save run-on test does not hash unity.
+
+**Cost.** None (no Jev change).
+
+## 54. Each ant's own stance (top-down; ja-k4k.6, ja-d8e, 2026-11-08)
+
+Research basis: `docs/stance.md`. Every figure was read in a search summary, not the paper, so all are **unverified**.
+- **Defence is an individual's threshold.** A pavement-ant worker fights a stranger once an internal state passes a threshold, raised by recent encounters (Hoover et al. 2016; Bubak et al. 2016: octopamine and serotonin). *Pheidole* defence moves closer to the nest as the threat grows.
+- **Hunger does not raise aggression.** Sugar-starved Argentine ants grew less aggressive (Grover et al. 2007); starved and fed colonies were no different (Thomas et al. 2005).
+- **Crowded colonies raid.** Fire-ant brood raiding rose from 0 % to 68.5 % with colony density (Tschinkel et al. 1995). The denser side wins boundary disputes.
+
+### 54.1 What was there
+
+- **A colony-level strategist.** Every 5 s it chose one stance (forage, defend or raid) and told every ant. It read:
+  - food brought home, averaged over 60 s;
+  - deaths in fights, fading over 30 s;
+  - a map scan for strangers near the nest;
+  - size against the cap, and the larder.
+- **Its rule** raided when no food came in, which had no source behind it, or when the larder was full and the colony large.
+- **"Defend"** sent every ant that smelt alarm to fight, wherever it was, and sent every waiting forager out.
+
+### 54.2 What changed (open ground; `stanceGate` 1)
+
+- **Each ant's stance is its own** (`#stanceOf`):
+  - **defend** while its `threat` is past `defendAt` (1) within `homeGround` (10) of its nest. Threat is seconds of alarm smelt or strangers in reach, leaking with a 20 s half-life.
+  - **raid** once recruited.
+  - **forage** otherwise.
+
+  What each stance does is unchanged. `Situation.stance` and `Touch.stance` keep their three values. Defence lingers: 5 s of faint alarm near home keeps an ant defending for about 40 s (half-life 20 s, `defendAt` 1). That is the fading internal state, and is intended.
+- **No strategist on open ground.** The game loop skips it. Its 60 s intake average, 30 s loss decay and map scan are not read there. The side view keeps it (`ja-1a9`).
+- **Raid scouts go on a `leave` answer.** The answers are now/soon/wait/**raid**.
+  - "raid" sends a waiting forager out at `raidScout` (1/90 s) as a raid scout.
+  - `Touch.crowd` (few, many) is how crowded home is, felt by a waiting ant: nestmates in its cell and the six round it over 5 s, "many" from `crowdAt` 40.
+  - Local rule: returns none and crowd many → raid.
+- **No raid without a living rival** (review of #53, S1). With none left, or only kin, the game clears `Colony.raidable`, and neither a "raid" answer nor a raid trail recruits; "raid" is then a wait. This is interim, until the world grows a neighbour (`ja-5hm`, `ja-506`).
+- **The raid trail recruits at home and by degrees.** An idle ant at home that smells it is recruited at `raidRecruit` (0.1/s) × the trail's level (up to strong).
+- **Why "by degrees":**
+  - Recruiting anywhere ran away: G′ seed 1 had 773 of 899 ants raiding.
+  - Recruiting all at once at home made every raid a war: one scout's trail called the 150–200 ants idle there. On G′ seeds 1–4 that lost about 880 ants, against 170 with no raids and main's 800, whatever `crowdAt` (6–80).
+  - Ants differ in threshold (*Pheidole* majors answer only intense recruitment).
+- **Assays.**
+  - A11, A12 and A9 set raiding through the leave response (`RAIDING`, `NEVER_RAID`).
+  - A6's two sides keep the broadcast (`stanceGate` 0): with their own stance, defenders 40 cells from home turned away from the pass.
+  - New A13 `defendHome`: a war party marches on a colony that forages a far pile.
+- **HUD:** top-down, the side stats show how many ants defend and raid.
+
+### 54.3 Results (local rule)
+
+| | This MR | `main` |
+|---|---|---|
+| G′ seeds 1–20: ants alive (median, worst) | **900, 507** | 892, 223 |
+| G′ food stored (median, worst) | **4,406**, 1,912 | 4,274, 1,816 |
+| G′ ants lost (median, worst) | **441**, 870 | 848, 1,113 |
+| Rival: food / lost | 4,536 / 438 | 4,179 / 828 |
+| A11 seeds 1–20 (pass, gain median, worst) | **20/20, 2.65, 1.64** | 16/20, 2.04, 1.32 |
+| A11 seeds 21–40 | **20/20, 3.01, 1.59** | 13/20, 1.84, 0.97 |
+| A13 (pass; food against no war party; against the broadcast) | 15/20; 0.63; broadcast 0.62 | 1/10 at the original mark |
+| A6 (broadcast, the march) | 14/20, gain 1.74 | 14/20, 1.74 |
+| A1–A5b, A9, A12 | as `main`: 20/20 each; A2b 19/20 (seed 15 fails on `main` too) | |
+| A10 | 5/20 (ja-je8) | |
+
+- **No G′ seed ends with fewer ants than on `main`.** Seed 5 stores 13 % less food (4,339 against 5,012).
+- **A13's first mark** (food at least 0.8 of the no-war-party control) failed under both stances: an 80-strong war party forced to fight costs a 200-ant colony 120–130 ants whoever defends. The mark is now relative to the broadcast stance. Defenders near home: 0.27 on average sampled, against the broadcast's whole colony.
+- **Tried:**
+  - a default that never raids: G′ seeds 1–4 lost about 170 ants;
+  - crowd-only raids with recruitment all at once: about 880 lost;
+  - `raidRecruit` 0.02: A11 8/10, worst seed 1.07.
+
+### 54.4 Jev (spent ≈ $0.029 of $0.10)
+
+- **Legends** (colony v7, response v10; the stance lane is unchanged, for the side view):
+  - Stance, on open ground, is the ant's own: "forage, the usual one; defend, only while it smells alarm or meets strangers close to its own nest; or raid, once recruited".
+  - `crowd` is sent to the leave lane with the returns. The leave question gains "raid".
+  - The leave lane's key adds `crowd`.
+- **Two wordings were corrected after replays:**
+  - **"crowd" tied only to raiding.** Cautious and Forage answered "wait" for a crowded home with many foragers coming back, and Warlike raided with food coming back. Cautious's replay stored 1,228 against main's 3,853. Now returns come first: a crowded home with none coming back is the one case left to the doctrine.
+  - **A stance sentence leading with threat and defence.** Cautious answered "return" in 125 of 151 mode situations. Now forage is "the usual one".
+- **A third wording, after review of #53 (D1).** Cautious's mode answers kept rested ants at home with food ahead. A sentence now says caution means going home from danger, not staying home from food.
+- **Live:** `colony-live.mjs all --top`, four full runs at $0.0065–0.0066, plus two leave-only runs and one Cautious mode run (about $0.0024).
+  - Real tokens per question: mode 202, leave 404, contact 262, trail 250.
+  - Caches: `experiments/caches/stance-top-*.json` (7 / 4 / 10). The mode bundles are re-shipped from them (`precache.mjs --import`, 151 answers per doctrine); the stance bundles stand.
+- **Replays,** G′ seeds 1–6, the first colony; `main` is MR 5.2's caches replayed today. The local rule on this branch: 4,207 food, 648 lost.
+
+| Cache | Food | Lost | Before the caution sentence: food | `main`: food | Lost |
+|---|---|---|---|---|---|
+| Forage | 4,018 | 502 | 3,955 | 4,363 | 824 |
+| Cautious | **3,595** | 91 | 2,234 | 3,853 | 592 |
+| Warlike | 3,093 | 641 | 3,467 | 3,472 | 866 |
+
+- **Losses fall under every doctrine.**
+- **Cautious kept rested foragers at home under the second wording** (2,234 food). The cause was in its mode answers: with them removed it stored 4,801 (seeds 1–3); with MR 5.2's answers restored for the 15 situations where they differed, 3,645.
+  - The caution sentence brings it to 3,595, 7 % under `main`'s, with a sixth of its losses. Some sacrifice is the doctrine's (the owner's call on #53).
+  - Some of those situations stay ambiguous on open ground: a "return" situation doesn't say whether the ant is home or walking there.
+- **Warlike fell 11 %** between the two recordings (3,467 to 3,093), with the same losses. Its answer counts barely moved (fight 80 → 82), so that is taken as Jev's run-to-run variance, not the sentence.
+- **The shipped mode answers** are 151 per doctrine, from top-down caches (they were 290, from the side view and top-down). The side view, still on the broadcast stance, will miss more at first and ask live under the daily budget (§50.11).
+
+### 54.5 Cost
+
+Offline estimates (`colony-cost`), on this branch against `main` on the same machine:
+
+| | This branch | `main` |
+|---|---|---|
+| Top-down, mode lane | ~$0.024/h (no stance lane) | ~$0.030/h |
+| Top-down, the six response lanes | ~$0.020/h | ~$0.015/h |
+| Side view, mode | ~671 tok/q, ~$0.102/h | ~652 tok/q, ~$0.099/h |
+| Side view, response lanes | ~$0.127/h | ~$0.117/h |
+
+The longer legends cost a few per cent; the top-down stance lane is gone. The estimates were taken before the last two wording changes, which are within a sentence of them.
+
+### 54.6 Left out
+
+- **The side view** keeps the strategist and raids by coordinates (`ja-1a9`; `ja-k4k.6` stays open for it).
+- **A fight-recruitment signal** (pavement ants' escalation): alarm already draws defenders.
+- **Brood need** as a raid cue (`ja-gkl`).

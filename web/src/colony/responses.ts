@@ -61,7 +61,44 @@ export interface Touch {
   stance: Stance;
   /** how good the food is, tasted: the food it carries, or the food `get` offers; "fair" otherwise */
   quality: Quality;
+  /** the alarm it smells, strongest of its three sensors: none, faint or strong (behaviour MR 4: graded alarm) */
+  alarm: "none" | "faint" | "strong";
+  /**
+   * with strangers in contact, nestmates against strangers in its cell and the six round it, by touch (behaviour MR 4):
+   * outnumbered (under two thirds as many), even, outnumbering (over half as many again); "none" with no stranger near
+   */
+  odds: Odds;
+  /**
+   * nestmates bringing food home it has touched lately, at home (behaviour MR 5, docs/activation.md: Gordon's harvester
+   * ants leave on the rate of successful returns): none, few or many; "none" where the colony doesn't gate leaving
+   */
+  returns: Returns;
+  /**
+   * the raid trail it smells where it is (behaviour MR 5.2, docs/raid-recruitment.md): none, faint or strong. A colony that
+   * doesn't recruit raiders by trail (raidGate 0, or the side view) reads "strong", so its raiders leave as they did.
+   */
+  raid: "none" | "faint" | "strong";
+  /**
+   * how crowded home is, felt by a waiting ant (docs/stance.md: nestmates in its cell and the six round it, over a few seconds):
+   * few or many; "few" where each ant's stance is not its own (the side view)
+   */
+  crowd: "few" | "many";
 }
+
+export type Returns = "none" | "few" | "many";
+
+/**
+ * How soon a rested forager waiting at home goes out (behaviour MR 5): now, soon, or wait (only a scout goes); or raid (docs/stance.md):
+ * out, soon, as a raid scout looking for the rival.
+ */
+export const LEAVE = ["now", "soon", "wait", "raid"] as const;
+export type Leave = (typeof LEAVE)[number];
+
+export type Odds = "none" | "outnumbered" | "even" | "outnumbering";
+
+/** What an ant does on meeting strangers (behaviour MR 4, docs/combat.md). */
+export const CONTACT = ["fight", "flee", "drop and run"] as const;
+export type Contact = (typeof CONTACT)[number];
 
 export type Trail = "food" | "home" | "none";
 
@@ -85,15 +122,28 @@ export interface Responses {
   trail(t: Touch): Trail;
   /** How much of it, as a share of the colony's `deposit`. */
   trailRate(t: Touch): number;
-  /** How hard to steer away from alarm, as a share of the colony's `alarmAvoid` (0 = ignore it). */
+  /**
+   * How hard to steer away from alarm, as a share of the colony's `alarmAvoid` (0 = ignore it); negative steers toward
+   * it (behaviour MR 4: a little alarm draws, docs/combat.md).
+   */
   alarmGain(t: Touch): number;
   /** In a fight: alarm laid, as a share of the fight's `alarm` rate. */
   raiseAlarm(t: Touch): number;
+  /**
+   * Strangers within reach (asked every step while they are, `odds` filled in): fight them; flee (home, away from
+   * them); or drop what it carries and flee (behaviour MR 4).
+   */
+  contact(t: Touch): Contact;
   /**
    * Following a food trail to where it ends, and no food there (behaviour MR 3, docs/trails.md: Robinson et al. 2005):
    * "no entry" laid, as a share of the colony's `deposit` (0 = none).
    */
   noEntry(t: Touch): number;
+  /**
+   * Rested, empty-jawed and home, where the colony gates leaving: go out now, soon, or wait (only a scout goes out, now
+   * and then). `returns` says how many nestmates bringing food it has met lately (behaviour MR 5).
+   */
+  leave(t: Touch): Leave;
 }
 
 /**
@@ -107,9 +157,24 @@ export const localResponses: Responses = {
   drop: () => true,
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
   trailRate: (t) => (t.carrying === "food" ? TRAIL_BY_QUALITY[t.quality] : 1),
-  alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : 1),
+  // Graded (behaviour MR 4; docs/combat.md: low doses attract, ten times more repel): a faint alarm draws an empty-jawed
+  // explorer to see, and a follower keeps to its trail; strong alarm repels everyone but fighters and diggers, as before.
+  alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : t.alarm === "faint" && t.carrying === "none" ? (t.mode === "explore" ? -1 : t.mode === "follow" ? 0 : 1) : 1),
   raiseAlarm: () => 1,
   noEntry: () => 1,
+  // Behaviour MR 4 (docs/combat.md): before it, every ant with a stranger near fought. Now a carrier takes its load home,
+  // raiders and defenders fight, and on a forage stance every ant turns away (at food, the ant that didn't start it usually retreats: Human & Gordon
+  // 1996). Fighting only while outnumbering was tried: one side always outnumbers somewhere, and its fighters cut down the
+  // other's fleers (G′ seeds 1–4: 7,482 lost against 6,069 never fighting). `odds` is there for a policy that weighs it.
+  // An ant its mode policy sent to fight (a doctrine's, or a raid's) fights: the local policy no longer sends ants to
+  // fight just because strangers are near, and it sends a fighter home once the strangers are gone.
+  contact: (t) => (t.carrying !== "none" ? "flee" : t.stance !== "forage" || t.mode === "fight" ? "fight" : "flee"),
+  // Behaviour MR 5 (docs/activation.md): a waiting forager goes out on the returns of successful foragers (Gordon;
+  // Pinter-Wollman et al. 2013); with none, it waits, and only scouts go. A fighting stance doesn't wait for food.
+  // A raider (mode fight) home on a raid stance goes on a scout's trail (behaviour MR 5.2); a forager answers its returns, and a
+  // colony that raids or defends sends it out whatever comes back (MR 5).
+  // Each ant's own stance (docs/stance.md): a crowded home with no food coming back sends a waiting forager out as a raid scout.
+  leave: (t) => (t.mode === "fight" ? (t.stance === "raid" && t.raid === "none" ? "wait" : "now") : t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : t.crowd === "many" ? "raid" : "wait"),
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */
@@ -119,7 +184,8 @@ export function responses(over: Partial<Responses> = {}): Responses {
 
 /**
  * A situation as a cache key: 4 modes × 5 items × porter × digging × 4 places × 5 offered × enemy × 3 stances, then
- * quality only when it isn't "fair" (so keys from before quality still match: most combinations never occur).
+ * quality only when it isn't "fair" (so keys from before quality still match: most combinations never occur). Alarm and
+ * odds are the contact lane's alone (colonyBrain.responseKey): the other lanes are never sent them.
  */
 export function touchKey(t: Touch): string {
   return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}${t.quality === "fair" ? "" : `|${t.quality}`}`;

@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { USD_PER_INPUT_TOKEN, type JevRequest } from "../../shared/jev.ts";
-import type { Services } from "../../server/api.ts";
+import { USD_PER_INPUT_TOKEN, type JevRequest, type RunSummary } from "../../shared/jev.ts";
+import type { Services } from "../../server/replies.ts";
 import { JevAbortError, type JevCallResult, type JevCaller } from "../../server/jev.ts";
-import { Ledger, type Timer } from "../../server/ledger.ts";
+import { Ledger, type BudgetStore, type Timer } from "../../server/ledger.ts";
 import { FetchJevClient } from "../fetchJev.ts";
-import { DailyBudget, corsHeaders, originAllowed, parseOrigins, passOk, utcDay } from "../gate.ts";
+import { corsHeaders, originAllowed, parseOrigins, passOk } from "../gate.ts";
 import { route } from "../routes.ts";
 
 const PAGES = "https://bwvogler.github.io";
@@ -34,23 +34,8 @@ test("passphrase: must match, and fails closed when none is configured", async (
   assert.equal(await passOk("anything", undefined), false);
 });
 
-test("daily budget: a run's cap is cut to what the day has left, and the day rolls over at UTC midnight", () => {
-  const b = new DailyBudget(1, null, DAY);
-  assert.equal(b.capFor(0.1, DAY), 0.1);
-  const spentTokens = Math.round(0.95 / USD_PER_INPUT_TOKEN);
-  assert.equal(b.record(spentTokens, DAY), true);
-  assert.equal(b.record(spentTokens, DAY), false, "the same session total is not counted twice");
-  assert.ok(Math.abs(b.capFor(0.1, DAY) - 0.05) < 1e-6);
-  const tomorrow = DAY + 24 * 3600 * 1000;
-  assert.equal(utcDay(tomorrow), "2026-11-06");
-  assert.equal(b.capFor(0.1, tomorrow), 0.1);
-  // Restored from storage on another day: that day's spend does not count today.
-  assert.equal(new DailyBudget(1, { day: "2026-11-04", inputTokens: spentTokens * 2 }, DAY).remainingUsd(DAY), 1);
-  assert.equal(new DailyBudget(1, { day: "2026-11-05", inputTokens: spentTokens * 2 }, DAY).remainingUsd(DAY), 0);
-});
-
-function services(client: JevCaller | null, now = () => DAY): Services {
-  return { client, ledger: new Ledger({ timer: manualTimer }), now };
+function services(client: JevCaller | null, opts: { dailyUsd?: number; store?: BudgetStore } = {}): Services {
+  return { client, ledger: new Ledger({ timer: manualTimer, dailyUsd: opts.dailyUsd, budgetStore: opts.store }), now: () => DAY };
 }
 
 const billed = (inputTokens: number): JevCaller => ({
@@ -58,35 +43,34 @@ const billed = (inputTokens: number): JevCaller => ({
   destroy: () => {},
 });
 
-test("routes: a call is counted against the day, and the day's cap stops the next run from starting", async () => {
-  const svc = services(billed(Math.round(0.6 / USD_PER_INPUT_TOKEN)));
-  const budget = new DailyBudget(1, null, DAY);
+test("routes: the ledger's daily budget holds across a restart of the Durable Object", async () => {
+  let saved: { day: string; tokens: number } | null = null;
+  const store: BudgetStore = { load: () => saved, save: (v) => void (saved = v) };
   const body = (o: unknown) => async () => JSON.stringify(o);
-  const start = await route(svc, budget, "POST", "/api/run", body({ action: "start", caps: { capUsd: 5, capSeconds: 60 } }));
-  assert.equal(start.status, 200);
-  assert.equal((start.body as { caps: { capUsd: number } }).caps.capUsd, 1, "asked for $5, the day has $1");
-  const r = await route(svc, budget, "POST", "/api/jev", body(ask));
-  assert.equal(r.status, 200);
-  assert.equal(r.spent, true);
-  // A second run gets only the $0.40 left. (The stub bills far more than the request's size reserves, so it overshoots; a real reply cannot.)
-  assert.equal((await route(svc, budget, "POST", "/api/run", body({ action: "start", caps: { capUsd: 1 } }))).status, 200);
-  assert.ok(Math.abs((budget.snapshot(DAY).usd) - 0.6) < 1e-6);
-  await route(svc, budget, "POST", "/api/jev", body(ask));
-  const after = await route(svc, budget, "POST", "/api/run", body({ action: "start" }));
-  assert.equal(after.status, 409);
-  assert.match((after.body as { error: string }).error, /daily cap/);
+  const svc = services(billed(Math.round(0.6 / USD_PER_INPUT_TOKEN)), { dailyUsd: 1, store });
+  assert.equal((await route(svc, "POST", "/api/run", body({ action: "start", caps: { capUsd: 100, capSeconds: 86_400 } }))).status, 200);
+  assert.equal((await route(svc, "POST", "/api/jev", body(ask))).status, 200);
+  assert.ok(saved!.tokens > 0, "the day's spend was handed to the store");
+  // Evicted and rebuilt: a new ledger from the same storage still counts the day's $0.60, so a reply billing $0.60 more is over.
+  const again = services(billed(Math.round(0.6 / USD_PER_INPUT_TOKEN)), { dailyUsd: 1, store });
+  const health = await route(again, "GET", "/api/health", async () => "");
+  assert.ok(Math.abs((health.body as { run: RunSummary }).run.budget!.spentUsd - 0.6) < 1e-6);
+  await route(again, "POST", "/api/run", body({ action: "start" }));
+  await route(again, "POST", "/api/jev", body(ask));
+  const spent = await route(again, "POST", "/api/run", body({ action: "start" }));
+  assert.equal((spent.body as RunSummary).running, false);
+  assert.equal((spent.body as RunSummary).stopReason, "budget");
 });
 
 test("routes: errors keep the dev server's statuses", async () => {
-  const budget = new DailyBudget(1, null, DAY);
-  const none = await route(services(null), budget, "POST", "/api/jev", async () => JSON.stringify(ask));
+  const none = await route(services(null), "POST", "/api/jev", async () => JSON.stringify(ask));
   assert.equal(none.status, 503);
   const svc = services(billed(1));
-  assert.equal((await route(svc, budget, "POST", "/api/jev", async () => "{nope")).status, 400);
-  assert.equal((await route(svc, budget, "GET", "/api/jev", async () => "")).status, 405);
-  assert.equal((await route(svc, budget, "GET", "/api/nope", async () => "")).status, 404);
-  assert.equal((await route(svc, budget, "POST", "/api/jev", async () => JSON.stringify(ask))).status, 409, "no run started");
-  const health = await route(svc, budget, "GET", "/api/health", async () => "");
+  assert.equal((await route(svc, "POST", "/api/jev", async () => "{nope")).status, 400);
+  assert.equal((await route(svc, "GET", "/api/jev", async () => "")).status, 405);
+  assert.equal((await route(svc, "GET", "/api/nope", async () => "")).status, 404);
+  assert.equal((await route(svc, "POST", "/api/jev", async () => JSON.stringify(ask))).status, 409, "no run started");
+  const health = await route(svc, "GET", "/api/health", async () => "");
   assert.equal(health.status, 200);
   assert.equal((health.body as { authorized: boolean }).authorized, true);
 });
@@ -136,4 +120,13 @@ test("fetch client: a stop before sending throws at once; one on the wire gets t
 test("fetch client: the deadline turns a hung upstream into a plain error", async () => {
   const hang: FakeFetch = (_u, init) => new Promise((_r, reject) => init.signal?.addEventListener("abort", () => reject(init.signal?.reason)));
   await assert.rejects(client(hang, { timeoutMs: 20 }).ask(ask), (e: Error) => !(e instanceof JevAbortError) && /exceeded 20 ms/.test(e.message));
+});
+
+test("the Worker never loads server/api.ts, and what it shares stays free of node:fs", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const dir = new URL("../", import.meta.url);
+  for (const f of readdirSync(dir).filter((n: string) => n.endsWith(".ts"))) {
+    assert.doesNotMatch(readFileSync(new URL(f, dir), "utf8"), /from\s+["'][^"']*server\/api\.ts["']/, `worker/${f} imports server/api.ts, which throws at load in a Worker`);
+  }
+  assert.doesNotMatch(readFileSync(new URL("../../server/replies.ts", import.meta.url), "utf8"), /from\s+["']node:fs["']|new URL\([^)]*import\.meta\.url/);
 });

@@ -15,7 +15,7 @@ export default function PassNote({ onSaved, wrong }: { onSaved: () => void; wron
         onSaved();
       }}
     >
-      <label htmlFor="jev-pass">{wrong ? "That passphrase was refused. Try again to let Jev steer the ants:" : "Jev is hosted for this page behind a passphrase. Enter it to let Jev steer the ants:"}</label>
+      <label htmlFor="jev-pass">{wrong ? "That passphrase was refused. Try again:" : "Jev is hosted for this page behind a passphrase. Enter it to let Jev answer new situations and take new policies:"}</label>
       <input
         id="jev-pass"
         type="password"

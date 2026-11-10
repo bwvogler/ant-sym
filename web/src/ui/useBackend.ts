@@ -1,12 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { detectBackend, type Backend } from "./backend.ts";
 
 let cached: Promise<Backend> | null = null;
+const listeners = new Set<() => void>();
 
-/** The backend probe, once per page; `recheck` asks again (after the passphrase is entered). */
-export function useBackend(): { backend: Backend | null; recheck: () => void } {
+/** Probe again (after the passphrase is entered): every useBackend on the page gets the new answer. */
+export function recheckBackend(): void {
+  cached = null;
+  for (const l of listeners) l();
+}
+
+export function useBackend(): Backend | null {
   const [b, setB] = useState<Backend | null>(null);
   const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setTick((t) => t + 1);
+    listeners.add(bump);
+    return () => void listeners.delete(bump);
+  }, []);
   useEffect(() => {
     cached ??= detectBackend();
     let live = true;
@@ -15,9 +26,5 @@ export function useBackend(): { backend: Backend | null; recheck: () => void } {
       live = false;
     };
   }, [tick]);
-  const recheck = useCallback(() => {
-    cached = null;
-    setTick((t) => t + 1);
-  }, []);
-  return { backend: b, recheck };
+  return b;
 }

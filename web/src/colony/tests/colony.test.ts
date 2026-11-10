@@ -31,6 +31,8 @@ test("trailLevel, climb, avoid, turnToward", () => {
   assert.equal(avoid(5, 2, 1, 0.3), 0.3, "alarm on the left: turn right");
   assert.equal(avoid(1, 2, 5, 0.3), -0.3, "alarm on the right: turn left");
   assert.equal(avoid(3, 0, 3, 0.3), 0, "clear ahead: hold course");
+  assert.equal(avoid(-1, 2, 5, 0.3), 0, "rock on the left is no way out: hold course, not into it (ja-dul)");
+  assert.equal(avoid(-1, 5, 2, 0.3), 0.3, "rock on the left, less alarm right: turn right");
   assert.deepEqual([0, 0.05, 0.99, 1, 30].map(trailLevel), ["none", "faint", "faint", "strong", "strong"]);
   assert.equal(climb(1, 2, 1, 0.3), 0, "the front is best: hold course");
   assert.equal(climb(3, 2, 1, 0.3), -0.3);

@@ -32,7 +32,16 @@ This note collects what real foragers do. All numbers come from abstracts or cit
 - **Rest takes time.** While the ant is inside its nest, fatigue falls at a rate, so a full rest takes `restTime` seconds.
 - **The clock lever still applies.** The fungus's `clock` scales how fast fatigue grows and how fast it rests.
 - **`tired` = fatigue above `patience`.**
-- **Left for MR 5:** the encounter-rate trigger for leaving (Gordon), which builds on this rest. That is behaviour MR 5 (`ja-um8`).
+- **Built in MR 5** (`ja-um8`, [activation](activation.md)): the encounter-rate trigger for leaving (Gordon). On top-down maps a rested forager waits at home until nestmates come home with food, or scouts now and then.
+
+## Play
+
+- **See:** a forager that searched in vain walks home and rests inside, and a mill round spent food breaks up as its ants tire (PRD §44.2, §45.5 A3). The follow card shows fatigue against patience. Learn's "Tiredness and rest" entry explains it, but doesn't name the fungus's lever.
+- **Choose:** the "time out" lever (`time`, the `clock` field) scales how fast a host tires and how fast it rests (PRD §44.2). Longer, a host ranges far; shorter, it stays home. It is a Senses lever: one step from the start, the full range after the Senses upgrade (PRD §50.12).
+- **Counterplay and progression:** none of its own. Tiredness is the colony's nature, and no ant senses a host's clock. Whether a host that tires slowly escapes its groomers by staying out is not measured.
+- **Cost:** `tired` is one field of the mode situation, so it adds no question. The mode lane is ~657 tokens a question, $0.074/h (PRD §44.3). The preset doctrines' mode answers are shipped (PRD §50.2), and a game whose situations are all cached spends nothing (PRD §50.11). The fungus lane asks `time` with every other lever on the menu (PRD §50.3).
+- **Risks:** famine, if a short clock keeps foragers home; mills, if a long one stops them tiring, since only tiredness breaks a mill while "no entry" ships off (PRD §45.4). Neither is measured: food home and A3's time to clear at each `time` level would show it. Fights must tire too: when they didn't, raids never ended (PRD §44.2).
+- **Owner decisions needed:** whether tiredness should show on the field, not only on the follow card; whether Learn's entry should name the `time` lever.
 
 ## Sources
 

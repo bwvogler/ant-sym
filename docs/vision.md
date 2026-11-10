@@ -28,11 +28,11 @@ This is the budget the policy may draw on. Each row points to the research secti
 | Path integration | a home vector whose error grows by about 10 % of distance | outside; resets inside the nest | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole) |
 | Landmarks and entrance odour | corrects the vector near home | near the hole | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole) |
 | Floor marks ("road signs") | which chamber this is; turns at decision points | local, underground | [nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs) |
-| Queen pheromone | where the queen is; whether the colony has a queen | within the nest | [nest-and-home §1](nest-and-home.md#the-queen), [queens-and-merging §2](queens-and-merging.md#2-what-ants-do) |
+| Queen pheromone | where the queen is; whether the colony has a queen; faint in a big nest, so new queens are reared | within the nest; carried on workers and passed by contact | [nest-and-home §1](nest-and-home.md#the-queen), [queens-and-merging §2](queens-and-merging.md#2-what-ants-do), [new-queens §2](new-queens.md#2-the-queen-holds-it-back) |
 | Brood | dig here, tend here | local | [nest-and-home §1](nest-and-home.md#nest-structure) |
 | Own body | age, hunger, load, fatigue | internal | [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants) (response thresholds) |
 
-**Not yet researched:** corpse odour, which matters for the midden, and the substrate cues a fungus can sense. Write a note, with primary sources, before building on either.
+**Not yet researched:** corpse odour, which matters for the midden. Write a note, with primary sources, before building on it. What a fungus senses inside its host is in [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers). Most of it is marked design: no paper shows a fungus reading those cues.
 
 ## Where the code is today
 
@@ -42,37 +42,44 @@ This is the budget the policy may draw on. Each row points to the research secti
   - `foodTrail` and `alarm`: from the antenna sensors, which is sensed;
   - `homeTrail`: on the ground, the home trail. Underground, it is the chamber's role, read from the chamber table (meant as floor smell);
   - `enemy`: strangers within two cells, recognised by odour.
-- **Stance.** The colony's `Stance` (`forage`, `defend`, `raid`) is chosen from colony-wide and map-wide totals (`StanceSituation`) and broadcast to every ant. No ant senses it.
+- **Stance.** On the top-down map each ant's stance (`forage`, `defend`, `raid`) is its own, from what it senses: defend while it senses a threat near its nest, raid once a raid trail or its own errand recruited it ([stance](stance.md)). On the side view the colony's `Stance` is still chosen from colony-wide and map-wide totals (`StanceSituation`) and broadcast to every ant: no ant senses it.
 
 **Everything else is scripted.** Each row below is a behaviour that a mechanic chooses for the ant, using knowledge the ant could not sense, and the sensed cue that could drive it instead.
 
 | Scripted behaviour | Where | What it reads that an ant can't sense | Sensed cue that could drive it | Bead |
 |---|---|---|---|---|
-| Work by age: young nurse, middle-aged dig and carry, old forage (and only the old end a trip home: `arrive`, behaviour MR 2) | `band`, `#mayGoOut`, `#digs`, `#staysIn`, the arrival rule | fixed age thresholds | response thresholds over brood signal and encounter rate; age only shifts the threshold ([nest-and-home: places with jobs](nest-and-home.md#places-with-jobs), [fungus-policy A7](fungus-policy.md#a-perception-what-the-host-senses)) | `ja-k4k.1` |
+| ~~Leaving the nest: a rested forager home goes straight out~~ | ~~the arrival rule~~ | ~~nothing: it ignored whether anyone was finding food~~ | built in MR 5 on top-down maps: a waiting forager leaves on contacts with nestmates bringing food, scouts now and then ([activation](activation.md)); the side view still sends it straight out (`ja-web`) | ~~`ja-um8`~~ |
+| Work by age: young nurse, middle-aged dig and carry, old forage (and only the old end a trip home: `arrive`, behaviour MR 2) | `band`, `#mayGoOut`, `#digs`, `#staysIn`, the arrival rule | fixed age thresholds | response thresholds over brood signal and encounter rate; age only shifts the threshold ([nest-and-home: places with jobs](nest-and-home.md#places-with-jobs), [fungus-policy A7](fungus-policy.md#a-perception-what-the-host-senses)). **Porting and nursing built** (`ja-xu6.1`, PRD §50.18): an old ant works inside when the hunger it feels by touch passes a threshold age raises; going out, digging and arrival are still by age | `ja-k4k.1` |
 | Steering to the queen and to the hole | `#toBrood`, `#climbOut`, `#outField`, `#walkTunnel` | the queen's exact position; a whole-nest distance field; exact depth; the true goal vector when stuck | queen pheromone, gravity, floor marks, the drifting vector ([nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs)) | `ja-k4k.2`, with `ja-ipu`, `ja-cwu` |
 | Digging gate, chamber placement and roles | `crowded`, `#newChamberWay`, `#chamberRoom`, `#roleFor` | the colony's total floor per ant; every chamber of every colony; a role fixed at founding | local crowding (encounter rate); brood as the digging template; roles from what is kept there ([nest-and-home: nest structure](nest-and-home.md#nest-structure)) | `ja-k4k.3` |
-| Nursing, porters, food flow | `#nurse`, `#port`, `#wanted`, `feed` | the least-tended brood chamber colony-wide; every chamber's unmet need; food added straight to stores | brood and hunger signals by contact; trophallaxis; food that has to be carried ([ant-communication §1](ant-communication.md#1-how-many-channels)) | `ja-k4k.4` |
-| Midden, mound, backfill | `#middenSide`, `#byANest`, `#byAnEntrance`, `#occupied` | the rival's hole position; every nest and entrance; a scan of every ant | corpse odour (not yet researched); distance from the entrance by the vector; local occupancy ([nest-and-home: places with jobs](nest-and-home.md#places-with-jobs)) | `ja-k4k.5` |
+| Nursing, porters, food flow | `#nurse`, `#port`, `#wanted`, `feed`, `#alatesOut` | the least-tended brood chamber colony-wide; every chamber's unmet need; food added straight to stores; a larva's and a waiting alate's chamber food, from the chamber table | brood and hunger signals by contact; trophallaxis; food that has to be carried ([ant-communication §1](ant-communication.md#1-how-many-channels)). **Hunger by contact and trophallaxis built** (`ja-xu6.1`, PRD §50.18): begging larvae, hungry adults and a queen who can't lay are felt within one cell and passed on, and draw ants to the stores' marks; where a porter takes food (`#wanted`, which now counts hungry adults too) still reads every chamber | `ja-k4k.4` |
+| Midden, mound, backfill | `#middenSide`, `#byANest`, `#byAnEntrance`, `#occupied`; the mound's reach in `#carryOut` and the side view's walk out (`#heaped`); `#pickPlane`'s flank test | the rival's hole position; every nest and entrance; a scan of every ant; the colony's total soil brought out (`#heaped`), which sets how far a spoil carrier walks before it drops, in the side view and on one world's plane; the true cell of the ant's own hole, for which neighbour is "farther out" on a flank (one world's plane) | corpse odour (not yet researched); distance from the entrance by the vector; local occupancy ([nest-and-home: places with jobs](nest-and-home.md#places-with-jobs)); for the reach, walk out until the ground underfoot leaves the mound's top (the spoil the carrier feels underfoot, as the midden's off-mound rule reads it); for the flank, "farther out" by the ant's own vector, as its spreading heading already is | `ja-k4k.5` |
 | In its own nest or a stranger's (`Touch.place` "out" underground; where trips end) | `#inOwnNest` | every other colony's hole position | its own colony's floor odour or home field underfoot ([nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs)) | `ja-k4k.2` |
 | ~~Tiredness: a timer only the hole resets~~ | ~~`since` vs `patience`~~ | ~~time at the hole (never inside); any load put down or fight counts as success~~ | built in MR 3.1: `fatigue` grows only while searching outside empty-jawed, resets on finding food, recovers while resting inside ([tiredness](tiredness.md)) | ~~`ja-q47`~~ |
-| Stance and raids | `StanceSituation` (`game.ts`), `raidTarget` | map-wide food; colony totals; the rival hole's coordinates | alarm, encounter rates, recruitment trails laid by scouts ([ant-communication §3](ant-communication.md#3-rival-colonies)) | `ja-k4k.6` |
+| Stance and raids (side view) | `StanceSituation` (`game.ts`), `raidTarget` | colony totals; the rival hole's coordinates. Top-down, built: ~~the strategist's totals~~ each ant's own stance (defend on a sensed threat near home, raid once recruited; raid scouts on the `leave` answer "raid", [stance](stance.md)), and raiders follow a scout's trail ([raid-recruitment](raid-recruitment.md)) | alarm, encounter rates, recruitment trails laid by scouts ([ant-communication §3](ant-communication.md#3-rival-colonies)); underground, trails in the tunnels (`ja-1a9`) | `ja-k4k.6` |
+| A founding or young colony's queen feeds her brood (as two nurses), and her first eggs become nanitics | `#nestLife` (`founding`, `incipient`) | whether any worker, or any worker reared by workers, has eclosed anywhere in the colony | begging felt by contact (hunger.ts) with few workers met; larvae fed by the queen herself | `ja-k4k.13` |
+| Grooming: every nestmate within reach grooms a host, at a fixed rate, up to a cap (4; a queen 8 in the evolving game, a stop-gap from `ja-lo8.12`) | `Fungus.step`, `#stepQueen` | who is a nestmate, by colony index rather than odour; nothing chooses it, and it costs the groomer nothing | the pathogen cue on the cuticle (fungal ergosterol, sickness cues), recognition by odour, the retinue drawn by queen pheromone ([fungus-body §4](fungus-body.md#4-grooming-and-the-queen)) | `ja-k4k.12` |
 
 ## The fungus
 
-**Today** (`fungus.ts`, `fungalPolicy.ts`). The fungus picks an intervention per fungal situation. Most of its levers already act the right way:
-- **On perception:** `soothe`, `share`, `roam` and `muddle` change channel gains, tolerance, the clock and floor marks.
-- **On emission:** `blend` and `cull` change the host's odour; `share` changes trail laying; `soothe` quiets the host.
-- **On the body:** `crown` passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
+**Today** (`fungus.ts`, `fungalPolicy.ts`, `levers.ts`; since `ja-lo8.4`). The fungus senses its host's body and sets a level for every lever, per fungal situation ([fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers)):
+- **What it senses:** arousal (perceived alarm, strangers close), touch (a nestmate or a foreigner on the cuticle), place (the substrate underfoot, the queen's mark), task (age band, standing in for juvenile hormone), carrying and grooming. Neither the host's mode nor a chamber's owner is read.
+- **On perception:** gains on food, rival trails, home, alarm, stranger scent, floor marks and the queen's scent (`ja-lo8.9`), and the felt time out.
+- **On emission:** trail laid, trail leaked to other colonies, alarm laid, a calming cue, the fungus's own odour, how much of the fungus shows to groomers, and, in a queen, how much of her signal she gives off (`ja-lo8.7`).
+- **Lethal, off until the player turns them on:** the odour weapon, and `crown`, which passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
 - **Its own effectors:** spores on the ground, contact spread, and Bloom corpses on the midden that sporulate.
+- **Its body and its progress** (`evolution.ts`, `ja-lo8.12`): in the game it lands weak and takes root as a mycelium by the hole, which grows and pays for the spores it puts out; every bit of new fungus can mutate, so mutations come as fast as it grows, and the player keeps them as its spread traits or to how far each group of levers may reach ([fungus-body](fungus-body.md)). Reach holds a level where it takes effect; Jev is asked the full range.
 
 The gaps:
-- **The fungal situation reads things a fungus can't sense.** Its `host` field is read straight from the ant's mode. In the side view, `ground` comes from the chamber table's owner. It should rest on what the fungus could sense: contact chemistry, its own load and the substrate (`ja-k4k.7`).
+- ~~**The fungal situation reads things a fungus can't sense** (its host's mode; the chamber table's owner)~~: closed by `ja-lo8.4` (`ja-k4k.7`). Most of the new senses are marked design in §11: no paper shows a fungus reading them.
 - **The fungus has no scent of its own on the ground,** and no choice of where or when to sporulate, such as summiting (`ja-k4k.8`).
 
 The biology and the full catalogue of levers:
 - [fungus-policy §2](fungus-policy.md#2-two-policies-and-the-perceived-state-between-them): two policies, and the perceived state between them;
 - [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants): what real parasites do;
-- [fungus-policy §4](fungus-policy.md#4-the-levers-the-fungus-can-pull): about 35 levers sorted into perception, recognition, emission, body, spread and world.
+- [fungus-policy §4](fungus-policy.md#4-the-levers-the-fungus-can-pull): about 35 levers sorted into perception, recognition, emission, body, spread and world;
+- [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers): the game's account of what the fungus senses inside an ant, and its perception and emission levers;
+- [new-queens](new-queens.md): when a colony rears new queens, and the fungus's two levers on it (queen signal and queen scent).
 
 ## The ladder
 

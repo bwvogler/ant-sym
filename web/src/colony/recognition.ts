@@ -1,6 +1,8 @@
+import { decode, encode } from "./save.ts";
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
-import type { Colony } from "./colony.ts";
+import type { Colony, Layer } from "./colony.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
+import { clampCol, inBounds, type Bounds } from "./world.ts";
 
 // Recognition, pure (ja-t4d.3, docs/fungus-policy.md §4.B). Who is an enemy
 // is no longer "an ant of another colony" but "an ant whose odour differs
@@ -86,6 +88,32 @@ export class SumGrid {
     for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++) for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by) > 0) return true;
     return false;
   }
+
+  /** The sums for a save (Recognition.saveBands): each touched cell in order, as x, y, sum (a float32, exact in JSON). */
+  saveState(): number[] {
+    const t = this.#touched;
+    const out: number[] = [];
+    for (let k = 0; k < t.length; k += 2) out.push(t[k] as number, t[k + 1] as number, this.layer.get(t[k] as number, t[k + 1] as number));
+    return out;
+  }
+
+  /**
+   * A saved state back (saveState): reset, then each cell, and its block's sum added up again. Every value added is
+   * positive and a block is only ever tested above 0, so a sum in another order reads the same.
+   */
+  loadState(saved: readonly number[]): void {
+    this.reset();
+    for (let k = 0; k < saved.length; k += 3) {
+      const x = saved[k] as number;
+      const y = saved[k + 1] as number;
+      const v = saved[k + 2] as number;
+      this.#touched.push(x, y);
+      this.layer.set(x, y, v);
+      const bx = x >> BLOCK_BITS;
+      const by = y >> BLOCK_BITS;
+      this.#blocks.set(bx, by, this.#blocks.get(bx, by) + v);
+    }
+  }
 }
 
 export interface RecognitionParams {
@@ -101,6 +129,21 @@ export interface RecognitionParams {
 export const TOLERANCE = 0.35;
 
 export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: TOLERANCE, nestDrift: 0.03, interval: 0.1 };
+
+/** Seconds for a daughter colony's odour to drift most of the way from her mother's (ja-lo8.9.1, Colony.odourAim). */
+export const ODOUR_DRIFT = 500;
+
+/**
+ * Where a daughter's odour drifts to from her mother's (ja-lo8.9.1): 1.5 tolerances away, toward the middle of the odour
+ * range, so the two smell like strangers within a sitting unless the fungus's odour levers hold them together. Split
+ * colonies of Aphaenogaster senilis differed in body odour within 5 days and could not be reunited by day 20
+ * (bioRxiv 614719); how far and how fast here are the game's own (design).
+ */
+export function driftAim(mother: number, tolerance: number): number {
+  const d = 1.5 * tolerance;
+  return mother <= 0.5 ? Math.min(1, mother + d) : Math.max(0, mother - d);
+}
+
 
 /**
  * Every colony's ants, by odour band, each counted as (1 − calm) of an enemy. `look(odour, tolerance)`
@@ -133,24 +176,25 @@ export class Recognition {
     this.params = { ...DEFAULT_RECOGNITION, ...params };
   }
 
-  /** Rebuild the bands from every living ant. */
-  build(colonies: readonly Colony[]): void {
+  /** Rebuild the bands from every living ant, or (one world, ja-lp4.3) every living ant on layer `layer`, on its map. */
+  build(colonies: readonly Colony[], layer = -1): void {
     for (const g of this.bins) g.reset();
     if (this.#calmed) for (const g of this.#everyone) g.reset();
     let calmed = false;
     for (const c of colonies) {
-      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (c.calm[i] as number) > 0) calmed = true;
+      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (layer < 0 || c.layer[i] === layer) && (c.calm[i] as number) > 0) calmed = true;
       if (calmed) break;
     }
     this.#calmed = calmed;
     let occupied = 0;
     let everyone = 0;
     for (const c of colonies) {
-      const { w, h } = c.map.size;
+      const map = layer < 0 ? c.map : (c.layers[layer] as Layer).map;
+      const h = map.size.h;
       for (let i = 0; i < c.n; i++) {
-        if (!c.alive[i]) continue;
+        if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
-        const cx = Math.min(w - 1, Math.max(0, CELL[0] as number));
+        const cx = clampCol(map, CELL[0] as number);
         const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
         const b = binOf(c.odour[i] as number);
         if (calmed) {
@@ -192,11 +236,11 @@ export class Recognition {
   }
 
   /**
-   * Strangers in the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to w × h, to the odour last looked at: weighted by
+   * Strangers in the cells within `r` steps of (cx, cy) (r = 1: the cell and its six neighbours), clipped to `map`, to the odour last looked at: weighted by
    * (1 − calm), as a fight counts them, or with `byOdour` each counted once, calmed or not (who smells
    * different, which calming does not change: what the fungus senses as contact).
    */
-  around(cx: number, cy: number, w: number, h: number, r = 1, byOdour = false): number {
+  around(cx: number, cy: number, map: Bounds, r = 1, byOdour = false): number {
     const everyone = byOdour && this.#calmed;
     const bins = everyone ? this.#everyone : this.bins;
     let s = 0;
@@ -208,7 +252,7 @@ export class Recognition {
       for (let k = 0; k < o.length; k += 2) {
         const x = cx + (o[k] as number);
         const y = cy + (o[k + 1] as number);
-        if (x >= 0 && y >= 0 && x < w && y < h) s += g.get(x, y);
+        if (inBounds(map, x, y)) s += g.get(x, y);
       }
     }
     return s;
@@ -238,20 +282,23 @@ export class Recognition {
         }
       if (masked) break;
     }
-    if (!masked && !this.#moving) return;
+    const drifting = colonies.some((c) => !Number.isNaN(c.odourAim) && Math.abs(c.odourAim - c.nestOdour) > 1e-6);
+    if (!masked && !this.#moving && !drifting) return;
     const drift = 1 - Math.exp(-this.params.nestDrift * dt);
     let moving = false;
     // Nests first, from the odours before the step: each drifts toward the mean of the ants at it.
     for (const c of colonies) {
-      const { nest } = c;
+      // The nest is on the home layer (one world: the curtain), and so are the ants at it.
+      const home = c.layers[c.home] as Layer;
+      const { nest } = home;
       const r2 = nest.r * nest.r;
       let at = 0;
       let sum = 0;
       // In the side view with a queen, the ants in the colony's royal chambers (nest slice 8: the founding disc, r 3,
       // held few of them once the royal chamber had widened); else the ants within the nest's disc.
-      const ch = c.queen ? c.map.chambers : null;
+      const ch = c.queen ? home.map.chambers : null;
       for (let i = 0; i < c.n; i++) {
-        if (!c.alive[i]) continue;
+        if (!c.alive[i] || c.layer[i] !== c.home) continue;
         if (ch) {
           cellOf(c.x[i] as number, c.y[i] as number);
           const k = ch.at(CELL[0] as number, CELL[1] as number);
@@ -271,6 +318,15 @@ export class Recognition {
         c.nestOdour = Math.min(1, Math.max(0, c.nestOdour + d));
       }
     }
+    // A daughter's nest drifts away from her mother's odour (ja-lo8.9.1), toward its own aim.
+    if (drifting) {
+      const k = 1 - Math.exp(-dt / ODOUR_DRIFT);
+      for (const c of colonies)
+        if (!Number.isNaN(c.odourAim) && Math.abs(c.odourAim - c.nestOdour) > 1e-6) {
+          c.nestOdour += (c.odourAim - c.nestOdour) * k;
+          moving = true;
+        }
+    }
     // Then every ant: its nest's odour, with its fungal share of the fungus's own.
     for (const c of colonies) {
       const n0 = c.nestOdour;
@@ -286,4 +342,43 @@ export class Recognition {
     }
     this.#moving = moving || masked;
   }
+
+  /** What carries over between ticks, for a save (save.ts): its settings and clock. The bands are built afresh every tick. */
+  saveState(): Record<string, unknown> {
+    return { params: encode(this.params), clock: this.#clock, moving: this.#moving };
+  }
+
+  loadState(r: Record<string, unknown>): void {
+    this.params = decode(r.params) as RecognitionParams;
+    this.#clock = r.clock as number;
+    this.#moving = r.moving as boolean;
+    this.#lookOdour = NaN; // the look cache is made afresh
+  }
+
+  /**
+   * The bands as last built (build), for a save (Game.save, U4b): the game builds them before fights and the next tick's
+   * steps read them, ants killed since included, so a load must not build them again from the living. `#everyone` only
+   * while some ant was calmed: otherwise it is empty. In today's games the saved `#everyone` can't change play (only
+   * Fungus.#touch reads it, after the same tick's build): it is saved for completeness, and no test reaches it (#63's review, N3).
+   */
+  saveBands(): BandsSave {
+    return { bins: this.bins.map((g) => g.saveState()), everyone: this.#calmed ? this.#everyone.map((g) => g.saveState()) : null, occupied: this.#occupied, occupiedEveryone: this.#occupiedEveryone };
+  }
+
+  loadBands(b: BandsSave): void {
+    this.bins.forEach((g, k) => g.loadState(b.bins[k] ?? []));
+    this.#everyone.forEach((g, k) => (b.everyone ? g.loadState(b.everyone[k] ?? []) : g.reset()));
+    this.#calmed = b.everyone !== null;
+    this.#occupied = b.occupied;
+    this.#occupiedEveryone = b.occupiedEveryone;
+    this.#lookOdour = NaN; // the bands changed: the next look rebuilds its mask, as after a build
+  }
+}
+
+/** A Recognition's bands in a save (saveBands): each band's cells (SumGrid.saveState), the calmed count's when built, and which bands hold anyone. */
+export interface BandsSave {
+  bins: number[][];
+  everyone: number[][] | null;
+  occupied: number;
+  occupiedEveryone: number;
 }

@@ -1,5 +1,3 @@
-import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
-
 // The hosted proxy's front door, pure so node --test covers it (the Worker in
 // index.ts is wiring). The Vite middleware refuses every cross-origin request
 // (server/api.ts `sameOrigin`); this proxy serves a page on another origin
@@ -49,68 +47,4 @@ export async function passOk(sent: string | null, expected: string | undefined):
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= (a[i] as number) ^ (b[i] as number);
   return diff === 0;
-}
-
-/** The UTC day a spend counts against, "YYYY-MM-DD". */
-export function utcDay(now: number): string {
-  return new Date(now).toISOString().slice(0, 10);
-}
-
-/** What the daily budget keeps in storage. */
-export interface DailySpend {
-  day: string;
-  inputTokens: number;
-}
-
-/**
- * The proxy's daily cap, across every run. Per-run caps (the ledger) bound one
- * game; this bounds a day, so a leaked passphrase costs at most the cap a day.
- * A run is started with its spend cap cut to what is left of the day, so the
- * ledger's own reservations enforce it; spend is recorded from the ledger's
- * session tokens, so a reply that lands after its run ended still counts.
- */
-export class DailyBudget {
-  #spend: DailySpend;
-  #seenSession = 0;
-  readonly #capUsd: number;
-
-  constructor(capUsd: number, saved: DailySpend | null, now: number) {
-    this.#capUsd = Number.isFinite(capUsd) && capUsd >= 0 ? capUsd : 0;
-    this.#spend = saved ?? { day: utcDay(now), inputTokens: 0 };
-  }
-
-  #roll(now: number): void {
-    const day = utcDay(now);
-    if (day !== this.#spend.day) this.#spend = { day, inputTokens: 0 };
-  }
-
-  /** Dollars left today. */
-  remainingUsd(now: number): number {
-    this.#roll(now);
-    return Math.max(0, this.#capUsd - this.#spend.inputTokens * USD_PER_INPUT_TOKEN);
-  }
-
-  /** The spend cap a run may start with: what it asked for, never more than today has left. */
-  capFor(askedUsd: number, now: number): number {
-    return Math.min(askedUsd, this.remainingUsd(now));
-  }
-
-  /** Count the ledger's session tokens since the last call. Returns true when there was something new to save. */
-  record(sessionInputTokens: number, now: number): boolean {
-    const delta = Math.max(0, sessionInputTokens - this.#seenSession);
-    this.#seenSession = Math.max(this.#seenSession, sessionInputTokens);
-    if (delta === 0) return false;
-    this.#roll(now);
-    this.#spend = { day: this.#spend.day, inputTokens: this.#spend.inputTokens + delta };
-    return true;
-  }
-
-  get capUsd(): number {
-    return this.#capUsd;
-  }
-
-  snapshot(now: number): DailySpend & { capUsd: number; usd: number } {
-    this.#roll(now);
-    return { ...this.#spend, capUsd: this.#capUsd, usd: this.#spend.inputTokens * USD_PER_INPUT_TOKEN };
-  }
 }

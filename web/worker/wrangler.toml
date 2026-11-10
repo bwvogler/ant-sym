@@ -4,14 +4,14 @@
 name = "jev-ants-api"
 main = "index.ts"
 compatibility_date = "2026-10-01"
-# server/jev.ts (shared helpers) imports node:http and node:https at the top.
+# server/jev.ts (shared with the dev server) imports node:http and node:https at the top.
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
 # Exact origins, comma-separated. PR previews live under the same origin as main.
 ALLOWED_ORIGINS = "https://bwvogler.github.io"
-# Across every run, per UTC day. Per-run caps still apply under it.
-DAILY_CAP_USD = "2"
+# Dollars per UTC day across every run (the ledger's budget, as the dev server's JEV_DAILY_USD, whose default is $0.10).
+JEV_DAILY_USD = "2"
 
 [[durable_objects.bindings]]
 name = "LEDGER"

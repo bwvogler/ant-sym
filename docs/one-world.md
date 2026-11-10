@@ -1,0 +1,265 @@
+# One world: the surface and a curtain under the line between the holes
+
+Design note. U1, the line's geometry, U2, the world's generation, U3, colonies on both layers with their homing, mound and midden (U3a–c), U4a, founding on the line, U4b, one-world saves, and U5.1, the page playing one world in two views, are built (`web/src/colony/transect.ts`, `oneWorld.ts`, the layers in `colony.ts` and `game.ts`, `ui/ColonyField.tsx`; on the page under Details → Ground → one world, the side view staying the default until U6); the rest is not. It answers the owner's request (2026-11-08) to make the top-down view and the side view two views of **one** game, and records the model chosen, the geometry rule that keeps it consistent, what changes in the code, and the order to build it in. Beads: epic `ja-lp4`; stages U1–U6 are `ja-lp4.1`–`ja-lp4.6`, and the research bead is `ja-lp4.7`. Decisions: PRD §51.
+
+## 1. Where we are
+
+The page has two separate games on two unrelated maps, and the Ground control switches between them by throwing the game away (ants, food, trails, the fungus).
+- **"Side view"** (`generateSideWorld`, 768 × 368 cells): a cross-section. Sky, a ground line one cell thick, soil and stones below. Two nests 340 columns apart, each a dug shaft and royal chamber. Foragers walk a one-cell walkway along the ground line.
+- **"From above"** (`generateWorld(seed, OPEN_WORLD)`, 512 × 368): the open surface. Rock and walkable ground, food in patches, two nests as discs about 140 apart. No soil, no queen.
+
+The split was never decided. It appeared in MR 13 (PRD §27) when the owner asked to see spoil carried above ground, and the surface map was kept so earlier numbers still reproduce. Since then the two have drifted:
+
+| Only the side view has | Only the top-down map has |
+|---|---|
+| the queen, brood, nurses, porters, undertakers (`#nestLife`, `#nurse`, `#port`) | a larder where every 4 food makes an ant (`foodPerAnt`) |
+| chambers, floor marks, road signs | 2D foraging: Deneubourg's trail choice, the food-trail cap (`foodCapTop`), carriers homing by trail and vector |
+| a drifting home vector (`#believe`, `#integrate`) | an exact nest position |
+| the mound as real soil, the midden | the faint-alarm pull; the bridge assay A1 |
+| the fungus's nest levers (`muddle`, `crown`) | |
+
+Each half is missing what the other has. The side view's foragers live on a line, which is not how ants forage. The top view's colonies have no nest, so nothing the fungus does underground can be seen there.
+
+## 2. The model: a plane and a curtain
+
+**The plane** is the surface, a 2D hex map like today's open map: rock, ground, food piles (which regrow, PRD §50.5), the mound and the midden. An ant on it moves with today's top-down physics. The top view shows the plane.
+
+**The curtain** is everything underground. It is one vertical 2D sheet that hangs under a line drawn through the nests' holes (§3), with coordinates *(s, depth)*:
+- *s* is distance along the line;
+- *depth* is rows below the ground.
+
+An ant in the curtain moves with today's side-view physics: the shaft, chambers, the queen and brood, porters, digging and floor marks. The side view shows the whole curtain, unrolled flat, so no tunnel is ever off-screen.
+
+**The surface belongs to the plane alone.** The curtain starts one row below the ground. The ground strip along the top of the side view is drawn from the plane cells under the line, with whichever ants stand on them, so nothing is simulated twice.
+
+**A hole is the only way between the two.** An ant standing on a hole cell on the plane steps down into the curtain at *(s_hole, 0)*: depth 0, the crust, which the built curtain stores at row `CRUST` (41), below its sky and the ground strip (see "The curtain as built"). An ant climbing out of the shaft steps up onto the plane at the hole. The crust is never dug except at a hole. Today `#crust` is a soil cell touching sky, and that still holds in the built curtain: its crust is the row under the ground strip, which is sky. The crust is the curtain's depth 0, stored at row `CRUST`, not row 0, which is sky. No other way between the layers exists. A second hole for a colony (polydomy, `queens-and-merging.md` open question 3) would be a later, deliberate act: breaking through as a sensed choice (`ja-4h2`), then new entrances in one world (`ja-lp4.9`).
+
+**The curtain as built (U2).** `oneWorld.ts` lays the curtain out as a side view, so today's renderer, nest digger and chambers work on it unchanged:
+- **Rows 0–39: sky.** This is room for the mound's cut (§4).
+- **Row 40: the ground strip.** Sky, like the rows above it (U5.1, §8 item 6; until then a copy of the plane, `refreshStrip`): the side view draws the plane cell P(s) there at column *s* as it renders. The sky and the strip are the map's `surfaceRows`: digging below (a hole, a nest founded later, the crust by a hole) never re-derives them, and a step up into them from a hole is the crossing onto the plane.
+- **Row 41 (`CRUST`): the crust**, depth 0 in this note's terms. It is open only at a hole. A hole is plane cell `line.holes[k]` ↔ curtain cell (`sHole[k]`, `CRUST`).
+- **Food:** the curtain's `foodTotal` and `foodLeft` count only its buried food, the pockets some colony can reach from its nest. The strip holds no food: the side view draws the plane's there, and the plane counts it.
+- **Below that: 300 rows of soil, stones, cavities and buried food**, by the side view's rules.
+
+Its column is *s* itself (U4a, owner 2026-11-09): every map has an x origin, `WorldMap.x0`, its first column, 0 on every map but the curtain, whose x0 is the line's *s*_min (−64 for the game's first line, the margin before V₀). Until U4a it was stored at *s* − *s*_min, so growing at V₀ would have shifted every column. The ground is a function of *s* and the row, and each nest's dig of its own hole, so a column keeps its ground when the line grows, and growing at V₀ only lowers x0: nothing is renumbered.
+
+**State.** Each ant carries a *layer* (plane or curtain) and its *x, y* in that layer. Each layer has its own copy of:
+- every colony's pheromones;
+- the occupancy grids that fights read;
+- its food: piles on the plane, buried pockets and chamber stores in the curtain.
+
+The fungus's own body, the mycelium it grows where it lands by a hole (`Fungus.root`, PRD §50.12), lies **in the curtain**: in the soil walls of the shaft just under the hole, not on the plane. *Metarhizium* lives in soil and around roots ([fungus-body §1](fungus-body.md#1-growth-without-a-host)), and the owner holds (2026-11-08) that sunlight's UV would kill exposed spores and hyphae; primary sources are pending (`ja-2qv`). Its mass lives in the wall's soil and it sporulates onto the shaft's open cells beside it, so ants pick spores up on every trip in and out. The landing's first spores fall by the hole; after that, its spores reach the plane only on the ants that carry them, and on corpses on the midden. Today's game roots it on the open cells by the hole, the ground ants walk on; that changes with it (`ja-yo3`).
+
+Fights happen within a layer. Two ants in different layers never meet, except across a hole.
+
+**Why one sheet is honest enough.** Ground-nesting ants build what Tschinkel calls a "shish-kebab": a near-vertical shaft with flat chambers off it, about 1 cm high, largest near the top, with gaps that grow with depth ([nest-and-home: nest structure](nest-and-home.md#nest-structure)). A vertical sheet keeps that shape. It loses chambers that branch off sideways out of the plane. A full 3D volume was considered and set aside (owner, 2026-11-08): it costs depth-times the memory and tick time, needs 3D digging and homing, and its side view would be a cut that misses tunnels.
+
+## 3. The line, and where a new nest may go
+
+**The transect** is the holes in order, V₀ … V_k, joined by straight segments on the hex grid. It extends a margin past each end, so an end hole isn't drawn at the edge of the side view and an end colony has room to dig outward: about 64 cells (one chunk), with rock beyond. The mound no longer needs that room, because it lies on the plane (§4). U2 checked the margin against how far the side view's nests dig today. Measured with `scripts/dig-spread.mjs` (the page's side-view game with no fungus landed, 600 ants a colony, seeds 1–3): after 600 s the farthest cell dug outward past an end hole (west of the westmost, east of the eastmost) lay 34, 51 and 36 columns beyond it, with the 99th percentile at 30–46, so 64 stays. U3c measured again on one world, where foraging is 2D, with the fungus landed (`dig-spread.mjs --one`, Garden on colony 0 at the start, 600 ants a colony, seeds 1–3, 600 s): the farthest lay 45, 46 and 49 columns past an end hole along the curtain, the 99th percentile 42–44, so 64 holds, 15 columns to spare. The game starts with two nests, so the line starts as one segment, Ink to Amber.
+
+**The founding rule** (the owner's, made precise). A colony may be founded at point *p* only when all of these hold:
+1. **Its nearest hole is an end** (V₀ or V_k). The owner's rule: no founding nearer an interior nest's hole, so the line always grows from an end and stays one unbranched strip. Ties are settled so a game replays exactly: a point as near an interior hole as an end is invalid, and a point as near both ends grows the line at V₀. With two nests both are ends, so the first founding may go beyond either.
+2. **The new segment doesn't fold back.** It may not turn back on the end segment by more than 120° (so the angle between them at the shared vertex is at least 60°). Away from that vertex (beyond the clearance) neither it nor the margin it will carry past the new hole crosses the line, the far end's margin included, or comes within a clearance (about 12 cells) of it (owner, 2026-11-08: the new margin is curtain too). The clearance is excused on both sides of the vertex, which makes it agree exactly with the 120° limit. Otherwise the curtain would pass under itself, and one surface cell would sit over two places underground.
+3. **It doesn't crowd a hole.** *p* is at least a hole gap from every hole, as a 2D distance: `HOLE_GAP_2D` = 16 (owner, 2026-11-09; it was 12, `ja-tjo`). At 12 two founded nests' royal chambers could share cells (a founding shaft slants 3 columns, its chamber is a disc of radius 4.5: on one world's default curtains, seeds 1–20, 15 of 80 pairs shared a cell, and `ja-tjo` counted 25 of 80 on side worlds); at 16 none do, as the side view's `HOLE_GAP` (16) keeps between holes. `NEST_GAP` (12) stays the top-down maps' gap between nests; `Game.addColony` there and in the side view moves a founding rather than refusing it. Rule 2's clearance already covers most of this.
+4. **It is on the plane's main open ground**: an open cell joined, walking, to the open region the world's holes share (`mainGround` in `oneWorld.ts`), never a pocket closed in by rock (owner, 2026-11-10, §8 item 15). A queen who lands in such a pocket walks on to ground that joins the rest, within the founding radius, or is lost.
+
+**The line on the hex grid.** Column *s* of the curtain lies under *P(s)*, a plane cell on the line. Columns are hex steps (owner, 2026-11-08): a segment's columns are the hex line between its two holes, one column per step, so neighbouring columns always lie over the same or adjacent cells. Columns spaced 1 apart along the line could not promise that: two points 1 apart fall in cells 2 steps apart wherever the line clips a hex corner. A segment is therefore `hexDistance` columns long, the same as its length running east–west and up to ~15% longer at a slant, never shorter, so the curtain is no shortcut. A cell sits over two columns only right at a bend. U1's property tests check both over random lines.
+
+**A landing that breaks the rule** (a queen's flight, `ja-lo8.9`, closed but not yet on main on 2026-11-08, whose landing rule U4 changes; the lab's "found a colony" button) moves to the nearest valid point within the flight's radius. If none lies within it, **the flight fails**: the queen dies, as most real foundresses do, and the game says why ("no room beyond the line's ends within her flight"). Decided by the owner (§8); `new-queens.md` §3 says so too.
+
+**What growing the line does to the curtain** (built in U4a: `growWorld`, §4). The curtain is indexed by *s*, so what is dug underground keeps its place when the line grows; growing at V₀ uses negative *s*, so nothing is renumbered, which fits the endless world's outward chunks (`ja-qpv`). What changes is the old end's margin: its range of *s* now runs along the new segment instead of straight on, so tunnels dug there keep their *s* but lie under different ground. Spoil and the midden are plane data and stay where they are. Beyond the old margin the curtain is new, undug ground.
+
+**A colony that falls keeps its vertex.** Its hole and tunnels stay. A later colony could take them over, which is the "abandonment" branch of `queens-and-merging.md` open question 3.
+
+**Neighbours meet underground.** Adjacent nests are adjacent along *s*, so their tunnels can meet. Along the curtain the distance between two holes is the segment's length, the same as on the surface, so this is no shortcut. **Allowed** (§8): strangers who meet in the curtain fight or flee by the same contact response as on the surface (`combat.md`). A rule stopping diggers short of a neighbour would read another nest's position, which the vision counts as a gap.
+
+## 4. What changes in the colony code
+
+**The switch moves from the map to the ant.** Today everything side-only switches on the map's kind: `#entrance`, `map.sky`, `map.hasSoil`, or a queen being present (`queens-and-merging.md` notes `queen !== null` as a side-view flag in about 20 places). In one world each of those becomes a check of the ant's own layer:
+- in the curtain: today's side-view code;
+- on the plane: today's top-down code.
+
+Most behaviour carries over unchanged. The new work is the seam between the two:
+- **Homing on the plane.** Use the side view's drifting vector (`#believe`, `#integrate`) in 2D, aimed at the hole. Today `#believe` keeps only the horizontal part (`b.y = goal.y`), and `#inOwnNest`, `#neighbour` and `#middenSide` measure only |x| to a hole. On the plane those become 2D distances. The vector resets inside the nest, as real ants' does ([nest-and-home: outside](nest-and-home.md#outside-home-is-the-hole)).
+- **The mound becomes surface data.** It becomes a spoil count per plane cell around the hole, a height field. Diggers carry pellets up the shaft and drop them on the plane. The side view draws the heap's cut through the curtain's sky rows. `heapMound` and the pellet pickers (`#pickLoose`, `takeLoose`) move to the plane, and the funnel that keeps every hole open becomes a ring on the plane.
+- **The midden** goes on the plane, at the edge of the cleared ground ([nest-and-home: places with jobs](nest-and-home.md#places-with-jobs)). As built (U3c) it is a ring set by each undertaker's own vector, not a disc facing the nearest hole, which would read other nests' positions (§8 item 14).
+- **The economy is the side view's: there is always a queen.** The larder stays, as the side view keeps it (the mode situation's `larder`, the queen laying while it holds), but it no longer turns into ants: "every 4 food makes an ant" is retired from one world.
+- **Raids** walk the plane to the target hole and go down its shaft. Today's side-view raid does the same thing in one dimension (`raidTarget`, `#aimRaids`, the scout's trail of PRD §49).
+- **The fungus** reads the ant's layer for its "ground" sense:
+  - in the curtain: chamber or tunnel;
+  - on the plane: the home-scent ratio.
+
+  `muddle` and `crown` are always offered, because there is always a nest. One world asks under the side view's fungus context.
+
+**Jev's cost should not change.** The mode situation keeps its fields and their meaning. `homeTrail` is a trail level on the plane and a place in the curtain, as today in each map. Confirm with `colony-cost` when the colony code lands; any change to a situation, legend or question needs its new figure in the PR (CLAUDE.md).
+
+**Tick cost will rise; measure it.** The open map with 1,200 + 1,200 ants runs at 3.3–3.9 ms a tick (PRD §12, §14). The side view, which is what the curtain will run, is the slower of today's maps: 7.0–7.3 ms at 1,200 + 1,200 (PRD §36, §37), its nest life costing more than the open map's foraging. One world runs both, each for the ants in it, so budget about 7–9 ms and measure before switching the page (U6).
+
+**U3a as built (2026-11-09, `ja-lp4.3`).** Colonies live on both layers; homing, the mound and the midden are still the old ones (U3b, U3c).
+- **Layer contexts.** A colony keeps one context per layer (map, pheromones, nest, entrance and the game's wiring) and binds the ant's own before stepping it, so each side-only switch is now per ant. A one-map game has one layer and never rebinds, so the old golden masters stay bit-exact.
+- **Up.** A curtain ant can step into the surface rows only at an open crust hole. It climbs out if it holds no brood, is no porter, and carries spoil or a corpse, or is of an age to go out and not homing to its chamber. Otherwise it is turned back down the shaft. It lands on that hole's plane cell, whichever colony's hole it is.
+- **Down.** On the plane, every ant going in (carrying food, or homing) goes down its own hole at the hole's cell. Food carried down counts as a return at the hole, and the side view's code takes it on to reception. A raider at a rival's hole goes down that shaft.
+- **The strip guard.** The curtain's sky and ground strip are the plane's (§8 item 6). Underground ants never stand there: the sense reads those rows as solid, unburying never moves an ant into them, and a test checks every tick.
+- **Per layer:** the occupancy grids, recognition, fights, unity's allied contact (`Game.#meet`) and the fungus's spores and "ground" sense. Two ants on different layers never meet.
+- **The spike** (`scripts/one-world-spike.mjs`, seeds 1–3, 300 + 300 ants, 300 s): food reaches the chambers (560–1,341 stored a colony), births are 131–155 (every colony at or near its cap of 450), the plane's food falls by 4.6–7.4%, carriers leave the hole's disc within 0.5 s, and the young stay by the hole at most 3.5 s.
+- **Two fixes the spike forced.** A returner homing to its chamber no longer climbs out at the top of the shaft and goes straight back down (up to 68 carriers a colony did, in 300 s). A young ant turned back at the hole forgets its last chamber, as the side view's young do on the ground: laying on, they marked the shaft's top with brood and royal and drew more young there (up to 13, some for minutes).
+- **Measured:** Jev's mode lane costs what the side view's does per situation; ticks run at 5.5 ms mean at 600 + 600 ants (PRD §51).
+
+**U3b as built (2026-11-09, `ja-lp4.3.2`).** On the plane a homing ant steers by its own drifting vector, not by the hole. The side view and the surface map are unchanged (their golden masters bit-exact); the one-world golden was re-recorded.
+- **The 2D drift.** Coming up out of its own hole, an ant starts its vector afresh and draws this trip's drift in 2D: `driftSurf` (x) and `driftSurfY` (y), each with σ = `PI_DRIFT`/√2, so the error's RMS is 10 % of the way out, as across the side view's ground. Up out of a rival's hole nothing resets (before, any hole zeroed the odometer).
+- **The odometer.** On the plane it counts the path walked while not returning; once the ant heads home the vector is fixed, as `#integrate` does in the side view.
+- **The snap.** Within `HOLE_SIGHT` (6) of its hole, or within `NEST_SIGHT` (8) with a clear line to it, the ant sees the hole and smells the entrance, and steers for the hole itself. Otherwise it steers for hole + distance × drift, held inside the plane's edges. Everything that steered by the nest now reads that belief: the progress check, the food trail's cone, home-trail climbing, Bug2 at walls.
+- **The search, in 2D loops (a simplification of the sources' loops).** Where the belief turns out empty, the ant visits points round it, a quarter turn apart, the first straight ahead; each loop of four is 1.6 times wider than the last. No random draw. The sources do give a 2D geometry: loops of growing size that start and end at the search's centre (Müller & Wehner 1994, from its abstract; modelled by Waldner & Merkle 2018; [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole)). U3b's widening spiral circles the centre and never goes back to it. Modelling the centred loops is a follow-up, with a research note first (`ja-lp4.11`, owner 2026-11-09).
+- **The stall rule (`SEARCH_STALL`).** Any returner on the plane that gets no nearer its belief for 3 s searches on as if it had reached it. That is what unblocks a belief inside rock, but it fires often away from the belief too. On seed 1 (120 s, 300 + 300) it fired 596 times: 81 % more than 10 cells from the belief, and 92 cutting short a walk round rock (review of #60). Narrower versions (only within 12 cells of the belief, or not while following a wall) delivered about the same on seeds 1–3, so it stays as is: in practice, "search sooner when blocked".
+- **Two fixes the spike forced.**
+  - A belief in rock was never reached, so the search never started: about half the carriers still out at the end of seed 3 had one (and in a test, one followed the wall round the plane's whole edge). That is the stall rule.
+  - With its loops alone, colonies delivered up to 44 % less food than U3a's. Now a searching ant with the home trail under its antennae, until its hole is in sight, gives the trail `homeTrail`'s share (0.8) of its turning, as a carrier on a food trail does ([trails](trails.md): route cues and scent first, the vector the fallback).
+- **The spike** (`scripts/one-world-spike.mjs`, seeds 1–3, 300 + 300 ants, 300 s), U3a → U3b, colonies 0 / 1:
+
+  | Seed | Stored | Carried down | Births | Up / down |
+  |---|---|---|---|---|
+  | 1 | 1,341 → 1,000 / 1,091 → 1,130 | 1,344 → 1,000 (−26 %) / 1,095 → 1,133 (+3 %) | 155 → 153 / 155 → 153 | 1,644/1,464 → 1,241/1,085 / 1,253/1,206 → 1,370/1,223 |
+  | 2 | 746 → 789 / 626 → 604 | 750 → 795 (+6 %) / 627 → 605 (−4 %) | 147 → 150 / 132 → 125 | 962/881 → 1,116/965 / 1,047/862 → 992/785 |
+  | 3 | 767 → 705 / 560 → 402 | 771 → 706 (−8 %) / 561 → 403 (−28 %) | 149 → 152 / 131 → 91 | 1,071/960 → 1,051/855 / 717/621 → 642/537 |
+
+  - 19–44 % of the trips that ended down the hole searched on the way.
+  - The longest a carrier took from picking food up to going down was 104–230 s (U3a: 57–187 s).
+  - On seeds 4–6, deliveries changed by −19 % to +3 %.
+  - The worst colony, seed 3's second, also had 31 % fewer births.
+
+**U3c as built (2026-11-09, `ja-lp4.3.3`).** The mound and the midden are on the plane. The side view and the surface map are unchanged (their golden masters bit-exact, no new random draw on their paths); the one-world golden was re-recorded.
+- **The mound is a height field.** `plane.spoil` holds pellets per plane cell (`generateOneWorld` allocates it; no other map has one) and `plane.moundCells` their total. `heapPlane` (world.ts) is the side view's sandpile in 2D: a pellet slides to its lowest neighbour (outward from the nearest hole on a tie) while that one is a level or more lower, so the pile stands at a level a cell, ≈41°. Only open ground takes spoil; food on a heaped cell stays on top; spoil doesn't change walking (a height to draw and to pick from).
+- **The ring.** Within every hole's ring a cell holds at most (hex distance to the hole − 1) levels, so each hole sits at the bottom of a crater and stays open, a rival's included: the side view's funnel, as physics, not an ant's choice. A pellet dropped where there is no room lands on the nearest cell with room (within 16 cells), else it is lost (`moundLost`).
+- **Spoil carried out by vector.** A pellet carrier crossing up keeps its pellet and walks out on a heading drawn at the crossing (one new draw, one world only). It heaps the pellet once its own vector (U3b: home believed at hole + odoSurf × drift) puts it `spoilTo` from home, the side view's draw 2 + reach × √u; after `SPOIL_GIVE_UP` it drops it where it stands. Its walk out counts on the odometer (it is not homing), so its vector after the drop is the one it walked. `soilOut`, the `SWELL` top-up and `moundLost` are counted as `#dropOut` counts them, and the side view's books hold in 2D: `plane.moundCells` = Σ (⌊soilOut × SWELL⌋ − moundLost − loosePicked + looseDropped) over the colonies (`oneWorldMound.test.ts`). Spoil and corpse carriers no longer count as going in (`#wantsIn`): on the plane every carrier is returning, and in a first cut they went straight back down the hole they came up.
+- **One deviation from the side view's reach.** There, `reach = 3 + heaped / (2 × MOUND_HEIGHT)` grows with the soil out because the mound is a strip: its length tracks the volume. On the plane it is a disc, so its area does: `reach = 3 + √(heaped × R / (π × MOUND_HEIGHT))` (cap `MOUND_REACH`). Grown linearly, the 2D disc thinned to under a pellet a cell.
+- **The pickers on the plane.** An explorer on a mound cell outside every hole's `ENTRANCE_ZONE` picks a pellet off it, asked by the `get` response with soil offered (no new situation or question): from a flank at the angle of repose (a cell beside it, farther from its hole, a level or more lower), at `LOOSE_SPREAD_PICK`, to carry it `LOOSE_SPREAD × (0.5 + u)` farther out by its vector and heap it there; from anywhere on the mound, at `LOOSE_FILL_PICK`, to take it home by its vector and down its hole, where the side view's `#backfill` takes it on (most come back up unused, as in the side view: `looseBack`, and are spread). The plan had a flank two levels steep; the slide keeps neighbours within a level, so such a flank forms only where pellets were taken, and spreading would almost never start: one level, the side view's own rule, is used.
+- **The midden on a ring set by vector** (the owner's decision, 2026-11-09, §8 item 14). A corpse carried up stays with its undertaker (a `Corpse` now has a `layer`), who walks it out on a heading drawn at the crossing and puts it down at the first cell with no spoil underfoot that its own vector puts at least `MIDDEN_MIN` (8) from home, or after `CORPSE_GIVE_UP`. It goes into `midden` at that plane cell, marked on the plane's scent with the side view's taper in 2D over `MIDDEN_SPREAD`, re-marked while it lies there; `buried` counts it, and a sporulating host's spores land there (`onBury`, on the plane). A rival raider on the plane shies from the mark (the side view's boundary: the raid-by-trail branch now reads it in one world). The dead on the plane still leave no corpse; a corpse carrier that dies there drops it on the plane, where it rots. A corpse its undertaker puts down at will (the carry response's "put down", contact's "drop and run": Jev's answers only, as the local rule never gives them to a carrier) goes on the midden only out on that ring; anywhere else, at the hole say, it lies on the plane unmarked, like a dying carrier's (the owner's decision, 2026-11-09, review of #61). One pile, which undertakers would find by corpse odour, is a follow-up, with a research note first. In the curtain `#middenSide`, `#neighbour` and `#middenAt` are no longer reached in one world; `#inOwnNest`'s use of other holes underground stays (`ja-k4k.2`), and the pickers' `ENTRANCE_ZONE` reads every hole, as the side view's `#byAnEntrance` does (`ja-k4k.5`).
+- **Not drawn yet.** U5 draws the plane's mound, its cut in the curtain's sky rows, the midden and corpses on the plane.
+- **The spike** (`scripts/one-world-spike.mjs`, now with each colony's mound and midden; seeds 1–3, 300 + 300 ants, 300 s), U3b → U3c, colonies 0 / 1:
+
+  | Seed | Carried down | Births | Mound: pellets, radius (95 %), tallest | Spread / taken down to fill |
+  |---|---|---|---|---|
+  | 1 | 1,000 → 1,012 (+1 %) / 1,133 → 1,050 (−7 %) | 153 → 154 / 153 → 161 | 216, 10, 2 / 415, 15, 2 | 4 / 6, 44 / 15 |
+  | 2 | 795 → 594 (−25 %) / 605 → 570 (−6 %) | 150 → 123 / 125 → 122 | 392, 12, 3 / 301, 21, 2 | 20 / 7, 56 / 15 |
+  | 3 | 706 → 783 (+11 %) / 403 → 397 (−1 %) | 152 → 152 / 91 → 90 | 426, 16, 3 / 450, 15, 3 | 57 / 21, 88 / 50 |
+
+  - On seeds 4–6 deliveries changed by −13 % to +66 % (876 → 1,455 on seed 4's first colony), and over all twelve colonies of seeds 1–6 by +3.4 % in total (11,072 → 11,449): the change of the random stream, not a loss to the mound's work.
+  - No corpse reaches the midden in 300 s: the dead on the plane leave none, and few die underground that early. Seed 1 run for 2,400 s: 10 and 34 corpses on the middens, a median 13 and 16 cells from the hole; the mounds then held 739 and 1,425 pellets, up to 3 and 5 levels high, 95 % within 24 and 36 cells.
+- **Measured again on one world** (§6 asks for it at the end of U3):
+  - **Dig spread** (`scripts/dig-spread.mjs --one`: one world, seeds 1–3, 600 + 600 ants, 600 s, Garden landed on colony 0 at the start as the page lands it): the farthest cell dug outward past an end hole along the curtain lay 45, 46 and 49 columns beyond it, the 99th percentile 43, 42 and 44 (the side view without the fungus: 34–51, p99 30–46). `MARGIN` 64 holds (§3).
+  - **Jev's cost** (`colony-cost --one`, seed 1, 600 + 600 ants, 10 sim-minutes): ~769 tokens a question, ~$0.092/h for the mode lane (159 distinct situations); U3b, run the same day, ~753 and ~$0.082/h (147). No situation, legend or question changed; the hourly figure moves with the situations a game happens to visit.
+  - **Tick time** (`colony-bench --one`, seed 1, 1,200 + 1,200 ants, 60 s): mean 12.78 ms, median 11.14, p90 18.80; U3b the same day 12.05 / 10.48 / 18.46. U3c costs about 0.7 ms a tick (6 %); both are over U6's 7–9 ms budget, so U6 has work to do.
+
+**U4a as built (2026-11-10, `ja-lp4.4.1`).** A colony can be founded on one world, by the lab or by a queen's flight; saves stay refused until U4b (`ja-lp4.4.2`). The side view and the surface map are unchanged (their golden masters bit-exact).
+- **The x origin.** `WorldMap.x0` is a map's first column (§2): every bounds check, flat array (index *y*·*w* + *x* − x0), clamp and packed key reads it, and the renderer and camera draw from it. Packed cell keys (*y*·65536 + *x*) decode negative columns (`keyX`, `keyY`); the "no cell" −1 sentinels (cell (−1, 0)) and the queen's `qx = −1` became values no cell takes. The curtain's x0 is the line's *s*_min, so its column is *s*. The one-world golden was re-recorded: every curtain position moved 64 lower, and float32 positions round differently there.
+- **The hole gap is 16** (owner, 2026-11-09, `ja-tjo`): §3 rule 3. On the curtains of seeds 1–20, nests founded 16 apart along *s* share no royal chamber cell (0 of 80 pairs; at 12, 15 of 80 in the same test).
+- **Growing the world** (`growWorld` in `oneWorld.ts`). The line grows at the end (`grow`); the curtain widens to its new columns, which get the ground by (seed, *s*, row), sky, and their 64-column blocks' buried pockets; the strip is copied again (the old end's margin now lies under the new segment); food a colony can't reach is dropped from the new columns only. The old columns keep their dug state, rock and food (the `ja-lp4.4` note: food is compared too). The new nest goes on both layers there: on the plane a nest round the hole, where nothing is dug (the plane has no soil to dig, and the founding rule puts the hole on the main open ground, §3 rule 4); in the curtain the shaft and royal chamber dug by `foundNest` at *s*_hole, from the stream keyed by the hole, before the new columns' food, so pockets keep their distance from it as a regenerated curtain's do (a test checks the new columns against `generateCurtain` along the grown line). The fungus's curtain spore cells are re-keyed (`Fungus.regrid`).
+- **Founding** (`Game.addColony`). In one world (x, y) is a point on the plane: `nearestValid` within `FOUND_RADIUS` (140) finds the hole on the plane's main open ground (`mainGround`, a reachability pass over the plane from the line's holes, ~14 ms a founding; §3 rule 4), or the founding throws "no room beyond the line's ends within her flight" (`NO_ROOM`). The colony lives in the curtain, its ants start there, and every colony is re-wired with the grown line (`Colony.line` is set again).
+- **The flight.** A queen flies `FLIGHT_2D` (140) from her mother's hole on the plane, in a direction drawn from the game's stream (one draw a flight, one world only), and lands where `nearestValid` puts her, or is lost: her body is booked to her mother's `eaten` and `Game.lastLoss` keeps why. The pen's side and distance stay side-view only until U5.
+- **The lab.** `Game.foundBeyond(end)` founds 30 kin ants 140 past an end, straight on along its end segment; the lab card shows "Found beyond ‹end nest›" for both ends when the game is one world (reached from U5).
+- **Measured.** `colony-bench --one` (seed 1, 1,200 + 1,200, 60 s), the same machine and day: main 12.38 ms mean (median 10.90), U4a 12.71 (10.95): no queen flies in 60 s, so this is the x origin's cost, within noise (the side view's, interleaved: within ±0.5 ms). A founding is a one-off ~30 ms (the curtain's new columns and a reachability pass over it). `colony-cost --one` (seed 1, 600 + 600, 10 sim-minutes): ~791 tokens a question, ~$0.101/h for the mode lane, 160 situations (U3c: ~769, ~$0.092/h, 159); no situation, legend or question changed. The founding radius: §8 item 5.
+- **Not yet.** Drawing: the renderer reads x0, but its camera's extent is taken once per colony, so a curtain grown mid-game draws its old width until U5 rebuilds it. A founding pulled to the plane's edge row can put a hole on the edge: the plane's rock at its rim stays as generated.
+
+**U4b as built (2026-11-10, `ja-lp4.4.2`).** A one-world game saves and loads, and continues bit for bit; so does every game on a tick with a fight death, which until now diverged on reload (`ja-7ej`). The golden masters, the one-world golden included, are bit-exact: nothing in `tick` changed.
+- **Version 5** (owner, 2026-11-10). `SAVE_VERSION` is 5, and an older save is refused, not migrated: nobody plays the game yet, so backward compatibility doesn't matter (owner, review of #63). `ui/saves.ts` lists only saves of this version as loadable. `grids` is required; one world's fields (`world`, `Founding.spot`, a colony's and the fungus's `layers`) are absent from a single-map save.
+- **The grids and bands** (every game). `Game.tick` builds the occupancy grids and recognition bands before fights, and the next tick's steps read them, the ants killed since included; load rebuilt them from the living. `GameSave.grids` keeps every `CountGrid` (per layer and colony) and each layer's bands, as touched cells in order; load never builds them again from the living.
+- **The world** (`GameSave.world`): the seed, the line (holes, V₀'s column, the margin) and the curtain as dug, its nests aside; `map` is the plane. Each founding records where it went (`Founding.spot`: `nearestValid`'s hole and the end it grew), and a load replays the foundings through `growWorld` (no search again; a founding nest is dug from the stream keyed by its hole, so the same), checks the grown line against the saved one, then pours the plane and the curtain over it in place. A save into the wrong kind of game, another seed or plane size, or with another line, is refused.
+- **Both layers' state.** A colony's other layer (between ticks the plane: its scent, holes and way out, `LAYER_STATE`) is saved beside its fields, which hold the bound one's; the fungus's other maps' spores, cells and base (`SPORE_LAYER_STATE`). Recognition past layer 0 carries nothing but its bands. Declaration tests hold every `Layer`, `SporeLayer` and `Game` field to saved or rebuilt.
+- **Guards.** `oneWorldSave.test.ts`: run-on hashes on both layers (mound, midden, spores in the curtain), foundings at V₀ and at the far end, fight deaths on each layer, a pending flight, a sweep of 30 save ticks round a fight death, a game loaded into itself; `oneWorldSaveMutations.test.ts`: without any one part the run diverges or the load refuses.
+- **Measured at page scale** (seed 1, 800 + 800 ants, 600 s, Garden landed, regrowth on; one world with a founding beyond V₀ at 60 s and the flights it flew, five colonies by the end):
+
+  | Game | Save (JSON) | gzipped | Plane / map | Curtain | Colonies | Save / load |
+  |---|---|---|---|---|---|---|
+  | One world | 17.1 MB | 1.7 MB | 1.4 MB | 2.6 MB | 13.0 MB (the plane's scent up to 1.7 MB a colony) | 0.70 s / 0.39 s |
+  | Side view | 8.8 MB | 0.4 MB | 2.7 MB | | 6.1 MB | 0.41 s / 0.20 s |
+  | Top-down (512 × 368) | 7.5 MB | 1.7 MB | 1.3 MB | | 6.1 MB | 0.29 s / 0.17 s |
+
+  The grids add 0.02–0.03 MB. Each run reloaded to the same hash. Under the ~20 MB the owner set for compressing saves (a follow-up then), so saves stay plain JSON; more colonies or ants would cross it.
+
+## 5. Two views of one game
+
+- **Ground becomes a camera switch,** "above" or "below", and no longer builds a new game.
+- **The top view** is the plane, with the line drawn dashed, the holes and each colony's mound disc. A label at each vertex names its nest.
+- **The side view** is the unrolled curtain.
+  - Each bend in the line is a faint vertical rule, labelled with the turn ("↱ 35°").
+  - The strip along the top is the plane under the line.
+  - Ants elsewhere on the surface aren't in this view.
+- **The two views are linked:**
+  - Clicking the line in the top view opens the side view at that *s*, and clicking the side view's ground strip opens the top view there.
+  - A followed ant can carry the camera across at the hole, as an option.
+  - Each view keeps its own camera (`camera.ts` is already pure) and minimap.
+- **On wide screens**, U5 ships the switch alone. Both views at once (side by side or stacked) is a follow-up, `ja-lp4.8` (§8).
+- **The Learn drawer's Nest tab** always has a nest to show. The field guide gains an entry for the line and the curtain.
+
+The renderer reads `colony.map.rock` row by row today (`paintChunk`, `drawHexes`, the minimap). The side view needs one more step: a column *s* maps to the plane cell *P(s)* for its ground strip, read from the plane as it is drawn (decided, §8). Below ground the curtain is a plain grid, so it draws exactly as the side view does now.
+
+**U5.1 as built (2026-11-10, `ja-lp4.5`).** One world is playable on the page, in two views with a switch; the views aren't linked yet (U5.2). The side view and the open map draw and play as before (their golden masters bit-exact); the one-world golden was re-recorded once, for the strip.
+- **The strip is drawn, not stored** (§8 item 6). The curtain's strip row is sky, like the rows above it, and `refreshStrip` is gone. The crossing up no longer needs an open strip cell: a step from a hole into the curtain's `surfaceRows` is a crossing, whatever the cell holds. The side view's walkers read the strip over a hole as their walkway (`walkable` in `colony.ts`: open ground, or one world's strip): with the strip as sky and only the open check, the hole cell read as a narrow tunnel and every walker turned back down the shaft. Curtain scent no longer leaks along the strip (pheromones stop at anything not open).
+- **The page.** Details → Ground has a third choice, "one world" (`generateOneWorld(seed)`); the game bar shows "above" and "below" (and the key v) for it, a camera switch kept out of the game's build, so switching never rebuilds the game. The page's default stays the side view until U6. The Nest tab, the fungus panel's nest upgrades and the lab's lever chips read "has nests" (the side view and one world). A lost flight's notice says why (`Game.lastLoss`). `?world=one` and its preview are retired.
+- **The renderer** (`ColonyField`) takes the world and the view. The map, the player's scent and the fungus's spores (`Fungus.sporesOn`) are the view's, read each frame; when the shown map changes or grows (a founding widens the curtain) its chunks, minimap and extent are built again (the U4a note above). Each view has its own camera, kept when switching. Only the view's layer's ants are drawn, picked and shown on the minimap; corpses lie on their layer; the midden is drawn above only; the brood, queen and alates below.
+  - **Above:** the mound as a spoil wash by height; the line dashed through the holes, fainter along its margins; a marker at each hole with its colony's name ("empty hole" if none).
+  - **Below:** the strip drawn from P(s) (rock, food or open ground), the mound's cut stacked on it by the plane's spoil height there, the plane's ants on a P(s) cell drawn level on the strip at their column(s) (`columnsOver`), and a faint rule at each bend labelled with its turn (`turnAt`, "↱ 35°").
+  - **Follow:** an ant on the other layer than the view's holds the camera where it was; carrying the camera across is U5.2.
+  - `nestView` counts only the ants in the curtain in a chamber; `chamberAt` finds a chamber's colony by its nest index.
+- **Measured** (seed 1, the same machine and day, main against U5.1). `colony-cost --one` (600 + 600, 10 sim-minutes): ~791 → ~784 tokens a question, ~$0.101 → ~$0.095/h for the mode lane, 160 → 158 situations: no situation, legend or question changed; the strip changes the random stream, so the game visits a few others. `colony-bench --one` (1,200 + 1,200, 60 s, two runs each, interleaved): mean 10.36 / 10.44 ms → 9.76 / 10.29 ms, within noise (the renderer is not in the tick).
+
+## 6. Building it: stages and guards
+
+The page keeps today's two maps until one world passes its own guards. U6 then takes them off the page (§8). The side view and the open map stay as test beds, with their golden masters bit-exact, until their assays are re-baselined on one world.
+
+| Stage | What | Guard |
+|---|---|---|
+| U1 (built) | `transect.ts`, pure: the line, *s* ↔ plane cell, signed *s*, `canFound` and `nearestValid` (the four rules of §3, with their ties), the turn limit, crossing and clearance tests | unit tests, with property tests over random lines: neighbouring columns map to the same or adjacent cells; no valid founding makes the curtain overlap itself |
+| U2 (built) | `generateOneWorld`: the plane from the open-map generator, the curtain from the side-view generator along the line. Both views drawn, with no simulation yet (`?world=one`) | map invariants: each hole is open on both layers; the curtain's ground row lies under *P(s)* |
+| U3a (built) | colonies on two layers: per-ant layer, hole crossings, pheromones, fights, recognition, contact and the fungus per layer, the queen economy; unity's allied contact (`Game.#meet`, PRD §53) counted per layer (§4, "U3a as built") | a new golden master for one world (`oneWorldGolden.test.ts`); the old ones bit-exact; `oneWorldGame.test.ts` |
+| U3b (built) | 2D homing on the plane: the side view's drifting vector (`#believe`, `#integrate`) aimed at the hole, with a 2D search (§4, "U3b as built") | the one-world golden re-recorded, said in the PR; the old ones bit-exact; `oneWorldHoming.test.ts` |
+| U3c (built) | the mound as a spoil height field on the plane, with the pickers and a ring that keeps every hole open; spoil and corpses carried out by the ant's own vector, the midden on a ring off the mound, not facing a rival (`ja-k4k.5`); then dig spread, Jev's cost and tick time measured again on one world (§4, "U3c as built") | as U3b; `oneWorldMound.test.ts`; `dig-spread.mjs --one`, `colony-cost --one`, `colony-bench --one` |
+| U4a (built) | founding on the line: maps get an x origin (the curtain indexed by *s*); `HOLE_GAP_2D` 16 (`ja-tjo`); `growWorld`; `Game.addColony` moves a founding to the nearest valid spot within 140 or refuses it; a flight lands there or is lost with its reason; the lab's "found beyond ‹end nest›" (§4, "U4a as built") | founding property tests (`oneWorldFounding.test.ts`), ja-tjo's merge assay; the old golden masters bit-exact; the one-world golden re-recorded once (the x origin); `colony-bench --one`, `colony-cost --one`, the founding-radius assay |
+| U4b (built) | saves: the plane, the curtain, the line and both layers' state; the grids and bands (every game); version 5, older saves refused (§4, "U4b as built") | `oneWorldSave.test.ts`, its mutations; the golden masters bit-exact |
+| U5.1 (built) | the page plays one world: a third Ground choice, the above/below switch, the renderer drawing one layer at a time with the line, the holes' names, the mound and its cut, the strip drawn from the plane and the bends; the strip no longer stored (§5, "U5.1 as built") | the one-world golden re-recorded once (the strip); the old ones bit-exact; a walker at a hole crosses with the strip as sky; `turnAt`, `nestView` and `sporesOn` tests; screenshots of both views by hand |
+| U5.2 | the views linked: clicks across, following an ant through a hole, the pen in one world by a click on the top view, the guide's entry (§5) | Playwright: switch views mid-game, follow an ant through a hole |
+| U6 | G1, a G-like whole-game guard on one world (and unity reachable: Garden in both clears `MET`, PRD §53); assays A1–A10 rerun on the plane; tick cost measured (budget 7–9 ms at 1,200 + 1,200); the page's default switched; the Ground control's world switch retired | `npm run exp`, `test:slow`, the bench |
+
+A research bead (`ja-lp4.7`) runs alongside: **nest spacing and flight distance.** No note gives a nearest-neighbour distance between nests or how far a founding queen flies, and the founding radius (§3) needs one. That needs primary sources, like every sense in the vision table.
+
+## 7. What stays the same
+
+- The policy, its situations, the doctrines and the local rules.
+- The fungus's levers and its policy.
+- Recognition and odour.
+- The hex grid and its chunks.
+- Behaviour MRs 1–5.2 as built. Each was tuned on one map kind, and in one world it runs on the layer it was tuned for.
+
+## Play
+
+*Added 2026-11-08 (`ja-gvt`). The case for play of one world; nothing here is built (PRD §51, `ja-lp4`).*
+
+- **See:** one game in two views (§5). From above, 2D foraging, trails and raids round every colony's hole and mound; below, the curtain unrolled with every nest's chambers, queen and brood. Today each map shows only half (§1). The field guide gains an entry for the line and the curtain, and the Nest tab always has a nest (§5).
+- **Choose:** every lever means something in the same game. The nest levers (floor marks, queen signal, crown) are always offered (§4), beside 2D foraging, where the trail levers act on branching trails rather than on the side view's one-cell walkway (§1). Where to land matters more: the mycelium lives in the shaft's soil under the hole (§2, PRD §51), and its spores reach the plane only on ants and corpses.
+- **Counterplay and progression:** unchanged in kind (fungus-policy §6, PRD §50.12). The line shapes the late game: a daughter colony (chapters 5–6, PRD §50.4) may found only beyond an end, and a flight with nowhere to land fails (§3, §8); neighbours' tunnels may meet underground and fight by the contact response.
+- **Cost:** Jev's should not change, since the mode situation keeps its fields (§4); U3 confirms it with `colony-cost`. One world asks under the side view's fungus context, so the side view's shipped fungus answers apply on the surface too (PRD §50.9 notes a top-down game has none). Not measured.
+- **Risks:** tick cost, budget 7–9 ms at 1,200 + 1,200 ants against the open map's 3.3–3.9 ms (§4, PRD §51); at 4× the top bar's "running at" warning would show a shortfall (PRD §50.4). Legibility: ants elsewhere on the surface are not in the side view, and the mycelium is hidden underground. A founding rule the player can't read: the game must say why a flight failed (§3).
+- **Owner decisions needed:** none. The founding radius is decided (§8).
+
+## 8. Decided, and still open
+
+**Decided (owner, 2026-11-08):**
+1. **Underground meetings are allowed.** Neighbouring colonies' tunnels may meet in the curtain; the contact response decides what happens (§3).
+2. **A flight with nowhere to land fails.** When no valid point lies within her radius, the queen dies and the game says why (§3). This replaces "the player's queen lands" in `new-queens.md` §3.
+3. **Wide screens: the switch first.** U5 ships the above/below switch with linked clicks. Both views at once is a follow-up (`ja-lp4.8`).
+4. **The old maps become tests only after U6.** The side and open maps leave the page and stay as test beds until their assays are re-baselined.
+5. **The founding radius is 140 cells, the same as the flight** (`ja-lp4.10`; [nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game)). Measured: flight 140 with a 70-cell radius failed 51% of flights from end nests and 55% from interior ones; with 140, 6% and 28% (`scripts/flight-failure.mjs`, 300 seeds on the default plane). The clearance stays 12; the hole gap became 16 (owner, 2026-11-09, `ja-tjo`), and rerun at 16 the same script gives 51 % and 55 % at radius 70, 7 % and 28 % at 140 (nest-spacing §4). U4a's assay on seeds 1–20, with each plane's own rock (`flight-failure.mjs --rock`): flight 140 with radius 140 fails 8 % from end nests and 27 % from interior ones, close to the bare plane's 7 % and 28 % (radius 70: 53 % and 56 %; 210: 0 % and 6 %), so 140 stands; the endless world (`ja-qpv`) looks at it again, since the plane's edges drive most failures at a smaller radius.
+6. **The ground strip is drawn, not stored** (2026-11-09; done in U5.1). The side view draws its top strip straight from the plane cells under the line when it renders; the curtain stops keeping a copy, so nothing underground can change the surface or take its food twice. U2 built the copy behind guards (`surfaceRows`); U3 kept underground ants off it; U5.1's renderer draws the strip from the plane, and the copy is gone (the strip row is sky).
+7. **The crust stays soil** (2026-11-09). Diggers leave it by the side view's own rule (soil touching the sky, `#crust`), as on today's ground, and the mycelium can grow in the shaft's soil wall just under the hole (§2). It is not made rock.
+
+8. **U3 is three PRs** (2026-11-09): U3a, U3b and U3c (§6).
+9. **Every returner goes down its hole** (2026-11-09), as harvester ants do ([activation](activation.md): returners go in; foragers wait in a chamber just inside). On the plane an ant carrying food or homing goes down at its own hole's cell.
+10. **Activation moves inside later** (2026-11-09, `ja-web`). The wait just inside the hole is its own stage after U3. Until then rested foragers go straight back out, as in the side view today, so one world never asks the `leave` lane. Raid scouts start only from `leave` = raid, so raids stay off until then; `ja-web` blocks U6, so one world never ships without them.
+11. **Each ant's own stance, on both layers** (2026-11-09). The strategist and the stance lane are skipped in one world, as top-down today.
+12. **All workers start underground** (2026-11-09), in the curtain with the queen and brood.
+13. ~~**Spoil and corpses go out at the hole, for now**~~ (2026-11-09). *Retired by U3c:* spoil carried up is carried out and heaped on the plane's mound, and corpses go to the plane's midden (§4, "U3c as built").
+14. **The midden lies on a ring set by the ant's own vector** (2026-11-09). An undertaker puts its corpse down off the mound, at least `MIDDEN_MIN` (8) from home by its own vector, not facing a rival's hole: that would read other nests' positions (`ja-k4k.5`). One pile, which undertakers find by corpse odour, comes later, after a research note on corpse odour with primary sources. The midden and the mound are drawn in U5.
+15. **A founding must join the plane's main open ground** (2026-11-10, PR #62 review D1). Rule 4 (§3) is the open region the world's holes share, not any open cell: under the old rule a queen could be moved into a pocket closed in by rock (seed 19's lab founding beyond the start landed in one of 17 cells) and her colony could never forage on the surface. A real queen walks after landing to find a site; the founding radius stands for that walk. Measured with `flight-failure.mjs --rock` (seeds 1–20): flight 140 with radius 140 fails 8 % from end nests and 28 % from interior ones (27 % under the old rule), radius 70 49 % and 56 % (53 %, 56 %), radius 210 0 % and 7 % (0 %, 6 %); so item 5's 140 stands. On seeds 1–20 no founded hole is in a pocket now (80 of 80 on the main ground; before, the six smallest regions were 3–70 cells).
+
+**Still open:** nothing.

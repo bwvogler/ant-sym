@@ -26,11 +26,15 @@ There is no nuptial flight, no queen besides the founding one, and no way for wo
   - a fairly small share of *b* workers is enough (Ross & Keller 1998; Gotzek & Ross 2008).
 - Polygyne species often also adopt mated queens back into the nest. The Pharaoh ant goes further and founds new nests by budding: queens and workers walk off together.
 
+**In the game:** what decides is the colony's nature, not a choice: a species trait, `queens: "one" | "several"`, with the fire ant's polygyne form as a per-colony flag, `accepts` (§3.1). Adoption's cue is one the ants already sense: a queen whose odour is within the colony's tolerance of its nest odour is taken in, the same test as for strangers (§3.2). **Design:** the flag stands in for the workers' *Gp-9* genotype. Not built (`ja-8fd.1`, `ja-1vg.1`; PRD §38).
+
 **Losing the queen.**
 - Orphaned workers of many species lay unfertilised eggs, which become males:
   - *Temnothorax*, where orphaned colonies lived for years producing males;
   - reportedly *Pogonomyrmex badius* (majors more than minors), and rarely *Atta*, where the workers may die before their sons are raised. These two are provisional: see Sources.
 - In most species an orphan makes no more workers: it ends, and its last throw is males. The exceptions are thelytokous species, whose workers lay eggs that become workers: *Pristomyrmex punctatus*, and *Cataglyphis cursor* (relevant to the desert ant species in `ja-8fd`). For them, orphaning is not an ending.
+
+**In the game:** orphaned is a state, built (PRD §33): with the queen dead no eggs are laid, brood in progress finishes and workers age out (§1). Worker-laid males wait for nuptial flights (§3.5, `ja-1vg.2`). Thelytoky is open decision 7 (§7).
 
 **Merging.**
 - Queenless colonies of an African army ant (*Dorylus molestus*, Mount Kenya) often fuse with a neighbour: 7 of 10 experimentally orphaned colonies did (Kronauer et al. 2010).
@@ -38,9 +42,13 @@ There is no nuptial flight, no queen besides the founding one, and no way for wo
 - Schneirla saw the same around 1950 in the Neotropical *Eciton*: queenless colonies trace and join foreign colonies, while colonies with a queen do not mingle (anecdotal accounts, cited by Kronauer et al.).
 - Fusion also happens where nest sites are scarce (*Pristomyrmex punctatus*).
 
+**In the game:** the cue is a meeting: an orphaned colony's forager meets a living ant of another colony, and each smells within the other's tolerance, a new mutual check (§3.3). The response: it defects, walks to that colony's hole and changes colony. Its nestmates follow the orphan trail it lays. **Design:** the mutual check, the calm gate (open decision 4) and the "merged" ending (open decision 1). Two parts still read what an ant can't sense: "workers of a colony that still has a queen never defect" reads the colony's state, and the walk §3.3 reuses `raidTarget`, another nest's coordinates. Each needs a sensed cue before it is built (`docs/vision.md`; top-down raiders follow a scout's trail since PRD §49). Not built (`ja-8fd.2`; PRD §38).
+
 **Supercolonies.**
 - Where a colony population loses the variation in its recognition cues, nests stop fighting each other. Introduced Argentine ants in California are the classic case (Tsutsui et al. 2000). The idea of one statewide supercolony has been disputed since.
 - This is the sim's Garden ending in nature: nests that smell alike and so stop fighting.
+
+**In the game:** built. An ant takes another for a stranger when their odours are further apart than its tolerance (Recognition, PRD §17). The colonies are one when their nests' odours are within tolerance and nobody has died fighting for a minute (`Game.unity`). The fungus gets there by carrying its own odour between the colonies' (PRD §22, §29, §37).
 
 ## 3. Proposal
 
@@ -131,7 +139,7 @@ An orphaned colony's workers lay male eggs. Males don't work and leave on the ne
 
 **The owner's answers** (2026-11-02):
 - **More than two colonies is coming soon.** Merging is worth building: with two colonies Garden alone unifies them (104–108 s, no deaths, PRD §37), so merging pays off once a colony can be absorbed while others play on. Nothing in the code may assume two colonies or a single rival; the nest fix-up (PRD §39) made raid targets, the midden and tunnel ownership work for any number.
-- **Crown stays,** and is reachable in real play: since PRD §39 it acts at any load, at a rate that grows with it, and the UI brush on a royal chamber orphans the colony in a game.
+- **Crown stays,** and is reachable in real play: since PRD §39 it acts at any load, at a rate that grows with it, and the UI brush on a royal chamber orphans the colony in a game. *(2026-11-08: the app has no brush now, PRD §50.15; `scripts/crown.mjs` replays the same stroke.)*
 
 **Open** (the owner's, not the implementer's):
 1. Should "merged" be a new ending (an `Outcome` ahead of `fallen`), given that `ja-1vg` plans "no won/lost"?
@@ -146,6 +154,16 @@ An orphaned colony's workers lay male eggs. Males don't work and leave on the ne
 10. Does a merged colony keep the orphan's midden? Probably not: middens are rebuilt by use.
 11. The two-strain play (§3.4): how do Bloom and Garden share the colony to be orphaned, when the first strain in holds a host?
 12. Can a colony with a queen absorb a beaten one's last brood? Raiders carry off nothing today; brood raiding (slave-making species) is a separate species trait, not this note.
+
+## Play
+
+Not built (PRD §38). Several queens and adoption are a colony's nature, a species setting (PRD §21), not the player's; merging is the part that is a route for the fungus.
+- **See:** once built, an orphan's foragers walking to a neighbour's hole and going in, taking its odour and colour at the next step, and an ending that reads as a unification. Learn's "The queen" and "One colony" entries cite §2 here.
+- **Choose:** *crown* orphans a colony (lethal, off the menu until turned on). *Fungal odour*, *stranger scent* and the *calming cue* (the Recognition upgrade) bring two colonies within each other's tolerance, which is the defection cue. No lever reaches defection itself. Since PRD §50 and §50.3 there is one fungus and crown is a lever on its menu, not Bloom's alone, so §3.4's two strains competing for one colony do not arise in the app.
+- **Counterplay and progression:** a colony with a queen never defects; a defector that finds no slot in the host stays behind (§3.3). Recognition reaches one step for 10 mutations and the full range for 1,500 (`evolution.ts`), so tolerance comes late. With more than two colonies, a merger absorbs one while others play on (§7).
+- **Cost:** none measured; nothing is built. No situation changes for the ants or the fungus. Adding `orphaned` to the strategist's situation could double its distinct stance situations and calls, to be measured with `npm run colony-cost -- --side` (§4, PRD §38).
+- **Risks:** a free lever, closed: crown acted at full strength from the first second, and is now held off until the fungus keeps the Crown upgrade (5,000) (`ja-lo8.16`, PRD §50.16). Invisible: a defector carries none of the orphan's odour, so the host's odour never records a merger (§3.3). A cliff: an orphaning by crown within one game, then a whole colony gone at once. The numbers in §5 would show it: time from orphaning to the last defector, and how often a game ends merged rather than fallen.
+- **Owner decisions needed:** §7's open list. First among them: "merged" as an ending beside unified and fallen (1; PRD §21 made those the fungus's outcomes), and whether the Unite aim allows crown (2).
 
 ## Sources
 - Kronauer, Schöning, d'Ettorre & Boomsma (2010). Colony fusion and worker reproduction after queen loss in army ants. *Proc. R. Soc. B* 277: 755–763 (*Dorylus molestus*, Kenya; cites Schneirla's *Eciton* accounts). [PMC2842746](https://pmc.ncbi.nlm.nih.gov/articles/PMC2842746)

@@ -152,11 +152,15 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
   for (let t = 0; t < 30 * 60; t++) {
     g.tick(1 / 30);
     if (t % 30 === 0)
-      for (let i = 0; i < c.n; i++)
-        if (c.alive[i] && c.mode[i] === 2 && Math.abs(c.driftSurf[i]! * c.odoSurf[i]!) < 3) {
-          samples++;
-          if (c.search[i] !== 0) searching++;
-        }
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || c.mode[i] !== 2 || Math.abs(c.driftSurf[i]! * c.odoSurf[i]!) >= 3) continue;
+        // On the ground line only, where its surface vector is what it homes by: underground it homes by its nest vector,
+        // and a search there round a wrongly believed chamber is that vector's (a young porter, ja-xu6.1's runs).
+        c.antCell(i);
+        if (!isSky(g.map, CELL[0] as number, CELL[1] as number)) continue;
+        samples++;
+        if (c.search[i] !== 0) searching++;
+      }
   }
   assert.ok(samples > 1000, `${samples} samples`);
   assert.equal(searching, 0, `${searching} of ${samples} were searching`);
@@ -267,4 +271,41 @@ test("only its own hole resets the surface vector: up out of another, the error 
   assert.ok((c.odoSurf[0] as number) >= 50, `up out of the rival's hole: the vector runs on (${c.odoSurf[0]})`);
   up(own);
   assert.ok((c.odoSurf[0] as number) < 1, `up out of its own: afresh (${c.odoSurf[0]})`);
+});
+
+test("in the side view a searching ant on the home trail still steers by its vector: the trail's lead is one world's plane's only (review of #60)", () => {
+  // One world U3b lets the home trail lead a searching ant on the plane (oneWorldHoming.test.ts); the side view keeps its
+  // split, the trail a hint at 0.25 of its turning and the vector 0.8. The side view reaches that branch searching on a
+  // home trail in open ground underground (side seed 1: 56 times in 240 s), where the fast golden never does.
+  const map = generateSideWorld(2, SMALL);
+  const n = map.nest;
+  cellOf(n.x, n.y);
+  const cx = CELL[0] as number;
+  const cy = CELL[1] as number;
+  // A room in the soil 25–60 columns east of the chamber, 7 rows tall: open ground, no tunnel, so it steers freely there.
+  for (let x = cx + 25; x <= cx + 60; x++)
+    for (let y = cy - 3; y <= cy + 3; y++) {
+      assert.ok(!isSky(map, x, y) && rockAt(map, x, y) !== OPEN, "solid soil");
+      map.rock.set(x, y, OPEN);
+    }
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "return");
+  // A home trail along the room's middle row, from 40 columns east of the chamber to its far end.
+  for (let x = cx + 40; x <= cx + 60; x++) c.ph.depositCell("home", x, cy, 40);
+  c.x[0] = centreX(cx + 40, cy);
+  c.y[0] = centreY(cy);
+  c.tick(1 / 30);
+  // Homing on an exact nest vector, but searching: it believes the chamber 3 east of where it is, 37 west of the ant and out
+  // of sight. It faces east, along the trail.
+  c.odoNest[0] = 0;
+  c.search[0] = 3;
+  c.mode[0] = 2;
+  c.x[0] = centreX(cx + 40, cy);
+  c.y[0] = centreY(cy);
+  c.heading[0] = 0;
+  c.bestD[0] = Infinity;
+  c.stallT[0] = 0;
+  const x0 = c.x[0] as number;
+  for (let k = 0; k < 45; k++) c.tick(1 / 30);
+  // Ungated, the trail leads it 10 east in the 1.5 s; gated, it turns west for its belief (5 west).
+  assert.ok((c.x[0] as number) < x0 - 2, `it turned for its belief, west (${((c.x[0] as number) - x0).toFixed(1)} from where it started)`);
 });

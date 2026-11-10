@@ -1,3 +1,4 @@
+import { decode, encode, fillLike } from "./save.ts";
 import { CHUNK, CHUNK_BITS, CHUNK_CELLS, ChunkLayer, chunkKey, chunkOf } from "./chunks.ts";
 import { CELL, cellOf } from "./hex.ts";
 import type { WorldMap } from "./world.ts";
@@ -22,7 +23,7 @@ import type { WorldMap } from "./world.ts";
 // shifted right, a chunk's top-left corner also touches the chunk diagonally
 // up-left, and its bottom-right corner the chunk diagonally down-right.
 
-export type Channel = "food" | "home" | "alarm" | "noEntry" | Mark;
+export type Channel = "food" | "home" | "alarm" | "noEntry" | "raid" | Mark;
 /**
  * The nest's road signs (nest slice 3, docs/nest-and-home.md §3.3): each chamber's role, laid on the floor by ants that
  * have been in it, fading the farther they have walked, so each leads back to its kind of chamber (Heyman et al. 2017).
@@ -30,7 +31,7 @@ export type Channel = "food" | "home" | "alarm" | "noEntry" | Mark;
  */
 export type Mark = "royal" | "brood" | "store" | "reception" | "midden";
 export const MARKS: Mark[] = ["royal", "brood", "store", "reception", "midden"];
-export const CHANNELS: Channel[] = ["food", "home", "alarm", "noEntry", ...MARKS];
+export const CHANNELS: Channel[] = ["food", "home", "alarm", "noEntry", "raid", ...MARKS];
 
 export interface ChannelParams {
   /** share lost per second */
@@ -48,6 +49,9 @@ export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
   // "No entry" (behaviour MR 3, docs/trails.md): laid where a food trail ends at no food. Robinson et al. 2008: the
   // repellent lasts about 2.4× the short-lived attractive trail (78 against 33 min), so t½ ≈ 27 s against food's 11.6 s.
   noEntry: { evaporation: 0.026, diffusion: 0.3 },
+  // The raid trail (behaviour MR 5.2, docs/raid-recruitment.md): laid by a scout that met strangers, going home. It outlives
+  // a trip out, not the raid: t½ ≈ 17 s.
+  raid: { evaporation: 0.04, diffusion: 0.3 },
   // Floor marks keep: slow to fade, not spreading (a sign on the floor, not a cloud; spreading them cost 10 % of a tick).
   royal: { evaporation: 0.01, diffusion: 0 },
   brood: { evaporation: 0.01, diffusion: 0 },
@@ -123,7 +127,8 @@ export class Pheromones {
 
   /** Add to integer cell (cx, cy). */
   depositCell(channel: Channel, cx: number, cy: number, amount: number): void {
-    if (cx < 0 || cy < 0 || cx >= this.map.size.w || cy >= this.map.size.h) return;
+    const { map } = this;
+    if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return;
     const f = this.fields[channel];
     f.set(cx, cy, Math.min(this.params[channel].max ?? MAX_LEVEL, f.get(cx, cy) + amount));
     this.#awake[channel].add(chunkKey(cx >> CHUNK_BITS, cy >> CHUNK_BITS));
@@ -134,7 +139,8 @@ export class Pheromones {
     cellOf(x, y);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
-    if (cx < 0 || cy < 0 || cx >= this.map.size.w || cy >= this.map.size.h) return -1;
+    const { map } = this;
+    if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return -1;
     return this.fields[channel].get(cx, cy);
   }
 
@@ -188,7 +194,8 @@ export class Pheromones {
     if (awake.size === 0) return;
     const layer = this.fields[ch];
     const map = this.map;
-    const maxCx = (map.size.w - 1) >> CHUNK_BITS;
+    const minCx = map.x0 >> CHUNK_BITS;
+    const maxCx = (map.x0 + map.size.w - 1) >> CHUNK_BITS;
     const maxCy = (map.size.h - 1) >> CHUNK_BITS;
     const keep = Math.max(0, 1 - this.params[ch].evaporation * dt);
     const k = Math.min(0.25, this.params[ch].diffusion * dt);
@@ -218,12 +225,12 @@ export class Pheromones {
           awake.add(nk);
           fed.add(nk);
         };
-        if (w > SLEEP && cx > 0) wake(cx - 1, cy);
+        if (w > SLEEP && cx > minCx) wake(cx - 1, cy);
         if (e > SLEEP && cx < maxCx) wake(cx + 1, cy);
         if (n > SLEEP && cy > 0) wake(cx, cy - 1);
         if (s > SLEEP && cy < maxCy) wake(cx, cy + 1);
         // The two corners that touch a diagonal chunk (odd rows sit half a cell right).
-        if ((a[0] as number) > SLEEP && cx > 0 && cy > 0) wake(cx - 1, cy - 1);
+        if ((a[0] as number) > SLEEP && cx > minCx && cy > 0) wake(cx - 1, cy - 1);
         if ((a[(EDGE << CHUNK_BITS) | EDGE] as number) > SLEEP && cx < maxCx && cy < maxCy) wake(cx + 1, cy + 1);
       }
     }
@@ -331,5 +338,18 @@ export class Pheromones {
       for (const v of a) s += v;
     });
     return s;
+  }
+
+  /** This field's state for a save (save.ts): its layers, settings, which chunks are awake, and its clocks. */
+  saveState(): Record<string, unknown> {
+    return { fields: encode(this.fields), params: encode(this.params), awake: encode(this.#awake), clock: encode(this.#clock), head: encode(this.#head) };
+  }
+
+  loadState(r: Record<string, unknown>): void {
+    fillLike(this.fields, r.fields);
+    this.params = decode(r.params) as Record<Channel, ChannelParams>;
+    fillLike(this.#awake, r.awake);
+    this.#clock = fillLike(this.#clock, r.clock) as Record<Channel, number>;
+    this.#head = fillLike(this.#head, r.head) as Record<Channel, number>;
   }
 }

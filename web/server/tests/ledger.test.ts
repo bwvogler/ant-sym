@@ -240,3 +240,55 @@ test("aborted calls are counted apart: not a request, no status, no latency, no 
   assert.deepEqual(s.statuses, { "200": 1 });
   assert.equal(s.inputTokens, 1000);
 });
+
+// The overall budget (PR #42 review S8): dollars per UTC day across every run, not per run.
+const DAY = Date.UTC(2026, 10, 7, 12);
+const HOUR = 3_600_000;
+const GAME = { capUsd: 100, capSeconds: 86_400 };
+
+test("the daily budget holds across runs: a second run on the same day starts with what the first spent", () => {
+  const l = new Ledger({ reserveTokens: 0, dailyUsd: 0.001 });
+  l.start(GAME, DAY);
+  l.end(l.begin(), { status: 200, ms: 1, inputTokens: 20_000 }); // $0.00084
+  l.stop("user", DAY + 1);
+  const second = l.start(GAME, DAY + HOUR);
+  assert.equal(second.running, true);
+  assert.ok(Math.abs(second.budget!.spentUsd - 20_000 * USD_PER_INPUT_TOKEN) < 1e-12, "not $0: the first run's spend");
+  assert.equal(second.usd, 0, "the run's own figure starts again");
+  l.end(l.begin(), { status: 200, ms: 1, inputTokens: 5_000 }); // $0.00105 today ≥ budget
+  assert.deepEqual(l.admit(DAY + HOUR + 1), { ok: false, reason: "budget" });
+  const s = l.summary(DAY + HOUR + 1);
+  assert.equal(s.stopReason, "budget");
+  assert.equal(s.budget!.remainingUsd, 0);
+  const third = l.start(GAME, DAY + 2 * HOUR);
+  assert.equal(third.running, false, "a run started with the budget spent ends at once");
+  assert.equal(third.stopReason, "budget");
+});
+
+test("a new UTC day starts the budget again; a reply from a run already replaced still counts", () => {
+  const l = new Ledger({ reserveTokens: 0, dailyUsd: 0.001 });
+  l.start(GAME, DAY);
+  const late = l.begin();
+  l.start(GAME, DAY + 1); // replaces the run with `late` still out
+  l.end(late, { status: 200, ms: 1, inputTokens: 30_000 }); // $0.00126: billed, so it counts
+  assert.deepEqual(l.admit(DAY + 2), { ok: false, reason: "budget" });
+  const tomorrow = l.start(GAME, DAY + 24 * HOUR);
+  assert.equal(tomorrow.running, true);
+  assert.equal(tomorrow.budget!.spentUsd, 0);
+  assert.equal(tomorrow.budget!.day, "2026-11-08");
+});
+
+test("the budget reserves for calls in flight, as the spend cap does, and survives the server through its store", () => {
+  let saved: { day: string; tokens: number } | null = null;
+  const store = { load: () => saved, save: (v: { day: string; tokens: number }) => void (saved = { ...v }) };
+  const l = new Ledger({ maxInFlight: 3, dailyUsd: 0.001, budgetStore: store });
+  l.start(GAME, DAY);
+  assert.deepEqual(l.admit(DAY, 10_000), { ok: true });
+  const a = l.begin(10_000);
+  assert.deepEqual(l.admit(DAY, 20_000), { ok: false, reason: "busy" }, "in flight, the rest might use it up: wait");
+  l.end(a, { status: 200, ms: 1, inputTokens: 10_000 });
+  assert.deepEqual(saved, { day: "2026-11-07", tokens: 10_000 });
+  const restarted = new Ledger({ dailyUsd: 0.001, budgetStore: store });
+  assert.ok(Math.abs(restarted.summary(DAY + HOUR).budget!.spentUsd - 10_000 * USD_PER_INPUT_TOKEN) < 1e-12, "a restarted server knows today's spend");
+  assert.equal(new Ledger().summary(DAY).budget!.usdPerDay, null, "no budget unless one is set");
+});

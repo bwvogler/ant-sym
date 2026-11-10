@@ -1,3 +1,4 @@
+import { encode, fillLike } from "./save.ts";
 import { ChunkLayer } from "./chunks.ts";
 import { nx, ny } from "./hex.ts";
 
@@ -124,5 +125,17 @@ export class Chambers {
     const d = floor - was;
     c.floor += d;
     this.floorOf[c.colony] = (this.floorOf[c.colony] as number) + d;
+  }
+
+  /** The chamber table for a save (save.ts). */
+  saveState(): Record<string, unknown> {
+    return { cell: encode(this.cell), floor: encode(this.#floor), list: encode(this.list), floorOf: encode(this.floorOf) };
+  }
+
+  loadState(r: Record<string, unknown>): void {
+    fillLike(this.cell, r.cell);
+    fillLike(this.#floor, r.floor);
+    fillLike(this.list, r.list);
+    fillLike(this.floorOf, r.floorOf);
   }
 }

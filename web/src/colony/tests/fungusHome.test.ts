@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { LARVA } from "../brood.ts";
 import { Colony, type Situation } from "../colony.ts";
 import { decodeFungal } from "../fungalPolicy.ts";
-import { Fungus, INTERVENTIONS, intervention, LETHAL, STRAINS } from "../fungus.ts";
+import { Fungus, LETHAL, PRESETS, preset, STRAINS } from "../fungus.ts";
 import { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { CountGrid, occupancy } from "../battle.ts";
@@ -11,7 +11,7 @@ import { MARKS } from "../pheromone.ts";
 import { MAX_MASK, Recognition } from "../recognition.ts";
 import { digCell, generateSideWorld, generateWorld, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../world.ts";
 
-// Nest slice 8 (docs/nest-and-home.md §4): the fungus on the new home. Its ground is the nest's places; it can blunt
+// Nest slice 8 (docs/nest-and-home.md §4): the fungus on the new home. What it feels underfoot is the nest's places; it can blunt
 // or swap a host's floor marks (muddle); a lethal strain-gated crown kills the queen and brood; a Bloom host's corpse
 // on the midden sporulates.
 
@@ -24,7 +24,7 @@ function walkway(map: WorldMap, x: number): number {
   return -1;
 }
 
-test("the fungus's ground in the side view: its own chamber, its own tunnels, the open ground, another's chamber", () => {
+test("what the fungus feels underfoot in the side view: open ground, a tunnel, a chamber's floor, the queen's mark", () => {
   const map = generateSideWorld(2, SMALL);
   const a = new Colony(map, { antCount: 5, maxAnts: 5, nest: 0 }, mulberry32(1));
   const b = new Colony(map, { antCount: 1, maxAnts: 1, nest: 1 }, mulberry32(2));
@@ -34,14 +34,11 @@ test("the fungus's ground in the side view: its own chamber, its own tunnels, th
   cellOf(map.nests[0]!.entrance!.x, map.nests[0]!.entrance!.y);
   const sx = (CELL[0] as number) + 20;
   place(2, centreX(sx, walkway(map, sx)), centreY(walkway(map, sx))); // the open ground
-  place(3, map.nests[1]!.x, map.nests[1]!.y); // the rival's chamber
-  place(4, map.nests[1]!.entrance!.x, map.nests[1]!.entrance!.y + 2); // the rival's shaft (review of slice 8: read as its own tunnel)
+  place(3, map.nests[1]!.x, map.nests[1]!.y); // the rival's chamber: a chamber's floor all the same (whose it is, is touch's)
+  place(4, a.queen!.x, a.queen!.y); // by the queen
+  cellOf(a.queen!.x, a.queen!.y);
+  a.ph.depositCell("royal", CELL[0] as number, CELL[1] as number, 5); // her mark, as she lays it
   b.x[0] = map.nests[1]!.x + 50; // far away
-  // Each nest's shaft smells of its colony (whose tunnel it is: review of #27, by the scent there, not the nearest hole).
-  for (const [c, n] of [[a, 0], [b, 1]] as const) {
-    cellOf(map.nests[n]!.entrance!.x, map.nests[n]!.entrance!.y + 2);
-    c.ph.depositCell("home", CELL[0] as number, CELL[1] as number, 5);
-  }
   for (let i = 0; i < 5; i++) {
     a.load[i] = 0.5;
     a.strain[i] = GARDEN;
@@ -49,35 +46,9 @@ test("the fungus's ground in the side view: its own chamber, its own tunnels, th
   const f = new Fungus(map, { grooming: 0 });
   f.hosts = 5;
   f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6);
-  assert.deepEqual([0, 1, 2, 3, 4].map((i) => decodeFungal(a.fungal[i]!, "garden").ground), ["home", "tunnel", "border", "foreign", "foreign"]);
-});
-
-test("whose tunnel a host is in is the scent where it stands: any number of colonies, not the nearest hole", () => {
-  // Review of #27: tunnel ownership compared the host's column with every nest's hole (map-wide, and wrong for a nest's
-  // tunnels that reach nearer another's hole, or for several holes per colony).
-  const map = generateSideWorld(2, { ...SMALL, nestCount: 3, nestGap: 70 });
-  const cols = map.nests.map((n) => (cellOf(n.entrance!.x, n.entrance!.y), CELL[0] as number));
-  const [a, b, c] = [0, 1, 2].map((k) => new Colony(map, { antCount: 1, maxAnts: 1, nest: k }, mulberry32(10 + k))) as [Colony, Colony, Colony];
-  // A tunnel of a's, dug 70 % of the way toward b's hole, 4 rows under the ground: nearer b's hole than a's.
-  const x = Math.round(cols[0]! + 0.7 * (cols[1]! - cols[0]!));
-  const y = walkway(map, x) + 5;
-  digCell(map, x, y);
-  a.ph.depositCell("home", x, y, 5);
-  for (const k of [a, b, c]) {
-    k.x[0] = centreX(x, y);
-    k.y[0] = centreY(y);
-    k.load[0] = 0.5;
-    k.strain[0] = GARDEN;
-  }
-  const ground = () => {
-    const f = new Fungus(map, { grooming: 0 });
-    f.hosts = 3;
-    f.step([a, b, c], [a, b, c].map((k) => occupancy(k, new CountGrid())), 1e-6);
-    return [a, b, c].map((k) => decodeFungal(k.fungal[0]!, "garden").ground);
-  };
-  assert.deepEqual(ground(), ["tunnel", "foreign", "foreign"], "a's tunnel: a's own, a stranger's to b and to a third colony");
-  b.ph.depositCell("home", x, y, 20); // b's ants have walked it far more since
-  assert.deepEqual(ground(), ["foreign", "tunnel", "foreign"]);
+  assert.deepEqual([0, 1, 2, 3, 4].map((i) => decodeFungal(a.fungal[i]!).place), ["chamber", "tunnel", "outside", "chamber", "queen"]);
+  // The task the fungus reads is the host's age band in the side view: founders are any age, so each is one of the three.
+  for (let i = 0; i < 5; i++) assert.ok(["nurse", "inside", "forager"].includes(decodeFungal(a.fungal[i]!).task));
 });
 
 test("muddle: a host misreads its floor marks: in a brood chamber it is asked as in a store; blunted, it can't tell", () => {
@@ -91,7 +62,7 @@ test("muddle: a host misreads its floor marks: in a brood chamber it is asked as
   c.tick(1 / 30);
   assert.equal(asked.at(-1)!.homeTrail, "brood");
   const f = new Fungus(map);
-  f.express(c, 0, intervention("muddle"), 1);
+  f.express(c, 0, preset("muddle"), 1);
   assert.ok(c.swapMarks[0]! >= 0.5);
   c.mode[0] = 1; // a new question
   c.tick(1 / 30);
@@ -103,19 +74,22 @@ test("muddle: a host misreads its floor marks: in a brood chamber it is asked as
   assert.equal(asked.at(-1)!.homeTrail, "store", "brood smells like store");
 });
 
-test("crown (lethal, Bloom's, off by default): a host by the queen kills her and the brood it touches", () => {
+test("crown (lethal, off by default): a host by the queen kills her and the brood it touches", () => {
   assert.ok(LETHAL.has("crown"));
-  assert.ok(STRAINS[BLOOM]!.allows.includes("crown"));
   assert.ok(!new Fungus(generateSideWorld(2, SMALL)).menu.has("crown"), "off the menu by default");
   const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
   const c = new Colony(map, { antCount: 2, maxAnts: 4 }, mulberry32(4), () => "explore");
   cellOf(c.queen!.x, c.queen!.y);
   const larva = c.brood.add(CELL[0] as number, CELL[1] as number, map.chambers!.at(CELL[0] as number, CELL[1] as number));
   larva.stage = LARVA;
+  // Nothing to feed it, so it stays a larva while the crown works (fed, it pupated and hatched first on some draws): no
+  // founding stock, and no second ant to forage.
+  c.feed(-c.larder);
+  c.kill(1);
   c.x[0] = c.queen!.x;
   c.y[0] = c.queen!.y;
   const f = new Fungus(map);
-  f.express(c, 0, intervention("crown"), 1);
+  f.express(c, 0, preset("crown"), 1);
   c.tick(1 / 30);
   assert.ok(!c.orphaned, "not at once: CROWN_RATE a second");
   for (let k = 0; k < 30 * 120 && (!c.orphaned || c.brood.size > 0); k++) {
@@ -126,7 +100,7 @@ test("crown (lethal, Bloom's, off by default): a host by the queen kills her and
   assert.ok(c.orphaned, "the queen is dead");
   assert.equal(c.brood.size, 0, "and the brood by her");
   assert.equal(c.broodKilled, 1);
-  assert.ok(INTERVENTIONS.some((v) => v.id === "muddle") && !LETHAL.has("muddle"));
+  assert.ok(PRESETS.some((v) => v.id === "muddle") && !LETHAL.has("marks"), "muddling the marks is not lethal");
 });
 
 test("crown below a high load: a lightly loaded host by the queen kills her too, in minutes", () => {
@@ -135,7 +109,7 @@ test("crown below a high load: a lightly loaded host by the queen kills her too,
   const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
   const c = new Colony(map, { antCount: 1, maxAnts: 2 }, mulberry32(4), () => "explore");
   const f = new Fungus(map);
-  f.express(c, 0, intervention("crown"), 0.2);
+  f.express(c, 0, preset("crown"), 0.2);
   let t = 0;
   for (; t < 900 && !c.orphaned; t += 1 / 30) {
     c.x[0] = c.queen!.x;
@@ -169,22 +143,22 @@ test("crown grows with a host's load; muddle and crown are offered only where th
   const f = new Fungus(map);
   // Review of #27: from a high load only, grooming took every host below it within seconds and no queen died in a game.
   // Now it is the spores a host passes on as it tends her: a lighter host is likelier to fail, not unable.
-  f.express(c, 0, intervention("crown"), 0.2);
+  f.express(c, 0, preset("crown"), 0.2);
   assert.ok(Math.abs(c.regicide[0]! - 0.2) < 1e-6, "a low load crowns at a fifth of the rate");
-  f.express(c, 0, intervention("crown"), 0.75);
+  f.express(c, 0, preset("crown"), 0.75);
   assert.ok(Math.abs(c.regicide[0]! - 0.75) < 1e-6);
-  f.express(c, 0, intervention("share"), 0.75);
+  f.express(c, 0, preset("share"), 0.75);
   assert.equal(c.regicide[0], 0, "only crown kills");
-  assert.ok(f.menu.has("muddle"));
+  assert.ok(f.menu.has("marks"), "the side view: floor marks are on the menu");
   f.menu = new Set([...f.menu, "crown"]);
   assert.ok(f.menu.has("crown"));
-  f.menu.add("cull"); // a copy (review of #27: adding to the live set skipped the NEST_ONLY filter)
-  assert.ok(!f.menu.has("cull"), "the menu getter hands out a copy");
+  f.menu.add("weapon"); // a copy (review of #27: adding to the live set skipped the NEST_ONLY filter)
+  assert.ok(!f.menu.has("weapon"), "the menu getter hands out a copy");
   const top = new Fungus(generateWorld(2));
-  assert.ok(!top.menu.has("muddle"), "the top-down maps have no chambers to muddle");
-  top.configure({ hide: false, cull: false }, ["dormant", "muddle", "crown", "cull"]);
-  assert.deepEqual([...top.menu].sort(), ["cull", "dormant"]);
-  assert.deepEqual(top.offered(BLOOM), ["dormant", "cull"]);
+  assert.ok(!top.menu.has("marks"), "the top-down maps have no chambers to muddle");
+  top.configure({ hide: false, cull: false }, ["show", "marks", "crown", "weapon"]);
+  assert.deepEqual([...top.menu].sort(), ["show", "weapon"]);
+  assert.deepEqual(top.asked, ["show", "weapon"], "and Jev is asked only those");
 });
 
 test("a host's corpse keeps its load and strain; a muddled ant reads no road sign", () => {

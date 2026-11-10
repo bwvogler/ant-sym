@@ -1,7 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PASS_HEADER, apiHeaders, apiUrl, detectBackend, hostedApi, isDemo, jevUnavailable } from "../backend.ts";
+import { PASS_HEADER, apiHeaders, apiUrl, detectBackend, hostedApi, isDemo } from "../backend.ts";
+import { canResume, policyLock } from "../policyLock.ts";
 import { PASS_HEADER as WORKER_PASS_HEADER } from "../../../worker/gate.ts";
+
+const running = { phase: "running" as const, run: null, lastError: null };
 
 const reply = (status: number, body: unknown, json = true) =>
   (async () => ({ ok: status >= 200 && status < 300, status, json: async () => (json ? body : Promise.reject(new SyntaxError("<html>"))) }) as Response) as typeof fetch;
@@ -12,29 +15,29 @@ test("apiUrl defaults to the root outside Vite", () => {
 });
 
 test("live server with a key", async () => {
-  assert.deepEqual(await detectBackend(reply(200, { ok: true, hasKey: true })), { hasBackend: true, hasKey: true, needsPass: false });
+  assert.deepEqual(await detectBackend(reply(200, { ok: true, hasKey: true })), { hasBackend: true, hasKey: true });
 });
 
 test("live server without a key", async () => {
   const b = await detectBackend(reply(200, { ok: true, hasKey: false }));
-  assert.deepEqual(b, { hasBackend: true, hasKey: false, needsPass: false });
-  assert.match(jevUnavailable(b)!, /JEV_API_KEY/);
+  assert.deepEqual(b, { hasBackend: true, hasKey: false });
+  assert.match(policyLock(b, running)!, /JEV_API_KEY/);
 });
 
 test("static host: 404, HTML body, or network error all mean no backend", async () => {
-  const none = { hasBackend: false, hasKey: false, needsPass: false };
+  const none = { hasBackend: false, hasKey: false };
   assert.deepEqual(await detectBackend(reply(404, null)), none);
   assert.deepEqual(await detectBackend(reply(200, null, false)), none);
   assert.deepEqual(await detectBackend((async () => { throw new TypeError("offline"); }) as typeof fetch), none);
-  assert.match(jevUnavailable(none)!, /Demo build/);
+  assert.match(policyLock(none, running)!, /No Jev server/);
 });
 
-test("Start stays disabled while the probe is pending; isDemo only after it answers", () => {
-  assert.match(jevUnavailable(null)!, /Checking/);
+test("policies stay locked while the probe is pending; isDemo only after it answers", () => {
+  assert.match(policyLock(null, running)!, /Checking/);
   assert.equal(isDemo(null), false);
-  assert.equal(isDemo({ hasBackend: false, hasKey: false, needsPass: false }), true);
-  assert.equal(isDemo({ hasBackend: true, hasKey: false, needsPass: false }), false);
-  assert.equal(jevUnavailable({ hasBackend: true, hasKey: true, needsPass: false }), null);
+  assert.equal(isDemo({ hasBackend: false, hasKey: false }), true);
+  assert.equal(isDemo({ hasBackend: true, hasKey: false }), false);
+  assert.equal(policyLock({ hasBackend: true, hasKey: true }, running), null);
 });
 
 test("a build with VITE_JEV_API calls the hosted proxy, not its own base path", () => {
@@ -53,10 +56,14 @@ test("the passphrase goes only to the hosted proxy, under the header the Worker 
   assert.deepEqual(apiHeaders(hosted, null), { "content-type": "application/json" });
 });
 
-test("hosted proxy without the passphrase: a backend that asks for it", async () => {
+test("hosted proxy without the passphrase: a backend that is locked until it is given", async () => {
   const b = await detectBackend(reply(200, { ok: true, hasKey: true, hosted: true, authorized: false }));
   assert.deepEqual(b, { hasBackend: true, hasKey: true, needsPass: true });
   assert.equal(isDemo(b), false);
-  assert.match(jevUnavailable(b)!, /passphrase/);
-  assert.deepEqual(await detectBackend(reply(200, { ok: true, hasKey: true, hosted: true, authorized: true })), { hasBackend: true, hasKey: true, needsPass: false });
+  assert.match(policyLock(b, running)!, /passphrase/);
+  assert.equal(canResume(b, { phase: "off", run: null, lastError: null }, false), false);
+  const open = await detectBackend(reply(200, { ok: true, hasKey: true, hosted: true, authorized: true, run: { budget: { day: "2026-11-10", usdPerDay: 2, spentUsd: 0, remainingUsd: 2 } } }));
+  assert.equal(open.needsPass, undefined);
+  assert.equal(open.budget?.usdPerDay, 2);
+  assert.equal(policyLock(open, running), null);
 });

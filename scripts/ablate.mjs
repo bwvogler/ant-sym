@@ -49,12 +49,16 @@ const local = {
     return localPolicy({ mode, tired: tired === "tired", foodTrail, homeTrail, alarm, enemy, stance });
   },
   stances: (k) => {
-    const [stance, ants, losses, enemy, foodLeft, larder] = k.split("|");
-    return localStance({ stance, ants, losses, enemyNearNest: enemy === "enemy", foodLeft, larder });
+    const [stance, ants, losses, enemy, intake, larder] = k.split("|");
+    return localStance({ stance, ants, losses, enemyNearNest: enemy === "enemy", intake: intake.replace("intake:", ""), larder });
   },
   response: (hook, k) => {
-    const [mode, carrying, porter, digging, place, offered, enemy, stance, quality = "fair"] = k.split("|");
-    return localResponses[hook]({ mode, carrying, porter: porter === "porter", digging: digging === "digging", place, offered, enemy: enemy === "enemy", stance, quality });
+    const f = k.split("|");
+    const [mode, carrying, porter, digging, place, offered, enemy, stance] = f;
+    const quality = f.find((x) => x === "poor" || x === "rich") ?? "fair";
+    const alarm = f.find((x) => x.startsWith("alarm:"))?.slice(6) ?? "none";
+    const odds = f.find((x) => x.startsWith("odds:"))?.slice(5) ?? "none";
+    return localResponses[hook]({ mode, carrying, porter: porter === "porter", digging: digging === "digging", place, offered, enemy: enemy === "enemy", stance, quality, alarm, odds });
   },
 };
 

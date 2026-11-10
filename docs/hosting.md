@@ -14,11 +14,13 @@ The pages are public, so the Worker has three locks:
 
 - **Passphrase.** Every call but `/api/health` needs the `x-jev-ants-pass` header to match the Worker secret `ACCESS_PASSPHRASE`. With no passphrase configured, nothing gets in. The page asks for it once and keeps it in that browser's `localStorage`. It is not the Jev key; the key never leaves the Worker.
 - **Origin.** A browser request from any origin other than `ALLOWED_ORIGINS` (in `web/worker/wrangler.toml`: `https://bwvogler.github.io`) is refused. Curl can fake an origin, so this lock only keeps other websites out; the passphrase is the real one.
-- **Daily cap.** `DAILY_CAP_USD` (default $2) bounds all runs in a UTC day. Each run starts with its spend cap cut to what the day has left, so the ledger's per-call reservations enforce the daily cap as strictly as the per-run one. The day's spend is kept in Durable Object storage and counted from real `usage.input_tokens`.
+- **Daily cap.** The ledger's own daily budget (PR #42 review S8), set by `JEV_DAILY_USD` in `web/worker/wrangler.toml`: $2 a UTC day across every run. That is above the dev server's $0.10 default, because the hosted game is played from several devices. The ledger reserves each call's worst case against it, as it does against a run's cap. The day's spend is counted from real `usage.input_tokens` and kept in Durable Object storage, so evicting or redeploying the Worker doesn't reset it.
 
 A leaked passphrase costs at most the daily cap per day. To revoke it, change the `JEV_ANTS_PASSPHRASE` secret and re-run the Pages workflow.
 
-There is one ledger for everyone, held in a single Durable Object, so two browsers share one run: a Start in one ends the other's run. That fits a single-user app.
+There is one ledger for everyone, held in a single Durable Object, so two browsers share one run: a start in one ends the other's run. That fits a single-user app.
+
+The reply functions the Worker shares with the dev server are in `web/server/replies.ts`, not `api.ts`. `api.ts` resolves its budget file's path from `import.meta.url` when it loads, and that throws in a Worker ("Invalid URL string"), so the Worker must never import it.
 
 ## One-time setup
 
@@ -40,7 +42,7 @@ curl -s -H "x-jev-ants-pass: $PASS" https://jev-ants-api.<sub>.workers.dev/api/h
 # … "authorized":true, "daily":{"day":…,"usd":…,"capUsd":2}
 ```
 
-Locally, `wrangler dev` in `web/worker` with `--env-file` holding `JEV_API_KEY`, `ACCESS_PASSPHRASE` and `ALLOWED_ORIGINS=http://localhost:4173` runs the same Worker under workerd. A build with `BASE_PATH=/ant-sym/ VITE_JEV_API=http://localhost:8799`, served by `vite preview`, then behaves like Pages. Measured that way on 2026-11-05: a wrong passphrase was refused, the run's $0.10 cap was cut to the $0.02 daily cap, and 17 calls (18,152 tokens, $0.0008) all returned 200.
+Locally, `wrangler dev` in `web/worker` with `--env-file` holding `JEV_API_KEY`, `ACCESS_PASSPHRASE`, `ALLOWED_ORIGINS=http://localhost:4173` and optionally `JEV_DAILY_USD` runs the same Worker under workerd. A build with `BASE_PATH=/ant-sym/ VITE_JEV_API=http://localhost:8799`, served by `vite preview`, then behaves like Pages. Checked that way on 2026-11-10, after the merge with the one-world game, with `JEV_DAILY_USD=0.02`. A wrong passphrase was refused. Once unlocked, Jev started on its own at the first uncached situation: 5 calls, all 200, and $0.00033 counted against the day's $0.02.
 
 ## Cost
 

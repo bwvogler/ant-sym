@@ -1,83 +1,95 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import type { FungalSituation } from "./fungalPolicy.ts";
-import { INTERVENTIONS, STRAINS } from "./fungus.ts";
+import { decodeLevels, encodeLevels, LEVERS, scale } from "./levers.ts";
 
-// The fungus's Jev lane, pure (ja-t4d.5). Its own lane, its own cache, its own
-// words: the player's aim for the fungus. Never in an ant's request: Jev, as
-// the fungus, chooses what the fungus does to a host; the host's choices stay
-// with its colony's policy. One question per fungal situation (never per host
-// or per step), a choice among only what that host's strain allows and the
-// player's menu has on, so the answer is always something the fungus can do.
+// The fungus's Jev lane, pure (ja-t4d.5; levers, ja-lo8.4). Its own lane, its own cache, its own words: the player's
+// aim for the fungus. Never in an ant's request: Jev, as the fungus, sets how hard each of the fungus's levers is
+// pulled in a host, from what the fungus senses inside it (docs/fungus-policy.md §11); the host's choices stay with
+// its colony's policy. One score question per lever per fungal situation (never per host or per step), only for the
+// levers the player's menu has on, so every answer is something the fungus can do.
 
-/** Bump when the fungal situation, the legend or the question change: old cached answers no longer apply. */
-export const FUNGUS_BRAIN_VERSION = 4;
+/** Bump when the fungal situation, the legend or the questions change: old cached answers no longer apply. */
+export const FUNGUS_BRAIN_VERSION = 8;
 
-export const FUNGUS_LEGEND =
-  "You are a fungus living inside the ants of rival colonies. You never decide what an ant does: each ant chooses for itself from what it senses. You choose what you do to the ant you are in, which changes what it senses, what it gives off and how others see it. Each key in `hosts` is one ant you live in, as you sense it from inside. strain is which of your strains it carries. load is how much of you is in it: low, mid or high. host is what the ant is doing: explore, follow (a food trail), return (home) or fight. ground is where it stands: home (its own colony's ground; inside a nest, one of its own colony's chambers), tunnel (its own nest's tunnels), border (between, or the open ground), or foreign (another colony's ground or chamber). contact is who touches it: none; kin (its own colony's ants); allied (another colony's ants that smell close enough to be tolerated: colonies coming together); or strangers (ants that smell different, whom ants fight unless calmed). groomed means enough of its nestmates are around to groom you off it (going dormant shows them less of you; it does not send them away). aim is what you want: follow it.";
-
-/** What a host of this strain may be given: what the strain allows and the menu has on, in the table's order. */
-export function offeredFor(strainId: string, menu: ReadonlySet<string>): string[] {
-  const strain = STRAINS.find((s) => s.id === strainId);
-  return strain ? strain.allows.filter((id) => menu.has(id)) : [];
-}
+/** Fungal situations to a request: each carries a question per lever (up to 16), so fewer than the ants' 100. */
+export const FUNGUS_BATCH = 50;
 
 /**
- * The cache key for a fungal situation, asked with these interventions on offer. What is offered is part of the
- * question, so it is part of the key, per strain: switching cull (Bloom's alone) keeps Garden's and Lockpick's
- * answers, and an answer is always read and kept against what it was offered (offeredIn), not today's menu.
+ * How long the lane lets new situations gather before it sends a part-full request (ms). The legend is most of a small
+ * request; hosts play their earlier or default levels meanwhile. Measured with scripts/fungus-cost.mjs (PRD §50.3).
  */
-export function fungalKey(s: FungalSituation, offered: readonly string[]): string {
-  return `${s.strain}|${s.load}|${s.host}|${s.ground}|${s.contact}|${s.groomed ? "groomed" : "unseen"}|${offered.join(",")}`;
+export const FUNGUS_GATHER_MS = 2000;
+
+export const FUNGUS_LEGEND =
+  "You are a fungus inside ants of rival colonies. You never decide what an ant does; you set how hard to pull each of your levers in the ant you are in: perception levers change what it senses, emission levers what it gives off. Each key in `hosts` is one ant, as you sense it from inside. arousal: calm, alarmed (smells alarm) or fighting (strangers close). touch: none, nestmate, or foreigner (an ant that smells of another colony). place: outside, tunnel, chamber, or queen (her mark underfoot). task: nurse (young), inside (middle-aged), forager (old), or queen (you are in the colony's queen: only her own levers are asked). carrying: nothing, food or brood. groomed: nestmates are grooming you off it. Answer one level per lever. Scored -2..+2: 0 as is, below damped, above boosted. Scored 0..2: 0 none, 1 some, 2 strong. Scored 0..1: 0 off, 1 on. Levers: " +
+  LEVERS.map((v) => `${v.id}: ${v.brief}.`).join(" ") +
+  " aim is what you want: follow it.";
+
+/**
+ * The cache key for a fungal situation, asked with these levers. Which levers are asked is part of the question, so
+ * it is part of the key: switching a lever on asks again, and switching it back off finds the old answers.
+ */
+export function fungalKey(s: FungalSituation, asked: readonly string[]): string {
+  return `${s.arousal}|${s.touch}|${s.place}|${s.task}|${s.carrying}|${s.groomed ? "groomed" : "unseen"}|${asked.join(",")}`;
 }
 
-/** What the question under this key offered. */
-export function offeredIn(key: string): string[] {
+/** The levers the question under this key asked. */
+export function askedIn(key: string): string[] {
   const on = key.slice(key.lastIndexOf("|") + 1);
   return on ? on.split(",") : [];
 }
 
-export function interventionQuestion(id: string, offered: readonly string[]): JevRequest["questions"] {
-  const criteria: Record<string, string> = {};
-  for (const k of offered) {
-    const v = INTERVENTIONS.find((x) => x.id === k);
-    if (v) criteria[k] = `${v.name}: ${v.blurb}`;
-  }
-  return { [`${id}_do`]: { type: "choice", instructions: `Going by the aim, what should you do to host \`${id}\`?`, criteria } };
+/** One score question per lever asked, for host `id`: the lever's levels, lowest first (levers.scale), are its criteria. */
+export function leverQuestions(id: string, asked: readonly string[]): JevRequest["questions"] {
+  const out: JevRequest["questions"] = {};
+  for (const lever of LEVERS) if (asked.includes(lever.id)) out[`${id}_${lever.id}`] = { type: "score", instructions: `${lever.id} in \`${id}\``, criteria: scale(lever) };
+  return out;
 }
 
-/** Whether a situation is worth asking: only a real choice is (one thing on offer, or none, needs no answer). */
-export function worthAsking(offered: readonly string[]): boolean {
-  return offered.length > 1;
+/** Whether a situation is worth asking: only with at least one lever on. */
+export function worthAsking(asked: readonly string[]): boolean {
+  return asked.length > 0;
 }
 
-/** One request for many fungal situations: one shared state (legend, aim, hosts), one choice each among what its host was offered. */
-export function packFungusRequest(items: { id: string; situation: FungalSituation; offered: readonly string[] }[], aim: string): JevRequest {
+/** One request for many fungal situations: one shared state (legend, aim, hosts), a score per lever for each. */
+export function packFungusRequest(items: { id: string; situation: FungalSituation; asked: readonly string[] }[], aim: string): JevRequest {
   const hosts: Record<string, FungalSituation> = {};
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
     hosts[it.id] = { ...it.situation };
-    Object.assign(questions, interventionQuestion(it.id, it.offered));
+    Object.assign(questions, leverQuestions(it.id, it.asked));
   }
   return { state: { legend: FUNGUS_LEGEND, aim, hosts }, questions };
 }
 
-/** An intervention from a reply, or null when it is missing or not one of what was offered (not cached; the local rule covers it). */
-export function readIntervention(answers: Record<string, JevAnswer>, id: string, offered: readonly string[]): string | null {
-  const a = answers[`${id}_do`];
-  if (!a || a.type !== "choice") return null;
-  return offered.includes(a.choice) ? a.choice : null;
+/**
+ * Jev's levels for host `id` as a cache answer (levers.encodeLevels over the levers asked), or null when any is missing
+ * (not cached; the local rule covers it). A score is an expected level: rounded to the nearest, within the lever's range.
+ */
+export function readLevels(answers: Record<string, JevAnswer>, id: string, asked: readonly string[]): string | null {
+  const levels: Record<string, number> = {};
+  for (const lid of asked) {
+    const lever = LEVERS.find((v) => v.id === lid);
+    const a = answers[`${id}_${lid}`];
+    if (!lever || !a || a.type !== "score" || !Number.isFinite(a.score)) return null;
+    levels[lid] = Math.max(0, Math.min(lever.words.length - 1, Math.round(a.score)));
+  }
+  return encodeLevels(levels, asked);
+}
+
+/** Whether a stored answer is one the question under `key` could have given. */
+export function validLevels(key: string, answer: string): boolean {
+  return decodeLevels(answer, askedIn(key)) !== null;
 }
 
 /**
- * What a cached answer was asked under: a different aim, legend, intervention wording or question wording is a different
- * cache (the menu is in each key). So is the view: `home` is one of the host's own chambers in the side view and
- * home-scented ground on a top-down map, so the same situation is a different place (review of #27: Garden's answers
- * crossed views). The top-down maps keep the context they had.
+ * What a cached answer was asked under: a different aim, legend or question wording is a different cache (the levers
+ * asked are in each key). So is the view: a chamber in the side view is a nest's disc on a top-down map.
  */
 export function fungusContext(aim: string, view: "top" | "side" = "top"): string {
-  const blurbs = INTERVENTIONS.map((v) => `${v.id}:${v.name}:${v.blurb}`).join("\n");
-  return `fungus-v${FUNGUS_BRAIN_VERSION}${view === "side" ? "-side" : ""}-${hash(FUNGUS_LEGEND + JSON.stringify(interventionQuestion("h0", ["x"])) + blurbs + "\u0000" + aim.trim())}`;
+  const words = LEVERS.map((v) => `${v.id}:${v.brief}:${scale(v).join("/")}`).join("\n");
+  return `fungus-v${FUNGUS_BRAIN_VERSION}${view === "side" ? "-side" : ""}-${hash(FUNGUS_LEGEND + JSON.stringify(leverQuestions("h0", ["food"])) + words + "\u0000" + aim.trim())}`;
 }
 
 /** Aims to start from: the player's words for what the fungus wants. */

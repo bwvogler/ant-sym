@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { MODES, type Colony, type Mode, type Situation } from "../colony/colony.ts";
-import { INFECTED, INTERVENTIONS, STRAINS } from "../colony/fungus.ts";
+import { MODES, TRAILS, type Colony, type Mode, type Situation } from "../colony/colony.ts";
+import { INFECTED, STRAINS, type Fungus } from "../colony/fungus.ts";
+import { pulled } from "../colony/levers.ts";
+import { UPGRADES } from "../colony/evolution.ts";
 import { decodeFungal, type FungalSituation } from "../colony/fungalPolicy.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
+import Help from "./Help.tsx";
+import { openLearn, type LearnTarget } from "./learn.ts";
+import type { DecidedBy } from "./colonyJev.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
 // when it last chose, and who made the choice: Jev's cached answer for
@@ -15,23 +20,23 @@ import { colonyName, colonyTone } from "./names.ts";
 
 interface Props {
   followed: Followed;
-  colony: Colony;
-  rival: Colony | null;
+  colonies: readonly Colony[];
+  fungus: Fungus;
   /** who decided, for an ant of colony k */
-  explain: (s: Situation, k: number) => { mode: Mode; by: "jev" | "waiting" | "local" };
-  explainFungus: (s: FungalSituation) => { answer: string; by: "jev" | "waiting" | "local" };
+  explain: (s: Situation, k: number) => { mode: Mode; by: DecidedBy };
+  explainFungus: (s: FungalSituation) => { answer: string; by: DecidedBy };
   onClose: () => void;
 }
 
-const BY = { jev: "Jev's cached answer under its colony's doctrine", waiting: "the local rule, while Jev is asked", local: "the local rule" } as const;
+const BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under its colony's doctrine", stale: "Jev's answer under its earlier doctrine: Jev can't answer the new one now", waiting: "the local rule, while Jev is asked", local: "the local rule" };
 
-export default function AntCard({ followed, colony, rival, explain, explainFungus, onClose }: Props) {
+export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose }: Props) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 250);
     return () => clearInterval(t);
   }, []);
-  const col = followedColony(colony, rival, followed);
+  const col = followedColony(colonies, followed);
   const i = followed.i;
   if (!col) return null;
   const mode = MODES[col.mode[i] as number] as Mode;
@@ -50,7 +55,7 @@ export default function AntCard({ followed, colony, rival, explain, explainFungu
         </h2>
         <span className="font-mono text-xs text-fg-2">
           {mode}
-          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
+          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s{col.queen ? ` · energy ${((col.energy[i] as number) * 100).toFixed(0)} %${(col.need[i] as number) >= 0.05 ? ` · feels hunger ${(col.need[i] as number).toFixed(2)}` : ""}` : ""} · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
         </span>
         <button type="button" className="ml-auto rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised" onClick={onClose}>
           Stop following
@@ -61,111 +66,111 @@ export default function AntCard({ followed, colony, rival, explain, explainFungu
       ) : q ? (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-fg-3">last asked:</span>
-          {chips(q).map(([k, v]) => (
-            <span key={k} className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2">
+          {chips(q).map(([k, v, to]) => (
+            <button key={k} type="button" className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2 hover:text-accent hover:underline" onClick={() => openLearn(to)} title={`Learn: ${k}`}>
               {k} {v}
-            </span>
+            </button>
           ))}
           <span className="text-fg-3">→</span>
-          <span className="rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent">{mode}</span>
+          <span className={`rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent ${decided?.by === "stale" ? "opacity-50" : ""}`} title={decided?.by === "stale" ? "stale: Jev can't answer now, so the answer under the earlier words plays" : undefined}>
+            {mode}
+          </span>
           <span className="text-fg-3">{decided ? `by ${BY[decided.by]}` : ""}</span>
+          <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "mode" })}>
+            why?
+          </button>
         </div>
       ) : (
         <p className="mt-2 text-xs text-fg-3">Not asked yet.</p>
       )}
-      <Fungal col={col} i={i} explain={explainFungus} />
+      <Fungal col={col} i={i} fungus={fungus} explain={explainFungus} />
     </section>
   );
 }
 
-/** What the fungus is doing to ant i: strain, load, the intervention it runs, and each sense it bends. */
-const FUNGUS_BY = { jev: "Jev's cached answer under your aim", waiting: "the local rule, while Jev is asked", local: "the local rule" } as const;
+/** What the fungus is doing to ant i: what it senses there, and the levers it pulls (fungus-policy §11). */
+const FUNGUS_BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under your aim", stale: "Jev's answer under your earlier aim: Jev can't answer the new one now", waiting: "the strain's default, while Jev is asked", local: "the strain's default" };
 
-function Fungal({ col, i, explain }: { col: Colony; i: number; explain: Props["explainFungus"] }) {
+function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: Fungus; explain: Props["explainFungus"] }) {
   const load = col.load[i] as number;
   const resist = col.resist[i] as number;
   if (load < INFECTED) return resist >= 0.05 ? <p className="mt-2 text-xs text-fg-3">Clean · resistance {resist.toFixed(2)} from grooming infected nestmates.</p> : null;
-  const strain = STRAINS[col.strain[i] as number];
-  const run = INTERVENTIONS[col.expr[i] as number];
-  const bent = perceives(col, i);
+  const s = col.strain[i] as number;
+  const strain = STRAINS[s];
   const code = col.fungal[i] as number;
-  const sensed = code >= 0 && strain ? decodeFungal(code, strain.id) : null;
-  const by = sensed ? explain(sensed).by : null;
+  const sensed = code >= 0 ? decodeFungal(code) : null;
+  const decided = sensed ? explain(sensed) : null;
+  const wanted = decided ? fungus.resolve(decided.answer, s) : {};
+  const levers = decided ? pulled(wanted, fungus.menu) : [];
+  // What the host runs: Jev's levels held to the fungus's reach (ja-lo8.12).
+  const held = fungus.held(wanted, s);
+  const stale = decided?.by === "stale";
   return (
     <>
-    {sensed && (
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-        <span className="text-fg-3">the fungus senses:</span>
-        {(
-          [
-            ["load", sensed.load],
-            ["host", sensed.host],
-            ["ground", sensed.ground],
-            ["contact", sensed.contact],
-            [sensed.groomed ? "groomed" : "unseen", ""],
-          ] as const
-        ).map(([k, v]) => (
-          <span key={k} className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2">
-            {k} {v}
-          </span>
-        ))}
-        <span className="text-fg-3">→</span>
-        <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-spore">{run?.name ?? "?"}</span>
-        <span className="text-fg-3">{by ? `by ${FUNGUS_BY[by]}` : ""}</span>
-      </div>
-    )}
-    <p className="mt-2 text-xs text-fg-2">
-      <span className="text-spore">
-        {strain?.name ?? "fungus"} {Math.round(100 * load)}%
-      </span>
-      {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {(col.odour[i] as number).toFixed(2)} (its nest {col.nestOdour.toFixed(2)}) · runs <span className="font-mono">{run?.name ?? "?"}</span>
-      {bent.length ? <span className="text-fg-3"> — it perceives {bent.join(", ")}. The ant's situation above is what it perceives; its own policy chose.</span> : <span className="text-fg-3"> — its senses are as they are.</span>}
-    </p>
+      {sensed && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-fg-3">the fungus senses:</span>
+          <Help to={{ tab: "policy", id: "fungus" }} label="what the fungus senses" />
+          {(
+            [
+              ["arousal", sensed.arousal],
+              ["touch", sensed.touch],
+              ["place", sensed.place],
+              ["task", sensed.task],
+              ["carrying", sensed.carrying],
+              [sensed.groomed ? "groomed" : "unseen", ""],
+            ] as const
+          ).map(([k, v]) => (
+            <span key={k} className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2">
+              {k} {v}
+            </span>
+          ))}
+        </div>
+      )}
+      {decided && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-fg-3">and pulls:</span>
+          {levers.length === 0 && <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-3">nothing</span>}
+          {levers.map(({ lever, level }) => {
+            const runs = held[lever.id] ?? level;
+            const by = runs === level ? null : UPGRADES.find((u) => u.levers?.includes(lever.id));
+            return (
+              <span
+                key={lever.id}
+                className={`rounded bg-raised px-1.5 py-0.5 font-mono ${lever.kind === "perceive" ? "text-spore" : lever.kind === "lethal" ? "text-err" : "text-accent"} ${stale ? "opacity-50" : ""}`}
+                title={`${lever.kind === "perceive" ? "what it perceives" : lever.kind === "lethal" ? "lethal" : "what it gives off"}: ${lever.blurb}${by ? `. Its policy wants ${lever.words[level]}; your fungus reaches ${lever.words[runs]}: keep ${by.name} to go further.` : ""}`}
+              >
+                {lever.name}: {lever.words[runs]}
+                {by && <span className="text-fg-3"> (wants {lever.words[level]})</span>}
+              </span>
+            );
+          })}
+          <span className="text-fg-3">by {FUNGUS_BY[decided.by]}</span>
+          <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "fungus" })}>
+            why?
+          </button>
+        </div>
+      )}
+      <p className="mt-1.5 text-xs text-fg-3">
+        <span className="text-spore">
+          {strain?.name ?? "fungus"} {Math.round(100 * load)}%
+        </span>
+        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {(col.odour[i] as number).toFixed(2)} (its nest {col.nestOdour.toFixed(2)}). The ant's situation above is what it perceives; its own policy chose.
+      </p>
     </>
   );
 }
 
-/** The senses the fungus bends in ant i, in words. */
-function perceives(col: Colony, i: number): string[] {
-  const out: string[] = [];
-  const gain = (name: string, v: number) => {
-    if (Math.abs(v - 1) >= 0.05) out.push(`${name} ×${v.toFixed(2)}`);
-  };
-  gain("food scent", col.gainFood[i] as number);
-  gain("home scent", col.gainHome[i] as number);
-  gain("alarm", col.gainAlarm[i] as number);
-  const foreign = col.foreignFood[i] as number;
-  if (foreign >= 0.05) out.push(`the other colony's food trail as its own ×${foreign.toFixed(2)}`);
-  const clock = col.clock[i] as number;
-  if (Math.abs(clock - 1) >= 0.05) out.push(`its time out ×${(1 / clock).toFixed(2)}`);
-  const wider = (col.tolerance[i] as number) - col.params.tolerance;
-  if (wider >= 0.02) out.push(`strangers only past ${(col.tolerance[i] as number).toFixed(2)} of odour (not ${col.params.tolerance.toFixed(2)})`);
-  const calm = col.calm[i] as number;
-  if (calm >= 0.05) out.push(`and gives off a calming cue (${calm.toFixed(2)})`);
-  const mask = col.mask[i] as number;
-  if (mask >= 0.02) out.push(`and carries ${Math.round(100 * mask)}% of the fungus's own odour`);
-  const lay = col.layGain[i] as number;
-  if (Math.abs(lay - 1) >= 0.05) out.push(`and lays its trail ×${lay.toFixed(2)}`);
-  const leak = col.crossLay[i] as number;
-  if (leak >= 0.05) out.push(`and leaks ${Math.round(100 * leak)}% of its food trail to the other colony`);
-  const marks = col.gainMarks[i] as number;
-  if (Math.abs(marks - 1) >= 0.05) out.push(`its nest's floor marks ×${marks.toFixed(2)}`);
-  if ((col.swapMarks[i] as number) >= 0.5) out.push("brood as store and store as brood");
-  const regicide = col.regicide[i] as number;
-  if (regicide >= 0.02) out.push(`and kills the queen and brood it touches (×${regicide.toFixed(2)})`);
-  const quiet = col.quiet[i] as number;
-  if (quiet >= 0.05) out.push(`and fights raising ${Math.round(100 * (1 - quiet))}% of the alarm`);
-  return out;
-}
-
-function chips(s: Situation): [string, string][] {
+/** The situation's fields, each with where the Learn drawer explains it. */
+function chips(s: Situation): [string, string, LearnTarget][] {
+  const underground = !(TRAILS as readonly string[]).includes(s.homeTrail);
   return [
-    ["mode", s.mode],
-    [s.tired ? "tired" : "fresh", ""],
-    ["food", s.foodTrail],
-    ["home", s.homeTrail],
-    ["alarm", s.alarm],
-    ["enemy", s.enemy],
-    ["stance", s.stance],
+    ["mode", s.mode, { tab: "policy", id: "mode" }],
+    [s.tired ? "tired" : "fresh", "", { tab: "guide", id: "fatigue" }],
+    ["food", s.foodTrail, { tab: "guide", id: "food-trail" }],
+    ["home", s.homeTrail, { tab: "guide", id: underground ? "inside" : "home-trail" }],
+    ["alarm", s.alarm, { tab: "guide", id: "alarm" }],
+    ["enemy", s.enemy, { tab: "guide", id: "strangers" }],
+    ["stance", s.stance, { tab: "policy", id: "stance" }],
   ];
 }

@@ -1,11 +1,12 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import type { ColonyParams, Mode, Policy, Stance, StancePolicy } from "./colony.ts";
+import { type ColonyParams, FAINT, MODES, type Mode, type Policy, type Stance, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
-import { localResponses, type Responses } from "./responses.ts";
+import { STRAINS } from "./fungus.ts";
+import { localResponses, responses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
-import { dropFood, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import { dropFood, isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -415,6 +416,18 @@ const always =
   (): T =>
     v;
 
+/**
+ * Each ant's own stance (docs/stance.md): a colony whose waiting foragers go out as raid scouts whenever no food comes back
+ * (what a raid stance did before), and one whose never do (a forage stance).
+ */
+export const RAIDING = responses({ leave: (t) => (t.mode !== "fight" && t.stance === "forage" && t.returns === "none" ? "raid" : localResponses.leave(t)) });
+export const NEVER_RAID = responses({
+  leave: (t) => {
+    const a = localResponses.leave(t);
+    return a === "raid" ? "wait" : a;
+  },
+});
+
 const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
 
 /** Food a colony must bring home for a bridge run to count: a share measured on almost no traffic says nothing (ja-dez). */
@@ -620,9 +633,13 @@ export const alarm: Assay = {
       summary() {
         const before = mean(crowd.slice(when - 10, when));
         const after = mean(crowd.slice(when + 1, when + 11));
+        // Recovery is searched from the crowd's lowest point in the 10 s after the alarm, not from the alarm itself
+        // (ja-qld): with no scatter at all the crowd never dips, and "back" counted from before it had left.
+        let low = when + 1;
+        for (let k = when + 1; k < Math.min(crowd.length, when + 11); k++) if ((crowd[k] as number) < (crowd[low] as number)) low = k;
         let back = NaN;
-        for (let k = when + 1; k < crowd.length; k++)
-          if (mean(crowd.slice(Math.max(when + 1, k - 4), k + 1)) >= 0.5 * before) {
+        for (let k = low; k < crowd.length; k++)
+          if (mean(crowd.slice(Math.max(low, k - 4), k + 1)) >= 0.5 * before) {
             back = k + 1 - when;
             break;
           }
@@ -646,10 +663,64 @@ export const alarm: Assay = {
 };
 
 /**
+ * A5's probe: once a second, the share of the colony outside the nest; every tick, trips out (an ant crossing from inside
+ * the nest's radius + 2 to outside it). Both are reported over windows of seconds [from, to).
+ */
+function outingProbe(nest: { x: number; y: number }, windows: Record<string, [number, number]>): Probe {
+  const outside: number[] = [];
+  const departs: number[] = [];
+  let was: Uint8Array = new Uint8Array(0);
+  let nextAt = 1;
+  return {
+    tick(game) {
+      const c = game.player;
+      if (was.length < c.n) {
+        const w = new Uint8Array(c.n);
+        w.set(was);
+        was = w;
+      }
+      const sec = Math.floor(game.time);
+      let out = 0;
+      let alive = 0;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i]) continue;
+        alive++;
+        const o = Math.hypot((c.x[i] as number) - nest.x, (c.y[i] as number) - nest.y) > c.nest.r + 2 ? 1 : 0;
+        if (o && !was[i]) departs[sec] = (departs[sec] ?? 0) + 1;
+        was[i] = o;
+        out += o;
+      }
+      if (game.time + 1e-9 >= nextAt) {
+        nextAt += 1;
+        outside.push(alive ? out / alive : 0);
+      }
+    },
+    summary() {
+      const m: Record<string, number> = {};
+      for (const [k, [a, b]] of Object.entries(windows)) {
+        m[`outside${k}`] = mean(outside.slice(a, b));
+        let d = 0;
+        for (let t = a; t < b; t++) d += departs[t] ?? 0;
+        m[`departs${k}`] = (d / (b - a)) * 60; // trips out per minute
+      }
+      return m;
+    },
+  };
+}
+
+/** Take every unit of food from the cells within r of world (x, y). */
+function clearFood(game: Game, x: number, y: number, r: number): void {
+  discWorld(game.map.size, x, y, r + 2, (cx, cy) => {
+    while (takeFoodCell(game.map, cx, cy));
+  });
+}
+
+/**
  * A5 — foraging regulation. With no food, a harvester-ant colony keeps most foragers home; when
  * foragers start coming back with food, more go out (Gordon; Pinter-Wollman et al. 2013: the rate of
- * returning foragers sets the rate of outgoing ones). Food appears at 120 s. Design mark: the share
- * of the colony outside the nest before food is at most half what it is once food flows.
+ * returning foragers sets the rate of outgoing ones; docs/activation.md). Food appears at 120 s. Design mark: the share
+ * of the colony outside the nest before food is at most half what it is once food flows. Trips out per minute are
+ * reported beside it, so a pass shows its cause.
  */
 export const regulate: Assay = {
   id: "regulate",
@@ -659,33 +730,13 @@ export const regulate: Assay = {
   spec: (seed) => {
     const nest = at(50, 50);
     const food = at(50, 15);
-    const outside: number[] = [];
-    let nextAt = 1;
-    const probe: Probe = {
-      tick(game) {
-        if (game.time + 1e-9 < nextAt) return;
-        nextAt += 1;
-        const c = game.player;
-        let out = 0;
-        let alive = 0;
-        for (let i = 0; i < c.n; i++) {
-          if (!c.alive[i]) continue;
-          alive++;
-          if (Math.hypot((c.x[i] as number) - nest.x, (c.y[i] as number) - nest.y) > c.nest.r + 2) out++;
-        }
-        outside.push(alive ? out / alive : 0);
-      },
-      summary() {
-        return { outsideBefore: mean(outside.slice(60, 120)), outsideAfter: mean(outside.slice(240, 360)) };
-      },
-    };
     return {
       seed,
       seconds: 360,
       map: () => new Arena(100, 100, true).build([{ x: 50, y: 50, r: 3 }]),
       game: { antCount: 300, rival: false },
       events: [{ at: 120, kind: "food", x: food.x, y: food.y, r: 3, perCell: 200 }],
-      probes: [probe],
+      probes: [outingProbe(nest, { Before: [60, 120], After: [240, 360] })],
     };
   },
   score: (r) => {
@@ -695,7 +746,44 @@ export const regulate: Assay = {
   },
 };
 
-/** A6 arenas: attackers (the first colony, always raiding) against defenders (the second, local rule), with or without a 2-cell pass between them. */
+/**
+ * A5b — foraging stops when food does. Food appears at 60 s and is taken away at 240 s, carriers' loads aside. With no
+ * successful foragers coming back, departures fall within minutes (Gordon 2002: removing returning foragers cut the
+ * outgoing rate, settling in about 3 min; docs/activation.md). Design mark: trips out per minute over the last two
+ * minutes are at most half those while food flowed.
+ */
+export const regulateStop: Assay = {
+  id: "regulateStop",
+  title: "A5b foraging stops: do departures fall once the food is gone?",
+  target: "trips out per minute, 300–420 s ≤ ½ × 150–240 s (Gordon 2002)",
+  seconds: 420,
+  spec: (seed) => {
+    const nest = at(50, 50);
+    const food = at(50, 15);
+    return {
+      seed,
+      seconds: 420,
+      map: () => new Arena(100, 100, true).build([{ x: 50, y: 50, r: 3 }]),
+      game: { antCount: 300, rival: false },
+      events: [
+        { at: 60, kind: "food", x: food.x, y: food.y, r: 3, perCell: 200 },
+        { at: 240, kind: "call", run: (g) => clearFood(g, food.x, food.y, 3) },
+      ],
+      probes: [outingProbe(nest, { Flow: [150, 240], Gone: [300, 420] })],
+    };
+  },
+  score: (r) => {
+    const f = r.metrics.departsFlow as number;
+    const g = r.metrics.departsGone as number;
+    return { pass: g <= 0.5 * f ? 1 : 0 };
+  },
+};
+
+/**
+ * A6 arenas: attackers (the first colony, always raiding) against defenders (the second, local rule), with or without a
+ * 2-cell pass between them. The attackers outnumber the defenders, 200 to PASS_DEFENDERS.
+ */
+export const PASS_DEFENDERS = 80;
 function battleSpec(seed: number, pass: boolean): RunSpec {
   const a = new Arena(120, 40).carve(2, 2, 117, 37);
   if (pass) a.wall(56, 2, 63, 37).carve(56, 19, 63, 20);
@@ -703,8 +791,13 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
     seed,
     seconds: 180,
     map: () => a.build([{ x: 20, y: 20, r: 3 }, { x: 100, y: 20, r: 3 }]),
-    game: { antCount: 200, rivalAnts: 200 },
-    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid") },
+    game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
+    // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
+    // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
+    // gain 1.26, 3/20 on main).
+    // Both sides keep the colony's stance (stanceGate 0, docs/stance.md): A6 is about who reaches whom at a pass, and with each
+    // ant's own stance the defenders 40 cells from home turned away from the pass instead of holding it (gain 1.64 against 1.95).
+    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid"), colony: { raidGate: 0, stanceGate: 0 }, rival: { stanceGate: 0 } },
   };
 }
 
@@ -715,13 +808,348 @@ const exchange = (r: RunResult) => {
 };
 
 /**
- * A6 — combat through a narrow pass. Narrow passes favour defenders (Lymbery et al. 2023, via
- * docs/ant-communication.md): only a few attackers can engage at once. Compare the exchange ratio
- * (attackers lost per defender lost) here with `open`; no pass mark until terrain-limited combat
- * lands (behaviour MR 4).
+ * A6 — few against many, through a narrow pass. Narrow ground favours the smaller side: in open arenas numbers win, in
+ * cluttered ones few meat ants held off many Argentine ants (Lymbery et al. 2023; docs/combat.md), because only a few
+ * attackers reach the defenders at once. Fights here count every stranger within reach, so in the open numbers win as
+ * the square of the odds; a pass is what limits who reaches whom. Score: the exchange (attackers lost per defender) in
+ * the pass against the same seed's open battle. Design mark: at least PASS_GAIN times the open exchange. (Before MR 4
+ * A6 pitted equal armies, 200 against 200, where terrain should favour neither side, and asked the pass to: it didn't.)
  */
-export const pass: Assay = { id: "pass", title: "A6 combat through a 2-cell pass", target: "exchange (attackers lost per defender) well above `open` (Lymbery et al. 2023); report only", seconds: 180, spec: (s) => battleSpec(s, true), score: exchange };
-export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass`; report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
+export const PASS_GAIN = 1.5;
+export const pass: Assay = {
+  id: "pass",
+  title: "A6 few against many through a 2-cell pass",
+  target: `the defenders' exchange in the pass ≥ ${PASS_GAIN}× the same battle's on open ground (design mark; Lymbery et al. 2023)`,
+  seconds: 180,
+  spec: (s) => battleSpec(s, true),
+  score: (r) => {
+    const e = exchange(r);
+    const o = exchange(runGame(battleSpec(r.seed, false)).result);
+    const gain = o.exchange > 0 ? e.exchange / o.exchange : NaN;
+    return { ...e, openExchange: o.exchange, gain, pass: gain >= PASS_GAIN ? 1 : 0 };
+  },
+};
+export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass` (which runs it too); report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
+
+/**
+ * A11 — raiders find the rival round a pocket of wall (behaviour MR 5.2, docs/raid-recruitment.md). Two nests at either
+ * end of a 120 × 60 arena; a pocket of wall between them, open toward the first nest, so a straight line from one to the
+ * other runs into its back. The first colony is forced to raid; the second defends by the local rule.
+ * Reported: the share of the colony's raiders (the ants recruited: scouts, and those a scout's trail called) that ever came within RAID_REACH of the rival's nest; the share of the time raiders
+ * outside their own nest were stuck (moved under 3 cells in 20 s, and not at the rival's nest); the first arrival.
+ * Score: the trail's gain, the share reaching the rival with the raid trail against the same seed with no trail laid
+ * (raidLay 0: scouts search alone; Polyergus raids stop without scouts, Topoff et al. 1987). Design marks: at least
+ * RAID_GAIN times as many reach the rival with the trail, and at most RAID_STUCK of the outside samples are stuck.
+ * `straight` is the same battle with the raiders sent at the rival hole's coordinates (`raidGate` 0, as before MR 5.2): the
+ * trail is a sensed cue, and costs reach against it (review of #41).
+ */
+export const RAID_REACH = 10;
+export const RAID_GAIN = 1.5;
+export const RAID_STUCK = 0.1;
+function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number }): Probe {
+  const reached = new Set<number>();
+  const was: number[][] = [];
+  let nextAt = 20;
+  let first = NaN;
+  let stuck = 0;
+  let outside = 0;
+  // Diagnosis (ja-sf1): who is recruited, where, and what the trail at the nest is.
+  let prev: Uint8Array | null = null;
+  let prevRep: Uint8Array | null = null;
+  const ever = new Set<number>();
+  let atHome = 0;
+  let finds = 0;
+  let findDist = 0;
+  let nestRaid = 0;
+  let nestSmelt = 0;
+  let samples = 0;
+  return {
+    tick(game) {
+      const c = game.player;
+      if (!prev || prev.length !== c.n) {
+        prev = new Uint8Array(c.n);
+        prevRep = new Uint8Array(c.n);
+      }
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i]) continue;
+        if (c.recruited[i] && !prev[i] && !ever.has(i)) {
+          ever.add(i);
+          if (Math.hypot((c.x[i] as number) - own.x, (c.y[i] as number) - own.y) <= c.nest.r) atHome++;
+        }
+        if (c.reporting[i] && !(prevRep as Uint8Array)[i]) {
+          finds++;
+          findDist += Math.hypot((c.x[i] as number) - rival.x, (c.y[i] as number) - rival.y);
+        }
+        prev[i] = c.recruited[i] as number;
+        (prevRep as Uint8Array)[i] = c.reporting[i] as number;
+        // Raiders only: on a raid stance an ant not recruited carries on as a forager (behaviour MR 5.2); raidGate 0 sends all.
+        if ((c.recruited[i] || c.params.raidGate <= 0) && Math.hypot((c.x[i] as number) - rival.x, (c.y[i] as number) - rival.y) <= RAID_REACH) {
+          reached.add(i);
+          if (Number.isNaN(first)) first = game.time;
+        }
+      }
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 20;
+      // The raid trail at the nest's rim, toward the rival (where recruits would smell it).
+      let best = 0;
+      for (let k = -2; k <= 2; k++) best = Math.max(best, c.ph.read("raid", own.x + c.nest.r + 1, own.y + k));
+      nestRaid += best;
+      if (best >= FAINT) nestSmelt++;
+      samples++;
+      for (let i = 0; i < c.n; i++) {
+        const x = c.x[i] as number;
+        const y = c.y[i] as number;
+        const prev = was[i];
+        was[i] = [x, y];
+        if (!c.alive[i] || !prev) continue;
+        if (Math.hypot(x - own.x, y - own.y) <= c.nest.r + 2 || Math.hypot(x - rival.x, y - rival.y) <= RAID_REACH) continue;
+        outside++;
+        if (Math.hypot(x - (prev[0] as number), y - (prev[1] as number)) < 3) stuck++;
+      }
+    },
+    summary(game) {
+      const n = Math.max(1, game.player.params.antCount);
+      let hit = 0;
+      let dead = 0;
+      let deadHit = 0;
+      for (const i of ever) {
+        if (reached.has(i)) hit++;
+        if (!game.player.alive[i]) {
+          dead++;
+          if (reached.has(i)) deadHit++;
+        }
+      }
+      return {
+        reached: reached.size / n,
+        stuck: outside ? stuck / outside : NaN,
+        firstReach: first,
+        recruited: ever.size / n,
+        recruitedAtHome: ever.size ? atHome / ever.size : NaN,
+        recruitsReaching: ever.size ? hit / ever.size : NaN,
+        finds,
+        findDist: finds ? findDist / finds : NaN,
+        recruitsDead: ever.size ? dead / ever.size : NaN,
+        deadReached: dead ? deadHit / dead : NaN,
+        nestRaid: samples ? nestRaid / samples : 0,
+        nestSmelt: samples ? nestSmelt / samples : 0,
+      };
+    },
+  };
+}
+function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
+  const a = new Arena(120, 60).carve(2, 2, 117, 57).wall(40, 18, 60, 20).wall(40, 40, 60, 42).wall(58, 18, 60, 42);
+  const own = at(20, 30);
+  const rival = at(100, 30);
+  return {
+    seed,
+    seconds: 300,
+    map: () => a.build([{ x: 20, y: 30, r: 3 }, { x: 100, y: 30, r: 3 }]),
+    game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
+    sides: { stance: always<Stance>("raid"), responses: RAIDING, rivalResponses: NEVER_RAID, ...(colony ? { colony } : {}) },
+    probes: [raidProbe(own, rival)],
+  };
+}
+export const raidFind: Assay = {
+  id: "raidFind",
+  title: "A11 raiders find the rival: the raid trail's gain, and stuck ants",
+  target: `≥ ${RAID_GAIN}× as many raiders reach the rival's nest with the raid trail as without; ≤ ${RAID_STUCK * 100} % of outside samples stuck (design marks; docs/raid-recruitment.md, ja-jwy)`,
+  seconds: 300,
+  spec: (s) => raidFindSpec(s),
+  score: (r) => {
+    const reached = r.metrics.reached as number;
+    const deaf = runGame(raidFindSpec(r.seed, { raidLay: 0 })).result.metrics.reached as number;
+    const straight = runGame(raidFindSpec(r.seed, { raidGate: 0 })).result.metrics.reached as number; // main: at the rival hole's coordinates
+    const gain = deaf > 0 ? reached / deaf : NaN;
+    const stuck = r.metrics.stuck as number;
+    const m = r.metrics;
+    return { reached, deaf, straight, gain, stuck, firstReach: m.firstReach as number, recruited: m.recruited as number, recruitedAtHome: m.recruitedAtHome as number, recruitsReaching: m.recruitsReaching as number, finds: m.finds as number, findDist: m.findDist as number, recruitsDead: m.recruitsDead as number, deadReached: m.deadReached as number, nestRaid: m.nestRaid as number, nestSmelt: m.nestSmelt as number, pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0 };
+  },
+};
+
+/**
+ * A12 — a raid no one can find doesn't starve the colony (behaviour MR 5.2, docs/raid-recruitment.md). One colony forced onto
+ * a raid stance with its rival sealed in rock, and a food pile it could forage. A raid stance is a bias, not an order: ants not
+ * recruited by a scout's trail go on foraging, and scouts that find no one tire and come home. (The first version made
+ * raiders wait at home for a trail that never came, and the strategist raids when no food comes in, so it never ate: 10 of
+ * 7,400.) Score: food stored over 900 s against the same colony on a forage stance. Design mark: at least RAID_STOP_FOOD
+ * of it. Reported: the share outside in the last 3 min.
+ */
+export const RAID_STOP_FOOD = 0.5;
+function raidStopSpec(seed: number, stance: Stance): RunSpec {
+  const nest = at(50, 50);
+  const food = at(50, 15);
+  return {
+    seed,
+    seconds: 900,
+    map: () => {
+      // The rival's nest is sealed in a pocket of rock: a stance is consulted only with two colonies, and no one can find it.
+      const a = new Arena(100, 100, true).wall(84, 84, 98, 98).carve(87, 87, 95, 95);
+      a.pile(50, 15, 3, 200);
+      return a.build([{ x: 50, y: 50, r: 3 }, { x: 91, y: 91, r: 3 }]);
+    },
+    game: { antCount: 300, rivalAnts: 30 },
+    sides: { stance: always<Stance>(stance), responses: stance === "raid" ? RAIDING : NEVER_RAID },
+    probes: [outingProbe(nest, { Late: [720, 900] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
+  };
+}
+export const raidStop: Assay = {
+  id: "raidStop",
+  title: "A12 a raid no one can find doesn't starve the colony",
+  target: `food stored over 900 s on a raid stance with no rival ≥ ${RAID_STOP_FOOD * 100} % of the same colony's on a forage stance (design mark; docs/raid-recruitment.md)`,
+  seconds: 900,
+  spec: (seed) => raidStopSpec(seed, "raid"),
+  score: (r) => {
+    const stored = r.metrics["you.stored"] as number;
+    const control = runGame(raidStopSpec(r.seed, "forage")).result.metrics["you.stored"] as number;
+    const share = control > 0 ? stored / control : NaN;
+    return { stored, control, share, outsideLate: r.metrics.outsideLate as number, pass: share >= RAID_STOP_FOOD ? 1 : 0 };
+  },
+};
+
+/**
+ * A9 — strangers meet at food (behaviour MR 4, docs/combat.md). Two colonies on stance forage, nests at either end of
+ * an open field, one food pile between them: their foragers meet there. At food, the ant that didn't start an encounter
+ * usually retreats (Human & Gordon 1996); foragers don't fight to the death over a bait. Score: ants lost per 100 food
+ * brought home (both colonies), and food home. Design mark: at most CONTACT_LOSSES lost per 100 food, half of what the
+ * colonies lost before MR 4 (8.7, 7.2–10.6 on seeds 1–10: every forager that met a stranger fought it).
+ */
+export const CONTACT_LOSSES = 4;
+export const contact: Assay = {
+  id: "contact",
+  title: "A9 strangers meet at food: forage, not war",
+  target: `≤ ${CONTACT_LOSSES} ants lost per 100 food home, both colonies (design mark; docs/combat.md)`,
+  seconds: 300,
+  spec: (seed) => ({
+    seed,
+    seconds: 300,
+    map: () => new Arena(120, 60, true).pile(60, 30, 4, 200).build([{ x: 12, y: 30, r: 3 }, { x: 108, y: 30, r: 3 }]),
+    game: { antCount: 200, rivalAnts: 200 },
+    sides: { stance: always<Stance>("forage"), rivalStance: always<Stance>("forage"), responses: NEVER_RAID, rivalResponses: NEVER_RAID },
+  }),
+  score: (r) => {
+    const lost = (r.metrics["you.losses"] as number) + (r.metrics["rival.losses"] as number);
+    const home = (r.metrics["you.stored"] as number) + (r.metrics["rival.stored"] as number);
+    const per100 = home > 0 ? (100 * lost) / home : Infinity;
+    return { lostPer100Food: per100, foodHomeBoth: home, pass: per100 <= CONTACT_LOSSES ? 1 : 0 };
+  },
+};
+
+/**
+ * A13 — defence from senses (docs/stance.md). One colony forages a pile 45 cells west of its nest; a war party of strangers
+ * (the rival, sent marching at the colony's hole: an experimental device) comes from the east. Defence is an individual's:
+ * the ants that sense a threat near home fight it, and foragers far off at the pile go on carrying (pavement ants: a
+ * threshold raised by encounters, Hoover et al. 2016; Pheidole: the fight moves closer to the nest as it grows). Score: food
+ * stored against the same seed with the war party sealed in rock (`foodShare`), the strangers killed per ant lost
+ * (`exchange`), and, sampled each second from 20 s, the colony's fighters within NEAR_HOME of its nest (`fightNear`) and its
+ * ants at the pile that are not fighting (`atPile`). `broadcast` is the same battle with the colony's stance chosen by its
+ * strategist and told to every ant (stanceGate 0, as before). Design mark: food at least DEFEND_FOOD of the broadcast's
+ * share, and at least half the war party killed. (An absolute mark of 0.8 of the control failed under both: an 80-strong
+ * war party forced to fight costs a 200-ant colony 120-130 ants whoever defends.)
+ */
+export const DEFEND_FOOD = 0.9;
+export const NEAR_HOME = 15;
+function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams>): RunSpec {
+  const nest = at(60, 30);
+  const pile = at(15, 30);
+  let fightNear = 0;
+  let atPile = 0;
+  let samples = 0;
+  let next = 20;
+  return {
+    seed,
+    seconds: 300,
+    map: () => {
+      const a = new Arena(160, 60, true).pile(15, 30, 4, 300);
+      if (sealed) a.wall(140, 20, 158, 40).carve(145, 25, 155, 35);
+      return a.build([{ x: 60, y: 30, r: 3 }, { x: 150, y: 30, r: 3 }]);
+    },
+    game: { antCount: 200, rivalAnts: 80 },
+    sides: {
+      ...(colony ? { colony } : {}),
+      rivalPolicy: always<Mode>("fight"),
+      rivalStance: always<Stance>("raid"),
+      rival: { raidGate: 0, stanceGate: 0 },
+    },
+    probes: [
+      {
+        tick(game) {
+          if (game.time + 1e-9 < next) return;
+          next += 1;
+          const c = game.player;
+          for (let i = 0; i < c.n; i++) {
+            if (!c.alive[i]) continue;
+            const x = c.x[i] as number;
+            const y = c.y[i] as number;
+            const fighting = MODES[c.mode[i] as number] === "fight";
+            if (fighting && Math.hypot(x - nest.x, y - nest.y) <= NEAR_HOME) fightNear++;
+            if (!fighting && Math.hypot(x - pile.x, y - pile.y) <= 8) atPile++;
+          }
+          samples++;
+        },
+        summary: () => ({ fightNear: samples ? fightNear / samples : 0, atPile: samples ? atPile / samples : 0 }),
+      },
+    ],
+  };
+}
+export const defendHome: Assay = {
+  id: "defendHome",
+  title: "A13 defence from senses: the nest is defended, the far pile still worked",
+  target: `food (against the same colony with no war party) ≥ ${DEFEND_FOOD * 100} % of the broadcast stance's, and ≥ half the war party killed (design marks; docs/stance.md)`,
+  seconds: 300,
+  spec: (seed) => defendSpec(seed, false),
+  score: (r) => {
+    const stored = r.metrics["you.stored"] as number;
+    const control = runGame(defendSpec(r.seed, true)).result.metrics["you.stored"] as number;
+    const foodShare = control > 0 ? stored / control : NaN;
+    const killed = r.metrics["rival.losses"] as number;
+    const lost = r.metrics["you.losses"] as number;
+    const broadcast = (runGame(defendSpec(r.seed, false, { stanceGate: 0 })).result.metrics["you.stored"] as number) / Math.max(1, control);
+    return { stored, control, foodShare, broadcast, killed, lost, exchange: killed / Math.max(1, lost), fightNear: r.metrics.fightNear as number, atPile: r.metrics.atPile as number, pass: foodShare >= DEFEND_FOOD * broadcast && killed >= 40 ? 1 : 0 };
+  },
+};
+
+/**
+ * A10 — faint alarm draws (behaviour MR 4, docs/combat.md: low doses attract, ten times more repel; Moser et al. 1968,
+ * Lopes et al. 2022). A faint alarm is painted 30 cells from the nest of a colony with no food to find at 40 s, while
+ * every ant still explores (later they tire and head home): the crowd within 4 cells of it over the next 10 s against
+ * the 10 s before. Design mark: at least FAINT_DRAW more ants (before MR 4 it emptied: alarm only repelled).
+ */
+export const FAINT_DRAW = 2;
+export const faintAlarm: Assay = {
+  id: "faintAlarm",
+  title: "A10 faint alarm draws ants",
+  target: `≥ ${FAINT_DRAW} more ants near a faint alarm than before it (design mark; docs/combat.md)`,
+  seconds: 60,
+  spec: (seed) => {
+    const spot = at(50, 50);
+    const when = 40;
+    const crowd: number[] = [];
+    let nextAt = 1;
+    const probe: Probe = {
+      tick(game) {
+        if (game.time + 1e-9 < nextAt) return;
+        nextAt += 1;
+        crowd.push(antsNear(game, spot.x, spot.y, 4));
+      },
+      summary() {
+        const before = mean(crowd.slice(when - 10, when));
+        const after = mean(crowd.slice(when + 1, when + 11));
+        return { nearBefore: before, nearAfter: after, draw: after - before };
+      },
+    };
+    return {
+      seed,
+      seconds: 60,
+      // No food: every ant explores, as the idle foragers a faint alarm should draw (on a busy trail they follow it).
+      map: () => new Arena(100, 100, true).build([{ x: 50, y: 82, r: 3 }]),
+      game: { antCount: 300, rival: false },
+      // Faint: above the sensors' FAINT (0.05), well under STRONG (1), for a few seconds at the spot.
+      events: [0, 2, 4, 6, 8].map((d) => ({ at: when + d, kind: "paint" as const, channel: "alarm" as const, x: spot.x, y: spot.y, r: 2, amount: 0.4 })),
+      probes: [probe],
+    };
+  },
+  score: (r) => ({ pass: (r.metrics.draw as number) >= FAINT_DRAW ? 1 : 0 }),
+};
 
 /**
  * G — the real game as the page opens it (the side view), 600 + 600 ants, 10 minutes. Also the
@@ -808,4 +1236,61 @@ export const nestFlow: Assay = {
   score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
 };
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, pass, open, game, gameTop, nestFlow];
+/**
+ * New queens (ja-lo8.9, royal.ts), on the first colony of a solo side-view game: when the fungus reaches the queen,
+ * when the first gyne is reared, how many are culled, when the first alate flies, and when the first daughter's first
+ * worker ecloses and first goes out. `arm` forces one of the fungus's queen levers in every host from the start, so
+ * the rearing is measured apart from how fast the fungus spreads: "signal" the queen's signal at "damp" (0.4), "scent"
+ * every worker's perception of her scent at "damp" (0.3); "none" forces nothing (the fungus lands and plays the local
+ * rule, which pulls neither: dilution alone).
+ */
+export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
+  const at: Record<string, number> = { queen: NaN, gyne: NaN, flight: NaN, daughter: NaN, daughterWorker: NaN, daughterOut: NaN };
+  const first = (k: string, t: number) => {
+    if (Number.isNaN(at[k] as number)) at[k] = t;
+  };
+  return {
+    tick(game) {
+      const c = game.player;
+      if (arm === "signal" && c.queen) c.queen.signal = 0.4;
+      if (arm === "scent") c.scentGain.fill(0.3);
+      const t = game.time;
+      if (game.revealed[0]) first("queen", t);
+      if (c.gynes > 0) first("gyne", t);
+      if (c.flights > 0) first("flight", t);
+      const k = game.lineage(0)[1];
+      const d = k === undefined ? undefined : game.colonies[k];
+      if (!d) return;
+      first("daughter", t);
+      if (!d.founding) first("daughterWorker", t);
+      if (Number.isNaN(at.daughterOut as number))
+        for (let i = 0; i < d.n; i++)
+          if (d.alive[i] && isSky(game.map, Math.floor(d.x[i] as number), Math.floor((d.y[i] as number) / R))) {
+            first("daughterOut", t);
+            break;
+          }
+    },
+    summary(game) {
+      const c = game.player;
+      return { ...Object.fromEntries(Object.entries(at).map(([k, v]) => [`t.${k}`, v])), gynes: c.gynes, culled: c.gynesCulled, flights: c.flights, daughters: game.lineage(0).length - 1 };
+    },
+  };
+}
+
+function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
+  const id = arm === "none" ? "lifecycle" : `lifecycle-${arm}`;
+  return {
+    id,
+    title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}`,
+    target: "report only (design, docs/new-queens.md §5): times to the queen, the first gyne, the first flight, and the daughter's first worker and forager; gynes, culls",
+    seconds: 1800,
+    spec: (seed) => ({ seed, seconds: 1800, game: { antCount: 600, rival: false }, events: [{ at: 0, kind: "call", run: (g) => void g.land(0, STRAINS.findIndex((x) => x.id === "garden")) }], probes: [lifecycleProbe(arm)] }),
+    score: (r) => Object.fromEntries(["t.queen", "t.gyne", "t.flight", "t.daughterWorker", "t.daughterOut", "gynes", "culled", "flights"].map((k) => [k, r.metrics[k] as number])),
+  };
+}
+
+export const lifecycle = lifecycleAssay("none");
+export const lifecycleSignal = lifecycleAssay("signal");
+export const lifecycleScent = lifecycleAssay("scent");
+
+export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, defendHome, faintAlarm, game, gameTop, nestFlow, lifecycle, lifecycleSignal, lifecycleScent];

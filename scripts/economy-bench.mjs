@@ -14,7 +14,9 @@
 // (no sampling): fills of floor ground (see Colony #floorGround) and of other cells, how many of each were dug out again,
 // and re-digs of filled cells as a share of all digs. It also checks food conservation every 10 s: map food + food in
 // jaws + larder + Σ brood (1 + fed) + 4 × births stays at the food the map started with.
-// A run is deterministic: the same arguments give the same numbers.
+// A run is deterministic: the same arguments give the same numbers. NUDGE=<n> (env) seeds the game with seed × 7919 + n
+// (ja-xu6: the economy test's worlds fail more often at n = 1). REGROW=<seconds> (env) turns on the game's food
+// regrowth (GameParams.regrow; the page uses game.GAME_REGROW); food that grows back is added to the map's total.
 //
 // Usage: node scripts/economy-bench.mjs [seeds=1-2] [seconds=3600] [ants per colony=600] [colonies=2] [every=600] [root=this repo] [small=0] [food=1]
 //   seeds: a list and/or ranges (1-6, or 1,3,5). root: another checkout to measure (its web/src/colony is imported), so
@@ -47,7 +49,7 @@ console.log(`economy-bench: seeds ${seeds.join(",")}, ${seconds} s, ${ants} ants
 for (const seed of seeds) {
   const map = W.generateSideWorld(seed, { ...(small ?? {}), nestCount: colonies });
   if (foodScale !== 1) scaleFood(map, foodScale);
-  const g = new Game(map, { antCount: ants, rivalAnts: ants, rival: colonies > 1 }, W.mulberry32(seed * 7919));
+  const g = new Game(map, { antCount: ants, rivalAnts: ants, rival: colonies > 1, regrow: Number(process.env.REGROW ?? 0) }, W.mulberry32(seed * 7919 + Number(process.env.NUDGE ?? 0)));
   const cs = g.colonies;
   const ch = map.chambers; // none before nest slice 2: older checkouts are measured too
   const floor0 = cs.map((_, k) => ch?.floorOf[k] ?? 0);
@@ -86,6 +88,8 @@ for (const seed of seeds) {
   };
   const followSum = cs.map(() => 0);
   const outs = cs.map(() => []);
+  // Larvae stranded (slow/economy.test's measure): unfed for over 120 s while the larder could feed them; the worst sample per window.
+  const stranded = cs.map(() => 0);
   let samples = 0;
   const lastHome = cs.map(() => 0);
   let worstDrift = 0;
@@ -93,9 +97,10 @@ for (const seed of seeds) {
     let s = map.foodLeft;
     for (const c of cs) {
       for (let i = 0; i < c.n; i++) if (c.alive[i] && c.carrying[i]) s += 1;
-      s += c.larder + 4 * c.births;
+      s += c.larder + 4 * c.births + (c.eaten ?? 0);
       for (const b of c.brood?.items ?? []) s += 1 + b.fed;
     }
+    s += g.royalFood?.() ?? 0; // new queens' bodies (ja-lo8.9)
     return s - map.foodTotal;
   };
   const t0 = performance.now();
@@ -117,6 +122,10 @@ for (const seed of seeds) {
         if (!W.isSky(map, CELL[0], CELL[1])) followSum[ci]++;
       }
       if (t >= 120 && t % 10 === 0) outs[ci].push(alive ? out / alive : 0);
+      if (t % 60 === 0 && c.brood) {
+        const waiting = c.brood.items.filter((b) => b.stage === 1 && b.t > 120 && b.fed < 3 - 1e-9).length;
+        if (c.larder >= waiting * 3) stranded[ci] = Math.max(stranded[ci], waiting);
+      }
     });
     if (t % 10 === 0) worstDrift = Math.max(worstDrift, Math.abs(conserved()));
     if (t % every !== 0) continue;
@@ -136,9 +145,10 @@ for (const seed of seeds) {
       const rate = (c.stored - lastHome[ci]) / every;
       lastHome[ci] = c.stored;
       console.log(
-        `  c${ci}: alive ${c.population}  born ${c.births} / old ${c.diedOld ?? 0}  lost ${c.losses}  home ${Math.round(c.stored)} (${rate.toFixed(2)}/s)  larder ${c.larder.toFixed(0)}  brood ${e}/${l}/${p}  queen ${c.queen ? (c.queen.alive ? "yes" : "dead") : "none"}  floor ×${((ch?.floorOf[ci] ?? 0) / Math.max(1, floor0[ci])).toFixed(2)} in ${mine} chambers  out>120 ${outText}  follow ${(followSum[ci] / samples).toFixed(1)}  ports ${c.portTrips}  dug ${c.soilDug} filled ${c.soilFilled}+${c.looseFilled} out ${c.soilOut}${c.looseDown === undefined ? "" : `  loose down ${c.looseDown} back ${c.looseBack}`}${c.handedOn === undefined ? "" : `  handed on ${c.handedOn}`}`,
+        `  c${ci}: alive ${c.population}  born ${c.births} / old ${c.diedOld ?? 0}  lost ${c.losses}  home ${Math.round(c.stored)} (${rate.toFixed(2)}/s)  larder ${c.larder.toFixed(0)}  brood ${e}/${l}/${p}  queen ${c.queen ? (c.queen.alive ? "yes" : "dead") : "none"}  floor ×${((ch?.floorOf[ci] ?? 0) / Math.max(1, floor0[ci])).toFixed(2)} in ${mine} chambers  out>120 ${outText}  follow ${(followSum[ci] / samples).toFixed(1)}  ports ${c.portTrips}  dug ${c.soilDug} filled ${c.soilFilled}+${c.looseFilled} out ${c.soilOut}${c.looseDown === undefined ? "" : `  loose down ${c.looseDown} back ${c.looseBack}`}${c.handedOn === undefined ? "" : `  handed on ${c.handedOn}`}${c.eaten === undefined ? "" : `  eaten ${c.eaten.toFixed(0)}  starved ${c.diedHungry} adults, ${c.broodStarved} larvae${c.queen ? `  queen energy ${(c.queen.energy ?? 1).toFixed(2)}` : ""}`}  stranded ${stranded[ci]}`,
       );
       followSum[ci] = 0;
+      stranded[ci] = 0;
     });
     samples = 0;
   }

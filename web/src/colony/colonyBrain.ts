@@ -1,7 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
-import { CARRY, type Carry, localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
+import { CARRY, type Carry, CONTACT, type Contact, LEAVE, type Leave, localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -18,15 +18,15 @@ import { CARRY, type Carry, localResponses, responses, touchKey, type Responses,
 // the page yet: scripts/colony-live.mjs asks them, colony-cost estimates them.
 
 /** Bump when the situation fields or their meaning change: old cached answers no longer apply. */
-export const COLONY_BRAIN_VERSION = 5;
+export const COLONY_BRAIN_VERSION = 7;
 /** The strategist's: its view didn't change with the nest (slice 3), so its cached stances keep (it shared the ants' version before). */
-export const STANCE_BRAIN_VERSION = 3;
+export const STANCE_BRAIN_VERSION = 4;
 
 export const COLONY_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony. mode is what the ant is doing now: explore (wander looking for new food, marking the way home, digging tunnels through soil), follow (walk up a food scent toward food), return (walk home) or fight (go for enemy ants, or follow the colony's alarm scent to a fight, or raid the enemy nest). tired means it has searched outside a long time without finding food; only staying inside the nest a while rests it. Going home when tired is how the colony stops searching where food has run out and stops following trails to food that is gone. return means walk home: an ant already inside the nest and not tired has finished its trip, and the colony needs it out searching again. foodTrail and alarm say how strong each scent is just ahead of the ant: none, faint or strong. Food scent is laid by ants carrying food home, so it leads to food; alarm scent is laid by ants in a fight, or by the fungus, and marks danger. homeTrail, on the ground, is how strong the home scent ahead is (none, faint or strong; it leads home); inside the nest it says where the ant is: in a tunnel, or in one of the nest's chambers by what the chamber is for (royal: the queen's; brood; store: food kept; reception: where food comes in; midden: refuse). An ant inside the nest is home. enemy is near when an ant of the rival colony is within two steps. stance is what the colony as a whole is doing: forage, defend or raid. An ant carrying something is not asked here: it answers a separate question about its load. doctrine is how the colony wants its ants to behave: follow it.";
+  "Each key in `ants` is the situation of one worker ant of a colony. mode is what the ant is doing now: explore (wander looking for new food, marking the way home, digging tunnels through soil), follow (walk up a food scent toward food), return (walk home) or fight (go for enemy ants, or follow the colony's alarm scent to a fight, or raid the enemy nest). tired means it has searched outside a long time without finding food; only staying inside the nest a while rests it. Going home when tired is how the colony stops searching where food has run out and stops following trails to food that is gone. return means walk home: an ant already inside the nest and not tired has finished its trip, and the colony needs it out searching again. Caution means going home from danger (alarm scent, strangers near), not staying home from food: a rested ant with a food trail ahead and no danger near is a forager the colony needs out. foodTrail and alarm say how strong each scent is just ahead of the ant: none, faint or strong. Food scent is laid by ants carrying food home, so it leads to food; alarm scent is laid by ants in a fight, or by the fungus, and marks danger. homeTrail, on the ground, is how strong the home scent ahead is (none, faint or strong; it leads home); inside the nest it says where the ant is: in a tunnel, or in one of the nest's chambers by what the chamber is for (royal: the queen's; brood; store: food kept; reception: where food comes in; midden: refuse). An ant inside the nest is home. enemy is near when an ant of the rival colony is within two steps. stance, on open ground, is this ant's own: forage, the usual one (gather food); defend, only while it smells alarm or meets strangers close to its own nest; or raid, once a scout's raid trail has recruited it or it has gone out as a raid scout. In an underground nest stance is what the colony asks of it: forage, defend or raid. An ant carrying something is not asked here: it answers a separate question about its load. doctrine is how the colony wants its ants to behave: follow it.";
 
 export const STRATEGY_LEGEND =
-  "`colony` describes an ant colony at war with a rival colony over the same food. stance is what it is doing now: forage (gather food), defend (fight near home) or raid (send fighters to the rival's nest). ants is how many ants it has against how many it can feed: few, some or many. losses is how many ants it lost lately: none, some or heavy. enemyNearNest says whether rival ants are close to home. foodLeft is how much food is left on the map: plenty, some or scarce. larder is food stored at home beyond what new ants need: low or full. doctrine is how the colony wants to behave: follow it.";
+  "`colony` describes an ant colony at war with a rival colony over the same food. stance is what it is doing now: forage (gather food), defend (fight near home) or raid (send fighters to the rival's nest). ants is how many ants it has against how many it can feed: few, some or many. losses is how many ants it lost lately: none, some or heavy. enemyNearNest says whether rival ants are close to home. intake is how much food its foragers have brought home lately for its size: none, some or plenty (the colony never knows how much food is left out there, only how fast it comes in). larder is food stored at home beyond what new ants need: low or full. doctrine is how the colony wants to behave: follow it.";
 
 export interface Doctrine {
   id: string;
@@ -40,14 +40,14 @@ export const DOCTRINES: Doctrine[] = [
   { id: "warlike", name: "Warlike", text: "Destroy the rival colony. Explorers become raiders whenever the colony has ants to spare. Follow alarm scent to every fight. Forage only to grow the colony." },
 ];
 
-const MODE_CRITERIA: Record<Mode, string> = {
+export const MODE_CRITERIA: Record<Mode, string> = {
   explore: "explore: wander and look for new food, digging through soil",
   follow: "follow: walk up the food scent toward food",
   return: "return: walk home",
   fight: "fight: go for enemy ants, follow alarm scent to a fight, or raid the rival nest",
 };
 
-const STANCE_CRITERIA: Record<Stance, string> = {
+export const STANCE_CRITERIA: Record<Stance, string> = {
   forage: "forage: gather food, fight only what comes close",
   defend: "defend: fighters stay near home and answer alarm",
   raid: "raid: send spare ants to fight at the rival's nest",
@@ -87,7 +87,7 @@ export function readMode(answers: Record<string, JevAnswer>, id: string): Mode |
 
 /** The cache key for the strategist's view. */
 export function stanceKey(s: StanceSituation): string {
-  return `${s.stance}|${s.ants}|${s.losses}|${s.enemyNearNest ? "enemy" : "clear"}|${s.foodLeft}|${s.larder}`;
+  return `${s.stance}|${s.ants}|${s.losses}|${s.enemyNearNest ? "enemy" : "clear"}|intake:${s.intake}|${s.larder}`;
 }
 
 export function stanceQuestion(id: string): JevRequest["questions"] {
@@ -122,12 +122,12 @@ export function stanceContext(doctrine: string): string {
 }
 
 /** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
-export const RESPONSE_BRAIN_VERSION = 6;
+export const RESPONSE_BRAIN_VERSION = 10;
 
 export const RESPONSE_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside: that food is already home, and a food trail laid inside the nest leads nestmates in, away from the food outside. digging says it is digging at a soil face. place is where it is: out (away from its nest), hole (at its nest's mouth), tunnel (in its own nest's tunnels) or chamber (in one of its own nest's chambers). offered, when it may pick something up, is what lies within reach: food; soil (a loose pellet off the mound: carried down to fill unused tunnels, or farther out, it keeps the mound spread and the nest's entrance clear); corpse (a dead nestmate: on the midden it can't spread disease in the nest); or brood (an egg by the queen, or a larva lying outside the brood chambers: larvae are fed only in a brood chamber, so brood left lying never becomes a worker). enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance is what the colony as a whole is doing: forage, defend or raid. quality, for food carried or offered, is how good it tastes: poor, fair or rich. The colony finds food and its way home only by scent trails: ants carrying food home lay the food trail that leads others out to it (more for richer food), and ants walking out lay the home trail that leads carriers back; where nobody lays, nobody can follow. doctrine is how the colony wants its ants to behave: follow it.";
+  "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. mode is what it is doing: explore, follow (a food scent), return (home) or fight. carrying is what it holds: none, food, soil (a pellet it dug), corpse (a dead nestmate for the midden) or brood (an egg, larva or pupa it is nursing). porter says it is carrying food between chambers inside the nest, not home from outside: that food is already home, and a food trail laid inside the nest leads nestmates in, away from the food outside. digging says it is digging at a soil face. place is where it is: out (away from its nest), hole (at its nest's mouth), tunnel (in its own nest's tunnels) or chamber (in one of its own nest's chambers). offered, when it may pick something up, is what lies within reach: food; soil (a loose pellet off the mound: carried down to fill unused tunnels, or farther out, it keeps the mound spread and the nest's entrance clear); corpse (a dead nestmate: on the midden it can't spread disease in the nest); or brood (an egg by the queen, or a larva lying outside the brood chambers: larvae are fed only in a brood chamber, so brood left lying never becomes a worker). enemy says whether ants of another colony are within the colony's enemy range, a few steps. stance, on open ground, is this ant's own: forage, the usual one (gather food); defend, only while it smells alarm or meets strangers close to its own nest; or raid, once a scout's raid trail has recruited it or it has gone out as a raid scout. In an underground nest stance is what the colony asks of it: forage, defend or raid. quality, for food carried or offered, is how good it tastes: poor, fair or rich. The colony finds food and its way home only by scent trails: ants carrying food home lay the food trail that leads others out to it (more for richer food), and ants walking out lay the home trail that leads carriers back; where nobody lays, nobody can follow. alarm is the alarm scent it smells: none, faint (a little: something is happening near) or strong (a fight close by). odds, when strangers are within reach, is how many nestmates are round it against them: outnumbered, even or outnumbering. Strangers in reach hurt any ant they touch, fighting or not, and an ant that fights where its side is outnumbered dies; one that turns away and leaves lives to forage. returns, for an ant waiting at home, is how many nestmates bringing food home it has met lately: none, few or many. The colony learns that there is food to be had only by meeting nestmates bringing it in: even a few coming back means there is food out there to fetch, and many that it is plentiful, so more ants are needed out; when none do, an ant that goes out is a scout searching alone, and most should wait inside. An ant that defends goes out whatever comes back. crowd, for an ant waiting at home, is how crowded home is: few or many nestmates round it. Returns come first: while food is coming back the colony needs its ants out fetching it, however crowded home is. A crowded home with no food coming back is the one case where the doctrine decides between raiding and waiting: those ants are spare, so a colony whose doctrine raids sends them out as raid scouts to find the rival's nest (raid: a scout that meets strangers lays the raid trail home, and the trail recruits raiders), and one whose doctrine shuns raids keeps them waiting. A raider's cue is a raid trail: raid is the scent a scout laid on its way home from strangers it found (none, faint or strong). Without one, no one yet knows where the rival is, and most raiders should wait inside while the scouts search. doctrine is how the colony wants its ants to behave: follow it.";
 
-export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail"] as const;
+export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail", "contact", "leave"] as const;
 export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
 
 export function responseQuestion(hook: ResponseHook, id: string): JevRequest["questions"] {
@@ -145,6 +145,31 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
           criteria: {
             take: "take: carry it where it belongs (food home into the nest, for the colony's larvae and stores; a porter's food to the chamber that wants it; soil out to the mound; a corpse to the midden; brood to a brood chamber)",
             "put down": "put down: put it down here, where it stands, and do something else",
+          },
+        },
+      };
+    case "contact":
+      return {
+        [`${id}_contact`]: {
+          type: "choice",
+          instructions: `Going by the doctrine, ${ant} has strangers of another colony within reach (odds says how many nestmates are round it against them): what should it do?`,
+          criteria: {
+            fight: "fight: attack the strangers where they are",
+            flee: "flee: turn away from them and go home, keeping whatever it carries",
+            "drop and run": "drop and run: put down what it carries here and flee home",
+          },
+        },
+      };
+    case "leave":
+      return {
+        [`${id}_leave`]: {
+          type: "choice",
+          instructions: `Going by the doctrine, ${ant} is rested and waiting at home with empty jaws, and no stranger is near. If its mode is return it is a forager: returns says how many nestmates bringing food it has met lately, and crowd how crowded home is. If its mode is fight it is a raider: raid is the trail a scout laid home from the rival, if one is under it. When should it go out, and as what?`,
+          criteria: {
+            now: "now: go out at once",
+            soon: "soon: go out in a few seconds",
+            wait: "wait: stay inside; only now and then does a waiting ant go out to scout",
+            raid: "raid: now and then go out as a raid scout, looking for the rival colony's nest (for a spare ant: home crowded, no food coming back)",
           },
         },
       };
@@ -170,8 +195,9 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
   for (const it of items) {
     const t = it.situation;
     // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
-    const { offered, quality, ...rest } = t;
-    ants[it.id] = hook === "get" ? { ...rest, offered, quality } : hook === "trail" ? { ...rest, quality } : { ...rest };
+    // alarm and odds only to `contact`; returns only to `leave`.
+    const { offered, quality, alarm, odds, returns, raid, crowd, ...rest } = t;
+    ants[it.id] = hook === "get" ? { ...rest, offered, quality } : hook === "trail" ? { ...rest, quality } : hook === "contact" ? { ...rest, alarm, odds } : hook === "leave" ? (t.mode === "fight" ? { ...rest, raid } : { ...rest, returns, crowd }) : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
@@ -191,7 +217,7 @@ export function cacheContexts(doctrine: string): Record<"mode" | "stance" | Resp
 }
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
-export type ResponseAnswer = boolean | Carry | Trail;
+export type ResponseAnswer = boolean | Carry | Trail | Contact | Leave;
 const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
 
 /**
@@ -204,10 +230,20 @@ export function readResponse(hook: ResponseHook, answers: Record<string, JevAnsw
   if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
   if (a.type !== "choice") return null;
   if (hook === "carry") return (CARRY as readonly string[]).includes(a.choice) ? (a.choice as Carry) : null;
+  if (hook === "contact") return (CONTACT as readonly string[]).includes(a.choice) ? (a.choice as Contact) : null;
+  if (hook === "leave") return (LEAVE as readonly string[]).includes(a.choice) ? (a.choice as Leave) : null;
   return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
 }
 
-/** Cached response answers per hook, keyed by touchKey: what scripts/colony-live.mjs saves and the experiments replay. */
+/**
+ * A response situation's cache key for a hook: touchKey, for `contact` the alarm and odds it is sent too, and for `leave`
+ * the returns (the other lanes aren't sent them, so they don't key on them: review of #38).
+ */
+export function responseKey(hook: ResponseHook, t: Touch): string {
+  return hook === "contact" ? `${touchKey(t)}|alarm:${t.alarm}|odds:${t.odds}` : hook === "leave" ? `${touchKey(t)}|${t.mode === "fight" ? `raid:${t.raid}` : `returns:${t.returns}|crowd:${t.crowd}`}` : touchKey(t);
+}
+
+/** Cached response answers per hook, keyed by responseKey: what scripts/colony-live.mjs saves and the experiments replay. */
 export type ResponseCache = Partial<Record<ResponseHook, Record<string, ResponseAnswer>>>;
 
 /**
@@ -221,7 +257,7 @@ export function responsesFromAnswers(cache: ResponseCache, base: Responses = loc
     if (!table) continue;
     const local = base[hook] as (t: Touch) => ResponseAnswer;
     (over as Record<ResponseHook, (t: Touch) => ResponseAnswer>)[hook] = (t) => {
-      const a = table[touchKey(t)];
+      const a = table[responseKey(hook, t)];
       onLookup?.(hook, a !== undefined);
       return a ?? local(t);
     };

@@ -1,5 +1,5 @@
 // Offline: can Bloom's crown orphan a colony in a real game? The app's own setup (generateSideWorld(seed), Game
-// with mulberry32(seed * 7919), 600 + 600 ants), crown on the menu, and the UI's spore brush (useColony.ts SPORES:
+// with mulberry32(seed * 7919), 600 + 600 ants), crown on the menu, and the app's old spore brush (game.ts BRUSH:
 // radius 3, spores 2, dose 0.15 per paint event). At PAINT_AT seconds the player paints Bloom on colony 1's royal
 // chamber: STROKES paint events along its floor (a short drag; the app paints one event per pointer move), or with
 // WHERE "hole", across its hole on the ground (where the foragers pass, not on the queen). The
@@ -8,21 +8,20 @@
 // Bloom's hosts in colony 1 over time, and both colonies' ants at the end.
 //
 // Usage: node scripts/crown.mjs [seed=1] [seconds=600] [ants=600] [strokes=6] [paintAt=60] [where=royal|hole]
-import { Game } from "../web/src/colony/game.ts";
+import { BRUSH as SPORES, Game } from "../web/src/colony/game.ts";
 import { INFECTED, STRAINS } from "../web/src/colony/fungus.ts";
 import { centreX, centreY } from "../web/src/colony/hex.ts";
 import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
 
 const [seed = 1, seconds = 600, ants = 600, strokes = 6, paintAt = 60] = process.argv.slice(2, 7).map(Number);
 const where = process.argv[7] ?? "royal";
-const SPORES = { radius: 3, spores: 2, dose: 0.15 }; // web/src/ui/useColony.ts
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 const DT = 1 / 30;
 const map = generateSideWorld(seed);
 const g = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 7919));
 const target = g.colonies[1];
 g.fungus.menu = new Set([...g.fungus.menu, "crown"]);
-g.fungus.policy = (s) => (s.strain === "bloom" && s.ground === "home" ? "crown" : "default");
+g.fungus.policy = (s) => (s.place === "queen" || s.place === "chamber" ? "crown" : "default");
 
 let diedAt = -1;
 let painted = false;

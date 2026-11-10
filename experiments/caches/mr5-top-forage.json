@@ -1,0 +1,62 @@
+{
+ "version": {
+  "colony": 5,
+  "stance": 4,
+  "response": 8
+ },
+ "contexts": {
+  "mode": "colony-v5-e792ce70",
+  "stance": "stance-v4-657ca221",
+  "get": "get-v8-a5a85a2b",
+  "carry": "carry-v8-0eda63a3",
+  "drop": "drop-v8-8e9324be",
+  "trail": "trail-v8-7761dae4",
+  "contact": "contact-v8-34f43caf",
+  "leave": "leave-v8-73dfa880"
+ },
+ "view": "top",
+ "seed": 1,
+ "ants": 600,
+ "seconds": 300,
+ "doctrine": {
+  "id": "forage",
+  "name": "Forage",
+  "text": "Gather as much food as possible. Follow a strong food scent; explore when there is none; go home when tired. Fight only an enemy that is close. Raid only when food runs out."
+ },
+ "modes": {},
+ "stances": {
+  "forage|some|none|clear|intake:some|low": "forage",
+  "forage|many|none|clear|intake:some|low": "forage",
+  "forage|many|some|clear|intake:some|low": "forage",
+  "forage|many|some|clear|intake:plenty|full": "forage",
+  "raid|many|heavy|clear|intake:plenty|full": "forage",
+  "raid|many|heavy|clear|intake:plenty|low": "forage",
+  "forage|many|heavy|clear|intake:plenty|full": "forage",
+  "raid|many|heavy|enemy|intake:plenty|full": "defend",
+  "defend|many|heavy|clear|intake:plenty|full": "forage",
+  "defend|many|heavy|enemy|intake:plenty|full": "defend",
+  "forage|many|heavy|clear|intake:plenty|low": "forage",
+  "forage|many|heavy|enemy|intake:plenty|full": "defend",
+  "defend|many|heavy|clear|intake:plenty|low": "forage",
+  "raid|many|heavy|enemy|intake:plenty|low": "defend",
+  "forage|many|heavy|enemy|intake:plenty|low": "defend",
+  "defend|many|heavy|clear|intake:some|low": "forage",
+  "forage|many|heavy|clear|intake:some|low": "forage"
+ },
+ "responses": {
+  "leave": {
+   "return|none|-|-|hole|none|clear|raid|returns:many": "now",
+   "return|none|-|-|hole|none|clear|raid|returns:few": "now",
+   "return|none|-|-|hole|none|clear|forage|returns:none": "wait",
+   "return|none|-|-|hole|none|clear|forage|returns:many": "wait",
+   "return|none|-|-|hole|none|clear|forage|returns:few": "soon",
+   "return|none|-|-|hole|none|clear|raid|returns:none": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:many": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:few": "now",
+   "return|none|-|-|hole|none|clear|defend|returns:none": "wait",
+   "return|none|-|-|hole|none|enemy|forage|returns:few": "soon",
+   "return|none|-|-|hole|none|enemy|forage|returns:none": "wait",
+   "return|none|-|-|hole|none|enemy|forage|returns:many": "wait"
+  }
+ }
+}

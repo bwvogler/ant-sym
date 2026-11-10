@@ -115,6 +115,12 @@ export class ChunkLayer<A extends Cells> {
       }
   }
 
+  /** Forget every chunk: the layer reads as `empty` everywhere and holds nothing (a save's restore, save.ts). */
+  dropAll(): void {
+    this.#table.fill(undefined);
+    this.#count = 0;
+  }
+
   /** Every cell, zeroed (or set to `empty`), keeping the chunks allocated. */
   clear(): void {
     this.forEach((_, __, a) => a.fill(this.empty));
