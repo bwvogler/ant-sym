@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CURTAIN, LIFESPAN, MIDDLE, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../colony.ts";
 import { decodeFungal } from "../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../fungus.ts";
-import { Game, gameRng, isOneWorld, type GameSave } from "../game.ts";
+import { Game, gameRng, isOneWorld } from "../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance } from "../hex.ts";
 import { generateOneWorld, type OneWorld } from "../oneWorld.ts";
 import { decode, encode } from "../save.ts";
@@ -542,14 +542,6 @@ test("one world: an ant that dies on the plane leaves no corpse underground; one
   c.putAnt(1, CURTAIN, at.x, at.y + 4);
   c.kill(1, false);
   assert.equal(c.corpses.length, 1, "the control: underground, the dead lie where they fall");
-});
-
-test("one world: saving, loading and a save's re-founding refuse until U4b (founding itself is U4a's)", () => {
-  const g = game();
-  assert.throws(() => g.save(), /one world: U4/);
-  assert.throws(() => g.load({} as GameSave), /one world: U4/);
-  const n = g.player.nest;
-  assert.throws(() => g.addColony({ x: 10, y: 10, antCount: 0, odour: 0, nest: { ...n } }), /one world: U4/);
 });
 
 test("a game on one map: each colony has one layer and every ant is on it", () => {

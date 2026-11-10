@@ -7,7 +7,7 @@ import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
-import { type End, nearestValid, outward } from "./transect.ts";
+import { type Cell, type End, nearestValid, outward } from "./transect.ts";
 import { cellOf, CELL } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -18,9 +18,6 @@ export { CURTAIN, PLANE } from "./colony.ts";
 export function isOneWorld(m: WorldMap | OneWorld): m is OneWorld {
   return "plane" in m && "curtain" in m && "line" in m;
 }
-
-/** What a one-world game refuses until U4b (docs/one-world.md §6): saving and loading, and so a save's re-founding. */
-const ONE_WORLD_U4 = "one world: U4";
 
 // The game, pure: two colonies (or one, solo) on one map, sharing its food.
 // The player is neither: the player is the fungus (fungus.ts). `player` and
@@ -146,6 +143,11 @@ export interface Founding {
    * draw from the restored game's random stream and could put the shaft elsewhere (PR #42 review, B1).
    */
   nest?: Nest;
+  /**
+   * One world (U4b): where the founding went, nearestValid's hole on the plane and the end of the line it grew (Game.addColony
+   * records it; x and y stay the landing point). A save's re-founding grows the line there again (oneWorld.ts growWorld).
+   */
+  spot?: { end: End; cell: Cell };
 }
 
 /** A saved game (Game.save): JSON. */
@@ -175,6 +177,11 @@ export interface GameSave {
    * version 4: those are built afresh, as they were.
    */
   grids?: { counts: number[][][]; bands: BandsSave[] };
+  /**
+   * One world (U4b): its seed, the line as saved (its holes, V₀'s column and the margin: a check, since load grows the
+   * line again from `founded`), and the curtain as dug (its nests aside: the world digs them). `map` is the plane.
+   */
+  world?: { seed: number; line: { holes: Cell[]; s0: number; margin: number }; curtain: unknown };
   private: { fightDeaths: number; lastFightDeath: number; metBy?: number[]; haveMet?: boolean; nextStrategy: number; regrowClock: number; rng: number | null; regrowRng: number | null };
 }
 
@@ -521,17 +528,20 @@ export class Game {
     const world = this.world;
     let at: number;
     let nest: Nest;
+    let spot: Founding["spot"];
     if (world) {
-      // A save's re-founding (f.nest) is U4b's, with one-world saves.
-      if (f.nest) throw new Error(ONE_WORLD_U4);
+      // A save's re-founding (f.nest) grows the line where the founding went (f.spot), as it was then: no search again.
+      if (f.nest && !f.spot) throw new Error("addColony: a save's founding needs its spot (one world)");
       cellOf(f.x, f.y);
       // Rule 4's open ground is the plane's main open ground (mainGround): never a pocket sealed off by rock (D1, #62).
-      const spot = nearestValid(world.line, { x: CELL[0] as number, y: CELL[1] as number }, FOUND_RADIUS, mainGround(world));
+      spot = f.nest ? f.spot : (nearestValid(world.line, { x: CELL[0] as number, y: CELL[1] as number }, FOUND_RADIUS, mainGround(world)) ?? undefined);
       if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
       const was = { x0: world.curtain.x0, w: world.curtain.size.w };
       at = growWorld(world, spot.end, spot.cell);
       // The fungus keeps the curtain's spore cells as flat indices: re-keyed to its new columns.
       this.fungus.regrid(CURTAIN, was);
+      // A save's nest is the one dug then, as the side view's (growWorld digs the same one: from the stream keyed by its hole).
+      if (f.nest) world.curtain.nests[at] = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
       nest = world.curtain.nests[at] as Nest;
     } else {
       // The new nest's index in map.nests, which holds the world's nests whether or not a colony lives in each (with the
@@ -557,7 +567,7 @@ export class Game {
     }
     this.colonies.push(c);
     for (const g of this.#grids) g.push(new CountGrid());
-    this.founded.push({ ...f, nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) } });
+    this.founded.push({ ...f, ...(spot ? { spot: { end: spot.end, cell: { x: spot.cell.x, y: spot.cell.y } } } : {}), nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) } });
     this.#wire();
     this.#refresh();
     const q = c.queen;
@@ -975,8 +985,10 @@ export class Game {
    * ui/saves.ts keeps the seed, view and settings beside it).
    */
   save(): GameSave {
-    if (this.world) throw new Error(ONE_WORLD_U4);
-    const map = Object.fromEntries(Object.entries(this.map).filter(([k]) => k !== "nests" && k !== "nest"));
+    // A map without its nests: the world (or a re-founding) makes them.
+    const bare = (m: WorldMap) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== "nests" && k !== "nest"));
+    const map = bare(this.map);
+    const world = this.world;
     return {
       version: SAVE_VERSION,
       time: this.time,
@@ -993,16 +1005,33 @@ export class Game {
       fungus: this.fungus.saveState(),
       recognition: this.recognition.saveState(),
       grids: { counts: this.#grids.map((gs) => gs.map((g) => g.saveState())), bands: this.#recs.map((r) => r.saveBands()) },
+      ...(world ? { world: { seed: world.seed, line: { holes: world.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: world.line.sHole[0] as number, margin: world.line.margin }, curtain: encode(bare(world.curtain)) } } : {}),
       private: { fightDeaths: this.#fightDeaths, lastFightDeath: this.#lastFightDeath, metBy: [...this.#metBy], haveMet: this.#haveMet, nextStrategy: this.#nextStrategy, regrowClock: this.#regrowClock, rng: (this.#rng as Partial<Rng>).state ?? null, regrowRng: this.#regrowRng?.state ?? null },
     };
   }
 
-  /** A save back into this game, built afresh from the same world and settings (Game.save). */
+  /**
+   * A save back into this game, built afresh from the same world and settings (Game.save). One world (U4b): built from
+   * the same seed and generateOneWorld options; the foundings grow the line again where they went, then the plane and
+   * the curtain as dug are poured over it.
+   */
   load(save: GameSave): void {
-    if (this.world) throw new Error(ONE_WORLD_U4);
     const saved = migrateSave(save);
+    const world = this.world;
+    const sw = saved.world;
+    if (!!sw !== !!world) throw new Error(sw ? "save: a one-world save, and this game is on one map" : "save: a save of a game on one map, and this game is one world");
+    if (world && sw) {
+      const size = (saved.map as { size?: { w: number; h: number } }).size;
+      if (sw.seed !== world.seed || size?.w !== this.map.size.w || size?.h !== this.map.size.h) throw new Error(`save: another world (seed ${sw.seed}, plane ${size?.w} × ${size?.h}; this game's: seed ${world.seed}, ${this.map.size.w} × ${this.map.size.h})`);
+    }
     // Colonies founded mid-game first, as they were: then everything (the map as dug among it) is poured back over them.
     for (const f of saved.founded ?? []) this.addColony(f);
+    if (world && sw) {
+      // The line grown again must be the one saved: else the curtain poured below would lie under another line.
+      const line = world.line;
+      const same = line.holes.length === sw.line.holes.length && line.holes.every((c, k) => c.x === sw.line.holes[k]?.x && c.y === sw.line.holes[k]?.y);
+      if (!same || line.sHole[0] !== sw.line.s0 || line.margin !== sw.line.margin) throw new Error("save: another world's line");
+    }
     if (saved.colonies.length !== this.colonies.length) throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
     this.time = saved.time;
     this.strategyChoices = saved.strategyChoices;
@@ -1012,6 +1041,7 @@ export class Game {
     this.flights = (saved.flights ?? []).map((f) => ({ ...f }));
     this.params = decode(saved.params) as GameParams;
     fillLike(this.map, saved.map);
+    if (world && sw) fillLike(world.curtain, sw.curtain);
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));
     this.colonies.forEach((c, k) => {
       const t = this.colonies[saved.raids[k] ?? -1];

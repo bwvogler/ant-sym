@@ -175,3 +175,19 @@ test("a one-world colony's save holds every layer's own state, and the fungus's 
   const s = g.player.saveState();
   assert.throws(() => fresh.player.loadState({ ...s, private: { ...(s.private as object), cur: PLANE } }), /layer 0 bound/);
 });
+
+test("the game's save holds every private field it declares, or the field is built again on load", () => {
+  // As for Colony and Fungus: a new #field in Game must be saved, or named here as rebuilt on load.
+  const src = readFileSync(new URL("../game.ts", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("export class Game "));
+  const declared = new Set<string>();
+  for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
+  const inPrivate = ["fightDeaths", "lastFightDeath", "metBy", "haveMet", "nextStrategy", "regrowClock", "rng", "regrowRng"];
+  // The occupancy grids and every layer's recognition bands are GameSave.grids (layer 0's recognition is `recognition` too).
+  const inGrids = ["grids", "recs"];
+  const derived = ["piles"]; // the food piles as the world began: from the fresh world
+  assert.deepEqual([...declared].sort(), [...inPrivate, ...inGrids, ...derived].sort(), "every declared #field is accounted for");
+  const s = build("top", 2).save();
+  assert.deepEqual(Object.keys(s.private).sort(), [...inPrivate].sort());
+  assert.deepEqual(Object.keys(s.grids!).sort(), ["bands", "counts"]);
+});
