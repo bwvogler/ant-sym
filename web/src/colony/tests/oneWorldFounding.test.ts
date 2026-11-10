@@ -7,7 +7,7 @@ import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { CRUST, generateCurtain, generateOneWorld, growWorld, STRIP, type OneWorld } from "../oneWorld.ts";
 import type { Flight } from "../royal.ts";
 import { cellAt, nearestValid } from "../transect.ts";
-import { disc, mulberry32, openCell, OPEN, ROCK, rockAt, type WorldMap } from "../world.ts";
+import { disc, mulberry32, openCell, OPEN, reachableFrom, ROCK, rockAt, type WorldMap } from "../world.ts";
 
 // Founding on the line (U4a, ja-lp4.4.1; docs/one-world.md §3): the world grows at an end, nothing already there moves,
 // and a queen with nowhere to land is lost with the reason. One world on the default plane, with its real rock.
@@ -97,6 +97,28 @@ function check(w: OneWorld, g: Game, label: string): void {
   for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) assert.ok(![...all[a]!].some((cell) => all[b]!.has(cell)), `${label}: nests ${a} and ${b}'s royal chambers merge`);
 }
 
+/**
+ * The food a growth adds (PR #62 review, S1): before any tick, the curtain's foodTotal and foodLeft are the food below the
+ * crust, so a growth counts what it buries; and every food cell in the columns it added (outside `old`) is one some
+ * colony can reach, walking or digging, so it buries none that no ant could ever take.
+ */
+function foodBooks(w: OneWorld, old: { sMin: number; sMax: number }, label: string): void {
+  const { curtain } = w;
+  const { x0 } = curtain;
+  const { w: cw, h } = curtain.size;
+  const reach = reachableFrom(curtain, curtain.nests, "diggable");
+  let sum = 0;
+  for (let s = x0; s < x0 + cw; s++)
+    for (let y = CRUST; y < h; y++) {
+      const v = curtain.food.get(s, y);
+      if (!v) continue;
+      sum += v;
+      if ((s < old.sMin || s > old.sMax) && !reach[y * cw + s - x0]) assert.fail(`${label}: food ${v} at new column ${s}, row ${y}, which no colony can reach`);
+    }
+  assert.ok(Math.abs(curtain.foodTotal - sum) < 1e-6 * Math.max(1, sum), `${label}: foodTotal ${curtain.foodTotal} but ${sum} below the crust`);
+  assert.ok(Math.abs(curtain.foodLeft - sum) < 1e-6 * Math.max(1, sum), `${label}: foodLeft ${curtain.foodLeft} but ${sum} below the crust`);
+}
+
 /** Found once, by the lab beyond an end or by a flight from a random colony, and check what growth must keep. Returns whether a colony was founded. */
 function foundOnce(w: OneWorld, g: Game, r: () => number, label: string): boolean {
   const old = w.line;
@@ -122,6 +144,7 @@ function foundOnce(w: OneWorld, g: Game, r: () => number, label: string): boolea
   const sNew = g.colonies[k]!.holeCells[g.colonies[k]!.params.nest]!.col;
   sameBelow(kept, below(w.curtain, old.sMin, old.sMax), sNew, label);
   check(w, g, label);
+  if (g.time === 0) foodBooks(w, old, label);
   return true;
 }
 
@@ -132,6 +155,7 @@ test("founding property test: on the default planes of seeds 1–20, random foun
     const g = game(seed, 2);
     const w = g.world!;
     check(w, g, `seed ${seed}, start`);
+    foodBooks(w, w.line, `seed ${seed}, start`);
     const r = mulberry32(seed * 977);
     for (let j = 0; j < 4; j++) {
       tries++;
@@ -258,4 +282,55 @@ test("the fungus's spores in the curtain stay on their cells when the curtain gr
   // A step reads each spore cell back from its key: a stale key reads an empty cell, and forgets it at once.
   for (let k = 0; k < 10; k++) g.tick(DT);
   assert.ok(g.fungus.sporeCells >= n - 2, `${g.fungus.sporeCells} of ${n} spore cells still there`);
+});
+
+test("a one-world flight replays: two games on the same seed fly the same flights to the same holes and the same losses (PR #62 review, S2)", () => {
+  const run = () => {
+    const g = game(1, 2);
+    const out: string[] = [];
+    // Flights from both colonies, landing where the game's stream sends each: a hole on the line, or lost with a reason.
+    for (let j = 0; j < 6; j++) {
+      const k = g.found(fly(g, j % 2));
+      out.push(k < 0 ? `lost: ${g.lastLoss?.reason}` : `colony ${k}`);
+    }
+    return { sHole: g.world!.line.sHole.slice(), lastLoss: g.lastLoss?.reason ?? null, out, colonies: g.colonies.length };
+  };
+  const a = run();
+  const b = run();
+  assert.ok(a.colonies > 2, `some flight landed: ${a.out.join("; ")}`);
+  assert.deepEqual(b.sHole, a.sHole, "the line's holes are where the first game put them");
+  assert.equal(b.lastLoss, a.lastLoss);
+  assert.deepEqual(b.out, a.out);
+});
+
+test("founding mid-game, 20 s in: every colony's way out (its out-field) is rebuilt over the grown curtain, and the game plays on (PR #62 review, S3)", () => {
+  // 40 ants a colony, so ants are underground on their way out often enough to need the field soon after the founding.
+  const g = game(1, 40);
+  const w = g.world!;
+  for (let k = 0; k < Math.round(20 / DT); k++) g.tick(DT);
+  const built = g.colonies.map((c) => c.layers[CURTAIN]!.outDist?.length ?? 0);
+  assert.ok(built.every((n) => n > 0), "every colony has built its out-field before the founding");
+  const old = w.line;
+  g.foundBeyond("start", 8);
+  assert.ok(w.line.sMin < old.sMin, "the curtain grew at V₀");
+  check(w, g, "after the founding");
+  // The field is built lazily, when an ant first needs the way out: tick until colonies have rebuilt it since the founding.
+  const at = g.time;
+  const { x0 } = w.curtain;
+  const { w: cw, h } = w.curtain.size;
+  const rebuilt = new Set<number>();
+  for (let k = 0; k < Math.round(10 / DT); k++) {
+    g.tick(DT);
+    g.colonies.forEach((c, j) => {
+      const L = c.layers[CURTAIN]!;
+      if (!L.outDist || L.outAt <= at) return;
+      // Cell (x, y) is at y·w + x − x0 of the curtain as it stands: a field kept from before reads every cell wrong.
+      assert.equal(L.outDist.length, cw * h, `colony ${j}'s out-field, rebuilt at ${L.outAt.toFixed(2)} s, covers the grown curtain`);
+      assert.equal(L.outDist[L.entranceRow * cw + L.entranceCol - x0], 0, `colony ${j}'s out-field starts at its hole`);
+      rebuilt.add(j);
+    });
+  }
+  assert.ok(rebuilt.size > 0, "some colony needed its way out, and rebuilt its out-field, in the 10 s after the founding");
+  g.colonies.forEach((c, k) => assert.ok(!Game.beaten(c) && (c.population > 0 || c.queen?.alive), `colony ${k} lives`));
+  check(w, g, "10 s after the founding");
 });

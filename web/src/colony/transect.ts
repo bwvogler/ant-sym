@@ -24,7 +24,9 @@ export const CLEARANCE = 12;
  * The least 2D distance between holes (one-world §3 rule 3), between cell centres in world units. 16 (owner,
  * 2026-11-09; ja-tjo): a founded nest's shaft slants 3 columns to a random side and its royal chamber is a disc of
  * radius 4.5, so two holes 16 apart along the curtain keep their chambers apart (16 − 2 × 3 > 2 × 4.5), as the side
- * view's HOLE_GAP does. At 12, 25 of 80 founding pairs shared a royal chamber. A test pins it against the dig.
+ * view's HOLE_GAP does. At 12, two founded royal chambers shared a cell in 15 of 80 pairs on one world's default
+ * curtains (seeds 1–20, transect.test.ts; ja-tjo's side-world count, chambers under 9 apart, was 25 of 80). A test pins it
+ * against the dig.
  */
 export const HOLE_GAP_2D = 16;
 /** The sharpest turn back a new segment may make on the end segment (one-world §3 rule 2): 120°. */

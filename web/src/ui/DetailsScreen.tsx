@@ -277,6 +277,8 @@ function World({ game, controls, update, stats, restart, newWorld }: Props) {
 function Lab({ game, controls, update, stats, jev }: Props) {
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   const [showDoctrines, setShowDoctrines] = useState(false);
+  // Why the last lab founding beyond an end founded nothing (one world: no room within the radius), until the next try.
+  const [foundNote, setFoundNote] = useState<string | null>(null);
   const locked = jev.lock !== null;
   return (
     <Card label="lab" title="Lab" wide>
@@ -336,7 +338,7 @@ function Lab({ game, controls, update, stats, jev }: Props) {
         {game.world ? (
           // One world (U4a): a colony may be founded only beyond an end of the line (docs/one-world.md §3).
           (["start", "end"] as const).map((end) => (
-            <button key={end} type="button" className="rounded-md border border-line px-2 py-1 hover:bg-raised" onClick={() => foundBeyondEnd(game, end)} title="A new colony of 30 ants, kin of the first (its odour), a flight past this end of the line, where the founding rule allows">
+            <button key={end} type="button" className="rounded-md border border-line px-2 py-1 hover:bg-raised" onClick={() => setFoundNote(foundBeyondEnd(game, end))} title="A new colony of 30 ants, kin of the first (its odour), a flight past this end of the line, where the founding rule allows">
               Found beyond {endNest(game, end)}
             </button>
           ))
@@ -346,6 +348,7 @@ function Lab({ game, controls, update, stats, jev }: Props) {
           </button>
         )}
         <span className="text-fg-3">{game.colonies.length} colonies. In the game a colony is founded by a new queen (ja-lo8.9).</span>
+        {game.world && foundNote && <span className="text-warn">{foundNote}</span>}
       </div>
       {locked && <p className="mt-3 text-xs text-warn">{jev.lock}</p>}
     </Card>
@@ -483,12 +486,18 @@ function endNest(game: Game, end: "start" | "end"): string {
   return k >= 0 ? colonyName(k) : "the empty hole";
 }
 
-/** One world's lab founding (Game.foundBeyond): no room beyond that end within the radius leaves the game as it was. */
-function foundBeyondEnd(game: Game, end: "start" | "end"): void {
+/**
+ * One world's lab founding (Game.foundBeyond): no room beyond that end within the radius leaves the game as it was.
+ * Returns what the lab says: null when a colony was founded, else why not (the engine's reason, NO_ROOM).
+ */
+function foundBeyondEnd(game: Game, end: "start" | "end"): string | null {
+  const name = endNest(game, end);
   try {
     game.foundBeyond(end);
+    return null;
   } catch (e) {
     if (!(e instanceof Error && e.message.includes("no room"))) throw e;
+    return `Nothing founded beyond ${name}: ${e.message.replace(/^addColony: /, "")}.`;
   }
 }
 

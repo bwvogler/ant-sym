@@ -217,7 +217,7 @@ interface SporeLayer {
   readonly map: WorldMap;
   readonly spores: ChunkLayer<Float32Array>;
   readonly sporeStrain: ChunkLayer<Uint8Array>;
-  /** cells holding spores, as y * w + x */
+  /** cells holding spores, as y * w + x − x0 (re-keyed by regrid when the map grows) */
   readonly sporeCells: Set<number>;
   /** the evolving fungus's base on this map (see #grow), as y * w + x − x0 (sporeCells' keys too) */
   base: number[];
