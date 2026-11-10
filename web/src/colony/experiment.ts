@@ -1,9 +1,10 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { type ColonyParams, FAINT, MODES, type Mode, type Policy, type Stance, type StancePolicy } from "./colony.ts";
+import { type Colony, type ColonyParams, FAINT, type Layer, MODES, type Mode, PLANE, type Policy, type Stance, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
-import { Game, type GameParams, gameRng, type Sides } from "./game.ts";
+import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { centreX, centreY, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
+import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, responses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
 import { dropFood, isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
@@ -21,9 +22,15 @@ import { dropFood, isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, 
 // and bench bed, docs/PRD.md §27), drawn in cell coordinates; everything an ant
 // or a probe sees is in world units (hex.ts). `game` is the real side-view
 // game. scripts/experiment.mjs sweeps assays over seeds and parameter values.
+//
+// One world (docs/one-world.md, U6a): `oneArena` makes an arena the plane of a one-world game, with a hole at each nest
+// and the curtain dug under the line through them; ONE_ASSAYS are the assays rerun so (`experiment.mjs --one`), and
+// `game1` (G1) is the whole one-world game. In a one-world game the surface probes (antsNear, the occupancy, crossing
+// and outing probes) count only the ants on the plane, since a curtain ant's x, y are the curtain's; paint lands on the
+// plane unless an event names a layer.
 
 export type Event =
-  | { at: number; kind: "paint"; colony?: number; channel: Channel; x: number; y: number; r: number; amount: number }
+  | { at: number; kind: "paint"; colony?: number; channel: Channel; x: number; y: number; r: number; amount: number; /** one world: the layer painted (default PLANE, the surface); on one map, its only layer */ layer?: number }
   | { at: number; kind: "food"; x: number; y: number; r: number; perCell: number }
   | { at: number; kind: "call"; run: (game: Game) => void };
 
@@ -35,8 +42,8 @@ export interface Probe {
 
 export interface RunSpec {
   seed: number;
-  /** the map, or how to make it from the seed; default the page's: generateSideWorld(seed) */
-  map?: WorldMap | ((seed: number) => WorldMap);
+  /** the map or one world (game.ts takes either), or how to make it from the seed; default the page's: generateSideWorld(seed) */
+  map?: WorldMap | OneWorld | ((seed: number) => WorldMap | OneWorld);
   game?: Partial<GameParams>;
   sides?: Sides;
   seconds: number;
@@ -57,15 +64,17 @@ export interface RunResult {
 /** Seconds a forager may hold its food before it counts as lost (slow/side.test's guard). */
 export const STUCK_AFTER = 120;
 
-/** The map a spec asks for. */
-export function specMap(spec: RunSpec): WorldMap {
+/** The map (or one world) a spec asks for. */
+export function specMap(spec: RunSpec): WorldMap | OneWorld {
   return typeof spec.map === "function" ? spec.map(spec.seed) : (spec.map ?? generateSideWorld(spec.seed));
 }
 
 /** Run a game headless and collect the standard numbers plus every probe's. */
 export function runGame(spec: RunSpec): { game: Game; result: RunResult } {
-  const map = specMap(spec);
-  const game = new Game(map, spec.game, gameRng(spec.seed), spec.sides);
+  const world = specMap(spec);
+  const game = new Game(world, spec.game, gameRng(spec.seed), spec.sides);
+  // The food the world began with: in one world the plane's piles and the curtain's buried pockets.
+  const foodTotal = isOneWorld(world) ? world.plane.foodTotal + world.curtain.foodTotal : world.foodTotal;
   const dt = spec.dt ?? 1 / 30;
   const events = [...(spec.events ?? [])].sort((a, b) => a.at - b.at);
   const probes = [heldProbe(), ...(spec.probes ?? [])];
@@ -84,7 +93,7 @@ export function runGame(spec: RunSpec): { game: Game; result: RunResult } {
     const side = sideName(k);
     metrics[`${side}.ants`] = c.population;
     metrics[`${side}.stored`] = c.stored;
-    metrics[`${side}.foodHome`] = map.foodTotal > 0 ? c.stored / map.foodTotal : 0;
+    metrics[`${side}.foodHome`] = foodTotal > 0 ? c.stored / foodTotal : 0;
     metrics[`${side}.losses`] = c.losses;
     metrics[`${side}.births`] = c.births;
     metrics[`${side}.situations`] = c.situationsSeen;
@@ -101,7 +110,8 @@ export function sideName(k: number): string {
 }
 
 function apply(game: Game, e: Event): void {
-  if (e.kind === "paint") (game.colonies[e.colony ?? 0] ?? game.player).paint(e.channel, e.x, e.y, e.r, e.amount);
+  // One world: on the plane, where the assays' arenas are, unless the event names a layer.
+  if (e.kind === "paint") (game.colonies[e.colony ?? 0] ?? game.player).paint(e.channel, e.x, e.y, e.r, e.amount, e.layer ?? (game.world ? PLANE : undefined));
   // Food added later is not part of foodTotal: foodHome stays a share of what the map started with.
   else if (e.kind === "food") discWorld(game.map.size, e.x, e.y, e.r, (x, y) => dropFood(game.map, centreX(x, y), centreY(y), e.perCell));
   else e.run(game);
@@ -128,8 +138,10 @@ export function foodIn(map: WorldMap, wx: number, wy: number, r: number): number
  * nest resets every tick, so it misses a carrier that won't put its food down at home; `maxCarrying` counts by the
  * probe's own clock, from pickup to put-down, wherever the ant is (#31's review, ja-1pm). `maxPorting`: porters (food
  * moved between chambers, which both other measures leave out) holding theirs over STUCK_AFTER (review of #36, ja-3po).
+ * In one world every layer counts by default (a carrier stuck in the tunnels is stuck too); `layer` counts only the ants
+ * on that layer at each sample (their clocks run on either), and `tag` follows each key (`you.maxHeldPlane`).
  */
-export function heldProbe(): Probe {
+export function heldProbe(layer = -1, tag = ""): Probe {
   const worst: number[] = [];
   const worstCarry: number[] = [];
   const worstPort: number[] = [];
@@ -164,6 +176,7 @@ export function heldProbe(): Probe {
         const t = carryT[k] as Float64Array;
         const pt = portT[k] as Float64Array;
         for (let i = 0; i < c.n; i++) {
+          if (!onLayer(game, c, i, layer)) continue;
           if (c.alive[i] && c.carrying[i] && !c.porting(i) && (c.since[i] as number) > STUCK_AFTER) held++;
           if ((t[i] as number) > STUCK_AFTER) carrying++;
           if ((pt[i] as number) > STUCK_AFTER) porting++;
@@ -175,12 +188,20 @@ export function heldProbe(): Probe {
     },
     summary() {
       const m: Record<string, number> = {};
-      worst.forEach((w, k) => (m[`${sideName(k)}.maxHeld`] = w));
-      worstCarry.forEach((w, k) => (m[`${sideName(k)}.maxCarrying`] = w));
-      worstPort.forEach((w, k) => (m[`${sideName(k)}.maxPorting`] = w));
+      worst.forEach((w, k) => (m[`${sideName(k)}.maxHeld${tag}`] = w));
+      worstCarry.forEach((w, k) => (m[`${sideName(k)}.maxCarrying${tag}`] = w));
+      worstPort.forEach((w, k) => (m[`${sideName(k)}.maxPorting${tag}`] = w));
       return m;
     },
   };
+}
+
+/**
+ * Whether a probe counts ant i of colony c on `layer`: on one map every ant; in one world only the ants on that layer
+ * (−1: every layer). A curtain ant's x, y are the curtain's, so a probe of the surface must leave it out.
+ */
+export function onLayer(game: Game, c: Colony, i: number, layer: number): boolean {
+  return !game.world || layer < 0 || c.layer[i] === layer;
 }
 
 /** A rectangle in world units, x0 ≤ x < x1, y0 ≤ y < y1. */
@@ -198,7 +219,7 @@ export function cellRect(x0: number, y0: number, x1: number, y1: number): Rect {
   return { x0: centreX(x0, 0) - 0.5, y0: centreY(y0) - 0.5, x1: centreX(x1, 1) + 0.5, y1: centreY(y1) + 0.5 };
 }
 
-/** Ant-seconds a colony spends in each region from `from` to `to` (s). */
+/** Ant-seconds a colony spends in each region from `from` to `to` (s); in one world, on the plane. */
 export function occupancyProbe(regions: Record<string, Rect>, from = 0, to = Infinity, colony = 0): Probe {
   const total: Record<string, number> = Object.fromEntries(Object.keys(regions).map((k) => [k, 0]));
   return {
@@ -207,7 +228,7 @@ export function occupancyProbe(regions: Record<string, Rect>, from = 0, to = Inf
       const c = game.colonies[colony];
       if (!c) return;
       for (let i = 0; i < c.n; i++) {
-        if (!c.alive[i]) continue;
+        if (!c.alive[i] || !onLayer(game, c, i, PLANE)) continue;
         const x = c.x[i] as number;
         const y = c.y[i] as number;
         for (const [k, r] of Object.entries(regions)) if (inRect(r, x, y)) total[k] = (total[k] as number) + dt;
@@ -220,7 +241,7 @@ export function occupancyProbe(regions: Record<string, Rect>, from = 0, to = Inf
 /**
  * Passages through gates: an ant inside a gate's rectangle that crosses its middle line (x = (x0 + x1) / 2), either
  * way, counts once (`<gate>Passes`). Goss et al. counted passages over each branch; occupancy also counts ants that
- * dawdle (ja-dez).
+ * dawdle (ja-dez). In one world, on the plane: an ant gone down a hole is out of every gate.
  */
 export function crossingProbe(gates: Record<string, Rect>, from = 0, colony = 0): Probe {
   const names = Object.keys(gates);
@@ -242,7 +263,7 @@ export function crossingProbe(gates: Record<string, Rect>, from = 0, colony = 0)
         const sd = side[g] as Int8Array;
         for (let i = 0; i < c.n; i++) {
           const x = c.x[i] as number;
-          if (!c.alive[i] || !inRect(r, x, c.y[i] as number)) {
+          if (!c.alive[i] || !onLayer(game, c, i, PLANE) || !inRect(r, x, c.y[i] as number)) {
             sd[i] = 0;
             continue;
           }
@@ -256,12 +277,12 @@ export function crossingProbe(gates: Record<string, Rect>, from = 0, colony = 0)
   };
 }
 
-/** Ants of a colony within r (world units) of world (x, y) right now. */
-export function antsNear(game: Game, x: number, y: number, r: number, colony = 0): number {
+/** Ants of a colony within r (world units) of world (x, y) right now; in one world, on `layer` (default the plane). */
+export function antsNear(game: Game, x: number, y: number, r: number, colony = 0, layer = PLANE): number {
   const c = game.colonies[colony];
   if (!c) return 0;
   let s = 0;
-  for (let i = 0; i < c.n; i++) if (c.alive[i] && Math.hypot((c.x[i] as number) - x, (c.y[i] as number) - y) <= r) s++;
+  for (let i = 0; i < c.n; i++) if (c.alive[i] && onLayer(game, c, i, layer) && Math.hypot((c.x[i] as number) - x, (c.y[i] as number) - y) <= r) s++;
   return s;
 }
 
@@ -378,6 +399,8 @@ export interface Assay {
   target: string;
   seconds: number;
   spec(seed: number): RunSpec;
+  /** the control run `score` makes beside it, when it makes one (A6: the same battle on open ground) */
+  control?(seed: number): RunSpec;
   /** the assay's own numbers from a run; `pass` is 1 or 0, or absent when there is no pass mark yet */
   score(result: RunResult, game: Game): Record<string, number>;
 }
@@ -664,9 +687,10 @@ export const alarm: Assay = {
 
 /**
  * A5's probe: once a second, the share of the colony outside the nest; every tick, trips out (an ant crossing from inside
- * the nest's radius + 2 to outside it). Both are reported over windows of seconds [from, to).
+ * the nest's radius + 2 to outside it). Both are reported over windows of seconds [from, to). In one world outside is on
+ * the plane, beyond the plane's nest (the disc round the hole) + 2: every ant in the curtain is in.
  */
-function outingProbe(nest: { x: number; y: number }, windows: Record<string, [number, number]>): Probe {
+export function outingProbe(nest: { x: number; y: number }, windows: Record<string, [number, number]>): Probe {
   const outside: number[] = [];
   const departs: number[] = [];
   let was: Uint8Array = new Uint8Array(0);
@@ -680,12 +704,13 @@ function outingProbe(nest: { x: number; y: number }, windows: Record<string, [nu
         was = w;
       }
       const sec = Math.floor(game.time);
+      const disc = game.world ? (c.layers[PLANE] as Layer).nest : c.nest;
       let out = 0;
       let alive = 0;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         alive++;
-        const o = Math.hypot((c.x[i] as number) - nest.x, (c.y[i] as number) - nest.y) > c.nest.r + 2 ? 1 : 0;
+        const o = onLayer(game, c, i, PLANE) && Math.hypot((c.x[i] as number) - nest.x, (c.y[i] as number) - nest.y) > disc.r + 2 ? 1 : 0;
         if (o && !was[i]) departs[sec] = (departs[sec] ?? 0) + 1;
         was[i] = o;
         out += o;
@@ -816,19 +841,25 @@ const exchange = (r: RunResult) => {
  * A6 pitted equal armies, 200 against 200, where terrain should favour neither side, and asked the pass to: it didn't.)
  */
 export const PASS_GAIN = 1.5;
-export const pass: Assay = {
-  id: "pass",
-  title: "A6 few against many through a 2-cell pass",
-  target: `the defenders' exchange in the pass ≥ ${PASS_GAIN}× the same battle's on open ground (design mark; Lymbery et al. 2023)`,
-  seconds: 180,
-  spec: (s) => battleSpec(s, true),
-  score: (r) => {
-    const e = exchange(r);
-    const o = exchange(runGame(battleSpec(r.seed, false)).result);
-    const gain = o.exchange > 0 ? e.exchange / o.exchange : NaN;
-    return { ...e, openExchange: o.exchange, gain, pass: gain >= PASS_GAIN ? 1 : 0 };
-  },
-};
+/** A6 on the arenas `remap` makes of its own (as they are, or one world's plane: onPlane), the open control too. */
+function passAssay(remap: (spec: RunSpec) => RunSpec): Assay {
+  const control = (s: number): RunSpec => remap(battleSpec(s, false));
+  return {
+    id: "pass",
+    title: "A6 few against many through a 2-cell pass",
+    target: `the defenders' exchange in the pass ≥ ${PASS_GAIN}× the same battle's on open ground (design mark; Lymbery et al. 2023)`,
+    seconds: 180,
+    spec: (s) => remap(battleSpec(s, true)),
+    control,
+    score: (r) => {
+      const e = exchange(r);
+      const o = exchange(runGame(control(r.seed)).result);
+      const gain = o.exchange > 0 ? e.exchange / o.exchange : NaN;
+      return { ...e, openExchange: o.exchange, gain, pass: gain >= PASS_GAIN ? 1 : 0 };
+    },
+  };
+}
+export const pass = passAssay((spec) => spec);
 export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass` (which runs it too); report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
 
 /**
@@ -1197,7 +1228,8 @@ export function nestFlowProbe(): Probe {
       if (Number.isNaN(firstBirth) && c.births > 0) firstBirth = game.time;
       if (game.time + 1e-9 < nextAt) return;
       nextAt += 30;
-      const ch = game.map.chambers;
+      // One world: the nest is in the curtain (game.map is the plane).
+      const ch = (game.world?.curtain ?? game.map).chambers;
       if (!ch) return;
       let reception = 0;
       let lying = 0;
@@ -1294,3 +1326,94 @@ export const lifecycleSignal = lifecycleAssay("signal");
 export const lifecycleScent = lifecycleAssay("scent");
 
 export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, defendHome, faintAlarm, game, gameTop, nestFlow, lifecycle, lifecycleSignal, lifecycleScent];
+
+// ---------------------------------------------------------------- one world (U6a, ja-lp4.6.1)
+
+export interface OneArenaOptions {
+  /** keep the curtain's buried food; by default there is none, so `stored` counts only food carried down from the plane */
+  buried?: boolean;
+}
+
+/**
+ * An arena as one world's plane (docs/one-world.md §2): the arena's map with an empty mound (`spoil`), a hole at each of
+ * its nests, in order, on the line through them (makeTransect: one hole is a line too, its margins straight out east and
+ * west), and the curtain dug under that line from `seed` (generateCurtain: each nest's shaft and royal chamber). Every
+ * worker starts in the curtain, with the queen and brood (one-world §8 item 12), and forages on the plane. The line's
+ * margins run off a small arena: off the plane is rock (transect.ts cellAt).
+ */
+export function oneArena(arena: WorldMap, seed: number, { buried = false }: OneArenaOptions = {}): OneWorld {
+  const world = oneWorldOn(seed, arena);
+  if (!buried) {
+    const { curtain } = world;
+    for (let y = 0; y < curtain.size.h; y++) for (let x = curtain.x0; x < curtain.x0 + curtain.size.w; x++) if (curtain.food.get(x, y)) curtain.food.set(x, y, 0);
+    curtain.foodTotal = 0;
+    curtain.foodLeft = 0;
+  }
+  return world;
+}
+
+/** A run spec moved to one world: its map, an arena (or a function of the seed making one), becomes the plane (oneArena). */
+export function onPlane(spec: RunSpec, opts: OneArenaOptions = {}): RunSpec {
+  const given = spec.map;
+  return {
+    ...spec,
+    map: (seed) => {
+      const m = typeof given === "function" ? given(seed) : given;
+      if (!m || isOneWorld(m)) throw new Error("onPlane: the spec's map must be an arena (a top-down map)");
+      return oneArena(m, seed, opts);
+    },
+  };
+}
+
+/** An arena assay rerun on one world's plane (onPlane), its probes counting the plane's ants, its paint on the plane. */
+function onPlaneAssay(a: Assay): Assay {
+  return { ...a, title: `${a.title} (one world)`, spec: (seed) => onPlane(a.spec(seed)) };
+}
+
+/**
+ * G1 — the one-world game (docs/one-world.md §6, U6): generateOneWorld(seed), 600 + 600 ants, 10 minutes, as G is for
+ * the side view, with its bound (A7): no colony with more than 2 foragers holding food over 120 s at any 10-s sample,
+ * counted on both layers (`maxHeldPlane`: those on the plane). Reported beside it: food carried down the holes, births,
+ * crossings up and down, porter trips and porters holding food over 120 s, per colony.
+ */
+export const game1: Assay = {
+  id: "game1",
+  title: "G1 the one-world game (with A7: foragers holding food)",
+  target: "≤ 2 foragers holding food over 120 s per colony at any 10-s sample, both layers (slow/side.test's bound); food carried down, births, crossings and porters reported",
+  seconds: 600,
+  spec: (seed) => ({ seed, seconds: 600, map: (s) => generateOneWorld(s), game: { antCount: 600, rivalAnts: 600 }, probes: [heldProbe(PLANE, "Plane")] }),
+  score: (r, g) => {
+    const m: Record<string, number> = {};
+    const both = (k: string) => Math.max(r.metrics[`you.${k}`] ?? 0, r.metrics[`rival.${k}`] ?? 0);
+    g.colonies.forEach((c, k) => {
+      const side = sideName(k);
+      m[`${side}.carriedDown`] = c.carriedDown;
+      m[`${side}.crossedUp`] = c.crossedUp;
+      m[`${side}.crossedDown`] = c.crossedDown;
+      m[`${side}.portTrips`] = c.portTrips;
+    });
+    const worst = both("maxHeld");
+    return { ...m, maxHeld: worst, maxHeldPlane: both("maxHeldPlane"), maxPorting: both("maxPorting"), pass: worst <= 2 ? 1 : 0 };
+  },
+};
+
+/** A8 on one world: the solo colony's nest in the curtain (nestFlowProbe reads the curtain's chambers). */
+const nestFlowOne: Assay = { ...nestFlow, title: `${nestFlow.title} (one world)`, spec: (seed) => ({ ...nestFlow.spec(seed), map: (s) => generateOneWorld(s) }) };
+
+/**
+ * The assays rerun on one world (`experiment.mjs --one`): A1, A2a, A2b, A3, A4, A6, A9 and A10 on their arenas made the
+ * plane (onPlane), A8 in the curtain, and G1. Same ids as the legacy ones, so `--one bridge` is A1 on the plane.
+ */
+export const ONE_ASSAYS: Assay[] = [...[bridge, twin, richPoor, deplete, alarm].map(onPlaneAssay), { ...passAssay(onPlane), title: `${pass.title} (one world)` }, onPlaneAssay(open), onPlaneAssay(contact), onPlaneAssay(faintAlarm), nestFlowOne, game1];
+
+/**
+ * Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). One world never asks `leave` until
+ * activation moves inside the hole (`ja-web`, docs/one-world.md §8 item 10): rested foragers go straight back out, and raid
+ * scouts start only from `leave` = raid.
+ */
+export const ONE_PENDING: Record<string, string> = {
+  regulate: "needs `ja-web`: activation (the leave lane) is not in one world yet",
+  regulateStop: "needs `ja-web`: activation (the leave lane) is not in one world yet",
+  raidFind: "U6b, after `ja-web`: raid scouts start only from leave = raid",
+  raidStop: "U6b, after `ja-web`: raid scouts start only from leave = raid",
+};

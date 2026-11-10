@@ -69,6 +69,14 @@ export interface OneWorld {
 export function generateOneWorld(seed: number, opts: { plane?: Partial<WorldOptions> } = {}): OneWorld {
   const plane = generateWorld(seed, { ...OPEN_WORLD, ...opts.plane });
   if (plane.nests.length > 2) throw new Error(`generateOneWorld: ${plane.nests.length} nests; the line starts with one or two, and grows by founding`);
+  return oneWorldOn(seed, plane);
+}
+
+/**
+ * One world on a given plane (generateOneWorld's; the assays' arenas, experiment.ts oneArena): its nests' holes, in
+ * order, make the line, the plane gets an empty mound (`spoil`), and the curtain is dug under the line from `seed`.
+ */
+export function oneWorldOn(seed: number, plane: WorldMap): OneWorld {
   const holes = plane.nests.map((n) => {
     cellOf(n.x, n.y);
     return { x: CELL[0]!, y: CELL[1]! };
