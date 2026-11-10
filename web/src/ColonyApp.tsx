@@ -202,6 +202,8 @@ export default function ColonyApp() {
   // sends a new queen from that colony with the fungus in her and opens her pen, Jev or not. With the game paused,
   // nextCrossing(maxSeconds, minTicks) rehearses on a copy which curtain ant comes up next, and on which fixed step (rehearse.ts),
   // and step(n) takes the game itself n of those steps: the guard follows that ant through its hole for certain.
+  // Keyless only: the copy shares the game's policies, so with JEV_API_KEY set a miss in the copy would ask Jev (a run, real
+  // spend, skewed hit counts). npm run e2e starts Vite without the key (PR #65 review N6).
   useEffect(() => {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
     (window as unknown as { jevAnts?: unknown }).jevAnts = {
