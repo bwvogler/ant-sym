@@ -67,9 +67,10 @@ export interface Backend {
 }
 
 /** Ask /api/health. Anything but a JSON `{ok: true}` (404 page, network error) means no backend. */
-export async function detectBackend(fetchFn: typeof fetch = fetch): Promise<Backend> {
+export async function detectBackend(fetchFn: typeof fetch = fetch, env: ViteEnv = viteEnv(), pass: string | null = passphrase()): Promise<Backend> {
   try {
-    const res = await fetchFn(apiUrl("api/health"), { headers: apiHeaders() });
+    // The passphrase goes on the probe too: an unlocked browser is only told so if it says the passphrase here.
+    const res = await fetchFn(apiUrl("api/health", env), { headers: apiHeaders(env, pass) });
     if (!res.ok) return { hasBackend: false, hasKey: false };
     const body = (await res.json()) as { ok?: unknown; hasKey?: unknown; hosted?: unknown; authorized?: unknown; run?: { budget?: Budget } };
     if (body?.ok !== true) return { hasBackend: false, hasKey: false };

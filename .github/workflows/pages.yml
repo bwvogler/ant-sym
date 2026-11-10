@@ -20,7 +20,8 @@ concurrency:
 
 jobs:
   worker:
-    # Deploys the proxy with its secrets. Skipped until CLOUDFLARE_API_TOKEN is set.
+    # Deploys the proxy with its secrets, once the build's lint and tests pass. Skipped until CLOUDFLARE_API_TOKEN is set.
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,7 +65,8 @@ jobs:
           BASE_PATH: /${{ github.event.repository.name }}/
           VITE_JEV_API: ${{ vars.JEV_API_URL }}
       - run: touch web/dist/.nojekyll
-      - uses: JamesIves/github-pages-deploy-action@v4
+      # Third-party, with write access to the repo: pinned to a commit, not a movable tag.
+      - uses: JamesIves/github-pages-deploy-action@fa24774553152dd7873cd16ebd8d959b010c5445 # v4.9.0
         with:
           folder: web/dist
           branch: gh-pages

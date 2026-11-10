@@ -3,7 +3,7 @@ import { dailyBudget, type Services } from "../server/replies.ts";
 import { Ledger, type BudgetStore } from "../server/ledger.ts";
 import { FetchJevClient } from "./fetchJev.ts";
 import { PASS_HEADER, corsHeaders, originAllowed, parseOrigins, passOk } from "./gate.ts";
-import { route } from "./routes.ts";
+import { MAX_JSON_BODY, route } from "./routes.ts";
 
 // The hosted Jev proxy for the GitHub Pages builds (main and PR previews): the
 // dev server's /api/health, /api/run and /api/jev on a Cloudflare Worker. The
@@ -57,6 +57,8 @@ export default {
 };
 
 const SPEND_KEY = "daily-spend";
+/** Per attempt: the Jev client's deadline, and how long a stopped run's call may still take. */
+const CALL_DEADLINE_MS = 20_000;
 
 /** The one ledger. In memory while the object is resident; the day's spend is kept in its storage. */
 export class JevLedger {
@@ -67,10 +69,20 @@ export class JevLedger {
       const saved = (await state.storage.get<{ day: string; tokens: number }>(SPEND_KEY)) ?? null;
       // The ledger's store is synchronous; a Durable Object's write is confirmed before the reply leaves (output gate).
       const store: BudgetStore = { load: () => saved, save: (v) => void state.storage.put(SPEND_KEY, v) };
-      // Workers' setTimeout returns a number with no unref(), so the ledger's default timer would throw.
-      const timer = { set: (fn: () => void, ms: number) => setTimeout(fn, ms), clear: (h: unknown) => clearTimeout(h as number) };
+      // Workers' setTimeout returns a number with no unref(), so the ledger's default timer would throw. Under Node (the
+      // tests) the handle has one, and unref keeps a run's time cap from holding the process open.
+      const timer = {
+        set: (fn: () => void, ms: number) => {
+          const t = setTimeout(fn, ms);
+          (t as unknown as { unref?: () => void }).unref?.();
+          return t;
+        },
+        clear: (h: unknown) => clearTimeout(h as number),
+      };
       this.#svc = {
-        client: env.JEV_API_KEY ? new FetchJevClient({ apiKey: env.JEV_API_KEY }) : null,
+        // A stop never cuts off a call already sent: it runs to its reply or its deadline, so what Jev bills is counted
+        // against the day (PR #66 review S1). The dev server's 1.5 s grace suits one local user; here it was a way past the cap.
+        client: env.JEV_API_KEY ? new FetchJevClient({ apiKey: env.JEV_API_KEY, timeoutMs: CALL_DEADLINE_MS, abortGraceMs: CALL_DEADLINE_MS }) : null,
         ledger: new Ledger({ maxInFlight: DEFAULT_IN_FLIGHT, timer, dailyUsd: dailyBudget(env as unknown as NodeJS.ProcessEnv), budgetStore: store }),
         now: () => Date.now(),
       };
@@ -78,6 +90,8 @@ export class JevLedger {
   }
 
   async fetch(req: Request): Promise<Response> {
+    // Refuse an oversized body before reading it (PR #66 review N3); parseBody still checks a body sent without a length.
+    if (Number(req.headers.get("content-length") ?? 0) > MAX_JSON_BODY) return json(413, { error: "request body too large" });
     const r = await route(this.#svc as Services, req.method, new URL(req.url).pathname, () => req.text());
     return json(r.status, r.body);
   }

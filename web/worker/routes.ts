@@ -1,4 +1,4 @@
-import type { RunCaps } from "../shared/jev.ts";
+import { DEFAULT_JEV_MODEL, type RunCaps } from "../shared/jev.ts";
 import { healthReply, jevReply, runReply, type Reply, type Services } from "../server/replies.ts";
 import { HttpError } from "../server/http.ts";
 
@@ -7,7 +7,7 @@ import { HttpError } from "../server/http.ts";
 // review S8), kept in Durable Object storage by index.ts. Pure, so node --test
 // covers it.
 
-const MAX_JSON_BODY = 1 << 20;
+export const MAX_JSON_BODY = 1 << 20;
 
 export function parseBody(text: string): unknown {
   if (text.length > MAX_JSON_BODY) throw new HttpError(413, "request body too large");
@@ -33,7 +33,9 @@ export async function route(svc: Services, method: string, path: string, bodyTex
     if (path === "/api/jev") {
       if (method !== "POST") throw new HttpError(405, "method not allowed (use POST)");
       if (!svc.client) throw new HttpError(503, "JEV_API_KEY is not set in the Worker's secrets");
-      return await jevReply(svc, parseBody(await bodyText()));
+      const raw = parseBody(await bodyText());
+      // The ledger prices tokens at jev-latest's rate, so a caller may not pick another model (PR #66 review N2).
+      return await jevReply(svc, raw && typeof raw === "object" ? { ...raw, model: DEFAULT_JEV_MODEL } : raw);
     }
     throw new HttpError(404, "no such route");
   } catch (e) {

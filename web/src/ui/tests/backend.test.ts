@@ -67,3 +67,15 @@ test("hosted proxy without the passphrase: a backend that is locked until it is 
   assert.equal(open.budget?.usdPerDay, 2);
   assert.equal(policyLock(open, running), null);
 });
+
+test("the health probe asks the hosted proxy, with the passphrase, so an unlocked browser is told it is unlocked", async () => {
+  const seen: { url: string; headers: Record<string, string> }[] = [];
+  const fetchFn = (async (url: string, init: RequestInit) => {
+    seen.push({ url, headers: init.headers as Record<string, string> });
+    return { ok: true, status: 200, json: async () => ({ ok: true, hasKey: true, hosted: true, authorized: true }) } as Response;
+  }) as unknown as typeof fetch;
+  const b = await detectBackend(fetchFn, { VITE_JEV_API: "https://p.example" }, "s3cret");
+  assert.equal(seen[0]!.url, "https://p.example/api/health");
+  assert.equal(seen[0]!.headers[PASS_HEADER], "s3cret");
+  assert.equal(b.needsPass, undefined);
+});

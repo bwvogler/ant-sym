@@ -37,7 +37,8 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}/pr-preview/pr-${{ github.event.pull_request.number }}/
           VITE_JEV_API: ${{ vars.JEV_API_URL }}
-      - uses: rossjrw/pr-preview-action@v1
+      # Third-party, with write access to the repo: pinned to a commit, not a movable tag.
+      - uses: rossjrw/pr-preview-action@873417d2df72380da1f3978378fb58560bcde976 # v1.8.2
         with:
           source-dir: web/dist
           preview-branch: gh-pages

@@ -14,7 +14,11 @@ export function useBackend(): Backend | null {
   const [b, setB] = useState<Backend | null>(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    const bump = () => setTick((t) => t + 1);
+    // A recheck shows "checking" until it answers, not the old answer: after Unlock, the old "locked" would read as "refused".
+    const bump = () => {
+      setB(null);
+      setTick((t) => t + 1);
+    };
     listeners.add(bump);
     return () => void listeners.delete(bump);
   }, []);

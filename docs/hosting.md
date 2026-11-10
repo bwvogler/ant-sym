@@ -14,9 +14,11 @@ The pages are public, so the Worker has three locks:
 
 - **Passphrase.** Every call but `/api/health` needs the `x-jev-ants-pass` header to match the Worker secret `ACCESS_PASSPHRASE`. With no passphrase configured, nothing gets in. The page asks for it once and keeps it in that browser's `localStorage`. It is not the Jev key; the key never leaves the Worker.
 - **Origin.** A browser request from any origin other than `ALLOWED_ORIGINS` (in `web/worker/wrangler.toml`: `https://bwvogler.github.io`) is refused. Curl can fake an origin, so this lock only keeps other websites out; the passphrase is the real one.
-- **Daily cap.** The ledger's own daily budget (PR #42 review S8), set by `JEV_DAILY_USD` in `web/worker/wrangler.toml`: $2 a UTC day across every run. That is above the dev server's $0.10 default, because the hosted game is played from several devices. The ledger reserves each call's worst case against it, as it does against a run's cap. The day's spend is counted from real `usage.input_tokens` and kept in Durable Object storage, so evicting or redeploying the Worker doesn't reset it.
+- **Daily cap.** The ledger's own daily budget (PR #42 review S8), set by `JEV_DAILY_USD` in `web/worker/wrangler.toml`: $2 a UTC day across every run. That is above the dev server's $0.10 default, because the hosted game is played from several devices. The ledger reserves each call's worst case against it, as it does against a run's cap. The day's reservations outlast the run that made them, so starting a new run does not free room held for calls still out (PR #66 review S1). The day's spend is counted from real `usage.input_tokens` and kept in Durable Object storage, so evicting or redeploying the Worker doesn't reset it.
 
-A leaked passphrase costs at most the daily cap per day. To revoke it, change the `JEV_ANTS_PASSPHRASE` secret and re-run the Pages workflow.
+A leaked passphrase costs at most the daily cap per day. One case slips past it: a call that gets no reply within 20 s. That call is cut off at its deadline and counted as costing nothing, though Jev may still bill it. Replies normally take well under a second. A stop never cuts a call that has been sent: the call runs to its reply or its deadline, and whatever Jev bills for it is counted against the day. (The dev server's 1.5 s grace before cutting a call would have been a way past the cap here.) The Worker also fixes the model at `jev-latest`, the one the ledger prices.
+
+To revoke the passphrase, change the `JEV_ANTS_PASSPHRASE` secret and re-run the Pages workflow.
 
 There is one ledger for everyone, held in a single Durable Object, so two browsers share one run: a start in one ends the other's run. That fits a single-user app.
 
@@ -24,7 +26,7 @@ The reply functions the Worker shares with the dev server are in `web/server/rep
 
 ## One-time setup
 
-1. **Pages source.** Settings → Pages → Build and deployment → Source: **Deploy from a branch**, branch **`gh-pages`**, folder **`/ (root)`**. The first run of `pages.yml` after this change creates the branch. Previews need branch deploys: the "GitHub Actions" source cannot hold more than one site.
+1. **Pages source.** Settings → Pages → Build and deployment → Source: **Deploy from a branch**, branch **`gh-pages`**, folder **`/ (root)`**. The branch already exists once any PR preview has run, or once `pages.yml` has run on `main` (it pushes there whatever the source is set to). The dropdown lists only existing branches. Previews need branch deploys: the "GitHub Actions" source cannot hold more than one site.
 2. **Cloudflare.** Create an account (the free plan is enough: Workers plus SQLite-backed Durable Objects). Then create an API token from the "Edit Cloudflare Workers" template, and note your account ID.
 3. **Repository secrets** (Settings → Secrets and variables → Actions → Secrets):
    - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
