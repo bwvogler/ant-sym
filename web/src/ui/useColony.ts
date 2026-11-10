@@ -57,7 +57,7 @@ export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 /** The colony the fungus lands by. */
 export const LANDING_COLONY = 0;
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side", view: "below" };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side", view: "above" };
 
 /** One colony's line in the panel. */
 export interface SideStats {
@@ -275,10 +275,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     return () => cancelAnimationFrame(raf);
   }, [game, colony, controls.playing, controls.speed]);
 
-  // Dev builds only: the game on window, for end-to-end checks (Playwright); not in the Pages build.
-  useEffect(() => {
-    if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) (window as unknown as { jevAnts?: { game: Game } }).jevAnts = { game };
-  }, [game]);
+  // The dev hook (window.jevAnts, the game and the page's views) is the page's: ColonyApp.
   // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
   useEffect(() => {
     if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
