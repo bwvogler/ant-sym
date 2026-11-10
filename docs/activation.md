@@ -70,16 +70,28 @@ The paper sites (journals.plos.org, pmc.ncbi.nlm.nih.gov, frontiersin.org) were 
 - **Scouts.** A waiting ant still goes out at 1/90 per second (`scoutRate`), the same order as Gordon's 3 minutes with nothing returning; at 1/180 the top-down game's worst seed fell to 5 ants alive.
   - With scouts at 1/30 per second, the returns made no difference: every waiting ant was out within a minute or two whatever came back.
 - **The strategist** reads `intake`, food stored per ant per second over the last 60 s, instead of the map's food left.
-- **The side view** is unchanged: a fresh forager still leaves the royal chamber at once (bead `ja-web`).
+- **The side view** is unchanged: a fresh forager still leaves the royal chamber at once.
+
+### One world: the gate at the top of the shaft (`ja-web`, PRD §48.6, 2026-11-10)
+
+A port of the above into one world, where the foragers' chamber "just inside the entrance" is the top of each colony's shaft in the curtain.
+- **The gate.** Every outgoing forager (old, exploring or following, or a recruited raider) with empty jaws passes a gate within `WAIT_STEPS` (3) steps of its own hole, by the way out through its tunnels. There it mills among the top cells, is not asked its mode, and rolls `leave` once a step, as a returning forager (as a raider if recruited). A yes is its pass, and it climbs out. It senses its place as `hole`, so its `leave` key has the top-down form.
+- **Who is never held:** porters, ants carrying spoil, a corpse or brood, the young and middle-aged, and a finder going home to tell.
+- **Who comes to the gate.** A rested returner with empty jaws is held as soon as it is down its hole (the owner's choice: it doesn't go down first). A tired one goes down to rest; rested, it climbs back up and is held.
+- **The cue.** Each carrier that comes down its hole with food counts once; every ant held at the top meets last tick's count, since the carrier walks down past all of them. `crowd` is the nestmates round a held ant. `met` leaks on both layers.
+- **A successful forager never waits.** A carrier that came down with food has a pass back out (`leaveOk`), used when it climbs out.
+- **Raids.** On "raid" a held ant goes out as a raid scout, in fight. A finder lays its raid trail on to its own hole (on open ground it stops at the nest's rim). Ants held at the gate smell that trail on the hole's cell and the six round it, and are recruited by it by degrees.
+- **Nobody waits on the plane**: every returner goes down its hole (one-world §8 item 9).
+- **Results** (PRD §48.6): A5b passes 7/10 on one world (`main` 6/10), and departures fall once food is gone (120 trips out a minute against `main`'s 167). A5 fails 0/10, as on `main`, because the middle-aged go out unheld. G1's food carried down is unchanged (−0.3 %), and raids return: 187 raid scouts, 47 finds and 15 recruits over 20 colonies, none on `main`.
 
 ## Play
 
-- **See:** on the top-down maps, rested foragers mill at the nest's rim and pour out once carriers come home with food; with none returning, a scout leaves now and then (PRD §48.3). The page starts on the side view, where a fresh forager still leaves at once (`ja-web`), so the player doesn't see it there. Learn has no guide entry for it; the Policy tab's small responses give the `leave` rule in words.
+- **See:** on the top-down maps, rested foragers mill at the nest's rim and pour out once carriers come home with food; with none returning, a scout leaves now and then (PRD §48.3). In one world (Details → Ground → one world) they mill at the top of the shaft in the view below, and climb out as carriers come down past them (PRD §48.6). The page still starts on the side view, where a fresh forager leaves at once, until U6b switches the default. Learn has no guide entry for it; the Policy tab's small responses give the `leave` rule in words.
 - **Choose:** none. No lever bends the count of returns a waiting ant meets. Levers that change how many carriers come home (`food`, `trail`, `time`) may shift it at second hand; not measured.
 - **Counterplay and progression:** none: it is the colony's nature, and the fungus has no hold on it.
-- **Cost:** the page answers `leave` by the local rule and asks Jev none of it; asked live top-down it was 268 tokens a question (PRD §48.5). The strategist's stance lane reads `intake` at 193 tokens a question, and its answers for the preset doctrines are shipped (PRD §48.5, §50.2). The live check cost $0.0016.
+- **Cost:** the page answers `leave` by the local rule and asks Jev none of it; asked live top-down it was 268 tokens a question (PRD §48.5). In one world it is asked now; `colony-cost --one` estimates the lane at about 1,900 tokens a question and $0.007 an hour if Jev were asked (PRD §48.6). The strategist's stance lane reads `intake` at 193 tokens a question, and its answers for the preset doctrines are shipped (PRD §48.5, §50.2). The live check cost $0.0016.
 - **Risks:** a cliff in the scout rate: at 1/180 a second, G′'s worst seed fell to 5 ants alive (PRD §48.4). A legend that doesn't explain a few returns gets "wait", which cost the first colony 11–14 % of its G′ food (PRD §48.5).
-- **Owner decisions needed:** activation in the side view (`ja-web`) or through one world's surface (PRD §51); a Learn entry; whether the fungus should have a lever on this cue, which would need research first.
+- **Owner decisions needed:** whether the middle-aged, who carry spoil out and then forage on the plane, should pass the gate too (A5 on one world, PRD §48.6); a Learn entry; whether the fungus should have a lever on this cue, which would need research first. Activation in one world is decided and built (`ja-web`); the side view keeps none.
 
 ## Sources
 

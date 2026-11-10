@@ -3104,6 +3104,59 @@ Warlike raids more, as its doctrine asks. Before the fix the same caches replaye
 - The legend's new sentences reach every response lane.
 - All six lanes would cost ~$0.109/h if asked, against ~$0.096/h for MR 4's five. The page asks none of them.
 
+### 48.6 One world: the gate at the top of the shaft (ja-web, 2026-11-10)
+
+The owner ruled `ja-web` a port of this section into one world (2026-11-10): one world only, no adding-mechanics process, measured against U6a's guards (`docs/one-world.md` §5). U6a had shown that one world never asked `leave` and so never raided: the gates were open ground's, and the plane, the only layer without a hole, is where nobody waits (every returner goes down its hole). Research basis as above: foragers wait in a chamber just inside the entrance and leave on contacts with nestmates coming home with food; a successful forager goes straight back out.
+
+**What was built** (`colony.ts`; the side view and the top-down maps unchanged, their golden masters bit-exact):
+- **The gate.** In one world every outgoing forager passes a gate at the top of its own shaft: the cells within `WAIT_STEPS` (3) steps of its hole along its tunnels (the way-out field). An old forager going out (exploring or following, or a recruited raider) with empty jaws and no pass is held there:
+  - it mills among those cells, is not asked its mode, and does not cross up;
+  - it rolls `leave` once a step, asked as a returning forager, or as a raider if recruited, at §48.3's rates; a yes is its pass, and it climbs out;
+  - it senses its place as `hole`, so its `leave` key has the top-down form;
+  - porters, carriers of spoil, corpses or brood, the young and middle-aged, and finders going home to tell are never held.
+- **Who comes to it.** A rested returner with empty jaws is held as soon as it is down its hole (owner: it doesn't go down first). A tired one goes down to rest; rested, `arrive` sends it out as before, and it is held at the top. A carrier that came down with food has a pass back out (`leaveOk`), used when it climbs out.
+- **The cue.** Each carrier down its own hole with food counts once a tick for its colony (`#holeIn`; `#returning` is keyed by cell with no layer). Every held ant adds last tick's count to `met`: the carrier walks down past all of them. `met` leaks on both layers. `crowd` is the nestmates in a held ant's cell and the six round it, over `CROWD_HALF`.
+- **Gates.** `gatesFor` gains `hold` (one world's curtain). In one world `gate` is off on the plane, where nobody waits. `rgate` and `sgate` are unchanged (the plane's), so raiders still walk the tunnels.
+- **Raids.** `leave` = raid sends a held ant out as a recruited raid scout, in fight; the local rule's crowded home with no returns makes them. Ants held at the gate smell the plane's raid trail on their hole's cell and the six round it (owner), and are recruited by it at `raidRecruit` × level. A raid ends as before, at the plane disc, with no trail there.
+- **Not in the plan: a finder lays its trail on to its hole.** On open ground a finder stops telling at the nest's rim, where the waiting ants are. In one world the trail then ended at the plane disc's rim, three cells from the hole: within a cell of the hole it peaked at 0.006 (G1 seed 4, 300 s), under FAINT (0.05), and no held ant was ever recruited. Now a finder in one world tells until it goes down its hole: 0.42 within a cell of it on the same seed.
+- **Counters** for the assays: `gateHeld`, `raidScouts`, `finds`, `recruits`. `SAVE_VERSION` 6.
+
+**Results** (local rule; seeds 1–10; full table in `docs/one-world.md` §5, "ja-web as built"):
+
+| | With returns | Deaf (`leaveGate` 10⁹) | `main` (no gate) |
+|---|---|---|---|
+| A5 pass | 0/10 | 0/10 | 0/10 |
+| A5 outside before food | 0.39 | 0.39 | 0.38 |
+| A5 outside once food flows | 0.20 | 0.21 | 0.21 |
+| A5 trips out per minute, before / after | 88 / 294 | 88 / 265 | 105 / 323 |
+| A5 food stored | 889 | 689 | 1,060 |
+| A5b pass | 7/10 | 6/10 | 6/10 |
+| A5b trips out per minute, flowing / gone | 341 / 120 | 286 / 125 | 365 / 167 |
+| A5b food stored | 762 | 559 | 632 |
+| Held at the gate, mean | 16–18 | 35–36 | — |
+
+- **A5 fails on one world, as on `main`.** The middle-aged go out unheld: they carry spoil up and out (U3c), then forage on the plane. On seed 1 at 60 s, 107 of the 162 ants outside before food were middle-aged (`main`: 110 of 217). The gate halves the old foragers outside (55 against 107), but only they pass it. Outside once food flows stays low because a carrier's trip down the shaft to reception counts as inside.
+- **The returns do the work where food flows:** A5b stores 762 with them and 559 deaf, and departures fall once food is gone (120 trips a minute against `main`'s 167).
+- **G1** (both colonies, against `main` on the same seeds): food carried down −0.3 % (44,582 against 44,711), births +3.7 %, crossings up +2.6 %, ants lost **+28 %** (1,679 against 1,315). Raids return: 187 raid scouts, 47 finds and 15 recruits over 20 colonies (none on `main`); recruits on 5 of 10 seeds, and seed 7 had no find. Few ants wait (2.6–7.4 a colony on average) while food keeps coming, so few are there to recruit. Held food still fails (`ja-lp4.6.3`).
+- **The assays on the plane** (against U6a): A1 8/10 (6/10), A2b 8/10 (9/10), A6 5/10 and A9 3/10 unchanged, A10 0/10. A8 solo stores 18 % less than `main` per seed (median 2,697 against 3,300).
+- **Unity** peaks a little lower in 600 s: 0.10–0.26 % at 300 + 300 and 0.14–0.39 % at 600 + 600 (U6a 0.11–0.29 % and 0.16–0.43 %). **The slow unity guard fails:** seed 3 at 600 + 600, which unified at 732 s under U6a, peaks at 0.44 % and never unifies in 1,800 s (`ja-lp4.6.6`; not loosened).
+- **Tick** at 1,200 + 1,200 (`colony-bench --one --page`, second half): 10.66 and 10.81 ms against `main`'s 9.10 and 9.31 on the same machine, **over the owner's 10 ms gate**. The gate's own code is about 1 % of the time; the plane's raid sensing (MR 5.2's `#raidLevel`, 2.3 %) now runs, since one world now lays raid trails.
+- **Tuning:** none. Neither A5b's nor G1's food fell, so `WAIT_STEPS` stays 3; `leaveGate` and `scoutRate` stay as §48.4 set them.
+
+**Jev.** `RESPONSE_LEGEND`'s stance sentence now covers one world: stance is the ant's own "on open ground, and in a nest whose hole opens onto open ground, above and below"; the colony's in a nest under a narrow strip of ground. `RESPONSE_BRAIN_VERSION` 11. The response lanes are not shipped in precache, so nothing is re-shipped and nothing was spent. The mode lane's legend has the same sentence and is not changed here: that would re-ship the mode answers (`ja-lp4.13`).
+
+**Cost** (`colony-cost`, offline, against `main` on the same machine):
+
+| | This branch | `main` |
+|---|---|---|
+| One world, `leave` lane, if asked | 15 situations, ~1,940 tok/q (estimated), ~$0.007/h | never asked |
+| One world, the six response lanes | ~$0.154/h | ~$0.125/h |
+| One world, mode | ~776 tok/q, ~$0.103/h | ~784 tok/q, ~$0.095/h |
+| Side view, the six response lanes | ~$0.193/h | ~$0.190/h |
+| Top-down, the six response lanes | ~$0.0216/h | ~$0.0213/h |
+
+The page asks none of the response lanes yet. One world's mode lane sees more distinct situations (192 against 158) and fewer mode choices, since held ants skip the mode policy.
+
 ## 49. Raiders follow a scout's trail (behaviour MR 5.2, ja-tu3, ja-jwy, 2026-11-06)
 
 Research basis: `docs/raid-recruitment.md`. Every figure in it was read in a search summary, not the paper (the hosts were outside the network allowlist), so all are **unverified**.
@@ -4130,6 +4183,8 @@ The owner asked for the top-down view and the side view to be two views of one g
 - **G1** fails the held-food bound on every seed (4–44 foragers a colony holding food over 120 s, all on the plane): skipped in `slow/oneWorld.test.ts` unless `G1=1`, the bound not loosened.
 - **Unity** is reachable but rare: Garden in both colonies, seeds 1–3, no game clears `MET` in 600 s (peak 0.11–0.43 %); by 1,800 s one of six does (seed 3, 600 + 600, unified at 732 s). The odours become alike; the colonies seldom meet, and only on the plane. Guarded on seed 3; `MET` unchanged.
 - **Tick** (`colony-bench --one --page`, seed 1): 6.1–6.4 ms mean at 600 + 600 and 9.9–10.4 ms at 1,200 + 1,200 (8.5–9.3 ms in the second minute, once the JIT has settled), against the 7–9 ms budget. The ants' step is ~73 % of it; no easy win was found. No situation, legend or question changed, so Jev's cost is unchanged.
+
+**`ja-web` built (2026-11-10).** Activation at the top of each shaft: every outgoing forager is held at a gate within `WAIT_STEPS` of its own hole and asked `leave` there; carriers have a pass; held ants smell the raid trail at their hole. A5b passes 7/10 on one world, A5 0/10 (the middle-aged go out unheld); G1's food carried down is unchanged and raids return; the tick at 1,200 + 1,200 is over the 10 ms gate (10.7–10.8 ms in the second half), and the slow unity guard (seed 3) no longer unifies. §48.6; `one-world.md` §5, "ja-web as built".
 
 ## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
 
