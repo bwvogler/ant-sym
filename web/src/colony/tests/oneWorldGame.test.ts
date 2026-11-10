@@ -7,7 +7,7 @@ import { Game, gameRng, isOneWorld } from "../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance } from "../hex.ts";
 import { generateOneWorld, type OneWorld } from "../oneWorld.ts";
 import { decode, encode } from "../save.ts";
-import { generateSideWorld, rockAt, OPEN } from "../world.ts";
+import { AIR, generateSideWorld, rockAt, OPEN } from "../world.ts";
 
 // One world's game (ja-lp4.3, U3a; docs/one-world.md §2, §4): colonies on the plane and the curtain, crossing at their
 // holes. A small plane (160 × 100) keeps it quick; seed 7's has two nests well inside it.
@@ -103,6 +103,34 @@ test("one world: an old explorer at the top of the shaft climbs out onto its hol
   const p = planeHole(h);
   assert.deepEqual([c.x[i], c.y[i]], [Math.fround(p.x), Math.fround(p.y)], "onto its hole's cell");
   assert.equal(c.crossedUp, 1, "nobody else went up");
+});
+
+test("one world: the strip over a hole is sky, and a walker stepping up into it from the hole crosses onto the plane (U5.1: the strip drawn, not stored)", () => {
+  const g = game();
+  const c = g.player;
+  ages(c, 0);
+  const h = own(c);
+  const curtain = g.world!.curtain;
+  // Both cells over the hole (its NW and NE neighbours, row CRUST − 1) are sky: nothing of the plane is stored there.
+  for (const dx of [-1, 0, 1]) {
+    cellOf(centreX(h.col, h.row) + dx * 0.5, centreY(h.row) - 1);
+    if ((CELL[1] as number) < h.row) assert.equal(rockAt(curtain, CELL[0] as number, CELL[1] as number), AIR);
+  }
+  const at = curtainHole(h);
+  const i = 0;
+  c.age[i] = ageOf(2);
+  c.putAnt(i, CURTAIN, at.x, at.y);
+  c.mode[i] = EXPLORE;
+  c.heading[i] = -Math.PI / 2;
+  // Its first steps up from the hole's centre land in the sky over it: a crossing, though the cell is not open ground.
+  let out = -1;
+  for (let k = 0; k < Math.round(2 / DT) && out < 0; k++) {
+    g.tick(DT);
+    if (c.layer[i] === PLANE) out = k;
+  }
+  assert.ok(out >= 0, "it crossed within 2 s, walking straight up");
+  const p = planeHole(h);
+  assert.deepEqual([c.x[i], c.y[i]], [Math.fround(p.x), Math.fround(p.y)], "onto its hole's cell");
 });
 
 test("one world: the young never go out, pushed back down the shaft", () => {
@@ -290,6 +318,20 @@ test("one world: allied contact is counted per layer", () => {
   };
   assert.equal(met(false), 0, "a layer apart, nobody meets");
   assert.ok(met(true) > 0, "together, they do");
+});
+
+test("one world: sporesOn reads each layer's spores (layer 0's are the public ones), for the renderer", () => {
+  const g = game();
+  const h = own(g.player);
+  const at = curtainHole(h);
+  g.fungus.paint([], at.x, at.y, 1.5, 3, 0, GARDEN, CURTAIN);
+  assert.equal(g.fungus.sporesOn(PLANE)!.spores, g.fungus.spores);
+  assert.equal(g.fungus.sporesOn(PLANE)!.sporeStrain, g.fungus.sporeStrain);
+  const [x, y] = [h.col, h.row]; // the hole, open
+  assert.ok(g.fungus.sporesOn(CURTAIN)!.spores.get(x, y) > 0, "the curtain's spores are on layer 1");
+  assert.equal(g.fungus.sporesOn(CURTAIN)!.sporeStrain.get(x, y), GARDEN);
+  assert.equal(g.fungus.spores.get(x, y), 0, "and not on the plane's");
+  assert.equal(g.fungus.sporesOn(2), null);
 });
 
 test("one world: the landing is on the plane by the hole, its spores dose only the ants on the plane, and the fungus reads each layer's ground", () => {

@@ -4,10 +4,11 @@
 // nest digger and chambers work on it unchanged:
 //
 //   rows 0 … CURTAIN_SKY − 1   sky (AIR): room for the mound's cut (one-world §4; the mound itself is the plane's `spoil`)
-//   row  CURTAIN_SKY            the ground strip: a copy of the plane under the line, P(s) column by column. The
-//                               surface belongs to the plane alone; this row is only how the side view shows it, and
-//                               refreshStrip copies it again (nothing is simulated twice, one-world §2). The sky and
-//                               the strip are the map's surfaceRows: digging below never re-derives them
+//   row  CURTAIN_SKY            the ground strip, sky (AIR) too: the side view draws the plane under the line here, P(s)
+//                               column by column, as it renders (one-world §8 item 6). The surface belongs to the plane
+//                               alone and is stored nowhere else, so nothing is simulated twice (one-world §2). The sky
+//                               and the strip are the map's surfaceRows: digging below never re-derives them, and an
+//                               ant stepping up into them from a hole crosses onto the plane (colony.ts)
 //   row  CRUST                  the crust, the curtain's row 0: solid except at a hole, the only way between the layers
 //   below it, CURTAIN_DEPTH rows of soil, stones and a few cavities, as the side view's ground.
 //
@@ -18,7 +19,7 @@
 import { ChunkLayer } from "./chunks.ts";
 import { Chambers } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY } from "./hex.ts";
-import { type Cell, cellAt, type End, grow, makeTransect, type Transect } from "./transect.ts";
+import { type Cell, type End, grow, makeTransect, type Transect } from "./transect.ts";
 import {
   AIR,
   buryPockets,
@@ -29,11 +30,8 @@ import {
   keepReachableFood,
   mulberry32,
   nearNests,
-  OPEN,
   OPEN_WORLD,
   reachableFrom,
-  ROCK,
-  rockAt,
   rockCut,
   SIDE_WORLD,
   soilCut,
@@ -45,7 +43,7 @@ import {
 
 /** Rows of sky above the curtain's ground strip: room for the mound's cut (one-world §4). */
 export const CURTAIN_SKY = 40;
-/** The ground strip: the plane under the line, as the side view shows it. */
+/** The ground strip's row: sky in the curtain, where the side view draws the plane under the line (P(s)). */
 export const STRIP = CURTAIN_SKY;
 /** The curtain's row 0, its crust: solid except at a hole. */
 export const CRUST = CURTAIN_SKY + 1;
@@ -79,7 +77,7 @@ export function generateOneWorld(seed: number, opts: { plane?: Partial<WorldOpti
   // The mound is the plane's (U3c): a height field of spoil, empty at the start.
   plane.spoil = new ChunkLayer((n) => new Uint16Array(n), 0);
   plane.moundCells = 0;
-  return { seed, plane, line, curtain: generateCurtain(seed, plane, line) };
+  return { seed, plane, line, curtain: generateCurtain(seed, line) };
 }
 
 /** The salt of the curtain's ground noise: the plane's rock uses `seed` itself. */
@@ -87,18 +85,17 @@ const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
 
 /**
  * The curtain under `line` (one-world §2): the side view's ground rules, laid along the line instead of along a straight
- * ground line, with each nest's shaft and royal chamber dug from its hole, buried food in pockets, and the plane under
- * the line copied into the ground strip.
+ * ground line, with each nest's shaft and royal chamber dug from its hole, and buried food in pockets. The ground strip
+ * is sky, as the rows above it: the plane under the line is drawn there, not stored (one-world §8 item 6).
  *
  * `colonies[k]` is the colony whose hole is the line's k-th (default: k). The curtain's nests are indexed by colony, as
  * every map's are (Colony's `nest` param), so a colony keeps its nest and royal chamber when the line grows at V₀ and
  * the holes renumber; `nest` is colony 0's, the player's.
  *
  * Food: `foodTotal` and `foodLeft` count the buried food any colony can reach, walking or digging from its nest. The
- * strip's food is the plane's, shown here; the plane counts it, and nothing should take it from the curtain (U3 routes
- * the surface to the plane).
+ * surface's food is the plane's alone.
  */
-export function generateCurtain(seed: number, plane: WorldMap, line: Transect, colonies: readonly number[] = line.holes.map((_, k) => k)): WorldMap {
+export function generateCurtain(seed: number, line: Transect, colonies: readonly number[] = line.holes.map((_, k) => k)): WorldMap {
   if (colonies.length !== line.holes.length || [...colonies].sort((a, b) => a - b).some((c, i) => c !== i)) throw new Error(`generateCurtain: colonies ${colonies.join(", ")} must number the ${line.holes.length} holes 0…${line.holes.length - 1}`);
   const w = line.sMax - line.sMin + 1;
   const x0 = line.sMin;
@@ -108,8 +105,8 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
   const scut = soilCut(SIDE_WORLD.soil);
   const gs = groundSeed(seed);
   const rock = new Uint8Array(w * h);
-  // Above the strip, sky; the strip is written by refreshStrip, below.
-  rock.fill(AIR, 0, STRIP * w);
+  // The sky and the strip: AIR (the strip is drawn from the plane, not stored).
+  rock.fill(AIR, 0, CRUST * w);
   for (let y = CRUST; y < h; y++)
     for (let s = x0; s < x0 + w; s++)
       // The side view's ground, by the line's column s and the row, below the crust.
@@ -121,8 +118,6 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
   curtain.loose = new ChunkLayer((n) => new Uint8Array(n), 0);
   curtain.moundCells = 0;
   curtain.chambers = new Chambers();
-  // The strip before the nests: the nest digger finds the ground under the sky, and never re-derives the strip.
-  refreshStrip(curtain, plane, line);
 
   // Each nest: a hole in the crust at its column, a slanted shaft and a royal chamber, dug as the side view digs them.
   // Each draws its shaft's slant from its own stream, keyed by its hole, so a nest is dug the same when the line grows.
@@ -143,7 +138,7 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
   // is placed depends only on its block, its depth and the nests near it, never on where the line ends, so a column keeps
   // its pockets when the line grows; a pocket past the line's end is cut off by the map's edge.
   buryAlong(curtain, seed, line.sMin, line.sMax, nearNest, () => CRUST + 4);
-  // Only food some colony can reach from its nest, walking or digging; the strip's food is the plane's, not counted here.
+  // Only food some colony can reach from its nest, walking or digging, below the crust.
   keepReachableFood(curtain, nests, "diggable", CRUST);
   return curtain;
 }
@@ -168,7 +163,7 @@ function buryAlong(curtain: WorldMap, seed: number, lo: number, hi: number, near
     }
 }
 
-/** The curtain's ground at column s, every row: sky over the strip (rows 0 … CRUST − 1, the strip's ground set by refreshStrip), then the side view's ground. */
+/** The curtain's ground at column s, every row: sky (rows 0 … CRUST − 1, the strip included), then the side view's ground. */
 function curtainColumn(curtain: WorldMap, seed: number, s: number): void {
   const cut = rockCut(SIDE_WORLD.rockiness);
   const scut = soilCut(SIDE_WORLD.soil);
@@ -186,7 +181,7 @@ function curtainColumn(curtain: WorldMap, seed: number, s: number): void {
  * founding canFound has allowed. The line grows (transect.ts grow): every existing s keeps its place, and the curtain
  * widens to the new line's columns (its x0 falls when it grows at V₀; nothing is renumbered). Its new columns get the
  * curtain's ground by (seed, s, row), sky, and the buried food of their 64-column blocks; the old columns keep their dug
- * state, rock and food. The strip is copied again wherever P(s) changed (the old end's margin now lies under the new
+ * state, rock and food (the strip is drawn from the line as it now runs: the old end's margin lies under the new
  * segment). The new nest goes on both layers: on the plane a nest of radius 3 round the hole, where nothing is dug (the
  * plane has no soil, and the founding rule put the hole on open ground joined to the main open ground: mainGround); in
  * the curtain a shaft and royal chamber dug from its hole, from the stream keyed by the hole, before the new columns' food, which keeps its distance from every nest. Only food a colony can reach in the new columns is kept and
@@ -201,7 +196,6 @@ export function growWorld(world: OneWorld, end: End, cell: Cell): number {
   curtain.size = { w: line.sMax - line.sMin + 1, h: curtain.size.h };
   for (let s = line.sMin; s <= line.sMax; s++) if (fresh(s)) curtainColumn(curtain, seed, s);
   world.line = line;
-  refreshStrip(curtain, plane, line);
   // The nest, on both layers: its index is the colony's that will live there (the maps' nests are indexed by colony).
   const k = curtain.nests.length;
   const sHole = line.sHole[end === "start" ? 0 : line.sHole.length - 1]!;
@@ -250,21 +244,4 @@ export function mainGround(world: OneWorld): (x: number, y: number) => boolean {
   const { x0 } = plane;
   const { w, h } = plane.size;
   return (x, y) => x >= x0 && y >= 0 && x < x0 + w && y < h && reach[y * w + x - x0] === 1;
-}
-
-/**
- * Copy the plane under the line into the curtain's ground strip (row STRIP): each column s gets P(s)'s ground (open, or
- * rock for anything solid or off the plane) and its food. The strip is how the side view shows the surface; the plane
- * is the only place it is simulated. The strip and the sky above it are the curtain's surfaceRows, which digging below
- * never re-derives, so only the strip needs copying again when the plane changes.
- */
-export function refreshStrip(curtain: WorldMap, plane: WorldMap, line: Transect): void {
-  for (let s = line.sMin; s <= line.sMax; s++) {
-    cellAt(line, s);
-    const px = CELL[0]!;
-    const py = CELL[1]!;
-    const t = rockAt(plane, px, py);
-    curtain.rock.set(s, STRIP, t === OPEN ? OPEN : ROCK);
-    curtain.food.set(s, STRIP, t === OPEN ? plane.food.get(px, py) : 0);
-  }
 }

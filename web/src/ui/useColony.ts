@@ -8,6 +8,7 @@ import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts";
+import { generateOneWorld } from "../colony/oneWorld.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
 // loop: React state carries only what the
@@ -32,13 +33,20 @@ export interface ColonyControls {
   cull: boolean;
   /** a rival colony at the map's second nest */
   rival: boolean;
-  /** the side view (a cross-section: sky, the ground line, the nest dug below) or the open surface from above */
+  /** the side view (a cross-section: sky, the ground line, the nest dug below), the open surface from above, or one world (both, docs/one-world.md) */
   ground: Ground;
+  /** one world's view: the plane from above, or the curtain below; a camera switch, not a new game (it is no build input) */
+  view: View;
   /** the player pressed Start (the start screen, ja-lo8.5): every game from then on begins with the fungus landing */
   started: boolean;
 }
 
-export type Ground = "side" | "open";
+export type Ground = "side" | "open" | "one";
+/** One world's two views (docs/one-world.md §5): "above" the plane, "below" the curtain under the line. */
+export type View = "above" | "below";
+
+/** Whether a game on this ground has nests underground (chambers, a queen): the side view and one world. */
+export const hasNests = (g: Ground): boolean => g !== "open";
 
 /** The game's default speed (owner, PRD §50: faster by default, every rate scaled together; no sim constant changes). */
 export const GAME_SPEED = 4;
@@ -49,7 +57,7 @@ export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 /** The colony the fungus lands by. */
 export const LANDING_COLONY = 0;
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side" };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side", view: "below" };
 
 /** One colony's line in the panel. */
 export interface SideStats {
@@ -166,7 +174,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const pending = useRef<SaveRecord | null>(null);
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
-    const build = () => new Game(controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : generateSideWorld(controls.seed), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW, autoFound: false }, gameRng(controls.seed, generation));
+    const map = () => (controls.ground === "open" ? generateWorld(controls.seed, OPEN_WORLD) : controls.ground === "one" ? generateOneWorld(controls.seed) : generateSideWorld(controls.seed));
+    const build = () => new Game(map(), { antCount: controls.antCount, rivalAnts: controls.antCount, rival: controls.rival, regrow: GAME_REGROW, autoFound: false }, gameRng(controls.seed, generation));
     const g = build();
     const r = pending.current;
     if (r && r.settings.seed === controls.seed && r.settings.ground === controls.ground && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
@@ -181,7 +190,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       }
     }
     return g;
-    // `loads` rebuilds the game when a save has the same settings as the game now
+    // `loads` rebuilds the game when a save has the same settings as the game now. `view` is not here: one world's two
+    // views are one game.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [controls.seed, controls.antCount, controls.rival, controls.ground, generation, loads]);
   const colony = game.player;
@@ -234,7 +244,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         setStats({
           time: colony.time,
           stored: game.colonies.reduce((n, c) => n + c.stored, 0),
-          foodTotal: colony.map.foodTotal,
+          // One world: both layers' food, as colony.foodLeft counts it (the plane's and the curtain's buried food).
+          foodTotal: game.world ? game.world.plane.foodTotal + game.world.curtain.foodTotal : colony.map.foodTotal,
           foodLeft: colony.foodLeft,
           counts: sumCounts(game.colonies),
           choicesPerSecond: rate,

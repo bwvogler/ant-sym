@@ -52,8 +52,8 @@ interface Props {
   retune: string;
   /** the Pages build: no server, so Jev never runs here */
   demo: boolean;
-  /** the map has a nest to look into (the side view) */
-  sideView: boolean;
+  /** the game has nests underground (the side view, one world): the Nest tab has one to show */
+  hasNests: boolean;
   onSideView: () => void;
 }
 
@@ -385,7 +385,7 @@ function followedSituation(colonies: readonly Colony[], f: Followed | null): { k
 
 /** The menu as the fungus runs it on this map: the nest's levers only where there is a nest (Fungus.menu drops them). */
 function mapMenu(props: Props): string[] {
-  return props.menu.filter((id) => props.sideView || !NEST_ONLY.has(id));
+  return props.menu.filter((id) => props.hasNests || !NEST_ONLY.has(id));
 }
 
 /** What the fungus senses in the followed ant, if it is infected. */
@@ -620,7 +620,7 @@ function NestTab(props: Props & { focus?: string }) {
           What an ant can sense
         </a>
       </p>
-      {!props.sideView || views.every((v) => v === null) ? (
+      {!props.hasNests || views.every((v) => v === null) ? (
         <section className={card}>
           <p className="text-[13px]">
             The map seen from above has no nest to look into: each colony's nest is a disc around its hole. In the side view the ants dig shafts and chambers below the ground line, and the queen lays there.

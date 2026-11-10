@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../../colony/colony.ts";
+import { Colony, CURTAIN, PLANE } from "../../colony/colony.ts";
+import { Game, gameRng } from "../../colony/game.ts";
+import { CELL, cellOf } from "../../colony/hex.ts";
+import { generateOneWorld } from "../../colony/oneWorld.ts";
 import { generateSideWorld, generateWorld, mulberry32 } from "../../colony/world.ts";
 import { nestView } from "../nest.ts";
 
@@ -34,3 +37,25 @@ test("the side view's nest: its own chambers only, the royal one with the queen 
     assert.deepEqual(v.brood, col.brood.counts());
   }
 });
+
+test("one world's nest: an ant on the plane over a chamber is not in it; only the curtain's ants count", () => {
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 30, rivalAnts: 30 }, gameRng(7));
+  const col = g.player;
+  const before = nestView(col)!;
+  const royal = before.chambers.find((c) => c.role === "royal")!;
+  const inRoyal = royal.ants;
+  // Every ant starts underground, most in the royal chamber. One of them onto the plane at the chamber's own coordinates
+  // (the plane is another map: above ground, not in it).
+  let a = -1;
+  for (let i = 0; i < col.n && a < 0; i++) if (col.alive[i] && col.layer[i] === CURTAIN && cellIn(col, i) === royal.id) a = i;
+  assert.ok(a >= 0 && inRoyal > 1);
+  col.putAnt(a, PLANE, royal.x, royal.y);
+  const after = nestView(col)!.chambers.find((c) => c.id === royal.id)!;
+  assert.equal(after.ants, inRoyal - 1, "the plane ant over the chamber isn't in it");
+});
+
+/** The chamber ant i stands in, on the colony's home map. */
+function cellIn(col: Colony, i: number): number {
+  cellOf(col.x[i]!, col.y[i]!);
+  return col.map.chambers!.at(CELL[0]!, CELL[1]!);
+}

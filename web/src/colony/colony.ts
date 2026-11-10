@@ -1745,7 +1745,7 @@ export class Colony {
     for (const d of UP_FIRST) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (rockAt(this.map, tx, ty) !== OPEN) continue;
+      if (!walkable(this.map, tx, ty)) continue;
       if (isSky(this.map, tx, ty)) return d;
       if (centreY(ty) < bestY) {
         bestY = centreY(ty);
@@ -1998,12 +1998,14 @@ export class Colony {
     // So is one that has been filled since (backfill), unless it is an explorer's face to dig: a cell it
     // chose to dig (digAim set), not one it was walking to, and not one put back moments ago (see refilled).
     // Kept, a walkway filled in front of an explorer was dug straight back out (the review of MR 12).
+    // (One world's ground strip over a hole is walkable: a step there crosses up, so it is a target to keep.)
+    const gWalk = this.gx[i] !== NO_CELL && walkable(map, this.gx[i] as number, this.gy[i] as number);
     const fresh =
       this.gx[i] === NO_CELL ||
       hexDistance(this.gx[i] as number, this.gy[i] as number, hx, hy) > 1 ||
-      (rockAt(map, this.gx[i] as number, this.gy[i] as number) !== OPEN &&
+      (!gWalk &&
         (mode !== EXPLORE || Number.isNaN(this.digAim[i] as number) || refilled(map, this.gx[i] as number, this.gy[i] as number, this.time))) ||
-      rockAt(map, this.gx[i] as number, this.gy[i] as number) === AIR; // sky (the ground under a walkway dug away) is no face to dig
+      (!gWalk && rockAt(map, this.gx[i] as number, this.gy[i] as number) === AIR); // sky (the ground under a walkway dug away) is no face to dig
     if (!fresh && Math.hypot(centreX(this.gx[i] as number, this.gy[i] as number) - x, centreY(this.gy[i] as number) - y) > step) return true;
     const hugging = mode === EXPLORE && (this.hugT[i] as number) > 0;
     const packed = cellKey(hx, hy);
@@ -2117,7 +2119,7 @@ export class Colony {
         const d = (dir + turn + 6) % 6;
         const tx = stepX(cx, cy, d);
         const ty = stepY(cy, d);
-        if (rockAt(map, tx, ty) !== OPEN) continue;
+        if (!walkable(map, tx, ty)) continue;
         const v = byVector ? Math.cos(DIR_ANGLE[d] as number) * hx + Math.sin(DIR_ANGLE[d] as number) * hy : (signs ? signs.get(tx, ty) * signGain : 0) + field.get(tx, ty);
         if (v > bestV) {
           bestV = v;
@@ -3722,7 +3724,7 @@ export class Colony {
     for (let d = 0; d < 6; d++) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (rockAt(this.map, tx, ty) !== OPEN) continue;
+      if (!walkable(this.map, tx, ty)) continue;
       // Along the ground, off it only into the hole it heads for: in at another (the rival's, nearer by column on the way
       // past), a carrier was trapped in that shaft (review of #15).
       if (alongGround && !isSky(this.map, tx, ty) && !this.#targetHole(tx, ty, hy)) continue;
@@ -5126,7 +5128,10 @@ export class Colony {
       cellOf(Math.fround(nx), Math.fround(ny)); // as stored (Float32), so the cached cell is the stored position's
       const lx = CELL[0] as number;
       const ly = CELL[1] as number;
-      let landOpen = rockAt(map, lx, ly) === OPEN;
+      // One world's curtain: a step up into its surface rows (sky; the side view draws the strip from the plane, it is
+      // stored nowhere, one-world §8 item 6) is a crossing, judged below (#mayCrossUp), whatever the cell holds.
+      const up = map.surfaceRows !== undefined && ly < map.surfaceRows;
+      let landOpen = up || rockAt(map, lx, ly) === OPEN;
       if (!landOpen) {
         // A step that stays in the ant's own cell moves even if that cell is solid: a cell filled round an
         // ant (another colony's ant backfilling, its grids a tick old) must not bury it.
@@ -5263,7 +5268,7 @@ export class Colony {
           // Carrying out on the plane (U3c): on from here the way it turned, not back into the rock.
           if (outward) this.#spoilA[i] = h;
         }
-      } else if (map.surfaceRows !== undefined && ly < map.surfaceRows) {
+      } else if (up) {
         // One world's curtain: a step up out of a hole (the crust is open nowhere else) is onto the surface, the plane's.
         // Up it goes if it may (#mayCrossUp); else it is pointed back down the shaft, as the side view's young are. Either
         // way its step ends here.
@@ -5923,9 +5928,23 @@ export function angleDiff(a: number, b: number): number {
   return d;
 }
 
-/** Whether cell (x, y)'s neighbour the way `d` is open. */
+/**
+ * Whether an ant may choose to step into cell (x, y): open ground, or one world's ground strip (the curtain's last surface
+ * row, sky: the side view draws the plane there, one-world §8 item 6), where a step from the hole under it is a crossing
+ * up onto the plane (tick). The strip touches the curtain's open cells only at the holes, the crust being solid elsewhere,
+ * so it reads as the walkway over a hole, as the side view's ground does. On every other map, open ground alone.
+ * openAt and #walkTunnel need it (an ant at a hole's top must see the way up). #upOut, the scent walk and #towardHole use
+ * it only to agree with openAt: none meets the strip today (PR #64 review N1: 0 disagreements with the open check, seeds
+ * 1-3, 300 s), since a step into it crosses up at once.
+ */
+export function walkable(map: WorldMap, x: number, y: number): boolean {
+  const t = rockAt(map, x, y);
+  return t === OPEN || (t === AIR && map.surfaceRows !== undefined && y === map.surfaceRows - 1);
+}
+
+/** Whether cell (x, y)'s neighbour the way `d` is open (walkable). */
 function openAt(map: WorldMap, x: number, y: number, d: number): boolean {
-  return rockAt(map, stepX(x, y, ((d % 6) + 6) % 6), stepY(y, ((d % 6) + 6) % 6)) === OPEN;
+  return walkable(map, stepX(x, y, ((d % 6) + 6) % 6), stepY(y, ((d % 6) + 6) % 6));
 }
 
 /**

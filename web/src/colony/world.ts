@@ -87,10 +87,11 @@ export interface WorldMap {
    */
   sky?: ChunkLayer<Uint8Array>;
   /**
-   * The one-world curtain (oneWorld.ts): its rows 0 … surfaceRows − 1, the sky over its ground strip and the strip, are
-   * drawn from the plane, not derived from the ground under them: updateSurface leaves them be, nothing fills them, no
-   * spoil is heaped there (the mound is the plane's, one-world §4), and no search passes through them. No cell in them
-   * is soil, so none is dug. The crust under them is soil touching their sky, which ants leave (colony.ts #crust) as
+   * The one-world curtain (oneWorld.ts): its rows 0 … surfaceRows − 1, the sky and the ground strip under it, are all
+   * sky (AIR), the plane's: the side view draws the plane under the line on the strip, which stores nothing (one-world
+   * §8 item 6). updateSurface leaves them be, nothing fills them, no spoil is heaped there (the mound is the plane's,
+   * one-world §4), and no search passes through them; a step up into them from a hole is a crossing onto the plane
+   * (colony.ts walkable). No cell in them is soil, so none is dug. The crust under them is soil touching their sky, which ants leave (colony.ts #crust) as
    * they leave today's ground line. Absent elsewhere.
    */
   surfaceRows?: number;
