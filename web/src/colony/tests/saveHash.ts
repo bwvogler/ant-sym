@@ -1,5 +1,7 @@
 import { ChunkLayer } from "../chunks.ts";
-import type { Game } from "../game.ts";
+import { CountGrid, occupancy } from "../battle.ts";
+import type { Game, GameSave } from "../game.ts";
+import { Recognition } from "../recognition.ts";
 import type { WorldMap } from "../world.ts";
 
 // A hash of everything a game holds that can be read from outside, for the save tests (save.test.ts, oneWorldSave.test.ts):
@@ -66,4 +68,20 @@ export function hashGame(g: Game): string {
   // What the game reads off its occupancy grids and recognition bands (Game.#refresh): unity, and strangers by each nest.
   text([g.unity(), g.colonies.map((_, k) => g.enemiesNearNest(k))]);
   return (h >>> 0).toString(16);
+}
+
+/**
+ * The grids and bands built again from the living, as a load did before saves kept them (Game.#refresh): for the
+ * controls that show a save's tick needs its own grids. Load a save into a fresh game first, then call this on it.
+ */
+export function gridsFromLiving(g: Game): GameSave["grids"] {
+  const one = g.layers.length === 1;
+  return {
+    counts: g.layers.map((_, l) => g.colonies.map((c) => occupancy(c, new CountGrid(), one ? -1 : l).saveState())),
+    bands: g.layers.map((_, l) => {
+      const r = new Recognition();
+      r.build(g.colonies, one ? -1 : l);
+      return r.saveBands();
+    }),
+  };
 }

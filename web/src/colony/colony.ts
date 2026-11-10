@@ -360,6 +360,9 @@ export type Wiring = Partial<Pick<Layer, "enemies" | "nestmates" | "friends" | "
  * are the colony's own fields, saved with them): its scent, the holes it sees and its cached way out. Every other key
  * is built again: the map, nest and entrance by the constructor and the world, the rest wired by the game (Game.#wire,
  * #aimAt). tests/save.test.ts holds every key to one list or the other.
+ *
+ * On today's plane only `ph` changes: it has no entrance, so `seeHoles` leaves its `holes` empty and its way out
+ * (`outDist` … `outAt`) is never worked out. Those are saved for completeness, and no test reaches them (#63's review, N3).
  */
 export const LAYER_STATE = ["ph", "holes", "outDist", "outCells", "outVersion", "outAt"] as const satisfies readonly (keyof Layer)[];
 

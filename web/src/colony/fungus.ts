@@ -207,7 +207,11 @@ export interface Census {
   meanResist: number;
 }
 
-/** The SporeLayer keys a save keeps for each map past the first (Fungus.saveState's `layers`); the rest are the map itself, or built every step. */
+/**
+ * The SporeLayer keys a save keeps for each map past the first (Fungus.saveState's `layers`); the rest are the map itself,
+ * or built every step. `base` there can't change in today's games (every `root` is on layer 0, so the curtain's base
+ * stays empty): it is saved for completeness, and no test reaches it (#63's review, N3).
+ */
 export const SPORE_LAYER_STATE = ["spores", "sporeStrain", "sporeCells", "base"] as const;
 
 /**
@@ -1049,10 +1053,9 @@ export class Fungus {
       if (layers.length !== this.#layers.length - 1) throw new Error(`save: the fungus saved on ${layers.length + 1} maps, here ${this.#layers.length}`);
       layers.forEach((x, k) => {
         const M = this.#layers[k + 1] as SporeLayer;
-        fillLike(M.spores, x.spores);
-        fillLike(M.sporeStrain, x.sporeStrain);
-        fillLike(M.sporeCells, x.sporeCells);
-        M.base = [...((x.base as number[] | undefined) ?? [])];
+        for (const key of SPORE_LAYER_STATE)
+          if (key === "base") M.base = [...((x.base as number[] | undefined) ?? [])];
+          else fillLike(M[key], x[key]);
       });
     }
     this.#evolved();

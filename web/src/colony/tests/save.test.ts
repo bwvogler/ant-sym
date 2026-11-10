@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, LAYER_STATE, PLANE, type Layer } from "../colony.ts";
 import { Game, gameRng, type GameSave } from "../game.ts";
-import { hashGame } from "./saveHash.ts";
+import { gridsFromLiving, hashGame } from "./saveHash.ts";
 import { STRAINS } from "../fungus.ts";
 import { CRUST, generateOneWorld } from "../oneWorld.ts";
 import { encode } from "../save.ts";
@@ -104,9 +104,12 @@ for (const view of ["side", "top"] as const)
     run(again, 3);
     assert.equal(hashGame(again), unbroken, "run on: as if never saved");
 
-    // Without the grids (as a version-4 save loads) the same save diverges: this tick really is one that needs them.
+    // With the grids built again from the living (as a load did before U4b) the same save diverges: this tick really is
+    // one that needs them.
+    const twin = fighting(view, false);
+    twin.load(saved);
     const rebuilt = fighting(view, false);
-    rebuilt.load({ ...saved, grids: undefined });
+    rebuilt.load({ ...saved, grids: gridsFromLiving(twin) });
     rebuilt.tick(DT);
     run(rebuilt, 3);
     assert.notEqual(hashGame(rebuilt), unbroken, "rebuilt from the living, the run differs");
@@ -177,7 +180,9 @@ test("a one-world colony's save holds every layer's own state, and the fungus's 
 });
 
 test("the game's save holds every private field it declares, or the field is built again on load", () => {
-  // As for Colony and Fungus: a new #field in Game must be saved, or named here as rebuilt on load.
+  // As for Colony and Fungus: a new #field in Game must be saved, or named here as rebuilt on load. Public fields are
+  // saved by name in Game.save, and one is left out on purpose: `lastLoss`, the page's notice of the last queen lost,
+  // which nothing in play reads (#63's review, N2).
   const src = readFileSync(new URL("../game.ts", import.meta.url), "utf8");
   const body = src.slice(src.indexOf("export class Game "));
   const declared = new Set<string>();
@@ -189,5 +194,22 @@ test("the game's save holds every private field it declares, or the field is bui
   assert.deepEqual([...declared].sort(), [...inPrivate, ...inGrids, ...derived].sort(), "every declared #field is accounted for");
   const s = build("top", 2).save();
   assert.deepEqual(Object.keys(s.private).sort(), [...inPrivate].sort());
-  assert.deepEqual(Object.keys(s.grids!).sort(), ["bands", "counts"]);
+  assert.deepEqual(Object.keys(s.grids).sort(), ["bands", "counts"]);
+});
+
+test("a single-map save's shape: the game's keys with the grids, colony saves as fields and private, the fungus's keys, one layer of grids", () => {
+  // A single-map game saves none of one world's parts (`world`, a colony's or the fungus's `layers`): held here by name.
+  const game = ["colonies", "flights", "founded", "fungus", "grids", "landed", "map", "params", "private", "raids", "recognition", "regrown", "revealed", "strategyChoices", "time", "version"];
+  const fungus = ["base", "clock", "evolution", "hosts", "menu", "params", "rule", "sporeCells", "sporeStrain", "spores"];
+  for (const view of ["top", "side"] as const) {
+    const g = build(view, 5);
+    g.land(0, GARDEN, { evolve: true });
+    run(g, 1);
+    const s = g.save();
+    assert.deepEqual(Object.keys(s).sort(), game, `${view}: the game's keys`);
+    for (const c of s.colonies) assert.deepEqual(Object.keys(c).sort(), ["fields", "private"], `${view}: a colony's keys`);
+    assert.deepEqual(Object.keys(s.fungus).sort(), fungus, `${view}: the fungus's keys`);
+    assert.deepEqual(Object.keys(s.grids).sort(), ["bands", "counts"]);
+    assert.equal(s.grids.counts.length, 1, `${view}: one layer`);
+  }
 });

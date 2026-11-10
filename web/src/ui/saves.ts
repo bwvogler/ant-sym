@@ -1,4 +1,4 @@
-import { readsSaveVersion, type GameSave } from "../colony/game.ts";
+import { SAVE_VERSION, type GameSave } from "../colony/game.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 import type { Ground } from "./useColony.ts";
 
@@ -100,12 +100,11 @@ export function record(slot: number, settings: GameSettings, player: PlayerState
 
 /** "12 min of sim, 3 h ago" style, for a slot's line. */
 /**
- * Whether this game can read the record: its own version, or an older one Game.load brings up to it (version 4, before
- * one-world saves: game.ts SAVE_MIGRATIONS). Any other (older, or newer) is listed but never loaded, since Game.load
- * refuses it (PR #42 review, B3).
+ * Whether this game can read the record: one saved by an older (or newer) version is listed but never loaded, since
+ * Game.load refuses it (PR #42 review, B3).
  */
 export function readable(r: SaveRecord): boolean {
-  return readsSaveVersion(r.game?.version);
+  return r.game?.version === SAVE_VERSION;
 }
 
 /** The newest save this game can read, or null: what Continue offers. */

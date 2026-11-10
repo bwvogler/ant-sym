@@ -358,7 +358,8 @@ export class Recognition {
   /**
    * The bands as last built (build), for a save (Game.save, U4b): the game builds them before fights and the next tick's
    * steps read them, ants killed since included, so a load must not build them again from the living. `#everyone` only
-   * while some ant was calmed: otherwise it is empty.
+   * while some ant was calmed: otherwise it is empty. In today's games the saved `#everyone` can't change play (only
+   * Fungus.#touch reads it, after the same tick's build): it is saved for completeness, and no test reaches it (#63's review, N3).
    */
   saveBands(): BandsSave {
     return { bins: this.bins.map((g) => g.saveState()), everyone: this.#calmed ? this.#everyone.map((g) => g.saveState()) : null, occupied: this.#occupied, occupiedEveryone: this.#occupiedEveryone };

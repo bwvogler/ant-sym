@@ -78,7 +78,11 @@ export class CountGrid {
     return out;
   }
 
-  /** A saved state back (saveState): reset, then each cell and its block's sum as they were. */
+  /**
+   * A saved state back (saveState): reset, then each cell and its block's sum as they were. The block sums are restored
+   * for completeness only: `any` reads them, and only resolveFights without recognition calls it, which a Game never
+   * does, so no test reaches them (#63's review, N3).
+   */
   loadState(saved: readonly number[]): void {
     this.reset();
     for (let k = 0; k < saved.length; k += 3) {

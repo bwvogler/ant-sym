@@ -6,7 +6,7 @@ import { Game, gameRng, type GameSave } from "../game.ts";
 import { centreX, centreY } from "../hex.ts";
 import { CRUST, generateOneWorld } from "../oneWorld.ts";
 import { generateSideWorld } from "../world.ts";
-import { hashGame } from "./saveHash.ts";
+import { gridsFromLiving, hashGame } from "./saveHash.ts";
 
 // One-world saves (U4b): each part of a save is needed. One save of one game, and one unbroken hash: take a part away or
 // put a stale one in, and the load must refuse it or run on to another hash. And a save into the wrong kind of game,
@@ -82,7 +82,14 @@ const diverge: [string, (s: GameSave) => void][] = [
       s.world!.curtain = copy(g.save()).world!.curtain;
     },
   ],
-  ["without the grids, saved on a tick with a fight death", (s) => delete s.grids],
+  [
+    "with the grids built again from the living, saved on a tick with a fight death",
+    (s) => {
+      const g = small();
+      g.load(copy(s));
+      s.grids = gridsFromLiving(g);
+    },
+  ],
   ["with the mound's spoil zeroed", (s) => ((s.map as Record<string, unknown>).spoil = { $chunks: [] })],
 ];
 

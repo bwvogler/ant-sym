@@ -60,36 +60,10 @@ export interface GameParams {
 export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0, autoFound: true };
 
 /**
- * Bump when what a save holds changes: an older save is refused, not misread, unless SAVE_MIGRATIONS brings it up to
- * this version.
+ * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
+ * older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
 export const SAVE_VERSION = 5;
-
-/**
- * Older saves this game still reads, each brought up to the next version (Game.load; the page's ui/saves.ts lists them
- * as loadable). 4 → 5 (U4b, one-world saves): nothing to change. Version 5's fields are all optional (GameSave.grids,
- * GameSave.world, Founding.spot, a colony's and the fungus's `layers`); a save without `grids` has its occupancy grids
- * and recognition bands built afresh from the ants, as a version-4 game did on load.
- */
-const SAVE_MIGRATIONS: Readonly<Record<number, (s: GameSave) => GameSave>> = {
-  4: (s) => ({ ...s, version: 5 }),
-};
-
-/** Whether this game reads saves of `version`: its own, or one SAVE_MIGRATIONS brings up to it. */
-export function readsSaveVersion(version: number | undefined): boolean {
-  return version === SAVE_VERSION || (version !== undefined && Object.hasOwn(SAVE_MIGRATIONS, version));
-}
-
-/** A save brought up to SAVE_VERSION (SAVE_MIGRATIONS, in order); one this game can't read throws, rather than being misread. */
-export function migrateSave(saved: GameSave): GameSave {
-  let s = saved;
-  while (s.version !== SAVE_VERSION) {
-    const up = Object.hasOwn(SAVE_MIGRATIONS, s.version) ? SAVE_MIGRATIONS[s.version] : undefined;
-    if (!up) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
-    s = up(s);
-  }
-  return s;
-}
 
 /**
  * Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony).
@@ -173,10 +147,9 @@ export interface GameSave {
   /**
    * The occupancy grids per layer and colony, and each layer's recognition bands, as the last tick built them (U4b).
    * They were built before that tick's fights and the next tick's steps read them, the ants killed since included: a load
-   * that built them again from the living would diverge from a save on a tick with a fight death. Missing from a save of
-   * version 4: those are built afresh, as they were.
+   * that built them again from the living would diverge from a save on a tick with a fight death.
    */
-  grids?: { counts: number[][][]; bands: BandsSave[] };
+  grids: { counts: number[][][]; bands: BandsSave[] };
   /**
    * One world (U4b): its seed, the line as saved (its holes, V₀'s column and the margin: a check, since load grows the
    * line again from `founded`), and the curtain as dug (its nests aside: the world digs them). `map` is the plane.
@@ -1015,8 +988,8 @@ export class Game {
    * the same seed and generateOneWorld options; the foundings grow the line again where they went, then the plane and
    * the curtain as dug are poured over it.
    */
-  load(save: GameSave): void {
-    const saved = migrateSave(save);
+  load(saved: GameSave): void {
+    if (saved.version !== SAVE_VERSION) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
     const world = this.world;
     const sw = saved.world;
     if (!!sw !== !!world) throw new Error(sw ? "save: a one-world save, and this game is on one map" : "save: a save of a game on one map, and this game is one world");
@@ -1059,12 +1032,10 @@ export class Game {
     this.#regrowClock = p.regrowClock;
     if (p.rng !== null && "state" in this.#rng) (this.#rng as Rng).state = p.rng;
     if (p.regrowRng !== null && this.#regrowRng) this.#regrowRng.state = p.regrowRng;
-    // The grids and bands as the save's last tick built them (GameSave.grids); a version-4 save builds them afresh.
+    // The grids and bands as the save's last tick built them (GameSave.grids), never built again from the living.
     const grids = saved.grids;
-    if (grids) {
-      if (grids.counts.length !== this.layers.length || grids.bands.length !== this.layers.length || grids.counts.some((gs) => gs.length !== this.colonies.length)) throw new Error("save: its grids are another game's");
-      this.#grids.forEach((gs, l) => gs.forEach((g, k) => g.loadState((grids.counts[l] as number[][])[k] as number[])));
-      this.#recs.forEach((r, l) => r.loadBands(grids.bands[l] as BandsSave));
-    } else this.#refresh();
+    if (grids.counts.length !== this.layers.length || grids.bands.length !== this.layers.length || grids.counts.some((gs) => gs.length !== this.colonies.length)) throw new Error("save: its grids are another game's");
+    this.#grids.forEach((gs, l) => gs.forEach((g, k) => g.loadState((grids.counts[l] as number[][])[k] as number[])));
+    this.#recs.forEach((r, l) => r.loadBands(grids.bands[l] as BandsSave));
   }
 }
