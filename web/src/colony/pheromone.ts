@@ -127,7 +127,8 @@ export class Pheromones {
 
   /** Add to integer cell (cx, cy). */
   depositCell(channel: Channel, cx: number, cy: number, amount: number): void {
-    if (cx < 0 || cy < 0 || cx >= this.map.size.w || cy >= this.map.size.h) return;
+    const { map } = this;
+    if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return;
     const f = this.fields[channel];
     f.set(cx, cy, Math.min(this.params[channel].max ?? MAX_LEVEL, f.get(cx, cy) + amount));
     this.#awake[channel].add(chunkKey(cx >> CHUNK_BITS, cy >> CHUNK_BITS));
@@ -138,7 +139,8 @@ export class Pheromones {
     cellOf(x, y);
     const cx = CELL[0] as number;
     const cy = CELL[1] as number;
-    if (cx < 0 || cy < 0 || cx >= this.map.size.w || cy >= this.map.size.h) return -1;
+    const { map } = this;
+    if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return -1;
     return this.fields[channel].get(cx, cy);
   }
 
@@ -192,7 +194,8 @@ export class Pheromones {
     if (awake.size === 0) return;
     const layer = this.fields[ch];
     const map = this.map;
-    const maxCx = (map.size.w - 1) >> CHUNK_BITS;
+    const minCx = map.x0 >> CHUNK_BITS;
+    const maxCx = (map.x0 + map.size.w - 1) >> CHUNK_BITS;
     const maxCy = (map.size.h - 1) >> CHUNK_BITS;
     const keep = Math.max(0, 1 - this.params[ch].evaporation * dt);
     const k = Math.min(0.25, this.params[ch].diffusion * dt);
@@ -222,12 +225,12 @@ export class Pheromones {
           awake.add(nk);
           fed.add(nk);
         };
-        if (w > SLEEP && cx > 0) wake(cx - 1, cy);
+        if (w > SLEEP && cx > minCx) wake(cx - 1, cy);
         if (e > SLEEP && cx < maxCx) wake(cx + 1, cy);
         if (n > SLEEP && cy > 0) wake(cx, cy - 1);
         if (s > SLEEP && cy < maxCy) wake(cx, cy + 1);
         // The two corners that touch a diagonal chunk (odd rows sit half a cell right).
-        if ((a[0] as number) > SLEEP && cx > 0 && cy > 0) wake(cx - 1, cy - 1);
+        if ((a[0] as number) > SLEEP && cx > minCx && cy > 0) wake(cx - 1, cy - 1);
         if ((a[(EDGE << CHUNK_BITS) | EDGE] as number) > SLEEP && cx < maxCx && cy < maxCy) wake(cx + 1, cy + 1);
       }
     }

@@ -1,11 +1,11 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { CHUNK } from "../colony/chunks.ts";
-import { type Colony, moundRadius } from "../colony/colony.ts";
+import { type Colony, keyX, keyY, moundRadius } from "../colony/colony.ts";
 import { CELL, cellOf, centreX, centreY, R, SIDE } from "../colony/hex.ts";
 import { INFECTED, type Fungus } from "../colony/fungus.ts";
 import { BINS, binOf } from "../colony/recognition.ts";
 import { AIR, SOIL, worldExtent } from "../colony/world.ts";
-import { type Camera, clamp, fit, fitZoom, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
+import { type Camera, clamp, fit, fitZoom, fromMinimap, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
@@ -62,6 +62,8 @@ const HEX_ZOOM = 12;
 const CLICK_SLOP_PX = 8;
 /** A click picks the nearest ant within this many CSS px. */
 const PICK_PX = 14;
+/** No chunk column: drawHexes' "none yet" (−1 is a real chunk column on one world's curtain). */
+const NO_CHUNK = -0x80000000;
 
 interface ChunkCanvas {
   canvas: HTMLCanvasElement;
@@ -107,8 +109,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     followCb.current = onFollow;
   }, [onFollow]);
 
-  // The map's size in world units (hexagon rows are R apart): what the camera fits and clamps to.
-  const world = useMemo(() => worldExtent(colony.map), [colony]);
+  // The map's extent in world units (hexagon rows are R apart), from its first column (x0: one world's curtain starts below 0): what the camera fits and clamps to.
+  const world = useMemo(() => ({ x0: colony.map.x0, ...worldExtent(colony.map) }), [colony]);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture>(NO_GESTURE);
 
@@ -121,6 +123,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     fitted.current = true;
     const ctx = canvas.getContext("2d")!;
     const { w: gw, h: gh } = colony.map.size;
+    // The map's first column: its columns run gx0 … gx0 + gw − 1 (gx0 < 0 on one world's curtain, whose column is the line's s).
+    const gx0 = colony.map.x0;
     const chunks = new Map<string, ChunkCanvas>();
     const chunkCanvas = (cx: number, cy: number): ChunkCanvas => {
       const key = `${cx},${cy}`;
@@ -206,7 +210,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         for (let lx = 0; lx < CHUNK; lx++) {
           const i = ly * CHUNK + lx;
           const o = i * 4;
-          if (x0 + lx >= gw || y0 + ly >= gh) {
+          if (x0 + lx < gx0 || x0 + lx >= gx0 + gw || y0 + ly >= gh) {
             px[o + 3] = 0; // past the edge of the map
             continue;
           }
@@ -276,10 +280,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       const food: [number, number, number] = rgb(theme.accent);
       for (let my = 0; my < mini.height; my++)
         for (let mx = 0; mx < mini.width; mx++) {
-          cellOf(mx * 2 + 1, my * 2 + 1);
+          cellOf(gx0 + mx * 2 + 1, my * 2 + 1);
           const x = CELL[0] as number;
           const y = CELL[1] as number;
-          const off = x < 0 || y < 0 || x >= gw || y >= gh;
+          const off = x < gx0 || y < 0 || x >= gx0 + gw || y >= gh;
           const t = off ? 1 : colony.map.rock.get(x, y);
           const fv = off ? 0 : colony.map.food.get(x, y);
           const o = (my * mini.width + mx) * 4;
@@ -294,7 +298,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         const tone = k === 0 ? theme.inkRgb : k === 1 ? theme.warnRgb : col.nestOdour < 0.5 ? theme.inkRgb : theme.warnRgb;
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i]) continue;
-          const mx = Math.floor((col.x[i] as number) / 2);
+          const mx = Math.floor(((col.x[i] as number) - gx0) / 2);
           const my = Math.floor((col.y[i] as number) / 2);
           if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
           const o = (my * mini.width + mx) * 4;
@@ -317,8 +321,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       const bg = colony.map.hasSoil ? theme.soil : theme.paperRgb;
       const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
       ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
-      const [ax, ay] = toScreen(c, v, 0, 0);
-      const [bx, by] = toScreen(c, v, world.w, world.h);
+      const [ax, ay] = toScreen(c, v, gx0, 0);
+      const [bx, by] = toScreen(c, v, gx0 + world.w, world.h);
       ctx.fillRect(ax, ay, bx - ax, by - ay);
       paths.clear();
       const k = SIDE * c.zoom * 1.04; // a hair over, so neighbours meet without seams
@@ -332,7 +336,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         const ly = y & 63;
         const sy = (y + 0.5) * R * c.zoom + oy;
         const shift = 0.5 + 0.5 * (y & 1);
-        let chunkX = -1;
+        let chunkX = NO_CHUNK; // a chunk column can be −1 (one world's curtain): none is a value no chunk takes
         let data: Uint8ClampedArray | null = null;
         for (let x = rx0; x <= rx1; x++) {
           if (x >> 6 !== chunkX) {
@@ -391,8 +395,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       const vis = visible(c, v);
       const ry0 = Math.max(0, Math.floor(vis.y0 / R) - 1);
       const ry1 = Math.min(gh - 1, Math.ceil(vis.y1 / R) + 1);
-      const rx0 = Math.max(0, Math.floor(vis.x0) - 1);
-      const rx1 = Math.min(gw - 1, Math.ceil(vis.x1) + 1);
+      const rx0 = Math.max(gx0, Math.floor(vis.x0) - 1);
+      const rx1 = Math.min(gx0 + gw - 1, Math.ceil(vis.x1) + 1);
       const hexes = c.zoom >= HEX_ZOOM * d;
       for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
         for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
@@ -506,8 +510,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         }
         // The midden keeps a count per cell: one cross a cell, larger the more lie there.
         for (const [key, n] of col.midden) {
-          const mx = key % 65536;
-          const my = Math.floor(key / 65536);
+          const mx = keyX(key);
+          const my = keyY(key);
           const wx = centreX(mx, my);
           const wy = centreY(my);
           if (!inView(wx, wy)) continue;
@@ -680,9 +684,9 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         const s = r.w / world.w;
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 1.5 * d;
-        const x0 = Math.max(0, vis.x0);
+        const x0 = Math.max(gx0, vis.x0);
         const y0 = Math.max(0, vis.y0);
-        ctx.strokeRect(r.x + x0 * s, r.y + y0 * s, (Math.min(world.w, vis.x1) - x0) * s, (Math.min(world.h, vis.y1) - y0) * s);
+        ctx.strokeRect(r.x + (x0 - gx0) * s, r.y + y0 * s, (Math.min(gx0 + world.w, vis.x1) - x0) * s, (Math.min(world.h, vis.y1) - y0) * s);
       }
     };
     const off = onFrame(draw);
@@ -754,9 +758,9 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     return x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h;
   };
   const jumpMini = (x: number, y: number) => {
-    const r = minimapRect(world, view(), dpr());
     if (follow.current) unfollow();
-    setCamera({ ...camera(), x: ((x - r.x) / r.w) * world.w, y: ((y - r.y) / r.h) * world.h });
+    const [wx, wy] = fromMinimap(world, view(), dpr(), x, y);
+    setCamera({ ...camera(), x: wx, y: wy });
   };
   /** The nearest ant (either colony) within PICK_PX of the point, or null. */
   const pick = (x: number, y: number): Followed | null => {

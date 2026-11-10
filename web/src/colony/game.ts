@@ -6,7 +6,7 @@ import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
-import { foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { cellOf, CELL } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -497,32 +497,35 @@ export class Game {
       cellOf(n.entrance.x, n.entrance.y);
       return [CELL[0] as number];
     });
+    const { x0 } = this.map;
     const w = this.map.size.w;
     for (let d = 0; d < w; d++)
       for (const c of d === 0 ? [col] : [col + d, col - d])
-        if (c >= HOLE_GAP && c < w - HOLE_GAP && taken.every((t) => Math.abs(t - c) >= HOLE_GAP)) return c;
+        if (c >= x0 + HOLE_GAP && c < x0 + w - HOLE_GAP && taken.every((t) => Math.abs(t - c) >= HOLE_GAP)) return c;
     throw new Error("addColony: no room for another hole");
   }
 
   /** The spot nearest (x, y) along x at least NEST_GAP from every nest (top-down): as #freeColumn, for nests' discs. */
   #freeSpot(x: number, y: number): { x: number; y: number } {
     const { w } = this.map.size;
+    const { x0 } = this.map;
     const clear = (cx: number) => this.map.nests.every((n) => Math.hypot(n.x - cx, n.y - y) >= NEST_GAP);
     for (let d = 0; d < w; d += 1)
-      for (const cx of d === 0 ? [x] : [x + d, x - d]) if (cx >= NEST_GAP && cx <= w - NEST_GAP && clear(cx)) return { x: cx, y };
+      for (const cx of d === 0 ? [x] : [x + d, x - d]) if (cx >= x0 + NEST_GAP && cx <= x0 + w - NEST_GAP && clear(cx)) return { x: cx, y };
     throw new Error("addColony: no room for another nest");
   }
 
   /** The ground's food piles now (as the world began): cells with food, on the walkway in the side view, anywhere top-down. */
   #notePiles(): void {
     const { w, h } = this.map.size;
+    const { x0 } = this.map;
     const cells: number[] = [];
     const full: number[] = [];
     for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
+      for (let x = x0; x < x0 + w; x++) {
         const v = this.map.food.get(x, y);
         if (v > 0 && (!this.map.sky || isSky(this.map, x, y))) {
-          cells.push(y * w + x);
+          cells.push(y * w + x - x0);
           full.push(v);
         }
       }
@@ -539,11 +542,13 @@ export class Game {
     const owed = this.#regrowClock;
     this.#regrowClock = 0;
     const { w } = this.map.size;
+    const { x0 } = this.map;
     const rate = owed / this.params.regrow;
     for (let k = 0; k < piles.cells.length; k++) {
       const c = piles.cells[k] as number;
-      const x = c % w;
-      const y = (c - x) / w;
+      const col = c % w;
+      const y = (c - col) / w;
+      const x = col + x0;
       const v = this.map.food.get(x, y);
       const short = (piles.full[k] as number) - v;
       if (short < 1 || rockAt(this.map, x, y)) continue; // full, or built over (a mound)
@@ -613,15 +618,16 @@ export class Game {
       const nest = (c.layers[l] as Layer).nest;
       rec.look(c.nestOdour, rec.params.tolerance);
       const { w, h } = m.size;
+      const { x0 } = m;
       const r = this.params.nestWatch;
       for (let y = Math.max(0, Math.floor((nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((nest.y + r) / R)); y++)
-        for (let x = Math.max(0, Math.floor(nest.x - r - 1)); x <= Math.min(w - 1, Math.ceil(nest.x + r)); x++)
+        for (let x = Math.max(x0, Math.floor(nest.x - r - 1)); x <= Math.min(x0 + w - 1, Math.ceil(nest.x + r)); x++)
           if (Math.hypot(centreX(x, y) - nest.x, centreY(y) - nest.y) <= r) s += rec.get(x, y);
       // The side view: the entrance too (it is above the chamber, out of that watch), unless the two overlap.
       const en = nest.entrance;
       if (en && Math.hypot(en.x - nest.x, en.y - nest.y) > r)
         for (let y = Math.max(0, Math.floor((en.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((en.y + r) / R)); y++)
-          for (let x = Math.max(0, Math.floor(en.x - r - 1)); x <= Math.min(w - 1, Math.ceil(en.x + r)); x++)
+          for (let x = Math.max(x0, Math.floor(en.x - r - 1)); x <= Math.min(x0 + w - 1, Math.ceil(en.x + r)); x++)
             if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - nest.x, centreY(y) - nest.y) > r) s += rec.get(x, y);
     });
     return s;
@@ -684,7 +690,7 @@ export class Game {
     const one = this.layers.length === 1;
     // Each ant meets the ants on its own layer: its grids and map.
     let l = 0;
-    let size = (this.layers[0] as WorldMap).size;
+    let map = this.layers[0] as WorldMap;
     let gap = 0;
     for (let a = 0; a < live.length; a++)
       for (let b = a + 1; b < live.length; b++) gap = Math.max(gap, Math.abs((this.colonies[live[a] as number] as Colony).nestOdour - (this.colonies[live[b] as number] as Colony).nestOdour));
@@ -697,21 +703,24 @@ export class Game {
           if (!c.alive[i]) continue;
           living++;
           const o = c.odour[i] as number;
-          let cx = -1;
-          let cy = -1;
+          // Its cell, once an ally is in question (a column can be negative: one world's curtain).
+          let placed = false;
+          let cx = 0;
+          let cy = 0;
           for (const d of live) {
             if (d === k) continue;
             if (Math.abs(o - (this.colonies[d] as Colony).nestOdour) > tol) continue;
-            if (cx < 0) {
+            if (!placed) {
+              placed = true;
               c.antCell(i);
               if (!one) {
                 l = c.layer[i] as number;
-                size = (this.layers[l] as WorldMap).size;
+                map = this.layers[l] as WorldMap;
               }
-              cx = Math.min(size.w - 1, Math.max(0, CELL[0] as number));
-              cy = Math.min(size.h - 1, Math.max(0, CELL[1] as number));
+              cx = clampCol(map, CELL[0] as number);
+              cy = Math.min(map.size.h - 1, Math.max(0, CELL[1] as number));
             }
-            if (around((this.#grids[l] as CountGrid[])[d] as CountGrid, size, cx, cy, 1) > 0) {
+            if (around((this.#grids[l] as CountGrid[])[d] as CountGrid, map, cx, cy, 1) > 0) {
               allied++;
               break;
             }

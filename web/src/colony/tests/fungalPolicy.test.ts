@@ -245,7 +245,7 @@ test("cull bites from a high load: at 0.7 its own nestmates already take it for 
     rec.step([c], 0.1);
     rec.build([c]);
     rec.look(c.odour[1] as number, rec.params.tolerance);
-    assert.ok(rec.around(20, 6, 40, 12) >= 1, `load ${l}: odour ${(c.odour[0] as number).toFixed(3)} is a stranger's`);
+    assert.ok(rec.around(20, 6, { x0: 0, size: { w: 40, h: 12 } }) >= 1, `load ${l}: odour ${(c.odour[0] as number).toFixed(3)} is a stranger's`);
   }
 });
 

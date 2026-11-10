@@ -11,9 +11,9 @@
 //   row  CRUST                  the crust, the curtain's row 0: solid except at a hole, the only way between the layers
 //   below it, CURTAIN_DEPTH rows of soil, stones and a few cavities, as the side view's ground.
 //
-// The curtain's storage column is s − line.sMin (colOf). Its terrain depends on s and the row, never on the storage
-// column, so the ground under a column keeps its stones and cavities when the line grows (U4); growing at V₀ lowers
-// sMin, and U4 shifts the storage to match.
+// The curtain's column is the line's s itself: its map starts at x0 = line.sMin (world.ts WorldMap.x0), which is
+// negative once the line has a margin before V₀. Its terrain depends on s and the row, so the ground under a column
+// keeps its stones and cavities when the line grows (U4), and growing at V₀ only lowers x0: nothing is renumbered.
 
 import { ChunkLayer } from "./chunks.ts";
 import { Chambers } from "./chambers.ts";
@@ -62,16 +62,6 @@ export interface OneWorld {
   line: Transect;
 }
 
-/** The curtain's storage column for line column s. */
-export function colOf(line: Transect, s: number): number {
-  return s - line.sMin;
-}
-
-/** The line column s of the curtain's storage column `col`. */
-export function sOf(line: Transect, col: number): number {
-  return col + line.sMin;
-}
-
 /**
  * A one-world map from a seed: the plane is `generateWorld(seed, OPEN_WORLD)` (with `plane` overriding options, e.g. a
  * smaller size for tests); its nests' holes, in order, make the line (Ink at V₀, Amber at V₁); the curtain is dug under
@@ -110,6 +100,7 @@ const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
 export function generateCurtain(seed: number, plane: WorldMap, line: Transect, colonies: readonly number[] = line.holes.map((_, k) => k)): WorldMap {
   if (colonies.length !== line.holes.length || [...colonies].sort((a, b) => a - b).some((c, i) => c !== i)) throw new Error(`generateCurtain: colonies ${colonies.join(", ")} must number the ${line.holes.length} holes 0…${line.holes.length - 1}`);
   const w = line.sMax - line.sMin + 1;
+  const x0 = line.sMin;
   const h = CRUST + CURTAIN_DEPTH;
   const size = { w, h };
   const cut = rockCut(SIDE_WORLD.rockiness);
@@ -119,12 +110,12 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
   // Above the strip, sky; the strip is written by refreshStrip, below.
   rock.fill(AIR, 0, STRIP * w);
   for (let y = CRUST; y < h; y++)
-    for (let col = 0; col < w; col++)
-      // The side view's ground, by the line's column s and the row (not the storage column), below the crust.
-      rock[y * w + col] = groundCell(gs, y - CRUST, centreX(sOf(line, col), y), centreY(y), cut, scut);
-  const curtain = worldFromArrays(size, [{ x: 0, y: 0, r: 3 }], { rock, seed });
+    for (let s = x0; s < x0 + w; s++)
+      // The side view's ground, by the line's column s and the row, below the crust.
+      rock[y * w + s - x0] = groundCell(gs, y - CRUST, centreX(s, y), centreY(y), cut, scut);
+  const curtain = worldFromArrays(size, [{ x: 0, y: 0, r: 3 }], { rock, seed, x0 });
   curtain.sky = new ChunkLayer((n) => new Uint8Array(n), 0);
-  for (let y = 0; y < CRUST; y++) for (let col = 0; col < w; col++) curtain.sky.set(col, y, 1);
+  for (let y = 0; y < CRUST; y++) for (let s = x0; s < x0 + w; s++) curtain.sky.set(s, y, 1);
   curtain.surfaceRows = CRUST;
   curtain.loose = new ChunkLayer((n) => new Uint8Array(n), 0);
   curtain.moundCells = 0;
@@ -141,7 +132,7 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
   for (let c = 0; c < colonies.length; c++) {
     const k = colonies.indexOf(c);
     const hole = line.holes[k]!;
-    nests[c] = foundNest(curtain, colOf(line, line.sHole[k]!), c, mulberry32(hash4(seed, 81, hole.x, hole.y)));
+    nests[c] = foundNest(curtain, line.sHole[k]!, c, mulberry32(hash4(seed, 81, hole.x, hole.y)));
   }
   curtain.nest = nests[0]!;
   curtain.nests = nests;
@@ -157,7 +148,7 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
       const at = () => {
         const row = by * 64 + Math.floor(r() * 64);
         const s = bs * 64 + Math.floor(r() * 64);
-        return row >= h - 3 || row < CRUST + 10 ? null : ([colOf(line, s), row] as const);
+        return row >= h - 3 || row < CRUST + 10 ? null : ([s, row] as const);
       };
       buryPockets(curtain, SIDE_WORLD, r, at, () => CRUST + 4, nearNest);
     }
@@ -174,12 +165,11 @@ export function generateCurtain(seed: number, plane: WorldMap, line: Transect, c
  */
 export function refreshStrip(curtain: WorldMap, plane: WorldMap, line: Transect): void {
   for (let s = line.sMin; s <= line.sMax; s++) {
-    const col = colOf(line, s);
     cellAt(line, s);
     const px = CELL[0]!;
     const py = CELL[1]!;
     const t = rockAt(plane, px, py);
-    curtain.rock.set(col, STRIP, t === OPEN ? OPEN : ROCK);
-    curtain.food.set(col, STRIP, t === OPEN ? plane.food.get(px, py) : 0);
+    curtain.rock.set(s, STRIP, t === OPEN ? OPEN : ROCK);
+    curtain.food.set(s, STRIP, t === OPEN ? plane.food.get(px, py) : 0);
   }
 }
