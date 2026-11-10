@@ -187,9 +187,9 @@ function curtainColumn(curtain: WorldMap, seed: number, s: number): void {
  * widens to the new line's columns (its x0 falls when it grows at V₀; nothing is renumbered). Its new columns get the
  * curtain's ground by (seed, s, row), sky, and the buried food of their 64-column blocks; the old columns keep their dug
  * state, rock and food. The strip is copied again wherever P(s) changed (the old end's margin now lies under the new
- * segment). The new nest is dug on both layers, as generateOneWorld digs the world's own: a disc round the hole on the
- * plane, a shaft and royal chamber from its hole in the curtain from the stream keyed by the hole, before the new
- * columns' food, which keeps its distance from every nest. Only food a colony can reach in the new columns is kept and
+ * segment). The new nest goes on both layers: on the plane a nest of radius 3 round the hole, where nothing is dug (the
+ * plane has no soil, and the founding rule put the hole on open ground joined to the main open ground: mainGround); in
+ * the curtain a shaft and royal chamber dug from its hole, from the stream keyed by the hole, before the new columns' food, which keeps its distance from every nest. Only food a colony can reach in the new columns is kept and
  * counted (foodTotal and foodLeft grow by it). Returns the new nest's index in both maps' nests.
  */
 export function growWorld(world: OneWorld, end: End, cell: Cell): number {
@@ -228,6 +228,28 @@ export function growWorld(world: OneWorld, end: End, cell: Cell): number {
   curtain.foodTotal += added;
   curtain.foodLeft += added;
   return k;
+}
+
+/**
+ * Where a founding's hole may go on the plane (one-world §3 rule 4, owner 2026-11-10, PR #62 review D1): open ground
+ * joined to the plane's main open ground, the region the world's holes share, so a founded colony can walk the surface
+ * to the rest of the world. A queen who lands in a pocket closed in by rock walks on, within FOUND_RADIUS, to ground
+ * that joins it (Game.addColony's nearestValid), as a real queen walks after landing to find a site. One reachability
+ * pass over the plane from every hole on the line, per founding (~14 ms on the default plane; founding is rare). Every hole
+ * is in that region (the generated nests share one, the largest, on seeds 1–300; a founding joins it), so any hole would
+ * do as the start; starting from all of them keeps it so if that ever failed. Plane rock never changes (OPEN_WORLD has
+ * no soil to dig), so the region could be cached per world; it isn't, since a pass per founding costs nothing that matters.
+ */
+export function mainGround(world: OneWorld): (x: number, y: number) => boolean {
+  const { plane, line } = world;
+  const reach = reachableFrom(
+    plane,
+    line.holes.map((v) => ({ x: centreX(v.x, v.y), y: centreY(v.y) })),
+    "open",
+  );
+  const { x0 } = plane;
+  const { w, h } = plane.size;
+  return (x, y) => x >= x0 && y >= 0 && x < x0 + w && y < h && reach[y * w + x - x0] === 1;
 }
 
 /**

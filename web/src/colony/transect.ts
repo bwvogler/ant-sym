@@ -280,7 +280,8 @@ function fold(t: Transect, end: End, vx: number, vy: number, nx: number, ny: num
  *     clearance) neither it nor its margin to come crosses the line or comes within the clearance of it, the far end's
  *     margin included;
  *  3. `p` is at least HOLE_GAP_2D from every hole;
- *  4. `p` is open ground (`open`, e.g. world.ts's openCell(map)).
+ *  4. `p` is open ground (`open`): in a game, the plane's main open ground (oneWorld.ts mainGround: the open region
+ *     the world's holes share, not a pocket closed in by rock; owner, 2026-11-10, PR #62 review D1).
  * They are checked 1, 3, 4, 2: the cheap ones first, and a spot crowding a hole is refused for that ("hole-gap"), not
  * for the turn its nearness makes.
  */

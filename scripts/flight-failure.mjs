@@ -11,18 +11,24 @@
 // plane changes size (the endless world, ja-qpv, removes the edges that drive most failures at radius 70).
 //
 // --rock (measured 2026-11-10, seeds 1–20): flight 140 fails 53%/56% from end/interior nests at radius 70, 8%/27% at
-// 140, 0%/6% at 210; flight 210, 76%/69% and 44%/45%.
+// 140, 0%/6% at 210; flight 210, 76%/69% and 44%/45%. With rule 4 as the main open ground (D1, below; 2026-11-10):
+// flight 140 fails 49%/56% at radius 70, 8%/28% at 140, 0%/7% at 210; flight 210, 77%/69% and 43%/45%.
 // --rock: the founding-radius assay one-world §8 item 5 asks for (U4a): each seed's own plane, generateWorld(seed,
-// OPEN_WORLD) as one world's is, with its rock (open = openCell(plane), the plane's edge included), and the line through
-// its two nests' holes, as generateOneWorld makes it. Default seeds 1–20.
+// OPEN_WORLD) as one world's is, with its rock, and the line through its two nests' holes, as generateOneWorld makes it.
+// Rule 4's open ground is the game's (oneWorld.ts mainGround; owner, 2026-11-10, PR #62 review D1): open cells joined to
+// the open region the nests' holes share, not a pocket sealed off by rock (the plane's edge included). Found once a
+// seed from its two holes: every founding joins that region, so it is the same from any later line. --any-open: any
+// open cell (openCell(plane)), the rule before D1. Default seeds 1–20.
 //
-// Usage: node scripts/flight-failure.mjs [--rock] [seeds=300 (20 with --rock)] [width=512] [height=368]
+// Usage: node scripts/flight-failure.mjs [--rock [--any-open]] [seeds=300 (20 with --rock)] [width=512] [height=368]
 import { CELL, cellOf, centreX, centreY } from "../web/src/colony/hex.ts";
 import { grow, makeTransect, nearestValid } from "../web/src/colony/transect.ts";
+import { mainGround } from "../web/src/colony/oneWorld.ts";
 import { generateWorld, mulberry32, OPEN_WORLD, openCell } from "../web/src/colony/world.ts";
 
 const rock = process.argv.includes("--rock");
-const args = process.argv.slice(2).filter((a) => a !== "--rock").map(Number);
+const anyOpen = process.argv.includes("--any-open");
+const args = process.argv.slice(2).filter((a) => !a.startsWith("--")).map(Number);
 const [seeds = rock ? 20 : 300, W = 512, H = 368] = args;
 const box = (x, y) => x >= 4 && y >= 4 && x < W - 4 && y < H - 4;
 let open = box;
@@ -31,13 +37,14 @@ let open = box;
 function start(seed) {
   if (!rock) return makeTransect([{ x: mid.x - 70, y: mid.y }, { x: mid.x + 70, y: mid.y }]);
   const plane = generateWorld(seed, { ...OPEN_WORLD, size: { w: W, h: H } });
-  open = openCell(plane);
-  return makeTransect(
+  const line = makeTransect(
     plane.nests.map((n) => {
       cellOf(n.x, n.y);
       return { x: CELL[0], y: CELL[1] };
     }),
   );
+  open = anyOpen ? openCell(plane) : mainGround({ seed, plane, curtain: plane, line });
+  return line;
 }
 
 function fly(t, from, rng, dist, radius) {

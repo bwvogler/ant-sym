@@ -1,12 +1,12 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer, type Policy, type StancePolicy } from "./colony.ts";
-import { growWorld, type OneWorld } from "./oneWorld.ts";
+import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
-import { clampCol, foundNest, isSky, mulberry32, openCell, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type End, nearestValid, outward } from "./transect.ts";
 import { cellOf, CELL } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
@@ -472,7 +472,8 @@ export class Game {
    * A new colony mid-game (ja-lo8.8; a daughter queen's, ja-lo8.9): in the side view a hole dug in the column under x
    * with a shaft and a founding chamber, as the world's own nests are dug (world.foundNest); top-down a nest's disc at
    * (x, y). In one world (U4a, docs/one-world.md §3) (x, y) is a point on the plane: the hole goes at the nearest cell
-   * within FOUND_RADIUS where the founding rule allows one (transect.ts nearestValid), the world grows there (oneWorld.ts
+   * within FOUND_RADIUS where the founding rule allows one (transect.ts nearestValid; on the plane's main open ground,
+   * oneWorld.ts mainGround), the world grows there (oneWorld.ts
    * growWorld: the line, the curtain, the nest on both layers), and the colony lives in the curtain with its plane above;
    * none there throws an error saying "no room" (NO_ROOM), as the side view's does. It starts with `antCount` workers
    * (in one world in the curtain, as every colony's do) and, in the side view and one world, its queen, at odour `odour`
@@ -488,7 +489,8 @@ export class Game {
       // A save's re-founding (f.nest) is U4b's, with one-world saves.
       if (f.nest) throw new Error(ONE_WORLD_U4);
       cellOf(f.x, f.y);
-      const spot = nearestValid(world.line, { x: CELL[0] as number, y: CELL[1] as number }, FOUND_RADIUS, openCell(world.plane));
+      // Rule 4's open ground is the plane's main open ground (mainGround): never a pocket sealed off by rock (D1, #62).
+      const spot = nearestValid(world.line, { x: CELL[0] as number, y: CELL[1] as number }, FOUND_RADIUS, mainGround(world));
       if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
       const was = { x0: world.curtain.x0, w: world.curtain.size.w };
       at = growWorld(world, spot.end, spot.cell);

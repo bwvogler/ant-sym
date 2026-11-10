@@ -7,7 +7,7 @@ import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { CRUST, generateCurtain, generateOneWorld, growWorld, STRIP, type OneWorld } from "../oneWorld.ts";
 import type { Flight } from "../royal.ts";
 import { cellAt, nearestValid } from "../transect.ts";
-import { disc, mulberry32, openCell, OPEN, reachableFrom, ROCK, rockAt, type WorldMap } from "../world.ts";
+import { disc, mulberry32, openCell, OPEN, reachable, reachableFrom, ROCK, rockAt, type WorldMap } from "../world.ts";
 
 // Founding on the line (U4a, ja-lp4.4.1; docs/one-world.md §3): the world grows at an end, nothing already there moves,
 // and a queen with nowhere to land is lost with the reason. One world on the default plane, with its real rock.
@@ -66,6 +66,21 @@ function chamberCells(map: WorldMap, k: number): Set<number> {
   return out;
 }
 
+/**
+ * The plane's main open ground: the open cells joined to the world's own first nest (colony 0's), as a flat array.
+ * Kept per plane: plane rock never changes (it has no soil to dig).
+ */
+const mainRegions = new WeakMap<WorldMap, Uint8Array>();
+function mainRegion(plane: WorldMap): Uint8Array {
+  let r = mainRegions.get(plane);
+  if (!r) {
+    const n = plane.nests[0]!;
+    r = reachable(plane, n.x, n.y, "open");
+    mainRegions.set(plane, r);
+  }
+  return r;
+}
+
 /** The invariants after every founding (U4a's property tests). */
 function check(w: OneWorld, g: Game, label: string): void {
   const { plane, curtain, line } = w;
@@ -92,6 +107,10 @@ function check(w: OneWorld, g: Game, label: string): void {
     cellAt(line, s);
     if (curtain.rock.get(s, STRIP) !== (rockAt(plane, CELL[0]!, CELL[1]!) === OPEN ? OPEN : ROCK)) assert.fail(`${label}: the strip at column ${s} isn't P(s)'s ground`);
   }
+  // Every hole joins the plane's main open ground (D1, PR #62): the region the world's own first hole is in, so no
+  // colony is founded in a pocket sealed off by rock.
+  const main = mainRegion(plane);
+  for (const h of line.holes) assert.ok(main[h.y * plane.size.w + h.x - plane.x0], `${label}: the hole at plane cell (${h.x}, ${h.y}) is in a pocket off the main open ground`);
   // No two royal chambers share a cell.
   const all = curtain.nests.map((_, k) => chamberCells(curtain, k));
   for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) assert.ok(![...all[a]!].some((cell) => all[b]!.has(cell)), `${label}: nests ${a} and ${b}'s royal chambers merge`);
@@ -333,4 +352,20 @@ test("founding mid-game, 20 s in: every colony's way out (its out-field) is rebu
   assert.ok(rebuilt.size > 0, "some colony needed its way out, and rebuilt its out-field, in the 10 s after the founding");
   g.colonies.forEach((c, k) => assert.ok(!Game.beaten(c) && (c.population > 0 || c.queen?.alive), `colony ${k} lives`));
   check(w, g, "10 s after the founding");
+});
+
+test("a founding joins the plane's main open ground: on seed 19 the lab's founding beyond the start no longer lands in a 17-cell pocket sealed by rock (PR #62 review, D1)", () => {
+  const g = game(19, 2);
+  const w = g.world!;
+  const k = g.foundBeyond("start", 2);
+  const h = g.colonies[k]!.holeCells[g.colonies[k]!.params.nest]!;
+  const { plane } = w;
+  const main = mainRegion(plane);
+  assert.equal(main[h.py * plane.size.w + h.px - plane.x0], 1, `the hole at plane cell (${h.px}, ${h.py}) is on the main open ground`);
+  // The rule's spot moved: the old rule's (any open cell) was plane cell (100, 25), in a pocket of 17 cells.
+  assert.notDeepEqual([h.px, h.py], [100, 25]);
+  const own = reachable(plane, centreX(h.px, h.py), centreY(h.py), "open");
+  let cells = 0;
+  for (const c of own) cells += c;
+  assert.ok(cells > 100_000, `the new colony can walk ${cells} cells of the surface`);
 });
