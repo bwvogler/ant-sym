@@ -8,7 +8,7 @@ test("save records: a slot each, newest first, the game's own save inside, and a
   const store = memorySaves();
   const g = new Game(generateWorld(4, { ...OPEN_WORLD, size: { w: 120, h: 80 } }), { antCount: 30, rivalAnts: 30 }, mulberry32(4));
   for (let k = 0; k < 90; k++) g.tick(1 / 30);
-  const settings = { seed: 4, ground: "open" as const, antCount: 30, rival: true, generation: 0 };
+  const settings = { seed: 4, antCount: 30, rival: true, generation: 0 };
   const player = { aim: { id: "unite", text: "One colony." }, doctrines: [{ id: "forage", text: "Gather." }], menu: ["food"], hide: false, cull: false };
   await store.put({ ...record(AUTOSAVE, settings, player, g.save(), "2. a first host"), savedAt: 1000 });
   await store.put({ ...record(1, settings, player, g.save(), "3. spread"), savedAt: 2000 });
@@ -27,7 +27,7 @@ test("save records: a slot each, newest first, the game's own save inside, and a
 
 test("a save from another version is listed but never offered or loaded: Continue skips it (PR #42 review, B3)", () => {
   const g = new Game(generateWorld(4, { ...OPEN_WORLD, size: { w: 120, h: 80 } }), { antCount: 30, rivalAnts: 30 }, mulberry32(4));
-  const settings = { seed: 4, ground: "open" as const, antCount: 30, rival: true, generation: 0 };
+  const settings = { seed: 4, antCount: 30, rival: true, generation: 0 };
   const player = { aim: { id: "unite", text: "One colony." }, doctrines: [], menu: [], hide: false, cull: false };
   const ok = { ...record(1, settings, player, g.save(), "1. land"), savedAt: 1000 };
   const old = { ...record(AUTOSAVE, settings, player, { ...g.save(), version: 0 }, "3. spread"), savedAt: 2000 };

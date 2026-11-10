@@ -7,7 +7,6 @@ import { UPGRADES } from "../colony/evolution.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
-import { generateSideWorld, generateWorld, OPEN_WORLD } from "../colony/world.ts";
 import { generateOneWorld } from "../colony/oneWorld.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
@@ -33,20 +32,14 @@ export interface ColonyControls {
   cull: boolean;
   /** a rival colony at the map's second nest */
   rival: boolean;
-  /** the side view (a cross-section: sky, the ground line, the nest dug below), the open surface from above, or one world (both, docs/one-world.md) */
-  ground: Ground;
   /** one world's view: the plane from above, or the curtain below; a camera switch, not a new game (it is no build input) */
   view: View;
   /** the player pressed Start (the start screen, ja-lo8.5): every game from then on begins with the fungus landing */
   started: boolean;
 }
 
-export type Ground = "side" | "open" | "one";
 /** One world's two views (docs/one-world.md §5): "above" the plane, "below" the curtain under the line. */
 export type View = "above" | "below";
-
-/** Whether a game on this ground has nests underground (chambers, a queen): the side view and one world. */
-export const hasNests = (g: Ground): boolean => g !== "open";
 
 /** The game's default speed (owner, PRD §50: faster by default, every rate scaled together; no sim constant changes). */
 export const GAME_SPEED = 4;
@@ -57,7 +50,7 @@ export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 /** The colony the fungus lands by. */
 export const LANDING_COLONY = 0;
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, ground: "side", view: "above" };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, view: "above" };
 
 /** One colony's line in the panel. */
 export interface SideStats {
@@ -165,7 +158,8 @@ function side(c: Colony, fungus: Fungus): SideStats {
 
 /** A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load). */
 export function buildGame(s: GameSettings): Game {
-  const map = s.ground === "open" ? generateWorld(s.seed, OPEN_WORLD) : s.ground === "one" ? generateOneWorld(s.seed) : generateSideWorld(s.seed);
+  // The page plays one world only (owner, 2026-11-10; PRD §55): the side and open maps stay for the assays and scripts.
+  const map = generateOneWorld(s.seed);
   return new Game(map, { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false }, gameRng(s.seed, s.generation));
 }
 
@@ -180,10 +174,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const pending = useRef<SaveRecord | null>(null);
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
-    const build = () => buildGame({ seed: controls.seed, ground: controls.ground, antCount: controls.antCount, rival: controls.rival, generation });
+    const build = () => buildGame({ seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
     const g = build();
     const r = pending.current;
-    if (r && r.settings.seed === controls.seed && r.settings.ground === controls.ground && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
+    if (r && r.settings.seed === controls.seed && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
       pending.current = null;
       try {
         g.load(r.game);
@@ -198,7 +192,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     // `loads` rebuilds the game when a save has the same settings as the game now. `view` is not here: one world's two
     // views are one game.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controls.seed, controls.antCount, controls.rival, controls.ground, generation, loads]);
+  }, [controls.seed, controls.antCount, controls.rival, generation, loads]);
   const colony = game.player;
   // The player's policy settings outlive a game: apply them to every new one's fungus.
   useEffect(() => {
@@ -289,11 +283,11 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const loadSave = useCallback((r: SaveRecord) => {
     pending.current = r;
     setGeneration(r.settings.generation);
-    setControls((c) => ({ ...c, seed: r.settings.seed, ground: r.settings.ground, antCount: r.settings.antCount, rival: r.settings.rival, started: true, playing: true }));
+    setControls((c) => ({ ...c, seed: r.settings.seed, antCount: r.settings.antCount, rival: r.settings.rival, started: true, playing: true }));
     setLoads((n) => n + 1);
   }, []);
   /** What builds this game again (saves.ts). */
-  const settings: GameSettings = { seed: controls.seed, ground: controls.ground, antCount: controls.antCount, rival: controls.rival, generation };
+  const settings: GameSettings = { seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation };
 
   /** The start screen's Start: this seed, playing, the fungus lands. */
   const start = useCallback((seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })), []);

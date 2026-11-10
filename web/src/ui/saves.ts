@@ -1,6 +1,5 @@
 import { SAVE_VERSION, type GameSave } from "../colony/game.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
-import type { Ground } from "./useColony.ts";
 
 // Saved games (the fungus game, ja-lo8.6): a game is long (queen births are rare: PRD §50), so it is kept between
 // sittings. A record is the game's own save (Game.save) plus what the page needs to build the same game again (its
@@ -11,7 +10,6 @@ import type { Ground } from "./useColony.ts";
 /** What builds the same game again: useColony's game is made from these (and its Restart count). */
 export interface GameSettings {
   seed: number;
-  ground: Ground;
   antCount: number;
   rival: boolean;
   generation: number;

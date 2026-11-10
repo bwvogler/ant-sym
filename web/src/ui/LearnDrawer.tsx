@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MODES, TRAILS, HOMES, STANCES, type Colony, type Situation } from "../colony/colony.ts";
 import { DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, STANCE_CRITERIA, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
 import { AROUSALS, CARRYING, decodeFungal, PLACES, TASKS, TOUCHES, type FungalSituation } from "../colony/fungalPolicy.ts";
-import { INFECTED, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
+import { INFECTED, LEVERS } from "../colony/fungus.ts";
 import { decodeLevels, pulled, PRESETS } from "../colony/levers.ts";
 import { askedIn } from "../colony/fungusBrain.ts";
 import { LeverChips } from "./DetailsScreen.tsx";
@@ -52,9 +52,6 @@ interface Props {
   retune: string;
   /** the Pages build: no server, so Jev never runs here */
   demo: boolean;
-  /** the game has nests underground (the side view, one world): the Nest tab has one to show */
-  hasNests: boolean;
-  onSideView: () => void;
 }
 
 const TABS: [LearnTab, string][] = [
@@ -383,11 +380,6 @@ function followedSituation(colonies: readonly Colony[], f: Followed | null): { k
   return col ? { k: sideIndex(f), i: f.i, col, s: col.lastQuestion(f.i) } : null;
 }
 
-/** The menu as the fungus runs it on this map: the nest's levers only where there is a nest (Fungus.menu drops them). */
-function mapMenu(props: Props): string[] {
-  return props.menu.filter((id) => props.hasNests || !NEST_ONLY.has(id));
-}
-
 /** What the fungus senses in the followed ant, if it is infected. */
 function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: number; s: FungalSituation } | null {
   const fol = followedSituation(colonies, f);
@@ -459,7 +451,7 @@ function StanceExplainer() {
 function FungusExplainer(props: Props) {
   const fungal = followedFungal(props.colonies, props.followed);
   const [table, setTable] = useState(false);
-  const menu = new Set(mapMenu(props));
+  const menu = new Set(props.menu);
   return (
     <>
       <p className="text-[13px]">
@@ -548,7 +540,7 @@ function SentExplainer(props: Props) {
   const lanes: { name: string; sample: Sample; words: string; about: string; tokens: number }[] = [
     { name: "An ant's mode", sample: { lane: "mode", situation: fol?.s ?? SAMPLE_SITUATION }, words: doctrine, about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation", tokens: tokensPerQuestion("mode", doctrine) },
     { name: "The colony's stance", sample: { lane: "stance", situation: SAMPLE_STANCE }, words: doctrine, about: "a sample view", tokens: tokensPerQuestion("stance", doctrine) },
-    { name: "The fungus, in one host", sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(mapMenu(props)) }, words: props.aim.text, about: fungal ? `ant #${fungal.i}` : "a sample host", tokens: tokensPerQuestion("fungus", props.aim.text) },
+    { name: "The fungus, in one host", sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(props.menu) }, words: props.aim.text, about: fungal ? `ant #${fungal.i}` : "a sample host", tokens: tokensPerQuestion("fungus", props.aim.text) },
   ];
   return (
     <>
@@ -620,14 +612,9 @@ function NestTab(props: Props & { focus?: string }) {
           What an ant can sense
         </a>
       </p>
-      {!props.hasNests || views.every((v) => v === null) ? (
+      {views.every((v) => v === null) ? (
         <section className={card}>
-          <p className="text-[13px]">
-            The map seen from above has no nest to look into: each colony's nest is a disc around its hole. In the side view the ants dig shafts and chambers below the ground line, and the queen lays there.
-          </p>
-          <button type="button" className="mt-2 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:bg-accent-hover" onClick={props.onSideView}>
-            Switch to the side view
-          </button>
+          <p className="text-[13px]">No nest to look into: no colony has a nest underground.</p>
         </section>
       ) : (
         <>

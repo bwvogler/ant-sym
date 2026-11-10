@@ -9,7 +9,7 @@ import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import Help from "./Help.tsx";
 import { colonyName, colonyTone } from "./names.ts";
 import { seg } from "./styles.ts";
-import { MAX_SPEED, type ColonyControls, type ColonyStats, type Ground, type SideStats } from "./useColony.ts";
+import { MAX_SPEED, type ColonyControls, type ColonyStats, type SideStats } from "./useColony.ts";
 import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
@@ -208,7 +208,7 @@ function FungusNumbers({ stats }: Props) {
   );
 }
 
-function World({ game, controls, update, stats, restart, newWorld }: Props) {
+function World({ game, controls, update, restart, newWorld }: Props) {
   const { size } = game.map;
   return (
     <Card label="world" title="World">
@@ -230,34 +230,11 @@ function World({ game, controls, update, stats, restart, newWorld }: Props) {
           Restart
         </button>
       </div>
-      <p className="mt-2 text-xs text-fg-3">
-        {game.world ? (
-          <>
-            One world: the surface, {size.w}×{size.h} cells seen from above (rock, ground and {game.map.foodTotal.toLocaleString()} units of food), and the ground under the line through the holes, {game.world.curtain.size.w}×{game.world.curtain.size.h} cells unrolled below it, where the nests are dug. Above and below (v) are two views of one game. The queen lays eggs while there is food; larvae fed by nurses become new ants.
-          </>
-        ) : (
-          <>
-            {size.w}×{size.h} cells {controls.ground === "side" ? "seen from the side: sky, the ground line, soil and stones to dig," : "seen from above: rock, ground"} and {stats ? stats.foodTotal.toLocaleString() : "—"} units of food.{" "}
-            {controls.ground === "side" ? "The queen lays eggs while there is food; larvae fed by nurses become new ants." : "Every 4 food stored is a new ant."}
-          </>
-        )}
-      </p>
-      <div className="mt-2 flex items-center justify-between">
-        <span>Ground</span>
-        <div className="flex overflow-hidden rounded-md border border-line text-sm">
-          {(["side", "open", "one"] as Ground[]).map((g) => (
-            <button
-              key={g}
-              type="button"
-              className={seg(controls.ground === g)}
-              onClick={() => update({ ground: g })}
-              title={g === "side" ? "A cross-section: ants forage on the ground line, dig their nest below it and carry the soil up to a mound" : g === "open" ? "The open surface from above: rock and walkable ground" : "The surface and the ground under the line between the holes: one game, seen from above or below (v)"}
-            >
-              {g === "side" ? "side view" : g === "open" ? "from above" : "one world"}
-            </button>
-          ))}
-        </div>
-      </div>
+      {game.world && (
+        <p className="mt-2 text-xs text-fg-3">
+          One world: the surface, {size.w}×{size.h} cells seen from above (rock, ground and {game.map.foodTotal.toLocaleString()} units of food), and the ground under the line through the holes, {game.world.curtain.size.w}×{game.world.curtain.size.h} cells unrolled below it, where the nests are dug. Above and below (v) are two views of one game. The queen lays eggs while there is food; larvae fed by nurses become new ants.
+        </p>
+      )}
       <label className="mt-2 flex items-center justify-between">
         <span>Two colonies</span>
         <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />

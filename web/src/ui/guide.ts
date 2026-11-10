@@ -253,7 +253,7 @@ export const GUIDE: GuideEntry[] = [
     id: "one-world",
     title: "The line and the curtain",
     onScreen:
-      "One world (Details → Ground → one world) is one game seen two ways. Above: the surface from above, where ants forage, with the mound and the midden; a dashed line runs through the nests' holes, each named. Below: the ground under that line, unrolled flat, with every nest's shaft and chambers; the strip along its top is the surface under the line, with the ants standing on it, and a faint rule marks each bend of the line (“↱ 35°”). Click the line above to look below there, or the strip below to look above; a followed ant that goes through a hole takes the camera with it (Carry across).",
+      "The game is one world, seen two ways. Above: the surface from above, where ants forage, with the mound and the midden; a dashed line runs through the nests' holes, each named. Below: the ground under that line, unrolled flat, with every nest's shaft and chambers; the strip along its top is the surface under the line, with the ants standing on it, and a faint rule marks each bend of the line (“↱ 35°”). Click the line above to look below there, or the strip below to look above; a followed ant that goes through a hole takes the camera with it (Carry across).",
     realAnts:
       "A ground-nesting ant's nest is descending shafts with flat chambers off them (Tschinkel's “shish-kebab”), largest near the top: one vertical sheet keeps that shape. A founding queen flies, then walks to a nest site on foot, and most founding queens fail.",
     inGame:
@@ -284,7 +284,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "fungus-body", title: "The fungus's body", covers: "A mycelium off the host, spores paid from its mass, adapting in hosts; grooming triggered by sensing the pathogen." },
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
   { note: "entrances", title: "Entrances", covers: "How many entrances colonies keep, sealing them at night, and what a digger senses near the surface." },
-  { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views, above and below (Details → Ground → one world; the page’s default stays the side view until U6). The views are linked, and a one-world game opens above." },
+  { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views, above and below. The views are linked, and a one-world game opens above." },
   { note: "nest-spacing", title: "Nest spacing", covers: "How far apart colonies sit, where young colonies survive, and how far a founding queen flies." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];

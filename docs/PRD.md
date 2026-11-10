@@ -4395,3 +4395,12 @@ The longer legends cost a few per cent; the top-down stance lane is gone. The es
 - **The side view** keeps the strategist and raids by coordinates (`ja-1a9`; `ja-k4k.6` stays open for it).
 - **A fight-recruitment signal** (pavement ants' escalation): alarm already draws defenders.
 - **Brood need** as a raid cue (`ja-gkl`).
+
+## 55. The page plays one world only (ja-97n, 2026-11-10)
+
+The owner (2026-11-10) removed the side-view and top-down games from the page and made one world (§51) its only game, so Details has no Ground choice. This takes the page switch out of U6b (`ja-lp4.6.2`), whose leave and raid assays and final baselines are still open. Only the UI changed:
+
+- `buildGame` always builds `generateOneWorld(seed)`. `ColonyControls`, the saved settings (`GameSettings`) and `hasNests` no longer carry a ground. Saves made before this change will not load into the same world; there is no migration, because nobody plays yet.
+- The Nest tab, the fungus panel's nest upgrades and the notices no longer check whether the map has nests. The Nest tab's "Switch to the side view" empty state is gone.
+- The simulation keeps its side and open maps (`generateSideWorld`, `generateWorld`): the assays, golden masters, benches and lab scripts still use them. Every golden master is bit-exact.
+- Cost: no legend, question or schema changed. The page's game is now one world, whose cost `node scripts/colony-cost.mjs --one` estimates.
