@@ -12,6 +12,7 @@
     "typecheck": "npm --prefix web run typecheck",
     "colony-bench": "node scripts/colony-bench.mjs",
     "colony-cost": "node scripts/colony-cost.mjs",
-    "exp": "node scripts/experiment.mjs"
+    "exp": "node scripts/experiment.mjs",
+    "e2e": "node scripts/e2e-one-world.mjs"
   }
 }

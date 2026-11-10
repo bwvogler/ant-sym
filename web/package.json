@@ -10,7 +10,8 @@
     "typecheck": "tsc -b",
     "test": "node --test --test-timeout=60000 server/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/*.test.ts",
     "preview": "vite preview",
-    "test:slow": "node --test --test-timeout=1200000 src/colony/tests/slow/*.test.ts"
+    "test:slow": "node --test --test-timeout=1200000 src/colony/tests/slow/*.test.ts",
+    "e2e": "node ../scripts/e2e-one-world.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
