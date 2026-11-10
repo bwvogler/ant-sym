@@ -22,6 +22,8 @@ To revoke the passphrase, change the `JEV_ANTS_PASSPHRASE` secret and re-run the
 
 There is one ledger for everyone, held in a single Durable Object, so two browsers share one run: a start in one ends the other's run. That fits a single-user app.
 
+Every build is on one origin (`bwvogler.github.io`), so in a browser `main` and every PR preview share one `localStorage`: the passphrase, the Jev answers cached in the page, and the game saves. One unlock covers them all, and answers a preview got from Jev are reused on `main`. On the other hand, a preview's autosave shows in `main`'s Continue list, and a preview whose words or legends differ caches its answers beside `main`'s. They are kept under their own context and don't overwrite main's. This is the owner's choice (PR #66 review D1, 2026-11-10): nobody else plays yet, so the mixing costs little. Revisit it when the site has players. The origin allowlist has the same reach: any Pages site on the `bwvogler` account may call the Worker, and the passphrase is what keeps a call out.
+
 The reply functions the Worker shares with the dev server are in `web/server/replies.ts`, not `api.ts`. `api.ts` resolves its budget file's path from `import.meta.url` when it loads, and that throws in a Worker ("Invalid URL string"), so the Worker must never import it.
 
 ## One-time setup
