@@ -123,7 +123,10 @@ export default function ColonyApp() {
               : `A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`,
           "warn",
         );
-      if (!game.flights.length) update({ playing: true });
+      if (!game.flights.length) {
+        update({ playing: true });
+        setDevPen(false); // the dev hook's pen was for that flight only
+      }
     },
     [game, update],
   );
@@ -160,6 +163,13 @@ export default function ColonyApp() {
   const penOpen = flight !== null && gate?.open === true;
   const circle = penOpen && oneWorld && flight ? flightCircle(game, flight) : null;
   const penWords = useRef<DoctrineChoice>({ id: "", text: "" });
+  /** "Let her fly": her own flight from her mother's hole (Game.landing), on the pen's words: no pointer needed. */
+  const onFly = useCallback(
+    (d: DoctrineChoice) => {
+      if (flight) foundOn(flight, d, game.landing(flight.mother));
+    },
+    [flight, game, foundOn],
+  );
   const onWords = useCallback((d: DoctrineChoice) => {
     penWords.current = d;
   }, []);
@@ -328,7 +338,7 @@ export default function ColonyApp() {
         </div>
         <aside className="flex w-full flex-col gap-3 lg:w-80">
           {flight && gate?.open && oneWorld && circle && (
-            <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} place={{ radius: circle.r, onWords }} />
+            <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} place={{ radius: circle.r, onWords, onFly }} />
           )}
           <FungusPanel stats={stats} jev={jev} evolve={evolve} side={nests} menu={controls.menu} />
         </aside>

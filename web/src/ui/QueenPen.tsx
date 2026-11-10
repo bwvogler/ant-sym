@@ -20,10 +20,14 @@ export interface Landing {
   distance: number;
 }
 
-/** One world's pen: she flies where the player clicks, within `radius` of her mother's hole; the words as they stand go to `onWords`. */
+/**
+ * One world's pen: she flies where the player clicks, within `radius` of her mother's hole; the words as they stand go
+ * to `onWords`. `onFly`: "Let her fly", her own flight (Game.landing) on those words, for a player with no pointer.
+ */
 export interface PenPlace {
   radius: number;
   onWords: (d: DoctrineChoice) => void;
+  onFly: (d: DoctrineChoice) => void;
 }
 
 export default function QueenPen({ flight, mother, daughter, doctrine, onFound, place }: { flight: Flight; mother: string; daughter: string; doctrine: DoctrineChoice; onFound: (d: DoctrineChoice, at: Landing) => void; place?: PenPlace }) {
@@ -77,6 +81,12 @@ export default function QueenPen({ flight, mother, daughter, doctrine, onFound, 
           Click where she flies (within {place.radius} of {mother}'s hole).
         </p>
         <p className="mt-1 text-xs text-fg-3">The top view shows her flight's circle and, under the pointer, where she would dig her hole (the nearest spot beyond an end of the line the founding rule allows) or why she can't.{words ? "" : " Write her words first."}</p>
+        <div className="mt-3 flex items-center justify-end gap-2">
+          <span className="text-xs text-fg-3">Or she flies by herself, {place.radius} from the hole, any way:</span>
+          <button type="button" className="rounded-md border border-accent px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent-soft disabled:opacity-50" disabled={!words} onClick={() => place.onFly({ id, text: words })}>
+            Let her fly
+          </button>
+        </div>
       </section>
     );
   return (
