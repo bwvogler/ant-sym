@@ -75,7 +75,7 @@ export class FeltGrid {
 
   reset(): void {
     const t = this.#touched;
-    for (let k = 0; k < t.length; k += 2) this.layer.set(t[k] as number, t[k + 1] as number, 0);
+    for (let k = 0; k < t.length; k += 2) this.layer.set(t[k], t[k + 1], 0);
     t.length = 0;
   }
 
@@ -96,7 +96,7 @@ export class FeltGrid {
     const o = discOffsets(r)[y & 1] as Int16Array;
     let m = 0;
     for (let k = 0; k < o.length; k += 2) {
-      const v = this.get(x + (o[k] as number), y + (o[k + 1] as number));
+      const v = this.get(x + (o[k]), y + (o[k + 1]));
       if (v > m) m = v;
     }
     return m;
@@ -121,7 +121,7 @@ export class DonorGrid {
 
   reset(): void {
     const t = this.#touched;
-    for (let k = 0; k < t.length; k += 2) this.layer.set(t[k] as number, t[k + 1] as number, 0);
+    for (let k = 0; k < t.length; k += 2) this.layer.set(t[k], t[k + 1], 0);
     t.length = 0;
   }
 
@@ -130,7 +130,7 @@ export class DonorGrid {
     if (y < 0) return; // a column may be negative (one world's curtain); a row never is
     const old = this.layer.get(x, y);
     if (old === 0) this.#touched.push(x, y);
-    if (old === 0 || (energy[i] as number) > (energy[old - 1] as number)) this.layer.set(x, y, i + 1);
+    if (old === 0 || (energy[i]) > (energy[old - 1])) this.layer.set(x, y, i + 1);
   }
 
   /** The best-fed ant within one cell of (x, y), or −1. */
@@ -138,11 +138,11 @@ export class DonorGrid {
     const o = discOffsets(1)[y & 1] as Int16Array;
     let best = -1;
     for (let k = 0; k < o.length; k += 2) {
-      const ax = x + (o[k] as number);
-      const ay = y + (o[k + 1] as number);
+      const ax = x + (o[k]);
+      const ay = y + (o[k + 1]);
       if (ay < 0) continue;
       const v = this.layer.get(ax, ay) - 1;
-      if (v >= 0 && (best < 0 || (energy[v] as number) > (energy[best] as number))) best = v;
+      if (v >= 0 && (best < 0 || (energy[v]) > (energy[best]))) best = v;
     }
     return best;
   }

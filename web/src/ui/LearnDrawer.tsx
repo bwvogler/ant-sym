@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { MODES, TRAILS, HOMES, STANCES, type Colony, type Situation } from "../colony/colony.ts";
-import { DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
-import { AROUSALS, CARRYING, decodeFungal, PLACES, TASKS, TOUCHES, type FungalSituation } from "../colony/fungalPolicy.ts";
-import { INFECTED, LEVERS } from "../colony/fungus.ts";
-import { decodeLevels, pulled, PRESETS } from "../colony/levers.ts";
-import { askedIn } from "../colony/fungusBrain.ts";
+import { type Colony, HOMES, MODES, STANCES, TRAILS, type Situation, DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, responseQuestion, RESPONSE_HOOKS, AROUSALS, CARRYING, decodeFungal, FUNGAL_PLACES, TASKS, TOUCHES, type FungalSituation, INFECTED, LEVERS, decodeLevels, pulled, PRESETS, askedIn, type Game, upgradeFor, AIMS } from "../colony/index.ts";
 import { LeverChips } from "./DetailsScreen.tsx";
-import type { Game } from "../colony/game.ts";
-import { upgradeFor } from "../colony/evolution.ts";
-import { AIMS } from "../colony/fungusBrain.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { docUrl, GUIDE, NOTES, type GuideEntry } from "./guide.ts";
@@ -380,8 +372,8 @@ function followedSituation(colonies: readonly Colony[], f: Followed | null): { k
 /** What the fungus senses in the followed ant, if it is infected. */
 function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: number; s: FungalSituation } | null {
   const fol = followedSituation(colonies, f);
-  if (!fol || (fol.col.load[fol.i] as number) < INFECTED) return null;
-  const code = fol.col.fungal[fol.i] as number;
+  if (!fol || (fol.col.load[fol.i]) < INFECTED) return null;
+  const code = fol.col.fungal[fol.i];
   return code >= 0 ? { i: fol.i, s: decodeFungal(code) } : null;
 }
 
@@ -437,7 +429,7 @@ function FungusExplainer(props: Props) {
         rows={[
           ["arousal", AROUSALS.join(" · "), "the host's arousal: it smells alarm, or strangers are close (amines rise with fighting)"],
           ["touch", TOUCHES.join(" · "), "who touches its cuticle: a nestmate or an ant of another colony"],
-          ["place", PLACES.join(" · "), "what is underfoot: open ground, a tunnel, a chamber's floor, the queen's mark"],
+          ["place", FUNGAL_PLACES.join(" · "), "what is underfoot: open ground, a tunnel, a chamber's floor, the queen's mark"],
           ["task", TASKS.join(" · "), "its body's stage of life (juvenile hormone tracks task): nurse, inside worker, forager"],
           ["carrying", CARRYING.join(" · "), "what is in its jaws"],
           ["groomed", "true · false", "its nestmates are grooming the fungus off it"],

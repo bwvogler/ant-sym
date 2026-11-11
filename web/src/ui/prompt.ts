@@ -1,9 +1,5 @@
 import type { JevRequest } from "../../shared/jev.ts";
-import type { Situation, StanceSituation } from "../colony/colony.ts";
-import { estimateTokens, packModeRequest, packStanceRequest } from "../colony/colonyBrain.ts";
-import type { FungalSituation } from "../colony/fungalPolicy.ts";
-import { FUNGUS_BATCH, packFungusRequest } from "../colony/fungusBrain.ts";
-import { DEFAULT_MENU, LEVERS } from "../colony/fungus.ts";
+import { type Situation, type StanceSituation, estimateTokens, packModeRequest, packStanceRequest, type FungalSituation, FUNGUS_BATCH, packFungusRequest, DEFAULT_MENU, LEVERS } from "../colony/index.ts";
 import type { LaneName } from "./colonyJev.ts";
 
 // What Jev is sent, pure: the Learn drawer shows the exact request for one

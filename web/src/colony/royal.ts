@@ -92,7 +92,7 @@ export interface Flight {
  * Sums and counts of a value on each cell this tick, for the mean of what the ants within one cell carry. Rebuilt every
  * tick like hunger.ts FeltGrid (not saved).
  */
-export class SumGrid {
+export class MeanGrid {
   readonly sum = new ChunkLayer((n) => new Float32Array(n), 0);
   readonly count = new ChunkLayer((n) => new Float32Array(n), 0);
   #touched: number[] = [];
@@ -100,8 +100,8 @@ export class SumGrid {
   reset(): void {
     const t = this.#touched;
     for (let k = 0; k < t.length; k += 2) {
-      this.sum.set(t[k] as number, t[k + 1] as number, 0);
-      this.count.set(t[k] as number, t[k + 1] as number, 0);
+      this.sum.set(t[k], t[k + 1], 0);
+      this.count.set(t[k], t[k + 1], 0);
     }
     t.length = 0;
   }
@@ -120,8 +120,8 @@ export class SumGrid {
     let s = 0;
     let n = 0;
     for (let k = 0; k < o.length; k += 2) {
-      const ax = x + (o[k] as number);
-      const ay = y + (o[k + 1] as number);
+      const ax = x + (o[k]);
+      const ay = y + (o[k + 1]);
       if (ay < 0) continue;
       s += this.sum.get(ax, ay);
       n += this.count.get(ax, ay);

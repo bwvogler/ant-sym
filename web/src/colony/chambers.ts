@@ -92,7 +92,7 @@ export class Chambers {
     if (this.#floor.get(x, y)) {
       this.#floor.set(x, y, 0);
       c.floor--;
-      this.floorOf[c.colony] = (this.floorOf[c.colony] as number) - 1;
+      this.floorOf[c.colony] = (this.floorOf[c.colony]) - 1;
     }
     this.cell.set(x, y, 0);
     c.cells--;
@@ -124,7 +124,7 @@ export class Chambers {
     this.#floor.set(x, y, floor);
     const d = floor - was;
     c.floor += d;
-    this.floorOf[c.colony] = (this.floorOf[c.colony] as number) + d;
+    this.floorOf[c.colony] = (this.floorOf[c.colony]) + d;
   }
 
   /** The chamber table for a save (save.ts). */

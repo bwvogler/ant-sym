@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chooseDig, Colony, DIG_FACE, GLANCE, refilled, soilFace, stub, tuneBackfill } from "../../colony.ts";
+import { BACKFILL, besideRefill, chooseDig, Colony, DIG_FACE, GLANCE, refilled, soilFace, stub, type ColonyParams } from "../../colony.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny } from "../../hex.ts";
 import { fillCell, mulberry32, OPEN, rockAt, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
 import { nestAt, put } from "../hexmaps.ts";
@@ -21,8 +21,8 @@ function build(extra: [number, number][] = []): WorldMap {
 }
 
 /** A one-ant colony whose scent stays where it is laid: `scent` per open cell (default `path` along row 6, 0 elsewhere). */
-function carrierOn(map: WorldMap, scent: (x: number, y: number) => number, seed = 2): Colony {
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "return");
+function carrierOn(map: WorldMap, scent: (x: number, y: number) => number, seed = 2, extra: Partial<ColonyParams> = {}): Colony {
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, ...extra }, mulberry32(seed), () => "return");
   c.ph.params.home = { evaporation: 0, diffusion: 0 };
   c.ph.params.food = { evaporation: 0, diffusion: 0 };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (rockAt(map, x, y) === OPEN) c.ph.fields.home.set(x, y, scent(x, y));
@@ -110,36 +110,32 @@ test("a carrier detours into a stale branch, walks it to its end and fills it ba
     b.push([x, y]);
   }
   const [b1, b2, b3] = b as [[number, number], [number, number], [number, number]];
-  const restore = tuneBackfill({ enterStale: 1 });
-  try {
-    const map = build(b);
-    assert.equal(stub(map, b1[0], b1[1], 5), false, "the branch's cells can't be filled while it goes on");
-    assert.equal(stub(map, b2[0], b2[1], 5), false);
-    const c = carrierOn(map, path);
+  const tuned = { backfill: { ...BACKFILL, enterStale: 1 } };
+  const map = build(b);
+  assert.equal(stub(map, b1[0], b1[1], 5), false, "the branch's cells can't be filled while it goes on");
+  assert.equal(stub(map, b2[0], b2[1], 5), false);
+  const c = carrierOn(map, path, 2, tuned);
+  run(c, 6);
+  // Its tip is two cells in: only a carrier that walked on into the branch (#staleStep) is beside it.
+  assert.equal(rockAt(map, b3[0], b3[1]), SOIL, "first trip: the branch's tip");
+  assert.equal(rockAt(map, b2[0], b2[1]), OPEN);
+  for (let trip = 2; trip <= 3; trip++) {
+    start(c);
     run(c, 6);
-    // Its tip is two cells in: only a carrier that walked on into the branch (#staleStep) is beside it.
-    assert.equal(rockAt(map, b3[0], b3[1]), SOIL, "first trip: the branch's tip");
-    assert.equal(rockAt(map, b2[0], b2[1]), OPEN);
-    for (let trip = 2; trip <= 3; trip++) {
-      start(c);
-      run(c, 6);
-    }
-    assert.equal(rockAt(map, b2[0], b2[1]), SOIL, "then the cell before it");
-    assert.equal(rockAt(map, b1[0], b1[1]), SOIL, "and back to the tunnel");
-    assert.equal(c.soilFilled, 3);
-    // A branch with scent in it (an ant digging there laid it on the way in) is in use.
-    const live = build(b);
-    const k = carrierOn(live, (_x, y) => (y === 6 ? 1 : 0.9));
-    let entered = false;
-    for (let t = 0; t < 30 * 5 && k.pellet[0] === 1; t++) {
-      k.tick(1 / 30);
-      if (k.y[0]! < centreY(6) - 0.6) entered = true;
-    }
-    assert.equal(rockAt(live, b3[0], b3[1]), OPEN, "live branch: not filled");
-    assert.ok(!entered, "and not entered");
-  } finally {
-    restore();
   }
+  assert.equal(rockAt(map, b2[0], b2[1]), SOIL, "then the cell before it");
+  assert.equal(rockAt(map, b1[0], b1[1]), SOIL, "and back to the tunnel");
+  assert.equal(c.soilFilled, 3);
+  // A branch with scent in it (an ant digging there laid it on the way in) is in use.
+  const live = build(b);
+  const k = carrierOn(live, (_x, y) => (y === 6 ? 1 : 0.9), 2, tuned);
+  let entered = false;
+  for (let t = 0; t < 30 * 5 && k.pellet[0] === 1; t++) {
+    k.tick(1 / 30);
+    if (k.y[0]! < centreY(6) - 0.6) entered = true;
+  }
+  assert.equal(rockAt(live, b3[0], b3[1]), OPEN, "live branch: not filled");
+  assert.ok(!entered, "and not entered");
 });
 
 test("fresh pellets draw more: a side cell too busy to fill on its own is filled next to a pellet put down moments ago", () => {
@@ -203,7 +199,7 @@ test("wall-following through ground being filled: a target cell filled meanwhile
     c.gy[0] = 6;
     c.gdir[0] = 0;
     c.tick(1 / 30);
-    assert.ok(Math.abs((c.gx[0] as number) - 12) <= 1 && Math.abs((c.gy[0] as number) - 6) <= 1, `re-decided from its own cell: target (${c.gx[0]}, ${c.gy[0]})`);
+    assert.ok(Math.abs((c.gx[0]) - 12) <= 1 && Math.abs((c.gy[0]) - 6) <= 1, `re-decided from its own cell: target (${c.gx[0]}, ${c.gy[0]})`);
   }
   // Grazing: right on its cell's edge, so the straight way to the next cell crosses a corner of the solid cell beside it.
   {
@@ -223,7 +219,7 @@ test("wall-following through ground being filled: a target cell filled meanwhile
       if (CELL[0] !== 13 || CELL[1] !== 5) continue;
       const h = Math.atan2(centreY(6) - py, centreX(13, 6) - px);
       cellOf(Math.fround(px + Math.cos(h) * step), Math.fround(py + Math.sin(h) * step));
-      if (rockAt(map, CELL[0] as number, CELL[1] as number) !== OPEN) {
+      if (rockAt(map, CELL[0], CELL[1]) !== OPEN) {
         sx = px;
         sy = py;
       }
@@ -252,8 +248,8 @@ test("wall-following through ground being filled: a target cell filled meanwhile
 });
 
 /** A one-ant colony of explorers on `map`, its ant at cell (x, y) heading east; it lays no scent. */
-function explorerOn(map: WorldMap, x: number, y: number, seed = 4): Colony {
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(seed), () => "explore");
+function explorerOn(map: WorldMap, x: number, y: number, seed = 4, extra: Partial<ColonyParams> = {}): Colony {
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, ...extra }, mulberry32(seed), () => "explore");
   put(c, 0, x, y);
   c.heading[0] = 0;
   c.mode[0] = 0;
@@ -281,7 +277,7 @@ test("a pellet put back is not dug out again: not as a tunnel's end, not as the 
       if (x !== 18) assert.equal(rockAt(map, x, y), SOIL, `and the dead end it left is not dug on either (${x}, ${y}): the colony is filling that branch back`);
     }
     // Long after (BACKFILL.hold), it is ground like any other.
-    assert.ok(!refilled(map, 20, 6, c.time + 601));
+    assert.ok(!refilled(map, 20, 6, c.time + 601, BACKFILL.hold));
   }
   // An explorer walking into a side cell (not a face it chose to dig) that is filled as it goes.
   {
@@ -312,19 +308,15 @@ test("a pellet put back is not dug out again: not as a tunnel's end, not as the 
 });
 
 test("a carrier never drops its pellet back into the cell it dug it from (even with no youth guard: BACKFILL.young 0)", () => {
-  const restore = tuneBackfill({ young: 0 });
-  try {
-    carrierKeepsItsDig();
-  } finally {
-    restore();
-  }
+  const tuned = { backfill: { ...BACKFILL, young: 0 } };
+  carrierKeepsItsDig(tuned);
 });
 
-function carrierKeepsItsDig(): void {
+function carrierKeepsItsDig(extra: Partial<ColonyParams> = {}): void {
   const map = build();
   const before = new Set<number>();
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (rockAt(map, x, y) === OPEN) before.add(y * W + x);
-  const c = explorerOn(map, 17, 6, 9);
+  const c = explorerOn(map, 17, 6, 9, extra);
   for (let k = 0; k < 30 * 20 && c.pellet[0] === 0; k++) c.tick(1 / 30);
   assert.equal(c.pellet[0], 1, "it dug at the tunnel's end");
   let dx = -1;
@@ -359,22 +351,27 @@ test("fresh digging is the frontier, not excess: a stale side cell dug in the la
 });
 
 test("a carrier never turns back the way it came into a 'stale branch': the path behind it smells fainter only because home scent fades away from the nest", () => {
-  const restore = tuneBackfill({ enterStale: 1 });
-  try {
-    // Busy up to x = 15, fainter beyond (an old stretch out to the tip at 20): from 15, the way behind is under half of here.
-    const map = build();
-    const c = carrierOn(map, (x, y) => (y !== 6 ? 0 : x <= 15 ? 1 : 0.3));
-    c.since[0] = 2.6;
-    let east = c.x[0]!;
-    let turned = false;
-    for (let t = 0; t < 30 * 4 && c.pellet[0] === 1; t++) {
-      c.tick(1 / 30);
-      if (c.x[0]! > east + 0.3) turned = true;
-      east = Math.min(east, c.x[0]!);
-    }
-    assert.ok(!turned, "it walked on home, never back east");
-    assert.equal(rockAt(map, 20, 6), OPEN, "and filled nothing at the tunnel's far end");
-  } finally {
-    restore();
+  const tuned = { backfill: { ...BACKFILL, enterStale: 1 } };
+  // Busy up to x = 15, fainter beyond (an old stretch out to the tip at 20): from 15, the way behind is under half of here.
+  const map = build();
+  const c = carrierOn(map, (x, y) => (y !== 6 ? 0 : x <= 15 ? 1 : 0.3), 2, tuned);
+  c.since[0] = 2.6;
+  let east = c.x[0]!;
+  let turned = false;
+  for (let t = 0; t < 30 * 4 && c.pellet[0] === 1; t++) {
+    c.tick(1 / 30);
+    if (c.x[0]! > east + 0.3) turned = true;
+    east = Math.min(east, c.x[0]!);
   }
+  assert.ok(!turned, "it walked on home, never back east");
+  assert.equal(rockAt(map, 20, 6), OPEN, "and filled nothing at the tunnel's far end");
+});
+
+test("refilled and besideRefill take the hold they are given: a cell filled 100 s ago is held at 600 s and free at 50 s", () => {
+  const map = build();
+  map.filledAt.set(20, 6, 0);
+  assert.equal(refilled(map, 20, 6, 100, 600), true);
+  assert.equal(refilled(map, 20, 6, 100, 50), false);
+  assert.equal(besideRefill(map, 19, 6, 100, 600), true, "a neighbour of the filled cell");
+  assert.equal(besideRefill(map, 19, 6, 100, 50), false);
 });

@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ChunkLayer } from "../../chunks.ts";
-import { CURTAIN, MIDDEN_MIN, MODES, PLANE, SWELL, type Colony, type Layer } from "../../colony.ts";
+import { CURTAIN, MIDDEN_MIN, PLANE, SWELL, type Colony, type Layer } from "../../colony.ts";
+import { MODES } from "../../vocab.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, nx, ny } from "../../hex.ts";
@@ -123,12 +124,12 @@ const holesOf = (c: Colony) => c.holeCells.map((h) => ({ x: h.px, y: h.py }));
 /** How far ant i of c believes it is from home on the plane: from its hole plus odoSurf × drift (U3b's vector). */
 function believed(c: Colony, i: number): number {
   const n = (c.layers[PLANE] as Layer).nest;
-  const o = c.odoSurf[i] as number;
-  return Math.hypot((c.x[i] as number) - (n.x + o * (c.driftSurf[i] as number)), (c.y[i] as number) - (n.y + o * (c.driftSurfY[i] as number)));
+  const o = c.odoSurf[i];
+  return Math.hypot((c.x[i]) - (n.x + o * (c.driftSurf[i])), (c.y[i]) - (n.y + o * (c.driftSurfY[i])));
 }
 const cellOfAnt = (c: Colony, i: number): [number, number] => {
-  cellOf(c.x[i] as number, c.y[i] as number);
-  return [CELL[0] as number, CELL[1] as number];
+  cellOf(c.x[i], c.y[i]);
+  return [CELL[0], CELL[1]];
 };
 
 /** Ant i of c, middle-aged, at the top of its shaft with spoil (a corpse: carry one first), heading up. */
@@ -162,7 +163,7 @@ test("one world: spoil carried up keeps going, out on the plane, and is heaped w
   assert.equal(c.pellet[i], 0, "put down within 20 s");
   assert.equal(c.soilOut, out + 1);
   assert.ok(far >= 2, `its vector put it ${far.toFixed(1)} out (spoilTo ≥ 2)`);
-  assert.ok((c.odoSurf[i] as number) > 2, `the walk out counted (${(c.odoSurf[i] as number).toFixed(1)})`);
+  assert.ok((c.odoSurf[i]) > 2, `the walk out counted (${(c.odoSurf[i]).toFixed(1)})`);
   const cells = spoilCells(plane);
   assert.equal(plane.moundCells, Math.floor(SWELL + 1e-9));
   const [ax, ay] = cellOfAnt(c, i);
@@ -309,7 +310,7 @@ test("one world: a rival raider on the plane shies from the colony's midden", ()
     }
     for (let k = 0; k < Math.round(3 / DT); k++) {
       g.tick(DT);
-      for (let i = 0; i < 6; i++) if (r.alive[i] && r.layer[i] === PLANE && Math.hypot((r.x[i] as number) - mx, (r.y[i] as number) - my) < 2) inside++;
+      for (let i = 0; i < 6; i++) if (r.alive[i] && r.layer[i] === PLANE && Math.hypot((r.x[i]) - mx, (r.y[i]) - my) < 2) inside++;
     }
     return inside;
   };
@@ -341,12 +342,12 @@ test("one world over 200 s: the mound's books balance, it stays round the hole w
           fillDown++;
           picked[ci]![i] = NaN;
         }
-        if (c.layer[i] === PLANE && wasPellet[ci]![i] && !c.pellet[i] && !Number.isNaN(picked[ci]![i] as number)) {
-          spreads.push(hexDistance(x, y, h.px, h.py) - (picked[ci]![i] as number));
+        if (c.layer[i] === PLANE && wasPellet[ci]![i] && !c.pellet[i] && !Number.isNaN(picked[ci]![i])) {
+          spreads.push(hexDistance(x, y, h.px, h.py) - (picked[ci]![i]));
           picked[ci]![i] = NaN;
         }
-        wasPellet[ci]![i] = c.pellet[i] as number;
-        wasLayer[ci]![i] = c.layer[i] as number;
+        wasPellet[ci]![i] = c.pellet[i];
+        wasLayer[ci]![i] = c.layer[i];
       }
     });
     if (k % 300 !== 0) continue;
@@ -384,7 +385,7 @@ test("one world over 200 s: the mound's books balance, it stays round the hole w
     assert.ok(n > 40, `colony ${c.params.nest}: ${n} pellets on its mound`);
     assert.ok(Math.hypot(sx / n, sy / n) < 4, `colony ${c.params.nest}: the mound's centre is ${Math.hypot(sx / n, sy / n).toFixed(1)} from its hole`);
     far.sort((a, b) => a - b);
-    assert.ok((far[Math.floor(far.length / 2)] as number) >= 3, `colony ${c.params.nest}: spoil carried out from the hole (median ${far[Math.floor(far.length / 2)]} cells)`);
+    assert.ok((far[Math.floor(far.length / 2)]) >= 3, `colony ${c.params.nest}: spoil carried out from the hole (median ${far[Math.floor(far.length / 2)]} cells)`);
   }
   assert.ok(spreads.length >= 4, `${spreads.length} pellets spread`);
   const mean = spreads.reduce((s, d) => s + d, 0) / spreads.length;

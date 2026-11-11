@@ -50,7 +50,7 @@ export interface Transect {
 
 /** Why a founding is refused: the rule of one-world §3 it breaks. */
 export type Refusal = "interior" | "turn" | "crosses" | "clearance" | "hole-gap" | "ground";
-export type Founding = { ok: true; end: End } | { ok: false; reason: Refusal };
+export type FoundCheck = { ok: true; end: End } | { ok: false; reason: Refusal };
 
 const cx = (c: Cell): number => centreX(c.x, c.y);
 const cy = (c: Cell): number => centreY(c.y);
@@ -306,7 +306,7 @@ function fold(t: Transect, end: End, vx: number, vy: number, nx: number, ny: num
  * They are checked 1, 3, 4, 2: the cheap ones first, and a spot crowding a hole is refused for that ("hole-gap"), not
  * for the turn its nearness makes.
  */
-export function canFound(t: Transect, p: Cell, open: (x: number, y: number) => boolean): Founding {
+export function canFound(t: Transect, p: Cell, open: (x: number, y: number) => boolean): FoundCheck {
   const h = t.holes;
   const k = h.length - 1;
   // 1. The nearest hole is an end.

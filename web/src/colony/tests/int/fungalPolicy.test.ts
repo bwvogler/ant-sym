@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { Colony, MODES, type Situation } from "../../colony.ts";
-import { AROUSALS, CARRYING, DEFAULT_RULE, FUNGAL_SITUATIONS, PLACES, STRAIN_DEFAULT, TASKS, TOUCHES, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../../fungalPolicy.ts";
+import { Colony } from "../../colony.ts";
+import { MODES, type Situation } from "../../vocab.ts";
+import { AROUSALS, CARRYING, DEFAULT_RULE, FUNGAL_SITUATIONS, FUNGAL_PLACES, STRAIN_DEFAULT, TASKS, TOUCHES, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../../fungalPolicy.ts";
 import { askedIn, FUNGUS_LEGEND, fungalKey, fungusContext, leverQuestions, packFungusRequest, readLevels, validLevels, worthAsking } from "../../fungusBrain.ts";
 import { DEFAULT_MENU, DORMANT_SHOW, Fungus, LETHAL, LEVERS, STRAINS, preset } from "../../fungus.ts";
 import { AS_IS, compose, CUSTOM, decodeLevels, encodeLevels, PRESETS, presetOf, pulled } from "../../levers.ts";
@@ -26,7 +27,7 @@ test("fungal situations: 864, and each encodes and decodes to itself", () => {
   const seen = new Set<number>();
   for (const arousal of AROUSALS)
     for (const touch of TOUCHES)
-      for (const place of PLACES)
+      for (const place of FUNGAL_PLACES)
         for (const task of TASKS)
           for (const carrying of CARRYING)
             for (const groomed of [false, true]) {
@@ -132,7 +133,7 @@ test("what the fungus senses is its host's body, never its mode, and nothing map
     const rec = new Recognition();
     rec.build([a, b]);
     f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6, rec);
-    return decodeFungal(a.fungal[0] as number);
+    return decodeFungal(a.fungal[0]);
   };
   assert.equal(sense(() => {}).touch, "none");
   assert.equal(sense((_a, b) => ((b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y))).touch, "foreigner");
@@ -173,7 +174,7 @@ test("groomed: a host among nestmates is groomed whether or not it hides (judged
     if (hide) c.show[0] = DORMANT_SHOW;
     f.policy = () => (hide ? "dormant" : "share");
     f.step([c], [occupancy(c, new CountGrid())], 1e-6);
-    return decodeFungal(c.fungal[0] as number).groomed;
+    return decodeFungal(c.fungal[0]).groomed;
   };
   assert.equal(groomed(false), true);
   // PR #7 review: judged at what a hidden host shows (a quarter), it read as ungroomed the step after it hid, showed, and hid again.
@@ -206,7 +207,7 @@ test("hiding needs its lever: with 'fungus showing' off the menu, a dormant host
     g.hosts = 1;
     g.step([c], [occupancy(c, new CountGrid())], 0.5);
     g.step([c], [occupancy(c, new CountGrid())], 0.5);
-    return c.load[0] as number;
+    return c.load[0];
   };
   assert.ok(load(["home"]) < load(["show", "home"]), "hiding is the showing lever's, and it is off");
 });
@@ -217,7 +218,7 @@ test("cull: the host's odour is pushed past tolerance from its own nest, so its 
   const rec = new Recognition();
   c.estrange[0] = 1;
   rec.step([c], 0.1);
-  assert.ok(Math.abs((c.odour[0] as number) - 0.5) < 1e-6, `odour ${c.odour[0]}`);
+  assert.ok(Math.abs((c.odour[0]) - 0.5) < 1e-6, `odour ${c.odour[0]}`);
   rec.build([c]);
   const deaths = resolveFights([c], [occupancy(c, new CountGrid())], 1, () => 0, undefined, rec);
   assert.ok(deaths[0]! >= 1, "a stranger among its nestmates: it dies (and they may too)");
@@ -234,8 +235,8 @@ test("cull bites from a high load: at 0.7 its own nestmates already take it for 
     const rec = new Recognition();
     rec.step([c], 0.1);
     rec.build([c]);
-    rec.look(c.odour[1] as number, rec.params.tolerance);
-    assert.ok(rec.around(20, 6, { x0: 0, size: { w: 40, h: 12 } }) >= 1, `load ${l}: odour ${(c.odour[0] as number).toFixed(3)} is a stranger's`);
+    rec.look(c.odour[1], rec.params.tolerance);
+    assert.ok(rec.around(20, 6, { x0: 0, size: { w: 40, h: 12 } }) >= 1, `load ${l}: odour ${(c.odour[0]).toFixed(3)} is a stranger's`);
   }
 });
 
@@ -291,13 +292,13 @@ test("hiding holds: with hide on, a groomed host stays hidden instead of flippin
     if (!stepped) continue;
     steps++;
     for (let i = 0; i < c.n; i++) {
-      if (!c.alive[i] || (c.fungal[i] as number) < 0) {
+      if (!c.alive[i] || (c.fungal[i]) < 0) {
         prev[i] = -1;
         continue;
       }
       hostSteps++;
-      const e = c.expr[i] as number;
-      if ((prev[i] as number) >= 0 && prev[i] !== e) flips++;
+      const e = c.expr[i];
+      if ((prev[i]) >= 0 && prev[i] !== e) flips++;
       prev[i] = e;
     }
   }

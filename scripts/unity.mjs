@@ -74,12 +74,12 @@ async function main() {
 
 async function work() {
   const { one, seed, ants, seconds } = workerData;
-  const { CURTAIN } = await import("../web/src/colony/colony.ts");
-  const { STRAINS } = await import("../web/src/colony/fungus.ts");
-  const { GAME_REGROW, Game, gameRng } = await import("../web/src/colony/game.ts");
-  const { CELL, cellOf, discOffsets } = await import("../web/src/colony/hex.ts");
-  const { generateOneWorld } = await import("../web/src/colony/oneWorld.ts");
-  const { generateSideWorld } = await import("../web/src/colony/world.ts");
+  const { CURTAIN } = await import("../web/src/colony/index.ts");
+  const { STRAINS } = await import("../web/src/colony/index.ts");
+  const { GAME_REGROW, Game, gameRng } = await import("../web/src/colony/index.ts");
+  const { CELL, cellOf, discOffsets } = await import("../web/src/colony/index.ts");
+  const { generateOneWorld } = await import("../web/src/colony/index.ts");
+  const { generateSideWorld } = await import("../web/src/colony/index.ts");
   const t0 = performance.now();
   const game = new Game(one ? generateOneWorld(seed) : generateSideWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed));
   const garden = STRAINS.findIndex((s) => s.id === "garden");

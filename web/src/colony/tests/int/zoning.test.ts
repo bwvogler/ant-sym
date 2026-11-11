@@ -42,7 +42,7 @@ test("the young never go out; the old do, more than the middle-aged (the old cli
         if (!c.alive[i] || c.carrying[i] || c.pellet[i]) continue;
         c.antCell(i);
         n++;
-        if (isSky(map, CELL[0] as number, CELL[1] as number)) out++;
+        if (isSky(map, CELL[0], CELL[1])) out++;
       }
     }
     return out / n;
@@ -79,7 +79,7 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
     if (!c.alive[i]) continue;
     c.antCell(i);
     const b = c.band(i);
-    depth[b]! += Math.max(0, (CELL[1] as number) - groundTop(map, CELL[0] as number));
+    depth[b]! += Math.max(0, (CELL[1]) - groundTop(map, CELL[0]));
     count[b]!++;
   }
   assert.ok(depth[0]! / count[0]! > depth[2]! / count[2]!, `young ${(depth[0]! / count[0]!).toFixed(1)} rows deep, old ${(depth[2]! / count[2]!).toFixed(1)}`);
@@ -90,7 +90,7 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
   for (let i = 0; i < c.n; i++) {
     if (!c.alive[i]) continue;
     c.antCell(i);
-    if (isSky(map, CELL[0] as number, CELL[1] as number)) continue;
+    if (isSky(map, CELL[0], CELL[1])) continue;
     near[c.band(i)]! += Math.hypot(c.x[i]! - c.queen!.x, c.y[i]! - c.queen!.y);
     inside[c.band(i)]!++;
   }
@@ -103,13 +103,13 @@ test("an old forager in a dead-end tunnel whose tip lies just under the ground b
   const map = generateSideWorld(2, SMALL_SIDE);
   const n = map.nest;
   cellOf(n.entrance!.x, n.entrance!.y);
-  const ex = CELL[0] as number;
-  const ey = CELL[1] as number;
+  const ex = CELL[0];
+  const ey = CELL[1];
   cellOf(n.x, n.y);
-  const cy = CELL[1] as number;
+  const cy = CELL[1];
   // A branch east out of the chamber's upper side, then straight up, its tip two rows under the ground line beside the hole.
   const tipX = ex + 4;
-  let x = CELL[0] as number;
+  let x = CELL[0];
   while (rockAt(map, x, cy - 3) === OPEN) x++;
   for (; x <= tipX; x++) digCell(map, x, cy - 3);
   for (let y = cy - 3; y >= ey + 2; y--) digCell(map, tipX, y);
@@ -123,7 +123,7 @@ test("an old forager in a dead-end tunnel whose tip lies just under the ground b
   for (let k = 0; k < 30 * 60 && out < 0; k++) {
     c.tick(1 / 30);
     c.antCell(0);
-    if (isSky(map, CELL[0] as number, CELL[1] as number)) out = k / 30;
+    if (isSky(map, CELL[0], CELL[1])) out = k / 30;
   }
   assert.equal(c.mode[0], 0, "still exploring (a forager on its way out)");
   assert.ok(out >= 0, "out on the ground within a minute");

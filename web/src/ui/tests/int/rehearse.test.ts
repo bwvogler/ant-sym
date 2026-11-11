@@ -1,8 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, Game, gameRng, PLANE } from "../../../colony/game.ts";
-import { generateOneWorld } from "../../../colony/oneWorld.ts";
-import { STRAINS } from "../../../colony/fungus.ts";
+import { CURTAIN, Game, gameRng, PLANE, generateOneWorld, STRAINS } from "../../../colony/index.ts";
 import { nextCrossing, REHEARSE_DT } from "../../rehearse.ts";
 
 // The e2e guard's rehearsal: the ant a copy of the game says comes up next does, on that very tick, when the game itself

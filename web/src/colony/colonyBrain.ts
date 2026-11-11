@@ -1,7 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
-import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
-import { CARRY, type Carry, CONTACT, type Contact, LEAVE, type Leave, localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
+import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
+import { CARRY, type Carry, CONTACT, type Contact, LEAVE, type Leave, localResponses, responses, touchKey, type Responses, type Touch, type TrailKind } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -217,7 +217,7 @@ export function cacheContexts(doctrine: string): Record<"mode" | "stance" | Resp
 }
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
-export type ResponseAnswer = boolean | Carry | Trail | Contact | Leave;
+export type ResponseAnswer = boolean | Carry | TrailKind | Contact | Leave;
 const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
 
 /**
@@ -232,7 +232,7 @@ export function readResponse(hook: ResponseHook, answers: Record<string, JevAnsw
   if (hook === "carry") return (CARRY as readonly string[]).includes(a.choice) ? (a.choice as Carry) : null;
   if (hook === "contact") return (CONTACT as readonly string[]).includes(a.choice) ? (a.choice as Contact) : null;
   if (hook === "leave") return (LEAVE as readonly string[]).includes(a.choice) ? (a.choice as Leave) : null;
-  return TRAILS_LAID.includes(a.choice) ? (a.choice as Trail) : null;
+  return TRAILS_LAID.includes(a.choice) ? (a.choice as TrailKind) : null;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { worldExtent, type WorldMap } from "./colony/world.ts";
+import { worldExtent, type WorldMap, CURTAIN, PLANE, UPGRADES, type Upgrade, LETHAL_LEVERS, FOUNDING_RESERVE, MAX_COLONIES, MET, type Game, AIMS, type Flight } from "./colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntCard from "./ui/AntCard.tsx";
@@ -8,18 +8,13 @@ import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
-import { CURTAIN, PLANE } from "./colony/colony.ts";
-import { UPGRADES, type Upgrade } from "./colony/evolution.ts";
-import { LETHAL_LEVERS } from "./colony/levers.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
-import { FOUNDING_RESERVE, MAX_COLONIES, MET, type Game } from "./colony/game.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo, passphrase } from "./ui/backend.ts";
 import PassNote from "./ui/PassNote.tsx";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
-import { AIMS } from "./colony/fungusBrain.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
 import Help from "./ui/Help.tsx";
 import { openLearn } from "./ui/learn.ts";
@@ -29,7 +24,6 @@ import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
 import type { DoctrineChoice } from "./ui/useColonyJev.ts";
 import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
-import type { Flight } from "./colony/royal.ts";
 
 // The game's main screen (ja-lo8.2): the field, a slim top bar, and the fungus, the player. You shape the fungus's
 // policy in words (its aim); Jev reads them and decides what the fungus does in each host it lives in.
@@ -211,7 +205,7 @@ export default function ColonyApp() {
       follow: (k: number, i: number) => {
         const c = game.colonies[k];
         if (!c || !c.alive[i]) return false;
-        setFollowed({ k, i, gen: c.gen[i] as number });
+        setFollowed({ k, i, gen: c.gen[i] });
         return true;
       },
       view: () => controls.view,

@@ -319,14 +319,14 @@ export class Evolution {
   /** The spread traits at the levels chosen. */
   traits(): Traits {
     const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0 };
-    for (const u of UPGRADES) if (u.trait && u.values) out[u.trait] = u.values[this.level(u.id)] as number;
+    for (const u of UPGRADES) if (u.trait && u.values) out[u.trait] = u.values[this.level(u.id)];
     return out;
   }
 
   /** Each lever's reach at the levels chosen. Every lever has one (a test pins it), the lethal ones included (ja-lo8.16). */
   reach(): Reach {
     const out: Record<string, number> = {};
-    for (const u of UPGRADES) if (u.levers && u.reach) for (const id of u.levers) out[id] = u.reach[this.level(u.id)] as number;
+    for (const u of UPGRADES) if (u.levers && u.reach) for (const id of u.levers) out[id] = u.reach[this.level(u.id)];
     return out;
   }
 

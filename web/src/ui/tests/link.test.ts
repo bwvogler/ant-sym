@@ -1,9 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CELL, cellOf, centreX, centreY } from "../../colony/hex.ts";
-import { CRUST, STRIP } from "../../colony/oneWorld.ts";
-import { cellAt, makeTransect } from "../../colony/transect.ts";
-import { mulberry32 } from "../../colony/world.ts";
+import { CELL, cellOf, centreX, centreY, CRUST, STRIP, cellAt, makeTransect, mulberry32 } from "../../colony/index.ts";
 import { columnNear, LINK_REACH, planePoint, stripColumn, stripPoint } from "../link.ts";
 
 // The views linked (U5.2): a click on the line above opens the side view at its column; a click on the strip below opens

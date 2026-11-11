@@ -1,13 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../../colony/colony.ts";
-import { mulberry32, worldFromArrays } from "../../colony/world.ts";
+import { Colony, mulberry32, worldFromArrays } from "../../colony/index.ts";
 import { followedColony } from "../follow.ts";
 
 test("a followed ant is gone when it dies, and stays gone when a newborn takes its slot", () => {
   const map = worldFromArrays({ w: 40, h: 12 }, [{ x: 6, y: 6, r: 2 }]);
   const c = new Colony(map, { antCount: 3, maxAnts: 3, foodPerAnt: 1 }, mulberry32(1), () => "explore");
-  const f = { k: 0, i: 1, gen: c.gen[1] as number };
+  const f = { k: 0, i: 1, gen: c.gen[1] };
   assert.equal(followedColony([c], f), c);
   c.kill(1);
   assert.equal(followedColony([c], f), null, "dead");

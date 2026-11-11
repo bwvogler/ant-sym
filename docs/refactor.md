@@ -73,7 +73,7 @@ The goal: a sense, a channel, a lane, a species, a nest kind and a renderer laye
    - `Touch` and `Place` (colony vs fungal policy)
    - `SumGrid` (defined twice)
    - `encode`
-3. **No mutable module state.** `backfill` / `tuneBackfill` and `TUNNEL_DRIFT` / `setTunnelDrift` become parameters.
+3. **No mutable module state.** `backfill` / `tuneBackfill` and `TUNNEL_DRIFT` / `setTunnelDrift` became colony params (`ColonyParams.backfill`, `ColonyParams.tunnelDrift`; done in S1).
 4. **Drop the `as number` casts** on typed arrays. The compiler doesn't ask for them.
 5. **`colony/index.ts` is the public surface** for the UI, scripts and experiments. No script imports `colony.ts` as a namespace.
 

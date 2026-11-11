@@ -1,10 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, CURTAIN, PLANE } from "../../colony/colony.ts";
-import { Game, gameRng } from "../../colony/game.ts";
-import { CELL, cellOf } from "../../colony/hex.ts";
-import { generateOneWorld } from "../../colony/oneWorld.ts";
-import { generateSideWorld, generateWorld, mulberry32 } from "../../colony/world.ts";
+import { Colony, CURTAIN, PLANE, Game, gameRng, CELL, cellOf, generateOneWorld, generateSideWorld, generateWorld, mulberry32 } from "../../colony/index.ts";
 import { nestView } from "../nest.ts";
 
 const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 2 };

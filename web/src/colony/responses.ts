@@ -1,4 +1,4 @@
-import type { Mode, Stance } from "./colony.ts";
+import type { Mode, Stance } from "./vocab.ts";
 
 // An ant's responses to what it touches and carries, pure. Choosing a mode is
 // the ant's one big decision (colony.ts, a `Policy`); these are the small
@@ -100,7 +100,7 @@ export type Odds = "none" | "outnumbered" | "even" | "outnumbering";
 export const CONTACT = ["fight", "flee", "drop and run"] as const;
 export type Contact = (typeof CONTACT)[number];
 
-export type Trail = "food" | "home" | "none";
+export type TrailKind = "food" | "home" | "none";
 
 /** What a carrier does with its load: take it where it belongs, or put it down where it stands. */
 export const CARRY = ["take", "put down"] as const;
@@ -119,7 +119,7 @@ export interface Responses {
   /** Carrying food, at a place it can put it down (the nest on a top-down map; its chamber in the side view): put it down? */
   drop(t: Touch): boolean;
   /** Which trail to lay this step. */
-  trail(t: Touch): Trail;
+  trail(t: Touch): TrailKind;
   /** How much of it, as a share of the colony's `deposit`. */
   trailRate(t: Touch): number;
   /**

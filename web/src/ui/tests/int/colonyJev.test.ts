@@ -1,13 +1,6 @@
 import { afterEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, localPolicy, localStance, type Mode, type Situation } from "../../../colony/colony.ts";
-import { DOCTRINES, policyContext, situationKey, stanceContext, stanceKey } from "../../../colony/colonyBrain.ts";
-import { fungalKey, fungusContext } from "../../../colony/fungusBrain.ts";
-import { generateWorld, mulberry32, OPEN_WORLD } from "../../../colony/world.ts";
-import { Game } from "../../../colony/game.ts";
-import { LEVERS, STRAINS, preset } from "../../../colony/fungus.ts";
-import { encodeLevels, PRESETS } from "../../../colony/levers.ts";
-import { decodeFungal, type FungalSituation } from "../../../colony/fungalPolicy.ts";
+import { Colony, localPolicy, localStance, type Mode, type Situation, DOCTRINES, policyContext, situationKey, stanceContext, stanceKey, fungalKey, fungusContext, generateWorld, mulberry32, OPEN_WORLD, Game, LEVERS, STRAINS, preset, encodeLevels, PRESETS, decodeFungal, type FungalSituation } from "../../../colony/index.ts";
 import { ColonyJev, type CacheStore } from "../../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../../shared/jev.ts";
 
@@ -484,7 +477,7 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
   assert.ok(j.state.fungusCached > 0 && j.state.fungusAsked > 0);
   // Jev's levels were dormant's: every host runs dormant now.
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
-  for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && (g.player.load[i] as number) > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
+  for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && (g.player.load[i]) > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
   const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(s).by, "jev");
   assert.equal(j.explainFungus(s).answer, encodeLevels(PRESETS[0]!.levels, g.fungus.asked), "Jev's levels: dormant's");

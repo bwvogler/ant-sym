@@ -49,5 +49,6 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm --prefix web ci
       # The flag goes before the files: node ignores --test-shard after them (so not `npm run test:soak -- ...`).
-      - run: node --test --test-timeout=60000 --test-shard=${{ matrix.shard }}/3 src/colony/tests/soak/*.test.ts
+      # 120 s a file: the files of a shard run side by side on a small runner, and one was cancelled at 60 s (#78).
+      - run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/3 src/colony/tests/soak/*.test.ts
         working-directory: web

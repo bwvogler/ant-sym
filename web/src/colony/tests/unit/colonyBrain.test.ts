@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DOCTRINES, estimateTokens, packModeRequest, policyContext, readMode, situationKey } from "../../colonyBrain.ts";
-import type { Situation } from "../../colony.ts";
+import type { Situation } from "../../vocab.ts";
 
 const S: Situation = { mode: "follow", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
 

@@ -1,5 +1,6 @@
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
-import { ENEMY, type Colony, type Layer } from "./colony.ts";
+import { type Colony, type Layer } from "./colony.ts";
+import { ENEMY } from "./vocab.ts";
 import { CELL, discOffsets } from "./hex.ts";
 import type { Recognition } from "./recognition.ts";
 import { clampCol, inBounds, type Bounds } from "./world.ts";
@@ -41,8 +42,8 @@ export class CountGrid {
   reset(): void {
     const t = this.#touched;
     for (let k = 0; k < t.length; k += 2) {
-      const x = t[k] as number;
-      const y = t[k + 1] as number;
+      const x = t[k];
+      const y = t[k + 1];
       this.layer.set(x, y, 0);
       this.#blocks.set(x >> BLOCK_BITS, y >> BLOCK_BITS, 0);
     }
@@ -74,7 +75,7 @@ export class CountGrid {
   saveState(): number[] {
     const t = this.#touched;
     const out: number[] = [];
-    for (let k = 0; k < t.length; k += 2) out.push(t[k] as number, t[k + 1] as number, this.layer.get(t[k] as number, t[k + 1] as number));
+    for (let k = 0; k < t.length; k += 2) out.push(t[k], t[k + 1], this.layer.get(t[k], t[k + 1]));
     return out;
   }
 
@@ -86,9 +87,9 @@ export class CountGrid {
   loadState(saved: readonly number[]): void {
     this.reset();
     for (let k = 0; k < saved.length; k += 3) {
-      const x = saved[k] as number;
-      const y = saved[k + 1] as number;
-      const v = saved[k + 2] as number;
+      const x = saved[k];
+      const y = saved[k + 1];
+      const v = saved[k + 2];
       this.#touched.push(x, y);
       this.layer.set(x, y, v);
       const bx = x >> BLOCK_BITS;
@@ -106,7 +107,7 @@ export function occupancy(colony: Colony, out: CountGrid, layer = -1): CountGrid
   for (let i = 0; i < colony.n; i++) {
     if (!colony.alive[i] || (layer >= 0 && colony.layer[i] !== layer)) continue;
     colony.antCell(i);
-    out.add(clampCol(map, CELL[0] as number), Math.min(h - 1, Math.max(0, CELL[1] as number)));
+    out.add(clampCol(map, CELL[0]), Math.min(h - 1, Math.max(0, CELL[1])));
   }
   return out;
 }
@@ -116,8 +117,8 @@ export function around(grid: CountGrid, map: Bounds, cx: number, cy: number, r =
   let s = 0;
   const o = discOffsets(r)[cy & 1] as Int16Array;
   for (let k = 0; k < o.length; k += 2) {
-    const x = cx + (o[k] as number);
-    const y = cy + (o[k + 1] as number);
+    const x = cx + (o[k]);
+    const y = cy + (o[k + 1]);
     if (inBounds(map, x, y)) s += grid.get(x, y);
   }
   return s;
@@ -138,12 +139,12 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
       c.antCell(i);
-      const cx = clampCol(map, CELL[0] as number);
-      const cy = Math.min(map.size.h - 1, Math.max(0, CELL[1] as number));
+      const cx = clampCol(map, CELL[0]);
+      const cy = Math.min(map.size.h - 1, Math.max(0, CELL[1]));
       let enemies = 0;
       if (rec) {
-        rec.look(c.odour[i] as number, rec.params.tolerance);
-        enemies = rec.around(cx, cy, map) * (1 - (c.calm[i] as number));
+        rec.look(c.odour[i], rec.params.tolerance);
+        enemies = rec.around(cx, cy, map) * (1 - (c.calm[i]));
         if (enemies < 1e-6) continue;
       } else {
         for (let j = 0; j < grids.length; j++) {
@@ -157,8 +158,8 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
       // How loudly is its raiseAlarm response (locally: always, × 1).
       if (enemies >= ENEMY) {
-        const loud = (1 - (c.quiet[i] as number)) * c.responses.raiseAlarm(c.touch(i, true));
-        if (loud > 0) ph.deposit("alarm", c.x[i] as number, c.y[i] as number, p.alarm * dt * loud);
+        const loud = (1 - (c.quiet[i])) * c.responses.raiseAlarm(c.touch(i, true));
+        if (loud > 0) ph.deposit("alarm", c.x[i], c.y[i], p.alarm * dt * loud);
       }
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
     }

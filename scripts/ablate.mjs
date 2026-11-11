@@ -35,8 +35,8 @@ const jobs = opt("jobs", undefined);
 const top = Number(opt("top", "0"));
 const match = opt("match", undefined);
 
-const { localPolicy, localStance } = await import("../web/src/colony/colony.ts");
-const { localResponses } = await import("../web/src/colony/responses.ts");
+const { localPolicy, localStance } = await import("../web/src/colony/index.ts");
+const { localResponses } = await import("../web/src/colony/index.ts");
 
 const cache = JSON.parse(readFileSync(file, "utf8"));
 const outDir = join(root, "experiments", "out", "ablate", `${basename(file, ".json")}-${opt("assay", "game")}-${opt("seconds", "300")}`);

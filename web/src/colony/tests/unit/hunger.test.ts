@@ -52,7 +52,7 @@ test("an ant uses energy, twice as fast outside, eats from food lying within two
   const { c } = colony(2);
   c.energy[0] = 0.9;
   c.tick(1);
-  assert.ok(Math.abs((c.energy[0] as number) - (0.9 - ADULT_DRAIN)) < 1e-6, `inside: ${c.energy[0]}`);
+  assert.ok(Math.abs((c.energy[0]) - (0.9 - ADULT_DRAIN)) < 1e-6, `inside: ${c.energy[0]}`);
   assert.ok(ADULT_DRAIN_OUT > ADULT_DRAIN);
   // Not hungry: it leaves the food. (10 in the royal chamber: the queen's stock of 8, which adults leave her, and 2 beyond.)
   c.feed(10);
@@ -72,7 +72,7 @@ test("an ant uses energy, twice as fast outside, eats from food lying within two
   at(0);
   at(1);
   c.tick(1 / 30);
-  assert.ok((c.energy[0] as number) > 0.9, `fed: ${c.energy[0]}`);
+  assert.ok((c.energy[0]) > 0.9, `fed: ${c.energy[0]}`);
   assert.ok(c.eaten > 0 && Math.abs(larder - c.larder - c.eaten) < 1e-9, `eaten ${c.eaten}, larder ${larder} → ${c.larder}`);
   // No food left: a hungry ant takes food by mouth from a well-fed nestmate it touches; energy is passed, not made.
   c.feed(-c.larder);
@@ -80,11 +80,11 @@ test("an ant uses energy, twice as fast outside, eats from food lying within two
   c.energy[1] = 1;
   at(0);
   at(1);
-  const before = (c.energy[0] as number) + (c.energy[1] as number);
+  const before = (c.energy[0]) + (c.energy[1]);
   c.tick(1 / 30);
-  assert.ok((c.energy[0] as number) > 0.3, `given: ${c.energy[0]}`);
-  assert.ok((c.energy[1] as number) >= SHARE_ABOVE - 1e-6, `the giver keeps enough: ${c.energy[1]}`);
-  assert.ok(Math.abs(before - 2 * (1 / 30) * ADULT_DRAIN - (c.energy[0] as number) - (c.energy[1] as number)) < 1e-5, "shared, not made");
+  assert.ok((c.energy[0]) > 0.3, `given: ${c.energy[0]}`);
+  assert.ok((c.energy[1]) >= SHARE_ABOVE - 1e-6, `the giver keeps enough: ${c.energy[1]}`);
+  assert.ok(Math.abs(before - 2 * (1 / 30) * ADULT_DRAIN - (c.energy[0]) - (c.energy[1])) < 1e-5, "shared, not made");
 });
 
 test("an ant that runs out of energy dies of hunger; a larva that does dies too, and its food leaves with it", () => {
@@ -125,7 +125,7 @@ test("hunger is felt by touch and passed on: an ant beside a begging larva feels
     at(2, c.queen!.x, c.queen!.y);
     c.tick(1 / 30);
   }
-  const [a, b, far] = [c.need[0] as number, c.need[1] as number, c.need[2] as number];
+  const [a, b, far] = [c.need[0], c.need[1], c.need[2]];
   assert.ok(a > 0.5, `beside it: ${a}`);
   assert.ok(b > 0.2 && b < a, `one further: ${b}`);
   assert.ok(b <= PASS * a + 1e-6 || b < a, "passed on, a little less");

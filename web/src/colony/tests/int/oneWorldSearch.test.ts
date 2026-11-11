@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HOLE_SIGHT, LIFESPAN, MODES, PI_DRIFT, PLANE, planeMoundReach, type Colony, type HoleCell } from "../../colony.ts";
+import { HOLE_SIGHT, LIFESPAN, PI_DRIFT, PLANE, planeMoundReach, type Colony, type HoleCell } from "../../colony.ts";
+import { MODES } from "../../vocab.ts";
 import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -66,15 +67,15 @@ function legs(g: Game, c: Colony, ox: number, oy: number, seconds: number): Leg[
   for (let k = 0; k < Math.round(seconds / DT); k++) {
     g.tick(DT);
     assert.equal(c.layer[0], PLANE, "still searching");
-    const x = (c.x[0] as number) - ox;
-    const y = (c.y[0] as number) - oy;
-    const m = c.searchLeg[0] as number;
+    const x = (c.x[0]) - ox;
+    const y = (c.y[0]) - oy;
+    const m = c.searchLeg[0];
     if (c.search[0] === 0) continue;
     if (m !== n) {
       if (n >= 0) out.push({ n, x, y, far, reach });
       n = m;
       far = 0;
-      reach = c.search[0] as number;
+      reach = c.search[0];
     }
     far = Math.max(far, Math.hypot(x, y));
   }
@@ -140,8 +141,8 @@ test("loops off (searchLoops 0): U3b's spiral, each point a quarter turn on and 
   const seen: { s: number; a: number }[] = [];
   for (let k = 0; k < Math.round(20 / DT); k++) {
     g.tick(DT);
-    const s = c.search[0] as number;
-    if (s !== 0 && (seen.length === 0 || seen[seen.length - 1]!.s !== s)) seen.push({ s, a: c.searchA[0] as number });
+    const s = c.search[0];
+    if (s !== 0 && (seen.length === 0 || seen[seen.length - 1]!.s !== s)) seen.push({ s, a: c.searchA[0] });
     assert.equal(c.searchLeg[0], 0, "no loops counted");
   }
   assert.ok(seen.length >= 4, `${seen.length} points`);
@@ -168,7 +169,7 @@ function mound(g: Game, k: number, pellets: number, heap = true): { x: number; y
     const a = rng() * 2 * Math.PI;
     const r = 2 + planeMoundReach(p) * Math.sqrt(rng());
     cellOf(hx + r * Math.cos(a), hy + r * Math.sin(a));
-    heapPlane(g.world!.plane, CELL[0] as number, CELL[1] as number, holes);
+    heapPlane(g.world!.plane, CELL[0], CELL[1], holes);
   }
   c.loadState({ fields: {}, private: { heaped: encode(pellets) } });
   return { x: hx, y: hy };
@@ -180,7 +181,7 @@ function spot(g: Game, x: number, y: number, r: number, toward: number, bare = f
     const a = toward + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 32);
     const p = { x: x + r * Math.cos(a), y: y + r * Math.sin(a) };
     cellOf(p.x, p.y);
-    if ((g.world!.plane.spoil!.get(CELL[0] as number, CELL[1] as number) > 0) !== bare) return p;
+    if ((g.world!.plane.spoil!.get(CELL[0], CELL[1]) > 0) !== bare) return p;
   }
   throw new Error("no such spot");
 }
@@ -210,7 +211,7 @@ function watch(g: Game, c: Colony, seconds: number, x: number, y: number): { t: 
   for (let k = 0; k < Math.round(seconds / DT); k++) {
     g.tick(DT);
     if (c.layer[0] !== PLANE) return { t: (k + 1) * DT, nearest };
-    nearest = Math.min(nearest, Math.hypot((c.x[0] as number) - x, (c.y[0] as number) - y));
+    nearest = Math.min(nearest, Math.hypot((c.x[0]) - x, (c.y[0]) - y));
   }
   return { t: NaN, nearest };
 }
@@ -234,7 +235,7 @@ test("smell: the same carrier not yet searching (homing on its full vector) cros
   const c = smeller(g, P.x, P.y, false);
   watch(g, c, 3, H.x, H.y);
   assert.equal(c.layer[0], PLANE, "still out");
-  assert.ok(Math.hypot((c.x[0] as number) - H.x, (c.y[0] as number) - H.y) > 20, `it kept on toward its vector's end (now ${Math.hypot((c.x[0] as number) - H.x, (c.y[0] as number) - H.y).toFixed(1)} from the hole)`);
+  assert.ok(Math.hypot((c.x[0]) - H.x, (c.y[0]) - H.y) > 20, `it kept on toward its vector's end (now ${Math.hypot((c.x[0]) - H.x, (c.y[0]) - H.y).toFixed(1)} from the hole)`);
 });
 
 test("smell: a searcher within its mound's reach but on bare ground is not pulled (it feels no spoil underfoot)", () => {
@@ -245,7 +246,7 @@ test("smell: a searcher within its mound's reach but on bare ground is not pulle
   const c = smeller(g, P.x, P.y, true);
   watch(g, c, 3, H.x, H.y);
   assert.equal(c.layer[0], PLANE, "still out");
-  assert.ok(Math.hypot((c.x[0] as number) - H.x, (c.y[0] as number) - H.y) > 14, "it went on with its loop");
+  assert.ok(Math.hypot((c.x[0]) - H.x, (c.y[0]) - H.y) > 14, "it went on with its loop");
 });
 
 test("smell: a searcher on the rival's mound is not pulled, to the rival's hole or its own", () => {
@@ -265,8 +266,8 @@ test("smell: a searcher on the rival's mound is not pulled, to the rival's hole 
   const { t, nearest } = watch(g, c, 10, V.x, V.y);
   assert.ok(Number.isNaN(t), "it went down no hole");
   assert.ok(nearest > HOLE_SIGHT, `never nearer the player's hole than ${nearest.toFixed(1)}`);
-  assert.ok(Math.hypot((c.x[0] as number) - P.x, (c.y[0] as number) - P.y) < 10, "it searched round where its vector ran out");
-  assert.ok((c.search[0] as number) > 0, "searching");
+  assert.ok(Math.hypot((c.x[0]) - P.x, (c.y[0]) - P.y) < 10, "it searched round where its vector ran out");
+  assert.ok((c.search[0]) > 0, "searching");
 });
 
 test("loops: the first loop heads the way the ant faces when its vector runs out", () => {

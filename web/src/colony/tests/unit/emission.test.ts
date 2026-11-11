@@ -119,11 +119,11 @@ test("the fungus writes what a host gives off: share is loud and leaks, soothe f
   f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
   assert.equal(c.expr[0], preset("share"));
-  assert.ok(Math.abs((c.layGain[0] as number) - 1.5) < 1e-5);
-  assert.ok(Math.abs((c.crossLay[0] as number) - 1) < 1e-5);
+  assert.ok(Math.abs((c.layGain[0]) - 1.5) < 1e-5);
+  assert.ok(Math.abs((c.crossLay[0]) - 1) < 1e-5);
   assert.equal(c.quiet[0], 0);
   assert.equal(c.expr[1], preset("soothe"));
-  assert.ok(Math.abs((c.quiet[1] as number) - 0.45) < 1e-5, "half load, half the quiet");
+  assert.ok(Math.abs((c.quiet[1]) - 0.45) < 1e-5, "half load, half the quiet");
   assert.equal(c.layGain[1], 1);
   // Cleared: as it was.
   const g = new Fungus(map, {}, STRAINS.map((s) => ({ ...s, decay: 1e9 })));

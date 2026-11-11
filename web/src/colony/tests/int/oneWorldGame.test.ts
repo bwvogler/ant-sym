@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { CURTAIN, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { MODES } from "../../vocab.ts";
 import { decodeFungal } from "../../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
@@ -29,7 +30,7 @@ const underground = (g: Game): boolean => {
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || c.layer[i] !== CURTAIN) continue;
       cellOf(c.x[i]!, c.y[i]!);
-      if ((CELL[1] as number) < top) return false;
+      if ((CELL[1]) < top) return false;
     }
     return true;
   });
@@ -101,7 +102,7 @@ test("one world: the strip over a hole is sky, and a walker stepping up into it 
   // Both cells over the hole (its NW and NE neighbours, row CRUST − 1) are sky: nothing of the plane is stored there.
   for (const dx of [-1, 0, 1]) {
     cellOf(centreX(h.col, h.row) + dx * 0.5, centreY(h.row) - 1);
-    if ((CELL[1] as number) < h.row) assert.equal(rockAt(curtain, CELL[0] as number, CELL[1] as number), AIR);
+    if ((CELL[1]) < h.row) assert.equal(rockAt(curtain, CELL[0], CELL[1]), AIR);
   }
   const at = curtainHole(h);
   const i = 0;
@@ -330,14 +331,14 @@ test("one world: the landing is on the plane by the hole, its spores dose only t
   const landed = g.land(0, GARDEN);
   assert.ok(Math.abs(landed.x - (nest.x + nest.r + 3)) < 1e-9 && landed.y === nest.y, "by the rim of the disc round the hole");
   cellOf(landed.x, landed.y);
-  assert.ok(g.fungus.spores.get(CELL[0] as number, CELL[1] as number) > 0, "spores on the plane");
+  assert.ok(g.fungus.spores.get(CELL[0], CELL[1]) > 0, "spores on the plane");
   // A brush on the plane at a spot where one ant stands on the plane, another under it in the curtain.
   const p = planeHole(own(c));
   const spot = { x: p.x + 10, y: p.y };
   c.putAnt(0, PLANE, spot.x, spot.y);
   c.putAnt(1, CURTAIN, spot.x, spot.y);
   g.paintSpores(spot.x, spot.y, 2, 3, 0.5, GARDEN);
-  assert.ok((c.load[0] as number) > 0, "the plane ant is dosed");
+  assert.ok((c.load[0]) > 0, "the plane ant is dosed");
   assert.equal(c.load[1], 0, "the curtain ant is not");
   // The fungus in a host reads the ground of the layer it is on: the plane's open ground, the curtain's chamber.
   const chamber = g.world!.curtain.nests[0]!;
@@ -349,9 +350,9 @@ test("one world: the landing is on the plane by the hole, its spores dose only t
     c.putAnt(1, CURTAIN, chamber.x, chamber.y);
     g.tick(DT);
   }
-  assert.ok((c.fungal[0] as number) >= 0 && (c.fungal[1] as number) >= 0, "both chose");
-  assert.equal(decodeFungal(c.fungal[0] as number).place, "outside");
-  assert.notEqual(decodeFungal(c.fungal[1] as number).place, "outside");
+  assert.ok((c.fungal[0]) >= 0 && (c.fungal[1]) >= 0, "both chose");
+  assert.equal(decodeFungal(c.fungal[0]).place, "outside");
+  assert.notEqual(decodeFungal(c.fungal[1]).place, "outside");
   // The nest's levers are offered: one world always has a nest.
   assert.ok(g.fungus.hasNest);
   g.fungus.menu = NEST_ONLY;
@@ -373,7 +374,7 @@ test("one world: food and ants are conserved over 90 s, and no ant underground i
       if (!c.alive[i]) continue;
       if (c.layer[i] === PLANE) {
         onPlane++;
-        carried += c.carrying[i] as number;
+        carried += c.carrying[i];
       } else inCurtain++;
     }
     assert.equal(c.population, start[k]! + c.births - c.losses - c.diedOld - c.diedHungry, `colony ${k}: born less dead`);
@@ -396,7 +397,7 @@ const planeLoad = (g: Game, x: number, y: number, each: () => void): number => {
     for (let i = 1; i < 6; i++) c.putAnt(i, PLANE, x, y);
   });
   let s = 0;
-  for (let i = 1; i < 6; i++) s += c.load[i] as number;
+  for (let i = 1; i < 6; i++) s += c.load[i];
   return s;
 };
 
@@ -433,7 +434,7 @@ test("one world: spores on the plane over the queen don't reach her", () => {
   const q = g.player.queen!;
   run(g, 3, () => g.paintSpores(q.x, q.y, 2, 3, 0, GARDEN));
   cellOf(q.x, q.y);
-  assert.ok(g.fungus.spores.get(CELL[0] as number, CELL[1] as number) > 0, "spores on the plane at her x, y");
+  assert.ok(g.fungus.spores.get(CELL[0], CELL[1]) > 0, "spores on the plane at her x, y");
   assert.equal(q.load, 0, "she is stepped on her home layer only");
 });
 
@@ -489,7 +490,7 @@ test("one world: an old ant holding brood, and an old porter, at the top of a sh
   const royal = royalOf(g, c);
   // Ant 0 holds an egg on its way to the royal chamber, as a nurse picks one up (#nurse).
   cellOf(at.x, at.y);
-  const egg = c.brood.add(CELL[0] as number, CELL[1] as number, -1);
+  const egg = c.brood.add(CELL[0], CELL[1], -1);
   egg.held = 0;
   // Ant 1 is a porter, taking food between chambers (#becomePorter): its food is already the colony's.
   c.carrying[1] = 1;

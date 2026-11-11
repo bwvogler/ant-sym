@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { Colony, localPolicy, type Situation } from "../../colony.ts";
+import { Colony, localPolicy } from "../../colony.ts";
+import { type Situation } from "../../vocab.ts";
 import { Fungus, STRAINS, preset } from "../../fungus.ts";
 import { compose, LEVERS } from "../../levers.ts";
 import { Game, MET, QUIET, type GameSave } from "../../game.ts";
@@ -124,7 +125,7 @@ test("odour: an ant smells of its nest; a host carries a share of the fungus's o
   // A host away from the nest, at full share.
   c.mask[4] = MAX_MASK;
   rec.step([c], 0.1);
-  assert.ok(Math.abs((c.odour[4] as number) - MAX_MASK * FUNGAL) < 1e-6, "its nest's odour, MAX_MASK of the way to the fungus's");
+  assert.ok(Math.abs((c.odour[4]) - MAX_MASK * FUNGAL) < 1e-6, "its nest's odour, MAX_MASK of the way to the fungus's");
   assert.equal(c.nestOdour, 0, "nobody at the nest carries the fungus: the nest stays");
   // Hosts at the nest: the nest drifts toward them, and every ant follows its nest.
   for (let i = 0; i < 4; i++) c.mask[i] = MAX_MASK;
@@ -134,7 +135,7 @@ test("odour: an ant smells of its nest; a host carries a share of the fungus's o
   // A healthy ant again (the fungus cleared): it smells of its nest alone.
   c.mask[4] = 0;
   rec.step([c], 0.1);
-  assert.ok(Math.abs((c.odour[4] as number) - c.nestOdour) < 1e-6);
+  assert.ok(Math.abs((c.odour[4]) - c.nestOdour) < 1e-6);
 });
 
 test("a host is never a stranger to its own nest, at any share any intervention can give", () => {
@@ -154,8 +155,8 @@ test("judged as an ant judges it (by band centre, in float32), a host at full sh
     c.odour[1] = n0 + MAX_MASK * (FUNGAL - n0);
     const rec = new Recognition();
     rec.build([c]);
-    rec.look(c.odour[0] as number, c.tolerance[0] as number);
-    assert.equal(rec.get(12, 6), 0, `nest ${n0}: host at ${c.odour[1]} (band ${binOf(c.odour[1] as number)}) seen as a stranger`);
+    rec.look(c.odour[0], c.tolerance[0]);
+    assert.equal(rec.get(12, 6), 0, `nest ${n0}: host at ${c.odour[1]} (band ${binOf(c.odour[1])}) seen as a stranger`);
   }
 });
 
@@ -173,11 +174,11 @@ test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, 
   f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
   assert.equal(c.expr[0], preset("soothe"));
-  assert.ok(Math.abs((c.calm[0] as number) - 0.8) < 1e-5);
-  assert.ok(Math.abs((c.tolerance[0] as number) - 0.65) < 1e-5);
+  assert.ok(Math.abs((c.calm[0]) - 0.8) < 1e-5);
+  assert.ok(Math.abs((c.tolerance[0]) - 0.65) < 1e-5);
   assert.equal(c.mask[0], 0);
   assert.equal(c.expr[1], preset("blend"));
-  assert.ok(Math.abs((c.mask[1] as number) - 0.3) < 1e-5, "half load, half the share");
+  assert.ok(Math.abs((c.mask[1]) - 0.3) < 1e-5, "half load, half the share");
   assert.equal(c.calm[1], 0);
 });
 

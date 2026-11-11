@@ -1,6 +1,7 @@
 // Test builders shared by the colony tests: the small maps and games, the step loop and the hand-placed colonies
 // that used to be copied file to file (S0b, ja-fnd.1.3). A test whose setup differs keeps its own and says why.
-import { LIFESPAN, MIDDLE, Colony, type HoleCell, type Policy } from "../colony.ts";
+import { LIFESPAN, MIDDLE, Colony, type HoleCell } from "../colony.ts";
+import { type Policy } from "../vocab.ts";
 import type { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { generateOneWorld, type OneWorld } from "../oneWorld.ts";
@@ -59,7 +60,7 @@ export function walkway(map: WorldMap, x: number): number {
 export function broodChamber(map: ReturnType<typeof generateSideWorld>) {
   const ch = map.chambers!;
   cellOf(map.nest.x, map.nest.y);
-  const [rx, ry] = [CELL[0] as number, CELL[1] as number];
+  const [rx, ry] = [CELL[0], CELL[1]];
   let x = rx;
   while (rockAt(map, x, ry) === OPEN) x++;
   digCell(map, x, ry);

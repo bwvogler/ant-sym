@@ -69,8 +69,8 @@ test("each nest: its entrance an open hole in the ground line with the walkway b
     for (const n of map.nests) {
       assert.ok(n.entrance, "an entrance");
       cellOf(n.entrance!.x, n.entrance!.y);
-      const ex = CELL[0] as number;
-      const ey = CELL[1] as number;
+      const ex = CELL[0];
+      const ey = CELL[1];
       assert.ok(!isSky(map, ex, ey) && rockAt(map, ex, ey) === OPEN, `seed ${seed}: the hole is open ground`);
       let beside = false;
       for (let d = 0; d < 6; d++) beside ||= isSky(map, nx(ex, ey, d), ny(ey, d)) && rockAt(map, nx(ex, ey, d), ny(ey, d)) === OPEN;
@@ -78,7 +78,7 @@ test("each nest: its entrance an open hole in the ground line with the walkway b
       assert.ok(n.y > n.entrance!.y + 8, "the chamber is well below the ground line");
       const walk = reachable(map, n.x, n.y, "open");
       cellOf(n.entrance.x, n.entrance.y);
-      assert.equal(walk[(CELL[1] as number) * map.size.w + (CELL[0] as number)], 1, "the chamber is joined to its entrance on foot");
+      assert.equal(walk[(CELL[1]) * map.size.w + (CELL[0])], 1, "the chamber is joined to its entrance on foot");
     }
     // Food: the generator drops food it can't reach by digging from the player's chamber, so "all food reachable, walking or
     // digging" (as this test said) couldn't fail. What it doesn't ensure, checked here with a walk of the test's own:
@@ -86,8 +86,8 @@ test("each nest: its entrance an open hole in the ground line with the walkway b
     // lies open, at least 4 rows under the ground line (a pocket's centre is 10 down, and its cells within 4 of that).
     const walk = new Uint8Array(map.size.w * map.size.h);
     cellOf(map.nest.x, map.nest.y);
-    const todo: [number, number][] = [[CELL[0] as number, CELL[1] as number]];
-    walk[(CELL[1] as number) * map.size.w + (CELL[0] as number)] = 1;
+    const todo: [number, number][] = [[CELL[0], CELL[1]]];
+    walk[(CELL[1]) * map.size.w + (CELL[0])] = 1;
     while (todo.length) {
       const [x, y] = todo.pop()!;
       for (let d = 0; d < 6; d++) {
@@ -147,7 +147,7 @@ test("homing in the side view: a carrier on the ground walks to its entrance and
   const map = generateSideWorld(2, { ...SMALL, nestCount: 1 });
   const n = map.nest;
   cellOf(n.entrance!.x, n.entrance!.y);
-  const ex = CELL[0] as number;
+  const ex = CELL[0];
   // Food carrier, 20 columns along the walkway.
   {
     const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "return");
@@ -174,7 +174,7 @@ test("homing in the side view: a carrier on the ground walks to its entrance and
     assert.equal(c.soilOut, 1, `up the shaft and out (${(t / 30).toFixed(0)} s)`);
     c.tick(1 / 30); // the pellet is heaped where it stands: it climbs on top of it
     c.antCell(0);
-    assert.ok(isSky(map, CELL[0] as number, CELL[1] as number), "dropped out on the ground (MR 15: carried out along it, not dropped at the hole)");
+    assert.ok(isSky(map, CELL[0], CELL[1]), "dropped out on the ground (MR 15: carried out along it, not dropped at the hole)");
   }
 });
 
@@ -196,7 +196,7 @@ test("foraging in the side view: carriers on the ground in sight of the hole mak
       for (let i = 0; i < c.n; i++) {
         c.antCell(i);
         const d = Math.abs(c.x[i]! - e.x);
-        const inSight = c.alive[i] && c.carrying[i] && isSky(map, CELL[0] as number, CELL[1] as number) && d < HOLE_SIGHT && Math.abs(c.y[i]! - e.y) < 2 * HOLE_SIGHT;
+        const inSight = c.alive[i] && c.carrying[i] && isSky(map, CELL[0], CELL[1]) && d < HOLE_SIGHT && Math.abs(c.y[i]! - e.y) < 2 * HOLE_SIGHT;
         if (inSight && nearD[i]! >= 0) {
           nearSamples++;
           if (d > nearD[i]! + 1) nearAway++;
@@ -208,7 +208,7 @@ test("foraging in the side view: carriers on the ground in sight of the hole mak
       // Every 2 s: a carrier on the ground should be nearer the hole (along the ground) than 2 s ago.
       for (let i = 0; i < c.n; i++) {
         c.antCell(i);
-        const onGround = c.alive[i] && c.carrying[i] && isSky(map, CELL[0] as number, CELL[1] as number);
+        const onGround = c.alive[i] && c.carrying[i] && isSky(map, CELL[0], CELL[1]);
         const d = Math.abs(c.x[i]! - e.x);
         if (onGround && lastD[i]! >= 0) {
           samples++;
@@ -268,8 +268,8 @@ test("a carrier homing along the ground passes the rival's hole without going in
     const map = generateSideWorld(seed);
     const r = map.nests[1]!.entrance!;
     cellOf(r.x, r.y);
-    const rx = CELL[0] as number;
-    const ry = CELL[1] as number;
+    const rx = CELL[0];
+    const ry = CELL[1];
     // A pellet heaped on the hole's rim on the side toward home (the mound may hold a row there): then the hole itself is
     // the step nearer home by column from the rim's other side.
     if (rim) assert.ok(fillCell(map, nx(rx, ry, NW), ny(ry, NW)) && isSky(map, nx(rx, ry, NE), ny(ry, NE)), "the rim heaped");
@@ -280,7 +280,7 @@ test("a carrier homing along the ground passes the rival's hole without going in
     for (; t < 30 * 120 && c.stored === 0; t++) {
       c.tick(1 / 30);
       c.antCell(0);
-      if (!isSky(map, CELL[0] as number, CELL[1] as number) && Math.abs(c.x[0]! - r.x) < 30) under++;
+      if (!isSky(map, CELL[0], CELL[1]) && Math.abs(c.x[0]! - r.x) < 30) under++;
     }
     return { under: under / 30, home: c.stored === 1 };
   };
@@ -351,14 +351,14 @@ test("a homing ant on the walkway cell above the hole, its step to the hole graz
   // 3 ants stood there 114–340 s in that game.
   const map = generateSideWorld(2, { nestCount: 1 });
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const hx = CELL[0] as number;
-  const hy = CELL[1] as number;
+  const hx = CELL[0];
+  const hy = CELL[1];
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "return");
   c.x[0] = 328.29095458984375; // float32, as stored
   c.y[0] = 58.04733657836914;
   c.mode[0] = 2;
   c.antCell(0);
-  const [ax, ay] = [CELL[0] as number, CELL[1] as number];
+  const [ax, ay] = [CELL[0], CELL[1]];
   assert.ok(isSky(map, ax, ay) && hexDistance(ax, ay, hx, hy) === 1 && ay === hy - 1, "on the walkway, just above the hole");
   let t = 0;
   for (; t < 30 * 5; t++) {

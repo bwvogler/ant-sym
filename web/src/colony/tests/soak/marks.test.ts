@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, localPolicy, REST, type Situation } from "../../colony.ts";
+import { Colony, localPolicy, REST } from "../../colony.ts";
+import { type Situation } from "../../vocab.ts";
 import { Game } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN, OPEN_WORLD, rockAt } from "../../world.ts";

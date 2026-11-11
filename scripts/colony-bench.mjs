@@ -16,11 +16,7 @@
 // whole game at the end (tests/saveHash.ts): a tick refactor must leave it unchanged.
 //
 // Usage: node scripts/colony-bench.mjs [--one [--page]] [--hash] [ants per colony=1200] [sim seconds=60] [seed=1] [spores=0]
-import { CURTAIN, PLANE } from "../web/src/colony/colony.ts";
-import { STRAINS } from "../web/src/colony/fungus.ts";
-import { GAME_REGROW, Game, gameRng } from "../web/src/colony/game.ts";
-import { generateOneWorld } from "../web/src/colony/oneWorld.ts";
-import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, SIDE_WORLD } from "../web/src/colony/world.ts";
+import { CURTAIN, PLANE, STRAINS, GAME_REGROW, Game, gameRng, generateOneWorld, generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, SIDE_WORLD } from "../web/src/colony/index.ts";
 
 const one = process.argv.includes("--one");
 const page = process.argv.includes("--page");
@@ -41,7 +37,7 @@ for (const [given, ground] of RUNS) {
   const t0 = performance.now();
   const map = ground.startsWith("one") ? generateOneWorld(seed) : ground.startsWith("side") ? generateSideWorld(seed, ground === "side, two" ? {} : { nestCount: 1 }) : generateWorld(seed, ground === "open" ? { ...OPEN_WORLD, size: given } : { size: given });
   const gen = performance.now() - t0;
-  const size = given ?? /** @type {import("../web/src/colony/oneWorld.ts").OneWorld} */ (map).plane.size;
+  const size = given ?? /** @type {import("../web/src/colony/index.ts").OneWorld} */ (map).plane.size;
   const game = page ? new Game(map, { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed)) : new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 31 + 7));
   if (page)
     game.land(

@@ -57,7 +57,7 @@ test("the queen is asked only her own levers, and her signal lever scales the ro
     const signal = c.queen!.signal;
     for (let k = 0; k < 30; k++) c.tick(1 / 30);
     cellOf(c.queen!.x, c.queen!.y);
-    return { signal, mark: c.ph.fields.royal.get(CELL[0] as number, CELL[1] as number) };
+    return { signal, mark: c.ph.fields.royal.get(CELL[0], CELL[1]) };
   };
   const damped = mark(0);
   const asIs = mark(2);

@@ -91,7 +91,7 @@ function flush(v: number): number {
 /** A neighbour's level across a chunk border: this cell's own level `v` when the neighbour is rock or off the map. */
 function across(rock: Uint8Array | undefined, field: Float32Array | undefined, i: number, v: number): number {
   if (!rock || rock[i]) return v;
-  return field ? (field[i] as number) : 0;
+  return field ? (field[i]) : 0;
 }
 
 export class Pheromones {
@@ -122,7 +122,7 @@ export class Pheromones {
   /** Add to the cell under world (x, y). */
   deposit(channel: Channel, x: number, y: number, amount: number): void {
     cellOf(x, y);
-    this.depositCell(channel, CELL[0] as number, CELL[1] as number, amount);
+    this.depositCell(channel, CELL[0], CELL[1], amount);
   }
 
   /** Add to integer cell (cx, cy). */
@@ -137,8 +137,8 @@ export class Pheromones {
   /** The level under world (x, y); −1 off the map, so a sensor reads the edge as worse than bare ground. */
   read(channel: Channel, x: number, y: number): number {
     cellOf(x, y);
-    const cx = CELL[0] as number;
-    const cy = CELL[1] as number;
+    const cx = CELL[0];
+    const cy = CELL[1];
     const { map } = this;
     if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return -1;
     return this.fields[channel].get(cx, cy);
@@ -215,10 +215,10 @@ export class Pheromones {
         let n = 0;
         let s = 0;
         for (let t = 0; t < CHUNK; t++) {
-          w = Math.max(w, a[t << CHUNK_BITS] as number);
-          e = Math.max(e, a[(t << CHUNK_BITS) | EDGE] as number);
-          n = Math.max(n, a[t] as number);
-          s = Math.max(s, a[(EDGE << CHUNK_BITS) | t] as number);
+          w = Math.max(w, a[t << CHUNK_BITS]);
+          e = Math.max(e, a[(t << CHUNK_BITS) | EDGE]);
+          n = Math.max(n, a[t]);
+          s = Math.max(s, a[(EDGE << CHUNK_BITS) | t]);
         }
         const wake = (nx: number, ny: number) => {
           const nk = chunkKey(nx, ny);
@@ -230,8 +230,8 @@ export class Pheromones {
         if (n > SLEEP && cy > 0) wake(cx, cy - 1);
         if (s > SLEEP && cy < maxCy) wake(cx, cy + 1);
         // The two corners that touch a diagonal chunk (odd rows sit half a cell right).
-        if ((a[0] as number) > SLEEP && cx > minCx && cy > 0) wake(cx - 1, cy - 1);
-        if ((a[(EDGE << CHUNK_BITS) | EDGE] as number) > SLEEP && cx < maxCx && cy < maxCy) wake(cx + 1, cy + 1);
+        if ((a[0]) > SLEEP && cx > minCx && cy > 0) wake(cx - 1, cy - 1);
+        if ((a[(EDGE << CHUNK_BITS) | EDGE]) > SLEEP && cx < maxCx && cy < maxCy) wake(cx + 1, cy + 1);
       }
     }
 
@@ -258,13 +258,13 @@ export class Pheromones {
           const i = row | lx;
           const ua = i - CHUNK + o;
           const da = i + CHUNK + o;
-          const v = f[i] as number;
-          const fl = f[i - 1] as number;
-          const fr = f[i + 1] as number;
-          const f1 = f[ua] as number;
-          const f2 = f[ua + 1] as number;
-          const f3 = f[da] as number;
-          const f4 = f[da + 1] as number;
+          const v = f[i];
+          const fl = f[i - 1];
+          const fr = f[i + 1];
+          const f1 = f[ua];
+          const f2 = f[ua + 1];
+          const f3 = f[da];
+          const f4 = f[da + 1];
           if (v === 0 && fl === 0 && fr === 0 && f1 === 0 && f2 === 0 && f3 === 0 && f4 === 0) {
             out[i] = 0;
             continue;
@@ -315,7 +315,7 @@ export class Pheromones {
       out[i] = 0;
       return 0;
     }
-    const v = f[i] as number;
+    const v = f[i];
     const o = (ly & 1) - 1;
     // Mean of the open neighbours; rock and the edge of the map count as this cell, so nothing leaks into them.
     const sum = this.#at(lx - 1, ly, v) + this.#at(lx + 1, ly, v) + this.#at(lx + o, ly - 1, v) + this.#at(lx + o + 1, ly - 1, v) + this.#at(lx + o, ly + 1, v) + this.#at(lx + o + 1, ly + 1, v);
