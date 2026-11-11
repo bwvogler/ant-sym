@@ -47,7 +47,7 @@ npx oxlint 2>&1 | grep -q ': error ' && { echo "  lint ERRORS:"; npx oxlint 2>&1
 if out=$(run npx vite build 2>&1); then echo "build: ok"; else echo "build: FAILED"; echo "$out" | tail -15; fi
 
 mb=$(git -C "$W" merge-base origin/main HEAD)
-g=$(git -C "$W" diff --stat "$mb" HEAD -- web/src/colony/tests/golden.json web/src/colony/tests/slow/golden.json web/public/precache | tail -1)
+g=$(git -C "$W" diff --stat "$mb" HEAD -- web/src/colony/tests/golden/golden.json web/src/colony/tests/slow/golden.json web/public/precache | tail -1)
 echo "goldens/precache since merge base: ${g:-unchanged}"
 
 brains=$(git -C "$W" diff --name-only "$mb" HEAD -- web/src/colony/colonyBrain.ts web/src/colony/fungusBrain.ts web/src/colony/responses.ts web/src/colony/fungalPolicy.ts web/src/colony/levers.ts web/shared/jev.ts)

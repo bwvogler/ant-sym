@@ -6,7 +6,7 @@ import { nx, ny } from "../../hex.ts";
 import { generateSideWorld, groundTop, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
 
 // Nest slice 2 (docs/nest-and-home.md §3.2): whole-colony chamber tests, too slow for `npm test`'s 60 s per file
-// (`npm run test:slow`). The rest are in ../chambers.test.ts.
+// (`npm run test:slow`). The rest are in ../int/chambers.test.ts.
 
 const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 

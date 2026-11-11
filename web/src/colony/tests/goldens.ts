@@ -5,7 +5,7 @@ import { Game } from "../game.ts";
 import { generateOneWorld } from "../oneWorld.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD } from "../world.ts";
 
-// Golden masters, shared by tests/golden.test.ts (fast) and tests/slow/golden.test.ts: seeded
+// Golden masters, shared by tests/golden/golden.test.ts (fast) and tests/slow/golden.test.ts: seeded
 // games recorded on main before the behaviour MRs (response hooks), checked every 10 s for the
 // colonies' counts and bit-exact hashes of every ant, each colony's pheromone fields and the map's food. A refactor that should not change behaviour
 // must keep them. A change meant to alter behaviour re-records them (GOLDEN_WRITE=1), says so in

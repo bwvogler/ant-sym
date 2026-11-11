@@ -8,7 +8,12 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "typecheck": "tsc -b",
-    "test": "node --test --test-timeout=60000 server/tests/*.test.ts worker/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/*.test.ts",
+    "test": "node --test --test-timeout=60000 server/tests/*.test.ts worker/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/unit/*.test.ts src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/soak/*.test.ts src/colony/tests/golden/*.test.ts",
+    "test:unit": "node --test --test-timeout=60000 server/tests/*.test.ts worker/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/unit/*.test.ts",
+    "test:watch": "node --test --watch --test-timeout=60000 server/tests/*.test.ts worker/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/unit/*.test.ts",
+    "test:int": "node --test --test-timeout=60000 src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts",
+    "test:soak": "node --test --test-timeout=60000 src/colony/tests/soak/*.test.ts",
+    "test:golden": "node --test --test-timeout=60000 src/colony/tests/golden/*.test.ts",
     "preview": "vite preview",
     "test:slow": "node --test --test-timeout=1200000 src/colony/tests/slow/*.test.ts",
     "e2e": "node ../scripts/e2e-one-world.mjs"
