@@ -12,6 +12,8 @@ import {
   type RunSummary,
 } from "../../shared/jev.ts";
 import { apiHeaders, apiUrl } from "./backend.ts";
+import { LANE_KINDS, laneOfContext, type LaneName } from "./lanes.ts";
+export type { LaneName } from "./lanes.ts";
 import {
   localPolicy,
   localStance,
@@ -112,8 +114,6 @@ export interface ColonyJevState {
 }
 
 type Listener = (s: ColonyJevState) => void;
-
-export type LaneName = "mode" | "stance" | "fungus";
 
 /** One stream of questions: how to key, pack and read them, the local fallback, and the words they are asked under. */
 interface Lane<S, A extends string> {
@@ -368,7 +368,7 @@ export class ColonyJev {
     const key = l.key(s);
     const hit = this.#cache(l).get(key);
     const running = this.#state.phase === "running";
-    if (running && l.name === "mode") {
+    if (running && LANE_KINDS[l.name].countsHits) {
       if (hit) this.#state.hits++;
       else this.#state.misses++;
     }
@@ -506,13 +506,7 @@ export class ColonyJev {
 
   /** A lane whose kind of context this is (by its prefix: colony-, stance-, fungus-), to check answers against. */
   #laneFor(context: string): Lane<unknown, string> | null {
-    const kind = context.startsWith("colony-")
-      ? "mode"
-      : context.startsWith("stance-")
-        ? "stance"
-        : context.startsWith("fungus-")
-          ? "fungus"
-          : null;
+    const kind = laneOfContext(context);
     if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
     const d = this.#driven[0] ?? colonyLanes("");
     return kind === "mode" ? (d.modes as Lane<unknown, string>) : kind === "stance" ? (d.stances as Lane<unknown, string>) : null;
@@ -729,11 +723,11 @@ export class ColonyJev {
     const seq = this.#runSeq;
     const context = l.context;
     const items = batch.map(([key, situation], n) => ({
-      id: `${l.name === "mode" ? "s" : l.name === "stance" ? "c" : "h"}${n}`,
+      id: `${LANE_KINDS[l.name].idPrefix}${n}`,
       key,
       situation,
     }));
-    const counted = l.name === "mode" ? "asked" : l.name === "stance" ? "stancesAsked" : "fungusAsked";
+    const counted = LANE_KINDS[l.name].counter;
     this.#inFlight++;
     this.#set({ [counted]: this.#state[counted] + items.length, requests: this.#state.requests + 1 });
     let reply: JevProxyReply | null = null;
@@ -796,6 +790,6 @@ export class ColonyJev {
     this.#saveSoon(context, cache as unknown as PolicyCache<string>);
     this.#set({ run: runOf(reply) ?? this.#state.run, lastError: null, ...this.#counts() });
     // The fungus asks its policy every step, so its new answers take hold by themselves; the ants reconsider.
-    if (seq === this.#runSeq && l.name !== "fungus") this.#reconsider();
+    if (seq === this.#runSeq && LANE_KINDS[l.name].reconsiders) this.#reconsider();
   }
 }
