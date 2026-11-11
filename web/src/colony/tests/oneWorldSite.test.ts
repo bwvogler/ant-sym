@@ -5,8 +5,9 @@ import { Game, gameRng } from "../game.ts";
 import { centreX, centreY } from "../hex.ts";
 import { generateOneWorld } from "../oneWorld.ts";
 import { dropFood } from "../world.ts";
+import { generateWorld, mulberry32 } from "../world.ts";
 
-// Site fidelity on one world's plane (ja-lp4.15.3, docs/forager-trips.md §3, PRD §57): a forager that picks up food keeps
+// Site fidelity on one world's plane (ja-lp4.15.3, docs/forager-trips.md §3, PRD §58): a forager that picks up food keeps
 // its own vector to the spot (where it stood less where its vector put its hole), walks it straight on its next trip out,
 // searches round the spot, and lets a food trail take over; forgets the spot when it tires there, replaces it at its
 // next find. A rock-free small plane (160 × 100, seed 7), no food but what a test drops, every ant young but ant 0.
@@ -226,4 +227,25 @@ test("site fidelity: with siteGive it gives the spot up once its search has wide
   assert.ok(forgot(100, 2) > long + 4, "a wider allowance, a longer search");
   const off = forgot(20, 0);
   assert.ok(off > 55 && off < 65, `siteGive 0: only tiring (patience 60 s) ends it: ${off.toFixed(1)} s`);
+});
+
+test("site fidelity: a newborn in a dead ant's slot remembers nothing", () => {
+  const { c } = plane();
+  c.foodX[0] = 12;
+  c.foodY[0] = -7;
+  c.kill(0);
+  assert.ok(c.spawn(), "a slot was free");
+  assert.ok(Number.isNaN(c.foodX[0] as number) && Number.isNaN(c.foodY[0] as number), "the dead ant's spot is not inherited");
+});
+
+test("site fidelity: not on a top-down map, where a find is not remembered", () => {
+  const world = generateWorld(3, { size: { w: 128, h: 96 }, nestCount: 1 });
+  const flat = new Colony(world, { antCount: 1, maxAnts: 1, siteFidelity: 1, deposit: 0 }, mulberry32(5), () => "explore");
+  flat.age[0] = 0.5 * LIFESPAN;
+  flat.mode[0] = EXPLORE;
+  flat.carrying[0] = 0;
+  dropFood(world, flat.x[0] as number, flat.y[0] as number, 3);
+  for (let t = 0; t < 90 && flat.carrying[0] !== 1; t++) flat.tick(DT);
+  assert.equal(flat.carrying[0], 1, "it picked the food up");
+  assert.ok(Number.isNaN(flat.foodX[0] as number), "nothing remembered off the plane");
 });

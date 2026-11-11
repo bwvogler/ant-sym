@@ -1643,7 +1643,7 @@ export const F1_FAR = 80;
 export const F1_SECONDS = 30;
 
 /**
- * F1 — foragers go back to where they found food (ja-lp4.15.1; docs/forager-trips.md §3, PRD §57). On one world's default
+ * F1 — foragers go back to where they found food (ja-lp4.15.1; docs/forager-trips.md §3, PRD §58). On one world's default
  * plane (generateOneWorld(seed)), F1_ANTS old foragers of the player are each set down just out of their hole, empty-
  * jawed and exploring on a fresh trip (odoSurf 3, a fresh drift as #crossUp draws it, a heading at random), as if sent out
  * again after a find at a known spot: a spot F1_NEAR to F1_FAR cells from the hole, on open ground joined to the hole

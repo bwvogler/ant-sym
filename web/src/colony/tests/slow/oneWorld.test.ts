@@ -18,7 +18,7 @@ import { generateOneWorld } from "../../oneWorld.ts";
 // until homing on the plane brings them under it (ja-lp4.6.3). Each seed runs about 3–5 minutes. With the mound's
 // smell (ja-lp4.11, PRD §56) it still fails: 1: 10 / 13, 2: 19 / 8, 3: 12 / 24, 4: 35 / 7, 5: 6 / 10, 6: 10 / 18, 7: 6 / 11,
 // 8: 11 / 10, 9: 7 / 2, 10: 18 / 8; seeds 5 and 9 at 10 and 7. The bound stays (owner, 2026-11-11).
-// Forager trips (ja-lp4.15, PRD §57) are built and off by default, so this still fails. Run with `--set colony.planePatience=0.5
+// Forager trips (ja-lp4.15, PRD §58) are built and off by default, so this still fails. Run with `--set colony.planePatience=0.5
 // --set rival.planePatience=0.5 --set colony.siteFidelity=1 --set rival.siteFidelity=1` (npm run exp -- --one game1) the guard's seeds
 // 5 and 9 hold 2 / 1 and 0 / 0 at worst and 4 seeds in 10 meet the bound (worst seed 13), at -13.7 % food carried down and
 // -12.8 % births against the default: not shipped without the owner. This test plays the defaults, so it stays skipped.

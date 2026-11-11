@@ -4494,7 +4494,7 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 
 **To read when the network allows:** the full texts of Waldner & Merkle 2018, Merkle et al. 2006 and Sturgis et al. 2011.
 
-## 57. Foragers on the plane search less and go back to their last find (design, ja-lp4.15, ja-lp4.6.3, 2026-11-11)
+## 58. Foragers on the plane search less and go back to their last find (design, ja-lp4.15, ja-lp4.6.3, 2026-11-11)
 
 **Research basis:** [forager-trips.md](forager-trips.md). No full text could be fetched (network policy), so every figure is **unverified**.
 
@@ -4560,9 +4560,31 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 - **Leave them off** (as shipped): the game is as §56 left it, G1 fails its bound on every seed and the guard stays skipped.
 - **Turn on ×0.5 with fidelity**: G1's guard seeds 5 and 9 reach 2 and 0 (un-skip it, the test setting both), the worst seed falls from 35 to 13 (78 to 32 on 11-20) and 4 seeds in 10 meet the bound, at -13.7 % food and -12.8 % births (-17.0 / -16.3 % on 11-20), and A1 at 7/10. The one-world golden would be re-recorded.
 - **Something between** (×0.75: -9.2 % / -10.3 %, worst seed 32): no setting met the 5 % rule and moved G1.
-- **None of these is cheap**: what might get G1 under the bound without the cost is a different end to a long search (by vector length, not patience), fidelity only for rich finds (Wolf et al. 2012), or the error law (§57 "Still open"); each is a new mechanic, through the `adding-mechanics` skill.
+- **None of these is cheap**: what might get G1 under the bound without the cost is a different end to a long search (by vector length, not patience), fidelity only for rich finds (Wolf et al. 2012), or the error law (§58 "Still open"); each is a new mechanic, through the `adding-mechanics` skill.
 
 **Beads.** `ja-lp4.15` (epic), children in build order: F1 and its baseline; the shorter search; site fidelity; tuning, G1 and docs. `ja-lp4.6.3` waits on it and on `ja-lp4.16` (route memory round rock).
 
 **Still open.** Whether to turn the levers on (above). Why fidelity does not win the food back: most remembered spots are spent when the ant is back (15-21 % of searches round one found food in a probe), so a rule that remembers only rich finds, or gives a spot up by how much the find was, is the next thing to measure. The error law (proportional to cells walked today, a random walk would be their square root) is the owner's call and not part of this. The full texts of Merkle & Wehner 2010, Wolf et al. 2012, Cheng et al. 2006 and Beverly et al. 2009.
 
+
+## 57. Foundation refactor: decisions (ja-fnd, 2026-11-11)
+
+The owner asked for a review of the work needed before the game grows: species with other senses and signals, new final structures and ways to interact, and a new UI and game experience. The roadmap is [refactor.md](refactor.md), and the beads are the epic `ja-fnd`, with one child for each stage, S0–S6. Decisions:
+
+- **One world only.** The top-down and side maps are retired, not kept behind a view strategy (owner, 2026-11-11). The page already plays only one world (§55). The simulation still branches on view proxies: `#entrance === null` 85 times in `colony.ts`, plus `map.sky`, plus `this.queen` read as "side view". It also carries plane/curtain twins. S2 ports the assays that carry baselines and re-records the golden masters on one world, then deletes the old maps. It waits for the mechanics that run only top-down to reach one world's surface (`ja-d6c`) and for one world's guards (`ja-lp4.6`).
+- **Order.**
+  - S0: fast tests and CI.
+  - S1: one vocabulary.
+  - S2: one world only.
+  - S3: take `Colony` apart.
+  - S4: species and lanes as data.
+
+  S2 comes before S3, so nothing is split that is about to be deleted. The UI (S5) and the wire contract (S6) are independent once S0 is done.
+- **Bit-exact moves.**
+  - Every stage but S2 keeps the golden masters bit-exact, RNG order included.
+  - A generated legend, question or key must match today's bytes, so no Jev answer is bought again.
+- **Measured at review time.**
+  - `npm test`: 3 min 44 s of wall time and 13.6 CPU-minutes for 610 tests at concurrency 4, locally; 310 s on CI, where `food.test.ts` was cancelled at the 60 s file limit (`ja-6mj`, now under S0).
+  - `colony.ts`: 6,528 lines; `tick()` about 1,055.
+  - `ColonyField.tsx`: 1,437 lines.
+- **Cost.** No legend, question or schema changed. S2 changes the Jev contexts that name a view, so its PR re-ships precache from a live check and gives each lane's hourly cost.

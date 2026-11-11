@@ -6,7 +6,7 @@ import { centreX, centreY } from "../hex.ts";
 import { generateOneWorld } from "../oneWorld.ts";
 import { generateSideWorld, generateWorld, mulberry32 } from "../world.ts";
 
-// A shorter search on one world's plane (ja-lp4.15.2, docs/forager-trips.md §1, PRD §57): a forager on the plane tires at
+// A shorter search on one world's plane (ja-lp4.15.2, docs/forager-trips.md §1, PRD §58): a forager on the plane tires at
 // patience × planePatience, on its own clock; in the nest, in the side view and on top-down maps, at patience.
 
 const DT = 1 / 30;

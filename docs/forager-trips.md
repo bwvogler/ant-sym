@@ -1,6 +1,6 @@
 # Forager trips: what keeps a forager's way home short
 
-*Research note for `ja-lp4.15` (one world, for `ja-lp4.6.3`; PRD §57). Written 2026-11-11 against code at `89f8dee`; built the same day, switched off ("What was built"). **No paper was read in full text.** Every publisher and repository host tried was refused (proxy 403, or DNS for `www.imls.uzh.ch`, `doc.rero.ch`, `cob.silverchair.com`, `openresearch-repository.anu.edu.au`). Every claim below comes from abstracts, database records and citing papers seen in search results, so all of it is **unverified**. The rules are **design**. It builds on [tiredness](tiredness.md) (what ends a trip; rest between bouts) and [nest-search](nest-search.md) (the search for the hole) and does not repeat them.*
+*Research note for `ja-lp4.15` (one world, for `ja-lp4.6.3`; PRD §58). Written 2026-11-11 against code at `89f8dee`; built the same day, switched off ("What was built"). **No paper was read in full text.** Every publisher and repository host tried was refused (proxy 403, or DNS for `www.imls.uzh.ch`, `doc.rero.ch`, `cob.silverchair.com`, `openresearch-repository.anu.edu.au`). Every claim below comes from abstracts, database records and citing papers seen in search results, so all of it is **unverified**. The rules are **design**. It builds on [tiredness](tiredness.md) (what ends a trip; rest between bouts) and [nest-search](nest-search.md) (the search for the hole) and does not repeat them.*
 
 ## The question
 
@@ -96,18 +96,18 @@ At 30 s G1 meets its bound on both seeds, but births fall 8–25 % a colony and 
 
 ## What was built
 
-*`ja-lp4.15`, PRD §57; measured 2026-11-11.* One world's plane only; every golden master, the one-world one included, is unchanged, because **both are built and switched off** (`planePatience` 1, `siteFidelity` 0, `siteGive` 0): the measurements below did not support turning either on within the rule set for the build.
+*`ja-lp4.15`, PRD §58; measured 2026-11-11.* One world's plane only; every golden master, the one-world one included, is unchanged, because **both are built and switched off** (`planePatience` 1, `siteFidelity` 0, `siteGive` 0): the measurements below did not support turning either on within the rule set for the build.
 
 - **A shorter search** (`planePatience`): a forager on the plane tires at `patience` × it (the fungus's `clock` still scales it); in the nest, the side view and on top-down maps, at `patience`. Rest, and the cap of twice `patience`, are unchanged.
 - **Site fidelity** (`siteFidelity`, saved per ant as `foodX`, `foodY`, NaN for none; `SAVE_VERSION` 8): at a pickup on the plane the ant keeps where it stood less where its vector put its hole (the hole plus `odoSurf` × drift: its home vector, negated), so only its own odometer and drift. An exploring ant with a spot turns toward the hole's believed place on this trip plus that offset, and within 2 cells of it runs U3b's spiral round it. Food in sight and a food trail (`follow`) come first. It forgets the spot when it tires while searching round it, or (`siteGive`) once the spiral has widened past `siteGive` σ of its vector; its next find replaces it. The odometer keeps counting while it searches (held, as a homing ant's is, F1 would read 92 % instead of 81 %; not built: it would cut the error of every carrier back from a remembered spot).
 - **F1** (`--one f1`): off, 8.7 % of foragers set down by their hole reach the spot of a find 40-80 cells out within 30 s; on, **81.3 %**, walking 1.05 times the straight line.
-- **G1**: the shorter search moves it, fidelity helps a little with it and does not win the food back. At ×0.5 (30 s) with fidelity: worst seed 35 to 13, seeds 5 and 9 at 2 and 0, food carried down -13.7 %, births -12.8 % (seeds 11-20: -17.0 % and -16.3 %). Fidelity alone: -6.3 % and -5.6 %, no gain. Most remembered spots are spent when the ant is back (a 300-s probe: 15 and 21 % of the searches round a spot found food), and the trip to a spent one is a trip not spent looking elsewhere (the likely cost; not isolated). The full table is in PRD §57.
+- **G1**: the shorter search moves it, fidelity helps a little with it and does not win the food back. At ×0.5 (30 s) with fidelity: worst seed 35 to 13, seeds 5 and 9 at 2 and 0, food carried down -13.7 %, births -12.8 % (seeds 11-20: -17.0 % and -16.3 %). Fidelity alone: -6.3 % and -5.6 %, no gain. Most remembered spots are spent when the ant is back (a 300-s probe: 15 and 21 % of the searches round a spot found food), and the trip to a spent one is a trip not spent looking elsewhere (the likely cost; not isolated). The full table is in PRD §58.
 - **The call for the owner:** G1's bound, the 5 % cost rule and the guard cannot all be met with these two rules. What would: a cheaper way to end a long search (a vector-length rule other than patience), fidelity only for rich finds (Wolf et al. 2012: how often it returns depends on how much it found), or the error law of §2.
 
 ## Open questions
 
 - The error law: proportional to cells walked (today) or to their square root (a random walk). Owner's call, not this mechanic's.
-- `planePatience`: 0.5 (30 s) met G1 on seeds 5 and 9 with fidelity on, and cost -13.7 % food and -12.8 % births; 0.75 -9.2 % and -10.3 % with the worst seed at 32; the sweep is in PRD §57. Off in the build.
+- `planePatience`: 0.5 (30 s) met G1 on seeds 5 and 9 with fidelity on, and cost -13.7 % food and -12.8 % births; 0.75 -9.2 % and -10.3 % with the worst seed at 32; the sweep is in PRD §58. Off in the build.
 - Whether site fidelity shares the nest's departures with the activation gate (ja-web) or bypasses it: kept; the memory steers only an ant that is already out.
 - The full texts to read when the network allows: Merkle & Wehner 2010, Wolf et al. 2012, Cheng et al. 2006, Beverly et al. 2009.
 
