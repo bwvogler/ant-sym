@@ -341,6 +341,20 @@ test("route memory: within routeSee of a place it takes the earliest and aims fo
   assert.equal(goalAfter(3, 60.5, 40), -1, "at place 0: no place before it, so the retrace is over");
 });
 
+test("route memory: a new goal judges progress afresh, not against the distance to the last one", () => {
+  const loop: [number, number][] = [[60, 40], [66, 40], [72, 40], [78, 44], [82, 50], [86, 56], [90, 52], [86, 46], [80, 42], [74, 41], [68, 38]];
+  const w = plane({ routeMemory: 1, routeSee: 5 });
+  const { g, c } = w;
+  store(c, loop);
+  carrier(w, 73, 41, 80);
+  c.routeState[0] = 1;
+  c.routeGoal[0] = 10;
+  c.bestD[0] = 0.5; // got within half a cell of the old goal
+  g.tick(DT);
+  assert.equal(c.routeGoal[0], 1, "it jumped to the earliest place it is near");
+  assert.ok((c.bestD[0] as number) > 3, `progress toward the new goal starts from its own distance, not the old goal's (${c.bestD[0]})`);
+});
+
 test("route memory: out of places the carrier searches as before and does not retrace again this trip", () => {
   const w = plane({ routeMemory: 1 }, POCKET);
   const { g, c, hx, hy } = w;
