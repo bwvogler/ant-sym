@@ -207,6 +207,12 @@ export interface ColonyParams {
   /** seconds out without food before an ant counts as tired */
   patience: number;
   /**
+   * One world's plane (ja-lp4.15, docs/forager-trips.md §1): a forager on the plane tires at `patience` × this (the
+   * fungus's `clock` still scales it); in the nest, and in the side view and top-down maps, at `patience`. On the plane
+   * the home vector's error grows with every cell walked, so a long search ends sooner. 1 = `patience` everywhere.
+   */
+  planePatience: number;
+  /**
    * seconds of rest inside its own nest that take a tired forager's fatigue from `patience` back to nothing (ja-q47,
    * docs/tiredness.md): rest is a stay inside, not a step through the hole
    */
@@ -337,7 +343,7 @@ const LOOP_AT = 2;
 /** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, planePatience: 1, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -1537,9 +1543,14 @@ export class Colony {
     return p;
   }
 
-  /** Whether ant i is tired: past the colony's patience, or not yet fully rested since it was (ja-q47). */
+  /** Whether ant i is tired: past its patience, or not yet fully rested since it was (ja-q47). */
   #isTired(i: number): boolean {
-    return this.#tired[i] === 1 || (this.fatigue[i] as number) > this.params.patience;
+    return this.#tired[i] === 1 || (this.fatigue[i] as number) > this.#patience(i);
+  }
+
+  /** The fatigue at which ant i tires: the colony's patience, shortened by planePatience on one world's plane (ja-lp4.15). */
+  #patience(i: number): number {
+    return this.line !== null && this.layer[i] === PLANE ? this.params.patience * this.params.planePatience : this.params.patience;
   }
 
   /** Whether ant i stands in its own nest (not a stranger's), by its cell. Leaves the shared CELL as it found it. */
@@ -5686,7 +5697,7 @@ export class Colony {
         else if (!this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && (m === EXPLORE || m === FOLLOW || m === FIGHT)) this.fatigue[i] = Math.min(2 * p.patience, (this.fatigue[i] as number) + dt / (this.clock[i] as number));
         // Tired once past patience, and until fully rested: resting only to just under the line sent foragers out to
         // tire again at once (G: up to 8 held, food home -9 %, in the first sweep).
-        if ((this.fatigue[i] as number) > p.patience) this.#tired[i] = 1;
+        if ((this.fatigue[i] as number) > this.#patience(i)) this.#tired[i] = 1;
         else if (this.fatigue[i] === 0) this.#tired[i] = 0;
       }
       // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
