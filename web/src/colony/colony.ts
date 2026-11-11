@@ -1,5 +1,5 @@
 import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
-import { type AntArrays, makeAntArrays } from "./ants.ts";
+import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
 import { type Channel, type ChannelParams, DEFAULT_CHANNELS, type Mark, MARKS, Pheromones } from "./pheromone.ts";
 import { Brood, EGG, foodOf, GYNE, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
@@ -6735,7 +6735,6 @@ export function keyX(k: number): number {
   return k - keyY(k) * 65536;
 }
 /** No cell: a key no cell takes (it would be row −32768). −1 was the old "none", but that is cell (−1, 0). */
-const NO_KEY = NO_CELL;
 /** What a pellet is (Colony soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
 const SOIL_DUG = 0;
 const SOIL_LOOSE = 1;
