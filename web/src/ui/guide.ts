@@ -388,6 +388,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "What a carrier does when its home vector points through rock: route memories beside path integration, and backtracking when lost. Planned for one world (not built, PRD §59).",
   },
   {
+    note: "desert-ant",
+    title: "Desert ants",
+    covers:
+      "A third species, the desert ant Cataglyphis: solitary foragers with no trails, who find food by smell and home by path integration, and work in a window between heat and predators. Planned (not built, PRD §60).",
+  },
+  {
     note: "nest-spacing",
     title: "Nest spacing",
     covers: "How far apart colonies sit, where young colonies survive, and how far a founding queen flies.",
