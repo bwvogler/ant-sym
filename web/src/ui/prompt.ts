@@ -6,12 +6,11 @@ import {
   packModeRequest,
   packStanceRequest,
   type FungalSituation,
-  FUNGUS_BATCH,
   packFungusRequest,
   DEFAULT_MENU,
   LEVERS,
 } from "../colony/index.ts";
-import type { LaneName } from "./colonyJev.ts";
+import { LANE_KINDS, type LaneName } from "./lanes.ts";
 
 // What Jev is sent, pure: the Learn drawer shows the exact request for one
 // situation, and what a question costs. Requests pack many situations behind
@@ -46,8 +45,7 @@ export const SAMPLE_FUNGAL: FungalSituation = {
 };
 const MENU_ON = new Set(DEFAULT_MENU);
 
-/** Situations a request carries when costing a question (as the page's estimates always have). */
-export const PER_REQUEST = 100;
+export { PER_REQUEST } from "./lanes.ts";
 
 export type Sample =
   | { lane: "mode"; situation: Situation }
@@ -82,7 +80,7 @@ const SAMPLES: Record<LaneName, Sample> = {
 
 /** Situations a request carries in lane `lane`: PER_REQUEST, but fewer for the fungus (a question per lever each). */
 export function perRequest(lane: LaneName): number {
-  return lane === "fungus" ? FUNGUS_BATCH : PER_REQUEST;
+  return LANE_KINDS[lane].perRequest;
 }
 
 /** Estimated input tokens per question (one situation) in lane `lane`, packed as the page packs them. */
