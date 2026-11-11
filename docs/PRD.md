@@ -4395,3 +4395,45 @@ The longer legends cost a few per cent; the top-down stance lane is gone. The es
 - **The side view** keeps the strategist and raids by coordinates (`ja-1a9`; `ja-k4k.6` stays open for it).
 - **A fight-recruitment signal** (pavement ants' escalation): alarm already draws defenders.
 - **Brood need** as a raid cue (`ja-gkl`).
+
+## 55. Lost carriers search in loops back through where their vector ran out, and smell their own mound (design, ja-lp4.11, ja-lp4.6.3, 2026-11-11)
+
+**Research basis:** [nest-search.md](nest-search.md). No full text could be fetched (network policy), so every figure is **unverified**.
+- **Loops from the origin.** A *Cataglyphis* forager whose vector runs out at no nest searches in loops of ever-increasing size that start and end at that spot and point different ways. The search stays centred there for an hour or more (Wehner & Srinivasan 1981; Müller & Wehner 1994; modelled by Waldner & Merkle 2018).
+- **Width by the trip.** The search is wider after a longer trip out, set by the distance the vector gives (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010).
+- **Smell, while searching.** Homing ants follow their nest's odour only once their vector has run out (Buehlmann, Hansson & Knaden 2012; Spehr et al. 2026). Harvester ants' mounds carry colony hydrocarbons, strongest at the entrance, which speed returning foragers (Sturgis, Greene & Gordon 2011).
+
+**The problem (measured).** G1 fails its bound on every seed. In ja-web's diagnosis (seeds 10 and 5), every carrier on the plane that held food over 120 s was homing and searching:
+- **The trips:** median 364–417 cells out, so the vector's miss is a median 48–51 cells, against `HOLE_SIGHT` 6.
+- **The search:** U3b's 4-point spiral had grown to a median reach of 57–64 cells (160–260 at the 90th percentile). It never comes back over the centre.
+- **Offline geometry:** today's spiral finds 74 % of carriers on 400-cell trips within 120 s, and never more than 81 %. Centred loops reach 99 % in 20 minutes but are no faster in the first 120 s. A hole sensed from 20 cells lifts the 120-s share to 86–93 % ([nest-search.md](nest-search.md), "What the game does today").
+
+**Decisions.**
+- Do both, centred loops and the mound's smell (owner, 2026-11-11).
+- Sources from abstracts, marked unverified (owner, 2026-11-11).
+- Parameters, all **design** and tuned against S1 and G1 (proposed: needs the owner after S1's baseline):
+  - loops headed a golden angle apart;
+  - a first reach of σ/2, growing σ/8 a loop, with σ from the ant's own trip;
+  - `SEARCH_STALL` skipping a waypoint instead of widening.
+
+**The mechanic.** One world's plane only (`line !== null`); the side view and top-down are bit-exact.
+- **Loops:** where the vector ran out at no hole, the ant runs loops out from that spot and back, each further out than the last and turned from it. Off: today's spiral (`SEARCH_GROW_2D`).
+- **The mound's smell:** a searching ant within its own mound's reach of its hole, on mound ground, steers up its colony's smell to its hole. The reach is the mound's as dug, at least `HOLE_SIGHT`. It is colony-specific and gated on searching. Off: sight 6 only.
+- **The sense row:** "Landmarks and entrance odour" widens from near the hole to its own mound, while searching.
+
+**Play.** Lost carriers loop back through the spot they took for home and walk in once they reach their own mound. Fewer ants wander for minutes with food. No new fungus lever: this is groundwork for U6b's one-world baselines.
+
+**Assays and targets.** These land first, with no behaviour change:
+- **S1, a search assay on one world.** Carriers are set down on the plane with a set miss, at trips of 100, 200, 400 and 600 cells, seeds 1–10. Targets: ≥ 99 % home within 600 s at every trip length, the search centred on its origin, and the 120-s share reported.
+- **G1:** ≤ 2 held over 120 s per colony on seeds 5 and 9, which un-skips its guard in `slow/oneWorld.test.ts`.
+
+The full G1 table on seeds 1–10 is reported against ja-web's.
+
+**Cost (estimated).** None in Jev: steering only, with no situation, legend or question changed. The per-ant work is small; the tick is checked with `colony-bench --one` against ja-lp4.6.7's figure.
+
+**Beads.** `ja-lp4.11` (epic), with children in build order: the S1 assay; centred loops; the mound's smell; tuning, G1 and docs. `ja-lp4.6.3` waits on the epic.
+
+**Still open.**
+- The loops' parameters and the stall rule (after S1).
+- If G1 still fails with both, the one-world bound or the trips' length (owner).
+- The full texts to read when the network allows: Waldner & Merkle 2018, Merkle et al. 2006, Sturgis et al. 2011.
