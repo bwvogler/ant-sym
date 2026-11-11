@@ -1,5 +1,5 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { type Colony, type ColonyParams, FAINT, type HoleCell, type Layer, LIFESPAN, MODES, type Mode, PI_DRIFT, PLANE, type Policy, type Stance, type StancePolicy } from "./colony.ts";
+import { type Colony, type ColonyParams, FAINT, type HoleCell, type Layer, LIFESPAN, MODES, type Mode, PI_DRIFT, PLANE, planeMoundReach, type Policy, type Stance, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, R } from "./hex.ts";
@@ -7,7 +7,8 @@ import { STRAINS } from "./fungus.ts";
 import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, responses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
-import { dropFood, isSky, mulberry32, rockAt, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import { encode } from "./save.ts";
+import { dropFood, heapPlane, isSky, mulberry32, rockAt, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -1448,6 +1449,8 @@ export const game1: Assay = {
 /** S1's trip lengths (cells walked out on the plane), and the carriers set down at each, per seed. */
 export const S1_TRIPS = [100, 200, 400, 600] as const;
 export const S1_PER_TRIP = 20;
+/** S1: the pellets on the player's mound at the start: about what a colony has out 5 minutes into G1 (800 by 300 s on seed 5). */
+export const S1_MOUND = 1000;
 
 /**
  * S1 — lost carriers find their hole (ja-lp4.11.1; docs/nest-search.md, PRD §55). On one world's default plane
@@ -1456,7 +1459,8 @@ export const S1_PER_TRIP = 20;
  * the game draws it at the hole (Gaussian, σ = PI_DRIFT/√2, so the miss is σ = 0.1/√2 × T per axis). Each stands at its
  * vector's end (the hole + T × drift: the search's origin), so its search begins there; a draw whose end is off the plane
  * (within 2 of an edge) or in rock is drawn again. Every other ant is young (stays in), with no scouts, and a carrier home is made young
- * too, so the carriers search alone. Per trip (`t400.home120` …): the share home (down its own hole) within 120 s and within 600 s, the
+ * too, so the carriers search alone. The player's mound starts as the game would have heaped S1_MOUND pellets.
+ * Per trip (`t400.home120` …): the share home (down its own hole) within 120 s and within 600 s, the
  * median time of those home, the search's centredness (`centre`: per carrier with 10 s or more on the plane, the
  * distance of its mean position, sampled each second, from its origin; their mean, in cells) and spread (`spread`: the
  * mean distance from the origin, the same way), and carriers that went down another hole (`wrong`). Target: ≥ 99 % home
@@ -1491,6 +1495,15 @@ export const search1: Assay = {
       const xMax = plane.size.w - 2;
       const yMax = plane.size.h * R - 2;
       for (const k of game.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
+      // The mound as the game heaps it (#carryOut, #dropPlane): pellet k goes 2 + reach × √u out on a heading drawn for it.
+      const holes = c.holeCells.map((h) => ({ x: h.px, y: h.py }));
+      for (let k = 0; k < S1_MOUND; k++) {
+        const a = rng() * 2 * Math.PI;
+        const r = 2 + planeMoundReach(k) * Math.sqrt(rng());
+        cellOf(hx + r * Math.cos(a), hy + r * Math.sin(a));
+        heapPlane(plane, CELL[0] as number, CELL[1] as number, holes);
+      }
+      c.loadState({ fields: {}, private: { heaped: encode(S1_MOUND) } });
       for (let i = 0; i < n; i++) {
         const T = S1_TRIPS[Math.floor(i / S1_PER_TRIP)] as number;
         let dx = 0;

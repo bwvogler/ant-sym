@@ -268,6 +268,12 @@ export interface ColonyParams {
    */
   searchStall: number;
   /**
+   * One world's plane (ja-lp4.11, docs/nest-search.md): a searching ant (its vector ran out at no hole) on its own mound
+   * smells its colony's hydrocarbons there, strongest at the hole (Sturgis, Greene & Gordon 2011), and walks up them to
+   * its hole, as it does in sight of it; only while searching (Buehlmann, Hansson & Knaden 2012). 1 = on; 0 = HOLE_SIGHT only.
+   */
+  moundSmell: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -330,7 +336,7 @@ const LOOP_AT = 2;
 /** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 0, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -2639,6 +2645,7 @@ export class Colony {
     const y = this.y[i] as number;
     const d = Math.hypot(x - goal.x, y - goal.y);
     if (d < HOLE_SIGHT || (d < NEST_SIGHT && this.#clearTo(x, y, goal.x, goal.y))) return goal;
+    if (this.params.moundSmell > 0 && this.search[i] !== 0 && this.#onOwnMound(x, y, d)) return goal;
     const odo = this.odoSurf[i] as number;
     let s = this.search[i] as number;
     let a = this.searchA[i] as number;
@@ -2661,6 +2668,25 @@ export class Colony {
     b.y = Math.max(lo, Math.min(hy, Math.max(lo, Math.min(hy, goal.y + odo * (this.driftSurfY[i] as number))) + s * Math.sin(a)));
     b.r = goal.r;
     return b;
+  }
+
+  /**
+   * One world's plane (ja-lp4.11): whether world (x, y), `d` from this colony's hole, is on its own mound: within the
+   * mound's reach as dug (the farthest a pellet is carried out now, #carryOut's 2 + reach; at least HOLE_SIGHT) and on
+   * spoil underfoot, which an ant feels (as an undertaker does, #onMiddenRing). The reach keeps it colony-specific: the
+   * rival's mound smells of strangers. With the plane bound; CELL is left as it was.
+   */
+  #onOwnMound(x: number, y: number, d: number): boolean {
+    if (d >= Math.max(HOLE_SIGHT, 2 + planeMoundReach(this.#heaped))) return false;
+    const spoil = this.map.spoil;
+    if (!spoil) return false;
+    const c0 = CELL[0] as number;
+    const c1 = CELL[1] as number;
+    cellOf(x, y);
+    const on = spoil.get(CELL[0] as number, CELL[1] as number) > 0;
+    CELL[0] = c0;
+    CELL[1] = c1;
+    return on;
   }
 
   /**
@@ -4030,8 +4056,7 @@ export class Colony {
       // The side view's draw (2 + reach × √u: uniform over a disc), with the disc's reach grown so its area tracks the soil
       // brought out at MOUND_HEIGHT levels deep (Tschinkel 2015), as the side view's length does along the ground: grown as
       // the side view's (linearly), the 2D disc thinned to under a pellet a cell.
-      const reach = Math.min(MOUND_REACH, 3 + Math.sqrt((this.#heaped * R) / (Math.PI * MOUND_HEIGHT)));
-      this.#spoilTo[i] = 2 + reach * Math.sqrt(this.#rng());
+      this.#spoilTo[i] = 2 + planeMoundReach(this.#heaped) * Math.sqrt(this.#rng());
     }
     this.wall[i] = 0;
     this.mx[i] = NaN;
@@ -6316,6 +6341,14 @@ let backfill: BackfillTuning = BACKFILL;
 const MOUND_HEIGHT = 3;
 /** The side view: the farthest (columns) a pellet is carried from the hole; past it the disc grows higher, not wider. */
 const MOUND_REACH = 90;
+/**
+ * One world's plane (U3c, #carryOut): the reach of the disc spoil is spread over once `heaped` pellets are out: grown so
+ * its area tracks the soil brought out at MOUND_HEIGHT levels deep (Tschinkel 2015), at most MOUND_REACH. A pellet goes
+ * 2 + reach × √u out.
+ */
+export function planeMoundReach(heaped: number): number {
+  return Math.min(MOUND_REACH, 3 + Math.sqrt((heaped * R) / (Math.PI * MOUND_HEIGHT)));
+}
 /** The midden lies this many columns from the hole, toward the nearest other colony (see #middenSide): just past the mound's largest reach. */
 export const MIDDEN_AT = MOUND_REACH + MIDDEN_PAST;
 /**
