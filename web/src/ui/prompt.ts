@@ -56,18 +56,18 @@ export type Sample =
 export function requestFor(sample: Sample, words: string, n = 1): JevRequest {
   if (sample.lane === "mode")
     return packModeRequest(
-      Array.from({ length: n }, (_, k) => ({ id: `s${k}`, situation: sample.situation })),
+      Array.from({ length: n }, (_, k) => ({ id: `${LANE_KINDS.mode.idPrefix}${k}`, situation: sample.situation })),
       words,
     );
   if (sample.lane === "stance")
     return packStanceRequest(
-      Array.from({ length: n }, (_, k) => ({ id: `c${k}`, situation: sample.situation })),
+      Array.from({ length: n }, (_, k) => ({ id: `${LANE_KINDS.stance.idPrefix}${k}`, situation: sample.situation })),
       words,
     );
   const menu = sample.menu ?? MENU_ON;
   const asked = LEVERS.filter((v) => menu.has(v.id)).map((v) => v.id);
   return packFungusRequest(
-    Array.from({ length: n }, (_, k) => ({ id: `h${k}`, situation: sample.situation, asked })),
+    Array.from({ length: n }, (_, k) => ({ id: `${LANE_KINDS.fungus.idPrefix}${k}`, situation: sample.situation, asked })),
     words,
   );
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { AIMS, DOCTRINES, fungusContext, policyContext, stanceContext } from "../../colony/index.ts";
 import { DEFAULT_COLONY_JEV } from "../colonyJev.ts";
 import { LANE_KINDS, laneOfContext, PER_REQUEST, type LaneName } from "../lanes.ts";
-import { perRequest } from "../prompt.ts";
+import { perRequest, requestFor } from "../prompt.ts";
 
 // One row a lane (ui/lanes.ts): the prefixes must be the ones the brains really put on their contexts, or a stored answer would be
 // checked against no lane.
@@ -39,4 +39,19 @@ test("only the ants' mode lane is tallied as hits and misses; the fungus's repli
     NAMES.filter((n) => !LANE_KINDS[n].reconsiders),
     ["fungus"],
   );
+});
+
+test("a request's items carry the ids of their lane's row: s0 for ants' modes, c0 for stances, h0 for the fungus", () => {
+  assert.deepEqual(
+    Object.fromEntries(NAMES.map((n) => [n, LANE_KINDS[n].idPrefix])),
+    { mode: "s", stance: "c", fungus: "h" },
+    "these are on the wire and in the cached requests",
+  );
+  const sample = {
+    mode: {
+      lane: "mode",
+      situation: { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" },
+    },
+  } as const;
+  assert.ok(JSON.stringify(requestFor(sample.mode, DOCTRINES[0]!.text, 2)).includes('"s1"'));
 });
