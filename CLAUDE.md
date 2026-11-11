@@ -31,6 +31,7 @@ npm run test:int               # colony/tests/int and ui/tests/int: files of 1.5
 npm run test:soak              # colony/tests/soak: files over 12 s and the *.soak.test.ts long games (CI shards it 3 ways: `-- --test-shard=1/3`)
 npm run test:golden            # the fast golden masters (colony/tests/golden)
 node --test --test-name-pattern='stranger' web/src/colony/tests/int/colony.test.ts   # one file, or the tests of it whose name matches
+npm run format                 # Prettier (width 140, Tailwind class order) over web/src, server, worker, shared and the scripts; `format:check` is what CI runs. A bulk reformat commit goes in .git-blame-ignore-revs
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
 npm run e2e                    # one world in Chromium (scripts/e2e-one-world.mjs): switch views, linked clicks, follow through a hole, the pen by a click; ~20 s; uses the machine's playwright, spends nothing
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
