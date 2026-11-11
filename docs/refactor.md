@@ -1,6 +1,6 @@
 # Foundation refactor: the roadmap
 
-*A review of the code on 2026-11-11, before new species (other senses and signals), new final structures, new interactions and a new UI. The decisions are in [PRD §56](PRD.md#56-foundation-refactor-decisions-ja-fnd-2026-11-11). The work is tracked in the bead epic named there; every numbered item below is a bead.*
+*A review of the code on 2026-11-11, before new species (other senses and signals), new final structures, new interactions and a new UI. The decisions are in [PRD §57](PRD.md#57-foundation-refactor-decisions-ja-fnd-2026-11-11). The work is tracked in the bead epic named there; every numbered item below is a bead.*
 
 ## Why
 

@@ -240,11 +240,13 @@ test("one world: a spoil or corpse carrier on the plane that never gets far enou
   const buried = c.buried;
   let spoilAt = NaN;
   let corpseAt = NaN;
-  for (let k = 1; k <= Math.round(65 / DT) && (c.pellet[0] || c.pellet[4]); k++) {
+  for (let k = 1; k <= Math.round(65 / DT) && (Number.isNaN(spoilAt) || Number.isNaN(corpseAt)); k++) {
     g.tick(DT);
     if (Number.isNaN(spoilAt) && !c.pellet[0]) spoilAt = k * DT;
     if (Number.isNaN(corpseAt) && !c.pellet[4]) corpseAt = k * DT;
-    for (const i of [0, 4]) if (c.pellet[i]) assert.equal(c.layer[i], PLANE, `ant ${i} is still out with it`);
+    // Until each has put its load down (after that the spoil carrier goes home, and may come up with a new pellet).
+    if (Number.isNaN(spoilAt)) assert.equal(c.layer[0], PLANE, "ant 0 is still out with it");
+    if (Number.isNaN(corpseAt)) assert.equal(c.layer[4], PLANE, "ant 4 is still out with it");
   }
   assert.ok(spoilAt > 14 && spoilAt < 16, `the spoil put down at ${spoilAt.toFixed(1)} s`);
   assert.equal(c.soilOut, out + 1, "heaped on the plane");
