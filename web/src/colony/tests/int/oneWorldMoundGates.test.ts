@@ -26,8 +26,8 @@ function quiet(seed = 7, ants = 10): Game {
 }
 const holesOf = (c: Colony) => c.holeCells.map((h) => ({ x: h.px, y: h.py }));
 const cellOfAnt = (c: Colony, i: number): [number, number] => {
-  cellOf(c.x[i] as number, c.y[i] as number);
-  return [CELL[0] as number, CELL[1] as number];
+  cellOf(c.x[i], c.y[i]);
+  return [CELL[0], CELL[1]];
 };
 /** Ant i of c, on the plane at (x, y), carrying a pellet of soil kind `soil`. */
 function withPellet(c: Colony, i: number, x: number, y: number, soil: number): void {
@@ -64,8 +64,8 @@ test("one world: nobody picks spoil off the mound within ENTRANCE_ZONE of a hole
   const zone: [number, number][] = [];
   const o = discOffsets(3)[h.py & 1] as Int16Array;
   for (let k = 0; k < o.length; k += 2) {
-    const x = h.px + (o[k] as number);
-    const y = h.py + (o[k + 1] as number);
+    const x = h.px + (o[k]);
+    const y = h.py + (o[k + 1]);
     if (plane.spoil!.get(x, y) > 0 && nearHole(x, y)) zone.push([x, y]);
   }
   assert.ok(zone.length >= 6, `${zone.length} spoil cells in the zone`);
@@ -81,7 +81,7 @@ test("one world: nobody picks spoil off the mound within ENTRANCE_ZONE of a hole
         c.putAnt(i, PLANE, centreX(x, y), centreY(y));
         c.mode[i] = EXPLORE;
       }
-    for (let i = 0; i < 16; i++) was[i] = c.pellet[i] as number;
+    for (let i = 0; i < 16; i++) was[i] = c.pellet[i];
     g.tick(DT);
     for (let i = 0; i < 16; i++) {
       if (c.layer[i] !== PLANE) continue;
@@ -107,14 +107,14 @@ test("one world: a loose pellet taken home to backfill homes on the plane by the
   c.driftSurfY[i] = 0;
   c.heading[i] = Math.PI / 2;
   const believed = { x: hole.x + 30, y: hole.y };
-  const d0 = Math.hypot((c.x[i] as number) - believed.x, (c.y[i] as number) - believed.y);
+  const d0 = Math.hypot((c.x[i]) - believed.x, (c.y[i]) - believed.y);
   for (let k = 0; k < Math.round(2 / DT); k++) {
     g.tick(DT);
     assert.equal(c.pellet[i], 1, "it keeps its pellet");
     assert.equal(c.layer[i], PLANE);
   }
-  const d1 = Math.hypot((c.x[i] as number) - believed.x, (c.y[i] as number) - believed.y);
-  const fromHole = Math.hypot((c.x[i] as number) - hole.x, (c.y[i] as number) - hole.y);
+  const d1 = Math.hypot((c.x[i]) - believed.x, (c.y[i]) - believed.y);
+  const fromHole = Math.hypot((c.x[i]) - hole.x, (c.y[i]) - hole.y);
   assert.ok(d1 < d0 - 4, `toward where it believes its hole is (${d0.toFixed(1)} → ${d1.toFixed(1)})`);
   assert.ok(fromHole > 19, `away from the true hole (${fromHole.toFixed(1)} from it)`);
 });
@@ -182,7 +182,7 @@ test("one world: a corpse carrier killed on the plane leaves the corpse on the p
   // the plane cell with the same coordinates as the curtain cell where the dead fall.
   undertake(7, 6);
   cellOf(at.x, at.y + 1);
-  const [bx, by] = [CELL[0] as number, CELL[1] as number];
+  const [bx, by] = [CELL[0], CELL[1]];
   const b = carriedBy(6);
   assert.equal(b.layer, CURTAIN, "picked up in the curtain");
   c.putAnt(6, PLANE, centreX(bx, by), centreY(by));
@@ -250,7 +250,7 @@ test("one world: an explorer spreads spoil only from a flank; off a flat mound t
   const disc = (x: number, y: number, r: number): [number, number][] => {
     const o = discOffsets(r)[y & 1] as Int16Array;
     const out: [number, number][] = [];
-    for (let k = 0; k < o.length; k += 2) out.push([x + (o[k] as number), y + (o[k + 1] as number)]);
+    for (let k = 0; k < o.length; k += 2) out.push([x + (o[k]), y + (o[k + 1])]);
     return out;
   };
   let mid: [number, number] | null = null;

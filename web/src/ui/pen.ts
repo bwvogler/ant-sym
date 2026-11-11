@@ -1,9 +1,4 @@
-import { INFECTED } from "../colony/fungus.ts";
-import { FLIGHT_2D, type Game } from "../colony/game.ts";
-import { centreX, centreY } from "../colony/hex.ts";
-import { mainGround, type OneWorld } from "../colony/oneWorld.ts";
-import type { Flight } from "../colony/royal.ts";
-import type { Cell, End, Transect } from "../colony/transect.ts";
+import { INFECTED, FLIGHT_2D, type Game, centreX, centreY, mainGround, type OneWorld, type Flight, type Cell, type End, type Transect } from "../colony/index.ts";
 
 // The queen's pen (ja-lo8.9), pure: whether a new queen who has flown opens it. The only time a colony's words change
 // (PRD §50): a new queen born with the fungus in her, from a colony whose queen the fungus reached, while Jev can read

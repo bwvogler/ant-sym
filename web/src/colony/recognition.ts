@@ -64,8 +64,8 @@ export class SumGrid {
   reset(): void {
     const t = this.#touched;
     for (let k = 0; k < t.length; k += 2) {
-      const x = t[k] as number;
-      const y = t[k + 1] as number;
+      const x = t[k];
+      const y = t[k + 1];
       this.layer.set(x, y, 0);
       this.#blocks.set(x >> BLOCK_BITS, y >> BLOCK_BITS, 0);
     }
@@ -94,7 +94,7 @@ export class SumGrid {
   saveState(): number[] {
     const t = this.#touched;
     const out: number[] = [];
-    for (let k = 0; k < t.length; k += 2) out.push(t[k] as number, t[k + 1] as number, this.layer.get(t[k] as number, t[k + 1] as number));
+    for (let k = 0; k < t.length; k += 2) out.push(t[k], t[k + 1], this.layer.get(t[k], t[k + 1]));
     return out;
   }
 
@@ -105,9 +105,9 @@ export class SumGrid {
   loadState(saved: readonly number[]): void {
     this.reset();
     for (let k = 0; k < saved.length; k += 3) {
-      const x = saved[k] as number;
-      const y = saved[k + 1] as number;
-      const v = saved[k + 2] as number;
+      const x = saved[k];
+      const y = saved[k + 1];
+      const v = saved[k + 2];
       this.#touched.push(x, y);
       this.layer.set(x, y, v);
       const bx = x >> BLOCK_BITS;
@@ -181,7 +181,7 @@ export class Recognition {
     if (this.#calmed) for (const g of this.#everyone) g.reset();
     let calmed = false;
     for (const c of colonies) {
-      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (layer < 0 || c.layer[i] === layer) && (c.calm[i] as number) > 0) calmed = true;
+      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (layer < 0 || c.layer[i] === layer) && (c.calm[i]) > 0) calmed = true;
       if (calmed) break;
     }
     this.#calmed = calmed;
@@ -193,14 +193,14 @@ export class Recognition {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
-        const cx = clampCol(map, CELL[0] as number);
-        const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
-        const b = binOf(c.odour[i] as number);
+        const cx = clampCol(map, CELL[0]);
+        const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const b = binOf(c.odour[i]);
         if (calmed) {
           (this.#everyone[b] as SumGrid).add(cx, cy, 1);
           everyone |= 1 << b;
         }
-        const weight = 1 - (c.calm[i] as number);
+        const weight = 1 - (c.calm[i]);
         if (weight <= 0) continue;
         (this.bins[b] as SumGrid).add(cx, cy, weight);
         occupied |= 1 << b;
@@ -249,8 +249,8 @@ export class Recognition {
       if (!g.any(cx - r - 1, cy - r, cx + r + 1, cy + r)) continue;
       const o = discOffsets(r)[cy & 1] as Int16Array;
       for (let k = 0; k < o.length; k += 2) {
-        const x = cx + (o[k] as number);
-        const y = cy + (o[k + 1] as number);
+        const x = cx + (o[k]);
+        const y = cy + (o[k + 1]);
         if (inBounds(map, x, y)) s += g.get(x, y);
       }
     }
@@ -275,7 +275,7 @@ export class Recognition {
     let masked = false;
     for (const c of colonies) {
       for (let i = 0; i < c.n; i++)
-        if (c.alive[i] && ((c.mask[i] as number) > 0 || (c.estrange[i] as number) > 0)) {
+        if (c.alive[i] && ((c.mask[i]) > 0 || (c.estrange[i]) > 0)) {
           masked = true;
           break;
         }
@@ -299,17 +299,17 @@ export class Recognition {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || c.layer[i] !== c.home) continue;
         if (ch) {
-          cellOf(c.x[i] as number, c.y[i] as number);
-          const k = ch.at(CELL[0] as number, CELL[1] as number);
+          cellOf(c.x[i], c.y[i]);
+          const k = ch.at(CELL[0], CELL[1]);
           const room = k >= 0 ? ch.list[k] : undefined;
           if (!room || room.role !== "royal" || room.colony !== c.params.nest) continue;
         } else {
-          const dx = (c.x[i] as number) - nest.x;
-          const dy = (c.y[i] as number) - nest.y;
+          const dx = (c.x[i]) - nest.x;
+          const dy = (c.y[i]) - nest.y;
           if (dx * dx + dy * dy >= r2) continue;
         }
         at++;
-        sum += c.odour[i] as number;
+        sum += c.odour[i];
       }
       if (at > 0) {
         const d = (sum / at - c.nestOdour) * drift;
@@ -331,11 +331,11 @@ export class Recognition {
       const n0 = c.nestOdour;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
-        const f = Math.min(MAX_MASK, c.mask[i] as number);
+        const f = Math.min(MAX_MASK, c.mask[i]);
         // The odour weapon (cull) pushes away from the nest's odour, toward the far side.
-        const away = (c.estrange[i] as number) * 0.5 * (n0 < FUNGAL ? 1 : n0 > FUNGAL ? -1 : 0);
+        const away = (c.estrange[i]) * 0.5 * (n0 < FUNGAL ? 1 : n0 > FUNGAL ? -1 : 0);
         const o = Math.min(1, Math.max(0, n0 + f * (FUNGAL - n0) + away));
-        if (Math.abs(o - (c.odour[i] as number)) > 1e-7) moving = true;
+        if (Math.abs(o - (c.odour[i])) > 1e-7) moving = true;
         c.odour[i] = o;
       }
     }

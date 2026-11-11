@@ -18,8 +18,8 @@ test("underground: both colonies dig tunnels out of their chambers, soil goes on
     for (const c of g.colonies)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
-        cellOf(c.x[i] as number, c.y[i] as number);
-        if (rockAt(map, CELL[0] as number, CELL[1] as number) !== OPEN) inSolid++;
+        cellOf(c.x[i], c.y[i]);
+        if (rockAt(map, CELL[0], CELL[1]) !== OPEN) inSolid++;
       }
   }
   assert.equal(inSolid, 0, "ant-ticks inside a solid cell");

@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Colony } from "../colony/colony.ts";
-import type { Mode, Stance } from "../colony/vocab.ts";
-import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
-import { Game, GAME_REGROW, gameRng, type Outcome, type Unity } from "../colony/game.ts";
-import { chapterOf, type ChapterView } from "../colony/chapters.ts";
-import { UPGRADES } from "../colony/evolution.ts";
+import { type Colony, type Mode, type Stance, DEFAULT_MENU, STRAINS, type Fungus, Game, GAME_REGROW, gameRng, type Outcome, type Unity, chapterOf, type ChapterView, UPGRADES, generateOneWorld } from "../colony/index.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
-import { generateOneWorld } from "../colony/oneWorld.ts";
 
 // Owns the one Game (the player's colony and the rival) and its animation
 // loop: React state carries only what the
@@ -130,7 +124,7 @@ function evolutionStats(game: Game): EvolutionStats | null {
   if (!e) return null;
   let inHosts = 0;
   for (const c of game.colonies) {
-    for (let i = 0; i < c.n; i++) if (c.alive[i] && c.strain[i] === e.strain) inHosts += c.load[i] as number;
+    for (let i = 0; i < c.n; i++) if (c.alive[i] && c.strain[i] === e.strain) inHosts += c.load[i];
     if (c.queen?.alive && c.queen.strain === e.strain) inHosts += c.queen.load;
   }
   return { mass: e.mass, inHosts, mutations: Math.floor(e.mutations), perMinute: 60 * e.rate, levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])) };

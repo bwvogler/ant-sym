@@ -25,7 +25,7 @@ const game = (seed = 7): Game => {
 };
 const open = (g: Game, x: number, y: number): boolean => {
   cellOf(x, y);
-  return rockAt(g.world!.plane, CELL[0] as number, CELL[1] as number) === OPEN;
+  return rockAt(g.world!.plane, CELL[0], CELL[1]) === OPEN;
 };
 
 /** Old ant i of c, at the top of hole h's shaft and heading up, with a pass through the gate there (ja-web), climbs out onto the plane (within 20 s). */
@@ -76,16 +76,16 @@ test("plane: the vector starts afresh up out of its own hole, with both drifts d
   // Out exploring for 3 s: the odometer is the path walked, step by step.
   let walked = 0;
   for (let k = 0; k < Math.round(3 / DT); k++) {
-    const x = c.x[0] as number;
-    const y = c.y[0] as number;
+    const x = c.x[0];
+    const y = c.y[0];
     g.tick(DT);
     assert.equal(c.layer[0], PLANE);
-    if (c.mode[0] !== RETURN) walked += Math.hypot((c.x[0] as number) - x, (c.y[0] as number) - y);
+    if (c.mode[0] !== RETURN) walked += Math.hypot((c.x[0]) - x, (c.y[0]) - y);
   }
   assert.ok(walked > 10, `it walked out (${walked.toFixed(1)})`);
-  assert.ok(Math.abs((c.odoSurf[0] as number) - walked) < 1e-3 * walked, `odometer ${c.odoSurf[0]} = path ${walked.toFixed(2)}`);
+  assert.ok(Math.abs((c.odoSurf[0]) - walked) < 1e-3 * walked, `odometer ${c.odoSurf[0]} = path ${walked.toFixed(2)}`);
   // Homing (tired, so its policy keeps it in return): the vector is fixed.
-  const out = c.odoSurf[0] as number;
+  const out = c.odoSurf[0];
   c.mode[0] = RETURN;
   c.fatigue[0] = 2 * c.params.patience;
   for (let k = 0; k < Math.round(1 / DT) && c.layer[0] === PLANE; k++) g.tick(DT);
@@ -102,8 +102,8 @@ test("plane: coming up a rival's hole leaves the vector as it was", () => {
   c.driftSurfY[0] = -0.2;
   climbOut(g, c, 0, rival);
   const p = planeHole(rival);
-  assert.ok(Math.hypot((c.x[0] as number) - p.x, (c.y[0] as number) - p.y) < 1, "up at the rival's hole");
-  assert.ok((c.odoSurf[0] as number) >= 50, `odometer runs on (${c.odoSurf[0]})`);
+  assert.ok(Math.hypot((c.x[0]) - p.x, (c.y[0]) - p.y) < 1, "up at the rival's hole");
+  assert.ok((c.odoSurf[0]) >= 50, `odometer runs on (${c.odoSurf[0]})`);
   assert.deepEqual([c.driftSurf[0], c.driftSurfY[0]], [Math.fround(0.3), Math.fround(-0.2)], "drift unchanged");
 });
 
@@ -115,7 +115,7 @@ test("plane: the drift's size over many trips out of its own hole is PI_DRIFT (R
   const N = 150;
   for (let n = 0; n < N; n++) {
     climbOut(g, c, 0, h);
-    sq += (c.driftSurf[0] as number) ** 2 + (c.driftSurfY[0] as number) ** 2;
+    sq += (c.driftSurf[0]) ** 2 + (c.driftSurfY[0]) ** 2;
   }
   const rms = Math.sqrt(sq / N);
   assert.ok(rms > 0.07 && rms < 0.13, `RMS |drift| ${rms.toFixed(3)} against PI_DRIFT ${PI_DRIFT}`);
@@ -137,8 +137,8 @@ test("plane: a carrier walks to where its vector says the hole is, not to the ho
   let seen = -1; // the tick it first came within NEST_SIGHT of the hole
   let k = 0;
   const t = home(g, c, 30, () => {
-    const x = c.x[0] as number;
-    const y = c.y[0] as number;
+    const x = c.x[0];
+    const y = c.y[0];
     if (seen < 0 && Math.hypot(x - H.x, y - H.y) < NEST_SIGHT) seen = k;
     if (seen < 0) nearB = Math.min(nearB, Math.hypot(x - B.x, y - B.y));
     k++;
@@ -159,7 +159,7 @@ test("plane: a carrier whose vector is 12 off finds nothing there, searches in w
   assert.ok(open(g, B.x, B.y));
   carrier(g, B.x + 20, B.y, 120, 0.1, 0);
   let most = 0;
-  const t = home(g, c, 60, () => (most = Math.max(most, c.search[0] as number)));
+  const t = home(g, c, 60, () => (most = Math.max(most, c.search[0])));
   assert.ok(most > 3.5, `it searched, and the loops grew (to ${most.toFixed(2)})`);
   assert.ok(t > 0, "down its hole within 60 s");
   assert.equal(c.carriedDown, 1);
@@ -174,7 +174,7 @@ test("plane: a carrier whose vector ends in rock gets as near as it can, searche
   assert.ok(!open(g, B.x, B.y), "its belief is in rock");
   carrier(g, H.x + 30, H.y + 10, 60, 0.2, -0.1);
   let most = 0;
-  const t = home(g, c, 60, () => (most = Math.max(most, c.search[0] as number)));
+  const t = home(g, c, 60, () => (most = Math.max(most, c.search[0])));
   assert.ok(most > 0, "it searched");
   assert.ok(t > 0, "down its hole within 60 s");
 });
@@ -190,7 +190,7 @@ test("plane: a belief past the plane's edge is held at the edge, and the carrier
   assert.ok(open(g, H.x, top));
   carrier(g, H.x + 6, top + 2, 300, 0, -0.2);
   let nearEdge = Infinity;
-  const t = home(g, c, 90, () => (nearEdge = Math.min(nearEdge, Math.hypot((c.x[0] as number) - H.x, (c.y[0] as number) - top))));
+  const t = home(g, c, 90, () => (nearEdge = Math.min(nearEdge, Math.hypot((c.x[0]) - H.x, (c.y[0]) - top))));
   assert.ok(nearEdge < 1.5, `it went to the edge, where its belief is held (within ${nearEdge.toFixed(2)})`);
   assert.ok(t > 0, "down its hole within 90 s");
 });
@@ -204,7 +204,7 @@ function searchingRun(g: Game, c: Colony, heading: number, seconds: number): { x
   c.stallT[0] = 0;
   c.fatigue[0] = 2 * c.params.patience; // tired: its policy keeps it in return
   for (let k = 0; k < Math.round(seconds / DT) && c.layer[0] === PLANE; k++) g.tick(DT);
-  return { x: c.x[0] as number, y: c.y[0] as number };
+  return { x: c.x[0], y: c.y[0] };
 }
 
 test("plane: a searching carrier with the home trail under its antennae follows the trail, not its vector (review of #60)", () => {

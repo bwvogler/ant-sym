@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import { type Colony } from "../colony/colony.ts";
-import { MODES, TRAILS, type Mode, type Situation } from "../colony/vocab.ts";
-import { INFECTED, STRAINS, type Fungus } from "../colony/fungus.ts";
-import { pulled } from "../colony/levers.ts";
-import { UPGRADES } from "../colony/evolution.ts";
-import { decodeFungal, type FungalSituation } from "../colony/fungalPolicy.ts";
+import { type Colony, MODES, TRAILS, type Mode, type Situation, INFECTED, STRAINS, type Fungus, pulled, UPGRADES, decodeFungal, type FungalSituation } from "../colony/index.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import Help from "./Help.tsx";
@@ -40,11 +35,11 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
   const col = followedColony(colonies, followed);
   const i = followed.i;
   if (!col) return null;
-  const mode = MODES[col.mode[i] as number] as Mode;
+  const mode = MODES[col.mode[i]] as Mode;
   const carrying = col.carrying[i] === 1;
-  const since = col.since[i] as number;
+  const since = col.since[i];
   // Tiredness is the ant's fatigue (seconds of unsuccessful search, less rest), not its time out (review of #36).
-  const fatigue = col.fatigue[i] as number;
+  const fatigue = col.fatigue[i];
   const q = col.lastQuestion(i);
   const k = sideIndex(followed);
   const decided = q && !carrying ? explain(q, k) : null;
@@ -56,7 +51,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
         </h2>
         <span className="font-mono text-xs text-fg-2">
           {mode}
-          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s{col.queen ? ` · energy ${((col.energy[i] as number) * 100).toFixed(0)} %${(col.need[i] as number) >= 0.05 ? ` · feels hunger ${(col.need[i] as number).toFixed(2)}` : ""}` : ""} · at ({(col.x[i] as number).toFixed(0)}, {(col.y[i] as number).toFixed(0)})
+          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s{col.queen ? ` · energy ${((col.energy[i]) * 100).toFixed(0)} %${(col.need[i]) >= 0.05 ? ` · feels hunger ${(col.need[i]).toFixed(2)}` : ""}` : ""} · at ({(col.x[i]).toFixed(0)}, {(col.y[i]).toFixed(0)})
         </span>
         <button type="button" className="ml-auto rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised" onClick={onClose}>
           Stop following
@@ -93,12 +88,12 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
 const FUNGUS_BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under your aim", stale: "Jev's answer under your earlier aim: Jev can't answer the new one now", waiting: "the strain's default, while Jev is asked", local: "the strain's default" };
 
 function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: Fungus; explain: Props["explainFungus"] }) {
-  const load = col.load[i] as number;
-  const resist = col.resist[i] as number;
+  const load = col.load[i];
+  const resist = col.resist[i];
   if (load < INFECTED) return resist >= 0.05 ? <p className="mt-2 text-xs text-fg-3">Clean · resistance {resist.toFixed(2)} from grooming infected nestmates.</p> : null;
-  const s = col.strain[i] as number;
+  const s = col.strain[i];
   const strain = STRAINS[s];
-  const code = col.fungal[i] as number;
+  const code = col.fungal[i];
   const sensed = code >= 0 ? decodeFungal(code) : null;
   const decided = sensed ? explain(sensed) : null;
   const wanted = decided ? fungus.resolve(decided.answer, s) : {};
@@ -156,7 +151,7 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
         <span className="text-spore">
           {strain?.name ?? "fungus"} {Math.round(100 * load)}%
         </span>
-        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {(col.odour[i] as number).toFixed(2)} (its nest {col.nestOdour.toFixed(2)}). The ant's situation above is what it perceives; its own policy chose.
+        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {(col.odour[i]).toFixed(2)} (its nest {col.nestOdour.toFixed(2)}). The ant's situation above is what it perceives; its own policy chose.
       </p>
     </>
   );

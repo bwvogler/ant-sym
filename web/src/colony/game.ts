@@ -407,8 +407,8 @@ export class Game {
     const e = m?.nest.entrance;
     if (!m || !e || !this.map.sky) return null;
     cellOf(e.x, e.y);
-    const col = CELL[0] as number;
-    const row = CELL[1] as number;
+    const col = CELL[0];
+    const row = CELL[1];
     const c = this.#freeColumnOrNull(col + side * distance);
     return c !== null && Math.abs(c - col) <= FLIGHT.radius ? { x: centreX(c, row), y: centreY(row) } : null;
   }
@@ -451,7 +451,7 @@ export class Game {
     const world = this.world;
     if (!world) return { ok: false, reason: "one world only" };
     cellOf(p.x, p.y);
-    const s = nearestValid(world.line, { x: CELL[0] as number, y: CELL[1] as number }, FOUND_RADIUS, ground ?? mainGround(world));
+    const s = nearestValid(world.line, { x: CELL[0], y: CELL[1] }, FOUND_RADIUS, ground ?? mainGround(world));
     return s ? { ok: true, cell: s.cell, end: s.end } : { ok: false, reason: NO_ROOM };
   }
 
@@ -548,7 +548,7 @@ export class Game {
       if (f.nest) nest = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
       else if (this.map.sky) {
         cellOf(f.x, f.y);
-        nest = foundNest(this.map, this.#freeColumn(CELL[0] as number), at, this.#rng);
+        nest = foundNest(this.map, this.#freeColumn(CELL[0]), at, this.#rng);
       } else nest = { ...this.#freeSpot(f.x, f.y), r: 3 };
       this.map.nests.push(nest);
     }
@@ -603,7 +603,7 @@ export class Game {
     const taken = this.map.nests.flatMap((n) => {
       if (!n.entrance) return [];
       cellOf(n.entrance.x, n.entrance.y);
-      return [CELL[0] as number];
+      return [CELL[0]];
     });
     const { x0 } = this.map;
     const w = this.map.size.w;
@@ -653,12 +653,12 @@ export class Game {
     const { x0 } = this.map;
     const rate = owed / this.params.regrow;
     for (let k = 0; k < piles.cells.length; k++) {
-      const c = piles.cells[k] as number;
+      const c = piles.cells[k];
       const col = c % w;
       const y = (c - col) / w;
       const x = col + x0;
       const v = this.map.food.get(x, y);
-      const short = (piles.full[k] as number) - v;
+      const short = (piles.full[k]) - v;
       if (short < 1 || rockAt(this.map, x, y)) continue; // full, or built over (a mound)
       if (this.#regrowRng!() < short * rate) {
         this.map.food.set(x, y, v + 1);
@@ -760,7 +760,7 @@ export class Game {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         living++;
-        const o = c.odour[i] as number;
+        const o = c.odour[i];
         if (live.some((other) => other !== c && Math.abs(o - other.nestOdour) <= tol)) near++;
       }
     const recognition = Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
@@ -801,7 +801,7 @@ export class Game {
     let map = this.layers[0] as WorldMap;
     let gap = 0;
     for (let a = 0; a < live.length; a++)
-      for (let b = a + 1; b < live.length; b++) gap = Math.max(gap, Math.abs((this.colonies[live[a] as number] as Colony).nestOdour - (this.colonies[live[b] as number] as Colony).nestOdour));
+      for (let b = a + 1; b < live.length; b++) gap = Math.max(gap, Math.abs((this.colonies[live[a]] as Colony).nestOdour - (this.colonies[live[b]] as Colony).nestOdour));
     this.colonies.forEach((c, k) => {
       let share = 0;
       if (live.length >= 2 && live.includes(k)) {
@@ -810,7 +810,7 @@ export class Game {
         for (let i = 0; i < c.n; i++) {
           if (!c.alive[i]) continue;
           living++;
-          const o = c.odour[i] as number;
+          const o = c.odour[i];
           // Its cell, once an ally is in question (a column can be negative: one world's curtain).
           let placed = false;
           let cx = 0;
@@ -822,11 +822,11 @@ export class Game {
               placed = true;
               c.antCell(i);
               if (!one) {
-                l = c.layer[i] as number;
+                l = c.layer[i];
                 map = this.layers[l] as WorldMap;
               }
-              cx = clampCol(map, CELL[0] as number);
-              cy = Math.min(map.size.h - 1, Math.max(0, CELL[1] as number));
+              cx = clampCol(map, CELL[0]);
+              cy = Math.min(map.size.h - 1, Math.max(0, CELL[1]));
             }
             if (around((this.#grids[l] as CountGrid[])[d] as CountGrid, map, cx, cy, 1) > 0) {
               allied++;
@@ -1004,7 +1004,7 @@ export class Game {
       fungus: this.fungus.saveState(),
       recognition: this.recognition.saveState(),
       grids: { counts: this.#grids.map((gs) => gs.map((g) => g.saveState())), bands: this.#recs.map((r) => r.saveBands()) },
-      ...(world ? { world: { seed: world.seed, line: { holes: world.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: world.line.sHole[0] as number, margin: world.line.margin }, curtain: encode(bare(world.curtain)) } } : {}),
+      ...(world ? { world: { seed: world.seed, line: { holes: world.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: world.line.sHole[0], margin: world.line.margin }, curtain: encode(bare(world.curtain)) } } : {}),
       private: { fightDeaths: this.#fightDeaths, lastFightDeath: this.#lastFightDeath, metBy: [...this.#metBy], haveMet: this.#haveMet, nextStrategy: this.#nextStrategy, regrowClock: this.#regrowClock, rng: (this.#rng as Partial<Rng>).state ?? null, regrowRng: this.#regrowRng?.state ?? null },
     };
   }

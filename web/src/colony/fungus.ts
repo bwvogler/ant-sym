@@ -139,7 +139,7 @@ const EDGE = CHUNK - 1;
 const AROUND = [0, 1].map((parity) => {
   const o = discOffsets(1)[parity] as Int16Array;
   const out: number[] = [];
-  for (let k = 0; k < o.length; k += 2) out.push((o[k + 1] as number) * CHUNK + (o[k] as number));
+  for (let k = 0; k < o.length; k += 2) out.push((o[k + 1]) * CHUNK + (o[k]));
   return out;
 });
 
@@ -158,8 +158,8 @@ export class LoadGrid {
   reset(): void {
     const t = this.#touched;
     for (let k = 0; k < t.length; k += 2) {
-      const x = t[k] as number;
-      const y = t[k + 1] as number;
+      const x = t[k];
+      const y = t[k + 1];
       this.sum.set(x, y, 0);
       this.#top.set(x, y, 0);
       this.#blocks.set(x >> BLOCK_BITS, y >> BLOCK_BITS, 0);
@@ -355,12 +355,12 @@ export class Fungus {
     for (const c of colonies)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layered && c.layer[i] !== layer)) continue;
-        const dx = (c.x[i] as number) - x;
-        const dy = (c.y[i] as number) - y;
+        const dx = (c.x[i]) - x;
+        const dy = (c.y[i]) - y;
         if (dx * dx + dy * dy > r2) continue;
-        const l = c.load[i] as number;
+        const l = c.load[i];
         if (l === 0) c.strain[i] = s;
-        const nl = Math.min(1, l + dose * (1 - (c.resist[i] as number)));
+        const nl = Math.min(1, l + dose * (1 - (c.resist[i])));
         if (l === 0 && nl > 0) this.hosts++;
         c.load[i] = nl;
       }
@@ -414,12 +414,12 @@ export class Fungus {
       const vis = L.visible[k] as LoadGrid;
       vis.reset();
       for (let i = 0; i < c.n; i++) {
-        const l = c.load[i] as number;
+        const l = c.load[i];
         if (!c.alive[i] || l === 0 || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
-        const cx = clampCol(map, CELL[0] as number);
-        const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
-        const s = c.strain[i] as number;
+        const cx = clampCol(map, CELL[0]);
+        const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const s = c.strain[i];
         all.add(cx, cy, l, s);
         vis.add(cx, cy, l * this.#shows(c, i, s), s);
       }
@@ -427,8 +427,8 @@ export class Fungus {
       const q = c.queen;
       if (q && q.alive && q.load > 0 && (layer < 0 || layer === c.home)) {
         cellOf(q.x, q.y);
-        const qx = clampCol(map, CELL[0] as number);
-        const qy = Math.min(h - 1, Math.max(0, CELL[1] as number));
+        const qx = clampCol(map, CELL[0]);
+        const qy = Math.min(h - 1, Math.max(0, CELL[1]));
         all.add(qx, qy, q.load, q.strain);
         vis.add(qx, qy, q.load * ((this.strains[q.strain] as Strain).visibility * q.show), q.strain);
       }
@@ -445,15 +445,15 @@ export class Fungus {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
-        const cx = clampCol(map, CELL[0] as number);
-        const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
-        const l = c.load[i] as number;
+        const cx = clampCol(map, CELL[0]);
+        const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const l = c.load[i];
         const ground = L.spores.get(cx, cy);
         const near = all.any(cx - 1, cy - 1, cx + 1, cy + 1);
         const seen = vis.any(cx - 1, cy - 1, cx + 1, cy + 1);
         if (l === 0 && ground === 0 && !near && !seen) continue;
-        const r = c.resist[i] as number;
-        const s = c.strain[i] as number;
+        const r = c.resist[i];
+        const s = c.strain[i];
         const st = this.strains[s] as Strain;
         this.#gather(L, cx, cy, k, grids, vis, near, seen);
 
@@ -504,7 +504,7 @@ export class Fungus {
           const ns = this.strains[strain] as Strain;
           const sit: FungalSituation = {
             arousal: this.#arousal(c, i),
-            touch: this.#touch(L, c, cx, cy, nb.ants - 1, rec, c.odour[i] as number),
+            touch: this.#touch(L, c, cx, cy, nb.ants - 1, rec, c.odour[i]),
             place: this.#place(L, layer, colonies, cx, cy),
             task: TASKS[Math.min(2, c.band(i))] ?? "forager",
             carrying: c.carrying[i] ? "food" : c.holdsBrood(i) ? "brood" : "nothing",
@@ -532,9 +532,9 @@ export class Fungus {
 
     // Spores taken, then the ground fades.
     for (let k = 0; k < taken.length; k += 3) {
-      const x = taken[k] as number;
-      const y = taken[k + 1] as number;
-      L.spores.set(x, y, Math.max(0, L.spores.get(x, y) - (taken[k + 2] as number)));
+      const x = taken[k];
+      const y = taken[k + 1];
+      L.spores.set(x, y, Math.max(0, L.spores.get(x, y) - (taken[k + 2])));
     }
     const keep = Math.exp(-p.sporeDecay * dt);
     for (const key of L.sporeCells) {
@@ -611,8 +611,8 @@ export class Fungus {
     const nb = this.#nb;
     const { h } = L.map.size;
     cellOf(q.x, q.y);
-    const cx = clampCol(L.map, CELL[0] as number);
-    const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
+    const cx = clampCol(L.map, CELL[0]);
+    const cy = Math.min(h - 1, Math.max(0, CELL[1]));
     const sit: FungalSituation = {
       arousal: "calm",
       touch: this.#touch(L, c, cx, cy, nb.ants, rec, null),
@@ -638,8 +638,8 @@ export class Fungus {
     const p = this.params;
     const { h } = L.map.size;
     cellOf(b.x, b.y);
-    const cx = clampCol(L.map, CELL[0] as number);
-    const cy = Math.min(h - 1, Math.max(0, CELL[1] as number));
+    const cx = clampCol(L.map, CELL[0]);
+    const cy = Math.min(h - 1, Math.max(0, CELL[1]));
     const l = b.load;
     const ground = L.spores.get(cx, cy);
     const near = L.all.any(cx - 1, cy - 1, cx + 1, cy + 1);
@@ -752,7 +752,7 @@ export class Fungus {
         const a = (grids[j] as CountGrid).layer.chunk(bx, by);
         if (!a) continue;
         let n = 0;
-        for (const d of around) n += a[o + d] as number;
+        for (const d of around) n += a[o + d];
         nb.ants += n;
         if (j === k) nb.own = n;
       }
@@ -760,7 +760,7 @@ export class Fungus {
       if (la) {
         let top = 0;
         for (const d of around) {
-          const v = la[o + d] as number;
+          const v = la[o + d];
           nb.load += v;
           if (v > top) {
             top = v;
@@ -771,15 +771,15 @@ export class Fungus {
         }
       }
       const va = visible ? vis.sum.chunk(bx, by) : undefined;
-      if (va) for (const d of around) nb.visible += va[o + d] as number;
+      if (va) for (const d of around) nb.visible += va[o + d];
       return;
     }
     const map = L.map;
     let top = 0;
     const o = discOffsets(1)[cy & 1] as Int16Array;
     for (let q = 0; q < o.length; q += 2) {
-      const x = cx + (o[q] as number);
-      const y = cy + (o[q + 1] as number);
+      const x = cx + (o[q]);
+      const y = cy + (o[q + 1]);
       if (!inBounds(map, x, y)) continue;
       for (let j = 0; j < grids.length; j++) {
         const n = (grids[j] as CountGrid).get(x, y);
@@ -834,7 +834,7 @@ export class Fungus {
    * has it show (a dormant host shows a quarter: hiding is how it escapes grooming).
    */
   #shows(c: Colony, i: number, s: number): number {
-    return (this.strains[s] as Strain).visibility * (c.show[i] as number);
+    return (this.strains[s] as Strain).visibility * (c.show[i]);
   }
 
   /** The player's settings: the local rule's thresholds and the menu (§5.1, levers 4 and 5). */
@@ -985,7 +985,7 @@ export class Fungus {
   expressLevels(c: Colony, i: number, wanted: LeverLevels, l: number, menu: ReadonlySet<string> | null = this.#menu): void {
     // Held to the fungus's reach (ja-lo8.12) in a host of the evolving strain, except where a lab or test runs a preset
     // whatever the menu says.
-    const levels = menu ? this.held(wanted, c.strain[i] as number) : wanted;
+    const levels = menu ? this.held(wanted, c.strain[i]) : wanted;
     c.expr[i] = presetOf(levels, menu ?? undefined);
     if (l <= 0) {
       c.asIs(i);
@@ -1025,8 +1025,8 @@ export class Fungus {
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i]) continue;
       living++;
-      resist += c.resist[i] as number;
-      const l = c.load[i] as number;
+      resist += c.resist[i];
+      const l = c.load[i];
       if (l >= INFECTED) {
         infected++;
         load += l;

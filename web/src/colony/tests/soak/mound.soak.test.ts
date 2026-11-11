@@ -23,7 +23,7 @@ test("in a game: soil is carried out and dropped along the ground, loose soil is
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i]) continue;
       c.antCell(i);
-      solidT[i] = rockAt(map, CELL[0] as number, CELL[1] as number) === OPEN ? 0 : solidT[i]! + 1 / 30;
+      solidT[i] = rockAt(map, CELL[0], CELL[1]) === OPEN ? 0 : solidT[i]! + 1 / 30;
       maxSolid = Math.max(maxSolid, solidT[i]!);
     }
     if (k % 300 === 0) {
@@ -43,8 +43,8 @@ test("in a game: soil is carried out and dropped along the ground, loose soil is
   // The way in: the chamber reaches the hole, and the hole the ground line.
   const walk = reachable(map, c.nest.x, c.nest.y, "open");
   cellOf(c.nest.entrance!.x, c.nest.entrance!.y);
-  const hx = CELL[0] as number;
-  const hy = CELL[1] as number;
+  const hx = CELL[0];
+  const hy = CELL[1];
   assert.equal(walk[hy * map.size.w + hx], 1, "the chamber reaches the hole");
   let out = false;
   for (let d = 0; d < 6; d++) out ||= isSky(map, nx(hx, hy, d), ny(hy, d)) && rockAt(map, nx(hx, hy, d), ny(hy, d)) === OPEN;

@@ -38,7 +38,7 @@ test("generateWorld: two nests, a walk apart, joined on foot, with food away fro
     assert.ok(d >= 0.7 * 140 && d < 260, `seed ${seed}: nests ${d.toFixed(0)} cells apart`);
     const reach = reachable(m, a.x, a.y);
     cellOf(b.x, b.y);
-    assert.equal(reach[(CELL[1] as number) * m.size.w + (CELL[0] as number)], 1, `seed ${seed}: the rival nest cannot be walked to`);
+    assert.equal(reach[(CELL[1]) * m.size.w + (CELL[0])], 1, `seed ${seed}: the rival nest cannot be walked to`);
   }
 });
 
@@ -128,7 +128,7 @@ test("a fighting ant goes for the enemy it can see", () => {
   put(c, 0, 20, 6);
   c.heading[0] = 0; // east
   for (let k = 0; k < 15; k++) c.tick(1 / 30);
-  assert.ok((c.y[0] as number) > at(20, 6).y + 0.3, `it turned south toward the enemy: y ${c.y[0]}`);
+  assert.ok((c.y[0]) > at(20, 6).y + 0.3, `it turned south toward the enemy: y ${c.y[0]}`);
 });
 
 test("the game: both colonies forage and grow, they meet and fight, no strategist on open ground, and food is never made or lost", () => {
@@ -171,7 +171,7 @@ test("contact (behaviour MR 4): a foraging ant meeting strangers runs straight a
   c.tick(1 / 30);
   assert.equal(c.mode[0], 2, "fleeing (return) while they are in reach");
   for (let k = 0; k < 14; k++) c.tick(1 / 30);
-  assert.ok((c.x[0] as number) > at(20, 6).x + 0.3, `it ran east, away from them and from home: x ${c.x[0]}`);
+  assert.ok((c.x[0]) > at(20, 6).x + 0.3, `it ran east, away from them and from home: x ${c.x[0]}`);
 });
 
 test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer toward it", () => {
@@ -183,7 +183,7 @@ test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer tow
     const p = at(22, 8);
     c.paint("alarm", p.x, p.y, 1, amount); // ahead and to the south
     for (let k = 0; k < 15; k++) c.tick(1 / 30);
-    return c.y[0] as number;
+    return c.y[0];
   };
   const y0 = at(20, 6).y;
   assert.ok(run(0.3) > y0 + 0.2, "faint: drawn south, toward it");
@@ -232,9 +232,9 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
     }
   put(c, 0, 14, 6);
   c.heading[0] = Math.PI; // facing away from it
-  const x0 = c.x[0] as number;
+  const x0 = c.x[0];
   for (let k = 0; k < 120; k++) c.tick(1 / 30);
-  assert.ok((c.x[0] as number) > x0 + 6, `climbed east: ${x0.toFixed(1)} → ${(c.x[0] as number).toFixed(1)}`);
+  assert.ok((c.x[0]) > x0 + 6, `climbed east: ${x0.toFixed(1)} → ${(c.x[0]).toFixed(1)}`);
 
   // A stranger beside a raider that stands on a raid trail is fought, not reported: the trail is where a scout was before.
   const g = new Game(arena(), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid" });
@@ -274,7 +274,7 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
               c.ph.deposit("raid", p.x, p.y, 0.1 * (x - 6)); // kept fresh: the end stays where it is
             }
         c.tick(1 / 30);
-        if ((c.x[0] as number) > at(26, 10).x) s += 1 / (30 * 30);
+        if ((c.x[0]) > at(26, 10).x) s += 1 / (30 * 30);
       }
     }
     return s;
@@ -315,7 +315,7 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
     put(c, 0, cx, 6);
     for (let k = 0; k < 60; k++) {
       put(c, 0, cx, 6);
-      c.paint("alarm", c.x[0] as number, c.y[0] as number, 4, 2);
+      c.paint("alarm", c.x[0], c.y[0], 4, 2);
       c.tick(1 / 30);
     }
     return c.touch(0, false).stance;
@@ -343,7 +343,7 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   const c = g.player;
   for (let i = 0; i < 20; i++) put(c, i, 4, 6);
   for (let k = 0; k < 30 * 10; k++) g.tick(1 / 30);
-  assert.ok((c.crowd[0] as number) >= c.params.crowdAt, `crowded: ${(c.crowd[0] as number).toFixed(1)} nestmates felt`);
+  assert.ok((c.crowd[0]) >= c.params.crowdAt, `crowded: ${(c.crowd[0]).toFixed(1)} nestmates felt`);
   assert.equal(c.touch(0, false).crowd, "many");
 });
 
@@ -369,8 +369,8 @@ test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at ho
   let atHome = 0;
   let out = 0;
   for (let i = 1; i < 80; i++) {
-    if (home(i)) atHome += c.recruited[i] as number;
-    else out += c.recruited[i] as number;
+    if (home(i)) atHome += c.recruited[i];
+    else out += c.recruited[i];
   }
   assert.equal(out, 0, "not out at its work");
   assert.equal(c.recruited[0], 0, "not while carrying");
@@ -390,7 +390,7 @@ test("no rival, no raid (review of #53 S1): with the rival beaten, a crowded hom
     g.tick(1 / 30);
   }
   let rec = 0;
-  for (let i = 0; i < c.n; i++) if (c.alive[i]) rec += c.recruited[i] as number;
+  for (let i = 0; i < c.n; i++) if (c.alive[i]) rec += c.recruited[i];
   assert.equal(c.raidable, false, "the game found no rival");
   assert.equal(rec, 0, "nobody raids");
 });
@@ -433,7 +433,7 @@ test("raid stance as a bias (review of #41): an ant not recruited, put in FIGHT,
     put(c, 0, 12, 6);
     c.heading[0] = Math.PI / 2; // facing across the field, not at the rival
     for (let k = 0; k < 60; k++) c.tick(1 / 30);
-    return Math.hypot((c.x[0] as number) - c.raidTarget.x, (c.y[0] as number) - c.raidTarget.y);
+    return Math.hypot((c.x[0]) - c.raidTarget.x, (c.y[0]) - c.raidTarget.y);
   };
   const off = run(0); // the old rule: straight at the coordinates
   const on = run(1);

@@ -100,8 +100,8 @@ export class MeanGrid {
   reset(): void {
     const t = this.#touched;
     for (let k = 0; k < t.length; k += 2) {
-      this.sum.set(t[k] as number, t[k + 1] as number, 0);
-      this.count.set(t[k] as number, t[k + 1] as number, 0);
+      this.sum.set(t[k], t[k + 1], 0);
+      this.count.set(t[k], t[k + 1], 0);
     }
     t.length = 0;
   }
@@ -120,8 +120,8 @@ export class MeanGrid {
     let s = 0;
     let n = 0;
     for (let k = 0; k < o.length; k += 2) {
-      const ax = x + (o[k] as number);
-      const ay = y + (o[k + 1] as number);
+      const ax = x + (o[k]);
+      const ay = y + (o[k + 1]);
       if (ay < 0) continue;
       s += this.sum.get(ax, ay);
       n += this.count.get(ax, ay);

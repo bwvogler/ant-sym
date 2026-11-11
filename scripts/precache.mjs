@@ -26,28 +26,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
-import { decode, SITUATIONS } from "../web/src/colony/colony.ts";
-import { STANCES } from "../web/src/colony/vocab.ts";
-import { AIMS, FUNGUS_BATCH, FUNGUS_BRAIN_VERSION, fungalKey, fungusContext, packFungusRequest, readLevels } from "../web/src/colony/fungusBrain.ts";
-import { encodeFungal, decodeFungal } from "../web/src/colony/fungalPolicy.ts";
-import { askedLevers, DEFAULT_MENU, STRAINS } from "../web/src/colony/fungus.ts";
-import { Game } from "../web/src/colony/game.ts";
-import { centreX, centreY } from "../web/src/colony/hex.ts";
-import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
-import {
-  COLONY_BRAIN_VERSION,
-  DOCTRINES,
-  estimateTokens,
-  packModeRequest,
-  packStanceRequest,
-  policyContext,
-  readMode,
-  readStance,
-  situationKey,
-  STANCE_BRAIN_VERSION,
-  stanceContext,
-  stanceKey,
-} from "../web/src/colony/colonyBrain.ts";
+import { decodeSituation, SITUATIONS, STANCES, AIMS, FUNGUS_BATCH, FUNGUS_BRAIN_VERSION, fungalKey, fungusContext, packFungusRequest, readLevels, encodeFungal, decodeFungal, askedLevers, DEFAULT_MENU, STRAINS, Game, centreX, centreY, generateSideWorld, mulberry32, COLONY_BRAIN_VERSION, DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, STANCE_BRAIN_VERSION, stanceContext, stanceKey } from "../web/src/colony/index.ts";
 
 const BATCH = 100;
 const OUT = new URL("../web/public/precache/", import.meta.url);
@@ -103,7 +82,7 @@ function fungalSituations() {
 
 const LANES = {
   mode: {
-    situations: () => Array.from({ length: SITUATIONS }, (_, c) => decode(c)),
+    situations: () => Array.from({ length: SITUATIONS }, (_, c) => decodeSituation(c)),
     key: situationKey,
     pack: (items, words) => packModeRequest(items, words),
     read: (answers, id) => readMode(answers, id),

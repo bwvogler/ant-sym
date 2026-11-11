@@ -12,8 +12,8 @@ const SMALL = { size: { w: 256, h: 160 }, surface: 60, relief: 0, nestCount: 1 }
 test("a sandpile round the hole: slopes of at most a row per column (≈41°), a funnel crater with the hole open, the walkway riding on top, food lifted", () => {
   const map = generateSideWorld(1, SMALL);
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const ex = CELL[0] as number;
-  const ey = CELL[1] as number;
+  const ex = CELL[0];
+  const ey = CELL[1];
   const top0 = Array.from({ length: map.size.w }, (_, x) => groundTop(map, x));
   // Food on the walkway three columns out: it ends up on top of the mound, not buried.
   const fy = groundTop(map, ex + 3) - 1;
@@ -72,7 +72,7 @@ test("two colonies: each picks up the other's spoil too, and the books still bal
   // No new holes onto the ground line, away from both entrances (spoil picked off a blanket over dug ground opened them).
   const holeCols = map.nests.map((n) => {
     cellOf(n.entrance!.x, n.entrance!.y);
-    return CELL[0] as number;
+    return CELL[0];
   });
   let holes = 0;
   for (let y = 0; y < map.size.h; y++)
@@ -88,7 +88,7 @@ test("a pellet is carried out along the ground and dropped where the carrier sta
   const map = generateSideWorld(1, { ...SMALL });
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, backfill: { ...BACKFILL, enterStale: 0 } }, mulberry32(9), () => "return");
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const ex = CELL[0] as number;
+  const ex = CELL[0];
   const drops: { at: number; cells: number[] }[] = [];
   for (let trip = 0; trip < 12; trip++) {
     c.x[0] = map.nest.x;
@@ -102,7 +102,7 @@ test("a pellet is carried out along the ground and dropped where the carrier sta
     for (let t = 0; t < 30 * 60 && c.pellet[0] === 1; t++) {
       c.tick(1 / 30);
       c.antCell(0);
-      at = CELL[0] as number;
+      at = CELL[0];
     }
     assert.equal(c.pellet[0], 0, `trip ${trip}: dropped`);
     const cells: number[] = [];
@@ -117,11 +117,11 @@ test("one colony's mound never buries another's hole: every hole keeps its funne
   const map = generateSideWorld(3, { size: { w: 320, h: 160 }, surface: 70, relief: 0, nestCount: 2, nestGap: 110 });
   const holes = map.nests.map((n) => {
     cellOf(n.entrance!.x, n.entrance!.y);
-    return CELL[0] as number;
+    return CELL[0];
   });
   const [a, b] = holes as [number, number];
   cellOf(map.nests[1]!.entrance!.x, map.nests[1]!.entrance!.y);
-  const by = CELL[1] as number;
+  const by = CELL[1];
   const topB = groundTop(map, b);
   const rng = mulberry32(4);
   for (let k = 0; k < 4000; k++) heapMound(map, a, b > a ? 1 : -1, Math.floor(rng() * 150), holes);

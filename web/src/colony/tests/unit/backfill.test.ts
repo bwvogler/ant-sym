@@ -199,7 +199,7 @@ test("wall-following through ground being filled: a target cell filled meanwhile
     c.gy[0] = 6;
     c.gdir[0] = 0;
     c.tick(1 / 30);
-    assert.ok(Math.abs((c.gx[0] as number) - 12) <= 1 && Math.abs((c.gy[0] as number) - 6) <= 1, `re-decided from its own cell: target (${c.gx[0]}, ${c.gy[0]})`);
+    assert.ok(Math.abs((c.gx[0]) - 12) <= 1 && Math.abs((c.gy[0]) - 6) <= 1, `re-decided from its own cell: target (${c.gx[0]}, ${c.gy[0]})`);
   }
   // Grazing: right on its cell's edge, so the straight way to the next cell crosses a corner of the solid cell beside it.
   {
@@ -219,7 +219,7 @@ test("wall-following through ground being filled: a target cell filled meanwhile
       if (CELL[0] !== 13 || CELL[1] !== 5) continue;
       const h = Math.atan2(centreY(6) - py, centreX(13, 6) - px);
       cellOf(Math.fround(px + Math.cos(h) * step), Math.fround(py + Math.sin(h) * step));
-      if (rockAt(map, CELL[0] as number, CELL[1] as number) !== OPEN) {
+      if (rockAt(map, CELL[0], CELL[1]) !== OPEN) {
         sx = px;
         sy = py;
       }

@@ -32,7 +32,7 @@ const game = (ants = 10): Game => {
 const fromHole = (c: Colony, i: number): number => {
   cellOf(c.x[i]!, c.y[i]!);
   const h = own(c);
-  return hexDistance(CELL[0] as number, CELL[1] as number, h.col, h.row);
+  return hexDistance(CELL[0], CELL[1], h.col, h.row);
 };
 /** Old ant i of c at the top of its own shaft, going out (exploring). */
 const toGate = (c: Colony, i: number): void => {

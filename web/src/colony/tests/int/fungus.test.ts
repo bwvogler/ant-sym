@@ -50,7 +50,7 @@ test("contact: a loaded ant raises the load of the clean ants around it, and pas
   f.hosts = 1;
   run(f, [c], 2);
   for (let i = 1; i < 5; i++) {
-    assert.ok((c.load[i] as number) > INFECTED, `ant ${i}: load ${c.load[i]}`);
+    assert.ok((c.load[i]) > INFECTED, `ant ${i}: load ${c.load[i]}`);
     assert.equal(c.strain[i], BLOOM);
   }
 });
@@ -63,7 +63,7 @@ test("an isolated ant: a clean one far away stays clean, and a Lockpick host alo
   f.hosts = 1;
   run(f, [c], 10);
   assert.equal(c.load[1], 0, "three cells is out of reach; fifteen certainly is");
-  assert.ok(Math.abs((c.load[0] as number) - 0.8) < 1e-6, `Lockpick never clears on its own and nobody grooms it: ${c.load[0]}`);
+  assert.ok(Math.abs((c.load[0]) - 0.8) < 1e-6, `Lockpick never clears on its own and nobody grooms it: ${c.load[0]}`);
 });
 
 test("grooming: nestmates clear a visible host, and a hidden strain is groomed far less", () => {
@@ -77,7 +77,7 @@ test("grooming: nestmates clear a visible host, and a hidden strain is groomed f
     const f = new Fungus(map);
     f.hosts = 1;
     run(f, [c], 5);
-    return c.load[0] as number;
+    return c.load[0];
   };
   const bloomAlone = groomed(BLOOM, false);
   const bloomGroomed = groomed(BLOOM, true);
@@ -95,7 +95,7 @@ test("priming: grooming a visible nestmate leaves an ant resistant, and a resist
   f.hosts = 1;
   run(f, [c], 3);
   assert.equal(c.load[1], 0);
-  assert.ok((c.resist[1] as number) > 0.01, `the groomer is primed: ${c.resist[1]}`);
+  assert.ok((c.resist[1]) > 0.01, `the groomer is primed: ${c.resist[1]}`);
   assert.equal(c.resist[0], 0, "a host's own load does not prime it");
 
   const pair = (resist: number): number => {
@@ -105,7 +105,7 @@ test("priming: grooming a visible nestmate leaves an ant resistant, and a resist
     const g = new Fungus(map, { grooming: 0, priming: 0 });
     g.hosts = 1;
     run(g, [d], 2);
-    return d.load[1] as number;
+    return d.load[1];
   };
   assert.ok(pair(0.8) < pair(0) * 0.3, `resistant ${pair(0.8).toFixed(4)} vs naive ${pair(0).toFixed(4)}`);
 });
@@ -119,8 +119,8 @@ test("across colonies: load passes both ways, at the same rate as within a colon
   const f = new Fungus(map, { grooming: 0, priming: 0 });
   f.hosts = 1;
   run(f, [mine, theirs], 1 / 30);
-  assert.ok((theirs.load[0] as number) > 0, "the rival caught it");
-  assert.ok(Math.abs((theirs.load[0] as number) - (mine.load[1] as number)) < 1e-7, `one step from clean: ${theirs.load[0]} vs ${mine.load[1]}`);
+  assert.ok((theirs.load[0]) > 0, "the rival caught it");
+  assert.ok(Math.abs((theirs.load[0]) - (mine.load[1])) < 1e-7, `one step from clean: ${theirs.load[0]} vs ${mine.load[1]}`);
 
   // And back: a rival host infects the player's ant.
   const a = placed(map, 0, [[20, 6]]);
@@ -129,7 +129,7 @@ test("across colonies: load passes both ways, at the same rate as within a colon
   const g = new Fungus(map, { grooming: 0, priming: 0 });
   g.hosts = 1;
   run(g, [a, b], 2);
-  assert.ok((a.load[0] as number) > INFECTED, `the player's ant caught it from the rival: ${a.load[0]}`);
+  assert.ok((a.load[0]) > INFECTED, `the player's ant caught it from the rival: ${a.load[0]}`);
   assert.equal(a.strain[0], LOCKPICK);
 });
 
@@ -154,8 +154,8 @@ test("the order colonies are listed in is no edge", () => {
   // Same colonies, listed the other way round (the grids follow the list).
   run(f2, [b2, a2], 2);
   for (let i = 0; i < 2; i++) {
-    assert.ok(Math.abs((a1.load[i] as number) - (a2.load[i] as number)) < 1e-6, `a${i}: ${a1.load[i]} vs ${a2.load[i]}`);
-    assert.ok(Math.abs((b1.load[i] as number) - (b2.load[i] as number)) < 1e-6, `b${i}: ${b1.load[i]} vs ${b2.load[i]}`);
+    assert.ok(Math.abs((a1.load[i]) - (a2.load[i])) < 1e-6, `a${i}: ${a1.load[i]} vs ${a2.load[i]}`);
+    assert.ok(Math.abs((b1.load[i]) - (b2.load[i])) < 1e-6, `b${i}: ${b1.load[i]} vs ${b2.load[i]}`);
   }
   assert.ok(Math.abs(f1.spores.get(21, 6) - f2.spores.get(21, 6)) < 1e-6, "spores taken the same either way");
 });
@@ -170,8 +170,8 @@ test("spore brush: spores on open ground in the stroke, a dose into every ant th
   assert.equal(f.spores.get(22, 6), 0, "rock takes no spores");
   assert.equal(f.spores.get(25, 6), 0, "outside the stroke");
   assert.equal(f.sporeStrain.get(20, 6), LOCKPICK);
-  assert.ok(Math.abs((mine.load[0] as number) - 0.3) < 1e-6);
-  assert.ok(Math.abs((theirs.load[0] as number) - 0.3) < 1e-6, "the brush does not care whose ant it is");
+  assert.ok(Math.abs((mine.load[0]) - 0.3) < 1e-6);
+  assert.ok(Math.abs((theirs.load[0]) - 0.3) < 1e-6, "the brush does not care whose ant it is");
   assert.equal(mine.load[1], 0);
   assert.equal(f.hosts, 2);
   assert.ok(f.active);
@@ -179,7 +179,7 @@ test("spore brush: spores on open ground in the stroke, a dose into every ant th
   // A host keeps its first strain; another strain's dose still adds load.
   f.paint([mine, theirs], at(20, 6).x, at(20, 6).y, 0.5, 0, 0.2, BLOOM);
   assert.equal(mine.strain[0], LOCKPICK);
-  assert.ok(Math.abs((mine.load[0] as number) - 0.5) < 1e-6);
+  assert.ok(Math.abs((mine.load[0]) - 0.5) < 1e-6);
 });
 
 test("spores on the ground: an ant walking onto them picks up load and takes some away; untouched spores fade", () => {
@@ -189,7 +189,7 @@ test("spores on the ground: an ant walking onto them picks up load and takes som
   f.paint([], at(30, 6).x, at(30, 6).y, 0.5, 4, 0, BLOOM);
   const c = placed(map, 0, [[15, 6]]);
   run(f, [c], 1);
-  assert.ok((c.load[0] as number) > INFECTED, `picked up: ${c.load[0]}`);
+  assert.ok((c.load[0]) > INFECTED, `picked up: ${c.load[0]}`);
   assert.equal(c.strain[0], BLOOM, "the ground's strain");
   assert.ok(f.spores.get(15, 6) < f.spores.get(30, 6), "the trodden cell lost more than the fade");
   const left = f.spores.get(30, 6);
@@ -220,7 +220,7 @@ test("a game with no spores runs as before: the fungus stays idle and draws no r
     const g = new Game(generateWorld(4, OPEN_WORLD), { antCount: 200, rivalAnts: 200 }, mulberry32(77));
     if (paint) g.paintSpores(-50, -50, 2, 3, 0.3, BLOOM); // off the map: paints nothing, infects nobody
     for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
-    return [g.player.stored, g.rival!.stored, g.player.losses, g.rival!.losses, g.player.x[0] as number];
+    return [g.player.stored, g.rival!.stored, g.player.losses, g.rival!.losses, g.player.x[0]];
   };
   const quiet = ticks(false);
   assert.deepEqual(ticks(true), quiet);
@@ -260,7 +260,7 @@ test("the one-chunk fast path reads the same as the clipped slow path across a c
   const inside = runAt(30);
   for (const x0 of [62, 63]) {
     const border = runAt(x0);
-    inside.forEach((v, i) => assert.ok(Math.abs(v - (border[i] as number)) < 1e-6, `x0 ${x0}, value ${i}: ${v} vs ${border[i]}`));
+    inside.forEach((v, i) => assert.ok(Math.abs(v - (border[i])) < 1e-6, `x0 ${x0}, value ${i}: ${v} vs ${border[i]}`));
   }
 });
 
@@ -284,5 +284,5 @@ test("advance: steps only once its interval has built up, and covers the time ow
 
   const b = setup();
   for (let k = 0; k < 30; k++) b.f.step([b.c], b.grids, 0.1);
-  for (let i = 0; i < 3; i++) assert.ok(Math.abs((a.c.load[i] as number) - (b.c.load[i] as number)) < 1e-5, `ant ${i}: ${a.c.load[i]} vs ${b.c.load[i]}`);
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs((a.c.load[i]) - (b.c.load[i])) < 1e-5, `ant ${i}: ${a.c.load[i]} vs ${b.c.load[i]}`);
 });

@@ -32,7 +32,7 @@ test("the side view's colony has a queen; the top-down maps keep the larder, wit
       const q = new Colony(m, { antCount: 1, nest: k }, mulberry32(1)).queen!;
       cellOf(q.x, q.y);
       const royal = m.chambers!.list.find((ch) => ch.colony === k && ch.role === "royal")!;
-      assert.equal(m.chambers!.at(CELL[0] as number, CELL[1] as number), royal.id, `seed ${seed}, colony ${k}: in her chamber`);
+      assert.equal(m.chambers!.at(CELL[0], CELL[1]), royal.id, `seed ${seed}, colony ${k}: in her chamber`);
       assert.equal(CELL[1], royal.floorRow, `seed ${seed}, colony ${k}: on its floor`);
       assert.ok(Math.abs(q.x - m.nests[k]!.x) <= 1, `seed ${seed}, colony ${k}: under its centre`);
     }
@@ -55,8 +55,8 @@ test("queen to worker: she lays while there is food; an egg becomes a larva, is 
       for (let i = 0; i < c.n; i++)
         if (c.alive[i] && !wasAlive[i]) {
           // Born where a pupa lay (its cell's centre), not somewhere in the founding chamber.
-          cellOf(c.x[i] as number, c.y[i] as number);
-          if (pupae.includes(`${CELL[0]},${CELL[1]}`) && c.x[i] === centreX(CELL[0] as number, CELL[1] as number)) bornAtPupa++;
+          cellOf(c.x[i], c.y[i]);
+          if (pupae.includes(`${CELL[0]},${CELL[1]}`) && c.x[i] === centreX(CELL[0], CELL[1])) bornAtPupa++;
         }
     pupae = c.brood.items.filter((b) => b.stage === PUPA).map((b) => `${b.x},${b.y}`);
     for (const b of c.brood.items) stages.add(b.stage);
@@ -78,7 +78,7 @@ test("nurses take eggs from the queen to a brood chamber", () => {
     const ch = map.chambers!;
     // A brood chamber dug beside the royal one, out along a tunnel from it.
     cellOf(map.nest.x, map.nest.y);
-    const [rx, ry] = [CELL[0] as number, CELL[1] as number];
+    const [rx, ry] = [CELL[0], CELL[1]];
     let x = rx;
     while (rockAt(map, x, ry) === OPEN) x++;
     for (let k = 0; k < 4; k++) digCell(map, x + k, ry);
@@ -168,7 +168,7 @@ test("a larva is fed before it pupates: with no food for it, it stays a larva", 
   const c = new Colony(map, { antCount: 20, maxAnts: 30 }, mulberry32(7), () => "explore");
   c.killQueen(); // no eggs: just the one larva
   cellOf(c.queen!.x, c.queen!.y);
-  const b = c.brood.add(CELL[0] as number, CELL[1] as number, map.chambers!.at(CELL[0] as number, CELL[1] as number));
+  const b = c.brood.add(CELL[0], CELL[1], map.chambers!.at(CELL[0], CELL[1]));
   b.stage = LARVA;
   b.t = 1000;
   for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);

@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Colony } from "../colony/colony.ts";
-import type { Situation } from "../colony/vocab.ts";
+import { type Colony, type Situation, DOCTRINES, type FungalSituation, AIMS, type Fungus } from "../colony/index.ts";
 import { COLONY_NAMES } from "./names.ts";
-import { DOCTRINES } from "../colony/colonyBrain.ts";
-import type { FungalSituation } from "../colony/fungalPolicy.ts";
-import { AIMS } from "../colony/fungusBrain.ts";
-import type { Fungus } from "../colony/fungus.ts";
 import { browserCache } from "./cacheStore.ts";
 import { ColonyJev, type ColonyJevState } from "./colonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";

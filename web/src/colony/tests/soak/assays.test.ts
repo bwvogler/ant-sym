@@ -68,7 +68,7 @@ test("heldProbe: a carrier that won't put its food down at home counts as carryi
   const top = (seed: number) => generateWorld(seed, { ...OPEN_WORLD, size: { w: 80, h: 50 } });
   const run = (drop: () => boolean) => runGame({ seed: 1, map: top, seconds: 200, game: { antCount: 60, rivalAnts: 0 }, sides: { responses: { ...localResponses, drop } } }).result.metrics;
   const keeps = run(() => false);
-  assert.ok((keeps["you.maxCarrying"] as number) > 0, `maxCarrying ${keeps["you.maxCarrying"]}`);
+  assert.ok((keeps["you.maxCarrying"]) > 0, `maxCarrying ${keeps["you.maxCarrying"]}`);
   const local = run(() => true);
   assert.equal(local["you.maxCarrying"], 0);
 });

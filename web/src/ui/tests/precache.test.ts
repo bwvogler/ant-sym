@@ -2,10 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { SITUATIONS } from "../../colony/colony.ts";
-import { MODES, STANCES } from "../../colony/vocab.ts";
-import { COLONY_BRAIN_VERSION, DOCTRINES, policyContext, STANCE_BRAIN_VERSION, stanceContext } from "../../colony/colonyBrain.ts";
-import { AIMS, FUNGUS_BRAIN_VERSION, fungusContext, validLevels } from "../../colony/fungusBrain.ts";
+import { SITUATIONS, MODES, STANCES, COLONY_BRAIN_VERSION, DOCTRINES, policyContext, STANCE_BRAIN_VERSION, stanceContext, AIMS, FUNGUS_BRAIN_VERSION, fungusContext, validLevels } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
 
 // The answers shipped with the page (scripts/precache.mjs → public/precache/) are only worth their bytes if the code

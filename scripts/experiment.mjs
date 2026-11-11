@@ -108,7 +108,7 @@ async function main() {
   if (policy) {
     if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file>`);
     const cache = loadCache(policy.slice(6));
-    const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } = await import("../web/src/colony/colonyBrain.ts");
+    const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } = await import("../web/src/colony/index.ts");
     const want = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
     if (JSON.stringify(cache.version) !== JSON.stringify(want)) fail(`${policy.slice(6)} was asked under brain versions ${JSON.stringify(cache.version)}; the code is at ${JSON.stringify(want)}. Ask afresh (scripts/colony-live.mjs).`);
     // Versions are bumped by hand; the contexts (legend, question wording, doctrine) catch an edit made without a bump.
@@ -214,8 +214,8 @@ async function work() {
   };
   const brains = {};
   if (policy) {
-    const { localPolicy, localStance } = await import("../web/src/colony/colony.ts");
-    const { responsesFromAnswers, situationKey, stanceKey } = await import("../web/src/colony/colonyBrain.ts");
+    const { localPolicy, localStance } = await import("../web/src/colony/index.ts");
+    const { responsesFromAnswers, situationKey, stanceKey } = await import("../web/src/colony/index.ts");
     const cache = loadCache(policy.slice(6));
     const lane = (table, key, local, name) => (s) => {
       const a = table?.[key(s)];

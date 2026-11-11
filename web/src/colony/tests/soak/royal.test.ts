@@ -27,7 +27,7 @@ function meanScent(c: Colony): number {
   let n = 0;
   for (let i = 0; i < c.n; i++)
     if (c.alive[i]) {
-      s += c.scent[i] as number;
+      s += c.scent[i];
       n++;
     }
   return s / n;
@@ -37,7 +37,7 @@ test("the queen's scent is carried on the ants and dilutes as the colony grows: 
   assert.equal(scentShare(0), 0);
   const few = colony(10).c;
   const many = colony(60).c;
-  assert.ok(Math.abs((few.scent[0] as number) - scentShare(10)) < 1e-6, "founders start with the colony's share");
+  assert.ok(Math.abs((few.scent[0]) - scentShare(10)) < 1e-6, "founders start with the colony's share");
   for (let k = 0; k < 30 * 60; k++) {
     few.tick(DT);
     many.tick(DT);
@@ -149,7 +149,7 @@ function flying(paint = false) {
   if (paint) {
     const garden = STRAINS.findIndex((s) => s.id === "garden");
     // Every ant dosed: the alate picks it up from the nestmates around her.
-    for (let i = 0; i < c.n; i++) if (c.alive[i]) g.paintSpores(c.x[i] as number, c.y[i] as number, 0.5, 0, 0.8, garden);
+    for (let i = 0; i < c.n; i++) if (c.alive[i]) g.paintSpores(c.x[i], c.y[i], 0.5, 0, 0.8, garden);
   }
   c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: ALATE_WAIT - 5, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
   return { g, c };
@@ -288,7 +288,7 @@ test("daughters landing together dig apart: their founding chambers never touch,
       }
     for (const d of g.colonies.slice(1)) {
       cellOf(d.queen!.x, d.queen!.y);
-      const room = ch.list[ch.at(CELL[0] as number, CELL[1] as number)];
+      const room = ch.list[ch.at(CELL[0], CELL[1])];
       assert.ok(room && room.colony === d.params.nest && room.role === "royal", `seed ${seed}: queen of nest ${d.params.nest} in ${room?.colony}'s ${room?.role}`);
     }
   }
@@ -346,7 +346,7 @@ function youngColony() {
   assert.equal(d.founding, false, "her first worker eclosed");
   const ch = map.chambers!;
   cellOf(d.queen!.x, d.queen!.y);
-  const [qx, qy] = [CELL[0] as number, CELL[1] as number];
+  const [qx, qy] = [CELL[0], CELL[1]];
   const room = ch.list[ch.at(qx, qy)]!;
   const away = () => {
     // Her nanitics are out foraging: none within two cells of her brood.

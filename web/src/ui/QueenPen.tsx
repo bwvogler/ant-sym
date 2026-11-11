@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { DOCTRINES } from "../colony/colonyBrain.ts";
-import { FLIGHT } from "../colony/game.ts";
-import type { Flight } from "../colony/royal.ts";
+import { DOCTRINES, FLIGHT, type Flight } from "../colony/index.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
 // The queen's pen (ja-lo8.9): a new queen has flown with the fungus in her, from a colony whose queen it reached. The

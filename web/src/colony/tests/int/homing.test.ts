@@ -20,12 +20,12 @@ function onWalkway(c: Colony, x: number): void {
 test("the surface vector: its error grows with the way out, starts afresh coming up out of the hole, and is fixed on the way home", () => {
   const map = generateSideWorld(2, SMALL_SIDE);
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const ex = CELL[0] as number;
+  const ex = CELL[0];
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(5), () => "explore");
   // Out of the hole onto the ground (a newborn is underground): the surface vector starts at zero, with this trip's drift.
   // In the hole first, then onto the walkway cell beside it: only its own hole starts the vector afresh (§40), so it
   // has to come up there, not be put down on the ground from the chamber.
-  const ey = CELL[1] as number;
+  const ey = CELL[1];
   c.x[0] = centreX(ex, ey);
   c.y[0] = centreY(ey);
   c.tick(1 / 30);
@@ -33,13 +33,13 @@ test("the surface vector: its error grows with the way out, starts afresh coming
   c.y[0] = centreY(ny(ey, NE));
   c.heading[0] = 0;
   c.tick(1 / 30);
-  assert.ok((c.odoSurf[0] as number) < 0.5, `fresh: ${c.odoSurf[0]}`);
+  assert.ok((c.odoSurf[0]) < 0.5, `fresh: ${c.odoSurf[0]}`);
   assert.notEqual(c.driftSurf[0], 0, "a drift drawn for the trip");
   // On along the ground, away from the hole (from its rim an explorer may turn back in).
   onWalkway(c, ex + 3);
   c.heading[0] = 0;
   for (let k = 0; k < 30 * 4; k++) c.tick(1 / 30);
-  const out = c.odoSurf[0] as number;
+  const out = c.odoSurf[0];
   assert.ok(out > 10 && out <= c.params.speed * 4 + 1, `the way out counted: ${out.toFixed(1)}`);
   // Homing: the vector it walks home on is the one it brought out.
   c.mode[0] = 2;
@@ -51,7 +51,7 @@ test("the surface vector: its error grows with the way out, starts afresh coming
 test("a carrier whose vector is 12 cells off walks to where it believes the hole is, finds nothing, searches, and gets home", () => {
   const map = generateSideWorld(2, SMALL_SIDE);
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const ex = CELL[0] as number;
+  const ex = CELL[0];
   const ent = map.nest.entrance!;
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "return");
   onWalkway(c, ex + 40);
@@ -65,8 +65,8 @@ test("a carrier whose vector is 12 cells off walks to where it believes the hole
   let t = 0;
   for (; t < 30 * 60 && c.stored === 0; t++) {
     c.tick(1 / 30);
-    if (c.search[0] === 0) nearBelief = Math.min(nearBelief, Math.abs((c.x[0] as number) - (ent.x + 12)));
-    searched = Math.max(searched, Math.abs(c.search[0] as number));
+    if (c.search[0] === 0) nearBelief = Math.min(nearBelief, Math.abs((c.x[0]) - (ent.x + 12)));
+    searched = Math.max(searched, Math.abs(c.search[0]));
   }
   assert.ok(12 > HOLE_SIGHT);
   assert.ok(nearBelief < 1.5, `it went where it believed the hole was (${nearBelief.toFixed(2)} off)`);
@@ -85,7 +85,7 @@ test("road signs: underground, a strong nest trail underfoot fades the in-nest m
     c.x[0] = sx;
     c.y[0] = sy;
     c.antCell(0);
-    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) c.ph.depositCell("home", (CELL[0] as number) + dx, (CELL[1] as number) + dy, scent);
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) c.ph.depositCell("home", (CELL[0]) + dx, (CELL[1]) + dy, scent);
     c.odoNest[0] = 100;
     c.mode[0] = 2;
     for (let k = 0; k < 30 * 2; k++) {
@@ -93,7 +93,7 @@ test("road signs: underground, a strong nest trail underfoot fades the in-nest m
       c.y[0] = sy;
       c.tick(1 / 30);
     }
-    return c.odoNest[0] as number;
+    return c.odoNest[0];
   };
   assert.ok(run(5) < 50, `strong trail: ${run(5).toFixed(1)}`);
   assert.ok(run(0) > 99, `no trail: ${run(0).toFixed(1)}`);
@@ -134,7 +134,7 @@ test("top-down maps keep no vector: homing there is exact, whatever the odometer
 /** The cell (x, y) world point (px, py) lies in. */
 function cellAt(px: number, py: number): [number, number] {
   cellOf(px, py);
-  return [CELL[0] as number, CELL[1] as number];
+  return [CELL[0], CELL[1]];
 }
 
 test("a homing ant whose vector is nearly right never searches: blocked anywhere but at its believed hole, it goes round (review of slice 1)", () => {
@@ -152,7 +152,7 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
         // On the ground line only, where its surface vector is what it homes by: underground it homes by its nest vector,
         // and a search there round a wrongly believed chamber is that vector's (a young porter, ja-xu6.1's runs).
         c.antCell(i);
-        if (!isSky(g.map, CELL[0] as number, CELL[1] as number)) continue;
+        if (!isSky(g.map, CELL[0], CELL[1])) continue;
         samples++;
         if (c.search[i] !== 0) searching++;
       }
@@ -177,7 +177,7 @@ function pillar(map: WorldMap, x0: number, wide: number, high: number): void {
 /** Seconds (up to `limit`) a lone carrier on the walkway `from` columns east of its hole takes to get its food home, with a vector `err` cells off (east +), on map `map`; the farthest east it went, and the widest its search grew. */
 function carrierHome(map: WorldMap, from: number, err: number, limit: number, setup: (c: Colony) => void = () => {}): { t: number; east: number; home: boolean; searched: number } {
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const ex = CELL[0] as number;
+  const ex = CELL[0];
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "return");
   onWalkway(c, ex + from);
   c.tick(1 / 30); // up on the ground: the surface vector starts
@@ -186,14 +186,14 @@ function carrierHome(map: WorldMap, from: number, err: number, limit: number, se
   c.carrying[0] = 1;
   c.mode[0] = 2;
   setup(c);
-  const x0 = c.x[0] as number;
+  const x0 = c.x[0];
   let east = x0;
   let searched = 0;
   let t = 0;
   for (; t < 30 * limit && c.stored === 0; t++) {
     c.tick(1 / 30);
-    east = Math.max(east, c.x[0] as number);
-    searched = Math.max(searched, Math.abs(c.search[0] as number));
+    east = Math.max(east, c.x[0]);
+    searched = Math.max(searched, Math.abs(c.search[0]));
   }
   return { t: t / 30, east: east - x0, home: c.stored === 1, searched };
 }
@@ -205,7 +205,7 @@ test("Bug2 on the ground tries the other side: blocked by a pillar with the way 
   const runs = [-1, 1].map((hand) => {
     const map = generateSideWorld(2, SMALL_SIDE);
     cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-    pillar(map, (CELL[0] as number) + 30, 2, 20);
+    pillar(map, (CELL[0]) + 30, 2, 20);
     return carrierHome(map, 40, 0, 90, (c) => (c.hand[0] = hand));
   });
   for (const r of runs) assert.ok(r.home, `home (${r.t.toFixed(0)} s; it went ${r.east.toFixed(0)} east of where it started)`);
@@ -217,7 +217,7 @@ test("a carrier whose vector is far off still gets home: 90 and 150 cells either
   // belief past the map's edge it waited at the edge for good.
   const map0 = generateSideWorld(2);
   cellOf(map0.nest.entrance!.x, map0.nest.entrance!.y);
-  const ex = CELL[0] as number;
+  const ex = CELL[0];
   for (const err of [90, 150, -90, -150]) {
     const r = carrierHome(generateSideWorld(2), err > 0 ? 10 : -10, err, 400);
     assert.ok(r.home, `${err} cells off: home in ${r.t.toFixed(0)} s`);
@@ -249,8 +249,8 @@ test("only its own hole resets the surface vector: up out of another, the error 
     c.odoSurf[0] = 50;
     c.driftSurf[0] = 0.3;
     cellOf(n!.entrance!.x, n!.entrance!.y);
-    const hx = CELL[0] as number;
-    const hy = CELL[1] as number;
+    const hx = CELL[0];
+    const hy = CELL[1];
     for (let d = 0; d < 6; d++) {
       const ax = nx(hx, hy, d);
       const ay = ny(hy, d);
@@ -263,9 +263,9 @@ test("only its own hole resets the surface vector: up out of another, the error 
     c.tick(1 / 30);
   };
   up(other);
-  assert.ok((c.odoSurf[0] as number) >= 50, `up out of the rival's hole: the vector runs on (${c.odoSurf[0]})`);
+  assert.ok((c.odoSurf[0]) >= 50, `up out of the rival's hole: the vector runs on (${c.odoSurf[0]})`);
   up(own);
-  assert.ok((c.odoSurf[0] as number) < 1, `up out of its own: afresh (${c.odoSurf[0]})`);
+  assert.ok((c.odoSurf[0]) < 1, `up out of its own: afresh (${c.odoSurf[0]})`);
 });
 
 test("in the side view a searching ant on the home trail still steers by its vector: the trail's lead is one world's plane's only (review of #60)", () => {
@@ -275,8 +275,8 @@ test("in the side view a searching ant on the home trail still steers by its vec
   const map = generateSideWorld(2, SMALL_SIDE);
   const n = map.nest;
   cellOf(n.x, n.y);
-  const cx = CELL[0] as number;
-  const cy = CELL[1] as number;
+  const cx = CELL[0];
+  const cy = CELL[1];
   // A room in the soil 25–60 columns east of the chamber, 7 rows tall: open ground, no tunnel, so it steers freely there.
   for (let x = cx + 25; x <= cx + 60; x++)
     for (let y = cy - 3; y <= cy + 3; y++) {
@@ -299,8 +299,8 @@ test("in the side view a searching ant on the home trail still steers by its vec
   c.heading[0] = 0;
   c.bestD[0] = Infinity;
   c.stallT[0] = 0;
-  const x0 = c.x[0] as number;
+  const x0 = c.x[0];
   for (let k = 0; k < 45; k++) c.tick(1 / 30);
   // Ungated, the trail leads it 10 east in the 1.5 s; gated, it turns west for its belief (5 west).
-  assert.ok((c.x[0] as number) < x0 - 2, `it turned for its belief, west (${((c.x[0] as number) - x0).toFixed(1)} from where it started)`);
+  assert.ok((c.x[0]) < x0 - 2, `it turned for its belief, west (${((c.x[0]) - x0).toFixed(1)} from where it started)`);
 });

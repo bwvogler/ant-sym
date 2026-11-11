@@ -1,12 +1,6 @@
 import { GAME_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
 import { apiHeaders, apiUrl } from "./backend.ts";
-import { localPolicy, localStance, type Colony } from "../colony/colony.ts";
-import { MODES, STANCES, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/vocab.ts";
-import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
-import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
-import { askedIn, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "../colony/fungusBrain.ts";
-import { askedLevers, DEFAULT_MENU, type Fungus } from "../colony/fungus.ts";
-import { PolicyCache } from "../colony/policyCache.ts";
+import { localPolicy, localStance, type Colony, MODES, STANCES, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation, packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey, localFungusRule, type FungalSituation, type FungusPolicy, askedIn, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking, askedLevers, DEFAULT_MENU, type Fungus, PolicyCache } from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
 // game. The player is the fungus, so no colony is the player's: Jev, when on,

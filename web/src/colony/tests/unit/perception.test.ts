@@ -130,7 +130,7 @@ test("alarm gain 0: a host does not shy from alarm it cannot smell", () => {
     at(c, 12, 6.5 * R);
     c.gainAlarm[0] = gain;
     for (let k = 0; k < 10; k++) c.tick(1 / 30);
-    return c.heading[0] as number;
+    return c.heading[0];
   };
   assert.ok(turn(1) > 0.2, `healthy: turns away (right, +) from the alarm: ${turn(1).toFixed(3)}`);
   assert.ok(Math.abs(turn(0)) < 1e-6, `soothed: holds its course: ${turn(0)}`);
@@ -169,11 +169,11 @@ test("the fungus writes a host's perception from its intervention and load; a cl
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
 
   assert.equal(c.expr[0], preset("share"), "Bloom's default: share");
-  assert.ok(Math.abs((c.gainFood[0] as number) - 1.25) < 1e-3, `food ×1.25 at half load: ${c.gainFood[0]}`);
-  assert.ok(Math.abs((c.foreignFood[0] as number) - 0.5) < 1e-3);
+  assert.ok(Math.abs((c.gainFood[0]) - 1.25) < 1e-3, `food ×1.25 at half load: ${c.gainFood[0]}`);
+  assert.ok(Math.abs((c.foreignFood[0]) - 0.5) < 1e-3);
   assert.equal(c.gainAlarm[0], 1, "share leaves alarm alone");
   assert.equal(c.expr[1], preset("soothe"), "Lockpick's default: soothe");
-  assert.ok(Math.abs((c.gainAlarm[1] as number) - 0.25) < 1e-6, "alarm ×0.25 at full load");
+  assert.ok(Math.abs((c.gainAlarm[1]) - 0.25) < 1e-6, "alarm ×0.25 at full load");
 
   // A strain that clears at once: the host is clean after one step, and perceives as it is.
   const g = new Fungus(map, {}, STRAINS.map((s) => ({ ...s, decay: 1e9 })));

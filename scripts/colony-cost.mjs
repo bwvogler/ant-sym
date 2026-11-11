@@ -19,12 +19,7 @@
 // by the page yet, so they are reported apart and not in the session's total.
 //
 // Usage: node scripts/colony-cost.mjs [--side | --one] [minutes=10] [ants=600] [seed=1]
-import { localPolicy, localStance, PLANE } from "../web/src/colony/colony.ts";
-import { DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, responseKey, situationKey, stanceContext, stanceKey } from "../web/src/colony/colonyBrain.ts";
-import { localResponses, responses } from "../web/src/colony/responses.ts";
-import { Game, gameRng } from "../web/src/colony/game.ts";
-import { generateOneWorld } from "../web/src/colony/oneWorld.ts";
-import { generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/world.ts";
+import { localPolicy, localStance, PLANE, DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, responseKey, situationKey, stanceContext, stanceKey, localResponses, responses, Game, gameRng, generateOneWorld, generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const side = process.argv.includes("--side");

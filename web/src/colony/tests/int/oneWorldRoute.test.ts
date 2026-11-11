@@ -105,14 +105,14 @@ test("route memory records a place every routeStep cells on the way out, from th
   c.heading[0] = 0;
   c.odoSurf[0] = 0;
   for (let k = 0; k < 4 * 30; k++) g.tick(DT);
-  const n = c.routeN[0] as number;
-  const walked = c.odoSurf[0] as number;
+  const n = c.routeN[0];
+  const walked = c.odoSurf[0];
   assert.ok(walked > 20, `it walked ${walked.toFixed(0)} cells`);
   assert.equal(n, Math.floor(walked / 8), `${n} places for ${walked.toFixed(1)} cells at 8 a place`);
   // Each place is where it stood: on the line it walked (east, at the hole's row, give or take its wander), spaced about 8 apart.
-  for (let k = 0; k < n; k++) assert.ok(Math.abs((c.routePlaces[2 * k + 1] as number) - hy) < 12 && (c.routePlaces[2 * k] as number) > hx, `place ${k}: (${c.routePlaces[2 * k]}, ${c.routePlaces[2 * k + 1]}) from (${hx}, ${hy})`);
+  for (let k = 0; k < n; k++) assert.ok(Math.abs((c.routePlaces[2 * k + 1]) - hy) < 12 && (c.routePlaces[2 * k]) > hx, `place ${k}: (${c.routePlaces[2 * k]}, ${c.routePlaces[2 * k + 1]}) from (${hx}, ${hy})`);
   for (let k = 1; k < n; k++) {
-    const d = Math.hypot((c.routePlaces[2 * k] as number) - (c.routePlaces[2 * k - 2] as number), (c.routePlaces[2 * k + 1] as number) - (c.routePlaces[2 * k - 1] as number));
+    const d = Math.hypot((c.routePlaces[2 * k]) - (c.routePlaces[2 * k - 2]), (c.routePlaces[2 * k + 1]) - (c.routePlaces[2 * k - 1]));
     assert.ok(d > 5 && d < 11, `places ${k - 1} and ${k} are ${d.toFixed(1)} apart`);
   }
   // Homing (a carrier, or on its way back), it stores nothing more.
@@ -130,7 +130,7 @@ test("route memory records a place every routeStep cells on the way out, from th
     g.tick(DT);
     c.mode[0] = MODES.indexOf("fight");
   }
-  assert.ok((c.odoSurf[0] as number) > 8, "it walked");
+  assert.ok((c.odoSurf[0]) > 8, "it walked");
   assert.equal(c.routeN[0], before, "a fighter adds no place");
 });
 
@@ -147,7 +147,7 @@ test("route memory off (routeMemory 0) records nothing, and a place set by hand 
     const xs: number[] = [];
     for (let k = 0; k < 30 * 30; k++) {
       g.tick(DT);
-      xs.push(c.x[0] as number, c.y[0] as number);
+      xs.push(c.x[0], c.y[0]);
     }
     if (!mem) assert.equal(c.routeN[0], 0, "off: no place stored");
     return xs;
@@ -175,21 +175,21 @@ test("route memory: a full store keeps every second place and doubles its spacin
   c.odoSurf[0] = 0;
   const first: number[] = [];
   let doubled = false;
-  for (let k = 0; k < 8 * 30 && (c.x[0] as number) < 150; k++) {
+  for (let k = 0; k < 8 * 30 && (c.x[0]) < 150; k++) {
     g.tick(DT);
-    assert.ok((c.routeN[0] as number) <= 8, "never more than routeMax");
-    if (!first.length && (c.routeN[0] as number) > 0) first.push(c.routePlaces[0] as number, c.routePlaces[1] as number);
-    if ((c.routeGap[0] as number) > 2 && !doubled) {
+    assert.ok((c.routeN[0]) <= 8, "never more than routeMax");
+    if (!first.length && (c.routeN[0]) > 0) first.push(c.routePlaces[0], c.routePlaces[1]);
+    if ((c.routeGap[0]) > 2 && !doubled) {
       doubled = true;
       assert.equal(c.routeGap[0], 4, "the spacing doubled");
       assert.equal(c.routeN[0], 5, "the 4 it kept (of 8) and the place that was due");
       assert.equal(c.routePlaces[0], first[0], "the first place is kept");
-      const d = Math.hypot((c.routePlaces[2] as number) - (c.routePlaces[0] as number), (c.routePlaces[3] as number) - (c.routePlaces[1] as number));
+      const d = Math.hypot((c.routePlaces[2]) - (c.routePlaces[0]), (c.routePlaces[3]) - (c.routePlaces[1]));
       assert.ok(d > 3 && d < 5, `the kept places are ${d.toFixed(1)} apart, twice the old spacing`);
     }
   }
   assert.ok(doubled, "the store filled");
-  assert.ok((c.routeGap[0] as number) >= 4);
+  assert.ok((c.routeGap[0]) >= 4);
 });
 
 test("route memory: a newborn in a dead ant's slot has no places and no retrace", () => {
@@ -219,7 +219,7 @@ test("route memory: coming up out of its own hole starts the trip's places afres
   store(c, [[hx + 8, hy], [hx + 16, hy]]);
   c.routeState[0] = 2;
   assert.ok(tickUntil(g, 20, () => c.layer[0] === PLANE), "it came up");
-  assert.ok((c.routeN[0] as number) <= 1, `${c.routeN[0]} places after coming up: the old ones are gone`);
+  assert.ok((c.routeN[0]) <= 1, `${c.routeN[0]} places after coming up: the old ones are gone`);
   assert.equal(c.routeState[0], 0);
 });
 
@@ -247,7 +247,7 @@ test("route memory: a stalled carrier starts retracing (routeMemory 1 and 2), on
     carrier(w, hx + 62, hy, 80);
     store(c, out);
     tickUntil(g, 20, () => c.routeState[0] !== 0);
-    return { state: c.routeState[0] as number, goal: c.routeGoal[0] as number, n: out.length };
+    return { state: c.routeState[0], goal: c.routeGoal[0], n: out.length };
   };
   for (const mem of [1, 2]) {
     const r = state(mem);
@@ -265,7 +265,7 @@ test("route memory 2 retraces on reaching its belief with no hole there; 1 searc
     carrier(w, hx + 60, hy, 60);
     c.driftSurf[0] = 1; // its vector's end is where it stands: 60 east of the hole it believes it left, nothing there
     g.tick(DT);
-    return { state: c.routeState[0] as number, search: c.search[0] as number };
+    return { state: c.routeState[0], search: c.search[0] };
   };
   const two = at(2);
   assert.equal(two.state, 1, "2: retracing");
@@ -286,7 +286,7 @@ test("route memory 2 retraces the way out to where it began: its first place, ne
   c.driftSurf[0] = 1; // its belief is the spot it stands on, 60 cells from the hole it left
   assert.ok(tickUntil(g, 20, () => c.routeState[0] === 2), "it walked its places in order to the first");
   assert.ok(g.time > 5 && g.time < 15, `after ${g.time.toFixed(1)} s (some 85 cells of places at 7 a second)`);
-  assert.ok(Math.hypot((c.x[0] as number) - hx, (c.y[0] as number) - hy) < 14, "and it is by its hole");
+  assert.ok(Math.hypot((c.x[0]) - hx, (c.y[0]) - hy) < 14, "and it is by its hole");
 });
 
 test("route memory: a carrier without food, without places, or already retraced this trip does not retrace", () => {
@@ -299,7 +299,7 @@ test("route memory: a carrier without food, without places, or already retraced 
     if (how === "food") c.carrying[0] = 0;
     if (how === "done") c.routeState[0] = 2;
     g.tick(DT);
-    return { state: c.routeState[0] as number, search: c.search[0] as number };
+    return { state: c.routeState[0], search: c.search[0] };
   };
   for (const how of ["food", "places", "done"] as const) {
     const r = run(2, how);
@@ -315,7 +315,7 @@ test("route memory: a carrier without food, without places, or already retraced 
     const xs: number[] = [];
     for (let k = 0; k < 30 * 30; k++) {
       g.tick(DT);
-      xs.push(c.x[0] as number, c.y[0] as number);
+      xs.push(c.x[0], c.y[0]);
     }
     return xs;
   };
@@ -333,7 +333,7 @@ test("route memory: within routeSee of a place it takes the earliest and aims fo
     c.routeState[0] = 1;
     c.routeGoal[0] = 10;
     g.tick(DT);
-    return c.routeGoal[0] as number;
+    return c.routeGoal[0];
   };
   assert.equal(goalAfter(5, 73, 41), 1, "close to places 2 and 9: the earlier, so it aims for place 1");
   assert.equal(goalAfter(5, 120, 70), 10, "far from every place: its goal stays");
@@ -353,7 +353,7 @@ test("route memory: a new goal judges progress afresh, not against the distance 
   c.bestD[0] = 0.5; // got within half a cell of the old goal
   g.tick(DT);
   assert.equal(c.routeGoal[0], 1, "it jumped to the earliest place it is near");
-  assert.ok((c.bestD[0] as number) > 3, `progress toward the new goal starts from its own distance, not the old goal's (${c.bestD[0]})`);
+  assert.ok((c.bestD[0]) > 3, `progress toward the new goal starts from its own distance, not the old goal's (${c.bestD[0]})`);
 });
 
 test("route memory: out of places the carrier searches as before and does not retrace again this trip", () => {
@@ -366,7 +366,7 @@ test("route memory: out of places the carrier searches as before and does not re
   g.tick(DT);
   assert.equal(c.routeState[0], 2, "the last place reached: done");
   assert.equal(c.routeGoal[0], -1);
-  assert.ok((c.search[0] as number) > 0, "its search goes on from here");
+  assert.ok((c.search[0]) > 0, "its search goes on from here");
   for (let k = 0; k < 30 * 30; k++) {
     g.tick(DT);
     assert.equal(c.routeState[0], 2, "stalled against the band again, it does not retrace a second time");
@@ -383,7 +383,7 @@ test("route memory: a place it cannot get to (behind rock) is given up on a stal
   carrier(w, here, hy, 80);
   c.routeState[0] = 1;
   c.routeGoal[0] = 3;
-  assert.ok(tickUntil(g, 60, () => (c.routeGoal[0] as number) < 3), "the goal moved to an earlier place");
+  assert.ok(tickUntil(g, 60, () => (c.routeGoal[0]) < 3), "the goal moved to an earlier place");
   assert.equal(c.routeGoal[0], 2, "to the one before");
   assert.ok(g.time > 3 && g.time < 15, `after the stall, ${g.time.toFixed(1)} s`);
 });
@@ -411,7 +411,7 @@ test("route memory: not on a top-down map, which has no vector to fail", () => {
     const xs: number[] = [];
     for (let t = 0; t < 20 * 30; t++) {
       flat.tick(DT);
-      xs.push(flat.x[0] as number, flat.y[0] as number);
+      xs.push(flat.x[0], flat.y[0]);
     }
     assert.equal(flat.routeN[0], 1, "it stored nothing on a flat map");
     assert.equal(flat.routeState[0], 0);

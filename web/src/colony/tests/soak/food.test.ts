@@ -32,7 +32,7 @@ test("the larder is the food lying in the colony's chambers, porters move it, an
 function reception(map: WorldMap, cells: number) {
   const ch = map.chambers!;
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const [ex, ey] = [CELL[0] as number, CELL[1] as number];
+  const [ex, ey] = [CELL[0], CELL[1]];
   let sx = ex;
   const sy = ey + 4;
   for (let x = ex - 3; x <= ex + 3 && rockAt(map, sx, sy) !== OPEN; x++) sx = x; // a shaft cell 4 rows down
@@ -171,7 +171,7 @@ test("a larva lying outside any chamber is taken in and raised (review of slice 
   const c = g.player;
   // A larva on the shaft just below the hole: in no chamber.
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y + 3);
-  const stray = c.brood.add(CELL[0] as number, CELL[1] as number, -1);
+  const stray = c.brood.add(CELL[0], CELL[1], -1);
   stray.stage = LARVA;
   c.feed(30);
   for (let k = 0; k < 30 * 120 && stray.stage === LARVA; k++) g.tick(1 / 30);

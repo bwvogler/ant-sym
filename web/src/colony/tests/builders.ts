@@ -60,7 +60,7 @@ export function walkway(map: WorldMap, x: number): number {
 export function broodChamber(map: ReturnType<typeof generateSideWorld>) {
   const ch = map.chambers!;
   cellOf(map.nest.x, map.nest.y);
-  const [rx, ry] = [CELL[0] as number, CELL[1] as number];
+  const [rx, ry] = [CELL[0], CELL[1]];
   let x = rx;
   while (rockAt(map, x, ry) === OPEN) x++;
   digCell(map, x, ry);

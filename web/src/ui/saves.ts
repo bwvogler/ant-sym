@@ -1,4 +1,4 @@
-import { SAVE_VERSION, type GameSave } from "../colony/game.ts";
+import { SAVE_VERSION, type GameSave } from "../colony/index.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
 // Saved games (the fungus game, ja-lo8.6): a game is long (queen births are rare: PRD §50), so it is kept between

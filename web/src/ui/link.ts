@@ -1,6 +1,4 @@
-import { CELL, cellOf, centreX, centreY, discOffsets, R, SIDE } from "../colony/hex.ts";
-import { STRIP } from "../colony/oneWorld.ts";
-import { cellAt, columnsOver, type Transect } from "../colony/transect.ts";
+import { CELL, cellOf, centreX, centreY, discOffsets, R, SIDE, STRIP, cellAt, columnsOver, type Transect } from "../colony/index.ts";
 
 // One world's two views linked (docs/one-world.md §5, U5.2), pure: a click on the line in the top view opens the side
 // view at that column s, and a click on the side view's ground strip (or the sky over it) opens the top view at P(s),
@@ -15,8 +13,8 @@ export const LINK_REACH = 3;
  */
 export function columnNear(line: Transect, wx: number, wy: number, reach = LINK_REACH): number | null {
   cellOf(wx, wy);
-  const x0 = CELL[0] as number;
-  const y0 = CELL[1] as number;
+  const x0 = CELL[0];
+  const y0 = CELL[1];
   // A cell within `reach` of the point is within reach + SIDE (the farthest a point lies from its cell's centre) of the
   // click's cell, and cells n steps apart are at least n·R apart: so at most (reach + SIDE) / R steps from it.
   const offs = discOffsets(Math.floor((reach + SIDE) / R))[y0 & 1]!;
@@ -50,16 +48,16 @@ export function stripPoint(s: number): { x: number; y: number } {
  */
 export function stripColumn(line: Transect, wx: number, wy: number): number | null {
   cellOf(wx, wy);
-  if ((CELL[1] as number) > STRIP) return null;
+  if ((CELL[1]) > STRIP) return null;
   cellOf(wx, centreY(STRIP));
-  const s = CELL[0] as number;
+  const s = CELL[0];
   return cellAt(line, s) ? s : null;
 }
 
 /** Where the top view centres to show column s: P(s), the plane cell over it (its centre), or null off the line. */
 export function planePoint(line: Transect, s: number): { x: number; y: number } | null {
   if (!cellAt(line, s)) return null;
-  const x = CELL[0] as number;
-  const y = CELL[1] as number;
+  const x = CELL[0];
+  const y = CELL[1];
   return { x: centreX(x, y), y: centreY(y) };
 }

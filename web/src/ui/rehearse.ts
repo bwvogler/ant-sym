@@ -1,4 +1,4 @@
-import { CURTAIN, PLANE, type Game } from "../colony/game.ts";
+import { CURTAIN, PLANE, type Game } from "../colony/index.ts";
 
 // A rehearsal (the e2e guard's: scripts/e2e-one-world.mjs, through the dev hook): which curtain ant comes up through a
 // hole next, found on a copy of the game, never on the game itself. A save reloads bit-exact (U4b), so a copy built from
@@ -55,9 +55,9 @@ export function nextCrossing(game: Game, fresh: Game, maxSeconds: number, minTic
       const before = was[k]!;
       for (let i = 0; i < before.length; i++) {
         if (!c.alive[i] || c.gen[i] !== gens[k]![i]) continue;
-        if (before[i] === CURTAIN && c.layer[i] === PLANE && t - since[k]![i]! >= minTicks) return { k, i, gen: c.gen[i] as number, ticks: t };
+        if (before[i] === CURTAIN && c.layer[i] === PLANE && t - since[k]![i]! >= minTicks) return { k, i, gen: c.gen[i], ticks: t };
         if (before[i] !== CURTAIN && c.layer[i] === CURTAIN) since[k]![i] = t;
-        before[i] = c.layer[i] as number;
+        before[i] = c.layer[i];
       }
     }
   }

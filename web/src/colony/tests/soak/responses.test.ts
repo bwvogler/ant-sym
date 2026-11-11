@@ -483,8 +483,8 @@ test("followChoice (top-down): at a fork a follower mostly takes the stronger tr
     branch(c, false, 2);
     put(c, 0, 8, 10);
     c.heading[0] = 0;
-    for (let k = 0; k < 30 * 4 && Math.abs((c.y[0] as number) - at(8, 10).y) < 5; k++) c.tick(1 / 30);
-    const dy = (c.y[0] as number) - at(8, 10).y;
+    for (let k = 0; k < 30 * 4 && Math.abs((c.y[0]) - at(8, 10).y) < 5; k++) c.tick(1 / 30);
+    const dy = (c.y[0]) - at(8, 10).y;
     if (dy <= -5) strong++;
     else if (dy >= 5) weak++;
   }

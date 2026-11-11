@@ -1,11 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { INFECTED } from "../../colony/fungus.ts";
-import type { Flight } from "../../colony/royal.ts";
-import { FLIGHT_2D, Game, gameRng, NO_ROOM } from "../../colony/game.ts";
-import { centreX, centreY } from "../../colony/hex.ts";
-import { generateOneWorld, mainGround } from "../../colony/oneWorld.ts";
-import { generateSideWorld } from "../../colony/world.ts";
+import { INFECTED, type Flight, FLIGHT_2D, Game, gameRng, NO_ROOM, centreX, centreY, generateOneWorld, mainGround, generateSideWorld } from "../../colony/index.ts";
 import { flightCircle, penGate, penGround, penSettle, type Settle, withinFlight } from "../pen.ts";
 
 // The queen's pen (ja-lo8.9): the only time a colony's words change. It opens for a new queen with the fungus in her,

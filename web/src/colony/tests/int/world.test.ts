@@ -181,7 +181,7 @@ function denseStep(f: Float32Array, rock: Uint8Array, w: number, h: number, p: C
 /** Index into a flat map array of the cell under world (x, y). */
 function cellIndex(m: WorldMap, x: number, y: number): number {
   cellOf(x, y);
-  return (CELL[1] as number) * m.size.w + (CELL[0] as number);
+  return (CELL[1]) * m.size.w + (CELL[0]);
 }
 
 test("the sparse step matches the dense one, across chunk borders and a ragged map edge", () => {

@@ -11,12 +11,7 @@
 // spore brush (radius 3, spores 2, dose 0.15), STROKES events in a short drag, at 30 s.
 //
 // Usage: node scripts/fungus-cost.mjs [play=lockpick] [minutes=5] [ants=600] [seed=1] [strokes=6]
-import { estimateTokens } from "../web/src/colony/colonyBrain.ts";
-import { FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, packFungusRequest, worthAsking, AIMS } from "../web/src/colony/fungusBrain.ts";
-import { STRAINS } from "../web/src/colony/fungus.ts";
-import { BRUSH as SPORES, Game } from "../web/src/colony/game.ts";
-import { centreX, centreY } from "../web/src/colony/hex.ts";
-import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
+import { estimateTokens, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, packFungusRequest, worthAsking, AIMS, STRAINS, BRUSH as SPORES, Game, centreX, centreY, generateSideWorld, mulberry32 } from "../web/src/colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const play = process.argv[2] ?? "lockpick";

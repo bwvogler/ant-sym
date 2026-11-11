@@ -1,12 +1,5 @@
 import { type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
-import { CHUNK, type ChunkLayer } from "../colony/chunks.ts";
-import { type Colony, CURTAIN, keyX, keyY, moundRadius, PLANE } from "../colony/colony.ts";
-import { CELL, cellOf, centreX, centreY, R, SIDE } from "../colony/hex.ts";
-import { INFECTED, type Fungus } from "../colony/fungus.ts";
-import { type OneWorld, STRIP } from "../colony/oneWorld.ts";
-import { BINS, binOf } from "../colony/recognition.ts";
-import { cellAt, columnsOver, turnAt } from "../colony/transect.ts";
-import { AIR, OPEN, rockAt, SOIL, type WorldMap, worldExtent } from "../colony/world.ts";
+import { CHUNK, type ChunkLayer, type Colony, CURTAIN, keyX, keyY, moundRadius, PLANE, CELL, cellOf, centreX, centreY, R, SIDE, INFECTED, type Fungus, type OneWorld, STRIP, BINS, binOf, cellAt, columnsOver, turnAt, AIR, OPEN, rockAt, SOIL, type WorldMap, worldExtent } from "../colony/index.ts";
 import { aimed, type Aim, type Camera, clamp, type Extent, fit, fitZoom, fromMinimap, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
@@ -329,8 +322,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
      */
     const stripAt = (s: number, y: number): readonly number[] | null => {
       if (!world || y > STRIP || !cellAt(world.line, s)) return null;
-      const qx = CELL[0] as number;
-      const qy = CELL[1] as number;
+      const qx = CELL[0];
+      const qy = CELL[1];
       const plane = world.plane;
       if (y === STRIP) return rockAt(plane, qx, qy) !== OPEN ? theme.rock : plane.food.get(qx, qy) > 0 ? theme.accentRgb : theme.paperRgb;
       return STRIP - y <= Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0) ? theme.spoil : null;
@@ -369,7 +362,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             px[o + 3] = 255;
             continue;
           }
-          const fv = fc ? (fc[i] as number) : 0;
+          const fv = fc ? (fc[i]) : 0;
           if (fv > 0) {
             px[o] = fr;
             px[o + 1] = fg;
@@ -378,7 +371,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             continue;
           }
           // Alarm is always shown: the player painted it, or a fight laid it, and it fades in seconds.
-          const al = alarmC ? Math.min(1, (alarmC[i] as number) / 6) : 0;
+          const al = alarmC ? Math.min(1, (alarmC[i]) / 6) : 0;
           if (al > 0.03) {
             px[o] = theme.alarm[0];
             px[o + 1] = theme.alarm[1];
@@ -387,7 +380,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             continue;
           }
           // Spores: the fungus's own mark on the ground, under food and alarm, over the trails.
-          const sp = sporeC ? Math.min(1, (sporeC[i] as number) / 3) : 0;
+          const sp = sporeC ? Math.min(1, (sporeC[i]) / 3) : 0;
           if (sp > 0.02) {
             px[o] = theme.sporeRgb[0];
             px[o + 1] = theme.sporeRgb[1];
@@ -395,7 +388,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             px[o + 3] = Math.round(35 + sp * 130);
             continue;
           }
-          const heap = spoilC ? (spoilC[i] as number) : 0;
+          const heap = spoilC ? (spoilC[i]) : 0;
           if (heap > 0) {
             px[o] = theme.spoil[0];
             px[o + 1] = theme.spoil[1];
@@ -403,13 +396,13 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             px[o + 3] = Math.min(255, 110 + heap * 45);
             continue;
           }
-          const f = show.food && foodC ? Math.min(1, (foodC[i] as number) / 4) : 0;
+          const f = show.food && foodC ? Math.min(1, (foodC[i]) / 4) : 0;
           // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
-          const h = show.home && homeC ? Math.min(1, (homeC[i] as number) / 12) : 0;
+          const h = show.home && homeC ? Math.min(1, (homeC[i]) / 12) : 0;
           if (f >= h && f > 0.02) {
-            px[o] = theme.trail[0] as number;
-            px[o + 1] = theme.trail[1] as number;
-            px[o + 2] = theme.trail[2] as number;
+            px[o] = theme.trail[0];
+            px[o + 1] = theme.trail[1];
+            px[o + 2] = theme.trail[2];
             px[o + 3] = Math.round(f * 150);
           } else if (h > 0.02) {
             px[o] = HOME_RGB[0];
@@ -417,7 +410,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             px[o + 2] = HOME_RGB[2];
             px[o + 3] = Math.round(h * 90);
           } else if (chamberC && chamberC[i]) {
-            const role = chambers!.list[(chamberC[i] as number) - 1]?.role ?? "none";
+            const role = chambers!.list[(chamberC[i]) - 1]?.role ?? "none";
             const tint = ROLE_RGB[role] ?? theme.chamber;
             px[o] = tint[0];
             px[o + 1] = tint[1];
@@ -434,8 +427,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         const ly = STRIP - y0;
         for (let lx = 0; lx < CHUNK; lx++) {
           if (!cellAt(line, x0 + lx)) continue;
-          const qx = CELL[0] as number;
-          const qy = CELL[1] as number;
+          const qx = CELL[0];
+          const qy = CELL[1];
           let o = (ly * CHUNK + lx) * 4;
           const food = plane.food.get(qx, qy);
           if (rockAt(plane, qx, qy) !== OPEN) {
@@ -469,8 +462,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       for (let my = 0; my < mini.height; my++)
         for (let mx = 0; mx < mini.width; mx++) {
           cellOf(gx0 + mx * 2 + 1, my * 2 + 1);
-          const x = CELL[0] as number;
-          const y = CELL[1] as number;
+          const x = CELL[0];
+          const y = CELL[1];
           const off = x < gx0 || y < 0 || x >= gx0 + gw || y >= gh;
           const t = off ? 1 : m.rock.get(x, y);
           const fv = off ? 0 : m.food.get(x, y);
@@ -488,8 +481,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         const tone = k === 0 ? theme.inkRgb : k === 1 ? theme.warnRgb : col.nestOdour < 0.5 ? theme.inkRgb : theme.warnRgb;
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
-          const mx = Math.floor(((col.x[i] as number) - gx0) / 2);
-          const my = Math.floor((col.y[i] as number) / 2);
+          const mx = Math.floor(((col.x[i]) - gx0) / 2);
+          const my = Math.floor((col.y[i]) / 2);
           if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
           const o = (my * mini.width + mx) * 4;
           px[o] = tone[0];
@@ -536,10 +529,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
           if (!data) continue;
           const o = ((ly << 6) | (x & 63)) * 4;
           // The cell over the paper, its alpha in 16 steps (so trails batch into few colours).
-          const a = Math.round(((data[o + 3] as number) / 255) * 15) / 15;
-          const r = Math.round((data[o] as number) * a + (pr[0] as number) * (1 - a));
-          const g = Math.round((data[o + 1] as number) * a + (pr[1] as number) * (1 - a));
-          const b = Math.round((data[o + 2] as number) * a + (pr[2] as number) * (1 - a));
+          const a = Math.round(((data[o + 3]) / 255) * 15) / 15;
+          const r = Math.round((data[o]) * a + (pr[0]) * (1 - a));
+          const g = Math.round((data[o + 1]) * a + (pr[1]) * (1 - a));
+          const b = Math.round((data[o + 2]) * a + (pr[2]) * (1 - a));
           const key = (r << 16) | (g << 8) | b;
           if (key === bgKey) continue;
           let path = paths.get(key);
@@ -595,7 +588,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         [line.sMax, line.holes[line.holes.length - 1]!],
       ] as const) {
         cellAt(line, s);
-        const [ax, ay] = toScreen(c, v, centreX(CELL[0] as number, CELL[1] as number), centreY(CELL[1] as number));
+        const [ax, ay] = toScreen(c, v, centreX(CELL[0], CELL[1]), centreY(CELL[1]));
         const [bx, by] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
         ctx.moveTo(ax, ay);
         ctx.lineTo(bx, by);
@@ -673,10 +666,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         let carriers = 0;
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || col.layer[i] !== PLANE) continue;
-          cellOf(col.x[i] as number, col.y[i] as number);
-          const over = columnsOver(w.line, CELL[0] as number, CELL[1] as number);
+          cellOf(col.x[i], col.y[i]);
+          const over = columnsOver(w.line, CELL[0], CELL[1]);
           for (let j = 0; j < over.length; j++) {
-            const wx = centreX(over[j] as number, STRIP);
+            const wx = centreX(over[j], STRIP);
             if (!inView(wx, wy)) continue;
             const [x, y] = toScreen(c, v, wx, wy);
             ctx.moveTo(x - half, y);
@@ -692,10 +685,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         ctx.fillStyle = theme.accent;
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || col.layer[i] !== PLANE || !col.carrying[i]) continue;
-          cellOf(col.x[i] as number, col.y[i] as number);
-          const over = columnsOver(w.line, CELL[0] as number, CELL[1] as number);
+          cellOf(col.x[i], col.y[i]);
+          const over = columnsOver(w.line, CELL[0], CELL[1]);
           for (let j = 0; j < over.length; j++) {
-            const wx = centreX(over[j] as number, STRIP);
+            const wx = centreX(over[j], STRIP);
             if (!inView(wx, wy)) continue;
             const [x, y] = toScreen(c, v, wx, wy);
             ctx.fillRect(x + half - crumb / 2, y - crumb / 2, crumb, crumb);
@@ -790,21 +783,21 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         follow.current = null;
         followCb.current(null);
       } else if (f && fcol && fHere && s.cam) {
-        s.cam = { ...s.cam, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
+        s.cam = { ...s.cam, x: fcol.x[f.i], y: fcol.y[f.i] };
         s.aim = null;
       }
       // One world: the followed ant went through a hole, out of the view (its layer changed, not the view): the page is
       // told, and may carry the camera across (U5.2). Where it was last seen here stays marked ("gone below").
       if (f && fcol && lv >= 0) {
-        const layer = fcol.layer[f.i] as number;
+        const layer = fcol.layer[f.i];
         const was = antLayer.current;
         if (carryTo.current === lv || !was || was.f !== f) carryTo.current = null;
         if (was && was.f === f && was.layer !== layer && layer !== (carryTo.current ?? lv)) {
           carryTo.current = layer;
-          crossCb.current?.(layer, fcol.x[f.i] as number, fcol.y[f.i] as number);
+          crossCb.current?.(layer, fcol.x[f.i], fcol.y[f.i]);
         }
         antLayer.current = { f, layer };
-        if (fHere) lastSeen.current = { f, lv, x: fcol.x[f.i] as number, y: fcol.y[f.i] as number };
+        if (fHere) lastSeen.current = { f, lv, x: fcol.x[f.i], y: fcol.y[f.i] };
       } else {
         antLayer.current = null;
         carryTo.current = null;
@@ -1007,15 +1000,15 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         ctx.globalAlpha = 0.85;
         // One stroke per odour band (most frames: one band per colony).
         let bands = 0;
-        for (let i = 0; i < col.n; i++) if (col.alive[i] && (lv < 0 || col.layer[i] === lv)) bands |= 1 << binOf(col.odour[i] as number);
+        for (let i = 0; i < col.n; i++) if (col.alive[i] && (lv < 0 || col.layer[i] === lv)) bands |= 1 << binOf(col.odour[i]);
         for (let b = 0; b < BINS; b++) {
           if (!(bands & (1 << b))) continue;
           ctx.beginPath();
           for (let i = 0; i < col.n; i++) {
-            if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || binOf(col.odour[i] as number) !== b || !inView(col.x[i] as number, col.y[i] as number)) continue;
-            const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
-            const hc = Math.cos(col.heading[i] as number) * half;
-            const hs = Math.sin(col.heading[i] as number) * half;
+            if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
+            const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
+            const hc = Math.cos(col.heading[i]) * half;
+            const hs = Math.sin(col.heading[i]) * half;
             ctx.moveTo(x - hc, y - hs);
             ctx.lineTo(x + hc, y + hs);
           }
@@ -1029,28 +1022,28 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         for (const [lo, hi, alpha] of [[INFECTED, 0.5, 0.55], [0.5, 2, 1]] as const) {
           ctx.globalAlpha = alpha;
           for (let i = 0; i < col.n; i++) {
-            const l = col.load[i] as number;
-            if (!col.alive[i] || l < lo || l >= hi || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i] as number, col.y[i] as number)) continue;
-            const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
+            const l = col.load[i];
+            if (!col.alive[i] || l < lo || l >= hi || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i], col.y[i])) continue;
+            const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
             ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot);
           }
         }
         ctx.globalAlpha = 1;
         ctx.fillStyle = theme.accent;
         for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || !col.carrying[i] || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i] as number, col.y[i] as number)) continue;
-          const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
-          ctx.fillRect(x + Math.cos(col.heading[i] as number) * half - crumb / 2, y + Math.sin(col.heading[i] as number) * half - crumb / 2, crumb, crumb);
+          if (!col.alive[i] || !col.carrying[i] || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i], col.y[i])) continue;
+          const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
+          ctx.fillRect(x + Math.cos(col.heading[i]) * half - crumb / 2, y + Math.sin(col.heading[i]) * half - crumb / 2, crumb, crumb);
         }
         ctx.fillStyle = theme.mound;
         ctx.strokeStyle = theme.mound;
         ctx.lineWidth = Math.max(1, d * 0.8);
         ctx.beginPath();
         for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || !col.pellet[i] || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i] as number, col.y[i] as number)) continue;
-          const [x, y] = toScreen(c, v, col.x[i] as number, col.y[i] as number);
-          const px = x + Math.cos(col.heading[i] as number) * half;
-          const py = y + Math.sin(col.heading[i] as number) * half;
+          if (!col.alive[i] || !col.pellet[i] || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i], col.y[i])) continue;
+          const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
+          const px = x + Math.cos(col.heading[i]) * half;
+          const py = y + Math.sin(col.heading[i]) * half;
           if (col.carriesCorpse(i)) {
             // A corpse in the jaws: the dead's grey cross, half size (slice 7 review: it was drawn as a soil crumb).
             const h = crumb * 0.75;
@@ -1097,7 +1090,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       // The followed ant: a jade ring (in one world, while it is on the view's layer). Gone through a hole: a dashed ring
       // where it was last seen here, saying where it went.
       if (f && fcol && fHere) {
-        const [x, y] = toScreen(c, v, fcol.x[f.i] as number, fcol.y[f.i] as number);
+        const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
         ctx.beginPath();
         ctx.arc(x, y, Math.max(9 * d, c.zoom * 1.6), 0, Math.PI * 2);
         ctx.strokeStyle = theme.accent;
@@ -1264,12 +1257,12 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     for (const [k, col] of colonies.entries()) {
       for (let i = 0; i < col.n; i++) {
         if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
-        const dx = (col.x[i] as number) - wx;
-        const dy = (col.y[i] as number) - wy;
+        const dx = (col.x[i]) - wx;
+        const dy = (col.y[i]) - wy;
         const dd = dx * dx + dy * dy;
         if (dd < bestD) {
           bestD = dd;
-          best = { k, i, gen: col.gen[i] as number };
+          best = { k, i, gen: col.gen[i] };
         }
       }
     }
@@ -1282,7 +1275,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     if (!chambers) return null;
     const [wx, wy] = toWorld(camera(), viewport(), x, y);
     cellOf(wx, wy);
-    const id = chambers.at(CELL[0] as number, CELL[1] as number);
+    const id = chambers.at(CELL[0], CELL[1]);
     const ch = id >= 0 ? chambers.list[id] : undefined;
     if (!ch) return null;
     // A chamber's colony is its nest's index (Colony.params.nest), not "the player's or not": three colonies and more since ja-lo8.8.

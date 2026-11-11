@@ -1,6 +1,4 @@
-import type { Role } from "../colony/chambers.ts";
-import type { Colony } from "../colony/colony.ts";
-import { CELL, cellOf, centreX, centreY, R } from "../colony/hex.ts";
+import { type Role, type Colony, CELL, cellOf, centreX, centreY, R } from "../colony/index.ts";
 
 // The nest as the player sees it, pure, for the Learn drawer's Nest tab and
 // the field's chamber labels. This is the whole map's view, read from the
@@ -59,14 +57,14 @@ export function nestView(col: Colony): NestView | null {
   for (let i = 0; i < col.n; i++) {
     // Only ants on the nest's layer (one world: the curtain; an ant on the plane over a chamber is not in it).
     if (!col.alive[i] || col.layer[i] !== col.home) continue;
-    cellOf(col.x[i] as number, col.y[i] as number);
-    const id = chambers.at(CELL[0] as number, CELL[1] as number);
+    cellOf(col.x[i], col.y[i]);
+    const id = chambers.at(CELL[0], CELL[1]);
     if (id >= 0) ants.set(id, (ants.get(id) ?? 0) + 1);
   }
   let queenIn = -1;
   if (col.queen) {
     cellOf(col.queen.x, col.queen.y);
-    queenIn = chambers.at(CELL[0] as number, CELL[1] as number);
+    queenIn = chambers.at(CELL[0], CELL[1]);
   }
   const list: ChamberView[] = [];
   for (const ch of chambers.list) {

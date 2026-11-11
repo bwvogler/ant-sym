@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { SITUATIONS } from "../colony/colony.ts";
-import { DOCTRINES } from "../colony/colonyBrain.ts";
-import { LETHAL, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
-import { upgradeFor } from "../colony/evolution.ts";
-import { MET, type Game } from "../colony/game.ts";
-import { DEFAULT_RECOGNITION } from "../colony/recognition.ts";
+import { SITUATIONS, DOCTRINES, LETHAL, LEVERS, NEST_ONLY, upgradeFor, MET, type Game, DEFAULT_RECOGNITION } from "../colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import Help from "./Help.tsx";
 import { colonyName, colonyTone } from "./names.ts";

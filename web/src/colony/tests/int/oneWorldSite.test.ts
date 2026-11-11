@@ -60,13 +60,13 @@ test("site fidelity: a find is remembered as where the ant stood less where its 
   dropFood(g.world!.plane, fx, fy, 3);
   // 50 cells walked with a drift of (0.06, -0.04) per cell: the vector's hole is (3, -2) off.
   out(c, fx - 2, fy, 0, 50, 0.06, -0.04);
-  assert.ok(Number.isNaN(c.foodX[0] as number), "nothing remembered before a find");
+  assert.ok(Number.isNaN(c.foodX[0]), "nothing remembered before a find");
   assert.ok(tickUntil(g, 3, () => c.carrying[0] === 1), "it found the food");
-  const x = c.x[0] as number;
-  const y = c.y[0] as number;
-  assert.ok(Math.abs((c.foodX[0] as number) - (x - (pn(g, c).x + 50 * 0.06))) < 0.1, `x: remembered ${c.foodX[0]}, stood ${x - hx}, odo ${c.odoSurf[0]}`);
-  assert.ok(Math.abs((c.foodY[0] as number) - (y - (pn(g, c).y - 50 * 0.04))) < 0.1, `y: remembered ${c.foodY[0]}`);
-  assert.ok(Math.abs((c.foodX[0] as number) - (x - hx)) > 2, "not the true offset from the hole: the drift is in it");
+  const x = c.x[0];
+  const y = c.y[0];
+  assert.ok(Math.abs((c.foodX[0]) - (x - (pn(g, c).x + 50 * 0.06))) < 0.1, `x: remembered ${c.foodX[0]}, stood ${x - hx}, odo ${c.odoSurf[0]}`);
+  assert.ok(Math.abs((c.foodY[0]) - (y - (pn(g, c).y - 50 * 0.04))) < 0.1, `y: remembered ${c.foodY[0]}`);
+  assert.ok(Math.abs((c.foodX[0]) - (x - hx)) > 2, "not the true offset from the hole: the drift is in it");
 });
 
 test("site fidelity: off, a find is not remembered and a memory is not steered by", () => {
@@ -74,7 +74,7 @@ test("site fidelity: off, a find is not remembered and a memory is not steered b
   dropFood(g.world!.plane, hx + 40, hy + 5, 3);
   out(c, hx + 38, hy + 5, 0, 50, 0.06, -0.04);
   assert.ok(tickUntil(g, 3, () => c.carrying[0] === 1));
-  assert.ok(Number.isNaN(c.foodX[0] as number), "off: nothing remembered");
+  assert.ok(Number.isNaN(c.foodX[0]), "off: nothing remembered");
   // A memory set by hand changes nothing off: the same run with and without it is the same, bit for bit.
   const run = (mem: boolean): number[] => {
     const w = plane({ siteFidelity: 0 });
@@ -84,7 +84,7 @@ test("site fidelity: off, a find is not remembered and a memory is not steered b
       w.c.foodY[0] = 20;
     }
     for (let k = 0; k < 150; k++) w.g.tick(DT);
-    return [w.c.x[0] as number, w.c.y[0] as number, w.c.heading[0] as number, w.c.odoSurf[0] as number];
+    return [w.c.x[0], w.c.y[0], w.c.heading[0], w.c.odoSurf[0]];
   };
   assert.deepEqual(run(true), run(false));
 });
@@ -98,33 +98,33 @@ test("site fidelity: on its next trip it walks the vector straight to where it b
   c.foodY[0] = sy - 50 * 0.05;
   // This trip's drift is (-0.1, 0.08): it will end up (odo × drift) from the spot's believed place, where it stops to search.
   out(c, hx + 3, hy, Math.PI, 3, -0.1, 0.08);
-  const start = { x: c.x[0] as number, y: c.y[0] as number };
+  const start = { x: c.x[0], y: c.y[0] };
   let path = 0;
   let last = { ...start };
   let arrived = -1;
   for (let k = 0; k < 20 * 30 && arrived < 0; k++) {
     g.tick(DT);
-    path += Math.hypot((c.x[0] as number) - last.x, (c.y[0] as number) - last.y);
-    last = { x: c.x[0] as number, y: c.y[0] as number };
+    path += Math.hypot((c.x[0]) - last.x, (c.y[0]) - last.y);
+    last = { x: c.x[0], y: c.y[0] };
     if (c.search[0] !== 0) arrived = k;
   }
   assert.ok(arrived >= 0, "it got there and began to search");
-  const odo = c.odoSurf[0] as number;
-  const bx = pn(g, c).x + odo * -0.1 + (c.foodX[0] as number);
-  const by = pn(g, c).y + odo * 0.08 + (c.foodY[0] as number);
+  const odo = c.odoSurf[0];
+  const bx = pn(g, c).x + odo * -0.1 + (c.foodX[0]);
+  const by = pn(g, c).y + odo * 0.08 + (c.foodY[0]);
   assert.ok(Math.hypot(last.x - bx, last.y - by) < 2.5, `at the believed spot (${bx.toFixed(1)}, ${by.toFixed(1)}), not ${Math.hypot(last.x - bx, last.y - by).toFixed(1)} off`);
   assert.ok(Math.hypot(last.x - (hx + sx), last.y - (hy + sy)) > 2.5, "which is not the spot itself: it walked its own vector");
   const straight = Math.hypot(bx - start.x, by - start.y);
   assert.ok(path < 1.2 * straight, `walked ${path.toFixed(1)} cells for ${straight.toFixed(1)} straight`);
   // It goes on round the spot: the search's reach grows and it stays within a few loops of it, for the next 8 s.
-  const reach0 = c.search[0] as number;
+  const reach0 = c.search[0];
   let far = 0;
   for (let k = 0; k < 8 * 30; k++) {
     g.tick(DT);
-    const o = c.odoSurf[0] as number;
-    far = Math.max(far, Math.hypot((c.x[0] as number) - (pn(g, c).x + o * -0.1 + (c.foodX[0] as number)), (c.y[0] as number) - (pn(g, c).y + o * 0.08 + (c.foodY[0] as number))));
+    const o = c.odoSurf[0];
+    far = Math.max(far, Math.hypot((c.x[0]) - (pn(g, c).x + o * -0.1 + (c.foodX[0])), (c.y[0]) - (pn(g, c).y + o * 0.08 + (c.foodY[0]))));
   }
-  assert.ok((c.search[0] as number) > reach0, `the search widened: ${reach0} to ${c.search[0]}`);
+  assert.ok((c.search[0]) > reach0, `the search widened: ${reach0} to ${c.search[0]}`);
   assert.ok(far < 25, `it searched round the spot (${far.toFixed(1)} at the farthest)`);
 });
 
@@ -142,7 +142,7 @@ test("site fidelity: a food trail it meets still takes over", () => {
     out(c, hx + 12, hy, 0);
     if (laid) trail(c, hx + 14, hy, 30);
     for (let k = 0; k < 4 * 30; k++) g.tick(DT);
-    return (c.x[0] as number) - (hx + 12);
+    return (c.x[0]) - (hx + 12);
   };
   assert.ok(end(false) < -10, `no trail: it walks its vector west (${end(false).toFixed(1)})`);
   assert.ok(end(true) > 10, `a trail east: it follows it east (${end(true).toFixed(1)})`);
@@ -156,16 +156,16 @@ test("site fidelity: it forgets the spot when it tires there without food, not w
   out(there.c, there.hx + 30, there.hy, 0, 30);
   there.c.fatigue[0] = there.c.params.patience - 1.5;
   assert.ok(tickUntil(there.g, 1, () => there.c.search[0] !== 0), "searching round the spot");
-  assert.ok(!Number.isNaN(there.c.foodX[0] as number), "still remembered while it searches");
-  assert.ok(tickUntil(there.g, 3, () => (there.c.fatigue[0] as number) > there.c.params.patience), "tired");
-  assert.ok(Number.isNaN(there.c.foodX[0] as number) && Number.isNaN(there.c.foodY[0] as number), "forgotten");
+  assert.ok(!Number.isNaN(there.c.foodX[0]), "still remembered while it searches");
+  assert.ok(tickUntil(there.g, 3, () => (there.c.fatigue[0]) > there.c.params.patience), "tired");
+  assert.ok(Number.isNaN(there.c.foodX[0]) && Number.isNaN(there.c.foodY[0]), "forgotten");
   // Elsewhere: tired on its way out, before it got there.
   const away = plane();
   away.c.foodX[0] = 70;
   away.c.foodY[0] = 0;
   out(away.c, away.hx + 5, away.hy, 0, 5);
   away.c.fatigue[0] = away.c.params.patience - 0.5;
-  assert.ok(tickUntil(away.g, 3, () => (away.c.fatigue[0] as number) > away.c.params.patience), "tired");
+  assert.ok(tickUntil(away.g, 3, () => (away.c.fatigue[0]) > away.c.params.patience), "tired");
   assert.equal(away.c.search[0], 0, "not searching: it had not got there");
   assert.equal(away.c.foodX[0], 70, "kept");
 });
@@ -178,7 +178,7 @@ test("site fidelity: the next find replaces the spot", () => {
   dropFood(g.world!.plane, hx + 25, hy - 10, 3);
   out(c, hx + 15, hy - 10, 0, 40);
   assert.ok(tickUntil(g, 3, () => c.carrying[0] === 1));
-  assert.ok(Math.abs((c.foodX[0] as number) - 25) < 1.5 && Math.abs((c.foodY[0] as number) + 10) < 1.5, `now (${c.foodX[0]}, ${c.foodY[0]})`);
+  assert.ok(Math.abs((c.foodX[0]) - 25) < 1.5 && Math.abs((c.foodY[0]) + 10) < 1.5, `now (${c.foodX[0]}, ${c.foodY[0]})`);
 });
 
 test("site fidelity: a new colony remembers nothing, the default is off, and a save carries the spots", () => {
@@ -207,7 +207,7 @@ test("site fidelity: a trail-follower with a memory is not drawn to it", () => {
   out(c, hx + 12, hy, 0);
   c.mode[0] = FOLLOW;
   for (let k = 0; k < 3 * 30; k++) g.tick(DT);
-  assert.ok((c.x[0] as number) - (hx + 12) > -8, "following (no trail here: it wanders), it does not head for the spot");
+  assert.ok((c.x[0]) - (hx + 12) > -8, "following (no trail here: it wanders), it does not head for the spot");
   assert.ok(HOLE_SIGHT > 0);
 });
 
@@ -219,7 +219,7 @@ test("site fidelity: with siteGive it gives the spot up once its search has wide
     c.foodY[0] = 0;
     out(c, pn(g, c).x + len, pn(g, c).y, 0);
     assert.ok(hx > 0 && hy > 0);
-    return tickUntil(g, 120, () => Number.isNaN(c.foodX[0] as number)) ? g.time : Infinity;
+    return tickUntil(g, 120, () => Number.isNaN(c.foodX[0])) ? g.time : Infinity;
   };
   const short = forgot(20, 1);
   const long = forgot(100, 1);
@@ -236,7 +236,7 @@ test("site fidelity: a newborn in a dead ant's slot remembers nothing", () => {
   c.foodY[0] = -7;
   c.kill(0);
   assert.ok(c.spawn(), "a slot was free");
-  assert.ok(Number.isNaN(c.foodX[0] as number) && Number.isNaN(c.foodY[0] as number), "the dead ant's spot is not inherited");
+  assert.ok(Number.isNaN(c.foodX[0]) && Number.isNaN(c.foodY[0]), "the dead ant's spot is not inherited");
 });
 
 test("site fidelity: not on a top-down map, where a find is not remembered", () => {
@@ -245,8 +245,8 @@ test("site fidelity: not on a top-down map, where a find is not remembered", () 
   flat.age[0] = 0.5 * LIFESPAN;
   flat.mode[0] = EXPLORE;
   flat.carrying[0] = 0;
-  dropFood(world, flat.x[0] as number, flat.y[0] as number, 3);
+  dropFood(world, flat.x[0], flat.y[0], 3);
   for (let t = 0; t < 90 && flat.carrying[0] !== 1; t++) flat.tick(DT);
   assert.equal(flat.carrying[0], 1, "it picked the food up");
-  assert.ok(Number.isNaN(flat.foodX[0] as number), "nothing remembered off the plane");
+  assert.ok(Number.isNaN(flat.foodX[0]), "nothing remembered off the plane");
 });

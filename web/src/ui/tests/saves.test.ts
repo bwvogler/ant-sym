@@ -1,9 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AUTOSAVE, describe, memorySaves, newestReadable, readable, record } from "../saves.ts";
-import { Game } from "../../colony/game.ts";
-import { generateWorld, mulberry32, OPEN_WORLD } from "../../colony/world.ts";
-import { generateOneWorld } from "../../colony/oneWorld.ts";
+import { Game, generateWorld, mulberry32, OPEN_WORLD, generateOneWorld } from "../../colony/index.ts";
 
 /** A small one-world game: the page plays one world only (PRD §55), so only its saves are offered. */
 const small = (seed: number) => new Game(generateOneWorld(seed, { plane: { size: { w: 120, h: 80 } } }), { antCount: 30, rivalAnts: 30 }, mulberry32(seed));

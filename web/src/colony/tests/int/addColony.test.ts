@@ -89,7 +89,7 @@ test("founding twice at one spot digs a second hole along the ground, and every 
   const col = (k: number) => {
     const e = g.colonies[k]!.nest.entrance!;
     cellOf(e.x, e.y);
-    return CELL[0] as number;
+    return CELL[0];
   };
   const cols = [0, 1, 2, 3].map(col);
   for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) assert.ok(Math.abs(cols[a]! - cols[b]!) >= HOLE_GAP, `holes ${a} and ${b} apart (PR #42 review, S2)`);

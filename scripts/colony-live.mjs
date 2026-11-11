@@ -28,28 +28,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
-import { localPolicy, localStance } from "../web/src/colony/colony.ts";
-import {
-  cacheContexts,
-  COLONY_BRAIN_VERSION,
-  DOCTRINES,
-  estimateTokens,
-  packModeRequest,
-  packResponseRequest,
-  packStanceRequest,
-  readMode,
-  readResponse,
-  readStance,
-  RESPONSE_BRAIN_VERSION,
-  RESPONSE_HOOKS,
-  responseKey,
-  situationKey,
-  STANCE_BRAIN_VERSION,
-  stanceKey,
-} from "../web/src/colony/colonyBrain.ts";
+import { localPolicy, localStance, cacheContexts, COLONY_BRAIN_VERSION, DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, readMode, readResponse, readStance, RESPONSE_BRAIN_VERSION, RESPONSE_HOOKS, responseKey, situationKey, STANCE_BRAIN_VERSION, stanceKey, localResponses, responses, generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, worldExtent } from "../web/src/colony/index.ts";
 import { runGame } from "../web/src/colony/experiment.ts";
-import { localResponses, responses } from "../web/src/colony/responses.ts";
-import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, worldExtent } from "../web/src/colony/world.ts";
 
 const BATCH = 100;
 const DT = 1 / 30;
