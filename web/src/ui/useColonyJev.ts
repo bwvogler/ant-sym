@@ -48,9 +48,16 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
     const off = jev.subscribe(setState);
     FIRST_DOCTRINES.forEach((d, k) => jev.setDoctrineFor(k, d.text));
     jev.setAim(AIMS[0]!.text);
+    // Answers are written to the store a second after the last reply: a tab hidden or closed in that second writes them now.
+    const flush = () => jev.flushCache();
+    const hidden = () => document.visibilityState === "hidden" && flush();
+    document.addEventListener("visibilitychange", hidden);
+    window.addEventListener("pagehide", flush);
     return () => {
       off();
-      // Leaving the page: end the run on the server (answers are already saved as they arrive).
+      document.removeEventListener("visibilitychange", hidden);
+      window.removeEventListener("pagehide", flush);
+      // Leaving the page: end the run on the server (stop and dispose write what the replies brought).
       if (jev.state.phase === "running") void jev.stop();
       jev.dispose();
     };

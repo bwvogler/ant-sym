@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { MAX_JSON_BODY } from "../shared/jev.ts";
 
 // HTTP helpers shared by every route, in the shape of lingo-dojo's server/sse.ts
 // minus SSE (nothing streams here yet).
@@ -12,10 +13,17 @@ export class HttpError extends Error {
   }
 }
 
-// A packed request of 100 situations is ~80 KB, so 1 MB leaves a wide margin.
-const MAX_JSON_BODY = 1 << 20;
+/** A request body's text as JSON (an empty body is `{}`): the dev server's readJsonBody and the hosted proxy's routes both parse through here. */
+export function parseJsonText(text: string): unknown {
+  if (text.length > MAX_JSON_BODY) throw new HttpError(413, "request body too large");
+  try {
+    return JSON.parse(text || "{}");
+  } catch {
+    throw new HttpError(400, "body is not valid JSON");
+  }
+}
 
-export async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
+export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const c of req) {
@@ -23,11 +31,7 @@ export async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
     if (size > MAX_JSON_BODY) throw new HttpError(413, "request body too large");
     chunks.push(c as Buffer);
   }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as T;
-  } catch {
-    throw new HttpError(400, "body is not valid JSON");
-  }
+  return parseJsonText(Buffer.concat(chunks).toString("utf8"));
 }
 
 export function sendJson(res: ServerResponse, status: number, data: unknown): void {

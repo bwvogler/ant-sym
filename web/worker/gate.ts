@@ -4,8 +4,8 @@
 // (GitHub Pages), so it does the opposite: only the listed origins, plus a
 // passphrase, because a public page with a key behind it is anyone's to spend.
 
-/** The header the page sends its passphrase in. Not the Jev key: that never leaves the Worker. */
-export const PASS_HEADER = "x-jev-ants-pass";
+import { PASS_HEADER } from "../shared/jev.ts";
+export { PASS_HEADER };
 
 /** "https://a.example, https://b.example" → exact origins, no trailing slashes. */
 export function parseOrigins(raw: string | undefined): string[] {

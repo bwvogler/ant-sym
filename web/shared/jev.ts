@@ -111,3 +111,96 @@ export const GAME_CAPS: RunCaps = { capUsd: 100, capSeconds: 86_400 };
 /** What Jev may cost per day, across runs and page loads, unless the server's JEV_DAILY_USD sets another figure. */
 export const DAILY_BUDGET_USD = 0.1;
 export const DEFAULT_JEV_MODEL = "jev-latest";
+
+/** The header the page sends the hosted proxy's passphrase in (web/worker/gate.ts checks it). Not the Jev key, which never leaves the server. */
+export const PASS_HEADER = "x-jev-ants-pass";
+
+/** The most a request body may be, for the dev server and the hosted proxy alike: a packed request of 100 situations is ~80 KB. */
+export const MAX_JSON_BODY = 1 << 20;
+
+// What the page reads back from the API, checked instead of cast: a reply from a server older or newer than the page, a 404 page or
+// a proxy's error body is `null`/undefined here, never a wrong-shaped object. Shapes are checked at the fields the page reads.
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** `body.error` when the body carries one as a string. */
+export function errorOf(body: unknown): string | undefined {
+  return isObject(body) && typeof body.error === "string" ? body.error : undefined;
+}
+
+/** A run summary: the fields the page reads (running, the pool width, the tokens and cost, the caps). */
+export function isRunSummary(v: unknown): v is RunSummary {
+  return (
+    isObject(v) &&
+    typeof v.running === "boolean" &&
+    typeof v.maxInFlight === "number" &&
+    typeof v.inputTokens === "number" &&
+    typeof v.usd === "number" &&
+    isObject(v.caps)
+  );
+}
+
+/** The run summary an error or reply body carries under `run`, or null. */
+export function runOf(body: unknown): RunSummary | null {
+  return isObject(body) && isRunSummary(body.run) ? body.run : null;
+}
+
+/** What /api/jev returns on a 200: the status of the upstream call, its body, and the run (read it with runOf: a run that has drifted must not drop a billed answer). */
+export function isProxyReply(v: unknown): v is JevProxyReply {
+  return isObject(v) && typeof v.status === "number" && typeof v.attempts === "number" && typeof v.inputTokens === "number" && isObject(v.run) && "body" in v;
+}
+
+/** Whether a Jev reply body holds answers. */
+export function hasAnswers(body: unknown): body is JevResponse {
+  return isObject(body) && isObject(body.answers);
+}
+
+/** What /api/health says: always `ok`; the hosted proxy adds `hosted` and `authorized` (false until the page sends the passphrase). */
+export interface HealthReply {
+  ok: true;
+  hasKey: boolean;
+  run?: RunSummary;
+  hosted?: boolean;
+  authorized?: boolean;
+}
+
+/** What the page takes from a health body: whether the server has a key, its hosted flags and today's budget. */
+export interface HealthRead {
+  hasKey: boolean;
+  hosted?: boolean;
+  authorized?: boolean;
+  budget?: Budget;
+}
+
+function isBudget(v: unknown): v is Budget {
+  return isObject(v) && typeof v.day === "string" && typeof v.spentUsd === "number" && (v.usdPerDay === null || typeof v.usdPerDay === "number") && (v.remainingUsd === null || typeof v.remainingUsd === "number");
+}
+
+/** A health body, or null when it is not one (a 404 page, another service on the port). */
+export function readHealth(v: unknown): HealthRead | null {
+  if (!isObject(v) || v.ok !== true) return null;
+  const budget = isObject(v.run) && isBudget(v.run.budget) ? v.run.budget : undefined;
+  return {
+    hasKey: v.hasKey === true,
+    ...(typeof v.hosted === "boolean" ? { hosted: v.hosted } : {}),
+    ...(typeof v.authorized === "boolean" ? { authorized: v.authorized } : {}),
+    ...(budget ? { budget } : {}),
+  };
+}
+
+/** The body of POST /api/run. */
+export interface RunRequest {
+  action?: string;
+  caps?: Partial<RunCaps>;
+}
+
+/** A run request from the wire: an object whose action is a string and whose caps are numbers, else nothing of them. */
+export function readRunRequest(v: unknown): RunRequest {
+  if (!isObject(v)) return {};
+  const caps: Partial<RunCaps> = {};
+  if (isObject(v.caps)) {
+    if (typeof v.caps.capUsd === "number") caps.capUsd = v.caps.capUsd;
+    if (typeof v.caps.capSeconds === "number") caps.capSeconds = v.caps.capSeconds;
+  }
+  return { ...(typeof v.action === "string" ? { action: v.action } : {}), ...(isObject(v.caps) ? { caps } : {}) };
+}

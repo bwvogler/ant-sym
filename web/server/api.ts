@@ -3,11 +3,11 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
-import type { RunCaps } from "../shared/jev.ts";
+import { readRunRequest } from "../shared/jev.ts";
 import { HttpError, methodNotAllowed, readJsonBody, sendJson } from "./http.ts";
 import { DEFAULT_IN_FLIGHT, JevClient } from "./jev.ts";
 import { Ledger, type BudgetStore } from "./ledger.ts";
-import { dailyBudget, healthReply, jevReply, runReply, type Reply, type Services } from "./replies.ts";
+import { dailyBudget, errorReply, healthReply, jevReply, runReply, type Reply, type Services } from "./replies.ts";
 
 export { dailyBudget, healthReply, isJevResponse, jevReply, runReply, validateJevRequest, type Reply, type Services } from "./replies.ts";
 
@@ -45,13 +45,13 @@ export function wrap(fn: Handler): Handler {
     return Promise.resolve()
       .then(() => fn(req, res))
       .catch((e) => {
-        const status = e instanceof HttpError ? e.status : 500;
-        if (status === 500) console.error(`[jev-ants] ${req.method} ${req.url}:`, e);
+        const r = errorReply(e);
+        if (r.status === 500) console.error(`[jev-ants] ${req.method} ${req.url}:`, e);
         if (res.headersSent) {
           res.destroy();
           return;
         }
-        if (!res.writableEnded) sendJson(res, status, { error: String((e as Error)?.message || e) });
+        if (!res.writableEnded) sendJson(res, r.status, r.body);
       });
   };
 }
@@ -101,7 +101,7 @@ export function makeHandlers(svc: Services) {
   const run: Handler = async (req, res) => {
     if (req.method === "GET") return send(res, runReply(svc, "GET", {}));
     if (req.method !== "POST") return methodNotAllowed(res, "GET, POST");
-    send(res, runReply(svc, "POST", await readJsonBody<{ action?: string; caps?: Partial<RunCaps> }>(req)));
+    send(res, runReply(svc, "POST", readRunRequest(await readJsonBody(req))));
   };
 
   const jev: Handler = async (req, res) => {

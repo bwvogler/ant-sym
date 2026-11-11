@@ -1,4 +1,4 @@
-import { GAME_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
+import { errorOf, GAME_CAPS, hasAnswers, isProxyReply, isRunSummary, runOf, type JevAnswer, type JevProxyReply, type JevRequest, type RunCaps, type RunSummary } from "../../shared/jev.ts";
 import { apiHeaders, apiUrl } from "./backend.ts";
 import { localPolicy, localStance, type Colony, MODES, STANCES, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation, packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey, localFungusRule, type FungalSituation, type FungusPolicy, askedIn, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking, askedLevers, DEFAULT_MENU, type Fungus, PolicyCache } from "../colony/index.ts";
 
@@ -23,9 +23,11 @@ export interface ColonyJevOptions {
   intervalMs: number;
   /** milliseconds a gathering lane (the fungus's) lets its queue fill before sending a part-full request */
   gatherMs: number;
+  /** milliseconds after a reply before the answers are written to the store (one write for the replies in between); 0 writes at once */
+  saveMs: number;
 }
 
-export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: FUNGUS_GATHER_MS };
+export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: FUNGUS_GATHER_MS, saveMs: 1000 };
 
 /**
  * The caps a game's run starts with: none that bind (GAME_CAPS). A run stays open from the first miss until the page
@@ -167,6 +169,9 @@ export class ColonyJev {
   #inFlight = 0;
   #timer: ReturnType<typeof setInterval> | null = null;
   #aborter = new AbortController();
+  /** caches with answers not yet written to the store, by context */
+  #unsaved = new Map<string, PolicyCache<string>>();
+  #saveTimer: ReturnType<typeof setTimeout> | null = null;
   #runSeq = 0;
   /** cycles to sit out after a failed call, so a broken upstream is not hammered */
   #cooldown = 0;
@@ -464,11 +469,12 @@ export class ColonyJev {
     let run: RunSummary;
     try {
       const res = await fetch(apiUrl("api/run"), { method: "POST", headers: apiHeaders(), body: JSON.stringify({ action: "start", caps: { ...COLONY_CAPS, ...caps } }) });
-      run = (await res.json()) as RunSummary;
-      if (!res.ok) {
-        this.#set({ lastError: (run as unknown as { error?: string }).error ?? `start failed (${res.status})` });
+      const body: unknown = await res.json();
+      if (!res.ok || !isRunSummary(body)) {
+        this.#set({ lastError: errorOf(body) ?? `start failed (${res.status})` });
         return;
       }
+      run = body;
     } catch (e) {
       this.#set({ lastError: `start failed: ${String(e)}` });
       return;
@@ -495,7 +501,26 @@ export class ColonyJev {
     if (this.#timer === null) this.#timer = setInterval(() => this.#cycle(), this.opts.intervalMs);
   }
 
+  /** Write what the replies since the last write brought: one write a context, however many replies there were. */
+  flushCache(): void {
+    if (this.#saveTimer !== null) clearTimeout(this.#saveTimer);
+    this.#saveTimer = null;
+    for (const [context, cache] of this.#unsaved) this.#store?.save(context, cache.entries());
+    this.#unsaved.clear();
+  }
+
+  #saveSoon(context: string, cache: PolicyCache<string>): void {
+    if (this.opts.saveMs <= 0) {
+      this.#store?.save(context, cache.entries());
+      return;
+    }
+    if (!this.#store) return;
+    this.#unsaved.set(context, cache);
+    this.#saveTimer ??= setTimeout(() => this.flushCache(), this.opts.saveMs);
+  }
+
   async stop(): Promise<void> {
+    this.flushCache();
     this.#life++;
     this.#halt();
     this.#aborter.abort();
@@ -503,14 +528,15 @@ export class ColonyJev {
     const seq = this.#runSeq;
     try {
       const res = await fetch(apiUrl("api/run"), { method: "POST", headers: apiHeaders(), body: JSON.stringify({ action: "stop" }) });
-      const run = (await res.json()) as RunSummary;
-      if (seq === this.#runSeq) this.#set({ phase: "stopped", run });
+      const body: unknown = await res.json();
+      if (seq === this.#runSeq) this.#set(isRunSummary(body) ? { phase: "stopped", run: body } : { phase: "stopped", lastError: errorOf(body) ?? `stop answered ${res.status}` });
     } catch (e) {
       if (seq === this.#runSeq) this.#set({ phase: "stopped", lastError: String(e) });
     }
   }
 
   dispose(): void {
+    this.flushCache();
     this.#life++;
     this.#halt();
     this.#aborter.abort();
@@ -592,25 +618,26 @@ export class ColonyJev {
     let error: string | null = null;
     try {
       const res = await fetch(apiUrl("api/jev"), { method: "POST", headers: apiHeaders(), body: JSON.stringify(l.pack(items, l.words)), signal: this.#aborter.signal });
-      const body = (await res.json()) as JevProxyReply | { error: string; run?: RunSummary };
+      const body: unknown = await res.json();
       if (res.status === 409) {
-        const run = (body as { run?: RunSummary }).run ?? null;
+        const run = runOf(body);
         this.#halt();
         this.#aborter.abort(); // as Stop does: the run is over, so is everything still in flight in it
-        this.#set({ phase: "stopped", run, lastError: `Jev stopped: ${(body as { error?: string }).error ?? "run over"}. Ants are on the local rule.` });
+        this.#set({ phase: "stopped", run, lastError: `Jev stopped: ${errorOf(body) ?? "run over"}. Ants are on the local rule.` });
         return;
       }
-      if (res.status === 429 && (body as { error?: string }).error === "busy") {
+      if (res.status === 429 && errorOf(body) === "busy") {
         // Ask again next cycle, under the context it was asked under, for what that context hasn't cached since. Into
         // every current lane asking under that context, not only the one that sent it: that lane may be gone (a new
         // game) or have moved to another doctrine, and other colonies' lanes skipped these while they were in flight (ja-1u2).
         if (seq === this.#runSeq)
           for (const m of this.#lanes()) if (m.name === l.name && m.context === context) for (const it of items) if (m.key(it.situation) === it.key && !this.#cache(m, context).get(it.key)) m.queue.set(it.key, it.situation); // a fungus key built under an older menu is not asked again
-        this.#set({ [counted]: this.#state[counted] - items.length, run: (body as { run?: RunSummary }).run ?? this.#state.run });
+        this.#set({ [counted]: this.#state[counted] - items.length, run: runOf(body) ?? this.#state.run });
         return;
       }
-      if (!res.ok) error = (body as { error: string }).error ?? `HTTP ${res.status}`;
-      else reply = body as JevProxyReply;
+      if (!res.ok) error = errorOf(body) ?? `HTTP ${res.status}`;
+      else if (isProxyReply(body)) reply = body;
+      else error = "the server's reply was not a Jev reply";
     } catch (err) {
       if ((err as { name?: string } | null)?.name === "AbortError") return; // Stop cut it
       error = String(err);
@@ -619,21 +646,21 @@ export class ColonyJev {
       // A new run (Start) cleared the in-flight set and may be asking these again: theirs, not this run's, to clear.
       if (seq === this.#runSeq) for (const it of items) this.#asking.delete(askKey(context, it.key));
     }
-    if (!reply || reply.status !== 200 || !reply.body || !("answers" in reply.body)) {
+    const answers = reply && reply.status === 200 && hasAnswers(reply.body) ? reply.body.answers : null;
+    if (!reply || !answers) {
       // Not billed as a reply; everyone keeps the local rule and meets the situation again later.
       this.#cooldown = 5;
-      this.#set({ failures: this.#state.failures + 1, lastError: error ?? `jev answered ${reply?.status ?? "?"}`, run: reply?.run ?? this.#state.run });
+      this.#set({ failures: this.#state.failures + 1, lastError: error ?? `jev answered ${reply?.status ?? "?"}`, run: runOf(reply) ?? this.#state.run });
       return;
     }
     // A billed answer is kept under the context it was asked under, whichever run or doctrine is current now.
     const cache = this.#cache(l, context);
-    const answers = (reply.body as JevResponse).answers;
     for (const it of items) {
       const a = l.read(answers, it.id, it.situation, it.key);
       if (a) cache.put(it.key, a);
     }
-    this.#store?.save(context, cache.entries());
-    this.#set({ run: reply.run, lastError: null, ...this.#counts() });
+    this.#saveSoon(context, cache as unknown as PolicyCache<string>);
+    this.#set({ run: runOf(reply) ?? this.#state.run, lastError: null, ...this.#counts() });
     // The fungus asks its policy every step, so its new answers take hold by themselves; the ants reconsider.
     if (seq === this.#runSeq && l.name !== "fungus") this.#reconsider();
   }

@@ -1,9 +1,9 @@
-import { DEFAULT_IN_FLIGHT } from "../shared/jev.ts";
+import { DEFAULT_IN_FLIGHT, MAX_JSON_BODY, PASS_HEADER } from "../shared/jev.ts";
 import { dailyBudget, type Services } from "../server/replies.ts";
 import { Ledger, reserveForBytes, type BudgetStore } from "../server/ledger.ts";
 import { FetchJevClient } from "./fetchJev.ts";
-import { PASS_HEADER, corsHeaders, originAllowed, parseOrigins, passOk } from "./gate.ts";
-import { MAX_JSON_BODY, route } from "./routes.ts";
+import { corsHeaders, originAllowed, parseOrigins, passOk } from "./gate.ts";
+import { route } from "./routes.ts";
 
 // The hosted Jev proxy for the GitHub Pages builds (main and PR previews): the
 // dev server's /api/health, /api/run and /api/jev on a Cloudflare Worker. The
@@ -88,7 +88,7 @@ export class JevLedger {
         // A stop never cuts off a call already sent: it runs to its reply or its deadline, so what Jev bills is counted
         // against the day (PR #66 review S1). The dev server's 1.5 s grace suits one local user; here it was a way past the cap.
         client: env.JEV_API_KEY ? new FetchJevClient({ apiKey: env.JEV_API_KEY, timeoutMs: CALL_DEADLINE_MS, abortGraceMs: CALL_DEADLINE_MS }) : null,
-        ledger: new Ledger({ maxInFlight: DEFAULT_IN_FLIGHT, timer, reserveTokens: RESERVE_CEILING, dailyUsd: dailyBudget(env as unknown as NodeJS.ProcessEnv), budgetStore: store }),
+        ledger: new Ledger({ maxInFlight: DEFAULT_IN_FLIGHT, timer, reserveTokens: RESERVE_CEILING, dailyUsd: dailyBudget(env), budgetStore: store }),
         now: () => Date.now(),
       };
     });

@@ -1,4 +1,5 @@
-import type { Budget } from "../../shared/jev.ts";
+import { PASS_HEADER, readHealth, type Budget } from "../../shared/jev.ts";
+export { PASS_HEADER };
 
 // Where the API is. In dev it is middleware on the Vite server, same origin.
 // A static build (GitHub Pages: main and the PR previews) has none of its own:
@@ -24,8 +25,6 @@ export function apiUrl(path: string, env: ViteEnv = viteEnv()): string {
   return `${base.endsWith("/") ? base : `${base}/`}${rel}`;
 }
 
-/** Sent to the hosted proxy; must match web/worker/gate.ts PASS_HEADER. Not the Jev key, which never reaches the browser. */
-export const PASS_HEADER = "x-jev-ants-pass";
 const PASS_KEY = "jev-ants:pass";
 /** Kept for this page when localStorage is blocked. */
 let memoryPass: string | null = null;
@@ -72,11 +71,11 @@ export async function detectBackend(fetchFn: typeof fetch = fetch, env: ViteEnv 
     // The passphrase goes on the probe too: an unlocked browser is only told so if it says the passphrase here.
     const res = await fetchFn(apiUrl("api/health", env), { headers: apiHeaders(env, pass) });
     if (!res.ok) return { hasBackend: false, hasKey: false };
-    const body = (await res.json()) as { ok?: unknown; hasKey?: unknown; hosted?: unknown; authorized?: unknown; run?: { budget?: Budget } };
-    if (body?.ok !== true) return { hasBackend: false, hasKey: false };
-    const budget = body.run?.budget;
+    const body = readHealth(await res.json());
+    if (!body) return { hasBackend: false, hasKey: false };
+    const budget = body.budget;
     const needsPass = body.hosted === true && body.authorized !== true;
-    return { hasBackend: true, hasKey: body.hasKey === true, ...(budget ? { budget } : {}), ...(needsPass ? { needsPass } : {}) };
+    return { hasBackend: true, hasKey: body.hasKey, ...(budget ? { budget } : {}), ...(needsPass ? { needsPass } : {}) };
   } catch {
     return { hasBackend: false, hasKey: false };
   }

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { EventEmitter } from "node:events";
-import { apiPlugins, buildServices, isJevResponse, makeHandlers, sameOrigin, validateJevRequest, wrap, type Services } from "../api.ts";
+import { apiPlugins, buildServices, isJevResponse, jevReply, makeHandlers, sameOrigin, validateJevRequest, wrap, type Services } from "../api.ts";
 import { DEFAULT_IN_FLIGHT } from "../jev.ts";
 import { Ledger } from "../ledger.ts";
 import { JevAbortError, type JevCallResult, type JevCaller } from "../jev.ts";
@@ -301,4 +301,20 @@ test("routes: a call reserves from its own payload, so a big request after a sma
   } finally {
     s.close();
   }
+});
+
+test("both transports pin the model: jevReply sends jev-latest whatever model the caller names (the ledger prices at that rate)", async () => {
+  const seen: (string | undefined)[] = [];
+  const caller: JevCaller = {
+    async ask(req) {
+      seen.push(req.model);
+      return { status: 200, body: { model: "jev-latest", answers: { q: { type: "noul", noul: 0.5 } }, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10 };
+    },
+    destroy() {},
+  };
+  const svc: Services = { client: caller, ledger: new Ledger({ maxInFlight: 2 }), now: () => Date.now() };
+  svc.ledger.start({}, Date.now());
+  const r = await jevReply(svc, { ...JEV_BODY, model: "jev-preview" });
+  assert.equal(r.status, 200);
+  assert.deepEqual(seen, ["jev-latest"]);
 });
