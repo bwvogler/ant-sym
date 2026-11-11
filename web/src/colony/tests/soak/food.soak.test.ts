@@ -32,8 +32,9 @@ function drift(over?: Partial<Responses>, seconds = 300): { worst: number; g: Ga
 }
 
 test("food is conserved over a game: map + jaws + larder + brood (1 + fed each) + 4 a birth is what the map started with", () => {
-  // Review of slice 4: the invariant held to 2e-10 in reviewers' runs, but nothing tested it.
-  const { worst, g } = drift();
+  // Review of slice 4: the invariant held to 2e-10 in reviewers' runs, but nothing tested it. 150 s of the 300 it ran: a 1 % leak
+  // on every stock into a chamber drifts the books by 1.6 at either length (the bound is 1e-6), and by 150 s the brood is raised.
+  const { worst, g } = drift(undefined, 150);
   assert.ok(g.colonies.every((c) => c.births > 0 && c.portTrips > 0), "brood raised, food moved");
   assert.ok(worst < 1e-6, `food drifted by ${worst}`);
 });
