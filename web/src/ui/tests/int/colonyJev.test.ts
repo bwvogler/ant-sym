@@ -43,8 +43,8 @@ function memoryStore(): CacheStore & { data: Map<string, [string, string][]> } {
 
 const tick = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const live = new Set<ColonyJev>();
-function make(store: CacheStore | null = null): ColonyJev {
-  const j = new ColonyJev({ intervalMs: 10, gatherMs: 0 }, store);
+function make(store: CacheStore | null = null, saveMs = 0): ColonyJev {
+  const j = new ColonyJev({ intervalMs: 10, gatherMs: 0, saveMs }, store);
   live.add(j);
   return j;
 }
@@ -884,4 +884,25 @@ test("lanes take turns at any request latency: a long mode queue does not keep t
       mock.timers.reset();
     }
   }
+});
+
+test("answers are written to the store once for the replies in a second, and at once on a flush or a stop (not after every reply)", async () => {
+  const sent = scriptFetch(answerAll("follow"));
+  const saves: string[] = [];
+  const store = memoryStore();
+  const counted: CacheStore = { load: store.load, save: (c, e) => (saves.push(c), store.save(c, e)) };
+  const j = make(counted, 60_000);
+  j.setDoctrine(DOCTRINES[0]!.text);
+  const c = colony();
+  j.attach(c);
+  await j.start();
+  run(c, 3);
+  await tick(60);
+  assert.ok(sent.length >= 1, "it asked");
+  assert.equal(saves.length, 0, "nothing written yet: the delay is a minute");
+  j.flushCache();
+  assert.equal(saves.length, 1, "one write for the context");
+  assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, j.state.cached, "everything the replies brought");
+  j.flushCache();
+  assert.equal(saves.length, 1, "nothing more to write");
 });

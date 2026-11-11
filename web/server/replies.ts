@@ -1,4 +1,4 @@
-import { DAILY_BUDGET_USD, DEFAULT_JEV_MODEL, type JevProxyReply, type JevRequest, type RunCaps } from "../shared/jev.ts";
+import { DAILY_BUDGET_USD, DEFAULT_JEV_MODEL, type HealthReply, type JevProxyReply, type JevRequest, type RunRequest } from "../shared/jev.ts";
 import { HttpError } from "./http.ts";
 import { JevAbortError, type JevCaller } from "./jev.ts";
 import { reserveForBytes, type Ledger } from "./ledger.ts";
@@ -47,7 +47,7 @@ export interface Services {
 }
 
 /** The daily budget from JEV_DAILY_USD (dollars, ≥ 0), else DAILY_BUDGET_USD. */
-export function dailyBudget(env: NodeJS.ProcessEnv): number {
+export function dailyBudget(env: { JEV_DAILY_USD?: string }): number {
   const v = Number(env.JEV_DAILY_USD);
   return env.JEV_DAILY_USD !== undefined && env.JEV_DAILY_USD !== "" && Number.isFinite(v) && v >= 0 ? v : DAILY_BUDGET_USD;
 }
@@ -59,11 +59,17 @@ export interface Reply {
 }
 
 export function healthReply(svc: Services): Reply {
-  return { status: 200, body: { ok: true, hasKey: svc.client !== null, run: svc.ledger.summary(svc.now()) } };
+  const body: HealthReply = { ok: true, hasKey: svc.client !== null, run: svc.ledger.summary(svc.now()) };
+  return { status: 200, body };
+}
+
+/** What a thrown error answers, for both transports: an HttpError its own status, anything else a 500; always `{error}`. */
+export function errorReply(e: unknown): Reply {
+  return { status: e instanceof HttpError ? e.status : 500, body: { error: String((e as Error)?.message || e) } };
 }
 
 /** /api/run: GET is the summary; POST {action} starts or stops the run. */
-export function runReply(svc: Services, method: string | undefined, body: { action?: string; caps?: Partial<RunCaps> }): Reply {
+export function runReply(svc: Services, method: string | undefined, body: RunRequest): Reply {
   if (method === "GET") return { status: 200, body: svc.ledger.summary(svc.now()) };
   if (body.action === "start") return { status: 200, body: svc.ledger.start(body.caps ?? {}, svc.now()) };
   if (body.action === "stop") return { status: 200, body: svc.ledger.stop("user", svc.now()) };
@@ -74,11 +80,12 @@ export function runReply(svc: Services, method: string | undefined, body: { acti
 /** /api/jev: one Jev call through the ledger. Throws HttpError for 400/502/503. */
 export async function jevReply(svc: Services, raw: unknown): Promise<Reply> {
   if (!svc.client) throw new HttpError(503, "JEV_API_KEY is not set in the server's environment");
-  const request = validateJevRequest(raw);
+  // The ledger prices tokens at jev-latest's rate, so a caller may not pick another model (PR #66 review N2): both transports pin it here.
+  const request = { ...validateJevRequest(raw), model: DEFAULT_JEV_MODEL };
   // Reserve from this request's own size, so a big call cannot hide under a small one's room.
   // Up to the ledger's own ceiling: the dev server's is the 64k context limit; the Worker's covers its largest body
   // (PR #66 re-review), so a big request cannot reserve less than it might bill.
-  const reserve = reserveForBytes(Buffer.byteLength(JSON.stringify(request)), svc.ledger.reserveTokens);
+  const reserve = reserveForBytes(new TextEncoder().encode(JSON.stringify(request)).length, svc.ledger.reserveTokens);
   const gate = svc.ledger.admit(svc.now(), reserve);
   if (!gate.ok) {
     // 429 "busy" is temporary: the pool is full or what is in flight might
