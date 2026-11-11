@@ -514,6 +514,7 @@ export class ColonyJev {
       this.#store?.save(context, cache.entries());
       return;
     }
+    if (!this.#store) return;
     this.#unsaved.set(context, cache);
     this.#saveTimer ??= setTimeout(() => this.flushCache(), this.opts.saveMs);
   }
@@ -649,7 +650,7 @@ export class ColonyJev {
     if (!reply || !answers) {
       // Not billed as a reply; everyone keeps the local rule and meets the situation again later.
       this.#cooldown = 5;
-      this.#set({ failures: this.#state.failures + 1, lastError: error ?? `jev answered ${reply?.status ?? "?"}`, run: reply?.run ?? this.#state.run });
+      this.#set({ failures: this.#state.failures + 1, lastError: error ?? `jev answered ${reply?.status ?? "?"}`, run: runOf(reply) ?? this.#state.run });
       return;
     }
     // A billed answer is kept under the context it was asked under, whichever run or doctrine is current now.
@@ -659,7 +660,7 @@ export class ColonyJev {
       if (a) cache.put(it.key, a);
     }
     this.#saveSoon(context, cache as unknown as PolicyCache<string>);
-    this.#set({ run: reply.run, lastError: null, ...this.#counts() });
+    this.#set({ run: runOf(reply) ?? this.#state.run, lastError: null, ...this.#counts() });
     // The fungus asks its policy every step, so its new answers take hold by themselves; the ants reconsider.
     if (seq === this.#runSeq && l.name !== "fungus") this.#reconsider();
   }

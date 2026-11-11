@@ -28,7 +28,10 @@ test("a proxy reply carries its status, attempts, tokens and run; its body holds
   const reply = { status: 200, body: { model: "m", answers: { q: { type: "noul", noul: 0.5 } }, usage: { input_tokens: 1, output_tokens: 0 } }, ms: 5, attempts: 1, inputTokens: 1, run: RUN };
   assert.equal(isProxyReply(reply), true);
   assert.equal(hasAnswers(reply.body), true);
-  assert.equal(isProxyReply({ ...reply, run: { running: true } }), false);
+  assert.equal(isProxyReply({ ...reply, run: { running: true } }), true, "a drifted run summary does not make a billed reply unreadable (read the run with runOf)");
+  assert.equal(runOf(reply), RUN);
+  assert.equal(runOf({ ...reply, run: { running: true } }), null);
+  assert.equal(isProxyReply({ ...reply, run: undefined }), false);
   assert.equal(isProxyReply({ status: 200 }), false);
   assert.equal(hasAnswers({ error: "upstream reply had no answers" }), false);
   assert.equal(hasAnswers(null), false);

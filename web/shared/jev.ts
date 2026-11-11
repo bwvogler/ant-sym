@@ -128,13 +128,11 @@ export function errorOf(body: unknown): string | undefined {
   return isObject(body) && typeof body.error === "string" ? body.error : undefined;
 }
 
-/** A run summary: the fields the page reads (running, the counts, the cost, the caps). */
+/** A run summary: the fields the page reads (running, the pool width, the tokens and cost, the caps). */
 export function isRunSummary(v: unknown): v is RunSummary {
   return (
     isObject(v) &&
     typeof v.running === "boolean" &&
-    typeof v.requests === "number" &&
-    typeof v.inFlight === "number" &&
     typeof v.maxInFlight === "number" &&
     typeof v.inputTokens === "number" &&
     typeof v.usd === "number" &&
@@ -147,9 +145,9 @@ export function runOf(body: unknown): RunSummary | null {
   return isObject(body) && isRunSummary(body.run) ? body.run : null;
 }
 
-/** What /api/jev returns on a 200: the status of the upstream call, its body, and the run. */
+/** What /api/jev returns on a 200: the status of the upstream call, its body, and the run (read it with runOf: a run that has drifted must not drop a billed answer). */
 export function isProxyReply(v: unknown): v is JevProxyReply {
-  return isObject(v) && typeof v.status === "number" && typeof v.attempts === "number" && typeof v.inputTokens === "number" && isRunSummary(v.run) && "body" in v;
+  return isObject(v) && typeof v.status === "number" && typeof v.attempts === "number" && typeof v.inputTokens === "number" && isObject(v.run) && "body" in v;
 }
 
 /** Whether a Jev reply body holds answers. */

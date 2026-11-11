@@ -11,12 +11,12 @@ const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReas
 type Script = (req: JevRequest) => { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 
 /** Scripted fetch; returns the situations each /api/jev request carried. */
-function scriptFetch(jev: Script) {
+function scriptFetch(jev: Script, runReply: (action: string) => { status: number; body: unknown } = () => ({ status: 200, body: RUN })) {
   const sent: string[][] = [];
   globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
     const path = String(url);
     let r: { status: number; body: unknown };
-    if (path.startsWith("/api/run")) r = { status: 200, body: RUN };
+    if (path.startsWith("/api/run")) r = runReply((JSON.parse(String(init?.body ?? "{}")) as { action?: string }).action ?? "");
     else {
       const req = JSON.parse(String(init?.body)) as JevRequest & { state: { ants?: Record<string, unknown> } };
       if (req.state.ants) sent.push(Object.values(req.state.ants).map((a) => JSON.stringify(a))); // ant situations only, not stances
@@ -905,4 +905,70 @@ test("answers are written to the store once for the replies in a second, and at 
   assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, j.state.cached, "everything the replies brought");
   j.flushCache();
   assert.equal(saves.length, 1, "nothing more to write");
+});
+
+test("a 200 that is not what the server sends is an error, not a run: start, stop and ask each say so and carry on locally", async () => {
+  // Start answered with a body that is no run summary: no run opens.
+  scriptFetch(answerAll("follow"), () => ({ status: 200, body: { oops: true } }));
+  const a = make();
+  await a.start();
+  assert.equal(a.state.phase, "off", "no run opened");
+  assert.match(a.state.lastError ?? "", /start failed \(200\)/);
+  // Stop answered the same way: the run is stopped locally and the error says why.
+  scriptFetch(answerAll("follow"), (action) => (action === "stop" ? { status: 200, body: "<html>" } : { status: 200, body: RUN }));
+  const b = make();
+  await b.start();
+  assert.equal(b.state.phase, "running");
+  await b.stop();
+  assert.equal(b.state.phase, "stopped");
+  assert.match(b.state.lastError ?? "", /stop answered 200/);
+  // A Jev reply that is not a proxy reply: a failure, the ants stay on the local rule.
+  scriptFetch(() => ({ status: 200, body: { weird: 1 } }));
+  const c = make();
+  c.setDoctrine(DOCTRINES[0]!.text);
+  const col = colony();
+  c.attach(col);
+  await c.start();
+  run(col, 3);
+  await tick(60);
+  assert.ok(c.state.failures >= 1, "counted as a failure");
+  assert.match(c.state.lastError ?? "", /not a Jev reply/);
+  assert.equal(c.state.cached, 0, "nothing cached");
+});
+
+test("a billed reply whose run summary has drifted is still cached: the answers matter, the summary is read if it can be", async () => {
+  const sent = scriptFetch((req) => {
+    const r = answerAll("follow")(req) as { status: number; body: { run: unknown } };
+    r.body.run = { running: true }; // an older or newer server's summary
+    return r;
+  });
+  const j = make();
+  j.setDoctrine(DOCTRINES[0]!.text);
+  const col = colony();
+  j.attach(col);
+  await j.start();
+  run(col, 3);
+  await tick(60);
+  assert.ok(sent.length > 0 && j.state.cached > 0, "answers cached");
+  assert.equal(j.state.failures, 0);
+});
+
+test("stop and dispose write the answers still waiting for the debounce", async () => {
+  for (const how of ["stop", "dispose"] as const) {
+    scriptFetch(answerAll("follow"));
+    const saves: string[] = [];
+    const store = memoryStore();
+    const j = make({ load: store.load, save: (c, e) => (saves.push(c), store.save(c, e)) }, 60_000);
+    j.setDoctrine(DOCTRINES[0]!.text);
+    const col = colony();
+    j.attach(col);
+    await j.start();
+    run(col, 3);
+    await tick(60);
+    assert.equal(saves.length, 0, `${how}: nothing written before it`);
+    if (how === "stop") await j.stop();
+    else j.dispose();
+    assert.equal(saves.length, 1, `${how} wrote them`);
+    assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, j.state.cached);
+  }
 });
