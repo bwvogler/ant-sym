@@ -4659,7 +4659,11 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 
 **Decisions.**
 - Desert ant first (owner, 2026-11-11, chosen from four candidates: desert ant, Pharaoh ant, army ant, leafcutter).
-- Proposed, needs the owner: build the descriptor first (`ja-fnd.5.1`–`.5.3`), then the species on it; heat in as its own bead after the first build; a radial food-odour gradient before any wind field; the fungus's levers for this host left to the owner.
+- Decided by me, on the owner's instruction to decide what I can decide well (2026-11-11; the owner can overturn any of these):
+  - **Descriptor first.** `ja-fnd.5.1`–`.5.3`, then the species on it. Why: the species' defining differences (a smaller channel set, its own situation fields, no stance lane) are exactly what the hard-coded `Situation` cannot express, so building it directly would mean a second copy of the colony's wiring to delete later; the descriptor work is bit-exact and goldens guard it.
+  - **Heat is its own bead after the first build** (`ja-rf5.5` depends on `ja-rf5.3`). Why: it is the biggest invented rule, the literature gives windows but no rates, and it can only be tuned once a species plays.
+  - **A radial food-odour gradient** before any wind field. Why: the papers give "several metres" and crosswind runs, no plume shape; a wind field is a new world system with nothing to measure it against.
+- Needs the owner: the fungus's levers for this host (`ja-rf5.7`), and allowing the journal hosts for the full-text read (`ja-rf5.1`).
 
 **The mechanic.** Food odour as a steering cue; own body heat as a sense and a return rule; the species' own lane and legend; no trail channels, no stance lane, no corpse removal. "Off": no species, so main bit for bit. Table in [desert-ant.md](desert-ant.md#the-mechanic).
 

@@ -97,11 +97,14 @@ The species is an **agent kind the one-policy shape must carry**. Cheapest slice
 
 ## Open questions
 
-1. **Which first slice?** (a) *Descriptor-first*: land `ja-fnd.5.1` to `.5.3` with a test species, then add *Cataglyphis* as the first non-ant-generic species; (b) *species-first*: build *Cataglyphis* as one more hard-coded colony and extract the descriptor from two real consumers. Recommendation: (a), the smallest refactor that the species forces (the channel set, the per-species situation and the absent lane), then the species.
-2. **Is heat in?** It is the species' defining pressure and the biggest new rule (a world field and a body rule). Without it, a desert ant is a generic ant with no trails. Recommendation: yes, as a separate bead after the species ships without it.
-3. **A food odour field or a laid-channel stand-in?** The research supports odour from the food; the cheapest build is a radial gradient from the food itself.
-4. **The player's lever on this species** (the fungus's choices; above): needs the owner.
-5. **Full-text reading.** The network blocked every journal host. Allow them, or supply the papers, before targets and numbers are set. Recommendation: read at least Wehner, Marsh & Wehner 1992; Schmid-Hempel & Schmid-Hempel 1984; Dillier & Wehner 2004; Buehlmann et al. 2012 and 2014 first.
+Decided on 2026-11-11 (the owner said to decide what can be decided well; PRD §60 gives the reasons; each can be overturned):
+1. **First slice:** descriptor first (`ja-fnd.5.1`–`.5.3`), then the species.
+2. **Heat:** its own bead after the first build (`ja-rf5.5`).
+3. **Food odour:** a radial gradient from each food item before any wind field.
+
+For the owner:
+4. **The fungus's levers on this host** (`ja-rf5.7`). The trail and alarm levers do nothing here, so the choice is what reaches it: heat felt by the host, a host's odour, or contact at an invitation. All design.
+5. **Full-text reading** (`ja-rf5.1`). Allow the journal hosts in the environment's network settings (nature.com, link.springer.com, cob.silverchair.com, pmc.ncbi.nlm.nih.gov, doc.rero.ch) or supply the papers. First to read: Wehner, Marsh & Wehner 1992; Schmid-Hempel & Schmid-Hempel 1984; Dillier & Wehner 2004; Buehlmann et al. 2012 and 2014.
 
 ## Sources
 
