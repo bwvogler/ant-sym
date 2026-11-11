@@ -208,3 +208,22 @@ test("site fidelity: a trail-follower with a memory is not drawn to it", () => {
   assert.ok((c.x[0] as number) - (hx + 12) > -8, "following (no trail here: it wanders), it does not head for the spot");
   assert.ok(HOLE_SIGHT > 0);
 });
+
+test("site fidelity: with siteGive it gives the spot up once its search has widened past what its vector's error covers, sooner for a short vector", () => {
+  // Seconds from its start (at the spot, no drift, no food) to the spot forgotten, for a spot `len` cells out and the given siteGive.
+  const forgot = (len: number, give: number): number => {
+    const { g, c, hx, hy } = plane({ siteFidelity: 1, siteGive: give });
+    c.foodX[0] = len;
+    c.foodY[0] = 0;
+    out(c, pn(g, c).x + len, pn(g, c).y, 0);
+    assert.ok(hx > 0 && hy > 0);
+    return tickUntil(g, 120, () => Number.isNaN(c.foodX[0] as number)) ? g.time : Infinity;
+  };
+  const short = forgot(20, 1);
+  const long = forgot(100, 1);
+  assert.ok(short < 6, `a 20-cell vector (σ 2): the spot given up after ${short.toFixed(1)} s`);
+  assert.ok(long > short + 8 && long < 90, `a 100-cell vector (σ 10): after ${long.toFixed(1)} s`);
+  assert.ok(forgot(100, 2) > long + 4, "a wider allowance, a longer search");
+  const off = forgot(20, 0);
+  assert.ok(off > 55 && off < 65, `siteGive 0: only tiring (patience 60 s) ends it: ${off.toFixed(1)} s`);
+});

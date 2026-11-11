@@ -132,6 +132,20 @@ export const GUIDE: GuideEntry[] = [
     ],
   },
   {
+    id: "forager-trips",
+    title: "Forager trips",
+    onScreen: "Nothing yet: both are built and switched off (PRD §57). Switched on, foragers on one world's plane fan out each to its own patch and come back to it trip after trip, short straight lines between the hole and the food, and fewer wander far with food in their jaws.",
+    realAnts:
+      "A harvester forager's trip ends on how long it searched, not how far the seed was. Desert ants that found food head the same way next time and search round where the feeder was, even after it is gone; they keep only the latest such vector.",
+    inGame:
+      "On the plane a forager's way home is only as good as its home vector, whose error grows with every cell it walks, so a long search ends sooner there than on a top-down map. A forager that picks up food keeps where it believes the food was (its home vector at that moment); on its next trip it walks that vector straight and searches round the spot when it gets there. A food trail it meets takes over; it forgets the spot when it tires there with nothing, and replaces it at its next find. The fungus's time-out lever scales how long a host searches either way.",
+    sources: [
+      { note: "forager-trips", anchor: "1-a-trip-ends-on-search-time", label: "A trip ends on search time" },
+      { note: "forager-trips", anchor: "3-foragers-go-back-to-where-they-last-found-food", label: "Foragers go back to where they last found food" },
+      { note: "tiredness", anchor: "what-ends-a-foraging-trip", label: "What ends a foraging trip" },
+    ],
+  },
+  {
     id: "chambers",
     title: "Chambers",
     swatch: (["royal", "brood", "store", "reception"] as const).map((r) => css(ROLE_RGB[r]!)),
@@ -286,7 +300,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "entrances", title: "Entrances", covers: "How many entrances colonies keep, sealing them at night, and what a digger senses near the surface." },
   { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views, above and below. The views are linked, and a one-world game opens above." },
   { note: "nest-search", title: "Nest search", covers: "How a lost carrier searches when its vector runs out at no hole: a spiral out from that spot and, on its own mound, its colony's smell leading it to the hole. Centred loops back through the spot are built but off." },
-  { note: "forager-trips", title: "Forager trips", covers: "What keeps a forager's way home short on one world's plane: a shorter search, and going back to where it last found food." },
+  { note: "forager-trips", title: "Forager trips", covers: "What keeps a forager's way home short on one world's plane: a shorter search there, and going back to where it last found food. Both built, switched off for now (PRD §57)." },
   { note: "nest-spacing", title: "Nest spacing", covers: "How far apart colonies sit, where young colonies survive, and how far a founding queen flies." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];

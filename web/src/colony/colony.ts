@@ -289,6 +289,12 @@ export interface ColonyParams {
    */
   siteFidelity: number;
   /**
+   * One world's plane, with siteFidelity (ja-lp4.15): a forager gives up the spot it searches round once the search's reach
+   * has widened past this many σ of the vector that led it there (σ = PI_DRIFT × that vector's length: an ant widens its
+   * search with its vector's length, Merkle & Wehner 2010), not waiting to tire. 0 = only tiring ends it.
+   */
+  siteGive: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -351,7 +357,7 @@ const LOOP_AT = 2;
 /** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, planePatience: 1, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, siteFidelity: 0, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, planePatience: 1, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, siteFidelity: 0, siteGive: 0, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -2760,6 +2766,13 @@ export class Colony {
       a = this.searchA[i] = a + Math.PI / 2;
       const { w, h } = this.map.size;
       s = this.search[i] = Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
+      // Widened past what its vector's error covers (a quarter turn each point, so it has been all round at the last): the spot is spent.
+      if (this.params.siteGive > 0 && s > this.params.siteGive * PI_DRIFT * Math.hypot(this.foodX[i] as number, this.foodY[i] as number)) {
+        this.foodX[i] = this.foodY[i] = NaN;
+        this.search[i] = 0;
+        this.searchA[i] = 0;
+        return this.heading[i] as number;
+      }
       px = tx + s * Math.cos(a);
       py = ty + s * Math.sin(a);
     }
