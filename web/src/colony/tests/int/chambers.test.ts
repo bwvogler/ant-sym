@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Chambers } from "../../chambers.ts";
-import { builtFloor, Colony, FLOOR_PER_ANT, LIFESPAN, MIDDLE, refilled, ROOMY_DIG, YOUNG } from "../../colony.ts";
+import { BACKFILL, builtFloor, Colony, FLOOR_PER_ANT, LIFESPAN, MIDDLE, refilled, ROOMY_DIG, YOUNG } from "../../colony.ts";
 import { nx, ny } from "../../hex.ts";
 import { digCell, fillCell, generateSideWorld, mulberry32, OPEN, rockAt, SOIL } from "../../world.ts";
 import { SMALL_SIDE } from "../builders.ts";
@@ -75,9 +75,9 @@ test("soil put back under a chamber cell stays put for good; put back elsewhere,
   digCell(map, ox, oy, 5);
   assert.ok(fillCell(map, ox, oy, 10));
   const later = 10 + 10_000;
-  assert.ok(builtFloor(map, fx, fy) && refilled(map, fx, fy, later), "floor put back is never dug");
-  assert.ok(!builtFloor(map, ox, oy) && !refilled(map, ox, oy, later), "elsewhere the hold runs out");
-  assert.ok(refilled(map, ox, oy, 11), "…but holds for a while");
+  assert.ok(builtFloor(map, fx, fy) && refilled(map, fx, fy, later, BACKFILL.hold), "floor put back is never dug");
+  assert.ok(!builtFloor(map, ox, oy) && !refilled(map, ox, oy, later, BACKFILL.hold), "elsewhere the hold runs out");
+  assert.ok(refilled(map, ox, oy, 11, BACKFILL.hold), "…but holds for a while");
   digCell(map, fx, fy, later); // a test (or a cave-in) digs it anyway: no longer put back
   assert.ok(!builtFloor(map, fx, fy));
 });

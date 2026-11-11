@@ -9,7 +9,7 @@ import { join, relative, sep } from "node:path";
 
 const WEB = new URL("../../../", import.meta.url).pathname; // web/
 const ROOT = join(WEB, "..");
-const INTERNAL = /["'](?:\.\.?\/)+(?:web\/src\/)?colony\/(?!index\.ts|experiment\.ts|tests\/)[\w/]+\.ts["']/;
+const INTERNAL = /["'](?:\.\.?\/)+(?:web\/)?(?:src\/)?colony\/(?!index\.ts|experiment\.ts|tests\/)[\w/]+\.ts["']/;
 
 function* walk(dir: string): Generator<string> {
   for (const name of readdirSync(dir)) {

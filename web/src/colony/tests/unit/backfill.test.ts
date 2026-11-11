@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BACKFILL, chooseDig, Colony, DIG_FACE, GLANCE, refilled, soilFace, stub, type ColonyParams } from "../../colony.ts";
+import { BACKFILL, besideRefill, chooseDig, Colony, DIG_FACE, GLANCE, refilled, soilFace, stub, type ColonyParams } from "../../colony.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny } from "../../hex.ts";
 import { fillCell, mulberry32, OPEN, rockAt, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
 import { nestAt, put } from "../hexmaps.ts";
@@ -128,7 +128,7 @@ test("a carrier detours into a stale branch, walks it to its end and fills it ba
   assert.equal(c.soilFilled, 3);
   // A branch with scent in it (an ant digging there laid it on the way in) is in use.
   const live = build(b);
-  const k = carrierOn(live, (_x, y) => (y === 6 ? 1 : 0.9));
+  const k = carrierOn(live, (_x, y) => (y === 6 ? 1 : 0.9), 2, tuned);
   let entered = false;
   for (let t = 0; t < 30 * 5 && k.pellet[0] === 1; t++) {
     k.tick(1 / 30);
@@ -277,7 +277,7 @@ test("a pellet put back is not dug out again: not as a tunnel's end, not as the 
       if (x !== 18) assert.equal(rockAt(map, x, y), SOIL, `and the dead end it left is not dug on either (${x}, ${y}): the colony is filling that branch back`);
     }
     // Long after (BACKFILL.hold), it is ground like any other.
-    assert.ok(!refilled(map, 20, 6, c.time + 601));
+    assert.ok(!refilled(map, 20, 6, c.time + 601, BACKFILL.hold));
   }
   // An explorer walking into a side cell (not a face it chose to dig) that is filled as it goes.
   {
@@ -365,4 +365,13 @@ test("a carrier never turns back the way it came into a 'stale branch': the path
   }
   assert.ok(!turned, "it walked on home, never back east");
   assert.equal(rockAt(map, 20, 6), OPEN, "and filled nothing at the tunnel's far end");
+});
+
+test("refilled and besideRefill take the hold they are given: a cell filled 100 s ago is held at 600 s and free at 50 s", () => {
+  const map = build();
+  map.filledAt.set(20, 6, 0);
+  assert.equal(refilled(map, 20, 6, 100, 600), true);
+  assert.equal(refilled(map, 20, 6, 100, 50), false);
+  assert.equal(besideRefill(map, 19, 6, 100, 600), true, "a neighbour of the filled cell");
+  assert.equal(besideRefill(map, 19, 6, 100, 50), false);
 });

@@ -1,5 +1,5 @@
 // The words every part of the colony shares: what an ant's mode, stance and situation may be, the trail levels it senses,
-// and the few constants those words carry. A leaf: it imports no colony code, so colony.ts, responses.ts, recognition.ts,
+// and the few constants those words carry. A leaf: it imports only the pheromone mark list, so colony.ts, responses.ts, recognition.ts,
 // battle.ts and the brains can all use it without importing each other (docs/refactor.md S1).
 import { MARKS } from "./pheromone.ts";
 

@@ -1,4 +1,4 @@
-import { type Mode, type Situation } from "../colony/index.ts";
+import type { Mode, Situation } from "../colony/index.ts";
 
 // The local rules in words, for the Learn drawer's Policy tab. Each mode and
 // stance rule is a row the drawer shows ("when …, then …") with the test it

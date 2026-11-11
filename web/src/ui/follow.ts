@@ -1,4 +1,4 @@
-import { type Colony } from "../colony/index.ts";
+import type { Colony } from "../colony/index.ts";
 
 // Which ant the camera follows. A slot alone is not an ant: when an ant dies
 // its slot is refilled by the next newborn, often within the same frame, so

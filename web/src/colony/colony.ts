@@ -38,7 +38,6 @@ const FOLLOW = 1;
 const RETURN = 2;
 const FIGHT = 3;
 
-
 /** A dead worker in the side view (nest slice 7): the cell it lies in, who carries it (−1 none), when it died, and the fungus in it. */
 export interface Corpse {
   x: number;
@@ -55,7 +54,6 @@ export interface Corpse {
 export function swapBroodStore(m: Mark): Mark {
   return m === "brood" ? "store" : m === "store" ? "brood" : m;
 }
-
 
 /**
  * The local rule. (An enemy close by is the contact response's to answer, behaviour MR 4: before it, this rule sent
@@ -101,7 +99,6 @@ export interface Queen {
   /** her scent not yet passed on (ja-lo8.9, royal.ts): it builds while no ant touches her, up to SCENT_HELD seconds' worth */
   held: number;
 }
-
 
 /**
  * Backfill tuning (frozen; tests and sweeps change it only through ColonyParams.backfill, per colony). A pellet carrier may fill only
@@ -2338,7 +2335,7 @@ export class Colony {
       dir = widen;
       this.digAim[i] = DIR_ANGLE[widen];
       this.#aimChamber(i, stepX(cx, cy, widen), stepY(cy, widen), here + 1);
-    } else if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && (crowded || this.#rng() < ROOMY_DIG) && this.#mayDig(cx, cy) && this.#digs(i) && startable(map, wx, wy, wallDir) && !refilled(map, wx, wy, this.time)) {
+    } else if (!fresh && rockAt(map, wx, wy) === SOIL && this.#rng() < START_HUG && (crowded || this.#rng() < ROOMY_DIG) && this.#mayDig(cx, cy) && this.#digs(i) && startable(map, wx, wy, wallDir) && !refilled(map, wx, wy, this.time, this.params.backfill.hold)) {
       dir = wallDir;
       this.digAim[i] = DIR_ANGLE[wallDir];
     } else {
@@ -5580,7 +5577,7 @@ export class Colony {
       // but not soil put back moments ago (see refilled: #17's hold on refilled cells).
       if (face !== NO_FACE && this.#chamberCell[i] !== NO_KEY && mode === EXPLORE && !carrying && !pellet) {
         cellOf(nx, ny);
-        if (this.#chamberCell[i] === cellKey(CELL[0], CELL[1]) && rockAt(map, CELL[0], CELL[1]) === SOIL && this.#digs(i) && this.crowded() && !refilled(map, CELL[0], CELL[1], this.time)) face = DIG_FACE;
+        if (this.#chamberCell[i] === cellKey(CELL[0], CELL[1]) && rockAt(map, CELL[0], CELL[1]) === SOIL && this.#digs(i) && this.crowded() && !refilled(map, CELL[0], CELL[1], this.time, this.params.backfill.hold)) face = DIG_FACE;
       }
       if (face === DIG_FACE && map.sky) {
         cellOf(nx, ny);
@@ -6499,7 +6496,6 @@ export function moundRadius(pellets: number, nestR: number): number {
   return Math.sqrt(nestR * nestR + (Math.max(0, pellets) * SWELL * R) / Math.PI);
 }
 
-
 /** The side view: about how high (rows) the spoil disc stands as it spreads: a steep cone halved the food brought home, six rows cost a third. */
 const MOUND_HEIGHT = 3;
 /** The side view: the farthest (columns) a pellet is carried from the hole; past it the disc grows higher, not wider. */
@@ -6608,12 +6604,12 @@ export function soilFace(map: WorldMap, x: number, y: number, px: number, py: nu
  * again for a good while. Without this, 38–46 % of all digs re-dug filled cells (MR 12's review). Soil put back under
  * a chamber cell (builtFloor) is left for good.
  */
-export function refilled(map: WorldMap, x: number, y: number, now = Infinity, hold: number = BACKFILL.hold): boolean {
+export function refilled(map: WorldMap, x: number, y: number, now: number, hold: number): boolean {
   return now - map.filledAt.get(x, y) < hold || builtFloor(map, x, y);
 }
 
 /** Whether any neighbour of cell (x, y) was filled back less than BACKFILL.hold seconds before `now` (a branch being filled from its tip; floor built back for good doesn't count). */
-export function besideRefill(map: WorldMap, x: number, y: number, now = Infinity, hold: number = BACKFILL.hold): boolean {
+export function besideRefill(map: WorldMap, x: number, y: number, now: number, hold: number): boolean {
   for (let d = 0; d < 6; d++) if (now - map.filledAt.get(stepX(x, y, d), stepY(y, d)) < hold) return true;
   return false;
 }
