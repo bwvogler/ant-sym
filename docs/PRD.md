@@ -4431,6 +4431,19 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 
 **Cost (estimated).** None in Jev: steering only, with no situation, legend or question changed. The per-ant work is small; the tick is checked with `colony-bench --one` against ja-lp4.6.7's figure.
 
+**S1's baseline (main at `f188c23`, U3b's spiral; seeds 1–10, ja-lp4.11.1).** `npm run exp -- --one s1 --seeds 1-10` (`experiment.ts` `search1`): on each seed's default plane (512 × 368), 20 of the player's carriers per trip length set down at their vector's end (odoSurf = T, each drift part drawn as the game draws it, σ = 0.1/√2 per axis; a draw ending in rock or within 2 of an edge drawn again), every other ant young and no scouts, 600 s. Shares pooled over the 200 carriers per trip (worst seed in brackets); the median is the median of the seeds' medians (carriers home only); centre is the mean distance of each carrier's mean position from its origin, spread its mean distance from it (cells, carriers with ≥ 10 s on the plane):
+
+| trip (cells) | home in 120 s | home in 600 s | median (s) | centre | spread | down another hole |
+|---|---|---|---|---|---|---|
+| 100 | 99.5 % (95) | 100 % (100) | 1.4 | 7.3 | 13.7 | 0 |
+| 200 | 95.5 % (75) | 99.0 % (95) | 17.1 | 6.0 | 14.2 | 0 |
+| 400 | 82.5 % (55) | 98.5 % (85) | 43.7 | 10.8 | 22.1 | 1 |
+| 600 | 63.5 % (40) | 94.5 % (85) | 88.5 | 15.3 | 31.8 | 2 |
+
+- The target (≥ 99 % in 600 s at every trip) fails at 400 and 600 cells, on 6 of 10 seeds; G1's median trips are 364–417 cells.
+- Lone carriers here do better than the offline model's spiral (74 % in 120 s at 400 cells). S1 has no crowd, no rival ants out and no trails but the searchers' own, so G1 remains the test of the game.
+- The search drifts off its origin as it grows: centre 11–15 cells at 400–600-cell trips, half its spread.
+
 **Beads.** `ja-lp4.11` (epic), with children in build order: the S1 assay; centred loops; the mound's smell; tuning, G1 and docs. `ja-lp4.6.3` waits on the epic.
 
 **Still open.**
