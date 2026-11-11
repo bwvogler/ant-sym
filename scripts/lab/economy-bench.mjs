@@ -18,7 +18,7 @@
 // (ja-xu6: the economy test's worlds fail more often at n = 1). REGROW=<seconds> (env) turns on the game's food
 // regrowth (GameParams.regrow; the page uses game.GAME_REGROW); food that grows back is added to the map's total.
 //
-// Usage: node scripts/economy-bench.mjs [seeds=1-2] [seconds=3600] [ants per colony=600] [colonies=2] [every=600] [root=this repo] [small=0] [food=1]
+// Usage: node scripts/lab/economy-bench.mjs [seeds=1-2] [seconds=3600] [ants per colony=600] [colonies=2] [every=600] [root=this repo] [small=0] [food=1]
 //   seeds: a list and/or ranges (1-6, or 1,3,5). root: another checkout to measure (its web/src/colony is imported), so
 //   the same harness measures before and after a change. small=1: the tests' small map (256 × 160, ground 40 rows down);
 //   or a size and ground row as W×H×ROW (e.g. 192x128x32). food: every cell's food × this (the economy test's small map
@@ -35,7 +35,7 @@ const seconds = Number(args[1] ?? 3600);
 const ants = Number(args[2] ?? 600);
 const colonies = Number(args[3] ?? 2);
 const every = Number(args[4] ?? 600);
-const root = resolve(args[5] ?? resolve(dirname(fileURLToPath(import.meta.url)), ".."));
+const root = resolve(args[5] ?? resolve(dirname(fileURLToPath(import.meta.url)), "../.."));
 const sizeArg = args[6] ?? "0";
 const foodScale = Number(args[7] ?? 1);
 const small = sizeArg === "1" ? { size: { w: 256, h: 160 }, nestGap: 120, surface: 40 } : sizeArg.includes("x") ? (([w, h, surface]) => ({ size: { w, h }, nestGap: Math.round(w / 2), surface }))(sizeArg.split("x").map(Number)) : null;

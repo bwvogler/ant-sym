@@ -10,7 +10,7 @@
     "test:unit": "npm --prefix web run test:unit",
     "test:watch": "npm --prefix web run test:watch",
     "test:slow": "npm --prefix web run test:slow",
-    "lint": "npm --prefix web run lint",
+    "lint": "npm --prefix web run lint && web/node_modules/.bin/oxlint -c web/.oxlintrc.json --ignore-pattern 'scripts/lab/**' scripts",
     "typecheck": "npm --prefix web run typecheck",
     "colony-bench": "node scripts/colony-bench.mjs",
     "colony-cost": "node scripts/colony-cost.mjs",

@@ -22,7 +22,7 @@ Realism is the floor, not the point. A mechanic earns its place when it makes th
 4. **Progression.** Does it keep a weak start and a slope, not a cliff (§50.12)? Is any part of it free power that skips the progression (§50.15: the brush was removed for exactly this)?
 5. **Pace.** Over how long does it show: seconds, minutes, a sitting, several sittings (saves)? Are queen births or other rare events made rarer or commoner?
 6. **Cost.** Jev tokens per hour of play, and whether a cached game still spends nothing (§50.11: one daily budget; ask only what isn't cached). A mechanic that makes every game re-ask is a play cost too.
-7. **Measure.** Which number would show it helped play: the progression curve (`scripts/progression.mjs`), unity, games won and lost over seeds, time to first host or the queen?
+7. **Measure.** Which number would show it helped play: the progression curve (`scripts/lab/progression.mjs`), unity, games won and lost over seeds, time to first host or the queen?
 
 ## Risks to play
 

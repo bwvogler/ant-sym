@@ -20,11 +20,11 @@
 // seed from its two holes: every founding joins that region, so it is the same from any later line. --any-open: any
 // open cell (openCell(plane)), the rule before D1. Default seeds 1–20.
 //
-// Usage: node scripts/flight-failure.mjs [--rock [--any-open]] [seeds=300 (20 with --rock)] [width=512] [height=368]
-import { CELL, cellOf, centreX, centreY } from "../web/src/colony/hex.ts";
-import { grow, makeTransect, nearestValid } from "../web/src/colony/transect.ts";
-import { mainGround } from "../web/src/colony/oneWorld.ts";
-import { generateWorld, mulberry32, OPEN_WORLD, openCell } from "../web/src/colony/world.ts";
+// Usage: node scripts/lab/flight-failure.mjs [--rock [--any-open]] [seeds=300 (20 with --rock)] [width=512] [height=368]
+import { CELL, cellOf, centreX, centreY } from "../../web/src/colony/hex.ts";
+import { grow, makeTransect, nearestValid } from "../../web/src/colony/transect.ts";
+import { mainGround } from "../../web/src/colony/oneWorld.ts";
+import { generateWorld, mulberry32, OPEN_WORLD, openCell } from "../../web/src/colony/world.ts";
 
 const rock = process.argv.includes("--rock");
 const anyOpen = process.argv.includes("--any-open");

@@ -5,7 +5,7 @@
 // order it has the mutations for, as soon as it has them. Reports when each chapter is reached (first host, a quarter of the colony, the
 // queen), each purchase, and the colony's infected share and resistance every minute. Seeds run in parallel.
 //
-// Usage: node scripts/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
+// Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy]
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
@@ -50,13 +50,13 @@ if (isMainThread) {
   const worst = (k) => (results.some((r) => r[k] < 0) ? "never (some seed)" : `${Math.max(...results.map((r) => r[k]))} s`);
   console.log(`worst seed: quarter ${worst("quarter")}, queen ${worst("queen")}`);
 } else {
-  const { Game, GAME_REGROW, gameRng } = await import("../web/src/colony/game.ts");
-  const { INFECTED, STRAINS, askedLevers } = await import("../web/src/colony/fungus.ts");
-  const { fungalKey } = await import("../web/src/colony/fungusBrain.ts");
-  const { STRAIN_DEFAULT } = await import("../web/src/colony/fungalPolicy.ts");
-  const { generateSideWorld } = await import("../web/src/colony/world.ts");
+  const { Game, GAME_REGROW, gameRng } = await import("../../web/src/colony/game.ts");
+  const { INFECTED, STRAINS, askedLevers } = await import("../../web/src/colony/fungus.ts");
+  const { fungalKey } = await import("../../web/src/colony/fungusBrain.ts");
+  const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
+  const { generateSideWorld } = await import("../../web/src/colony/world.ts");
   const { seed, seconds, aim, evolve, buy, order, strain } = workerData;
-  const answers = new Map(JSON.parse(readFileSync(new URL(`../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
+  const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
   const g = new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
   const menu = g.fungus.menu;
   g.fungus.policy = (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT;

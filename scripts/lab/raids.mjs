@@ -6,10 +6,10 @@
 //
 // With "erase" as a fifth argument, colony 0's midden mark is cleared every tick (the deterrent's own effect).
 //
-// Usage: node scripts/raids.mjs [seed=1] [ants=600] [seconds=450] [raidAt=300] [erase]
-import { Game } from "../web/src/colony/game.ts";
-import { CELL, cellOf } from "../web/src/colony/hex.ts";
-import { generateSideWorld, isSky, mulberry32 } from "../web/src/colony/world.ts";
+// Usage: node scripts/lab/raids.mjs [seed=1] [ants=600] [seconds=450] [raidAt=300] [erase]
+import { Game } from "../../web/src/colony/game.ts";
+import { CELL, cellOf } from "../../web/src/colony/hex.ts";
+import { generateSideWorld, isSky, mulberry32 } from "../../web/src/colony/world.ts";
 
 const [seed = 1, ants = 600, seconds = 450, raidAt = 300] = process.argv.slice(2, 6).map(Number);
 const erase = process.argv[6] === "erase";

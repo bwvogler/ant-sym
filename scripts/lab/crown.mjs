@@ -7,11 +7,11 @@
 // its own colony's chamber, the strain's default elsewhere. Reports when the queen died, brood crown killed, births,
 // Bloom's hosts in colony 1 over time, and both colonies' ants at the end.
 //
-// Usage: node scripts/crown.mjs [seed=1] [seconds=600] [ants=600] [strokes=6] [paintAt=60] [where=royal|hole]
-import { BRUSH as SPORES, Game } from "../web/src/colony/game.ts";
-import { INFECTED, STRAINS } from "../web/src/colony/fungus.ts";
-import { centreX, centreY } from "../web/src/colony/hex.ts";
-import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
+// Usage: node scripts/lab/crown.mjs [seed=1] [seconds=600] [ants=600] [strokes=6] [paintAt=60] [where=royal|hole]
+import { BRUSH as SPORES, Game } from "../../web/src/colony/game.ts";
+import { INFECTED, STRAINS } from "../../web/src/colony/fungus.ts";
+import { centreX, centreY } from "../../web/src/colony/hex.ts";
+import { generateSideWorld, mulberry32 } from "../../web/src/colony/world.ts";
 
 const [seed = 1, seconds = 600, ants = 600, strokes = 6, paintAt = 60] = process.argv.slice(2, 7).map(Number);
 const where = process.argv[7] ?? "royal";

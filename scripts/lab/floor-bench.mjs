@@ -8,14 +8,14 @@
 // Games: world (generateSideWorld seed) × game (mulberry32 seed). The default list is the nine the merge agent measured
 // (world 2 games 4–8; worlds 1, 3, 4 game 4; world 3 game 5).
 //
-// Usage: node scripts/floor-bench.mjs [games=2:4,2:5,2:6,2:7,2:8,1:4,3:4,4:4,3:5] [seconds=240] [root=this repo] [backfill tuning, e.g. young:0,hold:0]
+// Usage: node scripts/lab/floor-bench.mjs [games=2:4,2:5,2:6,2:7,2:8,1:4,3:4,4:4,3:5] [seconds=240] [root=this repo] [backfill tuning, e.g. young:0,hold:0]
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const args = process.argv.slice(2);
 const games = (args[0] ?? "2:4,2:5,2:6,2:7,2:8,1:4,3:4,4:4,3:5").split(",").map((s) => s.split(":").map(Number));
 const seconds = Number(args[1] ?? 240);
-const root = resolve(args[2] ?? resolve(dirname(fileURLToPath(import.meta.url)), ".."));
+const root = resolve(args[2] ?? resolve(dirname(fileURLToPath(import.meta.url)), "../.."));
 const { Game } = await import(`${root}/web/src/colony/game.ts`);
 const C = await import(`${root}/web/src/colony/colony.ts`);
 const W = await import(`${root}/web/src/colony/world.ts`);

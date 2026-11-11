@@ -100,7 +100,7 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   // #14's backfill guards (young / hold / besideRefill, merged through #17) cut floor growth here. In the F2 fix-up (PRD
   // §41) it came back: with the homing fix-up F1 merged in, pellet carriers get out of the nest sooner, and diggers widen
   // more; soil put back under a chamber cell now stays. At 240 s, all ants middle-aged, worlds 1–4, nine games (world 2
-  // games 4–8, worlds 1, 3, 4 game 4, world 3 game 5; `node scripts/floor-bench.mjs`):
+  // games 4–8, worlds 1, 3, 4 game 4, world 3 game 5; `node scripts/lab/floor-bench.mjs`):
   //   nest 6 before #14 (71658ee)   floor ×2.4–3.4, mean 2.96; stacked 3–5, none under 3
   //   nest 9 with #14 (99eed4b)      floor ×1.1–2.4, mean 1.90; stacked 1–8, 3 of 9 under 3
   //   F2, merged with F1 and F3      floor ×2.06–2.94, mean 2.43; stacked 2–8, mean 4.9, 1 of 9 under 3 (world 2 game 4,

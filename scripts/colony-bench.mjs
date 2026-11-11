@@ -36,12 +36,12 @@ const SIZES = [
   { w: 512, h: 320 },
 ];
 
-const RUNS = one ? [[null, page ? "one world, two, as the page plays it" : "one world, two"]] : [...SIZES.flatMap((s) => [[s, "underground"], [s, "open"]]), [SIDE_WORLD.size, "side, one colony"], [SIDE_WORLD.size, "side, two"]];
+const RUNS = /** @type {[{ w: number; h: number } | null, string][]} */ (one ? [[null, page ? "one world, two, as the page plays it" : "one world, two"]] : [...SIZES.flatMap((s) => [[s, "underground"], [s, "open"]]), [SIDE_WORLD.size, "side, one colony"], [SIDE_WORLD.size, "side, two"]]);
 for (const [given, ground] of RUNS) {
   const t0 = performance.now();
   const map = ground.startsWith("one") ? generateOneWorld(seed) : ground.startsWith("side") ? generateSideWorld(seed, ground === "side, two" ? {} : { nestCount: 1 }) : generateWorld(seed, ground === "open" ? { ...OPEN_WORLD, size: given } : { size: given });
   const gen = performance.now() - t0;
-  const size = given ?? map.plane.size;
+  const size = given ?? /** @type {import("../web/src/colony/oneWorld.ts").OneWorld} */ (map).plane.size;
   const game = page ? new Game(map, { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed)) : new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 31 + 7));
   if (page)
     game.land(

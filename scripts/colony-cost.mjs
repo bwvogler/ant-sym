@@ -38,7 +38,7 @@ const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
 const world = one ? generateOneWorld(seed) : side ? generateSideWorld(seed) : generateWorld(seed);
-const extent = worldExtent(one ? world.plane : world);
+const extent = worldExtent("plane" in world ? world.plane : world);
 let doctrine = DOCTRINES[0].text;
 let tokens = 0;
 let requests = 0;

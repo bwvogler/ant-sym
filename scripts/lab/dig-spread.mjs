@@ -13,13 +13,13 @@
 // Garden on colony 0). The cells are the curtain's, the holes its nests' entrance columns, and "outward" is along the
 // curtain past the end holes (west of the westmost column, east of the eastmost): the margin past each end hole.
 //
-// Usage: node scripts/dig-spread.mjs [--one] [seeds=1-3] [seconds=600] [ants=600]
-import { CHUNK, CHUNK_BITS } from "../web/src/colony/chunks.ts";
-import { Game, GAME_REGROW, gameRng } from "../web/src/colony/game.ts";
-import { STRAINS } from "../web/src/colony/fungus.ts";
-import { CELL, cellOf } from "../web/src/colony/hex.ts";
-import { generateOneWorld } from "../web/src/colony/oneWorld.ts";
-import { generateSideWorld } from "../web/src/colony/world.ts";
+// Usage: node scripts/lab/dig-spread.mjs [--one] [seeds=1-3] [seconds=600] [ants=600]
+import { CHUNK, CHUNK_BITS } from "../../web/src/colony/chunks.ts";
+import { Game, GAME_REGROW, gameRng } from "../../web/src/colony/game.ts";
+import { STRAINS } from "../../web/src/colony/fungus.ts";
+import { CELL, cellOf } from "../../web/src/colony/hex.ts";
+import { generateOneWorld } from "../../web/src/colony/oneWorld.ts";
+import { generateSideWorld } from "../../web/src/colony/world.ts";
 
 const one = process.argv.includes("--one");
 const [range = "1-3", secs = "600", antArg = "600"] = process.argv.slice(2).filter((a) => a !== "--one");

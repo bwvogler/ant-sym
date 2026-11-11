@@ -139,7 +139,7 @@ An orphaned colony's workers lay male eggs. Males don't work and leave on the ne
 
 **The owner's answers** (2026-11-02):
 - **More than two colonies is coming soon.** Merging is worth building: with two colonies Garden alone unifies them (104–108 s, no deaths, PRD §37), so merging pays off once a colony can be absorbed while others play on. Nothing in the code may assume two colonies or a single rival; the nest fix-up (PRD §39) made raid targets, the midden and tunnel ownership work for any number.
-- **Crown stays,** and is reachable in real play: since PRD §39 it acts at any load, at a rate that grows with it, and the UI brush on a royal chamber orphans the colony in a game. *(2026-11-08: the app has no brush now, PRD §50.15; `scripts/crown.mjs` replays the same stroke.)*
+- **Crown stays,** and is reachable in real play: since PRD §39 it acts at any load, at a rate that grows with it, and the UI brush on a royal chamber orphans the colony in a game. *(2026-11-08: the app has no brush now, PRD §50.15; `scripts/lab/crown.mjs` replays the same stroke.)*
 
 **Open** (the owner's, not the implementer's):
 1. Should "merged" be a new ending (an `Outcome` ahead of `fallen`), given that `ja-1vg` plans "no won/lost"?
