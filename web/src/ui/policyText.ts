@@ -1,4 +1,4 @@
-import type { Mode, Situation, Stance, StanceSituation } from "../colony/colony.ts";
+import type { Mode, Situation } from "../colony/colony.ts";
 
 // The local rules in words, for the Learn drawer's Policy tab. Each mode and
 // stance rule is a row the drawer shows ("when …, then …") with the test it
@@ -31,14 +31,6 @@ export const LOCAL_MODE_OTHERWISE = "Otherwise (a faint food trail): keep doing 
 export function localModeOtherwise(s: Situation): Mode {
   return s.mode === "return" ? "follow" : s.mode;
 }
-
-/** localStance (colony.ts), row by row. */
-export const LOCAL_STANCE_RULES: RuleRow<StanceSituation, Stance>[] = [
-  { when: "enemies are near the nest and ants were lost lately", then: "defend", test: (s) => s.enemyNearNest && s.losses !== "none" },
-  { when: "no food has come in lately and the colony is not small", then: "raid", test: (s) => s.intake === "none" && s.ants !== "few" },
-  { when: "the larder is full and the colony is at its size", then: "raid", test: (s) => s.larder === "full" && s.ants === "many" },
-];
-export const LOCAL_STANCE_OTHERWISE: Stance = "forage";
 
 /** The rows applied in order: what the drawer's words say the rule does. */
 export function byRows<S, A extends string>(rows: readonly RuleRow<S, A>[], otherwise: (s: S) => A, s: S): A {

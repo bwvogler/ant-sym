@@ -235,7 +235,7 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         </section>
       ))}
       <p className="-mt-2 text-xs text-fg-3">
-        A colony's doctrine is its nature: not yours to rewrite while it lives. Both the ants' modes and the colony's stance are asked under it. {props.retune} Colonies with the same doctrine share every answer.
+        A colony's doctrine is its nature: not yours to rewrite while it lives. The ants' modes are asked under it. {props.retune} Colonies with the same doctrine share every answer.
       </p>
 
       <section className="flex flex-col gap-2" aria-label="fungus aim">
@@ -403,13 +403,9 @@ function ModeExplainer(props: Props) {
         ]}
         note={
           <>
-            On open ground stance is the ant's own, from what it senses (
+            Stance is the ant's own, from what it senses (
             <a className="underline" href={docUrl("stance")} target="_blank" rel="noreferrer">
               docs/stance.md
-            </a>
-            ). Underground it is the one field no ant senses: the colony broadcasts it (a vision gap,{" "}
-            <a className="underline" href={docUrl("vision", "where-the-code-is-today")} target="_blank" rel="noreferrer">
-              ja-k4k.6
             </a>
             ). An ant carrying something is not asked: it answers its load's responses instead.
           </>
