@@ -4493,3 +4493,29 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 **Beads.** `ja-lp4.11` (epic), with children in build order: the S1 assay; centred loops; the mound's smell; tuning, G1 and docs. `ja-lp4.6.3` waits on the epic.
 
 **To read when the network allows:** the full texts of Waldner & Merkle 2018, Merkle et al. 2006 and Sturgis et al. 2011.
+
+## 57. Foragers on the plane search less and go back to their last find (design, ja-lp4.15, ja-lp4.6.3, 2026-11-11)
+
+**Research basis:** [forager-trips.md](forager-trips.md). No full text could be fetched (network policy), so every figure is **unverified**.
+
+**The problem (measured).** G1 still fails after §56. The carriers it counts found food no farther away than anyone else (seed 10: 61–66 cells from their hole, against 38–67 for every pickup), but had searched 32–46 s for it (a normal pickup: 1–6 s), so they had walked 5–7 times their distance from home, and the game's home-vector error grows with every cell walked. Cutting `patience` for both colonies to 30 s met G1's bound on seeds 5 and 9 (worst colony 2 and 0, against 10 and 7) but cost births 8–25 % a colony and the rival's food on seed 9 a third.
+
+**Decisions.**
+- Owner (2026-11-11): both levers, one PR: a shorter search on the plane for G1, and site fidelity to win back the food it costs.
+- Owner (2026-11-11, PR #70): G1's bound stays at 2.
+- Design: one world's plane only, each behind a setting whose "off" is main bit for bit (`planePatience` 1, `siteFidelity` 0).
+
+**The mechanic.**
+- **A shorter search on the plane:** a forager tires at `patience × planePatience` (the fungus's `clock` still scales it).
+- **Site fidelity:** a forager that picks up food on the plane keeps its own vector to the spot (drift and all) and, on its next trip, walks it straight and searches round it. A trail it meets still takes over. It forgets on tiring there or on its next find. New saved state: the food vector per ant; save version bumped once.
+
+**Assays.** F1 (new): of foragers set down after a find 40–80 cells out, with fidelity on, at least 80 % reach the spot within 30 s, walking under 1.5 times the straight line. G1, seeds 1–10: at most 2 on seeds 5 and 9, food carried down and births within 5 % of §56's, summed. `exp --one all` against §56 (A1 stays 8/10).
+
+**Play.** Foragers fan out each to its own patch and come back to it; fewer wander far with food. The fungus's "time out" lever matters more on the plane, and a host's route becomes predictable. No new lever.
+
+**Cost.** None: steering and the ant's own body; no situation field, legend or question changes.
+
+**Beads.** `ja-lp4.15` (epic), children in build order: F1 and its baseline; the shorter search; site fidelity; tuning, G1 and docs. `ja-lp4.6.3` waits on it and on `ja-lp4.16` (route memory round rock).
+
+**Still open.** `planePatience`'s value (the build sweeps it with fidelity on). The error law (proportional to cells walked today, a random walk would be their square root) is the owner's call and not part of this. The full texts of Merkle & Wehner 2010, Wolf et al. 2012, Cheng et al. 2006 and Beverly et al. 2009.
+
