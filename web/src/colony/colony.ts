@@ -6458,7 +6458,7 @@ export function wallSide(leftBlocked: boolean, rightBlocked: boolean, rng: () =>
 }
 
 /** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
-const NO_CELL = -0x80000000;
+const NO_CELL = NO_KEY;
 
 /**
  * A cell as one number, y·65536 + x: the midden's and returns' keys, and an ant's remembered cells. A column may be
