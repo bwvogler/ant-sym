@@ -11,7 +11,7 @@ The game has two colonies of one generic mound ant (trail-laying recruiters) and
 - What exists is weak and non-spatial: an "invitation" display by a finder, and in *C. niger* a finder that makes nestmates leave the nest while the recruits carry no information about where the food is (Szlep 1973, cited in a review; Razin et al., year and journal unconfirmed). **Unverified.**
 - Contrary evidence: the related *Ocymyrmex robustior* does group-recruit (a leader takes about 2–7 recruits to patches too big for one ant, Sommer et al. 2013). So "desert ant" is not uniformly solitary, and "no recruitment" is a statement about *Cataglyphis*, not the climate. No tandem running or group recruitment was found for any *Cataglyphis* species, including *C. cursor* and *C. floricola* (searched for, not found).
 
-**In the game:** the species has **no food trail, no home trail, no raid trail**: its channel set is smaller than the generic ant's. The mode choice for an empty-jawed ant therefore cannot read `foodTrail` (always "none"). A finder's "invitation" is a design option (a contact cue that makes a resting nestmate leave, with no location), and uses the existing `leave` response over the encounter rate (sense table: encounter rate), not a new channel. **Design:** the invitation's size; the literature gives none.
+**In the game:** the species has **no food trail, no home trail, no raid trail**: its channel set is smaller than the generic ant's. The mode choice for an empty-jawed ant therefore cannot read `foodTrail` (always "none"). A finder's "invitation" is a design option (a contact cue that makes a resting nestmate leave, with no location), and uses the existing `leave` response over the encounter rate (sense table: encounter rate), not a new channel. **Design:** the invitation's size; the literature gives none. Built, because the fungus's contact lever on this host needs it (owner, 2026-11-11).
 
 ## 2. They navigate by path integration, a sky compass and remembered views
 
@@ -102,9 +102,9 @@ Decided on 2026-11-11 (the owner said to decide what can be decided well; PRD §
 2. **Heat:** its own bead after the first build (`ja-rf5.5`).
 3. **Food odour:** a radial gradient from each food item before any wind field.
 
-For the owner:
-4. **The fungus's levers on this host** (`ja-rf5.7`). The trail and alarm levers do nothing here, so the choice is what reaches it: heat felt by the host, a host's odour, or contact at an invitation. All design.
-5. **Full-text reading** (`ja-rf5.1`). Allow the journal hosts in the environment's network settings (nature.com, link.springer.com, cob.silverchair.com, pmc.ncbi.nlm.nih.gov, doc.rero.ch) or supply the papers. First to read: Wehner, Marsh & Wehner 1992; Schmid-Hempel & Schmid-Hempel 1984; Dillier & Wehner 2004; Buehlmann et al. 2012 and 2014.
+Decided by the owner on 2026-11-11:
+4. **The fungus's levers on this host** (`ja-rf5.7`): host odour first, and contact at an invitation. Not heat felt by the host (it stays an option for later). The invitation (`ja-rf5.6`) is therefore no longer optional: the contact lever needs it.
+5. **Full-text reading** (`ja-rf5.1`): the owner allows the journal hosts (nature.com, link.springer.com, cob.silverchair.com, pmc.ncbi.nlm.nih.gov, doc.rero.ch) in the environment's network settings. First to read: Wehner, Marsh & Wehner 1992; Schmid-Hempel & Schmid-Hempel 1984; Dillier & Wehner 2004; Buehlmann et al. 2012 and 2014.
 
 ## Sources
 
