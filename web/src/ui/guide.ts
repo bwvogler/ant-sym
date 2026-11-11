@@ -286,6 +286,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "entrances", title: "Entrances", covers: "How many entrances colonies keep, sealing them at night, and what a digger senses near the surface." },
   { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views, above and below. The views are linked, and a one-world game opens above." },
   { note: "nest-search", title: "Nest search", covers: "How a lost carrier searches when its vector runs out at no hole: a spiral out from that spot and, on its own mound, its colony's smell leading it to the hole. Centred loops back through the spot are built but off." },
+  { note: "forager-trips", title: "Forager trips", covers: "What keeps a forager's way home short on one world's plane: a shorter search, and going back to where it last found food." },
   { note: "nest-spacing", title: "Nest spacing", covers: "How far apart colonies sit, where young colonies survive, and how far a founding queen flies." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../colony.ts";
-import { antsNear, Arena, at, cellRect, crossingProbe, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, runAssay, runGame, S1_PER_TRIP, S1_TRIPS, search1, specMap, type RunResult, type RunSpec } from "../experiment.ts";
+import { antsNear, Arena, at, cellRect, crossingProbe, F1_ANTS, F1_FAR, F1_NEAR, forage1, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, runAssay, runGame, S1_PER_TRIP, S1_TRIPS, search1, specMap, type RunResult, type RunSpec } from "../experiment.ts";
 import { STRAINS } from "../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
@@ -110,6 +110,28 @@ test("S1 sets its carriers down on the plane at their vector's end, the miss gro
   assert.ok((r.metrics["t100.home600"] as number) > 0.5, `t100 home in 20 s: ${r.metrics["t100.home600"]}`);
   for (const T of S1_TRIPS) for (const k of ["home120", "home600"]) assert.ok((r.metrics[`t${T}.${k}`] as number) >= 0 && (r.metrics[`t${T}.${k}`] as number) <= 1);
   assert.equal(r.metrics.pass, 0, "not all home in 20 s");
+});
+
+test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cells out on open ground, and scores their reach", () => {
+  const { game } = runGame({ ...forage1.spec(2), seconds: 1 / 30 });
+  const c = game.player;
+  const hc = c.holeCells[c.params.nest] as HoleCell;
+  const hx = centreX(hc.px, hc.py);
+  const hy = centreY(hc.py);
+  for (let i = 0; i < F1_ANTS; i++) {
+    assert.equal(c.layer[i], PLANE);
+    assert.equal(c.carrying[i], 0);
+    assert.equal(c.mode[i], MODES.indexOf("explore"));
+    assert.ok(Math.hypot((c.x[i] as number) - hx, (c.y[i] as number) - hy) < 5, `ant ${i} set down by its hole`);
+  }
+  // Two seconds: at 7 cells a second nobody is within sight of a spot 40 cells out. Over the full 30 s the shares are shares,
+  // and the straight way to a spot's sight is at least F1_NEAR less the sight.
+  const r = runAssay(forage1, 2, {}, 2);
+  assert.equal(r.metrics.reach, 0, "no forager is at a spot 40 cells away in 2 s");
+  const full = runAssay(forage1, 2, {});
+  assert.ok((full.metrics.reach as number) >= 0 && (full.metrics.reach as number) <= 1);
+  assert.ok((full.metrics.walked as number) >= F1_NEAR - 8 || Number.isNaN(full.metrics.walked), `walked ${full.metrics.walked}, at least the straight way to sight`);
+  assert.ok(F1_NEAR < F1_FAR);
 });
 
 /** Ant i of c put on `layer` at world (x, y): a probe reads only these fields. */

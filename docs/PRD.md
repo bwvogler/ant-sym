@@ -4515,6 +4515,10 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 
 **Cost.** None: steering and the ant's own body; no situation field, legend or question changes.
 
+**As built (2026-11-11, `ja-lp4.15.1`–`.4`).**
+- **F1** (`experiment.ts` `forage1`, `npm run exp -- --one f1`): on each seed's default plane, 40 of the player's old foragers are set down 3 cells out of their hole, exploring and empty-jawed on a fresh trip (a drift as the game draws it, a random heading). Each has its own spot 40-80 cells from the hole, on open ground joined to the hole, outside every hole's sight, and the world's food does not regrow. With `siteFidelity` on, each remembers the spot as its find would have left it (a straight walk out with a drift of its own); off, it knows nothing of it. 30 s. `reach` is the share within `HOLE_SIGHT` of its spot; `ratio` the path walked to get there over the straight line from where it was set down to the spot's sight (median per seed, then the mean over seeds). Target: reach at least 80 % with ratio under 1.5 (design marks).
+- **F1 baseline on `main`** (no fidelity, seeds 1-10, 400 foragers): **6.0 % reach their spot in 30 s** (per seed 0-13 %), median 13.3 s, ratio 1.84 (of the few that get there by chance), 93 cells walked. Pass 0/10.
+
 **Beads.** `ja-lp4.15` (epic), children in build order: F1 and its baseline; the shorter search; site fidelity; tuning, G1 and docs. `ja-lp4.6.3` waits on it and on `ja-lp4.16` (route memory round rock).
 
 **Still open.** `planePatience`'s value (the build sweeps it with fidelity on). The error law (proportional to cells walked today, a random walk would be their square root) is the owner's call and not part of this. The full texts of Merkle & Wehner 2010, Wolf et al. 2012, Cheng et al. 2006 and Beverly et al. 2009.
