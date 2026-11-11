@@ -4647,3 +4647,28 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 **Beads.** `ja-lp4.16` (epic, blocks `ja-lp4.6.3`), children in build order: `.1` read the full texts (research, does not block); `.2` assay R1 and its baseline (no behaviour change); `.3` route memory behind `routeMemory`; `.4` tune, turn on, G1 and the one-world assays; `.5` docs as built.
 
 **Still open.** The owner's calls above; R1's baseline; the tick; whether the bound of 2 is reachable on seeds 5 and 9 with this alone, or needs `ja-lp4.15`'s shorter search; the full texts to read when the network allows.
+
+## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
+
+**Research basis:** [desert-ant.md](desert-ant.md), all from abstracts (**unverified**; the network blocked full text):
+- *Cataglyphis* foragers work alone, with no trail pheromone and no recruitment to a place; they navigate by path integration, a sky compass and remembered views, and find food by smell (dead-arthropod odour, followed in crosswind runs).
+- Activity sits in a thermal window between predation and heat stress (*C. bombycina*, Wehner, Marsh & Wehner 1992); forager careers are short (*C. bicolor*, about 6 days, Schmid-Hempel & Schmid-Hempel 1984).
+- Colonies are small and mostly monogynous; between-colony aggression is at maximum (*C. iberica*, *C. niger*). No natural *Metarhizium* or *Beauveria* infection and no corpse removal were found.
+
+**The problem.** The game has one ant, built into `Situation`, `CHANNELS` and the two lanes. A species with fewer channels, its own situation fields and no stance lane cannot be added without touching about eight files ([refactor.md](refactor.md) S4). This species is the first real consumer of the descriptor in `ja-fnd.5.3`.
+
+**Decisions.**
+- Desert ant first (owner, 2026-11-11, chosen from four candidates: desert ant, Pharaoh ant, army ant, leafcutter).
+- Proposed, needs the owner: build the descriptor first (`ja-fnd.5.1`–`.5.3`), then the species on it; heat in as its own bead after the first build; a radial food-odour gradient before any wind field; the fungus's levers for this host left to the owner.
+
+**The mechanic.** Food odour as a steering cue; own body heat as a sense and a return rule; the species' own lane and legend; no trail channels, no stance lane, no corpse removal. "Off": no species, so main bit for bit. Table in [desert-ant.md](desert-ant.md#the-mechanic).
+
+**Play.** Lone runners that never form lines, bursts in the cool window, and a fungus whose trail levers do nothing here. Risks: a cliff when the whole colony leaves at once, a free heat lever, a heat model that does not show on the field.
+
+**Assays and targets.** No trail forms; trips are bursts inside the heat budget; a forager on a plume finds a patch faster than a blind search. Targets are set after the full texts are read (`ja-rf5.1`).
+
+**Cost (estimated).** The species' mode lane has fewer states than the generic ant's (no trails; a heat field with two or three values), so fewer questions; no stance lane. Measure with `npm run colony-cost` once its legend exists.
+
+**Beads.** `ja-rf5` (epic): `.1` read the full texts; `.2` assays (no behaviour change); `.3` the species on the descriptor (needs `ja-fnd.5.3`); `.4` food odour; `.5` heat; `.6` invitation; `.7` the fungus's levers (owner); `.8` Learn entry.
+
+**Still open.** The owner's calls above; the full texts; every number in the note.
