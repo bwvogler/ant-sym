@@ -99,10 +99,11 @@ export function record(slot: number, settings: GameSettings, player: PlayerState
 /** "12 min of sim, 3 h ago" style, for a slot's line. */
 /**
  * Whether this game can read the record: one saved by an older (or newer) version is listed but never loaded, since
- * Game.load refuses it (PR #42 review, B3).
+ * Game.load refuses it (PR #42 review, B3); nor is one from a single map (the side view or the open surface), since the
+ * page plays one world only (PRD §55).
  */
 export function readable(r: SaveRecord): boolean {
-  return r.game?.version === SAVE_VERSION;
+  return r.game?.version === SAVE_VERSION && r.game.world != null;
 }
 
 /** The newest save this game can read, or null: what Continue offers. */

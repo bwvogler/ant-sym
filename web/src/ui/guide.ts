@@ -56,7 +56,7 @@ export const GUIDE: GuideEntry[] = [
     onScreen: "The orange wash (Trails: “to home”). Ants walking out lay it, so it leads carriers back.",
     realAnts:
       "Outside, home is a small hole. A forager keeps a running home vector from its steps and a sky compass, with an error of roughly 10 % of the distance walked; landmarks and an odour at the entrance correct it near home, and the vector resets only inside the nest.",
-    inGame: "Ants walking out lay the home trail; on the top-down maps a carrier follows the food trail where it agrees with its home vector, and the vector otherwise.",
+    inGame: "Ants walking out lay the home trail; on the surface a carrier follows the food trail where it agrees with its home vector, and the vector otherwise.",
     sources: [
       { note: "nest-and-home", anchor: "outside-home-is-the-hole", label: "Outside: home is the hole" },
       { note: "trails", anchor: "which-journeys-lay-trail", label: "Which journeys lay trail" },
@@ -96,7 +96,7 @@ export const GUIDE: GuideEntry[] = [
     onScreen: "Brown haze where ants fight.",
     realAnts: "Alarm is volatile: it reaches a few centimetres and fades fast, so it calls the nearby ants, not the colony. Its meaning depends on strength: faint attracts, strong triggers attack or digging.",
     inGame:
-      "It fades in about 3 s and reaches about 5 cells, and its meaning is graded: a strong alarm repels every ant but fighters and diggers, and on the top-down maps a faint one draws an explorer with empty jaws to look (in the side view the drawn explorers crowded the tunnels, so it doesn't there). Ants in a fight lay it, and so does an ant that meets a stranger. A colony that defends sends fighters to it.",
+      "It fades in about 3 s and reaches about 5 cells, and its meaning is graded: a strong alarm repels every ant but fighters and diggers, and on the surface a faint one draws an explorer with empty jaws to look (underground the drawn explorers crowded the tunnels, so it doesn't there). Ants in a fight lay it, and so does an ant that meets a stranger. A colony that defends sends fighters to it.",
     sources: [
       { note: "ant-communication", anchor: "tldr", label: "Ant communication: TL;DR" },
       { note: "combat", anchor: "graded-alarm-a-little-draws-a-lot-repels-or-enrages", label: "Graded alarm" },
@@ -111,8 +111,8 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. At food, the ant that didn't start an encounter usually retreats. Fire-ant battles follow a roughly linear law, not Lanchester's square law; narrow, cluttered ground lets a few strong defenders hold off many attackers, open ground favours numbers.",
     inGame:
-      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, or drop its load and run. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the top-down map an ant defends only while it senses a threat near its own nest; far out it forages. Fights are settled by the odds in the cells around, so in a narrow pass only the front ranks meet.",
-    scripted: { bead: "ja-k4k.6", reads: "on the side view the colony's stance (forage, defend, raid) comes from colony totals and is broadcast to every ant, and raids aim at the rival's hole by its coordinates (top-down, each ant's stance is its own and a scout's trail leads the raiders)" },
+      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, or drop its load and run. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the surface an ant defends only while it senses a threat near its own nest; far out it forages. Fights are settled by the odds in the cells around, so in a narrow pass only the front ranks meet.",
+    scripted: { bead: "ja-k4k.6", reads: "on the side view (a lab map; the page plays one world, where each ant's stance is its own and a scout's trail leads the raiders) the colony's stance (forage, defend, raid) comes from colony totals and is broadcast to every ant, and raids aim at the rival's hole by its coordinates" },
     sources: [
       { note: "ant-communication", anchor: "3-rival-colonies", label: "Rival colonies" },
       { note: "combat", anchor: "meeting-a-stranger-fight-flee-or-drop-and-run", label: "Meeting a stranger" },
@@ -135,7 +135,7 @@ export const GUIDE: GuideEntry[] = [
     id: "chambers",
     title: "Chambers",
     swatch: (["royal", "brood", "store", "reception"] as const).map((r) => css(ROLE_RGB[r]!)),
-    onScreen: "Side view: tinted rooms off the shafts. Violet is the queen's, rose brood, gold store, teal reception (where food comes in). Turn on Labels on the field to name them.",
+    onScreen: "Below: tinted rooms off the shafts. Violet is the queen's, rose brood, gold store, teal reception (where food comes in). Turn on Labels on the field to name them.",
     realAnts:
       "A nest is shafts with chambers off them (Tschinkel's “shish-kebab”). Chambers are about 1 cm high whatever their area, largest near the top, with gaps that grow with depth; there is about 2 cm² of floor per worker. Brood, not CO₂, decides where ants dig.",
     inGame: "Ants dig chambers two rows high off the shafts. A new chamber's role comes from its depth against the queen's: reception above it, store below, brood otherwise.",
@@ -155,7 +155,7 @@ export const GUIDE: GuideEntry[] = [
     id: "queen",
     title: "The queen",
     swatch: ["var(--ink)"],
-    onScreen: "Side view: the large oval in the royal chamber. Hollow and crossed out when dead.",
+    onScreen: "Below: the large oval in the royal chamber. Hollow and crossed out when dead.",
     realAnts:
       "Her pheromone draws workers to tend and rescue her; it says where she is, not where home is. In a single-queen species, losing her means no more workers are ever made: the colony is doomed, but not ended at once.",
     inGame: "She lays eggs while the colony has food. A colony that loses her is orphaned: no more eggs, and its workers age out.",
