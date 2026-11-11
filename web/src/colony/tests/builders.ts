@@ -97,9 +97,14 @@ export const planeHole = (h: HoleCell) => ({ x: centreX(h.px, h.py), y: centreY(
  * one place the tests reach private fields by name: a renamed `#field` is fixed here.
  */
 export const editPrivate = (c: Colony, keys: readonly string[], edit: (r: Record<string, unknown>) => void): void => {
-  const saved = c.saveState().private as Record<string, unknown>;
+  const saved = c.saveState();
+  const priv = saved.private as Record<string, unknown>;
+  const pub = saved.fields as Record<string, unknown>;
+  // A key is a #field (in `private`) or one of ants.ts's arrays (a property of the colony, in `fields`).
+  const home = (k: string) => (k in priv ? priv : pub);
   const r: Record<string, unknown> = {};
-  for (const k of keys) r[k] = decode(saved[k]);
+  for (const k of keys) r[k] = decode(home(k)[k]);
   edit(r);
-  c.loadState({ fields: {}, private: Object.fromEntries(keys.map((k) => [k, encode(r[k])])) });
+  const into = (src: Record<string, unknown>) => Object.fromEntries(keys.filter((k) => home(k) === src).map((k) => [k, encode(r[k])]));
+  c.loadState({ fields: into(pub), private: into(priv) });
 };

@@ -7,7 +7,6 @@ import { Colony, localPolicy, localStance } from "../../colony.ts";
 import { MODES, type Situation, type StanceSituation } from "../../vocab.ts";
 import { localResponses, responses } from "../../responses.ts";
 import { Game } from "../../game.ts";
-import { decode } from "../../save.ts";
 import { foodIn, generateWorld, mulberry32, OPEN_WORLD, reachable, worldFromArrays, type WorldMap } from "../../world.ts";
 
 /** A bare 40×12 field with two nests, no food. */
@@ -318,7 +317,7 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
     mulberry32(1),
   );
   c.stance = "raid";
-  const pastEnd = () => (decode((c.saveState().private as Record<string, unknown>).pastEnd) as Uint8Array)[0];
+  const pastEnd = () => c.pastEnd[0];
   const lay = () => {
     for (let y = 1; y <= 18; y++)
       for (let x = 1; x <= 20; x++) {

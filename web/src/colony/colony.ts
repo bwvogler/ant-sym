@@ -1,4 +1,5 @@
 import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
+import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
 import { type Channel, type ChannelParams, DEFAULT_CHANNELS, type Mark, MARKS, Pheromones } from "./pheromone.ts";
 import { Brood, EGG, foodOf, GYNE, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
@@ -617,6 +618,11 @@ const COLONY_SKIP: ReadonlySet<string> = new Set([
   "perceived",
 ]);
 
+/** The per-ant arrays of ants.ts are the colony's own properties. */
+// The arrays are allocated in the constructor (makeAntArrays), which the compiler cannot see: that is the point of the merge.
+// eslint-disable-next-line typescript/no-unsafe-declaration-merging
+export interface Colony extends AntArrays {}
+
 export class Colony {
   /** the map, the colony's scent and its nest on the layer being stepped; between ticks, the home layer's */
   map: WorldMap;
@@ -694,19 +700,6 @@ export class Colony {
   digT: Float32Array;
   /** the heading the cell it is digging should carry on the tunnel at (NaN: none chosen; the face's own direction) */
   digAim: Float32Array;
-  /** the cell each ant is in, and the position that was worked out for (a cache: cellOf costs more than a floor, and many steps ask) */
-  #cellX: Int32Array;
-  #cellY: Int32Array;
-  #cellAtX: Float32Array;
-  #cellAtY: Float32Array;
-  /** a cell where this free-walking ant last found no tunnel (cellKey; NO_KEY none): it needn't look again until it moves on */
-  #noTunnel: Int32Array;
-  /** 1 while a pellet carrier is walking a stale branch to fill its end (see BACKFILL.enterStale) */
-  #staleWalk: Uint8Array;
-  /** the cell (cellKey) where this pellet carrier last looked for space to fill, this trip: once a cell is enough */
-  #looked: Int32Array;
-  /** the side view: what each homing ant is heading for (0 the chamber, 1 the entrance); a change drops the wall it was following */
-  #goalKind: Uint8Array;
   // Path integration in the side view (nest slice 1, docs/nest-and-home.md §3.1). An ant knows where home is only
   // by counting its own steps, and the count drifts: about 10 % of the distance walked (Wehner). Its depth does not
   // drift: gravity tells it how far it has climbed. So it believes its goal lies drift × distance off to one side.
@@ -747,32 +740,15 @@ export class Colony {
   /** 0 = recording (or none), 1 = retracing (routeGoal is the place it steers for), 2 = has retraced this trip */
   routeState: Uint8Array;
   routeGoal: Int16Array;
-  /** 1 while the ant is underground (the last tick), so coming up out of the hole is seen */
-  #under: Uint8Array;
-  /** the side view: a homing ant following the ground's surface round spoil to the hole: the nearness (#holeMetric) it must beat to let go; NaN = not following */
-  #groundMin: Float64Array;
-  /** cells walked on that surface (at each flipDue, the other hand) */
-  #groundT: Uint16Array;
   /** the side view: steps to this colony's hole through its tunnels, per cell (see #outField), the cells it reached, and the ground's version and time it was built at */
   #outDist: Int32Array | null = null;
   #outCells: number[] = [];
   #outVersion = -1;
   #outAt = -Infinity;
-  /** the hole x (#holeX) groundMin was measured against */
-  #groundRef: Float64Array;
-  // Chambers (nest slice 2): the side view's nest is dug, not given.
-  /** the face this ant is digging for a chamber (cellKey; NO_KEY none), and for which: chamber id + 1, or 0 for a new one */
-  #chamberCell: Int32Array;
-  #chamberFor: Int16Array;
   /** ants underground last tick (the side view): with the chambers' floor, how crowded the nest is */
   inNest = 0;
   /** ants out on the ground last tick (the side view) */
   outside = 0;
-  // Floor marks (nest slice 3): the role of the last chamber each ant was in (MARKS index + 1; 0 none), and seconds since.
-  #lastRole: Uint8Array;
-  #sinceRole: Float32Array;
-  /** seconds an ant has rested at home in "return" (see REST) */
-  #restT: Float32Array;
   // The queen and brood (nest slice 4; the side view only: elsewhere the larder still becomes ants directly).
   /** the colony's queen, in its royal chamber (null on the top-down maps); a colony whose queen is dead is orphaned */
   queen: Queen | null = null;
@@ -782,13 +758,6 @@ export class Colony {
   /** each ant's age and lifespan, seconds (the side view: workers die of age, so an orphaned colony dwindles) */
   age: Float32Array;
   lifespan: Float32Array;
-  /** 1 while an ant carries brood (a nurse), and the chamber it is taking it to */
-  #holdsBrood: Uint8Array;
-  #broodTo: Int16Array;
-  /** seconds a nurse has held its brood, or a porter its food */
-  #holdT: Float32Array;
-  /** what ant i felt by touch last tick (hunger.ts): it passes on PASS of it */
-  #feltLast: Float32Array;
   /** workers that died of age */
   diedOld = 0;
   /** workers that died of hunger (ja-xu6.1) */
@@ -817,10 +786,6 @@ export class Colony {
   incipient = false;
   /** brood killed by the fungus's crown */
   broodKilled = 0;
-  // Food flow (nest slice 5; with a queen): food lies in chambers; foragers bring it to reception, porters carry it on.
-  /** the chamber an ant carrying food is taking it to (−1: a forager, to reception or the royal chamber), and 1 if it is a porter's move inside the nest */
-  #portTo: Int16Array;
-  #porter: Uint8Array;
   /** porters' trips (food moved between chambers) */
   portTrips = 0;
   /** foragers that found food waiting at reception and carried theirs on to where it was wanted */
@@ -836,18 +801,12 @@ export class Colony {
   onBury: ((k: Corpse, layer?: number) => void) | null = null;
   /** Whether ant i carries a corpse (drawn as one, not as soil). */
   carriesCorpse(i: number): boolean {
-    return this.#corpse[i] === 1;
+    return this.corpse[i] === 1;
   }
   /** Whether ant i carries food between chambers (a porter), not home from outside (a forager). */
   porting(i: number): boolean {
-    return this.#porter[i] === 1;
+    return this.porter[i] === 1;
   }
-  /** 1 while an ant carries a corpse (moved like a soil pellet: up and out, along the ground) */
-  #corpse: Uint8Array;
-  /** 1 while an ant carried a load at its last step (what ends its trip when the load is put down: `arrive`) */
-  #loaded: Uint8Array;
-  /** the cell (cellKey) where ant i last put a load down, while it still stands there; else NO_KEY */
-  #putAt: Int32Array;
   /** corpses carried to the midden (one world: buried at the hole, on the plane) */
   buried = 0;
   /** one world: ants that climbed out onto the plane, and went down into the curtain */
@@ -867,23 +826,6 @@ export class Colony {
   #holes: number[] = [];
   /** the side view: cells of soil brought out that found no room on the mound (the sky's top on both sides; never seen in play) */
   moundLost = 0;
-  /**
-   * The side view: a pellet carrier carrying its pellet out along the ground: it drops it once it is this many
-   * columns from the hole (NaN: not carrying one out), on side #spoilSide, having walked #spoilT seconds. One world's
-   * plane (U3c): this far from home by its own vector (a corpse: at least this far, and off the mound), walking out on
-   * heading #spoilA, drawn at the crossing (or, spreading spoil off the mound, away from where it believes home is).
-   */
-  #spoilTo: Float32Array;
-  #spoilSide: Int8Array;
-  #spoilT: Float32Array;
-  #spoilA: Float32Array;
-  /**
-   * What the pellet carried is (with `pellet`; one place for it, review of MR 15: five per-ant arrays each cleared by
-   * hand): DUG, soil it dug, to the hole and out, or into unused space on the way; LOOSE, loose soil off the mound (moved,
-   * not dug: not in soilDug), out along the ground; FILL, loose soil taken down into the nest to backfill. #clearPellet
-   * puts the pellet and all its state down at once.
-   */
-  #soil: Uint8Array;
   /** the side view: loose pellets picked up off the mound, dropped on it again, put into unused space underground, and lost with ants that died */
   loosePicked = 0;
   looseDropped = 0;
@@ -899,15 +841,9 @@ export class Colony {
   #goalY = 0;
   /** the side view: where the ant being stepped believes the hole is, across the ground (see #believe, #towardHole) */
   #holeX = 0;
-  /** the cell it looked from before that (packed; −1 none): the way it came, which is never a stale branch */
-  #cameFrom: Int32Array;
-  /** the cell (packed) this ant last dug: its pellet never goes straight back in there */
-  #lastDug: Int32Array;
   /** the first cell of the wall being followed by cell: back there, it has been all the way round */
   loopX: Int32Array;
   loopY: Int32Array;
-  /** releases from a soil wall this trip that made no progress home (see NO_GAIN) */
-  #noGain: Uint8Array;
   /** which hand it keeps on tunnel walls when it walks a tunnel (+1 right, −1 left), chosen afresh each trip out */
   hand: Int8Array;
   /** seconds left of keeping a hand on a chamber's wall, after touching soil; 0 = wandering freely */
@@ -940,12 +876,6 @@ export class Colony {
    * it climbs out.
    */
   leaveOk: Uint8Array;
-  /** 1 once a recruited ant has been away from the nest: coming home then ends its raid */
-  #gone: Uint8Array;
-  /** a raider that has left the raid trail to search on, until it is home (ja-sf1) */
-  #pastEnd: Uint8Array;
-  /** 1 while the ant is on home ground with its threat past defendAt: its stance is defend (docs/stance.md) */
-  #defending: Uint8Array;
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
   #storedSeen = 0;
@@ -971,8 +901,6 @@ export class Colony {
   recruits = 0;
   /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; read only while it carries food (left as it was after delivery) */
   quality: Float32Array;
-  /** 1 from when fatigue passes patience until it has rested to nothing: a tired forager rests fully, not just under the line */
-  #tired: Uint8Array;
   /** seconds left of a detour after bumping into rock, when the pull toward the nest (or the raid) is off */
   detour: Float32Array;
   /** recent bumps, fading over seconds: each bump in a row doubles the next detour */
@@ -1055,10 +983,6 @@ export class Colony {
   gy: Int32Array;
   /** 1 while the wall being followed is followed cell by cell (any wall underground, or a tunnel), 0 by touch (rock on open ground) */
   byCell: Uint8Array;
-  /** the situation each ant was last asked about, encoded; −1 = never */
-  #asked: Int16Array;
-  /** the question behind each ant's current mode: its situation (with the mode it had) when last asked; −1 = never */
-  #question: Int16Array;
   /** enemy ants per cell, kept by the game each tick; null when there is no rival */
   enemies: CellCounts | null = null;
   /** the colony's odour: the nest's gestalt, which ants at the nest relax toward and newborns take */
@@ -1194,14 +1118,7 @@ export class Colony {
     this.digT = new Float32Array(n);
     this.hand = new Int8Array(n);
     this.digAim = new Float32Array(n).fill(NaN);
-    this.#cellX = new Int32Array(n);
-    this.#cellY = new Int32Array(n);
-    this.#cellAtX = new Float32Array(n).fill(NaN);
-    this.#cellAtY = new Float32Array(n).fill(NaN);
-    this.#noTunnel = new Int32Array(n).fill(NO_KEY);
-    this.#staleWalk = new Uint8Array(n);
-    this.#looked = new Int32Array(n).fill(NO_KEY);
-    this.#goalKind = new Uint8Array(n);
+    Object.assign(this, makeAntArrays(n));
     this.odoSurf = new Float32Array(n);
     this.odoNest = new Float32Array(n);
     this.driftSurf = new Float32Array(n);
@@ -1218,25 +1135,8 @@ export class Colony {
     this.routeAt = new Float32Array(n);
     this.routeState = new Uint8Array(n);
     this.routeGoal = new Int16Array(n).fill(-1);
-    this.#under = new Uint8Array(n);
-    this.#groundMin = new Float64Array(n).fill(NaN); // float64: compared with the metric itself (float32 rounding let the ant "beat" it on the cell it was set at)
-    this.#groundT = new Uint16Array(n);
-    this.#groundRef = new Float64Array(n).fill(NaN);
-    this.#chamberCell = new Int32Array(n).fill(NO_KEY);
-    this.#chamberFor = new Int16Array(n);
-    this.#lastRole = new Uint8Array(n);
-    this.#sinceRole = new Float32Array(n);
-    this.#restT = new Float32Array(n);
     this.age = new Float32Array(n);
     this.lifespan = new Float32Array(n).fill(Infinity);
-    this.#holdsBrood = new Uint8Array(n);
-    this.#holdT = new Float32Array(n);
-    this.#broodTo = new Int16Array(n).fill(-1);
-    this.#portTo = new Int16Array(n).fill(-1);
-    this.#porter = new Uint8Array(n);
-    this.#corpse = new Uint8Array(n);
-    this.#loaded = new Uint8Array(n);
-    this.#putAt = new Int32Array(n).fill(NO_KEY);
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
     if (this.#entrance && map.chambers)
       this.queen = {
@@ -1251,14 +1151,6 @@ export class Colony {
         unfed: 0,
         held: 0,
       };
-    this.#spoilTo = new Float32Array(n).fill(NaN);
-    this.#spoilSide = new Int8Array(n);
-    this.#spoilT = new Float32Array(n);
-    this.#spoilA = new Float32Array(n);
-    this.#soil = new Uint8Array(n);
-    this.#cameFrom = new Int32Array(n).fill(NO_KEY);
-    this.#lastDug = new Int32Array(n).fill(NO_KEY);
-    this.#noGain = new Uint8Array(n);
     this.loopX = new Int32Array(n).fill(NO_CELL);
     this.loopY = new Int32Array(n);
     this.hugT = new Float32Array(n);
@@ -1273,11 +1165,7 @@ export class Colony {
     this.reporting = new Uint8Array(n);
     this.recruited = new Uint8Array(n);
     this.leaveOk = new Uint8Array(n);
-    this.#gone = new Uint8Array(n);
-    this.#pastEnd = new Uint8Array(n);
-    this.#defending = new Uint8Array(n);
     this.quality = new Float32Array(n).fill(1);
-    this.#tired = new Uint8Array(n);
     this.detour = new Float32Array(n);
     this.bumps = new Float32Array(n);
     this.load = new Float32Array(n);
@@ -1291,7 +1179,6 @@ export class Colony {
     this.clock = new Float32Array(n).fill(1);
     this.energy = new Float32Array(n).fill(1);
     this.need = new Float32Array(n);
-    this.#feltLast = new Float32Array(n);
     this.scent = new Float32Array(n);
     this.scentGain = new Float32Array(n).fill(1);
     this.nestOdour = this.params.odour;
@@ -1320,8 +1207,6 @@ export class Colony {
     this.gx = new Int32Array(n).fill(NO_CELL);
     this.gy = new Int32Array(n);
     this.byCell = new Uint8Array(n);
-    this.#asked = new Int16Array(n).fill(-1);
-    this.#question = new Int16Array(n).fill(-1);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
     if (world) (this.layers[PLANE] as Layer).ph.phase((this.params.nest % 2) * 0.5);
@@ -1573,9 +1458,9 @@ export class Colony {
     this.mode[i] = EXPLORE;
     this.carrying[i] = 0;
     this.#clearPellet(i);
-    this.#looked[i] = NO_KEY;
-    this.#cameFrom[i] = NO_KEY;
-    this.#lastDug[i] = NO_KEY;
+    this.looked[i] = NO_KEY;
+    this.cameFrom[i] = NO_KEY;
+    this.lastDug[i] = NO_KEY;
     this.digT[i] = 0;
     this.digAim[i] = NaN;
     this.hand[i] = this.#rng() < 0.5 ? -1 : 1;
@@ -1585,7 +1470,7 @@ export class Colony {
     this.met[i] = 0;
     this.energy[i] = 1;
     this.need[i] = 0;
-    this.#feltLast[i] = 0;
+    this.feltLast[i] = 0;
     this.scent[i] = 0;
     this.scentGain[i] = 1;
     this.foes[i] = 0;
@@ -1594,11 +1479,11 @@ export class Colony {
     this.reporting[i] = 0;
     this.recruited[i] = 0;
     this.leaveOk[i] = 0;
-    this.#gone[i] = 0;
-    this.#pastEnd[i] = 0;
-    this.#defending[i] = 0;
+    this.gone[i] = 0;
+    this.pastEnd[i] = 0;
+    this.defending[i] = 0;
     this.quality[i] = 1;
-    this.#tired[i] = 0;
+    this.tired[i] = 0;
     this.detour[i] = 0;
     this.bumps[i] = 0;
     // A newborn is clean and unprimed.
@@ -1621,24 +1506,24 @@ export class Colony {
     this.foodX[i] = NaN;
     this.foodY[i] = NaN;
     this.#routeClear(i);
-    this.#under[i] = 1;
+    this.under[i] = 1;
     this.layer[i] = this.home; // born in the nest, on its layer
-    this.#goalKind[i] = 0; // born underground: home is the chamber
-    this.#groundMin[i] = NaN;
-    this.#chamberCell[i] = NO_KEY;
-    this.#lastRole[i] = 0; // born in the royal chamber: it lays royal once it has been there a tick
-    this.#sinceRole[i] = 0;
-    this.#restT[i] = 0;
+    this.goalKind[i] = 0; // born underground: home is the chamber
+    this.groundMin[i] = NaN;
+    this.chamberCell[i] = NO_KEY;
+    this.lastRole[i] = 0; // born in the royal chamber: it lays royal once it has been there a tick
+    this.sinceRole[i] = 0;
+    this.restT[i] = 0;
     this.age[i] = 0;
     this.lifespan[i] = this.queen ? LIFESPAN * (0.7 + 0.6 * this.#rng()) : Infinity;
-    this.#holdsBrood[i] = 0;
-    this.#broodTo[i] = -1;
-    this.#holdT[i] = 0;
-    this.#portTo[i] = -1;
-    this.#porter[i] = 0;
-    this.#corpse[i] = 0;
-    this.#loaded[i] = 0;
-    this.#putAt[i] = NO_KEY;
+    this.broodHeld[i] = 0;
+    this.broodTo[i] = -1;
+    this.holdT[i] = 0;
+    this.portTo[i] = -1;
+    this.porter[i] = 0;
+    this.corpse[i] = 0;
+    this.loaded[i] = 0;
+    this.putAt[i] = NO_KEY;
     this.wall[i] = 0;
     this.mx[i] = NaN;
     this.untouched[i] = 0;
@@ -1646,8 +1531,8 @@ export class Colony {
     this.stallT[i] = 0;
     this.gx[i] = NO_CELL;
     this.byCell[i] = 0;
-    this.#asked[i] = -1;
-    this.#question[i] = -1;
+    this.asked[i] = -1;
+    this.question[i] = -1;
     this.gen[i] = (this.gen[i] + 1) >>> 0;
     this.alive[i] = 1;
   }
@@ -1656,16 +1541,16 @@ export class Colony {
   antCell(i: number): void {
     const x = this.x[i];
     const y = this.y[i];
-    if (x !== this.#cellAtX[i] || y !== this.#cellAtY[i]) {
+    if (x !== this.cellAtX[i] || y !== this.cellAtY[i]) {
       cellOf(x, y);
-      this.#cellX[i] = CELL[0];
-      this.#cellY[i] = CELL[1];
-      this.#cellAtX[i] = x;
-      this.#cellAtY[i] = y;
+      this.cellX[i] = CELL[0];
+      this.cellY[i] = CELL[1];
+      this.cellAtX[i] = x;
+      this.cellAtY[i] = y;
       return;
     }
-    CELL[0] = this.#cellX[i];
-    CELL[1] = this.#cellY[i];
+    CELL[0] = this.cellX[i];
+    CELL[1] = this.cellY[i];
   }
 
   /** Ant i as a healthy ant: it perceives the world as it is, gives off no calming cue, and smells of its nest alone (from the next odour step). */
@@ -1691,12 +1576,12 @@ export class Colony {
 
   /** Whether ant i holds brood in its jaws (a nurse carrying an egg, larva or pupa): what the fungus in it senses as `carrying`. */
   holdsBrood(i: number): boolean {
-    return this.#holdsBrood[i] === 1;
+    return this.broodHeld[i] === 1;
   }
 
   /** What ant i holds, as a response sees it. */
   item(i: number): Item {
-    return this.carrying[i] ? "food" : this.pellet[i] ? (this.#corpse[i] ? "corpse" : "soil") : this.#holdsBrood[i] ? "brood" : "none";
+    return this.carrying[i] ? "food" : this.pellet[i] ? (this.corpse[i] ? "corpse" : "soil") : this.broodHeld[i] ? "brood" : "none";
   }
 
   /**
@@ -1720,7 +1605,7 @@ export class Colony {
     const t = this.#t;
     t.mode = MODES[mode] as Mode;
     t.carrying = item;
-    t.porter = this.#porter[i] === 1;
+    t.porter = this.porter[i] === 1;
     t.digging = this.digT[i] > 0;
     this.#ti = i; // t.place reads ant i's place when asked
     t.offered = offered;
@@ -1763,7 +1648,7 @@ export class Colony {
     const keepX = CELL[0];
     const keepY = CELL[1];
     let p: Where;
-    if (this.#entrance && this.#under[i]) {
+    if (this.#entrance && this.under[i]) {
       this.antCell(i);
       const cx = CELL[0];
       const cy = CELL[1];
@@ -1787,7 +1672,7 @@ export class Colony {
 
   /** Whether ant i is tired: past its patience, or not yet fully rested since it was (ja-q47). */
   #isTired(i: number): boolean {
-    return this.#tired[i] === 1 || this.fatigue[i] > this.#patience(i);
+    return this.tired[i] === 1 || this.fatigue[i] > this.#patience(i);
   }
 
   /** The fatigue at which ant i tires: the colony's patience, shortened by planePatience on one world's plane (ja-lp4.15). */
@@ -2078,7 +1963,7 @@ export class Colony {
 
   /** Whether ant i is an inside worker now: underground, carrying nothing, not allowed out (zoned by age). */
   #staysIn(i: number): boolean {
-    return this.queen !== null && this.#under[i] === 1 && !this.carrying[i] && !this.pellet[i] && !this.#mayGoOut(i);
+    return this.queen !== null && this.under[i] === 1 && !this.carrying[i] && !this.pellet[i] && !this.#mayGoOut(i);
   }
 
   /** Whether ant i digs: in the side view with a queen, the middle-aged (the young nurse, the old forage); elsewhere, any explorer. */
@@ -2107,26 +1992,26 @@ export class Colony {
   /** kill, with ant i's layer bound. */
   #killOn(i: number, lost: boolean): void {
     if (!this.alive[i]) return;
-    if (this.#holdsBrood[i]) this.#dropBrood(i);
-    if (this.carrying[i] && this.#porter[i]) {
+    if (this.broodHeld[i]) this.#dropBrood(i);
+    if (this.carrying[i] && this.porter[i]) {
       // A porter's food is already home: it stays the colony's, in the chamber it was taking it to (on the floor, a
       // forager would bring it "home" a second time).
-      const t = this.map.chambers?.list[this.#portTo[i]];
+      const t = this.map.chambers?.list[this.portTo[i]];
       if (t) this.#stock(t, 1);
       else this.feed(1);
       this.#inJaws -= 1;
       this.carrying[i] = 0;
-      this.#porter[i] = 0;
-      this.#portTo[i] = -1;
+      this.porter[i] = 0;
+      this.portTo[i] = -1;
     }
     if (this.carrying[i]) dropFood(this.map, this.x[i], this.y[i], 1, this.quality[i]);
     this.antCell(i);
-    if (this.#corpse[i]) {
+    if (this.corpse[i]) {
       // The corpse it carried falls where it falls, with it (one world: on the layer it was on; on the plane it lies there and rots).
       for (const k of this.corpses) if (k.held === i) ((k.held = -1), (k.x = CELL[0]), (k.y = CELL[1]), (k.layer = this.layer[i]));
-      this.#corpse[i] = 0;
+      this.corpse[i] = 0;
     } else if (this.pellet[i]) {
-      if (this.#soil[i] !== SOIL_DUG) this.looseLost++;
+      if (this.soil[i] !== SOIL_DUG) this.looseLost++;
       else this.soilLost++;
     }
     // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7). One world:
@@ -2157,8 +2042,8 @@ export class Colony {
     let dug = 0;
     let loose = 0;
     for (let i = 0; i < this.n; i++)
-      if (this.alive[i] && this.pellet[i] && !this.#corpse[i]) {
-        if (this.#soil[i] !== SOIL_DUG) loose++;
+      if (this.alive[i] && this.pellet[i] && !this.corpse[i]) {
+        if (this.soil[i] !== SOIL_DUG) loose++;
         else dug++;
       }
     return { dug, loose };
@@ -2174,7 +2059,7 @@ export class Colony {
 
   /** Every ant asks its policy again on its next tick: a new doctrine, or fresh answers from Jev, take effect at once. */
   reconsider(): void {
-    this.#asked.fill(-1);
+    this.asked.fill(-1);
   }
 
   /** The fungus's brush: lay `amount` of a trail on every open cell within `radius` of (x, y), on layer `layer` (home by default). */
@@ -2203,7 +2088,7 @@ export class Colony {
 
   /** The situation ant i was in when its policy last chose its mode, or null if it never chose (a carrier going home is not asked). */
   lastQuestion(i: number): Situation | null {
-    const q = this.#question[i];
+    const q = this.question[i];
     return this.alive[i] && q >= 0 ? decodeSituation(q) : null;
   }
 
@@ -2272,10 +2157,10 @@ export class Colony {
    * over from foraging would otherwise switch its home vector off, and bumps would keep renewing it.
    */
   #homeAfresh(i: number): void {
-    this.#chamberCell[i] = NO_KEY; // a chamber face it was walking up to is no longer its business (review of slice 2)
+    this.chamberCell[i] = NO_KEY; // a chamber face it was walking up to is no longer its business (review of slice 2)
     this.search[i] = 0; // a search left over from the last trip home
     this.searchA[i] = 0;
-    this.#groundMin[i] = NaN;
+    this.groundMin[i] = NaN;
     this.detour[i] = 0;
     this.bumps[i] = 0;
     this.wall[i] = 0;
@@ -2343,14 +2228,14 @@ export class Colony {
     const packed = cellKey(hx, hy);
     // Homing on the ground line (side view) goes cell by cell to the hole wherever the walkway is, one cell
     // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
-    const carryingOut = mode === RETURN && this.pellet[i] === 1 && this.#entrance !== null && !Number.isNaN(this.#spoilTo[i]);
+    const carryingOut = mode === RETURN && this.pellet[i] === 1 && this.#entrance !== null && !Number.isNaN(this.spoilTo[i]);
     // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
     const raiding = mode === FIGHT && this.#entrance !== null && this.#stanceOf(i) === "raid" && this.raidTarget !== null;
     const onSky = isSky(map, fresh ? hx : this.gx[i], fresh ? hy : this.gy[i]);
     // Homing underground with the hole still its goal: in at another hole than its own (see #goal). It climbs back out.
-    const climbing = mode === RETURN && this.#entrance !== null && !onSky && this.#goalKind[i] === 1 && this.pellet[i] === 0;
+    const climbing = mode === RETURN && this.#entrance !== null && !onSky && this.goalKind[i] === 1 && this.pellet[i] === 0;
     const groundHome = carryingOut || climbing || ((mode === RETURN || raiding) && this.#entrance !== null && onSky);
-    if (fresh && !hugging && !groundHome && this.#noTunnel[i] === packed) {
+    if (fresh && !hugging && !groundHome && this.noTunnel[i] === packed) {
       this.gx[i] = NO_CELL; // looked here already: open ground
       return false;
     }
@@ -2359,18 +2244,18 @@ export class Colony {
     if (!groundHome && !tunnel(map, cx, cy)) {
       if (hugging) return this.#hug(i, cx, cy, fresh);
       this.gx[i] = NO_CELL;
-      if (fresh) this.#noTunnel[i] = packed;
+      if (fresh) this.noTunnel[i] = packed;
       return false;
     }
-    this.#noTunnel[i] = NO_KEY;
+    this.noTunnel[i] = NO_KEY;
     let dir = fresh ? dirOf(this.heading[i]) : this.gdir[i];
     const ent = this.#entrance;
     if (carryingOut) {
       // Carrying a pellet out (side view): up to the hole if it is still in the shaft, then on along the ground away
       // from it to where it drops it (away from the hole from inside the shaft is down it).
       const inShaft = !isSky(map, cx, cy) && !(cx === this.#entranceCol && cy === this.#entranceRow);
-      const best = inShaft ? this.#towardHole(cx, cy, false) : this.#awayFromHole(cx, cy, this.#spoilSide[i]);
-      if (best < 0) this.#spoilTo[i] = Math.min(0, this.#spoilTo[i]); // the map's edge, or nowhere farther: it drops it here (one carried back to the midden walks on: #undertake)
+      const best = inShaft ? this.#towardHole(cx, cy, false) : this.#awayFromHole(cx, cy, this.spoilSide[i]);
+      if (best < 0) this.spoilTo[i] = Math.min(0, this.spoilTo[i]); // the map's edge, or nowhere farther: it drops it here (one carried back to the midden walks on: #undertake)
       dir = best < 0 ? handOnWall(map, cx, cy, dir, -this.hand[i]) : best;
     } else if (raiding) {
       const t = this.raidTarget as Nest;
@@ -2402,10 +2287,10 @@ export class Colony {
       // along the walkway both sides of the hole, so the most-scent rule below walks a carrier past it and on).
       // A surface it was following round toward one hole (believed, or the real one once in sight) says nothing about
       // the other: start afresh if the target changed.
-      if (this.#groundRef[i] !== this.#holeX) this.#groundMin[i] = NaN;
-      const min = this.#groundMin[i];
+      if (this.groundRef[i] !== this.#holeX) this.groundMin[i] = NaN;
+      const min = this.groundMin[i];
       let best = this.#towardHole(cx, cy, true, min);
-      if (best >= 0) this.#groundMin[i] = NaN;
+      if (best >= 0) this.groundMin[i] = NaN;
       else if (Number.isNaN(min) && this.#holeX !== ent.x && Math.abs(centreX(cx, cy) - this.#holeX) < 1) {
         // At the column where it believed the hole was, and no hole in sight: search to either side, farther each time.
         // (Only there: blocked anywhere else, it goes round the obstacle below, or every blocked step would widen the search.)
@@ -2416,16 +2301,16 @@ export class Colony {
         // No open way nearer the hole it heads for (spoil heaped between, a pit beside the mound, a step in the ground):
         // Bug2 on the ground, a hand on the surface until it is somewhere nearer that hole than here. Rocking between
         // the nearest cell and a step away kept whole colonies in such a pit.
-        this.#groundMin[i] = this.#holeMetric(cx, cy);
-        this.#groundRef[i] = this.#holeX;
-        this.#groundT[i] = 0;
+        this.groundMin[i] = this.#holeMetric(cx, cy);
+        this.groundRef[i] = this.#holeX;
+        this.groundT[i] = 0;
         // Which hand: feel ahead along the surface both ways (a gully between two heaps: one side leads over toward the
         // hole, the other along the far heap and away) and take the one that gets nearer than here sooner.
-        const m = this.#groundMin[i];
+        const m = this.groundMin[i];
         const ka = this.#groundLook(cx, cy, dir, 1, m);
         const kb = this.#groundLook(cx, cy, dir, -1, m);
         if (ka !== kb) this.hand[i] = ka < kb ? -1 : 1; // handOnWall below takes −hand
-      } else if (flipDue((this.#groundT[i] = Math.min(65535, this.#groundT[i] + 1)))) {
+      } else if (flipDue((this.groundT[i] = Math.min(65535, this.groundT[i] + 1)))) {
         // The long way round: the other hand, and turned back. Each leg is twice the last (GROUND_FLIP, then 2×, 4×...):
         // with equal legs, the walk back after a flip ended where it started, and flipped there again, for ever (a pit
         // on the mound whose only other way out was back: both hands left it the same way).
@@ -2488,7 +2373,7 @@ export class Colony {
       this.queen &&
       !this.carrying[i] &&
       !this.pellet[i] &&
-      !this.#holdsBrood[i] &&
+      !this.broodHeld[i] &&
       !isSky(map, cx, cy) &&
       this.#fetches(i) &&
       this.#toFood(cx, cy, dir) >= 0
@@ -2658,7 +2543,7 @@ export class Colony {
    */
   #chamberDug(i: number, x: number, y: number): void {
     const ch = this.map.chambers!;
-    let id = this.#chamberFor[i] - 1;
+    let id = this.chamberFor[i] - 1;
     if (id < 0) {
       if (!this.#chamberRoom(x, y, y - this.#soilTop(x)) || !this.#chamberSpot(null, x, y)) return; // another was started near it meanwhile: a tunnel stub
       id = ch.add(this.params.nest, y, this.#roleFor(y)).id;
@@ -2671,8 +2556,8 @@ export class Colony {
 
   /** Ant i is going to dig cell (x, y) for a chamber: `forId` = its id + 1, or 0 for a new chamber there. */
   #aimChamber(i: number, x: number, y: number, forId: number): void {
-    this.#chamberCell[i] = cellKey(x, y);
-    this.#chamberFor[i] = forId;
+    this.chamberCell[i] = cellKey(x, y);
+    this.chamberFor[i] = forId;
   }
 
   /**
@@ -2697,7 +2582,7 @@ export class Colony {
     for (let d = 0; d < 6; d++) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (cellKey(tx, ty) === this.#lastDug[i]) continue; // the cell it just dug: not straight back in
+      if (cellKey(tx, ty) === this.lastDug[i]) continue; // the cell it just dug: not straight back in
       if (this.time - map.dugAt.get(tx, ty) < this.params.backfill.young && !floorGround(map, tx, ty)) continue; // dug lately: the live frontier, not excess
       if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, this.params.backfill.maxOpen)) continue;
       if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.#staleBelow(cx, cy, tx, ty)) continue;
@@ -2712,7 +2597,7 @@ export class Colony {
       if (!fillCell(map, tx, ty, this.time)) continue;
       // A fresh trip out from here. (Letting its trip clock run on instead, so it lays only faint home scent
       // this deep, was measured worse: it soon tires and walks home empty. Seeds 3, 4, 6–8: 12 % less food home.)
-      if (this.#soil[i] !== SOIL_DUG) this.looseFilled++;
+      if (this.soil[i] !== SOIL_DUG) this.looseFilled++;
       else this.soilFilled++;
       this.#clearPellet(i);
       this.since[i] = 0;
@@ -2756,7 +2641,7 @@ export class Colony {
   #staleStep(i: number, step: number): boolean {
     const s = this.since[i];
     if (s <= this.params.backfill.after || s >= this.params.backfill.staleSearch) {
-      this.#staleWalk[i] = 0;
+      this.staleWalk[i] = 0;
       return false;
     }
     const { map } = this;
@@ -2787,7 +2672,7 @@ export class Colony {
       }
     }
     if (way < 0) {
-      this.#staleWalk[i] = 0;
+      this.staleWalk[i] = 0;
       this.gx[i] = NO_CELL;
       return false;
     }
@@ -2810,11 +2695,11 @@ export class Colony {
    */
   #enterStale(i: number, cx: number, cy: number): boolean {
     const s = this.since[i];
-    if (this.#staleWalk[i] || s >= this.params.backfill.staleSearch) return false;
+    if (this.staleWalk[i] || s >= this.params.backfill.staleSearch) return false;
     const { map } = this;
     const f = this.ph.fields;
     // The way it came: the cell it looked from last, if that is beside it; else the way behind its heading.
-    const from = this.#cameFrom[i];
+    const from = this.cameFrom[i];
     let bx = keyX(from);
     let by = keyY(from);
     if (from === NO_KEY || hexDistance(bx, by, cx, cy) !== 1) {
@@ -2840,7 +2725,7 @@ export class Colony {
     if (wayV >= this.#staleBelow(cx, cy, tx, ty)) return false;
     if (rockAt(map, bx, by) === OPEN && wayV >= this.#staleBelow(bx, by, tx, ty)) return false; // no staler than the path behind
     if (this.#rng() >= this.params.backfill.enterStale) return false;
-    this.#staleWalk[i] = 1;
+    this.staleWalk[i] = 1;
     this.gdir[i] = way;
     this.gx[i] = tx;
     this.gy[i] = ty;
@@ -2859,15 +2744,15 @@ export class Colony {
     const step = Math.hypot(this.x[i] - x0, this.y[i] - y0);
     // Only its own hole is where the vector points: up out of another (the rival's, say), its error stands (review of
     // #20: surfacing anywhere made the belief exactly its own hole).
-    const ownHole = !under && this.#under[i] === 1 && this.#atOwnHole(x0, y0);
+    const ownHole = !under && this.under[i] === 1 && this.#atOwnHole(x0, y0);
     this.antCell(i); // CELL is the ant's own again (the caller reads it)
     if (ownHole) {
       this.odoSurf[i] = 0;
       this.driftSurf[i] = gauss(this.#rng) * PI_DRIFT;
       this.search[i] = 0;
-    } else if (under && !this.#under[i]) this.search[i] = 0;
-    this.#under[i] = under ? 1 : 0;
-    if (under || this.mode[i] !== RETURN) this.#groundMin[i] = NaN;
+    } else if (under && !this.under[i]) this.search[i] = 0;
+    this.under[i] = under ? 1 : 0;
+    if (under || this.mode[i] !== RETURN) this.groundMin[i] = NaN;
     // The error grows with the way out; once the ant heads home it is fixed (the vector it walks home on is the one it
     // brought out; counting the walk home and the search into it moved the believed goal as fast as the ant chased it).
     if (this.mode[i] !== RETURN) {
@@ -2877,7 +2762,7 @@ export class Colony {
     if (atNest) {
       this.odoNest[i] = 0;
       this.driftNest[i] = gauss(this.#rng) * PI_DRIFT;
-      if (this.#goalKind[i] === 0) this.search[i] = 0;
+      if (this.goalKind[i] === 0) this.search[i] = 0;
     }
   }
 
@@ -2899,22 +2784,22 @@ export class Colony {
     const ent = this.#entrance;
     if (!ent) return this.nest;
     let kind = 1;
-    if (!pellet || this.#soil[i] === SOIL_FILL) {
+    if (!pellet || this.soil[i] === SOIL_FILL) {
       this.antCell(i);
       // Off the ground line it heads for the chamber, but only once in its own nest (in at its own hole, or anywhere in the
       // tunnels joined to it): in at another hole (the rival's), the chamber 340 columns away through soil was no way home
       // (review of #15: a carrier trapped in the rival's shaft for 300 s). There it keeps heading for its hole, and climbs out.
       const cx = CELL[0];
       const cy = CELL[1];
-      if (!isSky(this.map, cx, cy)) kind = this.#goalKind[i] === 1 && !this.#ownTunnels(cx, cy) ? 1 : 0;
+      if (!isSky(this.map, cx, cy)) kind = this.goalKind[i] === 1 && !this.#ownTunnels(cx, cy) ? 1 : 0;
     }
-    if (kind !== this.#goalKind[i]) {
+    if (kind !== this.goalKind[i]) {
       // A new goal: the wall it was following, and its line home, were for the other one.
-      this.#goalKind[i] = kind;
+      this.goalKind[i] = kind;
       this.bestD[i] = Infinity; // progress is toward the new goal
       this.stallT[i] = 0;
       this.search[i] = 0;
-      this.#groundMin[i] = NaN;
+      this.groundMin[i] = NaN;
       this.wall[i] = 0;
       this.mx[i] = NaN;
       this.gx[i] = NO_CELL;
@@ -2939,7 +2824,7 @@ export class Colony {
       ? Math.abs(x - goal.x) < HOLE_SIGHT && Math.abs(y - goal.y) < 2 * HOLE_SIGHT
       : Math.hypot(x - goal.x, y - goal.y) < NEST_SIGHT && this.#clearTo(x, y, goal.x, goal.y);
     if (sees) return goal;
-    const under = this.#under[i] === 1;
+    const under = this.under[i] === 1;
     const off = under ? this.driftNest[i] * this.odoNest[i] : this.driftSurf[i] * this.odoSurf[i];
     const b = this.#belief;
     // Never past the ground's ends: a belief off the map left a carrier at the map's edge for good, never reaching the
@@ -3244,17 +3129,17 @@ export class Colony {
     const cx = CELL[0];
     const cy = CELL[1];
     if (isSky(this.map, cx, cy)) {
-      this.#lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
+      this.lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
       return;
     }
     const role = this.#placeAt(cx, cy);
     if (role) {
-      this.#lastRole[i] = MARKS.indexOf(role) + 1;
-      this.#sinceRole[i] = 0;
-    } else this.#sinceRole[i] = this.#sinceRole[i] + dt;
-    const r = this.#lastRole[i];
+      this.lastRole[i] = MARKS.indexOf(role) + 1;
+      this.sinceRole[i] = 0;
+    } else this.sinceRole[i] = this.sinceRole[i] + dt;
+    const r = this.lastRole[i];
     if (r === 0) return;
-    const laid = this.params.deposit * Math.exp(-this.#sinceRole[i] / MARK_DECAY) * dt * this.layGain[i];
+    const laid = this.params.deposit * Math.exp(-this.sinceRole[i] / MARK_DECAY) * dt * this.layGain[i];
     if (laid > 1e-4) this.ph.depositCell(MARKS[r - 1] as Mark, cx, cy, laid);
   }
 
@@ -3268,7 +3153,7 @@ export class Colony {
   }
 
   #trueDestMark(i: number): Mark {
-    if (this.#holdsBrood[i]) return "brood";
+    if (this.broodHeld[i]) return "brood";
     if (this.carrying[i] && this.queen) {
       const role = this.map.chambers?.list[this.#foodTo(i)]?.role;
       if (role && role !== "none") return role;
@@ -3283,7 +3168,7 @@ export class Colony {
    * slice 5, and the F2 fix-up's runs to 3,600 s.)
    */
   #foodTo(i: number): number {
-    const to = this.#portTo[i];
+    const to = this.portTo[i];
     if (to >= 0) return to;
     const ch = this.map.chambers!;
     let royal = -1;
@@ -3349,7 +3234,7 @@ export class Colony {
     // larvae's): porters took food only to the brood and the queen, and a crowd starved beside a full store.
     const chs = this.map.chambers!;
     for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i] || !this.#under[i] || this.energy[i] >= ADULT_BEG_BELOW) continue;
+      if (!this.alive[i] || !this.under[i] || this.energy[i] >= ADULT_BEG_BELOW) continue;
       this.antCell(i);
       const id = chs.at(CELL[0], CELL[1]);
       const r = id >= 0 ? chs.list[id] : undefined;
@@ -3357,7 +3242,7 @@ export class Colony {
         want.set(id, (want.get(id) ?? 0) + 1 / ENERGY_PER_FOOD);
     }
     for (let i = 0; i < this.n; i++) {
-      const to = this.#portTo[i];
+      const to = this.portTo[i];
       if (to >= 0 && this.alive[i] && this.carrying[i]) en.set(to, (en.get(to) ?? 0) + 1);
     }
   }
@@ -3420,7 +3305,7 @@ export class Colony {
   #portInstead(i: number, cx: number, cy: number, target: number, dt: number): number {
     const ch = this.map.chambers!;
     const role = ch.list[target]!.role;
-    const late = (this.#holdT[i] = this.#holdT[i] + dt) > HOLD_MAX;
+    const late = (this.holdT[i] = this.holdT[i] + dt) > HOLD_MAX;
     for (let d = -1; d < 6; d++) {
       const id = d < 0 ? ch.at(cx, cy) : ch.at(stepX(cx, cy, d), stepY(cy, d));
       if (id < 0 || id === target) continue;
@@ -3437,8 +3322,8 @@ export class Colony {
       if (royal) {
         this.#enRouteTo.set(target, (this.#enRouteTo.get(target) ?? 1) - 1);
         this.#enRouteTo.set(royal.id, (this.#enRouteTo.get(royal.id) ?? 0) + 1);
-        this.#portTo[i] = royal.id;
-        this.#holdT[i] = 0;
+        this.portTo[i] = royal.id;
+        this.holdT[i] = 0;
         this.#homeAfresh(i);
         this.gx[i] = NO_CELL;
       }
@@ -3450,9 +3335,9 @@ export class Colony {
   #becomePorter(i: number, to: number): void {
     this.#inJaws += 1;
     this.carrying[i] = 1;
-    this.#porter[i] = 1;
-    this.#portTo[i] = to;
-    this.#holdT[i] = 0;
+    this.porter[i] = 1;
+    this.portTo[i] = to;
+    this.holdT[i] = 0;
     this.#enRouteTo.set(to, (this.#enRouteTo.get(to) ?? 0) + 1);
     this.mode[i] = RETURN;
     this.#homeAfresh(i);
@@ -3479,14 +3364,14 @@ export class Colony {
       if (here !== target) {
         here = -1;
         // (Porters only: a forager put down beside its chamber is an explorer in a tunnel, and dug at its ends.)
-        if (this.#porter[i]) {
+        if (this.porter[i]) {
           for (let d = 0; d < 6 && here < 0; d++) if (ch.at(stepX(cx, cy, d), stepY(cy, d)) === target) here = target;
           if (here < 0) here = this.#portInstead(i, cx, cy, target, dt);
         }
         if (here < 0) return false;
       }
       const c = ch.list[here]!;
-      if (!this.#porter[i] && c.role === "reception" && c.food >= 1) {
+      if (!this.porter[i] && c.role === "reception" && c.food >= 1) {
         // Food waiting here already: the porters aren't keeping up. The forager carries its own on (a seed harvester's
         // foragers drop seeds in the top chambers; with a backlog there, a larva starved below while food piled up).
         const to = this.#wanted(here);
@@ -3500,20 +3385,20 @@ export class Colony {
       if (!this.responses.drop(this.touch(i, enemy, this.mode[i], "food"))) return false;
       this.carrying[i] = 0;
       this.#stock(c, 1);
-      if (this.#porter[i]) (this.portTrips++, (this.#inJaws -= 1));
+      if (this.porter[i]) (this.portTrips++, (this.#inJaws -= 1));
       else this.stored++;
-      this.#portTo[i] = -1;
-      this.#porter[i] = 0;
+      this.portTo[i] = -1;
+      this.porter[i] = 0;
       this.mode[i] = EXPLORE;
-      this.#asked[i] = -1;
-      this.#question[i] = -1;
+      this.asked[i] = -1;
+      this.question[i] = -1;
       this.since[i] = 0;
       return true; // put down: it turns back (the tick turns it: its heading is written after)
     }
     if (
       this.mode[i] !== EXPLORE ||
       this.pellet[i] ||
-      this.#holdsBrood[i] ||
+      this.broodHeld[i] ||
       isSky(this.map, cx, cy) ||
       this.#rng() > PORT_RATE * dt ||
       !this.#worksInside(i)
@@ -3574,7 +3459,7 @@ export class Colony {
     this.antCell(i);
     const cx = CELL[0];
     const cy = CELL[1];
-    if (this.#holdsBrood[i]) {
+    if (this.broodHeld[i]) {
       for (const b of this.brood.items)
         if (b.held === i) {
           b.x = cx;
@@ -3582,7 +3467,7 @@ export class Colony {
         }
       // In its chamber, or beside it (a chamber a cell or two wide can be passed by), it puts the brood down there;
       // holding it too long (lost round a ring of tunnels: review of slice 4), wherever it is (a held larva goes unfed).
-      const to = this.#broodTo[i];
+      const to = this.broodTo[i];
       if (ch.at(cx, cy) === to) this.#dropBrood(i);
       else {
         for (let d = 0; d < 6; d++) {
@@ -3593,7 +3478,7 @@ export class Colony {
             return;
           }
         }
-        if ((this.#holdT[i] = this.#holdT[i] + dt) > HOLD_MAX) this.#dropBrood(i);
+        if ((this.holdT[i] = this.holdT[i] + dt) > HOLD_MAX) this.#dropBrood(i);
       }
       return;
     }
@@ -3627,9 +3512,9 @@ export class Colony {
         b.held = i;
         if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
         b.chamber = -1;
-        this.#holdsBrood[i] = 1;
-        this.#broodTo[i] = to;
-        this.#holdT[i] = 0;
+        this.broodHeld[i] = 1;
+        this.broodTo[i] = to;
+        this.holdT[i] = 0;
         this.#homeAfresh(i);
         this.gx[i] = NO_CELL;
         return;
@@ -3641,11 +3526,11 @@ export class Colony {
    * carries it out like spoil, up the shaft and along the ground, to the midden. `calm`: no enemy is near it.
    */
   #undertake(i: number, dt: number, calm: boolean): void {
-    if (this.corpses.length === 0 || this.carrying[i] || this.pellet[i] || this.#holdsBrood[i]) return;
+    if (this.corpses.length === 0 || this.carrying[i] || this.pellet[i] || this.broodHeld[i]) return;
     const mode = this.mode[i];
     // A raiding colony's middle-aged are all fighters (raid stance): one with no enemy near, still in its own nest, buries
     // its dead too (review of #26: a raiding colony buried nothing, and its dead lay in its own chambers).
-    if (mode !== EXPLORE && mode !== FOLLOW && !(mode === FIGHT && calm && this.#under[i] && this.band(i) === 1)) return;
+    if (mode !== EXPLORE && mode !== FOLLOW && !(mode === FIGHT && calm && this.under[i] && this.band(i) === 1)) return;
     if (this.#rng() > PICK_CORPSE * dt) return;
     this.antCell(i);
     const cx = CELL[0];
@@ -3659,7 +3544,7 @@ export class Colony {
         if (!this.responses.get(this.touch(i, !calm, mode, "none", "corpse"))) return;
         k.held = i;
         this.#clearPellet(i);
-        this.#corpse[i] = 1;
+        this.corpse[i] = 1;
         this.pellet[i] = 1;
         if (outside) {
           // Already out: straight along the ground to the midden (it won't come up out of the hole, where that is set).
@@ -3667,9 +3552,9 @@ export class Colony {
           // midden, and picked up again (review of #26: one corpse nine times).
           const side = this.#middenSide();
           const past = side * (cx - this.#entranceCol) > this.#middenAt();
-          this.#spoilTo[i] = past ? -this.#middenAt() : this.#middenAt();
-          this.#spoilSide[i] = past ? -side : side;
-          this.#spoilT[i] = 0;
+          this.spoilTo[i] = past ? -this.#middenAt() : this.#middenAt();
+          this.spoilSide[i] = past ? -side : side;
+          this.spoilT[i] = 0;
         }
         this.mode[i] = RETURN;
         this.#homeAfresh(i);
@@ -3744,12 +3629,12 @@ export class Colony {
         b.chamber = ch ? ch.at(cx, cy) : -1;
         if (b.chamber >= 0) ch!.list[b.chamber]!.brood++;
       }
-    this.#holdsBrood[i] = 0;
-    this.#broodTo[i] = -1;
-    this.#holdT[i] = 0;
+    this.broodHeld[i] = 0;
+    this.broodTo[i] = -1;
+    this.holdT[i] = 0;
     this.mode[i] = EXPLORE;
-    this.#asked[i] = -1;
-    this.#question[i] = -1;
+    this.asked[i] = -1;
+    this.question[i] = -1;
   }
 
   /**
@@ -3791,7 +3676,7 @@ export class Colony {
       this.antCell(i);
       const cx = CELL[0];
       const cy = CELL[1];
-      const under = this.#under[i] === 1;
+      const under = this.under[i] === 1;
       let e = energy[i] - (under ? ADULT_DRAIN : ADULT_DRAIN_OUT) * dt;
       if (e < EAT_BELOW && under && ch) {
         const o = discOffsets(2)[cy & 1] as Int16Array;
@@ -3818,7 +3703,7 @@ export class Colony {
       if (!under) continue;
       scentSum.add(cx, cy, scent[i]);
       if (queenHere && hexDistance(cx, cy, qx, qy) <= 1) touching++;
-      felt.put(cx, cy, Math.max(PASS * this.#feltLast[i], adultBegOf(e)));
+      felt.put(cx, cy, Math.max(PASS * this.feltLast[i], adultBegOf(e)));
       if (e > SHARE_ABOVE) donors.put(cx, cy, i, energy);
     }
     // The queen's scent (ja-lo8.9, royal.ts): it fades; underground it moves toward the mean the ants within one cell
@@ -3837,7 +3722,7 @@ export class Colony {
       if (!this.alive[i]) continue;
       let now = 0;
       let sc = scent[i] * fade;
-      if (this.#under[i] === 1) {
+      if (this.under[i] === 1) {
         this.antCell(i);
         const cx = CELL[0];
         const cy = CELL[1];
@@ -3860,7 +3745,7 @@ export class Colony {
         now = felt.near(cx, cy);
       }
       scent[i] = sc;
-      this.#feltLast[i] = now;
+      this.feltLast[i] = now;
       this.need[i] = feel(this.need[i], now, dt);
     }
   }
@@ -3915,7 +3800,7 @@ export class Colony {
     // below it within seconds and no queen ever died: review of #27).
     for (let i = 0; i < this.n; i++) {
       const r = this.regicide[i];
-      if (!this.alive[i] || r <= 0 || !this.#under[i]) continue; // the queen and brood are underground
+      if (!this.alive[i] || r <= 0 || !this.under[i]) continue; // the queen and brood are underground
       const crown = 1 - Math.exp(-CROWN_RATE * r * dt);
       this.antCell(i);
       const hx = CELL[0];
@@ -4334,13 +4219,13 @@ export class Colony {
     }
   }
 
-  /** Whether ant i is in a cell it hasn't looked round yet this trip (leaves its cell in CELL; the cell it looked from before goes in #cameFrom). */
+  /** Whether ant i is in a cell it hasn't looked round yet this trip (leaves its cell in CELL; the cell it looked from before goes in cameFrom). */
   #enteredCell(i: number): boolean {
     this.antCell(i);
     const packed = cellKey(CELL[0], CELL[1]);
-    if (this.#looked[i] === packed) return false;
-    this.#cameFrom[i] = this.#looked[i];
-    this.#looked[i] = packed;
+    if (this.looked[i] === packed) return false;
+    this.cameFrom[i] = this.looked[i];
+    this.looked[i] = packed;
     return true;
   }
 
@@ -4442,7 +4327,7 @@ export class Colony {
    */
   #dropOut(i: number, col: number): void {
     const { map, ph } = this;
-    if (this.#corpse[i]) {
+    if (this.corpse[i]) {
       // On the midden: the corpse lies on the ground there, and the midden smells of the colony (a boundary: see raids).
       // A carrier that gave up short of it (SPOIL_GIVE_UP) leaves the corpse lying, unmarked, for another to take on.
       const row = groundTop(map, col) - 1;
@@ -4465,7 +4350,7 @@ export class Colony {
       this.#clearPellet(i);
       return;
     }
-    const side = (this.#spoilSide[i] || 1) as -1 | 1;
+    const side = (this.spoilSide[i] || 1) as -1 | 1;
     const heap = (): void => {
       const cell =
         heapMound(map, this.#entranceCol, side, 0, this.#holes, col) ??
@@ -4481,7 +4366,7 @@ export class Colony {
         if (v > above) ph.depositCell(ch, cell[0], cell[1] - 1, v - above);
       }
     };
-    if (this.#soil[i] !== SOIL_DUG) {
+    if (this.soil[i] !== SOIL_DUG) {
       this.looseDropped++;
       heap();
     } else {
@@ -4535,7 +4420,7 @@ export class Colony {
     this.antCell(i);
     const cx = CELL[0];
     const cy = CELL[1];
-    if (this.#corpse[i]) {
+    if (this.corpse[i]) {
       const midden = !atWill || this.#onMiddenRing(i, cx, cy);
       for (let n = this.corpses.length - 1; n >= 0; n--) {
         const k = this.corpses[n] as Corpse;
@@ -4559,7 +4444,7 @@ export class Colony {
     const heap = (): void => {
       if (!heapPlane(this.map, cx, cy, holes)) this.moundLost++;
     };
-    if (this.#soil[i] !== SOIL_DUG) {
+    if (this.soil[i] !== SOIL_DUG) {
       this.looseDropped++;
       heap();
     } else {
@@ -4580,14 +4465,14 @@ export class Colony {
    * corpse to the midden, at least MIDDEN_MIN from home by its vector and off the mound.
    */
   #carryOut(i: number): void {
-    this.#spoilA[i] = this.#rng() * 2 * Math.PI;
-    this.#spoilT[i] = 0;
-    if (this.#corpse[i]) this.#spoilTo[i] = MIDDEN_MIN;
+    this.spoilA[i] = this.#rng() * 2 * Math.PI;
+    this.spoilT[i] = 0;
+    if (this.corpse[i]) this.spoilTo[i] = MIDDEN_MIN;
     else {
       // The side view's draw (2 + reach × √u: uniform over a disc), with the disc's reach grown so its area tracks the soil
       // brought out at MOUND_HEIGHT levels deep (Tschinkel 2015), as the side view's length does along the ground: grown as
       // the side view's (linearly), the 2D disc thinned to under a pellet a cell.
-      this.#spoilTo[i] = 2 + planeMoundReach(this.#heaped) * Math.sqrt(this.#rng());
+      this.spoilTo[i] = 2 + planeMoundReach(this.#heaped) * Math.sqrt(this.#rng());
     }
     this.wall[i] = 0;
     this.mx[i] = NaN;
@@ -4626,7 +4511,7 @@ export class Colony {
     if (!this.responses.get(this.touch(i, enemy, this.mode[i], "none", "soil"))) return false;
     if (!takePlane(map, cx, cy)) return false;
     this.pellet[i] = 1;
-    this.#soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;
+    this.soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;
     this.loosePicked++;
     this.since[i] = 0;
     this.#homeAfresh(i);
@@ -4637,9 +4522,9 @@ export class Colony {
       const odo = this.odoSurf[i];
       const bx = this.nest.x + odo * this.driftSurf[i];
       const by = this.nest.y + odo * this.driftSurfY[i];
-      this.#spoilA[i] = Math.atan2(this.y[i] - by, this.x[i] - bx);
-      this.#spoilTo[i] = this.#fromHomePlane(i) + LOOSE_SPREAD * (0.5 + this.#rng());
-      this.#spoilT[i] = 0;
+      this.spoilA[i] = Math.atan2(this.y[i] - by, this.x[i] - bx);
+      this.spoilTo[i] = this.#fromHomePlane(i) + LOOSE_SPREAD * (0.5 + this.#rng());
+      this.spoilT[i] = 0;
     }
     return true;
   }
@@ -4656,18 +4541,18 @@ export class Colony {
     const cx = CELL[0];
     const cy = CELL[1];
     if (this.carrying[i]) {
-      if (this.#porter[i]) {
+      if (this.porter[i]) {
         const here = this.map.chambers ? this.map.chambers.at(cx, cy) : -1;
         const c = here >= 0 ? this.map.chambers!.list[here]! : null;
         if (!c || c.colony !== this.params.nest) return;
         this.#stock(c, 1);
         this.portTrips++;
         this.#inJaws -= 1;
-        this.#porter[i] = 0;
-        this.#portTo[i] = -1;
+        this.porter[i] = 0;
+        this.portTo[i] = -1;
       } else {
         dropFood(this.map, this.x[i], this.y[i], 1, this.quality[i]);
-        this.#putAt[i] = cellKey(cx, cy);
+        this.putAt[i] = cellKey(cx, cy);
       }
       this.carrying[i] = 0;
     } else if (this.pellet[i]) {
@@ -4682,7 +4567,7 @@ export class Colony {
         this.#clearPellet(i);
       } else if (isSky(this.map, cx, cy)) this.#dropOut(i, cx);
       else return;
-    } else if (this.#holdsBrood[i]) this.#dropBrood(i);
+    } else if (this.broodHeld[i]) this.#dropBrood(i);
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
   }
@@ -4690,10 +4575,10 @@ export class Colony {
   /** Ant i carries no pellet (or corpse) any more: the pellet, what it was, and where it was taking it, all at once. */
   #clearPellet(i: number): void {
     this.pellet[i] = 0;
-    this.#soil[i] = SOIL_DUG;
-    this.#corpse[i] = 0;
-    this.#spoilTo[i] = NaN;
-    this.#staleWalk[i] = 0;
+    this.soil[i] = SOIL_DUG;
+    this.corpse[i] = 0;
+    this.spoilTo[i] = NaN;
+    this.staleWalk[i] = 0;
   }
 
   /**
@@ -4729,7 +4614,7 @@ export class Colony {
   /** Ant i takes up a loose pellet from column `col` (off the mound's top): down to fill, or spreading it farther out. */
   #takeUpLoose(i: number, col: number, fill: boolean): void {
     this.pellet[i] = 1;
-    this.#soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;
+    this.soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;
     this.loosePicked++;
     this.since[i] = 0;
     this.wall[i] = 0;
@@ -4738,9 +4623,9 @@ export class Colony {
     const out = col >= this.#entranceCol ? 1 : -1;
     if (fill) this.looseDown++;
     else {
-      this.#spoilSide[i] = out;
-      this.#spoilTo[i] = Math.abs(col - this.#entranceCol) + LOOSE_SPREAD * (0.5 + this.#rng());
-      this.#spoilT[i] = 0;
+      this.spoilSide[i] = out;
+      this.spoilTo[i] = Math.abs(col - this.#entranceCol) + LOOSE_SPREAD * (0.5 + this.#rng());
+      this.spoilT[i] = 0;
     }
   }
 
@@ -4812,7 +4697,7 @@ export class Colony {
     // 0, or no living rival: N3, S1) "raid" is a wait: it goes at raidScout, a scout like any other.
     if (answer === "raid" && this.params.stanceGate > 0 && this.params.raidGate > 0 && own && this.raidable) {
       this.recruited[i] = 1;
-      this.#gone[i] = 0;
+      this.gone[i] = 0;
       this.raidScouts++;
     }
     return true;
@@ -4838,7 +4723,7 @@ export class Colony {
     // Top-down, each ant's own (docs/stance.md): defend while it senses a threat on home ground, raid once recruited, else
     // forage. In one world on both layers (the owner's choice, ja-lp4.3): a raider keeps its stance down a rival's shaft.
     if (this.params.stanceGate > 0 && (this.#entrance === null || this.line !== null))
-      return this.#defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
+      return this.defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
     return this.stance === "raid" && this.recruited[i] === 0 && this.params.raidGate > 0 && this.#entrance === null
       ? "forage"
       : this.stance;
@@ -4894,8 +4779,8 @@ export class Colony {
       (m === EXPLORE || m === FOLLOW || (m === FIGHT && this.recruited[i] === 1)) &&
       !this.carrying[i] &&
       !this.pellet[i] &&
-      !this.#holdsBrood[i] &&
-      !this.#porter[i] &&
+      !this.broodHeld[i] &&
+      !this.porter[i] &&
       !this.reporting[i] &&
       this.band(i) === 2 &&
       this.#atGate(i)
@@ -5101,7 +4986,7 @@ export class Colony {
       h += Math.PI;
       this.gx[i] = NO_CELL;
     }
-    this.#cellAtX[i] = NaN; // its cell is worked out afresh
+    this.cellAtX[i] = NaN; // its cell is worked out afresh
     return h;
   }
 
@@ -5114,7 +4999,7 @@ export class Colony {
    * loose pellet taken home to backfill goes in.
    */
   #wantsIn(i: number, mode: number): boolean {
-    return this.carrying[i] === 1 || (mode === RETURN && (this.pellet[i] === 0 || this.#soil[i] === SOIL_FILL));
+    return this.carrying[i] === 1 || (mode === RETURN && (this.pellet[i] === 0 || this.soil[i] === SOIL_FILL));
   }
 
   /** Whether ant i is one world's, on the plane, and going in (#wantsIn): false at once on any other game. */
@@ -5130,11 +5015,11 @@ export class Colony {
    * nest's tunnels heads for the hole, and climbs out.
    */
   #mayCrossUp(i: number): boolean {
-    if (this.#holdsBrood[i] === 1 || this.#porter[i] === 1) return false;
+    if (this.broodHeld[i] === 1 || this.porter[i] === 1) return false;
     if (this.pellet[i] === 1) return true;
     // Held at the gate at the top of its own shaft (ja-web): not until it has a pass.
     if (this.params.leaveGate > 0 && this.#holdsAt(i)) return false;
-    return this.#mayGoOut(i) && !(this.mode[i] === RETURN && this.#goalKind[i] === 0);
+    return this.#mayGoOut(i) && !(this.mode[i] === RETURN && this.goalKind[i] === 0);
   }
 
   /** The colony (an index into holeCells) whose hole is plane cell (px, py), or −1. */
@@ -5163,16 +5048,16 @@ export class Colony {
       }
     }
     const hc = hs[k] as HoleCell;
-    if (this.pellet[i] && this.#soil[i] === SOIL_FILL) {
+    if (this.pellet[i] && this.soil[i] === SOIL_FILL) {
       // Taken down to backfill and found nowhere: back out with it, to spread (as at the chamber: looseBack).
-      this.#soil[i] = SOIL_LOOSE;
+      this.soil[i] = SOIL_LOOSE;
       this.looseBack++;
     } else if (this.carrying[i]) this.carriedUp++;
     this.layer[i] = PLANE;
     this.x[i] = centreX(hc.px, hc.py);
     this.y[i] = centreY(hc.py);
-    this.#under[i] = 0;
-    this.#goalKind[i] = 1;
+    this.under[i] = 0;
+    this.goalKind[i] = 1;
     if (k === this.params.nest) {
       // Up out of its own hole the vector starts afresh, pointing at it, with this trip's drift in 2D (U3b). Up out of a
       // rival's it runs on, its error standing (the side view's rule, #integrate; review of #20).
@@ -5181,7 +5066,7 @@ export class Colony {
       this.driftSurfY[i] = gauss(this.#rng) * PI_DRIFT_2D;
       this.#routeClear(i); // a fresh trip out: no places of the last
     }
-    this.#lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
+    this.lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
     this.leaveOk[i] = 0; // its pass through the gate is used (ja-web)
     this.#crossed(i);
     if (this.pellet[i]) this.#carryOut(i);
@@ -5207,18 +5092,18 @@ export class Colony {
       }
     } else if (gated && p.arrive !== "return" && this.mode[i] === RETURN && !this.pellet[i] && this.band(i) === 2 && !this.#isTired(i)) {
       this.mode[i] = p.arrive === "follow" && !this.recruited[i] ? FOLLOW : EXPLORE;
-      this.#asked[i] = -1;
-      this.#restT[i] = 0;
+      this.asked[i] = -1;
+      this.restT[i] = 0;
     }
     this.reporting[i] = 0; // a finder has told: its trail ends here, at the hole (ja-web)
     this.layer[i] = CURTAIN;
     this.x[i] = centreX(hc.col, hc.row);
     this.y[i] = centreY(hc.row);
     this.heading[i] = Math.PI / 2;
-    this.#under[i] = 1;
+    this.under[i] = 1;
     this.search[i] = 0;
-    this.#goalKind[i] = 1;
-    this.#defending[i] = 0;
+    this.goalKind[i] = 1;
+    this.defending[i] = 0;
     this.#crossed(i);
     this.crossedDown++;
   }
@@ -5233,29 +5118,29 @@ export class Colony {
     this.hugT[i] = 0;
     this.loopX[i] = NO_CELL;
     this.followT[i] = 0;
-    this.#noTunnel[i] = NO_KEY;
-    this.#looked[i] = NO_KEY;
-    this.#cameFrom[i] = NO_KEY;
-    this.#lastDug[i] = NO_KEY;
-    this.#putAt[i] = NO_KEY;
-    this.#chamberCell[i] = NO_KEY;
-    this.#staleWalk[i] = 0;
-    this.#spoilTo[i] = NaN;
-    this.#cellAtX[i] = NaN;
-    this.#groundRef[i] = NaN;
-    this.#restT[i] = 0;
+    this.noTunnel[i] = NO_KEY;
+    this.looked[i] = NO_KEY;
+    this.cameFrom[i] = NO_KEY;
+    this.lastDug[i] = NO_KEY;
+    this.putAt[i] = NO_KEY;
+    this.chamberCell[i] = NO_KEY;
+    this.staleWalk[i] = 0;
+    this.spoilTo[i] = NaN;
+    this.cellAtX[i] = NaN;
+    this.groundRef[i] = NaN;
+    this.restT[i] = 0;
   }
 
   /**
    * Put living ant i on layer `layer` at world (x, y), as if it had crossed there (tests: one world's crossings). Out of
-   * the nest's layer it is on the surface (`#under` 0), on it underground.
+   * the nest's layer it is on the surface (`under` 0), on it underground.
    */
   putAnt(i: number, layer: number, x: number, y: number): void {
     this.layer[i] = layer;
     this.x[i] = x;
     this.y[i] = y;
-    this.#under[i] = layer === this.home && this.#entranceOf(layer) ? 1 : 0;
-    this.#goalKind[i] = 1;
+    this.under[i] = layer === this.home && this.#entranceOf(layer) ? 1 : 0;
+    this.goalKind[i] = 1;
     this.#crossed(i);
   }
 
@@ -5353,14 +5238,14 @@ export class Colony {
         const felt = toEnemy !== null || this.#alarmSmelt !== "none";
         const th = this.threat[i] * threatLeak + (felt ? dt : 0);
         this.threat[i] = th;
-        this.#defending[i] = th >= p.defendAt && Math.hypot(this.x[i] - this.nest.x, this.y[i] - this.nest.y) <= p.homeGround ? 1 : 0;
+        this.defending[i] = th >= p.defendAt && Math.hypot(this.x[i] - this.nest.x, this.y[i] - this.nest.y) <= p.homeGround ? 1 : 0;
       }
       // Raid stance (behaviour MR 5.2): a raid is a bias, not an order. An ant is recruited by smelling a scout's raid trail, or goes out
       // as a scout at raidScout when it is home with empty jaws; the others forage. A recruited ant's raid ends when it comes home
       // with no trail under it: no trail was laid for it, or the trail has faded.
       if (rgate && (sgate || this.stance === "raid")) {
         const homeNow = this.#atNestTop(i);
-        if (!homeNow) this.#gone[i] = 1;
+        if (!homeNow) this.gone[i] = 1;
         if (this.recruited[i] === 0) {
           // Where each ant's stance is its own, the trail recruits at home (docs/stance.md; Polyergus scouts recruit the workers at their
           // own nest): an ant out at its work crosses it and carries on. Recruiting anywhere ran away: G′ seed 1, 773 of 899 raiding.
@@ -5376,30 +5261,30 @@ export class Colony {
                 this.#rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, this.#raidLevel(i) / STRONG) * dt)))
           ) {
             this.recruited[i] = 1;
-            this.#gone[i] = 0;
+            this.gone[i] = 0;
             this.recruits++;
           } else if (
             !sgate &&
             homeNow &&
             !this.carrying[i] &&
             !this.pellet[i] &&
-            !this.#holdsBrood[i] &&
+            !this.broodHeld[i] &&
             this.#rng() < 1 - Math.exp(-p.raidScout * dt)
           ) {
             this.recruited[i] = 1;
-            this.#gone[i] = 0;
+            this.gone[i] = 0;
             this.mode[i] = FIGHT; // out it goes
             this.raidScouts++;
           }
-        } else if (homeNow && this.#gone[i] === 1 && this.#raidSmelt(i) === "none") {
+        } else if (homeNow && this.gone[i] === 1 && this.#raidSmelt(i) === "none") {
           this.recruited[i] = 0;
-          this.#gone[i] = 0;
+          this.gone[i] = 0;
         }
-        if (homeNow || this.recruited[i] === 0) this.#pastEnd[i] = 0;
+        if (homeNow || this.recruited[i] === 0) this.pastEnd[i] = 0;
       } else if (this.recruited[i] === 1 && this.line === null) {
         // (In one world a raider keeps its stance underground: its raid ends at home on the plane.)
         this.recruited[i] = 0;
-        this.#pastEnd[i] = 0;
+        this.pastEnd[i] = 0;
       }
       // One world (ja-web): an ant held at the gate smells the plane's raid trail where it ends, at its own hole (#raidSmelt:
       // a finder recruits at its own entrance, Topoff et al. 1987), and is recruited by it by degrees, as an idle ant at
@@ -5414,7 +5299,7 @@ export class Colony {
         rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, this.#raidLevel(i) / STRONG) * dt)
       ) {
         this.recruited[i] = 1;
-        this.#gone[i] = 0;
+        this.gone[i] = 0;
         this.recruits++;
       }
       // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
@@ -5423,7 +5308,7 @@ export class Colony {
       // the side view ~11 % a tick for nothing, review of #35.)
       if (
         this.responses.carry !== localResponses.carry &&
-        (this.carrying[i] || this.pellet[i] || this.#holdsBrood[i]) &&
+        (this.carrying[i] || this.pellet[i] || this.broodHeld[i]) &&
         this.responses.carry(this.touch(i, toEnemy !== null)) === "put down"
       )
         this.#putDown(i);
@@ -5433,14 +5318,14 @@ export class Colony {
       // So does one carrying a soil pellet it dug, to drop on the mound.
       const carrying = this.carrying[i] === 1;
       const pellet = this.pellet[i] === 1;
-      const nursing = this.#holdsBrood[i] === 1;
+      const nursing = this.broodHeld[i] === 1;
       // One world's plane (U3c): carrying spoil or a corpse out from its hole, by its own vector (#carryOut). Spoil or a
       // corpse on the plane is always on its way out (one put there some other way, a test's, sets out now); only a loose
       // pellet taken home to backfill is not.
-      if (pellet && this.line !== null && this.#cur === PLANE && this.#soil[i] !== SOIL_FILL && Number.isNaN(this.#spoilTo[i]))
+      if (pellet && this.line !== null && this.#cur === PLANE && this.soil[i] !== SOIL_FILL && Number.isNaN(this.spoilTo[i]))
         this.#carryOut(i);
-      const outward = pellet && this.line !== null && this.#cur === PLANE && !Number.isNaN(this.#spoilTo[i]);
-      if (!pellet) this.#staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
+      const outward = pellet && this.line !== null && this.#cur === PLANE && !Number.isNaN(this.spoilTo[i]);
+      if (!pellet) this.staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
       // A finder (behaviour MR 5.2): a raider outside, its jaws empty, no raid trail under it, that has been in contact with
       // strangers for findAt seconds goes home to tell, laying the raid trail on the way. (A raider on the trail meeting
       // strangers fights them: the trail is where the scout was before.)
@@ -5467,7 +5352,7 @@ export class Colony {
       let goal = this.#goal(i, pellet);
       // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant. Only
       // where there is a hole into the layer: one world's plane has no chambers (its carriers home to the hole: #crossDown).
-      if (nursing && goal === this.nest && this.#entrance) goal = this.#chamberGoal(this.#broodTo[i]);
+      if (nursing && goal === this.nest && this.#entrance) goal = this.#chamberGoal(this.broodTo[i]);
       // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
       // its food to (a forager: reception, or the royal chamber until there is one).
       else if (carrying && this.queen && goal === this.nest && this.#entrance) goal = this.#chamberGoal(this.#foodTo(i));
@@ -5476,7 +5361,7 @@ export class Colony {
       const y0 = this.y[i];
       let mode = this.mode[i];
       const prevMode = mode;
-      const item: Item = carrying ? "food" : pellet ? (this.#corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
+      const item: Item = carrying ? "food" : pellet ? (this.corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
       const resp = this.responses;
       let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
       let waiting = false;
@@ -5486,17 +5371,17 @@ export class Colony {
         // question comes once the load is down.
         mode = RETURN;
         this.mode[i] = mode;
-        this.#asked[i] = -1;
-        this.#question[i] = -1;
-        if (!reporting) this.#loaded[i] = 1;
+        this.asked[i] = -1;
+        this.question[i] = -1;
+        if (!reporting) this.loaded[i] = 1;
       } else {
         // Its load just put down, wherever that was (spoil on the mound, a corpse on the midden, food in the larder): the
         // carrying trip is over, so it is not returning any more (ja-qnx; `arrive`). It heads back out along its trail: a
         // follower, which a fresh ant is asked as the local rule asked a returner (both follow a trail, explore without
         // one). As an explorer, the middle-aged diggers no longer followed the carriers' scent down to reception, where
         // they port its food on: food piled up there (A8, seeds 5-6: 30-37 % of the nest's food carried on, main 87-100 %).
-        if (this.#loaded[i]) {
-          this.#loaded[i] = 0;
+        if (this.loaded[i]) {
+          this.loaded[i] = 0;
           if (p.arrive !== "return" && mode === RETURN) {
             mode = FOLLOW;
             this.mode[i] = mode;
@@ -5520,10 +5405,10 @@ export class Colony {
           rolled = true;
           if (this.#leaves(i, dt, false)) {
             this.leaveOk[i] = 1;
-            this.#asked[i] = -1;
+            this.asked[i] = -1;
           }
         }
-        if (before !== this.#asked[i] && !waiting) {
+        if (before !== this.asked[i] && !waiting) {
           mode = MODES.indexOf(
             this.policy({
               mode: MODES[mode] as Mode,
@@ -5542,9 +5427,9 @@ export class Colony {
           if (mode === FIGHT && !enemy && this.#stanceOf(i) === "raid" && this.queen && !this.#mayGoOut(i)) mode = EXPLORE;
           if (mode === RETURN && this.mode[i] !== RETURN) this.#homeAfresh(i);
           this.mode[i] = mode;
-          this.#asked[i] = packSituation(mode, tired, food, home, alarm, enemy, stance);
+          this.asked[i] = packSituation(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
-          this.#question[i] = before;
+          this.question[i] = before;
           this.decisions++;
         }
       }
@@ -5568,13 +5453,13 @@ export class Colony {
         // The situation as answered, with the mode the contact response set: else the mode policy, asked again next step,
         // put the ant back on its trail and contact turned it round again, resetting its homing every other step (review
         // of #38: 6,170 flips in 150 s on G′ seed 1).
-        if (situation0 >= 0) this.#asked[i] = situation0 + mode * MODE_STRIDE;
+        if (situation0 >= 0) this.asked[i] = situation0 + mode * MODE_STRIDE;
       }
       // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
       // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
       // (Steering it by a drifted one left carriers surfacing off target and dropping spoil in pits beside the hole.)
       // (On one world's plane a loose pellet taken home to backfill homes by its vector, as any returner there.)
-      if (mode === RETURN && (!pellet || (this.line !== null && this.#cur === PLANE && this.#soil[i] === SOIL_FILL)))
+      if (mode === RETURN && (!pellet || (this.line !== null && this.#cur === PLANE && this.soil[i] === SOIL_FILL)))
         nest = this.#believe(i, goal);
       this.#goalX = nest.x;
       this.#goalY = nest.y;
@@ -5588,7 +5473,7 @@ export class Colony {
       if (mode !== prevMode) {
         this.gx[i] = NO_CELL;
         this.digAim[i] = NaN;
-        this.#chamberCell[i] = NO_KEY; // a face aimed at as an explorer: stale once it does something else (review of slice 2)
+        this.chamberCell[i] = NO_KEY; // a face aimed at as an explorer: stale once it does something else (review of slice 2)
       }
       const digging = this.digT[i] > 0;
       if (mode !== RETURN) {
@@ -5603,7 +5488,7 @@ export class Colony {
       } else if (outward) {
         // Out on its heading; a bump turned it (below), and while it wanders after one, it wanders.
         if (detouring) h += noise * p.wander;
-        else h = turnToward(h, this.#spoilA[i], p.turnRate * dt) + noise * p.wander * 0.25;
+        else h = turnToward(h, this.spoilA[i], p.turnRate * dt) + noise * p.wander * 0.25;
       } else if (mode === RETURN) {
         // Homing uses only what an ant has: its home vector (path integration: real ants count steps
         // against a sky compass), its antennae, and touch. A straight line home walks into the same
@@ -5676,9 +5561,9 @@ export class Colony {
         // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
         const look =
           pellet &&
-          !this.#corpse[i] &&
+          !this.corpse[i] &&
           map.hasSoil &&
-          Number.isNaN(this.#spoilTo[i]) &&
+          Number.isNaN(this.spoilTo[i]) &&
           this.since[i] > this.params.backfill.after &&
           this.#enteredCell(i);
         const lx = CELL[0];
@@ -5689,9 +5574,9 @@ export class Colony {
           this.gx[i] = NO_CELL;
           this.wall[i] = 0;
           this.mx[i] = NaN;
-        } else if (look && Number.isNaN(this.#spoilTo[i]) && this.#enterStale(i, lx, ly)) {
+        } else if (look && Number.isNaN(this.spoilTo[i]) && this.#enterStale(i, lx, ly)) {
           h = this.#towardTarget(i); // into a stale branch, to fill its end
-        } else if (this.#staleWalk[i] && this.#staleStep(i, p.speed * dt)) {
+        } else if (this.staleWalk[i] && this.#staleStep(i, p.speed * dt)) {
           h = this.#towardTarget(i); // on along it
         } else if (side === 0 && !(detouring && this.detour[i] > 0) && this.#walkTunnel(i, RETURN, p.speed * dt)) {
           h = this.#towardTarget(i); // in a tunnel: back the way it came (a wall it is already following, it keeps following)
@@ -5804,13 +5689,12 @@ export class Colony {
               // Or, a few times a trip, after 3 s of following wherever the way home is open: a hand on the wall
               // in a dug-out cavern drifts from speck to speck farther from home, and a speck needn't be walked
               // round. Only a few: a release that makes no progress could leave and meet the same wall for ever.
-              const anywhere = t > 3 && this.#noGain[i] < NO_GAIN && open2;
+              const anywhere = t > 3 && this.noGain[i] < NO_GAIN && open2;
               const sight = Math.hypot(goal.x - ox, goal.y - oy) < NEST_SIGHT && this.#clearTo(ox, oy, goal.x, goal.y);
               const leave = this.gx[i] !== NO_CELL && (onLine || island || nearer || anywhere || sight);
               // Into a tunnel with home scent: the scent leads from here (counted like a release: it may lead
               // back to this same wall, so after a few that gain nothing, only progress lets it go).
-              const scent =
-                !leave && (dist < hit - GAIN || this.#noGain[i] < NO_GAIN) && tunnel(map, cx, cy) && this.#homeScentNear(cx, cy);
+              const scent = !leave && (dist < hit - GAIN || this.noGain[i] < NO_GAIN) && tunnel(map, cx, cy) && this.#homeScentNear(cx, cy);
               if (looped && !leave && !scent && this.byCell[i]) {
                 // All the way round this wall (a speck of soil) and nowhere on it nearer home: it can't be the
                 // way. Give up on it now (wander a while, then try afresh) rather than after FOLLOW_GIVE_UP.
@@ -5819,8 +5703,8 @@ export class Colony {
                 // Progress is kept from wall to wall: the next wall it meets is judged against the nearest it has been
                 // (a give-up, which wanders, starts the trip's count afresh). A release that gains nothing counts
                 // against the few allowed, an island's too (review of #10: leave, meet the same spot, go round, leave).
-                if (dist < hit - GAIN) this.#noGain[i] = 0;
-                else if (!onLine && !nearer && !sight) this.#noGain[i] = this.#noGain[i] + 1;
+                if (dist < hit - GAIN) this.noGain[i] = 0;
+                else if (!onLine && !nearer && !sight) this.noGain[i] = this.noGain[i] + 1;
                 this.hitDist[i] = Math.min(hit, dist);
               }
               if (leave) {
@@ -5854,7 +5738,7 @@ export class Colony {
         else {
           // "No entry" ahead (behaviour MR 3): the food scent it marks counts for less. Read only where some was laid, and
           // only outside (a top-down map, or the side view's ground), where food trails lead to food.
-          const outside = this.#entrance === null || !this.#under[i];
+          const outside = this.#entrance === null || !this.under[i];
           let gl = fl;
           let gf = ff;
           let gr = fr;
@@ -5906,7 +5790,7 @@ export class Colony {
         if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - this.calm[i]));
         else if (Math.max(al, af, ar) >= FAINT && !sideRaid) h += climb(al, af, ar, p.turnRate * dt);
         else if (sideRaid && ((this.detour[i] = 0), this.#walkTunnel(i, FIGHT, p.speed * dt))) h = this.#towardTarget(i);
-        else if (this.#stanceOf(i) === "raid" && this.raidTarget && this.#entrance && this.#under[i]) {
+        else if (this.#stanceOf(i) === "raid" && this.raidTarget && this.#entrance && this.under[i]) {
           // A raider in a chamber (no tunnel: free steering): out of its own nest by its hole, or on into the rival's.
           // Steering straight at the rival's hole through soil left nearly every raider bumping inside its own nest.
           this.antCell(i);
@@ -5926,9 +5810,9 @@ export class Colony {
           // Nothing ahead as strong as underfoot, facing along the trail (the front sensor strongest): the raider leaves the trail and
           // searches on (raidOnward) as a scout does (a run out, then a search), until home. Mostly near home, where the trail is weak
           // and patchy (review of #44: a median 0.05–0.19 of the way out); gated on a strong end instead, A11 gained less (1.67, 2.01).
-          if (p.raidOnward > 0 && rf >= FAINT && rf === top && this.#pastEnd[i] === 0 && rf < ph.read("raid", x, y)) this.#pastEnd[i] = 1;
-          if (top >= FAINT && this.#pastEnd[i] === 0) h += climb(rl, rf, rr, p.turnRate * dt) + noise * p.wander * 0.25;
-          else if (this.#pastEnd[i] === 1 && top >= FAINT) h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
+          if (p.raidOnward > 0 && rf >= FAINT && rf === top && this.pastEnd[i] === 0 && rf < ph.read("raid", x, y)) this.pastEnd[i] = 1;
+          if (top >= FAINT && this.pastEnd[i] === 0) h += climb(rl, rf, rr, p.turnRate * dt) + noise * p.wander * 0.25;
+          else if (this.pastEnd[i] === 1 && top >= FAINT) h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
           else h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander;
           // One world's plane (U3c): the raided colony's midden marks its ground there too, and raiders shy from it, as the
           // side view's do (Pogonomyrmex badius; slice 7).
@@ -5957,9 +5841,9 @@ export class Colony {
         // Food in sight, unless soil stands between (it touched soil a moment ago): then keep a hand on the wall.
         if (seen && !(this.hugT[i] > 0)) h += climb(fl, ff, fr, p.turnRate * dt);
         else if (this.#walkTunnel(i, EXPLORE, p.speed * dt)) h = this.#towardTarget(i);
-        else if (this.queen?.alive && this.band(i) === 0 && this.#under[i])
+        else if (this.queen?.alive && this.band(i) === 0 && this.under[i])
           h = turnToward(h, Math.atan2(this.queen.y - this.y[i], this.queen.x - this.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
-        else if (this.#entrance && this.#outbound(i) && this.#under[i])
+        else if (this.#entrance && this.#outbound(i) && this.under[i])
           h =
             turnToward(h, Math.atan2(this.#entrance.y - this.y[i], this.#entrance.x - this.x[i]), p.turnRate * dt * 0.5) +
             noise * p.wander * 0.5;
@@ -5969,13 +5853,13 @@ export class Colony {
       }
       // Fleeing (behaviour MR 4): straight away from the strangers while they are in reach (then it resumes). Homing alone, the
       // fleeing ant often walked along them, or toward them, and died: G′ seed 2, 1,127 of the dead were fleeing.
-      if (fleeFrom !== null && (this.#entrance === null || !this.#under[i])) h = turnToward(h, fleeFrom + Math.PI, p.turnRate * dt * 2);
+      if (fleeFrom !== null && (this.#entrance === null || !this.under[i])) h = turnToward(h, fleeFrom + Math.PI, p.turnRate * dt * 2);
       // Smelling alarm: the alarmGain response says how hard to shy from it (locally: every mode but fighting, unless digging).
       if (Math.max(al, af, ar) >= FAINT) {
         const gain = resp.alarmGain(this.touch(i, toEnemy !== null, mode, item));
         // On the side view's ground line a carrier can't go round alarm, only turn back: it carries on home through it.
         // Shying, carriers turned back from fights at their own hole and held their food (G seeds 4, 8: raids, 3 held).
-        const noWayRound = carrying && this.#entrance !== null && !this.#under[i];
+        const noWayRound = carrying && this.#entrance !== null && !this.under[i];
         if (gain > 0 && !noWayRound) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
         // A faint alarm draws it: top-down only. In the side view the drawn explorers crowded the tunnels and the ground
         // line round the nest's fights (G seeds 1–20: 15/20 against 18/20 without the pull).
@@ -6066,10 +5950,10 @@ export class Colony {
         face = GLANCE; // (an aimed face passed ROOMY_DIG when it was chosen)
       // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say,
       // but not soil put back moments ago (see refilled: #17's hold on refilled cells).
-      if (face !== NO_FACE && this.#chamberCell[i] !== NO_KEY && mode === EXPLORE && !carrying && !pellet) {
+      if (face !== NO_FACE && this.chamberCell[i] !== NO_KEY && mode === EXPLORE && !carrying && !pellet) {
         cellOf(nx, ny);
         if (
-          this.#chamberCell[i] === cellKey(CELL[0], CELL[1]) &&
+          this.chamberCell[i] === cellKey(CELL[0], CELL[1]) &&
           rockAt(map, CELL[0], CELL[1]) === SOIL &&
           this.#digs(i) &&
           this.crowded() &&
@@ -6113,8 +5997,8 @@ export class Colony {
             this.gx[i] = NO_CELL;
           } else if (left <= 0 && digCell(map, fx, fy, this.time)) {
             // A chamber face: the cell joins its chamber (or founds a new one, if there is still room for one there).
-            if (this.#chamberCell[i] === cellKey(fx, fy) && map.chambers) this.#chamberDug(i, fx, fy);
-            this.#chamberCell[i] = NO_KEY;
+            if (this.chamberCell[i] === cellKey(fx, fy) && map.chambers) this.#chamberDug(i, fx, fy);
+            this.chamberCell[i] = NO_KEY;
             // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
             const aim = this.digAim[i];
             setTunnelHeading(
@@ -6127,9 +6011,9 @@ export class Colony {
             this.soilDug++;
             this.pellet[i] = 1;
             this.since[i] = 0;
-            this.#lastDug[i] = cellKey(fx, fy);
-            this.#looked[i] = NO_KEY; // a new trip home: every cell on it is looked round afresh
-            this.#cameFrom[i] = NO_KEY;
+            this.lastDug[i] = cellKey(fx, fy);
+            this.looked[i] = NO_KEY; // a new trip home: every cell on it is looked round afresh
+            this.cameFrom[i] = NO_KEY;
             this.#homeAfresh(i); // a fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it
             h += Math.PI;
           }
@@ -6150,7 +6034,7 @@ export class Colony {
             // touch rule. The cell is the landing cell the step was judged on (lx, ly: float32, as stored).
             const cellWall = map.hasSoil || rockAt(map, lx, ly) === SOIL;
             const newTrip = Number.isNaN(this.mx[i]);
-            if (newTrip) this.#noGain[i] = 0;
+            if (newTrip) this.noGain[i] = 0;
             if (newTrip || cellWall) {
               // The first rock this trip: remember where, so the line from here to the nest is the way home it
               // keeps returning to. Walls underground re-anchor it at every wall: in dug ground the ant meets speck
@@ -6197,7 +6081,7 @@ export class Colony {
           this.bumps[i] = Math.min(5, this.bumps[i] + 1);
           if (mode !== RETURN || outward) this.detour[i] = Math.max(this.detour[i], 0.5 * 2 ** Math.floor(this.bumps[i]) * (0.5 + rng()));
           // Carrying out on the plane (U3c): on from here the way it turned, not back into the rock.
-          if (outward) this.#spoilA[i] = h;
+          if (outward) this.spoilA[i] = h;
         }
       } else if (up) {
         // One world's curtain: a step up out of a hole (the crust is open nowhere else) is onto the surface, the plane's.
@@ -6212,7 +6096,7 @@ export class Colony {
           // marks start afresh at the next chamber (#layMark). Laying on, the young turned back at the hole marked the
           // shaft's top with brood and royal, which drew more young there (#toBrood): in the spike up to 13 were held
           // there for minutes.
-          this.#lastRole[i] = 0;
+          this.lastRole[i] = 0;
         }
         this.heading[i] = h;
         continue;
@@ -6220,10 +6104,10 @@ export class Colony {
         this.digT[i] = 0; // the face it was digging opened (another ant dug it), or it turned off it (its aim stays: it is walking up to the face)
         this.x[i] = nx;
         this.y[i] = ny;
-        this.#cellX[i] = lx;
-        this.#cellY[i] = ly;
-        this.#cellAtX[i] = this.x[i];
-        this.#cellAtY[i] = this.y[i];
+        this.cellX[i] = lx;
+        this.cellY[i] = ly;
+        this.cellAtX[i] = this.x[i];
+        this.cellAtY[i] = this.y[i];
       }
 
       // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
@@ -6254,11 +6138,11 @@ export class Colony {
       }
       // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
       const here = cellKey(CELL[0], CELL[1]);
-      if (this.#putAt[i] !== here) this.#putAt[i] = NO_KEY;
+      if (this.putAt[i] !== here) this.putAt[i] = NO_KEY;
       if (
         !carrying &&
         !pellet &&
-        this.#putAt[i] === NO_KEY &&
+        this.putAt[i] === NO_KEY &&
         map.food.get(CELL[0], CELL[1]) > 0 &&
         resp.get(this.touch(i, toEnemy !== null, mode, item, "food")) &&
         takeFoodCell(map, CELL[0], CELL[1])
@@ -6269,55 +6153,55 @@ export class Colony {
         this.#homeAfresh(i);
         this.since[i] = 0;
         this.fatigue[i] = 0; // found food: the search succeeded
-        this.#tired[i] = 0;
+        this.tired[i] = 0;
         h += Math.PI;
       } else if (outward) {
         // One world's plane (U3c): carrying out by its own vector. Spoil is heaped once it believes itself spoilTo from
         // home; a corpse goes on the midden once it is at least that far and off the mound (no spoil underfoot, which it can
         // feel). Either is put down where it stands after its give-up time.
-        this.#spoilT[i] = this.#spoilT[i] + dt;
-        const corpse = this.#corpse[i] === 1;
-        const far = this.#fromHomePlane(i) >= this.#spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
-        if (far || this.#spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) this.#dropPlane(i);
-      } else if (pellet && ent && !Number.isNaN(this.#spoilTo[i])) {
+        this.spoilT[i] = this.spoilT[i] + dt;
+        const corpse = this.corpse[i] === 1;
+        const far = this.#fromHomePlane(i) >= this.spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
+        if (far || this.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) this.#dropPlane(i);
+      } else if (pellet && ent && !Number.isNaN(this.spoilTo[i])) {
         // Carrying a pellet out along the ground (side view): dropped where it stands once far enough out (or stuck).
-        this.#spoilT[i] = this.#spoilT[i] + dt;
+        this.spoilT[i] = this.spoilT[i] + dt;
         const col = CELL[0];
         const onGround = isSky(map, col, CELL[1]);
         if (
-          (onGround && this.#spoilSide[i] * (col - this.#entranceCol) >= this.#spoilTo[i]) ||
-          this.#spoilT[i] > (this.#corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)
+          (onGround && this.spoilSide[i] * (col - this.#entranceCol) >= this.spoilTo[i]) ||
+          this.spoilT[i] > (this.corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)
         )
           this.#dropOut(i, col);
         // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
         // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
-      } else if (pellet && atEntrance && this.#soil[i] !== SOIL_FILL && this.line !== null) {
+      } else if (pellet && atEntrance && this.soil[i] !== SOIL_FILL && this.line !== null) {
         // One world: the spoil (or the dead) goes up the hole onto the plane, where it is put down (#crossUp).
         this.#crossUp(i, this.#entranceCol, this.#entranceRow);
         this.heading[i] = h;
         continue;
-      } else if (pellet && atEntrance && this.#soil[i] !== SOIL_FILL) {
+      } else if (pellet && atEntrance && this.soil[i] !== SOIL_FILL) {
         // Up and out of the hole: it carries the pellet on out along the ground to drop it, farther as the mound grows
         // (MOUND_REACH at most; more of them farther out, √ of a uniform draw), so the mound spreads as a disc, its area
         // tracking the nest's volume (Tschinkel 2015), where you see them drop it.
         const reach = Math.min(MOUND_REACH, 3 + this.#heaped / (2 * MOUND_HEIGHT));
-        if (this.#corpse[i]) {
+        if (this.corpse[i]) {
           // A corpse goes to the midden: one heap just past the mound's edge (harvesters: at the edge of the cleared disc).
-          this.#spoilTo[i] = this.#middenAt();
-          this.#spoilSide[i] = this.#middenSide();
+          this.spoilTo[i] = this.#middenAt();
+          this.spoilSide[i] = this.#middenSide();
         } else {
-          this.#spoilTo[i] = 2 + reach * Math.sqrt(rng());
-          this.#spoilSide[i] = rng() < 0.5 ? -1 : 1;
+          this.spoilTo[i] = 2 + reach * Math.sqrt(rng());
+          this.spoilSide[i] = rng() < 0.5 ? -1 : 1;
         }
-        this.#spoilT[i] = 0;
-        this.#staleWalk[i] = 0;
+        this.spoilT[i] = 0;
+        this.staleWalk[i] = 0;
         this.wall[i] = 0;
         this.mx[i] = NaN;
         this.gx[i] = NO_CELL;
-      } else if (pellet && this.#soil[i] === SOIL_FILL && atNest && !(this.line !== null && this.#cur === PLANE)) {
+      } else if (pellet && this.soil[i] === SOIL_FILL && atNest && !(this.line !== null && this.#cur === PLANE)) {
         // A loose pellet taken down to fill unused space, and none found on the way: it carries it back out. Most do (over
         // 90 %: PRD §40), and that is the rule as meant: see LOOSE_FILL_PICK.
-        this.#soil[i] = SOIL_LOOSE;
+        this.soil[i] = SOIL_LOOSE;
         this.looseBack++;
         this.wall[i] = 0;
         this.mx[i] = NaN;
@@ -6371,15 +6255,15 @@ export class Colony {
           !pellet &&
           !this.#isTired(i) &&
           !this.#inbound(i, mode) &&
-          (this.#restT[i] = this.#restT[i] + dt) > REST &&
+          (this.restT[i] = this.restT[i] + dt) > REST &&
           (!gate || ((rolled = true), this.#leaves(i, dt, toEnemy !== null)))
         ) {
           this.mode[i] = EXPLORE;
-          this.#asked[i] = -1;
-          this.#restT[i] = 0;
+          this.asked[i] = -1;
+          this.restT[i] = 0;
         }
       } else this.since[i] = this.since[i] + dt;
-      if (!atNest) this.#restT[i] = 0;
+      if (!atNest) this.restT[i] = 0;
       // Fatigue (ja-q47, docs/tiredness.md): what makes a forager tired is an unsuccessful search, and rest is a stay
       // inside. It grows only while the ant is out with empty jaws, exploring, following or fighting (a raid or a defence
       // tires it too: with fights left out, nothing sent a fighter home, raids never ended and combat losses rose 56-72 %,
@@ -6387,21 +6271,21 @@ export class Colony {
       // a full rest taking restTime. Finding food clears it (above). Digging, carrying spoil or nursing
       // neither tire nor rest it. Before, a timer that only the hole reset made every inside worker "tired".
       {
-        const inside = atNest || (ent !== null && this.#under[i] === 1 && this.#ownNestHere(i));
+        const inside = atNest || (ent !== null && this.under[i] === 1 && this.#ownNestHere(i));
         // Both run on the ant's clock (the fungus's lever slows tiring and resting alike), and fatigue stops at twice
         // patience, so an ant kept out (by Jev, say) needs no more than twice restTime to rest (review of #36).
         const m = this.mode[i];
         if (inside) this.fatigue[i] = Math.max(0, this.fatigue[i] - ((p.patience / p.restTime) * dt) / this.clock[i]);
-        else if (!this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && (m === EXPLORE || m === FOLLOW || m === FIGHT))
+        else if (!this.carrying[i] && !this.pellet[i] && !this.broodHeld[i] && (m === EXPLORE || m === FOLLOW || m === FIGHT))
           this.fatigue[i] = Math.min(2 * p.patience, this.fatigue[i] + dt / this.clock[i]);
         // Tired once past patience, and until fully rested: resting only to just under the line sent foragers out to
         // tire again at once (G: up to 8 held, food home -9 %, in the first sweep).
         if (this.fatigue[i] > this.#patience(i)) {
           // Tired where it searches round its last find's spot, with nothing found: that spot is spent (ja-lp4.15).
-          if (this.#tired[i] === 0 && p.siteFidelity > 0 && this.search[i] !== 0 && this.line !== null && this.#cur === PLANE)
+          if (this.tired[i] === 0 && p.siteFidelity > 0 && this.search[i] !== 0 && this.line !== null && this.#cur === PLANE)
             this.foodX[i] = this.foodY[i] = NaN;
-          this.#tired[i] = 1;
-        } else if (this.fatigue[i] === 0) this.#tired[i] = 0;
+          this.tired[i] = 1;
+        } else if (this.fatigue[i] === 0) this.tired[i] = 0;
       }
       // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
       // returning (Jev answered "return" to every returner, home or not: PRD §42.4), so a fresh one that has got home with
@@ -6426,18 +6310,18 @@ export class Colony {
         !nursing &&
         !this.#isTired(i) &&
         !this.#inbound(i, RETURN) &&
-        (ent === null ? atNest : this.#under[i] === 1 && this.band(i) === 2 && this.#home(i)) &&
+        (ent === null ? atNest : this.under[i] === 1 && this.band(i) === 2 && this.#home(i)) &&
         (!gate || (!rolled && this.#leaves(i, dt, toEnemy !== null)))
       ) {
         // A raid scout starts exploring, not on a food trail (review of #53, N6).
         this.mode[i] = p.arrive === "follow" && !this.recruited[i] ? FOLLOW : EXPLORE;
-        this.#asked[i] = -1;
-        this.#restT[i] = 0;
+        this.asked[i] = -1;
+        this.restT[i] = 0;
       }
       if (ent) {
         // Zoned by age (slice 6): an ant not to go out that has just stepped up out of the hole onto the ground goes
         // back down (carriers aside: soil goes out to the mound; food is on its way in).
-        if (this.queen && this.#under[i] && !carrying && !pellet && !this.#mayGoOut(i)) {
+        if (this.queen && this.under[i] && !carrying && !pellet && !this.#mayGoOut(i)) {
           this.antCell(i);
           if (isSky(map, CELL[0], CELL[1])) h = this.#pointDown(i, x0, y0, h);
         }
@@ -6446,7 +6330,7 @@ export class Colony {
         // (Heyman et al. 2017; slice 3 gives each chamber its own mark). Outside, the hole's sight and smell do it (#believe).
         // Read on the floor where it stands (a road sign is under its antennae; the sensors ahead are often in soil in a tunnel).
         if (
-          this.#under[i] &&
+          this.under[i] &&
           (ph.fields.home.get(CELL[0], CELL[1]) * this.gainHome[i] >= STRONG ||
             ph.fields[this.#destMark(i)].get(CELL[0], CELL[1]) * this.gainHome[i] * this.gainMarks[i] >= STRONG)
         )
@@ -6481,7 +6365,7 @@ export class Colony {
     if (this.#entrance) {
       let under = 0;
       let out = 0;
-      for (let k = 0; k < this.n; k++) if (this.alive[k]) this.#under[k] ? under++ : out++;
+      for (let k = 0; k < this.n; k++) if (this.alive[k]) this.under[k] ? under++ : out++;
       this.inNest = under;
       this.outside = out;
     }
@@ -6517,66 +6401,26 @@ export class Colony {
         alarmSmelt: this.#alarmSmelt,
         oddsNow: this.#oddsNow,
         t: this.#t,
-        cellX: this.#cellX,
-        cellY: this.#cellY,
-        cellAtX: this.#cellAtX,
-        cellAtY: this.#cellAtY,
-        noTunnel: this.#noTunnel,
-        staleWalk: this.#staleWalk,
-        looked: this.#looked,
-        goalKind: this.#goalKind,
-        under: this.#under,
-        groundMin: this.#groundMin,
-        groundT: this.#groundT,
         outDist: this.#outDist,
         outCells: this.#outCells,
         outVersion: this.#outVersion,
         outAt: this.#outAt,
-        groundRef: this.#groundRef,
-        chamberCell: this.#chamberCell,
-        chamberFor: this.#chamberFor,
-        lastRole: this.#lastRole,
-        sinceRole: this.#sinceRole,
-        restT: this.#restT,
         layT: this.#layT,
-        holdsBrood: this.#holdsBrood,
-        broodTo: this.#broodTo,
-        holdT: this.#holdT,
-        feltLast: this.#feltLast,
-        portTo: this.#portTo,
-        porter: this.#porter,
         inJaws: this.#inJaws,
-        corpse: this.#corpse,
-        loaded: this.#loaded,
-        putAt: this.#putAt,
         belief: this.#belief,
         entrance: this.#entrance,
         entranceCol: this.#entranceCol,
         entranceRow: this.#entranceRow,
         holes: this.#holes,
-        spoilTo: this.#spoilTo,
-        spoilSide: this.#spoilSide,
-        spoilT: this.#spoilT,
-        spoilA: this.#spoilA,
-        soil: this.#soil,
         heaped: this.#heaped,
         goalX: this.#goalX,
         goalY: this.#goalY,
         holeX: this.#holeX,
-        cameFrom: this.#cameFrom,
-        lastDug: this.#lastDug,
-        noGain: this.#noGain,
-        gone: this.#gone,
-        pastEnd: this.#pastEnd,
-        defending: this.#defending,
         storedSeen: this.#storedSeen,
         returning: this.#returning,
         returned: this.#returned,
         holeIn: this.#holeIn,
         holeSeen: this.#holeSeen,
-        tired: this.#tired,
-        asked: this.#asked,
-        question: this.#question,
         s: this.#s,
         chamberNest: this.#chamberNest,
         goalCells: this.#goalCells,
@@ -6599,66 +6443,26 @@ export class Colony {
     if ("alarmSmelt" in r) this.#alarmSmelt = fillLike(this.#alarmSmelt, r.alarmSmelt) as never;
     if ("oddsNow" in r) this.#oddsNow = fillLike(this.#oddsNow, r.oddsNow) as never;
     if ("t" in r) this.#t = fillLike(this.#t, r.t) as never;
-    if ("cellX" in r) this.#cellX = fillLike(this.#cellX, r.cellX) as never;
-    if ("cellY" in r) this.#cellY = fillLike(this.#cellY, r.cellY) as never;
-    if ("cellAtX" in r) this.#cellAtX = fillLike(this.#cellAtX, r.cellAtX) as never;
-    if ("cellAtY" in r) this.#cellAtY = fillLike(this.#cellAtY, r.cellAtY) as never;
-    if ("noTunnel" in r) this.#noTunnel = fillLike(this.#noTunnel, r.noTunnel) as never;
-    if ("staleWalk" in r) this.#staleWalk = fillLike(this.#staleWalk, r.staleWalk) as never;
-    if ("looked" in r) this.#looked = fillLike(this.#looked, r.looked) as never;
-    if ("goalKind" in r) this.#goalKind = fillLike(this.#goalKind, r.goalKind) as never;
-    if ("under" in r) this.#under = fillLike(this.#under, r.under) as never;
-    if ("groundMin" in r) this.#groundMin = fillLike(this.#groundMin, r.groundMin) as never;
-    if ("groundT" in r) this.#groundT = fillLike(this.#groundT, r.groundT) as never;
     if ("outDist" in r) this.#outDist = fillLike(this.#outDist, r.outDist) as never;
     if ("outCells" in r) this.#outCells = fillLike(this.#outCells, r.outCells) as never;
     if ("outVersion" in r) this.#outVersion = fillLike(this.#outVersion, r.outVersion) as never;
     if ("outAt" in r) this.#outAt = fillLike(this.#outAt, r.outAt) as never;
-    if ("groundRef" in r) this.#groundRef = fillLike(this.#groundRef, r.groundRef) as never;
-    if ("chamberCell" in r) this.#chamberCell = fillLike(this.#chamberCell, r.chamberCell) as never;
-    if ("chamberFor" in r) this.#chamberFor = fillLike(this.#chamberFor, r.chamberFor) as never;
-    if ("lastRole" in r) this.#lastRole = fillLike(this.#lastRole, r.lastRole) as never;
-    if ("sinceRole" in r) this.#sinceRole = fillLike(this.#sinceRole, r.sinceRole) as never;
-    if ("restT" in r) this.#restT = fillLike(this.#restT, r.restT) as never;
     if ("layT" in r) this.#layT = fillLike(this.#layT, r.layT) as never;
-    if ("holdsBrood" in r) this.#holdsBrood = fillLike(this.#holdsBrood, r.holdsBrood) as never;
-    if ("broodTo" in r) this.#broodTo = fillLike(this.#broodTo, r.broodTo) as never;
-    if ("holdT" in r) this.#holdT = fillLike(this.#holdT, r.holdT) as never;
-    if ("feltLast" in r) this.#feltLast = fillLike(this.#feltLast, r.feltLast) as never;
-    if ("portTo" in r) this.#portTo = fillLike(this.#portTo, r.portTo) as never;
-    if ("porter" in r) this.#porter = fillLike(this.#porter, r.porter) as never;
     if ("inJaws" in r) this.#inJaws = fillLike(this.#inJaws, r.inJaws) as never;
-    if ("corpse" in r) this.#corpse = fillLike(this.#corpse, r.corpse) as never;
-    if ("loaded" in r) this.#loaded = fillLike(this.#loaded, r.loaded) as never;
-    if ("putAt" in r) this.#putAt = fillLike(this.#putAt, r.putAt) as never;
     if ("belief" in r) this.#belief = fillLike(this.#belief, r.belief) as never;
     if ("entrance" in r) this.#entrance = fillLike(this.#entrance, r.entrance) as never;
     if ("entranceCol" in r) this.#entranceCol = fillLike(this.#entranceCol, r.entranceCol) as never;
     if ("entranceRow" in r) this.#entranceRow = fillLike(this.#entranceRow, r.entranceRow) as never;
     if ("holes" in r) this.#holes = fillLike(this.#holes, r.holes) as never;
-    if ("spoilTo" in r) this.#spoilTo = fillLike(this.#spoilTo, r.spoilTo) as never;
-    if ("spoilSide" in r) this.#spoilSide = fillLike(this.#spoilSide, r.spoilSide) as never;
-    if ("spoilT" in r) this.#spoilT = fillLike(this.#spoilT, r.spoilT) as never;
-    if ("spoilA" in r) this.#spoilA = fillLike(this.#spoilA, r.spoilA) as never;
-    if ("soil" in r) this.#soil = fillLike(this.#soil, r.soil) as never;
     if ("heaped" in r) this.#heaped = fillLike(this.#heaped, r.heaped) as never;
     if ("goalX" in r) this.#goalX = fillLike(this.#goalX, r.goalX) as never;
     if ("goalY" in r) this.#goalY = fillLike(this.#goalY, r.goalY) as never;
     if ("holeX" in r) this.#holeX = fillLike(this.#holeX, r.holeX) as never;
-    if ("cameFrom" in r) this.#cameFrom = fillLike(this.#cameFrom, r.cameFrom) as never;
-    if ("lastDug" in r) this.#lastDug = fillLike(this.#lastDug, r.lastDug) as never;
-    if ("noGain" in r) this.#noGain = fillLike(this.#noGain, r.noGain) as never;
-    if ("gone" in r) this.#gone = fillLike(this.#gone, r.gone) as never;
-    if ("pastEnd" in r) this.#pastEnd = fillLike(this.#pastEnd, r.pastEnd) as never;
-    if ("defending" in r) this.#defending = fillLike(this.#defending, r.defending) as never;
     if ("storedSeen" in r) this.#storedSeen = fillLike(this.#storedSeen, r.storedSeen) as never;
     if ("returning" in r) this.#returning = fillLike(this.#returning, r.returning) as never;
     if ("returned" in r) this.#returned = fillLike(this.#returned, r.returned) as never;
     if ("holeIn" in r) this.#holeIn = fillLike(this.#holeIn, r.holeIn) as never;
     if ("holeSeen" in r) this.#holeSeen = fillLike(this.#holeSeen, r.holeSeen) as never;
-    if ("tired" in r) this.#tired = fillLike(this.#tired, r.tired) as never;
-    if ("asked" in r) this.#asked = fillLike(this.#asked, r.asked) as never;
-    if ("question" in r) this.#question = fillLike(this.#question, r.question) as never;
     if ("s" in r) this.#s = fillLike(this.#s, r.s) as never;
     if ("chamberNest" in r) this.#chamberNest = fillLike(this.#chamberNest, r.chamberNest) as never;
     if ("goalCells" in r) this.#goalCells = fillLike(this.#goalCells, r.goalCells) as never;
@@ -6931,8 +6735,7 @@ export function keyX(k: number): number {
   return k - keyY(k) * 65536;
 }
 /** No cell: a key no cell takes (it would be row −32768). −1 was the old "none", but that is cell (−1, 0). */
-const NO_KEY = NO_CELL;
-/** What a pellet is (Colony #soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
+/** What a pellet is (Colony soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
 const SOIL_DUG = 0;
 const SOIL_LOOSE = 1;
 const SOIL_FILL = 2;

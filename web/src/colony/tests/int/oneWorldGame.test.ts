@@ -501,8 +501,8 @@ test("one world: an old ant holding brood, and an old porter, at the top of a sh
   // Ant 1 is a porter, taking food between chambers (#becomePorter): its food is already the colony's.
   c.carrying[1] = 1;
   c.mode[1] = RETURN;
-  editPrivate(c, ["holdsBrood", "broodTo", "porter", "portTo", "inJaws"], (r) => {
-    (r.holdsBrood as Uint8Array)[0] = 1;
+  editPrivate(c, ["broodHeld", "broodTo", "porter", "portTo", "inJaws"], (r) => {
+    (r.broodHeld as Uint8Array)[0] = 1;
     (r.broodTo as Int16Array)[0] = royal;
     (r.porter as Uint8Array)[1] = 1;
     (r.portTo as Int16Array)[1] = royal;
