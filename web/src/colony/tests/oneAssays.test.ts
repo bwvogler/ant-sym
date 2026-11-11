@@ -124,6 +124,14 @@ test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cel
     assert.equal(c.mode[i], MODES.indexOf("explore"));
     assert.ok(Math.hypot((c.x[i] as number) - hx, (c.y[i] as number) - hy) < 5, `ant ${i} set down by its hole`);
   }
+  // With fidelity on each forager remembers its spot (its find's offset from where it believed its hole), off none do.
+  const spec = forage1.spec(2);
+  const on = runGame({ ...spec, sides: { ...spec.sides, colony: { ...spec.sides?.colony, siteFidelity: 1 } }, seconds: 1 / 30 }).game.player;
+  for (let i = 0; i < F1_ANTS; i++) {
+    assert.ok(!Number.isNaN(on.foodX[i] as number), `ant ${i} remembers its spot`);
+    assert.ok(Math.hypot(on.foodX[i] as number, on.foodY[i] as number) > F1_NEAR - 20 && Math.hypot(on.foodX[i] as number, on.foodY[i] as number) < F1_FAR + 20, `ant ${i}: the spot is about the spot's distance out`);
+    assert.ok(Number.isNaN(c.foodX[i] as number), `ant ${i} knows nothing of its spot with fidelity off`);
+  }
   // Two seconds: at 7 cells a second nobody is within sight of a spot 40 cells out. Over the full 30 s the shares are shares,
   // and the straight way to a spot's sight is at least F1_NEAR less the sight.
   const r = runAssay(forage1, 2, {}, 2);

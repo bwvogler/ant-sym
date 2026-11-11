@@ -1647,12 +1647,16 @@ export const F1_SECONDS = 30;
  * plane (generateOneWorld(seed)), F1_ANTS old foragers of the player are each set down just out of their hole, empty-
  * jawed and exploring on a fresh trip (odoSurf 3, a fresh drift as #crossUp draws it, a heading at random), as if sent out
  * again after a find at a known spot: a spot F1_NEAR to F1_FAR cells from the hole, on open ground joined to the hole
- * (as S1's origins: no rock walled off, at least 2 from an edge, outside every hole's sight). The spot has no food now,
- * and the world's food doesn't regrow. With `siteFidelity` on, each ant remembers the spot as it would from its find
+ * (as S1's origins: no rock walled off, at least 2 from an edge, outside every hole's sight) and in a straight, open line
+ * from the hole (an explorer follows no wall: F1 asks about its memory, not about getting round rock). The plane has no food (the
+ * spot's is gone, and the walk is not cut short by a pile met on the way: in a first run with the world's own food 43 % of
+ * the foragers picked some up). With `siteFidelity` on, each ant remembers the spot as it would from its find
  * (its straight walk out, a drift drawn for that trip: what its home vector said at pickup); off, it knows nothing of it.
  * Every other ant is young and stays in, with no scouts. 30 s. Reported: `reach` (the share that got within HOLE_SIGHT of
  * the spot within F1_SECONDS), `median` (seconds, of those), `ratio` (the median of walked ÷ straight: the path walked to
- * get there over the straight line from where it was set down to the spot's sight) and `walked` (the median path, cells).
+ * get there over the straight line from where it was set down to the spot's sight), `walked` (the median path, cells),
+ * `fed` (the share that picked up food on the way: other food on the plane) and `short` (the median distance from its
+ * spot, at the end, of those that did not reach it).
  * Target: reach ≥ 80 % with ratio under 1.5 (design marks).
  */
 export const forage1: Assay = {
@@ -1671,6 +1675,7 @@ export const forage1: Assay = {
     const walked = new Float64Array(n);
     const reachT = new Float64Array(n).fill(Infinity);
     const reachPath = new Float64Array(n);
+    const fed = new Uint8Array(n);
     const setUp = (game: Game): void => {
       const rng = mulberry32(seed * 6101 + 17);
       const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
@@ -1685,6 +1690,9 @@ export const forage1: Assay = {
       const yMax = plane.size.h * R - 2;
       const holes = game.colonies.flatMap((k) => k.holeCells.map((h) => ({ x: centreX(h.px, h.py), y: centreY(h.py) })));
       for (const k of game.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
+      // No food on the plane: the walk to the spot is not cut short by food met on the way (a pile within 80 cells of the hole took 43 % of the foragers' trips).
+      for (let y = 0; y < plane.size.h; y++) for (let x = 0; x < plane.size.w; x++) plane.food.set(x, y, 0);
+      plane.foodLeft = 0;
       for (let i = 0; i < n; i++) {
         let sx = 0;
         let sy = 0;
@@ -1697,7 +1705,15 @@ export const forage1: Assay = {
           if (sx < 2 || sy < 2 || sx > xMax || sy > yMax) continue;
           if (holes.some((h) => Math.hypot(sx - h.x, sy - h.y) < 2 * HOLE_SIGHT)) continue;
           cellOf(sx, sy);
-          if (joined[(CELL[0] as number) + (CELL[1] as number) * w]) break;
+          if (!joined[(CELL[0] as number) + (CELL[1] as number) * w]) continue;
+          // And the straight line out to it is open ground: a forager that found it walked there; F1 asks about its memory, not
+          // about getting round rock (an explorer follows no wall).
+          let clear = true;
+          for (let t = 0; t < 1 && clear; t += 0.5 / Math.hypot(sx - hx, sy - hy)) {
+            cellOf(hx + t * (sx - hx), hy + t * (sy - hy));
+            clear = rockAt(plane, CELL[0] as number, CELL[1] as number) === OPEN;
+          }
+          if (clear) break;
         }
         spotX[i] = sx;
         spotY[i] = sy;
@@ -1724,8 +1740,10 @@ export const forage1: Assay = {
         // The find: a straight walk out to the spot, with a drift of its own, as the game draws one at the hole.
         const dx = (gauss() * PI_DRIFT) / Math.SQRT2;
         const dy = (gauss() * PI_DRIFT) / Math.SQRT2;
+        // Where its hole was believed to be on that trip, the plane's nest plus its drift: the find's offset from it.
+        const nest = plane.nests[c.params.nest] as Nest;
         const odo = Math.hypot(sx - hx, sy - hy);
-        rememberAt(c, i, sx - hx - odo * dx, sy - hy - odo * dy);
+        rememberAt(c, i, sx - (nest.x + odo * dx), sy - (nest.y + odo * dy));
       }
     };
     const probe: Probe = {
@@ -1735,6 +1753,7 @@ export const forage1: Assay = {
           if (c.layer[i] !== PLANE) continue;
           const x = c.x[i] as number;
           const y = c.y[i] as number;
+          if (c.carrying[i]) fed[i] = 1;
           if (reachT[i] === Infinity) {
             walked[i] = (walked[i] as number) + Math.hypot(x - (lastX[i] as number), y - (lastY[i] as number));
             if (Math.hypot(x - (spotX[i] as number), y - (spotY[i] as number)) < HOLE_SIGHT) {
@@ -1746,8 +1765,12 @@ export const forage1: Assay = {
           lastY[i] = y;
         }
       },
-      summary() {
+      summary(game) {
         const m: Record<string, number> = {};
+        const c = game.player;
+        const left: number[] = [];
+        for (let i = 0; i < n; i++) if (reachT[i] === Infinity) left.push(Math.hypot((c.x[i] as number) - (spotX[i] as number), (c.y[i] as number) - (spotY[i] as number)));
+        left.sort((a, b) => a - b);
         const times: number[] = [];
         const ratios: number[] = [];
         const paths: number[] = [];
@@ -1763,6 +1786,9 @@ export const forage1: Assay = {
         m.median = med(times);
         m.ratio = med(ratios);
         m.walked = med(paths);
+        // Those that did not get there: how many picked up food on the way (other food on the plane), and how far from the spot the rest were at the end.
+        m.fed = fed.reduce((a, b) => a + b, 0) / n;
+        m.short = left.length ? (left[Math.floor((left.length - 1) / 2)] as number) : NaN;
         m.pass = m.reach >= 0.8 && m.ratio < 1.5 ? 1 : 0;
         return m;
       },
@@ -1780,12 +1806,11 @@ export const forage1: Assay = {
   score: () => ({}),
 };
 
-/** F1's find, remembered: ant i's belief of the food relative to its hole (a no-op where the colony has no such memory). */
+/** F1's find, remembered: ant i's belief of the food relative to its hole, as Colony's pickup would have left it (siteFidelity on; off, none). */
 function rememberAt(c: Colony, i: number, rx: number, ry: number): void {
-  void c;
-  void i;
-  void rx;
-  void ry;
+  if (c.params.siteFidelity <= 0) return;
+  c.foodX[i] = rx;
+  c.foodY[i] = ry;
 }
 
 /** A8 on one world: the solo colony's nest in the curtain (nestFlowProbe reads the curtain's chambers). */
