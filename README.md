@@ -125,6 +125,7 @@ setup: Settings → Pages → Source: GitHub Actions.
 
 ```sh
 npm test            # every node --test suite: server, colony, ui (native TS, Node ≥ 22.18)
+npm run test:unit   # just the quick tier (~9 s); test:watch reruns it on save; see CLAUDE.md for the tiers
 npm run lint        # oxlint
 npm run typecheck   # tsc -b
 ```

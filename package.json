@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "npm --prefix web run dev",
     "test": "npm --prefix web test",
+    "test:unit": "npm --prefix web run test:unit",
+    "test:watch": "npm --prefix web run test:watch",
     "test:slow": "npm --prefix web run test:slow",
     "lint": "npm --prefix web run lint",
     "typecheck": "npm --prefix web run typecheck",

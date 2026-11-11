@@ -1,4 +1,4 @@
-// Offline, no key: the roomy-nest test's games (web/src/colony/tests/chambers.test.ts), game by game (PRD §31, §40): 30
+// Offline, no key: the roomy-nest test's games (web/src/colony/tests/int/chambers.test.ts), game by game (PRD §31, §40): 30
 // ants, every one middle-aged (a digger), dig for 120 s in the founding chamber of the small side world, with the chambers
 // (roomy: 30 ants want less floor than it has) and without (as before nest slice 2). Reports cells dug each way and the
 // ratio. Checkouts from before age zoning (nest slice 6) have every ant dig anyway.

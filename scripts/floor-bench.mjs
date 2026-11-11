@@ -1,4 +1,4 @@
-// Offline, no key: the crowded-nest test's games (web/src/colony/tests/chambers.test.ts), measured over more of them
+// Offline, no key: the crowded-nest test's games (web/src/colony/tests/int/chambers.test.ts), measured over more of them
 // (PRD §40, the F2 fix-up). Each game is a small side world (256 × 160, ground 40 rows down, one colony of 400 ants, every
 // ant middle-aged: a digger), run for `seconds`. Reported per game: the founding floor's growth (floor at the end ÷ floor
 // at the start), chambers, stacked chambers (with another above them, overlapping columns), whether the gap above grows

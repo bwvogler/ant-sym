@@ -26,7 +26,7 @@ env -u JEV_API_KEY npx tsc -b                     # typecheck, must be clean
 env -u JEV_API_KEY npm test 2>&1 | tail -12       # "# pass N", "# fail 0"
 npx oxlint 2>&1 | grep -c ': warning '          # warning count
 env -u JEV_API_KEY npx vite build 2>&1 | tail -3
-git -C "$W" diff --stat origin/main...HEAD -- web/src/colony/tests/golden.json web/src/colony/tests/slow/golden.json web/public/precache
+git -C "$W" diff --stat origin/main...HEAD -- web/src/colony/tests/golden/golden.json web/src/colony/tests/slow/golden.json web/public/precache
 ```
 
 **Lint baseline**: compare with main's count *now*, not a remembered number. The script counts it on a temporary checkout of `origin/main` with the PR's oxlint and removes it; pass the count as the second argument to skip that. oxlint prints one `file:line:col: warning …` line per warning; there is no summary line to read. A PR that adds a warning gets a nit with the `file:line`.
@@ -53,7 +53,7 @@ For each fix and each new test: find the line that makes it work, break it, run 
 cd "$W"
 perl -pi -e 's/if \(\(this\.founding \|\| this\.incipient\) && nurses === 0/if (this.founding && nurses === 0/' web/src/colony/colony.ts   # perl -pi works on macOS and Linux; sed -i doesn't
 git diff --stat                                        # check the mutation actually changed the file
-(cd web && env -u JEV_API_KEY node --test --test-timeout=60000 src/colony/tests/royal.test.ts 2>&1 | grep -E '^# (pass|fail)')
+(cd web && env -u JEV_API_KEY node --test --test-timeout=60000 src/colony/tests/soak/royal.test.ts 2>&1 | grep -E '^# (pass|fail)')
 git checkout -- .
 ```
 

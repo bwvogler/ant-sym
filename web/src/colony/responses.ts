@@ -8,7 +8,7 @@ import type { Mode, Stance } from "./colony.ts";
 // Each is a function of a small situation (`Touch`), so each can later be a
 // cached Jev question asked only when its moment comes, like the mode
 // (colonyBrain.ts: RESPONSE_HOOKS). `localResponses` is exactly the colony's
-// rules before the hooks (tests/golden.test.ts pins that); later behaviour
+// rules before the hooks (tests/golden/golden.test.ts pins that); later behaviour
 // MRs (docs/PRD.md §42) change them one at a time, each against the assays in
 // experiment.ts. What the fungus does to an ant (layGain, quiet, gainAlarm…)
 // stays outside: it scales what a response decides.
