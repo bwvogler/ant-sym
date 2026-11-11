@@ -4,7 +4,7 @@ import { Brood, EGG, foodOf, GYNE, isFed, LARVA, LARVA_FOOD, owed, PUPA, type Br
 export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
-import { TOLERANCE } from "./recognition.ts";
+import { type CellCounts, ENEMY, FAINT, HOMES, type Home, MODES, type Mode, type Policy, type Situation, type Stance, STANCES, type StancePolicy, type StanceSituation, STRONG, TOLERANCE, type Trail, TRAILS, trailLevel } from "./vocab.ts";
 import { ADULT_BEG_BELOW, ADULT_DRAIN, ADULT_DRAIN_OUT, adultBegOf, begOf, DonorGrid, EAT_BELOW, ENERGY_PER_FOOD, feel, FeltGrid, LARVA_DRAIN, LARVA_ENERGY_PER_FOOD, PASS, QUEEN_BEG, QUEEN_DRAIN, QUEEN_WAIT, NEED_FETCH, respond, SHARE_ABOVE, THETA_OLD } from "./hunger.ts";
 import { type Alate, ALATE_FEED, ALATE_RESERVE, ALATE_STEP, ALATE_WAIT, BIPOTENT, CULL_CUE, CULL_MARK, GYNE_CUE, GYNE_ENERGY, GYNE_MARK, GYNE_PANTRY, GYNE_SPACING, GYNE_TIME_X, SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY, scentShare, SumGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, qualityOf, type Responses, type Where, type Touch } from "./responses.ts";
@@ -33,36 +33,11 @@ import { cellAt, type Transect } from "./transect.ts";
 // ants, the colony's stance (forage, defend, raid) is the strategist's
 // choice, made every few seconds from a coarse view of the colony (game.ts).
 
-export const MODES = ["explore", "follow", "return", "fight"] as const;
-export type Mode = (typeof MODES)[number];
 const EXPLORE = 0;
 const FOLLOW = 1;
 const RETURN = 2;
 const FIGHT = 3;
 
-export const STANCES = ["forage", "defend", "raid"] as const;
-export type Stance = (typeof STANCES)[number];
-
-export const TRAILS = ["none", "faint", "strong"] as const;
-export type Trail = (typeof TRAILS)[number];
-/** Sensor readings at or above these are a faint / strong trail. */
-export const FAINT = 0.05;
-export const STRONG = 1;
-
-export function trailLevel(v: number): Trail {
-  return v >= STRONG ? "strong" : v >= FAINT ? "faint" : "none";
-}
-
-/**
- * Where an ant is in its nest (nest slice 3): in a tunnel, or in one of its colony's chambers by that chamber's role
- * (the floor's smell tells it, Heyman et al. 2017). The side view's underground; on the ground, and on the top-down
- * maps, the home trail's level stands in its place.
- */
-export const PLACES = ["tunnel", ...MARKS] as const;
-export type Place = (typeof PLACES)[number];
-/** The situation's home field: the home trail ahead (on the ground), or where in the nest the ant is. */
-export const HOMES = [...TRAILS, ...PLACES] as const;
-export type Home = (typeof HOMES)[number];
 
 /** A dead worker in the side view (nest slice 7): the cell it lies in, who carries it (−1 none), when it died, and the fungus in it. */
 export interface Corpse {
@@ -81,34 +56,6 @@ export function swapBroodStore(m: Mark): Mark {
   return m === "brood" ? "store" : m === "store" ? "brood" : m;
 }
 
-/** What a mode choice may depend on: few values, so an answer can be cached per situation. Carrying ants are never asked: they go home. */
-export interface Situation {
-  mode: Mode;
-  /** out longer than the colony's patience without finding food */
-  tired: boolean;
-  foodTrail: Trail;
-  /** on the ground: the home trail ahead; inside the nest (side view): where it is, a tunnel or a chamber's role */
-  homeTrail: Home;
-  alarm: Trail;
-  /** an ant of another colony within two cells */
-  enemy: "none" | "near";
-  /** what the colony as a whole is doing (the strategist's choice) */
-  stance: Stance;
-}
-
-export type Policy = (s: Situation) => Mode;
-
-/** Counts per cell, read by integer cell coordinates (the game's enemy grid). */
-export interface CellCounts {
-  get(x: number, y: number): number;
-  /** whether any cell in the rectangle x0..x1 × y0..y1 (inclusive) may hold a count: a cheap early out */
-  any(x0: number, y0: number, x1: number, y1: number): boolean;
-  /** count, from now on, what is a stranger to this odour at this tolerance (recognition.ts); absent: everything counts */
-  look?(odour: number, tolerance: number): void;
-}
-
-/** A cell holds an enemy an ant reacts to when its (calm-weighted) strangers reach this. */
-export const ENEMY = 0.5;
 
 /**
  * The local rule. (An enemy close by is the contact response's to answer, behaviour MR 4: before it, this rule sent
@@ -155,24 +102,6 @@ export interface Queen {
   held: number;
 }
 
-/** The strategist's coarse view of its own colony: few values, so a stance can be cached per view too. */
-export interface StanceSituation {
-  stance: Stance;
-  /** living ants against the colony's cap */
-  ants: "few" | "some" | "many";
-  /** ants lost lately (a 30 s fading count) */
-  losses: "none" | "some" | "heavy";
-  enemyNearNest: boolean;
-  /**
-   * food brought home lately, per ant (behaviour MR 5, docs/activation.md: a colony knows its food only as the rate
-   * foragers bring it in, never as what is left on the map): none, some or plenty
-   */
-  intake: "none" | "some" | "plenty";
-  /** food stored but not yet turned into ants (the colony is at its cap) */
-  larder: "low" | "full";
-}
-
-export type StancePolicy = (s: StanceSituation) => Stance;
 
 /** The local strategist: defend a nest under attack; raid when no food comes in or the colony is full and fed; else forage. */
 export const localStance: StancePolicy = (s) => {

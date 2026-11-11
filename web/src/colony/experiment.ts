@@ -1,5 +1,6 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { type Colony, type ColonyParams, FAINT, HOLE_SIGHT, type HoleCell, type Layer, LIFESPAN, MODES, type Mode, PI_DRIFT, PLANE, planeMoundReach, type Policy, type Stance, type StancePolicy } from "./colony.ts";
+import { type Colony, type ColonyParams, HOLE_SIGHT, type HoleCell, type Layer, LIFESPAN, PI_DRIFT, PLANE, planeMoundReach } from "./colony.ts";
+import { FAINT, MODES, type Mode, type Policy, type Stance, type StancePolicy } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";

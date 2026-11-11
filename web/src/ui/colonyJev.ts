@@ -1,6 +1,7 @@
 import { GAME_CAPS, type JevAnswer, type JevProxyReply, type JevRequest, type JevResponse, type RunCaps, type RunSummary } from "../../shared/jev.ts";
 import { apiHeaders, apiUrl } from "./backend.ts";
-import { localPolicy, localStance, MODES, STANCES, type Colony, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/colony.ts";
+import { localPolicy, localStance, type Colony } from "../colony/colony.ts";
+import { MODES, STANCES, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation } from "../colony/vocab.ts";
 import { packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey } from "../colony/colonyBrain.ts";
 import { localFungusRule, type FungalSituation, type FungusPolicy } from "../colony/fungalPolicy.ts";
 import { askedIn, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "../colony/fungusBrain.ts";

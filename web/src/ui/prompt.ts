@@ -1,5 +1,5 @@
 import type { JevRequest } from "../../shared/jev.ts";
-import type { Situation, StanceSituation } from "../colony/colony.ts";
+import type { Situation, StanceSituation } from "../colony/vocab.ts";
 import { estimateTokens, packModeRequest, packStanceRequest } from "../colony/colonyBrain.ts";
 import type { FungalSituation } from "../colony/fungalPolicy.ts";
 import { FUNGUS_BATCH, packFungusRequest } from "../colony/fungusBrain.ts";

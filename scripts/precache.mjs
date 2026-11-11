@@ -26,7 +26,8 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
-import { decode, SITUATIONS, STANCES } from "../web/src/colony/colony.ts";
+import { decode, SITUATIONS } from "../web/src/colony/colony.ts";
+import { STANCES } from "../web/src/colony/vocab.ts";
 import { AIMS, FUNGUS_BATCH, FUNGUS_BRAIN_VERSION, fungalKey, fungusContext, packFungusRequest, readLevels } from "../web/src/colony/fungusBrain.ts";
 import { encodeFungal, decodeFungal } from "../web/src/colony/fungalPolicy.ts";
 import { askedLevers, DEFAULT_MENU, STRAINS } from "../web/src/colony/fungus.ts";

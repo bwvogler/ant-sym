@@ -1,5 +1,6 @@
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
-import { ENEMY, type Colony, type Layer } from "./colony.ts";
+import { type Colony, type Layer } from "./colony.ts";
+import { ENEMY } from "./vocab.ts";
 import { CELL, discOffsets } from "./hex.ts";
 import type { Recognition } from "./recognition.ts";
 import { clampCol, inBounds, type Bounds } from "./world.ts";

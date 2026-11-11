@@ -1,6 +1,6 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
-import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./colony.ts";
+import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
 import { CARRY, type Carry, CONTACT, type Contact, LEAVE, type Leave, localResponses, responses, touchKey, type Responses, type Touch, type Trail } from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed

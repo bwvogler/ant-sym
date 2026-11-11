@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LARVA } from "../../brood.ts";
-import { Colony, type Situation } from "../../colony.ts";
+import { Colony } from "../../colony.ts";
+import { type Situation } from "../../vocab.ts";
 import { decodeFungal } from "../../fungalPolicy.ts";
 import { Fungus, LETHAL, PRESETS, preset, STRAINS } from "../../fungus.ts";
 import { Game } from "../../game.ts";

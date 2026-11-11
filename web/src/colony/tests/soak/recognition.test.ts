@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { Colony, localPolicy, type Situation } from "../../colony.ts";
+import { Colony, localPolicy } from "../../colony.ts";
+import { type Situation } from "../../vocab.ts";
 import { Fungus, STRAINS, preset } from "../../fungus.ts";
 import { compose, LEVERS } from "../../levers.ts";
 import { Game, MET, QUIET, type GameSave } from "../../game.ts";

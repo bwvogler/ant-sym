@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { MODES, TRAILS, type Colony, type Mode, type Situation } from "../colony/colony.ts";
+import { type Colony } from "../colony/colony.ts";
+import { MODES, TRAILS, type Mode, type Situation } from "../colony/vocab.ts";
 import { INFECTED, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { pulled } from "../colony/levers.ts";
 import { UPGRADES } from "../colony/evolution.ts";

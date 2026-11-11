@@ -1,5 +1,6 @@
 import { decode, encode } from "./save.ts";
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
+import { TOLERANCE } from "./vocab.ts";
 import type { Colony, Layer } from "./colony.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
 import { clampCol, inBounds, type Bounds } from "./world.ts";
@@ -125,8 +126,6 @@ export interface RecognitionParams {
   interval: number;
 }
 
-/** How far an odour may sit from an ant's own before it is a stranger. Tied to MAX_MASK, FUNGAL and BINS (above); colonies built alone use it too. */
-export const TOLERANCE = 0.35;
 
 export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: TOLERANCE, nestDrift: 0.03, interval: 0.1 };
 

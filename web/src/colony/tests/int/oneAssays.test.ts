@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { CURTAIN, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { MODES } from "../../vocab.ts";
 import { antsNear, Arena, at, cellRect, crossingProbe, F1_ANTS, F1_FAR, F1_NEAR, forage1, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, R1_ANTS, R1_DETOUR, R1_FAR, R1_NEAR, R1_PILE, route1, runAssay, runGame, S1_PER_TRIP, S1_TRIPS, search1, specMap, type RunResult, type RunSpec } from "../../experiment.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Colony, Mode, Stance } from "../colony/colony.ts";
+import type { Colony } from "../colony/colony.ts";
+import type { Mode, Stance } from "../colony/vocab.ts";
 import { DEFAULT_MENU, STRAINS, type Fungus } from "../colony/fungus.ts";
 import { Game, GAME_REGROW, gameRng, type Outcome, type Unity } from "../colony/game.ts";
 import { chapterOf, type ChapterView } from "../colony/chapters.ts";

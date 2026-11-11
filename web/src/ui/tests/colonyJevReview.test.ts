@@ -1,6 +1,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, type Situation } from "../../colony/colony.ts";
+import { Colony } from "../../colony/colony.ts";
+import { type Situation } from "../../colony/vocab.ts";
 import type { FungalSituation } from "../../colony/fungalPolicy.ts";
 import { generateWorld, mulberry32, OPEN_WORLD } from "../../colony/world.ts";
 import { ColonyJev, type CacheStore } from "../colonyJev.ts";

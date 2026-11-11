@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Colony, Situation } from "../colony/colony.ts";
+import type { Colony } from "../colony/colony.ts";
+import type { Situation } from "../colony/vocab.ts";
 import { COLONY_NAMES } from "./names.ts";
 import { DOCTRINES } from "../colony/colonyBrain.ts";
 import type { FungalSituation } from "../colony/fungalPolicy.ts";

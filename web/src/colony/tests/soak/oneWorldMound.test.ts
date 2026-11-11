@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ChunkLayer } from "../../chunks.ts";
-import { CURTAIN, MIDDEN_MIN, MODES, PLANE, SWELL, type Colony, type Layer } from "../../colony.ts";
+import { CURTAIN, MIDDEN_MIN, PLANE, SWELL, type Colony, type Layer } from "../../colony.ts";
+import { MODES } from "../../vocab.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, nx, ny } from "../../hex.ts";

@@ -1,6 +1,7 @@
 import { afterEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, localPolicy, localStance, type Mode, type Situation } from "../../../colony/colony.ts";
+import { Colony, localPolicy, localStance } from "../../../colony/colony.ts";
+import { type Mode, type Situation } from "../../../colony/vocab.ts";
 import { DOCTRINES, policyContext, situationKey, stanceContext, stanceKey } from "../../../colony/colonyBrain.ts";
 import { fungalKey, fungusContext } from "../../../colony/fungusBrain.ts";
 import { generateWorld, mulberry32, OPEN_WORLD } from "../../../colony/world.ts";

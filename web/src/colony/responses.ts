@@ -1,4 +1,4 @@
-import type { Mode, Stance } from "./colony.ts";
+import type { Mode, Stance } from "./vocab.ts";
 
 // An ant's responses to what it touches and carries, pure. Choosing a mode is
 // the ant's one big decision (colony.ts, a `Policy`); these are the small

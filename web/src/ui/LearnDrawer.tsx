@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { MODES, TRAILS, HOMES, STANCES, type Colony, type Situation } from "../colony/colony.ts";
+import { type Colony } from "../colony/colony.ts";
+import { HOMES, MODES, STANCES, TRAILS, type Situation } from "../colony/vocab.ts";
 import { DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
 import { AROUSALS, CARRYING, decodeFungal, PLACES, TASKS, TOUCHES, type FungalSituation } from "../colony/fungalPolicy.ts";
 import { INFECTED, LEVERS } from "../colony/fungus.ts";

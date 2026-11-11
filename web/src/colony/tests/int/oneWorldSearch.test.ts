@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HOLE_SIGHT, LIFESPAN, MODES, PI_DRIFT, PLANE, planeMoundReach, type Colony, type HoleCell } from "../../colony.ts";
+import { HOLE_SIGHT, LIFESPAN, PI_DRIFT, PLANE, planeMoundReach, type Colony, type HoleCell } from "../../colony.ts";
+import { MODES } from "../../vocab.ts";
 import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";

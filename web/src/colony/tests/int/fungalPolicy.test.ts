@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { Colony, MODES, type Situation } from "../../colony.ts";
+import { Colony } from "../../colony.ts";
+import { MODES, type Situation } from "../../vocab.ts";
 import { AROUSALS, CARRYING, DEFAULT_RULE, FUNGAL_SITUATIONS, PLACES, STRAIN_DEFAULT, TASKS, TOUCHES, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../../fungalPolicy.ts";
 import { askedIn, FUNGUS_LEGEND, fungalKey, fungusContext, leverQuestions, packFungusRequest, readLevels, validLevels, worthAsking } from "../../fungusBrain.ts";
 import { DEFAULT_MENU, DORMANT_SHOW, Fungus, LETHAL, LEVERS, STRAINS, preset } from "../../fungus.ts";

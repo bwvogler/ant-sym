@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { CURTAIN, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { MODES } from "../../vocab.ts";
 import { decodeFungal } from "../../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
