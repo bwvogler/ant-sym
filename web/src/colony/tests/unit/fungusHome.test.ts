@@ -9,7 +9,7 @@ import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { MARKS } from "../../pheromone.ts";
 import { MAX_MASK, Recognition } from "../../recognition.ts";
-import { digCell, generateSideWorld, generateWorld, mulberry32, OPEN, rockAt} from "../../world.ts";
+import { digCell, generateSideWorld, generateWorld, mulberry32, OPEN, rockAt } from "../../world.ts";
 import { SMALL_SIDE, walkway } from "../builders.ts";
 
 // Nest slice 8 (docs/nest-and-home.md §4): the fungus on the new home. What it feels underfoot is the nest's places; it can blunt

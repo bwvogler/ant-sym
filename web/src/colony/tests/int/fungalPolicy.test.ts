@@ -9,7 +9,7 @@ import { AS_IS, compose, CUSTOM, decodeLevels, encodeLevels, PRESETS, presetOf, 
 import { Game } from "../../game.ts";
 import { Recognition } from "../../recognition.ts";
 import { generateWorld, mulberry32, type WorldMap } from "../../world.ts";
-import { at} from "../hexmaps.ts";
+import { at } from "../hexmaps.ts";
 import { arena, placedAt } from "../builders.ts";
 
 // The fungus policy (ja-t4d.5; levers, ja-lo8.4): a level for every lever per host, from what the fungus senses inside

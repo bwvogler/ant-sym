@@ -5,7 +5,7 @@ import { Colony } from "../../colony.ts";
 import { Fungus, INFECTED, STRAINS, type Strain } from "../../fungus.ts";
 import { Game } from "../../game.ts";
 import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../../world.ts";
-import { at} from "../hexmaps.ts";
+import { at } from "../hexmaps.ts";
 import { arena, placedAt } from "../builders.ts";
 
 // The fungus's first slice (ja-t4d.1): load, contact spread across colonies,

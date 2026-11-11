@@ -4,7 +4,7 @@ import { LARVA } from "../../brood.ts";
 import { Colony, LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { ADULT_DRAIN, ADULT_DRAIN_OUT, begOf, BEG_BELOW, feel, FeltGrid, LARVA_DRAIN, NEED_FADE, PASS, respond, SHARE_ABOVE, THETA_OLD } from "../../hunger.ts";
-import { generateSideWorld, mulberry32} from "../../world.ts";
+import { generateSideWorld, mulberry32 } from "../../world.ts";
 import { SMALL_SIDE, broodChamber } from "../builders.ts";
 
 // Energy and hunger (ja-xu6.1, hunger.ts): every adult, larva and the queen has energy, drained with time and refilled by

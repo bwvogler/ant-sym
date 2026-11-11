@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Colony, CORPSE_ROT, LIFESPAN, MIDDEN_AT, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game, nearestRival } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
-import { generateSideWorld, isSky, mulberry32, takeFoodCell} from "../../world.ts";
+import { generateSideWorld, isSky, mulberry32, takeFoodCell } from "../../world.ts";
 import { SMALL_SIDE, walkway } from "../builders.ts";
 
 // Nest slice 7 (docs/nest-and-home.md §3.7): the dead lie where they fall until an undertaker (middle-aged) carries

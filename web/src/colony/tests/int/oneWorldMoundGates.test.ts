@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, MODES, PLANE, type Colony, type Corpse} from "../../colony.ts";
+import { CURTAIN, MODES, PLANE, type Colony, type Corpse } from "../../colony.ts";
 import { localResponses, type Responses } from "../../responses.ts";
 import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance } from "../../hex.ts";

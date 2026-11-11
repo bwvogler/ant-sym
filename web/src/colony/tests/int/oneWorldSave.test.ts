@@ -7,7 +7,7 @@ import { centreX, centreY } from "../../hex.ts";
 import { CRUST, generateOneWorld, growWorld } from "../../oneWorld.ts";
 import type { Flight } from "../../royal.ts";
 import { hashGame } from "../saveHash.ts";
-import { DT, run} from "../builders.ts";
+import { DT, run } from "../builders.ts";
 
 // One-world saves (U4b, ja-lp4.4.2; docs/one-world.md §4): run, save, load into a game built afresh from the same seed
 // and options, run on. The result must hash as the unbroken run on both layers: the plane, the curtain as dug and grown,

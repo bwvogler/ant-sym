@@ -7,7 +7,7 @@ import { INFECTED, STRAINS } from "../../fungus.ts";
 import { driftAim } from "../../recognition.ts";
 import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, GYNE_SPACING, scentShare, type Flight } from "../../royal.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
-import { generateSideWorld, mulberry32} from "../../world.ts";
+import { generateSideWorld, mulberry32 } from "../../world.ts";
 import { DT, SMALL_SIDE, broodChamber } from "../builders.ts";
 
 // New queens (ja-lo8.9, royal.ts): the queen's scent carried on the ants and diluted as the colony grows; gynes reared
