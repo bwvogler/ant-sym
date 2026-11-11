@@ -7,7 +7,7 @@ import DetailsScreen from "./ui/DetailsScreen.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
-import { buildGame, hasNests, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import { CURTAIN, PLANE } from "./colony/colony.ts";
 import { UPGRADES, type Upgrade } from "./colony/evolution.ts";
 import { LETHAL_LEVERS } from "./colony/levers.ts";
@@ -54,8 +54,7 @@ export default function ColonyApp() {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
-  const nests = hasNests(controls.ground);
-  useNotices(stats, jev.lock, jev.state.phase, controls.menu, nests);
+  useNotices(stats, jev.lock, jev.state.phase, controls.menu);
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too. The game is the same either way.
   const oneWorld = game.world;
   const setView = useCallback((view: View) => update({ view }), [update]);
@@ -266,12 +265,10 @@ export default function ColonyApp() {
         setRule={(r) => update(r)}
         retune={`A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`}
         demo={isDemo(backend)}
-        hasNests={nests}
-        onSideView={() => update({ ground: "side" })}
       />
       <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} saves={games} onLoad={(r) => (continueFrom(r), closeDetails())} />
       <Toasts />
-      {/* The side view's pen, over the field (and one world's, were her mother to have no hole: she lands by herself). */}
+      {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
       {flight && gate?.open && !circle && <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} />}
       {!controls.started && <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />}
 
@@ -352,7 +349,7 @@ export default function ColonyApp() {
           {flight && gate?.open && oneWorld && circle && (
             <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} place={{ radius: circle.r, onWords, onFly }} />
           )}
-          <FungusPanel stats={stats} jev={jev} evolve={evolve} side={nests} menu={controls.menu} />
+          <FungusPanel stats={stats} jev={jev} evolve={evolve} menu={controls.menu} />
         </aside>
       </div>
     </main>
@@ -360,7 +357,7 @@ export default function ColonyApp() {
 }
 
 /** The fungus: where it is, how far the colonies have come together, and its aim, the player's words. */
-function FungusPanel({ stats, jev, evolve, side, menu }: { stats: ColonyStats | null; jev: ReturnType<typeof useColonyJev>; evolve: (id: string) => boolean; side: boolean; menu: readonly string[] }) {
+function FungusPanel({ stats, jev, evolve, menu }: { stats: ColonyStats | null; jev: ReturnType<typeof useColonyJev>; evolve: (id: string) => boolean; menu: readonly string[] }) {
   const locked = jev.lock !== null;
   return (
     <section className="rounded-lg border border-line bg-panel p-4 text-sm text-fg-2" aria-label="fungus">
@@ -397,7 +394,7 @@ function FungusPanel({ stats, jev, evolve, side, menu }: { stats: ColonyStats | 
           )}
         </div>
       )}
-      {stats?.evolution && <Evolve e={stats.evolution} evolve={evolve} side={side} menu={menu} />}
+      {stats?.evolution && <Evolve e={stats.evolution} evolve={evolve} menu={menu} />}
       <div className="mt-4" aria-label="fungus aim">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5">
@@ -441,7 +438,7 @@ function idle(u: Upgrade, menu: readonly string[]): boolean {
   return !!u.levers?.every((id) => LETHAL_LEVERS.has(id) && !menu.includes(id));
 }
 
-function Evolve({ e, evolve, side, menu }: { e: EvolutionStats; evolve: (id: string) => boolean; side: boolean; menu: readonly string[] }) {
+function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) => boolean; menu: readonly string[] }) {
   return (
     <div className="mt-4" aria-label="evolution">
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -461,7 +458,7 @@ function Evolve({ e, evolve, side, menu }: { e: EvolutionStats; evolve: (id: str
       </div>
       <p className="mt-1 text-[11px] text-fg-3">Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep; each level asks more.</p>
       <ul className="mt-2 flex flex-col gap-1" aria-label="upgrades">
-        {UPGRADES.filter((u) => side || !u.nest).map((u) => {
+        {UPGRADES.map((u) => {
           const level = e.levels[u.id] ?? 0;
           const cost = u.costs[level];
           const next = u.steps[level + 1];
@@ -510,7 +507,7 @@ function goalLine(stats: ColonyStats | null): string {
 }
 
 /** Notices for what changed: the game's outcome, and Jev's state where it locks the policies. */
-function useNotices(stats: ColonyStats | null, lock: string | null, phase: string, menu: readonly string[], side: boolean): void {
+function useNotices(stats: ColonyStats | null, lock: string | null, phase: string, menu: readonly string[]): void {
   const outcome = stats?.outcome ?? "playing";
   const seenOutcome = useRef(outcome);
   useEffect(() => {
@@ -529,7 +526,7 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
   }, [chapter, stats]);
   // A mutation it can keep is worth a notice, once each time there was none it could afford (ja-lo8.12).
   // Only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not).
-  const affordable = stats?.evolution ? UPGRADES.some((u) => (side || !u.nest) && !idle(u, menu) && (u.costs[stats.evolution!.levels[u.id] ?? 0] ?? Infinity) <= stats.evolution!.mutations) : false;
+  const affordable = stats?.evolution ? UPGRADES.some((u) => !idle(u, menu) && (u.costs[stats.evolution!.levels[u.id] ?? 0] ?? Infinity) <= stats.evolution!.mutations) : false;
   const couldAfford = useRef(affordable);
   useEffect(() => {
     if (affordable && !couldAfford.current) pushToast("The fungus has mutations to keep: choose where they go, in the Fungus panel.", "good");

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MODES, TRAILS, HOMES, STANCES, type Colony, type Situation } from "../colony/colony.ts";
-import { DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, STANCE_CRITERIA, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
+import { DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
 import { AROUSALS, CARRYING, decodeFungal, PLACES, TASKS, TOUCHES, type FungalSituation } from "../colony/fungalPolicy.ts";
-import { INFECTED, LEVERS, NEST_ONLY } from "../colony/fungus.ts";
+import { INFECTED, LEVERS } from "../colony/fungus.ts";
 import { decodeLevels, pulled, PRESETS } from "../colony/levers.ts";
 import { askedIn } from "../colony/fungusBrain.ts";
 import { LeverChips } from "./DetailsScreen.tsx";
@@ -17,8 +17,8 @@ import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
 import { css, ROLE_RGB } from "./palette.ts";
-import { byRows, LOCAL_FUNGUS_RULES, LOCAL_MODE_OTHERWISE, LOCAL_MODE_RULES, LOCAL_MODE_STRANGERS, LOCAL_RESPONSE_RULES, LOCAL_STANCE_OTHERWISE, LOCAL_STANCE_RULES, localModeOtherwise } from "./policyText.ts";
-import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE, tokensPerQuestion, type Sample } from "./prompt.ts";
+import { byRows, LOCAL_FUNGUS_RULES, LOCAL_MODE_OTHERWISE, LOCAL_MODE_RULES, LOCAL_MODE_STRANGERS, LOCAL_RESPONSE_RULES, localModeOtherwise } from "./policyText.ts";
+import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQuestion, type Sample } from "./prompt.ts";
 import { seg } from "./styles.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
@@ -52,9 +52,6 @@ interface Props {
   retune: string;
   /** the Pages build: no server, so Jev never runs here */
   demo: boolean;
-  /** the game has nests underground (the side view, one world): the Nest tab has one to show */
-  hasNests: boolean;
-  onSideView: () => void;
 }
 
 const TABS: [LearnTab, string][] = [
@@ -238,7 +235,7 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         </section>
       ))}
       <p className="-mt-2 text-xs text-fg-3">
-        A colony's doctrine is its nature: not yours to rewrite while it lives. Both the ants' modes and the colony's stance are asked under it. {props.retune} Colonies with the same doctrine share every answer.
+        A colony's doctrine is its nature: not yours to rewrite while it lives. The ants' modes are asked under it. {props.retune} Colonies with the same doctrine share every answer.
       </p>
 
       <section className="flex flex-col gap-2" aria-label="fungus aim">
@@ -285,9 +282,6 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         <h3 className={h3}>How each decides</h3>
         <Section id="mode" ping={props.ping} title="How an ant chooses what to do" focus={props.focus}>
           <ModeExplainer {...props} />
-        </Section>
-        <Section id="stance" ping={props.ping} title="How the colony picks its stance (side view)" focus={props.focus}>
-          <StanceExplainer />
         </Section>
         <Section id="fungus" ping={props.ping} title="How the fungus chooses what to do to a host" focus={props.focus}>
           <FungusExplainer {...props} />
@@ -383,11 +377,6 @@ function followedSituation(colonies: readonly Colony[], f: Followed | null): { k
   return col ? { k: sideIndex(f), i: f.i, col, s: col.lastQuestion(f.i) } : null;
 }
 
-/** The menu as the fungus runs it on this map: the nest's levers only where there is a nest (Fungus.menu drops them). */
-function mapMenu(props: Props): string[] {
-  return props.menu.filter((id) => props.hasNests || !NEST_ONLY.has(id));
-}
-
 /** What the fungus senses in the followed ant, if it is infected. */
 function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: number; s: FungalSituation } | null {
   const fol = followedSituation(colonies, f);
@@ -410,17 +399,13 @@ function ModeExplainer(props: Props) {
           ["homeTrail", HOMES.join(" · "), "home scent ahead on the ground; underground, the chamber it stands in"],
           ["alarm", TRAILS.join(" · "), "alarm scent just ahead"],
           ["enemy", "none · near", "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)"],
-          ["stance", STANCES.join(" · "), "on open ground, the ant's own: defend while it senses a threat near its nest, raid once recruited; underground, what the colony as a whole is doing"],
+          ["stance", STANCES.join(" · "), "the ant's own: defend while it senses a threat near its nest, raid once recruited"],
         ]}
         note={
           <>
-            On open ground stance is the ant's own, from what it senses (
+            Stance is the ant's own, from what it senses (
             <a className="underline" href={docUrl("stance")} target="_blank" rel="noreferrer">
               docs/stance.md
-            </a>
-            ). Underground it is the one field no ant senses: the colony broadcasts it (a vision gap,{" "}
-            <a className="underline" href={docUrl("vision", "where-the-code-is-today")} target="_blank" rel="noreferrer">
-              ja-k4k.6
             </a>
             ). An ant carrying something is not asked: it answers its load's responses instead.
           </>
@@ -436,30 +421,10 @@ function ModeExplainer(props: Props) {
   );
 }
 
-function StanceExplainer() {
-  return (
-    <>
-      <Senses
-        rows={[
-          ["stance", STANCES.join(" · "), "what the colony is doing now"],
-          ["ants", "few · some · many", "living ants against how many it can feed"],
-          ["losses", "none · some · heavy", "ants lost lately"],
-          ["enemyNearNest", "true · false", "rival ants close to home"],
-          ["intake", "none · some · plenty", "food its foragers brought home lately, for its size"],
-          ["larder", "low · full", "food stored beyond what new ants need"],
-        ]}
-        note="The side view only: on the top-down map there is no strategist, and each ant's stance is its own (docs/stance.md). The strategist is not an ant: it reads colony totals. Its food is the rate foragers bring it home (behaviour MR 5), not what is left on the map; the stance is broadcast, and raids aim at the rival's hole by its coordinates (ja-k4k.6, ja-1a9)."
-      />
-      <Choices items={STANCES.map((m) => [m, STANCE_CRITERIA[m].replace(/^\w+: /, "")])} />
-      <RuleTable rows={LOCAL_STANCE_RULES} otherwise={`Otherwise: ${LOCAL_STANCE_OTHERWISE}.`} />
-    </>
-  );
-}
-
 function FungusExplainer(props: Props) {
   const fungal = followedFungal(props.colonies, props.followed);
   const [table, setTable] = useState(false);
-  const menu = new Set(mapMenu(props));
+  const menu = new Set(props.menu);
   return (
     <>
       <p className="text-[13px]">
@@ -547,8 +512,7 @@ function SentExplainer(props: Props) {
   const doctrine = props.game.revealed[k] ? (props.doctrines[k]?.text ?? "") : "(closed: reach this colony's queen)";
   const lanes: { name: string; sample: Sample; words: string; about: string; tokens: number }[] = [
     { name: "An ant's mode", sample: { lane: "mode", situation: fol?.s ?? SAMPLE_SITUATION }, words: doctrine, about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation", tokens: tokensPerQuestion("mode", doctrine) },
-    { name: "The colony's stance", sample: { lane: "stance", situation: SAMPLE_STANCE }, words: doctrine, about: "a sample view", tokens: tokensPerQuestion("stance", doctrine) },
-    { name: "The fungus, in one host", sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(mapMenu(props)) }, words: props.aim.text, about: fungal ? `ant #${fungal.i}` : "a sample host", tokens: tokensPerQuestion("fungus", props.aim.text) },
+    { name: "The fungus, in one host", sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(props.menu) }, words: props.aim.text, about: fungal ? `ant #${fungal.i}` : "a sample host", tokens: tokensPerQuestion("fungus", props.aim.text) },
   ];
   return (
     <>
@@ -620,14 +584,9 @@ function NestTab(props: Props & { focus?: string }) {
           What an ant can sense
         </a>
       </p>
-      {!props.hasNests || views.every((v) => v === null) ? (
+      {views.every((v) => v === null) ? (
         <section className={card}>
-          <p className="text-[13px]">
-            The map seen from above has no nest to look into: each colony's nest is a disc around its hole. In the side view the ants dig shafts and chambers below the ground line, and the queen lays there.
-          </p>
-          <button type="button" className="mt-2 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:bg-accent-hover" onClick={props.onSideView}>
-            Switch to the side view
-          </button>
+          <p className="text-[13px]">No nest to look into: no colony has a nest underground.</p>
         </section>
       ) : (
         <>

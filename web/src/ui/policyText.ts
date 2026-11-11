@@ -1,4 +1,4 @@
-import type { Mode, Situation, Stance, StanceSituation } from "../colony/colony.ts";
+import type { Mode, Situation } from "../colony/colony.ts";
 
 // The local rules in words, for the Learn drawer's Policy tab. Each mode and
 // stance rule is a row the drawer shows ("when …, then …") with the test it
@@ -32,14 +32,6 @@ export function localModeOtherwise(s: Situation): Mode {
   return s.mode === "return" ? "follow" : s.mode;
 }
 
-/** localStance (colony.ts), row by row. */
-export const LOCAL_STANCE_RULES: RuleRow<StanceSituation, Stance>[] = [
-  { when: "enemies are near the nest and ants were lost lately", then: "defend", test: (s) => s.enemyNearNest && s.losses !== "none" },
-  { when: "no food has come in lately and the colony is not small", then: "raid", test: (s) => s.intake === "none" && s.ants !== "few" },
-  { when: "the larder is full and the colony is at its size", then: "raid", test: (s) => s.larder === "full" && s.ants === "many" },
-];
-export const LOCAL_STANCE_OTHERWISE: Stance = "forage";
-
 /** The rows applied in order: what the drawer's words say the rule does. */
 export function byRows<S, A extends string>(rows: readonly RuleRow<S, A>[], otherwise: (s: S) => A, s: S): A {
   for (const r of rows) if (r.test(s)) return r.then;
@@ -59,7 +51,7 @@ export const LOCAL_RESPONSE_RULES: [hook: string, rule: string][] = [
   ["carry", "Take whatever it holds where it belongs: food home, soil to the mound, the dead to the midden, brood to a brood chamber."],
   ["drop", "Put food down where it goes."],
   ["trail", "Carrying food: lay the food trail, more for richer food. Walking out: lay the home trail. Porters, soil and corpse carriers: nothing."],
-  ["alarm", "Strong alarm repels every ant but fighters and diggers. On the top-down maps a faint one draws an explorer with empty jaws to look, and a follower keeps to its trail."],
+  ["alarm", "Strong alarm repels every ant but fighters and diggers. On the surface a faint one draws an explorer with empty jaws to look, and a follower keeps to its trail."],
   ["contact", "Strangers in reach: an ant carrying something takes it home; raiding, defending, or already sent to fight, it fights; otherwise, foraging, it turns away and goes home."],
-  ["leave", "Rested and waiting at home (top-down maps and one world): many nestmates coming home with food, go now; a few, go soon; none, and home crowded, now and then go out as a raid scout; none, wait, and only now and then go out to scout. An ant that defends goes out whatever comes back. A raider waits for a scout's raid trail, and goes on it."],
+  ["leave", "Rested and waiting at home: many nestmates coming home with food, go now; a few, go soon; none, and home crowded, now and then go out as a raid scout; none, wait, and only now and then go out to scout. An ant that defends goes out whatever comes back. A raider waits for a scout's raid trail, and goes on it."],
 ];
