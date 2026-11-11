@@ -4405,3 +4405,91 @@ The owner (2026-11-10) removed the side-view and top-down games from the page an
 - The simulation keeps its side and open maps (`generateSideWorld`, `generateWorld`): the assays, golden masters, benches and lab scripts still use them. Every golden master is bit-exact.
 - Cost: no legend, question or schema changed, but the page's game is now one world. `colony-cost --one` (seed 1, 600 + 600, 10 sim-minutes, offline, 2026-11-11): ~776 tokens a question, ~$0.103/h for the mode lane, 192 situations, and 0 stance choices (one world has no strategist). The side view measured ~$0.102/h (CLAUDE.md).
 - Review (PR #69): the Learn panel's strategist section and its stance request were removed, because one world never asks them. The follow card's stance chip now opens the guide's Strangers entry. Continue offers only one-world saves (`readable`). Player-facing text says "on the surface" or "below" instead of the side view or the top-down maps. `buildGame.test.ts` guards that the page builds one world.
+
+## 56. Lost carriers search in loops back through where their vector ran out, and smell their own mound (design, ja-lp4.11, ja-lp4.6.3, 2026-11-11)
+
+**Research basis:** [nest-search.md](nest-search.md). No full text could be fetched (network policy), so every figure is **unverified**.
+- **Loops from the origin.** A *Cataglyphis* forager whose vector runs out at no nest searches in loops of ever-increasing size that start and end at that spot and point different ways. The search stays centred there for an hour or more (Wehner & Srinivasan 1981; Müller & Wehner 1994; modelled by Waldner & Merkle 2018).
+- **Width by the trip.** The search is wider after a longer trip out, set by the distance the vector gives (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010).
+- **Smell, while searching.** Homing ants follow their nest's odour only once their vector has run out (Buehlmann, Hansson & Knaden 2012; Spehr et al. 2026). Harvester ants' mounds carry colony hydrocarbons, strongest at the entrance, which speed returning foragers (Sturgis, Greene & Gordon 2011).
+
+**The problem (measured).** G1 fails its bound on every seed. In ja-web's diagnosis (seeds 10 and 5), every carrier on the plane that held food over 120 s was homing and searching:
+- **The trips:** median 364–417 cells out, so the vector's miss is a median 48–51 cells, against `HOLE_SIGHT` 6.
+- **The search:** U3b's 4-point spiral had grown to a median reach of 57–64 cells (160–260 at the 90th percentile). It never comes back over the centre.
+- **Offline geometry:** today's spiral finds 74 % of carriers on 400-cell trips within 120 s, and never more than 81 %. Centred loops reach 99 % in 20 minutes but are no faster in the first 120 s. A hole sensed from 20 cells lifts the 120-s share to 86–93 % ([nest-search.md](nest-search.md), "What the game does today").
+
+**Decisions.**
+- Do both, centred loops and the mound's smell (owner, 2026-11-11).
+- Sources from abstracts, marked unverified (owner, 2026-11-11).
+- Parameters, all **design** and tuned against S1 and G1 (proposed: needs the owner after S1's baseline):
+  - loops headed a golden angle apart;
+  - a first reach of σ/2, growing σ/8 a loop, with σ from the ant's own trip;
+  - `SEARCH_STALL` skipping a waypoint instead of widening.
+
+**The mechanic.** One world's plane only (`line !== null`); the side view and top-down are bit-exact.
+- **Loops:** where the vector ran out at no hole, the ant runs loops out from that spot and back, each further out than the last and turned from it. Off: today's spiral (`SEARCH_GROW_2D`).
+- **The mound's smell:** a searching ant within its own mound's reach of its hole, on mound ground, steers up its colony's smell to its hole. The reach is the mound's as dug, at least `HOLE_SIGHT`. It is colony-specific and gated on searching. Off: sight 6 only.
+- **The sense row:** "Landmarks and entrance odour" widens from near the hole to its own mound, while searching.
+
+**Play.** Lost carriers loop back through the spot they took for home and walk in once they reach their own mound. Fewer ants wander for minutes with food. No new fungus lever: this is groundwork for U6b's one-world baselines.
+
+**Assays and targets.** These land first, with no behaviour change:
+- **S1, a search assay on one world.** Carriers are set down on the plane with a set miss, at trips of 100, 200, 400 and 600 cells, seeds 1–10. Targets: ≥ 99 % home within 600 s at every trip length, the search centred on its origin, and the 120-s share reported.
+- **G1:** ≤ 2 held over 120 s per colony on seeds 5 and 9, which un-skips its guard in `slow/oneWorld.test.ts`.
+
+The full G1 table on seeds 1–10 is reported against ja-web's.
+
+**Cost (estimated).** None in Jev: steering only, with no situation, legend or question changed. The per-ant work is small; the tick is checked with `colony-bench --one` against ja-lp4.6.7's figure.
+
+**As built (2026-11-11, `ja-lp4.11.1`–`.4`).** One world's plane only; the side-view and top-down golden masters are bit-exact; the one-world golden is unchanged: no carrier searches on its own mound within its window, so it does not exercise the smell (the smell's tests and S1 do). `SAVE_VERSION` 7 (`searchLeg`).
+- **Shipped: U3b's spiral with the mound's smell** (`searchLoops` 0, `moundSmell` 1; owner, 2026-11-11, by G1's worst seed without losing A1). The loops are built and tested but switched off: with them G1's worst seed was 49 against 35, and A1 fell to 4/10. Everything below on the loops is measured with `--set colony.searchLoops=…`.
+- **S1** (`experiment.ts` `search1`, `npm run exp -- --one s1`): on each seed's default plane (512 × 368), 40 of the player's carriers per trip length T (100, 200, 400, 600 cells) set down at t = 0 at their vector's end: odoSurf = T, each drift part drawn as the game draws it (σ = 0.1/√2 per axis); a draw ending in rock, within 2 of an edge, or in open ground walled off from the hole is drawn again. The player's mound starts as the game heaps 1,000 pellets (about G1 at 5 minutes; reach ~16). Every other ant is young, no scouts, and a carrier home is made young, so the carriers search alone. 600 s. Reported: the share home (down its own hole) in 120 s and 600 s, the median time of those home, `centre` (each carrier's mean position from its origin, sampled each second; mean, cells) and `spread` (its mean distance from the origin).
+- **Loops** (`#searchOn`, `#believePlane`, params `searchLoops`, `searchGrow`, `searchTurn`, `searchPetal`, `searchStall`): where the vector ran out at no hole, the ant visits three points a loop: out to the loop's reach at its heading − half the petal's width, across to + half, back to the origin (reached within `LOOP_AT` 2: it turns no tighter than ~1.2 cells and circled a point 1 away). Loop k heads `searchTurn` × k on from the first (which heads the way the ant faces; no random draw) and reaches σ × (`searchLoops` + `searchGrow` × k), at least `SEARCH_START` 3; σ = 0.1/√2 × its own odoSurf. No cap but the plane's longer side. `searchLoops` 0 is U3b's spiral bit for bit. The home trail still leads a searcher.
+- **The mound's smell** (`#onOwnMound`, `moundSmell`): a searching ant (`search` ≠ 0) on the plane within `max(HOLE_SIGHT, 2 + planeMoundReach(heaped))` of its own hole (the mound's reach as dug: the farthest `#carryOut` sends a pellet now) and on spoil underfoot (the plane's height field, as the undertaker's midden rule reads it) believes its hole where it is, as in sight of it. Not on a full vector; the reach is its own colony's, so a rival's mound doesn't pull. Off: `HOLE_SIGHT` only.
+- **S1, seeds 1–10** (shares pooled over 400 carriers a trip, worst seed in brackets; T = 100 is 99.3–100 % in 120 s in every row):
+
+  | T | `main` (U3b spiral) 120 s / 600 s | loops (design: σ/2, σ/8, golden, 60°, skip) | loops + smell (design) | loops + smell (tuned: 1.5σ) |
+  |---|---|---|---|---|
+  | 200 | 93.5 % (80) / 97.7 % (90) | 90.8 % (77.5) / 99.8 % (97.5) | 96.0 % (85) / 99.5 % (95) | 97.7 % (87.5) / 100 % (100) |
+  | 400 | 58.5 % (40) / 88.0 % (72.5) | 62.2 % (42.5) / 96.7 % (90) | 69.0 % (40) / 99.3 % (95) | 81.8 % (60) / 98.7 % (95) |
+  | 600 | 32.5 % (5) / 77.5 % (55) | 41.3 % (25) / 88.0 % (70) | 51.5 % (32.5) / 92.3 % (82.5) | 57.5 % (22.5) / 94.5 % (80) |
+  | median s (400 / 600) | 89 / 136 | 71 / 134 | 40 / 98 | 29 / 65 |
+  | centre / spread (600) | 24.7 / 51.3 | 8.5 / 31.7 | 8.5 / 29.1 | 20.3 / 45.3 |
+
+  **Shipped, the spiral with the smell:** 200 cells 97.0 % (85) / 98.8 % (95); 400 cells 71.0 % (50) / 92.3 % (75); 600 cells 42.0 % (20) / 86.3 % (70); medians 60 and 121 s; centre / spread at 600 cells 18.8 / 41.8. Better than `main` at every trip, short of the loops in S1.
+- **Confirmed on seeds 11–20** (loops + smell, 1.5σ): 400 cells 74.5 % (50) / 97.2 % (90), `main` 56.3 % (32.5) / 86.3 % (72.5); 600 cells 52.3 % (30) / 91.5 % (77.5), `main` 37.5 % (10) / 76.3 % (67.5). Loops alone (1.5σ): 61.2 % / 96.2 % and 41.8 % / 86.5 %.
+- **The target is not met:** ≥ 99 % home in 600 s holds at 100–200 cells with the loops but not at 400 (98.7 %) or 600 (94.5 %); with the shipped spiral and smell, at 100 cells only (98.8 / 92.3 / 86.3 % at 200 / 400 / 600). The carriers left are mostly far in the vector's tail (misses of 2–3σ) or behind rock: on seed 4, eleven origins lie in a pocket 20–50 cells from the hole across a rock band, 75–130 steps round it.
+- **Tuning the loops** (S1 seeds 1–10, one at a time, by the worst seed; 20 a trip until the last rounds, then 40):
+  - first reach (`searchLoops`): 0.25, 0.5, 1, 1.5, 2 σ: 1.5 best at 400 cells (81.8 %, worst seed 60, in 120 s; 98.7 %, worst 95, in 600 s). **1.5.**
+  - growth (`searchGrow`): σ/16, σ/8, σ/4: within noise of each other; σ/16 worst at 600 cells. **σ/8** (the design).
+  - turn (`searchTurn`): the golden angle against 90° and 180°: golden best (600 cells in 600 s: 94.5 %, against 90.3 % and 85.5 %). **Golden.**
+  - petal width (`searchPetal`): 60°, 90°, 120°: no gain from wider. **60°** (the design).
+  - **the stall rule** (`searchStall`, 3 s no nearer its point): skip to the next point (1) against start the next, wider loop (0): 400 cells 98.7 % (95) against 98.0 % (92.5) in 600 s, 600 cells 94.5 % (80) against 93.8 % (82.5), centre 20 against 26. A third rule, not stalling while following a wall (15 s instead), was no better (90.5 % at 600). **Skip (1)** (the design).
+- **G1** (seeds 1–10, both colonies, against `main` = ja-web, which this run reproduced exactly: food carried down 44,582, births 7,276, ants lost 1,679, raid scouts 187). Most foragers holding food over 120 s, you / rival:
+
+  | seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | `main` | 15 / 17 | 14 / 20 | 11 / 24 | 41 / 18 | 17 / 7 | 16 / 28 | 11 / 16 | 14 / 12 | 18 / 8 | 22 / 14 |
+  | loops 1.5σ + smell | 8 / 8 | 8 / 16 | 13 / 25 | 49 / 8 | 12 / 3 | 9 / 19 | 6 / 21 | 13 / 8 | 9 / 3 | 24 / 11 |
+  | **shipped: spiral + smell** | 10 / 13 | 19 / 8 | 12 / 24 | 35 / 7 | 6 / 10 | 10 / 18 | 6 / 11 | 11 / 10 | 7 / 2 | 18 / 8 |
+
+  Worst colony per seed: `main` 17, 20, 24, 41, 17, 28, 16, 14, 18, 22 (worst 41, sum 217); loops + smell 8, 16, 25, 49, 12, 19, 21, 13, 9, 24 (49, 196); **spiral + smell 13, 19, 24, 35, 10, 18, 11, 11, 7, 18 (35, 166)**.
+
+  - **G1 still fails, 0/10.** Shipped: the guard's seeds 5 and 9 at 10 and 7 (bound 2); better than `main` on 9 seeds, equal on 1 (seed 3, 24). All held are on the plane. Loops + smell: 5 and 9 at 12 and 9; food carried down 44,075 (−1.1 %), births 7,199 (−1.1 %), ants lost 1,618 (−3.6 %). The guard stays skipped behind `G1=1`.
+  - **Which part helps G1** (seeds 4, 5, 9, 10, worst colony): `main` 41, 17, 18, 22; loops 1.5σ alone 57, 19, 26, 38; spiral + smell 35, 10, 7, 18; loops 1σ + smell 70, 14, 10, 22; loops 1.5σ + smell 49, 12, 9, 24. **In G1 the smell does the good and the loops cost**, the reverse of S1's 600-s share. Seed 4's player: carriers back from a pocket north-east of its hole, across a rock band, believe home 20–30 cells away through rock; their loops grow by a point each 3-s stall (25–55 points) and never get round.
+  - **Why the bound is hard:** held carriers sampled on seed 9 (loops + smell, every 30 s from 150 s) had missed by 1.2–3.2σ, median ~2.3σ. In 120 s at 7 cells a second an ant sweeps at most ~840 × 12 cells² with sight 6: a disc of ~56 cells, ~1.9σ at a 420-cell trip, so even a perfect search leaves ~16 % of such carriers over 120 s; a mound of reach 16 raises that to ~3σ. Hundreds of carriers a minute then keep several held at any moment.
+  - **The first reach against G1 and A1.** At σ/2 (the design) G1 was worse still on seeds 4, 5, 9, 10: 92, 9, 10, 31 (seed 4's pocket: the loops grew by stalls). Among the loops, 1.5σ was best by G1's worst seed as well as S1's.
+- **The assays on one world, shipped (spiral + smell)** (`npm run exp -- --one`, seeds 1–10, against ja-web's table in [one-world.md](one-world.md) §5): A1 8/10 (ja-web 8/10; fail 5, 9; worst 0.69), A2a 10/10 (worst 0.76), A2b 9/10 (8/10; fail 3, 0.11), A3 10/10 (clear ≤ 33 s), A4 10/10 (scatter ≤ 0.35), A5 0/10, A5b 8/10 (7/10), A6 5/10 (5/10; worst seed 8, 0.81), A9 3/10 (worst 9.99, seed 7), A10 0/10, A8 reports (carried past reception 0.41–1.00).
+- **The same with the loops** (1.5σ + smell): A1 **4/10** (ja-web 8/10; worst seed 2, 0.63), A2a 10/10 (worst 0.79), A2b 8/10 (fail 4, 6; worst 0.16), A3 10/10 (clear ≤ 21 s), A4 10/10 (scatter ≤ 0.40), A5 0/10, A5b 6/10 (7/10), A6 4/10 (5/10; worst seed 8, 0.74), A9 3/10 (worst 9.87, seed 7), A10 0/10, A8 reports (carried past reception 0.28–1.00). **A1 is the loops' doing:** spiral 8/10, spiral + smell 8/10, loops 1.5σ alone 4/10, loops σ/2 7/10. Lost carriers with food run their long loops over both branches.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200, seed 1, two runs each, second-half mean): shipped 10.63 and 10.59 ms; loops + smell 10.19 and 10.73 ms; against 10.38 and 10.85 with the search off (this branch before the defaults changed) and ja-lp4.6.7's 10.66 and 10.81. No cost.
+- **Cost:** none in Jev (steering only: no situation, legend or question changed; `precache.test` passes).
+
+**Owner (2026-11-11): the bound stays.** G1's bound stays at 2; its guard stays skipped behind `G1=1`, and `ja-lp4.6.3` stays open. Why it still fails: the carriers held over 120 s missed by a median ~2.3σ, while an ant can sweep only ~1.9σ round its vector's end in 120 s (sight 6; the mound's smell widens that only near the hole). On seed 4, carriers back from a pocket across a rock band can't get round to a hole 20–30 cells away. Proposed follow-ups (beads to file):
+- **Shorter trips:** the error grows with the trip (σ = 0.1/√2 × the way out). G1's median trip is 364–417 cells; foragers that turn for home sooner, or food nearer the holes, keep misses within reach.
+- **Route memory for rock pockets:** a carrier retraces the way it came out (route following, beside path integration) where its vector points through rock.
+
+**Still open.** The follow-ups above; the loops, switched off, wait on them: they win S1 (94.5 % against 86.3 % home in 600 s at 600-cell trips) but lose G1 and A1, where carriers with food run long loops through rock and over trails.
+
+**Beads.** `ja-lp4.11` (epic), with children in build order: the S1 assay; centred loops; the mound's smell; tuning, G1 and docs. `ja-lp4.6.3` waits on the epic.
+
+**To read when the network allows:** the full texts of Waldner & Merkle 2018, Merkle et al. 2006 and Sturgis et al. 2011.

@@ -1,13 +1,14 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { type Colony, type ColonyParams, FAINT, type Layer, MODES, type Mode, PLANE, type Policy, type Stance, type StancePolicy } from "./colony.ts";
+import { type Colony, type ColonyParams, FAINT, type HoleCell, type Layer, LIFESPAN, MODES, type Mode, PI_DRIFT, PLANE, planeMoundReach, type Policy, type Stance, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
-import { centreX, centreY, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, responses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
-import { dropFood, isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import { encode } from "./save.ts";
+import { dropFood, heapPlane, isSky, mulberry32, rockAt, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -1445,6 +1446,188 @@ export const game1: Assay = {
   },
 };
 
+/** S1's trip lengths (cells walked out on the plane), and the carriers set down at each, per seed. */
+export const S1_TRIPS = [100, 200, 400, 600] as const;
+export const S1_PER_TRIP = 40;
+/** S1: the pellets on the player's mound at the start: about what a colony has out 5 minutes into G1 (800 by 300 s on seed 5). */
+export const S1_MOUND = 1000;
+
+/**
+ * S1 — lost carriers find their hole (ja-lp4.11.1; docs/nest-search.md, PRD §56). On one world's default plane
+ * (generateOneWorld(seed)), S1_PER_TRIP old carriers of the player per trip length T in S1_TRIPS are set down at t = 0
+ * with food, homing, their vector as a trip of T out of their own hole leaves it: odoSurf = T, each drift part drawn as
+ * the game draws it at the hole (Gaussian, σ = PI_DRIFT/√2, so the miss is σ = 0.1/√2 × T per axis). Each stands at its
+ * vector's end (the hole + T × drift: the search's origin), so its search begins there; a draw whose end is off the plane
+ * (within 2 of an edge), in rock or in a pocket of open ground walled off from the hole is drawn again. Every other ant is young (stays in), with no scouts, and a carrier home is made young
+ * too, so the carriers search alone. The player's mound starts as the game would have heaped S1_MOUND pellets.
+ * Per trip (`t400.home120` …): the share home (down its own hole) within 120 s and within 600 s, the
+ * median time of those home, the search's centredness (`centre`: per carrier with 10 s or more on the plane, the
+ * distance of its mean position, sampled each second, from its origin; their mean, in cells) and spread (`spread`: the
+ * mean distance from the origin, the same way), and carriers that went down another hole (`wrong`). Target: ≥ 99 % home
+ * within 600 s at every trip (Wehner & Srinivasan 1981: searches run for an hour or more; design mark).
+ */
+export const search1: Assay = {
+  id: "s1",
+  title: "S1 lost carriers find their hole (one world)",
+  target: "≥ 99 % home within 600 s at every trip length; the share in 120 s, the median time and the search's centredness reported",
+  seconds: 600,
+  spec: (seed) => {
+    const n = S1_TRIPS.length * S1_PER_TRIP;
+    const trip = new Float64Array(n);
+    const ox = new Float64Array(n);
+    const oy = new Float64Array(n);
+    const homeAt = new Float64Array(n).fill(Infinity);
+    const wrong = new Uint8Array(n);
+    const done = new Uint8Array(n);
+    const sx = new Float64Array(n);
+    const sy = new Float64Array(n);
+    const sd = new Float64Array(n);
+    const samples = new Uint32Array(n);
+    let nextAt = 1;
+    const setUp = (game: Game): void => {
+      const rng = mulberry32(seed * 7907 + 101);
+      const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+      const plane = game.world!.plane;
+      const c = game.player;
+      const hc = c.holeCells[c.params.nest] as HoleCell;
+      const hx = centreX(hc.px, hc.py);
+      const hy = centreY(hc.py);
+      const xMax = plane.size.w - 2;
+      const yMax = plane.size.h * R - 2;
+      // The open ground joined to the hole: a carrier can't have walked out to a pocket of it walled off by rock.
+      const { w } = plane.size;
+      const joined = new Uint8Array(w * plane.size.h);
+      const queue = [hc.px + hc.py * w];
+      joined[queue[0] as number] = 1;
+      for (let k = 0; k < queue.length; k++) {
+        const x = (queue[k] as number) % w;
+        const y = Math.floor((queue[k] as number) / w);
+        for (let d = 0; d < 6; d++) {
+          const tx = nx(x, y, d);
+          const ty = ny(y, d);
+          if (tx < 0 || ty < 0 || tx >= w || ty >= plane.size.h || joined[tx + ty * w] || rockAt(plane, tx, ty) !== OPEN) continue;
+          joined[tx + ty * w] = 1;
+          queue.push(tx + ty * w);
+        }
+      }
+      for (const k of game.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
+      // The mound as the game heaps it (#carryOut, #dropPlane): pellet k goes 2 + reach × √u out on a heading drawn for it.
+      const holes = c.holeCells.map((h) => ({ x: h.px, y: h.py }));
+      for (let k = 0; k < S1_MOUND; k++) {
+        const a = rng() * 2 * Math.PI;
+        const r = 2 + planeMoundReach(k) * Math.sqrt(rng());
+        cellOf(hx + r * Math.cos(a), hy + r * Math.sin(a));
+        heapPlane(plane, CELL[0] as number, CELL[1] as number, holes);
+      }
+      c.loadState({ fields: {}, private: { heaped: encode(S1_MOUND) } });
+      for (let i = 0; i < n; i++) {
+        const T = S1_TRIPS[Math.floor(i / S1_PER_TRIP)] as number;
+        let dx = 0;
+        let dy = 0;
+        let bx = 0;
+        let by = 0;
+        for (;;) {
+          dx = (gauss() * PI_DRIFT) / Math.SQRT2;
+          dy = (gauss() * PI_DRIFT) / Math.SQRT2;
+          bx = hx + T * dx;
+          by = hy + T * dy;
+          if (bx < 2 || by < 2 || bx > xMax || by > yMax) continue;
+          cellOf(bx, by);
+          if (joined[(CELL[0] as number) + (CELL[1] as number) * w]) break;
+        }
+        trip[i] = T;
+        ox[i] = bx;
+        oy[i] = by;
+        c.age[i] = 0.5 * LIFESPAN;
+        c.putAnt(i, PLANE, bx, by);
+        c.carrying[i] = 1;
+        c.mode[i] = MODES.indexOf("return");
+        c.heading[i] = rng() * 2 * Math.PI;
+        c.odoSurf[i] = T;
+        c.driftSurf[i] = dx;
+        c.driftSurfY[i] = dy;
+      }
+    };
+    const probe: Probe = {
+      tick(game) {
+        const c = game.player;
+        const hc = c.holeCells[c.params.nest] as HoleCell;
+        const sample = game.time + 1e-9 >= nextAt;
+        if (sample) nextAt += 1;
+        for (let i = 0; i < n; i++) {
+          if (done[i]) continue;
+          if (c.layer[i] !== PLANE) {
+            done[i] = 1;
+            // Young from now on, it stays in: carriers home don't go out again to lay trails the searchers would meet.
+            c.age[i] = 0.05 * LIFESPAN;
+            // #crossDown puts it at that hole's cell in the curtain.
+            if (Math.abs((c.x[i] as number) - centreX(hc.col, hc.row)) < 1e-3 && Math.abs((c.y[i] as number) - centreY(hc.row)) < 1e-3) homeAt[i] = game.time;
+            else wrong[i] = 1;
+            continue;
+          }
+          if (!sample) continue;
+          const ex = (c.x[i] as number) - (ox[i] as number);
+          const ey = (c.y[i] as number) - (oy[i] as number);
+          sx[i] = (sx[i] as number) + ex;
+          sy[i] = (sy[i] as number) + ey;
+          sd[i] = (sd[i] as number) + Math.hypot(ex, ey);
+          samples[i] = (samples[i] as number) + 1;
+        }
+      },
+      summary(game) {
+        const m: Record<string, number> = {};
+        let pass = 1;
+        for (const T of S1_TRIPS) {
+          let n120 = 0;
+          let n600 = 0;
+          let nWrong = 0;
+          let k = 0;
+          const times: number[] = [];
+          const centres: number[] = [];
+          const spreads: number[] = [];
+          for (let i = 0; i < n; i++) {
+            if (trip[i] !== T) continue;
+            k++;
+            const t = homeAt[i] as number;
+            if (t <= 120) n120++;
+            if (t <= game.time) {
+              n600++;
+              times.push(t);
+            }
+            nWrong += wrong[i] as number;
+            const s = samples[i] as number;
+            if (s >= 10) {
+              centres.push(Math.hypot((sx[i] as number) / s, (sy[i] as number) / s));
+              spreads.push((sd[i] as number) / s);
+            }
+          }
+          times.sort((a, b) => a - b);
+          const tag = `t${T}`;
+          m[`${tag}.home120`] = n120 / k;
+          m[`${tag}.home600`] = n600 / k;
+          m[`${tag}.median`] = times.length ? (times[Math.floor((times.length - 1) / 2)] as number) : NaN;
+          m[`${tag}.centre`] = mean(centres);
+          m[`${tag}.spread`] = mean(spreads);
+          m[`${tag}.wrong`] = nWrong;
+          if (n600 / k < 0.99) pass = 0;
+        }
+        m.pass = pass;
+        return m;
+      },
+    };
+    return {
+      seed,
+      seconds: 600,
+      map: (s) => generateOneWorld(s),
+      game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
+      sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+      events: [{ at: 0, kind: "call", run: setUp }],
+      probes: [probe],
+    };
+  },
+  score: () => ({}),
+};
+
 /** A8 on one world: the solo colony's nest in the curtain (nestFlowProbe reads the curtain's chambers). */
 const nestFlowOne: Assay = { ...nestFlow, title: `${nestFlow.title} (one world)`, spec: (seed) => ({ ...nestFlow.spec(seed), map: (s) => generateOneWorld(s) }) };
 
@@ -1454,7 +1637,7 @@ const nestFlowOne: Assay = { ...nestFlow, title: `${nestFlow.title} (one world)`
  * A5 and A5b (ja-web) count outside on the plane, past the disc round the hole, and report the ants held at the gate
  * at the top of the shaft (gateProbe).
  */
-export const ONE_ASSAYS: Assay[] = [...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)), ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])), { ...passAssay(onPlane), title: `${pass.title} (one world)` }, onPlaneAssay(open), onPlaneAssay(contact), onPlaneAssay(faintAlarm), nestFlowOne, game1];
+export const ONE_ASSAYS: Assay[] = [...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)), ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])), { ...passAssay(onPlane), title: `${pass.title} (one world)` }, onPlaneAssay(open), onPlaneAssay(contact), onPlaneAssay(faintAlarm), nestFlowOne, game1, search1];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). */
 export const ONE_PENDING: Record<string, string> = {

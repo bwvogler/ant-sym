@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, PLANE, type Colony, type Layer } from "../colony.ts";
-import { antsNear, Arena, at, cellRect, crossingProbe, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, runGame, specMap, type RunResult, type RunSpec } from "../experiment.ts";
+import { CURTAIN, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../colony.ts";
+import { antsNear, Arena, at, cellRect, crossingProbe, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, runAssay, runGame, S1_PER_TRIP, S1_TRIPS, search1, specMap, type RunResult, type RunSpec } from "../experiment.ts";
 import { STRAINS } from "../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../game.ts";
-import { CELL, cellOf } from "../hex.ts";
+import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { CRUST, generateCurtain, generateOneWorld, type OneWorld } from "../oneWorld.ts";
 import { cellAt } from "../transect.ts";
 import { OPEN, rockAt } from "../world.ts";
@@ -80,6 +80,36 @@ test("ONE_ASSAYS: every one runs on one world, A6's open-ground control too", ()
     if (a.control) assert.ok(isOneWorld(specMap(a.control(1))), `${a.id}'s control`);
   }
   assert.ok(ONE_ASSAYS.find((a) => a.id === "pass")?.control, "A6 runs its control");
+});
+
+test("S1 sets its carriers down on the plane at their vector's end, the miss growing with the trip, and scores them", () => {
+  // One tick: the set-up has run (at t = 0) and nobody has gone far.
+  const { game } = runGame({ ...search1.spec(2), seconds: 1 / 30 });
+  const c = game.player;
+  const hc = c.holeCells[c.params.nest] as HoleCell;
+  const hx = centreX(hc.px, hc.py);
+  const hy = centreY(hc.py);
+  S1_TRIPS.forEach((T, j) => {
+    let sq = 0;
+    for (let i = j * S1_PER_TRIP; i < (j + 1) * S1_PER_TRIP; i++) {
+      assert.equal(c.layer[i], PLANE);
+      assert.equal(c.carrying[i], 1);
+      assert.equal(c.mode[i], MODES.indexOf("return"));
+      assert.equal(c.odoSurf[i], T, "its trip");
+      // Its vector's end (where it stands, give or take a tick's walk) is the hole plus T × its drift.
+      const ex = hx + T * (c.driftSurf[i] as number);
+      const ey = hy + T * (c.driftSurfY[i] as number);
+      assert.ok(Math.hypot((c.x[i] as number) - ex, (c.y[i] as number) - ey) < 1, `ant ${i} stands at its vector's end`);
+      sq += (ex - hx) ** 2 + (ey - hy) ** 2;
+    }
+    const rms = Math.sqrt(sq / S1_PER_TRIP);
+    assert.ok(rms > 0.05 * T && rms < 0.16 * T, `trip ${T}: RMS miss ${rms.toFixed(1)}, against PI_DRIFT × T = ${(0.1 * T).toFixed(0)}`);
+  });
+  // Scored over 20 s: most 100-cell carriers (a miss of ~10, sight 6) are home, and each share is a share.
+  const r = runAssay(search1, 2, {}, 20);
+  assert.ok((r.metrics["t100.home600"] as number) > 0.5, `t100 home in 20 s: ${r.metrics["t100.home600"]}`);
+  for (const T of S1_TRIPS) for (const k of ["home120", "home600"]) assert.ok((r.metrics[`t${T}.${k}`] as number) >= 0 && (r.metrics[`t${T}.${k}`] as number) <= 1);
+  assert.equal(r.metrics.pass, 0, "not all home in 20 s");
 });
 
 /** Ant i of c put on `layer` at world (x, y): a probe reads only these fields. */

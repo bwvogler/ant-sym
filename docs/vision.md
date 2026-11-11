@@ -26,7 +26,7 @@ This is the budget the policy may draw on. Each row points to the research secti
 | Taste | the quality of food in the jaws (sugar strength) | contact, at pickup | [trails](trails.md#trail-amount-follows-food-quality) (Beckers et al. 1993) |
 | Gravity | up and down in the dark | everywhere underground | [nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs) |
 | Path integration | a home vector whose error grows by about 10 % of distance | outside; resets inside the nest | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole) |
-| Landmarks and entrance odour | corrects the vector near home | near the hole | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole) |
+| Landmarks and entrance odour | corrects the vector near home; while searching, the colony's own smell on its mound leads to the hole | near the hole; on one world's plane, the ant's own mound while its vector has run out (`ja-lp4.11`) | [nest-and-home §1](nest-and-home.md#outside-home-is-the-hole), [nest-search](nest-search.md) |
 | Floor marks ("road signs") | which chamber this is; turns at decision points | local, underground | [nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs) |
 | Queen pheromone | where the queen is; whether the colony has a queen; faint in a big nest, so new queens are reared | within the nest; carried on workers and passed by contact | [nest-and-home §1](nest-and-home.md#the-queen), [queens-and-merging §2](queens-and-merging.md#2-what-ants-do), [new-queens §2](new-queens.md#2-the-queen-holds-it-back) |
 | Brood | dig here, tend here | local | [nest-and-home §1](nest-and-home.md#nest-structure) |
