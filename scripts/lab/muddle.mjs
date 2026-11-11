@@ -4,10 +4,10 @@
 // "muddle" (every host muddles). Reports, per colony: food home, births, brood at the end and how much of it lies
 // outside any chamber (put down on the way), hosts at the end.
 //
-// Usage: node scripts/muddle.mjs [seed=1] [policy=muddle|local] [seconds=300] [ants=300] [strokes=6] [paintAt=30]
-import { BRUSH as SPORES, Game } from "../web/src/colony/game.ts";
-import { INFECTED, STRAINS } from "../web/src/colony/fungus.ts";
-import { generateSideWorld, mulberry32 } from "../web/src/colony/world.ts";
+// Usage: node scripts/lab/muddle.mjs [seed=1] [policy=muddle|local] [seconds=300] [ants=300] [strokes=6] [paintAt=30]
+import { BRUSH as SPORES, Game } from "../../web/src/colony/game.ts";
+import { INFECTED, STRAINS } from "../../web/src/colony/fungus.ts";
+import { generateSideWorld, mulberry32 } from "../../web/src/colony/world.ts";
 
 const args = process.argv.slice(2);
 const seed = Number(args[0] ?? 1);

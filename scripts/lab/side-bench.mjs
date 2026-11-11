@@ -16,7 +16,7 @@
 //   stuck60   ants still for 60 s or more at the end, anywhere
 // A run is deterministic: the same arguments give the same numbers.
 //
-// Usage: node scripts/side-bench.mjs [seeds=1-6] [seconds=600] [ants per colony=600] [colonies=2] [root=this repo]
+// Usage: node scripts/lab/side-bench.mjs [seeds=1-6] [seconds=600] [ants per colony=600] [colonies=2] [root=this repo]
 //   seeds: a list and/or ranges (1-6, or 1,3,5). root: another checkout to measure (its web/src/colony is imported),
 //   so the same harness measures before and after a change.
 import { dirname, resolve } from "node:path";
@@ -30,7 +30,7 @@ const seeds = (args[0] ?? "1-6").split(",").flatMap((s) => {
 const seconds = Number(args[1] ?? 600);
 const ants = Number(args[2] ?? 600);
 const colonies = Number(args[3] ?? 2);
-const root = resolve(args[4] ?? resolve(dirname(fileURLToPath(import.meta.url)), ".."));
+const root = resolve(args[4] ?? resolve(dirname(fileURLToPath(import.meta.url)), "../.."));
 const { Game } = await import(`${root}/web/src/colony/game.ts`);
 const W = await import(`${root}/web/src/colony/world.ts`);
 const { CELL, cellOf } = await import(`${root}/web/src/colony/hex.ts`);

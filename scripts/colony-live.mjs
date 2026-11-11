@@ -146,6 +146,7 @@ const brain = (lane) => (s) => {
 const map = view === "top" ? generateWorld(opts.seed, OPEN_WORLD) : generateSideWorld(opts.seed);
 const extent = worldExtent(map);
 const paint = mulberry32(opts.seed + 99);
+/** @type {import("../web/src/colony/experiment.ts").Event[]} */
 const events = [];
 for (let t = 0; t < opts.seconds; t += DT) if (paint() < DT / 20) events.push({ at: t, kind: "paint", channel: "alarm", x: paint() * extent.w, y: paint() * extent.h, r: 3, amount: 12 });
 const { game } = runGame({
@@ -164,8 +165,9 @@ console.log(
 const client = opts.dry ? null : new JevClient({ apiKey: KEY });
 async function ask(req) {
   const r = await client.ask({ model: DEFAULT_JEV_MODEL, ...req });
-  if (r.status !== 200 || !r.body?.answers) throw new Error(`Jev ${r.status} after ${r.attempts} attempt(s): ${JSON.stringify(r.body).slice(0, 300)}`);
-  return { answers: r.body.answers, inputTokens: r.inputTokens };
+  const body = /** @type {any} */ (r.body);
+  if (r.status !== 200 || !body?.answers) throw new Error(`Jev ${r.status} after ${r.attempts} attempt(s): ${JSON.stringify(r.body).slice(0, 300)}`);
+  return { answers: body.answers, inputTokens: r.inputTokens };
 }
 
 let spentTokens = 0;

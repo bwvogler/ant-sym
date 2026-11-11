@@ -4,10 +4,10 @@
 // and out on the ground. Reports food home, the share of time each colony raided, and its fighters in or out then.
 // Runs on any branch of the nest stack (it reads only public fields).
 //
-// Usage: node scripts/raid-food.mjs [seed=3] [ants=600] [seconds=600]
-import { Game } from "../web/src/colony/game.ts";
-import { CELL } from "../web/src/colony/hex.ts";
-import { generateSideWorld, isSky, mulberry32 } from "../web/src/colony/world.ts";
+// Usage: node scripts/lab/raid-food.mjs [seed=3] [ants=600] [seconds=600]
+import { Game } from "../../web/src/colony/game.ts";
+import { CELL } from "../../web/src/colony/hex.ts";
+import { generateSideWorld, isSky, mulberry32 } from "../../web/src/colony/world.ts";
 
 const [seed = 3, ants = 600, seconds = 600] = process.argv.slice(2).map(Number);
 const DT = 1 / 30;

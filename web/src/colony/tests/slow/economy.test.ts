@@ -14,11 +14,11 @@ import { generateSideWorld, mulberry32 } from "../../world.ts";
 // tests' small map (256 × 160) with one colony of 110 ants (165 at most) and 0.3 of the map's food, about the full game's
 // food per ant (27,840 for 1,200 founders there; 2,190 for 110 here). It still shows the dynamics: the founders die of
 // age within the hour; the colony digs its reception and brood chambers; it brings home all the food it can reach by
-// about 2,400 s and lives on its larder after. Measured (`node scripts/economy-bench.mjs 2 3600 110 1 1200 <root> 1 0.3`):
+// about 2,400 s and lives on its larder after. Measured (`node scripts/lab/economy-bench.mjs 2 3600 110 1 1200 <root> 1 0.3`):
 // at 3,600 s this branch has 152 workers (167 born, 125 dead of age); with a lifespan of 1,800 s, 20; with the food flow
 // as it was (food to a reception of any size, porters only from reception and stores, no forager handing on), 130, with
 // 30 larvae unfed for over two minutes beside 117 food in the nest (none on this branch until the last minute, when the
-// larder is down to 33: 2). `scripts/economy-bench.mjs` measures the full game. With energy and hunger (ja-xu6.1, PRD
+// larder is down to 33: 2). `scripts/lab/economy-bench.mjs` measures the full game. With energy and hunger (ja-xu6.1, PRD
 // §50.18) adults eat too (38 food in the hour here): 148 workers (159 born, 121 dead of age), 6 larvae once stranded, none starved.
 
 /** An hour of the tests' small map, one colony of 110 on 0.3 of the map's food (world `w`, the game seeded w × 7919 + nudge). */

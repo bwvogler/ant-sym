@@ -529,7 +529,7 @@ export class Game {
       } else {
         // Where she settles: the same reading the queen's pen previews (settleAt), so the two can't disagree.
         const s = this.settleAt(f);
-        if (!s.ok) throw new Error(`addColony: ${s.reason}`);
+        if (s.ok === false) throw new Error(`addColony: ${s.reason}`);
         spot = { cell: s.cell, end: s.end };
       }
       if (!spot) throw new Error(`addColony: ${NO_ROOM}`);

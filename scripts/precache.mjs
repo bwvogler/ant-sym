@@ -220,11 +220,12 @@ async function worker() {
     try {
       const r = await client.ask({ model: DEFAULT_JEV_MODEL, ...job.req });
       spent += r.inputTokens * USD_PER_INPUT_TOKEN;
-      if (r.status !== 200 || !r.body?.answers) throw new Error(`Jev ${r.status}`);
+      const body = /** @type {any} */ (r.body);
+      if (r.status !== 200 || !body?.answers) throw new Error(`Jev ${r.status}`);
       const b = bundles.get(job.file);
       let got = 0;
       for (const it of job.items) {
-        const a = LANES[job.lane].read(r.body.answers, it.id, it.situation);
+        const a = LANES[job.lane].read(body.answers, it.id, it.situation);
         if (a) {
           b.answers.set(it.key, a);
           got++;
