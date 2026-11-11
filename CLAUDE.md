@@ -24,7 +24,7 @@ The `ja` database syncs through the **`beads-dolt` branch**, not `refs/dolt/data
 ```sh
 npm --prefix web install
 npm run dev                    # http://localhost:38500
-npm test                       # every tier below, ~4 min on 4 cores; node --test, 60 s per file (the limit is a whole file: split a file before it nears it)
+npm test                       # every tier below, ~4 min on 4 cores; node --test, 120 s per file here and in the soak tier, 60 s in unit, int and golden (the limit is a whole file, and files run side by side: split a file before it nears it)
 npm run test:unit              # the quick tier (files under ~1.5 s alone: ui, server, worker, colony/tests/unit), ~9 s
 npm run test:watch             # the unit tier on every save (node --test --watch)
 npm run test:int               # colony/tests/int and ui/tests/int: files of 1.5-12 s
