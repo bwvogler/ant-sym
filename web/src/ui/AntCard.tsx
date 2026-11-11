@@ -171,6 +171,6 @@ function chips(s: Situation): [string, string, LearnTarget][] {
     ["home", s.homeTrail, { tab: "guide", id: underground ? "inside" : "home-trail" }],
     ["alarm", s.alarm, { tab: "guide", id: "alarm" }],
     ["enemy", s.enemy, { tab: "guide", id: "strangers" }],
-    ["stance", s.stance, { tab: "policy", id: "stance" }],
+    ["stance", s.stance, { tab: "guide", id: "strangers" }],
   ];
 }

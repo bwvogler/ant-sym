@@ -7,7 +7,7 @@ import { generateOneWorld } from "../oneWorld.ts";
 import { encode } from "../save.ts";
 import { heapPlane, mulberry32 } from "../world.ts";
 
-// One world's nest search (ja-lp4.11, docs/nest-search.md, PRD §55): a carrier whose vector ran out where no hole was
+// One world's nest search (ja-lp4.11, docs/nest-search.md, PRD §56): a carrier whose vector ran out where no hole was
 // runs loops out from that spot and back, each headed searchTurn on from the last and reaching further, the first
 // searchLoops σ out (σ from its own trip). A rock-free small plane (160 × 100, seed 7) keeps the geometry clean: the
 // player's hole at cell (48, 32), the carrier's vector ending 60 east of it, out of reach of the loops these tests watch.
@@ -16,7 +16,7 @@ const DT = 1 / 30;
 const RETURN = MODES.indexOf("return");
 const SIGMA_PER_CELL = PI_DRIFT / Math.SQRT2;
 
-/** The loops as designed (PRD §55), whatever the defaults. */
+/** The loops as designed (PRD §56), whatever the defaults. */
 const LOOPS: Partial<Colony["params"]> = { searchLoops: 0.5, searchGrow: 0.125, searchTurn: Math.PI * (3 - Math.sqrt(5)), searchPetal: Math.PI / 3, searchStall: 1 };
 
 const game = (params: Partial<Colony["params"]> = LOOPS): Game => {
@@ -267,4 +267,49 @@ test("smell: a searcher on the rival's mound is not pulled, to the rival's hole 
   assert.ok(nearest > HOLE_SIGHT, `never nearer the player's hole than ${nearest.toFixed(1)}`);
   assert.ok(Math.hypot((c.x[0] as number) - P.x, (c.y[0] as number) - P.y) < 10, "it searched round where its vector ran out");
   assert.ok((c.search[0] as number) > 0, "searching");
+});
+
+test("loops: the first loop heads the way the ant faces when its vector runs out", () => {
+  for (const face of [Math.PI / 2, -2]) {
+    const g = game();
+    const { c, ox, oy } = lost(g, 200);
+    c.heading[0] = face;
+    const ls = legs(g, c, ox, oy, 20);
+    const a = ls.find((l) => l.n === 0);
+    const b = ls.find((l) => l.n === 1);
+    assert.ok(a && b, "the first loop's legs out and across");
+    const head = Math.atan2(a.y + b.y, a.x + b.x);
+    const off = Math.abs(Math.atan2(Math.sin(head - face), Math.cos(head - face)));
+    assert.ok(off < 0.25, `facing ${face.toFixed(2)}, the first loop headed ${head.toFixed(2)}`);
+  }
+});
+
+test("loops: a point counts as reached within LOOP_AT (2 cells), not only within 1", () => {
+  const g = game();
+  const { c, ox, oy } = lost(g, 200);
+  // On the way back of loop 1 (leg 5: its point is the origin), 1.5 cells east of the origin, facing away.
+  c.putAnt(0, PLANE, ox + 1.5, oy);
+  c.search[0] = 10;
+  c.searchA[0] = 0;
+  c.searchLeg[0] = 5;
+  c.heading[0] = 0;
+  g.tick(DT);
+  assert.equal(c.searchLeg[0], 6, "1.5 cells from its point, it moves on to the next loop");
+});
+
+test("loops: a stall skips to the next point (searchStall 1), or starts the next loop (searchStall 0)", () => {
+  for (const [stall, want] of [[1, 5], [0, 6]] as const) {
+    const g = game({ ...LOOPS, searchStall: stall });
+    const { c, ox, oy } = lost(g, 200);
+    // Partway out on loop 1 (leg 4, its leg across), far from its point and no nearer it for longer than SEARCH_STALL.
+    c.putAnt(0, PLANE, ox - 5, oy);
+    c.search[0] = 10;
+    c.searchA[0] = 0;
+    c.searchLeg[0] = 4;
+    c.heading[0] = Math.PI;
+    c.bestD[0] = 0;
+    c.stallT[0] = 4; // past SEARCH_STALL (3 s), short of the tunnel walker's reset (TUNNEL_STALL + BY_VECTOR)
+    g.tick(DT);
+    assert.equal(c.searchLeg[0], want, `searchStall ${stall}: stalled on leg 4, it went to leg ${c.searchLeg[0]}`);
+  }
 });

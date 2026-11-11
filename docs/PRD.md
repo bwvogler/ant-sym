@@ -4396,7 +4396,17 @@ The longer legends cost a few per cent; the top-down stance lane is gone. The es
 - **A fight-recruitment signal** (pavement ants' escalation): alarm already draws defenders.
 - **Brood need** as a raid cue (`ja-gkl`).
 
-## 55. Lost carriers search in loops back through where their vector ran out, and smell their own mound (design, ja-lp4.11, ja-lp4.6.3, 2026-11-11)
+## 55. The page plays one world only (ja-97n, 2026-11-10)
+
+The owner (2026-11-10) removed the side-view and top-down games from the page and made one world (§51) its only game, so Details has no Ground choice. This takes the page switch out of U6b (`ja-lp4.6.2`), whose leave and raid assays and final baselines are still open. Only the UI changed:
+
+- `buildGame` always builds `generateOneWorld(seed)`. `ColonyControls`, the saved settings (`GameSettings`) and `hasNests` no longer carry a ground. Saves made before this change will not load into the same world; there is no migration, because nobody plays yet.
+- The Nest tab, the fungus panel's nest upgrades and the notices no longer check whether the map has nests. The Nest tab's "Switch to the side view" empty state is gone.
+- The simulation keeps its side and open maps (`generateSideWorld`, `generateWorld`): the assays, golden masters, benches and lab scripts still use them. Every golden master is bit-exact.
+- Cost: no legend, question or schema changed, but the page's game is now one world. `colony-cost --one` (seed 1, 600 + 600, 10 sim-minutes, offline, 2026-11-11): ~776 tokens a question, ~$0.103/h for the mode lane, 192 situations, and 0 stance choices (one world has no strategist). The side view measured ~$0.102/h (CLAUDE.md).
+- Review (PR #69): the Learn panel's strategist section and its stance request were removed, because one world never asks them. The follow card's stance chip now opens the guide's Strangers entry. Continue offers only one-world saves (`readable`). Player-facing text says "on the surface" or "below" instead of the side view or the top-down maps. `buildGame.test.ts` guards that the page builds one world.
+
+## 56. Lost carriers search in loops back through where their vector ran out, and smell their own mound (design, ja-lp4.11, ja-lp4.6.3, 2026-11-11)
 
 **Research basis:** [nest-search.md](nest-search.md). No full text could be fetched (network policy), so every figure is **unverified**.
 - **Loops from the origin.** A *Cataglyphis* forager whose vector runs out at no nest searches in loops of ever-increasing size that start and end at that spot and point different ways. The search stays centred there for an hour or more (Wehner & Srinivasan 1981; Müller & Wehner 1994; modelled by Waldner & Merkle 2018).
@@ -4431,7 +4441,7 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 
 **Cost (estimated).** None in Jev: steering only, with no situation, legend or question changed. The per-ant work is small; the tick is checked with `colony-bench --one` against ja-lp4.6.7's figure.
 
-**As built (2026-11-11, `ja-lp4.11.1`–`.4`).** One world's plane only; the side-view and top-down golden masters are bit-exact; the one-world golden was re-recorded with the shipped defaults. `SAVE_VERSION` 7 (`searchLeg`).
+**As built (2026-11-11, `ja-lp4.11.1`–`.4`).** One world's plane only; the side-view and top-down golden masters are bit-exact; the one-world golden is unchanged: no carrier searches on its own mound within its window, so it does not exercise the smell (the smell's tests and S1 do). `SAVE_VERSION` 7 (`searchLeg`).
 - **Shipped: U3b's spiral with the mound's smell** (`searchLoops` 0, `moundSmell` 1; owner, 2026-11-11, by G1's worst seed without losing A1). The loops are built and tested but switched off: with them G1's worst seed was 49 against 35, and A1 fell to 4/10. Everything below on the loops is measured with `--set colony.searchLoops=…`.
 - **S1** (`experiment.ts` `search1`, `npm run exp -- --one s1`): on each seed's default plane (512 × 368), 40 of the player's carriers per trip length T (100, 200, 400, 600 cells) set down at t = 0 at their vector's end: odoSurf = T, each drift part drawn as the game draws it (σ = 0.1/√2 per axis); a draw ending in rock, within 2 of an edge, or in open ground walled off from the hole is drawn again. The player's mound starts as the game heaps 1,000 pellets (about G1 at 5 minutes; reach ~16). Every other ant is young, no scouts, and a carrier home is made young, so the carriers search alone. 600 s. Reported: the share home (down its own hole) in 120 s and 600 s, the median time of those home, `centre` (each carrier's mean position from its origin, sampled each second; mean, cells) and `spread` (its mean distance from the origin).
 - **Loops** (`#searchOn`, `#believePlane`, params `searchLoops`, `searchGrow`, `searchTurn`, `searchPetal`, `searchStall`): where the vector ran out at no hole, the ant visits three points a loop: out to the loop's reach at its heading − half the petal's width, across to + half, back to the origin (reached within `LOOP_AT` 2: it turns no tighter than ~1.2 cells and circled a point 1 away). Loop k heads `searchTurn` × k on from the first (which heads the way the ant faces; no random draw) and reaches σ × (`searchLoops` + `searchGrow` × k), at least `SEARCH_START` 3; σ = 0.1/√2 × its own odoSurf. No cap but the plane's longer side. `searchLoops` 0 is U3b's spiral bit for bit. The home trail still leads a searcher.
@@ -4482,7 +4492,4 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 
 **Beads.** `ja-lp4.11` (epic), with children in build order: the S1 assay; centred loops; the mound's smell; tuning, G1 and docs. `ja-lp4.6.3` waits on the epic.
 
-**Still open.**
-- The loops' parameters and the stall rule (after S1).
-- If G1 still fails with both, the one-world bound or the trips' length (owner).
-- The full texts to read when the network allows: Waldner & Merkle 2018, Merkle et al. 2006, Sturgis et al. 2011.
+**To read when the network allows:** the full texts of Waldner & Merkle 2018, Merkle et al. 2006 and Sturgis et al. 2011.

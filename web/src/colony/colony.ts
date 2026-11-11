@@ -253,7 +253,7 @@ export interface ColonyParams {
    * One world's plane (ja-lp4.11, docs/nest-search.md): a homing ant whose vector ran out where no hole was searches in
    * loops out from that spot and back (Wehner & Srinivasan 1981; Müller & Wehner 1994), the first reaching this many σ
    * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × odoSurf; Merkle & Wehner 2010: the
-   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §55: the loops,
+   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §56: the loops,
    * tuned to 1.5, won S1 but lost G1 and A1 to the spiral with the mound's smell).
    */
   searchLoops: number;

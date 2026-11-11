@@ -1,6 +1,6 @@
 # Nest search: loops back through where the vector ran out, and the colony's own smell on its mound
 
-*Research note for epic `ja-lp4.11` (one world, for `ja-lp4.6.3`; PRD §55). Written 2026-11-11, against code at `f188c23`. **No paper was read in full text.** This session's network policy refused every publisher and repository host tried (PMC, Springer, biologists.com, OUP, doi.org, MPG PuRe, BMC). Every claim below comes from abstracts, highlights and citing papers seen in search results, so all of it is **unverified**. The parameters of the mechanic are **design**. The scratch research files list which full texts to read first when access exists.*
+*Research note for epic `ja-lp4.11` (one world, for `ja-lp4.6.3`; PRD §56). Written 2026-11-11, against code at `f188c23`. **No paper was read in full text.** This session's network policy refused every publisher and repository host tried (PMC, Springer, biologists.com, OUP, doi.org, MPG PuRe, BMC). Every claim below comes from abstracts, highlights and citing papers seen in search results, so all of it is **unverified**. The parameters of the mechanic are **design**. The scratch research files list which full texts to read first when access exists.*
 
 ## What the game does today, and what goes wrong
 
@@ -109,7 +109,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 | its vector ran out at no hole (its own vector) | path integration | steering: loops from that spot and back, each heading ~137.5° on, each reaching further | first reach ≈ σ/2, each next loop + σ/8, σ from its own trip (`odoSurf`); no cap | today's widening 4-point spiral (`SEARCH_GROW_2D`) | the spiral that outruns the hole |
 | its colony's smell on its mound, strongest at the hole (left–right) | landmarks and entrance odour (range widened) | steering: up the gradient to its hole | only while searching; within its own mound's reach; colony-specific | sight `HOLE_SIGHT` (6) only | — |
 
-- **Scope:** one world's plane only (`line !== null`). The side view's search (1D, either side) and top-down are untouched, so their goldens stay bit-exact. The one-world golden is re-recorded once.
+- **Scope:** one world's plane only (`line !== null`). The side view's search (1D, either side) and top-down are untouched, so their goldens stay bit-exact. The one-world golden is unchanged: it never has a carrier searching on its own mound, so the smell's tests and S1 cover it.
 - **`SEARCH_STALL`:** a blocked ant moves on to its next loop's next waypoint rather than widening on each stall, so blocking can't inflate the search. **Design**; measured against keeping today's rule.
 - **Cost:** steering only. No situation field, legend or question changes, so Jev's cost is unchanged.
 - **Assays, first, with no behaviour change:**
@@ -151,7 +151,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 
 ## What was built
 
-*2026-11-11, `ja-lp4.11` (PRD §55, "As built", has every number).*
+*2026-11-11, `ja-lp4.11` (PRD §56, "As built", has every number).*
 - **Shipped: U3b's spiral with the mound's smell** (`searchLoops` 0, `moundSmell` 1). The owner chose by G1's worst seed without losing A1: the loops lost both.
 - **The mound's smell.** As in the table: searching, within its own mound's reach as dug (`planeMoundReach`, at least `HOLE_SIGHT`), on spoil underfoot (the plane's height field, which the midden rule also reads), the ant steers for its hole. This is what helps the game.
 - **Loops, built but switched off.** As in the table: three points a loop (out, across a 60° petal, back to the origin), each a golden angle on, reaching σ × (`searchLoops` + k/8). Tuned on S1 to 1.5σ (growth, turn, width and the skip-a-point stall rule as designed). They win S1 but lose G1 (worst seed 49 against the spiral's 35) and A1 (8/10 → 4/10): carriers with food run long loops through rock and over the trails.

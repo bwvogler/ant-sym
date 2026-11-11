@@ -3,7 +3,7 @@
 // like the bench: `npm run e2e` (not part of `npm test`, which has no browser). It uses the `playwright` already on the
 // machine (no install, no dependency) and starts the dev server on a free port with no Jev key, so it spends nothing.
 //
-//  1. a one-world game, seed fixed (Start, then Details → Ground → one world): it opens above;
+//  1. a one-world game, seed fixed (Start: the page plays one world only): it opens above;
 //  2. above, below, above mid-game: each view keeps its own camera;
 //  3. a click on the line above shows below at that column; a click on the strip below shows above at P(s);
 //  4. an ant followed through a hole carries the camera across: the view switches and centres on it (the ant is the one a
@@ -134,9 +134,6 @@ try {
   console.log("1. a one-world game");
   await page.getByLabel("world seed").fill(String(SEED));
   await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.getByRole("button", { name: "Details", exact: true }).click();
-  await page.getByRole("button", { name: "one world", exact: true }).click();
-  await page.getByRole("button", { name: "Close Details" }).click();
   await until(() => page.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null), "the one-world game, landed");
   check((await page.evaluate(() => window.jevAnts.view())) === "above", "a one-world game opens above");
   check((await page.getByRole("button", { name: "above", exact: true }).getAttribute("aria-pressed")) === "true", "the switch shows above");

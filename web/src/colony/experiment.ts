@@ -1453,7 +1453,7 @@ export const S1_PER_TRIP = 40;
 export const S1_MOUND = 1000;
 
 /**
- * S1 — lost carriers find their hole (ja-lp4.11.1; docs/nest-search.md, PRD §55). On one world's default plane
+ * S1 — lost carriers find their hole (ja-lp4.11.1; docs/nest-search.md, PRD §56). On one world's default plane
  * (generateOneWorld(seed)), S1_PER_TRIP old carriers of the player per trip length T in S1_TRIPS are set down at t = 0
  * with food, homing, their vector as a trip of T out of their own hole leaves it: odoSurf = T, each drift part drawn as
  * the game draws it at the hole (Gaussian, σ = PI_DRIFT/√2, so the miss is σ = 0.1/√2 × T per axis). Each stands at its

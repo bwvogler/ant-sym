@@ -1,6 +1,5 @@
 import { SAVE_VERSION, type GameSave } from "../colony/game.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
-import type { Ground } from "./useColony.ts";
 
 // Saved games (the fungus game, ja-lo8.6): a game is long (queen births are rare: PRD §50), so it is kept between
 // sittings. A record is the game's own save (Game.save) plus what the page needs to build the same game again (its
@@ -11,7 +10,6 @@ import type { Ground } from "./useColony.ts";
 /** What builds the same game again: useColony's game is made from these (and its Restart count). */
 export interface GameSettings {
   seed: number;
-  ground: Ground;
   antCount: number;
   rival: boolean;
   generation: number;
@@ -101,10 +99,11 @@ export function record(slot: number, settings: GameSettings, player: PlayerState
 /** "12 min of sim, 3 h ago" style, for a slot's line. */
 /**
  * Whether this game can read the record: one saved by an older (or newer) version is listed but never loaded, since
- * Game.load refuses it (PR #42 review, B3).
+ * Game.load refuses it (PR #42 review, B3); nor is one from a single map (the side view or the open surface), since the
+ * page plays one world only (PRD §55).
  */
 export function readable(r: SaveRecord): boolean {
-  return r.game?.version === SAVE_VERSION;
+  return r.game?.version === SAVE_VERSION && r.game.world != null;
 }
 
 /** The newest save this game can read, or null: what Continue offers. */
