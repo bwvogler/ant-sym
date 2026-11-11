@@ -639,8 +639,6 @@ export class Colony {
   readonly layers: Layer[];
   /** the layer the nest is on (the queen, brood and chambers; where ants are born): 0, but the curtain in one world */
   home = 0;
-  /** the layer each ant is on (all `home` on a colony with one) */
-  layer: Uint8Array;
   /** the layer bound now (#bind): `home` between ticks */
   #cur = 0;
   /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map. The game sets it again when the line grows (Game.addColony) */
@@ -688,58 +686,6 @@ export class Colony {
   );
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
-  x: Float32Array;
-  y: Float32Array;
-  heading: Float32Array;
-  /** index into MODES */
-  mode: Uint8Array;
-  carrying: Uint8Array;
-  /** carrying a soil pellet it dug, home to the mound */
-  pellet: Uint8Array;
-  /** seconds of digging left at the soil face ahead; 0 = not digging */
-  digT: Float32Array;
-  /** the heading the cell it is digging should carry on the tunnel at (NaN: none chosen; the face's own direction) */
-  digAim: Float32Array;
-  // Path integration in the side view (nest slice 1, docs/nest-and-home.md §3.1). An ant knows where home is only
-  // by counting its own steps, and the count drifts: about 10 % of the distance walked (Wehner). Its depth does not
-  // drift: gravity tells it how far it has climbed. So it believes its goal lies drift × distance off to one side.
-  /** distance walked since the surface vector reset (coming up out of the hole) */
-  odoSurf: Float32Array;
-  /** distance walked underground since the in-nest memory reset (in the chamber) */
-  odoNest: Float32Array;
-  /** this trip's drift on the surface and in the nest, per unit walked (Gaussian, σ = PI_DRIFT); on one world's plane, driftSurf is the x part */
-  driftSurf: Float32Array;
-  /**
-   * One world's plane (U3b, docs/one-world.md §4): the surface drift's y part. Each part is drawn with σ = PI_DRIFT/√2 at
-   * its own hole, so the vector's error is PI_DRIFT × distance (RMS) in 2D, as the side view's is across the ground.
-   */
-  driftSurfY: Float32Array;
-  driftNest: Float32Array;
-  /** cells added to the believed goal while searching round it (it got there and found nothing): grows, alternating sides; on one world's plane, the loop's reach */
-  search: Float32Array;
-  /** one world's plane: the direction of the search's current point from where the vector ran out (a quarter turn more each time); with loops (searchLoops), the first loop's heading */
-  searchA: Float32Array;
-  /** one world's plane, with loops (searchLoops): the search's point, counted from its start, three a loop (out, across, back to the centre) */
-  searchLeg: Uint32Array;
-  /**
-   * One world's plane, with siteFidelity (ja-lp4.15): where the ant believes the food it last picked up lay, relative to its
-   * hole (x and y; NaN: none). Its home vector at the pickup, negated: where it stood less where it believed its hole was.
-   */
-  foodX: Float32Array;
-  foodY: Float32Array;
-  /**
-   * One world's plane, with routeMemory (ja-lp4.16): the places ant i stored on its way out of its hole, x then y, routeMax
-   * a slot (slot i × routeMax + k); routeN of them are in use. Its own positions only, cleared as it comes up out of its
-   * own hole.
-   */
-  routePlaces: Float32Array;
-  routeN: Uint8Array;
-  /** cells between two places now (routeStep, doubled each time the store is halved), and the odometer (odoSurf) where the last was stored */
-  routeGap: Float32Array;
-  routeAt: Float32Array;
-  /** 0 = recording (or none), 1 = retracing (routeGoal is the place it steers for), 2 = has retraced this trip */
-  routeState: Uint8Array;
-  routeGoal: Int16Array;
   /** the side view: steps to this colony's hole through its tunnels, per cell (see #outField), the cells it reached, and the ground's version and time it was built at */
   #outDist: Int32Array | null = null;
   #outCells: number[] = [];
@@ -755,9 +701,6 @@ export class Colony {
   readonly brood = new Brood();
   /** seconds owed toward the queen's next egg */
   #layT = 0;
-  /** each ant's age and lifespan, seconds (the side view: workers die of age, so an orphaned colony dwindles) */
-  age: Float32Array;
-  lifespan: Float32Array;
   /** workers that died of age */
   diedOld = 0;
   /** workers that died of hunger (ja-xu6.1) */
@@ -841,41 +784,6 @@ export class Colony {
   #goalY = 0;
   /** the side view: where the ant being stepped believes the hole is, across the ground (see #believe, #towardHole) */
   #holeX = 0;
-  /** the first cell of the wall being followed by cell: back there, it has been all the way round */
-  loopX: Int32Array;
-  loopY: Int32Array;
-  /** which hand it keeps on tunnel walls when it walks a tunnel (+1 right, −1 left), chosen afresh each trip out */
-  hand: Int8Array;
-  /** seconds left of keeping a hand on a chamber's wall, after touching soil; 0 = wandering freely */
-  hugT: Float32Array;
-  alive: Uint8Array;
-  /** bumped every time a slot gets a new ant, so (slot, gen) names one ant even after its slot is reused */
-  gen: Uint32Array;
-  /** seconds since the ant was last at the nest or picked up food (trail strength, backfill timing; not tiredness) */
-  since: Float32Array;
-  /** seconds of unsuccessful search, less rest inside the nest: tired above the colony's patience (ja-q47) */
-  fatigue: Float32Array;
-  /** encounters with nestmates coming home with food, leaking with a half-life of MET_HALF (behaviour MR 5) */
-  met: Float32Array;
-  /** seconds in contact with strangers, leaking (behaviour MR 5.2): how much of the rival a scout met; more lays a stronger raid trail */
-  foes: Float32Array;
-  /** 1 while the ant goes home to tell of the strangers it found, laying the raid trail (behaviour MR 5.2) */
-  reporting: Uint8Array;
-  /** seconds of alarm smelt or strangers in reach, leaking with a half-life of THREAT_HALF: a defender's threshold state (docs/stance.md) */
-  threat: Float32Array;
-  /** nestmates round a waiting ant at home, felt over CROWD_HALF (docs/stance.md: a crowded colony raids) */
-  crowd: Float32Array;
-  /**
-   * 1 while this ant acts on the colony's raid stance (behaviour MR 5.2): it smelt a scout's raid trail, or went out as a scout.
-   * Every other ant carries on as a forager. Cleared when it is home again with no trail under it.
-   */
-  recruited: Uint8Array;
-  /**
-   * One world (ja-web): 1 while this ant has a pass through the gate at the top of its shaft: it came down its hole with
-   * food, and goes back out unprompted (a successful forager never waits, PRD §48), or its `leave` said go. Cleared when
-   * it climbs out.
-   */
-  leaveOk: Uint8Array;
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
   #storedSeen = 0;
@@ -899,90 +807,6 @@ export class Colony {
   raidScouts = 0;
   finds = 0;
   recruits = 0;
-  /** the quality of the food in its jaws (world.ts: WorldMap.quality), tasted at pickup; read only while it carries food (left as it was after delivery) */
-  quality: Float32Array;
-  /** seconds left of a detour after bumping into rock, when the pull toward the nest (or the raid) is off */
-  detour: Float32Array;
-  /** recent bumps, fading over seconds: each bump in a row doubles the next detour */
-  bumps: Float32Array;
-  /** fungal load, 0..1 (fungus.ts): the fungus inside the ant; it never touches the ant's choices directly */
-  load: Float32Array;
-  /** which strain (an index into the fungus's strains) the load is; meaningful only where load > 0 */
-  strain: Uint8Array;
-  /** immune priming from grooming visible nestmates, 0..1: scales down every load the ant takes */
-  resist: Float32Array;
-  /** the preset the fungus runs in this ant (an index into levers.ts PRESETS; 0 = as it is or dormant; CUSTOM = Jev's own mix of levels) */
-  expr: Uint8Array;
-  // What the ant perceives (docs/fungus-policy.md §2): gains on the scent that is there, 1 = as it is.
-  // The fungus writes them (fungus.ts); the ant cannot tell. Its situation and its steering both read
-  // the bent sensors, and its own policy still decides. Seen food, the nest and rock are never bent.
-  /** food scent × this */
-  gainFood: Float32Array;
-  /** home scent × this */
-  gainHome: Float32Array;
-  /** alarm × this */
-  gainAlarm: Float32Array;
-  /** the other colony's food trail, × this, smelled as food scent (0 = not at all) */
-  foreignFood: Float32Array;
-  /** the ant's sense of time out: it is tired after patience × this */
-  clock: Float32Array;
-  /** the ant's energy, 0..1 (ja-xu6.1, hunger.ts): drained with time (faster outside), refilled by eating where food lies in its own nest; at 0 it dies. The side view only. */
-  energy: Float32Array;
-  /** the hunger it feels by touch: begging larvae, a hungry queen, need passed on by nestmates (hunger.ts). Draws old ants to carry food inside. */
-  need: Float32Array;
-  /** the queen's scent it carries (ja-lo8.9, royal.ts): picked up touching her, shared by contact, fading. The side view only. */
-  scent: Float32Array;
-  /** how strongly it perceives that scent (the fungus's queen-scent lever: 1 as it is) */
-  scentGain: Float32Array;
-  // Recognition (recognition.ts): who is a stranger is a matter of odour, not of colony.
-  /** the ant's odour, 0..1: a blend of cuticular hydrocarbons; strangers are ants whose odour differs by more than a tolerance */
-  odour: Float32Array;
-  /** how far apart an odour must be for this ant to perceive a stranger (params.tolerance, widened by the fungus) */
-  tolerance: Float32Array;
-  /** the calming cue the ant gives off, 0..1 (the fungus's): it counts as (1 − calm) of an enemy, and charges at (1 − calm) of the pace */
-  calm: Float32Array;
-  /** the fungal share of its odour, 0..MAX_MASK (the fungus's): its odour is its nest's, that share of the way to the fungus's own */
-  mask: Float32Array;
-  // What the ant gives off (docs/fungus-policy.md §4.C); the fungus writes them, 1 / 0 = as it is.
-  /** trail laid × this (C1) */
-  layGain: Float32Array;
-  /** carrying food, it also lays this share of its food trail into the other colony's food field (C2): it leaks where food is */
-  crossLay: Float32Array;
-  /** in a fight it lays (1 − this) of the alarm (C3): a quiet fight recruits fewer defenders */
-  quiet: Float32Array;
-  /** how far (× 0.5) the fungus pushes its odour away from its nest's: past the tolerance, its own colony takes it for a stranger (B6) */
-  estrange: Float32Array;
-  /** the fungal situation (fungalPolicy.ts encodeFungal) the fungus last chose for it in; −1 = none */
-  fungal: Int16Array;
-  // What the fungus bends inside the nest (nest slice 8; the fungus writes them, 1 / 0 = as it is).
-  /** the nest's floor marks smelled × this: road signs, and the chamber it is in */
-  gainMarks: Float32Array;
-  /** 0..1: past ½, brood smells like store and store like brood */
-  swapMarks: Float32Array;
-  /** 0..1: how surely it kills the queen and brood it touches, CROWN_RATE × this a second (lethal, the fungus's crown; its load) */
-  regicide: Float32Array;
-  /** the share of its strain's visibility it shows its groomers (the fungus's "showing" lever, ja-lo8.4): under 1 it hides the fungus */
-  show: Float32Array;
-  /** homing round an obstacle by touch: 0 = not; +1 = keeping the wall on its right, −1 = on its left */
-  wall: Int8Array;
-  /** distance home to beat to leave a wall: where it met the wall, or underground the nearest it has been since its last give-up */
-  hitDist: Float32Array;
-  /** seconds spent following the current wall */
-  followT: Float32Array;
-  /** seconds since a wall-following ant last touched rock (ahead, or on its wall side) */
-  untouched: Float32Array;
-  /** the nearest a homing ant has been to its nest this trip, and seconds since it last got 1 cell nearer */
-  bestD: Float32Array;
-  stallT: Float32Array;
-  /** where this homing trip first met rock, or underground the latest wall it met (NaN until then, and after a give-up): with the nest it fixes the line the ant leaves walls on */
-  mx: Float32Array;
-  my: Float32Array;
-  /** following a wall cell by cell: the way it faces (0 east, 1 south, 2 west, 3 north) and the cell it is walking to (NO_CELL = decide now) */
-  gdir: Uint8Array;
-  gx: Int32Array;
-  gy: Int32Array;
-  /** 1 while the wall being followed is followed cell by cell (any wall underground, or a tunnel), 0 by touch (rock on open ground) */
-  byCell: Uint8Array;
   /** enemy ants per cell, kept by the game each tick; null when there is no rival */
   enemies: CellCounts | null = null;
   /** the colony's odour: the nest's gestalt, which ants at the nest relax toward and newborns take */
@@ -1108,35 +932,7 @@ export class Colony {
     this.seeHoles();
     const n = this.params.maxAnts;
     this.n = n;
-    this.layer = new Uint8Array(n);
-    this.x = new Float32Array(n);
-    this.y = new Float32Array(n);
-    this.heading = new Float32Array(n);
-    this.mode = new Uint8Array(n);
-    this.carrying = new Uint8Array(n);
-    this.pellet = new Uint8Array(n);
-    this.digT = new Float32Array(n);
-    this.hand = new Int8Array(n);
-    this.digAim = new Float32Array(n).fill(NaN);
-    Object.assign(this, makeAntArrays(n));
-    this.odoSurf = new Float32Array(n);
-    this.odoNest = new Float32Array(n);
-    this.driftSurf = new Float32Array(n);
-    this.driftSurfY = new Float32Array(n);
-    this.driftNest = new Float32Array(n);
-    this.search = new Float32Array(n);
-    this.searchA = new Float32Array(n);
-    this.searchLeg = new Uint32Array(n);
-    this.foodX = new Float32Array(n).fill(NaN);
-    this.foodY = new Float32Array(n).fill(NaN);
-    this.routePlaces = new Float32Array(n * Math.max(2, Math.min(255, Math.floor(this.params.routeMax))) * 2);
-    this.routeN = new Uint8Array(n);
-    this.routeGap = new Float32Array(n).fill(this.params.routeStep);
-    this.routeAt = new Float32Array(n);
-    this.routeState = new Uint8Array(n);
-    this.routeGoal = new Int16Array(n).fill(-1);
-    this.age = new Float32Array(n);
-    this.lifespan = new Float32Array(n).fill(Infinity);
+    Object.assign(this, makeAntArrays(n, this.params));
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
     if (this.#entrance && map.chambers)
       this.queen = {
@@ -1151,62 +947,7 @@ export class Colony {
         unfed: 0,
         held: 0,
       };
-    this.loopX = new Int32Array(n).fill(NO_CELL);
-    this.loopY = new Int32Array(n);
-    this.hugT = new Float32Array(n);
-    this.alive = new Uint8Array(n);
-    this.gen = new Uint32Array(n);
-    this.since = new Float32Array(n);
-    this.fatigue = new Float32Array(n);
-    this.met = new Float32Array(n);
-    this.foes = new Float32Array(n);
-    this.threat = new Float32Array(n);
-    this.crowd = new Float32Array(n);
-    this.reporting = new Uint8Array(n);
-    this.recruited = new Uint8Array(n);
-    this.leaveOk = new Uint8Array(n);
-    this.quality = new Float32Array(n).fill(1);
-    this.detour = new Float32Array(n);
-    this.bumps = new Float32Array(n);
-    this.load = new Float32Array(n);
-    this.strain = new Uint8Array(n);
-    this.resist = new Float32Array(n);
-    this.expr = new Uint8Array(n);
-    this.gainFood = new Float32Array(n).fill(1);
-    this.gainHome = new Float32Array(n).fill(1);
-    this.gainAlarm = new Float32Array(n).fill(1);
-    this.foreignFood = new Float32Array(n);
-    this.clock = new Float32Array(n).fill(1);
-    this.energy = new Float32Array(n).fill(1);
-    this.need = new Float32Array(n);
-    this.scent = new Float32Array(n);
-    this.scentGain = new Float32Array(n).fill(1);
     this.nestOdour = this.params.odour;
-    this.odour = new Float32Array(n).fill(this.params.odour);
-    this.tolerance = new Float32Array(n).fill(this.params.tolerance);
-    this.calm = new Float32Array(n);
-    this.mask = new Float32Array(n);
-    this.layGain = new Float32Array(n).fill(1);
-    this.crossLay = new Float32Array(n);
-    this.quiet = new Float32Array(n);
-    this.estrange = new Float32Array(n);
-    this.fungal = new Int16Array(n).fill(-1);
-    this.gainMarks = new Float32Array(n).fill(1);
-    this.swapMarks = new Float32Array(n);
-    this.regicide = new Float32Array(n);
-    this.show = new Float32Array(n).fill(1);
-    this.wall = new Int8Array(n);
-    this.hitDist = new Float32Array(n);
-    this.followT = new Float32Array(n);
-    this.untouched = new Float32Array(n);
-    this.bestD = new Float32Array(n).fill(Infinity);
-    this.stallT = new Float32Array(n);
-    this.mx = new Float32Array(n).fill(NaN);
-    this.my = new Float32Array(n).fill(NaN);
-    this.gdir = new Uint8Array(n);
-    this.gx = new Int32Array(n).fill(NO_CELL);
-    this.gy = new Int32Array(n);
-    this.byCell = new Uint8Array(n);
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
     if (world) (this.layers[PLANE] as Layer).ph.phase((this.params.nest % 2) * 0.5);
@@ -6717,7 +6458,7 @@ export function wallSide(leftBlocked: boolean, rightBlocked: boolean, rng: () =>
 }
 
 /** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
-const NO_CELL = -0x80000000;
+const NO_CELL = NO_KEY;
 
 /**
  * A cell as one number, y·65536 + x: the midden's and returns' keys, and an ant's remembered cells. A column may be
