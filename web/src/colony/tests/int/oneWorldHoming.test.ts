@@ -2,30 +2,26 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, LIFESPAN, MODES, PI_DRIFT, PLANE, type Colony, type HoleCell } from "../../colony.ts";
 import { Game, gameRng } from "../../game.ts";
-import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
-import { generateOneWorld, type OneWorld } from "../../oneWorld.ts";
+import { CELL, cellOf } from "../../hex.ts";
 import { OPEN, rockAt } from "../../world.ts";
+import { DT, curtainHole, planeHole, smallOne } from "../builders.ts";
 
 // One world U3b (ja-lp4.3.2; docs/one-world.md §4, docs/nest-and-home.md §3.1): on the plane a homing ant steers by its own
 // drifting home vector, started afresh up out of its own hole, and searches in widening loops where it ran out. A small
 // plane (160 × 100) keeps it quick: seed 7's player's hole is at cell (48, 32), with open ground east and south-east of it.
 
-const DT = 1 / 30;
 const EXPLORE = MODES.indexOf("explore");
 const RETURN = MODES.indexOf("return");
 const OLD = 0.5 * LIFESPAN;
 /** colony.ts's NEST_SIGHT: within it, with a clear line, the hole is in sight. */
 const NEST_SIGHT = 8;
 
-const small = (seed = 7): OneWorld => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } });
 /** A game of few ants, every founder young (they stay in) but the one each test moves. */
 const game = (seed = 7): Game => {
-  const g = new Game(small(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed));
+  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed));
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = 0.05 * LIFESPAN;
   return g;
 };
-const planeHole = (h: HoleCell) => ({ x: centreX(h.px, h.py), y: centreY(h.py) });
-const curtainHole = (h: HoleCell) => ({ x: centreX(h.col, h.row), y: centreY(h.row) });
 const open = (g: Game, x: number, y: number): boolean => {
   cellOf(x, y);
   return rockAt(g.world!.plane, CELL[0] as number, CELL[1] as number) === OPEN;

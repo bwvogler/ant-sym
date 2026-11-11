@@ -9,12 +9,12 @@ import { CRUST, generateOneWorld } from "../../oneWorld.ts";
 import { encode } from "../../save.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, type WorldMap } from "../../world.ts";
+import { DT, run } from "../builders.ts";
 
 // Saving a game (ja-lo8.6): run, save, restore into a game built afresh from the same world and settings, run on. The
 // result must be bit-identical to the unbroken run: every typed array of every colony, every scent and map layer, the
 // fungus's spores, the brood and the chambers. A field the save misses shows up here as a hash that differs.
 
-const DT = 1 / 30;
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 function build(view: "side" | "top", seed: number): Game {
@@ -22,9 +22,6 @@ function build(view: "side" | "top", seed: number): Game {
   return new Game(map, { antCount: 200, rivalAnts: 200, regrow: 600 }, mulberry32(seed * 7919));
 }
 
-function run(g: Game, seconds: number): void {
-  for (let k = 0; k < Math.round(seconds / DT); k++) g.tick(DT);
-}
 
 for (const view of ["side", "top"] as const)
   test(`a save restored into a fresh game runs on exactly as the unbroken game (${view} view, the fungus landed)`, () => {

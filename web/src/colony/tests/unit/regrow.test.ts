@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
 import { generateSideWorld, isSky, mulberry32 } from "../../world.ts";
+import { SMALL_SIDE } from "../builders.ts";
 
 // Food regrows (ja-lo8.5, PRD §50.5): the ground's piles grow back toward their first size; off by default.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 /** Every surface food cell eaten bare, and what was there. */
 function strip(g: Game): number {
@@ -30,7 +30,7 @@ const surface = (g: Game) => {
 };
 
 test("off by default: eaten ground stays bare", () => {
-  const g = new Game(generateSideWorld(2, SMALL), { antCount: 1, rival: false }, mulberry32(1));
+  const g = new Game(generateSideWorld(2, SMALL_SIDE), { antCount: 1, rival: false }, mulberry32(1));
   assert.ok(strip(g) > 0, "the map has ground food");
   for (let k = 0; k < 30 * 60; k++) g.tick(1 / 30);
   assert.equal(surface(g), 0);
@@ -38,7 +38,7 @@ test("off by default: eaten ground stays bare", () => {
 });
 
 test("on: bare piles grow back at their deficit over the regrowth time, a unit at a time, and the books balance", () => {
-  const g = new Game(generateSideWorld(2, SMALL), { antCount: 1, rival: false, regrow: 600 }, mulberry32(1));
+  const g = new Game(generateSideWorld(2, SMALL_SIDE), { antCount: 1, rival: false, regrow: 600 }, mulberry32(1));
   const total0 = g.map.foodTotal;
   const taken = strip(g);
   const left0 = g.map.foodLeft;

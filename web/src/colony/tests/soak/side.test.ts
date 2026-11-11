@@ -4,16 +4,12 @@ import { Colony, HOLE_SIGHT } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, NE, NW, nx, ny } from "../../hex.ts";
 import { AIR, digCell, fillCell, flat, generateSideWorld, groundRow, groundTop, isSky, mulberry32, OPEN, reachable, rockAt, SIDE_WORLD, SOIL, type WorldMap } from "../../world.ts";
+import { walkway } from "../builders.ts";
 
 // The side view (MR 13): a cross-section with sky, a walkway along the ground line, nests dug below it.
 
 const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40 };
 
-/** The walkway cell of column x: the open sky cell just above the ground, or −1. */
-function walkway(map: WorldMap, x: number): number {
-  for (let y = 0; y < map.size.h; y++) if (isSky(map, x, y) && rockAt(map, x, y) === OPEN) return y;
-  return -1;
-}
 
 /** Whether the walkway (open sky cells) joins the map's west edge to its east edge, walking only on it. */
 function walkwayEdgeToEdge(map: WorldMap): boolean {

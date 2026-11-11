@@ -5,14 +5,14 @@ import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { digCell, generateSideWorld, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
+import { SMALL_SIDE, broodChamber } from "../builders.ts";
 
 // Nest slice 5 (docs/nest-and-home.md §3.6): food lies in chambers. Foragers bring it to reception; porters carry it to
 // where brood and the queen want it, and the rest down to stores; the queen and larvae eat what lies by them.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 test("the larder is the food lying in the colony's chambers, porters move it, and the queen's brood is raised from it", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const g = new Game(map, { antCount: 300, rival: false }, mulberry32(4));
   const c = g.player;
   for (let k = 0; k < 30 * 300; k++) {
@@ -55,7 +55,7 @@ function forage(map: WorldMap) {
 }
 
 test("a forager with food puts it down in reception when there is one; without one, in the royal chamber", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const royal = map.chambers!.list[0]!;
   const rec = reception(map, 4);
   const drop = (withReception: boolean) => {
@@ -76,7 +76,7 @@ test("a forager with food puts it down in reception when there is one; without o
 });
 
 test("a reception of a cell or two is no reception yet: foragers take their food to the royal chamber (review of slice 5: a one-cell reception choked the colony)", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const royal = map.chambers!.list[0]!;
   const rec = reception(map, 1);
   const c = forage(map);
@@ -87,7 +87,7 @@ test("a reception of a cell or two is no reception yet: foragers take their food
 });
 
 test("a forager finding food already waiting at reception carries its own on to where it is wanted (a backlog: the porters aren't keeping up)", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const royal = map.chambers!.list[0]!;
   const rec = reception(map, 4);
   const c = forage(map);
@@ -103,7 +103,7 @@ test("a forager finding food already waiting at reception carries its own on to 
 });
 
 test("food beyond the queen's stock in the royal chamber is carried on to hungry larvae (no reception yet: foragers put it there)", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const { b: room, cell } = broodChamber(map);
   const c = new Colony(map, { antCount: 12, maxAnts: 16, deposit: 0 }, mulberry32(5), () => "explore");
   // Diggers and carriers.
@@ -122,7 +122,7 @@ test("food beyond the queen's stock in the royal chamber is carried on to hungry
 });
 
 test("porters lay no food trail: food moved between chambers is no food to recruit to (review of slice 5: 4–5× as many ants followed food scent underground)", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const rec = reception(map, 4);
   const c = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(4), () => "explore");
   c.age[0] = ((YOUNG + MIDDLE) / 2) * LIFESPAN; // a carrier inside
@@ -144,24 +144,9 @@ test("porters lay no food trail: food moved between chambers is no food to recru
   assert.equal(food, 0, "no food trail anywhere");
 });
 
-/** A brood chamber of three cells dug beside the royal one (to its east), for colony 0. */
-function broodChamber(map: ReturnType<typeof generateSideWorld>) {
-  const ch = map.chambers!;
-  cellOf(map.nest.x, map.nest.y);
-  const [rx, ry] = [CELL[0] as number, CELL[1] as number];
-  let x = rx;
-  while (rockAt(map, x, ry) === OPEN) x++;
-  digCell(map, x, ry);
-  const b = ch.add(0, ry, "brood");
-  for (let k = 1; k <= 3; k++) {
-    digCell(map, x + k, ry);
-    ch.claim(b.id, x + k, ry, (a, y) => rockAt(map, a, y) === OPEN);
-  }
-  return { b, cell: [x + 2, ry] as const };
-}
 
 test("a larva eats what lies in its own chamber, not the royal chamber's", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const { b: room, cell } = broodChamber(map);
   const c = new Colony(map, { antCount: 1, maxAnts: 4 }, mulberry32(2), () => "explore");
   c.kill(0); // no porters: only where the food lies counts
@@ -181,7 +166,7 @@ test("a larva eats what lies in its own chamber, not the royal chamber's", () =>
 });
 
 test("a larva lying outside any chamber is taken in and raised (review of slice 5: strays starved)", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const g = new Game(map, { antCount: 80, rival: false }, mulberry32(3));
   const c = g.player;
   // A larva on the shaft just below the hole: in no chamber.

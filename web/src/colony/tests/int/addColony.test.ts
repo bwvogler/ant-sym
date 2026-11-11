@@ -3,14 +3,11 @@ import assert from "node:assert/strict";
 import { Game, HOLE_GAP, type GameSave } from "../../game.ts";
 import { CELL, cellOf } from "../../hex.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { run } from "../builders.ts";
 
 // Several colonies at runtime (ja-lo8.8): a colony founded mid-game digs its own nest, has its own queen, takes part
 // in the game like the world's own colonies, and survives a save.
 
-const DT = 1 / 30;
-const run = (g: Game, s: number) => {
-  for (let k = 0; k < Math.round(s / DT); k++) g.tick(DT);
-};
 /** Where to found: the ground line over this column, a quarter of the way between the two holes. */
 function spot(g: Game) {
   const a = g.colonies[0]!.nest.entrance!;

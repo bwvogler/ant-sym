@@ -6,8 +6,9 @@ import { Fungus, STRAINS, preset } from "../../fungus.ts";
 import { compose, LEVERS } from "../../levers.ts";
 import { Game, MET, QUIET, type GameSave } from "../../game.ts";
 import { BINS, FUNGAL, MAX_MASK, Recognition, binCentre, binOf } from "../../recognition.ts";
-import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../../world.ts";
+import { generateWorld, mulberry32, OPEN_WORLD, type WorldMap } from "../../world.ts";
 import { at, put } from "../hexmaps.ts";
+import { arena, placedAt } from "../builders.ts";
 
 /** Every host runs its strain's default intervention. */
 /** Every host runs its strain's default preset (Fungus.resolve). */
@@ -18,22 +19,9 @@ const strainDefault = () => "default";
 // (B3/B7); a colony full of hosts drifts toward that odour, and two colonies
 // that come to smell alike stop fighting: unified.
 
-function arena(): WorldMap {
-  return worldFromArrays({ w: 40, h: 12 }, [{ x: 4, y: 6.5, r: 2 }, { x: 36, y: 6.5, r: 2 }]);
-}
 
 /** A colony at nest `nest` with odour `odour`, its first ants at `cells` and the rest dead. */
-function placed(map: WorldMap, nest: number, odour: number, cells: [number, number][], policy = localPolicy): Colony {
-  const c = new Colony(map, { antCount: Math.max(1, cells.length), maxAnts: Math.max(1, cells.length), nest, odour }, mulberry32(7 + nest), policy);
-  for (let i = 0; i < c.n; i++) {
-    const cell = cells[i];
-    c.alive[i] = cell ? 1 : 0;
-    if (cell) {
-      put(c, i, cell[0], cell[1]);
-    }
-  }
-  return c;
-}
+const placed = (map: WorldMap, nest: number, odour: number, cells: [number, number][], policy = localPolicy): Colony => placedAt(map, cells, { nest, odour, seed: 7 + nest, policy });
 
 const crowd = (x: number, y: number, n: number): [number, number][] => Array.from({ length: n }, () => [x, y]);
 
@@ -41,7 +29,7 @@ test("odour bands: an ant counts in its odour's band; look() counts only the ban
   assert.equal(binOf(0), 0);
   assert.equal(binOf(1), BINS - 1);
   assert.equal(binOf(0.5), BINS / 2);
-  const map = arena();
+  const map = arena(6.5);
   const a = placed(map, 0, 0, crowd(10, 6, 3));
   const b = placed(map, 1, 1, crowd(10, 6, 2));
   b.calm[1] = 0.75;
@@ -60,7 +48,7 @@ test("odour bands: an ant counts in its odour's band; look() counts only the ban
 });
 
 test("with every ant at its colony's odour and nobody calm, odour recognition fights exactly as colony recognition did", () => {
-  const map = arena();
+  const map = arena(6.5);
   for (let round = 0; round < 6; round++) {
     const setup = (): Colony[] => [placed(map, 0, 0, [...crowd(20, 6, 4), ...crowd(21, 6, 3)]), placed(map, 1, 1, [...crowd(20, 6, 3), ...crowd(21, 7, 5)])];
     const old = setup();
@@ -75,7 +63,7 @@ test("with every ant at its colony's odour and nobody calm, odour recognition fi
 });
 
 test("two colonies that smell alike share a cell and nobody dies; a calm side takes and deals less", () => {
-  const map = arena();
+  const map = arena(6.5);
   const kill = (oa: number, ob: number, calm: number) => {
     let deaths = [0, 0];
     for (let round = 0; round < 40; round++) {
@@ -97,7 +85,7 @@ test("two colonies that smell alike share a cell and nobody dies; a calm side ta
 });
 
 test("a calmed encounter raises no alarm; a real fight does", () => {
-  const map = arena();
+  const map = arena(6.5);
   const alarm = (calm: number) => {
     const cs = [placed(map, 0, 0, crowd(20, 6, 1)), placed(map, 1, 1, crowd(20, 6, 1))];
     (cs[1] as Colony).calm[0] = calm;
@@ -111,7 +99,7 @@ test("a calmed encounter raises no alarm; a real fight does", () => {
 });
 
 test("an ant perceives a stranger near by its own odour and tolerance: a host's wider tolerance hides one", () => {
-  const map = arena();
+  const map = arena(6.5);
   const asked: Situation[] = [];
   const me = placed(map, 0, 0, [[20, 6]], (s) => {
     asked.push(s);
@@ -130,7 +118,7 @@ test("an ant perceives a stranger near by its own odour and tolerance: a host's 
 });
 
 test("odour: an ant smells of its nest; a host carries a share of the fungus's own; the nest drifts toward the ants at it", () => {
-  const map = arena();
+  const map = arena(6.5);
   const c = placed(map, 0, 0, [...crowd(4, 6, 4), [20, 6]]);
   const rec = new Recognition();
   // A host away from the nest, at full share.
@@ -159,7 +147,7 @@ test("a host is never a stranger to its own nest, at any share any intervention 
 });
 
 test("judged as an ant judges it (by band centre, in float32), a host at full share is still no stranger to a healthy nestmate", () => {
-  const map = arena();
+  const map = arena(6.5);
   for (const n0 of [0, 1]) {
     // A healthy ant and a host two cells apart; the host's odour MAX_MASK of the way to the fungus's.
     const c = placed(map, n0, n0, [[10, 6], [12, 6]]);
@@ -172,7 +160,7 @@ test("judged as an ant judges it (by band centre, in float32), a host at full sh
 });
 
 test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, Garden blends", () => {
-  const map = arena();
+  const map = arena(6.5);
   const c = placed(map, 0, 0, [[10, 3], [10, 9]]);
   const lockpick = STRAINS.findIndex((s) => s.id === "lockpick");
   const garden = STRAINS.findIndex((s) => s.id === "garden");
@@ -219,7 +207,7 @@ function hold(g: Game, seconds: number, where: [number, number] | "apart" | [[nu
 }
 
 test("unity: the nests' odour gap, the quiet and the meeting; unified when they smell alike, have met (MET over the fading minute), and nobody has died fighting for a minute", () => {
-  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const g = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   const u0 = g.unity();
   assert.equal(u0.gap, 1);
   assert.equal(u0.score, 0);
@@ -242,7 +230,7 @@ test("unity: the nests' odour gap, the quiet and the meeting; unified when they 
   assert.equal(u.unified, true);
   assert.equal(g.outcome(), "unified");
   // The quiet still counts (review of #56, R1): alike and met, but a fight death 10 s ago is no peace.
-  const q = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const q = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   smellAs(q, 0.45, 0.6);
   q.time = 10;
   hold(q, 20, [20, 6]);
@@ -254,7 +242,7 @@ test("unity: the nests' odour gap, the quiet and the meeting; unified when they 
 });
 
 test("unity, once won, holds while the colonies keep apart: kin forage at home (review of #56, R2)", () => {
-  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const g = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   const same = () => void smellAs(g, 0.45, 0.6);
   same();
   g.time = QUIET + 1;
@@ -275,7 +263,7 @@ test("unity, once won, holds while the colonies keep apart: kin forage at home (
 });
 
 test("unity: a fight death breaks the latch, and the colonies must meet again", () => {
-  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const g = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   const same = () => void smellAs(g, 0.45, 0.6);
   same();
   g.time = QUIET + 1;
@@ -305,7 +293,7 @@ test("unity: a fight death breaks the latch, and the colonies must meet again", 
 });
 
 test("unity: every colony must have met, not just most of the ants (review of #56, R3)", () => {
-  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const g = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   const [a, b] = smellAs(g, 0.45, 0.6);
   // All of a's ants share a cell with one of b's; b's other four stay home. Pooled, 6 of 10 ants are in contact; per
   // colony a's share is 1 and b's 1/5, and unity reads the least.
@@ -325,16 +313,16 @@ test("unity: every colony must have met, not just most of the ants (review of #5
 });
 
 test("unity: contact is the cell and the six around, not two cells off", () => {
-  const near = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const near = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   hold(near, 5, [[20, 6], [21, 6]], () => void smellAs(near, 0.45, 0.6));
   assert.ok(near.unity().met > 0, "a neighbouring cell is contact");
-  const far = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const far = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   hold(far, 5, [[20, 6], [22, 6]], () => void smellAs(far, 0.45, 0.6));
   assert.equal(far.unity().met, 0, "two cells off is not");
 });
 
 test("unity needs contact: colonies that smell alike but never meet are not one (ja-i0f, the underground repro in miniature)", () => {
-  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const g = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   smellAs(g, 0.45, 0.6);
   hold(g, 2 * QUIET, "apart");
   smellAs(g, 0.45, 0.6);
@@ -347,7 +335,7 @@ test("unity needs contact: colonies that smell alike but never meet are not one 
 });
 
 test("unity: strangers in contact are not a meeting", () => {
-  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const g = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   smellAs(g, 0.1, 0.9);
   // One tick together: the fight resolves, but strangers touching count for nothing.
   hold(g, 1 / 30, [20, 6]);
@@ -355,7 +343,7 @@ test("unity: strangers in contact are not a meeting", () => {
 });
 
 test("unity: the meeting and its latch are saved, and a save from before them loads as not met", () => {
-  const g = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const g = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   smellAs(g, 0.45, 0.6);
   g.time = QUIET + 1;
   hold(g, 10, [20, 6]);
@@ -363,20 +351,20 @@ test("unity: the meeting and its latch are saved, and a save from before them lo
   assert.ok(met > 0);
   assert.equal(g.unity().unified, true);
   const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
-  const back = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const back = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   back.load(saved);
   assert.equal(back.unity().met, met);
   assert.equal(back.unity().unified, true);
   delete (saved.private as { metBy?: number[] }).metBy;
   delete (saved.private as { haveMet?: boolean }).haveMet;
-  const old = new Game(arena(), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
+  const old = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
   old.load(saved);
   assert.equal(old.unity().met, 0);
   assert.equal(old.unity().unified, false);
 });
 
 test("a colony whose nest smells like ours is no rival: the strategist forages instead of raiding kin", () => {
-  const g = new Game(arena(), { antCount: 5, rivalAnts: 5, strategyEvery: 1 }, mulberry32(2));
+  const g = new Game(arena(6.5), { antCount: 5, rivalAnts: 5, strategyEvery: 1 }, mulberry32(2));
   const [a, b] = g.colonies as [Colony, Colony];
   // A strategist that would always raid a rival (the colony's stance, told to every ant: on open ground only with stanceGate 0).
   for (const c of [a, b]) {

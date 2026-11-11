@@ -6,13 +6,13 @@ import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { encode } from "../../save.ts";
 import { heapPlane, mulberry32 } from "../../world.ts";
+import { DT } from "../builders.ts";
 
 // One world's nest search (ja-lp4.11, docs/nest-search.md, PRD §56): a carrier whose vector ran out where no hole was
 // runs loops out from that spot and back, each headed searchTurn on from the last and reaching further, the first
 // searchLoops σ out (σ from its own trip). A rock-free small plane (160 × 100, seed 7) keeps the geometry clean: the
 // player's hole at cell (48, 32), the carrier's vector ending 60 east of it, out of reach of the loops these tests watch.
 
-const DT = 1 / 30;
 const RETURN = MODES.indexOf("return");
 const SIGMA_PER_CELL = PI_DRIFT / Math.SQRT2;
 

@@ -1,19 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ChunkLayer } from "../../chunks.ts";
-import { CURTAIN, LIFESPAN, MIDDEN_MIN, MIDDLE, MODES, PLANE, SWELL, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { CURTAIN, MIDDEN_MIN, MODES, PLANE, SWELL, type Colony, type Layer } from "../../colony.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, nx, ny } from "../../hex.ts";
-import { generateOneWorld, type OneWorld } from "../../oneWorld.ts";
 import { heapPlane, OPEN, rockAt, ROCK, worldFromArrays, type WorldMap } from "../../world.ts";
+import { DT, ageOf, curtainHole, own, planeHole, smallOne } from "../builders.ts";
 
 // One world U3c (ja-lp4.3.3; docs/one-world.md §4): the mound as a spoil height field on the plane (heapPlane: a 2D
 // sandpile at the angle of repose, a ring round every hole that keeps it open), spoil carried out by the ant's own vector,
 // pellets picked off it to spread or take down to backfill, and the midden on a ring set by the undertaker's vector, off
 // the mound. A small plane (160 × 100) keeps the games quick: seed 7's player's hole is at cell (48, 32).
 
-const DT = 1 / 30;
 const RETURN = MODES.indexOf("return");
 const FIGHT = MODES.indexOf("fight");
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
@@ -114,18 +113,12 @@ test("heapPlane: null once no cell within reach has room, every pellet before it
 
 // ——— in a game ———
 
-const small = (seed = 7): OneWorld => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } });
-/** An age in band b (0 young, 1 middle-aged, 2 old) that every founder's lifespan outlasts. */
-const ageOf = (b: 0 | 1 | 2) => [0.05, (0.15 + MIDDLE) / 2, 0.5][b]! * LIFESPAN;
 /** A game of few ants, every founder young (they stay in) but those a test moves. */
 function quiet(seed = 7): Game {
-  const g = new Game(small(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed));
+  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed));
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(0);
   return g;
 }
-const own = (c: Colony): HoleCell => c.holeCells[c.params.nest] as HoleCell;
-const curtainHole = (h: HoleCell) => ({ x: centreX(h.col, h.row), y: centreY(h.row) });
-const planeHole = (h: HoleCell) => ({ x: centreX(h.px, h.py), y: centreY(h.py) });
 const holesOf = (c: Colony) => c.holeCells.map((h) => ({ x: h.px, y: h.py }));
 /** How far ant i of c believes it is from home on the plane: from its hole plus odoSurf × drift (U3b's vector). */
 function believed(c: Colony, i: number): number {
@@ -327,7 +320,7 @@ test("one world: a rival raider on the plane shies from the colony's midden", ()
 });
 
 test("one world over 200 s: the mound's books balance, it stays round the hole with every hole open, spreaders carry spoil outward and backfillers take it down", () => {
-  const g = new Game(small(), { antCount: 150, rivalAnts: 150, regrow: 0 }, gameRng(7));
+  const g = new Game(smallOne(), { antCount: 150, rivalAnts: 150, regrow: 0 }, gameRng(7));
   const plane = g.world!.plane;
   // Per ant: the distance from its hole where it picked a pellet off the mound (NaN none), and whether it went down with it.
   const picked = g.colonies.map((c) => new Float32Array(c.n).fill(NaN));

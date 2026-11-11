@@ -5,7 +5,8 @@ import { Colony } from "../../colony.ts";
 import { Fungus, INFECTED, STRAINS, type Strain } from "../../fungus.ts";
 import { Game } from "../../game.ts";
 import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../../world.ts";
-import { at, put } from "../hexmaps.ts";
+import { at } from "../hexmaps.ts";
+import { arena, placedAt } from "../builders.ts";
 
 // The fungus's first slice (ja-t4d.1): load, contact spread across colonies,
 // grooming and priming, and the spore brush. Ants stand still here (the
@@ -15,22 +16,9 @@ const LOCKPICK = STRAINS.findIndex((s) => s.id === "lockpick");
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 
 /** A bare 40×12 field with two nests, no food. */
-function arena(): WorldMap {
-  return worldFromArrays({ w: 40, h: 12 }, [{ x: 4, y: 6, r: 2 }, { x: 36, y: 6, r: 2 }]);
-}
 
 /** A colony whose first `cells.length` ants stand at those cells (centre of each), the rest dead. */
-function placed(map: WorldMap, nest: number, cells: [number, number][]): Colony {
-  const c = new Colony(map, { antCount: Math.max(1, cells.length), maxAnts: Math.max(1, cells.length), nest }, mulberry32(1 + nest));
-  for (let i = 0; i < c.n; i++) {
-    const cell = cells[i];
-    c.alive[i] = cell ? 1 : 0;
-    if (cell) {
-      put(c, i, cell[0], cell[1]);
-    }
-  }
-  return c;
-}
+const placed = (map: WorldMap, nest: number, cells: [number, number][]): Colony => placedAt(map, cells, { nest, seed: 1 + nest });
 
 /** Step the fungus for `seconds` at 30 Hz with the colonies standing still. */
 function run(f: Fungus, colonies: Colony[], seconds: number): void {

@@ -7,18 +7,15 @@ import { centreX, centreY } from "../../hex.ts";
 import { CRUST, generateOneWorld } from "../../oneWorld.ts";
 import { generateSideWorld } from "../../world.ts";
 import { gridsFromLiving, hashGame } from "../saveHash.ts";
+import { DT, run } from "../builders.ts";
 
 // One-world saves (U4b): each part of a save is needed. One save of one game, and one unbroken hash: take a part away or
 // put a stale one in, and the load must refuse it or run on to another hash. And a save into the wrong kind of game,
 // or another world, is refused.
 
-const DT = 1 / 30;
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 const small = (seed = 7, w = 160): Game => new Game(generateOneWorld(seed, { plane: { size: { w, h: 100 } } }), { antCount: 60, rivalAnts: 60 }, gameRng(seed));
-const run = (g: Game, seconds: number): void => {
-  for (let k = 0; k < Math.round(seconds / DT); k++) g.tick(DT);
-};
 const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
 
 /**

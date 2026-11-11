@@ -7,10 +7,11 @@ import { Fungus, INFECTED, SPORE_LAYER_STATE, STRAINS, type Strain } from "../..
 import { fungalKey } from "../../fungusBrain.ts";
 import { Game } from "../../game.ts";
 import { hold, LEVERS } from "../../levers.ts";
-import { generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
+import { generateSideWorld, mulberry32, type WorldMap } from "../../world.ts";
 import { put } from "../hexmaps.ts";
 import { readFileSync } from "node:fs";
 import type { FungalSituation } from "../../fungalPolicy.ts";
+import { arena } from "../builders.ts";
 
 // The fungus's body and evolution (ja-lo8.12): reach holds levels where they take effect and nowhere else, mutations
 // come with growth, the mycelium pays for its spores, a founded colony can get what the first colony got, and the
@@ -18,9 +19,6 @@ import type { FungalSituation } from "../../fungalPolicy.ts";
 
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
-function arena(): WorldMap {
-  return worldFromArrays({ w: 40, h: 12 }, [{ x: 4, y: 6, r: 2 }, { x: 36, y: 6, r: 2 }]);
-}
 
 function placed(map: WorldMap, cells: [number, number][]): Colony {
   const c = new Colony(map, { antCount: cells.length, maxAnts: cells.length, nest: 0 }, mulberry32(1));

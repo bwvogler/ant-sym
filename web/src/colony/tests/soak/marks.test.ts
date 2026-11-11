@@ -4,14 +4,14 @@ import { Colony, localPolicy, REST, type Situation } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN, OPEN_WORLD, rockAt } from "../../world.ts";
+import { SMALL_SIDE } from "../builders.ts";
 
 // Nest slice 3 (docs/nest-and-home.md §3.3): chambers have roles, ants lay their chamber's mark on the floor as road
 // signs, and an ant inside the nest is asked by where it is, not by the home trail.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 test("roles and road signs: chambers dug get roles (brood among them), and the royal mark is strongest in the royal chamber", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const g = new Game(map, { antCount: 400, rival: false }, mulberry32(4));
   for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
   const ch = map.chambers!;
@@ -37,7 +37,7 @@ test("roles and road signs: chambers dug get roles (brood among them), and the r
 });
 
 test("inside the nest an ant is asked where it is, not the home trail: just home with food, it is asked as in the royal chamber", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const asked: Situation[] = [];
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), (s) => {
     asked.push(s);
@@ -77,7 +77,7 @@ test("ja-qnx: a policy that always says 'return' to a homing ant no longer parks
   // for good (its time out resets at the nest): all 300 of 300. It rests REST seconds and is asked afresh as an explorer,
   // so about a third are resting at home at any moment.
   const stubborn = (s: Situation) => (s.mode === "return" ? "return" : localPolicy(s));
-  for (const map of [generateWorld(1, OPEN_WORLD), generateSideWorld(2, SMALL)]) {
+  for (const map of [generateWorld(1, OPEN_WORLD), generateSideWorld(2, SMALL_SIDE)]) {
     const c = new Colony(map, { antCount: 300, maxAnts: 300 }, mulberry32(9), stubborn);
     for (let k = 0; k < 30 * 150; k++) c.tick(1 / 30);
     let parked = 0;

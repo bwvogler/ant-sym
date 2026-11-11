@@ -5,11 +5,11 @@ import { Game, gameRng } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { generateSideWorld, generateWorld, mulberry32 } from "../../world.ts";
+import { DT } from "../builders.ts";
 
 // A shorter search on one world's plane (ja-lp4.15.2, docs/forager-trips.md §1, PRD §58): a forager on the plane tires at
 // patience × planePatience, on its own clock; in the nest, in the side view and on top-down maps, at patience.
 
-const DT = 1 / 30;
 const EXPLORE = MODES.indexOf("explore");
 
 /** Seed 7's small plane (160 × 100), no food, every ant young (stays in) but ant 0, an old forager 20 cells east of its hole, exploring. */

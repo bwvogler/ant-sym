@@ -1,18 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, LIFESPAN, MIDDLE, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { CURTAIN, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
 import { decodeFungal } from "../../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance } from "../../hex.ts";
-import { generateOneWorld, type OneWorld } from "../../oneWorld.ts";
-import { decode, encode } from "../../save.ts";
 import { AIR, generateSideWorld, rockAt, OPEN } from "../../world.ts";
+import { DT, ageOf, curtainHole, editPrivate, own, planeHole, run, smallOne } from "../builders.ts";
 
 // One world's game (ja-lp4.3, U3a; docs/one-world.md §2, §4): colonies on the plane and the curtain, crossing at their
 // holes. A small plane (160 × 100) keeps it quick; seed 7's has two nests well inside it.
 
-const DT = 1 / 30;
 const SEED = 7;
 const EXPLORE = MODES.indexOf("explore");
 const RETURN = MODES.indexOf("return");
@@ -20,19 +18,7 @@ const FIGHT = MODES.indexOf("fight");
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 
-const small = (seed = SEED): OneWorld => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } });
-const game = (ants = 10, seed = SEED, regrow = 0): Game => new Game(small(seed), { antCount: ants, rivalAnts: ants, regrow }, gameRng(seed));
-const run = (g: Game, seconds: number, each?: () => void): void => {
-  for (let k = 0; k < Math.round(seconds / DT); k++) {
-    g.tick(DT);
-    each?.();
-  }
-};
-const own = (c: Colony): HoleCell => c.holeCells[c.params.nest] as HoleCell;
-const curtainHole = (h: HoleCell) => ({ x: centreX(h.col, h.row), y: centreY(h.row) });
-const planeHole = (h: HoleCell) => ({ x: centreX(h.px, h.py), y: centreY(h.py) });
-/** An age in band b (0 young, 1 middle-aged, 2 old) that every founder's lifespan outlasts. */
-const ageOf = (b: 0 | 1 | 2) => [0.05, (0.15 + MIDDLE) / 2, 0.5][b]! * LIFESPAN;
+const game = (ants = 10, seed = SEED, regrow = 0): Game => new Game(smallOne(seed), { antCount: ants, rivalAnts: ants, regrow }, gameRng(seed));
 const ages = (c: Colony, b: 0 | 1 | 2) => {
   for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(b);
 };
@@ -50,7 +36,7 @@ const underground = (g: Game): boolean => {
 };
 
 test("one world: two layers, home the curtain, a queen, every ant underground, holes on both layers by colony", () => {
-  const w = small();
+  const w = smallOne();
   assert.ok(isOneWorld(w));
   assert.equal(w.plane.nests.length, 2, "two nests on the small plane");
   const g = new Game(w, { antCount: 150, rivalAnts: 150 }, gameRng(SEED));
@@ -472,14 +458,6 @@ test("one world: the nest odour drifts toward the ants in the royal chamber, not
 // The crossing guards play reaches (review of #59, S2). Private state an ant can't be given by the public API is set
 // through the colony's own save and restore (saveState / loadState): no test hook.
 
-/** The colony's private fields `keys`, decoded; `edit` changes them, and they are put back. */
-const editPrivate = (c: Colony, keys: readonly string[], edit: (r: Record<string, unknown>) => void): void => {
-  const saved = c.saveState().private as Record<string, unknown>;
-  const r: Record<string, unknown> = {};
-  for (const k of keys) r[k] = decode(saved[k]);
-  edit(r);
-  c.loadState({ fields: {}, private: Object.fromEntries(keys.map((k) => [k, encode(r[k])])) });
-};
 /**
  * Ants `ants` of colony c at the top of a shaft (curtain point `at`) facing up, put there again every half second they are still in the
  * curtain (it takes them a few ticks to step up: put back every tick, nobody would reach the surface), for 3 s; `set`

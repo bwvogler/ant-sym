@@ -4,11 +4,11 @@ import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { digCell, generateSideWorld, generateWorld, groundTop, isSky, mulberry32, OPEN, rockAt } from "../../world.ts";
+import { SMALL_SIDE } from "../builders.ts";
 
 // Nest slice 6 (docs/nest-and-home.md §3.5, Tschinkel): who works where goes by age. The young nurse, deep with the
 // queen and brood, and never go out; the middle-aged dig and carry inside; the old forage.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 function aged(c: Colony, share: number): void {
   for (let i = 0; i < c.n; i++) {
@@ -20,7 +20,7 @@ function aged(c: Colony, share: number): void {
 test("bands: on the top-down maps every ant is old; in the side view by age", () => {
   const top = new Colony(generateWorld(1), { antCount: 5 }, mulberry32(1));
   assert.equal(top.band(0), 2);
-  const c = new Colony(generateSideWorld(2, SMALL), { antCount: 5 }, mulberry32(1));
+  const c = new Colony(generateSideWorld(2, SMALL_SIDE), { antCount: 5 }, mulberry32(1));
   c.age[0] = 0;
   c.age[1] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
   c.age[2] = (MIDDLE + 0.1) * LIFESPAN;
@@ -29,7 +29,7 @@ test("bands: on the top-down maps every ant is old; in the side view by age", ()
 
 test("the young never go out; the old do, more than the middle-aged (the old climb out to forage)", () => {
   const outShare = (share: number) => {
-    const map = generateSideWorld(2, SMALL);
+    const map = generateSideWorld(2, SMALL_SIDE);
     const g = new Game(map, { antCount: 120, rival: false }, mulberry32(3));
     aged(g.player, share);
     let out = 0;
@@ -56,7 +56,7 @@ test("the young never go out; the old do, more than the middle-aged (the old cli
 });
 
 test("the young sit deeper than the old, and only the middle-aged dig", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const g = new Game(map, { antCount: 300, rival: false }, mulberry32(5));
   const c = g.player;
   // Ages well inside each band, so none crosses into the next in the two minutes (an ant mid-dig as it comes of age finishes).
@@ -100,7 +100,7 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
 test("an old forager in a dead-end tunnel whose tip lies just under the ground by the hole goes back down and out by the shaft (review of #25)", () => {
   // Stepping straight toward the hole, the tip is nearer it than anything round it: old ants don't dig, so the first cut
   // parked them there until their mode changed. They climb out by the way through the tunnels (#climbOut).
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const n = map.nest;
   cellOf(n.entrance!.x, n.entrance!.y);
   const ex = CELL[0] as number;
