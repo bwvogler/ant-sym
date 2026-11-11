@@ -295,6 +295,20 @@ export interface ColonyParams {
    */
   siteGive: number;
   /**
+   * One world's plane (ja-lp4.16, docs/route-memory.md, PRD §59): a forager keeps its own way out, places stored every
+   * `routeStep` cells while it walks out (at most `routeMax`), and a carrier whose home vector fails walks back through
+   * them, recognising a place within `routeSee` cells (a stand-in, by design, for a familiar view; Collett et al. 2013;
+   * backtracking, Wystrach et al. 2013). 1 = when the vector stalls (no nearer its belief for SEARCH_STALL); 2 = also on
+   * reaching its belief with no hole there; 0 = nothing recorded, main bit for bit. Once a trip. Steering only.
+   */
+  routeMemory: number;
+  /** One world's plane, with routeMemory: cells walked between two stored places. */
+  routeStep: number;
+  /** One world's plane, with routeMemory: a stored place this close counts as recognised (0: only the next place in order, within LOOP_AT). */
+  routeSee: number;
+  /** One world's plane, with routeMemory: places an ant stores (when full it keeps every second and doubles its spacing). Read when the colony is built (the arrays' size). */
+  routeMax: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -357,7 +371,7 @@ const LOOP_AT = 2;
 /** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, planePatience: 1, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, siteFidelity: 0, siteGive: 0, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, planePatience: 1, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, siteFidelity: 0, siteGive: 0, routeMemory: 0, routeStep: 8, routeSee: 5, routeMax: 64, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -584,6 +598,19 @@ export class Colony {
    */
   foodX: Float32Array;
   foodY: Float32Array;
+  /**
+   * One world's plane, with routeMemory (ja-lp4.16): the places ant i stored on its way out of its hole, x then y, routeMax
+   * a slot (slot i × routeMax + k); routeN of them are in use. Its own positions only, cleared as it comes up out of its
+   * own hole.
+   */
+  routePlaces: Float32Array;
+  routeN: Uint8Array;
+  /** cells between two places now (routeStep, doubled each time the store is halved), and the odometer (odoSurf) where the last was stored */
+  routeGap: Float32Array;
+  routeAt: Float32Array;
+  /** 0 = recording (or none), 1 = retracing (routeGoal is the place it steers for), 2 = has retraced this trip */
+  routeState: Uint8Array;
+  routeGoal: Int16Array;
   /** 1 while the ant is underground (the last tick), so coming up out of the hole is seen */
   #under: Uint8Array;
   /** the side view: a homing ant following the ground's surface round spoil to the hole: the nearness (#holeMetric) it must beat to let go; NaN = not following */
@@ -1019,6 +1046,12 @@ export class Colony {
     this.searchLeg = new Uint32Array(n);
     this.foodX = new Float32Array(n).fill(NaN);
     this.foodY = new Float32Array(n).fill(NaN);
+    this.routePlaces = new Float32Array(n * Math.max(2, Math.min(255, Math.floor(this.params.routeMax))) * 2);
+    this.routeN = new Uint8Array(n);
+    this.routeGap = new Float32Array(n).fill(this.params.routeStep);
+    this.routeAt = new Float32Array(n);
+    this.routeState = new Uint8Array(n);
+    this.routeGoal = new Int16Array(n).fill(-1);
     this.#under = new Uint8Array(n);
     this.#groundMin = new Float64Array(n).fill(NaN); // float64: compared with the metric itself (float32 rounding let the ant "beat" it on the cell it was set at)
     this.#groundT = new Uint16Array(n);
@@ -1409,6 +1442,7 @@ export class Colony {
     this.searchA[i] = 0;
     this.foodX[i] = NaN;
     this.foodY[i] = NaN;
+    this.#routeClear(i);
     this.#under[i] = 1;
     this.layer[i] = this.home; // born in the nest, on its layer
     this.#goalKind[i] = 0; // born underground: home is the chamber
@@ -2682,6 +2716,10 @@ export class Colony {
     const d = Math.hypot(x - goal.x, y - goal.y);
     if (d < HOLE_SIGHT || (d < NEST_SIGHT && this.#clearTo(x, y, goal.x, goal.y))) return goal;
     if (this.params.moundSmell > 0 && this.search[i] !== 0 && this.#onOwnMound(x, y, d)) return goal;
+    if (this.routeState[i] === 1) {
+      const place = this.#routeBelief(i, goal);
+      if (place) return place;
+    }
     const odo = this.odoSurf[i] as number;
     let s = this.search[i] as number;
     let a = this.searchA[i] as number;
@@ -2723,6 +2761,100 @@ export class Colony {
     CELL[0] = c0;
     CELL[1] = c1;
     return on;
+  }
+
+  /** Ant i has no places stored: a fresh trip, or a newborn (ja-lp4.16). Its slot's places are left; routeN says none are in use. */
+  #routeClear(i: number): void {
+    this.routeN[i] = 0;
+    this.routeGap[i] = this.params.routeStep;
+    this.routeAt[i] = 0;
+    this.routeState[i] = 0;
+    this.routeGoal[i] = -1;
+  }
+
+  /**
+   * One world's plane (ja-lp4.16): ant i, walking out (exploring or following, empty-jawed), has walked on; once it is
+   * routeGap cells on from its last stored place (by its odometer) it stores where it stands. A full store keeps every second
+   * place and doubles the spacing, so a long trip is kept whole, coarser. Only its own position; no global read.
+   */
+  #routeRecord(i: number): void {
+    const odo = this.odoSurf[i] as number;
+    if (odo - (this.routeAt[i] as number) < (this.routeGap[i] as number)) return;
+    const cap = this.routePlaces.length / (2 * this.n); // routeMax as the colony was built, 2 to 255
+    const at = i * cap * 2;
+    let n = this.routeN[i] as number;
+    if (n >= cap) {
+      const keep = (n + 1) >> 1;
+      for (let k = 0; k < keep; k++) {
+        this.routePlaces[at + 2 * k] = this.routePlaces[at + 4 * k] as number;
+        this.routePlaces[at + 2 * k + 1] = this.routePlaces[at + 4 * k + 1] as number;
+      }
+      n = keep;
+      this.routeGap[i] = (this.routeGap[i] as number) * 2;
+    }
+    this.routePlaces[at + 2 * n] = this.x[i] as number;
+    this.routePlaces[at + 2 * n + 1] = this.y[i] as number;
+    this.routeN[i] = n + 1;
+    this.routeAt[i] = odo;
+  }
+
+  /**
+   * One world's plane (ja-lp4.16): the vector of carrier i has failed (a stall, or its belief reached with no hole there:
+   * `stalled`). Retracing, a stall means this place is out of reach: it aims for the one before. Not yet, with routeMemory
+   * on, places stored, and food in its jaws: it starts to retrace, from its newest place, once a trip. Returns whether route
+   * memory took the failure (the caller's search then waits).
+   */
+  #routeFail(i: number, stalled: boolean): boolean {
+    const p = this.params;
+    if (p.routeMemory <= 0 || this.line === null || this.#cur !== PLANE) return false;
+    if (this.routeState[i] === 1) return stalled ? this.#routeTo(i, (this.routeGoal[i] as number) - 1) : true;
+    if (this.routeState[i] !== 0 || (this.routeN[i] as number) === 0 || this.carrying[i] !== 1 || this.pellet[i] === 1 || (!stalled && p.routeMemory < 2)) return false;
+    this.routeState[i] = 1;
+    return this.#routeTo(i, (this.routeN[i] as number) - 1);
+  }
+
+  /** Ant i's goal is its place k, progress judged afresh toward it; none left (k < 0): it has retraced this trip and searches as it did. Always true. */
+  #routeTo(i: number, k: number): boolean {
+    this.wall[i] = 0;
+    this.mx[i] = NaN;
+    this.bestD[i] = Infinity;
+    this.stallT[i] = 0;
+    if (k < 0) {
+      this.routeState[i] = 2;
+      this.routeGoal[i] = -1;
+      this.#searchOn(i);
+    } else this.routeGoal[i] = k;
+    return true;
+  }
+
+  /**
+   * One world's plane (ja-lp4.16): where the retracing ant i steers: its goal place. Whenever it is within routeSee of a
+   * place it has stored, the earliest of them, it takes that one as reached and aims for the one before (which cuts out the
+   * loops of its way out); the goal itself is reached within LOOP_AT. Run out of places, it is done retracing (null, and its
+   * search goes on as it did).
+   */
+  #routeBelief(i: number, goal0: Nest): Nest | null {
+    const at = (i * this.routePlaces.length) / this.n;
+    const x = this.x[i] as number;
+    const y = this.y[i] as number;
+    const goal = this.routeGoal[i] as number;
+    const see = this.params.routeSee;
+    let e = -1;
+    for (let k = 0; k <= goal && see > 0; k++) {
+      if (Math.hypot((this.routePlaces[at + 2 * k] as number) - x, (this.routePlaces[at + 2 * k + 1] as number) - y) < see) {
+        e = k;
+        break;
+      }
+    }
+    if (e < 0 && Math.hypot((this.routePlaces[at + 2 * goal] as number) - x, (this.routePlaces[at + 2 * goal + 1] as number) - y) < LOOP_AT) e = goal;
+    if (e >= 0) this.#routeTo(i, e - 1);
+    if (this.routeState[i] !== 1) return null;
+    const g = this.routeGoal[i] as number;
+    const b = this.#belief;
+    b.x = this.routePlaces[at + 2 * g] as number;
+    b.y = this.routePlaces[at + 2 * g + 1] as number;
+    b.r = goal0.r;
+    return b;
   }
 
   /**
@@ -4717,6 +4849,7 @@ export class Colony {
       this.odoSurf[i] = 0;
       this.driftSurf[i] = gauss(this.#rng) * PI_DRIFT_2D;
       this.driftSurfY[i] = gauss(this.#rng) * PI_DRIFT_2D;
+      this.#routeClear(i); // a fresh trip out: no places of the last
     }
     this.#lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh
     this.leaveOk[i] = 0; // its pass through the gate is used (ja-web)
@@ -5115,7 +5248,7 @@ export class Colony {
         // plane's edge), but most firings are away from the belief: on seed 1 (120 s) 596, 81 % more than 10 cells from it,
         // 92 cutting short a walk round rock (review of #60). Narrower versions delivered about the same (seeds 1–3), so
         // it stays a general "search sooner when blocked" rule.
-        if (nest !== goal && (this.stallT[i] as number) > SEARCH_STALL && this.line !== null && this.#cur === PLANE) this.#searchOn(i, true);
+        if (nest !== goal && (this.stallT[i] as number) > SEARCH_STALL && this.line !== null && this.#cur === PLANE && !this.#routeFail(i, true)) this.#searchOn(i, true);
         if (this.#entrance && (this.wall[i] !== 0 || detouring)) {
           // On the ground line it homes cell by cell (see #walkTunnel): no walls to follow, no detour to wander (an
           // explorer's detour, run up bumping round, used to carry on once it had food, and walk it away from the hole).
@@ -5178,7 +5311,7 @@ export class Colony {
             // Where it believed home was, and nothing there (the side view's drifting vector): search round it.
             // (On one world's plane with loops, within LOOP_AT: at its speed it turns no tighter than ~1.2 cells, and circled
             // a point 1 away until it stalled.)
-            if (nest !== goal && Math.hypot(nest.x - x, nest.y - y) < (p.searchLoops > 0 && this.line !== null && this.#cur === PLANE ? LOOP_AT : 1)) this.#searchOn(i);
+            if (nest !== goal && Math.hypot(nest.x - x, nest.y - y) < (p.searchLoops > 0 && this.line !== null && this.#cur === PLANE ? LOOP_AT : 1) && !this.#routeFail(i, false)) this.#searchOn(i);
             // On one world's plane, searching (its vector ran out where no hole was) with the home trail under its antennae and
             // its hole not yet in sight (in sight, it steers for the hole itself: review of #60), the trail leads, with the share
             // of its turning a carrier gives a food trail (homeTrail): route cues and scent first, the vector the fallback
@@ -5831,6 +5964,7 @@ export class Colony {
         // heads home the vector is fixed.
         // Carrying spoil or a corpse out (U3c), it counts too: it is on its way out, and drops by the vector it brought.
         if (this.mode[i] !== RETURN || outward) this.odoSurf[i] = (this.odoSurf[i] as number) + Math.hypot((this.x[i] as number) - x0, (this.y[i] as number) - y0);
+        if (p.routeMemory > 0 && (this.mode[i] === EXPLORE || this.mode[i] === FOLLOW) && !this.carrying[i]) this.#routeRecord(i);
         this.antCell(i);
         const k = this.#holeAt(CELL[0] as number, CELL[1] as number);
         if (k >= 0 && (k === p.nest ? this.#wantsIn(i, this.mode[i] as number) : this.mode[i] === FIGHT && this.#stanceOf(i) === "raid")) {

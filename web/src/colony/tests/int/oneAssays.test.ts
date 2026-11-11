@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, MODES, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
-import { antsNear, Arena, at, cellRect, crossingProbe, F1_ANTS, F1_FAR, F1_NEAR, forage1, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, runAssay, runGame, S1_PER_TRIP, S1_TRIPS, search1, specMap, type RunResult, type RunSpec } from "../../experiment.ts";
+import { antsNear, Arena, at, cellRect, crossingProbe, F1_ANTS, F1_FAR, F1_NEAR, forage1, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, R1_ANTS, R1_DETOUR, R1_FAR, R1_NEAR, R1_PILE, route1, runAssay, runGame, S1_PER_TRIP, S1_TRIPS, search1, specMap, type RunResult, type RunSpec } from "../../experiment.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
@@ -140,6 +140,56 @@ test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cel
   assert.ok((full.metrics.reach as number) >= 0 && (full.metrics.reach as number) <= 1);
   assert.ok((full.metrics.walked as number) >= F1_NEAR - 8 || Number.isNaN(full.metrics.walked), `walked ${full.metrics.walked}, at least the straight way to sight`);
   assert.ok(F1_NEAR < F1_FAR);
+});
+
+test("R1 puts one pile in a pocket (no clear line, a way round at least 1.8 times the straight line) and sets foragers out on the way to it", () => {
+  const { game, result } = runGame({ ...route1.spec(4), seconds: 1 / 30 });
+  const c = game.player;
+  const plane = game.world!.plane;
+  const hc = c.holeCells[c.params.nest] as HoleCell;
+  const hx = centreX(hc.px, hc.py);
+  const hy = centreY(hc.py);
+  // Exactly one pile, of R1_PILE, and it is the only food on the plane.
+  const piles: { x: number; y: number; v: number }[] = [];
+  for (let y = 0; y < plane.size.h; y++) for (let x = 0; x < plane.size.w; x++) if (plane.food.get(x, y) > 0) piles.push({ x, y, v: plane.food.get(x, y) });
+  assert.equal(piles.length, 1);
+  assert.equal(piles[0]!.v, R1_PILE);
+  assert.equal(plane.foodLeft, R1_PILE);
+  const px = centreX(piles[0]!.x, piles[0]!.y);
+  const py = centreY(piles[0]!.y);
+  const d = Math.hypot(px - hx, py - hy);
+  assert.ok(d >= R1_NEAR && d <= R1_FAR, `the pile is ${d.toFixed(1)} cells out`);
+  assert.equal(result.metrics.dist, d);
+  assert.ok((result.metrics.way as number) >= R1_DETOUR * d, `a way round of ${result.metrics.way} for ${d.toFixed(1)} straight`);
+  let blocked = false;
+  for (let t = 0; t < 1; t += 0.5 / d) {
+    cellOf(hx + t * (px - hx), hy + t * (py - hy));
+    if (rockAt(plane, CELL[0] as number, CELL[1] as number) !== OPEN) blocked = true;
+  }
+  assert.ok(blocked, "no clear straight line from the hole to the pile");
+  // Foragers are out on the plane near the hole, exploring, empty-jawed, with a trip of 3 behind them and no path stored beyond that.
+  for (let i = 0; i < R1_ANTS; i++) {
+    assert.equal(c.layer[i], PLANE);
+    assert.equal(c.carrying[i], 0);
+    assert.equal(c.mode[i], MODES.indexOf("explore"));
+    assert.ok((c.odoSurf[i] as number) >= 3 && (c.odoSurf[i] as number) < 4, `ant ${i}: a trip of 3 behind it`);
+    assert.ok(Math.hypot((c.x[i] as number) - hx, (c.y[i] as number) - hy) < 5, `ant ${i} set down by its hole`);
+  }
+  // A seed with no pocket (1) has no pile, scores no pickups and reports no pass.
+  const none = runAssay(route1, 1, {}, 1);
+  assert.equal(none.metrics.pockets, 0);
+  assert.equal(none.metrics.picked, 0);
+  assert.ok(!("pass" in none.metrics));
+});
+
+test("R1 scores each pocket pickup's way home: the shares are shares", () => {
+  assert.ok((runAssay(route1, 7, {}, 2).metrics.picked as number) === 0, "nobody is at a pile 30 cells out in 2 s");
+  // A game that runs to R1_SECONDS scores the pickups of its first 120 s and each is home or not.
+  const full = runAssay(route1, 7, {});
+  assert.ok((full.metrics.picked as number) > 0 && (full.metrics.picked as number) <= R1_ANTS);
+  for (const k of ["home120", "home300", "held"]) assert.ok((full.metrics[k] as number) >= 0 && (full.metrics[k] as number) <= 1, k);
+  assert.ok((full.metrics.home120 as number) <= (full.metrics.home300 as number));
+  assert.equal(full.metrics.wrong, 0);
 });
 
 /** Ant i of c put on `layer` at world (x, y): a probe reads only these fields. */
