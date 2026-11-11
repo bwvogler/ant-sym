@@ -1,12 +1,11 @@
-# Every pull request, and every branch push but main's (main's gate is pages.yml), runs the same
-# checks the Pages build does before it deploys: lint, typecheck, and the fast tests. A failure
-# shows on the PR instead of blocking the deploy afterwards (ja-6mj). test:slow is not run here.
+# Every pull request runs the same checks the Pages build does before it deploys (main's gate is
+# pages.yml): lint, typecheck, and the fast tests. A failure shows on the PR instead of blocking the
+# deploy afterwards (ja-6mj). Only pull_request: a push trigger too would run each PR branch twice.
+# test:slow is not run here.
 name: CI
 
 on:
   pull_request:
-  push:
-    branches-ignore: [main]
 
 permissions:
   contents: read

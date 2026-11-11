@@ -24,7 +24,6 @@ const ticks = (g: Game, n: number): void => {
 const run = (g: Game, seconds: number): void => ticks(g, Math.round(seconds / DT));
 const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
 
-
 /**
  * Run g a tick at a time until a tick kills an ant in a fight on layer `layer` (a rise in Unity.deathsPerMinute, with an
  * ant on that layer dead in it), at most `seconds`; returns whether one did.
