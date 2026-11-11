@@ -1,3 +1,4 @@
+import { ANT_FIELDS } from "../../ants.ts";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -118,17 +119,28 @@ test("a save of another version is refused", () => {
 });
 
 test("a colony's save holds every private field it declares (but its random stream, the game's)", () => {
-  // The save's private list is written out by hand: a field left off it would lose its value on every load, and the
-  // restored game would only show it once that field mattered (PR #42 review, S1: tired, holdsBrood and cameFrom each
-  // slipped past the run-on test). So: every `#field` declared in Colony, and nothing else, is saved.
+  // The save's private list is written out by hand (the per-ant arrays are not: ants.ts's table saves them by its keys): a field
+  // left off it would lose its value on every load, and the restored game would only show it once that field mattered (PR #42
+  // review, S1: tired, holdsBrood (now broodHeld) and cameFrom each slipped past the run-on test). So: every `#field` declared in Colony, and
+  // nothing else, is saved; and every array of ants.ts is saved with the public fields.
   const src = readFileSync(new URL("../../colony.ts", import.meta.url), "utf8");
   const body = src.slice(src.indexOf("export class Colony "));
   const declared = new Set<string>();
   for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
   declared.delete("rng");
   const g = build("side", 2);
-  const saved = Object.keys(g.colonies[0]!.saveState().private as object);
-  assert.ok(declared.size > 50, `found the declarations (${declared.size})`);
+  const c0 = g.colonies[0]!;
+  const saved = Object.keys(c0.saveState().private as object);
+  // ants.ts's per-ant arrays are the colony's own properties and travel with its public arrays, in `fields`.
+  const fields = Object.keys(c0.saveState().fields as object);
+  assert.deepEqual(
+    Object.keys(ANT_FIELDS)
+      .filter((k) => !fields.includes(k))
+      .sort(),
+    [],
+    "an ants.ts array not saved with the public fields",
+  );
+  assert.ok(declared.size > 25, `found the declarations (${declared.size})`);
   assert.deepEqual([...declared].filter((k) => !saved.includes(k)).sort(), [], "declared but not saved");
   assert.deepEqual(saved.filter((k) => !declared.has(k)).sort(), [], "saved but not declared");
 });
