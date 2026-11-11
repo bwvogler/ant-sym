@@ -2,7 +2,7 @@ import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { type Colony, type ColonyParams, FAINT, type HoleCell, type Layer, LIFESPAN, MODES, type Mode, PI_DRIFT, PLANE, planeMoundReach, type Policy, type Stance, type StancePolicy } from "./colony.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
-import { CELL, cellOf, centreX, centreY, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, responses, type Responses } from "./responses.ts";
@@ -1448,7 +1448,7 @@ export const game1: Assay = {
 
 /** S1's trip lengths (cells walked out on the plane), and the carriers set down at each, per seed. */
 export const S1_TRIPS = [100, 200, 400, 600] as const;
-export const S1_PER_TRIP = 20;
+export const S1_PER_TRIP = 40;
 /** S1: the pellets on the player's mound at the start: about what a colony has out 5 minutes into G1 (800 by 300 s on seed 5). */
 export const S1_MOUND = 1000;
 
@@ -1458,7 +1458,7 @@ export const S1_MOUND = 1000;
  * with food, homing, their vector as a trip of T out of their own hole leaves it: odoSurf = T, each drift part drawn as
  * the game draws it at the hole (Gaussian, σ = PI_DRIFT/√2, so the miss is σ = 0.1/√2 × T per axis). Each stands at its
  * vector's end (the hole + T × drift: the search's origin), so its search begins there; a draw whose end is off the plane
- * (within 2 of an edge) or in rock is drawn again. Every other ant is young (stays in), with no scouts, and a carrier home is made young
+ * (within 2 of an edge), in rock or in a pocket of open ground walled off from the hole is drawn again. Every other ant is young (stays in), with no scouts, and a carrier home is made young
  * too, so the carriers search alone. The player's mound starts as the game would have heaped S1_MOUND pellets.
  * Per trip (`t400.home120` …): the share home (down its own hole) within 120 s and within 600 s, the
  * median time of those home, the search's centredness (`centre`: per carrier with 10 s or more on the plane, the
@@ -1494,6 +1494,22 @@ export const search1: Assay = {
       const hy = centreY(hc.py);
       const xMax = plane.size.w - 2;
       const yMax = plane.size.h * R - 2;
+      // The open ground joined to the hole: a carrier can't have walked out to a pocket of it walled off by rock.
+      const { w } = plane.size;
+      const joined = new Uint8Array(w * plane.size.h);
+      const queue = [hc.px + hc.py * w];
+      joined[queue[0] as number] = 1;
+      for (let k = 0; k < queue.length; k++) {
+        const x = (queue[k] as number) % w;
+        const y = Math.floor((queue[k] as number) / w);
+        for (let d = 0; d < 6; d++) {
+          const tx = nx(x, y, d);
+          const ty = ny(y, d);
+          if (tx < 0 || ty < 0 || tx >= w || ty >= plane.size.h || joined[tx + ty * w] || rockAt(plane, tx, ty) !== OPEN) continue;
+          joined[tx + ty * w] = 1;
+          queue.push(tx + ty * w);
+        }
+      }
       for (const k of game.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
       // The mound as the game heaps it (#carryOut, #dropPlane): pellet k goes 2 + reach × √u out on a heading drawn for it.
       const holes = c.holeCells.map((h) => ({ x: h.px, y: h.py }));
@@ -1517,7 +1533,7 @@ export const search1: Assay = {
           by = hy + T * dy;
           if (bx < 2 || by < 2 || bx > xMax || by > yMax) continue;
           cellOf(bx, by);
-          if (rockAt(plane, CELL[0] as number, CELL[1] as number) === OPEN) break;
+          if (joined[(CELL[0] as number) + (CELL[1] as number) * w]) break;
         }
         trip[i] = T;
         ox[i] = bx;

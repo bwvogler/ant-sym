@@ -4431,18 +4431,45 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 
 **Cost (estimated).** None in Jev: steering only, with no situation, legend or question changed. The per-ant work is small; the tick is checked with `colony-bench --one` against ja-lp4.6.7's figure.
 
-**S1's baseline (main at `f188c23`, U3b's spiral; seeds 1–10, ja-lp4.11.1).** `npm run exp -- --one s1 --seeds 1-10` (`experiment.ts` `search1`): on each seed's default plane (512 × 368), 20 of the player's carriers per trip length set down at their vector's end (odoSurf = T, each drift part drawn as the game draws it, σ = 0.1/√2 per axis; a draw ending in rock or within 2 of an edge drawn again), every other ant young and no scouts, 600 s. Shares pooled over the 200 carriers per trip (worst seed in brackets); the median is the median of the seeds' medians (carriers home only); centre is the mean distance of each carrier's mean position from its origin, spread its mean distance from it (cells, carriers with ≥ 10 s on the plane):
+**As built (2026-11-11, `ja-lp4.11.1`–`.4`).** One world's plane only; the side-view and top-down golden masters are bit-exact; the one-world golden was re-recorded once, with the tuned defaults. `SAVE_VERSION` 7 (`searchLeg`).
+- **S1** (`experiment.ts` `search1`, `npm run exp -- --one s1`): on each seed's default plane (512 × 368), 40 of the player's carriers per trip length T (100, 200, 400, 600 cells) set down at t = 0 at their vector's end: odoSurf = T, each drift part drawn as the game draws it (σ = 0.1/√2 per axis); a draw ending in rock, within 2 of an edge, or in open ground walled off from the hole is drawn again. The player's mound starts as the game heaps 1,000 pellets (about G1 at 5 minutes; reach ~16). Every other ant is young, no scouts, and a carrier home is made young, so the carriers search alone. 600 s. Reported: the share home (down its own hole) in 120 s and 600 s, the median time of those home, `centre` (each carrier's mean position from its origin, sampled each second; mean, cells) and `spread` (its mean distance from the origin).
+- **Loops** (`#searchOn`, `#believePlane`, params `searchLoops`, `searchGrow`, `searchTurn`, `searchPetal`, `searchStall`): where the vector ran out at no hole, the ant visits three points a loop: out to the loop's reach at its heading − half the petal's width, across to + half, back to the origin (reached within `LOOP_AT` 2: it turns no tighter than ~1.2 cells and circled a point 1 away). Loop k heads `searchTurn` × k on from the first (which heads the way the ant faces; no random draw) and reaches σ × (`searchLoops` + `searchGrow` × k), at least `SEARCH_START` 3; σ = 0.1/√2 × its own odoSurf. No cap but the plane's longer side. `searchLoops` 0 is U3b's spiral bit for bit. The home trail still leads a searcher.
+- **The mound's smell** (`#onOwnMound`, `moundSmell`): a searching ant (`search` ≠ 0) on the plane within `max(HOLE_SIGHT, 2 + planeMoundReach(heaped))` of its own hole (the mound's reach as dug: the farthest `#carryOut` sends a pellet now) and on spoil underfoot (the plane's height field, as the undertaker's midden rule reads it) believes its hole where it is, as in sight of it. Not on a full vector; the reach is its own colony's, so a rival's mound doesn't pull. Off: `HOLE_SIGHT` only.
+- **S1, seeds 1–10** (shares pooled over 400 carriers a trip, worst seed in brackets; T = 100 is 99.3–100 % in 120 s in every row):
 
-| trip (cells) | home in 120 s | home in 600 s | median (s) | centre | spread | down another hole |
-|---|---|---|---|---|---|---|
-| 100 | 99.5 % (95) | 100 % (100) | 1.4 | 7.3 | 13.7 | 0 |
-| 200 | 95.5 % (75) | 99.0 % (95) | 17.1 | 6.0 | 14.2 | 0 |
-| 400 | 82.5 % (55) | 98.5 % (85) | 43.7 | 10.8 | 22.1 | 1 |
-| 600 | 63.5 % (40) | 94.5 % (85) | 88.5 | 15.3 | 31.8 | 2 |
+  | T | `main` (U3b spiral) 120 s / 600 s | loops (design: σ/2, σ/8, golden, 60°, skip) | loops + smell (design) | **loops + smell (chosen: 1.5σ)** |
+  |---|---|---|---|---|
+  | 200 | 93.5 % (80) / 97.7 % (90) | 90.8 % (77.5) / 99.8 % (97.5) | 96.0 % (85) / 99.5 % (95) | **97.7 % (87.5) / 100 % (100)** |
+  | 400 | 58.5 % (40) / 88.0 % (72.5) | 62.2 % (42.5) / 96.7 % (90) | 69.0 % (40) / 99.3 % (95) | **81.8 % (60) / 98.7 % (95)** |
+  | 600 | 32.5 % (5) / 77.5 % (55) | 41.3 % (25) / 88.0 % (70) | 51.5 % (32.5) / 92.3 % (82.5) | **57.5 % (22.5) / 94.5 % (80)** |
+  | median s (400 / 600) | 89 / 136 | 71 / 134 | 40 / 98 | 29 / 65 |
+  | centre / spread (600) | 24.7 / 51.3 | 8.5 / 31.7 | 8.5 / 29.1 | 20.3 / 45.3 |
 
-- The target (≥ 99 % in 600 s at every trip) fails at 400 and 600 cells, on 6 of 10 seeds; G1's median trips are 364–417 cells.
-- Lone carriers here do better than the offline model's spiral (74 % in 120 s at 400 cells). S1 has no crowd, no rival ants out and no trails but the searchers' own, so G1 remains the test of the game.
-- The search drifts off its origin as it grows: centre 11–15 cells at 400–600-cell trips, half its spread.
+  The spiral with the smell (an earlier S1, 20 a trip, no walled-off filter) got 97.5 / 93.0 / 82.5 % in 600 s at 200 / 400 / 600.
+- **Confirmed on seeds 11–20** (chosen): 400 cells 74.5 % (50) / 97.2 % (90), `main` 56.3 % (32.5) / 86.3 % (72.5); 600 cells 52.3 % (30) / 91.5 % (77.5), `main` 37.5 % (10) / 76.3 % (67.5). Loops alone (1.5σ): 61.2 % / 96.2 % and 41.8 % / 86.5 %.
+- **The target is not met:** ≥ 99 % home in 600 s holds at 100–200 cells but not at 400 (98.7 %) or 600 (94.5 %). The carriers left are mostly far in the vector's tail (misses of 2–3σ) or behind rock: on seed 4, eleven origins lie in a pocket 20–50 cells from the hole across a rock band, 75–130 steps round it.
+- **Tuning** (S1 seeds 1–10, one at a time, by the worst seed; 20 a trip until the last rounds, then 40):
+  - first reach (`searchLoops`): 0.25, 0.5, 1, 1.5, 2 σ: 1.5 best at 400 cells (81.8 %, worst seed 60, in 120 s; 98.7 %, worst 95, in 600 s). **1.5.**
+  - growth (`searchGrow`): σ/16, σ/8, σ/4: within noise of each other; σ/16 worst at 600 cells. **σ/8** (the design).
+  - turn (`searchTurn`): the golden angle against 90° and 180°: golden best (600 cells in 600 s: 94.5 %, against 90.3 % and 85.5 %). **Golden.**
+  - petal width (`searchPetal`): 60°, 90°, 120°: no gain from wider. **60°** (the design).
+  - **the stall rule** (`searchStall`, 3 s no nearer its point): skip to the next point (1) against start the next, wider loop (0): 400 cells 98.7 % (95) against 98.0 % (92.5) in 600 s, 600 cells 94.5 % (80) against 93.8 % (82.5), centre 20 against 26. A third rule, not stalling while following a wall (15 s instead), was no better (90.5 % at 600). **Skip (1)** (the design).
+- **G1** (seeds 1–10, both colonies, against `main` = ja-web, which this run reproduced exactly: food carried down 44,582, births 7,276, ants lost 1,679, raid scouts 187). Most foragers holding food over 120 s, you / rival:
+
+  | seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | `main` | 15 / 17 | 14 / 20 | 11 / 24 | 41 / 18 | 17 / 7 | 16 / 28 | 11 / 16 | 14 / 12 | 18 / 8 | 22 / 14 |
+  | built | 8 / 8 | 8 / 16 | 13 / 25 | 49 / 8 | 12 / 3 | 9 / 19 | 6 / 21 | 13 / 8 | 9 / 3 | 24 / 11 |
+
+  - **G1 still fails, 0/10.** The guard's seeds: 5 at 12, 9 at 9 (bound 2). The worst colony per seed summed 217 → 196; better on 6 seeds, worse on 4 (seed 4: 41 → 49). All held are on the plane (`maxHeldPlane` = `maxHeld`). Food carried down 44,075 (−1.1 %), births 7,199 (−1.1 %), ants lost 1,618 (−3.6 %), raid scouts 201. The guard stays skipped behind `G1=1`.
+  - **Which part helps G1** (seeds 4, 5, 9, 10, worst colony): `main` 41, 17, 18, 22; loops 1.5σ alone 57, 19, 26, 38; spiral + smell 35, 10, 7, 18; loops 1σ + smell 70, 14, 10, 22; chosen (1.5σ + smell) 49, 12, 9, 24. **In G1 the smell does the good and the loops cost**, the reverse of S1's 600-s share. Seed 4's player: carriers back from a pocket north-east of its hole, across a rock band, believe home 20–30 cells away through rock; their loops grow by a point each 3-s stall (25–55 points) and never get round.
+  - **Why the bound is hard:** held carriers sampled on seed 9 (loops + smell, every 30 s from 150 s) had missed by 1.2–3.2σ, median ~2.3σ. In 120 s at 7 cells a second an ant sweeps at most ~840 × 12 cells² with sight 6: a disc of ~56 cells, ~1.9σ at a 420-cell trip, so even a perfect search leaves ~16 % of such carriers over 120 s; a mound of reach 16 raises that to ~3σ. Hundreds of carriers a minute then keep several held at any moment.
+  - **The first reach against G1 and A1.** At σ/2 (the design) G1 was worse still on seeds 4, 5, 9, 10: 92, 9, 10, 31 (seed 4's pocket: the loops grew by stalls). So 1.5σ stays, chosen by G1's worst seed as well as S1's.
+- **The assays on one world** (`npm run exp -- --one`, seeds 1–10, against ja-web's table in [one-world.md](one-world.md) §5): A1 **4/10** (ja-web 8/10; worst seed 2, 0.63), A2a 10/10 (worst 0.79), A2b 8/10 (fail 4, 6; worst 0.16), A3 10/10 (clear ≤ 21 s), A4 10/10 (scatter ≤ 0.40), A5 0/10, A5b 6/10 (7/10), A6 4/10 (5/10; worst seed 8, 0.74), A9 3/10 (worst 9.87, seed 7), A10 0/10, A8 reports (carried past reception 0.28–1.00). **A1 is the loops' doing:** spiral 8/10, spiral + smell 8/10, loops 1.5σ alone 4/10, loops σ/2 7/10. Lost carriers with food run their long loops over both branches.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200, seed 1, two runs each, second-half mean): 10.19 and 10.73 ms built, against 10.38 and 10.85 with the search off (this branch before the defaults changed) and ja-lp4.6.7's 10.66 and 10.81. No cost.
+- **Cost:** none in Jev (steering only: no situation, legend or question changed; `precache.test` passes).
+
+**Still open (owner).** G1's bound on one world, or the trips' length; whether to keep the loops at all: the spiral with the smell (`searchLoops` 0, `moundSmell` 1) did better in G1 (seeds 4, 5, 9, 10) and keeps A1 at 8/10, but is worse in S1 (82.5 % home in 600 s at 600-cell trips against 94.5 %); seed 4's rock pocket (route memory is not modelled).
 
 **Beads.** `ja-lp4.11` (epic), with children in build order: the S1 assay; centred loops; the mound's smell; tuning, G1 and docs. `ja-lp4.6.3` waits on the epic.
 
