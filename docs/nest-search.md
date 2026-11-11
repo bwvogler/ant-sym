@@ -152,10 +152,11 @@ So the question is: **how does a homing ant search when its vector runs out at n
 ## What was built
 
 *2026-11-11, `ja-lp4.11` (PRD §55, "As built", has every number).*
-- **Loops.** As in the table above: three points a loop (out, across a 60° petal, back to the origin), each loop a golden angle on, reaching σ × (1.5 + k/8), σ from the ant's own trip. Tuned on S1: the first reach went from the design's σ/2 to 1.5σ; growth, turn, width and the stall rule (skip to the next point) stayed as designed. `searchLoops` 0 restores U3b's spiral bit for bit.
-- **The mound's smell.** As in the table: searching, within its own mound's reach as dug (`planeMoundReach`, at least `HOLE_SIGHT`), on spoil underfoot (the plane's height field, which the midden rule also reads), the ant steers for its hole. `moundSmell` 0 turns it off.
-- **S1** (a new assay of lost carriers, seeds 1–10): home in 600 s at 400-cell trips 88 % → 98.7 %, at 600 cells 77.5 % → 94.5 %; in 120 s 58.5 % → 81.8 % and 32.5 % → 57.5 %. Confirmed on seeds 11–20. The ≥ 99 % target is met at 100–200 cells only.
-- **G1 still fails its bound** (0/10; seeds 5 and 9 at 12 and 9 against 2). On four seeds the smell helped and the loops cost: the spiral with the smell did better in G1 than the loops with it. The held carriers are in the vector's tail (misses ~2.3σ) or behind rock, and 120 s is too short to sweep that far even for a perfect search. The loops also cost A1 (the double bridge: 8/10 → 4/10), which the smell alone doesn't. The owner decides the bound, the trips, or the spiral with the smell.
+- **Shipped: U3b's spiral with the mound's smell** (`searchLoops` 0, `moundSmell` 1). The owner chose by G1's worst seed without losing A1: the loops lost both.
+- **The mound's smell.** As in the table: searching, within its own mound's reach as dug (`planeMoundReach`, at least `HOLE_SIGHT`), on spoil underfoot (the plane's height field, which the midden rule also reads), the ant steers for its hole. This is what helps the game.
+- **Loops, built but switched off.** As in the table: three points a loop (out, across a 60° petal, back to the origin), each a golden angle on, reaching σ × (`searchLoops` + k/8). Tuned on S1 to 1.5σ (growth, turn, width and the skip-a-point stall rule as designed). They win S1 but lose G1 (worst seed 49 against the spiral's 35) and A1 (8/10 → 4/10): carriers with food run long loops through rock and over the trails.
+- **S1** (lost carriers, seeds 1–10), home in 600 s at 400 / 600-cell trips: `main` 88 / 77.5 %, spiral + smell 92.3 / 86.3 %, loops + smell 98.7 / 94.5 %. The ≥ 99 % target is not met.
+- **G1 still fails its bound** (0/10). Shipped, seeds 5 and 9 hold 10 and 7 over 120 s against 2; the worst colony per seed fell on 9 of 10 seeds (sum 217 → 166). The held carriers are in the vector's tail (misses ~2.3σ, beyond the ~1.9σ an ant can sweep in 120 s) or behind rock (seed 4's pocket). The bound stays (owner); follow-ups proposed: shorter trips, and route memory for rock pockets.
 
 ## Sources
 

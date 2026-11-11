@@ -253,7 +253,8 @@ export interface ColonyParams {
    * One world's plane (ja-lp4.11, docs/nest-search.md): a homing ant whose vector ran out where no hole was searches in
    * loops out from that spot and back (Wehner & Srinivasan 1981; Müller & Wehner 1994), the first reaching this many σ
    * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × odoSurf; Merkle & Wehner 2010: the
-   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit.
+   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §55: the loops,
+   * tuned to 1.5, won S1 but lost G1 and A1 to the spiral with the mound's smell).
    */
   searchLoops: number;
   /** One world's plane: each next loop reaches this many σ further out than the last (searchLoops) */
@@ -336,7 +337,7 @@ const LOOP_AT = 2;
 /** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 1.5, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;

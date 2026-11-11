@@ -53,8 +53,7 @@ function sporesBelow(g: Game, c: Colony): void {
 
 /**
  * Run g a tick at a time until a tick kills an ant in a fight on layer `layer` (a rise in Unity.deathsPerMinute, with an
- * ant on that layer dead in it), at most `seconds`; returns whether one did. (On seed 7's small plane the first fight
- * death there came at 68 s once lost carriers searched in loops, ja-lp4.11: the tests give it 90.)
+ * ant on that layer dead in it), at most `seconds`; returns whether one did.
  */
 function toFightDeath(g: Game, layer: number, seconds: number): boolean {
   let last = g.unity().deathsPerMinute;
@@ -144,7 +143,7 @@ for (const layer of [PLANE, CURTAIN])
           moved++;
         }
     }
-    assert.ok(toFightDeath(whole, layer, 90), "a fight death there (the test's own check)");
+    assert.ok(toFightDeath(whole, layer, 40), "a fight death there (the test's own check)");
     const saved = copy(whole.save());
     whole.tick(DT);
     const next = hashGame(whole);
@@ -178,7 +177,7 @@ test("one world: a sweep of 30 save ticks round a fight death, each run on 1 tic
   const make = () => small();
   const whole = make();
   whole.land(0, GARDEN, { evolve: true });
-  assert.ok(toFightDeath(whole, PLANE, 90), "a fight death on the plane");
+  assert.ok(toFightDeath(whole, PLANE, 40), "a fight death on the plane");
   // The tick of the death: saves from 15 ticks before it to 14 after, from the same game run again from the start.
   const t0 = Math.round(whole.time / DT);
   const base = make();

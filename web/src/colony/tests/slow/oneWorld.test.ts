@@ -15,10 +15,10 @@ import { generateOneWorld } from "../../oneWorld.ts";
 // 9: 13 / 7, 10: 44 / 10. Every one of them is on the plane (maxHeldPlane equals maxHeld): carriers lost on the surface on
 // their way home, not stuck in the tunnels; porters hold theirs over 120 s on 2 of 20 colonies (at most 4). The bound is
 // not loosened without the owner: this is skipped (a todo would still run its body, 6–10 minutes that can't fail) unless G1=1, on the two seeds whose worst colony held fewest (5 and 9, 13 each),
-// until homing on the plane brings them under it (ja-lp4.6.3). Each seed runs about 3–5 minutes. With the nest search's
-// loops and the mound's smell (ja-lp4.11, PRD §55) it still fails: 1: 8 / 8, 2: 8 / 16, 3: 13 / 25, 4: 49 / 8, 5: 12 / 3,
-// 6: 9 / 19, 7: 6 / 21, 8: 13 / 8, 9: 9 / 3, 10: 24 / 11; seeds 5 and 9 at 12 and 9.
-test("G1, one world: hardly a forager holds its food over 120 s (seeds 5 and 9, 600 + 600 ants, 600 s; measured 12 and 9 at worst, bound 2)", { timeout: 1_800_000, skip: process.env.G1 ? false : "fails the bound on every seed (ja-lp4.6.3); G1=1 npm run test:slow runs it" }, () => {
+// until homing on the plane brings them under it (ja-lp4.6.3). Each seed runs about 3–5 minutes. With the mound's
+// smell (ja-lp4.11, PRD §55) it still fails: 1: 10 / 13, 2: 19 / 8, 3: 12 / 24, 4: 35 / 7, 5: 6 / 10, 6: 10 / 18, 7: 6 / 11,
+// 8: 11 / 10, 9: 7 / 2, 10: 18 / 8; seeds 5 and 9 at 10 and 7. The bound stays (owner, 2026-11-11).
+test("G1, one world: hardly a forager holds its food over 120 s (seeds 5 and 9, 600 + 600 ants, 600 s; measured 10 and 7 at worst, bound 2)", { timeout: 1_800_000, skip: process.env.G1 ? false : "fails the bound on every seed (ja-lp4.6.3); G1=1 npm run test:slow runs it" }, () => {
   const held: string[] = [];
   let worst = 0;
   for (const seed of [5, 9]) {
