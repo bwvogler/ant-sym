@@ -18,6 +18,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,6 +35,7 @@ jobs:
 
   soak:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -46,4 +48,6 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm --prefix web ci
-      - run: npm --prefix web run test:soak -- --test-shard=${{ matrix.shard }}/3
+      # The flag goes before the files: node ignores --test-shard after them (so not `npm run test:soak -- ...`).
+      - run: node --test --test-timeout=60000 --test-shard=${{ matrix.shard }}/3 src/colony/tests/soak/*.test.ts
+        working-directory: web
