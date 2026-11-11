@@ -33,12 +33,13 @@ npm run test:golden            # the fast golden masters (colony/tests/golden)
 node --test --test-name-pattern='stranger' web/src/colony/tests/int/colony.test.ts   # one file, or the tests of it whose name matches
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
 npm run e2e                    # one world in Chromium (scripts/e2e-one-world.mjs): switch views, linked clicks, follow through a hole, the pen by a click; ~20 s; uses the machine's playwright, spends nothing
-# scripts/*.mjs are the maintained tools: `npm run typecheck` checks them as JavaScript against the colony's types (web/tsconfig.scripts.json, not strict), and `npm run lint` lints them, so a rename in the core fails there. scripts/lab holds one-off measurements (benches, spikes) that fed a PRD section: not checked, run from the repo root, and the PRD names them by their old path (scripts/<name>.mjs)
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
 npm run exp -- all --seeds 1-10   # behaviour assays (web/src/colony/experiment.ts), offline; --set sweeps, --policy cache:<file> replays Jev
 node scripts/colony-live.mjs all --budget 0.10   # live: Jev against the local rule per lane; saves replayable caches (experiments/out/)
 node scripts/precache.mjs --import experiments/caches/<live-check>-*.json   # no spend: ship the answers a live check got (colony-live caches) as the preset doctrines' answers in web/public/precache; do this when precache.test fails (a legend, question or version moved)
 ```
+
+`scripts/*.mjs` are the maintained tools: `npm run typecheck` checks them as JavaScript against the colony's types (`web/tsconfig.scripts.json`, not strict; `e2e-one-world.mjs` is left out, it only drives the page) and `npm run lint` lints them, so a rename in the core fails there. `scripts/lab` holds one-off measurements (benches, spikes) that fed a PRD section: not checked, run from the repo root; the PRD names them by their old path (`scripts/<name>.mjs`).
 
 The page ships Jev's answers (`web/public/precache/`, ja-lo8.3) and plays cached answers whether or not a run is on; a lane whose words changed plays the local rule until the new answers arrive (ja-lo8.15); earlier words' answers play, stale, only while Jev can't run (`ColonyJev.canAsk`, set from `policyLock`). A change to a colony legend, question or brain version must re-ship them in the same PR: import the answers its live check got (`--import`, free), rather than asking every situation (`scripts/precache.mjs` without `--import`, ~$0.12 for the mode lane: only when the owner asks). Where nothing ships, a preset plays the local rule.
 
