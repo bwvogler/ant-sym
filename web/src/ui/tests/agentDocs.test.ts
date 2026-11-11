@@ -22,16 +22,23 @@ test("CLAUDE.md stays within its budget and points at the agent guide", () => {
   assert.ok(text.includes("docs/agent-guide.md"), "CLAUDE.md links docs/agent-guide.md");
 });
 
-test("the agent guide and the files it names exist", () => {
+test("the agent guide names files and symbols that exist", () => {
   const guide = readFileSync(join(ROOT, "docs/agent-guide.md"), "utf8");
-  for (const path of [
-    "web/src/ui/tests/colonyIndex.test.ts",
-    "web/src/colony/ants.ts",
-    "web/src/colony/vocab.ts",
-    "web/src/colony/tests/builders.ts",
-    "web/shared/jev.ts",
-  ]) {
-    assert.ok(guide.includes(path.split("/").pop()!), `the guide mentions ${path}`);
+  const named: [string, string[]][] = [
+    ["web/src/ui/tests/colonyIndex.test.ts", []],
+    ["web/src/colony/ants.ts", ["ANT_FIELDS"]],
+    ["web/src/colony/vocab.ts", []],
+    ["web/src/colony/tests/builders.ts", ["SMALL_SIDE", "smallOne", "arena", "placedAt", "editPrivate"]],
+    ["web/shared/jev.ts", ["isRunSummary", "readHealth"]],
+    ["web/src/colony/colony.ts", ["backfill", "tunnelDrift"]],
+  ];
+  for (const [path, symbols] of named) {
+    if (symbols.length === 0) assert.ok(guide.includes(path.split("/").pop()!), `the guide mentions ${path}`);
     assert.ok(existsSync(join(ROOT, path)), `${path} exists`);
+    const src = readFileSync(join(ROOT, path), "utf8");
+    for (const sym of symbols) {
+      assert.ok(guide.includes(sym), `the guide mentions ${sym}`);
+      assert.ok(src.includes(sym), `${path} still has ${sym}`);
+    }
   }
 });
