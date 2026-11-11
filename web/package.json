@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "format": "prettier --config .prettierrc.json --ignore-path ../.prettierignore --write \"src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"worker/**/*.ts\" \"shared/*.ts\" \"*.ts\" \"../scripts/**/*.mjs\"",
+    "format:check": "prettier --config .prettierrc.json --ignore-path ../.prettierignore --check \"src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"worker/**/*.ts\" \"shared/*.ts\" \"*.ts\" \"../scripts/**/*.mjs\"",
     "typecheck": "tsc -b",
     "test": "node --test --test-timeout=120000 server/tests/*.test.ts worker/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/unit/*.test.ts src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/soak/*.test.ts src/colony/tests/golden/*.test.ts",
     "test:unit": "node --test --test-timeout=60000 server/tests/*.test.ts worker/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/unit/*.test.ts",
@@ -30,6 +32,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
+    "prettier": "^3.10.0",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
   }

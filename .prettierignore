@@ -1,0 +1,10 @@
+node_modules
+dist
+web/public
+web/package-lock.json
+experiments
+data
+.beads
+docs
+*.md
+*.json
