@@ -4588,3 +4588,49 @@ The owner asked for a review of the work needed before the game grows: species w
   - `colony.ts`: 6,528 lines; `tick()` about 1,055.
   - `ColonyField.tsx`: 1,437 lines.
 - **Cost.** No legend, question or schema changed. S2 changes the Jev contexts that name a view, so its PR re-ships precache from a live check and gives each lane's hourly cost.
+
+
+## 59. A carrier whose home vector points through rock walks back the way it came (design, ja-lp4.16, ja-lp4.6.3, 2026-11-11)
+
+**Research basis:** [route-memory.md](route-memory.md). No full text could be fetched (network policy), so every figure is **unverified**.
+- **Route memories beside path integration.** Insects keep several memory-based guidance systems (path integration and image matching) that cooperate and train one another; local vectors from a route memory are dominant over the global vector, and a route is recalled without the vector or against it (Collett, Chittka & Collett 2013; Collett et al. 1998; Mangan & Webb 2012).
+- **A lost ant goes back.** *Melophorus bagoti* displaced onto unfamiliar ground backtrack opposite to the path they had just travelled, which raises the chance of reaching familiar terrain (Wystrach, Schwarz, Baniel & Cheng 2013).
+- **Against.** Routes are one way, and an inbound ant meeting its outbound route behaves as lost (Wehner et al. 2006); detours round an obstacle are learnt slowly and by trial, 13 of 47 after 24 h (Wystrach et al. 2020). No paper shows an ant reversing a whole outward walk point by point after one trip: that part is **design**.
+
+**The problem (measured; scratch probe, G1 600 + 600, 600 s, as shipped, seeds 4, 5, 9, 10).** Held carriers are not all behind rock. Seed 4, you: of 92 carrier trips over 120 s, 57 are pocket carriers (no clear line to the hole, the way round at least 1.8 times the straight distance: median 62 cells away, 116 steps round); at the worst sample, 29 of the 34 held. Of the 57, 29 got home, 9 died holding food and 19 were still held at 600 s; a median 9 search advances and 13 wall-follows each. The cause is in the code: `SEARCH_STALL` (3 s with no cell nearer the belief) calls `#searchOn`, which zeroes `wall`, `mx`, `bestD` and `stallT`, so Bug2 never gets round a band that takes longer. On seeds 5 and 9 (the guard's) the held carriers are in the open or beside rock, not behind it (seed 5, rival: 7 of 10 blocked-near; seed 9, you: 4 blocked, 4 open). A scratch copy where a wall-follower is left alone for up to 100 s moved seed 4's worst sample only from 34 to 29.
+
+**Decisions.**
+- Research route following and plan the mechanic before code (owner, `ja-lp4.16`, 2026-11-11, from PRD §56's follow-ups).
+- A route memory of its own way out, retraced when the vector fails, as the mechanic (proposed: needs the owner); (b) a remembered detour and (c) wall-following on a stall rejected as stated in the note.
+- Places stand in for views: a stored place is recognised within `routeSee` (5) cells (proposed: needs the owner). A one-trip memory of the whole way out is stronger than the biology shows (proposed: needs the owner).
+- `routeMemory` 1 (on a stall) or 2 (also at the vector's end): by seeds 1–10's worst seed (proposed).
+
+**The mechanic.** One world's plane only (`line !== null`); `routeMemory` 0 is `main` bit for bit.
+- **Record:** on the plane, not homing, the ant stores its own position each `routeStep` (8) cells; at most `routeMax` (64), halving and doubling the spacing when full; cleared at a fresh trip out of its hole.
+- **Engage:** a homing carrier on the plane, with a path, not yet retraced this trip, and its belief not its hole, retraces when its vector fails: the stall rule (1) and reaching its belief with no hole there (2).
+- **Retrace:** towards its newest place with Bug2 by touch; within `routeSee` of any stored place it takes the earliest and aims for the one before it (which cuts out its meander's loops). The hole's sight, smell or mound smell take over at any moment; when the places run out it searches as today, once per trip.
+- **Sense row:** "Route memory" (vision.md): the ant's own way out, one trip. Retires no scripted choice and adds no global read: it holds only its own past positions.
+- **Memory:** 512 bytes an ant (64 places × 2 × float32) and ~4 bytes of state; `SAVE_VERSION` 9.
+
+**Play.** Carriers that cannot get home by their vector turn and walk back out the way they came and then in; fewer sit against a rock face with food. No new fungus lever: groundwork for U6b's baselines. A fungus reach over `routeSee` (the home gain) is an option for the owner, not built.
+
+**Assays and targets.** Land first, with no behaviour change:
+- **R1, pocket carriers** (`--one r1`): foragers walk out on a default plane to a pile in a pocket, as in the note. Target (design: no paper measures a pocket detour): at least 95 % of pocket pickups home within 300 s, median walked ÷ geodesic at most 4. The baseline is reported.
+- **G1** (seeds 1–10): at most 2 held over 120 s per colony on seeds 5, 9 and 4, which un-skips the guard; food carried down and births within 5 % of `main`'s §56/§58 numbers summed over seeds 1–10 (§58's levers are off, so `main` is the baseline); judged by the worst seed, confirmed on 11–20.
+- **The one-world assays:** A1 stays 8/10, the rest no worse; S1 and the one-world golden unchanged (S1's carriers have no path). Ablation: `routeSee` 0; `routeStep` 16 and 32.
+
+**Prototype (scratch, not in the repo; one run a seed, not tuned; the build measures properly).** Most held at a sample, you / rival, with food and births summed over both colonies of seeds 4, 5, 9, 10:
+
+| | seed 4 | seed 5 | seed 9 | seed 10 | food carried down | births |
+|---|---|---|---|---|---|---|
+| off (`main`) | 34 / 8 | 6 / 10 | 8 / 2 | 19 / 8 | 18,306 | 2,962 |
+| `routeMemory` 1 | 5 / 1 | 2 / 2 | 5 / 1 | 3 / 2 | 17,532 (−4.2 %) | 2,891 (−2.4 %) |
+| `routeMemory` 2 | 4 / 2 | 3 / 2 | 3 / 3 | 5 / 3 | 19,579 (+7.0 %) | 2,987 (+0.8 %) |
+
+The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 decide.
+
+**Cost (estimated).** None in Jev: steering only, no situation, legend or question changed; `precache.test` must still pass and a cached game spends nothing. Per-ant memory above; the tick is checked with `colony-bench --one --page` against `ja-lp4.6.7`'s figure.
+
+**Beads.** `ja-lp4.16` (epic, blocks `ja-lp4.6.3`), children in build order: `.1` read the full texts (research, does not block); `.2` assay R1 and its baseline (no behaviour change); `.3` route memory behind `routeMemory`; `.4` tune, turn on, G1 and the one-world assays; `.5` docs as built.
+
+**Still open.** The owner's calls above; R1's baseline; the tick; whether the bound of 2 is reachable on seeds 5 and 9 with this alone, or needs `ja-lp4.15`'s shorter search; the full texts to read when the network allows.
