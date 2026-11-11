@@ -24,7 +24,13 @@ The `ja` database syncs through the **`beads-dolt` branch**, not `refs/dolt/data
 ```sh
 npm --prefix web install
 npm run dev                    # http://localhost:38500
-npm test                       # node --test, 60 s per file
+npm test                       # every tier below, ~4 min on 4 cores; node --test, 60 s per file (the limit is a whole file: split a file before it nears it)
+npm run test:unit              # the quick tier (files under ~1.5 s alone: ui, server, worker, colony/tests/unit), ~9 s
+npm run test:watch             # the unit tier on every save (node --test --watch)
+npm run test:int               # colony/tests/int and ui/tests/int: files of 1.5-12 s
+npm run test:soak              # colony/tests/soak: files over 12 s and the *.soak.test.ts long games (CI shards it 3 ways: `-- --test-shard=1/3`)
+npm run test:golden            # the fast golden masters (colony/tests/golden)
+node --test --test-name-pattern='stranger' web/src/colony/tests/int/colony.test.ts   # one file, or the tests of it whose name matches
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~5 min; run before merging colony changes
 npm run e2e                    # one world in Chromium (scripts/e2e-one-world.mjs): switch views, linked clicks, follow through a hole, the pen by a click; ~20 s; uses the machine's playwright, spends nothing
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
@@ -35,7 +41,7 @@ node scripts/precache.mjs --import experiments/caches/<live-check>-*.json   # no
 
 The page ships Jev's answers (`web/public/precache/`, ja-lo8.3) and plays cached answers whether or not a run is on; a lane whose words changed plays the local rule until the new answers arrive (ja-lo8.15); earlier words' answers play, stale, only while Jev can't run (`ColonyJev.canAsk`, set from `policyLock`). A change to a colony legend, question or brain version must re-ship them in the same PR: import the answers its live check got (`--import`, free), rather than asking every situation (`scripts/precache.mjs` without `--import`, ~$0.12 for the mode lane: only when the owner asks). Where nothing ships, a preset plays the local rule.
 
-A change that should not alter behaviour must keep the golden masters bit-exact (`tests/golden.test.ts`, `tests/slow/golden.test.ts`); one that should re-records them (`GOLDEN_WRITE=1`) and says so in its PR. Tune behaviour against the assays: compare `npm run exp` with the baseline (PRD §42), choose by the worst seed, confirm on seeds 11–20.
+A change that should not alter behaviour must keep the golden masters bit-exact (`tests/golden/golden.test.ts`, `tests/golden/oneWorldGolden.test.ts`, `tests/slow/golden.test.ts`); one that should re-records them (`GOLDEN_WRITE=1`) and says so in its PR. Tune behaviour against the assays: compare `npm run exp` with the baseline (PRD §42), choose by the worst seed, confirm on seeds 11–20.
 
 Merges to `main` deploy `web/dist` to the root of the `gh-pages` branch (`.github/workflows/pages.yml`, `BASE_PATH=/ant-sym/`). Every PR to `main` gets a preview at `/ant-sym/pr-preview/pr-<n>/` (`preview.yml`). Pages has no API of its own. Built with `VITE_JEV_API` (from the repository variable `JEV_API_URL`), a Pages build calls the hosted proxy `web/worker` (a Cloudflare Worker over the same reply functions as the dev server, `server/replies.ts`, which must stay free of `node:fs` and module-load file paths; behind a passphrase, an origin allowlist and a daily cap; `docs/hosting.md`). Built without it, `ui/backend.ts` finds no backend and the UI disables Jev. New fetches to the API must go through `apiUrl()` with `apiHeaders()`, never a bare `/api/...`. The Worker is the one place that accepts a cross-origin request, and only from `ALLOWED_ORIGINS`.
 
