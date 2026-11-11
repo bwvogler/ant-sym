@@ -9,20 +9,17 @@ import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { MARKS } from "../../pheromone.ts";
 import { MAX_MASK, Recognition } from "../../recognition.ts";
-import { digCell, generateSideWorld, generateWorld, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
+import { digCell, generateSideWorld, generateWorld, mulberry32, OPEN, rockAt} from "../../world.ts";
+import { SMALL_SIDE, walkway } from "../builders.ts";
 
 // Nest slice 8 (docs/nest-and-home.md §4): the fungus on the new home. What it feels underfoot is the nest's places; it can blunt
 // or swap a host's floor marks (muddle); a lethal strain-gated crown kills the queen and brood; a Bloom host's corpse
 // on the midden sporulates.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 2 };
+const SMALL = { ...SMALL_SIDE, nestCount: 2 };
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
-function walkway(map: WorldMap, x: number): number {
-  for (let y = 0; y < map.size.h; y++) if (isSky(map, x, y) && rockAt(map, x, y) === OPEN) return y;
-  return -1;
-}
 
 test("what the fungus feels underfoot in the side view: open ground, a tunnel, a chamber's floor, the queen's mark", () => {
   const map = generateSideWorld(2, SMALL);

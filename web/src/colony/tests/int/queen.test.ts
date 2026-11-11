@@ -5,29 +5,29 @@ import { Colony, T_EGG, T_LARVA, T_PUPA } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { cellOf, CELL, centreX } from "../../hex.ts";
 import { digCell, generateSideWorld, generateWorld, mulberry32, OPEN, rockAt } from "../../world.ts";
+import { SMALL_SIDE } from "../builders.ts";
 
 // Nest slice 4 (docs/nest-and-home.md §3.4): the queen lays, brood grows from egg to larva (fed) to pupa, workers are
 // born from pupae, and a colony that loses its queen is orphaned: no more eggs, its workers age out.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 /** A side world with no food on it: what the colony eats is only what a test puts in its larder. */
 function bare(seed: number) {
-  const map = generateSideWorld(seed, SMALL);
+  const map = generateSideWorld(seed, SMALL_SIDE);
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   return map;
 }
 
 test("the side view's colony has a queen; the top-down maps keep the larder, with no queen", () => {
   assert.equal(new Colony(generateWorld(1), { antCount: 10 }, mulberry32(1)).queen, null);
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const c = new Colony(map, { antCount: 10 }, mulberry32(1));
   assert.ok(c.queen?.alive);
   assert.equal(c.orphaned, false);
   // She lies on the royal chamber's floor: its bottom row, under the founding chamber's centre (review of slice 4: she
   // was placed a row below the centre, rows above the floor).
   for (const seed of [1, 2, 3, 4]) {
-    const m = generateSideWorld(seed, { ...SMALL, nestCount: 2 });
+    const m = generateSideWorld(seed, { ...SMALL_SIDE, nestCount: 2 });
     for (const k of [0, 1]) {
       const q = new Colony(m, { antCount: 1, nest: k }, mulberry32(1)).queen!;
       cellOf(q.x, q.y);
@@ -74,7 +74,7 @@ test("nurses take eggs from the queen to a brood chamber", () => {
   // before #17 was merged in, whose Y forks change the tunnels).
   let moved = 0;
   for (const seed of [3, 4, 5]) {
-    const map = generateSideWorld(2, SMALL);
+    const map = generateSideWorld(2, SMALL_SIDE);
     const ch = map.chambers!;
     // A brood chamber dug beside the royal one, out along a tunnel from it.
     cellOf(map.nest.x, map.nest.y);
@@ -127,7 +127,7 @@ test("orphaned: the queen dies, no egg is laid after, brood in progress still ha
 });
 
 test("strangers at her side kill the queen; a side-view colony with no workers and no pupae is beaten", () => {
-  const map = generateSideWorld(2, { ...SMALL, nestCount: 2 });
+  const map = generateSideWorld(2, { ...SMALL_SIDE, nestCount: 2 });
   const g = new Game(map, { antCount: 40, rivalAnts: 40 }, mulberry32(5));
   const [a, b] = g.colonies as [Colony, Colony];
   // Ten of b's ants on a's queen.

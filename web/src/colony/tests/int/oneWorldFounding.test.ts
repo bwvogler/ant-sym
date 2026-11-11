@@ -8,11 +8,11 @@ import { CRUST, generateCurtain, generateOneWorld, growWorld, STRIP, type OneWor
 import type { Flight } from "../../royal.ts";
 import { cellAt, nearestValid } from "../../transect.ts";
 import { AIR, disc, mulberry32, openCell, OPEN, reachable, reachableFrom, rockAt, type WorldMap } from "../../world.ts";
+import { DT } from "../builders.ts";
 
 // Founding on the line (U4a, ja-lp4.4.1; docs/one-world.md §3): the world grows at an end, nothing already there moves,
 // and a queen with nowhere to land is lost with the reason. One world on the default plane, with its real rock.
 
-const DT = 1 / 30;
 const FOOD = 2;
 
 /** A one-world game of few ants (the geometry is what is tested; the colonies only need to live). */

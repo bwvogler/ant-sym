@@ -3,23 +3,19 @@ import assert from "node:assert/strict";
 import { Colony, CORPSE_ROT, LIFESPAN, MIDDEN_AT, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game, nearestRival } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
-import { generateSideWorld, isSky, mulberry32, OPEN, rockAt, takeFoodCell, type WorldMap } from "../../world.ts";
+import { generateSideWorld, isSky, mulberry32, takeFoodCell} from "../../world.ts";
+import { SMALL_SIDE, walkway } from "../builders.ts";
 
 // Nest slice 7 (docs/nest-and-home.md §3.7): the dead lie where they fall until an undertaker (middle-aged) carries
 // them out to the midden past the mound's edge; the midden marks the colony's ground, and raiders shy from it.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 /** The corpses on colony c's midden, one entry each (it keeps a count per cell). */
 const buried = (c: Colony) => [...c.midden].flatMap(([key, n]) => Array.from({ length: n }, () => ({ x: key % 65536, y: Math.floor(key / 65536) })));
 
-function walkway(map: WorldMap, x: number): number {
-  for (let y = 0; y < map.size.h; y++) if (isSky(map, x, y) && rockAt(map, x, y) === OPEN) return y;
-  return -1;
-}
 
 test("the dead are carried out to the midden on the ground, past the mound; soil accounting is untouched", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const g = new Game(map, { antCount: 200, rival: false }, mulberry32(4));
   const c = g.player;
   for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN; // undertakers: the middle-aged
@@ -48,7 +44,7 @@ const middleAged = (c: Colony) => {
 };
 
 test("each colony's midden lies toward the other: a boundary between them", () => {
-  const map = generateSideWorld(2, { ...SMALL, nestCount: 2 });
+  const map = generateSideWorld(2, { ...SMALL_SIDE, nestCount: 2 });
   const g = new Game(map, { antCount: 120, rivalAnts: 120 }, mulberry32(4));
   for (const c of g.colonies) {
     middleAged(c);
@@ -78,7 +74,7 @@ test("each colony's midden lies toward the other: a boundary between them", () =
 });
 
 test("an undertaker that dies leaves the corpse it carried lying; the unclaimed dead rot", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const g = new Game(map, { antCount: 150, rival: false }, mulberry32(4));
   const c = g.player;
   middleAged(c);
@@ -103,7 +99,7 @@ test("an undertaker that dies leaves the corpse it carried lying; the unclaimed 
 test("a corpse lying past the midden is carried back to it, not put down where it lay and picked up again", () => {
   // Review of #26: carried "out to the midden" from beyond it, the drop fired at once, off the midden, and the corpse was
   // picked up again (one nine times); between the midden and MIDDEN_NEAR (100 columns), nothing past it was ever buried.
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const c = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(9), () => "explore");
   c.age[0] = (MIDDLE + 0.1) * LIFESPAN; // old: a forager, out on the ground
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
@@ -133,7 +129,7 @@ test("a corpse lying past the midden is carried back to it, not put down where i
 });
 
 test("raiders leave their own nest and go in at the rival's hole, down toward its chamber", () => {
-  const map = generateSideWorld(1, { ...SMALL, nestCount: 2 });
+  const map = generateSideWorld(1, { ...SMALL_SIDE, nestCount: 2 });
   const g = new Game(map, { antCount: 150, rivalAnts: 150 }, mulberry32(1));
   const [a, b] = g.colonies as [Colony, Colony];
   middleAged(b);
@@ -165,7 +161,7 @@ test("raiders leave their own nest and go in at the rival's hole, down toward it
 test("a raiding colony of every age: the young stay in to nurse, not parked at the hole; the rest go raiding", () => {
   // Review of #26 (blocker): raid stance made every explorer a fighter, the young too. A young raider climbed to its hole,
   // was put back down the shaft (slice 6: it may not go out), and climbed again: 70–93 of ~110 young parked at the hole.
-  const map = generateSideWorld(1, { ...SMALL, nestCount: 2 });
+  const map = generateSideWorld(1, { ...SMALL_SIDE, nestCount: 2 });
   const g = new Game(map, { antCount: 150, rivalAnts: 150 }, mulberry32(1));
   const [a, b] = g.colonies as [Colony, Colony];
   // Ages as a new colony has them (0 to half a lifespan, Colony's constructor): about a third young, every band present.
@@ -211,7 +207,7 @@ test("a raiding colony of every age: the young stay in to nurse, not parked at t
 test("a raid in force gets past the rival's midden and in at its hole", () => {
   // Review of #26: the midden's saturated mark turned back 98 % of raiders at every step onto it: a wall, and no raider
   // ever got into a nest that had one. Now the turn-back falls with the raiders around (a scout shies, a raid presses on).
-  const map = generateSideWorld(1, { ...SMALL, nestCount: 2 });
+  const map = generateSideWorld(1, { ...SMALL_SIDE, nestCount: 2 });
   const g = new Game(map, { antCount: 150, rivalAnts: 150 }, mulberry32(1));
   const [a, b] = g.colonies as [Colony, Colony];
   middleAged(b);
@@ -243,7 +239,7 @@ test("a raid in force gets past the rival's midden and in at its hole", () => {
 
 test("a raider walking at the rival's hole shies from its midden", () => {
   const run = (midden: boolean) => {
-    const map = generateSideWorld(2, { ...SMALL, nestCount: 2 });
+    const map = generateSideWorld(2, { ...SMALL_SIDE, nestCount: 2 });
     const g = new Game(map, { antCount: 1, rivalAnts: 1 }, mulberry32(5));
     const [a, b] = g.colonies as [Colony, Colony];
     a.kill(0);

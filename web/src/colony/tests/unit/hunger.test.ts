@@ -2,15 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LARVA } from "../../brood.ts";
 import { Colony, LIFESPAN } from "../../colony.ts";
-import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
+import { centreX, centreY } from "../../hex.ts";
 import { ADULT_DRAIN, ADULT_DRAIN_OUT, begOf, BEG_BELOW, feel, FeltGrid, LARVA_DRAIN, NEED_FADE, PASS, respond, SHARE_ABOVE, THETA_OLD } from "../../hunger.ts";
-import { digCell, generateSideWorld, mulberry32, OPEN, rockAt } from "../../world.ts";
+import { generateSideWorld, mulberry32} from "../../world.ts";
+import { SMALL_SIDE, broodChamber } from "../builders.ts";
 
 // Energy and hunger (ja-xu6.1, hunger.ts): every adult, larva and the queen has energy, drained with time and refilled by
 // eating; hunger is felt by touch (begging larvae, a queen who can't lay) and passed on; old ants answer it by working
 // inside, above a threshold age raises.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 test("a larva begs only once its energy is low; the response threshold is s²/(s²+θ²); felt need rises fast and fades slowly", () => {
   assert.equal(begOf(1), 0);
@@ -42,26 +42,11 @@ test("the felt grid keeps the strongest on a cell, reads the strongest within on
 
 /** A colony of `n` ants in the small side world, its queen alive, every ant exploring. */
 function colony(n = 1) {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const c = new Colony(map, { antCount: n, maxAnts: n + 4 }, mulberry32(2), () => "explore");
   return { map, c };
 }
 
-/** A brood chamber of three cells dug beside the royal one (to its east), for colony 0 (as in food.test). */
-function broodChamber(map: ReturnType<typeof generateSideWorld>) {
-  const ch = map.chambers!;
-  cellOf(map.nest.x, map.nest.y);
-  const [rx, ry] = [CELL[0] as number, CELL[1] as number];
-  let x = rx;
-  while (rockAt(map, x, ry) === OPEN) x++;
-  digCell(map, x, ry);
-  const b = ch.add(0, ry, "brood");
-  for (let k = 1; k <= 3; k++) {
-    digCell(map, x + k, ry);
-    ch.claim(b.id, x + k, ry, (a, y) => rockAt(map, a, y) === OPEN);
-  }
-  return { b, cell: [x + 2, ry] as const };
-}
 
 test("an ant uses energy, twice as fast outside, eats from food lying within two cells once hungry (not the queen's stock), and shares by mouth", () => {
   const { c } = colony(2);

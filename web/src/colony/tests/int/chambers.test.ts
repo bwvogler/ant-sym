@@ -4,13 +4,13 @@ import { Chambers } from "../../chambers.ts";
 import { builtFloor, Colony, FLOOR_PER_ANT, LIFESPAN, MIDDLE, refilled, ROOMY_DIG, YOUNG } from "../../colony.ts";
 import { nx, ny } from "../../hex.ts";
 import { digCell, fillCell, generateSideWorld, mulberry32, OPEN, rockAt, SOIL } from "../../world.ts";
+import { SMALL_SIDE } from "../builders.ts";
 
 // Nest slice 2 (docs/nest-and-home.md §3.2): the side view's nest is chambers the ants dig, regulated by floor per worker.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 test("chambers: the founding chamber is the colony's royal one with a floor; a floor cell dug out from under stops being floor; a filled cell leaves", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const ch = map.chambers!;
   const c0 = ch.list[0]!;
   assert.equal(c0.colony, 0);
@@ -55,7 +55,7 @@ test("chambers: the founding chamber is the colony's royal one with a floor; a f
 });
 
 test("soil put back under a chamber cell stays put for good; put back elsewhere, only for BACKFILL.hold (floor fills were dug out again at 2–7× the rate of others)", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const ch = map.chambers!;
   const c0 = ch.list[0]!;
   // A cell under the founding chamber's floor, dug out (a tunnel down) and filled back at 10 s.
@@ -88,7 +88,7 @@ test("a roomy nest barely digs (ja-wii): the same few ants dig far less when the
   const dug = (chambers: boolean) => {
     let s = 0;
     for (const seed of [6, 7, 8, 9]) {
-      const map = generateSideWorld(2, SMALL);
+      const map = generateSideWorld(2, SMALL_SIDE);
       if (!chambers) map.chambers = undefined; // no chambers: never roomy (as before slice 2)
       const c = new Colony(map, { antCount: 30, maxAnts: 30 }, mulberry32(seed));
       // All middle-aged (diggers, slice 6): this is about how much a nest digs, not who digs.

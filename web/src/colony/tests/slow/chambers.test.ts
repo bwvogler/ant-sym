@@ -4,11 +4,11 @@ import { CHAMBER_MIN_DEPTH, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { nx, ny } from "../../hex.ts";
 import { generateSideWorld, groundTop, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
+import { SMALL_SIDE } from "../builders.ts";
 
 // Nest slice 2 (docs/nest-and-home.md §3.2): whole-colony chamber tests, too slow for `npm test`'s 60 s per file
 // (`npm run test:slow`). The rest are in ../int/chambers.test.ts.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 /** The ground's top in column x as dug: under the mound's loose soil (what a chamber's depth is measured from). */
 function soilTop(map: WorldMap, x: number): number {
@@ -57,7 +57,7 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   const growth: number[] = [];
   const stacked: number[] = [];
   for (const seed of [4, 5, 6]) {
-    const map = generateSideWorld(2, SMALL);
+    const map = generateSideWorld(2, SMALL_SIDE);
     const g = new Game(map, { antCount: 400, rival: false }, mulberry32(seed));
     const ch = map.chambers!;
     const floor0 = ch.floorOf[0]!;
@@ -125,7 +125,7 @@ test("two crowded colonies on several maps: no chamber touches another, of eithe
   // beside it; a stale aim forcing a dig), and widening dug a chamber 4 rows under the ground beside the shaft, its depth
   // read from the mound's top and only where a chamber starts.
   for (const world of [1, 2]) {
-    const map = generateSideWorld(world, { ...SMALL, nestCount: 2 });
+    const map = generateSideWorld(world, { ...SMALL_SIDE, nestCount: 2 });
     const g = new Game(map, { antCount: 200, rivalAnts: 200 }, mulberry32(world + 10));
     for (const c of g.colonies)
       for (let i = 0; i < c.n; i++) {

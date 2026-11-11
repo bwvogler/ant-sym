@@ -6,7 +6,8 @@ import { Fungus, STRAINS, preset } from "../../fungus.ts";
 import { compose, LEVERS } from "../../levers.ts";
 import { Pheromones } from "../../pheromone.ts";
 import { Recognition } from "../../recognition.ts";
-import { mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
+import { mulberry32, type WorldMap } from "../../world.ts";
+import { arena } from "../builders.ts";
 
 /** Every host runs its strain's default intervention. */
 /** Every host runs its strain's default preset (Fungus.resolve). */
@@ -16,9 +17,6 @@ const strainDefault = () => "default";
 // quieter trail (C1), a carrier leaking its food trail into the other
 // colony's field (C2), and a fight that does not raise the alarm (C3).
 
-function arena(): WorldMap {
-  return worldFromArrays({ w: 40, h: 12 }, [{ x: 4, y: 6.5, r: 2 }, { x: 36, y: 6.5, r: 2 }]);
-}
 
 /** One ant walking east along y = 6.5 from x = 10 for a second, nothing to steer it. */
 function walker(map: WorldMap, carrying: boolean) {
@@ -32,7 +30,7 @@ function walker(map: WorldMap, carrying: boolean) {
 
 test("deposit gain: a host lays its trail louder or quieter, and a gain of 1 lays exactly what it did", () => {
   const laid = (gain: number) => {
-    const c = walker(arena(), false);
+    const c = walker(arena(6.5), false);
     c.layGain[0] = gain;
     // Carrying nothing and out from the nest: it walks home along its home vector, laying home trail.
     for (let k = 0; k < 30; k++) c.tick(1 / 30);
@@ -46,7 +44,7 @@ test("deposit gain: a host lays its trail louder or quieter, and a gain of 1 lay
 
 test("cross-laying: a carrier leaks its food trail into the other colony's field along its path; as-is it leaks nothing", () => {
   const run = (leak: number) => {
-    const map = arena();
+    const map = arena(6.5);
     const c = walker(map, true);
     const rival = new Pheromones(map);
     c.foreign = rival;
@@ -64,7 +62,7 @@ test("cross-laying: a carrier leaks its food trail into the other colony's field
 });
 
 test("silent fights: a quiet host lays no alarm, so a skirmish recruits fewer defenders", () => {
-  const map = arena();
+  const map = arena(6.5);
   // A skirmish at (20, 6); idle nestmates around it, defending: the local rule sends an ant that smells alarm to fight.
   const skirmish = (quiet: number) => {
     const cells: [number, number][] = [[20, 6], [20, 6], [20, 6]];
@@ -105,7 +103,7 @@ test("silent fights: a quiet host lays no alarm, so a skirmish recruits fewer de
 });
 
 test("the fungus writes what a host gives off: share is loud and leaks, soothe fights quietly; a cleared host is as it was", () => {
-  const map = arena();
+  const map = arena(6.5);
   const c = new Colony(map, { antCount: 2, maxAnts: 2 }, mulberry32(4));
   c.x[0] = c.x[1] = 20.5;
   c.y[0] = 3.5;

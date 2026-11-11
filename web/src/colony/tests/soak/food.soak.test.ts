@@ -4,15 +4,15 @@ import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
 import { responses, type Responses } from "../../responses.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { SMALL_SIDE } from "../builders.ts";
 
 // Nest slice 5 (docs/nest-and-home.md §3.6): food lies in chambers. Foragers bring it to reception; porters carry it to
 // where brood and the queen want it, and the rest down to stores; the queen and larvae eat what lies by them.
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
 /** The most food drifted from the map's starting total over a two-colony game, every 5 s: map + jaws + larder + brood (1 + fed each) + 4 a birth. */
 function drift(over?: Partial<Responses>, seconds = 300): { worst: number; g: Game } {
-  const map = generateSideWorld(1, { ...SMALL, nestCount: 2 });
+  const map = generateSideWorld(1, { ...SMALL_SIDE, nestCount: 2 });
   const g = new Game(map, { antCount: 200, rivalAnts: 200 }, mulberry32(7));
   if (over) for (const c of g.colonies) c.responses = responses(over);
   let worst = 0;

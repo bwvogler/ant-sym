@@ -6,13 +6,13 @@ import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { dropFood } from "../../world.ts";
 import { generateWorld, mulberry32 } from "../../world.ts";
+import { DT } from "../builders.ts";
 
 // Site fidelity on one world's plane (ja-lp4.15.3, docs/forager-trips.md §3, PRD §58): a forager that picks up food keeps
 // its own vector to the spot (where it stood less where its vector put its hole), walks it straight on its next trip out,
 // searches round the spot, and lets a food trail take over; forgets the spot when it tires there, replaces it at its
 // next find. A rock-free small plane (160 × 100, seed 7), no food but what a test drops, every ant young but ant 0.
 
-const DT = 1 / 30;
 const EXPLORE = MODES.indexOf("explore");
 const FOLLOW = MODES.indexOf("follow");
 

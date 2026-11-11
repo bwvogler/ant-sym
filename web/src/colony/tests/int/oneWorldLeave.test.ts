@@ -1,11 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, FAINT, LIFESPAN, MIDDLE, MODES, PLANE, WAIT_STEPS, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { CURTAIN, FAINT, MODES, PLANE, WAIT_STEPS, type Colony, type Layer } from "../../colony.ts";
 import { Game, gameRng } from "../../game.ts";
-import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance } from "../../hex.ts";
-import { generateOneWorld, type OneWorld } from "../../oneWorld.ts";
+import { CELL, cellOf, discOffsets, hexDistance } from "../../hex.ts";
 import { localResponses, responses, type Where } from "../../responses.ts";
-import { decode, encode } from "../../save.ts";
+import { DT, ageOf, curtainHole, editPrivate, own, planeHole, run, smallOne } from "../builders.ts";
 
 // Activation in one world (ja-web, PRD §48.6): every outgoing forager passes a gate at the top of its own shaft, within
 // WAIT_STEPS of its hole. There it waits, asked `leave`: it goes out on meeting carriers that come down with food, as a
@@ -13,16 +12,14 @@ import { decode, encode } from "../../save.ts";
 // at its hole, and is recruited by it. A carrier that came down with food has a pass back out. Seed 7's small plane, as
 // oneWorldGame.test.ts.
 
-const DT = 1 / 30;
 const SEED = 7;
 const EXPLORE = MODES.indexOf("explore");
 const RETURN = MODES.indexOf("return");
 const FIGHT = MODES.indexOf("fight");
 
-const small = (seed = SEED): OneWorld => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } });
 /** A small one-world game with every ant young (they stay in), but for those a test makes old; no scouts unless a test sets them. */
 const game = (ants = 10): Game => {
-  const g = new Game(small(), { antCount: ants, rivalAnts: ants, regrow: 0 }, gameRng(SEED));
+  const g = new Game(smallOne(), { antCount: ants, rivalAnts: ants, regrow: 0 }, gameRng(SEED));
   for (const c of g.colonies) {
     for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(0);
     c.params.scoutRate = 0;
@@ -30,11 +27,6 @@ const game = (ants = 10): Game => {
   }
   return g;
 };
-/** An age in band b (0 young, 1 middle-aged, 2 old) that every founder's lifespan outlasts. */
-const ageOf = (b: 0 | 1 | 2) => [0.05, (0.15 + MIDDLE) / 2, 0.5][b]! * LIFESPAN;
-const own = (c: Colony): HoleCell => c.holeCells[c.params.nest] as HoleCell;
-const curtainHole = (h: HoleCell) => ({ x: centreX(h.col, h.row), y: centreY(h.row) });
-const planeHole = (h: HoleCell) => ({ x: centreX(h.px, h.py), y: centreY(h.py) });
 /** Steps (hex) from ant i of c, in the curtain, to its hole's cell: at most WAIT_STEPS at the gate (the tunnels' way is never shorter). */
 const fromHole = (c: Colony, i: number): number => {
   cellOf(c.x[i]!, c.y[i]!);
@@ -48,15 +40,6 @@ const toGate = (c: Colony, i: number): void => {
   c.putAnt(i, CURTAIN, at.x, at.y);
   c.mode[i] = EXPLORE;
   c.heading[i] = -Math.PI / 2;
-};
-/** Run g for `seconds`, calling `each` after every tick; stop early once `until` holds. Returns the seconds run. */
-const run = (g: Game, seconds: number, each?: () => void, until?: () => boolean): number => {
-  for (let k = 0; k < Math.round(seconds / DT); k++) {
-    if (until?.()) return k * DT;
-    g.tick(DT);
-    each?.();
-  }
-  return seconds;
 };
 /** Carriers `ants` of c (old, empty-jawed spares) come down its hole with food, one each `every` seconds in turn, for `seconds`. */
 const carriersDown = (g: Game, c: Colony, ants: readonly number[], seconds: number, every = 0.2): void => {
@@ -74,14 +57,6 @@ const carriersDown = (g: Game, c: Colony, ants: readonly number[], seconds: numb
     }
     g.tick(DT);
   }
-};
-/** The colony's private fields `keys`, decoded; `edit` changes them, and they are put back (as oneWorldGame.test.ts: no test hook). */
-const editPrivate = (c: Colony, keys: readonly string[], edit: (r: Record<string, unknown>) => void): void => {
-  const saved = c.saveState().private as Record<string, unknown>;
-  const r: Record<string, unknown> = {};
-  for (const k of keys) r[k] = decode(saved[k]);
-  edit(r);
-  c.loadState({ fields: {}, private: Object.fromEntries(keys.map((k) => [k, encode(r[k])])) });
 };
 
 test("one world: a rested forager is held at the top of its shaft until carriers come down with food, then goes out", () => {

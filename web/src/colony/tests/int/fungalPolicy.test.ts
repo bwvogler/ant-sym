@@ -8,8 +8,9 @@ import { DEFAULT_MENU, DORMANT_SHOW, Fungus, LETHAL, LEVERS, STRAINS, preset } f
 import { AS_IS, compose, CUSTOM, decodeLevels, encodeLevels, PRESETS, presetOf, pulled } from "../../levers.ts";
 import { Game } from "../../game.ts";
 import { Recognition } from "../../recognition.ts";
-import { generateWorld, mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
-import { at, put } from "../hexmaps.ts";
+import { generateWorld, mulberry32, type WorldMap } from "../../world.ts";
+import { at} from "../hexmaps.ts";
+import { arena, placedAt } from "../builders.ts";
 
 // The fungus policy (ja-t4d.5; levers, ja-lo8.4): a level for every lever per host, from what the fungus senses inside
 // that host; levers off the player's menu stay as they are.
@@ -17,19 +18,8 @@ import { at, put } from "../hexmaps.ts";
 const ID = (id: string) => STRAINS.findIndex((s) => s.id === id);
 const sit = (s: Partial<FungalSituation> = {}): FungalSituation => ({ arousal: "calm", touch: "none", place: "outside", task: "forager", carrying: "nothing", groomed: false, ...s });
 
-function arena(): WorldMap {
-  return worldFromArrays({ w: 40, h: 12 }, [{ x: 4, y: 6.5, r: 2 }, { x: 36, y: 6.5, r: 2 }]);
-}
 
-function placed(map: WorldMap, nest: number, odour: number, cells: [number, number][]): Colony {
-  const c = new Colony(map, { antCount: Math.max(1, cells.length), maxAnts: Math.max(1, cells.length), nest, odour }, mulberry32(3 + nest));
-  for (let i = 0; i < c.n; i++) {
-    const cell = cells[i];
-    c.alive[i] = cell ? 1 : 0;
-    if (cell) put(c, i, cell[0], cell[1]);
-  }
-  return c;
-}
+const placed = (map: WorldMap, nest: number, odour: number, cells: [number, number][]): Colony => placedAt(map, cells, { nest, odour, seed: 3 + nest });
 
 test("fungal situations: 864, and each encodes and decodes to itself", () => {
   assert.equal(FUNGAL_SITUATIONS, 864);
@@ -107,7 +97,7 @@ test("the local rule: each strain's default preset, unless the player hides groo
 });
 
 test("the gate: whatever a policy answers, a host pulls only levers on the menu; lethal ones start off", () => {
-  const map = arena();
+  const map = arena(6.5);
   const f = new Fungus(map);
   assert.equal(f.menu.has("weapon"), false);
   assert.equal(f.menu.has("crown"), false);
@@ -130,7 +120,7 @@ test("the gate: whatever a policy answers, a host pulls only levers on the menu;
 });
 
 test("what the fungus senses is its host's body, never its mode, and nothing map-wide", () => {
-  const map = arena();
+  const map = arena(6.5);
   const sense = (setup: (a: Colony, b: Colony) => void) => {
     const a = placed(map, 0, 0, [[20, 6], [3, 3]]);
     const b = placed(map, 1, 1, [[30, 2]]);
@@ -172,7 +162,7 @@ test("what the fungus senses is its host's body, never its mode, and nothing map
 });
 
 test("groomed: a host among nestmates is groomed whether or not it hides (judged at its strain's visibility); hiding only shows them less", () => {
-  const map = arena();
+  const map = arena(6.5);
   const groomed = (hide: boolean) => {
     const c = placed(map, 0, 0, [[20, 6], [20, 6], [20, 6]]);
     c.load[0] = 0.8;
@@ -206,11 +196,11 @@ test("hiding protects a visible strain: Bloom hidden from its groomers keeps mor
 
 test("hiding needs its lever: with 'fungus showing' off the menu, a dormant host shows its strain's full visibility", () => {
   const load = (menu: string[]) => {
-    const c = placed(arena(), 0, 0, [[20, 6], [20, 6], [20, 6]]);
+    const c = placed(arena(6.5), 0, 0, [[20, 6], [20, 6], [20, 6]]);
     c.load[0] = 0.8;
     c.strain[0] = ID("garden");
     c.resist[1] = c.resist[2] = 1;
-    const g = new Fungus(arena());
+    const g = new Fungus(arena(6.5));
     g.configure({ hide: true, cull: false }, menu);
     g.policy = () => "dormant";
     g.hosts = 1;
@@ -222,7 +212,7 @@ test("hiding needs its lever: with 'fungus showing' off the menu, a dormant host
 });
 
 test("cull: the host's odour is pushed past tolerance from its own nest, so its own colony fights it", () => {
-  const map = arena();
+  const map = arena(6.5);
   const c = placed(map, 0, 0, [[20, 6], [20, 6], [20, 6]]);
   const rec = new Recognition();
   c.estrange[0] = 1;
@@ -236,7 +226,7 @@ test("cull: the host's odour is pushed past tolerance from its own nest, so its 
 
 test("cull bites from a high load: at 0.7 its own nestmates already take it for a stranger", () => {
   for (const l of [0.7, 0.75, 1]) {
-    const map = arena();
+    const map = arena(6.5);
     const c = placed(map, 0, 0, [[20, 6], [20, 6], [20, 6]]);
     const f = new Fungus(map);
     f.configure(DEFAULT_RULE, [...f.menu, "weapon"]);

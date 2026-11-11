@@ -6,22 +6,18 @@ import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { hashGame } from "../saveHash.ts";
+import { DT, run, ticks } from "../builders.ts";
 
 // One-world saves (U4b, ja-lp4.4.2; docs/one-world.md §4): run, save, load into a game built afresh from the same seed
 // and options, run on. The result must hash as the unbroken run on both layers: the plane, the curtain as dug and grown,
 // the line, every colony's scent on each layer, the fungus on each map, the grids and bands. Saving the loaded game must
 // give the same save, field for field. The mutations (oneWorldSaveMutations.test.ts) show each part is needed.
 
-const DT = 1 / 30;
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** Seed 7's small plane (160 × 100): two nests well inside it, quick to run. */
 const small = (ants = 60, autoFound = true): Game => new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: ants, rivalAnts: ants, autoFound }, gameRng(7));
 
-const ticks = (g: Game, n: number): void => {
-  for (let k = 0; k < n; k++) g.tick(DT);
-};
-const run = (g: Game, seconds: number): void => ticks(g, Math.round(seconds / DT));
 const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
 
 /**

@@ -4,17 +4,12 @@ import { Colony, HOLE_SIGHT } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, NE, nx, ny } from "../../hex.ts";
 import { generateSideWorld, generateWorld, groundTop, isSky, mulberry32, OPEN, rockAt, SOIL, updateSurface, type WorldMap } from "../../world.ts";
+import { SMALL_SIDE, walkway } from "../builders.ts";
 
 // Nest slice 1 (docs/nest-and-home.md §3.1): in the side view an ant knows where home is only by its own drifting
 // home vector, corrected by local cues (the hole in sight, a strong nest trail underground). Depth never drifts (gravity).
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 
-/** The walkway cell of column x: the open sky cell just above the ground. */
-function walkway(map: WorldMap, x: number): number {
-  for (let y = 0; y < map.size.h; y++) if (isSky(map, x, y) && rockAt(map, x, y) === OPEN) return y;
-  return -1;
-}
 
 function onWalkway(c: Colony, x: number): void {
   const y = walkway(c.map, x);
@@ -23,7 +18,7 @@ function onWalkway(c: Colony, x: number): void {
 }
 
 test("the surface vector: its error grows with the way out, starts afresh coming up out of the hole, and is fixed on the way home", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
   const ex = CELL[0] as number;
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(5), () => "explore");
@@ -54,7 +49,7 @@ test("the surface vector: its error grows with the way out, starts afresh coming
 });
 
 test("a carrier whose vector is 12 cells off walks to where it believes the hole is, finds nothing, searches, and gets home", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
   const ex = CELL[0] as number;
   const ent = map.nest.entrance!;
@@ -80,7 +75,7 @@ test("a carrier whose vector is 12 cells off walks to where it believes the hole
 });
 
 test("road signs: underground, a strong nest trail underfoot fades the in-nest memory's error; with none it stays", () => {
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const n = map.nest;
   const run = (scent: number) => {
     const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(4), () => "return");
@@ -208,7 +203,7 @@ test("Bug2 on the ground tries the other side: blocked by a pillar with the way 
   // it had. One hand climbs it; the other walks east along the flat ground, away. That one turns back after GROUND_FLIP
   // cells; with equal legs it turned again exactly where it started, at the pillar's foot, and shuttled for good.
   const runs = [-1, 1].map((hand) => {
-    const map = generateSideWorld(2, SMALL);
+    const map = generateSideWorld(2, SMALL_SIDE);
     cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
     pillar(map, (CELL[0] as number) + 30, 2, 20);
     return carrierHome(map, 40, 0, 90, (c) => (c.hand[0] = hand));
@@ -242,7 +237,7 @@ test("a carrier whose vector is far off still gets home: 90 and 150 cells either
 });
 
 test("only its own hole resets the surface vector: up out of another, the error stands (review of #20)", () => {
-  const map = generateSideWorld(2, { ...SMALL, nestCount: 2 });
+  const map = generateSideWorld(2, { ...SMALL_SIDE, nestCount: 2 });
   const [own, other] = map.nests;
   const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(5), () => "explore");
   const up = (n: typeof own) => {
@@ -277,7 +272,7 @@ test("in the side view a searching ant on the home trail still steers by its vec
   // One world U3b lets the home trail lead a searching ant on the plane (oneWorldHoming.test.ts); the side view keeps its
   // split, the trail a hint at 0.25 of its turning and the vector 0.8. The side view reaches that branch searching on a
   // home trail in open ground underground (side seed 1: 56 times in 240 s), where the fast golden never does.
-  const map = generateSideWorld(2, SMALL);
+  const map = generateSideWorld(2, SMALL_SIDE);
   const n = map.nest;
   cellOf(n.x, n.y);
   const cx = CELL[0] as number;

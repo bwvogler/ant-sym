@@ -1,48 +1,32 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, LIFESPAN, MIDDLE, MODES, PLANE, type Colony, type Corpse, type HoleCell } from "../../colony.ts";
+import { CURTAIN, MODES, PLANE, type Colony, type Corpse} from "../../colony.ts";
 import { localResponses, type Responses } from "../../responses.ts";
 import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance } from "../../hex.ts";
-import { generateOneWorld, type OneWorld } from "../../oneWorld.ts";
-import { decode, encode } from "../../save.ts";
 import { heapPlane, OPEN, rockAt } from "../../world.ts";
+import { DT, ageOf, curtainHole, editPrivate, own, planeHole, smallOne } from "../builders.ts";
 
 // One world U3c (ja-lp4.3.3): targeted guards for the plane's mound and midden gates that only the one-world golden held
 // (review of #61, S1 and N1, N3, N5). Each fails with the gate it names removed. The small seed-7 plane of
 // oneWorldMound.test.ts: the player's hole is at plane cell (48, 32).
 
-const DT = 1 / 30;
 const RETURN = MODES.indexOf("return");
 const EXPLORE = MODES.indexOf("explore");
 /** colony.ts's #soil codes (private): a dug pellet, and a loose one taken down to backfill. */
 const SOIL_DUG = 0;
 const SOIL_FILL = 2;
 
-const small = (seed = 7): OneWorld => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } });
-/** An age in band b (0 young, 1 middle-aged, 2 old) that every founder's lifespan outlasts. */
-const ageOf = (b: 0 | 1 | 2) => [0.05, (0.15 + MIDDLE) / 2, 0.5][b]! * LIFESPAN;
 /** A game of few ants, every founder young (they stay in) but those a test moves. */
 function quiet(seed = 7, ants = 10): Game {
-  const g = new Game(small(seed), { antCount: ants, rivalAnts: 10, regrow: 0 }, gameRng(seed));
+  const g = new Game(smallOne(seed), { antCount: ants, rivalAnts: 10, regrow: 0 }, gameRng(seed));
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(0);
   return g;
 }
-const own = (c: Colony): HoleCell => c.holeCells[c.params.nest] as HoleCell;
-const curtainHole = (h: HoleCell) => ({ x: centreX(h.col, h.row), y: centreY(h.row) });
-const planeHole = (h: HoleCell) => ({ x: centreX(h.px, h.py), y: centreY(h.py) });
 const holesOf = (c: Colony) => c.holeCells.map((h) => ({ x: h.px, y: h.py }));
 const cellOfAnt = (c: Colony, i: number): [number, number] => {
   cellOf(c.x[i] as number, c.y[i] as number);
   return [CELL[0] as number, CELL[1] as number];
-};
-/** The colony's private fields `keys`, decoded; `edit` changes them, and they are put back (as oneWorldGame.test.ts). */
-const editPrivate = (c: Colony, keys: readonly string[], edit: (r: Record<string, unknown>) => void): void => {
-  const saved = c.saveState().private as Record<string, unknown>;
-  const r: Record<string, unknown> = {};
-  for (const k of keys) r[k] = decode(saved[k]);
-  edit(r);
-  c.loadState({ fields: {}, private: Object.fromEntries(keys.map((k) => [k, encode(r[k])])) });
 };
 /** Ant i of c, on the plane at (x, y), carrying a pellet of soil kind `soil`. */
 function withPellet(c: Colony, i: number, x: number, y: number, soil: number): void {
