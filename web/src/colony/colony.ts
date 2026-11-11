@@ -250,6 +250,24 @@ export interface ColonyParams {
    */
   leaveGate: number;
   /**
+   * One world's plane (ja-lp4.11, docs/nest-search.md): a homing ant whose vector ran out where no hole was searches in
+   * loops out from that spot and back (Wehner & Srinivasan 1981; Müller & Wehner 1994), the first reaching this many σ
+   * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × odoSurf; Merkle & Wehner 2010: the
+   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit.
+   */
+  searchLoops: number;
+  /** One world's plane: each next loop reaches this many σ further out than the last (searchLoops) */
+  searchGrow: number;
+  /** One world's plane: radians between one loop's heading and the next's (the golden angle spreads them evenly round) */
+  searchTurn: number;
+  /** One world's plane: a loop's width (radians): out at its heading − half of it, across to + half, back to the centre */
+  searchPetal: number;
+  /**
+   * One world's plane, with searchLoops: a homing ant no nearer its search's point for SEARCH_STALL seconds moves on to the
+   * loop's next point (1), or starts the next, wider loop (0: U3b's widening on a stall, as loops).
+   */
+  searchStall: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -307,7 +325,12 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
 }
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+/** One world's plane, with loops (searchLoops): within this (world units) of a loop's point, the ant is there and goes on to the next. */
+const LOOP_AT = 2;
+/** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -524,8 +547,10 @@ export class Colony {
   driftNest: Float32Array;
   /** cells added to the believed goal while searching round it (it got there and found nothing): grows, alternating sides; on one world's plane, the loop's reach */
   search: Float32Array;
-  /** one world's plane: the direction of the search's current point from where the vector ran out (a quarter turn more each time) */
+  /** one world's plane: the direction of the search's current point from where the vector ran out (a quarter turn more each time); with loops (searchLoops), the first loop's heading */
   searchA: Float32Array;
+  /** one world's plane, with loops (searchLoops): the search's point, counted from its start, three a loop (out, across, back to the centre) */
+  searchLeg: Uint32Array;
   /** 1 while the ant is underground (the last tick), so coming up out of the hole is seen */
   #under: Uint8Array;
   /** the side view: a homing ant following the ground's surface round spoil to the hole: the nearness (#holeMetric) it must beat to let go; NaN = not following */
@@ -958,6 +983,7 @@ export class Colony {
     this.driftNest = new Float32Array(n);
     this.search = new Float32Array(n);
     this.searchA = new Float32Array(n);
+    this.searchLeg = new Uint32Array(n);
     this.#under = new Uint8Array(n);
     this.#groundMin = new Float64Array(n).fill(NaN); // float64: compared with the metric itself (float32 rounding let the ant "beat" it on the cell it was set at)
     this.#groundT = new Uint16Array(n);
@@ -2614,8 +2640,17 @@ export class Colony {
     const d = Math.hypot(x - goal.x, y - goal.y);
     if (d < HOLE_SIGHT || (d < NEST_SIGHT && this.#clearTo(x, y, goal.x, goal.y))) return goal;
     const odo = this.odoSurf[i] as number;
-    const s = this.search[i] as number;
-    const a = this.searchA[i] as number;
+    let s = this.search[i] as number;
+    let a = this.searchA[i] as number;
+    const p = this.params;
+    if (p.searchLoops > 0 && s !== 0) {
+      // Loops (ja-lp4.11): loop k heads searchTurn × k on from the first; out to its reach at the heading − half its
+      // width, across to + half, then back to where the vector ran out.
+      const n = this.searchLeg[i] as number;
+      const leg = n % 3;
+      if (leg === 2) s = 0;
+      else a += ((n - leg) / 3) * p.searchTurn + (leg === 0 ? -0.5 : 0.5) * p.searchPetal;
+    }
     const b = this.#belief;
     // Never past the plane's edges (as the side view's ground's ends): the search is centred on the point it can reach.
     const lo = EDGE;
@@ -2639,9 +2674,21 @@ export class Colony {
    * centre and never goes back to it (docs/nest-and-home.md §1, §3.1; centred loops are ja-lp4.11). No random draw there.
    * It also searches on whenever it gets no nearer its point for SEARCH_STALL seconds, and the home trail leads it (tick).
    */
-  #searchOn(i: number): void {
+  #searchOn(i: number, stalled = false): void {
     const s = this.search[i] as number;
-    if (this.line !== null && this.#cur === PLANE) {
+    const p = this.params;
+    if (this.line !== null && this.#cur === PLANE && p.searchLoops > 0) {
+      // Loops (ja-lp4.11, docs/nest-search.md): the next point, three a loop; stalled, with searchStall 0, the next loop's
+      // first. The first loop heads the way the ant faces (no random draw). Each loop reaches searchLoops σ + searchGrow σ
+      // a loop, σ from its own trip (the vector's error per axis), at least SEARCH_START; no cap but the plane's longer side.
+      const leg = this.searchLeg[i] as number;
+      const n = s === 0 ? 0 : stalled && p.searchStall === 0 ? leg - (leg % 3) + 3 : leg + 1;
+      if (s === 0) this.searchA[i] = this.heading[i] as number;
+      this.searchLeg[i] = n;
+      const sigma = PI_DRIFT_2D * (this.odoSurf[i] as number);
+      const { w, h } = this.map.size;
+      this.search[i] = Math.min(Math.max(w, h * R), Math.max(SEARCH_START, sigma * (p.searchLoops + p.searchGrow * Math.floor(n / 3))));
+    } else if (this.line !== null && this.#cur === PLANE) {
       const { w, h } = this.map.size;
       this.searchA[i] = s === 0 ? (this.heading[i] as number) : (this.searchA[i] as number) + Math.PI / 2;
       // A safety cap at the plane's longer side: games don't reach it (no search passed 100 cells in seeds 1–3, review of #60).
@@ -4953,7 +5000,7 @@ export class Colony {
         // plane's edge), but most firings are away from the belief: on seed 1 (120 s) 596, 81 % more than 10 cells from it,
         // 92 cutting short a walk round rock (review of #60). Narrower versions delivered about the same (seeds 1–3), so
         // it stays a general "search sooner when blocked" rule.
-        if (nest !== goal && (this.stallT[i] as number) > SEARCH_STALL && this.line !== null && this.#cur === PLANE) this.#searchOn(i);
+        if (nest !== goal && (this.stallT[i] as number) > SEARCH_STALL && this.line !== null && this.#cur === PLANE) this.#searchOn(i, true);
         if (this.#entrance && (this.wall[i] !== 0 || detouring)) {
           // On the ground line it homes cell by cell (see #walkTunnel): no walls to follow, no detour to wander (an
           // explorer's detour, run up bumping round, used to carry on once it had food, and walk it away from the hole).
@@ -5014,7 +5061,9 @@ export class Colony {
             h = turnToward(h, toNest, p.turnRate * dt * 0.8 * (1 - p.homeTrail));
           } else {
             // Where it believed home was, and nothing there (the side view's drifting vector): search round it.
-            if (nest !== goal && Math.hypot(nest.x - x, nest.y - y) < 1) this.#searchOn(i);
+            // (On one world's plane with loops, within LOOP_AT: at its speed it turns no tighter than ~1.2 cells, and circled
+            // a point 1 away until it stalled.)
+            if (nest !== goal && Math.hypot(nest.x - x, nest.y - y) < (p.searchLoops > 0 && this.line !== null && this.#cur === PLANE ? LOOP_AT : 1)) this.#searchOn(i);
             // On one world's plane, searching (its vector ran out where no hole was) with the home trail under its antennae and
             // its hole not yet in sight (in sight, it steers for the hole itself: review of #60), the trail leads, with the share
             // of its turning a carrier gives a food trail (homeTrail): route cues and scent first, the vector the fallback

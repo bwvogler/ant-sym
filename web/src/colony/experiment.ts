@@ -1455,8 +1455,8 @@ export const S1_PER_TRIP = 20;
  * with food, homing, their vector as a trip of T out of their own hole leaves it: odoSurf = T, each drift part drawn as
  * the game draws it at the hole (Gaussian, σ = PI_DRIFT/√2, so the miss is σ = 0.1/√2 × T per axis). Each stands at its
  * vector's end (the hole + T × drift: the search's origin), so its search begins there; a draw whose end is off the plane
- * (within 2 of an edge) or in rock is drawn again. Every other ant is young (stays in), with no scouts, so the carriers
- * search alone. Per trip (`t400.home120` …): the share home (down its own hole) within 120 s and within 600 s, the
+ * (within 2 of an edge) or in rock is drawn again. Every other ant is young (stays in), with no scouts, and a carrier home is made young
+ * too, so the carriers search alone. Per trip (`t400.home120` …): the share home (down its own hole) within 120 s and within 600 s, the
  * median time of those home, the search's centredness (`centre`: per carrier with 10 s or more on the plane, the
  * distance of its mean position, sampled each second, from its origin; their mean, in cells) and spread (`spread`: the
  * mean distance from the origin, the same way), and carriers that went down another hole (`wrong`). Target: ≥ 99 % home
@@ -1529,6 +1529,8 @@ export const search1: Assay = {
           if (done[i]) continue;
           if (c.layer[i] !== PLANE) {
             done[i] = 1;
+            // Young from now on, it stays in: carriers home don't go out again to lay trails the searchers would meet.
+            c.age[i] = 0.05 * LIFESPAN;
             // #crossDown puts it at that hole's cell in the curtain.
             if (Math.abs((c.x[i] as number) - centreX(hc.col, hc.row)) < 1e-3 && Math.abs((c.y[i] as number) - centreY(hc.row)) < 1e-3) homeAt[i] = game.time;
             else wrong[i] = 1;

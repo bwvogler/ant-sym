@@ -285,6 +285,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "queens-and-merging", title: "Queens and merging", covers: "Several queens, adoption, and orphaned colonies merging (not built)." },
   { note: "entrances", title: "Entrances", covers: "How many entrances colonies keep, sealing them at night, and what a digger senses near the surface." },
   { note: "one-world", title: "One world", covers: "The surface and a curtain under the line between the holes: one game in two views, above and below (Details → Ground → one world; the page’s default stays the side view until U6). The views are linked, and a one-world game opens above." },
+  { note: "nest-search", title: "Nest search", covers: "How a lost carrier searches when its vector runs out at no hole: loops back through that spot, wider after a longer trip, and its colony's smell on its own mound." },
   { note: "nest-spacing", title: "Nest spacing", covers: "How far apart colonies sit, where young colonies survive, and how far a founding queen flies." },
   { note: "new-queens", title: "New queens", covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built)." },
 ];
