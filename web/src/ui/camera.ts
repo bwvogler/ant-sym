@@ -1,4 +1,3 @@
-
 // The colony field's camera, pure: where the view is centred (in cells) and
 // how many device pixels a cell takes. The field draws through it, pointer
 // events come back through it, and every rule about how far you may zoom or

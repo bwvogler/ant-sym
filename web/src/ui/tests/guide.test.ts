@@ -57,7 +57,9 @@ test("every note in the docs index is in the guide's list", () => {
 });
 
 test("an entry that says a behaviour is still scripted names a gap that is still open in docs/vision.md", () => {
-  const rows = read("vision").split("\n").filter((l) => l.startsWith("|"));
+  const rows = read("vision")
+    .split("\n")
+    .filter((l) => l.startsWith("|"));
   for (const e of GUIDE) {
     if (!e.scripted) continue;
     const open = rows.some((r) => r.includes(`\`${e.scripted!.bead}\``) && !r.startsWith("| ~~"));

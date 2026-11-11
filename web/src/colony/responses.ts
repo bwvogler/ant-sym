@@ -159,7 +159,16 @@ export const localResponses: Responses = {
   trailRate: (t) => (t.carrying === "food" ? TRAIL_BY_QUALITY[t.quality] : 1),
   // Graded (behaviour MR 4; docs/combat.md: low doses attract, ten times more repel): a faint alarm draws an empty-jawed
   // explorer to see, and a follower keeps to its trail; strong alarm repels everyone but fighters and diggers, as before.
-  alarmGain: (t) => (t.mode === "fight" || t.digging ? 0 : t.alarm === "faint" && t.carrying === "none" ? (t.mode === "explore" ? -1 : t.mode === "follow" ? 0 : 1) : 1),
+  alarmGain: (t) =>
+    t.mode === "fight" || t.digging
+      ? 0
+      : t.alarm === "faint" && t.carrying === "none"
+        ? t.mode === "explore"
+          ? -1
+          : t.mode === "follow"
+            ? 0
+            : 1
+        : 1,
   raiseAlarm: () => 1,
   noEntry: () => 1,
   // Behaviour MR 4 (docs/combat.md): before it, every ant with a stranger near fought. Now a carrier takes its load home,
@@ -174,7 +183,18 @@ export const localResponses: Responses = {
   // A raider (mode fight) home on a raid stance goes on a scout's trail (behaviour MR 5.2); a forager answers its returns, and a
   // colony that raids or defends sends it out whatever comes back (MR 5).
   // Each ant's own stance (docs/stance.md): a crowded home with no food coming back sends a waiting forager out as a raid scout.
-  leave: (t) => (t.mode === "fight" ? (t.stance === "raid" && t.raid === "none" ? "wait" : "now") : t.stance !== "forage" || t.returns === "many" ? "now" : t.returns === "few" ? "soon" : t.crowd === "many" ? "raid" : "wait"),
+  leave: (t) =>
+    t.mode === "fight"
+      ? t.stance === "raid" && t.raid === "none"
+        ? "wait"
+        : "now"
+      : t.stance !== "forage" || t.returns === "many"
+        ? "now"
+        : t.returns === "few"
+          ? "soon"
+          : t.crowd === "many"
+            ? "raid"
+            : "wait",
 };
 
 /** Responses with some hooks replaced (experiments, tests, cached answers): the rest stay local. */

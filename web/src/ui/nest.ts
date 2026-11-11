@@ -88,5 +88,12 @@ export function nestView(col: Colony): NestView | null {
   list.sort((a, b) => a.depth - b.depth || a.x - b.x);
   let midden = 0;
   for (const n of col.midden.values()) midden += n;
-  return { chambers: list, queen: col.queen ? (col.queen.alive ? "alive" : "dead") : null, brood: col.brood.counts(), midden, inside: col.inNest, outside: col.outside };
+  return {
+    chambers: list,
+    queen: col.queen ? (col.queen.alive ? "alive" : "dead") : null,
+    brood: col.brood.counts(),
+    midden,
+    inside: col.inNest,
+    outside: col.outside,
+  };
 }

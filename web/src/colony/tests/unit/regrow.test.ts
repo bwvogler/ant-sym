@@ -6,7 +6,6 @@ import { SMALL_SIDE } from "../builders.ts";
 
 // Food regrows (ja-lo8.5, PRD §50.5): the ground's piles grow back toward their first size; off by default.
 
-
 /** Every surface food cell eaten bare, and what was there. */
 function strip(g: Game): number {
   const { w, h } = g.map.size;

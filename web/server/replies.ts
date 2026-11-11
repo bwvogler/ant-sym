@@ -1,4 +1,11 @@
-import { DAILY_BUDGET_USD, DEFAULT_JEV_MODEL, type HealthReply, type JevProxyReply, type JevRequest, type RunRequest } from "../shared/jev.ts";
+import {
+  DAILY_BUDGET_USD,
+  DEFAULT_JEV_MODEL,
+  type HealthReply,
+  type JevProxyReply,
+  type JevRequest,
+  type RunRequest,
+} from "../shared/jev.ts";
 import { HttpError } from "./http.ts";
 import { JevAbortError, type JevCaller } from "./jev.ts";
 import { reserveForBytes, type Ledger } from "./ledger.ts";
@@ -107,7 +114,8 @@ export async function jevReply(svc: Services, raw: unknown): Promise<Reply> {
     throw new HttpError(502, `jev unreachable: ${(e as Error).message}`);
   }
   // A 200 without answers is not an answer; keep the status for the ledger but say so.
-  const body = result.status === 200 && !isJevResponse(result.body) ? { error: "upstream reply had no answers", upstream: result.body } : result.body;
+  const body =
+    result.status === 200 && !isJevResponse(result.body) ? { error: "upstream reply had no answers", upstream: result.body } : result.body;
   svc.ledger.end(token, result);
   const reply: JevProxyReply = { ...result, body: body as JevProxyReply["body"], run: svc.ledger.summary(svc.now()) };
   return { status: 200, body: reply };

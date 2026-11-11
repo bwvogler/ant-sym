@@ -17,7 +17,6 @@ const strainDefault = () => "default";
 // quieter trail (C1), a carrier leaking its food trail into the other
 // colony's field (C2), and a fight that does not raise the alarm (C3).
 
-
 /** One ant walking east along y = 6.5 from x = 10 for a second, nothing to steer it. */
 function walker(map: WorldMap, carrying: boolean) {
   const c = new Colony(map, { antCount: 1, maxAnts: 1, wander: 0 }, mulberry32(5), () => "explore");
@@ -65,9 +64,18 @@ test("silent fights: a quiet host lays no alarm, so a skirmish recruits fewer de
   const map = arena(6.5);
   // A skirmish at (20, 6); idle nestmates around it, defending: the local rule sends an ant that smells alarm to fight.
   const skirmish = (quiet: number) => {
-    const cells: [number, number][] = [[20, 6], [20, 6], [20, 6]];
+    const cells: [number, number][] = [
+      [20, 6],
+      [20, 6],
+      [20, 6],
+    ];
     for (let x = 14; x <= 26; x += 2) cells.push([x, 3], [x, 9]);
-    const mine = new Colony(map, { antCount: cells.length, maxAnts: cells.length, nest: 0, odour: 0, wander: 0, stanceGate: 0 }, mulberry32(8), localPolicy);
+    const mine = new Colony(
+      map,
+      { antCount: cells.length, maxAnts: cells.length, nest: 0, odour: 0, wander: 0, stanceGate: 0 },
+      mulberry32(8),
+      localPolicy,
+    );
     cells.forEach(([x, y], i) => {
       mine.x[i] = x + 0.5;
       mine.y[i] = y + 0.5;
@@ -84,7 +92,14 @@ test("silent fights: a quiet host lays no alarm, so a skirmish recruits fewer de
     rec.build([mine, them]);
     // Half a second of fighting (nobody dies: the dice always say no), then the field spreads.
     for (let k = 0; k < 15; k++) {
-      resolveFights([mine, them], [occupancy(mine, new CountGrid()), occupancy(them, new CountGrid())], 1 / 30, () => 0.999, undefined, rec);
+      resolveFights(
+        [mine, them],
+        [occupancy(mine, new CountGrid()), occupancy(them, new CountGrid())],
+        1 / 30,
+        () => 0.999,
+        undefined,
+        rec,
+      );
       mine.ph.step(1 / 30);
     }
     const alarm = mine.ph.total("alarm");
@@ -119,14 +134,18 @@ test("the fungus writes what a host gives off: share is loud and leaks, soothe f
   f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
   assert.equal(c.expr[0], preset("share"));
-  assert.ok(Math.abs((c.layGain[0]) - 1.5) < 1e-5);
-  assert.ok(Math.abs((c.crossLay[0]) - 1) < 1e-5);
+  assert.ok(Math.abs(c.layGain[0] - 1.5) < 1e-5);
+  assert.ok(Math.abs(c.crossLay[0] - 1) < 1e-5);
   assert.equal(c.quiet[0], 0);
   assert.equal(c.expr[1], preset("soothe"));
-  assert.ok(Math.abs((c.quiet[1]) - 0.45) < 1e-5, "half load, half the quiet");
+  assert.ok(Math.abs(c.quiet[1] - 0.45) < 1e-5, "half load, half the quiet");
   assert.equal(c.layGain[1], 1);
   // Cleared: as it was.
-  const g = new Fungus(map, {}, STRAINS.map((s) => ({ ...s, decay: 1e9 })));
+  const g = new Fungus(
+    map,
+    {},
+    STRAINS.map((s) => ({ ...s, decay: 1e9 })),
+  );
   g.hosts = 2;
   g.step([c], [occupancy(c, new CountGrid())], 0.1);
   for (const i of [0, 1]) assert.deepEqual([c.layGain[i], c.crossLay[i], c.quiet[i]], [1, 0, 0]);

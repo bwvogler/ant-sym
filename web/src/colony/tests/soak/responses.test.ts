@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
 import { choose, Colony, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game } from "../../game.ts";
-import { packResponseRequest, readResponse, RESPONSE_HOOKS, responseContext, responseKey, responsesFromAnswers } from "../../colonyBrain.ts";
+import {
+  packResponseRequest,
+  readResponse,
+  RESPONSE_HOOKS,
+  responseContext,
+  responseKey,
+  responsesFromAnswers,
+} from "../../colonyBrain.ts";
 import { type Item, localResponses, responses, touchKey, type Touch } from "../../responses.ts";
 import { dropFood, foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, nestAt, put } from "../hexmaps.ts";
@@ -20,7 +27,24 @@ function corridor(food = 3): WorldMap {
   return worldFromArrays(size, [nestAt(6, 6, 2)], { food: f });
 }
 
-const touch = (t: Partial<Touch>): Touch => ({ mode: "explore", carrying: "none", porter: false, digging: false, place: "out", offered: "none", enemy: false, stance: "forage", quality: "fair", alarm: "none", odds: "none", returns: "none", raid: "strong", crowd: "few", ...t }) as Touch;
+const touch = (t: Partial<Touch>): Touch =>
+  ({
+    mode: "explore",
+    carrying: "none",
+    porter: false,
+    digging: false,
+    place: "out",
+    offered: "none",
+    enemy: false,
+    stance: "forage",
+    quality: "fair",
+    alarm: "none",
+    odds: "none",
+    returns: "none",
+    raid: "strong",
+    crowd: "few",
+    ...t,
+  }) as Touch;
 
 /** One ant heading east at the food 4 cells away, stepped until it is home with food or `seconds` pass. */
 function forage(c: Colony, seconds = 20): { picked: boolean } {
@@ -40,14 +64,16 @@ test("localResponses are the colony's rules before the hooks", () => {
   assert.equal(localResponses.trailRate(touch({ carrying: "food" })), 1, "fair food lays as before");
   assert.equal(localResponses.get(touch({ offered: "food" })), true);
   assert.equal(localResponses.get(touch({ mode: "fight", offered: "food" })), false, "not mid-fight");
-  for (const offered of ["soil", "corpse", "brood"] as const) assert.equal(localResponses.get(touch({ mode: "fight", offered })), true, `${offered}: the mechanic decides`);
+  for (const offered of ["soil", "corpse", "brood"] as const)
+    assert.equal(localResponses.get(touch({ mode: "fight", offered })), true, `${offered}: the mechanic decides`);
   assert.equal(localResponses.carry(touch({ carrying: "food" })), "take");
   assert.equal(localResponses.carry(touch({ carrying: "corpse" })), "take");
   assert.equal(localResponses.drop(touch({ carrying: "food", place: "chamber" })), true);
   assert.equal(localResponses.trail(touch({ carrying: "food" })), "food");
   assert.equal(localResponses.trail(touch({})), "home");
   assert.equal(localResponses.trail(touch({ carrying: "brood" })), "home", "a nurse marks the way home");
-  for (const t of [touch({ carrying: "soil" }), touch({ carrying: "corpse" }), touch({ carrying: "food", porter: true })]) assert.equal(localResponses.trail(t), "none", JSON.stringify(t));
+  for (const t of [touch({ carrying: "soil" }), touch({ carrying: "corpse" }), touch({ carrying: "food", porter: true })])
+    assert.equal(localResponses.trail(t), "none", JSON.stringify(t));
   assert.equal(localResponses.trailRate(touch({})), 1);
   assert.equal(localResponses.alarmGain(touch({ mode: "fight" })), 0);
   assert.equal(localResponses.alarmGain(touch({ digging: true })), 0);
@@ -146,7 +172,14 @@ test("touch: what a response sees of an ant", () => {
 test("response lanes: one question per situation, cached per hook and doctrine", () => {
   assert.equal(touchKey(touch({ carrying: "food", place: "chamber" })), "explore|food|-|-|chamber|none|clear|forage");
   for (const h of RESPONSE_HOOKS) {
-    const req = packResponseRequest(h, [{ id: "s0", situation: touch({}) }, { id: "s1", situation: touch({ mode: "fight", enemy: true }) }], "Gather food.");
+    const req = packResponseRequest(
+      h,
+      [
+        { id: "s0", situation: touch({}) },
+        { id: "s1", situation: touch({ mode: "fight", enemy: true }) },
+      ],
+      "Gather food.",
+    );
     assert.equal(Object.keys(req.questions).length, 2, h);
     assert.notEqual(responseContext(h, "Gather food."), responseContext(h, "Fight."), "a new doctrine is a new cache");
   }
@@ -169,7 +202,9 @@ test("readResponse: nouls are yes strictly above ½; choices must be one of the 
 test("responsesFromAnswers: cached answers win, the local responses cover the rest, and every lookup is heard", () => {
   const t = touch({ mode: "follow" });
   const heard: string[] = [];
-  const r = responsesFromAnswers({ get: { [touchKey(t)]: false }, trail: { [touchKey(t)]: "none" } }, localResponses, (h, hit) => heard.push(`${h}:${hit}`));
+  const r = responsesFromAnswers({ get: { [touchKey(t)]: false }, trail: { [touchKey(t)]: "none" } }, localResponses, (h, hit) =>
+    heard.push(`${h}:${hit}`),
+  );
   assert.equal(r.get(t), false);
   assert.equal(r.get(touch({})), true, "not cached: local");
   assert.equal(r.trail(t), "none");
@@ -387,8 +422,14 @@ test("quality: tasted at pickup, carried, offered to get and trailRate, and kept
   });
   const { picked } = forage(c, 20);
   assert.ok(picked);
-  assert.ok(seen.some((s) => s.hook === "get" && s.quality === "rich"), "get is offered rich food");
-  assert.ok(seen.some((s) => s.hook === "trailRate" && s.quality === "rich"), "a carrier of rich food knows it");
+  assert.ok(
+    seen.some((s) => s.hook === "get" && s.quality === "rich"),
+    "get is offered rich food",
+  );
+  assert.ok(
+    seen.some((s) => s.hook === "trailRate" && s.quality === "rich"),
+    "a carrier of rich food knows it",
+  );
   // Put down where it stands, the food keeps its quality, blended by amount with what lies there.
   const m2 = worldFromArrays(size, [nestAt(6, 6, 2)], {});
   const c2 = new Colony(m2, { antCount: 1, wander: 0 }, mulberry32(1));
@@ -468,7 +509,8 @@ test("followChoice (top-down): at a fork a follower mostly takes the stronger tr
     for (let k = 0; k < 9; k++) {
       const y = up ? 10 - k : 10 + k;
       for (let w = -1; w <= 1; w++) c.ph.depositCell("food", x + w, y, level);
-      if (y % 2 === 0) x += up ? 0 : 1; // walk the NE / SE diagonal in offset rows
+      if (y % 2 === 0)
+        x += up ? 0 : 1; // walk the NE / SE diagonal in offset rows
       else x += up ? 1 : 0;
     }
   };
@@ -483,8 +525,8 @@ test("followChoice (top-down): at a fork a follower mostly takes the stronger tr
     branch(c, false, 2);
     put(c, 0, 8, 10);
     c.heading[0] = 0;
-    for (let k = 0; k < 30 * 4 && Math.abs((c.y[0]) - at(8, 10).y) < 5; k++) c.tick(1 / 30);
-    const dy = (c.y[0]) - at(8, 10).y;
+    for (let k = 0; k < 30 * 4 && Math.abs(c.y[0] - at(8, 10).y) < 5; k++) c.tick(1 / 30);
+    const dy = c.y[0] - at(8, 10).y;
     if (dy <= -5) strong++;
     else if (dy >= 5) weak++;
   }
@@ -503,15 +545,27 @@ test("graded alarm (behaviour MR 4): faint draws an empty-jawed explorer, a foll
 
 test("contact (behaviour MR 4): raiders and defenders fight; foraging, every ant turns away", () => {
   assert.equal(localResponses.contact(touch({ stance: "raid", odds: "outnumbered" })), "fight");
-  assert.equal(localResponses.contact(touch({ stance: "raid", carrying: "food", mode: "return" })), "flee", "a carrier takes its load home, raid or not");
+  assert.equal(
+    localResponses.contact(touch({ stance: "raid", carrying: "food", mode: "return" })),
+    "flee",
+    "a carrier takes its load home, raid or not",
+  );
   assert.equal(localResponses.contact(touch({ stance: "defend", odds: "even" })), "fight");
   assert.equal(localResponses.contact(touch({ mode: "fight", odds: "outnumbered" })), "fight", "its policy sent it to fight");
   assert.equal(localResponses.contact(touch({ odds: "outnumbering" })), "flee", "foraging, it turns away even outnumbering");
   assert.equal(localResponses.contact(touch({ odds: "even" })), "flee");
   assert.equal(localResponses.contact(touch({ mode: "follow", odds: "outnumbered" })), "flee");
   assert.equal(localResponses.contact(touch({ carrying: "food", mode: "return", odds: "outnumbering" })), "flee");
-  assert.equal(responseKey("contact", touch({ odds: "even" })), "explore|none|-|-|out|none|clear|forage|alarm:none|odds:even", "the contact lane keys on odds and alarm");
-  assert.equal(responseKey("carry", touch({ odds: "even", alarm: "strong" })), "explore|none|-|-|out|none|clear|forage", "the other lanes, never sent them, don't");
+  assert.equal(
+    responseKey("contact", touch({ odds: "even" })),
+    "explore|none|-|-|out|none|clear|forage|alarm:none|odds:even",
+    "the contact lane keys on odds and alarm",
+  );
+  assert.equal(
+    responseKey("carry", touch({ odds: "even", alarm: "strong" })),
+    "explore|none|-|-|out|none|clear|forage",
+    "the other lanes, never sent them, don't",
+  );
 });
 
 test("the contact lane (behaviour MR 4) is sent alarm and odds; the other lanes are not", () => {
@@ -533,20 +587,41 @@ test("leave (behaviour MR 5): out now on many returns, soon on few, wait on none
   assert.equal(localResponses.leave(touch({ mode: "return", returns: "none", crowd: "many" })), "raid");
   assert.equal(localResponses.leave(touch({ mode: "return", returns: "few", crowd: "many" })), "soon", "food coming back: forage");
   assert.equal(localResponses.leave(touch({ mode: "return", returns: "none", stance: "defend" })), "now");
-  assert.equal(localResponses.leave(touch({ mode: "return", returns: "none", stance: "raid" })), "now", "a forager home on a raid stance goes out whatever comes back (MR 5)");
+  assert.equal(
+    localResponses.leave(touch({ mode: "return", returns: "none", stance: "raid" })),
+    "now",
+    "a forager home on a raid stance goes out whatever comes back (MR 5)",
+  );
   // Raiding (behaviour MR 5.2): a raider home, in mode fight, goes on a scout's raid trail; without one it waits, and the scouts search.
   assert.equal(localResponses.leave(touch({ mode: "fight", stance: "raid", raid: "none" })), "wait");
   assert.equal(localResponses.leave(touch({ mode: "fight", stance: "raid", raid: "faint" })), "now");
   assert.equal(localResponses.leave(touch({ mode: "fight", stance: "raid", raid: "strong" })), "now");
-  assert.equal(responseKey("leave", touch({ mode: "return", returns: "few" })), "return|none|-|-|out|none|clear|forage|returns:few|crowd:few", "a forager's key has its returns and its crowd");
-  assert.equal(responseKey("leave", touch({ mode: "fight", stance: "raid", raid: "faint" })), "fight|none|-|-|out|none|clear|raid|raid:faint", "a raider's key has the raid trail, and no returns");
-  assert.equal(responseKey("get", touch({ returns: "many" })), "explore|none|-|-|out|none|clear|forage", "the other lanes, never sent it, don't");
+  assert.equal(
+    responseKey("leave", touch({ mode: "return", returns: "few" })),
+    "return|none|-|-|out|none|clear|forage|returns:few|crowd:few",
+    "a forager's key has its returns and its crowd",
+  );
+  assert.equal(
+    responseKey("leave", touch({ mode: "fight", stance: "raid", raid: "faint" })),
+    "fight|none|-|-|out|none|clear|raid|raid:faint",
+    "a raider's key has the raid trail, and no returns",
+  );
+  assert.equal(
+    responseKey("get", touch({ returns: "many" })),
+    "explore|none|-|-|out|none|clear|forage",
+    "the other lanes, never sent it, don't",
+  );
   type Ants = { ants: Record<string, Record<string, unknown>> };
-  const l = (packResponseRequest("leave", [{ id: "s0", situation: touch({ mode: "return", returns: "few" }) }], "Gather food.").state as Ants).ants;
+  const l = (
+    packResponseRequest("leave", [{ id: "s0", situation: touch({ mode: "return", returns: "few" }) }], "Gather food.").state as Ants
+  ).ants;
   assert.equal(l.s0?.returns, "few");
   assert.equal(l.s0?.crowd, "few");
   assert.equal(l.s0?.raid, undefined, "a forager is not sent the raid trail");
-  const f = (packResponseRequest("leave", [{ id: "s0", situation: touch({ mode: "fight", stance: "raid", raid: "faint" }) }], "Gather food.").state as Ants).ants;
+  const f = (
+    packResponseRequest("leave", [{ id: "s0", situation: touch({ mode: "fight", stance: "raid", raid: "faint" }) }], "Gather food.")
+      .state as Ants
+  ).ants;
   assert.equal(f.s0?.raid, "faint");
   assert.equal(f.s0?.returns, undefined, "a raider is not sent its returns");
   assert.equal(f.s0?.crowd, undefined, "nor its crowd");

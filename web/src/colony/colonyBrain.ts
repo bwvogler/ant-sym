@@ -1,7 +1,20 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
-import { CARRY, type Carry, CONTACT, type Contact, LEAVE, type Leave, localResponses, responses, touchKey, type Responses, type Touch, type TrailKind } from "./responses.ts";
+import {
+  CARRY,
+  type Carry,
+  CONTACT,
+  type Contact,
+  LEAVE,
+  type Leave,
+  localResponses,
+  responses,
+  touchKey,
+  type Responses,
+  type Touch,
+  type TrailKind,
+} from "./responses.ts";
 
 // The colony's Jev brain, pure. Two choices go to Jev, both as packed
 // requests with one question per *situation* (never per ant or per tick):
@@ -35,9 +48,21 @@ export interface Doctrine {
 }
 
 export const DOCTRINES: Doctrine[] = [
-  { id: "forage", name: "Forage", text: "Gather as much food as possible. Follow a strong food scent; explore when there is none; go home when tired. Fight only an enemy that is close. Raid only when food runs out." },
-  { id: "cautious", name: "Cautious", text: "Safety first. Any alarm scent means go home, unless the colony is defending. Go home when tired. Otherwise follow food scent, even a faint one. Defend the nest; never raid." },
-  { id: "warlike", name: "Warlike", text: "Destroy the rival colony. Explorers become raiders whenever the colony has ants to spare. Follow alarm scent to every fight. Forage only to grow the colony." },
+  {
+    id: "forage",
+    name: "Forage",
+    text: "Gather as much food as possible. Follow a strong food scent; explore when there is none; go home when tired. Fight only an enemy that is close. Raid only when food runs out.",
+  },
+  {
+    id: "cautious",
+    name: "Cautious",
+    text: "Safety first. Any alarm scent means go home, unless the colony is defending. Go home when tired. Otherwise follow food scent, even a faint one. Defend the nest; never raid.",
+  },
+  {
+    id: "warlike",
+    name: "Warlike",
+    text: "Destroy the rival colony. Explorers become raiders whenever the colony has ants to spare. Follow alarm scent to every fight. Forage only to grow the colony.",
+  },
 ];
 
 export const MODE_CRITERIA: Record<Mode, string> = {
@@ -64,7 +89,9 @@ export function situationState(s: Situation): Situation {
 }
 
 export function modeQuestion(id: string): JevRequest["questions"] {
-  return { [`${id}_mode`]: { type: "choice", instructions: `Going by the doctrine, what should ant \`${id}\` do now?`, criteria: MODE_CRITERIA } };
+  return {
+    [`${id}_mode`]: { type: "choice", instructions: `Going by the doctrine, what should ant \`${id}\` do now?`, criteria: MODE_CRITERIA },
+  };
 }
 
 /** One request for many ant situations: one shared state (legend, doctrine, situations), one choice each. */
@@ -91,7 +118,13 @@ export function stanceKey(s: StanceSituation): string {
 }
 
 export function stanceQuestion(id: string): JevRequest["questions"] {
-  return { [`${id}_stance`]: { type: "choice", instructions: `Going by the doctrine, what should colony \`${id}\` do now?`, criteria: STANCE_CRITERIA } };
+  return {
+    [`${id}_stance`]: {
+      type: "choice",
+      instructions: `Going by the doctrine, what should colony \`${id}\` do now?`,
+      criteria: STANCE_CRITERIA,
+    },
+  };
 }
 
 /** One request for many strategist views (normally one or two). */
@@ -134,9 +167,19 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
   const ant = `ant \`${id}\``;
   switch (hook) {
     case "get":
-      return { [`${id}_get`]: { type: "noul", instructions: `Going by the doctrine, ${ant} has empty jaws and the thing named by offered within reach: should it pick it up?` } };
+      return {
+        [`${id}_get`]: {
+          type: "noul",
+          instructions: `Going by the doctrine, ${ant} has empty jaws and the thing named by offered within reach: should it pick it up?`,
+        },
+      };
     case "drop":
-      return { [`${id}_drop`]: { type: "noul", instructions: `Going by the doctrine, ${ant} is carrying food where it can put it down (its nest, or the chamber the food goes to): should it put it down here?` } };
+      return {
+        [`${id}_drop`]: {
+          type: "noul",
+          instructions: `Going by the doctrine, ${ant} is carrying food where it can put it down (its nest, or the chamber the food goes to): should it put it down here?`,
+        },
+      };
     case "carry":
       return {
         [`${id}_carry`]: {
@@ -197,7 +240,18 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
     // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
     // alarm and odds only to `contact`; returns only to `leave`.
     const { offered, quality, alarm, odds, returns, raid, crowd, ...rest } = t;
-    ants[it.id] = hook === "get" ? { ...rest, offered, quality } : hook === "trail" ? { ...rest, quality } : hook === "contact" ? { ...rest, alarm, odds } : hook === "leave" ? (t.mode === "fight" ? { ...rest, raid } : { ...rest, returns, crowd }) : { ...rest };
+    ants[it.id] =
+      hook === "get"
+        ? { ...rest, offered, quality }
+        : hook === "trail"
+          ? { ...rest, quality }
+          : hook === "contact"
+            ? { ...rest, alarm, odds }
+            : hook === "leave"
+              ? t.mode === "fight"
+                ? { ...rest, raid }
+                : { ...rest, returns, crowd }
+              : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
@@ -213,7 +267,11 @@ export function responseContext(hook: ResponseHook, doctrine: string): string {
  * question wording, version, doctrine). A replay refuses a cache whose contexts differ from the code's.
  */
 export function cacheContexts(doctrine: string): Record<"mode" | "stance" | ResponseHook, string> {
-  return { mode: policyContext(doctrine), stance: stanceContext(doctrine), ...(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, responseContext(h, doctrine)])) as Record<ResponseHook, string>) };
+  return {
+    mode: policyContext(doctrine),
+    stance: stanceContext(doctrine),
+    ...(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, responseContext(h, doctrine)])) as Record<ResponseHook, string>),
+  };
 }
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
@@ -240,7 +298,11 @@ export function readResponse(hook: ResponseHook, answers: Record<string, JevAnsw
  * the returns (the other lanes aren't sent them, so they don't key on them: review of #38).
  */
 export function responseKey(hook: ResponseHook, t: Touch): string {
-  return hook === "contact" ? `${touchKey(t)}|alarm:${t.alarm}|odds:${t.odds}` : hook === "leave" ? `${touchKey(t)}|${t.mode === "fight" ? `raid:${t.raid}` : `returns:${t.returns}|crowd:${t.crowd}`}` : touchKey(t);
+  return hook === "contact"
+    ? `${touchKey(t)}|alarm:${t.alarm}|odds:${t.odds}`
+    : hook === "leave"
+      ? `${touchKey(t)}|${t.mode === "fight" ? `raid:${t.raid}` : `returns:${t.returns}|crowd:${t.crowd}`}`
+      : touchKey(t);
 }
 
 /** Cached response answers per hook, keyed by responseKey: what scripts/colony-live.mjs saves and the experiments replay. */
@@ -250,7 +312,11 @@ export type ResponseCache = Partial<Record<ResponseHook, Record<string, Response
  * Responses that answer from a cache, and from `base` for any situation (or hook) the cache lacks. `onLookup`, if
  * given, hears every lookup (hook, and whether the cache had it): the replay's hit rate.
  */
-export function responsesFromAnswers(cache: ResponseCache, base: Responses = localResponses, onLookup?: (hook: ResponseHook, hit: boolean) => void): Responses {
+export function responsesFromAnswers(
+  cache: ResponseCache,
+  base: Responses = localResponses,
+  onLookup?: (hook: ResponseHook, hit: boolean) => void,
+): Responses {
   const over: Partial<Responses> = {};
   for (const hook of RESPONSE_HOOKS) {
     const table = cache[hook];

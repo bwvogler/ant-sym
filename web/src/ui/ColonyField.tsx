@@ -1,6 +1,52 @@
 import { type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
-import { CHUNK, type ChunkLayer, type Colony, CURTAIN, keyX, keyY, moundRadius, PLANE, CELL, cellOf, centreX, centreY, R, SIDE, INFECTED, type Fungus, type OneWorld, STRIP, BINS, binOf, cellAt, columnsOver, turnAt, AIR, OPEN, rockAt, SOIL, type WorldMap, worldExtent } from "../colony/index.ts";
-import { aimed, type Aim, type Camera, clamp, type Extent, fit, fitZoom, fromMinimap, minimapRect, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
+import {
+  CHUNK,
+  type ChunkLayer,
+  type Colony,
+  CURTAIN,
+  keyX,
+  keyY,
+  moundRadius,
+  PLANE,
+  CELL,
+  cellOf,
+  centreX,
+  centreY,
+  R,
+  SIDE,
+  INFECTED,
+  type Fungus,
+  type OneWorld,
+  STRIP,
+  BINS,
+  binOf,
+  cellAt,
+  columnsOver,
+  turnAt,
+  AIR,
+  OPEN,
+  rockAt,
+  SOIL,
+  type WorldMap,
+  worldExtent,
+} from "../colony/index.ts";
+import {
+  aimed,
+  type Aim,
+  type Camera,
+  clamp,
+  type Extent,
+  fit,
+  fitZoom,
+  fromMinimap,
+  minimapRect,
+  pan,
+  toScreen,
+  toWorld,
+  type Viewport,
+  visible,
+  zoomBy,
+} from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import type { PenCircle, Settle } from "./pen.ts";
@@ -141,7 +187,23 @@ interface ChunkCanvas {
 type Gesture = { kind: "pan" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
-export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, showHomeTrail, followed, onFollow, onChamber, world = null, view = CURTAIN, onLink, onCross, api, pen = null, tools }: Props) {
+export default function ColonyField({
+  colonies,
+  fungus,
+  onFrame,
+  showFoodTrail,
+  showHomeTrail,
+  followed,
+  onFollow,
+  onChamber,
+  world = null,
+  view = CURTAIN,
+  onLink,
+  onCross,
+  api,
+  pen = null,
+  tools,
+}: Props) {
   const colony = colonies[0] as Colony;
   const count = colonies.length;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -271,7 +333,27 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     };
     bind();
 
-    let theme = { paper: "", ink: "", accent: "", warn: "", line: "", rock: rgb("#c9c2b5"), soil: rgb("#e3d5bf"), sky: rgb("#e4edf1"), spoil: rgb("#c8b28c"), mound: "#6e6250", trail: [31, 111, 92], alarm: rgb("#8a5300"), accentRgb: rgb("#1f6f5c"), paperRgb: rgb("#f6f4ef"), inkRgb: rgb("#1c1b19"), warnRgb: rgb("#8a5300"), spore: "#7a4fa0", sporeRgb: rgb("#7a4fa0"), chamber: rgb("#a39a8a") };
+    let theme = {
+      paper: "",
+      ink: "",
+      accent: "",
+      warn: "",
+      line: "",
+      rock: rgb("#c9c2b5"),
+      soil: rgb("#e3d5bf"),
+      sky: rgb("#e4edf1"),
+      spoil: rgb("#c8b28c"),
+      mound: "#6e6250",
+      trail: [31, 111, 92],
+      alarm: rgb("#8a5300"),
+      accentRgb: rgb("#1f6f5c"),
+      paperRgb: rgb("#f6f4ef"),
+      inkRgb: rgb("#1c1b19"),
+      warnRgb: rgb("#8a5300"),
+      spore: "#7a4fa0",
+      sporeRgb: rgb("#7a4fa0"),
+      chamber: rgb("#a39a8a"),
+    };
     const retheme = () => {
       theme = {
         paper: cssVar("--paper"),
@@ -362,7 +444,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             px[o + 3] = 255;
             continue;
           }
-          const fv = fc ? (fc[i]) : 0;
+          const fv = fc ? fc[i] : 0;
           if (fv > 0) {
             px[o] = fr;
             px[o + 1] = fg;
@@ -371,7 +453,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             continue;
           }
           // Alarm is always shown: the player painted it, or a fight laid it, and it fades in seconds.
-          const al = alarmC ? Math.min(1, (alarmC[i]) / 6) : 0;
+          const al = alarmC ? Math.min(1, alarmC[i] / 6) : 0;
           if (al > 0.03) {
             px[o] = theme.alarm[0];
             px[o + 1] = theme.alarm[1];
@@ -380,7 +462,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             continue;
           }
           // Spores: the fungus's own mark on the ground, under food and alarm, over the trails.
-          const sp = sporeC ? Math.min(1, (sporeC[i]) / 3) : 0;
+          const sp = sporeC ? Math.min(1, sporeC[i] / 3) : 0;
           if (sp > 0.02) {
             px[o] = theme.sporeRgb[0];
             px[o + 1] = theme.sporeRgb[1];
@@ -388,7 +470,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             px[o + 3] = Math.round(35 + sp * 130);
             continue;
           }
-          const heap = spoilC ? (spoilC[i]) : 0;
+          const heap = spoilC ? spoilC[i] : 0;
           if (heap > 0) {
             px[o] = theme.spoil[0];
             px[o + 1] = theme.spoil[1];
@@ -396,9 +478,9 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             px[o + 3] = Math.min(255, 110 + heap * 45);
             continue;
           }
-          const f = show.food && foodC ? Math.min(1, (foodC[i]) / 4) : 0;
+          const f = show.food && foodC ? Math.min(1, foodC[i] / 4) : 0;
           // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
-          const h = show.home && homeC ? Math.min(1, (homeC[i]) / 12) : 0;
+          const h = show.home && homeC ? Math.min(1, homeC[i] / 12) : 0;
           if (f >= h && f > 0.02) {
             px[o] = theme.trail[0];
             px[o + 1] = theme.trail[1];
@@ -410,7 +492,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
             px[o + 2] = HOME_RGB[2];
             px[o + 3] = Math.round(h * 90);
           } else if (chamberC && chamberC[i]) {
-            const role = chambers!.list[(chamberC[i]) - 1]?.role ?? "none";
+            const role = chambers!.list[chamberC[i] - 1]?.role ?? "none";
             const tint = ROLE_RGB[role] ?? theme.chamber;
             px[o] = tint[0];
             px[o + 1] = tint[1];
@@ -470,7 +552,21 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
           const o = (my * mini.width + mx) * 4;
           const cut = strip && !off ? stripAt(x, y) : null;
           const heap = !off && t === 0 && m.spoil ? m.spoil.get(x, y) : 0;
-          const c = cut ?? (fv > 0 ? food : t === SOIL ? (!off && m.loose?.get(x, y) ? theme.spoil : theme.soil) : t === AIR ? theme.sky : t ? theme.rock : heap > 0 ? theme.spoil : theme.paperRgb);
+          const c =
+            cut ??
+            (fv > 0
+              ? food
+              : t === SOIL
+                ? !off && m.loose?.get(x, y)
+                  ? theme.spoil
+                  : theme.soil
+                : t === AIR
+                  ? theme.sky
+                  : t
+                    ? theme.rock
+                    : heap > 0
+                      ? theme.spoil
+                      : theme.paperRgb);
           px[o] = c[0];
           px[o + 1] = c[1];
           px[o + 2] = c[2];
@@ -481,8 +577,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         const tone = k === 0 ? theme.inkRgb : k === 1 ? theme.warnRgb : col.nestOdour < 0.5 ? theme.inkRgb : theme.warnRgb;
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
-          const mx = Math.floor(((col.x[i]) - gx0) / 2);
-          const my = Math.floor((col.y[i]) / 2);
+          const mx = Math.floor((col.x[i] - gx0) / 2);
+          const my = Math.floor(col.y[i] / 2);
           if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
           const o = (my * mini.width + mx) * 4;
           px[o] = tone[0];
@@ -509,8 +605,22 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       ctx.fillRect(ax, ay, bx - ax, by - ay);
       paths.clear();
       const k = SIDE * c.zoom * 1.04; // a hair over, so neighbours meet without seams
-      const [c0, c1, c2, c3, c4, c5] = [0, 1, 2, 3, 4, 5].map((j) => Math.cos(Math.PI / 6 + (j * Math.PI) / 3) * k) as [number, number, number, number, number, number];
-      const [s0, s1, s2, s3, s4, s5] = [0, 1, 2, 3, 4, 5].map((j) => Math.sin(Math.PI / 6 + (j * Math.PI) / 3) * k) as [number, number, number, number, number, number];
+      const [c0, c1, c2, c3, c4, c5] = [0, 1, 2, 3, 4, 5].map((j) => Math.cos(Math.PI / 6 + (j * Math.PI) / 3) * k) as [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+      ];
+      const [s0, s1, s2, s3, s4, s5] = [0, 1, 2, 3, 4, 5].map((j) => Math.sin(Math.PI / 6 + (j * Math.PI) / 3) * k) as [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+      ];
       const pr = theme.paperRgb;
       const ox = v.w / 2 - c.x * c.zoom;
       const oy = v.h / 2 - c.y * c.zoom;
@@ -529,10 +639,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
           if (!data) continue;
           const o = ((ly << 6) | (x & 63)) * 4;
           // The cell over the paper, its alpha in 16 steps (so trails batch into few colours).
-          const a = Math.round(((data[o + 3]) / 255) * 15) / 15;
-          const r = Math.round((data[o]) * a + (pr[0]) * (1 - a));
-          const g = Math.round((data[o + 1]) * a + (pr[1]) * (1 - a));
-          const b = Math.round((data[o + 2]) * a + (pr[2]) * (1 - a));
+          const a = Math.round((data[o + 3] / 255) * 15) / 15;
+          const r = Math.round(data[o] * a + pr[0] * (1 - a));
+          const g = Math.round(data[o + 1] * a + pr[1] * (1 - a));
+          const b = Math.round(data[o + 2] * a + pr[2] * (1 - a));
           const key = (r << 16) | (g << 8) | b;
           if (key === bgKey) continue;
           let path = paths.get(key);
@@ -1019,7 +1129,10 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         // Infected ants: a spore-coloured dot on the body, fainter for a light load.
         const dot = Math.max(1.5, len * 0.45);
         ctx.fillStyle = theme.spore;
-        for (const [lo, hi, alpha] of [[INFECTED, 0.5, 0.55], [0.5, 2, 1]] as const) {
+        for (const [lo, hi, alpha] of [
+          [INFECTED, 0.5, 0.55],
+          [0.5, 2, 1],
+        ] as const) {
           ctx.globalAlpha = alpha;
           for (let i = 0; i < col.n; i++) {
             const l = col.load[i];
@@ -1257,8 +1370,8 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     for (const [k, col] of colonies.entries()) {
       for (let i = 0; i < col.n; i++) {
         if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
-        const dx = (col.x[i]) - wx;
-        const dy = (col.y[i]) - wy;
+        const dx = col.x[i] - wx;
+        const dy = col.y[i] - wy;
         const dd = dx * dx + dy * dy;
         if (dd < bestD) {
           bestD = dd;
@@ -1359,7 +1472,16 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
     const v = viewport();
     const c = camera();
     const step = Math.min(v.w, v.h) * 0.15;
-    const moves: Record<string, [number, number]> = { ArrowLeft: [step, 0], a: [step, 0], ArrowRight: [-step, 0], d: [-step, 0], ArrowUp: [0, step], w: [0, step], ArrowDown: [0, -step], s: [0, -step] };
+    const moves: Record<string, [number, number]> = {
+      ArrowLeft: [step, 0],
+      a: [step, 0],
+      ArrowRight: [-step, 0],
+      d: [-step, 0],
+      ArrowUp: [0, step],
+      w: [0, step],
+      ArrowDown: [0, -step],
+      s: [0, -step],
+    };
     const key = e.key.length === 1 ? e.key.toLowerCase() : e.key; // Shift or Caps Lock still moves
     const m = moves[key];
     if (m) {
@@ -1398,7 +1520,7 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        className="absolute inset-0 block h-full w-full touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-grab active:cursor-grabbing"
+        className="absolute inset-0 block h-full w-full cursor-grab touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent active:cursor-grabbing"
         role="application"
         aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
         onPointerDown={onDown}
@@ -1409,18 +1531,30 @@ export default function ColonyField({ colonies, fungus, onFrame, showFoodTrail, 
         onKeyDown={onKey}
         onContextMenu={(e) => e.preventDefault()}
       />
-      <div className="pointer-events-none absolute left-2 top-2 flex gap-1.5">
+      <div className="pointer-events-none absolute top-2 left-2 flex gap-1.5">
         <button type="button" className={button} onClick={showAll} title="Show the whole map (0)">
           Whole map
         </button>
         {colonies.map((_, k) => (
-          <button key={k} type="button" className={button} onClick={() => goNest(k)} title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}>
+          <button
+            key={k}
+            type="button"
+            className={button}
+            onClick={() => goNest(k)}
+            title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}
+          >
             {colonyName(k)} nest
           </button>
         ))}
         {tools}
         {(world ? (view === PLANE ? world.plane : world.curtain) : colony.map).chambers && (
-          <button type="button" className={labels ? button.replace("border-line", "border-accent").replace("text-fg-2", "text-accent") : button} aria-pressed={labels} onClick={() => setLabels((on) => !on)} title="Name each chamber by its role; click a chamber to inspect it in Learn">
+          <button
+            type="button"
+            className={labels ? button.replace("border-line", "border-accent").replace("text-fg-2", "text-accent") : button}
+            aria-pressed={labels}
+            onClick={() => setLabels((on) => !on)}
+            title="Name each chamber by its role; click a chamber to inspect it in Learn"
+          >
             Labels
           </button>
         )}

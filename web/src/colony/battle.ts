@@ -64,7 +64,8 @@ export class CountGrid {
   }
 
   any(x0: number, y0: number, x1: number, y1: number): boolean {
-    for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++) for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by)) return true;
+    for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++)
+      for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by)) return true;
     return false;
   }
 
@@ -117,8 +118,8 @@ export function around(grid: CountGrid, map: Bounds, cx: number, cy: number, r =
   let s = 0;
   const o = discOffsets(r)[cy & 1] as Int16Array;
   for (let k = 0; k < o.length; k += 2) {
-    const x = cx + (o[k]);
-    const y = cy + (o[k + 1]);
+    const x = cx + o[k];
+    const y = cy + o[k + 1];
     if (inBounds(map, x, y)) s += grid.get(x, y);
   }
   return s;
@@ -130,7 +131,15 @@ export function around(grid: CountGrid, map: Bounds, cx: number, cy: number, r =
  * only the ants on that layer fight, on its map, and their alarm goes into their colony's scent there; the grids and
  * `rec` must be that layer's. Returns the deaths per colony.
  */
-export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number, rng: () => number, p: FightParams = DEFAULT_FIGHT, rec: Recognition | null = null, layer = -1): number[] {
+export function resolveFights(
+  colonies: Colony[],
+  grids: CountGrid[],
+  dt: number,
+  rng: () => number,
+  p: FightParams = DEFAULT_FIGHT,
+  rec: Recognition | null = null,
+  layer = -1,
+): number[] {
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
     const on = layer < 0 ? null : (c.layers[layer] as Layer);
@@ -144,7 +153,7 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       let enemies = 0;
       if (rec) {
         rec.look(c.odour[i], rec.params.tolerance);
-        enemies = rec.around(cx, cy, map) * (1 - (c.calm[i]));
+        enemies = rec.around(cx, cy, map) * (1 - c.calm[i]);
         if (enemies < 1e-6) continue;
       } else {
         for (let j = 0; j < grids.length; j++) {
@@ -158,7 +167,7 @@ export function resolveFights(colonies: Colony[], grids: CountGrid[], dt: number
       // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
       // How loudly is its raiseAlarm response (locally: always, × 1).
       if (enemies >= ENEMY) {
-        const loud = (1 - (c.quiet[i])) * c.responses.raiseAlarm(c.touch(i, true));
+        const loud = (1 - c.quiet[i]) * c.responses.raiseAlarm(c.touch(i, true));
         if (loud > 0) ph.deposit("alarm", c.x[i], c.y[i], p.alarm * dt * loud);
       }
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);

@@ -1,4 +1,18 @@
-import { worldExtent, type WorldMap, CURTAIN, PLANE, UPGRADES, type Upgrade, LETHAL_LEVERS, FOUNDING_RESERVE, MAX_COLONIES, MET, type Game, AIMS, type Flight } from "./colony/index.ts";
+import {
+  worldExtent,
+  type WorldMap,
+  CURTAIN,
+  PLANE,
+  UPGRADES,
+  type Upgrade,
+  LETHAL_LEVERS,
+  FOUNDING_RESERVE,
+  MAX_COLONIES,
+  MET,
+  type Game,
+  AIMS,
+  type Flight,
+} from "./colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntCard from "./ui/AntCard.tsx";
@@ -9,7 +23,18 @@ import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
-import { AUTOSAVE, AUTOSAVE_MS, browserSaves, describe, newestReadable, readable, record, type GameSettings, type PlayerState, type SaveRecord } from "./ui/saves.ts";
+import {
+  AUTOSAVE,
+  AUTOSAVE_MS,
+  browserSaves,
+  describe,
+  newestReadable,
+  readable,
+  record,
+  type GameSettings,
+  type PlayerState,
+  type SaveRecord,
+} from "./ui/saves.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo, passphrase } from "./ui/backend.ts";
 import PassNote from "./ui/PassNote.tsx";
@@ -85,7 +110,13 @@ export default function ColonyApp() {
     },
     [carry, showAt],
   );
-  const games = useSaves(game, settings, { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull }, stats, controls.started);
+  const games = useSaves(
+    game,
+    settings,
+    { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull },
+    stats,
+    controls.started,
+  );
   const continueFrom = useCallback(
     (r: SaveRecord) => {
       if (!readable(r)) {
@@ -182,7 +213,12 @@ export default function ColonyApp() {
     const mother = colonyName(flight.mother);
     return {
       ...circle,
-      preview: (p) => penSettle(circle, p, mother, (q) => (game.colonies.length >= MAX_COLONIES ? { ok: false, reason: `the map already holds ${MAX_COLONIES} colonies` } : game.settleAt(q, penGround(oneWorld)))),
+      preview: (p) =>
+        penSettle(circle, p, mother, (q) =>
+          game.colonies.length >= MAX_COLONIES
+            ? { ok: false, reason: `the map already holds ${MAX_COLONIES} colonies` }
+            : game.settleAt(q, penGround(oneWorld)),
+        ),
       onPick: (p) => {
         if (!withinFlight(circle, p)) return pushToast(`She can't fly that far: click within ${circle.r} of ${mother}'s hole.`, "warn");
         if (!penWords.current.text) return pushToast("Write her doctrine first.", "warn");
@@ -219,7 +255,15 @@ export default function ColonyApp() {
         if (!m) return false;
         setDevPen(true);
         game.revealed[mother] = true;
-        game.flights.push({ mother, x: m.nest.x, y: m.nest.y, load: 1, strain: game.fungus.evolution?.strain ?? 0, at: game.time, food: FOUNDING_RESERVE });
+        game.flights.push({
+          mother,
+          x: m.nest.x,
+          y: m.nest.y,
+          load: 1,
+          strain: game.fungus.evolution?.strain ?? 0,
+          at: game.time,
+          food: FOUNDING_RESERVE,
+        });
         return true;
       },
     };
@@ -234,10 +278,20 @@ export default function ColonyApp() {
           <p className="hidden text-sm text-fg-3 sm:block">you are the fungus</p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised" onClick={() => openLearn({ tab: "guide" })} title="What you are seeing, the policy behind it, and the research it comes from">
+          <button
+            type="button"
+            className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised"
+            onClick={() => openLearn({ tab: "guide" })}
+            title="What you are seeing, the policy behind it, and the research it comes from"
+          >
             Learn
           </button>
-          <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised" onClick={() => setDetails(true)} title="The colonies' numbers, Jev's spend, the world's settings and the lab">
+          <button
+            type="button"
+            className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised"
+            onClick={() => setDetails(true)}
+            title="The colonies' numbers, Jev's spend, the world's settings and the lab"
+          >
             Details
           </button>
         </div>
@@ -260,20 +314,57 @@ export default function ColonyApp() {
         retune={`A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`}
         demo={isDemo(backend)}
       />
-      <DetailsScreen open={details} onClose={closeDetails} game={game} controls={controls} update={update} stats={stats} fps={fps} restart={restart} newWorld={newWorld} jev={jev} saves={games} onLoad={(r) => (continueFrom(r), closeDetails())} />
+      <DetailsScreen
+        open={details}
+        onClose={closeDetails}
+        game={game}
+        controls={controls}
+        update={update}
+        stats={stats}
+        fps={fps}
+        restart={restart}
+        newWorld={newWorld}
+        jev={jev}
+        saves={games}
+        onLoad={(r) => (continueFrom(r), closeDetails())}
+      />
       <Toasts />
       {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
-      {flight && gate?.open && !circle && <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} />}
-      {!controls.started && <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />}
+      {flight && gate?.open && !circle && (
+        <QueenPen
+          key={flight.at}
+          flight={flight}
+          mother={colonyName(flight.mother)}
+          daughter={colonyName(game.colonies.length)}
+          doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
+          onFound={foundHers}
+        />
+      )}
+      {!controls.started && (
+        <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />
+      )}
 
       {backend?.needsPass && <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} />}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm" aria-label="game bar">
-        <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hover" onClick={() => update({ playing: !controls.playing })}>
+      <div
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm"
+        aria-label="game bar"
+      >
+        <button
+          type="button"
+          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hover"
+          onClick={() => update({ playing: !controls.playing })}
+        >
           {controls.playing ? "Pause" : "Play"}
         </button>
         <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="speed">
           {SPEEDS.map((v) => (
-            <button key={v} type="button" className={seg(controls.speed === v)} onClick={() => update({ speed: v })} aria-pressed={controls.speed === v}>
+            <button
+              key={v}
+              type="button"
+              className={seg(controls.speed === v)}
+              onClick={() => update({ speed: v })}
+              aria-pressed={controls.speed === v}
+            >
               {v}×
             </button>
           ))}
@@ -281,21 +372,35 @@ export default function ColonyApp() {
         {oneWorld && (
           <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="view">
             {(["above", "below"] as const).map((v) => (
-              <button key={v} type="button" className={seg(controls.view === v)} onClick={() => setView(v)} aria-pressed={controls.view === v} title={v === "above" ? "The surface from above: foraging, trails, the mound and the line through the holes (v)" : "Underground: the curtain under the line, unrolled, with every nest (v)"}>
+              <button
+                key={v}
+                type="button"
+                className={seg(controls.view === v)}
+                onClick={() => setView(v)}
+                aria-pressed={controls.view === v}
+                title={
+                  v === "above"
+                    ? "The surface from above: foraging, trails, the mound and the line through the holes (v)"
+                    : "Underground: the curtain under the line, unrolled, with every nest (v)"
+                }
+              >
                 {v}
               </button>
             ))}
           </div>
         )}
-        <span className="font-mono tabular-nums text-fg-2" title="sim time">
+        <span className="font-mono text-fg-2 tabular-nums" title="sim time">
           {clock(stats?.time ?? 0)}
         </span>
         {stats && controls.playing && stats.pace > 0 && stats.pace < controls.speed * 0.85 && (
-          <span className="rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn" title="This machine can't step the sim that fast: it runs as fast as it can">
+          <span
+            className="rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn"
+            title="This machine can't step the sim that fast: it runs as fast as it can"
+          >
             running at {stats.pace.toFixed(1)}×
           </span>
         )}
-        <span className="min-w-0 basis-full text-fg-2 sm:basis-0 sm:flex-1 sm:truncate">{goalLine(stats)}</span>
+        <span className="min-w-0 basis-full text-fg-2 sm:flex-1 sm:basis-0 sm:truncate">{goalLine(stats)}</span>
       </div>
 
       <div className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:flex-row">
@@ -332,16 +437,32 @@ export default function ColonyApp() {
             />
           </div>
           {followed ? (
-            <AntCard followed={followed} colonies={game.colonies} fungus={game.fungus} explain={jev.explain} explainFungus={jev.explainFungus} onClose={() => setFollowed(null)} />
+            <AntCard
+              followed={followed}
+              colonies={game.colonies}
+              fungus={game.fungus}
+              explain={jev.explain}
+              explainFungus={jev.explainFungus}
+              onClose={() => setFollowed(null)}
+            />
           ) : (
             <p className="text-xs text-fg-3">
-              Drag to pan · wheel or pinch to zoom · tap an ant to follow it and see what the fungus does inside it · Learn explains what you see.
+              Drag to pan · wheel or pinch to zoom · tap an ant to follow it and see what the fungus does inside it · Learn explains what
+              you see.
             </p>
           )}
         </div>
         <aside className="flex w-full flex-col gap-3 lg:w-80">
           {flight && gate?.open && oneWorld && circle && (
-            <QueenPen key={flight.at} flight={flight} mother={colonyName(flight.mother)} daughter={colonyName(game.colonies.length)} doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!} onFound={foundHers} place={{ radius: circle.r, onWords, onFly }} />
+            <QueenPen
+              key={flight.at}
+              flight={flight}
+              mother={colonyName(flight.mother)}
+              daughter={colonyName(game.colonies.length)}
+              doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
+              onFound={foundHers}
+              place={{ radius: circle.r, onWords, onFly }}
+            />
           )}
           <FungusPanel stats={stats} jev={jev} evolve={evolve} menu={controls.menu} />
         </aside>
@@ -351,11 +472,21 @@ export default function ColonyApp() {
 }
 
 /** The fungus: where it is, how far the colonies have come together, and its aim, the player's words. */
-function FungusPanel({ stats, jev, evolve, menu }: { stats: ColonyStats | null; jev: ReturnType<typeof useColonyJev>; evolve: (id: string) => boolean; menu: readonly string[] }) {
+function FungusPanel({
+  stats,
+  jev,
+  evolve,
+  menu,
+}: {
+  stats: ColonyStats | null;
+  jev: ReturnType<typeof useColonyJev>;
+  evolve: (id: string) => boolean;
+  menu: readonly string[];
+}) {
   const locked = jev.lock !== null;
   return (
     <section className="rounded-lg border border-line bg-panel p-4 text-sm text-fg-2" aria-label="fungus">
-      <h2 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-3">
+      <h2 className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-fg-3 uppercase">
         The fungus <Help to={{ tab: "guide", id: "fungus" }} label="the fungus" />
       </h2>
       {stats && (
@@ -364,12 +495,18 @@ function FungusPanel({ stats, jev, evolve, menu }: { stats: ColonyStats | null; 
             <div key={k}>
               <div className="flex items-baseline justify-between text-xs">
                 <span className={colonyTone(k)}>in the {colonyName(k)} colony</span>
-                <span className="font-mono tabular-nums text-spore">{Math.round(100 * s.infected)}%</span>
+                <span className="font-mono text-spore tabular-nums">{Math.round(100 * s.infected)}%</span>
               </div>
               <Bar value={s.infected} thin />
               {s.queen !== null && (
                 <p className="mt-0.5 text-[11px] text-fg-3">
-                  {s.queen === "lost" ? "its queen is dead" : s.queenLoad >= 0.05 ? <span className="text-spore">in its queen: {Math.round(100 * s.queenLoad)}%</span> : "its queen is clean"}
+                  {s.queen === "lost" ? (
+                    "its queen is dead"
+                  ) : s.queenLoad >= 0.05 ? (
+                    <span className="text-spore">in its queen: {Math.round(100 * s.queenLoad)}%</span>
+                  ) : (
+                    "its queen is clean"
+                  )}
                 </p>
               )}
             </div>
@@ -380,10 +517,12 @@ function FungusPanel({ stats, jev, evolve, menu }: { stats: ColonyStats | null; 
                 <span className="flex items-center gap-1.5">
                   one colony <Help to={{ tab: "guide", id: "unity" }} label="one colony" />
                 </span>
-                <span className="font-mono tabular-nums text-fg">{Math.round(100 * stats.unity.score)}%</span>
+                <span className="font-mono text-fg tabular-nums">{Math.round(100 * stats.unity.score)}%</span>
               </div>
               <Bar value={stats.unity.score} thin />
-              {stats.unity.alike && stats.unity.met < MET && <p className="mt-1 text-xs text-fg-3">The nests smell alike, but the colonies have not met yet.</p>}
+              {stats.unity.alike && stats.unity.met < MET && (
+                <p className="mt-1 text-xs text-fg-3">The nests smell alike, but the colonies have not met yet.</p>
+              )}
             </div>
           )}
         </div>
@@ -396,7 +535,13 @@ function FungusPanel({ stats, jev, evolve, menu }: { stats: ColonyStats | null; 
           </span>
           <div className="flex overflow-hidden rounded-md border border-line text-sm">
             {AIMS.map((a) => (
-              <button key={a.id} type="button" className={seg(jev.aim.id === a.id)} disabled={locked} onClick={() => jev.setAim({ id: a.id, text: a.text })}>
+              <button
+                key={a.id}
+                type="button"
+                className={seg(jev.aim.id === a.id)}
+                disabled={locked}
+                onClick={() => jev.setAim({ id: a.id, text: a.text })}
+              >
                 {a.name}
               </button>
             ))}
@@ -414,7 +559,10 @@ function FungusPanel({ stats, jev, evolve, menu }: { stats: ColonyStats | null; 
         {locked ? (
           <p className="mt-1 text-xs text-warn">{jev.lock}</p>
         ) : (
-          <p className="mt-1 text-xs text-fg-3">What the fungus wants, in your words. Jev reads it and decides what the fungus does inside each ant it lives in: what that ant perceives, and what it gives off. ≈ {TOKENS_PER_FUNGAL_SITUATION} tokens per situation asked.</p>
+          <p className="mt-1 text-xs text-fg-3">
+            What the fungus wants, in your words. Jev reads it and decides what the fungus does inside each ant it lives in: what that ant
+            perceives, and what it gives off. ≈ {TOKENS_PER_FUNGAL_SITUATION} tokens per situation asked.
+          </p>
         )}
       </div>
     </section>
@@ -439,7 +587,7 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
         <span className="flex items-center gap-1.5">
           Body <Help to={{ tab: "guide", id: "evolution" }} label="the fungus's body and mutations" />
         </span>
-        <span className="font-mono tabular-nums text-fg-2" title="its mycelium by the hole, and the fungus in its hosts">
+        <span className="font-mono text-fg-2 tabular-nums" title="its mycelium by the hole, and the fungus in its hosts">
           mycelium {e.mass.toFixed(0)} · in ants {e.inHosts.toFixed(0)}
         </span>
       </div>
@@ -450,7 +598,10 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
           <span className="text-fg-3"> · +{e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min</span>
         </span>
       </div>
-      <p className="mt-1 text-[11px] text-fg-3">Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep; each level asks more.</p>
+      <p className="mt-1 text-[11px] text-fg-3">
+        Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep; each level asks
+        more.
+      </p>
       <ul className="mt-2 flex flex-col gap-1" aria-label="upgrades">
         {UPGRADES.map((u) => {
           const level = e.levels[u.id] ?? 0;
@@ -459,7 +610,14 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
           return (
             <li key={u.id} className="flex items-center justify-between gap-2 text-xs">
               <span className="min-w-0 truncate" title={u.blurb}>
-                <span className={u.kind === "spread" ? "text-spore" : u.levers?.every((id) => LETHAL_LEVERS.has(id)) ? "text-err" : "text-accent"}>{u.name}</span> <span className="text-fg-3">{u.steps[level]}</span>
+                <span
+                  className={
+                    u.kind === "spread" ? "text-spore" : u.levers?.every((id) => LETHAL_LEVERS.has(id)) ? "text-err" : "text-accent"
+                  }
+                >
+                  {u.name}
+                </span>{" "}
+                <span className="text-fg-3">{u.steps[level]}</span>
                 {idle(u, menu) && <span className="text-fg-3"> (not on the menu)</span>}
               </span>
               {cost === undefined ? (
@@ -495,7 +653,8 @@ function clock(t: number): string {
 function goalLine(stats: ColonyStats | null): string {
   if (!stats) return "";
   if (stats.outcome === "fallen") return `The ${colonyName(stats.fallen)} colony is gone: there is no one left to unite it with.`;
-  if (stats.outcome === "unified") return "One colony: the nests smell alike, their ants have met, and nobody has died fighting for a minute.";
+  if (stats.outcome === "unified")
+    return "One colony: the nests smell alike, their ants have met, and nobody has died fighting for a minute.";
   const c = stats.chapter;
   return `${c.step < 7 ? `${c.step}. ` : ""}${c.goal}${c.progress > 0 && c.progress < 1 ? ` (${Math.round(100 * c.progress)}%)` : ""}`;
 }
@@ -520,10 +679,13 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
   }, [chapter, stats]);
   // A mutation it can keep is worth a notice, once each time there was none it could afford (ja-lo8.12).
   // Only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not).
-  const affordable = stats?.evolution ? UPGRADES.some((u) => !idle(u, menu) && (u.costs[stats.evolution!.levels[u.id] ?? 0] ?? Infinity) <= stats.evolution!.mutations) : false;
+  const affordable = stats?.evolution
+    ? UPGRADES.some((u) => !idle(u, menu) && (u.costs[stats.evolution!.levels[u.id] ?? 0] ?? Infinity) <= stats.evolution!.mutations)
+    : false;
   const couldAfford = useRef(affordable);
   useEffect(() => {
-    if (affordable && !couldAfford.current) pushToast("The fungus has mutations to keep: choose where they go, in the Fungus panel.", "good");
+    if (affordable && !couldAfford.current)
+      pushToast("The fungus has mutations to keep: choose where they go, in the Fungus panel.", "good");
     couldAfford.current = affordable;
   }, [affordable]);
   // Losing Jev mid-game (the cap, a stop) is worth a notice; the lock at page load is in the panel already.
@@ -550,7 +712,14 @@ export interface Saves {
 function useSaves(game: Game, settings: GameSettings, player: PlayerState, stats: ColonyStats | null, started: boolean): Saves {
   const store = useMemo(() => browserSaves(), []);
   const [list, setList] = useState<SaveRecord[]>([]);
-  const refresh = useCallback(() => void store.list().then(setList).catch(() => setList([])), [store]);
+  const refresh = useCallback(
+    () =>
+      void store
+        .list()
+        .then(setList)
+        .catch(() => setList([])),
+    [store],
+  );
   useEffect(refresh, [refresh]);
   // The latest of everything, for the timer and the hidden-tab handler (they outlive renders).
   const now = useRef({ game, settings, player, stats, started });

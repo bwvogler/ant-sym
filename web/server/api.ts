@@ -126,7 +126,10 @@ export function apiPlugins(services?: Services): Plugin {
       server.middlewares.use("/api/health", wrap(h.health));
       server.middlewares.use("/api/run", wrap(h.run));
       server.middlewares.use("/api/jev", wrap(h.jev));
-      server.middlewares.use("/api", wrap((_req, res) => sendJson(res, 404, { error: "no such route" })));
+      server.middlewares.use(
+        "/api",
+        wrap((_req, res) => sendJson(res, 404, { error: "no such route" })),
+      );
     },
   };
 }

@@ -56,7 +56,22 @@ export class Chambers {
 
   /** A new chamber for `colony`, its floor on row `floorRow` (no cells yet: claim them). */
   add(colony: number, floorRow: number, role: Role = "none"): Chamber {
-    const c: Chamber = { id: this.list.length, colony, floorRow, x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, cells: 0, floor: 0, role, brood: 0, food: 0, sumX: 0, sumY: 0 };
+    const c: Chamber = {
+      id: this.list.length,
+      colony,
+      floorRow,
+      x0: Infinity,
+      x1: -Infinity,
+      y0: Infinity,
+      y1: -Infinity,
+      cells: 0,
+      floor: 0,
+      role,
+      brood: 0,
+      food: 0,
+      sumX: 0,
+      sumY: 0,
+    };
     this.list.push(c);
     while (this.floorOf.length <= colony) this.floorOf.push(0);
     return c;
@@ -92,7 +107,7 @@ export class Chambers {
     if (this.#floor.get(x, y)) {
       this.#floor.set(x, y, 0);
       c.floor--;
-      this.floorOf[c.colony] = (this.floorOf[c.colony]) - 1;
+      this.floorOf[c.colony] = this.floorOf[c.colony] - 1;
     }
     this.cell.set(x, y, 0);
     c.cells--;
@@ -124,7 +139,7 @@ export class Chambers {
     this.#floor.set(x, y, floor);
     const d = floor - was;
     c.floor += d;
-    this.floorOf[c.colony] = (this.floorOf[c.colony]) + d;
+    this.floorOf[c.colony] = this.floorOf[c.colony] + d;
   }
 
   /** The chamber table for a save (save.ts). */

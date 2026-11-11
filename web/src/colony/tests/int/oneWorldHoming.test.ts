@@ -80,10 +80,10 @@ test("plane: the vector starts afresh up out of its own hole, with both drifts d
     const y = c.y[0];
     g.tick(DT);
     assert.equal(c.layer[0], PLANE);
-    if (c.mode[0] !== RETURN) walked += Math.hypot((c.x[0]) - x, (c.y[0]) - y);
+    if (c.mode[0] !== RETURN) walked += Math.hypot(c.x[0] - x, c.y[0] - y);
   }
   assert.ok(walked > 10, `it walked out (${walked.toFixed(1)})`);
-  assert.ok(Math.abs((c.odoSurf[0]) - walked) < 1e-3 * walked, `odometer ${c.odoSurf[0]} = path ${walked.toFixed(2)}`);
+  assert.ok(Math.abs(c.odoSurf[0] - walked) < 1e-3 * walked, `odometer ${c.odoSurf[0]} = path ${walked.toFixed(2)}`);
   // Homing (tired, so its policy keeps it in return): the vector is fixed.
   const out = c.odoSurf[0];
   c.mode[0] = RETURN;
@@ -102,8 +102,8 @@ test("plane: coming up a rival's hole leaves the vector as it was", () => {
   c.driftSurfY[0] = -0.2;
   climbOut(g, c, 0, rival);
   const p = planeHole(rival);
-  assert.ok(Math.hypot((c.x[0]) - p.x, (c.y[0]) - p.y) < 1, "up at the rival's hole");
-  assert.ok((c.odoSurf[0]) >= 50, `odometer runs on (${c.odoSurf[0]})`);
+  assert.ok(Math.hypot(c.x[0] - p.x, c.y[0] - p.y) < 1, "up at the rival's hole");
+  assert.ok(c.odoSurf[0] >= 50, `odometer runs on (${c.odoSurf[0]})`);
   assert.deepEqual([c.driftSurf[0], c.driftSurfY[0]], [Math.fround(0.3), Math.fround(-0.2)], "drift unchanged");
 });
 
@@ -115,7 +115,7 @@ test("plane: the drift's size over many trips out of its own hole is PI_DRIFT (R
   const N = 150;
   for (let n = 0; n < N; n++) {
     climbOut(g, c, 0, h);
-    sq += (c.driftSurf[0]) ** 2 + (c.driftSurfY[0]) ** 2;
+    sq += c.driftSurf[0] ** 2 + c.driftSurfY[0] ** 2;
   }
   const rms = Math.sqrt(sq / N);
   assert.ok(rms > 0.07 && rms < 0.13, `RMS |drift| ${rms.toFixed(3)} against PI_DRIFT ${PI_DRIFT}`);
@@ -190,7 +190,7 @@ test("plane: a belief past the plane's edge is held at the edge, and the carrier
   assert.ok(open(g, H.x, top));
   carrier(g, H.x + 6, top + 2, 300, 0, -0.2);
   let nearEdge = Infinity;
-  const t = home(g, c, 90, () => (nearEdge = Math.min(nearEdge, Math.hypot((c.x[0]) - H.x, (c.y[0]) - top))));
+  const t = home(g, c, 90, () => (nearEdge = Math.min(nearEdge, Math.hypot(c.x[0] - H.x, c.y[0] - top))));
   assert.ok(nearEdge < 1.5, `it went to the edge, where its belief is held (within ${nearEdge.toFixed(2)})`);
   assert.ok(t > 0, "down its hole within 90 s");
 });

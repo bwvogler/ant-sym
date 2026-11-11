@@ -62,7 +62,11 @@ function spread(map) {
 }
 
 for (let seed = lo; seed <= hi; seed++) {
-  const game = new Game(one ? generateOneWorld(seed) : generateSideWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW }, gameRng(seed));
+  const game = new Game(
+    one ? generateOneWorld(seed) : generateSideWorld(seed),
+    { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW },
+    gameRng(seed),
+  );
   if (one) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
   // One world: the curtain, where the digging is (game.map is the plane).
   const dug = one ? game.world.curtain : game.map;
@@ -70,7 +74,9 @@ for (let seed = lo; seed <= hi; seed++) {
   let tick = 0;
   for (const at of checkpoints) {
     for (; tick < Math.round(at / DT); tick++) game.tick(DT);
-    const pops = one ? ` (ants ${game.colonies.map((c) => c.population).join(" / ")}, infected ${game.colonies.map((c) => c.load.filter((v, i) => c.alive[i] && v > 0).length).join(" / ")})` : "";
+    const pops = one
+      ? ` (ants ${game.colonies.map((c) => c.population).join(" / ")}, infected ${game.colonies.map((c) => c.load.filter((v, i) => c.alive[i] && v > 0).length).join(" / ")})`
+      : "";
     console.log(`seed ${seed}${one ? " (one world)" : ""}, ${at} s: ${spread(dug)}${pops}`);
   }
 }

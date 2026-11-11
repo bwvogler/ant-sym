@@ -28,12 +28,21 @@ test("in a game: soil is carried out and dropped along the ground, loose soil is
     }
     if (k % 300 === 0) {
       let loose = 0;
-      for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
+      for (let y = 0; y < map.size.h; y++)
+        for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
       const carried = c.carriedPellets();
       assert.equal(loose, map.moundCells, "the mound on the map is its count");
       assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried.dug + c.soilLost, "dug = brought out + filled + carried + lost");
-      assert.equal(c.loosePicked, c.looseDropped + c.looseFilled + carried.loose + c.looseLost, "loose picked up = dropped again + filled + carried + lost");
-      assert.equal(map.moundCells, Math.floor(c.soilOut * SWELL + 1e-9) - c.moundLost - c.loosePicked + c.looseDropped, "the mound = soil brought out × SWELL, less what was taken off it, plus what was put back");
+      assert.equal(
+        c.loosePicked,
+        c.looseDropped + c.looseFilled + carried.loose + c.looseLost,
+        "loose picked up = dropped again + filled + carried + lost",
+      );
+      assert.equal(
+        map.moundCells,
+        Math.floor(c.soilOut * SWELL + 1e-9) - c.moundLost - c.loosePicked + c.looseDropped,
+        "the mound = soil brought out × SWELL, less what was taken off it, plus what was put back",
+      );
     }
   }
   assert.ok(c.soilOut > 50, `${c.soilOut} pellets brought out`);

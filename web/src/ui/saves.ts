@@ -113,7 +113,14 @@ export function newestReadable(list: readonly SaveRecord[]): SaveRecord | null {
 
 export function describe(r: SaveRecord, now = Date.now()): string {
   const ago = Math.max(0, now - r.savedAt) / 1000;
-  const when = ago < 90 ? "just now" : ago < 5400 ? `${Math.round(ago / 60)} min ago` : ago < 129600 ? `${Math.round(ago / 3600)} h ago` : `${Math.round(ago / 86400)} days ago`;
+  const when =
+    ago < 90
+      ? "just now"
+      : ago < 5400
+        ? `${Math.round(ago / 60)} min ago`
+        : ago < 129600
+          ? `${Math.round(ago / 3600)} h ago`
+          : `${Math.round(ago / 86400)} days ago`;
   const sim = r.simTime < 3600 ? `${Math.floor(r.simTime / 60)} min` : `${(r.simTime / 3600).toFixed(1)} h`;
   return `${r.slot === AUTOSAVE ? "Autosave" : `Slot ${r.slot}`} · world ${r.settings.seed} · ${sim} in · ${when}`;
 }

@@ -4,7 +4,29 @@ import { at } from "../hexmaps.ts";
 import assert from "node:assert/strict";
 import { CountGrid } from "../../battle.ts";
 import { CHUNK, ChunkLayer, chunkKey, chunkOf } from "../../chunks.ts";
-import { blocked, chunkRock, dig, OPEN, OPEN_WORLD, ROCK, SOIL, soilAt, dropFood, escapes, flat, foodAt, generateWorld, heightAt, noiseAt, reachable, rockAt, rockCut, takeFood, worldFromArrays, type WorldMap } from "../../world.ts";
+import {
+  blocked,
+  chunkRock,
+  dig,
+  OPEN,
+  OPEN_WORLD,
+  ROCK,
+  SOIL,
+  soilAt,
+  dropFood,
+  escapes,
+  flat,
+  foodAt,
+  generateWorld,
+  heightAt,
+  noiseAt,
+  reachable,
+  rockAt,
+  rockCut,
+  takeFood,
+  worldFromArrays,
+  type WorldMap,
+} from "../../world.ts";
 import { MAX_LEVEL, Pheromones, SLEEP, type ChannelParams, type Channel } from "../../pheromone.ts";
 
 const SMALL = { w: 160, h: 100 };
@@ -24,17 +46,31 @@ test("ChunkLayer: unwritten cells read as empty; writes land in their chunk; neg
   assert.equal(l.chunk(-1, -2)?.[58 * CHUNK + 63], 3, "(-1, -70) is local cell (63, 58) of chunk (-1, -2)");
   const rock = new ChunkLayer((n) => new Uint8Array(n), 1);
   assert.equal(rock.get(-9, 9), 1, "a layer can read as something other than zero where nothing was generated");
-  for (const [cx, cy] of [[0, 0], [-3, 7], [1200, -900]] as const) assert.deepEqual(chunkOf(chunkKey(cx, cy)), [cx, cy]);
+  for (const [cx, cy] of [
+    [0, 0],
+    [-3, 7],
+    [1200, -900],
+  ] as const)
+    assert.deepEqual(chunkOf(chunkKey(cx, cy)), [cx, cy]);
 });
 
 test("generateWorld: the same seed is the same world; another seed is another", () => {
   const a = generateWorld(7, { size: SMALL });
   const b = generateWorld(7, { size: SMALL });
-  assert.deepEqual(flat(a, a.rock, (n) => new Uint8Array(n)), flat(b, b.rock, (n) => new Uint8Array(n)));
-  assert.deepEqual(flat(a, a.food, (n) => new Float32Array(n)), flat(b, b.food, (n) => new Float32Array(n)));
+  assert.deepEqual(
+    flat(a, a.rock, (n) => new Uint8Array(n)),
+    flat(b, b.rock, (n) => new Uint8Array(n)),
+  );
+  assert.deepEqual(
+    flat(a, a.food, (n) => new Float32Array(n)),
+    flat(b, b.food, (n) => new Float32Array(n)),
+  );
   assert.deepEqual(a.nests, b.nests);
   const c = generateWorld(8, { size: SMALL });
-  assert.notDeepEqual(flat(c, c.rock, (n) => new Uint8Array(n)), flat(a, a.rock, (n) => new Uint8Array(n)));
+  assert.notDeepEqual(
+    flat(c, c.rock, (n) => new Uint8Array(n)),
+    flat(a, a.rock, (n) => new Uint8Array(n)),
+  );
 });
 
 test("terrain is position-pure: a chunk is the same whatever else was generated, and a bigger map contains the smaller one", () => {
@@ -112,7 +148,14 @@ test("blocked: rock and the edge of the map", () => {
 test("escapes: open ground escapes, a walled pocket does not", () => {
   const size = { w: 60, h: 60 };
   const rock = new Uint8Array(60 * 60);
-  for (let k = 20; k <= 30; k++) for (const [x, y] of [[k, 20], [k, 30], [20, k], [30, k]] as const) rock[y * 60 + x] = 1;
+  for (let k = 20; k <= 30; k++)
+    for (const [x, y] of [
+      [k, 20],
+      [k, 30],
+      [20, k],
+      [30, k],
+    ] as const)
+      rock[y * 60 + x] = 1;
   const m = worldFromArrays(size, [{ x: 5, y: 5, r: 2 }], { rock });
   assert.ok(escapes(m, 5, 5, 20));
   assert.ok(!escapes(m, 25, 25, 20), "inside the walled square");
@@ -139,7 +182,11 @@ test("Pheromones: deposit and read, capped; evaporation takes its share; nothing
   const size = { w: 5, h: 5 };
   const rock = new Uint8Array(25);
   rock[2 * 5 + 3] = 1; // east of the centre
-  const ph = new Pheromones(bare(size, rock), { food: { evaporation: 0.5, diffusion: 0 }, home: { evaporation: 0, diffusion: 1 }, alarm: { evaporation: 0, diffusion: 0 } });
+  const ph = new Pheromones(bare(size, rock), {
+    food: { evaporation: 0.5, diffusion: 0 },
+    home: { evaporation: 0, diffusion: 1 },
+    alarm: { evaporation: 0, diffusion: 0 },
+  });
   const c = at(2, 2);
   ph.deposit("food", c.x, c.y, 10);
   assert.equal(ph.read("food", c.x - 0.2, c.y + 0.3), 10);
@@ -181,7 +228,7 @@ function denseStep(f: Float32Array, rock: Uint8Array, w: number, h: number, p: C
 /** Index into a flat map array of the cell under world (x, y). */
 function cellIndex(m: WorldMap, x: number, y: number): number {
   cellOf(x, y);
-  return (CELL[1]) * m.size.w + (CELL[0]);
+  return CELL[1] * m.size.w + CELL[0];
 }
 
 test("the sparse step matches the dense one, across chunk borders and a ragged map edge", () => {
@@ -209,7 +256,8 @@ test("the sparse step matches the dense one, across chunk borders and a ragged m
     dense = denseStep(dense, rock, w, h, params, 1 / 30);
   }
   let worst = 0;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) worst = Math.max(worst, Math.abs(ph.read("food", at(x, y).x, at(x, y).y) - dense[y * w + x]!));
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) worst = Math.max(worst, Math.abs(ph.read("food", at(x, y).x, at(x, y).y) - dense[y * w + x]!));
   assert.ok(worst < 1e-4, `largest difference ${worst}`);
 });
 
@@ -279,7 +327,13 @@ test("CountGrid: counts with n, any() finds them by block, reset clears exactly 
 
 test("ChunkLayer: growing the table in every direction keeps what was written; drop forgets a chunk", () => {
   const l = new ChunkLayer((n) => new Float32Array(n), 0);
-  const cells: [number, number, number][] = [[1, 1, 1], [700, 2, 2], [-650, -3, 3], [5, 900, 4], [-1, -1000, 5]];
+  const cells: [number, number, number][] = [
+    [1, 1, 1],
+    [700, 2, 2],
+    [-650, -3, 3],
+    [5, 900, 4],
+    [-1, -1000, 5],
+  ];
   for (const [x, y, v] of cells) l.set(x, y, v);
   for (const [x, y, v] of cells) assert.equal(l.get(x, y), v, `(${x}, ${y}) survived the table growing`);
   assert.equal(l.count, 5);
@@ -291,9 +345,15 @@ test("ChunkLayer: growing the table in every direction keeps what was written; d
 
 test("chunkRock is exactly the height threshold at each hexagon's centre, cell for cell", () => {
   const cut = rockCut(0.22);
-  for (const [cx, cy] of [[0, 0], [3, -2], [-5, 7]] as const) {
+  for (const [cx, cy] of [
+    [0, 0],
+    [3, -2],
+    [-5, 7],
+  ] as const) {
     const r = chunkRock(9, cx, cy, cut);
-    for (let ly = 0; ly < CHUNK; ly += 7) for (let lx = 0; lx < CHUNK; lx += 5) assert.equal(r[ly * CHUNK + lx], heightAt(9, centreX(cx * CHUNK + lx, cy * CHUNK + ly), centreY(cy * CHUNK + ly)) > cut ? 1 : 0);
+    for (let ly = 0; ly < CHUNK; ly += 7)
+      for (let lx = 0; lx < CHUNK; lx += 5)
+        assert.equal(r[ly * CHUNK + lx], heightAt(9, centreX(cx * CHUNK + lx, cy * CHUNK + ly), centreY(cy * CHUNK + ly)) > cut ? 1 : 0);
   }
 });
 

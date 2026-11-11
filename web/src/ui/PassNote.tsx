@@ -15,7 +15,11 @@ export default function PassNote({ onSaved, wrong }: { onSaved: () => void; wron
         onSaved();
       }}
     >
-      <label htmlFor="jev-pass">{wrong ? "That passphrase was refused. Try again:" : "Jev is hosted for this page behind a passphrase. Enter it to let Jev answer new situations and take new policies:"}</label>
+      <label htmlFor="jev-pass">
+        {wrong
+          ? "That passphrase was refused. Try again:"
+          : "Jev is hosted for this page behind a passphrase. Enter it to let Jev answer new situations and take new policies:"}
+      </label>
       <input
         id="jev-pass"
         type="password"
@@ -24,7 +28,11 @@ export default function PassNote({ onSaved, wrong }: { onSaved: () => void; wron
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
-      <button type="submit" className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink hover:bg-accent-hover disabled:opacity-50" disabled={!value.trim()}>
+      <button
+        type="submit"
+        className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink hover:bg-accent-hover disabled:opacity-50"
+        disabled={!value.trim()}
+      >
         Unlock
       </button>
     </form>

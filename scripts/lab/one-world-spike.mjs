@@ -40,7 +40,14 @@ function moundOf(plane, c) {
   const md = [];
   for (const [key, n] of c.midden) for (let k = 0; k < n; k++) md.push(hexDistance(key % 65536, Math.floor(key / 65536), own.px, own.py));
   md.sort((a, b) => a - b);
-  return { pellets: far.length, cells, top, radius: far.length ? far[Math.floor(0.95 * (far.length - 1))] : 0, midden: md.length, middenAt: md.length ? md[Math.floor((md.length - 1) / 2)] : NaN };
+  return {
+    pellets: far.length,
+    cells,
+    top,
+    radius: far.length ? far[Math.floor(0.95 * (far.length - 1))] : 0,
+    midden: md.length,
+    middenAt: md.length ? md[Math.floor((md.length - 1) / 2)] : NaN,
+  };
 }
 
 const [range = "1-3", secs = "300", antArg = "300"] = process.argv.slice(2);
@@ -59,8 +66,19 @@ for (let seed = lo; seed <= hi; seed++) {
   const atHole = game.colonies.map((c) => ({ gen: new Uint32Array(c.n), t: new Float32Array(c.n), most: [0, 0] }));
   // Per colony and ant slot: on the plane, seconds since it turned home (carrying, or in return), whether it carried food
   // and whether it searched this trip; the layer it was on last tick, so a trip that ends down the hole is seen.
-  const trip = game.colonies.map((c) => ({ gen: new Uint32Array(c.n), t: new Float32Array(c.n), food: new Uint8Array(c.n), searched: new Uint8Array(c.n), was: new Uint8Array(c.n).fill(1), most: 0, trips: 0, searchTrips: 0 }));
-  console.log(`seed ${seed}: plane ${world.plane.size.w}×${world.plane.size.h}, curtain ${world.curtain.size.w}×${world.curtain.size.h}, holes ${game.player.holeCells.map((h) => `(${h.px},${h.py})↔col ${h.col}`).join(", ")}`);
+  const trip = game.colonies.map((c) => ({
+    gen: new Uint32Array(c.n),
+    t: new Float32Array(c.n),
+    food: new Uint8Array(c.n),
+    searched: new Uint8Array(c.n),
+    was: new Uint8Array(c.n).fill(1),
+    most: 0,
+    trips: 0,
+    searchTrips: 0,
+  }));
+  console.log(
+    `seed ${seed}: plane ${world.plane.size.w}×${world.plane.size.h}, curtain ${world.curtain.size.w}×${world.curtain.size.h}, holes ${game.player.holeCells.map((h) => `(${h.px},${h.py})↔col ${h.col}`).join(", ")}`,
+  );
   for (let k = 1; k <= Math.round(seconds / DT); k++) {
     game.tick(DT);
     game.colonies.forEach((c, ci) => {
@@ -146,5 +164,7 @@ for (let seed = lo; seed <= hi; seed++) {
       });
     }
   }
-  console.log(`  plane food ${world.plane.foodLeft}/${world.plane.foodTotal} (regrown ${game.regrown}); plane spoil ${world.plane.moundCells} pellets; ${((performance.now() - t0) / 1000).toFixed(0)} s wall`);
+  console.log(
+    `  plane food ${world.plane.foodLeft}/${world.plane.foodTotal} (regrown ${game.regrown}); plane spoil ${world.plane.moundCells} pellets; ${((performance.now() - t0) / 1000).toFixed(0)} s wall`,
+  );
 }

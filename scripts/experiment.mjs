@@ -97,7 +97,10 @@ async function main() {
     const a = list.find((x) => x.id === id) ?? (one ? null : ONE_ASSAYS.find((x) => x.id === id && !ASSAYS.some((y) => y.id === id)));
     if (a) return { assay: a, one: one || !ASSAYS.includes(a) };
     if (one && ONE_PENDING[id]) pending.push(id);
-    else fail(`no assay "${id}"${one ? " on one world" : ""} (have: ${[...list, ...(one ? [] : ONE_ASSAYS.filter((x) => !ASSAYS.some((y) => y.id === x.id)))].map((x) => x.id).join(", ")})`);
+    else
+      fail(
+        `no assay "${id}"${one ? " on one world" : ""} (have: ${[...list, ...(one ? [] : ONE_ASSAYS.filter((x) => !ASSAYS.some((y) => y.id === x.id)))].map((x) => x.id).join(", ")})`,
+      );
     return null;
   };
   const all = ids.length === 0 || ids.includes("all");
@@ -108,19 +111,34 @@ async function main() {
   if (policy) {
     if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file>`);
     const cache = loadCache(policy.slice(6));
-    const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } = await import("../web/src/colony/index.ts");
+    const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } =
+      await import("../web/src/colony/index.ts");
     const want = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
-    if (JSON.stringify(cache.version) !== JSON.stringify(want)) fail(`${policy.slice(6)} was asked under brain versions ${JSON.stringify(cache.version)}; the code is at ${JSON.stringify(want)}. Ask afresh (scripts/colony-live.mjs).`);
+    if (JSON.stringify(cache.version) !== JSON.stringify(want))
+      fail(
+        `${policy.slice(6)} was asked under brain versions ${JSON.stringify(cache.version)}; the code is at ${JSON.stringify(want)}. Ask afresh (scripts/colony-live.mjs).`,
+      );
     // Versions are bumped by hand; the contexts (legend, question wording, doctrine) catch an edit made without a bump.
-    if (JSON.stringify(cache.contexts) !== JSON.stringify(cacheContexts(cache.doctrine?.text ?? ""))) fail(`${policy.slice(6)} was asked under other questions or another doctrine than the code's (cache contexts differ). Ask afresh (scripts/colony-live.mjs).`);
+    if (JSON.stringify(cache.contexts) !== JSON.stringify(cacheContexts(cache.doctrine?.text ?? "")))
+      fail(
+        `${policy.slice(6)} was asked under other questions or another doctrine than the code's (cache contexts differ). Ask afresh (scripts/colony-live.mjs).`,
+      );
     const n = (t) => Object.keys(t ?? {}).length;
-    console.log(`Replaying Jev's answers under the doctrine "${cache.doctrine?.name ?? "?"}" (${cache.view ?? "?"} view, seed ${cache.seed}): ${n(cache.modes)} modes, ${n(cache.stances)} stances, ${Object.entries(cache.responses ?? {}).map(([h, t]) => `${n(t)} ${h}`).join(", ")}.`);
+    console.log(
+      `Replaying Jev's answers under the doctrine "${cache.doctrine?.name ?? "?"}" (${cache.view ?? "?"} view, seed ${cache.seed}): ${n(cache.modes)} modes, ${n(cache.stances)} stances, ${Object.entries(
+        cache.responses ?? {},
+      )
+        .map(([h, t]) => `${n(t)} ${h}`)
+        .join(", ")}.`,
+    );
   }
 
   // One job per assay, combination and seed; the longest assays first, so the pool ends together.
   const secondsOf = (id) => chosen.find((x) => x.id === id).seconds;
   const queue = [];
-  for (const { assay, one: inOne } of picked) for (const [ci, c] of cs.entries()) for (const seed of seeds) queue.push({ id: assay.id, one: inOne, ci, o: c.o, seed, seconds, policy });
+  for (const { assay, one: inOne } of picked)
+    for (const [ci, c] of cs.entries())
+      for (const seed of seeds) queue.push({ id: assay.id, one: inOne, ci, o: c.o, seed, seconds, policy });
   queue.sort((a, b) => secondsOf(b.id) - secondsOf(a.id));
   const results = new Map(); // `${id}|${ci}` → runs
   const t0 = performance.now();
@@ -177,12 +195,16 @@ async function main() {
             t.hit += hit;
             t.miss += miss;
           }
-        const parts = Object.entries(sum).filter(([, v]) => v.hit + v.miss > 0).map(([lane, v]) => `${lane} ${Math.round((100 * v.hit) / (v.hit + v.miss))} % of ${(v.hit + v.miss).toLocaleString()}`);
+        const parts = Object.entries(sum)
+          .filter(([, v]) => v.hit + v.miss > 0)
+          .map(([lane, v]) => `${lane} ${Math.round((100 * v.hit) / (v.hit + v.miss))} % of ${(v.hit + v.miss).toLocaleString()}`);
         console.log(`Jev's answers (cache hits; the rest the local rule): ${parts.join(", ") || "no lookups"}\n`);
       }
     }
   }
-  console.error(`${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`);
+  console.error(
+    `${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`,
+  );
   if (json) writeFileSync(json, JSON.stringify(out, null, 1));
 }
 

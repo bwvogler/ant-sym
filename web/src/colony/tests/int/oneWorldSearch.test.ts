@@ -18,10 +18,20 @@ const RETURN = MODES.indexOf("return");
 const SIGMA_PER_CELL = PI_DRIFT / Math.SQRT2;
 
 /** The loops as designed (PRD §56), whatever the defaults. */
-const LOOPS: Partial<Colony["params"]> = { searchLoops: 0.5, searchGrow: 0.125, searchTurn: Math.PI * (3 - Math.sqrt(5)), searchPetal: Math.PI / 3, searchStall: 1 };
+const LOOPS: Partial<Colony["params"]> = {
+  searchLoops: 0.5,
+  searchGrow: 0.125,
+  searchTurn: Math.PI * (3 - Math.sqrt(5)),
+  searchPetal: Math.PI / 3,
+  searchStall: 1,
+};
 
 const game = (params: Partial<Colony["params"]> = LOOPS): Game => {
-  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(7));
+  const g = new Game(
+    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
+    { antCount: 10, rivalAnts: 10, regrow: 0 },
+    gameRng(7),
+  );
   for (const c of g.colonies) {
     for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = 0.05 * LIFESPAN;
     Object.assign(c.params, { scoutRate: 0, raidScout: 0, ...params });
@@ -67,8 +77,8 @@ function legs(g: Game, c: Colony, ox: number, oy: number, seconds: number): Leg[
   for (let k = 0; k < Math.round(seconds / DT); k++) {
     g.tick(DT);
     assert.equal(c.layer[0], PLANE, "still searching");
-    const x = (c.x[0]) - ox;
-    const y = (c.y[0]) - oy;
+    const x = c.x[0] - ox;
+    const y = c.y[0] - oy;
     const m = c.searchLeg[0];
     if (c.search[0] === 0) continue;
     if (m !== n) {
@@ -88,9 +98,11 @@ test("loops: each loop goes out and comes back through the spot where the vector
   const ls = legs(g, c, ox, oy, 40);
   const back = ls.filter((l) => l.n % 3 === 2);
   assert.ok(back.length >= 3, `${back.length} loops done`);
-  for (const l of back) assert.ok(Math.hypot(l.x, l.y) < 2.5, `loop ${(l.n - 2) / 3} ended ${Math.hypot(l.x, l.y).toFixed(2)} from its origin`);
+  for (const l of back)
+    assert.ok(Math.hypot(l.x, l.y) < 2.5, `loop ${(l.n - 2) / 3} ended ${Math.hypot(l.x, l.y).toFixed(2)} from its origin`);
   // And it went out between: the leg out reached the loop's reach.
-  for (const l of ls.filter((l) => l.n % 3 === 0)) assert.ok(l.far > l.reach - 2.5, `loop ${l.n / 3} went out to ${l.far.toFixed(1)} of ${l.reach.toFixed(1)}`);
+  for (const l of ls.filter((l) => l.n % 3 === 0))
+    assert.ok(l.far > l.reach - 2.5, `loop ${l.n / 3} went out to ${l.far.toFixed(1)} of ${l.reach.toFixed(1)}`);
 });
 
 test("loops: each reaches further than the last, the first σ/2 out and σ/8 more a loop, σ from the trip walked", () => {
@@ -115,7 +127,11 @@ test("loops: each reaches further than the last, the first σ/2 out and σ/8 mor
   });
   for (let k = 1; k < short.out.length; k++) assert.ok(short.out[k]! > short.out[k - 1]!, `loop ${k} reaches further than loop ${k - 1}`);
   // Twice the trip, twice the reach.
-  for (let k = 0; k < 3; k++) assert.ok(Math.abs(long.out[k]! / short.out[k]! - 2) < 0.3, `loop ${k}: ${long.out[k]!.toFixed(1)} after 400 cells, ${short.out[k]!.toFixed(1)} after 200`);
+  for (let k = 0; k < 3; k++)
+    assert.ok(
+      Math.abs(long.out[k]! / short.out[k]! - 2) < 0.3,
+      `loop ${k}: ${long.out[k]!.toFixed(1)} after 400 cells, ${short.out[k]!.toFixed(1)} after 200`,
+    );
 });
 
 test("loops: successive loops head the golden angle apart (each loop's way out, at its widest)", () => {
@@ -131,7 +147,10 @@ test("loops: successive loops head the golden angle apart (each loop's way out, 
   assert.ok(heads.length >= 3, `${heads.length} loops`);
   for (let k = 1; k < heads.length; k++) {
     const turn = (((heads[k]! - heads[k - 1]!) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-    assert.ok(Math.abs(turn - (c.params.searchTurn as number)) < 0.15, `loop ${k} turned ${((turn * 180) / Math.PI).toFixed(0)}° on from loop ${k - 1}`);
+    assert.ok(
+      Math.abs(turn - (c.params.searchTurn as number)) < 0.15,
+      `loop ${k} turned ${((turn * 180) / Math.PI).toFixed(0)}° on from loop ${k - 1}`,
+    );
   }
 });
 
@@ -148,7 +167,10 @@ test("loops off (searchLoops 0): U3b's spiral, each point a quarter turn on and 
   assert.ok(seen.length >= 4, `${seen.length} points`);
   assert.equal(seen[0]!.s, 3, "the first at SEARCH_START");
   for (let k = 1; k < seen.length; k++) {
-    assert.ok(Math.abs(seen[k]!.s / seen[k - 1]!.s - Math.sqrt(Math.sqrt(1.6))) < 1e-5, `point ${k}: ${seen[k]!.s} after ${seen[k - 1]!.s}`);
+    assert.ok(
+      Math.abs(seen[k]!.s / seen[k - 1]!.s - Math.sqrt(Math.sqrt(1.6))) < 1e-5,
+      `point ${k}: ${seen[k]!.s} after ${seen[k - 1]!.s}`,
+    );
     assert.ok(Math.abs(seen[k]!.a - seen[k - 1]!.a - Math.PI / 2) < 1e-5, `point ${k} a quarter turn on`);
   }
 });
@@ -181,7 +203,7 @@ function spot(g: Game, x: number, y: number, r: number, toward: number, bare = f
     const a = toward + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 32);
     const p = { x: x + r * Math.cos(a), y: y + r * Math.sin(a) };
     cellOf(p.x, p.y);
-    if ((g.world!.plane.spoil!.get(CELL[0], CELL[1]) > 0) !== bare) return p;
+    if (g.world!.plane.spoil!.get(CELL[0], CELL[1]) > 0 !== bare) return p;
   }
   throw new Error("no such spot");
 }
@@ -211,7 +233,7 @@ function watch(g: Game, c: Colony, seconds: number, x: number, y: number): { t: 
   for (let k = 0; k < Math.round(seconds / DT); k++) {
     g.tick(DT);
     if (c.layer[0] !== PLANE) return { t: (k + 1) * DT, nearest };
-    nearest = Math.min(nearest, Math.hypot((c.x[0]) - x, (c.y[0]) - y));
+    nearest = Math.min(nearest, Math.hypot(c.x[0] - x, c.y[0] - y));
   }
   return { t: NaN, nearest };
 }
@@ -235,7 +257,10 @@ test("smell: the same carrier not yet searching (homing on its full vector) cros
   const c = smeller(g, P.x, P.y, false);
   watch(g, c, 3, H.x, H.y);
   assert.equal(c.layer[0], PLANE, "still out");
-  assert.ok(Math.hypot((c.x[0]) - H.x, (c.y[0]) - H.y) > 20, `it kept on toward its vector's end (now ${Math.hypot((c.x[0]) - H.x, (c.y[0]) - H.y).toFixed(1)} from the hole)`);
+  assert.ok(
+    Math.hypot(c.x[0] - H.x, c.y[0] - H.y) > 20,
+    `it kept on toward its vector's end (now ${Math.hypot(c.x[0] - H.x, c.y[0] - H.y).toFixed(1)} from the hole)`,
+  );
 });
 
 test("smell: a searcher within its mound's reach but on bare ground is not pulled (it feels no spoil underfoot)", () => {
@@ -246,7 +271,7 @@ test("smell: a searcher within its mound's reach but on bare ground is not pulle
   const c = smeller(g, P.x, P.y, true);
   watch(g, c, 3, H.x, H.y);
   assert.equal(c.layer[0], PLANE, "still out");
-  assert.ok(Math.hypot((c.x[0]) - H.x, (c.y[0]) - H.y) > 14, "it went on with its loop");
+  assert.ok(Math.hypot(c.x[0] - H.x, c.y[0] - H.y) > 14, "it went on with its loop");
 });
 
 test("smell: a searcher on the rival's mound is not pulled, to the rival's hole or its own", () => {
@@ -266,8 +291,8 @@ test("smell: a searcher on the rival's mound is not pulled, to the rival's hole 
   const { t, nearest } = watch(g, c, 10, V.x, V.y);
   assert.ok(Number.isNaN(t), "it went down no hole");
   assert.ok(nearest > HOLE_SIGHT, `never nearer the player's hole than ${nearest.toFixed(1)}`);
-  assert.ok(Math.hypot((c.x[0]) - P.x, (c.y[0]) - P.y) < 10, "it searched round where its vector ran out");
-  assert.ok((c.search[0]) > 0, "searching");
+  assert.ok(Math.hypot(c.x[0] - P.x, c.y[0] - P.y) < 10, "it searched round where its vector ran out");
+  assert.ok(c.search[0] > 0, "searching");
 });
 
 test("loops: the first loop heads the way the ant faces when its vector runs out", () => {
@@ -299,7 +324,10 @@ test("loops: a point counts as reached within LOOP_AT (2 cells), not only within
 });
 
 test("loops: a stall skips to the next point (searchStall 1), or starts the next loop (searchStall 0)", () => {
-  for (const [stall, want] of [[1, 5], [0, 6]] as const) {
+  for (const [stall, want] of [
+    [1, 5],
+    [0, 6],
+  ] as const) {
     const g = game({ ...LOOPS, searchStall: stall });
     const { c, ox, oy } = lost(g, 200);
     // Partway out on loop 1 (leg 4, its leg across), far from its point and no nearer it for longer than SEARCH_STALL.

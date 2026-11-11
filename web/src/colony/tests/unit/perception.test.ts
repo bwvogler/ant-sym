@@ -118,7 +118,11 @@ test("the host's own policy is asked the very question a healthy ant would be as
   assert.deepEqual(Object.keys(sb), Object.keys(sa), "same fields: nothing says the ant is infected");
   assert.equal(situationKey(sb), situationKey(sa), "same cache key");
   const doctrine = "Gather food.";
-  assert.equal(JSON.stringify(packModeRequest([{ id: "s0", situation: sb }], doctrine)), JSON.stringify(packModeRequest([{ id: "s0", situation: sa }], doctrine)), "byte-identical Jev request");
+  assert.equal(
+    JSON.stringify(packModeRequest([{ id: "s0", situation: sb }], doctrine)),
+    JSON.stringify(packModeRequest([{ id: "s0", situation: sa }], doctrine)),
+    "byte-identical Jev request",
+  );
   assert.equal(b.c.mode[0], a.c.mode[0], "and the same choice");
 });
 
@@ -169,14 +173,18 @@ test("the fungus writes a host's perception from its intervention and load; a cl
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
 
   assert.equal(c.expr[0], preset("share"), "Bloom's default: share");
-  assert.ok(Math.abs((c.gainFood[0]) - 1.25) < 1e-3, `food ×1.25 at half load: ${c.gainFood[0]}`);
-  assert.ok(Math.abs((c.foreignFood[0]) - 0.5) < 1e-3);
+  assert.ok(Math.abs(c.gainFood[0] - 1.25) < 1e-3, `food ×1.25 at half load: ${c.gainFood[0]}`);
+  assert.ok(Math.abs(c.foreignFood[0] - 0.5) < 1e-3);
   assert.equal(c.gainAlarm[0], 1, "share leaves alarm alone");
   assert.equal(c.expr[1], preset("soothe"), "Lockpick's default: soothe");
-  assert.ok(Math.abs((c.gainAlarm[1]) - 0.25) < 1e-6, "alarm ×0.25 at full load");
+  assert.ok(Math.abs(c.gainAlarm[1] - 0.25) < 1e-6, "alarm ×0.25 at full load");
 
   // A strain that clears at once: the host is clean after one step, and perceives as it is.
-  const g = new Fungus(map, {}, STRAINS.map((s) => ({ ...s, decay: 1e9 })));
+  const g = new Fungus(
+    map,
+    {},
+    STRAINS.map((s) => ({ ...s, decay: 1e9 })),
+  );
   g.hosts = 2;
   g.step([c], [occupancy(c, new CountGrid())], 0.1);
   for (const i of [0, 1]) {

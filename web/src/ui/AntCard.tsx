@@ -1,5 +1,18 @@
 import { useEffect, useState } from "react";
-import { type Colony, MODES, TRAILS, type Mode, type Situation, INFECTED, STRAINS, type Fungus, pulled, UPGRADES, decodeFungal, type FungalSituation } from "../colony/index.ts";
+import {
+  type Colony,
+  MODES,
+  TRAILS,
+  type Mode,
+  type Situation,
+  INFECTED,
+  STRAINS,
+  type Fungus,
+  pulled,
+  UPGRADES,
+  decodeFungal,
+  type FungalSituation,
+} from "../colony/index.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import Help from "./Help.tsx";
@@ -24,7 +37,12 @@ interface Props {
   onClose: () => void;
 }
 
-const BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under its colony's doctrine", stale: "Jev's answer under its earlier doctrine: Jev can't answer the new one now", waiting: "the local rule, while Jev is asked", local: "the local rule" };
+const BY: Record<DecidedBy, string> = {
+  jev: "Jev's cached answer under its colony's doctrine",
+  stale: "Jev's answer under its earlier doctrine: Jev can't answer the new one now",
+  waiting: "the local rule, while Jev is asked",
+  local: "the local rule",
+};
 
 export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose }: Props) {
   const [, setTick] = useState(0);
@@ -51,28 +69,51 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
         </h2>
         <span className="font-mono text-xs text-fg-2">
           {mode}
-          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s{col.queen ? ` · energy ${((col.energy[i]) * 100).toFixed(0)} %${(col.need[i]) >= 0.05 ? ` · feels hunger ${(col.need[i]).toFixed(2)}` : ""}` : ""} · at ({(col.x[i]).toFixed(0)}, {(col.y[i]).toFixed(0)})
+          {carrying ? " · carrying food" : ""} · out {since.toFixed(0)} s · fatigue {fatigue.toFixed(0)} / {col.params.patience} s
+          {col.queen
+            ? ` · energy ${(col.energy[i] * 100).toFixed(0)} %${col.need[i] >= 0.05 ? ` · feels hunger ${col.need[i].toFixed(2)}` : ""}`
+            : ""}{" "}
+          · at ({col.x[i].toFixed(0)}, {col.y[i].toFixed(0)})
         </span>
-        <button type="button" className="ml-auto rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised" onClick={onClose}>
+        <button
+          type="button"
+          className="ml-auto rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised"
+          onClick={onClose}
+        >
           Stop following
         </button>
       </div>
       {carrying ? (
-        <p className="mt-2 text-xs text-fg-3">Carrying food home: a mechanic, not a choice. It is asked again once it puts the food down.</p>
+        <p className="mt-2 text-xs text-fg-3">
+          Carrying food home: a mechanic, not a choice. It is asked again once it puts the food down.
+        </p>
       ) : q ? (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-fg-3">last asked:</span>
           {chips(q).map(([k, v, to]) => (
-            <button key={k} type="button" className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2 hover:text-accent hover:underline" onClick={() => openLearn(to)} title={`Learn: ${k}`}>
+            <button
+              key={k}
+              type="button"
+              className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2 hover:text-accent hover:underline"
+              onClick={() => openLearn(to)}
+              title={`Learn: ${k}`}
+            >
               {k} {v}
             </button>
           ))}
           <span className="text-fg-3">→</span>
-          <span className={`rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent ${decided?.by === "stale" ? "opacity-50" : ""}`} title={decided?.by === "stale" ? "stale: Jev can't answer now, so the answer under the earlier words plays" : undefined}>
+          <span
+            className={`rounded bg-accent-soft px-1.5 py-0.5 font-mono text-accent ${decided?.by === "stale" ? "opacity-50" : ""}`}
+            title={decided?.by === "stale" ? "stale: Jev can't answer now, so the answer under the earlier words plays" : undefined}
+          >
             {mode}
           </span>
           <span className="text-fg-3">{decided ? `by ${BY[decided.by]}` : ""}</span>
-          <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "mode" })}>
+          <button
+            type="button"
+            className="text-accent underline-offset-2 hover:underline"
+            onClick={() => openLearn({ tab: "policy", id: "mode" })}
+          >
             why?
           </button>
         </div>
@@ -85,12 +126,20 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
 }
 
 /** What the fungus is doing to ant i: what it senses there, and the levers it pulls (fungus-policy §11). */
-const FUNGUS_BY: Record<DecidedBy, string> = { jev: "Jev's cached answer under your aim", stale: "Jev's answer under your earlier aim: Jev can't answer the new one now", waiting: "the strain's default, while Jev is asked", local: "the strain's default" };
+const FUNGUS_BY: Record<DecidedBy, string> = {
+  jev: "Jev's cached answer under your aim",
+  stale: "Jev's answer under your earlier aim: Jev can't answer the new one now",
+  waiting: "the strain's default, while Jev is asked",
+  local: "the strain's default",
+};
 
 function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: Fungus; explain: Props["explainFungus"] }) {
   const load = col.load[i];
   const resist = col.resist[i];
-  if (load < INFECTED) return resist >= 0.05 ? <p className="mt-2 text-xs text-fg-3">Clean · resistance {resist.toFixed(2)} from grooming infected nestmates.</p> : null;
+  if (load < INFECTED)
+    return resist >= 0.05 ? (
+      <p className="mt-2 text-xs text-fg-3">Clean · resistance {resist.toFixed(2)} from grooming infected nestmates.</p>
+    ) : null;
   const s = col.strain[i];
   const strain = STRAINS[s];
   const code = col.fungal[i];
@@ -142,7 +191,11 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
             );
           })}
           <span className="text-fg-3">by {FUNGUS_BY[decided.by]}</span>
-          <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={() => openLearn({ tab: "policy", id: "fungus" })}>
+          <button
+            type="button"
+            className="text-accent underline-offset-2 hover:underline"
+            onClick={() => openLearn({ tab: "policy", id: "fungus" })}
+          >
             why?
           </button>
         </div>
@@ -151,7 +204,8 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
         <span className="text-spore">
           {strain?.name ?? "fungus"} {Math.round(100 * load)}%
         </span>
-        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {(col.odour[i]).toFixed(2)} (its nest {col.nestOdour.toFixed(2)}). The ant's situation above is what it perceives; its own policy chose.
+        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {col.odour[i].toFixed(2)} (its nest {col.nestOdour.toFixed(2)}
+        ). The ant's situation above is what it perceives; its own policy chose.
       </p>
     </>
   );

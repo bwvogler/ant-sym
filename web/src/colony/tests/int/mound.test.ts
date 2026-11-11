@@ -36,15 +36,20 @@ test("a sandpile round the hole: slopes of at most a row per column (≈41°), a
     const h = top0[x]! - groundTop(map, x); // how high the mound stands in column x
     assert.ok(h >= 0);
     if (x !== ex) assert.ok(hole - groundTop(map, x) <= Math.abs(x - ex) - 1 || h === 0, `column ${x}: inside the funnel's slope`);
-    if (top0[x] === top0[x + 1] && x !== ex && x + 1 !== ex) assert.ok(Math.abs(groundTop(map, x) - groundTop(map, x + 1)) <= 1, `columns ${x}–${x + 1}: at most a row apart`);
+    if (top0[x] === top0[x + 1] && x !== ex && x + 1 !== ex)
+      assert.ok(Math.abs(groundTop(map, x) - groundTop(map, x + 1)) <= 1, `columns ${x}–${x + 1}: at most a row apart`);
     const y = groundTop(map, x) - 1;
     assert.equal(rockAt(map, x, y), OPEN, `column ${x}: a walkway cell on top`);
   }
   assert.equal(groundTop(map, ex), top0[ex], "the hole's column is never heaped");
   assert.equal(rockAt(map, ex, ey), OPEN, "the entrance stays open");
-  assert.ok(Math.max(...Array.from({ length: 40 }, (_, k) => top0[ex - 20 + k]! - groundTop(map, ex - 20 + k))) > 10, "a mound you can see: over ten rows high");
+  assert.ok(
+    Math.max(...Array.from({ length: 40 }, (_, k) => top0[ex - 20 + k]! - groundTop(map, ex - 20 + k))) > 10,
+    "a mound you can see: over ten rows high",
+  );
   let food = 0;
-  for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) food += map.food.get(x, y) > 0 && isSky(map, x, y) && x === ex + 3 ? map.food.get(x, y) : 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = 0; x < map.size.w; x++) food += map.food.get(x, y) > 0 && isSky(map, x, y) && x === ex + 3 ? map.food.get(x, y) : 0;
   assert.equal(food, 5, "the food on the walkway was lifted on top, not buried");
 });
 
@@ -55,7 +60,8 @@ test("two colonies: each picks up the other's spoil too, and the books still bal
     g.tick(1 / 30);
     if (k % 450 !== 0) continue;
     let loose = 0;
-    for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
+    for (let y = 0; y < map.size.h; y++)
+      for (let x = 0; x < map.size.w; x++) loose += map.loose!.get(x, y) && rockAt(map, x, y) === SOIL ? 1 : 0;
     // The mound is both colonies' (each picks up the other's spoil): only the total is a count of cells (review of MR 15:
     // one colony's own count went negative). It is each colony's soil brought out × SWELL, less what it took off, plus what it put back.
     let mound = 0;
@@ -63,12 +69,23 @@ test("two colonies: each picks up the other's spoil too, and the books still bal
       const carried = c.carriedPellets();
       mound += Math.floor(c.soilOut * SWELL + 1e-9) - c.moundLost - c.loosePicked + c.looseDropped;
       assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried.dug + c.soilLost, "dug = brought out + filled + carried + lost");
-      assert.equal(c.loosePicked, c.looseDropped + c.looseFilled + carried.loose + c.looseLost, "loose picked up = dropped + filled + carried + lost");
+      assert.equal(
+        c.loosePicked,
+        c.looseDropped + c.looseFilled + carried.loose + c.looseLost,
+        "loose picked up = dropped + filled + carried + lost",
+      );
     }
-    assert.equal(mound, loose, "both colonies' soil out, less what they took off and plus what they put back, is the loose soil on the map");
+    assert.equal(
+      mound,
+      loose,
+      "both colonies' soil out, less what they took off and plus what they put back, is the loose soil on the map",
+    );
     assert.equal(map.moundCells, loose, "the map's count is the loose soil on it");
   }
-  assert.ok(g.colonies.every((c) => c.soilOut > 20), "both brought soil out");
+  assert.ok(
+    g.colonies.every((c) => c.soilOut > 20),
+    "both brought soil out",
+  );
   // No new holes onto the ground line, away from both entrances (spoil picked off a blanket over dug ground opened them).
   const holeCols = map.nests.map((n) => {
     cellOf(n.entrance!.x, n.entrance!.y);
@@ -86,7 +103,12 @@ test("two colonies: each picks up the other's spoil too, and the books still bal
 test("a pellet is carried out along the ground and dropped where the carrier stands, not by the hole", () => {
   // No scent in this one-ant world (deposit 0): every branch would look unused, so no detours to fill them.
   const map = generateSideWorld(1, { ...SMALL });
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, backfill: { ...BACKFILL, enterStale: 0 } }, mulberry32(9), () => "return");
+  const c = new Colony(
+    map,
+    { antCount: 1, maxAnts: 1, deposit: 0, backfill: { ...BACKFILL, enterStale: 0 } },
+    mulberry32(9),
+    () => "return",
+  );
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
   const ex = CELL[0];
   const drops: { at: number; cells: number[] }[] = [];
@@ -106,11 +128,17 @@ test("a pellet is carried out along the ground and dropped where the carrier sta
     }
     assert.equal(c.pellet[0], 0, `trip ${trip}: dropped`);
     const cells: number[] = [];
-    for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (map.loose!.get(x, y) && !before.has(y * map.size.w + x)) cells.push(x);
+    for (let y = 0; y < map.size.h; y++)
+      for (let x = 0; x < map.size.w; x++) if (map.loose!.get(x, y) && !before.has(y * map.size.w + x)) cells.push(x);
     drops.push({ at, cells });
   }
-  for (const d of drops) for (const x of d.cells) assert.ok(Math.abs(x - d.at) <= 4, `heaped in column ${x}, dropped at ${d.at}: where it stood (and slid a little)`);
-  assert.ok(drops.some((d) => Math.abs(d.at - ex) >= 4), "carried away from the hole");
+  for (const d of drops)
+    for (const x of d.cells)
+      assert.ok(Math.abs(x - d.at) <= 4, `heaped in column ${x}, dropped at ${d.at}: where it stood (and slid a little)`);
+  assert.ok(
+    drops.some((d) => Math.abs(d.at - ex) >= 4),
+    "carried away from the hole",
+  );
 });
 
 test("one colony's mound never buries another's hole: every hole keeps its funnel, however far the spoil spreads", () => {
@@ -127,9 +155,11 @@ test("one colony's mound never buries another's hole: every hole keeps its funne
   for (let k = 0; k < 4000; k++) heapMound(map, a, b > a ? 1 : -1, Math.floor(rng() * 150), holes);
   assert.equal(groundTop(map, b), topB, "the other hole's column is never heaped");
   assert.equal(rockAt(map, b, by), OPEN, "its hole is open");
-  for (const d of [1, 2]) assert.ok(groundTop(map, b) - groundTop(map, b + d) < d && groundTop(map, b) - groundTop(map, b - d) < d, `its funnel holds ${d} out`);
+  for (const d of [1, 2])
+    assert.ok(groundTop(map, b) - groundTop(map, b + d) < d && groundTop(map, b) - groundTop(map, b - d) < d, `its funnel holds ${d} out`);
   const walk = reachable(map, map.nests[1]!.x, map.nests[1]!.y, "open");
   let toSky = false;
-  for (let y = 0; y < map.size.h && !toSky; y++) for (let x = 0; x < map.size.w && !toSky; x++) toSky = walk[y * map.size.w + x] === 1 && isSky(map, x, y);
+  for (let y = 0; y < map.size.h && !toSky; y++)
+    for (let x = 0; x < map.size.w && !toSky; x++) toSky = walk[y * map.size.w + x] === 1 && isSky(map, x, y);
   assert.ok(toSky, "its chamber still reaches the ground line");
 });

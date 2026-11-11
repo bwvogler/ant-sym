@@ -20,7 +20,14 @@ const { Game } = await import(`${root}/web/src/colony/game.ts`);
 const C = await import(`${root}/web/src/colony/colony.ts`);
 const W = await import(`${root}/web/src/colony/world.ts`);
 const { nx, ny } = await import(`${root}/web/src/colony/hex.ts`);
-const tuning = args[3] ? Object.fromEntries(args[3].split(",").map((kv) => kv.split(":")).map(([k, v]) => [k, Number(v)])) : {};
+const tuning = args[3]
+  ? Object.fromEntries(
+      args[3]
+        .split(",")
+        .map((kv) => kv.split(":"))
+        .map(([k, v]) => [k, Number(v)]),
+    )
+  : {};
 const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 const rows = [];
 for (const [world, seed] of games) {
@@ -82,9 +89,21 @@ for (const [world, seed] of games) {
         if (b >= 0 && b !== a) touch++;
       }
     }
-  const r = { world, seed, growth: ch.floorOf[0] / floor0, chambers: mine.length, stacked: gaps.length, trend: mean(gaps.slice(half)) > mean(gaps.slice(0, half)), touch, ...n, dug: g.player.soilDug };
+  const r = {
+    world,
+    seed,
+    growth: ch.floorOf[0] / floor0,
+    chambers: mine.length,
+    stacked: gaps.length,
+    trend: mean(gaps.slice(half)) > mean(gaps.slice(0, half)),
+    touch,
+    ...n,
+    dug: g.player.soilDug,
+  };
   rows.push(r);
-  console.log(`world ${world} game ${seed}: floor ×${r.growth.toFixed(2)}  chambers ${r.chambers}  stacked ${r.stacked}  trend ${r.trend ? "yes" : "no"}  touching ${touch}  dug ${r.dug}  fills floor ${n.floor} (re-dug ${n.floorRedug}) other ${n.other} (re-dug ${n.otherRedug})`);
+  console.log(
+    `world ${world} game ${seed}: floor ×${r.growth.toFixed(2)}  chambers ${r.chambers}  stacked ${r.stacked}  trend ${r.trend ? "yes" : "no"}  touching ${touch}  dug ${r.dug}  fills floor ${n.floor} (re-dug ${n.floorRedug}) other ${n.other} (re-dug ${n.otherRedug})`,
+  );
 }
 const g = rows.map((r) => r.growth);
 const st = rows.map((r) => r.stacked);

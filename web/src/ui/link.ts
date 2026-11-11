@@ -48,7 +48,7 @@ export function stripPoint(s: number): { x: number; y: number } {
  */
 export function stripColumn(line: Transect, wx: number, wy: number): number | null {
   cellOf(wx, wy);
-  if ((CELL[1]) > STRIP) return null;
+  if (CELL[1] > STRIP) return null;
   cellOf(wx, centreY(STRIP));
   const s = CELL[0];
   return cellAt(line, s) ? s : null;

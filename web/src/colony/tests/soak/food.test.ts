@@ -10,7 +10,6 @@ import { SMALL_SIDE, broodChamber } from "../builders.ts";
 // Nest slice 5 (docs/nest-and-home.md §3.6): food lies in chambers. Foragers bring it to reception; porters carry it to
 // where brood and the queen want it, and the rest down to stores; the queen and larvae eat what lies by them.
 
-
 test("the larder is the food lying in the colony's chambers, porters move it, and the queen's brood is raised from it", () => {
   const map = generateSideWorld(2, SMALL_SIDE);
   const g = new Game(map, { antCount: 300, rival: false }, mulberry32(4));
@@ -143,7 +142,6 @@ test("porters lay no food trail: food moved between chambers is no food to recru
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) food += c.ph.fields.food.get(x, y);
   assert.equal(food, 0, "no food trail anywhere");
 });
-
 
 test("a larva eats what lies in its own chamber, not the royal chamber's", () => {
   const map = generateSideWorld(2, SMALL_SIDE);

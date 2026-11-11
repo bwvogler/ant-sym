@@ -120,8 +120,8 @@ export class MeanGrid {
     let s = 0;
     let n = 0;
     for (let k = 0; k < o.length; k += 2) {
-      const ax = x + (o[k]);
-      const ay = y + (o[k + 1]);
+      const ax = x + o[k];
+      const ay = y + o[k + 1];
       if (ay < 0) continue;
       s += this.sum.get(ax, ay);
       n += this.count.get(ax, ay);

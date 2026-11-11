@@ -19,7 +19,8 @@ const FIGHT = MODES.indexOf("fight");
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 
-const game = (ants = 10, seed = SEED, regrow = 0): Game => new Game(smallOne(seed), { antCount: ants, rivalAnts: ants, regrow }, gameRng(seed));
+const game = (ants = 10, seed = SEED, regrow = 0): Game =>
+  new Game(smallOne(seed), { antCount: ants, rivalAnts: ants, regrow }, gameRng(seed));
 const ages = (c: Colony, b: 0 | 1 | 2) => {
   for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(b);
 };
@@ -30,7 +31,7 @@ const underground = (g: Game): boolean => {
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || c.layer[i] !== CURTAIN) continue;
       cellOf(c.x[i]!, c.y[i]!);
-      if ((CELL[1]) < top) return false;
+      if (CELL[1] < top) return false;
     }
     return true;
   });
@@ -47,7 +48,11 @@ test("one world: two layers, home the curtain, a queen, every ant underground, h
   g.colonies.forEach((c, k) => {
     assert.equal(c.layers.length, 2);
     assert.equal(c.home, CURTAIN);
-    assert.deepEqual(c.layers.map((L) => L.map), g.layers, "a colony's layers are the game's, in order");
+    assert.deepEqual(
+      c.layers.map((L) => L.map),
+      g.layers,
+      "a colony's layers are the game's, in order",
+    );
     assert.equal(c.map, w.curtain, "between ticks the home layer is bound");
     assert.equal((c.layers[PLANE] as Layer).nest, w.plane.nests[k]);
     assert.equal((c.layers[CURTAIN] as Layer).nest, w.curtain.nests[k]);
@@ -102,7 +107,7 @@ test("one world: the strip over a hole is sky, and a walker stepping up into it 
   // Both cells over the hole (its NW and NE neighbours, row CRUST − 1) are sky: nothing of the plane is stored there.
   for (const dx of [-1, 0, 1]) {
     cellOf(centreX(h.col, h.row) + dx * 0.5, centreY(h.row) - 1);
-    if ((CELL[1]) < h.row) assert.equal(rockAt(curtain, CELL[0], CELL[1]), AIR);
+    if (CELL[1] < h.row) assert.equal(rockAt(curtain, CELL[0], CELL[1]), AIR);
   }
   const at = curtainHole(h);
   const i = 0;
@@ -338,7 +343,7 @@ test("one world: the landing is on the plane by the hole, its spores dose only t
   c.putAnt(0, PLANE, spot.x, spot.y);
   c.putAnt(1, CURTAIN, spot.x, spot.y);
   g.paintSpores(spot.x, spot.y, 2, 3, 0.5, GARDEN);
-  assert.ok((c.load[0]) > 0, "the plane ant is dosed");
+  assert.ok(c.load[0] > 0, "the plane ant is dosed");
   assert.equal(c.load[1], 0, "the curtain ant is not");
   // The fungus in a host reads the ground of the layer it is on: the plane's open ground, the curtain's chamber.
   const chamber = g.world!.curtain.nests[0]!;
@@ -350,7 +355,7 @@ test("one world: the landing is on the plane by the hole, its spores dose only t
     c.putAnt(1, CURTAIN, chamber.x, chamber.y);
     g.tick(DT);
   }
-  assert.ok((c.fungal[0]) >= 0 && (c.fungal[1]) >= 0, "both chose");
+  assert.ok(c.fungal[0] >= 0 && c.fungal[1] >= 0, "both chose");
   assert.equal(decodeFungal(c.fungal[0]).place, "outside");
   assert.notEqual(decodeFungal(c.fungal[1]).place, "outside");
   // The nest's levers are offered: one world always has a nest.
@@ -477,7 +482,8 @@ const atTop = (g: Game, c: Colony, at: { x: number; y: number }, ants: readonly 
   }
 };
 /** The player's royal chamber in the curtain. */
-const royalOf = (g: Game, c: Colony): number => g.world!.curtain.chambers!.list.find((r) => r.role === "royal" && r.colony === c.params.nest)!.id;
+const royalOf = (g: Game, c: Colony): number =>
+  g.world!.curtain.chambers!.list.find((r) => r.role === "royal" && r.colony === c.params.nest)!.id;
 
 test("one world: an old ant holding brood, and an old porter, at the top of a shaft are turned back down it", () => {
   // At the top of the rival's shaft: lost in another nest's tunnels, a homing ant heads for the hole and climbs out (#goal),

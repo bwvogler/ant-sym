@@ -16,7 +16,20 @@
 // whole game at the end (tests/saveHash.ts): a tick refactor must leave it unchanged.
 //
 // Usage: node scripts/colony-bench.mjs [--one [--page]] [--hash] [ants per colony=1200] [sim seconds=60] [seed=1] [spores=0]
-import { CURTAIN, PLANE, STRAINS, GAME_REGROW, Game, gameRng, generateOneWorld, generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, SIDE_WORLD } from "../web/src/colony/index.ts";
+import {
+  CURTAIN,
+  PLANE,
+  STRAINS,
+  GAME_REGROW,
+  Game,
+  gameRng,
+  generateOneWorld,
+  generateSideWorld,
+  generateWorld,
+  mulberry32,
+  OPEN_WORLD,
+  SIDE_WORLD,
+} from "../web/src/colony/index.ts";
 
 const one = process.argv.includes("--one");
 const page = process.argv.includes("--page");
@@ -32,13 +45,30 @@ const SIZES = [
   { w: 512, h: 320 },
 ];
 
-const RUNS = /** @type {[{ w: number; h: number } | null, string][]} */ (one ? [[null, page ? "one world, two, as the page plays it" : "one world, two"]] : [...SIZES.flatMap((s) => [[s, "underground"], [s, "open"]]), [SIDE_WORLD.size, "side, one colony"], [SIDE_WORLD.size, "side, two"]]);
+const RUNS = /** @type {[{ w: number; h: number } | null, string][]} */ (
+  one
+    ? [[null, page ? "one world, two, as the page plays it" : "one world, two"]]
+    : [
+        ...SIZES.flatMap((s) => [
+          [s, "underground"],
+          [s, "open"],
+        ]),
+        [SIDE_WORLD.size, "side, one colony"],
+        [SIDE_WORLD.size, "side, two"],
+      ]
+);
 for (const [given, ground] of RUNS) {
   const t0 = performance.now();
-  const map = ground.startsWith("one") ? generateOneWorld(seed) : ground.startsWith("side") ? generateSideWorld(seed, ground === "side, two" ? {} : { nestCount: 1 }) : generateWorld(seed, ground === "open" ? { ...OPEN_WORLD, size: given } : { size: given });
+  const map = ground.startsWith("one")
+    ? generateOneWorld(seed)
+    : ground.startsWith("side")
+      ? generateSideWorld(seed, ground === "side, two" ? {} : { nestCount: 1 })
+      : generateWorld(seed, ground === "open" ? { ...OPEN_WORLD, size: given } : { size: given });
   const gen = performance.now() - t0;
   const size = given ?? /** @type {import("../web/src/colony/index.ts").OneWorld} */ (map).plane.size;
-  const game = page ? new Game(map, { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed)) : new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 31 + 7));
+  const game = page
+    ? new Game(map, { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed))
+    : new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 31 + 7));
   if (page)
     game.land(
       0,
@@ -66,5 +96,7 @@ for (const [given, ground] of RUNS) {
   const onLayer = (c, l) => c.layer.filter((v, i) => v === l && c.alive[i]).length;
   const layers = game.world ? `; plane/curtain ${game.colonies.map((c) => `${onLayer(c, PLANE)}/${onLayer(c, CURTAIN)}`).join(" + ")}` : "";
   const h = hash ? `; hash ${(await import("../web/src/colony/tests/saveHash.ts")).hashGame(game)}` : "";
-  console.log(`${size.w}×${size.h} ${ground}: generate ${gen.toFixed(0)} ms; tick mean ${mean} ms, median ${q(0.5)} ms, p90 ${q(0.9)} ms over ${seconds} s (second half: mean ${lateMean} ms); ants ${alive}${layers}; stored ${game.colonies.map((c) => c.stored).join(" / ")}; dug ${dug}; awake chunks ${awake}${spores ? `; infected ${game.colonies.map((c) => game.fungus.census(c).infected).join(" + ")}` : ""}${page ? `; infected ${game.colonies.map((c) => game.fungus.census(c).infected).join(" + ")}, spore cells ${game.fungus.sporeCells}` : ""}${h}`);
+  console.log(
+    `${size.w}×${size.h} ${ground}: generate ${gen.toFixed(0)} ms; tick mean ${mean} ms, median ${q(0.5)} ms, p90 ${q(0.9)} ms over ${seconds} s (second half: mean ${lateMean} ms); ants ${alive}${layers}; stored ${game.colonies.map((c) => c.stored).join(" / ")}; dug ${dug}; awake chunks ${awake}${spores ? `; infected ${game.colonies.map((c) => game.fungus.census(c).infected).join(" + ")}` : ""}${page ? `; infected ${game.colonies.map((c) => game.fungus.census(c).infected).join(" + ")}, spore cells ${game.fungus.sporeCells}` : ""}${h}`,
+  );
 }

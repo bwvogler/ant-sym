@@ -6,7 +6,27 @@ import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
 // PR #7 review: the fungus lane's menu, and a 409 with questions still in flight.
 
-const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReason: null, elapsedSeconds: 0, caps: { capUsd: 0.1, capSeconds: 1800 }, requests: 0, inFlight: 0, maxInFlight: 5, inputTokens: 0, usd: 0, sessionInputTokens: 0, sessionUsd: 0, aborted: 0, medianMs: null, p90Ms: null, statuses: {}, remainingUsd: 0.1, remainingSeconds: 1800 };
+const RUN: RunSummary = {
+  running: true,
+  startedAt: 0,
+  stoppedAt: null,
+  stopReason: null,
+  elapsedSeconds: 0,
+  caps: { capUsd: 0.1, capSeconds: 1800 },
+  requests: 0,
+  inFlight: 0,
+  maxInFlight: 5,
+  inputTokens: 0,
+  usd: 0,
+  sessionInputTokens: 0,
+  sessionUsd: 0,
+  aborted: 0,
+  medianMs: null,
+  p90Ms: null,
+  statuses: {},
+  remainingUsd: 0.1,
+  remainingSeconds: 1800,
+};
 type Req = JevRequest & { state: Record<string, unknown> };
 const realFetch = globalThis.fetch;
 const live = new Set<ColonyJev>();
@@ -30,13 +50,27 @@ function proxy(opts: { answer: (q: string) => string; status?: (req: Req) => num
       await new Promise<void>((resolve, reject) => {
         count.holding++;
         held.push(() => (count.holding--, resolve()));
-        init?.signal?.addEventListener("abort", () => (count.holding--, count.aborted++, reject(Object.assign(new Error("aborted"), { name: "AbortError" }))));
+        init?.signal?.addEventListener(
+          "abort",
+          () => (count.holding--, count.aborted++, reject(Object.assign(new Error("aborted"), { name: "AbortError" }))),
+        );
       });
     const st = opts.status?.(req) ?? 200;
     if (st === 409) return { ok: false, status: 409, json: async () => ({ error: "over", run: RUN }) } as Response;
     const answers: Record<string, unknown> = {};
-    for (const [q, spec] of Object.entries(req.questions)) answers[q] = spec.type === "score" ? { type: "score", score: Number(opts.answer(q)) } : { type: "choice", choice: opts.answer(q), confidence: 0.9 };
-    const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
+    for (const [q, spec] of Object.entries(req.questions))
+      answers[q] =
+        spec.type === "score"
+          ? { type: "score", score: Number(opts.answer(q)) }
+          : { type: "choice", choice: opts.answer(q), confidence: 0.9 };
+    const body = {
+      status: 200,
+      body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } },
+      ms: 1,
+      attempts: 1,
+      inputTokens: 10,
+      run: RUN,
+    };
     return { ok: true, status: 200, json: async () => body } as Response;
   }) as typeof fetch;
   return { reqs, count, release: () => held.splice(0).forEach((r) => r()) };
@@ -48,7 +82,15 @@ function make(store: CacheStore | null = null): ColonyJev {
   return j;
 }
 
-const fungal = (s: Partial<FungalSituation> = {}): FungalSituation => ({ arousal: "calm", touch: "nestmate", place: "chamber", task: "nurse", carrying: "nothing", groomed: false, ...s });
+const fungal = (s: Partial<FungalSituation> = {}): FungalSituation => ({
+  arousal: "calm",
+  touch: "nestmate",
+  place: "chamber",
+  task: "nurse",
+  carrying: "nothing",
+  groomed: false,
+  ...s,
+});
 const fungusRequests = (reqs: Req[]) => reqs.filter((r) => r.state.hosts);
 
 test("no lever on, no question: with the menu empty the fungus is never asked; the local rule decides, free", async () => {
@@ -89,7 +131,11 @@ test("a menu change while a fungus question is in flight: its answer is kept for
   await tick(30);
   assert.notEqual(j.explainFungus(s).by, "jev", "alarm is off: the answer does not serve this menu");
   j.setMenu(m1);
-  assert.deepEqual(j.explainFungus(s), { answer: "0,0", by: "jev" }, "paid for under m1, kept under m1 (levels in table order: alarm, calm)");
+  assert.deepEqual(
+    j.explainFungus(s),
+    { answer: "0,0", by: "jev" },
+    "paid for under m1, kept under m1 (levels in table order: alarm, calm)",
+  );
   assert.equal(j.state.fungusCached, 1);
 });
 
@@ -106,8 +152,24 @@ test("a 409 ends the run and cancels what is still in flight: Start again asks i
   const c = new Colony(generateWorld(1, OPEN_WORLD), { antCount: 5 }, mulberry32(9));
   j.attach(c);
   await j.start();
-  const a: Situation = { mode: "explore", tired: true, foodTrail: "faint", homeTrail: "strong", alarm: "faint", enemy: "none", stance: "forage" };
-  const b: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "strong", enemy: "none", stance: "forage" };
+  const a: Situation = {
+    mode: "explore",
+    tired: true,
+    foodTrail: "faint",
+    homeTrail: "strong",
+    alarm: "faint",
+    enemy: "none",
+    stance: "forage",
+  };
+  const b: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "none",
+    homeTrail: "none",
+    alarm: "strong",
+    enemy: "none",
+    stance: "forage",
+  };
   j.policy(a);
   j.policy(b);
   await tick(40);

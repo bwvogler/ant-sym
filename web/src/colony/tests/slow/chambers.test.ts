@@ -9,7 +9,6 @@ import { SMALL_SIDE } from "../builders.ts";
 // Nest slice 2 (docs/nest-and-home.md §3.2): whole-colony chamber tests, too slow for `npm test`'s 60 s per file
 // (`npm run test:slow`). The rest are in ../int/chambers.test.ts.
 
-
 /** The ground's top in column x as dug: under the mound's loose soil (what a chamber's depth is measured from). */
 function soilTop(map: WorldMap, x: number): number {
   let y = groundTop(map, x);
@@ -26,7 +25,8 @@ function touching(map: WorldMap): string {
       if (a < 0) continue;
       for (let d = 0; d < 6; d++) {
         const b = ch.at(nx(x, y, d), ny(y, d));
-        if (b >= 0 && b !== a) return `chambers ${a} (colony ${ch.list[a]!.colony}) and ${b} (colony ${ch.list[b]!.colony}) touch at (${x}, ${y})`;
+        if (b >= 0 && b !== a)
+          return `chambers ${a} (colony ${ch.list[a]!.colony}) and ${b} (colony ${ch.list[b]!.colony}) touch at (${x}, ${y})`;
       }
     }
   return "";
@@ -81,7 +81,9 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
         }
       }
     // Every chamber cell is open: backfill never fills one.
-    for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `game ${seed}: chamber cell (${x}, ${y}) filled`);
+    for (let y = 0; y < map.size.h; y++)
+      for (let x = 0; x < map.size.w; x++)
+        if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `game ${seed}: chamber cell (${x}, ${y}) filled`);
     // The gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth: the imposed rule.
     const gaps = mine
       .map((b) => {
@@ -112,12 +114,19 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   // the same and less of it is chamber floor. Re-baselined by the owner's choice (PRD §44): at least ×1.5 in every game
   // and ×2 on average, which nest 9's backfill regression (×1.1 in this test's first game, mean 1.90) still fails.
   // Bead ja-k4k.3: chamber growth from sensed crowding. Stacked chambers keep the mean bound over the three games.
-  for (const [k, x] of growth.entries()) assert.ok(x >= 1.5, `game ${4 + k}: floor growth ×${x.toFixed(2)} (${growth.map((v) => v.toFixed(2)).join(", ")})`);
+  for (const [k, x] of growth.entries())
+    assert.ok(x >= 1.5, `game ${4 + k}: floor growth ×${x.toFixed(2)} (${growth.map((v) => v.toFixed(2)).join(", ")})`);
   const meanGrowth = growth.reduce((a, b) => a + b, 0) / growth.length;
-  assert.ok(meanGrowth >= 2, `floor growth, mean over three games ×${meanGrowth.toFixed(2)} (${growth.map((v) => v.toFixed(2)).join(", ")})`);
+  assert.ok(
+    meanGrowth >= 2,
+    `floor growth, mean over three games ×${meanGrowth.toFixed(2)} (${growth.map((v) => v.toFixed(2)).join(", ")})`,
+  );
   const meanStacked = stacked.reduce((a, b) => a + b, 0) / stacked.length;
   assert.ok(meanStacked >= 3, `stacked chambers, mean over three games ${meanStacked.toFixed(1)} (${stacked.join(", ")})`);
-  assert.ok(trends >= 2, `the spacing rule shows: gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`);
+  assert.ok(
+    trends >= 2,
+    `the spacing rule shows: gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`,
+  );
 });
 
 test("two crowded colonies on several maps: no chamber touches another, of either colony, and none is dug shallower than CHAMBER_MIN_DEPTH under the ground", () => {

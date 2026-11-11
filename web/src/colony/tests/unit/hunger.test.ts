@@ -3,14 +3,26 @@ import assert from "node:assert/strict";
 import { LARVA } from "../../brood.ts";
 import { Colony, LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { ADULT_DRAIN, ADULT_DRAIN_OUT, begOf, BEG_BELOW, feel, FeltGrid, LARVA_DRAIN, NEED_FADE, PASS, respond, SHARE_ABOVE, THETA_OLD } from "../../hunger.ts";
+import {
+  ADULT_DRAIN,
+  ADULT_DRAIN_OUT,
+  begOf,
+  BEG_BELOW,
+  feel,
+  FeltGrid,
+  LARVA_DRAIN,
+  NEED_FADE,
+  PASS,
+  respond,
+  SHARE_ABOVE,
+  THETA_OLD,
+} from "../../hunger.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
 import { SMALL_SIDE, broodChamber } from "../builders.ts";
 
 // Energy and hunger (ja-xu6.1, hunger.ts): every adult, larva and the queen has energy, drained with time and refilled by
 // eating; hunger is felt by touch (begging larvae, a queen who can't lay) and passed on; old ants answer it by working
 // inside, above a threshold age raises.
-
 
 test("a larva begs only once its energy is low; the response threshold is s²/(s²+θ²); felt need rises fast and fades slowly", () => {
   assert.equal(begOf(1), 0);
@@ -47,12 +59,11 @@ function colony(n = 1) {
   return { map, c };
 }
 
-
 test("an ant uses energy, twice as fast outside, eats from food lying within two cells once hungry (not the queen's stock), and shares by mouth", () => {
   const { c } = colony(2);
   c.energy[0] = 0.9;
   c.tick(1);
-  assert.ok(Math.abs((c.energy[0]) - (0.9 - ADULT_DRAIN)) < 1e-6, `inside: ${c.energy[0]}`);
+  assert.ok(Math.abs(c.energy[0] - (0.9 - ADULT_DRAIN)) < 1e-6, `inside: ${c.energy[0]}`);
   assert.ok(ADULT_DRAIN_OUT > ADULT_DRAIN);
   // Not hungry: it leaves the food. (10 in the royal chamber: the queen's stock of 8, which adults leave her, and 2 beyond.)
   c.feed(10);
@@ -72,7 +83,7 @@ test("an ant uses energy, twice as fast outside, eats from food lying within two
   at(0);
   at(1);
   c.tick(1 / 30);
-  assert.ok((c.energy[0]) > 0.9, `fed: ${c.energy[0]}`);
+  assert.ok(c.energy[0] > 0.9, `fed: ${c.energy[0]}`);
   assert.ok(c.eaten > 0 && Math.abs(larder - c.larder - c.eaten) < 1e-9, `eaten ${c.eaten}, larder ${larder} → ${c.larder}`);
   // No food left: a hungry ant takes food by mouth from a well-fed nestmate it touches; energy is passed, not made.
   c.feed(-c.larder);
@@ -80,11 +91,11 @@ test("an ant uses energy, twice as fast outside, eats from food lying within two
   c.energy[1] = 1;
   at(0);
   at(1);
-  const before = (c.energy[0]) + (c.energy[1]);
+  const before = c.energy[0] + c.energy[1];
   c.tick(1 / 30);
-  assert.ok((c.energy[0]) > 0.3, `given: ${c.energy[0]}`);
-  assert.ok((c.energy[1]) >= SHARE_ABOVE - 1e-6, `the giver keeps enough: ${c.energy[1]}`);
-  assert.ok(Math.abs(before - 2 * (1 / 30) * ADULT_DRAIN - (c.energy[0]) - (c.energy[1])) < 1e-5, "shared, not made");
+  assert.ok(c.energy[0] > 0.3, `given: ${c.energy[0]}`);
+  assert.ok(c.energy[1] >= SHARE_ABOVE - 1e-6, `the giver keeps enough: ${c.energy[1]}`);
+  assert.ok(Math.abs(before - 2 * (1 / 30) * ADULT_DRAIN - c.energy[0] - c.energy[1]) < 1e-5, "shared, not made");
 });
 
 test("an ant that runs out of energy dies of hunger; a larva that does dies too, and its food leaves with it", () => {

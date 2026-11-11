@@ -31,13 +31,21 @@ export const run = (g: Game, seconds: number, each?: () => void, until?: () => b
 };
 
 /** A 40 × 12 open map with a nest at each end, centred on row `nestY` (6 or 6.5, as each test had it), radius 2. */
-export const arena = (nestY = 6): WorldMap => worldFromArrays({ w: 40, h: 12 }, [{ x: 4, y: nestY, r: 2 }, { x: 36, y: nestY, r: 2 }]);
+export const arena = (nestY = 6): WorldMap =>
+  worldFromArrays({ w: 40, h: 12 }, [
+    { x: 4, y: nestY, r: 2 },
+    { x: 36, y: nestY, r: 2 },
+  ]);
 
 /**
  * A colony of nest `opts.nest` with its first ants at `cells` and the rest dead. `seed` seeds its rng; `odour` and `policy`
  * are left to the colony's defaults unless given.
  */
-export function placedAt(map: WorldMap, cells: [number, number][], opts: { nest: number; seed: number; odour?: number; policy?: Policy }): Colony {
+export function placedAt(
+  map: WorldMap,
+  cells: [number, number][],
+  opts: { nest: number; seed: number; odour?: number; policy?: Policy },
+): Colony {
   const n = Math.max(1, cells.length);
   const params: Partial<Colony["params"]> = { antCount: n, maxAnts: n, nest: opts.nest };
   if (opts.odour !== undefined) params.odour = opts.odour;

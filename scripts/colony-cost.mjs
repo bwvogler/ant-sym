@@ -19,7 +19,32 @@
 // by the page yet, so they are reported apart and not in the session's total.
 //
 // Usage: node scripts/colony-cost.mjs [--side | --one] [minutes=10] [ants=600] [seed=1]
-import { localPolicy, localStance, PLANE, DOCTRINES, estimateTokens, packModeRequest, packResponseRequest, packStanceRequest, policyContext, RESPONSE_HOOKS, responseContext, responseKey, situationKey, stanceContext, stanceKey, localResponses, responses, Game, gameRng, generateOneWorld, generateSideWorld, generateWorld, mulberry32, worldExtent } from "../web/src/colony/index.ts";
+import {
+  localPolicy,
+  localStance,
+  PLANE,
+  DOCTRINES,
+  estimateTokens,
+  packModeRequest,
+  packResponseRequest,
+  packStanceRequest,
+  policyContext,
+  RESPONSE_HOOKS,
+  responseContext,
+  responseKey,
+  situationKey,
+  stanceContext,
+  stanceKey,
+  localResponses,
+  responses,
+  Game,
+  gameRng,
+  generateOneWorld,
+  generateSideWorld,
+  generateWorld,
+  mulberry32,
+  worldExtent,
+} from "../web/src/colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const side = process.argv.includes("--side");
@@ -60,7 +85,12 @@ function lane(key, pack, contextOf, local, acc = null) {
       queue.clear();
       for (let b = 0; b < items.length; b += 100) {
         const chunk = items.slice(b, b + 100);
-        const t = estimateTokens(pack(chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })), doctrine));
+        const t = estimateTokens(
+          pack(
+            chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })),
+            doctrine,
+          ),
+        );
         if (acc) {
           acc.tokens += t;
           acc.requests++;
@@ -79,7 +109,18 @@ function lane(key, pack, contextOf, local, acc = null) {
 }
 const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
 const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
-const hooks = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, lane((t) => responseKey(h, t), (items, d) => packResponseRequest(h, items, d), (d) => responseContext(h, d), localResponses[h], { tokens: 0, requests: 0, questions: 0 })]));
+const hooks = Object.fromEntries(
+  RESPONSE_HOOKS.map((h) => [
+    h,
+    lane(
+      (t) => responseKey(h, t),
+      (items, d) => packResponseRequest(h, items, d),
+      (d) => responseContext(h, d),
+      localResponses[h],
+      { tokens: 0, requests: 0, questions: 0 },
+    ),
+  ]),
+);
 const game = new Game(world, { antCount: ants, rivalAnts: ants }, side || one ? gameRng(seed) : mulberry32(seed + 7), {
   policy: modes.policy,
   stance: stances.policy,
@@ -93,7 +134,13 @@ const flush = () => {
 };
 
 // The session: a doctrine for each slice of time, the first one again at the end (should be free).
-const plan = [DOCTRINES[0], DOCTRINES[1], DOCTRINES[2], { id: "custom", name: "Custom", text: "Hoard food: follow any food scent, even faint; explore otherwise; flee home at strong alarm." }, DOCTRINES[0]];
+const plan = [
+  DOCTRINES[0],
+  DOCTRINES[1],
+  DOCTRINES[2],
+  { id: "custom", name: "Custom", text: "Hoard food: follow any food scent, even faint; explore otherwise; flee home at strong alarm." },
+  DOCTRINES[0],
+];
 const slice = (minutes * 60) / plan.length;
 const rng = mulberry32(seed + 99);
 let next = 0;
@@ -116,22 +163,43 @@ for (const d of plan) {
     if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12, ...(one ? [PLANE] : [])); // world units: rows are R apart
   }
   flush();
-  phases.push({ name: d.name, newSituations: modes.seen(policyContext(doctrine)) - before.modes, newStances: stances.seen(stanceContext(doctrine)) - before.stances, tokens: tokens - before.tokens, requests: requests - before.requests });
+  phases.push({
+    name: d.name,
+    newSituations: modes.seen(policyContext(doctrine)) - before.modes,
+    newStances: stances.seen(stanceContext(doctrine)) - before.stances,
+    tokens: tokens - before.tokens,
+    requests: requests - before.requests,
+  });
 }
 
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
 const r = game.rival;
-console.log(`game cost, offline (${one ? "one world" : side ? "side view" : "top-down"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`);
-console.log(`you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`);
-console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations; ${game.strategyChoices / game.colonies.length} stance choices each\n`);
-for (const p of phases) console.log(`  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`);
-console.log(`\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${Math.round(tokens / Math.max(1, questions))} tok per question, ${Math.round(colony.decisions / Math.max(1, questions))} mode choices per question)`);
-console.log(`≈ ${usd((tokens * 60) / minutes)} per hour at this pace of retuning (one every ${(slice / 60).toFixed(1)} min); target ≤ $0.25/h`);
+console.log(
+  `game cost, offline (${one ? "one world" : side ? "side view" : "top-down"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
+);
+console.log(
+  `you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`,
+);
+console.log(
+  `${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations; ${game.strategyChoices / game.colonies.length} stance choices each\n`,
+);
+for (const p of phases)
+  console.log(
+    `  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`,
+  );
+console.log(
+  `\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${Math.round(tokens / Math.max(1, questions))} tok per question, ${Math.round(colony.decisions / Math.max(1, questions))} mode choices per question)`,
+);
+console.log(
+  `≈ ${usd((tokens * 60) / minutes)} per hour at this pace of retuning (one every ${(slice / 60).toFixed(1)} min); target ≤ $0.25/h`,
+);
 console.log(`\nresponse lanes, if each were asked like the modes (not asked by the page yet; not in the total above):`);
 let rt = 0;
 for (const h of RESPONSE_HOOKS) {
   const a = hooks[h].acc;
   rt += a.tokens;
-  console.log(`  ${h.padEnd(6)} ${String(a.questions).padStart(4)} situations · ${String(a.requests).padStart(3)} requests · ~${a.tokens.toLocaleString().padStart(6)} tok ≈ ${usd(a.tokens)} (~${Math.round(a.tokens / Math.max(1, a.questions))} tok per question)`);
+  console.log(
+    `  ${h.padEnd(6)} ${String(a.questions).padStart(4)} situations · ${String(a.requests).padStart(3)} requests · ~${a.tokens.toLocaleString().padStart(6)} tok ≈ ${usd(a.tokens)} (~${Math.round(a.tokens / Math.max(1, a.questions))} tok per question)`,
+  );
 }
 console.log(`  all ${RESPONSE_HOOKS.length} ≈ ${usd((rt * 60) / minutes)} per hour more at this pace`);

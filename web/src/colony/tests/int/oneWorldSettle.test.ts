@@ -35,11 +35,19 @@ for (const seed of [1, 2]) {
         const k = g.addColony({ x: p.x, y: p.y, antCount: 0, odour: g.player.nestOdour });
         const spot = g.founded[g.founded.length - 1]!.spot!;
         assert.equal(k, before);
-        assert.deepEqual({ cell: spot.cell, end: spot.end }, { cell: s.cell, end: s.end }, `point ${n} (${p.x.toFixed(1)}, ${p.y.toFixed(1)}): settleAt said ${JSON.stringify(s)}, addColony founded at ${JSON.stringify(spot)}`);
+        assert.deepEqual(
+          { cell: spot.cell, end: spot.end },
+          { cell: s.cell, end: s.end },
+          `point ${n} (${p.x.toFixed(1)}, ${p.y.toFixed(1)}): settleAt said ${JSON.stringify(s)}, addColony founded at ${JSON.stringify(spot)}`,
+        );
         founded++;
       } else {
         assert.equal(s.reason, NO_ROOM);
-        assert.throws(() => g.addColony({ x: p.x, y: p.y, antCount: 0, odour: g.player.nestOdour }), new RegExp(NO_ROOM), `point ${n}: settleAt refused, addColony founded`);
+        assert.throws(
+          () => g.addColony({ x: p.x, y: p.y, antCount: 0, odour: g.player.nestOdour }),
+          new RegExp(NO_ROOM),
+          `point ${n}: settleAt refused, addColony founded`,
+        );
         assert.equal(g.colonies.length, before);
         refused++;
       }

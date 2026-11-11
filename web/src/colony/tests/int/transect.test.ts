@@ -2,7 +2,19 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CELL, centreX, centreY, hexDistance } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
-import { canFound, cellAt, columnsOver, grow, HOLE_GAP_2D, makeTransect, MARGIN, nearestValid, turnAt, type Cell, type Transect } from "../../transect.ts";
+import {
+  canFound,
+  cellAt,
+  columnsOver,
+  grow,
+  HOLE_GAP_2D,
+  makeTransect,
+  MARGIN,
+  nearestValid,
+  turnAt,
+  type Cell,
+  type Transect,
+} from "../../transect.ts";
 import { disc, foundNest, hash4, mulberry32, type Nest } from "../../world.ts";
 
 const open = () => true;
@@ -53,7 +65,12 @@ test("turnAt: the signed turn at each interior vertex, in degrees: right (clockw
 });
 
 test("a slanted segment is hexDistance columns long: never shorter than the surface, at most ~15% longer", () => {
-  for (const b of [{ x: 140, y: 160 }, { x: 160, y: 30 }, { x: 70, y: 180 }, { x: 100, y: 200 }]) {
+  for (const b of [
+    { x: 140, y: 160 },
+    { x: 160, y: 30 },
+    { x: 70, y: 180 },
+    { x: 100, y: 200 },
+  ]) {
     const t = makeTransect([A, b]);
     const steps = hexDistance(A.x, A.y, b.x, b.y);
     assert.equal(t.sHole[1], steps);
@@ -94,12 +111,19 @@ test("rule 1: the nearest hole must be an end; a tie with an interior hole is re
 test("rule 1's ties are exact on every row: equal distances in floating point are compared as whole numbers (PR #55 review)", () => {
   // B and C equally far from p, 20 rows above and below it: Math.hypot of the centres differs in its last bit on some rows.
   for (let y0 = 0; y0 < 200; y0++) {
-    const t = makeTransect([{ x: 100, y: y0 }, { x: 100, y: y0 + 40 }, { x: 100, y: y0 + 80 }]);
+    const t = makeTransect([
+      { x: 100, y: y0 },
+      { x: 100, y: y0 + 40 },
+      { x: 100, y: y0 + 80 },
+    ]);
     assert.deepEqual(canFound(t, { x: 140, y: y0 + 60 }, open), { ok: false, reason: "interior" }, `y0 = ${y0}`);
   }
   // And the ends: a point as far from Ink as from Amber grows at V₀ on every row.
   for (let y0 = 0; y0 < 200; y0++) {
-    const t = makeTransect([{ x: 100, y: y0 }, { x: 100, y: y0 + 40 }]);
+    const t = makeTransect([
+      { x: 100, y: y0 },
+      { x: 100, y: y0 + 40 },
+    ]);
     const f = canFound(t, { x: 180, y: y0 + 20 }, open);
     assert.ok(!f.ok || f.end === "start", `y0 = ${y0}: a tie between the ends grows at V₀`);
   }
@@ -149,7 +173,12 @@ test("rules 3 and 4: a hole gap from every hole, on open ground", () => {
 test("one hole: no line to fold back on yet, so any open spot a hole gap away grows at V₀", () => {
   const t = makeTransect([A]);
   assert.deepEqual([t.sMin, t.sMax], [-MARGIN, MARGIN]);
-  for (const p of [{ x: 160, y: 100 }, { x: 40, y: 100 }, { x: 100, y: 30 }]) assert.deepEqual(canFound(t, p, open), { ok: true, end: "start" });
+  for (const p of [
+    { x: 160, y: 100 },
+    { x: 40, y: 100 },
+    { x: 100, y: 30 },
+  ])
+    assert.deepEqual(canFound(t, p, open), { ok: true, end: "start" });
   assert.deepEqual(canFound(t, { x: 105, y: 100 }, open), { ok: false, reason: "hole-gap" });
   // Its first founding re-aims both margins straight on from the new segment: a lone hole has no direction yet.
   const g = grow(t, "start", { x: 100, y: 30 });
@@ -175,11 +204,16 @@ test("the hole gap keeps founded royal chambers apart: HOLE_GAP_2D (16, ja-tjo) 
     const n = foundNest(curtain, s, 10 + k, () => v);
     slant = Math.max(slant, Math.abs(n.x - n.entrance!.x));
     const royal = curtain.chambers!.list.find((c) => c.colony === 10 + k)!;
-    for (let y = royal.y0; y <= royal.y1; y++) for (let x = royal.x0; x <= royal.x1; x++) if (curtain.chambers!.at(x, y) === royal.id) reach = Math.max(reach, Math.abs(centreX(x, y) - n.x));
+    for (let y = royal.y0; y <= royal.y1; y++)
+      for (let x = royal.x0; x <= royal.x1; x++)
+        if (curtain.chambers!.at(x, y) === royal.id) reach = Math.max(reach, Math.abs(centreX(x, y) - n.x));
   }
   assert.equal(slant, 3, "the shaft's foot is 3 columns off its hole");
   assert.ok(reach >= 3.5 && reach <= 4.5, `the chamber reaches ${reach} either side of the foot`);
-  assert.ok(HOLE_GAP_2D - 2 * slant - 2 * reach >= 1, `at ${HOLE_GAP_2D}, ${HOLE_GAP_2D - 2 * slant - 2 * reach} columns between two chambers at the worst`);
+  assert.ok(
+    HOLE_GAP_2D - 2 * slant - 2 * reach >= 1,
+    `at ${HOLE_GAP_2D}, ${HOLE_GAP_2D - 2 * slant - 2 * reach} columns between two chambers at the worst`,
+  );
 });
 
 test("ja-tjo's assay: on the curtains of seeds 1–20, nests founded HOLE_GAP_2D apart along s never share a royal chamber cell (4 sites a seed)", () => {
@@ -191,7 +225,8 @@ test("ja-tjo's assay: on the curtains of seeds 1–20, nests founded HOLE_GAP_2D
     // of its hole, so a pair at s and s + gap digs only in s − 8 … s + gap + 8.
     const sites: number[] = [];
     for (let s = line.sMin + 10; s + HOLE_GAP_2D <= line.sMax - 10 && sites.length < 4; s++)
-      if (line.sHole.every((h) => s + HOLE_GAP_2D + 8 < h - 8 || s - 8 > h + 8) && sites.every((o) => s - 8 > o + HOLE_GAP_2D + 8)) sites.push(s);
+      if (line.sHole.every((h) => s + HOLE_GAP_2D + 8 < h - 8 || s - 8 > h + 8) && sites.every((o) => s - 8 > o + HOLE_GAP_2D + 8))
+        sites.push(s);
     assert.equal(sites.length, 4, `seed ${seed}: four sites`);
     sites.forEach((s, j) => {
       // Each nest's slant from its own stream, keyed by its column, as founding keys it by its hole.
@@ -228,12 +263,18 @@ test("nearestValid: the nearest allowed cell within the radius, or null when the
   const far = { x: 300, y: 76 };
   const d = Math.hypot(centreX(far.x, far.y) - centreX(300, 0), centreY(far.y) - centreY(0));
   assert.ok(d > 61 && d < 70 && hexDistance(300, 0, far.x, far.y) > 70, `${d}`);
-  const line = makeTransect([{ x: 100, y: 0 }, { x: 200, y: 0 }]);
+  const line = makeTransect([
+    { x: 100, y: 0 },
+    { x: 200, y: 0 },
+  ]);
   assert.deepEqual(nearestValid(line, { x: 300, y: 0 }, 70, only(far))?.cell, far);
   assert.equal(nearestValid(line, { x: 300, y: 0 }, 70, only({ x: 371, y: 0 })), null);
   assert.deepEqual(nearestValid(line, { x: 300, y: 0 }, 71, only({ x: 371, y: 0 }))?.cell, { x: 371, y: 0 });
   // Nowhere open: the flight fails.
-  assert.equal(nearestValid(t, { x: 260, y: 100 }, 10, () => false), null);
+  assert.equal(
+    nearestValid(t, { x: 260, y: 100 }, 10, () => false),
+    null,
+  );
 });
 
 /** A random line: two holes, then up to `n` foundings, each at the nearest valid spot to a random point beyond an end. */
@@ -296,7 +337,10 @@ test("property: no valid founding makes the curtain overlap itself (a cell over 
       const lo = Math.min(...cols);
       const hi = Math.max(...cols);
       // Measured on 600 random lines (PR #55 review): no cell sat over two columns at all; allow two either side of a bend.
-      assert.ok(t.sHole.some((sv) => Math.abs(lo - sv) <= 2 && Math.abs(hi - sv) <= 2), `seed ${seed}: one cell over columns ${cols.join(", ")}, away from every bend`);
+      assert.ok(
+        t.sHole.some((sv) => Math.abs(lo - sv) <= 2 && Math.abs(hi - sv) <= 2),
+        `seed ${seed}: one cell over columns ${cols.join(", ")}, away from every bend`,
+      );
     }
   }
   assert.ok(lines >= 100, `most random lines grew (${lines} of 120)`);

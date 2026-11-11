@@ -39,6 +39,8 @@ console.log(
     births: g.colonies.map((c) => c.births),
     losses: g.colonies.map((c) => c.losses),
     raidingShare: raid.map((r) => +(r.raiding / r.samples).toFixed(2)),
-    fightersWhileRaiding: raid.map((r) => (r.raiding ? { under: +(r.under / r.raiding).toFixed(0), out: +(r.out / r.raiding).toFixed(0) } : null)),
+    fightersWhileRaiding: raid.map((r) =>
+      r.raiding ? { under: +(r.under / r.raiding).toFixed(0), out: +(r.out / r.raiding).toFixed(0) } : null,
+    ),
   }),
 );

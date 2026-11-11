@@ -40,13 +40,27 @@ function chunked(layer: ChunkLayer<Float32Array>): ArrayBufferView[] {
   return out;
 }
 
-export type Sample = { t: number; food: string; colonies: { stored: number; births: number; losses: number; decisions: number; population: number; ants: string; fields: string }[] };
+export type Sample = {
+  t: number;
+  food: string;
+  colonies: { stored: number; births: number; losses: number; decisions: number; population: number; ants: string; fields: string }[];
+};
 
 /** One world's sample: per layer ([plane, curtain]) the food and each colony's fields, each ant's layer in its hash, and the crossings. */
 export type OneSample = {
   t: number;
   food: string[];
-  colonies: { stored: number; births: number; losses: number; decisions: number; population: number; ants: string; fields: string[]; crossedUp: number; crossedDown: number }[];
+  colonies: {
+    stored: number;
+    births: number;
+    losses: number;
+    decisions: number;
+    population: number;
+    ants: string;
+    fields: string[];
+    crossedUp: number;
+    crossedDown: number;
+  }[];
 };
 
 const DT = 1 / 30;
@@ -122,7 +136,13 @@ export function fixture(file: URL, scenarios: Scenario[]): Record<string, Sample
 }
 
 /** Check a run against its recording: the same number of samples, each equal. */
-export function check(s: Scenario, want: Sample[] | OneSample[] | undefined, got: Sample[] | OneSample[], deepEqual: (a: unknown, b: unknown, msg: string) => void, equal: (a: unknown, b: unknown, msg: string) => void): void {
+export function check(
+  s: Scenario,
+  want: Sample[] | OneSample[] | undefined,
+  got: Sample[] | OneSample[],
+  deepEqual: (a: unknown, b: unknown, msg: string) => void,
+  equal: (a: unknown, b: unknown, msg: string) => void,
+): void {
   equal(!!want, true, `no recording for ${s.name}`);
   equal(got.length, want!.length, `${s.name}: ${got.length} samples, recording has ${want!.length}`);
   for (let k = 0; k < want!.length; k++) deepEqual(got[k], want![k], `${s.name}: first difference at t = ${want![k]!.t} s`);

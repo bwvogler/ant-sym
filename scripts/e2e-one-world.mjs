@@ -27,7 +27,9 @@ let chromium;
 try {
   ({ chromium } = require("playwright"));
 } catch {
-  console.error("e2e-one-world: can't resolve 'playwright'. This guard uses a copy already installed on the machine (on NODE_PATH or in a parent node_modules); install it there, it is not a dependency of this repo.");
+  console.error(
+    "e2e-one-world: can't resolve 'playwright'. This guard uses a copy already installed on the machine (on NODE_PATH or in a parent node_modules); install it there, it is not a dependency of this repo.",
+  );
   process.exit(2);
 }
 
@@ -81,16 +83,25 @@ function clampCam(layer, tx, ty, zoom) {
   const z = Math.max(Math.min(cv.width / W, cv.height / H), Math.min(28, zoom));
   const hw = cv.width / z / 2;
   const hh = cv.height / z / 2;
-  return { x: hw * 2 >= W ? m.x0 + W / 2 : Math.max(m.x0 + hw, Math.min(m.x0 + W - hw, tx)), y: hh * 2 >= H ? H / 2 : Math.max(hh, Math.min(H - hh, ty)), zoom: z };
+  return {
+    x: hw * 2 >= W ? m.x0 + W / 2 : Math.max(m.x0 + hw, Math.min(m.x0 + W - hw, tx)),
+    y: hh * 2 >= H ? H / 2 : Math.max(hh, Math.min(H - hh, ty)),
+    zoom: z,
+  };
 }
-const expectCam = (page, layer, tx, ty, zoom) => page.evaluate(([layer, tx, ty, zoom]) => window.__clampCam(layer, tx, ty, zoom), [layer, tx, ty, zoom]);
+const expectCam = (page, layer, tx, ty, zoom) =>
+  page.evaluate(([layer, tx, ty, zoom]) => window.__clampCam(layer, tx, ty, zoom), [layer, tx, ty, zoom]);
 const sameCam = (a, b) => near(a.x, b.x, 1e-6) && near(a.y, b.y, 1e-6) && near(a.zoom, b.zoom, 1e-6);
 
 // The dev server: Vite on a free port, the Jev key left out of its environment (no run can start, nothing is spent).
 const port = await freePort();
 const env = { ...process.env };
 delete env.JEV_API_KEY;
-const vite = spawn(process.execPath, [join(WEB, "node_modules/vite/bin/vite.js"), "--port", String(port), "--host", "127.0.0.1", "--strictPort"], { cwd: WEB, env, stdio: ["ignore", "pipe", "pipe"] });
+const vite = spawn(
+  process.execPath,
+  [join(WEB, "node_modules/vite/bin/vite.js"), "--port", String(port), "--host", "127.0.0.1", "--strictPort"],
+  { cwd: WEB, env, stdio: ["ignore", "pipe", "pipe"] },
+);
 let viteLog = "";
 vite.stdout.on("data", (d) => (viteLog += d));
 vite.stderr.on("data", (d) => (viteLog += d));
@@ -191,7 +202,8 @@ try {
     return got;
   };
   /** Poll until the field's label (its aria-label) says `re`. */
-  const labelSays = (re, what) => until(async () => re.test((await canvas.getAttribute("aria-label")) ?? ""), what, 3000).then(() => check(true, what));
+  const labelSays = (re, what) =>
+    until(async () => re.test((await canvas.getAttribute("aria-label")) ?? ""), what, 3000).then(() => check(true, what));
   await keys("Equal", "Equal", "Equal", "ArrowLeft", "ArrowUp");
   const above = await steadyCam("above");
   await page.getByRole("button", { name: "below", exact: true }).click();
@@ -245,7 +257,9 @@ try {
     const R = Math.sqrt(3) / 2;
     const clear = (wx, wy, layer) => {
       let d = Infinity;
-      for (const col of game.colonies) for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === layer) d = Math.min(d, Math.hypot(col.x[i] - wx, col.y[i] - wy));
+      for (const col of game.colonies)
+        for (let i = 0; i < col.n; i++)
+          if (col.alive[i] && col.layer[i] === layer) d = Math.min(d, Math.hypot(col.x[i] - wx, col.y[i] - wy));
       return d;
     };
     // The spot on the line farthest from any plane ant (beyond the field's pick reach, so the click is no follow).
@@ -271,7 +285,11 @@ try {
   await until(async () => (await view()) === "below", "below after a click on the line");
   // Where the side view should look: the strip at s, clamped to the curtain in the box it is drawn in (camera.ts clamp).
   // The strip at s (centreX(s, STRIP): row 40 is even), at least the link's zoom (8 a cell at deviceScaleFactor 1).
-  const atS = await camAt("below", () => expectCam(page, "below", spot.s + 0.5, 40.5 * (Math.sqrt(3) / 2), Math.max(spot.zoom, 8)), `below centres on the strip at s = ${spot.s}`);
+  const atS = await camAt(
+    "below",
+    () => expectCam(page, "below", spot.s + 0.5, 40.5 * (Math.sqrt(3) / 2), Math.max(spot.zoom, 8)),
+    `below centres on the strip at s = ${spot.s}`,
+  );
   await steadyCam("below");
   await shot("link-below");
   // Back up: a click on the sky over the strip, a few columns along.
@@ -301,7 +319,11 @@ try {
   check(up !== null, "a spot on the sky over the strip");
   await page.mouse.click(up.sx, up.sy);
   await until(async () => (await view()) === "above", "above after a click on the strip");
-  await camAt("above", () => expectCam(page, "above", up.x, up.y, atS.zoom), `above centres on P(${up.s}) (${up.x.toFixed(1)}, ${up.y.toFixed(1)}), at the side view's zoom`);
+  await camAt(
+    "above",
+    () => expectCam(page, "above", up.x, up.y, atS.zoom),
+    `above centres on P(${up.s}) (${up.x.toFixed(1)}, ${up.y.toFixed(1)}), at the side view's zoom`,
+  );
 
   // ——— 4. An ant followed through a hole carries the camera across ———
   console.log("4. follow an ant through a hole");
@@ -313,18 +335,30 @@ try {
   await page.getByRole("button", { name: "below", exact: true }).click();
   await until(async () => (await view()) === "below", "below");
   check((await page.getByRole("button", { name: "Play", exact: true }).count()) === 1, "the game is paused");
-  check((await page.getByRole("button", { name: "Carry across" }).getAttribute("aria-pressed")) === "true", "carry across is on by default");
+  check(
+    (await page.getByRole("button", { name: "Carry across" }).getAttribute("aria-pressed")) === "true",
+    "carry across is on by default",
+  );
   let next = null;
   for (let n = 0; n < 4 && !next; n++) {
     const r0 = Date.now();
     next = await page.evaluate((lead) => window.jevAnts.nextCrossing(20, lead), LEAD);
-    console.log(`  ..  rehearsal ${n + 1}: ${next ? `colony ${next.k}'s ant ${next.i} comes up on step ${next.ticks}` : "none within 20 s"} (${Date.now() - r0} ms)`);
+    console.log(
+      `  ..  rehearsal ${n + 1}: ${next ? `colony ${next.k}'s ant ${next.i} comes up on step ${next.ticks}` : "none within 20 s"} (${Date.now() - r0} ms)`,
+    );
     if (!next) await page.evaluate(() => window.jevAnts.step(300)); // ten seconds on, and again
   }
   check(next !== null, "a rehearsal found a curtain ant that comes up");
   const lead = LEAD; // the rehearsal's crossing is LEAD steps on at the least
   await page.evaluate((n) => window.jevAnts.step(n), next.ticks - lead);
-  check(await page.evaluate(({ k, i, gen }) => window.jevAnts.game.colonies[k].gen[i] === gen && window.jevAnts.game.colonies[k].layer[i] === 1 && window.jevAnts.follow(k, i), next), "the ant, still below, is followed");
+  check(
+    await page.evaluate(
+      ({ k, i, gen }) =>
+        window.jevAnts.game.colonies[k].gen[i] === gen && window.jevAnts.game.colonies[k].layer[i] === 1 && window.jevAnts.follow(k, i),
+      next,
+    ),
+    "the ant, still below, is followed",
+  );
   // Each frame the page records the ant, the view and the top view's camera; after fifteen frames seen from below (the
   // field has taken the follow) it steps the game one fixed step a frame, LEAD and forty more.
   await page.evaluate(
@@ -334,7 +368,15 @@ try {
       const loop = () => {
         if (window.__trail !== trail) return;
         const col = window.jevAnts.game.colonies[k];
-        trail.push({ stepped, layer: col.layer[i], alive: col.alive[i], view: window.jevAnts.view(), cam: window.jevAnts.camera("above"), x: col.x[i], y: col.y[i] });
+        trail.push({
+          stepped,
+          layer: col.layer[i],
+          alive: col.alive[i],
+          view: window.jevAnts.view(),
+          cam: window.jevAnts.camera("above"),
+          x: col.x[i],
+          y: col.y[i],
+        });
         if (trail.length > 15 && stepped < steps) {
           window.jevAnts.step(1);
           stepped++;
@@ -368,8 +410,14 @@ try {
   await page.evaluate(() => (window.__trail = null));
   if (carried.never) throw new Error("the rehearsed ant never came up: the game did not play what its copy played");
   if (carried.stuck) throw new Error(`the followed ant came up, but the view did not come with it: ${JSON.stringify(carried.stuck)}`);
-  check(carried.up.stepped === lead && carried.below >= 15, `the followed ant went up through a hole on the step rehearsed (${carried.up.stepped} of ${lead}), seen from below`);
-  check(true, `the view came above with it, the camera on the ant (${carried.on.cam.x.toFixed(1)}, ${carried.on.cam.y.toFixed(1)}) ~ (${carried.on.x.toFixed(1)}, ${carried.on.y.toFixed(1)}), zoom kept ×${carried.on.cam.zoom.toFixed(2)}`);
+  check(
+    carried.up.stepped === lead && carried.below >= 15,
+    `the followed ant went up through a hole on the step rehearsed (${carried.up.stepped} of ${lead}), seen from below`,
+  );
+  check(
+    true,
+    `the view came above with it, the camera on the ant (${carried.on.cam.x.toFixed(1)}, ${carried.on.cam.y.toFixed(1)}) ~ (${carried.on.x.toFixed(1)}, ${carried.on.y.toFixed(1)}), zoom kept ×${carried.on.cam.zoom.toFixed(2)}`,
+  );
 
   // ——— 5. The queen's pen: a click on the top view ———
   console.log("5. the queen's pen");
@@ -390,7 +438,11 @@ try {
   });
   check((await page.getByRole("button", { name: "Stop following" }).count()) === 0, "the pen ends a follow");
   // The circle's centre, clamped to the plane in the box as it is now (at the zoom the pen chose to fit the circle).
-  await camAt("above", async () => expectCam(page, "above", circle.x, circle.y, (await cam("above")).zoom), "the top view looks at her flight's circle round Ink's hole");
+  await camAt(
+    "above",
+    async () => expectCam(page, "above", circle.x, circle.y, (await cam("above")).zoom),
+    "the top view looks at her flight's circle round Ink's hole",
+  );
 
   // The pen takes clicks on the top view only: a click below, while it is open, founds nothing and refuses nothing.
   await page.getByRole("button", { name: "below", exact: true }).click();
@@ -410,7 +462,8 @@ try {
         const wy = c.y + ((sy - r.top) * k - cv.height / 2) / c.zoom;
         if (wy < (41 + 6) * R) continue; // underground, well below the strip (a click on the strip or the sky links)
         let d = Infinity;
-        for (const col of game.colonies) for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === 1) d = Math.min(d, Math.hypot(col.x[i] - wx, col.y[i] - wy));
+        for (const col of game.colonies)
+          for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === 1) d = Math.min(d, Math.hypot(col.x[i] - wx, col.y[i] - wy));
         if (!best || d > best.d) best = { sx, sy, d };
       }
     return best;
@@ -418,7 +471,12 @@ try {
   check(deep !== null, "a spot underground, clear of ants");
   await page.mouse.click(deep.sx, deep.sy);
   await sleep(600); // nothing should happen: give it time to
-  check((await page.evaluate(() => window.jevAnts.game.colonies.length)) === before && (await card.count()) === 1 && (await page.getByText("She can't fly that far").count()) === 0, "a click on the view below founds nothing while the pen is open");
+  check(
+    (await page.evaluate(() => window.jevAnts.game.colonies.length)) === before &&
+      (await card.count()) === 1 &&
+      (await page.getByText("She can't fly that far").count()) === 0,
+    "a click on the view below founds nothing while the pen is open",
+  );
   await page.getByRole("button", { name: "above", exact: true }).click();
   await until(async () => (await view()) === "above", "above again, with the pen open");
   await steadyCam("above");
@@ -434,7 +492,10 @@ try {
     const cv = document.querySelector("canvas");
     const r = cv.getBoundingClientRect();
     const k = cv.width / r.width;
-    const screen = (wx, wy) => ({ sx: r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k, sy: r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k });
+    const screen = (wx, wy) => ({
+      sx: r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k,
+      sy: r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k,
+    });
     const onScreen = ({ sx, sy }) => sx > r.left + 30 && sx < r.right - 30 && sy > r.top + 50 && sy < r.bottom - 30;
     let inside = null;
     let outside = null;
@@ -457,7 +518,10 @@ try {
   await shot("pen");
   await page.mouse.click(pts.outside.sx, pts.outside.sy);
   await page.getByText("She can't fly that far").first().waitFor({ timeout: 3000 });
-  check((await page.evaluate(() => window.jevAnts.game.colonies.length)) === before, "a click outside her flight is refused, and founds nothing");
+  check(
+    (await page.evaluate(() => window.jevAnts.game.colonies.length)) === before,
+    "a click outside her flight is refused, and founds nothing",
+  );
   await page.mouse.move(pts.outside.sx, pts.outside.sy);
   await sleep(300);
   await shot("pen-outside");
@@ -467,7 +531,10 @@ try {
     const g = window.jevAnts.game;
     return g.founded[g.founded.length - 1].spot;
   });
-  check(founded.cell.x === pts.inside.cell.x && founded.cell.y === pts.inside.cell.y && founded.end === pts.inside.end, `a click inside founds her colony where the preview said (${founded.cell.x}, ${founded.cell.y}, ${founded.end})`);
+  check(
+    founded.cell.x === pts.inside.cell.x && founded.cell.y === pts.inside.cell.y && founded.end === pts.inside.end,
+    `a click inside founds her colony where the preview said (${founded.cell.x}, ${founded.cell.y}, ${founded.end})`,
+  );
   await page.getByText("is founded, on your words").first().waitFor({ timeout: 3000 });
   check((await card.count()) === 0, "the pen is closed");
   check((await page.getByRole("button", { name: "Pause", exact: true }).count()) === 1, "the game plays on");
@@ -487,7 +554,10 @@ try {
     "her own flight",
     3000,
   );
-  check((await card.count()) === 0 && (await page.getByRole("button", { name: "Pause", exact: true }).count()) === 1, `"Let her fly" by the keyboard sends her on her own flight (${flew}), and the game plays on`);
+  check(
+    (await card.count()) === 0 && (await page.getByRole("button", { name: "Pause", exact: true }).count()) === 1,
+    `"Let her fly" by the keyboard sends her on her own flight (${flew}), and the game plays on`,
+  );
 
   // The dev hook's pen was for its flight alone: a queen flown now, with Jev unable to read words, opens no pen.
   await page.evaluate(() => {
@@ -496,14 +566,25 @@ try {
     g.revealed[0] = true;
     g.flights.push({ mother: 0, x: m.nest.x, y: m.nest.y, load: 1, strain: g.fungus.evolution?.strain ?? 0, at: g.time, food: 24 });
   });
-  await until(() => page.evaluate(() => /can't read new words now|was lost/.test(document.querySelector("[role=status]")?.textContent ?? "") && window.jevAnts.game.flights.length === 0), "her founding on her mother's words", 5000);
+  await until(
+    () =>
+      page.evaluate(
+        () =>
+          /can't read new words now|was lost/.test(document.querySelector("[role=status]")?.textContent ?? "") &&
+          window.jevAnts.game.flights.length === 0,
+      ),
+    "her founding on her mother's words",
+    5000,
+  );
   check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
   process.exit(0);
 } catch (e) {
-  console.error(`e2e-one-world: FAILED after ${((Date.now() - t0) / 1000).toFixed(1)} s: ${e instanceof Error ? e.message : e}${errors.length ? `\npage errors: ${errors.join("\n")}` : ""}`);
+  console.error(
+    `e2e-one-world: FAILED after ${((Date.now() - t0) / 1000).toFixed(1)} s: ${e instanceof Error ? e.message : e}${errors.length ? `\npage errors: ${errors.join("\n")}` : ""}`,
+  );
   await stop();
   process.exit(1);
 }

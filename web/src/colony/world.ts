@@ -147,7 +147,16 @@ export interface WorldOptions {
 }
 
 /** Underground: ~12 % rock, ~70 % soil, small open chambers (~18 %); ants dig. Food lies in more, nearer pockets than on the surface, since every way to it is dug. */
-export const DEFAULT_WORLD: WorldOptions = { size: { w: 512, h: 368 }, rockiness: 0.12, patchesPerChunk: 2.5, foodPerCell: 12, nestCount: 2, nestGap: 140, foodMinDist: 16, soil: 0.8 };
+export const DEFAULT_WORLD: WorldOptions = {
+  size: { w: 512, h: 368 },
+  rockiness: 0.12,
+  patchesPerChunk: 2.5,
+  foodPerCell: 12,
+  nestCount: 2,
+  nestGap: 140,
+  foodMinDist: 16,
+  soil: 0.8,
+};
 
 /** The open surface map (before digging): ~22 % rock, no soil. */
 export const OPEN_WORLD: Partial<WorldOptions> = { rockiness: 0.22, soil: 0, patchesPerChunk: 1.5, foodMinDist: 24 };
@@ -228,7 +237,8 @@ export function rockCut(rockiness: number): number {
   const have = cuts.get(rockiness);
   if (have !== undefined) return have;
   const sample: number[] = [];
-  for (let s = 1; s <= 12; s++) for (let y = 0; y < 96; y++) for (let x = 0; x < 96; x++) sample.push(heightAt(s * 7919, x * 5 + s * 1013, y * 5 - s * 577));
+  for (let s = 1; s <= 12; s++)
+    for (let y = 0; y < 96; y++) for (let x = 0; x < 96; x++) sample.push(heightAt(s * 7919, x * 5 + s * 1013, y * 5 - s * 577));
   sample.sort((a, b) => a - b);
   const cut = sample[Math.floor((1 - rockiness) * (sample.length - 1))];
   cuts.set(rockiness, cut);
@@ -247,9 +257,10 @@ export function soilCut(soil: number): number {
   const have = soilCuts.get(soil);
   if (have !== undefined) return have;
   const sample: number[] = [];
-  for (let s = 1; s <= 12; s++) for (let y = 0; y < 96; y++) for (let x = 0; x < 96; x++) sample.push(chamberAt(s * 7919, x * 5 + s * 1013, y * 5 - s * 577));
+  for (let s = 1; s <= 12; s++)
+    for (let y = 0; y < 96; y++) for (let x = 0; x < 96; x++) sample.push(chamberAt(s * 7919, x * 5 + s * 1013, y * 5 - s * 577));
   sample.sort((a, b) => a - b);
-  const cut = soil <= 0 ? -Infinity : (sample[Math.min(sample.length - 1, Math.floor(soil * (sample.length - 1)))]);
+  const cut = soil <= 0 ? -Infinity : sample[Math.min(sample.length - 1, Math.floor(soil * (sample.length - 1)))];
   soilCuts.set(soil, cut);
   return cut;
 }
@@ -520,7 +531,11 @@ function blankLayers(size: WorldSize, x0 = 0): { rock: ChunkLayer<Uint8Array>; f
 }
 
 /** A map from flat row-major arrays (tests, small hand-made fields): rock and food default to none. With `x0`, its columns start there (index y·w + x − x0). */
-export function worldFromArrays(size: WorldSize, nests: Nest[], opts: { rock?: ArrayLike<number>; food?: ArrayLike<number>; quality?: ArrayLike<number>; seed?: number; x0?: number } = {}): WorldMap {
+export function worldFromArrays(
+  size: WorldSize,
+  nests: Nest[],
+  opts: { rock?: ArrayLike<number>; food?: ArrayLike<number>; quality?: ArrayLike<number>; seed?: number; x0?: number } = {},
+): WorldMap {
   const x0 = opts.x0 ?? 0;
   const { rock, food } = blankLayers(size, x0);
   const quality = opts.quality ? qualityLayer() : undefined;
@@ -539,7 +554,24 @@ export function worldFromArrays(size: WorldSize, nests: Nest[], opts: { rock?: A
     }
   let hasSoil = false;
   if (opts.rock) for (let i = 0; i < opts.rock.length && !hasSoil; i++) hasSoil = opts.rock[i] === SOIL;
-  return { size, x0, seed: opts.seed ?? 0, rock, food, ...(quality ? { quality } : {}), nest: nests[0]!, nests, foodTotal: total, foodLeft: total, dug: 0, filled: 0, hasSoil, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer() };
+  return {
+    size,
+    x0,
+    seed: opts.seed ?? 0,
+    rock,
+    food,
+    ...(quality ? { quality } : {}),
+    nest: nests[0]!,
+    nests,
+    foodTotal: total,
+    foodLeft: total,
+    dug: 0,
+    filled: 0,
+    hasSoil,
+    digHeading: headingLayer(),
+    filledAt: timeLayer(),
+    dugAt: timeLayer(),
+  };
 }
 
 /** A layer as a flat row-major array over the map (tests, the reachability oracle): cell (x, y) at y·w + x − x0. */
@@ -642,7 +674,8 @@ export function escapes(map: WorldMap, x: number, y: number, radius: number, thr
 /** Visit every cell whose centre is within `r` of world (cx, cy), on the map. */
 export function disc(map: WorldMap, cx: number, cy: number, r: number, fn: (x: number, y: number) => void): void {
   for (let y = Math.max(0, Math.floor(cy / R - r / R - 1)); y <= Math.min(map.size.h - 1, Math.ceil(cy / R + r / R)); y++)
-    for (let x = Math.max(map.x0, Math.floor(cx - r - 1)); x <= Math.min(map.x0 + map.size.w - 1, Math.ceil(cx + r)); x++) if (Math.hypot(centreX(x, y) - cx, centreY(y) - cy) <= r) fn(x, y);
+    for (let x = Math.max(map.x0, Math.floor(cx - r - 1)); x <= Math.min(map.x0 + map.size.w - 1, Math.ceil(cx + r)); x++)
+      if (Math.hypot(centreX(x, y) - cx, centreY(y) - cy) <= r) fn(x, y);
 }
 
 /** Index into a flat map array of the cell under world (x, y), or −1 off the map. */
@@ -661,7 +694,23 @@ export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): W
   const cut = rockCut(o.rockiness);
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
-  const map: WorldMap = { size, x0: 0, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: o.soil > 0, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer() };
+  const map: WorldMap = {
+    size,
+    x0: 0,
+    seed,
+    rock,
+    food,
+    nest: { x: ext.w / 2, y: ext.h / 2, r: 3 },
+    nests: [],
+    foodTotal: 0,
+    foodLeft: 0,
+    dug: 0,
+    filled: 0,
+    hasSoil: o.soil > 0,
+    digHeading: headingLayer(),
+    filledAt: timeLayer(),
+    dugAt: timeLayer(),
+  };
   // Placement plans through diggable ground (anywhere but rock): underground, the ants dig the rest.
   const dg: Through = "diggable";
   rock.forEach((cx, cy, r) => {
@@ -777,7 +826,8 @@ export function keepReachableFood(map: WorldMap, from: readonly { x: number; y: 
 
 /** Whether world (x, y) lies within `d` of a nest or its entrance (side view): how far food keeps from nests. */
 export function nearNests(nests: readonly Nest[]): (x: number, y: number, d: number) => boolean {
-  return (x, y, d) => nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || (n.entrance !== undefined && Math.hypot(x - n.entrance.x, y - n.entrance.y) < d));
+  return (x, y, d) =>
+    nests.some((n) => Math.hypot(x - n.x, y - n.y) < d || (n.entrance !== undefined && Math.hypot(x - n.entrance.x, y - n.entrance.y) < d));
 }
 
 /**
@@ -877,7 +927,27 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
   const scut = soilCut(o.soil);
   const ext = extent(size.w, size.h);
   const loose = new ChunkLayer((n) => new Uint8Array(n), 0);
-  const map: WorldMap = { size, x0: 0, seed, rock, food, nest: { x: ext.w / 2, y: ext.h / 2, r: 3 }, nests: [], foodTotal: 0, foodLeft: 0, dug: 0, filled: 0, hasSoil: true, digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer(), sky, loose, moundCells: 0, chambers: new Chambers() };
+  const map: WorldMap = {
+    size,
+    x0: 0,
+    seed,
+    rock,
+    food,
+    nest: { x: ext.w / 2, y: ext.h / 2, r: 3 },
+    nests: [],
+    foodTotal: 0,
+    foodLeft: 0,
+    dug: 0,
+    filled: 0,
+    hasSoil: true,
+    digHeading: headingLayer(),
+    filledAt: timeLayer(),
+    dugAt: timeLayer(),
+    sky,
+    loose,
+    moundCells: 0,
+    chambers: new Chambers(),
+  };
   const ground = new Int32Array(size.w);
   for (let x = 0; x < size.w; x++) ground[x] = Math.max(2, Math.min(size.h - 8, groundRow(seed, o, x)));
   for (let y = 0; y < size.h; y++)
@@ -913,7 +983,7 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
         const x0 = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
         const wide = 3 + Math.floor(r() * 4);
         if (x0 + wide >= size.w - 1) continue;
-        const y0 = (ground[x0]) - 1;
+        const y0 = ground[x0] - 1;
         if (nearNest(centreX(x0, y0), centreY(y0), o.foodMinDist + wide)) continue;
         for (let x = x0; x < x0 + wide; x++) {
           const y = walkwayRow(map, x, ground[x]);
@@ -930,9 +1000,9 @@ export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> 
       const at = () => {
         const row = (cy << CHUNK_BITS) + Math.floor(r() * CHUNK);
         const col = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
-        return col >= size.w || row >= size.h - 3 || row < (ground[col]) + 10 ? null : ([col, row] as const);
+        return col >= size.w || row >= size.h - 3 || row < ground[col] + 10 ? null : ([col, row] as const);
       };
-      buryPockets(map, o, r, at, (fx) => (ground[fx]) + 4, nearNest);
+      buryPockets(map, o, r, at, (fx) => ground[fx] + 4, nearNest);
     }
   // Only food the player's ants can reach, walking or digging (the walkway and the soil are one ground).
   keepReachableFood(map, [map.nest], "diggable");
@@ -1024,7 +1094,14 @@ export function groundTop(map: WorldMap, x: number): number {
  * keeps its funnel, so one colony's mound never buries another's way in. Food on the cell it buries is lifted on top.
  * Returns the cell heaped, or null if there is no room on that side (the sky's top, the map's edge).
  */
-export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number, holes: readonly number[] = [ex], from?: number): [number, number] | null {
+export function heapMound(
+  map: WorldMap,
+  ex: number,
+  side: -1 | 1,
+  land: number,
+  holes: readonly number[] = [ex],
+  from?: number,
+): [number, number] | null {
   if (!map.sky || !map.loose || map.surfaceRows) return null; // the curtain: the mound is the plane's (one-world §4)
   const tops = holes.map((h) => groundTop(map, h));
   // Room in column c: on the map, no hole's column, and below every funnel's slope up from its hole.
@@ -1035,7 +1112,7 @@ export function heapMound(map: WorldMap, ex: number, side: -1 | 1, land: number,
     const top = groundTop(map, c);
     for (let k = 0; k < holes.length; k++) {
       const h = holes[k];
-      if (c === h || (tops[k]) - top >= Math.abs(c - h) - 1) return false;
+      if (c === h || tops[k] - top >= Math.abs(c - h) - 1) return false;
     }
     return true;
   };
@@ -1105,8 +1182,8 @@ export function heapPlane(map: WorldMap, x: number, y: number, holes: readonly {
     const offs = discOffsets(SPOIL_SEARCH)[cy & 1] as Int16Array;
     let found = false;
     for (let k = 2; k < offs.length; k += 2) {
-      const tx = cx + (offs[k]);
-      const ty = cy + (offs[k + 1]);
+      const tx = cx + offs[k];
+      const ty = cy + offs[k + 1];
       if (room(tx, ty)) {
         cx = tx;
         cy = ty;

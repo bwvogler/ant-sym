@@ -9,7 +9,6 @@ import { SMALL_SIDE } from "../builders.ts";
 // Nest slice 6 (docs/nest-and-home.md §3.5, Tschinkel): who works where goes by age. The young nurse, deep with the
 // queen and brood, and never go out; the middle-aged dig and carry inside; the old forage.
 
-
 function aged(c: Colony, share: number): void {
   for (let i = 0; i < c.n; i++) {
     c.age[i] = share * LIFESPAN;
@@ -52,7 +51,10 @@ test("the young never go out; the old do, more than the middle-aged (the old cli
   const old = outShare(MIDDLE + 0.1);
   assert.equal(young, 0, "the young stay in");
   assert.ok(old > 0.1, `the old forage: ${(old * 100).toFixed(0)} % out`);
-  assert.ok(middle > 0 && middle < old, `the middle-aged go out less than the old: ${(middle * 100).toFixed(0)} % vs ${(old * 100).toFixed(0)} %`);
+  assert.ok(
+    middle > 0 && middle < old,
+    `the middle-aged go out less than the old: ${(middle * 100).toFixed(0)} % vs ${(old * 100).toFixed(0)} %`,
+  );
 });
 
 test("the young sit deeper than the old, and only the middle-aged dig", () => {
@@ -79,10 +81,13 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
     if (!c.alive[i]) continue;
     c.antCell(i);
     const b = c.band(i);
-    depth[b]! += Math.max(0, (CELL[1]) - groundTop(map, CELL[0]));
+    depth[b]! += Math.max(0, CELL[1] - groundTop(map, CELL[0]));
     count[b]!++;
   }
-  assert.ok(depth[0]! / count[0]! > depth[2]! / count[2]!, `young ${(depth[0]! / count[0]!).toFixed(1)} rows deep, old ${(depth[2]! / count[2]!).toFixed(1)}`);
+  assert.ok(
+    depth[0]! / count[0]! > depth[2]! / count[2]!,
+    `young ${(depth[0]! / count[0]!).toFixed(1)} rows deep, old ${(depth[2]! / count[2]!).toFixed(1)}`,
+  );
   // …and with the queen: of the ants underground, the young nearer her than the middle-aged (they keep to the royal and
   // brood marks; inside anyway, they'd otherwise wander the nest like anyone).
   const near = [0, 0, 0];
@@ -94,7 +99,10 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
     near[c.band(i)]! += Math.hypot(c.x[i]! - c.queen!.x, c.y[i]! - c.queen!.y);
     inside[c.band(i)]!++;
   }
-  assert.ok(near[0]! / inside[0]! < near[1]! / inside[1]!, `from the queen, underground: young ${(near[0]! / inside[0]!).toFixed(1)}, middle-aged ${(near[1]! / inside[1]!).toFixed(1)}`);
+  assert.ok(
+    near[0]! / inside[0]! < near[1]! / inside[1]!,
+    `from the queen, underground: young ${(near[0]! / inside[0]!).toFixed(1)}, middle-aged ${(near[1]! / inside[1]!).toFixed(1)}`,
+  );
 });
 
 test("an old forager in a dead-end tunnel whose tip lies just under the ground by the hole goes back down and out by the shaft (review of #25)", () => {

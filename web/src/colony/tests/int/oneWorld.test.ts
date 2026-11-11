@@ -3,7 +3,24 @@ import assert from "node:assert/strict";
 import { CELL, cellOf, NE, NW, nx, ny } from "../../hex.ts";
 import { CRUST, CURTAIN_DEPTH, generateCurtain, generateOneWorld, STRIP, type OneWorld } from "../../oneWorld.ts";
 import { cellAt, grow, nearestValid } from "../../transect.ts";
-import { AIR, digCell, fillCell, flat, foundNest, heapMound, inBounds, isSky, mulberry32, openCell, OPEN, reachable, ROCK, rockAt, SOIL, type WorldMap } from "../../world.ts";
+import {
+  AIR,
+  digCell,
+  fillCell,
+  flat,
+  foundNest,
+  heapMound,
+  inBounds,
+  isSky,
+  mulberry32,
+  openCell,
+  OPEN,
+  reachable,
+  ROCK,
+  rockAt,
+  SOIL,
+  type WorldMap,
+} from "../../world.ts";
 import { cellKey, keyX, keyY } from "../../colony.ts";
 
 const SEEDS = [1, 2, 3, 4, 5, 6];
@@ -74,7 +91,11 @@ test("each hole is open on both layers, and its shaft leads on foot to the royal
     const { plane, curtain, line } = world(seed);
     line.sHole.forEach((s, k) => {
       assert.ok(cellAt(line, s));
-      assert.deepEqual([CELL[0], CELL[1]], [line.holes[k]!.x, line.holes[k]!.y], `seed ${seed}: the plane cell over hole ${k}'s column is the hole`);
+      assert.deepEqual(
+        [CELL[0], CELL[1]],
+        [line.holes[k]!.x, line.holes[k]!.y],
+        `seed ${seed}: the plane cell over hole ${k}'s column is the hole`,
+      );
       assert.equal(rockAt(plane, CELL[0]!, CELL[1]!), OPEN, `seed ${seed}: hole ${k} open on the plane`);
       const col = s;
       assert.equal(rockAt(curtain, col, CRUST), OPEN, `seed ${seed}: hole ${k} open in the curtain's crust`);
@@ -86,7 +107,11 @@ test("each hole is open on both layers, and its shaft leads on foot to the royal
       assert.equal(walk[cellIndex(curtain, CELL[0]!, CELL[1]!)], 1, `seed ${seed}: nest ${k}'s chamber is a walk from its hole`);
       assert.ok(CELL[1]! >= CRUST + 10, `seed ${seed}: the chamber is well below the crust`);
     });
-    assert.equal(curtain.chambers!.list.filter((c) => c.role === "royal").length, curtain.nests.length, `seed ${seed}: a royal chamber per nest`);
+    assert.equal(
+      curtain.chambers!.list.filter((c) => c.role === "royal").length,
+      curtain.nests.length,
+      `seed ${seed}: a royal chamber per nest`,
+    );
   }
 });
 
@@ -105,7 +130,11 @@ test("the ground strip is sky, as the rows above it: the side view draws P(s) th
     line.sHole.forEach((s, k) => {
       assert.equal(rockAt(curtain, s, CRUST), OPEN, `seed ${seed}: hole ${k} open under the strip`);
       cellAt(line, s);
-      assert.deepEqual([CELL[0], CELL[1]], [line.holes[k]!.x, line.holes[k]!.y], `seed ${seed}: the strip over hole ${k} is drawn from its plane cell`);
+      assert.deepEqual(
+        [CELL[0], CELL[1]],
+        [line.holes[k]!.x, line.holes[k]!.y],
+        `seed ${seed}: the strip over hole ${k} is drawn from its plane cell`,
+      );
     });
   }
 });
@@ -119,7 +148,10 @@ test("the crust is solid except at the holes: the only way between the layers (o
       assert.notEqual(curtain.rock.get(col, CRUST), OPEN, `seed ${seed}: crust open at column ${col}`);
       assert.equal(curtain.sky!.get(col, CRUST), 0);
       // It touches the strip's sky, so the side view's #crust rule (colony.ts) keeps diggers off it, as on today's ground.
-      assert.ok([NW, NE].some((d) => isSky(curtain, nx(col, CRUST, d), ny(CRUST, d))), `seed ${seed}: crust at column ${col} touches the sky`);
+      assert.ok(
+        [NW, NE].some((d) => isSky(curtain, nx(col, CRUST, d), ny(CRUST, d))),
+        `seed ${seed}: crust at column ${col} touches the sky`,
+      );
     }
   }
 });
@@ -144,7 +176,14 @@ test("buried food lies below the crust, reachable from some nest; the strip's fo
 });
 
 /** Every shared column of two curtains has the same ground, except in the 64-column pocket blocks within reach of `sNew`. */
-function sameGround(seed: number, a: OneWorld["curtain"], la: OneWorld["line"], b: OneWorld["curtain"], lb: OneWorld["line"], sNew: number): number {
+function sameGround(
+  seed: number,
+  a: OneWorld["curtain"],
+  la: OneWorld["line"],
+  b: OneWorld["curtain"],
+  lb: OneWorld["line"],
+  sNew: number,
+): number {
   // A new nest pushes aside the pockets near it, and with them the rest of their block's draws; its shaft and chamber
   // lie within a few columns of its hole. Pockets keep 16 + radius + 1 ≤ 21 from a nest.
   const lo = Math.floor((sNew - 30) / 64) * 64;
@@ -179,10 +218,17 @@ test("the curtain's ground keeps its place when the line grows, at either end: i
       assert.equal(CELL[0]!, k === 2 ? before.sHole[0] : line.sHole[k], `seed ${seed}: colony ${k}'s nest is at its own hole`);
     });
     assert.equal(c1.nest, c1.nests[0], "the player's nest is still Ink's");
-    assert.deepEqual(c1.chambers!.list.filter((c) => c.role === "royal").map((c) => c.colony).sort(), [0, 1, 2]);
+    assert.deepEqual(
+      c1
+        .chambers!.list.filter((c) => c.role === "royal")
+        .map((c) => c.colony)
+        .sort(),
+      [0, 1, 2],
+    );
     const inkChamber = c1.chambers!.list.find((c) => c.role === "royal" && c.colony === 0)!;
     // Chamber ids go by colony too: each colony's royal chamber keeps its id when the line grows at V₀.
-    for (const c of c1.chambers!.list.filter((ch) => ch.role === "royal")) assert.equal(c.id, c.colony, `seed ${seed}: colony ${c.colony}'s royal chamber id`);
+    for (const c of c1.chambers!.list.filter((ch) => ch.role === "royal"))
+      assert.equal(c.id, c.colony, `seed ${seed}: colony ${c.colony}'s royal chamber id`);
     assert.equal(inkChamber.id, curtain.chambers!.list.find((c) => c.role === "royal" && c.colony === 0)!.id);
     cellOf(c1.nests[0]!.x, c1.nests[0]!.y);
     assert.equal(c1.chambers!.cell.get(CELL[0]!, CELL[1]!), inkChamber.id + 1, `seed ${seed}: Ink's chamber is colony 0's`);
@@ -204,7 +250,9 @@ test("digging below never re-derives the sky and the strip: they are the plane's
     assert.equal(curtain.surfaceRows, CRUST);
     const snap = () => {
       const out: number[] = [];
-      for (let y = 0; y < CRUST; y++) for (let x = curtain.x0; x < curtain.x0 + curtain.size.w; x++) out.push(curtain.rock.get(x, y), curtain.sky!.get(x, y), curtain.food.get(x, y));
+      for (let y = 0; y < CRUST; y++)
+        for (let x = curtain.x0; x < curtain.x0 + curtain.size.w; x++)
+          out.push(curtain.rock.get(x, y), curtain.sky!.get(x, y), curtain.food.get(x, y));
       return out;
     };
     const before = snap();

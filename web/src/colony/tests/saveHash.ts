@@ -60,7 +60,22 @@ export function hashGame(g: Game): string {
       text([L.holes, L.outCells, L.outVersion, L.outAt]);
       if (L.outDist) view(L.outDist);
     }
-    text([c.stored, c.births, c.losses, c.decisions, c.larder, c.stance, c.queen, c.brood.items, c.corpses, c.midden, c.alates, c.eaten, c.nestOdour, c.odourAim]);
+    text([
+      c.stored,
+      c.births,
+      c.losses,
+      c.decisions,
+      c.larder,
+      c.stance,
+      c.queen,
+      c.brood.items,
+      c.corpses,
+      c.midden,
+      c.alates,
+      c.eaten,
+      c.nestOdour,
+      c.odourAim,
+    ]);
     // Its private fields too, as its save holds them: the hash above sees only what can be read from outside.
     text(c.saveState().private);
   }

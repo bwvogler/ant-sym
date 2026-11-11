@@ -21,7 +21,6 @@ const SMALL = { ...SMALL_SIDE, nestCount: 2 };
 const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
-
 test("what the fungus feels underfoot in the side view: open ground, a tunnel, a chamber's floor, the queen's mark", () => {
   const map = generateSideWorld(2, SMALL);
   const a = new Colony(map, { antCount: 5, maxAnts: 5, nest: 0 }, mulberry32(1));
@@ -30,7 +29,7 @@ test("what the fungus feels underfoot in the side view: open ground, a tunnel, a
   place(0, map.nests[0]!.x, map.nests[0]!.y); // own chamber
   place(1, map.nests[0]!.entrance!.x, map.nests[0]!.entrance!.y + 2); // own shaft
   cellOf(map.nests[0]!.entrance!.x, map.nests[0]!.entrance!.y);
-  const sx = (CELL[0]) + 20;
+  const sx = CELL[0] + 20;
   place(2, centreX(sx, walkway(map, sx)), centreY(walkway(map, sx))); // the open ground
   place(3, map.nests[1]!.x, map.nests[1]!.y); // the rival's chamber: a chamber's floor all the same (whose it is, is touch's)
   place(4, a.queen!.x, a.queen!.y); // by the queen
@@ -44,7 +43,10 @@ test("what the fungus feels underfoot in the side view: open ground, a tunnel, a
   const f = new Fungus(map, { grooming: 0 });
   f.hosts = 5;
   f.step([a, b], [occupancy(a, new CountGrid()), occupancy(b, new CountGrid())], 1e-6);
-  assert.deepEqual([0, 1, 2, 3, 4].map((i) => decodeFungal(a.fungal[i]!).place), ["chamber", "tunnel", "outside", "chamber", "queen"]);
+  assert.deepEqual(
+    [0, 1, 2, 3, 4].map((i) => decodeFungal(a.fungal[i]!).place),
+    ["chamber", "tunnel", "outside", "chamber", "queen"],
+  );
   // The task the fungus reads is the host's age band in the side view: founders are any age, so each is one of the three.
   for (let i = 0; i < 5; i++) assert.ok(["nurse", "inside", "forager"].includes(decodeFungal(a.fungal[i]!).task));
 });
@@ -223,7 +225,12 @@ test("the nest's odour drifts toward hosts in its royal chamber, wherever in it 
     } else {
       // In the old disc, but out of the royal chamber (a cave-in took those cells out of it).
       cells.length = 0;
-      for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, -1]] as const) {
+      for (const [dx, dy] of [
+        [0, 0],
+        [1, 0],
+        [-1, 0],
+        [0, -1],
+      ] as const) {
         ch.release(nx0 + dx, ny0 + dy);
         cells.push([nx0 + dx, ny0 + dy]);
       }

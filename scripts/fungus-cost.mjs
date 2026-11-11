@@ -11,7 +11,22 @@
 // spore brush (radius 3, spores 2, dose 0.15), STROKES events in a short drag, at 30 s.
 //
 // Usage: node scripts/fungus-cost.mjs [play=lockpick] [minutes=5] [ants=600] [seed=1] [strokes=6]
-import { estimateTokens, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, packFungusRequest, worthAsking, AIMS, STRAINS, BRUSH as SPORES, Game, centreX, centreY, generateSideWorld, mulberry32 } from "../web/src/colony/index.ts";
+import {
+  estimateTokens,
+  FUNGUS_BATCH,
+  FUNGUS_GATHER_MS,
+  fungalKey,
+  packFungusRequest,
+  worthAsking,
+  AIMS,
+  STRAINS,
+  BRUSH as SPORES,
+  Game,
+  centreX,
+  centreY,
+  generateSideWorld,
+  mulberry32,
+} from "../web/src/colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 
 const play = process.argv[2] ?? "lockpick";
@@ -41,7 +56,12 @@ const flush = () => {
   queue.clear();
   for (let b = 0; b < items.length; b += FUNGUS_BATCH) {
     const chunk = items.slice(b, b + FUNGUS_BATCH);
-    tokens += estimateTokens(packFungusRequest(chunk.map(([, it], n) => ({ id: `h${n}`, ...it })), aim));
+    tokens += estimateTokens(
+      packFungusRequest(
+        chunk.map(([, it], n) => ({ id: `h${n}`, ...it })),
+        aim,
+      ),
+    );
     requests++;
     for (const [k] of chunk) asked.add(k);
   }

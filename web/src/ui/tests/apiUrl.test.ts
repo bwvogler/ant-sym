@@ -16,5 +16,5 @@ function files(dir: string): string[] {
 
 test("no fetch to a bare /api/ path", () => {
   const bad = files(new URL("../../", import.meta.url).pathname).filter((f) => /fetch\(\s*["'`]\/api\//.test(readFileSync(f, "utf8")));
-  assert.deepEqual(bad, [], "use fetch(apiUrl(\"api/...\")) instead");
+  assert.deepEqual(bad, [], 'use fetch(apiUrl("api/...")) instead');
 });

@@ -16,7 +16,8 @@ import { DT } from "../builders.ts";
 const FOOD = 2;
 
 /** A one-world game of few ants (the geometry is what is tested; the colonies only need to live). */
-const game = (seed: number, ants = 8): Game => new Game(generateOneWorld(seed), { antCount: ants, rivalAnts: ants, regrow: 0 }, gameRng(seed));
+const game = (seed: number, ants = 8): Game =>
+  new Game(generateOneWorld(seed), { antCount: ants, rivalAnts: ants, regrow: 0 }, gameRng(seed));
 
 /** A flight from colony `mother` (as Colony.flown gives one), pending: found() and lose() take only pending flights. */
 function fly(g: Game, mother: number): Flight {
@@ -53,7 +54,10 @@ function sameBelow(was: Below, now: Below, sNew: number, label: string): void {
     for (let r = 0; r < was.rows; r++) {
       const i = (s - was.lo) * was.rows + r;
       const j = (s - now.lo) * now.rows + r;
-      if (was.rock[i] !== now.rock[j] || was.food[i] !== now.food[j]) assert.fail(`${label}: column ${s}, row ${r + CRUST} changed: rock ${was.rock[i]} → ${now.rock[j]}, food ${was.food[i]} → ${now.food[j]}`);
+      if (was.rock[i] !== now.rock[j] || was.food[i] !== now.food[j])
+        assert.fail(
+          `${label}: column ${s}, row ${r + CRUST} changed: rock ${was.rock[i]} → ${now.rock[j]}, food ${was.food[i]} → ${now.food[j]}`,
+        );
     }
   }
 }
@@ -103,14 +107,22 @@ function check(w: OneWorld, g: Game, label: string): void {
     });
   }
   // The strip is sky over every column, the new ones included (the side view draws P(s) there); the holes are open under it.
-  for (let s = line.sMin; s <= line.sMax; s++) if (curtain.rock.get(s, STRIP) !== AIR || curtain.sky!.get(s, STRIP) !== 1 || curtain.food.get(s, STRIP) !== 0) assert.fail(`${label}: the strip at column ${s} isn't sky`);
+  for (let s = line.sMin; s <= line.sMax; s++)
+    if (curtain.rock.get(s, STRIP) !== AIR || curtain.sky!.get(s, STRIP) !== 1 || curtain.food.get(s, STRIP) !== 0)
+      assert.fail(`${label}: the strip at column ${s} isn't sky`);
   // Every hole joins the plane's main open ground (D1, PR #62): the region the world's own first hole is in, so no
   // colony is founded in a pocket sealed off by rock.
   const main = mainRegion(plane);
-  for (const h of line.holes) assert.ok(main[h.y * plane.size.w + h.x - plane.x0], `${label}: the hole at plane cell (${h.x}, ${h.y}) is in a pocket off the main open ground`);
+  for (const h of line.holes)
+    assert.ok(
+      main[h.y * plane.size.w + h.x - plane.x0],
+      `${label}: the hole at plane cell (${h.x}, ${h.y}) is in a pocket off the main open ground`,
+    );
   // No two royal chambers share a cell.
   const all = curtain.nests.map((_, k) => chamberCells(curtain, k));
-  for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) assert.ok(![...all[a]!].some((cell) => all[b]!.has(cell)), `${label}: nests ${a} and ${b}'s royal chambers merge`);
+  for (let a = 0; a < all.length; a++)
+    for (let b = a + 1; b < all.length; b++)
+      assert.ok(![...all[a]!].some((cell) => all[b]!.has(cell)), `${label}: nests ${a} and ${b}'s royal chambers merge`);
 }
 
 /**
@@ -129,10 +141,17 @@ function foodBooks(w: OneWorld, old: { sMin: number; sMax: number }, label: stri
       const v = curtain.food.get(s, y);
       if (!v) continue;
       sum += v;
-      if ((s < old.sMin || s > old.sMax) && !reach[y * cw + s - x0]) assert.fail(`${label}: food ${v} at new column ${s}, row ${y}, which no colony can reach`);
+      if ((s < old.sMin || s > old.sMax) && !reach[y * cw + s - x0])
+        assert.fail(`${label}: food ${v} at new column ${s}, row ${y}, which no colony can reach`);
     }
-  assert.ok(Math.abs(curtain.foodTotal - sum) < 1e-6 * Math.max(1, sum), `${label}: foodTotal ${curtain.foodTotal} but ${sum} below the crust`);
-  assert.ok(Math.abs(curtain.foodLeft - sum) < 1e-6 * Math.max(1, sum), `${label}: foodLeft ${curtain.foodLeft} but ${sum} below the crust`);
+  assert.ok(
+    Math.abs(curtain.foodTotal - sum) < 1e-6 * Math.max(1, sum),
+    `${label}: foodTotal ${curtain.foodTotal} but ${sum} below the crust`,
+  );
+  assert.ok(
+    Math.abs(curtain.foodLeft - sum) < 1e-6 * Math.max(1, sum),
+    `${label}: foodLeft ${curtain.foodLeft} but ${sum} below the crust`,
+  );
 }
 
 /** Found once, by the lab beyond an end or by a flight from a random colony, and check what growth must keep. Returns whether a colony was founded. */
@@ -243,7 +262,9 @@ test("growth at V₀ and at V_k keeps every existing s in place, and the new col
       const fresh = generateCurtain(seed, line, colonies);
       for (let s = line.sMin; s <= line.sMax; s++) {
         if (s >= old.sMin && s <= old.sMax) continue;
-        for (let y = 0; y < w.curtain.size.h; y++) if (w.curtain.rock.get(s, y) !== fresh.rock.get(s, y)) assert.fail(`seed ${seed}: new column ${s}, row ${y}: ${w.curtain.rock.get(s, y)}, generated ${fresh.rock.get(s, y)}`);
+        for (let y = 0; y < w.curtain.size.h; y++)
+          if (w.curtain.rock.get(s, y) !== fresh.rock.get(s, y))
+            assert.fail(`seed ${seed}: new column ${s}, row ${y}: ${w.curtain.rock.get(s, y)}, generated ${fresh.rock.get(s, y)}`);
       }
     }
   }
@@ -290,7 +311,16 @@ test("the fungus's spores in the curtain stay on their cells when the curtain gr
   const c = g.player;
   const h = c.holeCells[c.params.nest]!;
   // Spores a few rows down the player's shaft, in the curtain.
-  g.fungus.paint([], centreX(h.col, CRUST + 3), centreY(CRUST + 3), 2, 3, 0, STRAINS.findIndex((s) => s.id === "bloom"), CURTAIN);
+  g.fungus.paint(
+    [],
+    centreX(h.col, CRUST + 3),
+    centreY(CRUST + 3),
+    2,
+    3,
+    0,
+    STRAINS.findIndex((s) => s.id === "bloom"),
+    CURTAIN,
+  );
   const n = g.fungus.sporeCells;
   assert.ok(n > 0);
   g.foundBeyond("start", 8);
@@ -325,7 +355,10 @@ test("founding mid-game, 20 s in: every colony's way out (its out-field) is rebu
   const w = g.world!;
   for (let k = 0; k < Math.round(20 / DT); k++) g.tick(DT);
   const built = g.colonies.map((c) => c.layers[CURTAIN]!.outDist?.length ?? 0);
-  assert.ok(built.every((n) => n > 0), "every colony has built its out-field before the founding");
+  assert.ok(
+    built.every((n) => n > 0),
+    "every colony has built its out-field before the founding",
+  );
   const old = w.line;
   g.foundBeyond("start", 8);
   assert.ok(w.line.sMin < old.sMin, "the curtain grew at V₀");

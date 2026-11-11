@@ -1,5 +1,33 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { type Colony, HOMES, MODES, STANCES, TRAILS, type Situation, DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, responseQuestion, RESPONSE_HOOKS, AROUSALS, CARRYING, decodeFungal, FUNGAL_PLACES, TASKS, TOUCHES, type FungalSituation, INFECTED, LEVERS, decodeLevels, pulled, PRESETS, askedIn, type Game, upgradeFor, AIMS } from "../colony/index.ts";
+import {
+  type Colony,
+  HOMES,
+  MODES,
+  STANCES,
+  TRAILS,
+  type Situation,
+  DOCTRINES,
+  MODE_CRITERIA,
+  RESPONSE_LEGEND,
+  responseQuestion,
+  RESPONSE_HOOKS,
+  AROUSALS,
+  CARRYING,
+  decodeFungal,
+  FUNGAL_PLACES,
+  TASKS,
+  TOUCHES,
+  type FungalSituation,
+  INFECTED,
+  LEVERS,
+  decodeLevels,
+  pulled,
+  PRESETS,
+  askedIn,
+  type Game,
+  upgradeFor,
+  AIMS,
+} from "../colony/index.ts";
 import { LeverChips } from "./DetailsScreen.tsx";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
@@ -9,7 +37,15 @@ import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
 import { css, ROLE_RGB } from "./palette.ts";
-import { byRows, LOCAL_FUNGUS_RULES, LOCAL_MODE_OTHERWISE, LOCAL_MODE_RULES, LOCAL_MODE_STRANGERS, LOCAL_RESPONSE_RULES, localModeOtherwise } from "./policyText.ts";
+import {
+  byRows,
+  LOCAL_FUNGUS_RULES,
+  LOCAL_MODE_OTHERWISE,
+  LOCAL_MODE_RULES,
+  LOCAL_MODE_STRANGERS,
+  LOCAL_RESPONSE_RULES,
+  localModeOtherwise,
+} from "./policyText.ts";
 import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQuestion, type Sample } from "./prompt.ts";
 import { seg } from "./styles.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
@@ -97,12 +133,24 @@ export default function LearnDrawer(props: Props) {
         <h2 className="font-semibold text-fg">Learn</h2>
         <div className="ml-2 flex overflow-hidden rounded-md border border-line text-sm" role="tablist">
           {TABS.map(([t, name]) => (
-            <button key={t} type="button" role="tab" aria-selected={target.tab === t} className={seg(target.tab === t)} onClick={() => openLearn({ tab: t })}>
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={target.tab === t}
+              className={seg(target.tab === t)}
+              onClick={() => openLearn({ tab: t })}
+            >
               {name}
             </button>
           ))}
         </div>
-        <button type="button" className="ml-auto rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised" onClick={closeLearn} aria-label="Close Learn">
+        <button
+          type="button"
+          className="ml-auto rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised"
+          onClick={closeLearn}
+          aria-label="Close Learn"
+        >
           Close
         </button>
       </div>
@@ -121,7 +169,8 @@ function GuideTab({ focus }: { focus?: string }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-fg-3">
-        What you see on the field, what real ants do, and how the game models it. Each claim comes from a research note in the repository, linked under <em>Sources</em>.
+        What you see on the field, what real ants do, and how the game models it. Each claim comes from a research note in the repository,
+        linked under <em>Sources</em>.
       </p>
       {GUIDE.map((e) => (
         <Entry key={e.id} e={e} hot={focus === e.id} />
@@ -205,29 +254,36 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[13px] leading-snug">
-        Each colony's ants follow its <em>doctrine</em>; the fungus follows your <em>aim</em>. Jev reads these words and answers once per situation (what an ant senses, not one ant), and every ant in that situation takes the answer.
-        Its answers are kept, and play even when Jev can't run; where it has not answered yet, the local rule decides.
+        Each colony's ants follow its <em>doctrine</em>; the fungus follows your <em>aim</em>. Jev reads these words and answers once per
+        situation (what an ant senses, not one ant), and every ant in that situation takes the answer. Its answers are kept, and play even
+        when Jev can't run; where it has not answered yet, the local rule decides.
       </p>
 
       {props.doctrines.slice(0, Math.max(1, sides)).map((d, k) => (
         <section key={k} className="flex flex-col gap-1" aria-label={`${colonyName(k)} doctrine`}>
           <h3 className="font-medium">
             <span className={colonyTone(k)}>{colonyName(k)}</span> <span className="text-fg-2">doctrine</span>{" "}
-            {props.game.revealed[k] && <span className="text-xs font-normal text-fg-3">({DOCTRINES.find((p) => p.id === d.id)?.name ?? "custom"})</span>}
+            {props.game.revealed[k] && (
+              <span className="text-xs font-normal text-fg-3">({DOCTRINES.find((p) => p.id === d.id)?.name ?? "custom"})</span>
+            )}
           </h3>
           {props.game.revealed[k] ? (
             <p id={`learn-doctrine-${k}`} className="rounded-md border border-line bg-raised px-2 py-1.5 text-[13px] leading-snug text-fg">
               {d.text}
             </p>
           ) : (
-            <p id={`learn-doctrine-${k}`} className="rounded-md border border-dashed border-line px-2 py-1.5 text-[13px] leading-snug text-fg-3">
+            <p
+              id={`learn-doctrine-${k}`}
+              className="rounded-md border border-dashed border-line px-2 py-1.5 text-[13px] leading-snug text-fg-3"
+            >
               Closed to you: reach the {colonyName(k)} colony's queen to read its mind.
             </p>
           )}
         </section>
       ))}
       <p className="-mt-2 text-xs text-fg-3">
-        A colony's doctrine is its nature: not yours to rewrite while it lives. The ants' modes are asked under it. {props.retune} Colonies with the same doctrine share every answer.
+        A colony's doctrine is its nature: not yours to rewrite while it lives. The ants' modes are asked under it. {props.retune} Colonies
+        with the same doctrine share every answer.
       </p>
 
       <section className="flex flex-col gap-2" aria-label="fungus aim">
@@ -237,7 +293,13 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
           </h3>
           <div className="flex overflow-hidden rounded-md border border-line text-sm">
             {AIMS.map((a) => (
-              <button key={a.id} type="button" className={seg(props.aim.id === a.id)} disabled={props.lock !== null} onClick={() => props.setAim({ id: a.id, text: a.text })}>
+              <button
+                key={a.id}
+                type="button"
+                className={seg(props.aim.id === a.id)}
+                disabled={props.lock !== null}
+                onClick={() => props.setAim({ id: a.id, text: a.text })}
+              >
                 {a.name}
               </button>
             ))}
@@ -259,14 +321,25 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         </div>
         <label className="flex items-center justify-between text-xs text-fg-2">
           <span>Local rule: groomed hosts hide (show a quarter)</span>
-          <input type="checkbox" checked={props.hide} disabled={props.lock !== null} onChange={(e) => props.setRule({ hide: e.target.checked })} />
+          <input
+            type="checkbox"
+            checked={props.hide}
+            disabled={props.lock !== null}
+            onChange={(e) => props.setRule({ hide: e.target.checked })}
+          />
         </label>
         <label className="flex items-center justify-between text-xs text-fg-2">
           <span>Local rule: cull hosts fighting foreigners</span>
-          <input type="checkbox" checked={props.cull} disabled={props.lock !== null} onChange={(e) => props.setRule({ cull: e.target.checked })} />
+          <input
+            type="checkbox"
+            checked={props.cull}
+            disabled={props.lock !== null}
+            onChange={(e) => props.setRule({ cull: e.target.checked })}
+          />
         </label>
         <p className="text-xs text-fg-3">
-          Jev sets, for each situation the fungus senses in a host, a level for every lever on the menu, under your aim. Where Jev has not answered, the strain does what it was bred for, within the menu and the two settings above.
+          Jev sets, for each situation the fungus senses in a host, a level for every lever on the menu, under your aim. Where Jev has not
+          answered, the strain does what it was bred for, within the menu and the two settings above.
         </p>
       </section>
 
@@ -303,7 +376,12 @@ function Section({ id, title, focus, ping, children }: { id: string; title: stri
     if (hot) setOpen(true);
   }
   return (
-    <details id={`learn-${id}`} open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className={`scroll-mt-2 rounded-lg border bg-panel ${hot ? "border-accent/60" : "border-line"}`}>
+    <details
+      id={`learn-${id}`}
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      className={`scroll-mt-2 rounded-lg border bg-panel ${hot ? "border-accent/60" : "border-line"}`}
+    >
       <summary className="cursor-pointer px-3 py-2 text-[13px] font-medium text-fg">{title}</summary>
       <div className="flex flex-col gap-3 border-t border-line px-3 py-3">{children}</div>
     </details>
@@ -348,7 +426,9 @@ function RuleTable({ rows, otherwise, live }: { rows: { when: string; then: stri
   return (
     <div>
       <h4 className={h3}>The local rule</h4>
-      <p className="mt-0.5 text-xs text-fg-3">Free, and the baseline Jev is measured against. Read top to bottom: the first line that holds decides.</p>
+      <p className="mt-0.5 text-xs text-fg-3">
+        Free, and the baseline Jev is measured against. Read top to bottom: the first line that holds decides.
+      </p>
       <ol className="mt-1.5 flex flex-col gap-1 text-[13px]">
         {rows.map((r, k) => (
           <li key={k} className={`grid grid-cols-[1fr_auto] gap-2 rounded px-1 ${live === k ? "bg-accent-soft" : ""}`}>
@@ -363,7 +443,10 @@ function RuleTable({ rows, otherwise, live }: { rows: { when: string; then: stri
 }
 
 /** The followed ant, if it is alive and was asked: its colony index and its last situation. */
-function followedSituation(colonies: readonly Colony[], f: Followed | null): { k: number; i: number; col: Colony; s: Situation | null } | null {
+function followedSituation(
+  colonies: readonly Colony[],
+  f: Followed | null,
+): { k: number; i: number; col: Colony; s: Situation | null } | null {
   if (!f || !colonies[0]) return null;
   const col = followedColony(colonies, f);
   return col ? { k: sideIndex(f), i: f.i, col, s: col.lastQuestion(f.i) } : null;
@@ -372,7 +455,7 @@ function followedSituation(colonies: readonly Colony[], f: Followed | null): { k
 /** What the fungus senses in the followed ant, if it is infected. */
 function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: number; s: FungalSituation } | null {
   const fol = followedSituation(colonies, f);
-  if (!fol || (fol.col.load[fol.i]) < INFECTED) return null;
+  if (!fol || fol.col.load[fol.i] < INFECTED) return null;
   const code = fol.col.fungal[fol.i];
   return code >= 0 ? { i: fol.i, s: decodeFungal(code) } : null;
 }
@@ -390,7 +473,11 @@ function ModeExplainer(props: Props) {
           ["foodTrail", TRAILS.join(" · "), "food scent just ahead"],
           ["homeTrail", HOMES.join(" · "), "home scent ahead on the ground; underground, the chamber it stands in"],
           ["alarm", TRAILS.join(" · "), "alarm scent just ahead"],
-          ["enemy", "none · near", "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)"],
+          [
+            "enemy",
+            "none · near",
+            "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)",
+          ],
           ["stance", STANCES.join(" · "), "the ant's own: defend while it senses a threat near its nest, raid once recruited"],
         ]}
         note={
@@ -407,7 +494,8 @@ function ModeExplainer(props: Props) {
       <RuleTable rows={LOCAL_MODE_RULES} otherwise={LOCAL_MODE_OTHERWISE} live={live >= 0 ? live : LOCAL_MODE_RULES.length} />
       <p className="-mt-1 text-xs text-fg-3">{LOCAL_MODE_STRANGERS}</p>
       <p className="-mt-1 text-xs text-fg-3">
-        Highlighted: the line that decides {fol?.s ? `ant #${fol.i}'s last situation` : "a sample situation (follow an ant to see its own)"}: {byRows(LOCAL_MODE_RULES, localModeOtherwise, s)}.
+        Highlighted: the line that decides {fol?.s ? `ant #${fol.i}'s last situation` : "a sample situation (follow an ant to see its own)"}
+        : {byRows(LOCAL_MODE_RULES, localModeOtherwise, s)}.
       </p>
     </>
   );
@@ -420,7 +508,9 @@ function FungusExplainer(props: Props) {
   return (
     <>
       <p className="text-[13px]">
-        The fungus never chooses for an ant. Inside each ant it lives in, it <em>senses</em> the ant's body, and sets how hard to pull each of its <em>levers</em>: some change what the ant perceives, others what it gives off to other ants. The ant's own policy still decides what the ant does, from the world as it now perceives it.
+        The fungus never chooses for an ant. Inside each ant it lives in, it <em>senses</em> the ant's body, and sets how hard to pull each
+        of its <em>levers</em>: some change what the ant perceives, others what it gives off to other ants. The ant's own policy still
+        decides what the ant does, from the world as it now perceives it.
       </p>
       <p className="rounded-md border border-line bg-raised px-2 py-1.5 font-mono text-[11px] leading-snug text-fg-2">
         what the fungus senses in the ant → a level for each lever → what the ant perceives, and what it gives off → the ant's own choice
@@ -436,8 +526,26 @@ function FungusExplainer(props: Props) {
         ]}
         note={
           <>
-            Most of these are marked design in the research note: no paper shows a fungus reading them. <a className="text-accent hover:underline" href={docUrl("fungus-policy", "11-what-the-fungus-senses-inside-an-ant-and-its-levers")} target="_blank" rel="noreferrer">fungus-policy §11</a>
-            {fungal && <> · The followed ant's fungus senses: <span className="font-mono">{fungal.s.arousal} · {fungal.s.touch} · {fungal.s.place} · {fungal.s.task} · {fungal.s.carrying}{fungal.s.groomed ? " · groomed" : ""}</span>.</>}
+            Most of these are marked design in the research note: no paper shows a fungus reading them.{" "}
+            <a
+              className="text-accent hover:underline"
+              href={docUrl("fungus-policy", "11-what-the-fungus-senses-inside-an-ant-and-its-levers")}
+              target="_blank"
+              rel="noreferrer"
+            >
+              fungus-policy §11
+            </a>
+            {fungal && (
+              <>
+                {" "}
+                · The followed ant's fungus senses:{" "}
+                <span className="font-mono">
+                  {fungal.s.arousal} · {fungal.s.touch} · {fungal.s.place} · {fungal.s.task} · {fungal.s.carrying}
+                  {fungal.s.groomed ? " · groomed" : ""}
+                </span>
+                .
+              </>
+            )}
           </>
         }
       />
@@ -446,7 +554,25 @@ function FungusExplainer(props: Props) {
         <ul className="mt-1.5 flex flex-col gap-1 text-[13px]">
           {LEVERS.filter((v) => menu.has(v.id) || v.kind === "lethal").map((v) => (
             <li key={v.id} className={menu.has(v.id) ? "" : "opacity-60"}>
-              <span className={`font-mono text-xs ${v.kind === "perceive" ? "text-spore" : v.kind === "lethal" ? "text-err" : "text-accent"}`}>{v.name}</span> <span className="text-xs text-fg-3">({v.kind === "perceive" ? "what it perceives" : v.kind === "emit" ? "what it gives off" : menu.has(v.id) ? (props.game.fungus.evolution?.reach()[v.id] === 0 ? `lethal, on, held off until you keep ${upgradeFor(v.id)?.name ?? "its upgrade"}` : "lethal, on") : "lethal, off"})</span> — {v.blurb}. <span className="text-xs text-fg-3">{v.words.join(" · ")}</span>
+              <span
+                className={`font-mono text-xs ${v.kind === "perceive" ? "text-spore" : v.kind === "lethal" ? "text-err" : "text-accent"}`}
+              >
+                {v.name}
+              </span>{" "}
+              <span className="text-xs text-fg-3">
+                (
+                {v.kind === "perceive"
+                  ? "what it perceives"
+                  : v.kind === "emit"
+                    ? "what it gives off"
+                    : menu.has(v.id)
+                      ? props.game.fungus.evolution?.reach()[v.id] === 0
+                        ? `lethal, on, held off until you keep ${upgradeFor(v.id)?.name ?? "its upgrade"}`
+                        : "lethal, on"
+                      : "lethal, off"}
+                )
+              </span>{" "}
+              — {v.blurb}. <span className="text-xs text-fg-3">{v.words.join(" · ")}</span>
             </li>
           ))}
         </ul>
@@ -458,7 +584,13 @@ function FungusExplainer(props: Props) {
             <li key={r}>{r}</li>
           ))}
         </ol>
-        <p className="mt-1 text-xs text-fg-3">The strains' defaults are presets, named sets of levels: {PRESETS.filter((p) => p.id !== "dormant").map((p) => p.name).join(", ")}.</p>
+        <p className="mt-1 text-xs text-fg-3">
+          The strains' defaults are presets, named sets of levels:{" "}
+          {PRESETS.filter((p) => p.id !== "dormant")
+            .map((p) => p.name)
+            .join(", ")}
+          .
+        </p>
       </div>
       <div>
         <button type="button" className="text-xs text-accent underline-offset-2 hover:underline" onClick={() => setTable((t) => !t)}>
@@ -477,7 +609,9 @@ function AnswerTable({ rows }: { rows: { key: string; answer: string; stale: boo
   return (
     <div className="mt-1.5 flex flex-col gap-1 text-[12px]">
       <p className="text-xs text-fg-3">
-        {rows.filter((r) => !r.stale).length} answered under this aim{rows.some((r) => r.stale) ? `, ${rows.filter((r) => r.stale).length} dimmed: an earlier aim's, played while Jev can't answer` : ""}.
+        {rows.filter((r) => !r.stale).length} answered under this aim
+        {rows.some((r) => r.stale) ? `, ${rows.filter((r) => r.stale).length} dimmed: an earlier aim's, played while Jev can't answer` : ""}
+        .
       </p>
       {sorted.map((r) => {
         const senses = r.key.split("|").slice(0, 6);
@@ -487,7 +621,15 @@ function AnswerTable({ rows }: { rows: { key: string; answer: string; stale: boo
           <div key={r.key} className={`rounded border border-line px-2 py-1 ${r.stale ? "opacity-50" : ""}`}>
             <span className="font-mono text-fg-2">{senses.join(" · ")}</span>
             <span className="text-fg-3"> → </span>
-            {on.length === 0 ? <span className="text-fg-3">nothing</span> : on.map(({ lever, level }) => <span key={lever.id} className="mr-1.5 font-mono text-fg">{lever.name}: {lever.words[level]}</span>)}
+            {on.length === 0 ? (
+              <span className="text-fg-3">nothing</span>
+            ) : (
+              on.map(({ lever, level }) => (
+                <span key={lever.id} className="mr-1.5 font-mono text-fg">
+                  {lever.name}: {lever.words[level]}
+                </span>
+              ))
+            )}
           </div>
         );
       })}
@@ -503,20 +645,38 @@ function SentExplainer(props: Props) {
   // A colony's doctrine is closed until its queen is reached (ja-lo8.7): the request is shown with the words hidden.
   const doctrine = props.game.revealed[k] ? (props.doctrines[k]?.text ?? "") : "(closed: reach this colony's queen)";
   const lanes: { name: string; sample: Sample; words: string; about: string; tokens: number }[] = [
-    { name: "An ant's mode", sample: { lane: "mode", situation: fol?.s ?? SAMPLE_SITUATION }, words: doctrine, about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation", tokens: tokensPerQuestion("mode", doctrine) },
-    { name: "The fungus, in one host", sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(props.menu) }, words: props.aim.text, about: fungal ? `ant #${fungal.i}` : "a sample host", tokens: tokensPerQuestion("fungus", props.aim.text) },
+    {
+      name: "An ant's mode",
+      sample: { lane: "mode", situation: fol?.s ?? SAMPLE_SITUATION },
+      words: doctrine,
+      about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation",
+      tokens: tokensPerQuestion("mode", doctrine),
+    },
+    {
+      name: "The fungus, in one host",
+      sample: { lane: "fungus", situation: fungal?.s ?? SAMPLE_FUNGAL, menu: new Set(props.menu) },
+      words: props.aim.text,
+      about: fungal ? `ant #${fungal.i}` : "a sample host",
+      tokens: tokensPerQuestion("fungus", props.aim.text),
+    },
   ];
   return (
     <>
       <p className="text-[13px]">
-        Each request carries a fixed legend (what each field means), then the doctrine or aim, then up to {PER_REQUEST} situations, each with its question. Only the doctrine and aim are yours to change. Tokens cost ${(USD_PER_INPUT_TOKEN * 1e6).toFixed(3)} per million.
+        Each request carries a fixed legend (what each field means), then the doctrine or aim, then up to {PER_REQUEST} situations, each
+        with its question. Only the doctrine and aim are yours to change. Tokens cost ${(USD_PER_INPUT_TOKEN * 1e6).toFixed(3)} per million.
       </p>
       {lanes.map((l) => (
         <details key={l.name} className="rounded-md border border-line">
           <summary className="cursor-pointer px-2 py-1.5 text-xs">
-            <span className="font-medium text-fg">{l.name}</span> <span className="text-fg-3">· ≈ {l.tokens} tokens a question · for {l.about}</span>
+            <span className="font-medium text-fg">{l.name}</span>{" "}
+            <span className="text-fg-3">
+              · ≈ {l.tokens} tokens a question · for {l.about}
+            </span>
           </summary>
-          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words border-t border-line bg-raised p-2 font-mono text-[11px] leading-snug text-fg-2">{JSON.stringify(requestFor(l.sample, l.words), null, 2)}</pre>
+          <pre className="max-h-80 overflow-auto border-t border-line bg-raised p-2 font-mono text-[11px] leading-snug break-words whitespace-pre-wrap text-fg-2">
+            {JSON.stringify(requestFor(l.sample, l.words), null, 2)}
+          </pre>
         </details>
       ))}
     </>
@@ -527,7 +687,9 @@ function ResponsesExplainer() {
   return (
     <>
       <p className="text-[13px]">
-        On this page an ant's small responses are decided by the local rule: Jev is not asked them here. <span className="font-mono text-xs">scripts/colony-live.mjs</span> asks the questions below offline, against this legend; the alarm rule has no question yet.
+        On this page an ant's small responses are decided by the local rule: Jev is not asked them here.{" "}
+        <span className="font-mono text-xs">scripts/colony-live.mjs</span> asks the questions below offline, against this legend; the alarm
+        rule has no question yet.
       </p>
       <dl className="flex flex-col gap-1 text-[13px]">
         {LOCAL_RESPONSE_RULES.map(([hook, rule]) => (
@@ -553,7 +715,7 @@ function ResponsesExplainer() {
       </div>
       <details className="rounded-md border border-line">
         <summary className="cursor-pointer px-2 py-1.5 text-xs font-medium text-fg">The legend</summary>
-        <p className="whitespace-pre-wrap border-t border-line p-2 text-xs leading-snug">{RESPONSE_LEGEND}</p>
+        <p className="border-t border-line p-2 text-xs leading-snug whitespace-pre-wrap">{RESPONSE_LEGEND}</p>
       </details>
     </>
   );
@@ -571,7 +733,8 @@ function NestTab(props: Props & { focus?: string }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="rounded-md bg-accent-soft px-3 py-2 text-xs text-accent">
-        This is the whole nest as you see it, read from the game's chamber table. An ant sees none of it: underground it senses only the role of the chamber it stands in, from its floor's smell.{" "}
+        This is the whole nest as you see it, read from the game's chamber table. An ant sees none of it: underground it senses only the
+        role of the chamber it stands in, from its floor's smell.{" "}
         <a className="underline" href={docUrl("vision", "what-an-ant-can-sense")} target="_blank" rel="noreferrer">
           What an ant can sense
         </a>
@@ -590,14 +753,19 @@ function NestTab(props: Props & { focus?: string }) {
             <ul className="mt-2 flex flex-col gap-1 text-[13px]">
               {(["royal", "brood", "store", "reception"] as const).map((r) => (
                 <li key={r} className="flex items-center gap-2">
-                  <span className="inline-block h-3 w-3 shrink-0 rounded-sm border border-line" style={{ background: css(ROLE_RGB[r]!) }} aria-hidden />
+                  <span
+                    className="inline-block h-3 w-3 shrink-0 rounded-sm border border-line"
+                    style={{ background: css(ROLE_RGB[r]!) }}
+                    aria-hidden
+                  />
                   <span className="font-mono text-xs text-fg">{r}</span>
                   <span>{ROLE_TEXT[r]}</span>
                 </li>
               ))}
             </ul>
             <p className="mt-2 text-xs text-fg-3">
-              A new chamber's role comes from its depth against the queen's (reception above, store below, brood otherwise): still a script, not something ants decide from what they sense (
+              A new chamber's role comes from its depth against the queen's (reception above, store below, brood otherwise): still a script,
+              not something ants decide from what they sense (
               <a className="underline" href={docUrl("vision", "where-the-code-is-today")} target="_blank" rel="noreferrer">
                 ja-k4k.3
               </a>
@@ -618,27 +786,36 @@ function NestCard({ k, v, focus }: { k: number; v: NestView; focus?: string }) {
         <span className={colonyTone(k)}>{colonyName(k)}</span> nest
       </h3>
       <p className="mt-1 font-mono text-xs text-fg-2">
-        queen {v.queen === "alive" ? "alive" : v.queen === "dead" ? "dead (orphaned)" : "—"} · brood {v.brood.join(" / ")} (eggs / larvae / pupae) · {v.inside} inside, {v.outside} out · {v.midden} on the midden
+        queen {v.queen === "alive" ? "alive" : v.queen === "dead" ? "dead (orphaned)" : "—"} · brood {v.brood.join(" / ")} (eggs / larvae /
+        pupae) · {v.inside} inside, {v.outside} out · {v.midden} on the midden
       </p>
       <div className="mt-2 overflow-x-auto">
         <table className="w-full min-w-[22rem] text-left text-xs">
-          <thead className="text-[11px] uppercase tracking-wide text-fg-3">
+          <thead className="text-[11px] tracking-wide text-fg-3 uppercase">
             <tr>
               <th className="py-1 pr-2 font-medium">chamber</th>
-              <th className="py-1 pr-2 text-right font-medium" title="rows below the ground line">depth</th>
-              <th className="py-1 pr-2 text-right font-medium" title="cells (floor cells)">size</th>
+              <th className="py-1 pr-2 text-right font-medium" title="rows below the ground line">
+                depth
+              </th>
+              <th className="py-1 pr-2 text-right font-medium" title="cells (floor cells)">
+                size
+              </th>
               <th className="py-1 pr-2 text-right font-medium">ants</th>
               <th className="py-1 pr-2 text-right font-medium">brood</th>
               <th className="py-1 text-right font-medium">food</th>
             </tr>
           </thead>
-          <tbody className="font-mono tabular-nums text-fg-2">
+          <tbody className="font-mono text-fg-2 tabular-nums">
             {v.chambers.map((c) => {
               const id = `chamber-${k}-${c.id}`;
               return (
                 <tr key={c.id} id={`learn-${id}`} className={`scroll-mt-2 border-t border-line ${focus === id ? "bg-accent-soft" : ""}`}>
                   <td className="py-1 pr-2">
-                    <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: c.role in ROLE_RGB ? css(ROLE_RGB[c.role]!) : "var(--mound)" }} aria-hidden />
+                    <span
+                      className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm align-middle"
+                      style={{ background: c.role in ROLE_RGB ? css(ROLE_RGB[c.role]!) : "var(--mound)" }}
+                      aria-hidden
+                    />
                     {c.role}
                     {c.queen ? " ♛" : ""}
                   </td>

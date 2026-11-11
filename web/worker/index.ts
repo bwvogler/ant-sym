@@ -87,8 +87,16 @@ export class JevLedger {
       this.#svc = {
         // A stop never cuts off a call already sent: it runs to its reply or its deadline, so what Jev bills is counted
         // against the day (PR #66 review S1). The dev server's 1.5 s grace suits one local user; here it was a way past the cap.
-        client: env.JEV_API_KEY ? new FetchJevClient({ apiKey: env.JEV_API_KEY, timeoutMs: CALL_DEADLINE_MS, abortGraceMs: CALL_DEADLINE_MS }) : null,
-        ledger: new Ledger({ maxInFlight: DEFAULT_IN_FLIGHT, timer, reserveTokens: RESERVE_CEILING, dailyUsd: dailyBudget(env), budgetStore: store }),
+        client: env.JEV_API_KEY
+          ? new FetchJevClient({ apiKey: env.JEV_API_KEY, timeoutMs: CALL_DEADLINE_MS, abortGraceMs: CALL_DEADLINE_MS })
+          : null,
+        ledger: new Ledger({
+          maxInFlight: DEFAULT_IN_FLIGHT,
+          timer,
+          reserveTokens: RESERVE_CEILING,
+          dailyUsd: dailyBudget(env),
+          budgetStore: store,
+        }),
         now: () => Date.now(),
       };
     });

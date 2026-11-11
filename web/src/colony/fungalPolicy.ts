@@ -48,7 +48,15 @@ export const HIGH_LOAD = 0.7;
 
 /** The fungal situation as one number (0 .. FUNGAL_SITUATIONS − 1): what a host keeps of what it was last asked. */
 export function encodeFungal(s: FungalSituation): number {
-  return (((((AROUSALS.indexOf(s.arousal) * TOUCHES.length + TOUCHES.indexOf(s.touch)) * FUNGAL_PLACES.length + FUNGAL_PLACES.indexOf(s.place)) * TASKS.length + TASKS.indexOf(s.task)) * CARRYING.length + CARRYING.indexOf(s.carrying)) * 2) + (s.groomed ? 1 : 0);
+  return (
+    ((((AROUSALS.indexOf(s.arousal) * TOUCHES.length + TOUCHES.indexOf(s.touch)) * FUNGAL_PLACES.length + FUNGAL_PLACES.indexOf(s.place)) *
+      TASKS.length +
+      TASKS.indexOf(s.task)) *
+      CARRYING.length +
+      CARRYING.indexOf(s.carrying)) *
+      2 +
+    (s.groomed ? 1 : 0)
+  );
 }
 
 export function decodeFungal(code: number): FungalSituation {

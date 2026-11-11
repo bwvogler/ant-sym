@@ -289,7 +289,10 @@ test("the budget reserves for calls in flight, as the spend cap does, and surviv
   l.end(a, { status: 200, ms: 1, inputTokens: 10_000 });
   assert.deepEqual(saved, { day: "2026-11-07", tokens: 10_000 });
   const restarted = new Ledger({ dailyUsd: 0.001, budgetStore: store });
-  assert.ok(Math.abs(restarted.summary(DAY + HOUR).budget!.spentUsd - 10_000 * USD_PER_INPUT_TOKEN) < 1e-12, "a restarted server knows today's spend");
+  assert.ok(
+    Math.abs(restarted.summary(DAY + HOUR).budget!.spentUsd - 10_000 * USD_PER_INPUT_TOKEN) < 1e-12,
+    "a restarted server knows today's spend",
+  );
   assert.equal(new Ledger().summary(DAY).budget!.usdPerDay, null, "no budget unless one is set");
 });
 

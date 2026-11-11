@@ -18,12 +18,20 @@ const opt = (name, fallback) => {
   return k < 0 ? fallback : args[k + 1];
 };
 const flag = (name) => args.includes(`--${name}`);
-const DEFAULT_ORDER = "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,infectivity,evasion,recognition,trails,royal,fruiting,evasion,royal,stealth";
+const DEFAULT_ORDER =
+  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,infectivity,evasion,recognition,trails,royal,fruiting,evasion,royal,stealth";
 
 if (isMainThread) {
   const [a, b = a] = opt("seeds", "1-3").split("-").map(Number);
   const seeds = Array.from({ length: b - a + 1 }, (_, k) => a + k);
-  const job = { seconds: Number(opt("seconds", 900)), aim: opt("aim", "unite"), evolve: flag("evolve"), buy: !flag("no-buy"), order: opt("order", DEFAULT_ORDER).split(","), strain: opt("strain", "garden") };
+  const job = {
+    seconds: Number(opt("seconds", 900)),
+    aim: opt("aim", "unite"),
+    evolve: flag("evolve"),
+    buy: !flag("no-buy"),
+    order: opt("order", DEFAULT_ORDER).split(","),
+    strain: opt("strain", "garden"),
+  };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
   let next = 0;
@@ -41,9 +49,13 @@ if (isMainThread) {
     for (let k = 0; k < width; k++) launch();
   });
   results.sort((x, y) => x.seed - y.seed);
-  console.log(`aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`);
+  console.log(
+    `aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
+  );
   for (const r of results) {
-    console.log(`seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rival)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}`);
+    console.log(
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rival)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}`,
+    );
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
@@ -60,9 +72,26 @@ if (isMainThread) {
   const g = new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
   const menu = g.fungus.menu;
   g.fungus.policy = (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT;
-  g.land(0, STRAINS.findIndex((s) => s.id === strain), { evolve });
+  g.land(
+    0,
+    STRAINS.findIndex((s) => s.id === strain),
+    { evolve },
+  );
   const DT = 1 / 30;
-  const r = { seed, first: -1, quarter: -1, half: -1, queen: -1, rival: -1, bought: [], minutes: [], earned: 0, spent: 0, growth: 0, mass: 0 };
+  const r = {
+    seed,
+    first: -1,
+    quarter: -1,
+    half: -1,
+    queen: -1,
+    rival: -1,
+    bought: [],
+    minutes: [],
+    earned: 0,
+    spent: 0,
+    growth: 0,
+    mass: 0,
+  };
   const share = (c) => {
     const f = g.fungus.census(c);
     return { s: f.living ? f.infected / f.living : 0, n: f.infected, resist: f.meanResist };
