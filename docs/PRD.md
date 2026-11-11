@@ -4619,6 +4619,19 @@ The owner asked for a review of the work needed before the game grows: species w
 - **G1** (seeds 1–10): at most 2 held over 120 s per colony on seeds 5, 9 and 4, which un-skips the guard; food carried down and births within 5 % of `main`'s §56/§58 numbers summed over seeds 1–10 (§58's levers are off, so `main` is the baseline); judged by the worst seed, confirmed on 11–20.
 - **The one-world assays:** A1 stays 8/10, the rest no worse; S1 and the one-world golden unchanged (S1's carriers have no path). Ablation: `routeSee` 0; `routeStep` 16 and 32.
 
+**R1 baseline (built, ja-lp4.16.2; `npm run exp -- --one r1`, seeds 1–10; no behaviour change, the goldens bit-exact).** `--one r1` finds the pockets of the seed's default plane, puts one pile (200) on a pocket cell drawn for the seed, sets 40 foragers down three steps out of the hole along the way round and turns each toward the next cells of that way (a path found with a penalty for rock-edge cells, so they do not graze corners) until it holds food: the walk out is a real path walked by the ant, and from the pickup its own steering carries it home. Pickups in the first 120 s are scored (each has 300 s). Four seeds have no pocket under the definition (1, 2, 6, 9). Today's ants, per seed with a pocket (the pile's straight distance and way round in cells; home within 120 / 300 s; median seconds home; median walked ÷ the way round from the pickup cell, of those home; the share of the 40 still holding food on the plane at 420 s):
+
+| seed | pile: straight / way | pocket cells | home 120 s | home 300 s | median s | walked ÷ way | still held |
+|---|---|---|---|---|---|---|---|
+| 3 | 54 / 136 | 512 | 7.5 % | 22.5 % | 221 | 11.2 | 65 % |
+| 4 | 45 / 97 | 3,816 | 7.5 % | 45 % | 186 | 13.2 | 48 % |
+| 5 | 55 / 129 | 151 | 85 % | 95 % | 50 | 2.7 | 5 % |
+| 7 | 32 / 63 | 144 | 100 % | 100 % | 27 | 3.0 | 0 |
+| 8 | 39 / 75 | 10 | 100 % | 100 % | 15 | 1.4 | 0 |
+| 10 | 38 / 74 | 185 | 100 % | 100 % | 11 | 1.0 | 0 |
+
+The target (95 % home within 300 s, median walked ÷ way round at most 4) is met on 4 of the 6 seeds with a pocket (5, 7, 8, 10); seeds 3 and 4 fail it, as they do G1's bound. No carrier went down another hole. A slow test (`tests/slow/oneWorldRoute.test.ts`) asserts it on seeds 1–10 and is marked `todo` for `ja-lp4.16.3`.
+
 **Prototype (scratch, not in the repo; one run a seed, not tuned; the build measures properly).** Most held at a sample, you / rival, with food and births summed over both colonies of seeds 4, 5, 9, 10:
 
 | | seed 4 | seed 5 | seed 9 | seed 10 | food carried down | births |

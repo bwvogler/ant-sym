@@ -1806,6 +1806,261 @@ export const forage1: Assay = {
   score: () => ({}),
 };
 
+/** R1: foragers that walk out to the pile in a pocket, per seed. */
+export const R1_ANTS = 40;
+/** R1: the pocket's nearest and farthest from the hole (cells, straight), and how much longer the way round is than the straight line (at least). */
+export const R1_NEAR = 15;
+export const R1_FAR = 60;
+export const R1_DETOUR = 1.8;
+/** R1: seconds a game runs, and the seconds a pocket carrier has to get home for its pickup to count (a pickup after R1_SECONDS − R1_WAIT is not scored). */
+export const R1_SECONDS = 420;
+export const R1_WAIT = 300;
+/** R1: food on the pile (cells of one: each pickup takes one). */
+export const R1_PILE = 200;
+
+/**
+ * The way round over open ground from `source`'s cell, per cell (x + y × width): 6 neighbours a cell, -1 = not joined to it.
+ * Each step costs 1, and `rimCost` more into a cell with rock beside it (0: the steps, a way round in cells; more: a way that keeps off rock faces).
+ */
+function geodesic(plane: WorldMap, source: number, rimCost = 0): Int32Array {
+  const { w, h } = plane.size;
+  const dist = new Int32Array(w * h).fill(-1);
+  const rim = (x: number, y: number): boolean => {
+    for (let d = 0; d < 6; d++) {
+      const tx = nx(x, y, d);
+      const ty = ny(y, d);
+      if (tx < 0 || ty < 0 || tx >= w || ty >= h || rockAt(plane, tx, ty) !== OPEN) return true;
+    }
+    return false;
+  };
+  const buckets: number[][] = [[source]];
+  dist[source] = 0;
+  const settled = new Uint8Array(w * h);
+  for (let dd = 0; dd < buckets.length; dd++) {
+    const b = buckets[dd];
+    if (!b) continue;
+    for (let k = 0; k < b.length; k++) {
+      const at = b[k] as number;
+      if (settled[at] || dist[at] !== dd) continue;
+      settled[at] = 1;
+      const x = at % w;
+      const y = Math.floor(at / w);
+      for (let d = 0; d < 6; d++) {
+        const tx = nx(x, y, d);
+        const ty = ny(y, d);
+        if (tx < 0 || ty < 0 || tx >= w || ty >= h || rockAt(plane, tx, ty) !== OPEN) continue;
+        const nd = dd + 1 + (rimCost > 0 && rim(tx, ty) ? rimCost : 0);
+        const cur = dist[tx + ty * w] as number;
+        if (cur >= 0 && cur <= nd) continue;
+        dist[tx + ty * w] = nd;
+        (buckets[nd] ??= []).push(tx + ty * w);
+      }
+    }
+  }
+  return dist;
+}
+
+/**
+ * R1 — pocket carriers get home (ja-lp4.16.2; docs/route-memory.md "Assays", PRD §59). On one world's default plane
+ * (generateOneWorld(seed)) the pockets are the open cells R1_NEAR to R1_FAR cells (straight) from the player's hole, joined
+ * to it, outside every hole's sight, with no clear straight line to it and a way round (the open ground's steps) at least
+ * R1_DETOUR times the straight distance. The plane's food is cleared and one pile of R1_PILE put on a pocket cell drawn
+ * for the seed (a seed with no pocket reports `pockets` 0 and scores nothing). R1_ANTS old foragers of the player are set
+ * down three steps out of the hole along that way, exploring on a fresh trip (odoSurf 3, a fresh drift as #crossUp draws it), and walk out to the pile
+ * by the way round: the probe turns each toward the next cells of the way round, every tick, until it carries food, so
+ * the walk out is a real path (no teleporting) and from the pickup it is the ant's own steering that carries it home. Every
+ * other ant is young and stays in, with no scouts; an ant that is home is made young too. R1_SECONDS. Per pocket pickup
+ * (one before R1_SECONDS − R1_WAIT): the seconds from pickup to going down its own hole. Reported: `pockets` (cells),
+ * `dist` (the pile's straight distance from the hole), `way` (its way round), `picked` (pickups scored), `home120` and
+ * `home300` (the shares of them home within 120 and 300 s), `median` (seconds, of those home), `ratio` (the median of
+ * walked ÷ the way round from the pickup cell, of those home) and `held` (the share still on the plane holding food at
+ * the end) and `wrong` (pickups that went down another hole). Target (design: no paper measures a pocket detour): home300 ≥ 95 % and ratio ≤ 4.
+ */
+export const route1: Assay = {
+  id: "r1",
+  title: "R1 pocket carriers get home (one world)",
+  target: "≥ 95 % of pocket pickups home within 300 s, median walked ÷ the way round at most 4",
+  seconds: R1_SECONDS,
+  spec: (seed) => {
+    const n = R1_ANTS;
+    const pickT = new Float64Array(n).fill(Infinity);
+    const homeAt = new Float64Array(n).fill(Infinity);
+    const wrong = new Uint8Array(n);
+    const walked = new Float64Array(n);
+    const lastX = new Float64Array(n);
+    const lastY = new Float64Array(n);
+    const wayHome = new Float64Array(n);
+    const done = new Uint8Array(n);
+    let pockets = 0;
+    let pileDist = NaN;
+    let pileWay = NaN;
+    let toPile: Int32Array | null = null;
+    let fromHole: Int32Array | null = null;
+    const setUp = (game: Game): void => {
+      const rng = mulberry32(seed * 8209 + 31);
+      const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+      const plane = game.world!.plane;
+      const c = game.player;
+      const hc = c.holeCells[c.params.nest] as HoleCell;
+      const hx = centreX(hc.px, hc.py);
+      const hy = centreY(hc.py);
+      const { w, h } = plane.size;
+      for (const k of game.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) plane.food.set(x, y, 0);
+      plane.foodLeft = 0;
+      fromHole = geodesic(plane, hc.px + hc.py * w);
+      const holes = game.colonies.flatMap((k) => k.holeCells.map((q) => ({ x: centreX(q.px, q.py), y: centreY(q.py) })));
+      const pocket: number[] = [];
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          const g = fromHole[x + y * w] as number;
+          if (g < 0) continue;
+          const px = centreX(x, y);
+          const py = centreY(y);
+          const d = Math.hypot(px - hx, py - hy);
+          if (d < R1_NEAR || d > R1_FAR || g < R1_DETOUR * d) continue;
+          if (holes.some((q) => Math.hypot(px - q.x, py - q.y) < 2 * HOLE_SIGHT)) continue;
+          let clear = true;
+          for (let t = 0; t < 1 && clear; t += 0.5 / d) {
+            cellOf(hx + t * (px - hx), hy + t * (py - hy));
+            clear = rockAt(plane, CELL[0] as number, CELL[1] as number) === OPEN;
+          }
+          if (!clear) pocket.push(x + y * w);
+        }
+      pockets = pocket.length;
+      if (pockets === 0) return;
+      const cell = pocket[Math.floor(rng() * pockets)] as number;
+      const pxc = centreX(cell % w, Math.floor(cell / w));
+      const pyc = centreY(Math.floor(cell / w));
+      pileDist = Math.hypot(pxc - hx, pyc - hy);
+      pileWay = fromHole[cell] as number;
+      dropFood(plane, pxc, pyc, R1_PILE);
+      toPile = geodesic(plane, cell, 4);
+      // Set down three steps out of the hole along the way round (at its cell, an explorer would go straight back down).
+      let sx = hc.px;
+      let sy = hc.py;
+      for (let s = 0; s < 3; s++) {
+        let best = (toPile as Int32Array)[sx + sy * w] as number;
+        let bx = sx;
+        let by = sy;
+        for (let d = 0; d < 6; d++) {
+          const tx = nx(sx, sy, d);
+          const ty = ny(sy, d);
+          if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+          const g = (toPile as Int32Array)[tx + ty * w] as number;
+          if (g >= 0 && g < best) {
+            best = g;
+            bx = tx;
+            by = ty;
+          }
+        }
+        sx = bx;
+        sy = by;
+      }
+      const ox = centreX(sx, sy);
+      const oy = centreY(sy);
+      for (let i = 0; i < n; i++) {
+        c.age[i] = 0.5 * LIFESPAN;
+        c.putAnt(i, PLANE, ox, oy);
+        c.carrying[i] = 0;
+        c.mode[i] = MODES.indexOf("explore");
+        c.heading[i] = Math.atan2(oy - hy, ox - hx);
+        c.odoSurf[i] = 3;
+        c.driftSurf[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
+        c.driftSurfY[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
+        lastX[i] = ox;
+        lastY[i] = oy;
+      }
+    };
+    const probe: Probe = {
+      tick(game) {
+        const c = game.player;
+        const hc = c.holeCells[c.params.nest] as HoleCell;
+        const plane = game.world!.plane;
+        const { w } = plane.size;
+        if (!toPile || !fromHole) return;
+        for (let i = 0; i < n; i++) {
+          if (done[i]) continue;
+          if (c.layer[i] !== PLANE) {
+            done[i] = 1;
+            c.age[i] = 0.05 * LIFESPAN;
+            if (pickT[i] === Infinity) continue;
+            if (Math.abs((c.x[i] as number) - centreX(hc.col, hc.row)) < 1e-3 && Math.abs((c.y[i] as number) - centreY(hc.row)) < 1e-3) homeAt[i] = game.time;
+            else wrong[i] = 1;
+            continue;
+          }
+          const x = c.x[i] as number;
+          const y = c.y[i] as number;
+          if (c.carrying[i]) {
+            if (pickT[i] === Infinity) {
+              pickT[i] = game.time;
+              cellOf(x, y);
+              wayHome[i] = Math.max(1, (fromHole[(CELL[0] as number) + (CELL[1] as number) * w] as number) ?? 1);
+            } else walked[i] = (walked[i] as number) + Math.hypot(x - (lastX[i] as number), y - (lastY[i] as number));
+          } else if (pickT[i] === Infinity) {
+            // On its way out: toward the cell three steps on along the way round to the pile.
+            cellOf(x, y);
+            let cx = CELL[0] as number;
+            let cy = CELL[1] as number;
+            for (let s = 0; s < 2; s++) {
+              let best = toPile[cx + cy * w] as number;
+              let bx = cx;
+              let by = cy;
+              for (let d = 0; d < 6; d++) {
+                const tx = nx(cx, cy, d);
+                const ty = ny(cy, d);
+                if (tx < 0 || ty < 0 || tx >= w || ty >= plane.size.h) continue;
+                const g = toPile[tx + ty * w] as number;
+                if (g >= 0 && g < best) {
+                  best = g;
+                  bx = tx;
+                  by = ty;
+                }
+              }
+              cx = bx;
+              cy = by;
+            }
+            c.heading[i] = Math.atan2(centreY(cy) - y, centreX(cx, cy) - x);
+          }
+          lastX[i] = x;
+          lastY[i] = y;
+        }
+      },
+      summary(game) {
+        const m: Record<string, number> = { pockets, dist: pileDist, way: pileWay };
+        const c = game.player;
+        const counted: number[] = [];
+        for (let i = 0; i < n; i++) if (pickT[i] <= R1_SECONDS - R1_WAIT) counted.push(i);
+        const took = (i: number): number => (homeAt[i] as number) - (pickT[i] as number);
+        const share = (T: number): number => (counted.length ? counted.filter((i) => took(i) <= T).length / counted.length : NaN);
+        const med = (v: number[]): number => (v.length ? (v.sort((a, b) => a - b)[Math.floor((v.length - 1) / 2)] as number) : NaN);
+        const home = counted.filter((i) => homeAt[i] !== Infinity);
+        m.picked = counted.length;
+        m.home120 = share(120);
+        m.home300 = share(R1_WAIT);
+        m.median = med(home.map(took));
+        m.ratio = med(home.map((i) => (walked[i] as number) / (wayHome[i] as number)));
+        let held = 0;
+        for (let i = 0; i < n; i++) if (c.layer[i] === PLANE && c.carrying[i]) held++;
+        m.held = held / n;
+        m.wrong = counted.filter((i) => wrong[i]).length;
+        if (counted.length > 0) m.pass = m.home300 >= 0.95 && m.ratio <= 4 ? 1 : 0;
+        return m;
+      },
+    };
+    return {
+      seed,
+      seconds: R1_SECONDS,
+      map: (s) => generateOneWorld(s),
+      game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
+      sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+      events: [{ at: 0, kind: "call", run: setUp }],
+      probes: [probe],
+    };
+  },
+  score: () => ({}),
+};
+
 /** F1's find, remembered: ant i's belief of the food relative to its hole, as Colony's pickup would have left it (siteFidelity on; off, none). */
 function rememberAt(c: Colony, i: number, rx: number, ry: number): void {
   if (c.params.siteFidelity <= 0) return;
@@ -1822,7 +2077,7 @@ const nestFlowOne: Assay = { ...nestFlow, title: `${nestFlow.title} (one world)`
  * A5 and A5b (ja-web) count outside on the plane, past the disc round the hole, and report the ants held at the gate
  * at the top of the shaft (gateProbe).
  */
-export const ONE_ASSAYS: Assay[] = [...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)), ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])), { ...passAssay(onPlane), title: `${pass.title} (one world)` }, onPlaneAssay(open), onPlaneAssay(contact), onPlaneAssay(faintAlarm), nestFlowOne, game1, search1, forage1];
+export const ONE_ASSAYS: Assay[] = [...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)), ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])), { ...passAssay(onPlane), title: `${pass.title} (one world)` }, onPlaneAssay(open), onPlaneAssay(contact), onPlaneAssay(faintAlarm), nestFlowOne, game1, search1, forage1, route1];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). */
 export const ONE_PENDING: Record<string, string> = {
