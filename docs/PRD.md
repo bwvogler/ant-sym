@@ -4405,3 +4405,25 @@ The owner (2026-11-10) removed the side-view and top-down games from the page an
 - The simulation keeps its side and open maps (`generateSideWorld`, `generateWorld`): the assays, golden masters, benches and lab scripts still use them. Every golden master is bit-exact.
 - Cost: no legend, question or schema changed, but the page's game is now one world. `colony-cost --one` (seed 1, 600 + 600, 10 sim-minutes, offline, 2026-11-11): ~776 tokens a question, ~$0.103/h for the mode lane, 192 situations, and 0 stance choices (one world has no strategist). The side view measured ~$0.102/h (CLAUDE.md).
 - Review (PR #69): the Learn panel's strategist section and its stance request were removed, because one world never asks them. The follow card's stance chip now opens the guide's Strangers entry. Continue offers only one-world saves (`readable`). Player-facing text says "on the surface" or "below" instead of the side view or the top-down maps. `buildGame.test.ts` guards that the page builds one world.
+
+## 56. Foundation refactor: decisions (ja-fnd, 2026-11-11)
+
+The owner asked for a review of the work needed before the game grows: species with other senses and signals, new final structures and ways to interact, and a new UI and game experience. The roadmap is [refactor.md](refactor.md), and the beads are the epic `ja-fnd`, with one child for each stage, S0–S6. Decisions:
+
+- **One world only.** The top-down and side maps are retired, not kept behind a view strategy (owner, 2026-11-11). The page already plays only one world (§55). The simulation still branches on view proxies: `#entrance === null` 85 times in `colony.ts`, plus `map.sky`, plus `this.queen` read as "side view". It also carries plane/curtain twins. S2 ports the assays that carry baselines and re-records the golden masters on one world, then deletes the old maps. It waits for the mechanics that run only top-down to reach one world's surface (`ja-d6c`) and for one world's guards (`ja-lp4.6`).
+- **Order.**
+  - S0: fast tests and CI.
+  - S1: one vocabulary.
+  - S2: one world only.
+  - S3: take `Colony` apart.
+  - S4: species and lanes as data.
+
+  S2 comes before S3, so nothing is split that is about to be deleted. The UI (S5) and the wire contract (S6) are independent once S0 is done.
+- **Bit-exact moves.**
+  - Every stage but S2 keeps the golden masters bit-exact, RNG order included.
+  - A generated legend, question or key must match today's bytes, so no Jev answer is bought again.
+- **Measured at review time.**
+  - `npm test`: 3 min 44 s of wall time and 13.6 CPU-minutes for 610 tests at concurrency 4, locally; 310 s on CI, where `food.test.ts` was cancelled at the 60 s file limit (`ja-6mj`, now under S0).
+  - `colony.ts`: 6,528 lines; `tick()` about 1,055.
+  - `ColonyField.tsx`: 1,437 lines.
+- **Cost.** No legend, question or schema changed. S2 changes the Jev contexts that name a view, so its PR re-ships precache from a live check and gives each lane's hourly cost.
