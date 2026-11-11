@@ -4493,3 +4493,25 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 **Beads.** `ja-lp4.11` (epic), with children in build order: the S1 assay; centred loops; the mound's smell; tuning, G1 and docs. `ja-lp4.6.3` waits on the epic.
 
 **To read when the network allows:** the full texts of Waldner & Merkle 2018, Merkle et al. 2006 and Sturgis et al. 2011.
+
+## 57. Foundation refactor: decisions (ja-fnd, 2026-11-11)
+
+The owner asked for a review of the work needed before the game grows: species with other senses and signals, new final structures and ways to interact, and a new UI and game experience. The roadmap is [refactor.md](refactor.md), and the beads are the epic `ja-fnd`, with one child for each stage, S0–S6. Decisions:
+
+- **One world only.** The top-down and side maps are retired, not kept behind a view strategy (owner, 2026-11-11). The page already plays only one world (§55). The simulation still branches on view proxies: `#entrance === null` 85 times in `colony.ts`, plus `map.sky`, plus `this.queen` read as "side view". It also carries plane/curtain twins. S2 ports the assays that carry baselines and re-records the golden masters on one world, then deletes the old maps. It waits for the mechanics that run only top-down to reach one world's surface (`ja-d6c`) and for one world's guards (`ja-lp4.6`).
+- **Order.**
+  - S0: fast tests and CI.
+  - S1: one vocabulary.
+  - S2: one world only.
+  - S3: take `Colony` apart.
+  - S4: species and lanes as data.
+
+  S2 comes before S3, so nothing is split that is about to be deleted. The UI (S5) and the wire contract (S6) are independent once S0 is done.
+- **Bit-exact moves.**
+  - Every stage but S2 keeps the golden masters bit-exact, RNG order included.
+  - A generated legend, question or key must match today's bytes, so no Jev answer is bought again.
+- **Measured at review time.**
+  - `npm test`: 3 min 44 s of wall time and 13.6 CPU-minutes for 610 tests at concurrency 4, locally; 310 s on CI, where `food.test.ts` was cancelled at the 60 s file limit (`ja-6mj`, now under S0).
+  - `colony.ts`: 6,528 lines; `tick()` about 1,055.
+  - `ColonyField.tsx`: 1,437 lines.
+- **Cost.** No legend, question or schema changed. S2 changes the Jev contexts that name a view, so its PR re-ships precache from a live check and gives each lane's hourly cost.
