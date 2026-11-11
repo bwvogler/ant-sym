@@ -42,7 +42,9 @@ const RETURN = 2;
 const EXPLORE = 0;
 const pct = (v) => `${(100 * v).toFixed(1)} %`;
 const totals = [];
-console.log(`side-bench: seeds ${seeds.join(",")}, ${seconds} s, ${ants} ants × ${colonies} colon${colonies === 1 ? "y" : "ies"}, root ${root}`);
+console.log(
+  `side-bench: seeds ${seeds.join(",")}, ${seconds} s, ${ants} ants × ${colonies} colon${colonies === 1 ? "y" : "ies"}, root ${root}`,
+);
 for (const seed of seeds) {
   const map = W.generateSideWorld(seed, colonies === 1 ? { nestCount: 1 } : { nestCount: colonies });
   const g = new Game(map, { antCount: ants, rivalAnts: ants }, W.mulberry32(seed * 7919));
@@ -123,7 +125,23 @@ for (const seed of seeds) {
     }
     const outMean = s.out.length ? s.out.reduce((a, b) => a + b, 0) / s.out.length : 0;
     const outWorst = s.out.length ? Math.max(...s.out) : 0;
-    const r = { seed, colony: ci, food: c.stored, births: c.births, alive: c.population, outMean, outWorst, car, carPeak: s.carEndMax, carMax, port, portPeak: s.portPeak, ...s.stuck, hole, stuck60 };
+    const r = {
+      seed,
+      colony: ci,
+      food: c.stored,
+      births: c.births,
+      alive: c.population,
+      outMean,
+      outWorst,
+      car,
+      carPeak: s.carEndMax,
+      carMax,
+      port,
+      portPeak: s.portPeak,
+      ...s.stuck,
+      hole,
+      stuck60,
+    };
     totals.push(r);
     return r;
   });

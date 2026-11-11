@@ -63,7 +63,9 @@ async function main() {
   out.sort((a, b) => a.ants - b.ants || a.seed - b.seed);
   const pct = (v) => `${(100 * v).toFixed(2)} %`;
   console.log(`Unity with Garden in both colonies, ${one ? "one world" : "the side view"}, ${seconds} s (MET = 1 % met is whole)\n`);
-  console.log(`| ants | seed | peak met | met at end | unified at | gap at end | quiet at end | ants lost | allied contact${one ? ": plane / curtain" : ""} (ant-s) | wall |`);
+  console.log(
+    `| ants | seed | peak met | met at end | unified at | gap at end | quiet at end | ants lost | allied contact${one ? ": plane / curtain" : ""} (ant-s) | wall |`,
+  );
   console.log("|---|---|---|---|---|---|---|---|---|---|");
   for (const r of out)
     console.log(
@@ -81,7 +83,11 @@ async function work() {
   const { generateOneWorld } = await import("../web/src/colony/index.ts");
   const { generateSideWorld } = await import("../web/src/colony/index.ts");
   const t0 = performance.now();
-  const game = new Game(one ? generateOneWorld(seed) : generateSideWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed));
+  const game = new Game(
+    one ? generateOneWorld(seed) : generateSideWorld(seed),
+    { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false },
+    gameRng(seed),
+  );
   const garden = STRAINS.findIndex((s) => s.id === "garden");
   // By each royal chamber: the colony's nest on its home layer (one world: the curtain).
   for (const c of game.colonies) {
@@ -137,5 +143,19 @@ async function work() {
   }
   game.colonies.forEach((c, ci) => (deaths += c.losses - lost0[ci]));
   const u = game.unity();
-  parentPort.postMessage({ seed, ants, peakMet, peakAt, met: u.met, unifiedAt, outcome: game.outcome(), gap: u.gap, quiet: u.quiet, deaths, plane: contact[0], curtain: contact[1] ?? 0, wall: (performance.now() - t0) / 1000 });
+  parentPort.postMessage({
+    seed,
+    ants,
+    peakMet,
+    peakAt,
+    met: u.met,
+    unifiedAt,
+    outcome: game.outcome(),
+    gap: u.gap,
+    quiet: u.quiet,
+    deaths,
+    plane: contact[0],
+    curtain: contact[1] ?? 0,
+    wall: (performance.now() - t0) / 1000,
+  });
 }

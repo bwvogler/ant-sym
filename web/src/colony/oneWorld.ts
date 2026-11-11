@@ -68,7 +68,8 @@ export interface OneWorld {
  */
 export function generateOneWorld(seed: number, opts: { plane?: Partial<WorldOptions> } = {}): OneWorld {
   const plane = generateWorld(seed, { ...OPEN_WORLD, ...opts.plane });
-  if (plane.nests.length > 2) throw new Error(`generateOneWorld: ${plane.nests.length} nests; the line starts with one or two, and grows by founding`);
+  if (plane.nests.length > 2)
+    throw new Error(`generateOneWorld: ${plane.nests.length} nests; the line starts with one or two, and grows by founding`);
   return oneWorldOn(seed, plane);
 }
 
@@ -104,7 +105,10 @@ const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
  * surface's food is the plane's alone.
  */
 export function generateCurtain(seed: number, line: Transect, colonies: readonly number[] = line.holes.map((_, k) => k)): WorldMap {
-  if (colonies.length !== line.holes.length || [...colonies].sort((a, b) => a - b).some((c, i) => c !== i)) throw new Error(`generateCurtain: colonies ${colonies.join(", ")} must number the ${line.holes.length} holes 0…${line.holes.length - 1}`);
+  if (colonies.length !== line.holes.length || [...colonies].sort((a, b) => a - b).some((c, i) => c !== i))
+    throw new Error(
+      `generateCurtain: colonies ${colonies.join(", ")} must number the ${line.holes.length} holes 0…${line.holes.length - 1}`,
+    );
   const w = line.sMax - line.sMin + 1;
   const x0 = line.sMin;
   const h = CRUST + CURTAIN_DEPTH;
@@ -156,7 +160,14 @@ export function generateCurtain(seed: number, line: Transect, colonies: readonly
  * pocket's radius is up to 4), each from its own stream, as the side view's ground places them. `floor(s)`: no cell of a
  * pocket opens above that row of column s (Infinity: not at all, a column that keeps what it has).
  */
-function buryAlong(curtain: WorldMap, seed: number, lo: number, hi: number, nearNest: (x: number, y: number, d: number) => boolean, floor: (s: number) => number): void {
+function buryAlong(
+  curtain: WorldMap,
+  seed: number,
+  lo: number,
+  hi: number,
+  nearNest: (x: number, y: number, d: number) => boolean,
+  floor: (s: number) => number,
+): void {
   const h = curtain.size.h;
   for (let by = 0; by < Math.ceil(h / 64); by++)
     // Blocks just past either end too: a pocket centred there (radius up to 4) can reach into the line's columns.

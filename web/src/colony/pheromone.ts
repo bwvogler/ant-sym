@@ -91,7 +91,7 @@ function flush(v: number): number {
 /** A neighbour's level across a chunk border: this cell's own level `v` when the neighbour is rock or off the map. */
 function across(rock: Uint8Array | undefined, field: Float32Array | undefined, i: number, v: number): number {
   if (!rock || rock[i]) return v;
-  return field ? (field[i]) : 0;
+  return field ? field[i] : 0;
 }
 
 export class Pheromones {
@@ -230,8 +230,8 @@ export class Pheromones {
         if (n > SLEEP && cy > 0) wake(cx, cy - 1);
         if (s > SLEEP && cy < maxCy) wake(cx, cy + 1);
         // The two corners that touch a diagonal chunk (odd rows sit half a cell right).
-        if ((a[0]) > SLEEP && cx > minCx && cy > 0) wake(cx - 1, cy - 1);
-        if ((a[(EDGE << CHUNK_BITS) | EDGE]) > SLEEP && cx < maxCx && cy < maxCy) wake(cx + 1, cy + 1);
+        if (a[0] > SLEEP && cx > minCx && cy > 0) wake(cx - 1, cy - 1);
+        if (a[(EDGE << CHUNK_BITS) | EDGE] > SLEEP && cx < maxCx && cy < maxCy) wake(cx + 1, cy + 1);
       }
     }
 
@@ -274,7 +274,13 @@ export class Pheromones {
             continue;
           }
           // Mean of the open neighbours; rock counts as this cell, so nothing leaks into it.
-          const sum = (rock[i - 1] ? v : fl) + (rock[i + 1] ? v : fr) + (rock[ua] ? v : f1) + (rock[ua + 1] ? v : f2) + (rock[da] ? v : f3) + (rock[da + 1] ? v : f4);
+          const sum =
+            (rock[i - 1] ? v : fl) +
+            (rock[i + 1] ? v : fr) +
+            (rock[ua] ? v : f1) +
+            (rock[ua + 1] ? v : f2) +
+            (rock[da] ? v : f3) +
+            (rock[da + 1] ? v : f4);
           const nv = flush((v + k * (sum / 6 - v)) * keep);
           out[i] = nv;
           if (nv > max) max = nv;
@@ -318,7 +324,13 @@ export class Pheromones {
     const v = f[i];
     const o = (ly & 1) - 1;
     // Mean of the open neighbours; rock and the edge of the map count as this cell, so nothing leaks into them.
-    const sum = this.#at(lx - 1, ly, v) + this.#at(lx + 1, ly, v) + this.#at(lx + o, ly - 1, v) + this.#at(lx + o + 1, ly - 1, v) + this.#at(lx + o, ly + 1, v) + this.#at(lx + o + 1, ly + 1, v);
+    const sum =
+      this.#at(lx - 1, ly, v) +
+      this.#at(lx + 1, ly, v) +
+      this.#at(lx + o, ly - 1, v) +
+      this.#at(lx + o + 1, ly - 1, v) +
+      this.#at(lx + o, ly + 1, v) +
+      this.#at(lx + o + 1, ly + 1, v);
     const nv = flush((v + k * (sum / 6 - v)) * keep);
     out[i] = nv;
     return nv;
@@ -342,7 +354,13 @@ export class Pheromones {
 
   /** This field's state for a save (save.ts): its layers, settings, which chunks are awake, and its clocks. */
   saveState(): Record<string, unknown> {
-    return { fields: encode(this.fields), params: encode(this.params), awake: encode(this.#awake), clock: encode(this.#clock), head: encode(this.#head) };
+    return {
+      fields: encode(this.fields),
+      params: encode(this.params),
+      awake: encode(this.#awake),
+      clock: encode(this.#clock),
+      head: encode(this.#head),
+    };
   }
 
   loadState(r: Record<string, unknown>): void {

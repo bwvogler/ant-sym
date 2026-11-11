@@ -23,8 +23,10 @@ export interface JevStatus {
 export function policyLock(b: Backend | null, s: JevStatus, starting = false): string | null {
   if (b === null) return "Checking for the Jev server…";
   if (!b.hasBackend) return "No Jev server in this build: the game plays the answers Jev already gave, and policies can't be changed.";
-  if (b.needsPass) return "Jev is hosted for this page behind a passphrase: enter it above to change policies. Until then the game plays the answers Jev already gave.";
-  if (!b.hasKey) return "JEV_API_KEY is not set in the server's environment: the game plays the answers Jev already gave, and policies can't be changed.";
+  if (b.needsPass)
+    return "Jev is hosted for this page behind a passphrase: enter it above to change policies. Until then the game plays the answers Jev already gave.";
+  if (!b.hasKey)
+    return "JEV_API_KEY is not set in the server's environment: the game plays the answers Jev already gave, and policies can't be changed.";
   if (s.phase === "running" || starting) return null;
   if (s.phase === "stopped") {
     const reason = s.run?.stopReason ?? null;
@@ -32,7 +34,8 @@ export function policyLock(b: Backend | null, s: JevStatus, starting = false): s
       const usd = s.run?.budget?.usdPerDay;
       return `Jev's daily budget${typeof usd === "number" ? ` ($${usd.toFixed(2)})` : ""} is spent: the game plays the answers Jev already gave, and policies can't be changed until tomorrow.`;
     }
-    if (reason === "spend-cap") return `Jev's spend cap for this run ($${(s.run?.caps.capUsd ?? 0).toFixed(2)}) is reached: the game plays the answers Jev already gave, and policies can't be changed.`;
+    if (reason === "spend-cap")
+      return `Jev's spend cap for this run ($${(s.run?.caps.capUsd ?? 0).toFixed(2)}) is reached: the game plays the answers Jev already gave, and policies can't be changed.`;
     if (reason === "time-cap") return null;
     if (reason === "user") return "Jev is stopped (Details → Resume Jev): policies can't be changed until it runs.";
     return `Jev stopped${s.lastError ? `: ${s.lastError}` : ""}. Policies can't be changed until it runs (Details → Resume Jev).`;

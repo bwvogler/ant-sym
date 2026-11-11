@@ -9,10 +9,9 @@ import { SMALL_SIDE, walkway } from "../builders.ts";
 // Nest slice 7 (docs/nest-and-home.md §3.7): the dead lie where they fall until an undertaker (middle-aged) carries
 // them out to the midden past the mound's edge; the midden marks the colony's ground, and raiders shy from it.
 
-
 /** The corpses on colony c's midden, one entry each (it keeps a count per cell). */
-const buried = (c: Colony) => [...c.midden].flatMap(([key, n]) => Array.from({ length: n }, () => ({ x: key % 65536, y: Math.floor(key / 65536) })));
-
+const buried = (c: Colony) =>
+  [...c.midden].flatMap(([key, n]) => Array.from({ length: n }, () => ({ x: key % 65536, y: Math.floor(key / 65536) })));
 
 test("the dead are carried out to the midden on the ground, past the mound; soil accounting is untouched", () => {
   const map = generateSideWorld(2, SMALL_SIDE);
@@ -21,14 +20,16 @@ test("the dead are carried out to the midden on the ground, past the mound; soil
   for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN; // undertakers: the middle-aged
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
   let killed = 0;
-  for (let i = 0; i < c.n && killed < 20; i++) if (c.alive[i] && !c.carrying[i] && !c.pellet[i] && c.y[i]! > map.nest.entrance!.y + 3) {
+  for (let i = 0; i < c.n && killed < 20; i++)
+    if (c.alive[i] && !c.carrying[i] && !c.pellet[i] && c.y[i]! > map.nest.entrance!.y + 3) {
       c.kill(i);
       killed++;
     }
   assert.equal(c.corpses.length, 20);
   for (let k = 0; k < 30 * 180; k++) {
     g.tick(1 / 30);
-    if (k % 300 === 0) assert.equal(c.soilDug, c.soilOut + c.soilFilled + c.carriedPellets().dug + c.soilLost, "dug = mound + filled + carried + lost");
+    if (k % 300 === 0)
+      assert.equal(c.soilDug, c.soilOut + c.soilFilled + c.carriedPellets().dug + c.soilLost, "dug = mound + filled + carried + lost");
   }
   assert.ok(c.buried >= 15, `${c.buried} of 20 on the midden`);
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
@@ -55,7 +56,8 @@ test("each colony's midden lies toward the other: a boundary between them", () =
   for (const c of g.colonies) {
     let killed = 0;
     // near the hole, in it or on the ground (the rival's ants were mostly out: few underground to kill)
-    for (let i = 0; i < c.n && killed < 12; i++) if (c.alive[i] && !c.carrying[i] && !c.pellet[i] && Math.abs(c.x[i]! - c.nest.entrance!.x) < 15) {
+    for (let i = 0; i < c.n && killed < 12; i++)
+      if (c.alive[i] && !c.carrying[i] && !c.pellet[i] && Math.abs(c.x[i]! - c.nest.entrance!.x) < 15) {
         c.kill(i);
         killed++;
       }
@@ -64,7 +66,10 @@ test("each colony's midden lies toward the other: a boundary between them", () =
   const [a, b] = g.colonies as [Colony, Colony];
   const col = (c: Colony) => (cellOf(c.nest.entrance!.x, c.nest.entrance!.y), CELL[0]);
   const toward = Math.sign(col(b) - col(a));
-  for (const [c, side] of [[a, toward], [b, -toward]] as const) {
+  for (const [c, side] of [
+    [a, toward],
+    [b, -toward],
+  ] as const) {
     const heap = buried(c);
     // and on its own side of the halfway line (40 % of the way at most: the nests here are only 120 columns apart)
     for (const k of heap) assert.ok(Math.abs(k.x - col(c)) < Math.abs(k.x - col(c === a ? b : a)), "on its own ground");
@@ -79,7 +84,9 @@ test("an undertaker that dies leaves the corpse it carried lying; the unclaimed 
   const c = g.player;
   middleAged(c);
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
-  const victim = Array.from({ length: c.n }, (_, i) => i).find((i) => c.alive[i] && !c.carrying[i] && !c.pellet[i] && c.y[i]! > map.nest.entrance!.y + 3)!;
+  const victim = Array.from({ length: c.n }, (_, i) => i).find(
+    (i) => c.alive[i] && !c.carrying[i] && !c.pellet[i] && c.y[i]! > map.nest.entrance!.y + 3,
+  )!;
   c.kill(victim);
   let carrier = -1;
   for (let k = 0; k < 30 * 120 && carrier < 0; k++) {
@@ -103,7 +110,7 @@ test("a corpse lying past the midden is carried back to it, not put down where i
   const c = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(9), () => "explore");
   c.age[0] = (MIDDLE + 0.1) * LIFESPAN; // old: a forager, out on the ground
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
-  const x = (CELL[0]) + MIDDEN_AT + 6; // east (alone, the midden faces east), 99 columns out
+  const x = CELL[0] + MIDDEN_AT + 6; // east (alone, the midden faces east), 99 columns out
   const y = walkway(map, x);
   c.corpses.push({ x, y, held: -1, died: 0, load: 0, strain: 0 });
   for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) while (takeFoodCell(map, x + dx, y + dy)); // a forager with food goes home instead
@@ -184,7 +191,7 @@ test("a raiding colony of every age: the young stay in to nurse, not parked at t
         continue;
       }
       b.antCell(i);
-      const at = Math.abs((CELL[0]) - hx) <= 2 && Math.abs((CELL[1]) - hy) <= 2;
+      const at = Math.abs(CELL[0] - hx) <= 2 && Math.abs(CELL[1] - hy) <= 2;
       if (at) longest = Math.max(longest, stay.set(i, (stay.get(i) ?? 0) + 1).get(i)!);
       else stay.delete(i);
       if (k % 30) continue;
@@ -260,7 +267,7 @@ test("a raider walking at the rival's hole shies from its midden", () => {
     for (let k = 0; k < 30 * 20; k++) {
       g.tick(1 / 30);
       b.stance = "raid";
-      closest = Math.min(closest, Math.abs((b.x[0]) - map.nests[0]!.entrance!.x));
+      closest = Math.min(closest, Math.abs(b.x[0] - map.nests[0]!.entrance!.x));
     }
     return closest;
   };

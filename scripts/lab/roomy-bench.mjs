@@ -20,7 +20,8 @@ const dig = (seed, chambers) => {
   const map = W.generateSideWorld(2, SMALL);
   if (!chambers) map.chambers = undefined;
   const c = new C.Colony(map, { antCount: 30, maxAnts: 30 }, W.mulberry32(seed));
-  if (C.YOUNG !== undefined && c.age) for (let i = 0; i < c.n; i++) ((c.age[i] = ((C.YOUNG + C.MIDDLE) / 2) * C.LIFESPAN), (c.lifespan[i] = Infinity));
+  if (C.YOUNG !== undefined && c.age)
+    for (let i = 0; i < c.n; i++) ((c.age[i] = ((C.YOUNG + C.MIDDLE) / 2) * C.LIFESPAN), (c.lifespan[i] = Infinity));
   for (let k = 0; k < 30 * 120; k++) c.tick(1 / 30);
   return c.soilDug;
 };

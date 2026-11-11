@@ -14,13 +14,11 @@ import { DT, SMALL_SIDE, broodChamber } from "../builders.ts";
 // where nurses perceive it faint and culled where they perceive it strong; the alate's walk out and flight; a daughter
 // founded alone, at her mother's odour, drifting away from it.
 
-
 function colony(n: number) {
   const map = generateSideWorld(2, SMALL_SIDE);
   const c = new Colony(map, { antCount: n, maxAnts: n + 4 }, mulberry32(2), () => "explore");
   return { map, c };
 }
-
 
 function meanScent(c: Colony): number {
   let s = 0;
@@ -37,7 +35,7 @@ test("the queen's scent is carried on the ants and dilutes as the colony grows: 
   assert.equal(scentShare(0), 0);
   const few = colony(10).c;
   const many = colony(60).c;
-  assert.ok(Math.abs((few.scent[0]) - scentShare(10)) < 1e-6, "founders start with the colony's share");
+  assert.ok(Math.abs(few.scent[0] - scentShare(10)) < 1e-6, "founders start with the colony's share");
   for (let k = 0; k < 30 * 60; k++) {
     few.tick(DT);
     many.tick(DT);
@@ -108,7 +106,16 @@ test("nurses feeding a gyne rear no second beside her: gyne brood or an alate wi
   }
   // An alate waiting by it blocks it too.
   const { c, larva, hold } = nursery(0.001);
-  c.alates.push({ x: centreX(larva.x + 1, larva.y), y: centreY(larva.y), t: 0, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
+  c.alates.push({
+    x: centreX(larva.x + 1, larva.y),
+    y: centreY(larva.y),
+    t: 0,
+    step: 0,
+    load: 0,
+    strain: 0,
+    resist: 0,
+    food: ALATE_RESERVE,
+  });
   for (let k = 0; k < 30 * (GYNE_CUE + 2); k++) {
     hold();
     c.tick(DT);
@@ -189,7 +196,10 @@ test("an alate waits, walks out along the tunnels and flies; she founds a daught
   assert.equal(c.incipient, false);
   // Her colony's odour drifts from her mother's until they are strangers.
   for (let k = 0; k < 30 * 600; k++) g.tick(DT);
-  assert.ok(Math.abs(d.nestOdour - c.nestOdour) > g.recognition.params.tolerance, `apart: ${d.nestOdour.toFixed(2)} vs ${c.nestOdour.toFixed(2)}`);
+  assert.ok(
+    Math.abs(d.nestOdour - c.nestOdour) > g.recognition.params.tolerance,
+    `apart: ${d.nestOdour.toFixed(2)} vs ${c.nestOdour.toFixed(2)}`,
+  );
 });
 
 test("an alate picks up the fungus from infected nestmates as she walks out, and her daughter's queen carries it (revealed)", () => {
@@ -261,7 +271,10 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
     again.tick(DT);
   }
   const [a, b] = [g.colonies[1]!, again.colonies[1]!];
-  assert.deepEqual([b.founding, b.incipient, b.population, b.nestOdour, b.odourAim, b.brood.items.length], [a.founding, a.incipient, a.population, a.nestOdour, a.odourAim, a.brood.items.length]);
+  assert.deepEqual(
+    [b.founding, b.incipient, b.population, b.nestOdour, b.odourAim, b.brood.items.length],
+    [a.founding, a.incipient, a.population, a.nestOdour, a.odourAim, a.brood.items.length],
+  );
   assert.equal(b.incipient, true, "a young daughter stays young across a save (PR #54 review, N7)");
   assert.deepEqual(again.player.alates, g.player.alates);
 });
@@ -284,12 +297,18 @@ test("daughters landing together dig apart: their founding chambers never touch,
     for (let a = 0; a < nests.length; a++)
       for (let b = a + 1; b < nests.length; b++) {
         const [p, q] = [nests[a]!, nests[b]!];
-        assert.ok(Math.hypot(p.x - q.x, p.y - q.y) > p.r + q.r + 3, `seed ${seed}: chambers of nests ${a} and ${b} at ${p.x.toFixed(1)} and ${q.x.toFixed(1)}`);
+        assert.ok(
+          Math.hypot(p.x - q.x, p.y - q.y) > p.r + q.r + 3,
+          `seed ${seed}: chambers of nests ${a} and ${b} at ${p.x.toFixed(1)} and ${q.x.toFixed(1)}`,
+        );
       }
     for (const d of g.colonies.slice(1)) {
       cellOf(d.queen!.x, d.queen!.y);
       const room = ch.list[ch.at(CELL[0], CELL[1])];
-      assert.ok(room && room.colony === d.params.nest && room.role === "royal", `seed ${seed}: queen of nest ${d.params.nest} in ${room?.colony}'s ${room?.role}`);
+      assert.ok(
+        room && room.colony === d.params.nest && room.role === "royal",
+        `seed ${seed}: queen of nest ${d.params.nest} in ${room?.colony}'s ${room?.role}`,
+      );
     }
   }
 });

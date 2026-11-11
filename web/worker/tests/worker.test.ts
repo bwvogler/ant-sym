@@ -39,7 +39,13 @@ function services(client: JevCaller | null, opts: { dailyUsd?: number; store?: B
 }
 
 const billed = (inputTokens: number): JevCaller => ({
-  ask: async (): Promise<JevCallResult> => ({ status: 200, body: { model: "m", answers: { q: { type: "noul", noul: 1 } }, usage: { input_tokens: inputTokens, output_tokens: 1 } }, ms: 5, attempts: 1, inputTokens }),
+  ask: async (): Promise<JevCallResult> => ({
+    status: 200,
+    body: { model: "m", answers: { q: { type: "noul", noul: 1 } }, usage: { input_tokens: inputTokens, output_tokens: 1 } },
+    ms: 5,
+    attempts: 1,
+    inputTokens,
+  }),
   destroy: () => {},
 });
 
@@ -81,7 +87,10 @@ const client = (f: FakeFetch, extra: Partial<ConstructorParameters<typeof FetchJ
 
 test("fetch client: sends the key upstream, retries 429, reads usage", async () => {
   const seen: RequestInit[] = [];
-  const replies = [new Response("{}", { status: 429, headers: { "retry-after": "0" } }), Response.json({ answers: {}, usage: { input_tokens: 42 } })];
+  const replies = [
+    new Response("{}", { status: 429, headers: { "retry-after": "0" } }),
+    Response.json({ answers: {}, usage: { input_tokens: 42 } }),
+  ];
   const r = await client(async (_u, init) => {
     seen.push(init);
     return replies.shift()!;
@@ -118,15 +127,26 @@ test("fetch client: a stop before sending throws at once; one on the wire gets t
 });
 
 test("fetch client: the deadline turns a hung upstream into a plain error", async () => {
-  const hang: FakeFetch = (_u, init) => new Promise((_r, reject) => init.signal?.addEventListener("abort", () => reject(init.signal?.reason)));
-  await assert.rejects(client(hang, { timeoutMs: 20 }).ask(ask), (e: Error) => !(e instanceof JevAbortError) && /exceeded 20 ms/.test(e.message));
+  const hang: FakeFetch = (_u, init) =>
+    new Promise((_r, reject) => init.signal?.addEventListener("abort", () => reject(init.signal?.reason)));
+  await assert.rejects(
+    client(hang, { timeoutMs: 20 }).ask(ask),
+    (e: Error) => !(e instanceof JevAbortError) && /exceeded 20 ms/.test(e.message),
+  );
 });
 
 test("the Worker never loads server/api.ts, and what it shares stays free of node:fs", async () => {
   const { readdirSync, readFileSync } = await import("node:fs");
   const dir = new URL("../", import.meta.url);
   for (const f of readdirSync(dir).filter((n: string) => n.endsWith(".ts"))) {
-    assert.doesNotMatch(readFileSync(new URL(f, dir), "utf8"), /from\s+["'][^"']*server\/api\.ts["']/, `worker/${f} imports server/api.ts, which throws at load in a Worker`);
+    assert.doesNotMatch(
+      readFileSync(new URL(f, dir), "utf8"),
+      /from\s+["'][^"']*server\/api\.ts["']/,
+      `worker/${f} imports server/api.ts, which throws at load in a Worker`,
+    );
   }
-  assert.doesNotMatch(readFileSync(new URL("../../server/replies.ts", import.meta.url), "utf8"), /from\s+["']node:fs["']|new URL\([^)]*import\.meta\.url/);
+  assert.doesNotMatch(
+    readFileSync(new URL("../../server/replies.ts", import.meta.url), "utf8"),
+    /from\s+["']node:fs["']|new URL\([^)]*import\.meta\.url/,
+  );
 });

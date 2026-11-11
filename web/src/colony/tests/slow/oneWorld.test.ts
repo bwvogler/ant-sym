@@ -22,16 +22,22 @@ import { generateOneWorld } from "../../oneWorld.ts";
 // --set rival.planePatience=0.5 --set colony.siteFidelity=1 --set rival.siteFidelity=1` (npm run exp -- --one game1) the guard's seeds
 // 5 and 9 hold 2 / 1 and 0 / 0 at worst and 4 seeds in 10 meet the bound (worst seed 13), at -13.7 % food carried down and
 // -12.8 % births against the default: not shipped without the owner. This test plays the defaults, so it stays skipped.
-test("G1, one world: hardly a forager holds its food over 120 s (seeds 5 and 9, 600 + 600 ants, 600 s; measured 10 and 7 at worst, bound 2)", { timeout: 1_800_000, skip: process.env.G1 ? false : "fails the bound on every seed (ja-lp4.6.3); G1=1 npm run test:slow runs it" }, () => {
-  const held: string[] = [];
-  let worst = 0;
-  for (const seed of [5, 9]) {
-    const m = runAssay(game1, seed).metrics;
-    held.push(`seed ${seed}: ${m["you.maxHeld"]} / ${m["rival.maxHeld"]} (on the plane ${m["you.maxHeldPlane"]} / ${m["rival.maxHeldPlane"]})`);
-    worst = Math.max(worst, m.maxHeld as number);
-  }
-  assert.ok(worst <= 2, `foragers holding food over 120 s, most at any 10-s sample per colony: ${held.join("; ")}`);
-});
+test(
+  "G1, one world: hardly a forager holds its food over 120 s (seeds 5 and 9, 600 + 600 ants, 600 s; measured 10 and 7 at worst, bound 2)",
+  { timeout: 1_800_000, skip: process.env.G1 ? false : "fails the bound on every seed (ja-lp4.6.3); G1=1 npm run test:slow runs it" },
+  () => {
+    const held: string[] = [];
+    let worst = 0;
+    for (const seed of [5, 9]) {
+      const m = runAssay(game1, seed).metrics;
+      held.push(
+        `seed ${seed}: ${m["you.maxHeld"]} / ${m["rival.maxHeld"]} (on the plane ${m["you.maxHeldPlane"]} / ${m["rival.maxHeldPlane"]})`,
+      );
+      worst = Math.max(worst, m.maxHeld as number);
+    }
+    assert.ok(worst <= 2, `foragers holding food over 120 s, most at any 10-s sample per colony: ${held.join("; ")}`);
+  },
+);
 
 // Unity reachable on one world (PRD §53, ja-i0f; docs/one-world.md U6a): Garden painted in both colonies at the start, in
 // the curtain by each royal chamber, and the game as the page plays it (gameRng, regrowth on, autoFound off). The side view never got
@@ -41,19 +47,30 @@ test("G1, one world: hardly a forager holds its food over 120 s (seeds 5 and 9, 
 // Since ja-web (the gate at the top of the shaft, PRD §48.6) fewer ants are out to meet: seed 3 peaks at 0.44 % at 768 s and
 // doesn't unify in 1,800 s. The owner (2026-11-10, PR #68) skipped it until MET or its window is changed so a one-world game
 // can unify (ja-lp4.6.6); UNITY=1 npm run test:slow runs it. About 3 minutes when it passes, 15 when it fails.
-test("unity, one world: Garden in both colonies clears MET and unifies (seed 3, 600 + 600 ants, within 900 s)", { timeout: 1_800_000, skip: process.env.UNITY ? false : "doesn't unify since ja-web's gate (ja-lp4.6.6); UNITY=1 npm run test:slow runs it" }, () => {
-  const g = new Game(generateOneWorld(3), { antCount: 600, rivalAnts: 600, regrow: GAME_REGROW, autoFound: false }, gameRng(3));
-  const garden = STRAINS.findIndex((s) => s.id === "garden");
-  for (const c of g.colonies) {
-    const nest = (c.layers[CURTAIN] as Layer).nest;
-    g.paintSpores(nest.x, nest.y, nest.r + 2, 3, 0.3, garden, CURTAIN);
-  }
-  let peak = 0;
-  for (let k = 1; k <= 30 * 900 && g.outcome() !== "unified"; k++) {
-    g.tick(1 / 30);
-    if (k % 30 === 0) peak = Math.max(peak, g.unity().met);
-  }
-  const u = g.unity();
-  assert.ok(Math.max(peak, u.met) >= MET, `the colonies met as allies: peak met ${(100 * peak).toFixed(2)} %`);
-  assert.equal(g.outcome(), "unified", `unified by ${g.time.toFixed(0)} s: gap ${u.gap.toFixed(3)}, quiet ${u.quiet.toFixed(0)} s, met ${(100 * u.met).toFixed(2)} %`);
-});
+test(
+  "unity, one world: Garden in both colonies clears MET and unifies (seed 3, 600 + 600 ants, within 900 s)",
+  {
+    timeout: 1_800_000,
+    skip: process.env.UNITY ? false : "doesn't unify since ja-web's gate (ja-lp4.6.6); UNITY=1 npm run test:slow runs it",
+  },
+  () => {
+    const g = new Game(generateOneWorld(3), { antCount: 600, rivalAnts: 600, regrow: GAME_REGROW, autoFound: false }, gameRng(3));
+    const garden = STRAINS.findIndex((s) => s.id === "garden");
+    for (const c of g.colonies) {
+      const nest = (c.layers[CURTAIN] as Layer).nest;
+      g.paintSpores(nest.x, nest.y, nest.r + 2, 3, 0.3, garden, CURTAIN);
+    }
+    let peak = 0;
+    for (let k = 1; k <= 30 * 900 && g.outcome() !== "unified"; k++) {
+      g.tick(1 / 30);
+      if (k % 30 === 0) peak = Math.max(peak, g.unity().met);
+    }
+    const u = g.unity();
+    assert.ok(Math.max(peak, u.met) >= MET, `the colonies met as allies: peak met ${(100 * peak).toFixed(2)} %`);
+    assert.equal(
+      g.outcome(),
+      "unified",
+      `unified by ${g.time.toFixed(0)} s: gap ${u.gap.toFixed(3)}, quiet ${u.quiet.toFixed(0)} s, met ${(100 * u.met).toFixed(2)} %`,
+    );
+  },
+);

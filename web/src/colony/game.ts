@@ -58,7 +58,18 @@ export interface GameParams {
   autoFound: boolean;
 }
 
-export const DEFAULT_GAME: GameParams = { antCount: 800, rival: true, rivalAnts: 800, strategyEvery: 5, nestWatch: 12, fight: DEFAULT_FIGHT, fungus: {}, recognition: {}, regrow: 0, autoFound: true };
+export const DEFAULT_GAME: GameParams = {
+  antCount: 800,
+  rival: true,
+  rivalAnts: 800,
+  strategyEvery: 5,
+  nestWatch: 12,
+  fight: DEFAULT_FIGHT,
+  fungus: {},
+  recognition: {},
+  regrow: 0,
+  autoFound: true,
+};
 
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
@@ -157,7 +168,16 @@ export interface GameSave {
    * line again from `founded`), and the curtain as dug (its nests aside: the world digs them). `map` is the plane.
    */
   world?: { seed: number; line: { holes: Cell[]; s0: number; margin: number }; curtain: unknown };
-  private: { fightDeaths: number; lastFightDeath: number; metBy?: number[]; haveMet?: boolean; nextStrategy: number; regrowClock: number; rng: number | null; regrowRng: number | null };
+  private: {
+    fightDeaths: number;
+    lastFightDeath: number;
+    metBy?: number[];
+    haveMet?: boolean;
+    nextStrategy: number;
+    regrowClock: number;
+    rng: number | null;
+    regrowRng: number | null;
+  };
 }
 
 /** The game's regrowth (GameParams.regrow): a pile eaten bare is half back in about 20 minutes. */
@@ -332,11 +352,27 @@ export class Game {
     this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(this.params.recognition)));
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
-    const mine = new Colony(home, { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony }, rng, player.policy ?? localPolicy, player.stance ?? localStance, layered);
+    const mine = new Colony(
+      home,
+      { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony },
+      rng,
+      player.policy ?? localPolicy,
+      player.stance ?? localStance,
+      layered,
+    );
     if (player.responses) mine.responses = player.responses;
     this.colonies = [mine];
     if (this.params.rival && home.nests.length > 1)
-      this.colonies.push(new Colony(home, { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 }, rng, player.rivalPolicy ?? localPolicy, player.rivalStance ?? localStance, layered));
+      this.colonies.push(
+        new Colony(
+          home,
+          { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 },
+          rng,
+          player.rivalPolicy ?? localPolicy,
+          player.rivalStance ?? localStance,
+          layered,
+        ),
+      );
     if (player.rivalResponses && this.colonies[1]) this.colonies[1].responses = player.rivalResponses;
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
@@ -359,7 +395,8 @@ export class Game {
       // other strains die with their host (nest slices 7–8).
       // On the layer it is buried on: one world's midden is on the plane (U3c).
       c.onBury = (d, layer = 0) => {
-        if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates) this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
+        if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates)
+          this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
       };
       if (this.colonies.length > 1) {
         this.layers.forEach((_, l) => {
@@ -430,7 +467,15 @@ export class Game {
     // No room for her hole after all (side view: landing sites are free columns, so only by a caller's own site; one
     // world: nowhere the founding rule allows within FOUND_RADIUS): she is lost, and the game says why.
     try {
-      return this.addColony({ x: at.x, y: at.y, antCount: 0, odour: mother.nestOdour, mother: f.mother, reserve: f.food, ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}) });
+      return this.addColony({
+        x: at.x,
+        y: at.y,
+        antCount: 0,
+        odour: mother.nestOdour,
+        mother: f.mother,
+        reserve: f.food,
+        ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}),
+      });
     } catch (e) {
       if (!(e instanceof Error && e.message.includes("no room"))) throw e;
       this.#lost(f, e.message.replace(/^addColony: /, ""));
@@ -447,7 +492,10 @@ export class Game {
    * the default plane); a caller asking many times (the pen, under the pointer) passes one it keeps while the line is the
    * same. Not one world: refused.
    */
-  settleAt(p: { x: number; y: number }, ground?: (x: number, y: number) => boolean): { ok: true; cell: Cell; end: End } | { ok: false; reason: string } {
+  settleAt(
+    p: { x: number; y: number },
+    ground?: (x: number, y: number) => boolean,
+  ): { ok: true; cell: Cell; end: End } | { ok: false; reason: string } {
     const world = this.world;
     if (!world) return { ok: false, reason: "one world only" };
     cellOf(p.x, p.y);
@@ -553,7 +601,20 @@ export class Game {
       this.map.nests.push(nest);
     }
     const home = world ? world.curtain : this.map;
-    const c = new Colony(home, { antCount: f.antCount, maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)), nest: at, odour: f.odour, tolerance: this.recognition.params.tolerance }, this.#rng, localPolicy, localStance, world ? { plane: world.plane, line: world.line } : null);
+    const c = new Colony(
+      home,
+      {
+        antCount: f.antCount,
+        maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)),
+        nest: at,
+        odour: f.odour,
+        tolerance: this.recognition.params.tolerance,
+      },
+      this.#rng,
+      localPolicy,
+      localStance,
+      world ? { plane: world.plane, line: world.line } : null,
+    );
     if (f.mother !== undefined && c.queen && !f.nest) {
       // A daughter (ja-lo8.9): her queen founds alone on her reserve, at her mother's odour, which drifts away from it
       // from now on (ja-lo8.9.1); what the fungus put in her is given below (Founding.fungus). (Not when a save founds
@@ -565,7 +626,11 @@ export class Game {
     }
     this.colonies.push(c);
     for (const g of this.#grids) g.push(new CountGrid());
-    this.founded.push({ ...f, ...(spot ? { spot: { end: spot.end, cell: { x: spot.cell.x, y: spot.cell.y } } } : {}), nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) } });
+    this.founded.push({
+      ...f,
+      ...(spot ? { spot: { end: spot.end, cell: { x: spot.cell.x, y: spot.cell.y } } } : {}),
+      nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) },
+    });
     this.#wire();
     this.#refresh();
     const q = c.queen;
@@ -592,7 +657,12 @@ export class Game {
     const holes = world.line.holes;
     const v = end === "start" ? holes[0]! : holes[holes.length - 1]!;
     const [ux, uy] = outward(holes, end);
-    return this.addColony({ x: centreX(v.x, v.y) + FLIGHT_2D * ux, y: centreY(v.y) + FLIGHT_2D * uy, antCount, odour: this.player.nestOdour });
+    return this.addColony({
+      x: centreX(v.x, v.y) + FLIGHT_2D * ux,
+      y: centreY(v.y) + FLIGHT_2D * uy,
+      antCount,
+      odour: this.player.nestOdour,
+    });
   }
 
   /**
@@ -658,7 +728,7 @@ export class Game {
       const y = (c - col) / w;
       const x = col + x0;
       const v = this.map.food.get(x, y);
-      const short = (piles.full[k]) - v;
+      const short = piles.full[k] - v;
       if (short < 1 || rockAt(this.map, x, y)) continue; // full, or built over (a mound)
       if (this.#regrowRng!() < short * rate) {
         this.map.food.set(x, y, v + 1);
@@ -736,7 +806,8 @@ export class Game {
       if (en && Math.hypot(en.x - nest.x, en.y - nest.y) > r)
         for (let y = Math.max(0, Math.floor((en.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((en.y + r) / R)); y++)
           for (let x = Math.max(x0, Math.floor(en.x - r - 1)); x <= Math.min(x0 + w - 1, Math.ceil(en.x + r)); x++)
-            if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - nest.x, centreY(y) - nest.y) > r) s += rec.get(x, y);
+            if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - nest.x, centreY(y) - nest.y) > r)
+              s += rec.get(x, y);
     });
     return s;
   }
@@ -752,7 +823,9 @@ export class Game {
     const tol = this.recognition.params.tolerance;
     // The widest gap between any two nests' odours: one colony when even that is within tolerance.
     let gap = 0;
-    for (let a = 0; a < live.length; a++) for (let b = a + 1; b < live.length; b++) gap = Math.max(gap, Math.abs((live[a] as Colony).nestOdour - (live[b] as Colony).nestOdour));
+    for (let a = 0; a < live.length; a++)
+      for (let b = a + 1; b < live.length; b++)
+        gap = Math.max(gap, Math.abs((live[a] as Colony).nestOdour - (live[b] as Colony).nestOdour));
     // Mixing: each colony's ants within tolerance of another colony's nest odour (with two: the other one).
     let near = 0;
     let living = 0;
@@ -765,7 +838,16 @@ export class Game {
       }
     const recognition = Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
     const unified = gap <= tol && quiet >= QUIET && (met >= MET || this.#haveMet) && live.every((c) => !Game.beaten(c));
-    return { gap, deathsPerMinute, quiet, mixing: living ? near / living : 0, met, alike: gap <= tol, score: recognition * Math.min(1, quiet / QUIET) * (this.#haveMet ? 1 : Math.min(1, met / MET)), unified };
+    return {
+      gap,
+      deathsPerMinute,
+      quiet,
+      mixing: living ? near / living : 0,
+      met,
+      alike: gap <= tol,
+      score: recognition * Math.min(1, quiet / QUIET) * (this.#haveMet ? 1 : Math.min(1, met / MET)),
+      unified,
+    };
   }
 
   /** Unity.met: the least allied contact among `live` colonies (each must have met someone; review of #56, R3). */
@@ -801,7 +883,8 @@ export class Game {
     let map = this.layers[0] as WorldMap;
     let gap = 0;
     for (let a = 0; a < live.length; a++)
-      for (let b = a + 1; b < live.length; b++) gap = Math.max(gap, Math.abs((this.colonies[live[a]] as Colony).nestOdour - (this.colonies[live[b]] as Colony).nestOdour));
+      for (let b = a + 1; b < live.length; b++)
+        gap = Math.max(gap, Math.abs((this.colonies[live[a]] as Colony).nestOdour - (this.colonies[live[b]] as Colony).nestOdour));
     this.colonies.forEach((c, k) => {
       let share = 0;
       if (live.length >= 2 && live.includes(k)) {
@@ -840,7 +923,8 @@ export class Game {
     });
     if (live.length < 2 || gap > tol) this.#haveMet = false;
     // Armed only when unity holds whole (the quiet too): contact from before a fight does not re-arm it while the quiet is owed.
-    else if (this.time - this.#lastFightDeath >= QUIET && this.#metNow(live.map((k) => this.colonies[k] as Colony)) >= MET) this.#haveMet = true;
+    else if (this.time - this.#lastFightDeath >= QUIET && this.#metNow(live.map((k) => this.colonies[k] as Colony)) >= MET)
+      this.#haveMet = true;
   }
 
   tick(dt: number): void {
@@ -865,7 +949,10 @@ export class Game {
       const one = this.layers.length === 1;
       let died = 0;
       this.#grids.forEach((grids, l) => {
-        died += resolveFights(this.colonies, grids, dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, one ? -1 : l).reduce((x, y) => x + y, 0);
+        died += resolveFights(this.colonies, grids, dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, one ? -1 : l).reduce(
+          (x, y) => x + y,
+          0,
+        );
       });
       if (died > 0) {
         this.#fightDeaths += died;
@@ -886,7 +973,8 @@ export class Game {
     });
     if (this.fungus.active) {
       const recs = this.colonies.length > 1 ? this.#recs : null;
-      if (this.layers.length === 1) this.fungus.advance(this.colonies, this.#grids[0] as CountGrid[], dt, recs ? (recs[0] as Recognition) : null);
+      if (this.layers.length === 1)
+        this.fungus.advance(this.colonies, this.#grids[0] as CountGrid[], dt, recs ? (recs[0] as Recognition) : null);
       else this.fungus.advanceLayers(this.colonies, this.#grids, dt, recs);
     }
     if (this.time >= this.#nextStrategy) {
@@ -922,7 +1010,11 @@ export class Game {
    * hole, where its ants walk out and back. No ant is dosed directly: the first hosts are ants that walk through it.
    * The top-down maps have no hole: it falls at the nest's rim. Lands once; returns where.
    */
-  land(k: number, strain: number, { spores = LANDING.spores, evolve = false }: { spores?: number; evolve?: boolean } = {}): { x: number; y: number } {
+  land(
+    k: number,
+    strain: number,
+    { spores = LANDING.spores, evolve = false }: { spores?: number; evolve?: boolean } = {},
+  ): { x: number; y: number } {
     if (this.landed) return this.landed;
     const { x, y } = this.#byHole(this.colonies[k] ?? this.player);
     // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
@@ -956,7 +1048,12 @@ export class Game {
    * only from brood: no workers and no pupa or fully fed larva left (eggs and hungry larvae need nurses), whatever the queen or the larder.
    */
   static beaten(c: Colony): boolean {
-    if (c.queen) return !(c.founding && c.queen.alive) && c.population === 0 && !c.brood.items.some((b) => b.stage === PUPA || (b.stage === LARVA && isFed(b)));
+    if (c.queen)
+      return (
+        !(c.founding && c.queen.alive) &&
+        c.population === 0 &&
+        !c.brood.items.some((b) => b.stage === PUPA || (b.stage === LARVA && isFed(b)))
+      );
     return c.population === 0 && c.larder < c.params.foodPerAnt;
   }
 
@@ -1004,8 +1101,25 @@ export class Game {
       fungus: this.fungus.saveState(),
       recognition: this.recognition.saveState(),
       grids: { counts: this.#grids.map((gs) => gs.map((g) => g.saveState())), bands: this.#recs.map((r) => r.saveBands()) },
-      ...(world ? { world: { seed: world.seed, line: { holes: world.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: world.line.sHole[0], margin: world.line.margin }, curtain: encode(bare(world.curtain)) } } : {}),
-      private: { fightDeaths: this.#fightDeaths, lastFightDeath: this.#lastFightDeath, metBy: [...this.#metBy], haveMet: this.#haveMet, nextStrategy: this.#nextStrategy, regrowClock: this.#regrowClock, rng: (this.#rng as Partial<Rng>).state ?? null, regrowRng: this.#regrowRng?.state ?? null },
+      ...(world
+        ? {
+            world: {
+              seed: world.seed,
+              line: { holes: world.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: world.line.sHole[0], margin: world.line.margin },
+              curtain: encode(bare(world.curtain)),
+            },
+          }
+        : {}),
+      private: {
+        fightDeaths: this.#fightDeaths,
+        lastFightDeath: this.#lastFightDeath,
+        metBy: [...this.#metBy],
+        haveMet: this.#haveMet,
+        nextStrategy: this.#nextStrategy,
+        regrowClock: this.#regrowClock,
+        rng: (this.#rng as Partial<Rng>).state ?? null,
+        regrowRng: this.#regrowRng?.state ?? null,
+      },
     };
   }
 
@@ -1018,20 +1132,29 @@ export class Game {
     if (saved.version !== SAVE_VERSION) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
     const world = this.world;
     const sw = saved.world;
-    if (!!sw !== !!world) throw new Error(sw ? "save: a one-world save, and this game is on one map" : "save: a save of a game on one map, and this game is one world");
+    if (!!sw !== !!world)
+      throw new Error(
+        sw ? "save: a one-world save, and this game is on one map" : "save: a save of a game on one map, and this game is one world",
+      );
     if (world && sw) {
       const size = (saved.map as { size?: { w: number; h: number } }).size;
-      if (sw.seed !== world.seed || size?.w !== this.map.size.w || size?.h !== this.map.size.h) throw new Error(`save: another world (seed ${sw.seed}, plane ${size?.w} × ${size?.h}; this game's: seed ${world.seed}, ${this.map.size.w} × ${this.map.size.h})`);
+      if (sw.seed !== world.seed || size?.w !== this.map.size.w || size?.h !== this.map.size.h)
+        throw new Error(
+          `save: another world (seed ${sw.seed}, plane ${size?.w} × ${size?.h}; this game's: seed ${world.seed}, ${this.map.size.w} × ${this.map.size.h})`,
+        );
     }
     // Colonies founded mid-game first, as they were: then everything (the map as dug among it) is poured back over them.
     for (const f of saved.founded ?? []) this.addColony(f);
     if (world && sw) {
       // The line grown again must be the one saved: else the curtain poured below would lie under another line.
       const line = world.line;
-      const same = line.holes.length === sw.line.holes.length && line.holes.every((c, k) => c.x === sw.line.holes[k]?.x && c.y === sw.line.holes[k]?.y);
+      const same =
+        line.holes.length === sw.line.holes.length &&
+        line.holes.every((c, k) => c.x === sw.line.holes[k]?.x && c.y === sw.line.holes[k]?.y);
       if (!same || line.sHole[0] !== sw.line.s0 || line.margin !== sw.line.margin) throw new Error("save: another world's line");
     }
-    if (saved.colonies.length !== this.colonies.length) throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
+    if (saved.colonies.length !== this.colonies.length)
+      throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
     this.time = saved.time;
     this.strategyChoices = saved.strategyChoices;
     this.landed = decode(saved.landed) as Game["landed"];
@@ -1060,7 +1183,12 @@ export class Game {
     if (p.regrowRng !== null && this.#regrowRng) this.#regrowRng.state = p.regrowRng;
     // The grids and bands as the save's last tick built them (GameSave.grids), never built again from the living.
     const grids = saved.grids;
-    if (grids.counts.length !== this.layers.length || grids.bands.length !== this.layers.length || grids.counts.some((gs) => gs.length !== this.colonies.length)) throw new Error("save: its grids are another game's");
+    if (
+      grids.counts.length !== this.layers.length ||
+      grids.bands.length !== this.layers.length ||
+      grids.counts.some((gs) => gs.length !== this.colonies.length)
+    )
+      throw new Error("save: its grids are another game's");
     this.#grids.forEach((gs, l) => gs.forEach((g, k) => g.loadState((grids.counts[l] as number[][])[k] as number[])));
     this.#recs.forEach((r, l) => r.loadBands(grids.bands[l] as BandsSave));
   }

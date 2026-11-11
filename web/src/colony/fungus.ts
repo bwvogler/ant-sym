@@ -2,9 +2,35 @@ import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony, Layer } from "./colony.ts";
-import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, TASKS, encodeFungal, localFungusRule, type Arousal, type FungalSituation, type FungusPolicy, type FungusRule, type FungalPlace, type FungalTouch } from "./fungalPolicy.ts";
+import {
+  DEFAULT_RULE,
+  HIGH_LOAD,
+  STRAIN_DEFAULT,
+  TASKS,
+  encodeFungal,
+  localFungusRule,
+  type Arousal,
+  type FungalSituation,
+  type FungusPolicy,
+  type FungusRule,
+  type FungalPlace,
+  type FungalTouch,
+} from "./fungalPolicy.ts";
 import { Evolution, type EvolutionSave } from "./evolution.ts";
-import { compose, decodeLevels, hold, LETHAL_LEVERS, leverFor, LEVERS, NEST_LEVERS, presetOf, PRESETS, type LeverLevels, type Preset, type Reach } from "./levers.ts";
+import {
+  compose,
+  decodeLevels,
+  hold,
+  LETHAL_LEVERS,
+  leverFor,
+  LEVERS,
+  NEST_LEVERS,
+  presetOf,
+  PRESETS,
+  type LeverLevels,
+  type Preset,
+  type Reach,
+} from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
 import { clampCol, disc, inBounds, rockAt, type WorldMap } from "./world.ts";
@@ -74,9 +100,34 @@ export interface Strain {
  * Garden after the leafcutter's cultivar, whose odour becomes the colony's (blends odours).
  */
 export const STRAINS: readonly Strain[] = [
-  { id: "lockpick", name: "Lockpick", blurb: "spreads slowly, hides, never clears on its own; its hosts barely smell alarm", transmission: 0.15, decay: 0, visibility: 0.1, expresses: "soothe" },
-  { id: "bloom", name: "Bloom", blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant; its hosts smell the rival's food trail as their own", transmission: 0.6, decay: 0.01, visibility: 0.8, expresses: "share", sporulates: true },
-  { id: "garden", name: "Garden", blurb: "spreads steadily and half-shows; its hosts carry its own odour, so colonies that grow it come to smell alike", transmission: 0.3, decay: 0, visibility: 0.3, expresses: "blend" },
+  {
+    id: "lockpick",
+    name: "Lockpick",
+    blurb: "spreads slowly, hides, never clears on its own; its hosts barely smell alarm",
+    transmission: 0.15,
+    decay: 0,
+    visibility: 0.1,
+    expresses: "soothe",
+  },
+  {
+    id: "bloom",
+    name: "Bloom",
+    blurb: "spreads fast, shows, is groomed off and leaves the groomers resistant; its hosts smell the rival's food trail as their own",
+    transmission: 0.6,
+    decay: 0.01,
+    visibility: 0.8,
+    expresses: "share",
+    sporulates: true,
+  },
+  {
+    id: "garden",
+    name: "Garden",
+    blurb: "spreads steadily and half-shows; its hosts carry its own odour, so colonies that grow it come to smell alike",
+    transmission: 0.3,
+    decay: 0,
+    visibility: 0.3,
+    expresses: "blend",
+  },
 ];
 
 export interface FungusParams {
@@ -113,7 +164,20 @@ export interface FungusParams {
   borderRatio: number;
 }
 
-export const DEFAULT_FUNGUS: FungusParams = { pickup: 0.3, sporeDecay: 0.03, maxSpores: 6, grooming: 0.12, groomers: 4, queenGroomers: 8, priming: 0.02, clear: 0.002, minDose: 0.02, interval: 0.1, groomedAt: 0.05, borderRatio: 2 };
+export const DEFAULT_FUNGUS: FungusParams = {
+  pickup: 0.3,
+  sporeDecay: 0.03,
+  maxSpores: 6,
+  grooming: 0.12,
+  groomers: 4,
+  queenGroomers: 8,
+  priming: 0.02,
+  clear: 0.002,
+  minDose: 0.02,
+  interval: 0.1,
+  groomedAt: 0.05,
+  borderRatio: 2,
+};
 
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
 export const DORMANT_SHOW = 0.25;
@@ -139,7 +203,7 @@ const EDGE = CHUNK - 1;
 const AROUND = [0, 1].map((parity) => {
   const o = discOffsets(1)[parity] as Int16Array;
   const out: number[] = [];
-  for (let k = 0; k < o.length; k += 2) out.push((o[k + 1]) * CHUNK + (o[k]));
+  for (let k = 0; k < o.length; k += 2) out.push(o[k + 1] * CHUNK + o[k]);
   return out;
 });
 
@@ -190,7 +254,8 @@ export class LoadGrid {
   }
 
   any(x0: number, y0: number, x1: number, y1: number): boolean {
-    for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++) for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by) > 0) return true;
+    for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++)
+      for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by) > 0) return true;
     return false;
   }
 }
@@ -355,12 +420,12 @@ export class Fungus {
     for (const c of colonies)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layered && c.layer[i] !== layer)) continue;
-        const dx = (c.x[i]) - x;
-        const dy = (c.y[i]) - y;
+        const dx = c.x[i] - x;
+        const dy = c.y[i] - y;
         if (dx * dx + dy * dy > r2) continue;
         const l = c.load[i];
         if (l === 0) c.strain[i] = s;
-        const nl = Math.min(1, l + dose * (1 - (c.resist[i])));
+        const nl = Math.min(1, l + dose * (1 - c.resist[i]));
         if (l === 0 && nl > 0) this.hosts++;
         c.load[i] = nl;
       }
@@ -385,7 +450,12 @@ export class Fungus {
    * rival). Each map's ants read and pass on load only among themselves, and take spores off that map; a queen and her
    * alates are on her colony's home layer.
    */
-  stepLayers(colonies: readonly Colony[], grids: readonly (readonly CountGrid[])[], dt: number, recs: readonly Recognition[] | null = null): void {
+  stepLayers(
+    colonies: readonly Colony[],
+    grids: readonly (readonly CountGrid[])[],
+    dt: number,
+    recs: readonly Recognition[] | null = null,
+  ): void {
     if (!this.active) return;
     this.#made = 0;
     let hosts = 0;
@@ -400,7 +470,14 @@ export class Fungus {
    * One map's part of a step: the ants on layer `layer` (−1: every ant, the fungus on one map), their queens' and alates'
    * where `layer` is their home, then the spores taken and the ground fading. Returns the hosts after it.
    */
-  #stepLayer(L: SporeLayer, layer: number, colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null): number {
+  #stepLayer(
+    L: SporeLayer,
+    layer: number,
+    colonies: readonly Colony[],
+    grids: readonly CountGrid[],
+    dt: number,
+    rec: Recognition | null,
+  ): number {
     const p = this.params;
     const map = L.map;
     const { w, h } = map.size;
@@ -534,7 +611,7 @@ export class Fungus {
     for (let k = 0; k < taken.length; k += 3) {
       const x = taken[k];
       const y = taken[k + 1];
-      L.spores.set(x, y, Math.max(0, L.spores.get(x, y) - (taken[k + 2])));
+      L.spores.set(x, y, Math.max(0, L.spores.get(x, y) - taken[k + 2]));
     }
     const keep = Math.exp(-p.sporeDecay * dt);
     for (const key of L.sporeCells) {
@@ -592,7 +669,15 @@ export class Fungus {
    * does in her, from what it senses there (task "queen", place "queen"): how much of it she shows, and how much of her
    * royal mark she lays. Returns whether she is a host after the step.
    */
-  #stepQueen(L: SporeLayer, c: Colony, k: number, grids: readonly CountGrid[], dt: number, rec: Recognition | null, evolving: number): boolean {
+  #stepQueen(
+    L: SporeLayer,
+    c: Colony,
+    k: number,
+    grids: readonly CountGrid[],
+    dt: number,
+    rec: Recognition | null,
+    evolving: number,
+  ): boolean {
     const q = c.queen;
     if (!q || !q.alive) return false;
     // Her retinue's larger cap is the evolving game's stop-gap (ja-k4k.12); a lab or test game grooms her as any host
@@ -634,7 +719,17 @@ export class Fungus {
    * fungus's strain (its resistance evaded, its gains counted: ja-lo8.12); `groomers`: the most nestmates that groom her.
    * Sets her load and strain; returns the nestmates around her, or −1 when nothing reached her and she carries none.
    */
-  #royalLoad(L: SporeLayer, b: { x: number; y: number; load: number; strain: number; resist: number }, show: number, k: number, grids: readonly CountGrid[], dt: number, inGrid: boolean, evolving: number, groomers: number): number {
+  #royalLoad(
+    L: SporeLayer,
+    b: { x: number; y: number; load: number; strain: number; resist: number },
+    show: number,
+    k: number,
+    grids: readonly CountGrid[],
+    dt: number,
+    inGrid: boolean,
+    evolving: number,
+    groomers: number,
+  ): number {
     const p = this.params;
     const { h } = L.map.size;
     cellOf(b.x, b.y);
@@ -736,7 +831,16 @@ export class Fungus {
    * fetched once and indexed; cells past a ragged map edge inside a chunk are never written,
    * so they read 0 like the clipped slow path.
    */
-  #gather(L: SporeLayer, cx: number, cy: number, k: number, grids: readonly CountGrid[], vis: LoadGrid, load: boolean, visible: boolean): void {
+  #gather(
+    L: SporeLayer,
+    cx: number,
+    cy: number,
+    k: number,
+    grids: readonly CountGrid[],
+    vis: LoadGrid,
+    load: boolean,
+    visible: boolean,
+  ): void {
     const nb = this.#nb;
     nb.load = nb.visible = nb.ants = nb.own = 0;
     nb.topX = cx;
@@ -778,8 +882,8 @@ export class Fungus {
     let top = 0;
     const o = discOffsets(1)[cy & 1] as Int16Array;
     for (let q = 0; q < o.length; q += 2) {
-      const x = cx + (o[q]);
-      const y = cy + (o[q + 1]);
+      const x = cx + o[q];
+      const y = cy + o[q + 1];
       if (!inBounds(map, x, y)) continue;
       for (let j = 0; j < grids.length; j++) {
         const n = (grids[j] as CountGrid).get(x, y);
@@ -815,7 +919,12 @@ export class Fungus {
   }
 
   /** advance, on every map (one world): stepLayers when a step comes due. The clock is the fungus's one clock. */
-  advanceLayers(colonies: readonly Colony[], grids: readonly (readonly CountGrid[])[], dt: number, recs: readonly Recognition[] | null = null): boolean {
+  advanceLayers(
+    colonies: readonly Colony[],
+    grids: readonly (readonly CountGrid[])[],
+    dt: number,
+    recs: readonly Recognition[] | null = null,
+  ): boolean {
     this.#clock += dt;
     if (this.#clock + 1e-9 < this.params.interval) return false;
     const owed = this.#clock;
@@ -834,7 +943,7 @@ export class Fungus {
    * has it show (a dormant host shows a quarter: hiding is how it escapes grooming).
    */
   #shows(c: Colony, i: number, s: number): number {
-    return (this.strains[s] as Strain).visibility * (c.show[i]);
+    return (this.strains[s] as Strain).visibility * c.show[i];
   }
 
   /** The player's settings: the local rule's thresholds and the menu (§5.1, levers 4 and 5). */
@@ -969,7 +1078,9 @@ export class Fungus {
     const id = answer === STRAIN_DEFAULT ? fallback : answer;
     const p = PRESETS.find((x) => x.id === id);
     if (p) return p.levels;
-    return decodeLevels(answer, queen ? askedLevers(this.#menu, true) : this.asked) ?? (PRESETS.find((x) => x.id === fallback) as Preset).levels;
+    return (
+      decodeLevels(answer, queen ? askedLevers(this.#menu, true) : this.asked) ?? (PRESETS.find((x) => x.id === fallback) as Preset).levels
+    );
   }
 
   /** Run preset e (an index into PRESETS) in ant i of colony c at load l, whatever the menu says: a lab and test helper (the step goes through expressLevels under the menu). */
@@ -1038,9 +1149,26 @@ export class Fungus {
   /** The fungus's state for a save (save.ts): the ground's spores, its settings, its menu and clock. Its policy is the page's to wire. */
   saveState(): Record<string, unknown> {
     const L = this.#layers[0] as SporeLayer;
-    const out: Record<string, unknown> = { spores: encode(this.spores), sporeStrain: encode(this.sporeStrain), sporeCells: encode(L.sporeCells), hosts: this.hosts, rule: encode(this.rule), params: encode(this.params), menu: encode(this.#menu), clock: this.#clock, evolution: this.#evolution?.save() ?? null, base: [...L.base] };
+    const out: Record<string, unknown> = {
+      spores: encode(this.spores),
+      sporeStrain: encode(this.sporeStrain),
+      sporeCells: encode(L.sporeCells),
+      hosts: this.hosts,
+      rule: encode(this.rule),
+      params: encode(this.params),
+      menu: encode(this.#menu),
+      clock: this.#clock,
+      evolution: this.#evolution?.save() ?? null,
+      base: [...L.base],
+    };
     // One world (U4b): every other map's spores, their cells and the base there (SPORE_LAYER_STATE), from layer 1 on.
-    if (this.#layers.length > 1) out.layers = this.#layers.slice(1).map((M) => ({ spores: encode(M.spores), sporeStrain: encode(M.sporeStrain), sporeCells: encode(M.sporeCells), base: [...M.base] }));
+    if (this.#layers.length > 1)
+      out.layers = this.#layers.slice(1).map((M) => ({
+        spores: encode(M.spores),
+        sporeStrain: encode(M.sporeStrain),
+        sporeCells: encode(M.sporeCells),
+        base: [...M.base],
+      }));
     return out;
   }
 
@@ -1059,7 +1187,8 @@ export class Fungus {
     L.base = [...((r.base as number[] | undefined) ?? [])];
     const layers = r.layers as Record<string, unknown>[] | undefined;
     if (layers) {
-      if (layers.length !== this.#layers.length - 1) throw new Error(`save: the fungus saved on ${layers.length + 1} maps, here ${this.#layers.length}`);
+      if (layers.length !== this.#layers.length - 1)
+        throw new Error(`save: the fungus saved on ${layers.length + 1} maps, here ${this.#layers.length}`);
       layers.forEach((x, k) => {
         const M = this.#layers[k + 1] as SporeLayer;
         for (const key of SPORE_LAYER_STATE)

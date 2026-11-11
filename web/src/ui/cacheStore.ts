@@ -14,7 +14,11 @@ type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 function pairs(raw: string | null): [string, string][] {
   if (!raw) return [];
   const entries = JSON.parse(raw) as unknown;
-  return Array.isArray(entries) ? entries.filter((e): e is [string, string] => Array.isArray(e) && e.length === 2 && typeof e[0] === "string" && typeof e[1] === "string") : [];
+  return Array.isArray(entries)
+    ? entries.filter(
+        (e): e is [string, string] => Array.isArray(e) && e.length === 2 && typeof e[0] === "string" && typeof e[1] === "string",
+      )
+    : [];
 }
 
 /** A CacheStore over `storage()` (a getter: reading localStorage itself can throw when storage is blocked). */

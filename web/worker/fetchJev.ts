@@ -1,5 +1,15 @@
 import type { JevRequest } from "../shared/jev.ts";
-import { DEFAULT_ABORT_GRACE_MS, DEFAULT_BASE_URL, JevAbortError, defaultSleep, headersFor, inputTokensOf, retryDelayMs, type JevCallResult, type JevCaller } from "../server/jev.ts";
+import {
+  DEFAULT_ABORT_GRACE_MS,
+  DEFAULT_BASE_URL,
+  JevAbortError,
+  defaultSleep,
+  headersFor,
+  inputTokensOf,
+  retryDelayMs,
+  type JevCallResult,
+  type JevCaller,
+} from "../server/jev.ts";
 
 // JevClient (server/jev.ts) for a Cloudflare Worker: fetch instead of
 // node:https. The Node client avoids fetch because undici serialises requests
@@ -66,7 +76,11 @@ export class FetchJevClient implements JevCaller {
     }
   }
 
-  async #post(payload: string, headers: Record<string, string>, signal?: AbortSignal): Promise<{ status: number; text: string; retryAfter: string | undefined }> {
+  async #post(
+    payload: string,
+    headers: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<{ status: number; text: string; retryAfter: string | undefined }> {
     const ctl = new AbortController();
     let grace: ReturnType<typeof setTimeout> | null = null;
     const deadline = setTimeout(() => ctl.abort(new Timeout(`jev request exceeded ${this.#timeoutMs} ms`)), this.#timeoutMs);

@@ -199,7 +199,7 @@ test("wall-following through ground being filled: a target cell filled meanwhile
     c.gy[0] = 6;
     c.gdir[0] = 0;
     c.tick(1 / 30);
-    assert.ok(Math.abs((c.gx[0]) - 12) <= 1 && Math.abs((c.gy[0]) - 6) <= 1, `re-decided from its own cell: target (${c.gx[0]}, ${c.gy[0]})`);
+    assert.ok(Math.abs(c.gx[0] - 12) <= 1 && Math.abs(c.gy[0] - 6) <= 1, `re-decided from its own cell: target (${c.gx[0]}, ${c.gy[0]})`);
   }
   // Grazing: right on its cell's edge, so the straight way to the next cell crosses a corner of the solid cell beside it.
   {
@@ -274,7 +274,12 @@ test("a pellet put back is not dug out again: not as a tunnel's end, not as the 
     for (let d = 0; d < 6; d++) {
       const x = nx(19, 6, d);
       const y = ny(6, d);
-      if (x !== 18) assert.equal(rockAt(map, x, y), SOIL, `and the dead end it left is not dug on either (${x}, ${y}): the colony is filling that branch back`);
+      if (x !== 18)
+        assert.equal(
+          rockAt(map, x, y),
+          SOIL,
+          `and the dead end it left is not dug on either (${x}, ${y}): the colony is filling that branch back`,
+        );
     }
     // Long after (BACKFILL.hold), it is ground like any other.
     assert.ok(!refilled(map, 20, 6, c.time + 601, BACKFILL.hold));
@@ -299,7 +304,8 @@ test("a pellet put back is not dug out again: not as a tunnel's end, not as the 
   {
     const map = build();
     assert.ok(fillCell(map, 20, 6, 100));
-    for (const u of [0.01, 0.5, 0.99]) assert.notEqual(chooseDig(map, 19, 6, 0, u, 100.5), 0, "east, straight on, is the fresh fill: never that");
+    for (const u of [0.01, 0.5, 0.99])
+      assert.notEqual(chooseDig(map, 19, 6, 0, u, 100.5), 0, "east, straight on, is the fresh fill: never that");
     assert.equal(chooseDig(map, 19, 6, 0, 0.5), 0, "with no clock (long after): east");
     const a = { x: centreX(19, 6), y: centreY(6) };
     assert.equal(soilFace(map, a.x, a.y, a.x + 0.6, a.y, 0, 20, 6, 100.5), GLANCE);

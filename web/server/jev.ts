@@ -123,9 +123,7 @@ export class JevClient implements JevCaller {
     this.#url = new URL("/v1/systemone", opts.baseUrl ?? DEFAULT_BASE_URL);
     const maxSockets = opts.maxSockets ?? DEFAULT_IN_FLIGHT;
     this.#agent =
-      this.#url.protocol === "https:"
-        ? new https.Agent({ keepAlive: true, maxSockets })
-        : new http.Agent({ keepAlive: true, maxSockets });
+      this.#url.protocol === "https:" ? new https.Agent({ keepAlive: true, maxSockets }) : new http.Agent({ keepAlive: true, maxSockets });
     this.#maxRetries = opts.maxRetries ?? 3;
     this.#timeoutMs = opts.timeoutMs ?? 20_000;
     this.#sleep = opts.sleep ?? defaultSleep;
@@ -175,7 +173,11 @@ export class JevClient implements JevCaller {
     }
   }
 
-  #post(payload: Buffer, headers: Record<string, string>, signal?: AbortSignal): Promise<{ status: number; text: string; retryAfter: string | undefined }> {
+  #post(
+    payload: Buffer,
+    headers: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<{ status: number; text: string; retryAfter: string | undefined }> {
     const lib = this.#url.protocol === "https:" ? https : http;
     return new Promise((resolve, reject) => {
       let settled = false;

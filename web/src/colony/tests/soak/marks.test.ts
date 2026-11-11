@@ -10,7 +10,6 @@ import { SMALL_SIDE } from "../builders.ts";
 // Nest slice 3 (docs/nest-and-home.md §3.3): chambers have roles, ants lay their chamber's mark on the floor as road
 // signs, and an ant inside the nest is asked by where it is, not by the home trail.
 
-
 test("roles and road signs: chambers dug get roles (brood among them), and the royal mark is strongest in the royal chamber", () => {
   const map = generateSideWorld(2, SMALL_SIDE);
   const g = new Game(map, { antCount: 400, rival: false }, mulberry32(4));
@@ -18,8 +17,14 @@ test("roles and road signs: chambers dug get roles (brood among them), and the r
   const ch = map.chambers!;
   const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
   assert.equal(mine.filter((c) => c.role === "royal").length, 1, "one royal chamber");
-  assert.ok(mine.every((c) => c.role !== "none"), `roles: ${mine.map((c) => c.role).join(", ")}`);
-  assert.ok(mine.some((c) => c.role === "brood"), "brood chambers");
+  assert.ok(
+    mine.every((c) => c.role !== "none"),
+    `roles: ${mine.map((c) => c.role).join(", ")}`,
+  );
+  assert.ok(
+    mine.some((c) => c.role === "brood"),
+    "brood chambers",
+  );
   // Mean royal mark in the royal chamber vs in every other chamber.
   const ph = g.player.ph;
   const sum = new Map<number, [number, number]>();
@@ -32,9 +37,14 @@ test("roles and road signs: chambers dug get roles (brood among them), and the r
       a[1]++;
       sum.set(id, a);
     }
-  const mean = (id: number) => (sum.get(id)![0] / sum.get(id)![1]);
+  const mean = (id: number) => sum.get(id)![0] / sum.get(id)![1];
   const royal = mine.find((c) => c.role === "royal")!.id;
-  for (const c of mine) if (c.id !== royal && c.cells > 4) assert.ok(mean(royal) > mean(c.id), `royal mark: royal chamber ${mean(royal).toFixed(2)} vs ${c.role} ${c.id} ${mean(c.id).toFixed(2)}`);
+  for (const c of mine)
+    if (c.id !== royal && c.cells > 4)
+      assert.ok(
+        mean(royal) > mean(c.id),
+        `royal mark: royal chamber ${mean(royal).toFixed(2)} vs ${c.role} ${c.id} ${mean(c.id).toFixed(2)}`,
+      );
 });
 
 test("inside the nest an ant is asked where it is, not the home trail: just home with food, it is asked as in the royal chamber", () => {

@@ -58,7 +58,19 @@ const local = {
     const quality = f.find((x) => x === "poor" || x === "rich") ?? "fair";
     const alarm = f.find((x) => x.startsWith("alarm:"))?.slice(6) ?? "none";
     const odds = f.find((x) => x.startsWith("odds:"))?.slice(5) ?? "none";
-    return localResponses[hook]({ mode, carrying, porter: porter === "porter", digging: digging === "digging", place, offered, enemy: enemy === "enemy", stance, quality, alarm, odds });
+    return localResponses[hook]({
+      mode,
+      carrying,
+      porter: porter === "porter",
+      digging: digging === "digging",
+      place,
+      offered,
+      enemy: enemy === "enemy",
+      stance,
+      quality,
+      alarm,
+      odds,
+    });
   },
 };
 
@@ -71,7 +83,8 @@ const add = (g, lane, key) => {
 };
 for (const [k, v] of Object.entries(cache.modes ?? {})) {
   const l = local.modes(k);
-  if (l !== v) add(`mode: ${k.split("|")[0]}${k.split("|")[1] === "tired" ? " tired" : ""} (stance ${k.split("|")[6]}) ${l} → ${v}`, "modes", k);
+  if (l !== v)
+    add(`mode: ${k.split("|")[0]}${k.split("|")[1] === "tired" ? " tired" : ""} (stance ${k.split("|")[6]}) ${l} → ${v}`, "modes", k);
 }
 for (const [k, v] of Object.entries(cache.stances ?? {})) {
   const l = local.stances(k);
@@ -100,7 +113,23 @@ const run = (name, c) => {
   const cf = join(outDir, `${name}.cache.json`);
   const jf = join(outDir, `${name}.json`);
   writeFileSync(cf, JSON.stringify(c));
-  execFileSync(process.execPath, [join(root, "scripts", "experiment.mjs"), assay, "--seeds", seeds, "--seconds", seconds, "--policy", `cache:${cf}`, "--json", jf, ...(jobs ? ["--jobs", jobs] : [])], { stdio: ["ignore", "ignore", "inherit"] });
+  execFileSync(
+    process.execPath,
+    [
+      join(root, "scripts", "experiment.mjs"),
+      assay,
+      "--seeds",
+      seeds,
+      "--seconds",
+      seconds,
+      "--policy",
+      `cache:${cf}`,
+      "--json",
+      jf,
+      ...(jobs ? ["--jobs", jobs] : []),
+    ],
+    { stdio: ["ignore", "ignore", "inherit"] },
+  );
   const runs = JSON.parse(readFileSync(jf, "utf8"))[0].runs;
   return { stored: runs.map((r) => r.metrics["you.stored"]), held: Math.max(...runs.map((r) => r.metrics["you.maxHeld"] ?? 0)) };
 };
@@ -109,13 +138,18 @@ const sum = (a) => a.reduce((x, y) => x + y, 0);
 const ordered = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
 const matched = match ? ordered.filter(([g]) => new RegExp(match).test(g)) : ordered;
 const chosen = top > 0 ? matched.slice(0, top) : matched;
-console.log(`${file}: ${sum(ordered.map(([, e]) => e.length))} answers differ from the local rule, in ${ordered.length} groups; replaying ${assay} (${seconds} s, seeds ${seeds}) ${chosen.length + 2} times.\n`);
+console.log(
+  `${file}: ${sum(ordered.map(([, e]) => e.length))} answers differ from the local rule, in ${ordered.length} groups; replaying ${assay} (${seconds} s, seeds ${seeds}) ${chosen.length + 2} times.\n`,
+);
 
 const allLocal = { ...structuredClone(cache), modes: {}, stances: {}, responses: {} };
 const base = run("all", cache);
 const loc = run("local", allLocal);
 console.log(`| replay | food home (sum) | per seed | Δ vs all of Jev | held over 120 s, most |\n|---|---|---|---|---|`);
-const row = (name, r) => console.log(`| ${name} | ${sum(r.stored)} | ${r.stored.join(", ")} | ${name === "all of Jev's answers" ? "–" : `${sum(r.stored) - sum(base.stored) >= 0 ? "+" : ""}${sum(r.stored) - sum(base.stored)}`} | ${r.held} |`);
+const row = (name, r) =>
+  console.log(
+    `| ${name} | ${sum(r.stored)} | ${r.stored.join(", ")} | ${name === "all of Jev's answers" ? "–" : `${sum(r.stored) - sum(base.stored) >= 0 ? "+" : ""}${sum(r.stored) - sum(base.stored)}`} | ${r.held} |`,
+  );
 row("all of Jev's answers", base);
 row("the local rule", loc);
 const results = [];
@@ -124,4 +158,18 @@ for (const [g, entries] of chosen) {
   results.push({ g, n: entries.length, r });
   row(`without ${g} (${entries.length})`, r);
 }
-writeFileSync(join(outDir, "ablation.json"), JSON.stringify({ assay, seconds, seeds, base, local: loc, groups: results.map((x) => ({ group: x.g, answers: ordered.find(([g]) => g === x.g)[1].map((e) => e.key), ...x.r })) }, null, 1));
+writeFileSync(
+  join(outDir, "ablation.json"),
+  JSON.stringify(
+    {
+      assay,
+      seconds,
+      seeds,
+      base,
+      local: loc,
+      groups: results.map((x) => ({ group: x.g, answers: ordered.find(([g]) => g === x.g)[1].map((e) => e.key), ...x.r })),
+    },
+    null,
+    1,
+  ),
+);

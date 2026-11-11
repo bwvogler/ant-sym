@@ -92,9 +92,14 @@ test("founding twice at one spot digs a second hole along the ground, and every 
     return CELL[0];
   };
   const cols = [0, 1, 2, 3].map(col);
-  for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) assert.ok(Math.abs(cols[a]! - cols[b]!) >= HOLE_GAP, `holes ${a} and ${b} apart (PR #42 review, S2)`);
+  for (let a = 0; a < 4; a++)
+    for (let b = a + 1; b < 4; b++) assert.ok(Math.abs(cols[a]! - cols[b]!) >= HOLE_GAP, `holes ${a} and ${b} apart (PR #42 review, S2)`);
   // The world's colonies learn the founded holes, so their mounds keep those funnels open too (S3).
-  for (const c of g.colonies) assert.deepEqual([...(c.saveState().private as { holes: number[] }).holes].sort((x, y) => x - y), [...cols].sort((x, y) => x - y));
+  for (const c of g.colonies)
+    assert.deepEqual(
+      [...(c.saveState().private as { holes: number[] }).holes].sort((x, y) => x - y),
+      [...cols].sort((x, y) => x - y),
+    );
 });
 
 test("a founded colony that falls does not end the game; the world's own colonies still do", () => {

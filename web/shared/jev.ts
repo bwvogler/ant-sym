@@ -147,7 +147,14 @@ export function runOf(body: unknown): RunSummary | null {
 
 /** What /api/jev returns on a 200: the status of the upstream call, its body, and the run (read it with runOf: a run that has drifted must not drop a billed answer). */
 export function isProxyReply(v: unknown): v is JevProxyReply {
-  return isObject(v) && typeof v.status === "number" && typeof v.attempts === "number" && typeof v.inputTokens === "number" && isObject(v.run) && "body" in v;
+  return (
+    isObject(v) &&
+    typeof v.status === "number" &&
+    typeof v.attempts === "number" &&
+    typeof v.inputTokens === "number" &&
+    isObject(v.run) &&
+    "body" in v
+  );
 }
 
 /** Whether a Jev reply body holds answers. */
@@ -173,7 +180,13 @@ export interface HealthRead {
 }
 
 function isBudget(v: unknown): v is Budget {
-  return isObject(v) && typeof v.day === "string" && typeof v.spentUsd === "number" && (v.usdPerDay === null || typeof v.usdPerDay === "number") && (v.remainingUsd === null || typeof v.remainingUsd === "number");
+  return (
+    isObject(v) &&
+    typeof v.day === "string" &&
+    typeof v.spentUsd === "number" &&
+    (v.usdPerDay === null || typeof v.usdPerDay === "number") &&
+    (v.remainingUsd === null || typeof v.remainingUsd === "number")
+  );
 }
 
 /** A health body, or null when it is not one (a 404 page, another service on the port). */

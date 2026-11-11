@@ -3,7 +3,15 @@ import assert from "node:assert/strict";
 import { DOCTRINES, estimateTokens, packModeRequest, policyContext, readMode, situationKey } from "../../colonyBrain.ts";
 import type { Situation } from "../../vocab.ts";
 
-const S: Situation = { mode: "follow", tired: false, foodTrail: "faint", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" };
+const S: Situation = {
+  mode: "follow",
+  tired: false,
+  foodTrail: "faint",
+  homeTrail: "strong",
+  alarm: "none",
+  enemy: "none",
+  stance: "forage",
+};
 
 test("situationKey is stable and tells situations apart", () => {
   assert.equal(situationKey(S), situationKey({ ...S }));
@@ -12,7 +20,13 @@ test("situationKey is stable and tells situations apart", () => {
 });
 
 test("packModeRequest: one shared state with the doctrine, one choice per situation", () => {
-  const r = packModeRequest([{ id: "s0", situation: S }, { id: "s1", situation: { ...S, mode: "explore" } }], "be brave");
+  const r = packModeRequest(
+    [
+      { id: "s0", situation: S },
+      { id: "s1", situation: { ...S, mode: "explore" } },
+    ],
+    "be brave",
+  );
   const state = r.state as { legend: string; doctrine: string; ants: Record<string, Situation> };
   assert.equal(state.doctrine, "be brave");
   assert.ok(state.legend.includes("doctrine"));
@@ -39,7 +53,14 @@ test("policyContext changes with the doctrine and ignores surrounding whitespace
 
 test("stances: key, pack and read; their own context per doctrine", async () => {
   const { packStanceRequest, readStance, stanceContext, stanceKey } = await import("../../colonyBrain.ts");
-  const v = { stance: "forage" as const, ants: "many" as const, losses: "none" as const, enemyNearNest: true, intake: "some" as const, larder: "full" as const };
+  const v = {
+    stance: "forage" as const,
+    ants: "many" as const,
+    losses: "none" as const,
+    enemyNearNest: true,
+    intake: "some" as const,
+    larder: "full" as const,
+  };
   assert.notEqual(stanceKey(v), stanceKey({ ...v, enemyNearNest: false }));
   const r = packStanceRequest([{ id: "c0", situation: v }], "be brave");
   assert.deepEqual(Object.keys(r.questions), ["c0_stance"]);

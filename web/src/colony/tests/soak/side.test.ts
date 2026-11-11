@@ -3,13 +3,28 @@ import assert from "node:assert/strict";
 import { Colony, HOLE_SIGHT } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, NE, NW, nx, ny } from "../../hex.ts";
-import { AIR, digCell, fillCell, flat, generateSideWorld, groundRow, groundTop, isSky, mulberry32, OPEN, reachable, rockAt, SIDE_WORLD, SOIL, type WorldMap } from "../../world.ts";
+import {
+  AIR,
+  digCell,
+  fillCell,
+  flat,
+  generateSideWorld,
+  groundRow,
+  groundTop,
+  isSky,
+  mulberry32,
+  OPEN,
+  reachable,
+  rockAt,
+  SIDE_WORLD,
+  SOIL,
+  type WorldMap,
+} from "../../world.ts";
 import { walkway } from "../builders.ts";
 
 // The side view (MR 13): a cross-section with sky, a walkway along the ground line, nests dug below it.
 
 const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40 };
-
 
 /** Whether the walkway (open sky cells) joins the map's west edge to its east edge, walking only on it. */
 function walkwayEdgeToEdge(map: WorldMap): boolean {
@@ -78,7 +93,7 @@ test("each nest: its entrance an open hole in the ground line with the walkway b
       assert.ok(n.y > n.entrance!.y + 8, "the chamber is well below the ground line");
       const walk = reachable(map, n.x, n.y, "open");
       cellOf(n.entrance.x, n.entrance.y);
-      assert.equal(walk[(CELL[1]) * map.size.w + (CELL[0])], 1, "the chamber is joined to its entrance on foot");
+      assert.equal(walk[CELL[1] * map.size.w + CELL[0]], 1, "the chamber is joined to its entrance on foot");
     }
     // Food: the generator drops food it can't reach by digging from the player's chamber, so "all food reachable, walking or
     // digging" (as this test said) couldn't fail. What it doesn't ensure, checked here with a walk of the test's own:
@@ -87,7 +102,7 @@ test("each nest: its entrance an open hole in the ground line with the walkway b
     const walk = new Uint8Array(map.size.w * map.size.h);
     cellOf(map.nest.x, map.nest.y);
     const todo: [number, number][] = [[CELL[0], CELL[1]]];
-    walk[(CELL[1]) * map.size.w + (CELL[0])] = 1;
+    walk[CELL[1] * map.size.w + CELL[0]] = 1;
     while (todo.length) {
       const [x, y] = todo.pop()!;
       for (let d = 0; d < 6; d++) {
@@ -121,7 +136,8 @@ test("the walkway follows the ground: dig the soil from under a walkway cell and
   const map = generateSideWorld(4, SMALL);
   // A flat stretch away from the nests: find a column whose walkway sits on soil.
   let x = 10;
-  while (walkway(map, x) < 0 || Math.abs(walkway(map, x) - walkway(map, x + 1)) > 0 || Math.abs(walkway(map, x) - walkway(map, x - 1)) > 0) x++;
+  while (walkway(map, x) < 0 || Math.abs(walkway(map, x) - walkway(map, x + 1)) > 0 || Math.abs(walkway(map, x) - walkway(map, x - 1)) > 0)
+    x++;
   const y = walkway(map, x);
   // Dig every ground neighbour of (x, y): it loses its footing.
   for (let d = 0; d < 6; d++) {
@@ -196,7 +212,8 @@ test("foraging in the side view: carriers on the ground in sight of the hole mak
       for (let i = 0; i < c.n; i++) {
         c.antCell(i);
         const d = Math.abs(c.x[i]! - e.x);
-        const inSight = c.alive[i] && c.carrying[i] && isSky(map, CELL[0], CELL[1]) && d < HOLE_SIGHT && Math.abs(c.y[i]! - e.y) < 2 * HOLE_SIGHT;
+        const inSight =
+          c.alive[i] && c.carrying[i] && isSky(map, CELL[0], CELL[1]) && d < HOLE_SIGHT && Math.abs(c.y[i]! - e.y) < 2 * HOLE_SIGHT;
         if (inSight && nearD[i]! >= 0) {
           nearSamples++;
           if (d > nearD[i]! + 1) nearAway++;
@@ -222,7 +239,10 @@ test("foraging in the side view: carriers on the ground in sight of the hole mak
   assert.ok(c.stored > 40, `food home: ${c.stored}`);
   assert.ok(samples > 50, `${samples} samples of carriers on the ground`);
   // Near the hole (in sight of it, or nearly), never away: carriers used to shuttle past it.
-  assert.ok(nearSamples > 50 && nearAway <= nearSamples * 0.01, `${nearAway} of ${nearSamples} times a carrier in sight of the hole had moved away from it (they used to shuttle past it)`);
+  assert.ok(
+    nearSamples > 50 && nearAway <= nearSamples * 0.01,
+    `${nearAway} of ${nearSamples} times a carrier in sight of the hole had moved away from it (they used to shuttle past it)`,
+  );
   // Anywhere, rarely: a drifted vector (nest slice 1) can put the hole behind a carrier, which walks there first, then
   // searches; going round a heap on the ground can mean a few steps away first. (Measured 7.8 %: three quarters of it
   // drift and search, the rest going round heaps. With an exact vector, before slice 1, it was 0.)
@@ -297,7 +317,10 @@ test("a carrier homing along the ground passes the rival's hole without going in
     for (const rim of [false, true])
       for (const off of [15, 5, -5]) {
         const a = run(seed, (c, rx) => onGround(c, rx + off), rim);
-        assert.ok(a.home && a.under === 0, `seed ${seed}${rim ? ", rim heaped" : ""}, ${off} from the rival's hole: home (${a.home}), ${a.under.toFixed(1)} s in under the rival's hole`);
+        assert.ok(
+          a.home && a.under === 0,
+          `seed ${seed}${rim ? ", rim heaped" : ""}, ${off} from the rival's hole: home (${a.home}), ${a.under.toFixed(1)} s in under the rival's hole`,
+        );
       }
   for (const seed of [8, 3]) {
     const b = run(seed, (c, rx, ry) => {

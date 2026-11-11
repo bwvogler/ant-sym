@@ -28,7 +28,21 @@ export interface PenPlace {
   onFly: (d: DoctrineChoice) => void;
 }
 
-export default function QueenPen({ flight, mother, daughter, doctrine, onFound, place }: { flight: Flight; mother: string; daughter: string; doctrine: DoctrineChoice; onFound: (d: DoctrineChoice, at: Landing) => void; place?: PenPlace }) {
+export default function QueenPen({
+  flight,
+  mother,
+  daughter,
+  doctrine,
+  onFound,
+  place,
+}: {
+  flight: Flight;
+  mother: string;
+  daughter: string;
+  doctrine: DoctrineChoice;
+  onFound: (d: DoctrineChoice, at: Landing) => void;
+  place?: PenPlace;
+}) {
   const [text, setText] = useState(doctrine.text);
   const [id, setId] = useState(doctrine.id);
   const [side, setSide] = useState<1 | -1>(1);
@@ -45,11 +59,20 @@ export default function QueenPen({ flight, mother, daughter, doctrine, onFound, 
   const presets = (
     <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="presets">
       {DOCTRINES.map((d) => (
-        <button key={d.id} type="button" className={`rounded-md border px-2 py-1 text-xs ${id === d.id && text === d.text ? "border-accent text-accent" : "border-line text-fg-2 hover:bg-raised"}`} onClick={() => pick({ id: d.id, text: d.text })}>
+        <button
+          key={d.id}
+          type="button"
+          className={`rounded-md border px-2 py-1 text-xs ${id === d.id && text === d.text ? "border-accent text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
+          onClick={() => pick({ id: d.id, text: d.text })}
+        >
           {d.name}
         </button>
       ))}
-      <button type="button" className="rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised" onClick={() => pick(doctrine)}>
+      <button
+        type="button"
+        className="rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised"
+        onClick={() => pick(doctrine)}
+      >
         her mother's
       </button>
     </div>
@@ -70,30 +93,43 @@ export default function QueenPen({ flight, mother, daughter, doctrine, onFound, 
       <section className="rounded-lg border border-accent/60 bg-panel p-4 text-sm shadow-lg" role="region" aria-label="The queen's pen">
         <h2 className="text-base font-semibold tracking-tight text-fg">A new queen, with you in her</h2>
         <p className="mt-1 text-xs leading-relaxed text-fg-2">
-          She has flown from <span className="font-medium">{mother}</span>, carrying you (load {Math.round(flight.load * 100)} %). Write the doctrine her colony, <span className="font-medium">{daughter}</span>, will live by: the only time a
-          colony's words change.
+          She has flown from <span className="font-medium">{mother}</span>, carrying you (load {Math.round(flight.load * 100)} %). Write the
+          doctrine her colony, <span className="font-medium">{daughter}</span>, will live by: the only time a colony's words change.
         </p>
         {presets}
         {editor("h-24")}
         <p className="mt-2 font-medium text-accent">
           Click where she flies (within {place.radius} of {mother}'s hole).
         </p>
-        <p className="mt-1 text-xs text-fg-3">The top view shows her flight's circle and, under the pointer, where she would dig her hole (the nearest spot beyond an end of the line the founding rule allows) or why she can't.{words ? "" : " Write her words first."}</p>
+        <p className="mt-1 text-xs text-fg-3">
+          The top view shows her flight's circle and, under the pointer, where she would dig her hole (the nearest spot beyond an end of the
+          line the founding rule allows) or why she can't.{words ? "" : " Write her words first."}
+        </p>
         <div className="mt-3 flex items-center justify-end gap-2">
           <span className="text-xs text-fg-3">Or she flies by herself, {place.radius} from the hole, any way:</span>
-          <button type="button" className="rounded-md border border-accent px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent-soft disabled:opacity-50" disabled={!words} onClick={() => place.onFly({ id, text: words })}>
+          <button
+            type="button"
+            className="rounded-md border border-accent px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent-soft disabled:opacity-50"
+            disabled={!words}
+            onClick={() => place.onFly({ id, text: words })}
+          >
             Let her fly
           </button>
         </div>
       </section>
     );
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-ground/80 px-4 backdrop-blur-sm" role="dialog" aria-label="The queen's pen">
+    <div
+      className="fixed inset-0 z-20 flex items-center justify-center bg-ground/80 px-4 backdrop-blur-sm"
+      role="dialog"
+      aria-label="The queen's pen"
+    >
       <section className="w-full max-w-xl rounded-xl border border-line bg-panel p-6 shadow-2xl">
         <h2 className="text-2xl font-semibold tracking-tight text-fg">A new queen, with you in her</h2>
         <p className="mt-2 text-sm leading-relaxed text-fg-2">
-          She has flown from <span className="font-medium">{mother}</span>, carrying you (load {Math.round(flight.load * 100)} %). Write the doctrine her colony, <span className="font-medium">{daughter}</span>, will live by. This is
-          the only time a colony's words change: {mother} keeps its own.
+          She has flown from <span className="font-medium">{mother}</span>, carrying you (load {Math.round(flight.load * 100)} %). Write the
+          doctrine her colony, <span className="font-medium">{daughter}</span>, will live by. This is the only time a colony's words change:{" "}
+          {mother} keeps its own.
         </p>
         {presets}
         {editor("h-32")}
@@ -101,18 +137,40 @@ export default function QueenPen({ flight, mother, daughter, doctrine, onFound, 
           <span>She lands</span>
           <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="side">
             {([-1, 1] as const).map((s) => (
-              <button key={s} type="button" className={`px-2 py-1 text-xs ${side === s ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised"}`} onClick={() => setSide(s)} aria-pressed={side === s}>
+              <button
+                key={s}
+                type="button"
+                className={`px-2 py-1 text-xs ${side === s ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised"}`}
+                onClick={() => setSide(s)}
+                aria-pressed={side === s}
+              >
                 {s < 0 ? "west" : "east"}
               </button>
             ))}
           </div>
-          <input type="range" min={16} max={FLIGHT.radius} value={distance} onChange={(e) => setDistance(Number(e.target.value))} aria-label="distance" />
+          <input
+            type="range"
+            min={16}
+            max={FLIGHT.radius}
+            value={distance}
+            onChange={(e) => setDistance(Number(e.target.value))}
+            aria-label="distance"
+          />
           <span className="font-mono tabular-nums">{distance} cells</span>
           <span className="text-xs text-fg-3">from {mother}'s hole (the nearest free spot there)</span>
         </div>
-        <p className="mt-3 text-xs text-fg-3">Her colony plays the ants' own rule until Jev has answered the new words, and its odour drifts from her mother's: unless you hold them together, they will come to fight.</p>
+        <p className="mt-3 text-xs text-fg-3">
+          Her colony plays the ants' own rule until Jev has answered the new words, and its odour drifts from her mother's: unless you hold
+          them together, they will come to fight.
+        </p>
         <div className="mt-4 flex justify-end">
-          <button type="button" className="rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover disabled:opacity-50" disabled={!words} onClick={() => onFound({ id, text: words }, { side, distance })} autoFocus>
+          <button
+            type="button"
+            className="rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover disabled:opacity-50"
+            disabled={!words}
+            onClick={() => onFound({ id, text: words }, { side, distance })}
+            autoFocus
+          >
             Found her colony
           </button>
         </div>

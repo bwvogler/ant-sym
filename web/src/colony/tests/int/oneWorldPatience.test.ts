@@ -15,7 +15,11 @@ const EXPLORE = MODES.indexOf("explore");
 
 /** Seed 7's small plane (160 × 100), no food, every ant young (stays in) but ant 0, an old forager 20 cells east of its hole, exploring. */
 function plane(params: Partial<Colony["params"]>): { g: Game; c: Colony } {
-  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(7));
+  const g = new Game(
+    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
+    { antCount: 10, rivalAnts: 10, regrow: 0 },
+    gameRng(7),
+  );
   const map = g.world!.plane;
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   map.foodLeft = 0;
@@ -51,15 +55,29 @@ test("planePatience: a forager on the plane tires at patience × planePatience",
   ];
   for (const [pp, f, want] of cases) {
     const { g, c } = plane({ planePatience: pp });
-    assert.equal(tiredAt(c, (dt) => g.tick(dt), f), want, `planePatience ${pp}, fatigue ${f}`);
+    assert.equal(
+      tiredAt(c, (dt) => g.tick(dt), f),
+      want,
+      `planePatience ${pp}, fatigue ${f}`,
+    );
   }
 });
 
 test("planePatience: tired stays tired until fully rested, at the shorter line too", () => {
-  for (const [pp, f, rested] of [[0.5, 31, 20], [1, 61, 50]] as const) {
+  for (const [pp, f, rested] of [
+    [0.5, 31, 20],
+    [1, 61, 50],
+  ] as const) {
     const { g, c } = plane({ planePatience: pp });
-    assert.equal(tiredAt(c, (dt) => g.tick(dt), f), true);
-    assert.equal(tiredAt(c, (dt) => g.tick(dt), rested), true, `planePatience ${pp}: at ${rested}, below the line, still tired until it has rested to nothing`);
+    assert.equal(
+      tiredAt(c, (dt) => g.tick(dt), f),
+      true,
+    );
+    assert.equal(
+      tiredAt(c, (dt) => g.tick(dt), rested),
+      true,
+      `planePatience ${pp}: at ${rested}, below the line, still tired until it has rested to nothing`,
+    );
   }
 });
 
@@ -86,15 +104,49 @@ test("planePatience: not in the nest, not in the side view, not on a top-down ma
   const { g, c } = plane({ planePatience: 0.5 });
   const hc = c.holeCells[c.params.nest] as HoleCell;
   c.putAnt(0, CURTAIN, centreX(hc.col, hc.row), centreY(hc.row) + 14);
-  assert.equal(tiredAt(c, (dt) => g.tick(dt), 31), false, "in the curtain");
-  assert.equal(tiredAt(c, (dt) => g.tick(dt), 61), true, "past patience, in the curtain");
+  assert.equal(
+    tiredAt(c, (dt) => g.tick(dt), 31),
+    false,
+    "in the curtain",
+  );
+  assert.equal(
+    tiredAt(c, (dt) => g.tick(dt), 61),
+    true,
+    "past patience, in the curtain",
+  );
   // A top-down map and the side view: no plane, so `line` is null.
-  const flat = new Colony(generateWorld(3, { size: { w: 128, h: 96 }, nestCount: 1 }), { antCount: 1, maxAnts: 1, planePatience: 0.5, deposit: 0 }, mulberry32(5), () => "explore");
-  assert.equal(tiredAt(flat, (dt) => flat.tick(dt), 31), false, "top-down at 31 s");
-  assert.equal(tiredAt(flat, (dt) => flat.tick(dt), 61), true, "top-down at 61 s");
-  const side = new Colony(generateSideWorld(2, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 }), { antCount: 1, maxAnts: 1, planePatience: 0.5, deposit: 0 }, mulberry32(5), () => "explore");
-  assert.equal(tiredAt(side, (dt) => side.tick(dt), 31), false, "side view at 31 s");
-  assert.equal(tiredAt(side, (dt) => side.tick(dt), 61), true, "side view at 61 s");
+  const flat = new Colony(
+    generateWorld(3, { size: { w: 128, h: 96 }, nestCount: 1 }),
+    { antCount: 1, maxAnts: 1, planePatience: 0.5, deposit: 0 },
+    mulberry32(5),
+    () => "explore",
+  );
+  assert.equal(
+    tiredAt(flat, (dt) => flat.tick(dt), 31),
+    false,
+    "top-down at 31 s",
+  );
+  assert.equal(
+    tiredAt(flat, (dt) => flat.tick(dt), 61),
+    true,
+    "top-down at 61 s",
+  );
+  const side = new Colony(
+    generateSideWorld(2, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 }),
+    { antCount: 1, maxAnts: 1, planePatience: 0.5, deposit: 0 },
+    mulberry32(5),
+    () => "explore",
+  );
+  assert.equal(
+    tiredAt(side, (dt) => side.tick(dt), 31),
+    false,
+    "side view at 31 s",
+  );
+  assert.equal(
+    tiredAt(side, (dt) => side.tick(dt), 61),
+    true,
+    "side view at 61 s",
+  );
 });
 
 test("planePatience defaults to 1: main's search, bit for bit", () => {

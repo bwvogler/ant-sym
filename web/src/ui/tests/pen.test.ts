@@ -1,6 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { INFECTED, type Flight, FLIGHT_2D, Game, gameRng, NO_ROOM, centreX, centreY, generateOneWorld, mainGround, generateSideWorld } from "../../colony/index.ts";
+import {
+  INFECTED,
+  type Flight,
+  FLIGHT_2D,
+  Game,
+  gameRng,
+  NO_ROOM,
+  centreX,
+  centreY,
+  generateOneWorld,
+  mainGround,
+  generateSideWorld,
+} from "../../colony/index.ts";
 import { flightCircle, penGate, penGround, penSettle, type Settle, withinFlight } from "../pen.ts";
 
 // The queen's pen (ja-lo8.9): the only time a colony's words change. It opens for a new queen with the fungus in her,
@@ -46,8 +58,15 @@ test("a click outside the circle is refused, without asking where she would sett
   assert.match(!out.ok ? out.reason : "", /too far: she flies at most 140 from Amber's hole/);
   assert.equal(penSettle(c, { x: 100 + 100, y: 50 + 100 }, "Amber", settle).ok, false, "141 away, diagonally");
   assert.equal(asked, 0);
-  assert.deepEqual(penSettle(c, { x: 100, y: 50 + FLIGHT_2D }, "Amber", settle), { ok: true, cell: { x: 1, y: 2 }, end: "end" }, "on the edge");
-  assert.deepEqual(penSettle(c, { x: 130, y: 40 }, "Amber", () => ({ ok: false, reason: NO_ROOM })), { ok: false, reason: NO_ROOM });
+  assert.deepEqual(
+    penSettle(c, { x: 100, y: 50 + FLIGHT_2D }, "Amber", settle),
+    { ok: true, cell: { x: 1, y: 2 }, end: "end" },
+    "on the edge",
+  );
+  assert.deepEqual(
+    penSettle(c, { x: 130, y: 40 }, "Amber", () => ({ ok: false, reason: NO_ROOM })),
+    { ok: false, reason: NO_ROOM },
+  );
   assert.ok(withinFlight(c, { x: 100, y: 50 }));
 });
 
@@ -57,7 +76,8 @@ test("a click inside the circle founds where the pen showed; the ground is kept 
   const ground = penGround(world);
   assert.equal(penGround(world), ground, "worked out again for the same line");
   const fresh = mainGround(world);
-  for (let y = 0; y < world.plane.size.h; y += 7) for (let x = 0; x < world.plane.size.w; x += 7) assert.equal(ground(x, y), fresh(x, y), `(${x}, ${y})`);
+  for (let y = 0; y < world.plane.size.h; y += 7)
+    for (let x = 0; x < world.plane.size.w; x += 7) assert.equal(ground(x, y), fresh(x, y), `(${x}, ${y})`);
   // Her flight from Amber (colony 1), pending; a click inside the circle where the preview says she settles.
   const f: Flight = { mother: 1, x: 0, y: 0, load: 0, strain: 0, at: 0, food: 24 };
   g.flights.push(f);

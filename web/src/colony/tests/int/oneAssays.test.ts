@@ -2,7 +2,39 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
 import { MODES } from "../../vocab.ts";
-import { antsNear, Arena, at, cellRect, crossingProbe, F1_ANTS, F1_FAR, F1_NEAR, forage1, game1, heldProbe, nestFlowProbe, occupancyProbe, ONE_ASSAYS, oneArena, onPlane, outingProbe, R1_ANTS, R1_DETOUR, R1_FAR, R1_NEAR, R1_PILE, route1, runAssay, runGame, S1_PER_TRIP, S1_TRIPS, search1, specMap, type RunResult, type RunSpec } from "../../experiment.ts";
+import {
+  antsNear,
+  Arena,
+  at,
+  cellRect,
+  crossingProbe,
+  F1_ANTS,
+  F1_FAR,
+  F1_NEAR,
+  forage1,
+  game1,
+  heldProbe,
+  nestFlowProbe,
+  occupancyProbe,
+  ONE_ASSAYS,
+  oneArena,
+  onPlane,
+  outingProbe,
+  R1_ANTS,
+  R1_DETOUR,
+  R1_FAR,
+  R1_NEAR,
+  R1_PILE,
+  route1,
+  runAssay,
+  runGame,
+  S1_PER_TRIP,
+  S1_TRIPS,
+  search1,
+  specMap,
+  type RunResult,
+  type RunSpec,
+} from "../../experiment.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
@@ -16,7 +48,11 @@ import { OPEN, rockAt } from "../../world.ts";
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** A small open arena with two nests 36 cells apart, a pile between. */
-const arena = () => new Arena(60, 40, true).pile(30, 20, 3, 50).build([{ x: 12, y: 20, r: 3 }, { x: 48, y: 20, r: 3 }]);
+const arena = () =>
+  new Arena(60, 40, true).pile(30, 20, 3, 50).build([
+    { x: 12, y: 20, r: 3 },
+    { x: 48, y: 20, r: 3 },
+  ]);
 const oneGame = (seed = 3, ants = 20): Game => new Game(oneArena(arena(), seed), { antCount: ants, rivalAnts: ants }, gameRng(seed));
 
 test("oneArena: the arena is the plane, a hole at each nest open on both layers, the curtain dug under the line", () => {
@@ -46,7 +82,8 @@ test("oneArena: no buried food unless asked, so `stored` counts only food carrie
   assert.equal(w.curtain.foodTotal, 0);
   assert.equal(w.curtain.foodLeft, 0);
   let food = 0;
-  for (let y = 0; y < w.curtain.size.h; y++) for (let x = w.curtain.x0; x < w.curtain.x0 + w.curtain.size.w; x++) food += w.curtain.food.get(x, y);
+  for (let y = 0; y < w.curtain.size.h; y++)
+    for (let x = w.curtain.x0; x < w.curtain.x0 + w.curtain.size.w; x++) food += w.curtain.food.get(x, y);
   assert.equal(food, 0, "no food in any curtain cell");
   // Asked to keep it, the curtain is generateCurtain's, food and all (seed 5's has some).
   const kept = oneArena(arena(), 5, { buried: true });
@@ -55,7 +92,16 @@ test("oneArena: no buried food unless asked, so `stored` counts only food carrie
   assert.equal(kept.curtain.foodTotal, ref.foodTotal);
   assert.equal(kept.curtain.foodLeft, ref.foodLeft);
   // runGame's foodHome is a share of both layers' food: the curtain's buried pockets kept here, so it counts.
-  const spec = onPlane({ seed: 5, seconds: 1 / 30, map: arena, game: { antCount: 5, rival: false }, events: [{ at: 0, kind: "call", run: (g) => void (g.player.stored = 10) }] }, { buried: true });
+  const spec = onPlane(
+    {
+      seed: 5,
+      seconds: 1 / 30,
+      map: arena,
+      game: { antCount: 5, rival: false },
+      events: [{ at: 0, kind: "call", run: (g) => void (g.player.stored = 10) }],
+    },
+    { buried: true },
+  );
   const { game, result } = runGame(spec);
   const curtainFood = game.world!.curtain.foodTotal;
   assert.ok(curtainFood > 0);
@@ -98,9 +144,9 @@ test("S1 sets its carriers down on the plane at their vector's end, the miss gro
       assert.equal(c.mode[i], MODES.indexOf("return"));
       assert.equal(c.odoSurf[i], T, "its trip");
       // Its vector's end (where it stands, give or take a tick's walk) is the hole plus T × its drift.
-      const ex = hx + T * (c.driftSurf[i]);
-      const ey = hy + T * (c.driftSurfY[i]);
-      assert.ok(Math.hypot((c.x[i]) - ex, (c.y[i]) - ey) < 1, `ant ${i} stands at its vector's end`);
+      const ex = hx + T * c.driftSurf[i];
+      const ey = hy + T * c.driftSurfY[i];
+      assert.ok(Math.hypot(c.x[i] - ex, c.y[i] - ey) < 1, `ant ${i} stands at its vector's end`);
       sq += (ex - hx) ** 2 + (ey - hy) ** 2;
     }
     const rms = Math.sqrt(sq / S1_PER_TRIP);
@@ -108,8 +154,8 @@ test("S1 sets its carriers down on the plane at their vector's end, the miss gro
   });
   // Scored over 20 s: most 100-cell carriers (a miss of ~10, sight 6) are home, and each share is a share.
   const r = runAssay(search1, 2, {}, 20);
-  assert.ok((r.metrics["t100.home600"]) > 0.5, `t100 home in 20 s: ${r.metrics["t100.home600"]}`);
-  for (const T of S1_TRIPS) for (const k of ["home120", "home600"]) assert.ok((r.metrics[`t${T}.${k}`]) >= 0 && (r.metrics[`t${T}.${k}`]) <= 1);
+  assert.ok(r.metrics["t100.home600"] > 0.5, `t100 home in 20 s: ${r.metrics["t100.home600"]}`);
+  for (const T of S1_TRIPS) for (const k of ["home120", "home600"]) assert.ok(r.metrics[`t${T}.${k}`] >= 0 && r.metrics[`t${T}.${k}`] <= 1);
   assert.equal(r.metrics.pass, 0, "not all home in 20 s");
 });
 
@@ -123,14 +169,18 @@ test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cel
     assert.equal(c.layer[i], PLANE);
     assert.equal(c.carrying[i], 0);
     assert.equal(c.mode[i], MODES.indexOf("explore"));
-    assert.ok(Math.hypot((c.x[i]) - hx, (c.y[i]) - hy) < 5, `ant ${i} set down by its hole`);
+    assert.ok(Math.hypot(c.x[i] - hx, c.y[i] - hy) < 5, `ant ${i} set down by its hole`);
   }
   // With fidelity on each forager remembers its spot (its find's offset from where it believed its hole), off none do.
   const spec = forage1.spec(2);
-  const on = runGame({ ...spec, sides: { ...spec.sides, colony: { ...spec.sides?.colony, siteFidelity: 1 } }, seconds: 1 / 30 }).game.player;
+  const on = runGame({ ...spec, sides: { ...spec.sides, colony: { ...spec.sides?.colony, siteFidelity: 1 } }, seconds: 1 / 30 }).game
+    .player;
   for (let i = 0; i < F1_ANTS; i++) {
     assert.ok(!Number.isNaN(on.foodX[i]), `ant ${i} remembers its spot`);
-    assert.ok(Math.hypot(on.foodX[i], on.foodY[i]) > F1_NEAR - 20 && Math.hypot(on.foodX[i], on.foodY[i]) < F1_FAR + 20, `ant ${i}: the spot is about the spot's distance out`);
+    assert.ok(
+      Math.hypot(on.foodX[i], on.foodY[i]) > F1_NEAR - 20 && Math.hypot(on.foodX[i], on.foodY[i]) < F1_FAR + 20,
+      `ant ${i}: the spot is about the spot's distance out`,
+    );
     assert.ok(Number.isNaN(c.foodX[i]), `ant ${i} knows nothing of its spot with fidelity off`);
   }
   // Two seconds: at 7 cells a second nobody is within sight of a spot 40 cells out. Over the full 30 s the shares are shares,
@@ -139,7 +189,10 @@ test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cel
   assert.equal(r.metrics.reach, 0, "no forager is at a spot 40 cells away in 2 s");
   const full = runAssay(forage1, 2, {});
   assert.ok((full.metrics.reach as number) >= 0 && (full.metrics.reach as number) <= 1);
-  assert.ok((full.metrics.walked as number) >= F1_NEAR - 8 || Number.isNaN(full.metrics.walked), `walked ${full.metrics.walked}, at least the straight way to sight`);
+  assert.ok(
+    (full.metrics.walked as number) >= F1_NEAR - 8 || Number.isNaN(full.metrics.walked),
+    `walked ${full.metrics.walked}, at least the straight way to sight`,
+  );
   assert.ok(F1_NEAR < F1_FAR);
 });
 
@@ -152,7 +205,8 @@ test("R1 puts one pile in a pocket (no clear line, a way round at least 1.8 time
   const hy = centreY(hc.py);
   // Exactly one pile, of R1_PILE, and it is the only food on the plane.
   const piles: { x: number; y: number; v: number }[] = [];
-  for (let y = 0; y < plane.size.h; y++) for (let x = 0; x < plane.size.w; x++) if (plane.food.get(x, y) > 0) piles.push({ x, y, v: plane.food.get(x, y) });
+  for (let y = 0; y < plane.size.h; y++)
+    for (let x = 0; x < plane.size.w; x++) if (plane.food.get(x, y) > 0) piles.push({ x, y, v: plane.food.get(x, y) });
   assert.equal(piles.length, 1);
   assert.equal(piles[0]!.v, R1_PILE);
   assert.equal(plane.foodLeft, R1_PILE);
@@ -173,8 +227,8 @@ test("R1 puts one pile in a pocket (no clear line, a way round at least 1.8 time
     assert.equal(c.layer[i], PLANE);
     assert.equal(c.carrying[i], 0);
     assert.equal(c.mode[i], MODES.indexOf("explore"));
-    assert.ok((c.odoSurf[i]) >= 3 && (c.odoSurf[i]) < 4, `ant ${i}: a trip of 3 behind it`);
-    assert.ok(Math.hypot((c.x[i]) - hx, (c.y[i]) - hy) < 5, `ant ${i} set down by its hole`);
+    assert.ok(c.odoSurf[i] >= 3 && c.odoSurf[i] < 4, `ant ${i}: a trip of 3 behind it`);
+    assert.ok(Math.hypot(c.x[i] - hx, c.y[i] - hy) < 5, `ant ${i} set down by its hole`);
   }
   // A seed with no pocket (1) has no pile, scores no pickups and reports no pass.
   const none = runAssay(route1, 1, {}, 1);
@@ -188,7 +242,7 @@ test("R1 scores each pocket pickup's way home: the shares are shares", () => {
   // A game that runs to R1_SECONDS scores the pickups of its first 120 s and each is home or not.
   const full = runAssay(route1, 7, {});
   assert.ok((full.metrics.picked as number) > 0 && (full.metrics.picked as number) <= R1_ANTS);
-  for (const k of ["home120", "home300", "held"]) assert.ok((full.metrics[k]) >= 0 && (full.metrics[k]) <= 1, k);
+  for (const k of ["home120", "home300", "held"]) assert.ok(full.metrics[k] >= 0 && full.metrics[k] <= 1, k);
   assert.ok((full.metrics.home120 as number) <= (full.metrics.home300 as number));
   assert.equal(full.metrics.wrong, 0);
 });
@@ -278,7 +332,13 @@ test("heldProbe(PLANE) counts carriers on the plane only; by default every layer
 
 test("an assay's paint lands on the plane in one world, and Game.paintSpores on the layer asked", () => {
   const spot = at(30, 20);
-  const spec: RunSpec = onPlane({ seed: 3, seconds: 1 / 30, map: arena, game: { antCount: 5, rival: false }, events: [{ at: 0, kind: "paint", channel: "alarm", x: spot.x, y: spot.y, r: 2, amount: 5 }] });
+  const spec: RunSpec = onPlane({
+    seed: 3,
+    seconds: 1 / 30,
+    map: arena,
+    game: { antCount: 5, rival: false },
+    events: [{ at: 0, kind: "paint", channel: "alarm", x: spot.x, y: spot.y, r: 2, amount: 5 }],
+  });
   const { game } = runGame(spec);
   const c = game.player;
   const read = (l: number) => (c.layers[l] as Layer).ph.read("alarm", spot.x, spot.y);

@@ -18,7 +18,10 @@ test("chapters follow the game in order, each ending when what it asks for is tr
     [{ landed: true, hosts: 300, share: 0.4, queenInfected: true, gynes: 1, daughters: 1 }, "open"],
   ];
   for (const [patch, want] of steps) assert.equal(chapterOf({ ...base, ...patch }).chapter, want, JSON.stringify(patch));
-  assert.deepEqual(steps.map(([, c]) => c), [...CHAPTERS]);
+  assert.deepEqual(
+    steps.map(([, c]) => c),
+    [...CHAPTERS],
+  );
   const spread = chapterOf({ ...base, landed: true, hosts: 10, share: SPREAD_SHARE / 2 });
   assert.equal(spread.progress, 0.5);
   assert.equal(spread.step, 3);

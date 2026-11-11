@@ -1,6 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { aimed, clamp, fit, fitZoom, fromMinimap, MAX_ZOOM, minimapRect, pan, toScreen, toWorld, visible, zoomAt, zoomBy } from "../camera.ts";
+import {
+  aimed,
+  clamp,
+  fit,
+  fitZoom,
+  fromMinimap,
+  MAX_ZOOM,
+  minimapRect,
+  pan,
+  toScreen,
+  toWorld,
+  visible,
+  zoomAt,
+  zoomBy,
+} from "../camera.ts";
 
 const world = { w: 512, h: 320 };
 const view = { w: 1000, h: 500 };
@@ -15,7 +29,11 @@ test("fit shows the whole map, centred", () => {
 
 test("toWorld and toScreen are inverses", () => {
   const c = { x: 100, y: 60, zoom: 7 };
-  for (const [sx, sy] of [[0, 0], [123.5, 400], [999, 1]] as const) {
+  for (const [sx, sy] of [
+    [0, 0],
+    [123.5, 400],
+    [999, 1],
+  ] as const) {
     const [wx, wy] = toWorld(c, view, sx, sy);
     const [bx, by] = toScreen(c, view, wx, wy);
     assert.ok(near(bx, sx) && near(by, sy));

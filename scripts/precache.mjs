@@ -26,13 +26,53 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
-import { decodeSituation, SITUATIONS, STANCES, AIMS, FUNGUS_BATCH, FUNGUS_BRAIN_VERSION, fungalKey, fungusContext, packFungusRequest, readLevels, encodeFungal, decodeFungal, askedLevers, DEFAULT_MENU, STRAINS, Game, centreX, centreY, generateSideWorld, mulberry32, COLONY_BRAIN_VERSION, DOCTRINES, estimateTokens, packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, STANCE_BRAIN_VERSION, stanceContext, stanceKey } from "../web/src/colony/index.ts";
+import {
+  decodeSituation,
+  SITUATIONS,
+  STANCES,
+  AIMS,
+  FUNGUS_BATCH,
+  FUNGUS_BRAIN_VERSION,
+  fungalKey,
+  fungusContext,
+  packFungusRequest,
+  readLevels,
+  encodeFungal,
+  decodeFungal,
+  askedLevers,
+  DEFAULT_MENU,
+  STRAINS,
+  Game,
+  centreX,
+  centreY,
+  generateSideWorld,
+  mulberry32,
+  COLONY_BRAIN_VERSION,
+  DOCTRINES,
+  estimateTokens,
+  packModeRequest,
+  packStanceRequest,
+  policyContext,
+  readMode,
+  readStance,
+  situationKey,
+  STANCE_BRAIN_VERSION,
+  stanceContext,
+  stanceKey,
+} from "../web/src/colony/index.ts";
 
 const BATCH = 100;
 const OUT = new URL("../web/public/precache/", import.meta.url);
 
 const args = process.argv.slice(2);
-const opts = { lanes: "mode,stance,fungus", doctrines: DOCTRINES.map((d) => d.id).join(","), budget: 0.35, inFlight: 4, dry: false, import: [] };
+const opts = {
+  lanes: "mode,stance,fungus",
+  doctrines: DOCTRINES.map((d) => d.id).join(","),
+  budget: 0.35,
+  inFlight: 4,
+  dry: false,
+  import: [],
+};
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
   if (a === "--lanes") opts.lanes = args[++k];
@@ -53,7 +93,8 @@ function stanceSituations() {
     for (const ants of ["few", "some", "many"])
       for (const losses of ["none", "some", "heavy"])
         for (const enemyNearNest of [false, true])
-          for (const intake of ["none", "some", "plenty"]) for (const larder of ["low", "full"]) out.push({ stance, ants, losses, enemyNearNest, intake, larder });
+          for (const intake of ["none", "some", "plenty"])
+            for (const larder of ["low", "full"]) out.push({ stance, ants, losses, enemyNearNest, intake, larder });
   return out;
 }
 
@@ -100,7 +141,11 @@ const LANES = {
   fungus: {
     situations: fungalSituations,
     key: (s) => fungalKey(s, fungusAsked(s)),
-    pack: (items, words) => packFungusRequest(items.map((it) => ({ ...it, asked: fungusAsked(it.situation) })), words),
+    pack: (items, words) =>
+      packFungusRequest(
+        items.map((it) => ({ ...it, asked: fungusAsked(it.situation) })),
+        words,
+      ),
     read: (answers, id, situation) => readLevels(answers, id, fungusAsked(situation)),
     context: (words) => fungusContext(words, "side"),
     id: "h",
@@ -135,7 +180,11 @@ for (const lane of lanes) {
     const context = L.context(d.text);
     const file = `${lane}-${d.id}.json`;
     const fileUrl = new URL(file, OUT);
-    const have = new Map(existsSync(fileUrl) && index.bundles.some((b) => b.file === file && b.context === context) ? JSON.parse(readFileSync(fileUrl, "utf8")) : []);
+    const have = new Map(
+      existsSync(fileUrl) && index.bundles.some((b) => b.file === file && b.context === context)
+        ? JSON.parse(readFileSync(fileUrl, "utf8"))
+        : [],
+    );
     bundles.set(file, { lane, [L.words ? "aim" : "doctrine"]: d.id, context, file, answers: have });
     const todo = all.filter((s) => !have.has(L.key(s)));
     const batch = L.batch ?? BATCH;
@@ -153,11 +202,15 @@ if (opts.import.length) {
     const c = JSON.parse(readFileSync(path, "utf8"));
     const d = DOCTRINES.find((x) => x.text === c.doctrine?.text);
     if (!d) throw new Error(`${path}: its doctrine is not a preset's`);
-    for (const [lane, field] of [["mode", "modes"], ["stance", "stances"]]) {
+    for (const [lane, field] of [
+      ["mode", "modes"],
+      ["stance", "stances"],
+    ]) {
       if (!lanes.includes(lane)) continue;
       const b = bundles.get(`${lane}-${d.id}.json`);
       if (!b) continue;
-      if (c.contexts?.[lane] !== b.context) throw new Error(`${path}: its ${lane} answers were asked under ${c.contexts?.[lane]}, the code asks under ${b.context}`);
+      if (c.contexts?.[lane] !== b.context)
+        throw new Error(`${path}: its ${lane} answers were asked under ${c.contexts?.[lane]}, the code asks under ${b.context}`);
       let got = 0;
       for (const [key, a] of Object.entries(c[field] ?? {}))
         if (!b.answers.has(key)) {
@@ -171,7 +224,9 @@ if (opts.import.length) {
   for (const b of bundles.values()) console.log(`  ${b.file}: ${b.answers.size} answers`);
   process.exit(0);
 }
-console.log(`${jobs.length} requests, ≈ ${Math.round(estimate).toLocaleString()} tokens ≈ $${(estimate * USD_PER_INPUT_TOKEN).toFixed(4)} (budget $${opts.budget.toFixed(2)})`);
+console.log(
+  `${jobs.length} requests, ≈ ${Math.round(estimate).toLocaleString()} tokens ≈ $${(estimate * USD_PER_INPUT_TOKEN).toFixed(4)} (budget $${opts.budget.toFixed(2)})`,
+);
 if (opts.dry) process.exit(0);
 
 const client = new JevClient({ apiKey: KEY });
@@ -182,7 +237,13 @@ function save() {
   index.bundles = index.bundles.filter((b) => !bundles.has(b.file));
   for (const b of bundles.values()) {
     writeFileSync(new URL(b.file, OUT), JSON.stringify([...b.answers].sort(([a], [c]) => (a < c ? -1 : a > c ? 1 : 0))));
-    index.bundles.push({ lane: b.lane, ...(b.aim ? { aim: b.aim } : { doctrine: b.doctrine }), context: b.context, file: b.file, answers: b.answers.size });
+    index.bundles.push({
+      lane: b.lane,
+      ...(b.aim ? { aim: b.aim } : { doctrine: b.doctrine }),
+      context: b.context,
+      file: b.file,
+      answers: b.answers.size,
+    });
   }
   index.bundles.sort((a, b) => (a.file < b.file ? -1 : 1));
   writeFileSync(indexUrl, `${JSON.stringify(index, null, 2)}\n`);
@@ -192,7 +253,7 @@ async function worker() {
     const job = jobs[next++];
     if (!job) return;
     const est = estimateTokens(job.req) * USD_PER_INPUT_TOKEN;
-    if ((spent + est) > opts.budget) {
+    if (spent + est > opts.budget) {
       console.log(`budget: stopping before ${job.file} (${job.items.length} situations)`);
       next = jobs.length;
       return;

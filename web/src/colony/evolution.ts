@@ -96,7 +96,8 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "fruiting",
     kind: "spread",
     name: "Fruiting body",
-    blurb: "how much of its mycelium it turns into spores on its patch each second, for the ants that walk through: more spores, a smaller mycelium",
+    blurb:
+      "how much of its mycelium it turns into spores on its patch each second, for the ants that walk through: more spores, a smaller mycelium",
     steps: ["sparse", "thick", "dense"],
     costs: [3, 500],
     trait: "spores",
@@ -156,7 +157,8 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "royal",
     kind: "reach",
     name: "Royal",
-    blurb: "how far it bends the queen's royal mark: what she lays (queen signal) and what nurses perceive of it (queen scent): the route to new queens",
+    blurb:
+      "how far it bends the queen's royal mark: what she lays (queen signal) and what nurses perceive of it (queen scent): the route to new queens",
     steps: ["none", "one step", "the full range"],
     costs: [1000, 4000],
     levers: ["queenSignal", "queenScent"],
@@ -169,7 +171,8 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "weapon",
     kind: "reach",
     name: "Odour weapon",
-    blurb: "whether a host can smell like nobody's, so its own colony and the others kill it (odour weapon, lethal): only once it is on the menu",
+    blurb:
+      "whether a host can smell like nobody's, so its own colony and the others kill it (odour weapon, lethal): only once it is on the menu",
     steps: ["held off", "free"],
     costs: [2500],
     levers: ["weapon"],
@@ -331,7 +334,15 @@ export class Evolution {
   }
 
   save(): EvolutionSave {
-    return { strain: this.strain, mass: this.mass, patches: this.patches, growth: this.growth, spent: this.spent, rate: this.rate, levels: { ...this.#levels } };
+    return {
+      strain: this.strain,
+      mass: this.mass,
+      patches: this.patches,
+      growth: this.growth,
+      spent: this.spent,
+      rate: this.rate,
+      levels: { ...this.#levels },
+    };
   }
 
   static load(r: EvolutionSave): Evolution {
@@ -347,4 +358,5 @@ export class Evolution {
 }
 
 // Every lever an upgrade names exists: a typo would leave a lever at full range unnoticed.
-for (const u of UPGRADES) for (const id of u.levers ?? []) if (!LEVERS.some((v) => v.id === id)) throw new Error(`evolution: no lever "${id}"`);
+for (const u of UPGRADES)
+  for (const id of u.levers ?? []) if (!LEVERS.some((v) => v.id === id)) throw new Error(`evolution: no lever "${id}"`);

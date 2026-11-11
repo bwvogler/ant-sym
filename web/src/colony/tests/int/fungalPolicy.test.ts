@@ -3,8 +3,31 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
 import { MODES, type Situation } from "../../vocab.ts";
-import { AROUSALS, CARRYING, DEFAULT_RULE, FUNGAL_SITUATIONS, FUNGAL_PLACES, STRAIN_DEFAULT, TASKS, TOUCHES, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../../fungalPolicy.ts";
-import { askedIn, FUNGUS_LEGEND, fungalKey, fungusContext, leverQuestions, packFungusRequest, readLevels, validLevels, worthAsking } from "../../fungusBrain.ts";
+import {
+  AROUSALS,
+  CARRYING,
+  DEFAULT_RULE,
+  FUNGAL_SITUATIONS,
+  FUNGAL_PLACES,
+  STRAIN_DEFAULT,
+  TASKS,
+  TOUCHES,
+  decodeFungal,
+  encodeFungal,
+  localFungusRule,
+  type FungalSituation,
+} from "../../fungalPolicy.ts";
+import {
+  askedIn,
+  FUNGUS_LEGEND,
+  fungalKey,
+  fungusContext,
+  leverQuestions,
+  packFungusRequest,
+  readLevels,
+  validLevels,
+  worthAsking,
+} from "../../fungusBrain.ts";
 import { DEFAULT_MENU, DORMANT_SHOW, Fungus, LETHAL, LEVERS, STRAINS, preset } from "../../fungus.ts";
 import { AS_IS, compose, CUSTOM, decodeLevels, encodeLevels, PRESETS, presetOf, pulled } from "../../levers.ts";
 import { Game } from "../../game.ts";
@@ -17,10 +40,18 @@ import { arena, placedAt } from "../builders.ts";
 // that host; levers off the player's menu stay as they are.
 
 const ID = (id: string) => STRAINS.findIndex((s) => s.id === id);
-const sit = (s: Partial<FungalSituation> = {}): FungalSituation => ({ arousal: "calm", touch: "none", place: "outside", task: "forager", carrying: "nothing", groomed: false, ...s });
+const sit = (s: Partial<FungalSituation> = {}): FungalSituation => ({
+  arousal: "calm",
+  touch: "none",
+  place: "outside",
+  task: "forager",
+  carrying: "nothing",
+  groomed: false,
+  ...s,
+});
 
-
-const placed = (map: WorldMap, nest: number, odour: number, cells: [number, number][]): Colony => placedAt(map, cells, { nest, odour, seed: 3 + nest });
+const placed = (map: WorldMap, nest: number, odour: number, cells: [number, number][]): Colony =>
+  placedAt(map, cells, { nest, odour, seed: 3 + nest });
 
 test("fungal situations: 864, and each encodes and decodes to itself", () => {
   assert.equal(FUNGAL_SITUATIONS, 864);
@@ -104,7 +135,11 @@ test("the gate: whatever a policy answers, a host pulls only levers on the menu;
   assert.equal(f.menu.has("crown"), false);
   assert.ok(!f.menu.has("marks"), "no nest on a top-down map: floor marks are off it");
   const asked = f.asked;
-  assert.deepEqual(asked, DEFAULT_MENU.filter((id) => id !== "marks" && id !== "queenSignal" && id !== "queenScent"), "a worker's levers on a top-down map: no nest, no queen");
+  assert.deepEqual(
+    asked,
+    DEFAULT_MENU.filter((id) => id !== "marks" && id !== "queenSignal" && id !== "queenScent"),
+    "a worker's levers on a top-down map: no nest, no queen",
+  );
   const levels = Object.fromEntries(asked.map((id) => [id, 0]));
   f.policy = () => encodeLevels(levels, asked);
   assert.deepEqual(f.choose(sit(), ID("garden")), levels, "Jev's levels, read over the levers asked");
@@ -123,7 +158,10 @@ test("the gate: whatever a policy answers, a host pulls only levers on the menu;
 test("what the fungus senses is its host's body, never its mode, and nothing map-wide", () => {
   const map = arena(6.5);
   const sense = (setup: (a: Colony, b: Colony) => void) => {
-    const a = placed(map, 0, 0, [[20, 6], [3, 3]]);
+    const a = placed(map, 0, 0, [
+      [20, 6],
+      [3, 3],
+    ]);
     const b = placed(map, 1, 1, [[30, 2]]);
     a.load[0] = 0.8;
     a.strain[0] = ID("garden");
@@ -138,11 +176,23 @@ test("what the fungus senses is its host's body, never its mode, and nothing map
   assert.equal(sense(() => {}).touch, "none");
   assert.equal(sense((_a, b) => ((b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y))).touch, "foreigner");
   assert.equal(sense((a) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y))).touch, "nestmate");
-  assert.equal(sense((a, b) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y), (b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y))).touch, "foreigner", "a foreigner over a nestmate");
+  assert.equal(
+    sense((a, b) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y), (b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y))).touch,
+    "foreigner",
+    "a foreigner over a nestmate",
+  );
   // Touch is smell, not colony (PR #42 review, S4): an ant of the other colony that smells like home is a nestmate to
   // the fungus, and a nestmate that smells foreign is a foreigner; the host's own odour never counts.
-  assert.equal(sense((_a, b) => ((b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y), (b.odour[0] = 0))).touch, "nestmate", "a foreign ant at the host's odour");
-  assert.equal(sense((a) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y), (a.odour[1] = 1))).touch, "foreigner", "an estranged nestmate");
+  assert.equal(
+    sense((_a, b) => ((b.x[0] = at(21, 6).x), (b.y[0] = at(21, 6).y), (b.odour[0] = 0))).touch,
+    "nestmate",
+    "a foreign ant at the host's odour",
+  );
+  assert.equal(
+    sense((a) => ((a.x[1] = at(20, 7).x), (a.y[1] = at(20, 7).y), (a.odour[1] = 1))).touch,
+    "foreigner",
+    "an estranged nestmate",
+  );
   assert.equal(sense((a) => (a.odour[0] = 1)).touch, "none", "a host that smells foreign itself, alone");
   assert.equal(sense(() => {}).place, "outside");
   assert.equal(sense((a) => ((a.x[0] = at(4, 6).x), (a.y[0] = at(4, 6).y))).place, "chamber", "on a nest's disc, top-down");
@@ -150,11 +200,26 @@ test("what the fungus senses is its host's body, never its mode, and nothing map
   assert.equal(sense(() => {}).carrying, "nothing");
   assert.equal(sense((a) => (a.carrying[0] = 1)).carrying, "food");
   assert.equal(sense(() => {}).arousal, "calm", "a host that never chose");
-  const asked = (q: Partial<Situation>) => (a: Colony) => (a.lastQuestion = () => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...q }));
+  const asked = (q: Partial<Situation>) => (a: Colony) =>
+    (a.lastQuestion = () => ({
+      mode: "explore",
+      tired: false,
+      foodTrail: "none",
+      homeTrail: "none",
+      alarm: "none",
+      enemy: "none",
+      stance: "forage",
+      ...q,
+    }));
   assert.equal(sense(asked({ alarm: "faint" })).arousal, "alarmed");
   assert.equal(sense(asked({ alarm: "strong", enemy: "near" })).arousal, "fighting", "strangers close outrank alarm");
   // Not the mode: an ant that changes what it does, in the same body and place, is the same situation to the fungus.
-  for (const m of MODES.keys()) assert.deepEqual(sense((a) => (a.mode[0] = m)), sense(() => {}), `mode ${MODES[m]}`);
+  for (const m of MODES.keys())
+    assert.deepEqual(
+      sense((a) => (a.mode[0] = m)),
+      sense(() => {}),
+      `mode ${MODES[m]}`,
+    );
   // Nothing map-wide: where the nests' odours stand does not enter what the fungus senses.
   assert.deepEqual(
     sense((a, b) => ((a.nestOdour = 0.45), (b.nestOdour = 0.55))),
@@ -165,7 +230,11 @@ test("what the fungus senses is its host's body, never its mode, and nothing map
 test("groomed: a host among nestmates is groomed whether or not it hides (judged at its strain's visibility); hiding only shows them less", () => {
   const map = arena(6.5);
   const groomed = (hide: boolean) => {
-    const c = placed(map, 0, 0, [[20, 6], [20, 6], [20, 6]]);
+    const c = placed(map, 0, 0, [
+      [20, 6],
+      [20, 6],
+      [20, 6],
+    ]);
     c.load[0] = 0.8;
     c.strain[0] = ID("bloom");
     c.resist[1] = c.resist[2] = 1;
@@ -192,12 +261,19 @@ test("hiding protects a visible strain: Bloom hidden from its groomers keeps mor
   const shown = run(false);
   const hidden = run(true);
   assert.ok(hidden.meanLoad > shown.meanLoad + 0.1, `load: hidden ${hidden.meanLoad.toFixed(2)} vs shown ${shown.meanLoad.toFixed(2)}`);
-  assert.ok(hidden.meanResist < shown.meanResist, `and the colony primes less: ${hidden.meanResist.toFixed(3)} vs ${shown.meanResist.toFixed(3)}`);
+  assert.ok(
+    hidden.meanResist < shown.meanResist,
+    `and the colony primes less: ${hidden.meanResist.toFixed(3)} vs ${shown.meanResist.toFixed(3)}`,
+  );
 });
 
 test("hiding needs its lever: with 'fungus showing' off the menu, a dormant host shows its strain's full visibility", () => {
   const load = (menu: string[]) => {
-    const c = placed(arena(6.5), 0, 0, [[20, 6], [20, 6], [20, 6]]);
+    const c = placed(arena(6.5), 0, 0, [
+      [20, 6],
+      [20, 6],
+      [20, 6],
+    ]);
     c.load[0] = 0.8;
     c.strain[0] = ID("garden");
     c.resist[1] = c.resist[2] = 1;
@@ -214,11 +290,15 @@ test("hiding needs its lever: with 'fungus showing' off the menu, a dormant host
 
 test("cull: the host's odour is pushed past tolerance from its own nest, so its own colony fights it", () => {
   const map = arena(6.5);
-  const c = placed(map, 0, 0, [[20, 6], [20, 6], [20, 6]]);
+  const c = placed(map, 0, 0, [
+    [20, 6],
+    [20, 6],
+    [20, 6],
+  ]);
   const rec = new Recognition();
   c.estrange[0] = 1;
   rec.step([c], 0.1);
-  assert.ok(Math.abs((c.odour[0]) - 0.5) < 1e-6, `odour ${c.odour[0]}`);
+  assert.ok(Math.abs(c.odour[0] - 0.5) < 1e-6, `odour ${c.odour[0]}`);
   rec.build([c]);
   const deaths = resolveFights([c], [occupancy(c, new CountGrid())], 1, () => 0, undefined, rec);
   assert.ok(deaths[0]! >= 1, "a stranger among its nestmates: it dies (and they may too)");
@@ -228,7 +308,11 @@ test("cull: the host's odour is pushed past tolerance from its own nest, so its 
 test("cull bites from a high load: at 0.7 its own nestmates already take it for a stranger", () => {
   for (const l of [0.7, 0.75, 1]) {
     const map = arena(6.5);
-    const c = placed(map, 0, 0, [[20, 6], [20, 6], [20, 6]]);
+    const c = placed(map, 0, 0, [
+      [20, 6],
+      [20, 6],
+      [20, 6],
+    ]);
     const f = new Fungus(map);
     f.configure(DEFAULT_RULE, [...f.menu, "weapon"]);
     f.express(c, 0, preset("cull"), l);
@@ -236,7 +320,7 @@ test("cull bites from a high load: at 0.7 its own nestmates already take it for 
     rec.step([c], 0.1);
     rec.build([c]);
     rec.look(c.odour[1], rec.params.tolerance);
-    assert.ok(rec.around(20, 6, { x0: 0, size: { w: 40, h: 12 } }) >= 1, `load ${l}: odour ${(c.odour[0]).toFixed(3)} is a stranger's`);
+    assert.ok(rec.around(20, 6, { x0: 0, size: { w: 40, h: 12 } }) >= 1, `load ${l}: odour ${c.odour[0].toFixed(3)} is a stranger's`);
   }
 });
 
@@ -255,11 +339,18 @@ test("the fungus lane's request: the aim, a score per lever on the menu for each
   assert.equal(state.doctrine, undefined, "and no colony doctrine");
   assert.deepEqual(state.hosts.h1, sit({ touch: "foreigner", arousal: "fighting" }));
   for (const lever of LEVERS) assert.ok(FUNGUS_LEGEND.includes(`${lever.id}: ${lever.brief}`), `the legend explains ${lever.id}`);
-  assert.deepEqual(Object.keys(req.questions).filter((k) => k.startsWith("h1_")), ["h1_alarmLaid", "h1_calm"].sort((a, b) => LEVERS.findIndex((v) => `h1_${v.id}` === a) - LEVERS.findIndex((v) => `h1_${v.id}` === b)));
+  assert.deepEqual(
+    Object.keys(req.questions).filter((k) => k.startsWith("h1_")),
+    ["h1_alarmLaid", "h1_calm"].sort((a, b) => LEVERS.findIndex((v) => `h1_${v.id}` === a) - LEVERS.findIndex((v) => `h1_${v.id}` === b)),
+  );
   assert.equal(Object.keys(req.questions).filter((k) => k.startsWith("h0_")).length, asked.length);
   for (const q of Object.values(req.questions)) assert.equal(q.type, "score");
   const score = (n: number) => ({ type: "score" as const, score: n });
-  assert.equal(readLevels({ h1_calm: score(1.6), h1_alarmLaid: score(0.2) }, "h1", ["alarmLaid", "calm"]), "0,2", "rounded to the nearest level");
+  assert.equal(
+    readLevels({ h1_calm: score(1.6), h1_alarmLaid: score(0.2) }, "h1", ["alarmLaid", "calm"]),
+    "0,2",
+    "rounded to the nearest level",
+  );
   assert.equal(readLevels({ h1_calm: score(9) }, "h1", ["calm"]), "2", "within the lever's range");
   assert.equal(readLevels({ h1_calm: score(1) }, "h1", ["alarmLaid", "calm"]), null, "a lever missing: not cached");
   assert.equal(readLevels({ h1_calm: { type: "choice", choice: "x" } as never }, "h1", ["calm"]), null);
@@ -292,13 +383,13 @@ test("hiding holds: with hide on, a groomed host stays hidden instead of flippin
     if (!stepped) continue;
     steps++;
     for (let i = 0; i < c.n; i++) {
-      if (!c.alive[i] || (c.fungal[i]) < 0) {
+      if (!c.alive[i] || c.fungal[i] < 0) {
         prev[i] = -1;
         continue;
       }
       hostSteps++;
       const e = c.expr[i];
-      if ((prev[i]) >= 0 && prev[i] !== e) flips++;
+      if (prev[i] >= 0 && prev[i] !== e) flips++;
       prev[i] = e;
     }
   }

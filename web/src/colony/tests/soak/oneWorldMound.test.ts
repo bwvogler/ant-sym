@@ -40,7 +40,8 @@ function spoilCells(map: WorldMap): { x: number; y: number; h: number }[] {
 }
 
 /** Every open cell's ring cap: the most it may hold, a level less than its distance from the nearest hole. */
-const capOf = (x: number, y: number, holes: { x: number; y: number }[]): number => Math.min(...holes.map((h) => hexDistance(x, y, h.x, h.y) - 1));
+const capOf = (x: number, y: number, holes: { x: number; y: number }[]): number =>
+  Math.min(...holes.map((h) => hexDistance(x, y, h.x, h.y) - 1));
 
 test("heapPlane: pellets dropped on one cell pile into a cone at the angle of repose, a level a cell at most", () => {
   const map = openPlane(64, 64);
@@ -48,13 +49,18 @@ test("heapPlane: pellets dropped on one cell pile into a cone at the angle of re
   for (let k = 0; k < 500; k++) assert.ok(heapPlane(map, 32, 32, holes), `pellet ${k} heaped`);
   const cells = spoilCells(map);
   assert.equal(map.moundCells, 500);
-  assert.equal(cells.reduce((s, c) => s + c.h, 0), 500, "every pellet is on the plane, once");
+  assert.equal(
+    cells.reduce((s, c) => s + c.h, 0),
+    500,
+    "every pellet is on the plane, once",
+  );
   const peak = map.spoil!.get(32, 32);
   assert.equal(Math.max(...cells.map((c) => c.h)), peak, "highest where they were dropped");
   // A hex cone of slope 1 and height H holds H + 6·Σ d(H − d): 512 at H = 8. Piled at repose, 500 stand about that high.
   assert.ok(peak >= 7, `a cone ${peak} levels high`);
   for (const c of cells) {
-    for (let d = 0; d < 6; d++) assert.ok(c.h - map.spoil!.get(nx(c.x, c.y, d), ny(c.y, d)) <= 1, `(${c.x}, ${c.y}): at most a level above each neighbour`);
+    for (let d = 0; d < 6; d++)
+      assert.ok(c.h - map.spoil!.get(nx(c.x, c.y, d), ny(c.y, d)) <= 1, `(${c.x}, ${c.y}): at most a level above each neighbour`);
     assert.ok(c.h <= peak - hexDistance(c.x, c.y, 32, 32) + 1, `(${c.x}, ${c.y}): under the cone's slope`);
   }
   // At repose: a full cone, no shallower than a level a cell (within one level of its slope), and nothing past its foot.
@@ -76,7 +82,8 @@ test("heapPlane: the ring round every hole keeps it open: after 500 pellets drop
   for (let k = 0; k < 500; k++) assert.ok(heapPlane(map, 24, 30, holes), `pellet ${k} heaped`);
   for (let k = 0; k < 200; k++) assert.ok(heapPlane(map, 27, 30, holes), `pellet ${k} between the holes heaped`);
   assert.equal(map.moundCells, 700);
-  for (const c of spoilCells(map)) assert.ok(c.h <= capOf(c.x, c.y, holes), `(${c.x}, ${c.y}) holds ${c.h}, its ring allows ${capOf(c.x, c.y, holes)}`);
+  for (const c of spoilCells(map))
+    assert.ok(c.h <= capOf(c.x, c.y, holes), `(${c.x}, ${c.y}) holds ${c.h}, its ring allows ${capOf(c.x, c.y, holes)}`);
   for (const h of holes) {
     assert.equal(map.spoil!.get(h.x, h.y), 0, "the hole is open");
     for (let d = 0; d < 6; d++) assert.equal(map.spoil!.get(nx(h.x, h.y, d), ny(h.y, d)), 0, "and every cell beside it");
@@ -125,7 +132,7 @@ const holesOf = (c: Colony) => c.holeCells.map((h) => ({ x: h.px, y: h.py }));
 function believed(c: Colony, i: number): number {
   const n = (c.layers[PLANE] as Layer).nest;
   const o = c.odoSurf[i];
-  return Math.hypot((c.x[i]) - (n.x + o * (c.driftSurf[i])), (c.y[i]) - (n.y + o * (c.driftSurfY[i])));
+  return Math.hypot(c.x[i] - (n.x + o * c.driftSurf[i]), c.y[i] - (n.y + o * c.driftSurfY[i]));
 }
 const cellOfAnt = (c: Colony, i: number): [number, number] => {
   cellOf(c.x[i], c.y[i]);
@@ -163,7 +170,7 @@ test("one world: spoil carried up keeps going, out on the plane, and is heaped w
   assert.equal(c.pellet[i], 0, "put down within 20 s");
   assert.equal(c.soilOut, out + 1);
   assert.ok(far >= 2, `its vector put it ${far.toFixed(1)} out (spoilTo ≥ 2)`);
-  assert.ok((c.odoSurf[i]) > 2, `the walk out counted (${(c.odoSurf[i]).toFixed(1)})`);
+  assert.ok(c.odoSurf[i] > 2, `the walk out counted (${c.odoSurf[i].toFixed(1)})`);
   const cells = spoilCells(plane);
   assert.equal(plane.moundCells, Math.floor(SWELL + 1e-9));
   const [ax, ay] = cellOfAnt(c, i);
@@ -268,7 +275,10 @@ test("one world: a corpse carried up goes on the midden, off the mound and at le
   assert.ok(far >= MIDDEN_MIN, `by its vector ${far.toFixed(1)} from home`);
   assert.equal(under, 0, "no spoil underfoot where it put it down");
   assert.equal(plane.spoil!.get(mx, my), 0, "the midden's cell is off the mound");
-  assert.ok(hexDistance(mx, my, h.px, h.py) >= reach - 2, `past the mound (${hexDistance(mx, my, h.px, h.py)} cells out; the mound reaches ${reach})`);
+  assert.ok(
+    hexDistance(mx, my, h.px, h.py) >= reach - 2,
+    `past the mound (${hexDistance(mx, my, h.px, h.py)} cells out; the mound reaches ${reach})`,
+  );
   assert.equal(rockAt(plane, mx, my), OPEN);
   const midden = (L: number) => (c.layers[L] as Layer).ph.fields.midden;
   // The full mark at once where it was put down (#dropPlane), not only the tenth a second it keeps laying (#middenSmell).
@@ -310,7 +320,7 @@ test("one world: a rival raider on the plane shies from the colony's midden", ()
     }
     for (let k = 0; k < Math.round(3 / DT); k++) {
       g.tick(DT);
-      for (let i = 0; i < 6; i++) if (r.alive[i] && r.layer[i] === PLANE && Math.hypot((r.x[i]) - mx, (r.y[i]) - my) < 2) inside++;
+      for (let i = 0; i < 6; i++) if (r.alive[i] && r.layer[i] === PLANE && Math.hypot(r.x[i] - mx, r.y[i] - my) < 2) inside++;
     }
     return inside;
   };
@@ -337,13 +347,14 @@ test("one world over 200 s: the mound's books balance, it stays round the hole w
         if (!c.alive[i]) continue;
         const [x, y] = cellOfAnt(c, i);
         // Picked up on the plane (nothing else gives an ant a pellet there).
-        if (c.layer[i] === PLANE && c.pellet[i] && !wasPellet[ci]![i] && wasLayer[ci]![i] === PLANE) picked[ci]![i] = hexDistance(x, y, h.px, h.py);
+        if (c.layer[i] === PLANE && c.pellet[i] && !wasPellet[ci]![i] && wasLayer[ci]![i] === PLANE)
+          picked[ci]![i] = hexDistance(x, y, h.px, h.py);
         if (wasLayer[ci]![i] === PLANE && c.layer[i] === CURTAIN && wasPellet[ci]![i] && c.pellet[i]) {
           fillDown++;
           picked[ci]![i] = NaN;
         }
         if (c.layer[i] === PLANE && wasPellet[ci]![i] && !c.pellet[i] && !Number.isNaN(picked[ci]![i])) {
-          spreads.push(hexDistance(x, y, h.px, h.py) - (picked[ci]![i]));
+          spreads.push(hexDistance(x, y, h.px, h.py) - picked[ci]![i]);
           picked[ci]![i] = NaN;
         }
         wasPellet[ci]![i] = c.pellet[i];
@@ -356,10 +367,18 @@ test("one world over 200 s: the mound's books balance, it stays round the hole w
       const carried = c.carriedPellets();
       mound += Math.floor(c.soilOut * SWELL + 1e-9) - c.moundLost - c.loosePicked + c.looseDropped;
       assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried.dug + c.soilLost, "dug = brought out + filled + carried + lost");
-      assert.equal(c.loosePicked, c.looseDropped + c.looseFilled + carried.loose + c.looseLost, "loose picked up = dropped + filled + carried + lost");
+      assert.equal(
+        c.loosePicked,
+        c.looseDropped + c.looseFilled + carried.loose + c.looseLost,
+        "loose picked up = dropped + filled + carried + lost",
+      );
     }
     const cells = spoilCells(plane);
-    assert.equal(cells.reduce((s, c) => s + c.h, 0), plane.moundCells, "the plane's count is the spoil on it");
+    assert.equal(
+      cells.reduce((s, c) => s + c.h, 0),
+      plane.moundCells,
+      "the plane's count is the spoil on it",
+    );
     assert.equal(plane.moundCells, mound, "both colonies' soil out × SWELL, less what was taken off, plus what was put back");
   }
   const holes = holesOf(g.player);
@@ -383,9 +402,15 @@ test("one world over 200 s: the mound's books balance, it stays round the hole w
       far.push(d);
     }
     assert.ok(n > 40, `colony ${c.params.nest}: ${n} pellets on its mound`);
-    assert.ok(Math.hypot(sx / n, sy / n) < 4, `colony ${c.params.nest}: the mound's centre is ${Math.hypot(sx / n, sy / n).toFixed(1)} from its hole`);
+    assert.ok(
+      Math.hypot(sx / n, sy / n) < 4,
+      `colony ${c.params.nest}: the mound's centre is ${Math.hypot(sx / n, sy / n).toFixed(1)} from its hole`,
+    );
     far.sort((a, b) => a - b);
-    assert.ok((far[Math.floor(far.length / 2)]) >= 3, `colony ${c.params.nest}: spoil carried out from the hole (median ${far[Math.floor(far.length / 2)]} cells)`);
+    assert.ok(
+      far[Math.floor(far.length / 2)] >= 3,
+      `colony ${c.params.nest}: spoil carried out from the hole (median ${far[Math.floor(far.length / 2)]} cells)`,
+    );
   }
   assert.ok(spreads.length >= 4, `${spreads.length} pellets spread`);
   const mean = spreads.reduce((s, d) => s + d, 0) / spreads.length;

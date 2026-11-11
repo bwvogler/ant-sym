@@ -43,7 +43,9 @@ export function askedIn(key: string): string[] {
 /** One score question per lever asked, for host `id`: the lever's levels, lowest first (levers.scale), are its criteria. */
 export function leverQuestions(id: string, asked: readonly string[]): JevRequest["questions"] {
   const out: JevRequest["questions"] = {};
-  for (const lever of LEVERS) if (asked.includes(lever.id)) out[`${id}_${lever.id}`] = { type: "score", instructions: `${lever.id} in \`${id}\``, criteria: scale(lever) };
+  for (const lever of LEVERS)
+    if (asked.includes(lever.id))
+      out[`${id}_${lever.id}`] = { type: "score", instructions: `${lever.id} in \`${id}\``, criteria: scale(lever) };
   return out;
 }
 

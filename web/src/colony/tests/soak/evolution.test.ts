@@ -19,7 +19,6 @@ import { arena } from "../builders.ts";
 
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
-
 function placed(map: WorldMap, cells: [number, number][]): Colony {
   const c = new Colony(map, { antCount: cells.length, maxAnts: cells.length, nest: 0 }, mulberry32(1));
   cells.forEach((cell, i) => put(c, i, cell[0], cell[1]));
@@ -61,7 +60,7 @@ test("reach acts where levels take effect: Jev's question and cache key do not c
   assert.equal(fungalKey(sit, f.askedFor(sit)), key, "so the cache key is the same, and an upgrade re-asks nothing");
   // Jev wants food scent strongly boosted (×2.5); the fungus starts with Senses at one step (×1.5).
   f.expressLevels(c, 0, { food: 4 }, 1);
-  assert.ok(Math.abs((c.gainFood[0]) - 1.5) < 1e-9, `held to one step: ${c.gainFood[0]}`);
+  assert.ok(Math.abs(c.gainFood[0] - 1.5) < 1e-9, `held to one step: ${c.gainFood[0]}`);
   assert.deepEqual(f.held({ food: 4, odour: 2 }, GARDEN), { food: 3, odour: 0 }, "and Recognition starts at none");
   const LOCKPICK = STRAINS.findIndex((x) => x.id === "lockpick");
   assert.deepEqual(f.held({ food: 4 }, LOCKPICK), { food: 4 }, "another strain's host (a lab brush) is not held (PR #43 review, N2)");
@@ -69,10 +68,10 @@ test("reach acts where levels take effect: Jev's question and cache key do not c
   e.replicate(upgrade("senses").costs[0]! / MUTATION);
   assert.ok(f.upgrade("senses"), "the mutations for the Senses' full range");
   f.expressLevels(c, 0, { food: 4 }, 1);
-  assert.ok(Math.abs((c.gainFood[0]) - 2.5) < 1e-9, `the full range: ${c.gainFood[0]}`);
+  assert.ok(Math.abs(c.gainFood[0] - 2.5) < 1e-9, `the full range: ${c.gainFood[0]}`);
   // A lab helper runs a preset whatever the menu and the reach say.
   f.express(c, 0, 2, 1); // share: food 3
-  assert.ok(Math.abs((c.gainFood[0]) - 1.5) < 1e-9);
+  assert.ok(Math.abs(c.gainFood[0] - 1.5) < 1e-9);
 });
 
 test("every lever has a reach, the lethal ones included: crown and odour weapon are held off until their upgrade (ja-lo8.16)", () => {
@@ -94,11 +93,11 @@ test("every lever has a reach, the lethal ones included: crown and odour weapon 
   e.replicate((upgrade("weapon").costs[0]! + upgrade("crown").costs[0]!) / MUTATION);
   assert.ok(f.upgrade("weapon"), "the mutations for the odour weapon");
   f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
-  assert.ok((c.estrange[0]) > 0, "freed: the host smells like nobody's");
+  assert.ok(c.estrange[0] > 0, "freed: the host smells like nobody's");
   assert.equal(c.regicide[0], 0, "crown still held");
   assert.ok(f.upgrade("crown"), "the mutations for crown");
   f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
-  assert.ok((c.regicide[0]) > 0, "freed: the host kills the queen it tends");
+  assert.ok(c.regicide[0] > 0, "freed: the host kills the queen it tends");
   // A game that doesn't evolve (the lab, the assays) has no reach: the lethal levers run as the menu says.
   const lab = new Fungus(map);
   lab.configure({ hide: false, cull: false }, ["crown"]);
@@ -116,17 +115,18 @@ test("the game's step holds a lethal answer too: a policy that culls estranges n
   f.evolve(GARDEN);
   f.hosts = 1; // load set by hand: tell the step there is a host to step
   run(f, [c], 0.2);
-  assert.ok((c.load[0]) > 0.5, "still a host");
-  assert.ok((c.fungal[0]) >= 0, "the step read its situation and expressed its policy's answer");
+  assert.ok(c.load[0] > 0.5, "still a host");
+  assert.ok(c.fungal[0] >= 0, "the step read its situation and expressed its policy's answer");
   assert.equal(c.estrange[0], 0, "held off through the step");
   f.evolution!.replicate(upgrade("weapon").costs[0]! / MUTATION);
   assert.ok(f.upgrade("weapon"));
   run(f, [c], 0.2);
-  assert.ok((c.estrange[0]) > 0, `freed: ${c.estrange[0]}`);
+  assert.ok(c.estrange[0] > 0, `freed: ${c.estrange[0]}`);
 });
 
 test("mutations: a fixed share of growth, kept level by level, each level of an upgrade asking more than the last", () => {
-  for (const u of UPGRADES) for (let k = 1; k < u.costs.length; k++) assert.ok(u.costs[k]! > u.costs[k - 1]!, `${u.id}: level ${k + 1} asks more`);
+  for (const u of UPGRADES)
+    for (let k = 1; k < u.costs.length; k++) assert.ok(u.costs[k]! > u.costs[k - 1]!, `${u.id}: level ${k + 1} asks more`);
   const e = new Evolution(GARDEN);
   assert.equal(e.mutations, 0);
   const [a, b, c] = upgrade("infectivity").costs as number[];
@@ -196,7 +196,7 @@ test("the minimum dose is a rate: a clean ant exposed above it is infected at an
       c.load[0] = 1;
       f.hosts = 1;
       run(f, [c], 3, dt);
-      assert.equal((c.load[1]) > 0, infected, `transmission ${transmission} at a ${dt} s step: ${c.load[1]}`);
+      assert.equal(c.load[1] > 0, infected, `transmission ${transmission} at a ${dt} s step: ${c.load[1]}`);
     }
 });
 
@@ -227,14 +227,16 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
   const clean = g.colonies[g.addColony({ x: e.x + 40, y: e.y, antCount: 200, odour: 0.5 })]!;
   const first = g.colonies[0]!;
   // The same colony: params but identity, a queen, chambers, policies, responses and the game's wiring.
-  const own = (c: typeof first) => Object.fromEntries(Object.entries(c.params).filter(([k]) => !["nest", "odour", "antCount", "maxAnts"].includes(k)));
+  const own = (c: typeof first) =>
+    Object.fromEntries(Object.entries(c.params).filter(([k]) => !["nest", "odour", "antCount", "maxAnts"].includes(k)));
   assert.deepEqual(own(clean), own(first));
   assert.equal(clean.params.maxAnts, first.params.maxAnts);
   assert.ok(clean.queen?.alive && first.queen?.alive);
   assert.equal(clean.policy, first.policy);
   assert.equal(clean.stancePolicy, first.stancePolicy);
   assert.equal(clean.responses, first.responses);
-  for (const wire of ["friends", "enemies", "nestmates", "onBury", "raidMarks"] as const) assert.equal(Boolean(clean[wire]), Boolean(first[wire]), wire);
+  for (const wire of ["friends", "enemies", "nestmates", "onBury", "raidMarks"] as const)
+    assert.equal(Boolean(clean[wire]), Boolean(first[wire]), wire);
   assert.equal(clean.others.length, first.others.length);
   // The fungus: a clean founding gets no patch; one whose queen carries the evolving fungus gets what the landing gave.
   const patches = g.fungus.base.length;
@@ -245,7 +247,10 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
   assert.ok(g.fungus.base.length > patches);
   const { w } = g.map.size;
   const hole = carried.nest.entrance!;
-  assert.ok(g.fungus.base.slice(patches).every((key) => Math.abs((key % w) + 0.5 - hole.x) < 8), "by her hole, as the landing is by the first colony's");
+  assert.ok(
+    g.fungus.base.slice(patches).every((key) => Math.abs((key % w) + 0.5 - hole.x) < 8),
+    "by her hole, as the landing is by the first colony's",
+  );
 });
 
 test("a weak start loses in the nest: Garden as listed takes a quarter of the colony in seconds, the evolving one does not", () => {
@@ -302,15 +307,15 @@ test("mutations from hosts: load passed on by contact counts, spores picked up f
   c.strain[0] = GARDEN;
   f.hosts = 1;
   run(f, [c], 3);
-  assert.ok((c.load[1]) > 0.05);
-  assert.ok(Math.abs(f.evolution!.growth - (c.load[1])) < 1e-6, `what contact passed on: ${f.evolution!.growth} vs ${c.load[1]}`);
+  assert.ok(c.load[1] > 0.05);
+  assert.ok(Math.abs(f.evolution!.growth - c.load[1]) < 1e-6, `what contact passed on: ${f.evolution!.growth} vs ${c.load[1]}`);
   // Ground: a lone ant on spores takes load, and nothing new is made.
   const g = new Fungus(map, { grooming: 0, priming: 0 });
   g.evolve(GARDEN);
   const d = placed(map, [[20, 6]]);
   g.paint([d], d.x[0], d.y[0], 1, 3, 0, GARDEN); // spores under it, no dose
   run(g, [d], 3);
-  assert.ok((d.load[0]) > 0.05, `it took load off the ground: ${d.load[0]}`);
+  assert.ok(d.load[0] > 0.05, `it took load off the ground: ${d.load[0]}`);
   assert.equal(g.evolution!.growth, 0, "moved, not made");
 });
 
@@ -346,7 +351,11 @@ test("the fungus's save holds every private field it declares, or the field is d
   const scratch = ["made", "nb"];
   // Each map's spores, base and step grids (ja-lp4.3): layer 0's spore cells and base are saved; its grids are per-step scratch.
   const layered = { layers: ["sporeCells", "base"] } as Record<string, string[]>;
-  assert.deepEqual([...declared].sort(), [...Object.keys(saved), ...Object.keys(layered), ...derived, ...scratch].sort(), "every declared #field is accounted for");
+  assert.deepEqual(
+    [...declared].sort(),
+    [...Object.keys(saved), ...Object.keys(layered), ...derived, ...scratch].sort(),
+    "every declared #field is accounted for",
+  );
   const keys = Object.keys(new Fungus(arena()).saveState());
   for (const [field, key] of Object.entries(saved)) assert.ok(keys.includes(key), `#${field} is saved as ${key}`);
   for (const [field, ks] of Object.entries(layered)) for (const key of ks) assert.ok(keys.includes(key), `#${field} is saved as ${key}`);
@@ -355,7 +364,11 @@ test("the fungus's save holds every private field it declares, or the field is d
   const start = src.indexOf("interface SporeLayer {");
   const layerKeys = [...src.slice(start, src.indexOf("\n}\n", start)).matchAll(/^ {2}(?:readonly )?(\w+):/gm)].map((m) => m[1]!);
   const perStep = ["map", "all", "visible", "taken"];
-  assert.deepEqual([...layerKeys].sort(), [...SPORE_LAYER_STATE, ...perStep].sort(), "every SporeLayer key is saved per map or built again");
+  assert.deepEqual(
+    [...layerKeys].sort(),
+    [...SPORE_LAYER_STATE, ...perStep].sort(),
+    "every SporeLayer key is saved per map or built again",
+  );
   const two = new Fungus([arena(), arena()]).saveState();
   assert.deepEqual(Object.keys((two.layers as Record<string, unknown>[])[0]!).sort(), [...SPORE_LAYER_STATE].sort(), "a second map's keys");
   assert.ok(!("layers" in new Fungus(arena()).saveState()), "one map: no layers, the shape as it was");

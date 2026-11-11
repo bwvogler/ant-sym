@@ -18,7 +18,11 @@ const EXPLORE = MODES.indexOf("explore");
 const FOLLOW = MODES.indexOf("follow");
 
 function plane(params: Partial<Colony["params"]> = { siteFidelity: 1 }): { g: Game; c: Colony; hx: number; hy: number } {
-  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(7));
+  const g = new Game(
+    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
+    { antCount: 10, rivalAnts: 10, regrow: 0 },
+    gameRng(7),
+  );
   const map = g.world!.plane;
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   map.foodLeft = 0;
@@ -61,12 +65,18 @@ test("site fidelity: a find is remembered as where the ant stood less where its 
   // 50 cells walked with a drift of (0.06, -0.04) per cell: the vector's hole is (3, -2) off.
   out(c, fx - 2, fy, 0, 50, 0.06, -0.04);
   assert.ok(Number.isNaN(c.foodX[0]), "nothing remembered before a find");
-  assert.ok(tickUntil(g, 3, () => c.carrying[0] === 1), "it found the food");
+  assert.ok(
+    tickUntil(g, 3, () => c.carrying[0] === 1),
+    "it found the food",
+  );
   const x = c.x[0];
   const y = c.y[0];
-  assert.ok(Math.abs((c.foodX[0]) - (x - (pn(g, c).x + 50 * 0.06))) < 0.1, `x: remembered ${c.foodX[0]}, stood ${x - hx}, odo ${c.odoSurf[0]}`);
-  assert.ok(Math.abs((c.foodY[0]) - (y - (pn(g, c).y - 50 * 0.04))) < 0.1, `y: remembered ${c.foodY[0]}`);
-  assert.ok(Math.abs((c.foodX[0]) - (x - hx)) > 2, "not the true offset from the hole: the drift is in it");
+  assert.ok(
+    Math.abs(c.foodX[0] - (x - (pn(g, c).x + 50 * 0.06))) < 0.1,
+    `x: remembered ${c.foodX[0]}, stood ${x - hx}, odo ${c.odoSurf[0]}`,
+  );
+  assert.ok(Math.abs(c.foodY[0] - (y - (pn(g, c).y - 50 * 0.04))) < 0.1, `y: remembered ${c.foodY[0]}`);
+  assert.ok(Math.abs(c.foodX[0] - (x - hx)) > 2, "not the true offset from the hole: the drift is in it");
 });
 
 test("site fidelity: off, a find is not remembered and a memory is not steered by", () => {
@@ -104,15 +114,18 @@ test("site fidelity: on its next trip it walks the vector straight to where it b
   let arrived = -1;
   for (let k = 0; k < 20 * 30 && arrived < 0; k++) {
     g.tick(DT);
-    path += Math.hypot((c.x[0]) - last.x, (c.y[0]) - last.y);
+    path += Math.hypot(c.x[0] - last.x, c.y[0] - last.y);
     last = { x: c.x[0], y: c.y[0] };
     if (c.search[0] !== 0) arrived = k;
   }
   assert.ok(arrived >= 0, "it got there and began to search");
   const odo = c.odoSurf[0];
-  const bx = pn(g, c).x + odo * -0.1 + (c.foodX[0]);
-  const by = pn(g, c).y + odo * 0.08 + (c.foodY[0]);
-  assert.ok(Math.hypot(last.x - bx, last.y - by) < 2.5, `at the believed spot (${bx.toFixed(1)}, ${by.toFixed(1)}), not ${Math.hypot(last.x - bx, last.y - by).toFixed(1)} off`);
+  const bx = pn(g, c).x + odo * -0.1 + c.foodX[0];
+  const by = pn(g, c).y + odo * 0.08 + c.foodY[0];
+  assert.ok(
+    Math.hypot(last.x - bx, last.y - by) < 2.5,
+    `at the believed spot (${bx.toFixed(1)}, ${by.toFixed(1)}), not ${Math.hypot(last.x - bx, last.y - by).toFixed(1)} off`,
+  );
   assert.ok(Math.hypot(last.x - (hx + sx), last.y - (hy + sy)) > 2.5, "which is not the spot itself: it walked its own vector");
   const straight = Math.hypot(bx - start.x, by - start.y);
   assert.ok(path < 1.2 * straight, `walked ${path.toFixed(1)} cells for ${straight.toFixed(1)} straight`);
@@ -122,9 +135,9 @@ test("site fidelity: on its next trip it walks the vector straight to where it b
   for (let k = 0; k < 8 * 30; k++) {
     g.tick(DT);
     const o = c.odoSurf[0];
-    far = Math.max(far, Math.hypot((c.x[0]) - (pn(g, c).x + o * -0.1 + (c.foodX[0])), (c.y[0]) - (pn(g, c).y + o * 0.08 + (c.foodY[0]))));
+    far = Math.max(far, Math.hypot(c.x[0] - (pn(g, c).x + o * -0.1 + c.foodX[0]), c.y[0] - (pn(g, c).y + o * 0.08 + c.foodY[0])));
   }
-  assert.ok((c.search[0]) > reach0, `the search widened: ${reach0} to ${c.search[0]}`);
+  assert.ok(c.search[0] > reach0, `the search widened: ${reach0} to ${c.search[0]}`);
   assert.ok(far < 25, `it searched round the spot (${far.toFixed(1)} at the farthest)`);
 });
 
@@ -142,7 +155,7 @@ test("site fidelity: a food trail it meets still takes over", () => {
     out(c, hx + 12, hy, 0);
     if (laid) trail(c, hx + 14, hy, 30);
     for (let k = 0; k < 4 * 30; k++) g.tick(DT);
-    return (c.x[0]) - (hx + 12);
+    return c.x[0] - (hx + 12);
   };
   assert.ok(end(false) < -10, `no trail: it walks its vector west (${end(false).toFixed(1)})`);
   assert.ok(end(true) > 10, `a trail east: it follows it east (${end(true).toFixed(1)})`);
@@ -155,9 +168,15 @@ test("site fidelity: it forgets the spot when it tires there without food, not w
   there.c.foodY[0] = 0;
   out(there.c, there.hx + 30, there.hy, 0, 30);
   there.c.fatigue[0] = there.c.params.patience - 1.5;
-  assert.ok(tickUntil(there.g, 1, () => there.c.search[0] !== 0), "searching round the spot");
+  assert.ok(
+    tickUntil(there.g, 1, () => there.c.search[0] !== 0),
+    "searching round the spot",
+  );
   assert.ok(!Number.isNaN(there.c.foodX[0]), "still remembered while it searches");
-  assert.ok(tickUntil(there.g, 3, () => (there.c.fatigue[0]) > there.c.params.patience), "tired");
+  assert.ok(
+    tickUntil(there.g, 3, () => there.c.fatigue[0] > there.c.params.patience),
+    "tired",
+  );
   assert.ok(Number.isNaN(there.c.foodX[0]) && Number.isNaN(there.c.foodY[0]), "forgotten");
   // Elsewhere: tired on its way out, before it got there.
   const away = plane();
@@ -165,7 +184,10 @@ test("site fidelity: it forgets the spot when it tires there without food, not w
   away.c.foodY[0] = 0;
   out(away.c, away.hx + 5, away.hy, 0, 5);
   away.c.fatigue[0] = away.c.params.patience - 0.5;
-  assert.ok(tickUntil(away.g, 3, () => (away.c.fatigue[0]) > away.c.params.patience), "tired");
+  assert.ok(
+    tickUntil(away.g, 3, () => away.c.fatigue[0] > away.c.params.patience),
+    "tired",
+  );
   assert.equal(away.c.search[0], 0, "not searching: it had not got there");
   assert.equal(away.c.foodX[0], 70, "kept");
 });
@@ -178,20 +200,27 @@ test("site fidelity: the next find replaces the spot", () => {
   dropFood(g.world!.plane, hx + 25, hy - 10, 3);
   out(c, hx + 15, hy - 10, 0, 40);
   assert.ok(tickUntil(g, 3, () => c.carrying[0] === 1));
-  assert.ok(Math.abs((c.foodX[0]) - 25) < 1.5 && Math.abs((c.foodY[0]) + 10) < 1.5, `now (${c.foodX[0]}, ${c.foodY[0]})`);
+  assert.ok(Math.abs(c.foodX[0] - 25) < 1.5 && Math.abs(c.foodY[0] + 10) < 1.5, `now (${c.foodX[0]}, ${c.foodY[0]})`);
 });
 
 test("site fidelity: a new colony remembers nothing, the default is off, and a save carries the spots", () => {
   assert.equal(DEFAULT_COLONY.siteFidelity, 0);
   const { g, c } = plane();
-  assert.ok(Array.from(c.foodX).every((v) => Number.isNaN(v)), "no ant remembers a spot");
+  assert.ok(
+    Array.from(c.foodX).every((v) => Number.isNaN(v)),
+    "no ant remembers a spot",
+  );
   c.foodX[0] = 12.5;
   c.foodY[0] = -7.25;
   c.foodX[3] = -40;
   c.foodY[3] = 33;
   for (let k = 0; k < 10; k++) g.tick(DT);
   const saved = JSON.parse(JSON.stringify(g.save()));
-  const fresh = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(7));
+  const fresh = new Game(
+    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
+    { antCount: 10, rivalAnts: 10, regrow: 0 },
+    gameRng(7),
+  );
   fresh.load(saved);
   for (const k of [0, 3, 1]) {
     assert.ok(Object.is(fresh.player.foodX[k], c.foodX[k]), `ant ${k}: x ${fresh.player.foodX[k]} against ${c.foodX[k]}`);
@@ -207,7 +236,7 @@ test("site fidelity: a trail-follower with a memory is not drawn to it", () => {
   out(c, hx + 12, hy, 0);
   c.mode[0] = FOLLOW;
   for (let k = 0; k < 3 * 30; k++) g.tick(DT);
-  assert.ok((c.x[0]) - (hx + 12) > -8, "following (no trail here: it wanders), it does not head for the spot");
+  assert.ok(c.x[0] - (hx + 12) > -8, "following (no trail here: it wanders), it does not head for the spot");
   assert.ok(HOLE_SIGHT > 0);
 });
 

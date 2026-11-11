@@ -25,8 +25,25 @@ function crowd(c: Colony, x: number, y: number, count: number): void {
   }
 }
 
-const sit = (s: Partial<Situation>): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
-const view = (s: Partial<StanceSituation>): StanceSituation => ({ stance: "forage", ants: "some", losses: "none", enemyNearNest: false, intake: "some", larder: "low", ...s });
+const sit = (s: Partial<Situation>): Situation => ({
+  mode: "explore",
+  tired: false,
+  foodTrail: "none",
+  homeTrail: "none",
+  alarm: "none",
+  enemy: "none",
+  stance: "forage",
+  ...s,
+});
+const view = (s: Partial<StanceSituation>): StanceSituation => ({
+  stance: "forage",
+  ants: "some",
+  losses: "none",
+  enemyNearNest: false,
+  intake: "some",
+  larder: "low",
+  ...s,
+});
 
 test("generateWorld: two nests, a walk apart, joined on foot, with food away from both", () => {
   for (let seed = 1; seed <= 15; seed++) {
@@ -38,12 +55,16 @@ test("generateWorld: two nests, a walk apart, joined on foot, with food away fro
     assert.ok(d >= 0.7 * 140 && d < 260, `seed ${seed}: nests ${d.toFixed(0)} cells apart`);
     const reach = reachable(m, a.x, a.y);
     cellOf(b.x, b.y);
-    assert.equal(reach[(CELL[1]) * m.size.w + (CELL[0])], 1, `seed ${seed}: the rival nest cannot be walked to`);
+    assert.equal(reach[CELL[1] * m.size.w + CELL[0]], 1, `seed ${seed}: the rival nest cannot be walked to`);
   }
 });
 
 test("localPolicy: enemies near are the contact response's (MR 4); raids take explorers, not followers; defence answers alarm; a fight over sends the ant home", () => {
-  assert.equal(localPolicy(sit({ enemy: "near", tired: true })), "return", "an enemy near is no mode question any more: tired, it goes home");
+  assert.equal(
+    localPolicy(sit({ enemy: "near", tired: true })),
+    "return",
+    "an enemy near is no mode question any more: tired, it goes home",
+  );
   assert.equal(localPolicy(sit({ stance: "raid", mode: "explore" })), "fight");
   assert.equal(localPolicy(sit({ stance: "raid", mode: "follow", foodTrail: "strong" })), "follow");
   assert.equal(localPolicy(sit({ stance: "defend", alarm: "faint" })), "fight");
@@ -75,7 +96,8 @@ test("fights: equal numbers trade; the bigger crowd loses fewer; fighters lay al
     const [da, db] = resolveFights([a, b], grids, 0.2, mulberry32(round + 7));
     evenA += da!;
     evenB += db!;
-    if (round === 0) assert.ok(a.ph.read("alarm", at(20, 6).x, at(20, 6).y) > 0 && b.ph.read("alarm", at(20, 6).x, at(20, 6).y) > 0, "both laid alarm");
+    if (round === 0)
+      assert.ok(a.ph.read("alarm", at(20, 6).x, at(20, 6).y) > 0 && b.ph.read("alarm", at(20, 6).x, at(20, 6).y) > 0, "both laid alarm");
 
     const small = new Colony(m, { antCount: 20, maxAnts: 20, nest: 0 }, mulberry32(round + 2));
     const big = new Colony(m, { antCount: 20, maxAnts: 20, nest: 1 }, mulberry32(round + 3));
@@ -128,7 +150,7 @@ test("a fighting ant goes for the enemy it can see", () => {
   put(c, 0, 20, 6);
   c.heading[0] = 0; // east
   for (let k = 0; k < 15; k++) c.tick(1 / 30);
-  assert.ok((c.y[0]) > at(20, 6).y + 0.3, `it turned south toward the enemy: y ${c.y[0]}`);
+  assert.ok(c.y[0] > at(20, 6).y + 0.3, `it turned south toward the enemy: y ${c.y[0]}`);
 });
 
 test("the game: both colonies forage and grow, they meet and fight, no strategist on open ground, and food is never made or lost", () => {
@@ -171,7 +193,7 @@ test("contact (behaviour MR 4): a foraging ant meeting strangers runs straight a
   c.tick(1 / 30);
   assert.equal(c.mode[0], 2, "fleeing (return) while they are in reach");
   for (let k = 0; k < 14; k++) c.tick(1 / 30);
-  assert.ok((c.x[0]) > at(20, 6).x + 0.3, `it ran east, away from them and from home: x ${c.x[0]}`);
+  assert.ok(c.x[0] > at(20, 6).x + 0.3, `it ran east, away from them and from home: x ${c.x[0]}`);
 });
 
 test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer toward it", () => {
@@ -234,7 +256,7 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
   c.heading[0] = Math.PI; // facing away from it
   const x0 = c.x[0];
   for (let k = 0; k < 120; k++) c.tick(1 / 30);
-  assert.ok((c.x[0]) > x0 + 6, `climbed east: ${x0.toFixed(1)} → ${(c.x[0]).toFixed(1)}`);
+  assert.ok(c.x[0] > x0 + 6, `climbed east: ${x0.toFixed(1)} → ${c.x[0].toFixed(1)}`);
 
   // A stranger beside a raider that stands on a raid trail is fought, not reported: the trail is where a scout was before.
   const g = new Game(arena(), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid" });
@@ -262,7 +284,11 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
   const past = (raidOnward: number) => {
     let s = 0;
     for (let seed = 1; seed <= 5; seed++) {
-      const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidOnward, stanceGate: 0 }, mulberry32(seed));
+      const c = new Colony(
+        worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]),
+        { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidOnward, stanceGate: 0 },
+        mulberry32(seed),
+      );
       c.stance = "raid";
       put(c, 0, 12, 10);
       c.heading[0] = 0; // facing east, up the trail
@@ -274,7 +300,7 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
               c.ph.deposit("raid", p.x, p.y, 0.1 * (x - 6)); // kept fresh: the end stays where it is
             }
         c.tick(1 / 30);
-        if ((c.x[0]) > at(26, 10).x) s += 1 / (30 * 30);
+        if (c.x[0] > at(26, 10).x) s += 1 / (30 * 30);
       }
     }
     return s;
@@ -286,7 +312,11 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
 
   // Home again, it is done with that trail end (review of #44, N2): its flag clears, even with a raid trail at home keeping it
   // recruited (else it would never climb a trail again).
-  const c = new Colony(worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, stanceGate: 0 }, mulberry32(1));
+  const c = new Colony(
+    worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]),
+    { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, stanceGate: 0 },
+    mulberry32(1),
+  );
   c.stance = "raid";
   const pastEnd = () => (decode((c.saveState().private as Record<string, unknown>).pastEnd) as Uint8Array)[0];
   const lay = () => {
@@ -339,17 +369,26 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   assert.equal(r.touch(0, false).stance, "raid");
 
   // Twenty ants waiting at home: each feels the others round it.
-  const g = new Game(arena(), { antCount: 20, rivalAnts: 1 }, mulberry32(16), { policy: () => "return", responses: responses({ leave: () => "wait" }), colony: { scoutRate: 0, crowdAt: 6 } });
+  const g = new Game(arena(), { antCount: 20, rivalAnts: 1 }, mulberry32(16), {
+    policy: () => "return",
+    responses: responses({ leave: () => "wait" }),
+    colony: { scoutRate: 0, crowdAt: 6 },
+  });
   const c = g.player;
   for (let i = 0; i < 20; i++) put(c, i, 4, 6);
   for (let k = 0; k < 30 * 10; k++) g.tick(1 / 30);
-  assert.ok((c.crowd[0]) >= c.params.crowdAt, `crowded: ${(c.crowd[0]).toFixed(1)} nestmates felt`);
+  assert.ok(c.crowd[0] >= c.params.crowdAt, `crowded: ${c.crowd[0].toFixed(1)} nestmates felt`);
   assert.equal(c.touch(0, false).crowd, "many");
 });
 
 test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at home, by degrees, never while carrying", () => {
   // 40 ants at home on a strong raid trail, 40 out on one 30 cells away; recruited at raidRecruit (0.5/s here) for 1 s.
-  const g = new Game(worldFromArrays({ w: 60, h: 20 }, [nestAt(6, 10, 3), nestAt(56, 10, 3)]), { antCount: 80, rivalAnts: 5 }, mulberry32(21), { policy: () => "return", responses: responses({ leave: () => "wait" }), colony: { raidRecruit: 0.5, scoutRate: 0, raidScout: 0 } });
+  const g = new Game(
+    worldFromArrays({ w: 60, h: 20 }, [nestAt(6, 10, 3), nestAt(56, 10, 3)]),
+    { antCount: 80, rivalAnts: 5 },
+    mulberry32(21),
+    { policy: () => "return", responses: responses({ leave: () => "wait" }), colony: { raidRecruit: 0.5, scoutRate: 0, raidScout: 0 } },
+  );
   const c = g.player;
   const home = (i: number) => i < 40;
   const place = () => {
@@ -379,14 +418,16 @@ test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at ho
 });
 
 test("no rival, no raid (review of #53 S1): with the rival beaten, a crowded home's raid answer and a raid trail recruit no one", () => {
-  const g = new Game(arena(), { antCount: 20, rivalAnts: 5 }, mulberry32(22), { policy: () => "return", colony: { scoutRate: 0, crowdAt: 2, raidScout: 5, raidRecruit: 5 } });
+  const g = new Game(arena(), { antCount: 20, rivalAnts: 5 }, mulberry32(22), {
+    policy: () => "return",
+    colony: { scoutRate: 0, crowdAt: 2, raidScout: 5, raidRecruit: 5 },
+  });
   const [c, r] = g.colonies as [Colony, Colony];
   for (let i = 0; i < r.n; i++) r.alive[i] = 0;
   r.larder = 0;
   for (let i = 0; i < 20; i++) put(c, i, 4, 6);
   for (let k = 0; k < 30 * 8; k++) {
-    for (let y = 4; y <= 8; y++)
-      for (let x = 2; x <= 6; x++) c.ph.deposit("raid", at(x, y).x, at(x, y).y, 0.05);
+    for (let y = 4; y <= 8; y++) for (let x = 2; x <= 6; x++) c.ph.deposit("raid", at(x, y).x, at(x, y).y, 0.05);
     g.tick(1 / 30);
   }
   let rec = 0;
@@ -433,11 +474,14 @@ test("raid stance as a bias (review of #41): an ant not recruited, put in FIGHT,
     put(c, 0, 12, 6);
     c.heading[0] = Math.PI / 2; // facing across the field, not at the rival
     for (let k = 0; k < 60; k++) c.tick(1 / 30);
-    return Math.hypot((c.x[0]) - c.raidTarget.x, (c.y[0]) - c.raidTarget.y);
+    return Math.hypot(c.x[0] - c.raidTarget.x, c.y[0] - c.raidTarget.y);
   };
   const off = run(0); // the old rule: straight at the coordinates
   const on = run(1);
-  assert.ok(on > off + 4, `not recruited, it doesn't head for the hole: ${on.toFixed(1)} cells off against ${off.toFixed(1)} with raidGate 0`);
+  assert.ok(
+    on > off + 4,
+    `not recruited, it doesn't head for the hole: ${on.toFixed(1)} cells off against ${off.toFixed(1)} with raidGate 0`,
+  );
 });
 
 test("raid stance as a bias (review of #41): leave asks a recruited ant as a raider (fight) and the others as foragers (return)", () => {

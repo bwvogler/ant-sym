@@ -27,7 +27,13 @@ test("storageCache: a save merges with what another tab stored under the same co
   const tabB = storageCache(() => m);
   tabA.save("ctx", [["a", "follow"]]);
   tabB.save("ctx", [["b", "explore"]]); // tab B never loaded "a"
-  assert.deepEqual(new Map(tabA.load("ctx")), new Map([["a", "follow"], ["b", "explore"]]));
+  assert.deepEqual(
+    new Map(tabA.load("ctx")),
+    new Map([
+      ["a", "follow"],
+      ["b", "explore"],
+    ]),
+  );
   tabB.save("ctx", [["a", "return"]]);
   assert.equal(new Map(tabA.load("ctx")).get("a"), "return", "the newer answer for a key wins");
 });
@@ -41,6 +47,11 @@ test("storageCache: blocked or missing storage starts cold and never throws", ()
   const none = storageCache(() => null);
   assert.deepEqual(none.load("ctx"), []);
   none.save("ctx", [["a", "b"]]);
-  const full = storageCache(() => ({ getItem: () => null, setItem: () => { throw new Error("QuotaExceededError"); } }));
+  const full = storageCache(() => ({
+    getItem: () => null,
+    setItem: () => {
+      throw new Error("QuotaExceededError");
+    },
+  }));
   full.save("ctx", [["a", "b"]]);
 });

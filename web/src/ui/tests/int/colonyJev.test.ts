@@ -1,12 +1,56 @@
 import { afterEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, localPolicy, localStance, type Mode, type Situation, DOCTRINES, policyContext, situationKey, stanceContext, stanceKey, fungalKey, fungusContext, generateWorld, mulberry32, OPEN_WORLD, Game, LEVERS, STRAINS, preset, encodeLevels, PRESETS, decodeFungal, type FungalSituation } from "../../../colony/index.ts";
+import {
+  Colony,
+  localPolicy,
+  localStance,
+  type Mode,
+  type Situation,
+  DOCTRINES,
+  policyContext,
+  situationKey,
+  stanceContext,
+  stanceKey,
+  fungalKey,
+  fungusContext,
+  generateWorld,
+  mulberry32,
+  OPEN_WORLD,
+  Game,
+  LEVERS,
+  STRAINS,
+  preset,
+  encodeLevels,
+  PRESETS,
+  decodeFungal,
+  type FungalSituation,
+} from "../../../colony/index.ts";
 import { ColonyJev, type CacheStore } from "../../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../../shared/jev.ts";
 
 // The colony's Jev client against a scripted fetch: no server, no key.
 
-const RUN: RunSummary = { running: true, startedAt: 0, stoppedAt: null, stopReason: null, elapsedSeconds: 0, caps: { capUsd: 0.1, capSeconds: 1800 }, requests: 0, inFlight: 0, maxInFlight: 5, inputTokens: 0, usd: 0, sessionInputTokens: 0, sessionUsd: 0, aborted: 0, medianMs: null, p90Ms: null, statuses: {}, remainingUsd: 0.1, remainingSeconds: 1800 };
+const RUN: RunSummary = {
+  running: true,
+  startedAt: 0,
+  stoppedAt: null,
+  stopReason: null,
+  elapsedSeconds: 0,
+  caps: { capUsd: 0.1, capSeconds: 1800 },
+  requests: 0,
+  inFlight: 0,
+  maxInFlight: 5,
+  inputTokens: 0,
+  usd: 0,
+  sessionInputTokens: 0,
+  sessionUsd: 0,
+  aborted: 0,
+  medianMs: null,
+  p90Ms: null,
+  statuses: {},
+  remainingUsd: 0.1,
+  remainingSeconds: 1800,
+};
 
 type Script = (req: JevRequest) => { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 
@@ -33,7 +77,17 @@ const answerAll =
   (req) => {
     const answers: Record<string, unknown> = {};
     for (const q of Object.keys(req.questions)) answers[q] = { type: "choice", choice: mode, confidence: 0.9 };
-    return { status: 200, body: { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN } };
+    return {
+      status: 200,
+      body: {
+        status: 200,
+        body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } },
+        ms: 1,
+        attempts: 1,
+        inputTokens: 10,
+        run: RUN,
+      },
+    };
   };
 
 function memoryStore(): CacheStore & { data: Map<string, [string, string][]> } {
@@ -65,7 +119,15 @@ function run(c: Colony, k: number) {
 test("off, with answers cached: they play, and nothing is asked (the fungus game: Jev's answers outlive its run)", async () => {
   const sent = scriptFetch(answerAll("return"));
   const store = memoryStore();
-  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const s: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "none",
+    homeTrail: "none",
+    alarm: "none",
+    enemy: "none",
+    stance: "forage",
+  };
   const wrong: Mode = localPolicy(s) === "fight" ? "return" : "fight";
   store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), wrong]]);
   const j = make(store);
@@ -116,7 +178,15 @@ test("running: each new situation is asked once; the answers are cached and the 
 test("a miss with no run wants one, under a preset's words too; a cached answer doesn't (PR #42 review S7)", async () => {
   const sent = scriptFetch(answerAll("follow"));
   const store = memoryStore();
-  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const s: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "none",
+    homeTrail: "none",
+    alarm: "none",
+    enemy: "none",
+    stance: "forage",
+  };
   store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), "follow"]]);
   const j = make(store);
   let wants = 0;
@@ -168,7 +238,11 @@ test("a 409 ends the run and the colony is back on the local rule", async () => 
   await tick(40);
   assert.equal(j.state.phase, "stopped");
   assert.match(String(j.state.lastError), /spend-cap/);
-  assert.equal(j.policy({ mode: "follow", tired: true, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" }), "return", "the local rule answers");
+  assert.equal(
+    j.policy({ mode: "follow", tired: true, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" }),
+    "return",
+    "the local rule answers",
+  );
 });
 
 test("busy puts the situations back in the queue; a failure cools down instead of hammering", async () => {
@@ -205,7 +279,15 @@ test("busy puts the situations back in the queue; a failure cools down instead o
 test("a new doctrine: until Jev answers it, the local rule acts and each situation is asked; the old words' answers never stand in (ja-lo8.15)", async () => {
   const sent = scriptFetch(answerAll("fight"));
   const store = memoryStore();
-  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const s: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "none",
+    homeTrail: "none",
+    alarm: "none",
+    enemy: "none",
+    stance: "forage",
+  };
   const old: Mode = localPolicy(s) === "return" ? "follow" : "return";
   store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), old]]);
   const j = make(store);
@@ -227,7 +309,15 @@ test("a new doctrine: until Jev answers it, the local rule acts and each situati
 test("while Jev can't answer, the old words' answers act, stale; a change of canAsk makes the colonies reconsider (ja-lo8.3, ja-lo8.15)", () => {
   scriptFetch(answerAll("fight"));
   const store = memoryStore();
-  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const s: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "none",
+    homeTrail: "none",
+    alarm: "none",
+    enemy: "none",
+    stance: "forage",
+  };
   const old: Mode = localPolicy(s) === "return" ? "follow" : "return";
   store.data.set(policyContext(DOCTRINES[0]!.text), [[situationKey(s), old]]);
   const j = make(store);
@@ -256,7 +346,15 @@ test("while Jev can't answer, the old words' answers act, stale; a change of can
 test("a daughter colony's new words play the local rule, never another doctrine's answers (ja-lo8.15)", () => {
   scriptFetch(answerAll("fight"));
   const store = memoryStore();
-  const s: Situation = { mode: "explore", tired: false, foodTrail: "faint", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const s: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "faint",
+    homeTrail: "none",
+    alarm: "none",
+    enemy: "none",
+    stance: "forage",
+  };
   const mother = DOCTRINES[2]!.text;
   const motherSays: Mode = localPolicy(s) === "return" ? "follow" : "return";
   store.data.set(policyContext(mother), [[situationKey(s), motherSays]]);
@@ -274,14 +372,26 @@ test("answers shipped with the page are seeded under the ones this browser alrea
   scriptFetch(answerAll("fight"));
   const store = memoryStore();
   const ctx = policyContext(DOCTRINES[0]!.text);
-  const a: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const a: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "none",
+    homeTrail: "none",
+    alarm: "none",
+    enemy: "none",
+    stance: "forage",
+  };
   const b: Situation = { ...a, foodTrail: "strong" };
   store.data.set(ctx, [[situationKey(a), "return"]]);
   const j = make(store);
   const c = colony();
   j.setDoctrine(DOCTRINES[0]!.text);
   j.attach(c);
-  const added = j.seed(ctx, [[situationKey(a), "explore"], [situationKey(b), "follow"], ["nonsense", "dance"]]);
+  const added = j.seed(ctx, [
+    [situationKey(a), "explore"],
+    [situationKey(b), "follow"],
+    ["nonsense", "dance"],
+  ]);
   assert.equal(added, 1, "only b: a is the browser's, and 'dance' is no mode");
   assert.equal(c.policy(a), "return", "the browser's own answer wins");
   assert.equal(c.policy(b), "follow", "the shipped answer plays, with no run on");
@@ -296,7 +406,17 @@ test("the strategist's stance goes through its own cached lane", async () => {
       if (q.endsWith("_stance")) stances.push(q);
       answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "defend" : "explore" };
     }
-    return { status: 200, body: { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN } };
+    return {
+      status: 200,
+      body: {
+        status: 200,
+        body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } },
+        ms: 1,
+        attempts: 1,
+        inputTokens: 10,
+        run: RUN,
+      },
+    };
   });
   const j = make();
   const c = colony();
@@ -319,7 +439,15 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const SIT = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" } as const;
+const SIT = {
+  mode: "explore",
+  tired: false,
+  foodTrail: "none",
+  homeTrail: "strong",
+  alarm: "none",
+  enemy: "none",
+  stance: "forage",
+} as const;
 
 test("a late Stop reply does not overwrite a run started again in the meantime", async () => {
   const slowStop = deferred<void>();
@@ -396,7 +524,15 @@ test("explain says who decides a situation, without counting or queuing it", asy
   const j = make();
   const c = colony();
   j.attach(c);
-  const s = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "strong", alarm: "none", enemy: "none", stance: "forage" } as const;
+  const s = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "none",
+    homeTrail: "strong",
+    alarm: "none",
+    enemy: "none",
+    stance: "forage",
+  } as const;
   assert.deepEqual(j.explain(s), { mode: "explore", by: "local" }, "off: the local rule");
   await j.start();
   const before = { hits: j.state.hits, misses: j.state.misses };
@@ -435,7 +571,14 @@ function scriptAll(fungal: string) {
         answers[q] = { type: "score", score: levels[lever.id] ?? lever.asIs };
       } else answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : "explore", confidence: 0.9 };
     }
-    const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
+    const body = {
+      status: 200,
+      body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } },
+      ms: 1,
+      attempts: 1,
+      inputTokens: 10,
+      run: RUN,
+    };
     return { ok: true, status: 200, json: async () => body } as Response;
   }) as typeof fetch;
   return reqs;
@@ -444,7 +587,14 @@ function scriptAll(fungal: string) {
 /** A small game with Garden painted on the player's nest. */
 function infectedGame() {
   const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
-  g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 2, 3, 0.4, STRAINS.findIndex((s) => s.id === "garden"));
+  g.paintSpores(
+    g.player.nest.x,
+    g.player.nest.y,
+    g.player.nest.r + 2,
+    3,
+    0.4,
+    STRAINS.findIndex((s) => s.id === "garden"),
+  );
   return g;
 }
 
@@ -457,7 +607,10 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
   j.setAim("Spread unseen.");
   // Off: the local rule (Garden's default, blend).
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
-  assert.ok([...g.player.expr].some((e) => e === preset("blend")), "off: Garden blends");
+  assert.ok(
+    [...g.player.expr].some((e) => e === preset("blend")),
+    "off: Garden blends",
+  );
   await j.start();
   for (let round = 0; round < 6; round++) {
     for (let k = 0; k < 6; k++) g.tick(1 / 30);
@@ -477,7 +630,7 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
   assert.ok(j.state.fungusCached > 0 && j.state.fungusAsked > 0);
   // Jev's levels were dormant's: every host runs dormant now.
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
-  for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && (g.player.load[i]) > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
+  for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && g.player.load[i] > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
   const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(s).by, "jev");
   assert.equal(j.explainFungus(s).answer, encodeLevels(PRESETS[0]!.levels, g.fungus.asked), "Jev's levels: dormant's");
@@ -512,7 +665,10 @@ test("the fungus lane: a new aim is a new cache, a new menu a new question; stop
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
   const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(s).by, "local");
-  assert.ok([...g.player.expr].some((e) => e === preset("blend")), "stopped: the local rule again");
+  assert.ok(
+    [...g.player.expr].some((e) => e === preset("blend")),
+    "stopped: the local rule again",
+  );
 });
 
 // Every colony on equal footing (ja-t4d.6): the player is the fungus, so Jev drives each colony under its own doctrine.
@@ -528,8 +684,16 @@ function scriptByDoctrine(answer: (doctrine: string) => string) {
     reqs.push(req);
     if (holding) await new Promise<void>((r) => (held = r));
     const answers: Record<string, unknown> = {};
-    for (const q of Object.keys(req.questions)) answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : answer(String(req.state.doctrine)), confidence: 0.9 };
-    const body = { status: 200, body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } }, ms: 1, attempts: 1, inputTokens: 10, run: RUN };
+    for (const q of Object.keys(req.questions))
+      answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : answer(String(req.state.doctrine)), confidence: 0.9 };
+    const body = {
+      status: 200,
+      body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } },
+      ms: 1,
+      attempts: 1,
+      inputTokens: 10,
+      run: RUN,
+    };
     return { ok: true, status: 200, json: async () => body } as Response;
   }) as typeof fetch;
   return { reqs, hold: () => void (holding = true), release: () => ((holding = false), held?.()) };
@@ -591,7 +755,15 @@ test("each colony its own doctrine: its questions carry its own words, its own c
   assert.deepEqual([...doctrines].sort(), ["Amber's way.", "Ink's way."]);
   assert.equal(j.state.doctrineCached.length, 2);
   assert.ok(j.state.doctrineCached[0]! > 0 && j.state.doctrineCached[1]! > 0);
-  const s: Situation = { mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage" };
+  const s: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "none",
+    homeTrail: "none",
+    alarm: "none",
+    enemy: "none",
+    stance: "forage",
+  };
   run(a!, 1);
   run(b!, 1);
   const ea = j.explain(s, 0);
@@ -608,7 +780,15 @@ test("explain says 'waiting' while the question is in flight", async () => {
   j.attachColonies([a!]);
   await j.start();
   hold();
-  const s: Situation = { mode: "explore", tired: true, foodTrail: "faint", homeTrail: "strong", alarm: "faint", enemy: "none", stance: "forage" };
+  const s: Situation = {
+    mode: "explore",
+    tired: true,
+    foodTrail: "faint",
+    homeTrail: "strong",
+    alarm: "faint",
+    enemy: "none",
+    stance: "forage",
+  };
   j.policy(s); // queued
   await tick(30); // sent, and held in flight
   assert.equal(j.explain(s, 0).by, "waiting");
@@ -619,8 +799,24 @@ test("explain says 'waiting' while the question is in flight", async () => {
 
 // Hardening from the reviews of #2–#7 (ja-ue6, ja-7tf, ja-1u2, ja-6yj, ja-ytc).
 
-const sit = (s: Partial<Situation> = {}): Situation => ({ mode: "explore", tired: false, foodTrail: "none", homeTrail: "none", alarm: "none", enemy: "none", stance: "forage", ...s });
-const GARDEN: FungalSituation = { arousal: "calm", touch: "nestmate", place: "outside", task: "forager", carrying: "nothing", groomed: false };
+const sit = (s: Partial<Situation> = {}): Situation => ({
+  mode: "explore",
+  tired: false,
+  foodTrail: "none",
+  homeTrail: "none",
+  alarm: "none",
+  enemy: "none",
+  stance: "forage",
+  ...s,
+});
+const GARDEN: FungalSituation = {
+  arousal: "calm",
+  touch: "nestmate",
+  place: "outside",
+  task: "forager",
+  carrying: "nothing",
+  groomed: false,
+};
 
 test("stored answers a lane could not have given are dropped on load (ja-ue6)", async () => {
   scriptFetch(answerAll("explore"));
@@ -781,7 +977,9 @@ test("Start while running aborts the old run's calls", async () => {
   globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
     if (String(url).includes("api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
     signals.push(init!.signal!);
-    return new Promise<Response>((_, reject) => init!.signal!.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }))));
+    return new Promise<Response>((_, reject) =>
+      init!.signal!.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }))),
+    );
   }) as typeof fetch;
   const j = make();
   const c = colony();
@@ -791,7 +989,10 @@ test("Start while running aborts the old run's calls", async () => {
   await tick(30);
   assert.ok(signals.length > 0, "a call is in flight");
   await j.start();
-  assert.ok(signals.every((s) => s.aborted), "the first run's calls were cut");
+  assert.ok(
+    signals.every((s) => s.aborted),
+    "the first run's calls were cut",
+  );
 });
 
 test("busy after a new game: the situations go back into the new game's lanes, not the old one's (ja-1u2)", async () => {
@@ -863,15 +1064,17 @@ test("lanes take turns at any request latency: a long mode queue does not keep t
       j.attach(colony(5));
       await j.start();
       const trails = ["none", "faint", "strong"] as const;
-      for (const foodTrail of trails) for (const homeTrail of trails) for (const alarm of trails) j.policy(sit({ foodTrail, homeTrail, alarm })); // 27 mode questions
+      for (const foodTrail of trails)
+        for (const homeTrail of trails) for (const alarm of trails) j.policy(sit({ foodTrail, homeTrail, alarm })); // 27 mode questions
       j.fungusPolicy(GARDEN);
       const settle = async () => {
         for (let k = 0; k < 5; k++) await new Promise((r) => setImmediate(r));
       };
       for (let cycle = 0; cycle < 40 && !order.includes("fungus"); cycle++) {
         now++;
-        for (const p of pending.splice(0)) if (p.due <= now) p.done();
-        else pending.push(p);
+        for (const p of pending.splice(0))
+          if (p.due <= now) p.done();
+          else pending.push(p);
         await settle();
         mock.timers.tick(10);
         await settle();

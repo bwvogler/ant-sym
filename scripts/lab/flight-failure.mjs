@@ -28,14 +28,21 @@ import { generateWorld, mulberry32, OPEN_WORLD, openCell } from "../../web/src/c
 
 const rock = process.argv.includes("--rock");
 const anyOpen = process.argv.includes("--any-open");
-const args = process.argv.slice(2).filter((a) => !a.startsWith("--")).map(Number);
+const args = process.argv
+  .slice(2)
+  .filter((a) => !a.startsWith("--"))
+  .map(Number);
 const [seeds = rock ? 20 : 300, W = 512, H = 368] = args;
 const box = (x, y) => x >= 4 && y >= 4 && x < W - 4 && y < H - 4;
 let open = box;
 
 /** The seed's own plane, and its line through its nests' holes (generateOneWorld's), with --rock; else the bare box. */
 function start(seed) {
-  if (!rock) return makeTransect([{ x: mid.x - 70, y: mid.y }, { x: mid.x + 70, y: mid.y }]);
+  if (!rock)
+    return makeTransect([
+      { x: mid.x - 70, y: mid.y },
+      { x: mid.x + 70, y: mid.y },
+    ]);
   const plane = generateWorld(seed, { ...OPEN_WORLD, size: { w: W, h: H } });
   const line = makeTransect(
     plane.nests.map((n) => {
@@ -54,7 +61,13 @@ function fly(t, from, rng, dist, radius) {
 }
 
 const mid = { x: Math.round(W / 2), y: Math.round(H / 2) };
-for (const [dist, radius] of [[140, 70], [140, 140], [140, 210], [210, 70], [210, 140]]) {
+for (const [dist, radius] of [
+  [140, 70],
+  [140, 140],
+  [140, 210],
+  [210, 70],
+  [210, 140],
+]) {
   const tally = { end: [0, 0], interior: [0, 0] };
   let holes = 0;
   for (let seed = 1; seed <= seeds; seed++) {
@@ -74,5 +87,7 @@ for (const [dist, radius] of [[140, 70], [140, 140], [140, 210], [210, 70], [210
     });
   }
   const pct = ([n, f]) => `${((100 * f) / Math.max(1, n)).toFixed(0)}% of ${n}`;
-  console.log(`flight ${dist}, radius ${radius}: fail from ends ${pct(tally.end)}, from interior ${pct(tally.interior)}; mean holes ${(holes / seeds).toFixed(1)}`);
+  console.log(
+    `flight ${dist}, radius ${radius}: fail from ends ${pct(tally.end)}, from interior ${pct(tally.interior)}; mean holes ${(holes / seeds).toFixed(1)}`,
+  );
 }

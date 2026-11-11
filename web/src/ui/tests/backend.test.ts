@@ -7,7 +7,12 @@ import { PASS_HEADER as WORKER_PASS_HEADER } from "../../../worker/gate.ts";
 const running = { phase: "running" as const, run: null, lastError: null };
 
 const reply = (status: number, body: unknown, json = true) =>
-  (async () => ({ ok: status >= 200 && status < 300, status, json: async () => (json ? body : Promise.reject(new SyntaxError("<html>"))) }) as Response) as typeof fetch;
+  (async () =>
+    ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => (json ? body : Promise.reject(new SyntaxError("<html>"))),
+    }) as Response) as typeof fetch;
 
 test("apiUrl defaults to the root outside Vite", () => {
   assert.equal(apiUrl("api/jev"), "/api/jev");
@@ -28,7 +33,12 @@ test("static host: 404, HTML body, or network error all mean no backend", async 
   const none = { hasBackend: false, hasKey: false };
   assert.deepEqual(await detectBackend(reply(404, null)), none);
   assert.deepEqual(await detectBackend(reply(200, null, false)), none);
-  assert.deepEqual(await detectBackend((async () => { throw new TypeError("offline"); }) as typeof fetch), none);
+  assert.deepEqual(
+    await detectBackend((async () => {
+      throw new TypeError("offline");
+    }) as typeof fetch),
+    none,
+  );
   assert.match(policyLock(none, running)!, /No Jev server/);
 });
 
@@ -62,7 +72,15 @@ test("hosted proxy without the passphrase: a backend that is locked until it is 
   assert.equal(isDemo(b), false);
   assert.match(policyLock(b, running)!, /passphrase/);
   assert.equal(canResume(b, { phase: "off", run: null, lastError: null }, false), false);
-  const open = await detectBackend(reply(200, { ok: true, hasKey: true, hosted: true, authorized: true, run: { budget: { day: "2026-11-10", usdPerDay: 2, spentUsd: 0, remainingUsd: 2 } } }));
+  const open = await detectBackend(
+    reply(200, {
+      ok: true,
+      hasKey: true,
+      hosted: true,
+      authorized: true,
+      run: { budget: { day: "2026-11-10", usdPerDay: 2, spentUsd: 0, remainingUsd: 2 } },
+    }),
+  );
   assert.equal(open.needsPass, undefined);
   assert.equal(open.budget?.usdPerDay, 2);
   assert.equal(policyLock(open, running), null);

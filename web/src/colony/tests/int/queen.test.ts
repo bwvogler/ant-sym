@@ -10,7 +10,6 @@ import { SMALL_SIDE } from "../builders.ts";
 // Nest slice 4 (docs/nest-and-home.md §3.4): the queen lays, brood grows from egg to larva (fed) to pupa, workers are
 // born from pupae, and a colony that loses its queen is orphaned: no more eggs, its workers age out.
 
-
 /** A side world with no food on it: what the colony eats is only what a test puts in its larder. */
 function bare(seed: number) {
   const map = generateSideWorld(seed, SMALL_SIDE);
@@ -94,7 +93,12 @@ test("nurses take eggs from the queen to a brood chamber", () => {
     for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
     const inBrood = c.brood.items.filter((b) => b.held < 0 && b.chamber === brood.id).length;
     // Every chamber counts exactly what lies in it (the royal one too: a pick-up takes it off its count).
-    for (const ch2 of ch.list) assert.equal(ch2.brood, c.brood.items.filter((b) => b.held < 0 && b.chamber === ch2.id).length, `seed ${seed}: chamber ${ch2.id} (${ch2.role})`);
+    for (const ch2 of ch.list)
+      assert.equal(
+        ch2.brood,
+        c.brood.items.filter((b) => b.held < 0 && b.chamber === ch2.id).length,
+        `seed ${seed}: chamber ${ch2.id} (${ch2.role})`,
+      );
     assert.ok(brood.brood === inBrood, `seed ${seed}: the chamber counts what lies in it`);
     moved += inBrood;
   }
@@ -177,4 +181,3 @@ test("a larva is fed before it pupates: with no food for it, it stays a larva", 
   for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
   assert.notEqual(b.stage, LARVA, "fed, it pupated");
 });
-

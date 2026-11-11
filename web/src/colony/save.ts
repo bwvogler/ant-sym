@@ -110,7 +110,18 @@ export function fillLike(current: unknown, saved: unknown): unknown {
     return current;
   }
   // A plain object (or one of the sim's own) into the one it is now, field by field: chunk layers and arrays inside it keep their identity.
-  if (!special && saved !== null && typeof saved === "object" && !Array.isArray(saved) && current !== null && typeof current === "object" && !Array.isArray(current) && !ArrayBuffer.isView(current) && !(current instanceof Map) && !(current instanceof Set)) {
+  if (
+    !special &&
+    saved !== null &&
+    typeof saved === "object" &&
+    !Array.isArray(saved) &&
+    current !== null &&
+    typeof current === "object" &&
+    !Array.isArray(current) &&
+    !ArrayBuffer.isView(current) &&
+    !(current instanceof Map) &&
+    !(current instanceof Set)
+  ) {
     const t = current as Record<string, unknown>;
     for (const [k, x] of Object.entries(saved as Record<string, unknown>)) {
       const d = Object.getOwnPropertyDescriptor(t, k);
@@ -120,7 +131,12 @@ export function fillLike(current: unknown, saved: unknown): unknown {
     return current;
   }
   const v = decode(saved);
-  if (ArrayBuffer.isView(current) && ArrayBuffer.isView(v) && (current as unknown as ArrayLike<number>).length === (v as unknown as ArrayLike<number>).length && current.constructor === v.constructor) {
+  if (
+    ArrayBuffer.isView(current) &&
+    ArrayBuffer.isView(v) &&
+    (current as unknown as ArrayLike<number>).length === (v as unknown as ArrayLike<number>).length &&
+    current.constructor === v.constructor
+  ) {
     (current as unknown as { set(a: ArrayLike<number>): void }).set(v as unknown as ArrayLike<number>);
     return current;
   }

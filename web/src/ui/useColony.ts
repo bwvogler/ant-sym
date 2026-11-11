@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Colony, type Mode, type Stance, DEFAULT_MENU, STRAINS, type Fungus, Game, GAME_REGROW, gameRng, type Outcome, type Unity, chapterOf, type ChapterView, UPGRADES, generateOneWorld } from "../colony/index.ts";
+import {
+  type Colony,
+  type Mode,
+  type Stance,
+  DEFAULT_MENU,
+  STRAINS,
+  type Fungus,
+  Game,
+  GAME_REGROW,
+  gameRng,
+  type Outcome,
+  type Unity,
+  chapterOf,
+  type ChapterView,
+  UPGRADES,
+  generateOneWorld,
+} from "../colony/index.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
@@ -45,7 +61,20 @@ export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 /** The colony the fungus lands by. */
 export const LANDING_COLONY = 0;
 
-export const DEFAULT_COLONY_CONTROLS: ColonyControls = { seed: 1, antCount: 600, speed: GAME_SPEED, playing: false, started: false, showFoodTrail: true, showHomeTrail: false, menu: [...DEFAULT_MENU], hide: false, cull: false, rival: true, view: "above" };
+export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
+  seed: 1,
+  antCount: 600,
+  speed: GAME_SPEED,
+  playing: false,
+  started: false,
+  showFoodTrail: true,
+  showHomeTrail: false,
+  menu: [...DEFAULT_MENU],
+  hide: false,
+  cull: false,
+  rival: true,
+  view: "above",
+};
 
 /** One colony's line in the panel. */
 export interface SideStats {
@@ -127,7 +156,13 @@ function evolutionStats(game: Game): EvolutionStats | null {
     for (let i = 0; i < c.n; i++) if (c.alive[i] && c.strain[i] === e.strain) inHosts += c.load[i];
     if (c.queen?.alive && c.queen.strain === e.strain) inHosts += c.queen.load;
   }
-  return { mass: e.mass, inHosts, mutations: Math.floor(e.mutations), perMinute: 60 * e.rate, levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])) };
+  return {
+    mass: e.mass,
+    inHosts,
+    mutations: Math.floor(e.mutations),
+    perMinute: 60 * e.rate,
+    levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])),
+  };
 }
 
 /** Ants in each mode, over every colony. */
@@ -148,14 +183,35 @@ function seenTogether(colonies: readonly Colony[]): number {
 
 function side(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
-  return { population: c.population, cap: c.params.maxAnts, stored: c.stored, losses: c.losses, births: c.births, queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null, queenLoad: c.queen?.load ?? 0, brood: c.brood.counts(), broodKilled: c.broodKilled, stance: c.ownStances ? stanceText(c.stanceCounts()) : c.stance, infected: f.living ? f.infected / f.living : 0, resist: f.meanResist, dug: c.soilDug, mound: c.soilOut, filled: c.soilFilled, refilled: c.looseFilled };
+  return {
+    population: c.population,
+    cap: c.params.maxAnts,
+    stored: c.stored,
+    losses: c.losses,
+    births: c.births,
+    queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null,
+    queenLoad: c.queen?.load ?? 0,
+    brood: c.brood.counts(),
+    broodKilled: c.broodKilled,
+    stance: c.ownStances ? stanceText(c.stanceCounts()) : c.stance,
+    infected: f.living ? f.infected / f.living : 0,
+    resist: f.meanResist,
+    dug: c.soilDug,
+    mound: c.soilOut,
+    filled: c.soilFilled,
+    refilled: c.looseFilled,
+  };
 }
 
 /** A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load). */
 export function buildGame(s: GameSettings): Game {
   // The page plays one world only (owner, 2026-11-10; PRD §55): the side and open maps stay for the assays and scripts.
   const map = generateOneWorld(s.seed);
-  return new Game(map, { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false }, gameRng(s.seed, s.generation));
+  return new Game(
+    map,
+    { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false },
+    gameRng(s.seed, s.generation),
+  );
 }
 
 /** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
@@ -172,14 +228,25 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     const build = () => buildGame({ seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
     const g = build();
     const r = pending.current;
-    if (r && r.settings.seed === controls.seed && r.settings.antCount === controls.antCount && r.settings.rival === controls.rival && r.settings.generation === generation) {
+    if (
+      r &&
+      r.settings.seed === controls.seed &&
+      r.settings.antCount === controls.antCount &&
+      r.settings.rival === controls.rival &&
+      r.settings.generation === generation
+    ) {
       pending.current = null;
       try {
         g.load(r.game);
       } catch (e) {
         // A save this game can't read (another version, another shape): a fresh game of the same world rather than a
         // blank page (PR #42 review, B3). The notice waits until React has finished rendering.
-        queueMicrotask(() => pushToast(`That save couldn't be loaded (${e instanceof Error ? e.message : String(e)}); this is a fresh game of its world.`, "warn"));
+        queueMicrotask(() =>
+          pushToast(
+            `That save couldn't be loaded (${e instanceof Error ? e.message : String(e)}); this is a fresh game of its world.`,
+            "warn",
+          ),
+        );
         return build();
       }
     }
@@ -278,14 +345,24 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const loadSave = useCallback((r: SaveRecord) => {
     pending.current = r;
     setGeneration(r.settings.generation);
-    setControls((c) => ({ ...c, seed: r.settings.seed, antCount: r.settings.antCount, rival: r.settings.rival, started: true, playing: true }));
+    setControls((c) => ({
+      ...c,
+      seed: r.settings.seed,
+      antCount: r.settings.antCount,
+      rival: r.settings.rival,
+      started: true,
+      playing: true,
+    }));
     setLoads((n) => n + 1);
   }, []);
   /** What builds this game again (saves.ts). */
   const settings: GameSettings = { seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation };
 
   /** The start screen's Start: this seed, playing, the fungus lands. */
-  const start = useCallback((seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })), []);
+  const start = useCallback(
+    (seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })),
+    [],
+  );
 
   const onFrame = useCallback((fn: () => void) => {
     frameListeners.current.add(fn);
@@ -308,7 +385,15 @@ function chapterFor(game: Game): ChapterView {
   const line = game.lineage(k);
   const gynes = line.reduce((n, j) => n + (game.colonies[j]?.gynes ?? 0), 0);
   const daughters = line.length - 1;
-  return chapterOf({ landed: game.landed !== null, colony: colonyName(k), hosts: f.infected, share: f.living ? f.infected / f.living : 0, queenInfected: game.revealed[k] === true, gynes, daughters });
+  return chapterOf({
+    landed: game.landed !== null,
+    colony: colonyName(k),
+    hosts: f.infected,
+    share: f.living ? f.infected / f.living : 0,
+    queenInfected: game.revealed[k] === true,
+    gynes,
+    daughters,
+  });
 }
 
 /** Each ant's own stance, counted (top-down): "3 defend · 12 raid", or "all forage". */

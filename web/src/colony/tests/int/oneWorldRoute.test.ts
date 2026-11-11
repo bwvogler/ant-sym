@@ -26,7 +26,12 @@ interface World {
 
 /** Seed 7's small plane, no food, no rock unless `band` carves it (rock cells given), no scouts; the player's ants young but ant 0, which is old. */
 function plane(params: Partial<Colony["params"]> = { routeMemory: 1 }, rock: [number, number, number, number][] = []): World {
-  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(7), { colony: params });
+  const g = new Game(
+    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
+    { antCount: 10, rivalAnts: 10, regrow: 0 },
+    gameRng(7),
+    { colony: params },
+  );
   const map = g.world!.plane;
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   map.foodLeft = 0;
@@ -110,9 +115,13 @@ test("route memory records a place every routeStep cells on the way out, from th
   assert.ok(walked > 20, `it walked ${walked.toFixed(0)} cells`);
   assert.equal(n, Math.floor(walked / 8), `${n} places for ${walked.toFixed(1)} cells at 8 a place`);
   // Each place is where it stood: on the line it walked (east, at the hole's row, give or take its wander), spaced about 8 apart.
-  for (let k = 0; k < n; k++) assert.ok(Math.abs((c.routePlaces[2 * k + 1]) - hy) < 12 && (c.routePlaces[2 * k]) > hx, `place ${k}: (${c.routePlaces[2 * k]}, ${c.routePlaces[2 * k + 1]}) from (${hx}, ${hy})`);
+  for (let k = 0; k < n; k++)
+    assert.ok(
+      Math.abs(c.routePlaces[2 * k + 1] - hy) < 12 && c.routePlaces[2 * k] > hx,
+      `place ${k}: (${c.routePlaces[2 * k]}, ${c.routePlaces[2 * k + 1]}) from (${hx}, ${hy})`,
+    );
   for (let k = 1; k < n; k++) {
-    const d = Math.hypot((c.routePlaces[2 * k]) - (c.routePlaces[2 * k - 2]), (c.routePlaces[2 * k + 1]) - (c.routePlaces[2 * k - 1]));
+    const d = Math.hypot(c.routePlaces[2 * k] - c.routePlaces[2 * k - 2], c.routePlaces[2 * k + 1] - c.routePlaces[2 * k - 1]);
     assert.ok(d > 5 && d < 11, `places ${k - 1} and ${k} are ${d.toFixed(1)} apart`);
   }
   // Homing (a carrier, or on its way back), it stores nothing more.
@@ -130,7 +139,7 @@ test("route memory records a place every routeStep cells on the way out, from th
     g.tick(DT);
     c.mode[0] = MODES.indexOf("fight");
   }
-  assert.ok((c.odoSurf[0]) > 8, "it walked");
+  assert.ok(c.odoSurf[0] > 8, "it walked");
   assert.equal(c.routeN[0], before, "a fighter adds no place");
 });
 
@@ -141,7 +150,13 @@ test("route memory off (routeMemory 0) records nothing, and a place set by hand 
     const { g, c, hx, hy } = w;
     carrier(w, hx + 60, hy + 5, 80);
     if (mem) {
-      store(c, along([[hx, hy], [hx + 60, hy + 5]]));
+      store(
+        c,
+        along([
+          [hx, hy],
+          [hx + 60, hy + 5],
+        ]),
+      );
       c.routeState[0] = 0;
     }
     const xs: number[] = [];
@@ -175,26 +190,30 @@ test("route memory: a full store keeps every second place and doubles its spacin
   c.odoSurf[0] = 0;
   const first: number[] = [];
   let doubled = false;
-  for (let k = 0; k < 8 * 30 && (c.x[0]) < 150; k++) {
+  for (let k = 0; k < 8 * 30 && c.x[0] < 150; k++) {
     g.tick(DT);
-    assert.ok((c.routeN[0]) <= 8, "never more than routeMax");
-    if (!first.length && (c.routeN[0]) > 0) first.push(c.routePlaces[0], c.routePlaces[1]);
-    if ((c.routeGap[0]) > 2 && !doubled) {
+    assert.ok(c.routeN[0] <= 8, "never more than routeMax");
+    if (!first.length && c.routeN[0] > 0) first.push(c.routePlaces[0], c.routePlaces[1]);
+    if (c.routeGap[0] > 2 && !doubled) {
       doubled = true;
       assert.equal(c.routeGap[0], 4, "the spacing doubled");
       assert.equal(c.routeN[0], 5, "the 4 it kept (of 8) and the place that was due");
       assert.equal(c.routePlaces[0], first[0], "the first place is kept");
-      const d = Math.hypot((c.routePlaces[2]) - (c.routePlaces[0]), (c.routePlaces[3]) - (c.routePlaces[1]));
+      const d = Math.hypot(c.routePlaces[2] - c.routePlaces[0], c.routePlaces[3] - c.routePlaces[1]);
       assert.ok(d > 3 && d < 5, `the kept places are ${d.toFixed(1)} apart, twice the old spacing`);
     }
   }
   assert.ok(doubled, "the store filled");
-  assert.ok((c.routeGap[0]) >= 4);
+  assert.ok(c.routeGap[0] >= 4);
 });
 
 test("route memory: a newborn in a dead ant's slot has no places and no retrace", () => {
   const { c } = plane();
-  store(c, [[50, 50], [58, 50], [66, 50]]);
+  store(c, [
+    [50, 50],
+    [58, 50],
+    [66, 50],
+  ]);
   c.routeState[0] = 1;
   c.routeGoal[0] = 2;
   c.routeGap[0] = 16;
@@ -216,10 +235,16 @@ test("route memory: coming up out of its own hole starts the trip's places afres
   c.mode[0] = EXPLORE;
   c.heading[0] = -Math.PI / 2;
   c.leaveOk[0] = 1;
-  store(c, [[hx + 8, hy], [hx + 16, hy]]);
+  store(c, [
+    [hx + 8, hy],
+    [hx + 16, hy],
+  ]);
   c.routeState[0] = 2;
-  assert.ok(tickUntil(g, 20, () => c.layer[0] === PLANE), "it came up");
-  assert.ok((c.routeN[0]) <= 1, `${c.routeN[0]} places after coming up: the old ones are gone`);
+  assert.ok(
+    tickUntil(g, 20, () => c.layer[0] === PLANE),
+    "it came up",
+  );
+  assert.ok(c.routeN[0] <= 1, `${c.routeN[0]} places after coming up: the old ones are gone`);
   assert.equal(c.routeState[0], 0);
 });
 
@@ -228,7 +253,13 @@ test("route memory 1: a carrier walled off from its hole by a band walks back ou
     const w = plane({ routeMemory: mem }, POCKET);
     const { g, c, hx, hy } = w;
     // Its way out: up over the band, along it to its east end, down and back in along the pocket.
-    const out = along([[hx, hy], [hx + 12, hy - 18], [hx + 107, hy - 18], [hx + 107, hy], [hx + 62, hy]]);
+    const out = along([
+      [hx, hy],
+      [hx + 12, hy - 18],
+      [hx + 107, hy - 18],
+      [hx + 107, hy],
+      [hx + 62, hy],
+    ]);
     carrier(w, hx + 62, hy, 80);
     store(c, out);
     return tickUntil(g, 150, () => c.layer[0] !== PLANE) ? g.time : null;
@@ -243,7 +274,13 @@ test("route memory: a stalled carrier starts retracing (routeMemory 1 and 2), on
   const state = (mem: number): { state: number; goal: number; n: number } => {
     const w = plane({ routeMemory: mem }, POCKET);
     const { g, c, hx, hy } = w;
-    const out = along([[hx, hy], [hx + 12, hy - 18], [hx + 107, hy - 18], [hx + 107, hy], [hx + 62, hy]]);
+    const out = along([
+      [hx, hy],
+      [hx + 12, hy - 18],
+      [hx + 107, hy - 18],
+      [hx + 107, hy],
+      [hx + 62, hy],
+    ]);
     carrier(w, hx + 62, hy, 80);
     store(c, out);
     tickUntil(g, 20, () => c.routeState[0] !== 0);
@@ -261,7 +298,13 @@ test("route memory 2 retraces on reaching its belief with no hole there; 1 searc
   const at = (mem: number): { state: number; search: number } => {
     const w = plane({ routeMemory: mem });
     const { g, c, hx, hy } = w;
-    store(c, along([[hx, hy], [hx + 60, hy]]));
+    store(
+      c,
+      along([
+        [hx, hy],
+        [hx + 60, hy],
+      ]),
+    );
     carrier(w, hx + 60, hy, 60);
     c.driftSurf[0] = 1; // its vector's end is where it stands: 60 east of the hole it believes it left, nothing there
     g.tick(DT);
@@ -281,19 +324,36 @@ test("route memory 2 retraces on reaching its belief with no hole there; 1 searc
 test("route memory 2 retraces the way out to where it began: its first place, near its hole, where the retrace ends", () => {
   const w = plane({ routeMemory: 2 });
   const { g, c, hx, hy } = w;
-  store(c, [[hx + 7, hy], ...along([[hx + 7, hy], [hx + 30, hy + 20], [hx + 60, hy]])]);
+  store(c, [
+    [hx + 7, hy],
+    ...along([
+      [hx + 7, hy],
+      [hx + 30, hy + 20],
+      [hx + 60, hy],
+    ]),
+  ]);
   carrier(w, hx + 60, hy, 60);
   c.driftSurf[0] = 1; // its belief is the spot it stands on, 60 cells from the hole it left
-  assert.ok(tickUntil(g, 20, () => c.routeState[0] === 2), "it walked its places in order to the first");
+  assert.ok(
+    tickUntil(g, 20, () => c.routeState[0] === 2),
+    "it walked its places in order to the first",
+  );
   assert.ok(g.time > 5 && g.time < 15, `after ${g.time.toFixed(1)} s (some 85 cells of places at 7 a second)`);
-  assert.ok(Math.hypot((c.x[0]) - hx, (c.y[0]) - hy) < 14, "and it is by its hole");
+  assert.ok(Math.hypot(c.x[0] - hx, c.y[0] - hy) < 14, "and it is by its hole");
 });
 
 test("route memory: a carrier without food, without places, or already retraced this trip does not retrace", () => {
   const run = (mem: number, how: "food" | "places" | "done"): { state: number; search: number } => {
     const w = plane({ routeMemory: mem });
     const { g, c, hx, hy } = w;
-    if (how !== "places") store(c, along([[hx, hy], [hx + 60, hy]]));
+    if (how !== "places")
+      store(
+        c,
+        along([
+          [hx, hy],
+          [hx + 60, hy],
+        ]),
+      );
     carrier(w, hx + 60, hy, 60);
     c.driftSurf[0] = 1;
     if (how === "food") c.carrying[0] = 0;
@@ -324,7 +384,19 @@ test("route memory: a carrier without food, without places, or already retraced 
 
 test("route memory: within routeSee of a place it takes the earliest and aims for the one before; routeSee 0 only walks them in order", () => {
   // A way out that doubled back: place 2 and place 9 lie 4 apart.
-  const loop: [number, number][] = [[60, 40], [66, 40], [72, 40], [78, 44], [82, 50], [86, 56], [90, 52], [86, 46], [80, 42], [74, 41], [68, 38]];
+  const loop: [number, number][] = [
+    [60, 40],
+    [66, 40],
+    [72, 40],
+    [78, 44],
+    [82, 50],
+    [86, 56],
+    [90, 52],
+    [86, 46],
+    [80, 42],
+    [74, 41],
+    [68, 38],
+  ];
   const goalAfter = (see: number, x: number, y: number): number => {
     const w = plane({ routeMemory: 1, routeSee: see });
     const { g, c } = w;
@@ -343,7 +415,19 @@ test("route memory: within routeSee of a place it takes the earliest and aims fo
 });
 
 test("route memory: a new goal judges progress afresh, not against the distance to the last one", () => {
-  const loop: [number, number][] = [[60, 40], [66, 40], [72, 40], [78, 44], [82, 50], [86, 56], [90, 52], [86, 46], [80, 42], [74, 41], [68, 38]];
+  const loop: [number, number][] = [
+    [60, 40],
+    [66, 40],
+    [72, 40],
+    [78, 44],
+    [82, 50],
+    [86, 56],
+    [90, 52],
+    [86, 46],
+    [80, 42],
+    [74, 41],
+    [68, 38],
+  ];
   const w = plane({ routeMemory: 1, routeSee: 5 });
   const { g, c } = w;
   store(c, loop);
@@ -353,7 +437,7 @@ test("route memory: a new goal judges progress afresh, not against the distance 
   c.bestD[0] = 0.5; // got within half a cell of the old goal
   g.tick(DT);
   assert.equal(c.routeGoal[0], 1, "it jumped to the earliest place it is near");
-  assert.ok((c.bestD[0]) > 3, `progress toward the new goal starts from its own distance, not the old goal's (${c.bestD[0]})`);
+  assert.ok(c.bestD[0] > 3, `progress toward the new goal starts from its own distance, not the old goal's (${c.bestD[0]})`);
 });
 
 test("route memory: out of places the carrier searches as before and does not retrace again this trip", () => {
@@ -366,7 +450,7 @@ test("route memory: out of places the carrier searches as before and does not re
   g.tick(DT);
   assert.equal(c.routeState[0], 2, "the last place reached: done");
   assert.equal(c.routeGoal[0], -1);
-  assert.ok((c.search[0]) > 0, "its search goes on from here");
+  assert.ok(c.search[0] > 0, "its search goes on from here");
   for (let k = 0; k < 30 * 30; k++) {
     g.tick(DT);
     assert.equal(c.routeState[0], 2, "stalled against the band again, it does not retrace a second time");
@@ -379,11 +463,19 @@ test("route memory: a place it cannot get to (behind rock) is given up on a stal
   const { g, c, hx, hy } = w;
   const here = hx + 62;
   // Places 0 to 2 lie outside the pocket (below its lower arm); place 3, the goal, is on the far side of its wall: straight at it is rock.
-  store(c, [[hx + 10, hy + 25], [hx + 20, hy + 25], [hx + 30, hy + 25], [hx + 10, hy]]);
+  store(c, [
+    [hx + 10, hy + 25],
+    [hx + 20, hy + 25],
+    [hx + 30, hy + 25],
+    [hx + 10, hy],
+  ]);
   carrier(w, here, hy, 80);
   c.routeState[0] = 1;
   c.routeGoal[0] = 3;
-  assert.ok(tickUntil(g, 60, () => (c.routeGoal[0]) < 3), "the goal moved to an earlier place");
+  assert.ok(
+    tickUntil(g, 60, () => c.routeGoal[0] < 3),
+    "the goal moved to an earlier place",
+  );
   assert.equal(c.routeGoal[0], 2, "to the one before");
   assert.ok(g.time > 3 && g.time < 15, `after the stall, ${g.time.toFixed(1)} s`);
 });
@@ -391,11 +483,18 @@ test("route memory: a place it cannot get to (behind rock) is given up on a stal
 test("route memory: the hole's sight takes over at any moment of a retrace", () => {
   const w = plane({ routeMemory: 1 });
   const { g, c, hx, hy } = w;
-  store(c, [[hx + 30, hy], [hx + 40, hy + 10], [hx + 50, hy]]);
+  store(c, [
+    [hx + 30, hy],
+    [hx + 40, hy + 10],
+    [hx + 50, hy],
+  ]);
   carrier(w, hx + 4, hy + 2, 60);
   c.routeState[0] = 1;
   c.routeGoal[0] = 2;
-  assert.ok(tickUntil(g, 5, () => c.layer[0] !== PLANE), "in sight of its hole it goes down it, not to its place 50 cells away");
+  assert.ok(
+    tickUntil(g, 5, () => c.layer[0] !== PLANE),
+    "in sight of its hole it goes down it, not to its place 50 cells away",
+  );
 });
 
 test("route memory: not on a top-down map, which has no vector to fail", () => {
@@ -422,13 +521,25 @@ test("route memory: not on a top-down map, which has no vector to fail", () => {
 
 test("route memory: a save carries the places and the retrace, and the game runs on to the same", () => {
   assert.equal(SAVE_VERSION, 9);
-  const make = (): Game => new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(7), { colony: { routeMemory: 2 } });
+  const make = (): Game =>
+    new Game(
+      generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
+      { antCount: 10, rivalAnts: 10, regrow: 0 },
+      gameRng(7),
+      { colony: { routeMemory: 2 } },
+    );
   const g = make();
   const c = g.player;
   const hc = c.holeCells[c.params.nest] as HoleCell;
   const hx = centreX(hc.px, hc.py);
   const hy = centreY(hc.py);
-  store(c, along([[hx, hy], [hx + 40, hy + 8]]));
+  store(
+    c,
+    along([
+      [hx, hy],
+      [hx + 40, hy + 8],
+    ]),
+  );
   c.routeState[0] = 1;
   c.routeGoal[0] = 3;
   c.routeGap[0] = 16;
@@ -440,12 +551,14 @@ test("route memory: a save carries the places and the retrace, and the game runs
   const fresh = make();
   fresh.load(saved);
   const f = fresh.player;
-  for (const k of ["routePlaces", "routeN", "routeGap", "routeAt", "routeState", "routeGoal"] as const) assert.deepEqual(Array.from(f[k]), Array.from(c[k]), k);
+  for (const k of ["routePlaces", "routeN", "routeGap", "routeAt", "routeState", "routeGoal"] as const)
+    assert.deepEqual(Array.from(f[k]), Array.from(c[k]), k);
   for (let k = 0; k < 60; k++) {
     g.tick(DT);
     fresh.tick(DT);
   }
-  for (const k of ["x", "y", "routeN", "routeState", "routeGoal"] as const) assert.deepEqual(Array.from(fresh.player[k]), Array.from(c[k]), `after running on: ${k}`);
+  for (const k of ["x", "y", "routeN", "routeState", "routeGoal"] as const)
+    assert.deepEqual(Array.from(fresh.player[k]), Array.from(c[k]), `after running on: ${k}`);
 });
 
 test("R1: pocket carriers get home with route memory 2 (seed 4: 45 % home within 300 s without it)", { timeout: 120_000 }, () => {

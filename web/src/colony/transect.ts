@@ -85,7 +85,8 @@ function marginCells(holes: readonly Cell[], end: End, margin: number): Int32Arr
 export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0?: number } = {}): Transect {
   if (holes.length === 0) throw new Error("makeTransect: no holes");
   for (let i = 1; i < holes.length; i++)
-    if (holes[i]!.x === holes[i - 1]!.x && holes[i]!.y === holes[i - 1]!.y) throw new Error(`makeTransect: holes ${i - 1} and ${i} are the same cell`);
+    if (holes[i]!.x === holes[i - 1]!.x && holes[i]!.y === holes[i - 1]!.y)
+      throw new Error(`makeTransect: holes ${i - 1} and ${i} are the same cell`);
   const margin = opts.margin ?? MARGIN;
   const s0 = opts.s0 ?? 0;
   if (!Number.isInteger(margin) || margin < 0) throw new Error(`makeTransect: margin ${margin} is not a whole number of cells`);
@@ -107,7 +108,14 @@ export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0
   }
   const after = marginCells(holes, "end", margin);
   for (let j = 0; j < after.length; j++) parts.push(after[j]!);
-  return { holes: holes.map((h) => ({ x: h.x, y: h.y })), sHole, sMin: s0 - margin, sMax: s + margin, margin, cells: Int32Array.from(parts) };
+  return {
+    holes: holes.map((h) => ({ x: h.x, y: h.y })),
+    sHole,
+    sMin: s0 - margin,
+    sMax: s + margin,
+    margin,
+    cells: Int32Array.from(parts),
+  };
 }
 
 /**
@@ -189,7 +197,9 @@ function meets(p: Seg, q: Seg): boolean {
   const d3 = cross(x2 - x1, y2 - y1, x3 - x1, y3 - y1);
   const d4 = cross(x2 - x1, y2 - y1, x4 - x1, y4 - y1);
   if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
-  return (d1 === 0 && onSeg(q, x1, y1)) || (d2 === 0 && onSeg(q, x2, y2)) || (d3 === 0 && onSeg(p, x3, y3)) || (d4 === 0 && onSeg(p, x4, y4));
+  return (
+    (d1 === 0 && onSeg(q, x1, y1)) || (d2 === 0 && onSeg(q, x2, y2)) || (d3 === 0 && onSeg(p, x3, y3)) || (d4 === 0 && onSeg(p, x4, y4))
+  );
 }
 
 function onSeg([x1, y1, x2, y2]: Seg, px: number, py: number): boolean {
@@ -358,7 +368,12 @@ function roundDisc(radius: number, parity: number): Int16Array {
  * holds, with the end it grows; nearest by exact distance, then a fixed order, so a game replays. Null when there is
  * none (a flight with nowhere to land fails: one-world §3, §8).
  */
-export function nearestValid(t: Transect, p: Cell, radius: number, open: (x: number, y: number) => boolean): { cell: Cell; end: End } | null {
+export function nearestValid(
+  t: Transect,
+  p: Cell,
+  radius: number,
+  open: (x: number, y: number) => boolean,
+): { cell: Cell; end: End } | null {
   const offs = roundDisc(radius, p.y & 1);
   for (let i = 0; i < offs.length; i += 2) {
     const cell = { x: p.x + offs[i]!, y: p.y + offs[i + 1]! };

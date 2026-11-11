@@ -15,7 +15,8 @@ import { DT, run } from "../builders.ts";
 
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
-const small = (seed = 7, w = 160): Game => new Game(generateOneWorld(seed, { plane: { size: { w, h: 100 } } }), { antCount: 60, rivalAnts: 60 }, gameRng(seed));
+const small = (seed = 7, w = 160): Game =>
+  new Game(generateOneWorld(seed, { plane: { size: { w, h: 100 } } }), { antCount: 60, rivalAnts: 60 }, gameRng(seed));
 const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
 
 /**
@@ -47,7 +48,10 @@ function setUp(): { saved: GameSave; unbroken: string } {
   }
   assert.ok((g.map.moundCells ?? 0) > 0, "the mound has begun");
   assert.ok(g.fungus.sporeCells > 0);
-  assert.ok(g.colonies.every((k) => k.layers[PLANE]!.ph.total("home") > 0), "every colony has trails on the plane");
+  assert.ok(
+    g.colonies.every((k) => k.layers[PLANE]!.ph.total("home") > 0),
+    "every colony has trails on the plane",
+  );
   const saved = copy(g.save());
   run(g, 5);
   return { saved, unbroken: hashGame(g) };

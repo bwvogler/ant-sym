@@ -12,12 +12,12 @@ const PASS = "correct horse battery staple";
 
 function storage() {
   const m = new Map<string, unknown>();
-  return { m, get: async <T,>(k: string) => m.get(k) as T | undefined, put: async (k: string, v: unknown) => void m.set(k, v) };
+  return { m, get: async <T>(k: string) => m.get(k) as T | undefined, put: async (k: string, v: unknown) => void m.set(k, v) };
 }
 
 async function ledgerObject(env: Record<string, string>, store = storage()) {
   let ready: Promise<unknown> = Promise.resolve();
-  const state = { storage: store, blockConcurrencyWhile: <T,>(fn: () => Promise<T>) => (ready = fn()) as Promise<T> };
+  const state = { storage: store, blockConcurrencyWhile: <T>(fn: () => Promise<T>) => (ready = fn()) as Promise<T> };
   const obj = new JevLedger(state, env as never);
   await ready;
   return { obj, store };
@@ -42,7 +42,11 @@ function stubUpstream(inputTokens: number) {
   upstream = [];
   globalThis.fetch = (async (_url: string, init: RequestInit) => {
     upstream.push({ body: JSON.parse(String(init.body)) });
-    return Response.json({ model: "jev", answers: { q: { type: "noul", noul: 1 } }, usage: { input_tokens: inputTokens, output_tokens: 1 } });
+    return Response.json({
+      model: "jev",
+      answers: { q: { type: "noul", noul: 1 } },
+      usage: { input_tokens: inputTokens, output_tokens: 1 },
+    });
   }) as typeof fetch;
 }
 afterEach(() => {
@@ -70,7 +74,10 @@ test("without the right passphrase: health says locked, every other route is 401
   const health = await worker.fetch(req("/api/health", { origin: PAGES }), env as never);
   assert.deepEqual(await health.json(), { ok: true, hasKey: true, hosted: true, authorized: false });
   for (const pass of [undefined, "", "wrong"]) {
-    const r = await worker.fetch(req("/api/run", { method: "POST", origin: PAGES, pass, body: JSON.stringify({ action: "start" }) }), env as never);
+    const r = await worker.fetch(
+      req("/api/run", { method: "POST", origin: PAGES, pass, body: JSON.stringify({ action: "start" }) }),
+      env as never,
+    );
     assert.equal(r.status, 401, `pass ${JSON.stringify(pass)}`);
     assert.equal(r.headers.get("access-control-allow-origin"), PAGES, "the page can read the refusal");
   }
@@ -88,7 +95,11 @@ test("no passphrase configured: nobody gets in, not even with an empty header", 
 test("unlocked: a call goes through with CORS, the model is pinned, and no reply carries the key", async () => {
   stubUpstream(1_000);
   const env = await environment();
-  const send = (path: string, body?: unknown) => worker.fetch(req(path, { method: body ? "POST" : "GET", origin: PAGES, pass: PASS, ...(body ? { body: JSON.stringify(body) } : {}) }), env as never);
+  const send = (path: string, body?: unknown) =>
+    worker.fetch(
+      req(path, { method: body ? "POST" : "GET", origin: PAGES, pass: PASS, ...(body ? { body: JSON.stringify(body) } : {}) }),
+      env as never,
+    );
   const texts: string[] = [];
   for (const [path, body] of [["/api/health"], ["/api/run", { action: "start" }], ["/api/jev", ask], ["/api/run"]] as const) {
     const r = await send(path, body);
@@ -103,7 +114,9 @@ test("unlocked: a call goes through with CORS, the model is pinned, and no reply
 
 test("an oversized body is refused by its length, before it is read", async () => {
   const { obj } = await ledgerObject({ JEV_API_KEY: KEY, JEV_DAILY_USD: "1" });
-  const r = await obj.fetch(new Request("https://x/api/jev", { method: "POST", headers: { "content-length": String(2 << 20) }, body: "{}" }));
+  const r = await obj.fetch(
+    new Request("https://x/api/jev", { method: "POST", headers: { "content-length": String(2 << 20) }, body: "{}" }),
+  );
   assert.equal(r.status, 413);
 });
 
@@ -113,7 +126,8 @@ test("the day's spend is written to Durable Object storage and a rebuilt object 
   const store = storage();
   const env = { JEV_API_KEY: KEY, JEV_DAILY_USD: "1" };
   const { obj } = await ledgerObject(env, store);
-  const post = (o: { fetch(r: Request): Promise<Response> }, path: string, body: unknown) => o.fetch(new Request(`https://x${path}`, { method: "POST", body: JSON.stringify(body) }));
+  const post = (o: { fetch(r: Request): Promise<Response> }, path: string, body: unknown) =>
+    o.fetch(new Request(`https://x${path}`, { method: "POST", body: JSON.stringify(body) }));
   await post(obj, "/api/run", { action: "start" });
   assert.equal((await post(obj, "/api/jev", ask)).status, 200);
   assert.equal((store.m.get("daily-spend") as { tokens: number }).tokens, tokens);
@@ -146,7 +160,10 @@ test("a call already sent when a new run starts runs to its reply, and what it b
   // Slower than the dev server's 1.5 s grace, and honouring abort as a real fetch would.
   globalThis.fetch = ((_url: string, init: RequestInit) =>
     new Promise((resolve, reject) => {
-      const t = setTimeout(() => resolve(Response.json({ answers: { q: { type: "noul", noul: 1 } }, usage: { input_tokens: tokens } })), 1_800);
+      const t = setTimeout(
+        () => resolve(Response.json({ answers: { q: { type: "noul", noul: 1 } }, usage: { input_tokens: tokens } })),
+        1_800,
+      );
       init.signal?.addEventListener("abort", () => (clearTimeout(t), reject(init.signal?.reason)));
     })) as typeof fetch;
   const store = storage();

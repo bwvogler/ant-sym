@@ -20,9 +20,9 @@ const strainDefault = () => "default";
 // (B3/B7); a colony full of hosts drifts toward that odour, and two colonies
 // that come to smell alike stop fighting: unified.
 
-
 /** A colony at nest `nest` with odour `odour`, its first ants at `cells` and the rest dead. */
-const placed = (map: WorldMap, nest: number, odour: number, cells: [number, number][], policy = localPolicy): Colony => placedAt(map, cells, { nest, odour, seed: 7 + nest, policy });
+const placed = (map: WorldMap, nest: number, odour: number, cells: [number, number][], policy = localPolicy): Colony =>
+  placedAt(map, cells, { nest, odour, seed: 7 + nest, policy });
 
 const crowd = (x: number, y: number, n: number): [number, number][] => Array.from({ length: n }, () => [x, y]);
 
@@ -51,13 +51,28 @@ test("odour bands: an ant counts in its odour's band; look() counts only the ban
 test("with every ant at its colony's odour and nobody calm, odour recognition fights exactly as colony recognition did", () => {
   const map = arena(6.5);
   for (let round = 0; round < 6; round++) {
-    const setup = (): Colony[] => [placed(map, 0, 0, [...crowd(20, 6, 4), ...crowd(21, 6, 3)]), placed(map, 1, 1, [...crowd(20, 6, 3), ...crowd(21, 7, 5)])];
+    const setup = (): Colony[] => [
+      placed(map, 0, 0, [...crowd(20, 6, 4), ...crowd(21, 6, 3)]),
+      placed(map, 1, 1, [...crowd(20, 6, 3), ...crowd(21, 7, 5)]),
+    ];
     const old = setup();
-    const byColony = resolveFights(old, old.map((c) => occupancy(c, new CountGrid())), 0.3, mulberry32(round + 11));
+    const byColony = resolveFights(
+      old,
+      old.map((c) => occupancy(c, new CountGrid())),
+      0.3,
+      mulberry32(round + 11),
+    );
     const now = setup();
     const rec = new Recognition();
     rec.build(now);
-    const byOdour = resolveFights(now, now.map((c) => occupancy(c, new CountGrid())), 0.3, mulberry32(round + 11), undefined, rec);
+    const byOdour = resolveFights(
+      now,
+      now.map((c) => occupancy(c, new CountGrid())),
+      0.3,
+      mulberry32(round + 11),
+      undefined,
+      rec,
+    );
     assert.deepEqual(byOdour, byColony, `round ${round}`);
     now.forEach((c, k) => assert.deepEqual([...c.alive], [...(old[k] as Colony).alive], `round ${round}, colony ${k}: the same ants died`));
   }
@@ -72,7 +87,14 @@ test("two colonies that smell alike share a cell and nobody dies; a calm side ta
       for (let i = 0; i < 5; i++) (cs[0] as Colony).calm[i] = calm;
       const rec = new Recognition();
       rec.build(cs);
-      const d = resolveFights(cs, cs.map((c) => occupancy(c, new CountGrid())), 0.2, mulberry32(round + 3), undefined, rec);
+      const d = resolveFights(
+        cs,
+        cs.map((c) => occupancy(c, new CountGrid())),
+        0.2,
+        mulberry32(round + 3),
+        undefined,
+        rec,
+      );
       deaths = [deaths[0]! + d[0]!, deaths[1]! + d[1]!];
     }
     return deaths;
@@ -92,7 +114,14 @@ test("a calmed encounter raises no alarm; a real fight does", () => {
     (cs[1] as Colony).calm[0] = calm;
     const rec = new Recognition();
     rec.build(cs);
-    resolveFights(cs, cs.map((c) => occupancy(c, new CountGrid())), 0.1, () => 0.999, undefined, rec);
+    resolveFights(
+      cs,
+      cs.map((c) => occupancy(c, new CountGrid())),
+      0.1,
+      () => 0.999,
+      undefined,
+      rec,
+    );
     return (cs[0] as Colony).ph.read("alarm", at(20, 6).x, at(20, 6).y);
   };
   assert.ok(alarm(0) > 0);
@@ -125,7 +154,7 @@ test("odour: an ant smells of its nest; a host carries a share of the fungus's o
   // A host away from the nest, at full share.
   c.mask[4] = MAX_MASK;
   rec.step([c], 0.1);
-  assert.ok(Math.abs((c.odour[4]) - MAX_MASK * FUNGAL) < 1e-6, "its nest's odour, MAX_MASK of the way to the fungus's");
+  assert.ok(Math.abs(c.odour[4] - MAX_MASK * FUNGAL) < 1e-6, "its nest's odour, MAX_MASK of the way to the fungus's");
   assert.equal(c.nestOdour, 0, "nobody at the nest carries the fungus: the nest stays");
   // Hosts at the nest: the nest drifts toward them, and every ant follows its nest.
   for (let i = 0; i < 4; i++) c.mask[i] = MAX_MASK;
@@ -135,7 +164,7 @@ test("odour: an ant smells of its nest; a host carries a share of the fungus's o
   // A healthy ant again (the fungus cleared): it smells of its nest alone.
   c.mask[4] = 0;
   rec.step([c], 0.1);
-  assert.ok(Math.abs((c.odour[4]) - c.nestOdour) < 1e-6);
+  assert.ok(Math.abs(c.odour[4] - c.nestOdour) < 1e-6);
 });
 
 test("a host is never a stranger to its own nest, at any share any intervention can give", () => {
@@ -144,14 +173,19 @@ test("a host is never a stranger to its own nest, at any share any intervention 
     const o = n0 + MAX_MASK * (FUNGAL - n0);
     assert.ok(Math.abs(o - n0) < tol, `nest ${n0}: host at ${o}`);
   }
-  for (const lever of LEVERS) for (let level = 0; level < lever.words.length; level++) assert.ok(compose({ [lever.id]: level }).mask >= 0 && compose({ [lever.id]: level }).mask <= MAX_MASK, lever.id);
+  for (const lever of LEVERS)
+    for (let level = 0; level < lever.words.length; level++)
+      assert.ok(compose({ [lever.id]: level }).mask >= 0 && compose({ [lever.id]: level }).mask <= MAX_MASK, lever.id);
 });
 
 test("judged as an ant judges it (by band centre, in float32), a host at full share is still no stranger to a healthy nestmate", () => {
   const map = arena(6.5);
   for (const n0 of [0, 1]) {
     // A healthy ant and a host two cells apart; the host's odour MAX_MASK of the way to the fungus's.
-    const c = placed(map, n0, n0, [[10, 6], [12, 6]]);
+    const c = placed(map, n0, n0, [
+      [10, 6],
+      [12, 6],
+    ]);
     c.odour[1] = n0 + MAX_MASK * (FUNGAL - n0);
     const rec = new Recognition();
     rec.build([c]);
@@ -162,7 +196,10 @@ test("judged as an ant judges it (by band centre, in float32), a host at full sh
 
 test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, Garden blends", () => {
   const map = arena(6.5);
-  const c = placed(map, 0, 0, [[10, 3], [10, 9]]);
+  const c = placed(map, 0, 0, [
+    [10, 3],
+    [10, 9],
+  ]);
   const lockpick = STRAINS.findIndex((s) => s.id === "lockpick");
   const garden = STRAINS.findIndex((s) => s.id === "garden");
   c.load[0] = 1;
@@ -174,11 +211,11 @@ test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, 
   f.policy = strainDefault; // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
   assert.equal(c.expr[0], preset("soothe"));
-  assert.ok(Math.abs((c.calm[0]) - 0.8) < 1e-5);
-  assert.ok(Math.abs((c.tolerance[0]) - 0.65) < 1e-5);
+  assert.ok(Math.abs(c.calm[0] - 0.8) < 1e-5);
+  assert.ok(Math.abs(c.tolerance[0] - 0.65) < 1e-5);
   assert.equal(c.mask[0], 0);
   assert.equal(c.expr[1], preset("blend"));
-  assert.ok(Math.abs((c.mask[1]) - 0.3) < 1e-5, "half load, half the share");
+  assert.ok(Math.abs(c.mask[1] - 0.3) < 1e-5, "half load, half the share");
   assert.equal(c.calm[1], 0);
 });
 
@@ -200,7 +237,12 @@ function hold(g: Game, seconds: number, where: [number, number] | "apart" | [[nu
   for (let k = 0; k < Math.round(seconds * 30); k++) {
     each?.();
     g.colonies.forEach((c, j) => {
-      const at: [number, number] = where === "apart" ? [j === 0 ? 2 : 37, 6] : Array.isArray(where[0]) ? (where as [[number, number], [number, number]])[j] as [number, number] : (where as [number, number]);
+      const at: [number, number] =
+        where === "apart"
+          ? [j === 0 ? 2 : 37, 6]
+          : Array.isArray(where[0])
+            ? ((where as [[number, number], [number, number]])[j] as [number, number])
+            : (where as [number, number]);
       for (let i = 0; i < c.n; i++) if (c.alive[i]) put(c, i, at[0], at[1]);
     });
     g.tick(1 / 30);
@@ -315,10 +357,26 @@ test("unity: every colony must have met, not just most of the ants (review of #5
 
 test("unity: contact is the cell and the six around, not two cells off", () => {
   const near = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
-  hold(near, 5, [[20, 6], [21, 6]], () => void smellAs(near, 0.45, 0.6));
+  hold(
+    near,
+    5,
+    [
+      [20, 6],
+      [21, 6],
+    ],
+    () => void smellAs(near, 0.45, 0.6),
+  );
   assert.ok(near.unity().met > 0, "a neighbouring cell is contact");
   const far = new Game(arena(6.5), { antCount: 5, rivalAnts: 5 }, mulberry32(1));
-  hold(far, 5, [[20, 6], [22, 6]], () => void smellAs(far, 0.45, 0.6));
+  hold(
+    far,
+    5,
+    [
+      [20, 6],
+      [22, 6],
+    ],
+    () => void smellAs(far, 0.45, 0.6),
+  );
   assert.equal(far.unity().met, 0, "two cells off is not");
 });
 

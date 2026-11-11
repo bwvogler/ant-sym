@@ -1,4 +1,16 @@
-import { INFECTED, FLIGHT_2D, type Game, centreX, centreY, mainGround, type OneWorld, type Flight, type Cell, type End, type Transect } from "../colony/index.ts";
+import {
+  INFECTED,
+  FLIGHT_2D,
+  type Game,
+  centreX,
+  centreY,
+  mainGround,
+  type OneWorld,
+  type Flight,
+  type Cell,
+  type End,
+  type Transect,
+} from "../colony/index.ts";
 
 // The queen's pen (ja-lo8.9), pure: whether a new queen who has flown opens it. The only time a colony's words change
 // (PRD §50): a new queen born with the fungus in her, from a colony whose queen the fungus reached, while Jev can read
@@ -11,9 +23,18 @@ export type PenGate = { open: true } | { open: false; reason: string };
  * reached (Game.revealed), and Jev can answer new words (`lock` null: policyLock). `mother` is her colony's name.
  */
 export function penGate(f: Flight, revealed: readonly boolean[], lock: string | null, mother: string): PenGate {
-  if (f.load < INFECTED) return { open: false, reason: `A new queen flew from ${mother} without you in her: she founds her colony on her mother's doctrine.` };
-  if (!revealed[f.mother]) return { open: false, reason: `A new queen flew from ${mother} with you in her, but you never reached ${mother}'s queen: its doctrine is closed to you, so she founds on her mother's doctrine.` };
-  if (lock !== null) return { open: false, reason: `A new queen flew from ${mother} with you in her, but Jev can't read new words now (${lock}): she founds on her mother's doctrine.` };
+  if (f.load < INFECTED)
+    return { open: false, reason: `A new queen flew from ${mother} without you in her: she founds her colony on her mother's doctrine.` };
+  if (!revealed[f.mother])
+    return {
+      open: false,
+      reason: `A new queen flew from ${mother} with you in her, but you never reached ${mother}'s queen: its doctrine is closed to you, so she founds on her mother's doctrine.`,
+    };
+  if (lock !== null)
+    return {
+      open: false,
+      reason: `A new queen flew from ${mother} with you in her, but Jev can't read new words now (${lock}): she founds on her mother's doctrine.`,
+    };
   return { open: true };
 }
 
@@ -47,7 +68,12 @@ export function withinFlight(c: PenCircle, p: { x: number; y: number }): boolean
  * Where a click at plane point p in the pen sends her: outside the circle, refused (she can't fly that far); inside it,
  * where `settle` (Game.settleAt, with the pen's ground) says. `mother` is her mother colony's name.
  */
-export function penSettle(c: PenCircle, p: { x: number; y: number }, mother: string, settle: (p: { x: number; y: number }) => Settle): Settle {
+export function penSettle(
+  c: PenCircle,
+  p: { x: number; y: number },
+  mother: string,
+  settle: (p: { x: number; y: number }) => Settle,
+): Settle {
   if (!withinFlight(c, p)) return { ok: false, reason: `too far: she flies at most ${c.r} from ${mother}'s hole` };
   return settle(p);
 }

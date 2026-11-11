@@ -1,5 +1,15 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { type Colony, type ColonyParams, HOLE_SIGHT, type HoleCell, type Layer, LIFESPAN, PI_DRIFT, PLANE, planeMoundReach } from "./colony.ts";
+import {
+  type Colony,
+  type ColonyParams,
+  HOLE_SIGHT,
+  type HoleCell,
+  type Layer,
+  LIFESPAN,
+  PI_DRIFT,
+  PLANE,
+  planeMoundReach,
+} from "./colony.ts";
 import { FAINT, MODES, type Mode, type Policy, type Stance, type StancePolicy } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
@@ -9,7 +19,23 @@ import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, responses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
 import { encode } from "./save.ts";
-import { dropFood, heapPlane, isSky, mulberry32, rockAt, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import {
+  dropFood,
+  heapPlane,
+  isSky,
+  mulberry32,
+  rockAt,
+  takeFoodCell,
+  generateSideWorld,
+  generateWorld,
+  OPEN,
+  OPEN_WORLD,
+  ROCK,
+  type Nest,
+  type WorldMap,
+  type WorldSize,
+  worldFromArrays,
+} from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -32,7 +58,17 @@ import { dropFood, heapPlane, isSky, mulberry32, rockAt, takeFoodCell, generateS
 // plane unless an event names a layer.
 
 export type Event =
-  | { at: number; kind: "paint"; colony?: number; channel: Channel; x: number; y: number; r: number; amount: number; /** one world: the layer painted (default PLANE, the surface); on one map, its only layer */ layer?: number }
+  | {
+      at: number;
+      kind: "paint";
+      colony?: number;
+      channel: Channel;
+      x: number;
+      y: number;
+      r: number;
+      amount: number;
+      /** one world: the layer painted (default PLANE, the surface); on one map, its only layer */ layer?: number;
+    }
   | { at: number; kind: "food"; x: number; y: number; r: number; perCell: number }
   | { at: number; kind: "call"; run: (game: Game) => void };
 
@@ -113,7 +149,8 @@ export function sideName(k: number): string {
 
 function apply(game: Game, e: Event): void {
   // One world: on the plane, where the assays' arenas are, unless the event names a layer.
-  if (e.kind === "paint") (game.colonies[e.colony ?? 0] ?? game.player).paint(e.channel, e.x, e.y, e.r, e.amount, e.layer ?? (game.world ? PLANE : undefined));
+  if (e.kind === "paint")
+    (game.colonies[e.colony ?? 0] ?? game.player).paint(e.channel, e.x, e.y, e.r, e.amount, e.layer ?? (game.world ? PLANE : undefined));
   // Food added later is not part of foodTotal: foodHome stays a share of what the map started with.
   else if (e.kind === "food") discWorld(game.map.size, e.x, e.y, e.r, (x, y) => dropFood(game.map, centreX(x, y), centreY(y), e.perCell));
   else e.run(game);
@@ -124,7 +161,8 @@ export function discWorld(size: WorldSize, wx: number, wy: number, r: number, fn
   const y0 = Math.max(0, Math.floor((wy - r) / R) - 1);
   const y1 = Math.min(size.h - 1, Math.ceil((wy + r) / R) + 1);
   for (let y = y0; y <= y1; y++)
-    for (let x = Math.max(0, Math.floor(wx - r) - 1); x <= Math.min(size.w - 1, Math.ceil(wx + r) + 1); x++) if (Math.hypot(centreX(x, y) - wx, centreY(y) - wy) <= r) fn(x, y);
+    for (let x = Math.max(0, Math.floor(wx - r) - 1); x <= Math.min(size.w - 1, Math.ceil(wx + r) + 1); x++)
+      if (Math.hypot(centreX(x, y) - wx, centreY(y) - wy) <= r) fn(x, y);
 }
 
 /** Food left within r (world units) of world (wx, wy). */
@@ -165,8 +203,8 @@ export function heldProbe(layer = -1, tag = ""): Probe {
         const t = grow(carryT);
         const pt = grow(portT);
         for (let i = 0; i < c.n; i++) {
-          t[i] = c.alive[i] && c.carrying[i] && !c.porting(i) ? (t[i]) + dt : 0;
-          pt[i] = c.alive[i] && c.carrying[i] && c.porting(i) ? (pt[i]) + dt : 0;
+          t[i] = c.alive[i] && c.carrying[i] && !c.porting(i) ? t[i] + dt : 0;
+          pt[i] = c.alive[i] && c.carrying[i] && c.porting(i) ? pt[i] + dt : 0;
         }
       });
       if (game.time + 1e-9 < nextAt) return;
@@ -179,9 +217,9 @@ export function heldProbe(layer = -1, tag = ""): Probe {
         const pt = portT[k] as Float64Array;
         for (let i = 0; i < c.n; i++) {
           if (!onLayer(game, c, i, layer)) continue;
-          if (c.alive[i] && c.carrying[i] && !c.porting(i) && (c.since[i]) > STUCK_AFTER) held++;
-          if ((t[i]) > STUCK_AFTER) carrying++;
-          if ((pt[i]) > STUCK_AFTER) porting++;
+          if (c.alive[i] && c.carrying[i] && !c.porting(i) && c.since[i] > STUCK_AFTER) held++;
+          if (t[i] > STUCK_AFTER) carrying++;
+          if (pt[i] > STUCK_AFTER) porting++;
         }
         worst[k] = Math.max(worst[k] ?? 0, held);
         worstCarry[k] = Math.max(worstCarry[k] ?? 0, carrying);
@@ -233,7 +271,7 @@ export function occupancyProbe(regions: Record<string, Rect>, from = 0, to = Inf
         if (!c.alive[i] || !onLayer(game, c, i, PLANE)) continue;
         const x = c.x[i];
         const y = c.y[i];
-        for (const [k, r] of Object.entries(regions)) if (inRect(r, x, y)) total[k] = (total[k]) + dt;
+        for (const [k, r] of Object.entries(regions)) if (inRect(r, x, y)) total[k] = total[k] + dt;
       }
     },
     summary: () => ({ ...total }),
@@ -270,7 +308,7 @@ export function crossingProbe(gates: Record<string, Rect>, from = 0, colony = 0)
             continue;
           }
           const now = x < mid ? -1 : 1;
-          if (sd[i] !== 0 && sd[i] !== now && game.time >= from) total[g] = (total[g]) + 1;
+          if (sd[i] !== 0 && sd[i] !== now && game.time >= from) total[g] = total[g] + 1;
           sd[i] = now;
         }
       });
@@ -284,7 +322,7 @@ export function antsNear(game: Game, x: number, y: number, r: number, colony = 0
   const c = game.colonies[colony];
   if (!c) return 0;
   let s = 0;
-  for (let i = 0; i < c.n; i++) if (c.alive[i] && onLayer(game, c, i, layer) && Math.hypot((c.x[i]) - x, (c.y[i]) - y) <= r) s++;
+  for (let i = 0; i < c.n; i++) if (c.alive[i] && onLayer(game, c, i, layer) && Math.hypot(c.x[i] - x, c.y[i] - y) <= r) s++;
   return s;
 }
 
@@ -334,7 +372,11 @@ export class Arena {
       const y0 = Math.max(0, Math.floor((Math.min(ay, by) - half) / R) - 1);
       const y1 = Math.min(this.size.h - 1, Math.ceil((Math.max(ay, by) + half) / R) + 1);
       for (let y = y0; y <= y1; y++)
-        for (let x = Math.max(0, Math.floor(Math.min(ax, bx) - half) - 1); x <= Math.min(this.size.w - 1, Math.ceil(Math.max(ax, bx) + half) + 1); x++) {
+        for (
+          let x = Math.max(0, Math.floor(Math.min(ax, bx) - half) - 1);
+          x <= Math.min(this.size.w - 1, Math.ceil(Math.max(ax, bx) + half) + 1);
+          x++
+        ) {
           const px = centreX(x, y);
           const py = centreY(y);
           const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
@@ -345,7 +387,8 @@ export class Arena {
   }
 
   #fill(x0: number, y0: number, x1: number, y1: number, v: number): this {
-    for (let y = Math.max(0, y0); y <= Math.min(this.size.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(this.size.w - 1, x1); x++) this.rock[y * this.size.w + x] = v;
+    for (let y = Math.max(0, y0); y <= Math.min(this.size.h - 1, y1); y++)
+      for (let x = Math.max(0, x0); x <= Math.min(this.size.w - 1, x1); x++) this.rock[y * this.size.w + x] = v;
     return this;
   }
 
@@ -365,7 +408,11 @@ export class Arena {
   /** The map, with nests centred on cells (cx, cy), radius r (world units). */
   build(nests: { x: number; y: number; r: number }[]): WorldMap {
     const ns: Nest[] = nests.map((n) => ({ ...at(n.x, n.y), r: n.r }));
-    return worldFromArrays(this.size, ns, { rock: this.rock, food: this.food, ...(this.quality.some((q) => q !== 1) ? { quality: this.quality } : {}) });
+    return worldFromArrays(this.size, ns, {
+      rock: this.rock,
+      food: this.food,
+      ...(this.quality.some((q) => q !== 1) ? { quality: this.quality } : {}),
+    });
   }
 }
 
@@ -445,7 +492,9 @@ const always =
  * Each ant's own stance (docs/stance.md): a colony whose waiting foragers go out as raid scouts whenever no food comes back
  * (what a raid stance did before), and one whose never do (a forage stance).
  */
-export const RAIDING = responses({ leave: (t) => (t.mode !== "fight" && t.stance === "forage" && t.returns === "none" ? "raid" : localResponses.leave(t)) });
+export const RAIDING = responses({
+  leave: (t) => (t.mode !== "fight" && t.stance === "forage" && t.returns === "none" ? "raid" : localResponses.leave(t)),
+});
 export const NEVER_RAID = responses({
   leave: (t) => {
     const a = localResponses.leave(t);
@@ -494,12 +543,54 @@ function bridgeSpec(seed: number): RunSpec {
     seconds: 300,
     map: () =>
       new Arena(84, rows)
-        .path([[n.x - 5, y], [n.x + 5, y]], 4.5) // nest room
-        .path([[n.x, y], [ax, y]], half) // stem
-        .path([[ax, y], [ax + dx, shortY], [bx - dx, shortY], [bx, y]], half) // short branch
-        .path([[ax, y], [ax + dx, y + up * dy], [ax + dx, longY], [bx - dx, longY], [bx - dx, y + up * dy], [bx, y]], half) // long branch
-        .path([[bx, y], [76, y]], half) // to the food
-        .path([[72, y], [80, y]], 4.5) // food room
+        .path(
+          [
+            [n.x - 5, y],
+            [n.x + 5, y],
+          ],
+          4.5,
+        ) // nest room
+        .path(
+          [
+            [n.x, y],
+            [ax, y],
+          ],
+          half,
+        ) // stem
+        .path(
+          [
+            [ax, y],
+            [ax + dx, shortY],
+            [bx - dx, shortY],
+            [bx, y],
+          ],
+          half,
+        ) // short branch
+        .path(
+          [
+            [ax, y],
+            [ax + dx, y + up * dy],
+            [ax + dx, longY],
+            [bx - dx, longY],
+            [bx - dx, y + up * dy],
+            [bx, y],
+          ],
+          half,
+        ) // long branch
+        .path(
+          [
+            [bx, y],
+            [76, y],
+          ],
+          half,
+        ) // to the food
+        .path(
+          [
+            [72, y],
+            [80, y],
+          ],
+          4.5,
+        ) // food room
         .pile(76, row, 4, 40)
         .build([{ x: 8, y: row, r: 3 }]),
     game: { antCount: 300, rival: false },
@@ -516,7 +607,7 @@ export const bridge: Assay = {
   score: (r) => {
     const ratio = (a: number, b: number) => (a + b > 0 ? a / (a + b) : NaN);
     const passShare = ratio(r.metrics.shortPasses as number, r.metrics.longPasses as number);
-    const shortShare = (r.metrics["you.stored"]) >= BRIDGE_MIN_STORED ? passShare : NaN;
+    const shortShare = r.metrics["you.stored"] >= BRIDGE_MIN_STORED ? passShare : NaN;
     return { shortShare, timeShare: ratio(r.metrics.short as number, r.metrics.long as number), pass: shortShare >= 0.8 ? 1 : 0 };
   },
 };
@@ -533,7 +624,11 @@ export const twin: Assay = {
   spec: (seed) => ({
     seed,
     seconds: 240,
-    map: () => new Arena(100, 100, true).pile(25, 20, 3, 200).pile(75, 20, 3, 200).build([{ x: 50, y: 85, r: 3 }]),
+    map: () =>
+      new Arena(100, 100, true)
+        .pile(25, 20, 3, 200)
+        .pile(75, 20, 3, 200)
+        .build([{ x: 50, y: 85, r: 3 }]),
     game: { antCount: 300, rival: false },
   }),
   score: (_r, game) => {
@@ -604,7 +699,8 @@ export const deplete: Assay = {
         nextAt += 1;
         crowd.push(antsNear(game, patch.x, patch.y, 6));
         if (Number.isNaN(emptyAt) && foodIn(game.map, patch.x, patch.y, 2) <= 0) emptyAt = game.time;
-        if (!Number.isNaN(emptyAt) && Number.isNaN(follow60) && game.time >= emptyAt + 60) follow60 = game.player.counts().follow / Math.max(1, game.player.population);
+        if (!Number.isNaN(emptyAt) && Number.isNaN(follow60) && game.time >= emptyAt + 60)
+          follow60 = game.player.counts().follow / Math.max(1, game.player.population);
       },
       summary(): Record<string, number> {
         if (Number.isNaN(emptyAt)) return { emptyAt: NaN, peakCrowd: NaN, clearAfter: NaN, followAfter60: NaN };
@@ -661,7 +757,7 @@ export const alarm: Assay = {
         // Recovery is searched from the crowd's lowest point in the 10 s after the alarm, not from the alarm itself
         // (ja-qld): with no scatter at all the crowd never dips, and "back" counted from before it had left.
         let low = when + 1;
-        for (let k = when + 1; k < Math.min(crowd.length, when + 11); k++) if ((crowd[k]) < (crowd[low])) low = k;
+        for (let k = when + 1; k < Math.min(crowd.length, when + 11); k++) if (crowd[k] < crowd[low]) low = k;
         let back = NaN;
         for (let k = low; k < crowd.length; k++)
           if (mean(crowd.slice(Math.max(low, k - 4), k + 1)) >= 0.5 * before) {
@@ -712,7 +808,7 @@ export function outingProbe(nest: { x: number; y: number }, windows: Record<stri
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         alive++;
-        const o = onLayer(game, c, i, PLANE) && Math.hypot((c.x[i]) - nest.x, (c.y[i]) - nest.y) > disc.r + 2 ? 1 : 0;
+        const o = onLayer(game, c, i, PLANE) && Math.hypot(c.x[i] - nest.x, c.y[i] - nest.y) > disc.r + 2 ? 1 : 0;
         if (o && !was[i]) departs[sec] = (departs[sec] ?? 0) + 1;
         was[i] = o;
         out += o;
@@ -817,14 +913,23 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
   return {
     seed,
     seconds: 180,
-    map: () => a.build([{ x: 20, y: 20, r: 3 }, { x: 100, y: 20, r: 3 }]),
+    map: () =>
+      a.build([
+        { x: 20, y: 20, r: 3 },
+        { x: 100, y: 20, r: 3 },
+      ]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
     // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
     // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
     // gain 1.26, 3/20 on main).
     // Both sides keep the colony's stance (stanceGate 0, docs/stance.md): A6 is about who reaches whom at a pass, and with each
     // ant's own stance the defenders 40 cells from home turned away from the pass instead of holding it (gain 1.64 against 1.95).
-    sides: { policy: always<Mode>("fight"), stance: always<Stance>("raid"), colony: { raidGate: 0, stanceGate: 0 }, rival: { stanceGate: 0 } },
+    sides: {
+      policy: always<Mode>("fight"),
+      stance: always<Stance>("raid"),
+      colony: { raidGate: 0, stanceGate: 0 },
+      rival: { stanceGate: 0 },
+    },
   };
 }
 
@@ -862,7 +967,14 @@ function passAssay(remap: (spec: RunSpec) => RunSpec): Assay {
   };
 }
 export const pass = passAssay((spec) => spec);
-export const open: Assay = { id: "open", title: "A6 control: the same battle on open ground", target: "control for `pass` (which runs it too); report only", seconds: 180, spec: (s) => battleSpec(s, false), score: exchange };
+export const open: Assay = {
+  id: "open",
+  title: "A6 control: the same battle on open ground",
+  target: "control for `pass` (which runs it too); report only",
+  seconds: 180,
+  spec: (s) => battleSpec(s, false),
+  score: exchange,
+};
 
 /**
  * A11 — raiders find the rival round a pocket of wall (behaviour MR 5.2, docs/raid-recruitment.md). Two nests at either
@@ -907,16 +1019,16 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
         if (!c.alive[i]) continue;
         if (c.recruited[i] && !prev[i] && !ever.has(i)) {
           ever.add(i);
-          if (Math.hypot((c.x[i]) - own.x, (c.y[i]) - own.y) <= c.nest.r) atHome++;
+          if (Math.hypot(c.x[i] - own.x, c.y[i] - own.y) <= c.nest.r) atHome++;
         }
         if (c.reporting[i] && !(prevRep as Uint8Array)[i]) {
           finds++;
-          findDist += Math.hypot((c.x[i]) - rival.x, (c.y[i]) - rival.y);
+          findDist += Math.hypot(c.x[i] - rival.x, c.y[i] - rival.y);
         }
         prev[i] = c.recruited[i];
         (prevRep as Uint8Array)[i] = c.reporting[i];
         // Raiders only: on a raid stance an ant not recruited carries on as a forager (behaviour MR 5.2); raidGate 0 sends all.
-        if ((c.recruited[i] || c.params.raidGate <= 0) && Math.hypot((c.x[i]) - rival.x, (c.y[i]) - rival.y) <= RAID_REACH) {
+        if ((c.recruited[i] || c.params.raidGate <= 0) && Math.hypot(c.x[i] - rival.x, c.y[i] - rival.y) <= RAID_REACH) {
           reached.add(i);
           if (Number.isNaN(first)) first = game.time;
         }
@@ -937,7 +1049,7 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
         if (!c.alive[i] || !prev) continue;
         if (Math.hypot(x - own.x, y - own.y) <= c.nest.r + 2 || Math.hypot(x - rival.x, y - rival.y) <= RAID_REACH) continue;
         outside++;
-        if (Math.hypot(x - (prev[0]), y - (prev[1])) < 3) stuck++;
+        if (Math.hypot(x - prev[0], y - prev[1]) < 3) stuck++;
       }
     },
     summary(game) {
@@ -976,7 +1088,11 @@ function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
   return {
     seed,
     seconds: 300,
-    map: () => a.build([{ x: 20, y: 30, r: 3 }, { x: 100, y: 30, r: 3 }]),
+    map: () =>
+      a.build([
+        { x: 20, y: 30, r: 3 },
+        { x: 100, y: 30, r: 3 },
+      ]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
     sides: { stance: always<Stance>("raid"), responses: RAIDING, rivalResponses: NEVER_RAID, ...(colony ? { colony } : {}) },
     probes: [raidProbe(own, rival)],
@@ -995,7 +1111,24 @@ export const raidFind: Assay = {
     const gain = deaf > 0 ? reached / deaf : NaN;
     const stuck = r.metrics.stuck as number;
     const m = r.metrics;
-    return { reached, deaf, straight, gain, stuck, firstReach: m.firstReach as number, recruited: m.recruited as number, recruitedAtHome: m.recruitedAtHome as number, recruitsReaching: m.recruitsReaching as number, finds: m.finds as number, findDist: m.findDist as number, recruitsDead: m.recruitsDead as number, deadReached: m.deadReached as number, nestRaid: m.nestRaid as number, nestSmelt: m.nestSmelt as number, pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0 };
+    return {
+      reached,
+      deaf,
+      straight,
+      gain,
+      stuck,
+      firstReach: m.firstReach as number,
+      recruited: m.recruited as number,
+      recruitedAtHome: m.recruitedAtHome as number,
+      recruitsReaching: m.recruitsReaching as number,
+      finds: m.finds as number,
+      findDist: m.findDist as number,
+      recruitsDead: m.recruitsDead as number,
+      deadReached: m.deadReached as number,
+      nestRaid: m.nestRaid as number,
+      nestSmelt: m.nestSmelt as number,
+      pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0,
+    };
   },
 };
 
@@ -1018,7 +1151,10 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
       // The rival's nest is sealed in a pocket of rock: a stance is consulted only with two colonies, and no one can find it.
       const a = new Arena(100, 100, true).wall(84, 84, 98, 98).carve(87, 87, 95, 95);
       a.pile(50, 15, 3, 200);
-      return a.build([{ x: 50, y: 50, r: 3 }, { x: 91, y: 91, r: 3 }]);
+      return a.build([
+        { x: 50, y: 50, r: 3 },
+        { x: 91, y: 91, r: 3 },
+      ]);
     },
     game: { antCount: 300, rivalAnts: 30 },
     sides: { stance: always<Stance>(stance), responses: stance === "raid" ? RAIDING : NEVER_RAID },
@@ -1055,13 +1191,17 @@ export const contact: Assay = {
   spec: (seed) => ({
     seed,
     seconds: 300,
-    map: () => new Arena(120, 60, true).pile(60, 30, 4, 200).build([{ x: 12, y: 30, r: 3 }, { x: 108, y: 30, r: 3 }]),
+    map: () =>
+      new Arena(120, 60, true).pile(60, 30, 4, 200).build([
+        { x: 12, y: 30, r: 3 },
+        { x: 108, y: 30, r: 3 },
+      ]),
     game: { antCount: 200, rivalAnts: 200 },
     sides: { stance: always<Stance>("forage"), rivalStance: always<Stance>("forage"), responses: NEVER_RAID, rivalResponses: NEVER_RAID },
   }),
   score: (r) => {
-    const lost = (r.metrics["you.losses"]) + (r.metrics["rival.losses"]);
-    const home = (r.metrics["you.stored"]) + (r.metrics["rival.stored"]);
+    const lost = r.metrics["you.losses"] + r.metrics["rival.losses"];
+    const home = r.metrics["you.stored"] + r.metrics["rival.stored"];
     const per100 = home > 0 ? (100 * lost) / home : Infinity;
     return { lostPer100Food: per100, foodHomeBoth: home, pass: per100 <= CONTACT_LOSSES ? 1 : 0 };
   },
@@ -1094,7 +1234,10 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
     map: () => {
       const a = new Arena(160, 60, true).pile(15, 30, 4, 300);
       if (sealed) a.wall(140, 20, 158, 40).carve(145, 25, 155, 35);
-      return a.build([{ x: 60, y: 30, r: 3 }, { x: 150, y: 30, r: 3 }]);
+      return a.build([
+        { x: 60, y: 30, r: 3 },
+        { x: 150, y: 30, r: 3 },
+      ]);
     },
     game: { antCount: 200, rivalAnts: 80 },
     sides: {
@@ -1136,8 +1279,19 @@ export const defendHome: Assay = {
     const foodShare = control > 0 ? stored / control : NaN;
     const killed = r.metrics["rival.losses"];
     const lost = r.metrics["you.losses"];
-    const broadcast = (runGame(defendSpec(r.seed, false, { stanceGate: 0 })).result.metrics["you.stored"]) / Math.max(1, control);
-    return { stored, control, foodShare, broadcast, killed, lost, exchange: killed / Math.max(1, lost), fightNear: r.metrics.fightNear as number, atPile: r.metrics.atPile as number, pass: foodShare >= DEFEND_FOOD * broadcast && killed >= 40 ? 1 : 0 };
+    const broadcast = runGame(defendSpec(r.seed, false, { stanceGate: 0 })).result.metrics["you.stored"] / Math.max(1, control);
+    return {
+      stored,
+      control,
+      foodShare,
+      broadcast,
+      killed,
+      lost,
+      exchange: killed / Math.max(1, lost),
+      fightNear: r.metrics.fightNear as number,
+      atPile: r.metrics.atPile as number,
+      pass: foodShare >= DEFEND_FOOD * broadcast && killed >= 40 ? 1 : 0,
+    };
   },
 };
 
@@ -1177,7 +1331,15 @@ export const faintAlarm: Assay = {
       map: () => new Arena(100, 100, true).build([{ x: 50, y: 82, r: 3 }]),
       game: { antCount: 300, rival: false },
       // Faint: above the sensors' FAINT (0.05), well under STRONG (1), for a few seconds at the spot.
-      events: [0, 2, 4, 6, 8].map((d) => ({ at: when + d, kind: "paint" as const, channel: "alarm" as const, x: spot.x, y: spot.y, r: 2, amount: 0.4 })),
+      events: [0, 2, 4, 6, 8].map((d) => ({
+        at: when + d,
+        kind: "paint" as const,
+        channel: "alarm" as const,
+        x: spot.x,
+        y: spot.y,
+        r: 2,
+        amount: 0.4,
+      })),
       probes: [probe],
     };
   },
@@ -1198,7 +1360,11 @@ export const game: Assay = {
   score: (r) => {
     const worst = Math.max(r.metrics["you.maxHeld"] ?? 0, r.metrics["rival.maxHeld"] ?? 0);
     // Porters are reported, not judged: they have no bound yet (ja-3po).
-    return { maxHeld: worst, maxPorting: Math.max(r.metrics["you.maxPorting"] ?? 0, r.metrics["rival.maxPorting"] ?? 0), pass: worst <= 2 ? 1 : 0 };
+    return {
+      maxHeld: worst,
+      maxPorting: Math.max(r.metrics["you.maxPorting"] ?? 0, r.metrics["rival.maxPorting"] ?? 0),
+      pass: worst <= 2 ? 1 : 0,
+    };
   },
 };
 
@@ -1249,7 +1415,14 @@ export function nestFlowProbe(): Probe {
       }
     },
     summary(game) {
-      return { beyond: samples ? beyond / samples : NaN, receptionMax, starved, firstBirth, portTrips: game.player.portTrips, handedOn: game.player.handedOn };
+      return {
+        beyond: samples ? beyond / samples : NaN,
+        receptionMax,
+        starved,
+        firstBirth,
+        portTrips: game.player.portTrips,
+        handedOn: game.player.handedOn,
+      };
     },
   };
 }
@@ -1264,10 +1437,17 @@ export function nestFlowProbe(): Probe {
 export const nestFlow: Assay = {
   id: "nestFlow",
   title: "A8 nest flow: food carried on from reception, larvae fed",
-  target: "report only (Tschinkel, Rink & Kwapich 2015: food dropped in the top chambers is carried down by others); larvae unfed beside food ≤ 5 is the economy test's bound",
+  target:
+    "report only (Tschinkel, Rink & Kwapich 2015: food dropped in the top chambers is carried down by others); larvae unfed beside food ≤ 5 is the economy test's bound",
   seconds: 900,
   spec: (seed) => ({ seed, seconds: 900, game: { antCount: 600, rival: false }, probes: [nestFlowProbe()] }),
-  score: (r) => ({ beyond: r.metrics.beyond as number, receptionMax: r.metrics.receptionMax as number, starved: r.metrics.starved as number, firstBirth: r.metrics.firstBirth as number, portTrips: r.metrics.portTrips as number }),
+  score: (r) => ({
+    beyond: r.metrics.beyond as number,
+    receptionMax: r.metrics.receptionMax as number,
+    starved: r.metrics.starved as number,
+    firstBirth: r.metrics.firstBirth as number,
+    portTrips: r.metrics.portTrips as number,
+  }),
 };
 
 /**
@@ -1299,14 +1479,20 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
       if (!d.founding) first("daughterWorker", t);
       if (Number.isNaN(at.daughterOut as number))
         for (let i = 0; i < d.n; i++)
-          if (d.alive[i] && isSky(game.map, Math.floor(d.x[i]), Math.floor((d.y[i]) / R))) {
+          if (d.alive[i] && isSky(game.map, Math.floor(d.x[i]), Math.floor(d.y[i] / R))) {
             first("daughterOut", t);
             break;
           }
     },
     summary(game) {
       const c = game.player;
-      return { ...Object.fromEntries(Object.entries(at).map(([k, v]) => [`t.${k}`, v])), gynes: c.gynes, culled: c.gynesCulled, flights: c.flights, daughters: game.lineage(0).length - 1 };
+      return {
+        ...Object.fromEntries(Object.entries(at).map(([k, v]) => [`t.${k}`, v])),
+        gynes: c.gynes,
+        culled: c.gynesCulled,
+        flights: c.flights,
+        daughters: game.lineage(0).length - 1,
+      };
     },
   };
 }
@@ -1316,10 +1502,30 @@ function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
   return {
     id,
     title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}`,
-    target: "report only (design, docs/new-queens.md §5): times to the queen, the first gyne, the first flight, and the daughter's first worker and forager; gynes, culls",
+    target:
+      "report only (design, docs/new-queens.md §5): times to the queen, the first gyne, the first flight, and the daughter's first worker and forager; gynes, culls",
     seconds: 1800,
-    spec: (seed) => ({ seed, seconds: 1800, game: { antCount: 600, rival: false }, events: [{ at: 0, kind: "call", run: (g) => void g.land(0, STRAINS.findIndex((x) => x.id === "garden")) }], probes: [lifecycleProbe(arm)] }),
-    score: (r) => Object.fromEntries(["t.queen", "t.gyne", "t.flight", "t.daughterWorker", "t.daughterOut", "gynes", "culled", "flights"].map((k) => [k, r.metrics[k]])),
+    spec: (seed) => ({
+      seed,
+      seconds: 1800,
+      game: { antCount: 600, rival: false },
+      events: [
+        {
+          at: 0,
+          kind: "call",
+          run: (g) =>
+            void g.land(
+              0,
+              STRAINS.findIndex((x) => x.id === "garden"),
+            ),
+        },
+      ],
+      probes: [lifecycleProbe(arm)],
+    }),
+    score: (r) =>
+      Object.fromEntries(
+        ["t.queen", "t.gyne", "t.flight", "t.daughterWorker", "t.daughterOut", "gynes", "culled", "flights"].map((k) => [k, r.metrics[k]]),
+      ),
   };
 }
 
@@ -1327,7 +1533,28 @@ export const lifecycle = lifecycleAssay("none");
 export const lifecycleSignal = lifecycleAssay("signal");
 export const lifecycleScent = lifecycleAssay("scent");
 
-export const ASSAYS: Assay[] = [bridge, twin, richPoor, deplete, alarm, regulate, regulateStop, pass, open, raidFind, raidStop, contact, defendHome, faintAlarm, game, gameTop, nestFlow, lifecycle, lifecycleSignal, lifecycleScent];
+export const ASSAYS: Assay[] = [
+  bridge,
+  twin,
+  richPoor,
+  deplete,
+  alarm,
+  regulate,
+  regulateStop,
+  pass,
+  open,
+  raidFind,
+  raidStop,
+  contact,
+  defendHome,
+  faintAlarm,
+  game,
+  gameTop,
+  nestFlow,
+  lifecycle,
+  lifecycleSignal,
+  lifecycleScent,
+];
 
 // ---------------------------------------------------------------- one world (U6a, ja-lp4.6.1)
 
@@ -1347,7 +1574,8 @@ export function oneArena(arena: WorldMap, seed: number, { buried = false }: OneA
   const world = oneWorldOn(seed, arena);
   if (!buried) {
     const { curtain } = world;
-    for (let y = 0; y < curtain.size.h; y++) for (let x = curtain.x0; x < curtain.x0 + curtain.size.w; x++) if (curtain.food.get(x, y)) curtain.food.set(x, y, 0);
+    for (let y = 0; y < curtain.size.h; y++)
+      for (let x = curtain.x0; x < curtain.x0 + curtain.size.w; x++) if (curtain.food.get(x, y)) curtain.food.set(x, y, 0);
     curtain.foodTotal = 0;
     curtain.foodLeft = 0;
   }
@@ -1423,9 +1651,16 @@ export function gateProbe(): Probe {
 export const game1: Assay = {
   id: "game1",
   title: "G1 the one-world game (with A7: foragers holding food)",
-  target: "≤ 2 foragers holding food over 120 s per colony at any 10-s sample, both layers (slow/side.test's bound); food carried down, births, crossings and porters reported",
+  target:
+    "≤ 2 foragers holding food over 120 s per colony at any 10-s sample, both layers (slow/side.test's bound); food carried down, births, crossings and porters reported",
   seconds: 600,
-  spec: (seed) => ({ seed, seconds: 600, map: (s) => generateOneWorld(s), game: { antCount: 600, rivalAnts: 600 }, probes: [heldProbe(PLANE, "Plane"), gateProbe()] }),
+  spec: (seed) => ({
+    seed,
+    seconds: 600,
+    map: (s) => generateOneWorld(s),
+    game: { antCount: 600, rivalAnts: 600 },
+    probes: [heldProbe(PLANE, "Plane"), gateProbe()],
+  }),
   score: (r, g) => {
     const m: Record<string, number> = {};
     const both = (k: string) => Math.max(r.metrics[`you.${k}`] ?? 0, r.metrics[`rival.${k}`] ?? 0);
@@ -1454,8 +1689,8 @@ function joinedOpen(plane: WorldMap, hc: HoleCell): Uint8Array {
   const queue = [hc.px + hc.py * w];
   joined[queue[0]] = 1;
   for (let k = 0; k < queue.length; k++) {
-    const x = (queue[k]) % w;
-    const y = Math.floor((queue[k]) / w);
+    const x = queue[k] % w;
+    const y = Math.floor(queue[k] / w);
     for (let d = 0; d < 6; d++) {
       const tx = nx(x, y, d);
       const ty = ny(y, d);
@@ -1540,7 +1775,7 @@ export const search1: Assay = {
           by = hy + T * dy;
           if (bx < 2 || by < 2 || bx > xMax || by > yMax) continue;
           cellOf(bx, by);
-          if (joined[(CELL[0]) + (CELL[1]) * w]) break;
+          if (joined[CELL[0] + CELL[1] * w]) break;
         }
         trip[i] = T;
         ox[i] = bx;
@@ -1568,17 +1803,17 @@ export const search1: Assay = {
             // Young from now on, it stays in: carriers home don't go out again to lay trails the searchers would meet.
             c.age[i] = 0.05 * LIFESPAN;
             // #crossDown puts it at that hole's cell in the curtain.
-            if (Math.abs((c.x[i]) - centreX(hc.col, hc.row)) < 1e-3 && Math.abs((c.y[i]) - centreY(hc.row)) < 1e-3) homeAt[i] = game.time;
+            if (Math.abs(c.x[i] - centreX(hc.col, hc.row)) < 1e-3 && Math.abs(c.y[i] - centreY(hc.row)) < 1e-3) homeAt[i] = game.time;
             else wrong[i] = 1;
             continue;
           }
           if (!sample) continue;
-          const ex = (c.x[i]) - (ox[i]);
-          const ey = (c.y[i]) - (oy[i]);
-          sx[i] = (sx[i]) + ex;
-          sy[i] = (sy[i]) + ey;
-          sd[i] = (sd[i]) + Math.hypot(ex, ey);
-          samples[i] = (samples[i]) + 1;
+          const ex = c.x[i] - ox[i];
+          const ey = c.y[i] - oy[i];
+          sx[i] = sx[i] + ex;
+          sy[i] = sy[i] + ey;
+          sd[i] = sd[i] + Math.hypot(ex, ey);
+          samples[i] = samples[i] + 1;
         }
       },
       summary(game) {
@@ -1604,15 +1839,15 @@ export const search1: Assay = {
             nWrong += wrong[i];
             const s = samples[i];
             if (s >= 10) {
-              centres.push(Math.hypot((sx[i]) / s, (sy[i]) / s));
-              spreads.push((sd[i]) / s);
+              centres.push(Math.hypot(sx[i] / s, sy[i] / s));
+              spreads.push(sd[i] / s);
             }
           }
           times.sort((a, b) => a - b);
           const tag = `t${T}`;
           m[`${tag}.home120`] = n120 / k;
           m[`${tag}.home600`] = n600 / k;
-          m[`${tag}.median`] = times.length ? (times[Math.floor((times.length - 1) / 2)]) : NaN;
+          m[`${tag}.median`] = times.length ? times[Math.floor((times.length - 1) / 2)] : NaN;
           m[`${tag}.centre`] = mean(centres);
           m[`${tag}.spread`] = mean(spreads);
           m[`${tag}.wrong`] = nWrong;
@@ -1706,7 +1941,7 @@ export const forage1: Assay = {
           if (sx < 2 || sy < 2 || sx > xMax || sy > yMax) continue;
           if (holes.some((h) => Math.hypot(sx - h.x, sy - h.y) < 2 * HOLE_SIGHT)) continue;
           cellOf(sx, sy);
-          if (!joined[(CELL[0]) + (CELL[1]) * w]) continue;
+          if (!joined[CELL[0] + CELL[1] * w]) continue;
           // And the straight line out to it is open ground: a forager that found it walked there; F1 asks about its memory, not
           // about getting round rock (an explorer follows no wall).
           let clear = true;
@@ -1722,7 +1957,7 @@ export const forage1: Assay = {
         let px = hx + 3 * Math.cos(a);
         let py = hy + 3 * Math.sin(a);
         cellOf(px, py);
-        if (!joined[(CELL[0]) + (CELL[1]) * w]) {
+        if (!joined[CELL[0] + CELL[1] * w]) {
           px = hx;
           py = hy;
         }
@@ -1756,8 +1991,8 @@ export const forage1: Assay = {
           const y = c.y[i];
           if (c.carrying[i]) fed[i] = 1;
           if (reachT[i] === Infinity) {
-            walked[i] = (walked[i]) + Math.hypot(x - (lastX[i]), y - (lastY[i]));
-            if (Math.hypot(x - (spotX[i]), y - (spotY[i])) < HOLE_SIGHT) {
+            walked[i] = walked[i] + Math.hypot(x - lastX[i], y - lastY[i]);
+            if (Math.hypot(x - spotX[i], y - spotY[i]) < HOLE_SIGHT) {
               reachT[i] = game.time;
               reachPath[i] = walked[i];
             }
@@ -1770,7 +2005,7 @@ export const forage1: Assay = {
         const m: Record<string, number> = {};
         const c = game.player;
         const left: number[] = [];
-        for (let i = 0; i < n; i++) if (reachT[i] === Infinity) left.push(Math.hypot((c.x[i]) - (spotX[i]), (c.y[i]) - (spotY[i])));
+        for (let i = 0; i < n; i++) if (reachT[i] === Infinity) left.push(Math.hypot(c.x[i] - spotX[i], c.y[i] - spotY[i]));
         left.sort((a, b) => a - b);
         const times: number[] = [];
         const ratios: number[] = [];
@@ -1779,17 +2014,17 @@ export const forage1: Assay = {
           if (reachT[i] === Infinity) continue;
           times.push(reachT[i]);
           // To its sight: the straight line is the distance from where it was set down to the spot, less the sight.
-          ratios.push((reachPath[i]) / Math.max(1, Math.hypot((spotX[i]) - (startX[i]), (spotY[i]) - (startY[i])) - HOLE_SIGHT));
+          ratios.push(reachPath[i] / Math.max(1, Math.hypot(spotX[i] - startX[i], spotY[i] - startY[i]) - HOLE_SIGHT));
           paths.push(reachPath[i]);
         }
-        const med = (v: number[]): number => (v.length ? (v.sort((a, b) => a - b)[Math.floor((v.length - 1) / 2)]) : NaN);
+        const med = (v: number[]): number => (v.length ? v.sort((a, b) => a - b)[Math.floor((v.length - 1) / 2)] : NaN);
         m.reach = times.length / n;
         m.median = med(times);
         m.ratio = med(ratios);
         m.walked = med(paths);
         // Those that did not get there: how many picked up food on the way (other food on the plane), and how far from the spot the rest were at the end.
         m.fed = fed.reduce((a, b) => a + b, 0) / n;
-        m.short = left.length ? (left[Math.floor((left.length - 1) / 2)]) : NaN;
+        m.short = left.length ? left[Math.floor((left.length - 1) / 2)] : NaN;
         m.pass = m.reach >= 0.8 && m.ratio < 1.5 ? 1 : 0;
         return m;
       },
@@ -1986,7 +2221,7 @@ export const route1: Assay = {
             done[i] = 1;
             c.age[i] = 0.05 * LIFESPAN;
             if (pickT[i] === Infinity) continue;
-            if (Math.abs((c.x[i]) - centreX(hc.col, hc.row)) < 1e-3 && Math.abs((c.y[i]) - centreY(hc.row)) < 1e-3) homeAt[i] = game.time;
+            if (Math.abs(c.x[i] - centreX(hc.col, hc.row)) < 1e-3 && Math.abs(c.y[i] - centreY(hc.row)) < 1e-3) homeAt[i] = game.time;
             else wrong[i] = 1;
             continue;
           }
@@ -1996,8 +2231,8 @@ export const route1: Assay = {
             if (pickT[i] === Infinity) {
               pickT[i] = game.time;
               cellOf(x, y);
-              wayHome[i] = Math.max(1, (fromHole[(CELL[0]) + (CELL[1]) * w]) ?? 1);
-            } else walked[i] = (walked[i]) + Math.hypot(x - (lastX[i]), y - (lastY[i]));
+              wayHome[i] = Math.max(1, fromHole[CELL[0] + CELL[1] * w] ?? 1);
+            } else walked[i] = walked[i] + Math.hypot(x - lastX[i], y - lastY[i]);
           } else if (pickT[i] === Infinity) {
             // On its way out: toward the cell three steps on along the way round to the pile.
             cellOf(x, y);
@@ -2032,15 +2267,15 @@ export const route1: Assay = {
         const c = game.player;
         const counted: number[] = [];
         for (let i = 0; i < n; i++) if (pickT[i] <= R1_SECONDS - R1_WAIT) counted.push(i);
-        const took = (i: number): number => (homeAt[i]) - (pickT[i]);
+        const took = (i: number): number => homeAt[i] - pickT[i];
         const share = (T: number): number => (counted.length ? counted.filter((i) => took(i) <= T).length / counted.length : NaN);
-        const med = (v: number[]): number => (v.length ? (v.sort((a, b) => a - b)[Math.floor((v.length - 1) / 2)]) : NaN);
+        const med = (v: number[]): number => (v.length ? v.sort((a, b) => a - b)[Math.floor((v.length - 1) / 2)] : NaN);
         const home = counted.filter((i) => homeAt[i] !== Infinity);
         m.picked = counted.length;
         m.home120 = share(120);
         m.home300 = share(R1_WAIT);
         m.median = med(home.map(took));
-        m.ratio = med(home.map((i) => (walked[i]) / (wayHome[i])));
+        m.ratio = med(home.map((i) => walked[i] / wayHome[i]));
         let held = 0;
         for (let i = 0; i < n; i++) if (c.layer[i] === PLANE && c.carrying[i]) held++;
         m.held = held / n;
@@ -2070,7 +2305,11 @@ function rememberAt(c: Colony, i: number, rx: number, ry: number): void {
 }
 
 /** A8 on one world: the solo colony's nest in the curtain (nestFlowProbe reads the curtain's chambers). */
-const nestFlowOne: Assay = { ...nestFlow, title: `${nestFlow.title} (one world)`, spec: (seed) => ({ ...nestFlow.spec(seed), map: (s) => generateOneWorld(s) }) };
+const nestFlowOne: Assay = {
+  ...nestFlow,
+  title: `${nestFlow.title} (one world)`,
+  spec: (seed) => ({ ...nestFlow.spec(seed), map: (s) => generateOneWorld(s) }),
+};
 
 /**
  * The assays rerun on one world (`experiment.mjs --one`): A1, A2a, A2b, A3, A4, A5, A5b, A6, A9 and A10 on their arenas
@@ -2078,7 +2317,19 @@ const nestFlowOne: Assay = { ...nestFlow, title: `${nestFlow.title} (one world)`
  * A5 and A5b (ja-web) count outside on the plane, past the disc round the hole, and report the ants held at the gate
  * at the top of the shaft (gateProbe).
  */
-export const ONE_ASSAYS: Assay[] = [...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)), ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])), { ...passAssay(onPlane), title: `${pass.title} (one world)` }, onPlaneAssay(open), onPlaneAssay(contact), onPlaneAssay(faintAlarm), nestFlowOne, game1, search1, forage1, route1];
+export const ONE_ASSAYS: Assay[] = [
+  ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
+  ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
+  { ...passAssay(onPlane), title: `${pass.title} (one world)` },
+  onPlaneAssay(open),
+  onPlaneAssay(contact),
+  onPlaneAssay(faintAlarm),
+  nestFlowOne,
+  game1,
+  search1,
+  forage1,
+  route1,
+];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). */
 export const ONE_PENDING: Record<string, string> = {

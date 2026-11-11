@@ -12,7 +12,11 @@ const build = (): Game => new Game(generateOneWorld(SEED), { antCount: 60, rival
 for (const below of [60, 600])
   test(`the ant a rehearsal finds comes up on the tick it said, in the game stepped the same way (${below} steps below first)`, () => {
     const game = build();
-    game.land(0, STRAINS.findIndex((s) => s.id === "garden"), { evolve: true });
+    game.land(
+      0,
+      STRAINS.findIndex((s) => s.id === "garden"),
+      { evolve: true },
+    );
     for (let t = 0; t < 20 * 30; t++) game.tick(REHEARSE_DT); // the ants out, and some back
     const time = game.time;
     // `below` steps in the curtain at the least before it comes up: the guard follows it from below that long.

@@ -38,18 +38,29 @@ const every = Number(args[4] ?? 600);
 const root = resolve(args[5] ?? resolve(dirname(fileURLToPath(import.meta.url)), "../.."));
 const sizeArg = args[6] ?? "0";
 const foodScale = Number(args[7] ?? 1);
-const small = sizeArg === "1" ? { size: { w: 256, h: 160 }, nestGap: 120, surface: 40 } : sizeArg.includes("x") ? (([w, h, surface]) => ({ size: { w, h }, nestGap: Math.round(w / 2), surface }))(sizeArg.split("x").map(Number)) : null;
+const small =
+  sizeArg === "1"
+    ? { size: { w: 256, h: 160 }, nestGap: 120, surface: 40 }
+    : sizeArg.includes("x")
+      ? (([w, h, surface]) => ({ size: { w, h }, nestGap: Math.round(w / 2), surface }))(sizeArg.split("x").map(Number))
+      : null;
 const { Game } = await import(`${root}/web/src/colony/game.ts`);
 const W = await import(`${root}/web/src/colony/world.ts`);
 const { CELL, nx, ny } = await import(`${root}/web/src/colony/hex.ts`);
 
 const DT = 1 / 30;
 const FOLLOW = 1;
-console.log(`economy-bench: seeds ${seeds.join(",")}, ${seconds} s, ${ants} ants × ${colonies}, ${small ? `map ${small.size.w}×${small.size.h}, ground row ${small.surface}` : "app map"}, root ${root}`);
+console.log(
+  `economy-bench: seeds ${seeds.join(",")}, ${seconds} s, ${ants} ants × ${colonies}, ${small ? `map ${small.size.w}×${small.size.h}, ground row ${small.surface}` : "app map"}, root ${root}`,
+);
 for (const seed of seeds) {
   const map = W.generateSideWorld(seed, { ...(small ?? {}), nestCount: colonies });
   if (foodScale !== 1) scaleFood(map, foodScale);
-  const g = new Game(map, { antCount: ants, rivalAnts: ants, rival: colonies > 1, regrow: Number(process.env.REGROW ?? 0) }, W.mulberry32(seed * 7919 + Number(process.env.NUDGE ?? 0)));
+  const g = new Game(
+    map,
+    { antCount: ants, rivalAnts: ants, rival: colonies > 1, regrow: Number(process.env.REGROW ?? 0) },
+    W.mulberry32(seed * 7919 + Number(process.env.NUDGE ?? 0)),
+  );
   const cs = g.colonies;
   const ch = map.chambers; // none before nest slice 2: older checkouts are measured too
   const floor0 = cs.map((_, k) => ch?.floorOf[k] ?? 0);
@@ -136,12 +147,16 @@ for (const seed of seeds) {
         const v = map.food.get(x, y);
         if (v > 0) W.isSky(map, x, y) ? (ground += v) : (below += v);
       }
-    console.log(`seed ${seed} t ${t}: map food ${Math.round(ground)} on the ground, ${Math.round(below)} below (of ${Math.round(map.foodTotal)}); fills ${n.fills} (floor ${n.floorFills}); digs ${n.digs}, re-digs of fills ${n.redigs} (${((100 * n.redigs) / Math.max(1, n.digs)).toFixed(1)} % of digs; floor ${n.floorRedigs} = ${((100 * n.floorRedigs) / Math.max(1, n.floorFills)).toFixed(0)} % of floor fills, other ${n.otherRedigs} = ${((100 * n.otherRedigs) / Math.max(1, n.fills - n.floorFills)).toFixed(0)} %); conservation drift ≤ ${worstDrift.toExponential(1)}`);
+    console.log(
+      `seed ${seed} t ${t}: map food ${Math.round(ground)} on the ground, ${Math.round(below)} below (of ${Math.round(map.foodTotal)}); fills ${n.fills} (floor ${n.floorFills}); digs ${n.digs}, re-digs of fills ${n.redigs} (${((100 * n.redigs) / Math.max(1, n.digs)).toFixed(1)} % of digs; floor ${n.floorRedigs} = ${((100 * n.floorRedigs) / Math.max(1, n.floorFills)).toFixed(0)} % of floor fills, other ${n.otherRedigs} = ${((100 * n.otherRedigs) / Math.max(1, n.fills - n.floorFills)).toFixed(0)} %); conservation drift ≤ ${worstDrift.toExponential(1)}`,
+    );
     cs.forEach((c, ci) => {
       const [e, l, p] = c.brood?.counts() ?? [0, 0, 0];
       const mine = ch ? ch.list.filter((x) => x.colony === ci && x.cells > 0).length : 0;
       const o = outs[ci];
-      const outText = o.length ? `${((100 * o.reduce((a, b) => a + b, 0)) / o.length).toFixed(2)} % / ${(100 * Math.max(...o)).toFixed(1)} %` : "–";
+      const outText = o.length
+        ? `${((100 * o.reduce((a, b) => a + b, 0)) / o.length).toFixed(2)} % / ${(100 * Math.max(...o)).toFixed(1)} %`
+        : "–";
       const rate = (c.stored - lastHome[ci]) / every;
       lastHome[ci] = c.stored;
       console.log(

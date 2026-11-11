@@ -36,11 +36,17 @@ export interface ChapterView {
 }
 
 export function chapterOf(s: ChapterState): ChapterView {
-  const view = (chapter: Chapter, goal: string, progress = 0): ChapterView => ({ chapter, step: CHAPTERS.indexOf(chapter) + 1, goal, progress: Math.max(0, Math.min(1, progress)) });
+  const view = (chapter: Chapter, goal: string, progress = 0): ChapterView => ({
+    chapter,
+    step: CHAPTERS.indexOf(chapter) + 1,
+    goal,
+    progress: Math.max(0, Math.min(1, progress)),
+  });
   if (!s.landed) return view("land", `Land by the ${s.colony} colony's hole.`);
   if (s.hosts === 0) return view("host", `Your spores lie by the ${s.colony} colony's hole: wait for an ant to walk through them.`);
   if (s.share < SPREAD_SHARE) return view("spread", `Spread through a quarter of the ${s.colony} colony.`, s.share / SPREAD_SHARE);
-  if (!s.queenInfected) return view("queen", `Reach the ${s.colony} colony's queen: she lies in the royal chamber, tended by its youngest ants.`);
+  if (!s.queenInfected)
+    return view("queen", `Reach the ${s.colony} colony's queen: she lies in the royal chamber, tended by its youngest ants.`);
   if (s.gynes === 0) return view("newQueen", `Make the ${s.colony} colony raise a new queen.`);
   if (s.daughters === 0) return view("daughter", "Write the new queen's doctrine, and see her colony grow.");
   return view("open", "Every queen born with you in her opens the pen again.");

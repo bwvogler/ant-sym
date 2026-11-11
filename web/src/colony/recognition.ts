@@ -86,7 +86,8 @@ export class SumGrid {
   }
 
   any(x0: number, y0: number, x1: number, y1: number): boolean {
-    for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++) for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by) > 0) return true;
+    for (let by = y0 >> BLOCK_BITS; by <= y1 >> BLOCK_BITS; by++)
+      for (let bx = x0 >> BLOCK_BITS; bx <= x1 >> BLOCK_BITS; bx++) if (this.#blocks.get(bx, by) > 0) return true;
     return false;
   }
 
@@ -126,7 +127,6 @@ export interface RecognitionParams {
   interval: number;
 }
 
-
 export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: TOLERANCE, nestDrift: 0.03, interval: 0.1 };
 
 /** Seconds for a daughter colony's odour to drift most of the way from her mother's (ja-lo8.9.1, Colony.odourAim). */
@@ -142,7 +142,6 @@ export function driftAim(mother: number, tolerance: number): number {
   const d = 1.5 * tolerance;
   return mother <= 0.5 ? Math.min(1, mother + d) : Math.max(0, mother - d);
 }
-
 
 /**
  * Every colony's ants, by odour band, each counted as (1 − calm) of an enemy. `look(odour, tolerance)`
@@ -181,7 +180,7 @@ export class Recognition {
     if (this.#calmed) for (const g of this.#everyone) g.reset();
     let calmed = false;
     for (const c of colonies) {
-      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (layer < 0 || c.layer[i] === layer) && (c.calm[i]) > 0) calmed = true;
+      for (let i = 0; i < c.n && !calmed; i++) if (c.alive[i] && (layer < 0 || c.layer[i] === layer) && c.calm[i] > 0) calmed = true;
       if (calmed) break;
     }
     this.#calmed = calmed;
@@ -200,7 +199,7 @@ export class Recognition {
           (this.#everyone[b] as SumGrid).add(cx, cy, 1);
           everyone |= 1 << b;
         }
-        const weight = 1 - (c.calm[i]);
+        const weight = 1 - c.calm[i];
         if (weight <= 0) continue;
         (this.bins[b] as SumGrid).add(cx, cy, weight);
         occupied |= 1 << b;
@@ -249,8 +248,8 @@ export class Recognition {
       if (!g.any(cx - r - 1, cy - r, cx + r + 1, cy + r)) continue;
       const o = discOffsets(r)[cy & 1] as Int16Array;
       for (let k = 0; k < o.length; k += 2) {
-        const x = cx + (o[k]);
-        const y = cy + (o[k + 1]);
+        const x = cx + o[k];
+        const y = cy + o[k + 1];
         if (inBounds(map, x, y)) s += g.get(x, y);
       }
     }
@@ -275,7 +274,7 @@ export class Recognition {
     let masked = false;
     for (const c of colonies) {
       for (let i = 0; i < c.n; i++)
-        if (c.alive[i] && ((c.mask[i]) > 0 || (c.estrange[i]) > 0)) {
+        if (c.alive[i] && (c.mask[i] > 0 || c.estrange[i] > 0)) {
           masked = true;
           break;
         }
@@ -304,8 +303,8 @@ export class Recognition {
           const room = k >= 0 ? ch.list[k] : undefined;
           if (!room || room.role !== "royal" || room.colony !== c.params.nest) continue;
         } else {
-          const dx = (c.x[i]) - nest.x;
-          const dy = (c.y[i]) - nest.y;
+          const dx = c.x[i] - nest.x;
+          const dy = c.y[i] - nest.y;
           if (dx * dx + dy * dy >= r2) continue;
         }
         at++;
@@ -333,9 +332,9 @@ export class Recognition {
         if (!c.alive[i]) continue;
         const f = Math.min(MAX_MASK, c.mask[i]);
         // The odour weapon (cull) pushes away from the nest's odour, toward the far side.
-        const away = (c.estrange[i]) * 0.5 * (n0 < FUNGAL ? 1 : n0 > FUNGAL ? -1 : 0);
+        const away = c.estrange[i] * 0.5 * (n0 < FUNGAL ? 1 : n0 > FUNGAL ? -1 : 0);
         const o = Math.min(1, Math.max(0, n0 + f * (FUNGAL - n0) + away));
-        if (Math.abs(o - (c.odour[i])) > 1e-7) moving = true;
+        if (Math.abs(o - c.odour[i]) > 1e-7) moving = true;
         c.odour[i] = o;
       }
     }
@@ -361,7 +360,12 @@ export class Recognition {
    * Fungus.#touch reads it, after the same tick's build): it is saved for completeness, and no test reaches it (#63's review, N3).
    */
   saveBands(): BandsSave {
-    return { bins: this.bins.map((g) => g.saveState()), everyone: this.#calmed ? this.#everyone.map((g) => g.saveState()) : null, occupied: this.#occupied, occupiedEveryone: this.#occupiedEveryone };
+    return {
+      bins: this.bins.map((g) => g.saveState()),
+      everyone: this.#calmed ? this.#everyone.map((g) => g.saveState()) : null,
+      occupied: this.#occupied,
+      occupiedEveryone: this.#occupiedEveryone,
+    };
   }
 
   loadBands(b: BandsSave): void {

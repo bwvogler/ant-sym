@@ -98,7 +98,7 @@ export class ChunkLayer<A extends Cells> {
     const ty = (y >> CHUNK_BITS) - this.#cy0;
     if (tx < 0 || ty < 0 || tx >= this.#cw || ty >= this.#ch) return this.empty;
     const a = this.#table[ty * this.#cw + tx];
-    return a ? (a[((y & MASK) << CHUNK_BITS) | (x & MASK)]) : this.empty;
+    return a ? a[((y & MASK) << CHUNK_BITS) | (x & MASK)] : this.empty;
   }
 
   set(x: number, y: number, v: number): void {

@@ -17,7 +17,8 @@ import { DT, run } from "../builders.ts";
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** Seed 7's small plane (160 × 100): two nests well inside it, quick to run. */
-const small = (ants = 60, autoFound = true): Game => new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: ants, rivalAnts: ants, autoFound }, gameRng(7));
+const small = (ants = 60, autoFound = true): Game =>
+  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: ants, rivalAnts: ants, autoFound }, gameRng(7));
 /** Seed 1's default plane, where a founding beyond V₀ fits (the line grows at V₀: the curtain's x0 falls). */
 const big = (autoFound = true): Game => new Game(generateOneWorld(1), { antCount: 40, rivalAnts: 40, autoFound }, gameRng(1));
 
@@ -75,9 +76,15 @@ test("one world: a save runs on exactly as the unbroken game: the plane with its
   c.midden.set(cellKey(h.px + 9, h.py), 2);
   c.corpses.push({ x: centreX(h.px + 7, h.py), y: centreY(h.py), held: -1, died: whole.time, load: 0, strain: 0, layer: PLANE });
   assert.ok((whole.map.moundCells ?? 0) > 0, "the mound has begun (the test's own check)");
-  assert.ok(whole.colonies.every((k) => k.layer.some((l, i) => k.alive[i] === 1 && l === PLANE)), "both colonies have ants on the plane");
+  assert.ok(
+    whole.colonies.every((k) => k.layer.some((l, i) => k.alive[i] === 1 && l === PLANE)),
+    "both colonies have ants on the plane",
+  );
   const saved = copy(whole.save());
-  assert.ok(((saved.fungus.layers as { sporeCells: unknown }[])[0]!.sporeCells as { $set: unknown[] }).$set.length > 0, "spores in the curtain");
+  assert.ok(
+    ((saved.fungus.layers as { sporeCells: unknown }[])[0]!.sporeCells as { $set: unknown[] }).$set.length > 0,
+    "spores in the curtain",
+  );
   const at = hashGame(whole);
   run(whole, 15);
   const unbroken = hashGame(whole);

@@ -22,7 +22,6 @@ function build(view: "side" | "top", seed: number): Game {
   return new Game(map, { antCount: 200, rivalAnts: 200, regrow: 600 }, mulberry32(seed * 7919));
 }
 
-
 for (const view of ["side", "top"] as const)
   test(`a save restored into a fresh game runs on exactly as the unbroken game (${view} view, the fungus landed)`, () => {
     const whole = build(view, 3);
@@ -144,7 +143,11 @@ test("every Layer key is saved per layer (LAYER_STATE) or built again: by the co
   const built = ["map", "nest", "entrance", "entranceCol", "entranceRow"]; // the constructor, from the world
   const wired = ["enemies", "nestmates", "friends", "foreign", "raidMarks", "raidTarget", "raidNest", "others"]; // Game.#wire, #aimAt
   assert.equal(declared.length, 19, `found the declarations (${declared.join(", ")})`);
-  assert.deepEqual([...declared].sort(), [...LAYER_STATE, ...built, ...wired].sort(), "every key is saved or built again, and no key is both");
+  assert.deepEqual(
+    [...declared].sort(),
+    [...LAYER_STATE, ...built, ...wired].sort(),
+    "every key is saved or built again, and no key is both",
+  );
 });
 
 test("a one-world colony's save holds every layer's own state, and the fungus's every map's spores: loaded into a fresh game, each reads as it was", () => {
@@ -196,7 +199,24 @@ test("the game's save holds every private field it declares, or the field is bui
 
 test("a single-map save's shape: the game's keys with the grids, colony saves as fields and private, the fungus's keys, one layer of grids", () => {
   // A single-map game saves none of one world's parts (`world`, a colony's or the fungus's `layers`): held here by name.
-  const game = ["colonies", "flights", "founded", "fungus", "grids", "landed", "map", "params", "private", "raids", "recognition", "regrown", "revealed", "strategyChoices", "time", "version"];
+  const game = [
+    "colonies",
+    "flights",
+    "founded",
+    "fungus",
+    "grids",
+    "landed",
+    "map",
+    "params",
+    "private",
+    "raids",
+    "recognition",
+    "regrown",
+    "revealed",
+    "strategyChoices",
+    "time",
+    "version",
+  ];
   const fungus = ["base", "clock", "evolution", "hosts", "menu", "params", "rule", "sporeCells", "sporeStrain", "spores"];
   for (const view of ["top", "side"] as const) {
     const g = build(view, 5);

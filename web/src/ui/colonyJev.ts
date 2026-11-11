@@ -1,6 +1,54 @@
-import { errorOf, GAME_CAPS, hasAnswers, isProxyReply, isRunSummary, runOf, type JevAnswer, type JevProxyReply, type JevRequest, type RunCaps, type RunSummary } from "../../shared/jev.ts";
+import {
+  errorOf,
+  GAME_CAPS,
+  hasAnswers,
+  isProxyReply,
+  isRunSummary,
+  runOf,
+  type JevAnswer,
+  type JevProxyReply,
+  type JevRequest,
+  type RunCaps,
+  type RunSummary,
+} from "../../shared/jev.ts";
 import { apiHeaders, apiUrl } from "./backend.ts";
-import { localPolicy, localStance, type Colony, MODES, STANCES, type Mode, type Policy, type Situation, type Stance, type StancePolicy, type StanceSituation, packModeRequest, packStanceRequest, policyContext, readMode, readStance, situationKey, stanceContext, stanceKey, localFungusRule, type FungalSituation, type FungusPolicy, askedIn, FUNGUS_BATCH, FUNGUS_GATHER_MS, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking, askedLevers, DEFAULT_MENU, type Fungus, PolicyCache } from "../colony/index.ts";
+import {
+  localPolicy,
+  localStance,
+  type Colony,
+  MODES,
+  STANCES,
+  type Mode,
+  type Policy,
+  type Situation,
+  type Stance,
+  type StancePolicy,
+  type StanceSituation,
+  packModeRequest,
+  packStanceRequest,
+  policyContext,
+  readMode,
+  readStance,
+  situationKey,
+  stanceContext,
+  stanceKey,
+  localFungusRule,
+  type FungalSituation,
+  type FungusPolicy,
+  askedIn,
+  FUNGUS_BATCH,
+  FUNGUS_GATHER_MS,
+  fungalKey,
+  fungusContext,
+  packFungusRequest,
+  readLevels,
+  validLevels,
+  worthAsking,
+  askedLevers,
+  DEFAULT_MENU,
+  type Fungus,
+  PolicyCache,
+} from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
 // game. The player is the fungus, so no colony is the player's: Jev, when on,
@@ -115,7 +163,9 @@ function askKey(context: string, key: string): string {
   return `${context}\u0000${key}`;
 }
 
-function lane<S, A extends string>(spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "valid" | "contextOf" | "words" | "asks" | "batch" | "gather">): Lane<S, A> {
+function lane<S, A extends string>(
+  spec: Pick<Lane<S, A>, "name" | "key" | "pack" | "read" | "local" | "valid" | "contextOf" | "words" | "asks" | "batch" | "gather">,
+): Lane<S, A> {
   return { ...spec, context: spec.contextOf(spec.words), fallback: [], queue: new Map() };
 }
 
@@ -129,8 +179,26 @@ interface Driven {
 /** A colony's two lanes, asking under `words` (its doctrine). */
 function colonyLanes(words: string): Omit<Driven, "colony"> {
   return {
-    modes: lane<Situation, Mode>({ name: "mode", key: situationKey, pack: packModeRequest, read: (a, id) => readMode(a, id), local: localPolicy, valid: (_k, a) => (MODES as readonly string[]).includes(a), contextOf: policyContext, words }),
-    stances: lane<StanceSituation, Stance>({ name: "stance", key: stanceKey, pack: packStanceRequest, read: (a, id) => readStance(a, id), local: localStance, valid: (_k, a) => (STANCES as readonly string[]).includes(a), contextOf: stanceContext, words }),
+    modes: lane<Situation, Mode>({
+      name: "mode",
+      key: situationKey,
+      pack: packModeRequest,
+      read: (a, id) => readMode(a, id),
+      local: localPolicy,
+      valid: (_k, a) => (MODES as readonly string[]).includes(a),
+      contextOf: policyContext,
+      words,
+    }),
+    stances: lane<StanceSituation, Stance>({
+      name: "stance",
+      key: stanceKey,
+      pack: packStanceRequest,
+      read: (a, id) => readStance(a, id),
+      local: localStance,
+      valid: (_k, a) => (STANCES as readonly string[]).includes(a),
+      contextOf: stanceContext,
+      words,
+    }),
   };
 }
 
@@ -148,7 +216,11 @@ export class ColonyJev {
   #fungal = lane<FungalSituation, string>({
     name: "fungus",
     key: (s) => fungalKey(s, this.#asked(s)),
-    pack: (items, aim) => packFungusRequest(items.map((it) => ({ ...it, asked: askedIn(it.key) })), aim),
+    pack: (items, aim) =>
+      packFungusRequest(
+        items.map((it) => ({ ...it, asked: askedIn(it.key) })),
+        aim,
+      ),
     read: (a, id, _s, key) => readLevels(a, id, askedIn(key)),
     valid: validLevels,
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
@@ -185,7 +257,22 @@ export class ColonyJev {
   /** where the next cycle starts in the lanes, so no lane waits behind the others' long queues (ja-ytc) */
   #nextLane = 0;
   #listeners = new Set<Listener>();
-  #state: ColonyJevState = { phase: "off", run: null, asked: 0, stancesAsked: 0, requests: 0, hits: 0, misses: 0, cached: 0, stancesCached: 0, doctrineCached: [], fungusAsked: 0, fungusCached: 0, failures: 0, lastError: null };
+  #state: ColonyJevState = {
+    phase: "off",
+    run: null,
+    asked: 0,
+    stancesAsked: 0,
+    requests: 0,
+    hits: 0,
+    misses: 0,
+    cached: 0,
+    stancesCached: 0,
+    doctrineCached: [],
+    fungusAsked: 0,
+    fungusCached: 0,
+    failures: 0,
+    lastError: null,
+  };
 
   /**
    * Called when a situation has no answer under the current words and no run is on (S7): the page starts one if Jev
@@ -240,7 +327,10 @@ export class ColonyJev {
     let c = this.#caches.get(context);
     if (!c) {
       // Stored answers are kept only if this lane's question could have given them.
-      c = new PolicyCache<string>(context, (this.#store?.load(context) ?? []).filter(([key, a]) => l.valid(key, a)));
+      c = new PolicyCache<string>(
+        context,
+        (this.#store?.load(context) ?? []).filter(([key, a]) => l.valid(key, a)),
+      );
       this.#caches.set(context, c);
     }
     return c as unknown as PolicyCache<A>;
@@ -344,7 +434,8 @@ export class ColonyJev {
     for (const [key, answer] of this.#cache(l).entries()) if (current(key)) out.set(key, { key, answer, stale: false });
     if (!this.#canAsk)
       for (const c of l.fallback)
-        for (const [key, answer] of this.#cache(l, c).entries()) if (!out.has(key) && current(key)) out.set(key, { key, answer, stale: true });
+        for (const [key, answer] of this.#cache(l, c).entries())
+          if (!out.has(key) && current(key)) out.set(key, { key, answer, stale: true });
     return [...out.values()];
   }
 
@@ -415,7 +506,13 @@ export class ColonyJev {
 
   /** A lane whose kind of context this is (by its prefix: colony-, stance-, fungus-), to check answers against. */
   #laneFor(context: string): Lane<unknown, string> | null {
-    const kind = context.startsWith("colony-") ? "mode" : context.startsWith("stance-") ? "stance" : context.startsWith("fungus-") ? "fungus" : null;
+    const kind = context.startsWith("colony-")
+      ? "mode"
+      : context.startsWith("stance-")
+        ? "stance"
+        : context.startsWith("fungus-")
+          ? "fungus"
+          : null;
     if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
     const d = this.#driven[0] ?? colonyLanes("");
     return kind === "mode" ? (d.modes as Lane<unknown, string>) : kind === "stance" ? (d.stances as Lane<unknown, string>) : null;
@@ -468,7 +565,11 @@ export class ColonyJev {
     const startNo = ++this.#starts;
     let run: RunSummary;
     try {
-      const res = await fetch(apiUrl("api/run"), { method: "POST", headers: apiHeaders(), body: JSON.stringify({ action: "start", caps: { ...COLONY_CAPS, ...caps } }) });
+      const res = await fetch(apiUrl("api/run"), {
+        method: "POST",
+        headers: apiHeaders(),
+        body: JSON.stringify({ action: "start", caps: { ...COLONY_CAPS, ...caps } }),
+      });
       const body: unknown = await res.json();
       if (!res.ok || !isRunSummary(body)) {
         this.#set({ lastError: errorOf(body) ?? `start failed (${res.status})` });
@@ -496,7 +597,19 @@ export class ColonyJev {
     this.#aborter = new AbortController();
     this.#clearQueues();
     this.#cooldown = 0;
-    this.#set({ phase: "running", run, asked: 0, stancesAsked: 0, fungusAsked: 0, requests: 0, hits: 0, misses: 0, failures: 0, lastError: null, ...this.#counts() });
+    this.#set({
+      phase: "running",
+      run,
+      asked: 0,
+      stancesAsked: 0,
+      fungusAsked: 0,
+      requests: 0,
+      hits: 0,
+      misses: 0,
+      failures: 0,
+      lastError: null,
+      ...this.#counts(),
+    });
     this.#reconsider();
     if (this.#timer === null) this.#timer = setInterval(() => this.#cycle(), this.opts.intervalMs);
   }
@@ -529,7 +642,12 @@ export class ColonyJev {
     try {
       const res = await fetch(apiUrl("api/run"), { method: "POST", headers: apiHeaders(), body: JSON.stringify({ action: "stop" }) });
       const body: unknown = await res.json();
-      if (seq === this.#runSeq) this.#set(isRunSummary(body) ? { phase: "stopped", run: body } : { phase: "stopped", lastError: errorOf(body) ?? `stop answered ${res.status}` });
+      if (seq === this.#runSeq)
+        this.#set(
+          isRunSummary(body)
+            ? { phase: "stopped", run: body }
+            : { phase: "stopped", lastError: errorOf(body) ?? `stop answered ${res.status}` },
+        );
     } catch (e) {
       if (seq === this.#runSeq) this.#set({ phase: "stopped", lastError: String(e) });
     }
@@ -581,7 +699,7 @@ export class ColonyJev {
     // in a game) no longer holds every slot while the fungus and the other colonies wait (ja-ytc).
     const lanes = this.#lanes();
     const first = this.#nextLane % lanes.length;
-    for (let moved = true; moved && this.#inFlight < width; ) {
+    for (let moved = true; moved && this.#inFlight < width;) {
       moved = false;
       for (let j = 0; j < lanes.length && this.#inFlight < width; j++) {
         const l = lanes[(first + j) % lanes.length] as Lane<unknown, string>;
@@ -610,14 +728,23 @@ export class ColonyJev {
   async #ask<S, A extends string>(l: Lane<S, A>, batch: [string, S][]): Promise<void> {
     const seq = this.#runSeq;
     const context = l.context;
-    const items = batch.map(([key, situation], n) => ({ id: `${l.name === "mode" ? "s" : l.name === "stance" ? "c" : "h"}${n}`, key, situation }));
+    const items = batch.map(([key, situation], n) => ({
+      id: `${l.name === "mode" ? "s" : l.name === "stance" ? "c" : "h"}${n}`,
+      key,
+      situation,
+    }));
     const counted = l.name === "mode" ? "asked" : l.name === "stance" ? "stancesAsked" : "fungusAsked";
     this.#inFlight++;
     this.#set({ [counted]: this.#state[counted] + items.length, requests: this.#state.requests + 1 });
     let reply: JevProxyReply | null = null;
     let error: string | null = null;
     try {
-      const res = await fetch(apiUrl("api/jev"), { method: "POST", headers: apiHeaders(), body: JSON.stringify(l.pack(items, l.words)), signal: this.#aborter.signal });
+      const res = await fetch(apiUrl("api/jev"), {
+        method: "POST",
+        headers: apiHeaders(),
+        body: JSON.stringify(l.pack(items, l.words)),
+        signal: this.#aborter.signal,
+      });
       const body: unknown = await res.json();
       if (res.status === 409) {
         const run = runOf(body);
@@ -631,7 +758,10 @@ export class ColonyJev {
         // every current lane asking under that context, not only the one that sent it: that lane may be gone (a new
         // game) or have moved to another doctrine, and other colonies' lanes skipped these while they were in flight (ja-1u2).
         if (seq === this.#runSeq)
-          for (const m of this.#lanes()) if (m.name === l.name && m.context === context) for (const it of items) if (m.key(it.situation) === it.key && !this.#cache(m, context).get(it.key)) m.queue.set(it.key, it.situation); // a fungus key built under an older menu is not asked again
+          for (const m of this.#lanes())
+            if (m.name === l.name && m.context === context)
+              for (const it of items)
+                if (m.key(it.situation) === it.key && !this.#cache(m, context).get(it.key)) m.queue.set(it.key, it.situation); // a fungus key built under an older menu is not asked again
         this.#set({ [counted]: this.#state[counted] - items.length, run: runOf(body) ?? this.#state.run });
         return;
       }
@@ -650,7 +780,11 @@ export class ColonyJev {
     if (!reply || !answers) {
       // Not billed as a reply; everyone keeps the local rule and meets the situation again later.
       this.#cooldown = 5;
-      this.#set({ failures: this.#state.failures + 1, lastError: error ?? `jev answered ${reply?.status ?? "?"}`, run: runOf(reply) ?? this.#state.run });
+      this.#set({
+        failures: this.#state.failures + 1,
+        lastError: error ?? `jev answered ${reply?.status ?? "?"}`,
+        run: runOf(reply) ?? this.#state.run,
+      });
       return;
     }
     // A billed answer is kept under the context it was asked under, whichever run or doctrine is current now.

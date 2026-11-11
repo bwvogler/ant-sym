@@ -32,7 +32,11 @@ function isPairs(v: unknown): v is [string, string][] {
  * Fetch the index and every bundle, and hand each to `seed(context, entries)`. A missing or malformed file is skipped:
  * the page plays on without it. Returns the answers seeded.
  */
-export async function loadPrecache(seed: (context: string, entries: [string, string][]) => number, fetchFn: typeof fetch = fetch, base?: string): Promise<number> {
+export async function loadPrecache(
+  seed: (context: string, entries: [string, string][]) => number,
+  fetchFn: typeof fetch = fetch,
+  base?: string,
+): Promise<number> {
   let index: PrecacheIndex;
   try {
     const res = await fetchFn(precacheUrl("index.json", base));

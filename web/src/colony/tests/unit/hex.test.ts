@@ -1,6 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CELL, cellOf, centreX, centreY, corners, DIR_ANGLE, dirOf, discOffsets, extent, hexDistance, hexLine, nx, ny, R, SIDE } from "../../hex.ts";
+import {
+  CELL,
+  cellOf,
+  centreX,
+  centreY,
+  corners,
+  DIR_ANGLE,
+  dirOf,
+  discOffsets,
+  extent,
+  hexDistance,
+  hexLine,
+  nx,
+  ny,
+  R,
+  SIDE,
+} from "../../hex.ts";
 
 const near = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps;
 
@@ -19,13 +35,24 @@ test("cellOf is the inverse of a cell's centre, and finds the nearest centre for
     cellOf(px, py);
     const [cx, cy] = [CELL[0]!, CELL[1]!];
     const d = Math.hypot(centreX(cx, cy) - px, centreY(cy) - py);
-    for (let w = 0; w < 6; w++) assert.ok(d <= Math.hypot(centreX(nx(cx, cy, w), ny(cy, w)) - px, centreY(ny(cy, w)) - py) + 1e-9, `(${px}, ${py}) is nearer a neighbour of (${cx}, ${cy})`);
+    for (let w = 0; w < 6; w++)
+      assert.ok(
+        d <= Math.hypot(centreX(nx(cx, cy, w), ny(cy, w)) - px, centreY(ny(cy, w)) - py) + 1e-9,
+        `(${px}, ${py}) is nearer a neighbour of (${cx}, ${cy})`,
+      );
     assert.ok(d <= SIDE + 1e-9, "within the hexagon's circumradius");
   }
 });
 
 test("six neighbours, each 1 away at the way's angle; going there and back returns, on even and odd rows", () => {
-  for (const [x, y] of [[5, 4], [5, 5], [-3, -1], [-3, -2], [63, 63], [64, 64]] as const) {
+  for (const [x, y] of [
+    [5, 4],
+    [5, 5],
+    [-3, -1],
+    [-3, -2],
+    [63, 63],
+    [64, 64],
+  ] as const) {
     for (let d = 0; d < 6; d++) {
       const ax = nx(x, y, d);
       const ay = ny(y, d);
@@ -54,7 +81,12 @@ test("dirOf rounds a heading to the nearest of the six ways; hexDistance counts 
 });
 
 test("discOffsets: 1, 7, 19 cells; every offset within the radius, centre first, on both row parities", () => {
-  for (const [radius, n] of [[0, 1], [1, 7], [2, 19], [3, 37]] as const) {
+  for (const [radius, n] of [
+    [0, 1],
+    [1, 7],
+    [2, 19],
+    [3, 37],
+  ] as const) {
     for (const parity of [0, 1]) {
       const o = discOffsets(radius)[parity]!;
       assert.equal(o.length / 2, n);
@@ -82,7 +114,12 @@ test("hexLine: both ends, one neighbour per step, hexDistance + 1 cells, each wi
     assert.equal(line.length, 2 * (n + 1));
     assert.deepEqual([line[0], line[1]], [ax, ay]);
     assert.deepEqual([line[2 * n], line[2 * n + 1]], [bx, by]);
-    for (let i = 1; i <= n; i++) assert.equal(hexDistance(line[2 * i - 2]!, line[2 * i - 1]!, line[2 * i]!, line[2 * i + 1]!), 1, `step ${i} of (${ax}, ${ay}) → (${bx}, ${by})`);
+    for (let i = 1; i <= n; i++)
+      assert.equal(
+        hexDistance(line[2 * i - 2]!, line[2 * i - 1]!, line[2 * i]!, line[2 * i + 1]!),
+        1,
+        `step ${i} of (${ax}, ${ay}) → (${bx}, ${by})`,
+      );
     // Each cell lies within a hexagon's reach of the straight line between the centres.
     const [x1, y1, x2, y2] = [centreX(ax, ay), centreY(ay), centreX(bx, by), centreY(by)];
     const len = Math.hypot(x2 - x1, y2 - y1);
@@ -100,9 +137,18 @@ test("hexLine: both ends, one neighbour per step, hexDistance + 1 cells, each wi
     const fwd = hexLine(ax, ay, bx, by);
     const back = hexLine(bx, by, ax, ay);
     const n = fwd.length / 2;
-    for (let i = 0; i < n; i++) assert.deepEqual([back[2 * (n - 1 - i)], back[2 * (n - 1 - i) + 1]], [fwd[2 * i], fwd[2 * i + 1]], `(${ax}, ${ay}) ↔ (${bx}, ${by}) at ${i}`);
+    for (let i = 0; i < n; i++)
+      assert.deepEqual(
+        [back[2 * (n - 1 - i)], back[2 * (n - 1 - i) + 1]],
+        [fwd[2 * i], fwd[2 * i + 1]],
+        `(${ax}, ${ay}) ↔ (${bx}, ${by}) at ${i}`,
+      );
   }
-  for (const [ax, ay, bx, by] of [[0, 0, 3, 6], [0, 0, 6, 4], [2, 1, -4, 9]]) {
+  for (const [ax, ay, bx, by] of [
+    [0, 0, 3, 6],
+    [0, 0, 6, 4],
+    [2, 1, -4, 9],
+  ]) {
     const fwd = [...hexLine(ax, ay, bx, by)];
     const back = [...hexLine(bx, by, ax, ay)];
     const rev: number[] = [];

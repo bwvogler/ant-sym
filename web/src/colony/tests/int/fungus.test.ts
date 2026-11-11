@@ -44,31 +44,46 @@ test("strains: Lockpick hides and holds, Bloom spreads fast and shows", () => {
 
 test("contact: a loaded ant raises the load of the clean ants around it, and passes on its strain", () => {
   const map = arena();
-  const c = placed(map, 0, [[10, 6], [10, 6], [11, 6], [10, 7], [9, 5]]);
+  const c = placed(map, 0, [
+    [10, 6],
+    [10, 6],
+    [11, 6],
+    [10, 7],
+    [9, 5],
+  ]);
   infect(c, 0, 1, BLOOM);
   const f = new Fungus(map, { grooming: 0, priming: 0 });
   f.hosts = 1;
   run(f, [c], 2);
   for (let i = 1; i < 5; i++) {
-    assert.ok((c.load[i]) > INFECTED, `ant ${i}: load ${c.load[i]}`);
+    assert.ok(c.load[i] > INFECTED, `ant ${i}: load ${c.load[i]}`);
     assert.equal(c.strain[i], BLOOM);
   }
 });
 
 test("an isolated ant: a clean one far away stays clean, and a Lockpick host alone keeps its load", () => {
   const map = arena();
-  const c = placed(map, 0, [[10, 6], [25, 6]]);
+  const c = placed(map, 0, [
+    [10, 6],
+    [25, 6],
+  ]);
   infect(c, 0, 0.8, LOCKPICK);
   const f = new Fungus(map);
   f.hosts = 1;
   run(f, [c], 10);
   assert.equal(c.load[1], 0, "three cells is out of reach; fifteen certainly is");
-  assert.ok(Math.abs((c.load[0]) - 0.8) < 1e-6, `Lockpick never clears on its own and nobody grooms it: ${c.load[0]}`);
+  assert.ok(Math.abs(c.load[0] - 0.8) < 1e-6, `Lockpick never clears on its own and nobody grooms it: ${c.load[0]}`);
 });
 
 test("grooming: nestmates clear a visible host, and a hidden strain is groomed far less", () => {
   const map = arena();
-  const crowd: [number, number][] = [[10, 6], [10, 6], [10, 6], [10, 6], [10, 6]];
+  const crowd: [number, number][] = [
+    [10, 6],
+    [10, 6],
+    [10, 6],
+    [10, 6],
+    [10, 6],
+  ];
   const groomed = (strain: number, mates: boolean): number => {
     const c = placed(map, 0, mates ? crowd : [[10, 6]]);
     infect(c, 0, 0.6, strain);
@@ -83,23 +98,36 @@ test("grooming: nestmates clear a visible host, and a hidden strain is groomed f
   const bloomGroomed = groomed(BLOOM, true);
   const lockGroomed = groomed(LOCKPICK, true);
   assert.ok(bloomGroomed < bloomAlone - 0.3, `Bloom with groomers ${bloomGroomed.toFixed(3)} vs alone ${bloomAlone.toFixed(3)}`);
-  assert.ok(lockGroomed > bloomGroomed + 0.3, `Lockpick hides from grooming: ${lockGroomed.toFixed(3)} vs Bloom ${bloomGroomed.toFixed(3)}`);
+  assert.ok(
+    lockGroomed > bloomGroomed + 0.3,
+    `Lockpick hides from grooming: ${lockGroomed.toFixed(3)} vs Bloom ${bloomGroomed.toFixed(3)}`,
+  );
 });
 
 test("priming: grooming a visible nestmate leaves an ant resistant, and a resistant ant takes less load", () => {
   const map = arena();
-  const c = placed(map, 0, [[10, 6], [10, 6]]);
+  const c = placed(map, 0, [
+    [10, 6],
+    [10, 6],
+  ]);
   infect(c, 0, 1, BLOOM);
   // A strain that cannot spread: the groomer's resistance comes from grooming alone, not from catching it.
-  const f = new Fungus(map, {}, STRAINS.map((s) => ({ ...s, transmission: 0 })));
+  const f = new Fungus(
+    map,
+    {},
+    STRAINS.map((s) => ({ ...s, transmission: 0 })),
+  );
   f.hosts = 1;
   run(f, [c], 3);
   assert.equal(c.load[1], 0);
-  assert.ok((c.resist[1]) > 0.01, `the groomer is primed: ${c.resist[1]}`);
+  assert.ok(c.resist[1] > 0.01, `the groomer is primed: ${c.resist[1]}`);
   assert.equal(c.resist[0], 0, "a host's own load does not prime it");
 
   const pair = (resist: number): number => {
-    const d = placed(map, 0, [[10, 6], [10, 6]]);
+    const d = placed(map, 0, [
+      [10, 6],
+      [10, 6],
+    ]);
     infect(d, 0, 1, LOCKPICK); // barely visible: priming stays small, so resistance is what was set
     d.resist[1] = resist;
     const g = new Fungus(map, { grooming: 0, priming: 0 });
@@ -113,14 +141,17 @@ test("priming: grooming a visible nestmate leaves an ant resistant, and a resist
 test("across colonies: load passes both ways, at the same rate as within a colony", () => {
   const map = arena();
   // One host and two clean ants on one cell: a nestmate of the host and an ant of the other colony.
-  const mine = placed(map, 0, [[20, 6], [20, 6]]);
+  const mine = placed(map, 0, [
+    [20, 6],
+    [20, 6],
+  ]);
   const theirs = placed(map, 1, [[20, 6]]);
   infect(mine, 0, 1, BLOOM);
   const f = new Fungus(map, { grooming: 0, priming: 0 });
   f.hosts = 1;
   run(f, [mine, theirs], 1 / 30);
-  assert.ok((theirs.load[0]) > 0, "the rival caught it");
-  assert.ok(Math.abs((theirs.load[0]) - (mine.load[1])) < 1e-7, `one step from clean: ${theirs.load[0]} vs ${mine.load[1]}`);
+  assert.ok(theirs.load[0] > 0, "the rival caught it");
+  assert.ok(Math.abs(theirs.load[0] - mine.load[1]) < 1e-7, `one step from clean: ${theirs.load[0]} vs ${mine.load[1]}`);
 
   // And back: a rival host infects the player's ant.
   const a = placed(map, 0, [[20, 6]]);
@@ -129,15 +160,21 @@ test("across colonies: load passes both ways, at the same rate as within a colon
   const g = new Fungus(map, { grooming: 0, priming: 0 });
   g.hosts = 1;
   run(g, [a, b], 2);
-  assert.ok((a.load[0]) > INFECTED, `the player's ant caught it from the rival: ${a.load[0]}`);
+  assert.ok(a.load[0] > INFECTED, `the player's ant caught it from the rival: ${a.load[0]}`);
   assert.equal(a.strain[0], LOCKPICK);
 });
 
 test("the order colonies are listed in is no edge", () => {
   const map = arena();
   const setup = (): [Colony, Colony] => {
-    const a = placed(map, 0, [[20, 6], [21, 6]]);
-    const b = placed(map, 1, [[20, 6], [21, 7]]);
+    const a = placed(map, 0, [
+      [20, 6],
+      [21, 6],
+    ]);
+    const b = placed(map, 1, [
+      [20, 6],
+      [21, 7],
+    ]);
     infect(a, 0, 1, BLOOM);
     infect(b, 0, 0.5, LOCKPICK);
     return [a, b];
@@ -154,15 +191,25 @@ test("the order colonies are listed in is no edge", () => {
   // Same colonies, listed the other way round (the grids follow the list).
   run(f2, [b2, a2], 2);
   for (let i = 0; i < 2; i++) {
-    assert.ok(Math.abs((a1.load[i]) - (a2.load[i])) < 1e-6, `a${i}: ${a1.load[i]} vs ${a2.load[i]}`);
-    assert.ok(Math.abs((b1.load[i]) - (b2.load[i])) < 1e-6, `b${i}: ${b1.load[i]} vs ${b2.load[i]}`);
+    assert.ok(Math.abs(a1.load[i] - a2.load[i]) < 1e-6, `a${i}: ${a1.load[i]} vs ${a2.load[i]}`);
+    assert.ok(Math.abs(b1.load[i] - b2.load[i]) < 1e-6, `b${i}: ${b1.load[i]} vs ${b2.load[i]}`);
   }
   assert.ok(Math.abs(f1.spores.get(21, 6) - f2.spores.get(21, 6)) < 1e-6, "spores taken the same either way");
 });
 
 test("spore brush: spores on open ground in the stroke, a dose into every ant there of either colony, and nobody outside it", () => {
-  const map = worldFromArrays({ w: 40, h: 12 }, [{ x: 4, y: 6, r: 2 }, { x: 36, y: 6, r: 2 }], { rock: Array.from({ length: 40 * 12 }, (_, i) => (i === 6 * 40 + 22 ? 1 : 0)) });
-  const mine = placed(map, 0, [[20, 6], [30, 6]]);
+  const map = worldFromArrays(
+    { w: 40, h: 12 },
+    [
+      { x: 4, y: 6, r: 2 },
+      { x: 36, y: 6, r: 2 },
+    ],
+    { rock: Array.from({ length: 40 * 12 }, (_, i) => (i === 6 * 40 + 22 ? 1 : 0)) },
+  );
+  const mine = placed(map, 0, [
+    [20, 6],
+    [30, 6],
+  ]);
   const theirs = placed(map, 1, [[21, 6]]);
   const f = new Fungus(map);
   f.paint([mine, theirs], at(20, 6).x, at(20, 6).y, 2, 2, 0.3, LOCKPICK);
@@ -170,8 +217,8 @@ test("spore brush: spores on open ground in the stroke, a dose into every ant th
   assert.equal(f.spores.get(22, 6), 0, "rock takes no spores");
   assert.equal(f.spores.get(25, 6), 0, "outside the stroke");
   assert.equal(f.sporeStrain.get(20, 6), LOCKPICK);
-  assert.ok(Math.abs((mine.load[0]) - 0.3) < 1e-6);
-  assert.ok(Math.abs((theirs.load[0]) - 0.3) < 1e-6, "the brush does not care whose ant it is");
+  assert.ok(Math.abs(mine.load[0] - 0.3) < 1e-6);
+  assert.ok(Math.abs(theirs.load[0] - 0.3) < 1e-6, "the brush does not care whose ant it is");
   assert.equal(mine.load[1], 0);
   assert.equal(f.hosts, 2);
   assert.ok(f.active);
@@ -179,7 +226,7 @@ test("spore brush: spores on open ground in the stroke, a dose into every ant th
   // A host keeps its first strain; another strain's dose still adds load.
   f.paint([mine, theirs], at(20, 6).x, at(20, 6).y, 0.5, 0, 0.2, BLOOM);
   assert.equal(mine.strain[0], LOCKPICK);
-  assert.ok(Math.abs((mine.load[0]) - 0.5) < 1e-6);
+  assert.ok(Math.abs(mine.load[0] - 0.5) < 1e-6);
 });
 
 test("spores on the ground: an ant walking onto them picks up load and takes some away; untouched spores fade", () => {
@@ -189,7 +236,7 @@ test("spores on the ground: an ant walking onto them picks up load and takes som
   f.paint([], at(30, 6).x, at(30, 6).y, 0.5, 4, 0, BLOOM);
   const c = placed(map, 0, [[15, 6]]);
   run(f, [c], 1);
-  assert.ok((c.load[0]) > INFECTED, `picked up: ${c.load[0]}`);
+  assert.ok(c.load[0] > INFECTED, `picked up: ${c.load[0]}`);
   assert.equal(c.strain[0], BLOOM, "the ground's strain");
   assert.ok(f.spores.get(15, 6) < f.spores.get(30, 6), "the trodden cell lost more than the fade");
   const left = f.spores.get(30, 6);
@@ -240,16 +287,32 @@ test("in a real game, the dial shows: Lockpick holds its load unseen, Bloom is g
   const lock = after(LOCKPICK);
   const bloom = after(BLOOM);
   assert.ok(lock.meanLoad > bloom.meanLoad + 0.2, `load: Lockpick ${lock.meanLoad.toFixed(2)} vs Bloom ${bloom.meanLoad.toFixed(2)}`);
-  assert.ok(bloom.meanResist > lock.meanResist * 2, `resistance: Bloom ${bloom.meanResist.toFixed(3)} vs Lockpick ${lock.meanResist.toFixed(3)}`);
+  assert.ok(
+    bloom.meanResist > lock.meanResist * 2,
+    `resistance: Bloom ${bloom.meanResist.toFixed(3)} vs Lockpick ${lock.meanResist.toFixed(3)}`,
+  );
 });
 
 test("the one-chunk fast path reads the same as the clipped slow path across a chunk border", () => {
-  const map = worldFromArrays({ w: 160, h: 20 }, [{ x: 4, y: 10, r: 2 }, { x: 150, y: 10, r: 2 }]);
+  const map = worldFromArrays({ w: 160, h: 20 }, [
+    { x: 4, y: 10, r: 2 },
+    { x: 150, y: 10, r: 2 },
+  ]);
   // The same little crowd twice: inside a chunk (x 30–32) and straddling the border at x 63|64.
-  const crowdAt = (x0: number): [number, number][] => [[x0, 10], [x0 + 1, 10], [x0 + 2, 10], [x0 + 1, 11], [x0 + 1, 9], [x0 + 1, 10]];
+  const crowdAt = (x0: number): [number, number][] => [
+    [x0, 10],
+    [x0 + 1, 10],
+    [x0 + 2, 10],
+    [x0 + 1, 11],
+    [x0 + 1, 9],
+    [x0 + 1, 10],
+  ];
   const runAt = (x0: number) => {
     const a = placed(map, 0, crowdAt(x0));
-    const b = placed(map, 1, [[x0 + 1, 10], [x0 + 2, 11]]);
+    const b = placed(map, 1, [
+      [x0 + 1, 10],
+      [x0 + 2, 11],
+    ]);
     infect(a, 0, 1, BLOOM);
     infect(b, 1, 0.5, LOCKPICK);
     const f = new Fungus(map);
@@ -260,14 +323,18 @@ test("the one-chunk fast path reads the same as the clipped slow path across a c
   const inside = runAt(30);
   for (const x0 of [62, 63]) {
     const border = runAt(x0);
-    inside.forEach((v, i) => assert.ok(Math.abs(v - (border[i])) < 1e-6, `x0 ${x0}, value ${i}: ${v} vs ${border[i]}`));
+    inside.forEach((v, i) => assert.ok(Math.abs(v - border[i]) < 1e-6, `x0 ${x0}, value ${i}: ${v} vs ${border[i]}`));
   }
 });
 
 test("advance: steps only once its interval has built up, and covers the time owed", () => {
   const map = arena();
   const setup = () => {
-    const c = placed(map, 0, [[10, 6], [10, 6], [11, 6]]);
+    const c = placed(map, 0, [
+      [10, 6],
+      [10, 6],
+      [11, 6],
+    ]);
     infect(c, 0, 1, BLOOM);
     const f = new Fungus(map, { interval: 0.1 });
     f.hosts = 1;
@@ -284,5 +351,5 @@ test("advance: steps only once its interval has built up, and covers the time ow
 
   const b = setup();
   for (let k = 0; k < 30; k++) b.f.step([b.c], b.grids, 0.1);
-  for (let i = 0; i < 3; i++) assert.ok(Math.abs((a.c.load[i]) - (b.c.load[i])) < 1e-5, `ant ${i}: ${a.c.load[i]} vs ${b.c.load[i]}`);
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(a.c.load[i] - b.c.load[i]) < 1e-5, `ant ${i}: ${a.c.load[i]} vs ${b.c.load[i]}`);
 });

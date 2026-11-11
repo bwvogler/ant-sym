@@ -8,7 +8,6 @@ import { SMALL_SIDE } from "../builders.ts";
 
 // Nest slice 2 (docs/nest-and-home.md §3.2): the side view's nest is chambers the ants dig, regulated by floor per worker.
 
-
 test("chambers: the founding chamber is the colony's royal one with a floor; a floor cell dug out from under stops being floor; a filled cell leaves", () => {
   const map = generateSideWorld(2, SMALL_SIDE);
   const ch = map.chambers!;
@@ -23,7 +22,12 @@ test("chambers: the founding chamber is the colony's royal one with a floor; a f
   let fy = -1;
   for (let y = 0; y < map.size.h && fx < 0; y++)
     for (let x = 0; x < map.size.w; x++)
-      if (ch.at(x, y) === 0 && rockAt(map, x, y) === OPEN && rockAt(map, x - (1 - (y & 1)), y + 1) === SOIL && rockAt(map, x + (y & 1), y + 1) === SOIL) {
+      if (
+        ch.at(x, y) === 0 &&
+        rockAt(map, x, y) === OPEN &&
+        rockAt(map, x - (1 - (y & 1)), y + 1) === SOIL &&
+        rockAt(map, x + (y & 1), y + 1) === SOIL
+      ) {
         fx = x;
         fy = y;
         break;
@@ -60,7 +64,8 @@ test("soil put back under a chamber cell stays put for good; put back elsewhere,
   const c0 = ch.list[0]!;
   // A cell under the founding chamber's floor, dug out (a tunnel down) and filled back at 10 s.
   let fx = -1;
-  for (let x = c0.x0; x <= c0.x1 && fx < 0; x++) if (ch.at(x, c0.floorRow) === 0 && rockAt(map, nx(x, c0.floorRow, 1), ny(c0.floorRow, 1)) === SOIL) fx = nx(x, c0.floorRow, 1);
+  for (let x = c0.x0; x <= c0.x1 && fx < 0; x++)
+    if (ch.at(x, c0.floorRow) === 0 && rockAt(map, nx(x, c0.floorRow, 1), ny(c0.floorRow, 1)) === SOIL) fx = nx(x, c0.floorRow, 1);
   const fy = c0.floorRow + 1;
   assert.ok(fx >= 0, "a cell under the floor");
   const floor = c0.floor;

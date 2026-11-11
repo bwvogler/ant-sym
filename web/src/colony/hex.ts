@@ -27,12 +27,12 @@ const NY = [0, 1, 1, 0, -1, -1];
 
 /** The x of cell (x, y)'s neighbour the way `d` (0–5). */
 export function nx(x: number, y: number, d: number): number {
-  return x + (NX[((y & 1) * 6) + d]);
+  return x + NX[(y & 1) * 6 + d];
 }
 
 /** The y of cell (x, y)'s neighbour the way `d` (0–5). */
 export function ny(y: number, d: number): number {
-  return y + (NY[d]);
+  return y + NY[d];
 }
 
 /** The world x of cell (x, y)'s centre. */

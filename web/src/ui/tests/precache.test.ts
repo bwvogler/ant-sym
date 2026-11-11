@@ -2,7 +2,20 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { SITUATIONS, MODES, STANCES, COLONY_BRAIN_VERSION, DOCTRINES, policyContext, STANCE_BRAIN_VERSION, stanceContext, AIMS, FUNGUS_BRAIN_VERSION, fungusContext, validLevels } from "../../colony/index.ts";
+import {
+  SITUATIONS,
+  MODES,
+  STANCES,
+  COLONY_BRAIN_VERSION,
+  DOCTRINES,
+  policyContext,
+  STANCE_BRAIN_VERSION,
+  stanceContext,
+  AIMS,
+  FUNGUS_BRAIN_VERSION,
+  fungusContext,
+  validLevels,
+} from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
 
 // The answers shipped with the page (scripts/precache.mjs → public/precache/) are only worth their bytes if the code
@@ -11,7 +24,11 @@ import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
 
 const DIR = fileURLToPath(new URL("../../../public/precache/", import.meta.url));
 const index = JSON.parse(readFileSync(`${DIR}index.json`, "utf8")) as PrecacheIndex;
-const CONTEXT: Record<string, (words: string) => string> = { mode: policyContext, stance: stanceContext, fungus: (aim) => fungusContext(aim, "side") };
+const CONTEXT: Record<string, (words: string) => string> = {
+  mode: policyContext,
+  stance: stanceContext,
+  fungus: (aim) => fungusContext(aim, "side"),
+};
 const VALID: Record<string, readonly string[]> = { mode: MODES, stance: STANCES };
 const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324 };
 
@@ -45,7 +62,14 @@ test("every preset doctrine ships mode and stance answers, each situation once, 
 
 test("loadPrecache seeds each bundle under its context, and skips what it can't read", async () => {
   const files: Record<string, unknown> = {
-    "/x/precache/index.json": { versions: {}, bundles: [{ lane: "mode", doctrine: "forage", context: "colony-a", file: "a.json", answers: 1 }, { lane: "mode", doctrine: "forage", context: "colony-b", file: "b.json", answers: 1 }, { lane: "mode", doctrine: "forage", context: "colony-c", file: "missing.json", answers: 1 }] },
+    "/x/precache/index.json": {
+      versions: {},
+      bundles: [
+        { lane: "mode", doctrine: "forage", context: "colony-a", file: "a.json", answers: 1 },
+        { lane: "mode", doctrine: "forage", context: "colony-b", file: "b.json", answers: 1 },
+        { lane: "mode", doctrine: "forage", context: "colony-c", file: "missing.json", answers: 1 },
+      ],
+    },
     "/x/precache/a.json": [["k1", "explore"]],
     "/x/precache/b.json": { not: "pairs" },
   };
@@ -58,7 +82,13 @@ test("loadPrecache seeds each bundle under its context, and skips what it can't 
   assert.equal(n, 1);
   assert.deepEqual(seeded, [["colony-a", 1]]);
   assert.equal(precacheUrl("index.json", "/ant-sym"), "/ant-sym/precache/index.json");
-  const none = await loadPrecache(() => 1, (async () => { throw new TypeError("offline"); }) as typeof fetch, "/");
+  const none = await loadPrecache(
+    () => 1,
+    (async () => {
+      throw new TypeError("offline");
+    }) as typeof fetch,
+    "/",
+  );
   assert.equal(none, 0);
 });
 

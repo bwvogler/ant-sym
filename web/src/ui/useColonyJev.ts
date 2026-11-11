@@ -159,5 +159,23 @@ export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: 
   /** today's spend against the server's daily budget: the last run's figure, else the one the page loaded with */
   const budget = state.run?.budget ?? backend?.budget ?? null;
 
-  return { state, budget, start, stop, lock, resumable, fungusAnswers, restore, doctrines, setDoctrine, draftDoctrine, foundWith, explain, aim, setAim, draftAim: setAimState, explainFungus };
+  return {
+    state,
+    budget,
+    start,
+    stop,
+    lock,
+    resumable,
+    fungusAnswers,
+    restore,
+    doctrines,
+    setDoctrine,
+    draftDoctrine,
+    foundWith,
+    explain,
+    aim,
+    setAim,
+    draftAim: setAimState,
+    explainFungus,
+  };
 }

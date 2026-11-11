@@ -1,4 +1,12 @@
-import { DEFAULT_CAPS, DEFAULT_IN_FLIGHT, USD_PER_INPUT_TOKEN, type Budget, type RunCaps, type RunSummary, type StopReason } from "../shared/jev.ts";
+import {
+  DEFAULT_CAPS,
+  DEFAULT_IN_FLIGHT,
+  USD_PER_INPUT_TOKEN,
+  type Budget,
+  type RunCaps,
+  type RunSummary,
+  type StopReason,
+} from "../shared/jev.ts";
 
 // The spend ledger: one run at a time, real tokens only. The browser decides
 // *when* to stop for "formed"; the server enforces the spend and time caps so
@@ -150,7 +158,12 @@ export class Ledger {
   #budget(now: number): Budget {
     this.#roll(now);
     const limited = Number.isFinite(this.#dailyUsd);
-    return { day: this.#day, usdPerDay: limited ? this.#dailyUsd : null, spentUsd: this.spentToday, remainingUsd: limited ? Math.max(0, this.#dailyUsd - this.spentToday) : null };
+    return {
+      day: this.#day,
+      usdPerDay: limited ? this.#dailyUsd : null,
+      spentUsd: this.spentToday,
+      remainingUsd: limited ? Math.max(0, this.#dailyUsd - this.spentToday) : null,
+    };
   }
 
   /** The ceiling held back per in-flight call whose size is not given. */

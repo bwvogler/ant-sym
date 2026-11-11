@@ -24,7 +24,11 @@ export default class ErrorBoundary extends Component<{ children: ReactNode }, { 
         <h1 className="text-lg font-semibold">Something broke</h1>
         <p className="mt-2 text-fg-2">The game stopped with an error. Your saved games are kept.</p>
         <pre className="mt-3 overflow-x-auto rounded-md border border-line bg-raised p-2 text-xs text-fg-3">{error.message}</pre>
-        <button type="button" className="mt-4 rounded-md bg-accent px-4 py-2 font-medium text-accent-ink hover:bg-accent-hover" onClick={() => location.reload()}>
+        <button
+          type="button"
+          className="mt-4 rounded-md bg-accent px-4 py-2 font-medium text-accent-ink hover:bg-accent-hover"
+          onClick={() => location.reload()}
+        >
           Reload
         </button>
       </div>
