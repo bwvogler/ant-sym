@@ -1,0 +1,5 @@
+# Bulk changes that touch lines without changing what they do. GitHub's blame view reads this file by itself;
+# a local clone needs: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Prettier, width 140 and Tailwind class order (#80)
+33ef24bbcd9345615ac547f2cb4acf48c1d3bdd7
