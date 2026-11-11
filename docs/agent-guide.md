@@ -50,7 +50,7 @@ What Prettier (`npm run format`) and oxlint (`npm run lint`) enforce is not repe
 - No module-level mutable state (`let` at module scope, setters for tests). Tuning that varies goes in `ColonyParams` (see `backfill`, `tunnelDrift`); each colony copies what a save loads into.
 
 ### Data and types
-- Per-ant data: a new array that a colony keeps per ant goes in `colony/ants.ts` `ANT_FIELDS` (type, fill, one doc line). It is allocated, saved and loaded by construction; don't add a `#field` array and a line in `saveState`. (The older public arrays, `x`, `y`, `mode`, …, are being moved there.)
+- Per-ant data: a new array that a colony keeps per ant goes in `colony/ants.ts` `ANT_FIELDS` (type, fill, one doc line). It is allocated, saved and loaded by construction; don't add a `#field` array and a line in `saveState`. (The public arrays the page reads, `x`, `y`, `mode`, …, are in the same table.)
 - No `any` (lint). No casts on JSON: read wire data through the readers in `shared/jev.ts` (`isRunSummary`, `readHealth`, …). `x[i] as number` on an array read is noise (`noUncheckedIndexedAccess` is off): don't write it.
 - Strings the UI and Jev see (legends, questions) are part of the product and of its cost: a change to one changes the hourly cost; follow the CLAUDE.md cost and precache rules.
 
