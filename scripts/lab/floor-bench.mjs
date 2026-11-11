@@ -20,12 +20,12 @@ const { Game } = await import(`${root}/web/src/colony/game.ts`);
 const C = await import(`${root}/web/src/colony/colony.ts`);
 const W = await import(`${root}/web/src/colony/world.ts`);
 const { nx, ny } = await import(`${root}/web/src/colony/hex.ts`);
-if (args[3]) C.tuneBackfill(Object.fromEntries(args[3].split(",").map((kv) => kv.split(":")).map(([k, v]) => [k, Number(v)])));
+const tuning = args[3] ? Object.fromEntries(args[3].split(",").map((kv) => kv.split(":")).map(([k, v]) => [k, Number(v)])) : {};
 const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
 const rows = [];
 for (const [world, seed] of games) {
   const map = W.generateSideWorld(world, SMALL);
-  const g = new Game(map, { antCount: 400, rival: false }, W.mulberry32(seed));
+  const g = new Game(map, { antCount: 400, rival: false, colony: { backfill: { ...C.BACKFILL, ...tuning } } }, W.mulberry32(seed));
   const ch = map.chambers;
   const floor0 = ch.floorOf[0];
   for (let i = 0; i < g.player.n; i++) {

@@ -1,6 +1,6 @@
-import { after, test } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, SWELL, tuneBackfill } from "../../colony.ts";
+import { BACKFILL, Colony, SWELL } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { CELL, cellOf, nx, ny } from "../../hex.ts";
 import { generateSideWorld, groundTop, heapMound, isSky, mulberry32, OPEN, reachable, rockAt, SOIL } from "../../world.ts";
@@ -85,9 +85,8 @@ test("two colonies: each picks up the other's spoil too, and the books still bal
 
 test("a pellet is carried out along the ground and dropped where the carrier stands, not by the hole", () => {
   // No scent in this one-ant world (deposit 0): every branch would look unused, so no detours to fill them.
-  after(tuneBackfill({ enterStale: 0 }));
   const map = generateSideWorld(1, { ...SMALL });
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(9), () => "return");
+  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, backfill: { ...BACKFILL, enterStale: 0 } }, mulberry32(9), () => "return");
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y);
   const ex = CELL[0] as number;
   const drops: { at: number; cells: number[] }[] = [];

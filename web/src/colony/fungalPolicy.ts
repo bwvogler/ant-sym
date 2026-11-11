@@ -17,9 +17,9 @@
 export const AROUSALS = ["calm", "alarmed", "fighting"] as const;
 export type Arousal = (typeof AROUSALS)[number];
 export const TOUCHES = ["none", "nestmate", "foreigner"] as const;
-export type Touch = (typeof TOUCHES)[number];
-export const PLACES = ["outside", "tunnel", "chamber", "queen"] as const;
-export type Place = (typeof PLACES)[number];
+export type FungalTouch = (typeof TOUCHES)[number];
+export const FUNGAL_PLACES = ["outside", "tunnel", "chamber", "queen"] as const;
+export type FungalPlace = (typeof FUNGAL_PLACES)[number];
 export const TASKS = ["nurse", "inside", "forager", "queen"] as const;
 export type Task = (typeof TASKS)[number];
 export const CARRYING = ["nothing", "food", "brood"] as const;
@@ -27,8 +27,8 @@ export type Carrying = (typeof CARRYING)[number];
 
 export interface FungalSituation {
   arousal: Arousal;
-  touch: Touch;
-  place: Place;
+  touch: FungalTouch;
+  place: FungalPlace;
   task: Task;
   carrying: Carrying;
   groomed: boolean;
@@ -41,14 +41,14 @@ export interface FungalSituation {
 export type FungusPolicy = (s: FungalSituation) => string;
 
 /** Situations: 3 × 3 × 4 × 4 × 3 × 2 = 864 (a queen's are a few of them: she is always by herself, at home). */
-export const FUNGAL_SITUATIONS = AROUSALS.length * TOUCHES.length * PLACES.length * TASKS.length * CARRYING.length * 2;
+export const FUNGAL_SITUATIONS = AROUSALS.length * TOUCHES.length * FUNGAL_PLACES.length * TASKS.length * CARRYING.length * 2;
 
 /** A load at or past this is "high": where cull takes full effect (Fungus.express). */
 export const HIGH_LOAD = 0.7;
 
 /** The fungal situation as one number (0 .. FUNGAL_SITUATIONS − 1): what a host keeps of what it was last asked. */
 export function encodeFungal(s: FungalSituation): number {
-  return (((((AROUSALS.indexOf(s.arousal) * TOUCHES.length + TOUCHES.indexOf(s.touch)) * PLACES.length + PLACES.indexOf(s.place)) * TASKS.length + TASKS.indexOf(s.task)) * CARRYING.length + CARRYING.indexOf(s.carrying)) * 2) + (s.groomed ? 1 : 0);
+  return (((((AROUSALS.indexOf(s.arousal) * TOUCHES.length + TOUCHES.indexOf(s.touch)) * FUNGAL_PLACES.length + FUNGAL_PLACES.indexOf(s.place)) * TASKS.length + TASKS.indexOf(s.task)) * CARRYING.length + CARRYING.indexOf(s.carrying)) * 2) + (s.groomed ? 1 : 0);
 }
 
 export function decodeFungal(code: number): FungalSituation {
@@ -59,9 +59,9 @@ export function decodeFungal(code: number): FungalSituation {
   c = Math.floor(c / CARRYING.length);
   const task = TASKS[c % TASKS.length] as Task;
   c = Math.floor(c / TASKS.length);
-  const place = PLACES[c % PLACES.length] as Place;
-  c = Math.floor(c / PLACES.length);
-  const touch = TOUCHES[c % TOUCHES.length] as Touch;
+  const place = FUNGAL_PLACES[c % FUNGAL_PLACES.length] as FungalPlace;
+  c = Math.floor(c / FUNGAL_PLACES.length);
+  const touch = TOUCHES[c % TOUCHES.length] as FungalTouch;
   const arousal = AROUSALS[Math.floor(c / TOUCHES.length)] as Arousal;
   return { arousal, touch, place, task, carrying, groomed };
 }

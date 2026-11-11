@@ -2,7 +2,7 @@ import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
 import type { Colony, Layer } from "./colony.ts";
-import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, TASKS, encodeFungal, localFungusRule, type Arousal, type FungalSituation, type FungusPolicy, type FungusRule, type Place, type Touch } from "./fungalPolicy.ts";
+import { DEFAULT_RULE, HIGH_LOAD, STRAIN_DEFAULT, TASKS, encodeFungal, localFungusRule, type Arousal, type FungalSituation, type FungusPolicy, type FungusRule, type FungalPlace, type FungalTouch } from "./fungalPolicy.ts";
 import { Evolution, type EvolutionSave } from "./evolution.ts";
 import { compose, decodeLevels, hold, LETHAL_LEVERS, leverFor, LEVERS, NEST_LEVERS, presetOf, PRESETS, type LeverLevels, type Preset, type Reach } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
@@ -681,7 +681,7 @@ export class Fungus {
    * estranged nestmate as a foreigner. `others`: the ants around, not counting the host; `own`: the host's own odour
    * (an ant is in the bands it counts; the queen is not), so a host that smells foreign itself does not count itself.
    */
-  #touch(L: SporeLayer, c: Colony, cx: number, cy: number, others: number, rec: Recognition | null, own: number | null): Touch {
+  #touch(L: SporeLayer, c: Colony, cx: number, cy: number, others: number, rec: Recognition | null, own: number | null): FungalTouch {
     let foreign = 0;
     if (rec) {
       const tol = rec.params.tolerance;
@@ -709,7 +709,7 @@ export class Fungus {
    * on the floor (any colony's). A chamber is felt by its floor, not read from whose it is. On map L, layer `layer` (−1:
    * the fungus's one map).
    */
-  #place(L: SporeLayer, layer: number, colonies: readonly Colony[], cx: number, cy: number): Place {
+  #place(L: SporeLayer, layer: number, colonies: readonly Colony[], cx: number, cy: number): FungalPlace {
     const { map } = L;
     const ch = map.chambers;
     if (ch && map.sky) {

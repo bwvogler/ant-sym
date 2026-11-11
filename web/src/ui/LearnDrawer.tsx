@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type Colony } from "../colony/colony.ts";
 import { HOMES, MODES, STANCES, TRAILS, type Situation } from "../colony/vocab.ts";
 import { DOCTRINES, MODE_CRITERIA, RESPONSE_LEGEND, responseQuestion, RESPONSE_HOOKS } from "../colony/colonyBrain.ts";
-import { AROUSALS, CARRYING, decodeFungal, PLACES, TASKS, TOUCHES, type FungalSituation } from "../colony/fungalPolicy.ts";
+import { AROUSALS, CARRYING, decodeFungal, FUNGAL_PLACES, TASKS, TOUCHES, type FungalSituation } from "../colony/fungalPolicy.ts";
 import { INFECTED, LEVERS } from "../colony/fungus.ts";
 import { decodeLevels, pulled, PRESETS } from "../colony/levers.ts";
 import { askedIn } from "../colony/fungusBrain.ts";
@@ -438,7 +438,7 @@ function FungusExplainer(props: Props) {
         rows={[
           ["arousal", AROUSALS.join(" · "), "the host's arousal: it smells alarm, or strangers are close (amines rise with fighting)"],
           ["touch", TOUCHES.join(" · "), "who touches its cuticle: a nestmate or an ant of another colony"],
-          ["place", PLACES.join(" · "), "what is underfoot: open ground, a tunnel, a chamber's floor, the queen's mark"],
+          ["place", FUNGAL_PLACES.join(" · "), "what is underfoot: open ground, a tunnel, a chamber's floor, the queen's mark"],
           ["task", TASKS.join(" · "), "its body's stage of life (juvenile hormone tracks task): nurse, inside worker, forager"],
           ["carrying", CARRYING.join(" · "), "what is in its jaws"],
           ["groomed", "true · false", "its nestmates are grooming the fungus off it"],

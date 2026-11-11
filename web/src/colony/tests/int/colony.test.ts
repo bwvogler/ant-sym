@@ -2,7 +2,7 @@ import { test } from "node:test";
 import { CountGrid } from "../../battle.ts";
 import { Game } from "../../game.ts";
 import assert from "node:assert/strict";
-import { avoid, chooseDig, climb, Colony, moundRadius, SWELL, decode, DIG_FACE, digChance, setTunnelDrift, diggable, encodeSituation, GLANCE, FOLLOW_GIVE_UP, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, START_FACE, startable, tunnelEnd, turnToward, WALL_LOST, wallSide } from "../../colony.ts";
+import { avoid, chooseDig, climb, Colony, moundRadius, SWELL, decode, DIG_FACE, digChance, diggable, encodeSituation, GLANCE, FOLLOW_GIVE_UP, handOnWall, localPolicy, narrow, NO_FACE, SITUATIONS, soilFace, START_FACE, startable, tunnelEnd, turnToward, WALL_LOST, wallSide } from "../../colony.ts";
 import { trailLevel, type Situation } from "../../vocab.ts";
 import { fillCell, foodIn, generateWorld, tunnelHeading, mulberry32, OPEN, OPEN_WORLD, ROCK, rockAt, setRock, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, hexMap, nestAt, put } from "../hexmaps.ts";
@@ -572,11 +572,11 @@ test("chooseDig dithers between the two ways either side of a heading, in propor
 
 test("meander: tunnels from one start wander off in many directions, yet stay one cell wide (and run straight with no drift)", () => {
   /** Dig with one explorer from a small chamber in a soil field for a while; return the dug cells. */
-  const dig = (seed: number) => {
+  const dig = (seed: number, tunnelDrift?: number) => {
     const rock = new Uint8Array(120 * 80).fill(SOIL);
     for (let y = 38; y <= 42; y++) for (let x = 58; x <= 62; x++) rock[y * 120 + x] = OPEN;
     const m = worldFromArrays({ w: 120, h: 80 }, [nestAt(60, 40, 1.5)], { rock });
-    const c = new Colony(m, { antCount: 3, maxAnts: 3, deposit: 0, patience: 1e9 }, mulberry32(seed), () => "explore");
+    const c = new Colony(m, { antCount: 3, maxAnts: 3, deposit: 0, patience: 1e9, ...(tunnelDrift === undefined ? {} : { tunnelDrift }) }, mulberry32(seed), () => "explore");
     for (let k = 0; k < 30 * 150; k++) c.tick(1 / 30);
     const cells: [number, number][] = [];
     for (let y = 0; y < 80; y++) for (let x = 0; x < 120; x++) if (!Number.isNaN(tunnelHeading(m, x, y))) cells.push([x, y]);
@@ -610,17 +610,14 @@ test("meander: tunnels from one start wander off in many directions, yet stay on
   const between = angles.filter((a) => Math.abs(((a / (Math.PI / 3)) % 1 + 1) % 1 - 0.5) < 0.5 - 20 / 60).length;
   assert.ok(between / angles.length > 0.2, `${((100 * between) / angles.length).toFixed(0)} % of tunnel runs are well between the six ways`);
 
-  setTunnelDrift(0);
-  try {
-    const { cells, m } = dig(3);
+  {
+    const { cells, m } = dig(3, 0);
     const off = cells.map(([x, y]) => {
       const a = tunnelHeading(m, x, y) / (Math.PI / 3);
       return Math.abs(a - Math.round(a)) * 60;
     });
     // Headings are kept in 252 steps (a multiple of 6), so forks land exactly and runs stay on the six ways.
     assert.ok(cells.length > 15 && off.every((o) => o < 2), `no drift: every run is one of the six ways (worst ${Math.max(...off).toFixed(1)}°)`);
-  } finally {
-    setTunnelDrift(0.2);
   }
 });
 

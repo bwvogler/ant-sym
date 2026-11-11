@@ -92,7 +92,7 @@ export interface Flight {
  * Sums and counts of a value on each cell this tick, for the mean of what the ants within one cell carry. Rebuilt every
  * tick like hunger.ts FeltGrid (not saved).
  */
-export class SumGrid {
+export class MeanGrid {
   readonly sum = new ChunkLayer((n) => new Float32Array(n), 0);
   readonly count = new ChunkLayer((n) => new Float32Array(n), 0);
   #touched: number[] = [];

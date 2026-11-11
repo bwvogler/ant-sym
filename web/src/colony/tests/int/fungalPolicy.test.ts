@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
 import { MODES, type Situation } from "../../vocab.ts";
-import { AROUSALS, CARRYING, DEFAULT_RULE, FUNGAL_SITUATIONS, PLACES, STRAIN_DEFAULT, TASKS, TOUCHES, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../../fungalPolicy.ts";
+import { AROUSALS, CARRYING, DEFAULT_RULE, FUNGAL_SITUATIONS, FUNGAL_PLACES, STRAIN_DEFAULT, TASKS, TOUCHES, decodeFungal, encodeFungal, localFungusRule, type FungalSituation } from "../../fungalPolicy.ts";
 import { askedIn, FUNGUS_LEGEND, fungalKey, fungusContext, leverQuestions, packFungusRequest, readLevels, validLevels, worthAsking } from "../../fungusBrain.ts";
 import { DEFAULT_MENU, DORMANT_SHOW, Fungus, LETHAL, LEVERS, STRAINS, preset } from "../../fungus.ts";
 import { AS_IS, compose, CUSTOM, decodeLevels, encodeLevels, PRESETS, presetOf, pulled } from "../../levers.ts";
@@ -27,7 +27,7 @@ test("fungal situations: 864, and each encodes and decodes to itself", () => {
   const seen = new Set<number>();
   for (const arousal of AROUSALS)
     for (const touch of TOUCHES)
-      for (const place of PLACES)
+      for (const place of FUNGAL_PLACES)
         for (const task of TASKS)
           for (const carrying of CARRYING)
             for (const groomed of [false, true]) {
