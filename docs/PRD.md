@@ -4494,6 +4494,79 @@ The full G1 table on seeds 1–10 is reported against ja-web's.
 
 **To read when the network allows:** the full texts of Waldner & Merkle 2018, Merkle et al. 2006 and Sturgis et al. 2011.
 
+## 58. Foragers on the plane search less and go back to their last find (design, ja-lp4.15, ja-lp4.6.3, 2026-11-11)
+
+**Research basis:** [forager-trips.md](forager-trips.md). No full text could be fetched (network policy), so every figure is **unverified**.
+
+**The problem (measured).** G1 still fails after §56. The carriers it counts found food no farther away than anyone else (seed 10: 61–66 cells from their hole, against 38–67 for every pickup), but had searched 32–46 s for it (a normal pickup: 1–6 s), so they had walked 5–7 times their distance from home, and the game's home-vector error grows with every cell walked. Cutting `patience` for both colonies to 30 s met G1's bound on seeds 5 and 9 (worst colony 2 and 0, against 10 and 7) but cost births 8–25 % a colony and the rival's food on seed 9 a third.
+
+**Decisions.**
+- Owner (2026-11-11): both levers, one PR: a shorter search on the plane for G1, and site fidelity to win back the food it costs.
+- Owner (2026-11-11, PR #70): G1's bound stays at 2.
+- Design: one world's plane only, each behind a setting whose "off" is main bit for bit (`planePatience` 1, `siteFidelity` 0).
+
+**The mechanic.**
+- **A shorter search on the plane:** a forager tires at `patience × planePatience` (the fungus's `clock` still scales it).
+- **Site fidelity:** a forager that picks up food on the plane keeps its own vector to the spot (drift and all) and, on its next trip, walks it straight and searches round it. A trail it meets still takes over. It forgets on tiring there or on its next find. New saved state: the food vector per ant; save version bumped once.
+
+**Assays.** F1 (new): of foragers set down after a find 40–80 cells out, with fidelity on, at least 80 % reach the spot within 30 s, walking under 1.5 times the straight line. G1, seeds 1–10: at most 2 on seeds 5 and 9, food carried down and births within 5 % of §56's, summed. `exp --one all` against §56 (A1 stays 8/10).
+
+**Play.** Foragers fan out each to its own patch and come back to it; fewer wander far with food. The fungus's "time out" lever matters more on the plane, and a host's route becomes predictable. No new lever.
+
+**Cost.** None: steering and the ant's own body; no situation field, legend or question changes.
+
+**As built (2026-11-11, `ja-lp4.15.1`–`.4`).**
+- **F1** (`experiment.ts` `forage1`, `npm run exp -- --one f1`): on each seed's default plane, 40 of the player's old foragers are set down 3 cells out of their hole, exploring and empty-jawed on a fresh trip (a drift as the game draws it, a random heading). Each has its own spot 40-80 cells from the hole, on open ground joined to the hole, outside every hole's sight and in a straight open line from the hole (an explorer follows no wall: F1 asks about the memory, not rock). The plane's food is removed: in a first run with the world's own food 43 % of the foragers picked some up on the way, and the 6.0 % baseline written in `ja-lp4.15.1` is that run's. With `siteFidelity` on, each remembers the spot as its find would have left it (a straight walk out with a drift of its own, where it stood less where its vector put its hole); off, it knows nothing of it. 30 s. `reach` is the share within `HOLE_SIGHT` of its spot; `ratio` the path walked to get there over the straight line from where it was set down to the spot's sight (median per seed, then the mean over seeds). Target: reach at least 80 % with ratio under 1.5 (design marks).
+- **F1, seeds 1-10, 400 foragers** (`ja-lp4.15.3`): fidelity off **8.7 %** reach (per seed 3-15 %), median 12.6 s, ratio 1.88 (of the few that get there by chance), those that did not were 72 cells from their spot at 30 s; fidelity on **81.3 %** (per seed 75-90 %; 6/10 seeds at 80 %), median 6.8 s, ratio **1.05**, 47 cells walked. Target met pooled. The misses are those whose vector's error at the spot (the find's drift against this trip's, ~6 cells a side at 60 cells out) puts the spot past what the spiral round the believed place covers while the drift goes on growing.
+- **The odometer while it searches round the spot**: counted as ever (the drift keeps growing: the believed spot moves away). Held, as a homing ant's is, the share is **92 %** (min 80 %). Not built: it would shorten every searcher's error on the way home from a remembered spot, which is the model's central mechanism; named for the owner.
+- **The steering** (`#siteAim`): an exploring ant with a spot steers at the hole's believed place plus the spot's offset (turning at its turn rate, with a quarter of the wander noise), the believed place being its own odometer × this trip's drift; within `LOOP_AT` (2) of it, it runs U3b's spiral round it (a point a quarter turn on and `SEARCH_GROW_2D` further out each time one is reached). A bump turns it at random as any explorer's, and it steers on at once: with the detour wander left in it, bumping ants lost the walk. Food in sight and a food trail (`follow`) come first. No new random draw.
+- **Forgetting**: when it tires while searching round the spot (`search` set, the first tick `tired` rises); one that tires on the way out keeps it.
+
+- **`siteGive`** (built after the first sweep, default 0 = off): with it, a forager gives its spot up once the spiral's reach passes `siteGive` × σ of the vector that led it there (σ = `PI_DRIFT` × that vector's length: a search widens with its vector's length, Merkle & Wehner 2010, so a spot found on a short trip is given up sooner). In a 300-s probe on seed 5 (`planePatience` 1, fidelity on) a colony's foragers began 649 and 666 searches round a remembered spot and 98 and 138 found food there (15 %, 21 %): most spots are spent by the time an ant is back. F1 does not need the wide spiral (reach 82.3 / 82.5 / 80.8 / 82.0 % at give 1 / 1.5 / 2 / 3, against 81.3 % with none), and the cost of fidelity in G1 falls from -6.3 % food, -5.6 % births to -0.9 % and -3.8 %.
+- **G1, seeds 1-10** (`npm run exp -- --one game1 --seeds 1-10 --set colony.planePatience=… --set rival.planePatience=… --set colony.siteFidelity=1 --set rival.siteFidelity=1 [--set colony.siteGive=1 …]`; both colonies set the same). Most foragers holding food over 120 s, the worse colony of the two per seed; `×` is `planePatience`, "fidelity" is `siteFidelity` 1; the cost columns are the sums over both colonies, against `main` (shipped: spiral + the mound's smell, which this run reproduced exactly: §56's per-seed numbers). The bound is 2; `pass` counts seeds that meet it.
+
+| config | s1 | s2 | s3 | s4 | s5 | s6 | s7 | s8 | s9 | s10 | worst | sum | food carried down | births | losses | 5 & 9 | pass |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `main` (nothing on) | 13 | 19 | 24 | 35 | 10 | 18 | 11 | 11 | 7 | 18 | 35 | 166 | 44566 (0.0 %) | 7072 (0.0 %) | 1630 (0.0 %) | 10 / 7 | 0 |
+| fidelity | 13 | 9 | 20 | 35 | 19 | 18 | 15 | 10 | 6 | 25 | 35 | 170 | 41743 (-6.3 %) | 6678 (-5.6 %) | 1176 (-27.9 %) | 19 / 6 | 0 |
+| fidelity, give 1 | 14 | 14 | 18 | 36 | 11 | 17 | 20 | 18 | 5 | 28 | 36 | 181 | 44148 (-0.9 %) | 6800 (-3.8 %) | 1238 (-24.0 %) | 11 / 5 | 0 |
+| ×0.9, fidelity, give 1 | 8 | 11 | 15 | 29 | 8 | 18 | 12 | 11 | 3 | 13 | 29 | 128 | 42281 (-5.1 %) | 6589 (-6.8 %) | 1081 (-33.7 %) | 8 / 3 | 0 |
+| ×0.85, fidelity, give 1 | 5 | 9 | 17 | 38 | 9 | 10 | 16 | 9 | 3 | 21 | 38 | 137 | 43824 (-1.7 %) | 6658 (-5.9 %) | 1082 (-33.6 %) | 9 / 3 | 0 |
+| ×0.75, fidelity, give 1 | 6 | 9 | 12 | 28 | 6 | 8 | 17 | 6 | 3 | 11 | 28 | 106 | 42419 (-4.8 %) | 6526 (-7.7 %) | 835 (-48.8 %) | 6 / 3 | 0 |
+| ×0.75, fidelity | 8 | 4 | 12 | 32 | 11 | 8 | 13 | 6 | 2 | 15 | 32 | 111 | 40488 (-9.2 %) | 6342 (-10.3 %) | 740 (-54.6 %) | 11 / 2 | 1 |
+| ×0.67, fidelity | 6 | 2 | 20 | 29 | 4 | 6 | 27 | 4 | 4 | 19 | 29 | 121 | 38952 (-12.6 %) | 6165 (-12.8 %) | 637 (-60.9 %) | 4 / 4 | 1 |
+| ×0.5, no fidelity | 4 | 2 | 11 | 21 | 3 | 3 | 5 | 2 | 1 | 3 | 21 | 55 | 38000 (-14.7 %) | 6188 (-12.5 %) | 761 (-53.3 %) | 3 / 1 | 3 |
+| **×0.5, fidelity** | 5 | 3 | 7 | 13 | 2 | 2 | 6 | 1 | 0 | 6 | 13 | 45 | 38482 (-13.7 %) | 6169 (-12.8 %) | 416 (-74.5 %) | 2 / 0 | 4 |
+| ×0.5, fidelity, give 1 | 2 | 2 | 8 | 13 | 3 | 3 | 4 | 1 | 1 | 6 | 13 | 43 | 38448 (-13.7 %) | 5981 (-15.4 %) | 398 (-75.6 %) | 3 / 1 | 4 |
+
+  - **The shorter search is what moves G1**: ×0.5 takes the worst seed from 35 to 13 and seeds 5 and 9 (the guard) to 2 and 0, with 4 seeds in 10 under the bound (ants lost -74.5 %); but it costs **-13.7 % food carried down and -12.8 % births**. Between 1 and 0.5 the gain and the cost both grow, with noise (×0.67 is no better than ×0.75 on the worst seed).
+  - **Fidelity does not win the food back**: with the search at ×0.5 it lowers the held counts (worst seed 13 against 21 without it, sum 45 against 55, seeds 5 and 9 at 2 / 0 against 3 / 1) and leaves food and births where they are (-13.7 / -12.8 %, against -14.7 / -12.5 %). On its own (×1) it costs -6.3 % food and -5.6 % births, and does not lower the held counts (worst 35, sum 170 against 166). With give 1 the cost is -0.9 % and -3.8 %, still with no gain in the worst seed (36, sum 181).
+  - **The 5 % rule** (food carried down and births no more than 5 % below `main`, summed): only "fidelity, give 1" at ×1 meets it (-0.9 / -3.8 %), and it does not lower the held counts, so by the rule nothing beats `main`. The nearest to the rule that moves G1 is ×0.9 or ×0.85 with fidelity and give 1 (-5.1 / -6.8 % and -1.7 / -5.9 %; worst seed 29 and 38, sums 128 and 137).
+- **Confirmed on seeds 11-20** (the same columns; `main`'s worst seeds there are worse than on 1-10):
+
+| config | s11 | s12 | s13 | s14 | s15 | s16 | s17 | s18 | s19 | s20 | worst | sum | food carried down | births | losses | 5 & 9 | pass |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `main` (nothing on) | 26 | 35 | 42 | 12 | 14 | 78 | 63 | 11 | 24 | 39 | 78 | 344 | 45980 (0.0 %) | 7162 (0.0 %) | 1722 (0.0 %) | 0 |
+| ×0.5, fidelity | 4 | 7 | 9 | 1 | 5 | 16 | 32 | 1 | 7 | 17 | 32 | 99 | 38170 (-17.0 %) | 5998 (-16.3 %) | 315 (-81.7 %) | 2 |
+| fidelity, give 1 | 13 | 28 | 24 | 9 | 8 | 50 | 65 | 11 | 21 | 44 | 65 | 273 | 42199 (-8.2 %) | 6953 (-2.9 %) | 1367 (-20.6 %) | 0 |
+
+  ×0.5 with fidelity: worst 78 to 32, sum 344 to 99, food -17.0 %, births -16.3 %. Fidelity with give 1 alone: -8.2 % food, -2.9 % births, worst 78 to 65, sum 344 to 273.
+- **Shipped defaults: both off** (`planePatience` 1, `siteFidelity` 0, `siteGive` 0): main bit for bit, so no golden master moved, the one-world golden included. The rule the owner set (pick by G1's worst seed within 5 % of main's food and births) leaves nothing that moves G1; turning on ×0.5 with fidelity would meet the guard (seeds 5 and 9 at 2 and 0, 4 of 10 seeds under the bound; 11-20: 2 of 10) at -13.7 % food and -12.8 % births (-17.0 / -16.3 % on 11-20). That is the owner's decision (below). The guard stays skipped behind `G1=1`, with the numbers in its comment, and `ja-lp4.6.3` stays open.
+- **The assays on one world** (`npm run exp -- --one …`, seeds 1-10; the defaults reproduce §56 exactly: A1 8/10, A2a 10/10, A2b 9/10, A3 10/10, A4 10/10, A5 0/10, A5b 8/10, A6 5/10, A9 3/10 (worst 9.99), A10 0/10, A8 carried past reception 0.41-1.00, as they are bit for bit). With ×0.5 and fidelity on: **A1 7/10** (fail 2, 4, 6; §56 8/10), A2a 10/10, A2b 8/10 (fail 3, 4), A3 8/10 (fail 1, 8; emptied by 57-105 s), A4 10/10, A5 0/10, A5b 7/10 (fail 3, 7, 10), A6 5/10, A9 **10/10** (lost per 100 food 0.59-1.59), A10 0/10, A8 0.34-1.00. A1 falls and A2b, A3 and A5b with it: a second reason it is not shipped.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200, seed 1, 60 s, two runs each, second-half mean): this branch 11.55 and 10.83 ms, and 11.33 and 11.83 ms in an earlier pair; the plan commit (before the code) 10.72 and 11.35 ms. No cost beyond the machine's noise (the new branches run only with a setting on).
+- **Cost:** none in Jev (steering and the ant's own body; no situation, legend or question changed; `precache.test` passes).
+
+**Owner (decision needed).** G1's bound stays at 2 (2026-11-11). With both levers built, which of these:
+- **Leave them off** (as shipped): the game is as §56 left it, G1 fails its bound on every seed and the guard stays skipped.
+- **Turn on ×0.5 with fidelity**: G1's guard seeds 5 and 9 reach 2 and 0 (un-skip it, the test setting both), the worst seed falls from 35 to 13 (78 to 32 on 11-20) and 4 seeds in 10 meet the bound, at -13.7 % food and -12.8 % births (-17.0 / -16.3 % on 11-20), and A1 at 7/10. The one-world golden would be re-recorded.
+- **Something between** (×0.75: -9.2 % / -10.3 %, worst seed 32): no setting met the 5 % rule and moved G1.
+- **None of these is cheap**: what might get G1 under the bound without the cost is a different end to a long search (by vector length, not patience), fidelity only for rich finds (Wolf et al. 2012), or the error law (§58 "Still open"); each is a new mechanic, through the `adding-mechanics` skill.
+
+**Beads.** `ja-lp4.15` (epic), children in build order: F1 and its baseline; the shorter search; site fidelity; tuning, G1 and docs. `ja-lp4.6.3` waits on it and on `ja-lp4.16` (route memory round rock).
+
+**Still open.** Whether to turn the levers on (above). Why fidelity does not win the food back: most remembered spots are spent when the ant is back (15-21 % of searches round one found food in a probe), so a rule that remembers only rich finds, or gives a spot up by how much the find was, is the next thing to measure. The error law (proportional to cells walked today, a random walk would be their square root) is the owner's call and not part of this. The full texts of Merkle & Wehner 2010, Wolf et al. 2012, Cheng et al. 2006 and Beverly et al. 2009.
+
+
 ## 57. Foundation refactor: decisions (ja-fnd, 2026-11-11)
 
 The owner asked for a review of the work needed before the game grows: species with other senses and signals, new final structures and ways to interact, and a new UI and game experience. The roadmap is [refactor.md](refactor.md), and the beads are the epic `ja-fnd`, with one child for each stage, S0–S6. Decisions:

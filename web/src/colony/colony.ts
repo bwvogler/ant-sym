@@ -207,6 +207,12 @@ export interface ColonyParams {
   /** seconds out without food before an ant counts as tired */
   patience: number;
   /**
+   * One world's plane (ja-lp4.15, docs/forager-trips.md §1): a forager on the plane tires at `patience` × this (the
+   * fungus's `clock` still scales it); in the nest, and in the side view and top-down maps, at `patience`. On the plane
+   * the home vector's error grows with every cell walked, so a long search ends sooner. 1 = `patience` everywhere.
+   */
+  planePatience: number;
+  /**
    * seconds of rest inside its own nest that take a tired forager's fatigue from `patience` back to nothing (ja-q47,
    * docs/tiredness.md): rest is a stay inside, not a step through the hole
    */
@@ -275,6 +281,20 @@ export interface ColonyParams {
    */
   moundSmell: number;
   /**
+   * One world's plane (ja-lp4.15, docs/forager-trips.md §3): a forager that picks up food keeps its own vector to the spot
+   * (where it believes the food is, relative to its hole: what its home vector said at pickup, drift and all). On its
+   * next trip out it walks that vector straight, and searches round the spot when it gets there; a food trail it meets
+   * still takes over. It forgets the spot when it tires there without finding food, and replaces it at its next find
+   * (Wolf, Wittlinger & Bolek 2012; Cheng, Narendra & Wehner 2006). 1 = on; 0 = no memory of a find (main bit for bit).
+   */
+  siteFidelity: number;
+  /**
+   * One world's plane, with siteFidelity (ja-lp4.15): a forager gives up the spot it searches round once the search's reach
+   * has widened past this many σ of the vector that led it there (σ = PI_DRIFT × that vector's length: an ant widens its
+   * search with its vector's length, Merkle & Wehner 2010), not waiting to tire. 0 = only tiring ends it.
+   */
+  siteGive: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -337,7 +357,7 @@ const LOOP_AT = 2;
 /** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
+export const DEFAULT_COLONY: ColonyParams = { antCount: 800, maxAnts: 1200, foodPerAnt: 4, nest: 0, speed: 7, sensorDistance: 3, sensorAngle: 0.6, turnRate: 6, wander: 4, deposit: 4, depositDecay: 20, patience: 60, planePatience: 1, restTime: 30, followChoice: 1, foodTrailTop: 1, foodCapTop: 80, homeTrail: 0.8, homeTrailCone: Math.PI / 2, noEntryAvoid: 0, alarmDraw: 2, alarmAvoid: 1.5, leaveGate: 1, searchLoops: 0, searchGrow: 0.125, searchTurn: GOLDEN_ANGLE, searchPetal: Math.PI / 3, searchStall: 1, moundSmell: 1, siteFidelity: 0, siteGive: 0, raidGate: 1, raidLay: 1, findAt: 0.3, raidOnward: 1, stanceGate: 1, defendAt: 1, homeGround: 10, crowdAt: 40, raidRecruit: 0.1, raidScout: 1 / 90, scoutRate: 1 / 90, odour: 0, tolerance: TOLERANCE, enemyRange: 2, channels: Object.freeze({}), arrive: "explore" };
 
 /** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
 const SEEN = 100;
@@ -558,6 +578,12 @@ export class Colony {
   searchA: Float32Array;
   /** one world's plane, with loops (searchLoops): the search's point, counted from its start, three a loop (out, across, back to the centre) */
   searchLeg: Uint32Array;
+  /**
+   * One world's plane, with siteFidelity (ja-lp4.15): where the ant believes the food it last picked up lay, relative to its
+   * hole (x and y; NaN: none). Its home vector at the pickup, negated: where it stood less where it believed its hole was.
+   */
+  foodX: Float32Array;
+  foodY: Float32Array;
   /** 1 while the ant is underground (the last tick), so coming up out of the hole is seen */
   #under: Uint8Array;
   /** the side view: a homing ant following the ground's surface round spoil to the hole: the nearness (#holeMetric) it must beat to let go; NaN = not following */
@@ -991,6 +1017,8 @@ export class Colony {
     this.search = new Float32Array(n);
     this.searchA = new Float32Array(n);
     this.searchLeg = new Uint32Array(n);
+    this.foodX = new Float32Array(n).fill(NaN);
+    this.foodY = new Float32Array(n).fill(NaN);
     this.#under = new Uint8Array(n);
     this.#groundMin = new Float64Array(n).fill(NaN); // float64: compared with the metric itself (float32 rounding let the ant "beat" it on the cell it was set at)
     this.#groundT = new Uint16Array(n);
@@ -1379,6 +1407,8 @@ export class Colony {
     this.driftNest[i] = 0;
     this.search[i] = 0;
     this.searchA[i] = 0;
+    this.foodX[i] = NaN;
+    this.foodY[i] = NaN;
     this.#under[i] = 1;
     this.layer[i] = this.home; // born in the nest, on its layer
     this.#goalKind[i] = 0; // born underground: home is the chamber
@@ -1537,9 +1567,14 @@ export class Colony {
     return p;
   }
 
-  /** Whether ant i is tired: past the colony's patience, or not yet fully rested since it was (ja-q47). */
+  /** Whether ant i is tired: past its patience, or not yet fully rested since it was (ja-q47). */
   #isTired(i: number): boolean {
-    return this.#tired[i] === 1 || (this.fatigue[i] as number) > this.params.patience;
+    return this.#tired[i] === 1 || (this.fatigue[i] as number) > this.#patience(i);
+  }
+
+  /** The fatigue at which ant i tires: the colony's patience, shortened by planePatience on one world's plane (ja-lp4.15). */
+  #patience(i: number): number {
+    return this.line !== null && this.layer[i] === PLANE ? this.params.patience * this.params.planePatience : this.params.patience;
   }
 
   /** Whether ant i stands in its own nest (not a stranger's), by its cell. Leaves the shared CELL as it found it. */
@@ -2688,6 +2723,60 @@ export class Colony {
     CELL[0] = c0;
     CELL[1] = c1;
     return on;
+  }
+
+  /**
+   * One world's plane (ja-lp4.15): ant i has picked up food where it stands. It keeps where it believes that is, relative to its
+   * hole: where it stands less where its vector says the hole is (the hole plus odoSurf × (driftSurf, driftSurfY): its home
+   * vector, negated). Only its own odometer and drift; no coordinate of the food or the hole's true place. With the plane bound.
+   */
+  #rememberSite(i: number): void {
+    const odo = this.odoSurf[i] as number;
+    this.foodX[i] = (this.x[i] as number) - (this.nest.x + odo * (this.driftSurf[i] as number));
+    this.foodY[i] = (this.y[i] as number) - (this.nest.y + odo * (this.driftSurfY[i] as number));
+  }
+
+  /**
+   * One world's plane (ja-lp4.15): the heading an exploring ant i with a remembered spot (foodX, foodY) steers on. Where it
+   * believes the spot is: its vector's own hole (the hole plus odoSurf × drift, as #believePlane) plus the remembered offset,
+   * walked straight; within LOOP_AT of it, it searches round it, U3b's spiral (a point a quarter turn on and SEARCH_GROW_2D
+   * further out each time one is reached; the first heads the way it faces). Its search state is the homing ant's
+   * (search, searchA), zeroed when it turns for home (#homeAfresh) or finds food. Never past the plane's edges.
+   */
+  #siteAim(i: number): number {
+    const odo = this.odoSurf[i] as number;
+    const x = this.x[i] as number;
+    const y = this.y[i] as number;
+    const lx = this.map.x0 + EDGE;
+    const hx = this.map.x0 + this.map.size.w - EDGE;
+    const hy = this.map.size.h * R - EDGE;
+    const tx = Math.max(lx, Math.min(hx, this.nest.x + odo * (this.driftSurf[i] as number) + (this.foodX[i] as number)));
+    const ty = Math.max(EDGE, Math.min(hy, this.nest.y + odo * (this.driftSurfY[i] as number) + (this.foodY[i] as number)));
+    let s = this.search[i] as number;
+    if (s === 0) {
+      if (Math.hypot(tx - x, ty - y) >= LOOP_AT) return Math.atan2(ty - y, tx - x);
+      // There, and nothing in sight: round it, the first point ahead of it.
+      this.searchA[i] = this.heading[i] as number;
+      s = this.search[i] = SEARCH_START;
+    }
+    let a = this.searchA[i] as number;
+    let px = tx + s * Math.cos(a);
+    let py = ty + s * Math.sin(a);
+    if (Math.hypot(px - x, py - y) < LOOP_AT) {
+      a = this.searchA[i] = a + Math.PI / 2;
+      const { w, h } = this.map.size;
+      s = this.search[i] = Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
+      // Widened past what its vector's error covers (a quarter turn each point, so it has been all round at the last): the spot is spent.
+      if (this.params.siteGive > 0 && s > this.params.siteGive * PI_DRIFT * Math.hypot(this.foodX[i] as number, this.foodY[i] as number)) {
+        this.foodX[i] = this.foodY[i] = NaN;
+        this.search[i] = 0;
+        this.searchA[i] = 0;
+        return this.heading[i] as number;
+      }
+      px = tx + s * Math.cos(a);
+      py = ty + s * Math.sin(a);
+    }
+    return Math.atan2(py - y, px - x);
   }
 
   /**
@@ -5321,6 +5410,7 @@ export class Colony {
         else if (this.#walkTunnel(i, EXPLORE, p.speed * dt)) h = this.#towardTarget(i);
         else if (this.queen?.alive && this.band(i) === 0 && this.#under[i]) h = turnToward(h, Math.atan2(this.queen.y - (this.y[i] as number), this.queen.x - (this.x[i] as number)), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
         else if (this.#entrance && this.#outbound(i) && this.#under[i]) h = turnToward(h, Math.atan2(this.#entrance.y - (this.y[i] as number), this.#entrance.x - (this.x[i] as number)), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
+        else if (p.siteFidelity > 0 && this.line !== null && this.#cur === PLANE && !Number.isNaN(this.foodX[i] as number)) h = turnToward(h, this.#siteAim(i), p.turnRate * dt) + noise * p.wander * 0.25;
         else h += noise * p.wander;
       }
       // Fleeing (behaviour MR 4): straight away from the strangers while they are in reach (then it resumes). Homing alone, the
@@ -5585,6 +5675,7 @@ export class Colony {
       if (!carrying && !pellet && this.#putAt[i] === NO_KEY && map.food.get(CELL[0] as number, CELL[1] as number) > 0 && resp.get(this.touch(i, toEnemy !== null, mode, item, "food")) && takeFoodCell(map, CELL[0] as number, CELL[1] as number)) {
         this.carrying[i] = 1;
         this.quality[i] = qualityAt(map, CELL[0] as number, CELL[1] as number);
+        if (p.siteFidelity > 0 && this.line !== null && this.#cur === PLANE) this.#rememberSite(i);
         this.#homeAfresh(i);
         this.since[i] = 0;
         this.fatigue[i] = 0; // found food: the search succeeded
@@ -5686,7 +5777,11 @@ export class Colony {
         else if (!this.carrying[i] && !this.pellet[i] && !this.#holdsBrood[i] && (m === EXPLORE || m === FOLLOW || m === FIGHT)) this.fatigue[i] = Math.min(2 * p.patience, (this.fatigue[i] as number) + dt / (this.clock[i] as number));
         // Tired once past patience, and until fully rested: resting only to just under the line sent foragers out to
         // tire again at once (G: up to 8 held, food home -9 %, in the first sweep).
-        if ((this.fatigue[i] as number) > p.patience) this.#tired[i] = 1;
+        if ((this.fatigue[i] as number) > this.#patience(i)) {
+          // Tired where it searches round its last find's spot, with nothing found: that spot is spent (ja-lp4.15).
+          if (this.#tired[i] === 0 && p.siteFidelity > 0 && this.search[i] !== 0 && this.line !== null && this.#cur === PLANE) this.foodX[i] = this.foodY[i] = NaN;
+          this.#tired[i] = 1;
+        }
         else if (this.fatigue[i] === 0) this.#tired[i] = 0;
       }
       // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
