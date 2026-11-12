@@ -641,6 +641,7 @@ export class Game {
       if (this.fungus.evolution?.strain === f.fungus.strain) {
         const at = this.#byHole(c);
         this.fungus.root(at.x, at.y, LANDING.radius);
+        this.#rootShaft(c);
       }
     }
     return k;
@@ -1021,8 +1022,15 @@ export class Game {
     if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
     this.fungus.root(x, y, LANDING.radius);
+    this.#rootShaft(this.colonies[k] ?? this.player);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
+  }
+
+  /** One world, with hyphae (ja-2bw.2): the fungus also roots on the walls of the shaft under colony c's hole, in the curtain. */
+  #rootShaft(c: Colony): void {
+    const e = this.world ? (c.layers[CURTAIN] as Layer | undefined)?.nest.entrance : undefined;
+    if (e) this.fungus.rootShaft(CURTAIN, e.x, e.y);
   }
 
   /** Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim). */

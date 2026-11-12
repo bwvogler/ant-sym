@@ -357,6 +357,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     covers: "A mycelium off the host, spores paid from its mass, adapting in hosts; grooming triggered by sensing the pathogen.",
   },
   {
+    note: "hyphal-growth",
+    title: "Hyphal growth",
+    covers:
+      "Tips that extend at a steady rate, branch to keep length per tip constant, slide along or split at walls; where it lives (topsoil, walls, corpses); cords, knots and stalks.",
+  },
+  {
     note: "queens-and-merging",
     title: "Queens and merging",
     covers: "Several queens, adoption, and orphaned colonies merging (not built).",
