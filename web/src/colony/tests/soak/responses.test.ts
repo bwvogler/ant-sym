@@ -215,7 +215,7 @@ test("responsesFromAnswers: cached answers win, the local responses cover the re
 
 test("get is asked for loose soil, corpses and brood too, and refusing one leaves it lying", () => {
   const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
-  /** A side-view game with dead to bury, run for 150 s; what get was offered, and the most ants holding each item at once. */
+  /** A side-view game with dead to bury, run for 200 s (brood is first offered at ~171 s); what get was offered, and the most ants holding each item at once. */
   const run = (refuse: Item | null) => {
     const map = generateSideWorld(2, SMALL);
     const g = new Game(map, { antCount: 200, rival: false }, mulberry32(4));
@@ -224,7 +224,7 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
     c.responses = responses({ get: (t) => (offered.add(t.offered), t.offered !== refuse && localResponses.get(t)) });
     for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN * (i % 2); // half young (nurses), half middle-aged (undertakers)
     const held: Partial<Record<Item, number>> = {};
-    for (let k = 0; k < 30 * 150; k++) {
+    for (let k = 0; k < 30 * 200; k++) {
       if (k === 30 * 20)
         for (let i = 0, n = 0; i < c.n && n < 20; i++)
           if (c.alive[i] && c.item(i) === "none" && c.y[i]! > map.nest.entrance!.y + 3) {
