@@ -85,7 +85,7 @@ if (isMainThread) {
         )
       : new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
   const menu = g.fungus.menu;
-  g.fungus.policy = (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT;
+  g.fungus.bindPolicy("fungus", (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT);
   g.land(
     0,
     STRAINS.findIndex((s) => s.id === strain),

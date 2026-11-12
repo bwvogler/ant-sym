@@ -38,7 +38,7 @@ for (let t = 0, k = 0; t < seconds; t += DT, k++) {
     }
   }
   if (g.time >= raidAt) {
-    b.stancePolicy = () => "raid";
+    b.bindPolicy("stance", () => "raid");
     b.stance = "raid";
     if (!deathsAt.length) deathsAt.push(a.losses, b.losses);
   }

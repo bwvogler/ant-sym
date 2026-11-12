@@ -77,7 +77,7 @@ function fungalSituations() {
   const map = generateSideWorld(1);
   const g = new Game(map, { antCount: 600, rivalAnts: 600 }, mulberry32(7919));
   const met = new Set();
-  g.fungus.policy = (s) => (met.add(encodeFungal(s)), "default");
+  g.fungus.bindPolicy("fungus", (s) => (met.add(encodeFungal(s)), "default"));
   const strain = (id) => STRAINS.findIndex((x) => x.id === id);
   for (let t = 0, painted = false; t < 300; t += 1 / 30) {
     g.tick(1 / 30);

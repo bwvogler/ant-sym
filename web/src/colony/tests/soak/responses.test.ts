@@ -254,7 +254,7 @@ test("arrive (ja-qnx): a returner home with empty jaws is no longer returning, t
   const home = (arrive: "explore" | "return") => {
     // leaveGate 0: the trip's end alone (with the gate, behaviour MR 5, a rested forager home waits for returns: see leave).
     const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, arrive, leaveGate: 0 }, mulberry32(1));
-    c.policy = stubborn;
+    c.bindPolicy("mode", stubborn);
     put(c, 0, 12, 6);
     c.mode[0] = 2; // return
     let left = 0;
@@ -275,7 +275,7 @@ const c0r = () => corridor(0).nests[0]!.r;
 
 test("arrive: putting a load down ends the trip, wherever it was put down", () => {
   const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
-  c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+  c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : "explore"));
   c.responses = responses({ drop: () => true });
   put(c, 0, 30, 6);
   c.carrying[0] = 1;
@@ -290,7 +290,7 @@ test("arrive in the side view: a fresh forager returning to the royal chamber is
   const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
   const at = (age: number, since: number) => {
     const c = new Colony(generateSideWorld(2, SMALL), { antCount: 1, maxAnts: 1 }, mulberry32(1));
-    c.policy = (s) => (s.mode === "return" ? "return" : "explore"); // Jev's answer to returners: keep returning
+    c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : "explore")); // Jev's answer to returners: keep returning
     c.x[0] = c.queen!.x;
     c.y[0] = c.queen!.y;
     c.age[0] = age * LIFESPAN;
@@ -308,7 +308,7 @@ test("arrive in the side view: a fresh forager returning to the royal chamber is
 test("rest on a top-down map: a tired returner rests in the nest for restTime before its trip ends (ja-q47; the hole used to rest it at once)", () => {
   // leaveGate 0: rest alone (with the gate, behaviour MR 5, the rested ant then waits for returns: see leave).
   const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, restTime: 30, leaveGate: 0 }, mulberry32(1));
-  c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+  c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : "explore"));
   put(c, 0, 6, 6); // in the nest
   c.mode[0] = 2;
   c.fatigue[0] = c.params.patience * 1.5; // tired
@@ -359,7 +359,7 @@ test("fatigue: finding food clears it at once (the search succeeded)", () => {
 
 test("REST waits for rest: a tired returner held at the nest is not sent out after REST's 10 s", () => {
   const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1, restTime: 60 }, mulberry32(1));
-  c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+  c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : "explore"));
   c.mode[0] = 2;
   c.fatigue[0] = c.params.patience * 2; // a full rest takes 120 s
   for (let k = 0; k < 30 * 20; k++) {
@@ -371,7 +371,7 @@ test("REST waits for rest: a tired returner held at the nest is not sent out aft
 
 test("fatigue: fighting out of the nest tires an ant too, so a raid ends with the raiders going home (review of #36)", () => {
   const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
-  c.policy = () => "fight";
+  c.bindPolicy("mode", () => "fight");
   put(c, 0, 30, 6);
   c.mode[0] = 3;
   for (let k = 0; k < 30 * 5; k++) c.tick(1 / 30);
@@ -381,7 +381,7 @@ test("fatigue: fighting out of the nest tires an ant too, so a raid ends with th
 test("fatigue: it stops at twice patience, so rest from the worst takes twice restTime; the clock slows rest as it slows tiring", () => {
   const out = (clock: number) => {
     const c = new Colony(corridor(0), { antCount: 1, maxAnts: 1 }, mulberry32(1));
-    c.policy = () => "explore";
+    c.bindPolicy("mode", () => "explore");
     c.clock[0] = clock;
     for (let k = 0; k < 30 * 300; k++) {
       put(c, 0, 30, 6); // kept out, searching
@@ -394,7 +394,7 @@ test("fatigue: it stops at twice patience, so rest from the worst takes twice re
   // Rest from the cap, in the nest: ×1 clock takes 2 × restTime; ×2 clock takes twice that.
   const rest = (c: Colony, seconds: number) => {
     c.mode[0] = 2;
-    c.policy = (s) => (s.mode === "return" ? "return" : "explore");
+    c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : "explore"));
     for (let k = 0; k < 30 * seconds; k++) {
       put(c, 0, 6, 6);
       c.tick(1 / 30);
@@ -456,7 +456,7 @@ test("noEntry: a follower at a food trail's end with no food marks it; with food
     if (food) for (let y = 4; y <= 8; y++) for (let x = 21; x <= 23; x++) f[y * size.w + x] = food; // a small pile at the trail's end
     const map = worldFromArrays(size, [nestAt(4, 6, 2)], { food: f });
     const c = new Colony(map, { antCount: 1, wander: 0, noEntryAvoid: 4 }, mulberry32(1));
-    c.policy = () => "follow";
+    c.bindPolicy("mode", () => "follow");
     c.responses = responses({ noEntry: () => noEntry });
     // A food trail along rows 5–7 from the nest to x = 20 (on over the pile, when there is one), strongest at its far end, as carriers lay it.
     for (let x = 8; x <= (food ? 23 : 20); x++) for (let y = 5; y <= 7; y++) c.ph.depositCell("food", x, y, 1 + x / 4);
@@ -519,7 +519,7 @@ test("followChoice (top-down): at a fork a follower mostly takes the stronger tr
   for (let seed = 1; seed <= 40; seed++) {
     const map = worldFromArrays(size, [nestAt(3, 10, 2)], {});
     const c = new Colony(map, { antCount: 1, wander: 0 }, mulberry32(seed));
-    c.policy = () => "follow";
+    c.bindPolicy("mode", () => "follow");
     for (let x = 6; x <= 16; x++) for (let y = 9; y <= 11; y++) c.ph.depositCell("food", x, y, 4);
     branch(c, true, 8);
     branch(c, false, 2);

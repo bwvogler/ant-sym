@@ -82,7 +82,7 @@ function carrier(w: World, x: number, y: number, odo = 100): void {
   c.driftSurf[0] = 0;
   c.driftSurfY[0] = 0;
   c.fatigue[0] = 0;
-  c.policy = () => "return";
+  c.bindPolicy("mode", () => "return");
 }
 
 const tickUntil = (g: Game, seconds: number, done: () => boolean): boolean => {
@@ -103,7 +103,7 @@ const POCKET: [number, number, number, number][] = [
 test("route memory records a place every routeStep cells on the way out, from the hole, and only a forager walking out", () => {
   const w = plane({ routeMemory: 1, routeStep: 8 });
   const { g, c, hx, hy } = w;
-  c.policy = () => "explore";
+  c.bindPolicy("mode", () => "explore");
   c.putAnt(0, PLANE, hx + 3, hy);
   c.mode[0] = EXPLORE;
   c.carrying[0] = 0;
@@ -130,7 +130,7 @@ test("route memory records a place every routeStep cells on the way out, from th
   for (let k = 0; k < 2 * 30; k++) g.tick(DT);
   assert.equal(c.routeN[0], before, "a homing ant adds no place");
   // Nor one in another mode (a fighter walks out too: its odometer runs), or one with food (a carrier on the way to its find).
-  c.policy = () => "fight";
+  c.bindPolicy("mode", () => "fight");
   c.carrying[0] = 0;
   c.mode[0] = MODES.indexOf("fight");
   c.odoSurf[0] = 0;
@@ -170,7 +170,7 @@ test("route memory off (routeMemory 0) records nothing, and a place set by hand 
   assert.deepEqual(run(true), run(false), "the same run, bit for bit, with or without places");
   // And walking out records nothing.
   const w = plane({ routeMemory: 0 });
-  w.c.policy = () => "explore";
+  w.c.bindPolicy("mode", () => "explore");
   w.c.putAnt(0, PLANE, w.hx + 3, w.hy);
   w.c.mode[0] = EXPLORE;
   w.c.carrying[0] = 0;
@@ -182,7 +182,7 @@ test("route memory off (routeMemory 0) records nothing, and a place set by hand 
 test("route memory: a full store keeps every second place and doubles its spacing", () => {
   const w = plane({ routeMemory: 1, routeStep: 2, routeMax: 8 });
   const { g, c, hx, hy } = w;
-  c.policy = () => "explore";
+  c.bindPolicy("mode", () => "explore");
   c.putAnt(0, PLANE, hx + 3, hy);
   c.mode[0] = EXPLORE;
   c.carrying[0] = 0;
@@ -230,7 +230,7 @@ test("route memory: a newborn in a dead ant's slot has no places and no retrace"
 test("route memory: coming up out of its own hole starts the trip's places afresh", () => {
   const { g, c, hx, hy } = plane();
   const hc = c.holeCells[c.params.nest] as HoleCell;
-  c.policy = () => "explore";
+  c.bindPolicy("mode", () => "explore");
   c.putAnt(0, CURTAIN, centreX(hc.col, hc.row), centreY(hc.row));
   c.mode[0] = EXPLORE;
   c.heading[0] = -Math.PI / 2;
