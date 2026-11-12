@@ -33,7 +33,7 @@ Comma-separated words, in any order. A word it doesn't know throws and lists the
 
 ## Volume
 
-`verbose` on the 1200-ant `game` is ~1500 events a second (885k in 600 s, 300 MB). Start at `summary` or `detail`; add `mode` only with `ant=` or `colony=`. The journal costs about 5% of tick time when on and nothing when off. `exp --log` streams to the files; the page keeps the newest 2000.
+`verbose` on the 1200-ant `game` is on the order of a thousand events a second (hundreds of MB over 10 sim-minutes; measured in PR #95). Start at `summary` or `detail`; add `mode` only with `ant=` or `colony=`. Watching costs a few percent of tick time (PR #95) and nothing when off. `exp --log` streams to the files; the page keeps the newest 2000.
 
 ## Changing it
 

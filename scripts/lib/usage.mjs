@@ -2,7 +2,7 @@
 // A script calls `helpAndExit(import.meta.url)` right after its imports; with --help or -h among its arguments it
 // prints that block (the `//` lines at the top of the file, shebang skipped) and exits 0 before doing anything, so an
 // agent that asks a script what it does gets the same text a reader of the file does, never a second copy to keep
-// current (docs/agent-guide.md: point, don't copy). web/src/ui/tests/scriptsHelp.test.ts holds that every script answers.
+// current (docs/agent-guide.md: point, don't copy). web/src/ui/tests/int/scriptsHelp.test.ts holds that every script answers.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
