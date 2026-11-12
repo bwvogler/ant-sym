@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { REPO } from "./guide.ts";
 import { colonyName } from "./names.ts";
 import { LANDING_COLONY } from "./useColony.ts";
 import { describe, type SaveRecord } from "./saves.ts";
@@ -79,6 +80,11 @@ export default function StartScreen({
           >
             {firstGame ? "Start without the tutorial" : "Play the tutorial"}
           </button>
+        </p>
+        <p className="mt-3 text-right text-xs">
+          <a href={REPO} target="_blank" rel="noopener noreferrer" className="text-fg-3 underline-offset-2 hover:text-fg-2 hover:underline">
+            Source on GitHub
+          </a>
         </p>
         {latest && (
           <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
