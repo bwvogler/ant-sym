@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   AIMS,
   askedLevers,
+  decodeSituation,
   DEFAULT_MENU,
   DOCTRINES,
   fungalKey,
@@ -19,7 +20,9 @@ import {
   readLevels,
   readMode,
   readStance,
+  SITUATIONS,
   situationKey,
+  STANCE_SCHEMA,
   stanceContext,
   stanceKey,
   validLevels,
@@ -42,7 +45,7 @@ const idOf = (x: unknown): [string, number] => [sha(x), JSON.stringify(x).length
 
 const MODE_SITUATIONS: Situation[] = [
   SAMPLE_SITUATION,
-  { mode: "return", tired: true, foodTrail: "none", homeTrail: "chamber" as never, alarm: "strong", enemy: "near", stance: "defend" },
+  { mode: "return", tired: true, foodTrail: "none", homeTrail: "brood", alarm: "strong", enemy: "near", stance: "defend" },
   { mode: "follow", tired: false, foodTrail: "strong", homeTrail: "faint", alarm: "faint", enemy: "none", stance: "raid" },
 ];
 const STANCE_SITUATIONS: StanceSituation[] = [
@@ -64,7 +67,7 @@ const MENUS = [[...DEFAULT_MENU] as string[], ["food", "rival", "trail"]];
 test("each lane's cache key for fixed situations", () => {
   assert.deepEqual(MODE_SITUATIONS.map(situationKey), [
     "explore|fresh|faint|strong|none|none|forage",
-    "return|tired|none|chamber|strong|near|defend",
+    "return|tired|none|brood|strong|near|defend",
     "follow|fresh|strong|faint|faint|none|raid",
   ]);
   assert.deepEqual(STANCE_SITUATIONS.map(stanceKey), [
@@ -103,8 +106,8 @@ test("each lane's packed request (a hash of its JSON, and its length), under two
       ),
     ),
     [
-      ["447750e020be2ed3", 3739],
-      ["3cdf545c718b6480", 3574],
+      ["dd23f31db6be0146", 3737],
+      ["17685becca019aea", 3572],
     ],
   );
   assert.deepEqual(
@@ -143,6 +146,22 @@ test("each lane's packed request (a hash of its JSON, and its length), under two
   // A fungus request asks one question per lever asked, by host id.
   const three = packFungusRequest([{ id: "h0", situation: SAMPLE_FUNGAL, asked: ["food", "rival", "trail"] }], AIM_TEXTS[0]!);
   assert.deepEqual(Object.keys(three.questions), ["h0_food", "h0_rival", "h0_trail"]);
+});
+
+test("each local rule over every situation it can be asked in (a hash of all its answers, and how many of each)", () => {
+  const modes = Array.from({ length: SITUATIONS }, (_, c) => localPolicy(decodeSituation(c)));
+  const stances = Array.from({ length: STANCE_SCHEMA.size }, (_, c) => localStance(STANCE_SCHEMA.decode(c)));
+  const count = (a: string[]) => Object.fromEntries([...new Set(a)].sort().map((k) => [k, a.filter((x) => x === k).length]));
+  assert.equal(sha(modes), "62b63730107db786");
+  assert.deepEqual(count(modes), { explore: 396, fight: 756, follow: 576, return: 2160 });
+  assert.equal(sha(stances), "7a7f8053a84da201");
+  assert.deepEqual(count(stances), { defend: 108, forage: 144, raid: 72 });
+});
+
+test("a doctrine or aim is trimmed in its context, so stray spaces are not a new cache", () => {
+  assert.equal(policyContext(`  ${DOCTRINE_TEXTS[1]}\n`), policyContext(DOCTRINE_TEXTS[1]!));
+  assert.equal(stanceContext(`  ${DOCTRINE_TEXTS[1]}\n`), stanceContext(DOCTRINE_TEXTS[1]!));
+  assert.equal(fungusContext(`  ${AIM_TEXTS[1]}\n`, "top"), fungusContext(AIM_TEXTS[1]!, "top"));
 });
 
 test("each lane's local answer, and how each lane reads a reply, a bad one and none", () => {
@@ -197,6 +216,12 @@ test("what the Learn panel and the cost estimates send: the sample requests and 
     ["5412af7a49137dcb", 2150],
     ["2d6065573ea781b2", 6690],
   ]);
+  // The fungus sample takes a menu (the Learn panel shows the levers the player has on): the request asks only those.
+  assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL, menu: new Set(MENUS[1]) }, AIM_TEXTS[0]!, 2)), [
+    "0a8d8be9e2350816",
+    2869,
+  ]);
+  assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL }, AIM_TEXTS[0]!, 2)), ["07db7a08ecbdf6c3", 5157]);
   assert.deepEqual(
     [
       tokensPerQuestion("mode", DOCTRINE_TEXTS[0]!),
