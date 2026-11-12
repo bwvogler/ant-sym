@@ -12,7 +12,7 @@
 // with ant=<i>.
 import type { Colony } from "./colony.ts";
 import { INFECTED } from "./fungus.ts";
-import type { Game, Outcome } from "./game.ts";
+import { Game, type Outcome } from "./game.ts";
 import { MODES, type Situation, type Stance } from "./vocab.ts";
 
 export const JOURNAL_CATEGORIES = ["colony", "queen", "stance", "jev", "birth", "death", "mode", "infection"] as const;
@@ -171,7 +171,6 @@ export class Journal {
       this.#outcomeAt = game.time;
     }
     const t = game.time;
-    const own = game.colonies.length - game.founded.length;
     game.colonies.forEach((c, k) => {
       let s = this.#seen[k];
       if (!s || s.colony !== c) {
@@ -185,7 +184,7 @@ export class Journal {
         });
         return;
       }
-      this.#colony(game, c, k, s, k < own);
+      this.#colony(game, c, k, s);
     });
     if (t - this.#outcomeAt >= OUTCOME_EVERY) {
       this.#outcomeAt = t;
@@ -210,7 +209,7 @@ export class Journal {
     };
   }
 
-  #colony(game: Game, c: Colony, k: number, s: Seen, own: boolean): void {
+  #colony(game: Game, c: Colony, k: number, s: Seen): void {
     const t = game.time;
     if (c.stance !== s.stance) {
       this.#write({ t, cat: "stance", colony: k, text: `${s.stance} → ${c.stance}`, data: { from: s.stance, to: c.stance } });
@@ -222,7 +221,8 @@ export class Journal {
         this.#write({ t, cat: "queen", colony: k, text: "the queen died: the colony is orphaned", data: { load: c.queen?.load } });
       s.queen = queen;
     }
-    const beaten = own && game.fallen() === k;
+    // Every colony, a founded one too (its fall doesn't end the game, Game.fallen, but it is still news).
+    const beaten = Game.beaten(c);
     if (beaten && !s.fallen) this.#write({ t, cat: "colony", colony: k, text: "fallen" });
     s.fallen = beaten;
     const f = this.filter;

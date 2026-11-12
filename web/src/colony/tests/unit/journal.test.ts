@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Game } from "../../game.ts";
+import { Game, gameRng } from "../../game.ts";
+import { generateOneWorld } from "../../oneWorld.ts";
 import { Journal, JOURNAL_CATEGORIES, parseJournalSpec, formatJournalEvent } from "../../journal.ts";
 import { MODES } from "../../vocab.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
@@ -100,17 +101,81 @@ test("death: killed, old age and starved are told apart", () => {
   );
 });
 
-test("birth: a slot that comes alive, or is reused with a new gen, is a birth", () => {
-  const { g, j, c } = watched("birth,death");
+test("birth: a slot reused with a new gen is the old ant's death and a birth, with no mode change for the newborn", () => {
+  const { g, j, c } = watched("birth,death,mode");
   const i = firstAlive(c);
-  c.gen[i]++; // the slot reused within one tick: the old ant died and a new one was born
+  // The slot reused within one tick: the old ant died and a new one was born, in another mode than the old one's.
+  c.gen[i]++;
+  c.mode[i] = (c.mode[i] + 1) % MODES.length;
   j.observe(g);
   assert.deepEqual(
-    j.events.map((e) => [e.cat, e.ant, e.gen]),
+    j.events.map((e) => [e.cat, e.ant, e.gen, e.text]),
     [
-      ["death", i, c.gen[i] - 1],
-      ["birth", i, c.gen[i]],
+      ["death", i, c.gen[i] - 1, "died"],
+      ["birth", i, c.gen[i], `born (${MODES[c.mode[i]]})`],
     ],
+  );
+});
+
+test("colony=<k>: only that colony's events, and the game's own", () => {
+  const g = new Game(generateSideWorld(3, { ...SMALL_SIDE, nestCount: 2 }), { antCount: 8 }, mulberry32(3));
+  assert.equal(g.colonies.length, 2);
+  const j = new Journal("stance,colony=1");
+  j.observe(g);
+  j.events.length = 0;
+  g.colonies[0]!.stance = "raid";
+  g.colonies[1]!.stance = "defend";
+  j.note("stance", -1, "the game's own");
+  j.observe(g);
+  assert.deepEqual(
+    j.events.map((e) => [e.colony, e.text]),
+    [
+      [-1, "the game's own"],
+      [1, "forage → defend"],
+    ],
+  );
+});
+
+test("fallen, and the outcome: a colony with no ants and no brood to come is beaten; the outcome follows within a second", () => {
+  const g = new Game(generateSideWorld(3, { ...SMALL_SIDE, nestCount: 2 }), { antCount: 8 }, mulberry32(3));
+  const j = new Journal("colony");
+  j.observe(g);
+  j.events.length = 0;
+  const c = g.colonies[1]!;
+  for (let i = 0; i < c.n; i++) if (c.alive[i]) c.kill(i);
+  c.brood.items.length = 0;
+  ticks(g, 1);
+  j.observe(g);
+  assert.deepEqual(
+    j.events.map((e) => [e.colony, e.text]),
+    [[1, "fallen"]],
+  );
+  ticks(g, 31);
+  j.observe(g);
+  assert.deepEqual(
+    j.events.map((e) => [e.colony, e.text]),
+    [
+      [1, "fallen"],
+      [-1, "outcome: playing → fallen"],
+    ],
+  );
+});
+
+test("founded: a colony that appears mid-game is written as founded, once", () => {
+  // The whole one world: the small one has no room beyond its ends for a founding.
+  const g = new Game(generateOneWorld(2), { antCount: 8, rivalAnts: 8, regrow: 0 }, gameRng(2));
+  const j = new Journal("colony");
+  j.observe(g);
+  assert.deepEqual(
+    j.events.map((e) => e.text),
+    ["8 ants", "8 ants"],
+  );
+  const k = g.foundBeyond("end", 5);
+  j.observe(g);
+  j.observe(g);
+  assert.deepEqual(
+    j.events.slice(2).map((e) => [e.colony, e.text]),
+    [[k, `founded with ${g.colonies[k]!.population} ants`]],
   );
 });
 
@@ -181,5 +246,10 @@ test("off observes nothing; the buffer keeps the newest `limit` events; note() a
   );
   assert.equal(j.written, 3);
   assert.deepEqual(heard, ["a", "b", "c"]);
+  const none = new Journal("jev", 0);
+  let n = 0;
+  none.subscribe(() => n++);
+  none.note("jev", 0, "x");
+  assert.deepEqual([none.events.length, none.written, n], [0, 1, 1], "limit 0 (exp --log): kept nowhere, heard by the listener");
   assert.match(formatJournalEvent(j.events[0]!), /^\s+0\.0s {2}c0 +jev +b$/);
 });

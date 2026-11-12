@@ -30,7 +30,7 @@
 // writes experiments/out/journal/<assay>-<n>-seed<s>.jsonl (one event a line) and a .txt beside it to read; n is the
 // --set combination's index. Watching changes nothing in the run. Verbose on a whole game is ~1500 events a second
 // (300 MB in 600 s of `game`): narrow it with ant=<i>.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readFileSync, writeFileSync, writeSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 
@@ -272,10 +272,19 @@ async function work() {
     brains.stance = lane(cache.stances, stanceKey, localStance, "stance");
     brains.responses = responsesFromAnswers(cache.responses ?? {}, undefined, count);
   }
+  // Each event goes to the files as it is written (the journal keeps none): a verbose whole game is hundreds of MB.
   let journal;
+  let files = [];
   if (log !== null) {
-    const { Journal } = await import("../web/src/colony/index.ts");
-    journal = new Journal(log, Infinity);
+    const { Journal, formatJournalEvent } = await import("../web/src/colony/index.ts");
+    journal = new Journal(log, 0);
+    const base = `${JOURNAL_DIR}/${id}-${ci}-seed${seed}`;
+    files = [openSync(`${base}.jsonl`, "w"), openSync(`${base}.txt`, "w")];
+    const [jsonl, txt] = files;
+    journal.subscribe((e) => {
+      writeSync(jsonl, JSON.stringify(e) + "\n");
+      writeSync(txt, formatJournalEvent(e) + "\n");
+    });
   }
   const run = runAssay(
     (one ? ONE_ASSAYS : ASSAYS).find((x) => x.id === id),
@@ -284,11 +293,6 @@ async function work() {
     seconds,
     journal,
   );
-  if (journal) {
-    const { formatJournalEvent } = await import("../web/src/colony/index.ts");
-    const base = `${JOURNAL_DIR}/${id}-${ci}-seed${seed}`;
-    writeFileSync(`${base}.jsonl`, journal.events.map((e) => JSON.stringify(e)).join("\n") + "\n");
-    writeFileSync(`${base}.txt`, journal.events.map(formatJournalEvent).join("\n") + "\n");
-  }
+  for (const fd of files) closeSync(fd);
   parentPort.postMessage({ ...run, lookups });
 }
