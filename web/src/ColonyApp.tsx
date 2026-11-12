@@ -38,6 +38,9 @@ import {
 import { colonyName, colonyTone } from "./ui/names.ts";
 import { isDemo, passphrase } from "./ui/backend.ts";
 import PassNote from "./ui/PassNote.tsx";
+import Tip from "./ui/Tip.tsx";
+import { NextBody, UpgradeBody } from "./ui/UpgradeTips.tsx";
+import { BODY_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
@@ -587,12 +590,12 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
         <span className="flex items-center gap-1.5">
           Body <Help to={{ tab: "guide", id: "evolution" }} label="the fungus's body and mutations" />
         </span>
-        <span className="font-mono text-fg-2 tabular-nums" title="its mycelium by the hole, and the fungus in its hosts">
+        <Tip tip={BODY_TIP} className="font-mono text-fg-2 tabular-nums">
           mycelium {e.mass.toFixed(0)} · in ants {e.inHosts.toFixed(0)}
-        </span>
+        </Tip>
       </div>
       <div className="mt-2 flex items-baseline justify-between text-xs">
-        <span>Mutations</span>
+        <Tip tip={MUTATION_TIP}>Mutations</Tip>
         <span className="font-mono tabular-nums">
           <span className={e.mutations > 0 ? "text-spore" : "text-fg-3"}>{e.mutations.toLocaleString()}</span>
           <span className="text-fg-3"> · +{e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min</span>
@@ -609,7 +612,7 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
           const next = u.steps[level + 1];
           return (
             <li key={u.id} className="flex items-center justify-between gap-2 text-xs">
-              <span className="min-w-0 truncate" title={u.blurb}>
+              <Tip tip={<UpgradeBody u={u} level={level} />} className="min-w-0 truncate">
                 <span
                   className={
                     u.kind === "spread" ? "text-spore" : u.levers?.every((id) => LETHAL_LEVERS.has(id)) ? "text-err" : "text-accent"
@@ -619,19 +622,20 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
                 </span>{" "}
                 <span className="text-fg-3">{u.steps[level]}</span>
                 {idle(u, menu) && <span className="text-fg-3"> (not on the menu)</span>}
-              </span>
+              </Tip>
               {cost === undefined ? (
                 <span className="shrink-0 text-fg-3">at its most</span>
               ) : (
-                <button
-                  type="button"
-                  className="shrink-0 rounded-md border border-line px-2 py-0.5 text-fg hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={cost > e.mutations}
-                  onClick={() => evolve(u.id)}
-                  title={`${u.blurb}. Next: ${next}, for ${cost.toLocaleString()} mutation${cost === 1 ? "" : "s"}.`}
-                >
-                  {next} · {cost.toLocaleString()}
-                </button>
+                <Tip tip={<NextBody u={u} level={level} />} className="shrink-0" dotted={false} tapToOpen={false} tabStop={false}>
+                  <button
+                    type="button"
+                    className="rounded-md border border-line px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40"
+                    disabled={cost > e.mutations}
+                    onClick={() => evolve(u.id)}
+                  >
+                    {next} · {cost.toLocaleString()}
+                  </button>
+                </Tip>
               )}
             </li>
           );
