@@ -78,9 +78,9 @@ export const DEFAULT_GAME: GameParams = {
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
  * 6: the gate at the top of the shaft (ja-web: each ant's pass, the carriers down the hole, the raid counters); 7: each
- * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
+ * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 /** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
 function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
@@ -150,6 +150,8 @@ export interface Founding {
 /** A saved game (Game.save): JSON. */
 export interface GameSave {
   version: number;
+  /** the id of the species the game was played with (Species.id): a game built for another is refused (Game.load) */
+  species: string;
   time: number;
   strategyChoices: number;
   landed: unknown;
@@ -1099,6 +1101,7 @@ export class Game {
     const world = this.world;
     return {
       version: SAVE_VERSION,
+      species: this.params.species.id,
       time: this.time,
       strategyChoices: this.strategyChoices,
       landed: encode(this.landed),
@@ -1143,6 +1146,8 @@ export class Game {
    */
   load(saved: GameSave): void {
     if (saved.version !== SAVE_VERSION) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
+    if (saved.species !== this.params.species.id)
+      throw new Error(`save: a save of species "${saved.species}", and this game plays "${this.params.species.id}"`);
     const world = this.world;
     const sw = saved.world;
     if (!!sw !== !!world)

@@ -11,7 +11,7 @@ test("save records: a slot each, newest first, the game's own save inside, and a
   const store = memorySaves();
   const g = small(4);
   for (let k = 0; k < 90; k++) g.tick(1 / 30);
-  const settings = { seed: 4, antCount: 30, rival: true, generation: 0 };
+  const settings = { species: "generic", seed: 4, antCount: 30, rival: true, generation: 0 };
   const player = {
     aim: { id: "unite", text: "One colony." },
     doctrines: [{ id: "forage", text: "Gather." }],
@@ -40,7 +40,7 @@ test("save records: a slot each, newest first, the game's own save inside, and a
 
 test("a save from another version is listed but never offered or loaded: Continue skips it (PR #42 review, B3)", () => {
   const g = small(4);
-  const settings = { seed: 4, antCount: 30, rival: true, generation: 0 };
+  const settings = { species: "generic", seed: 4, antCount: 30, rival: true, generation: 0 };
   const player = { aim: { id: "unite", text: "One colony." }, doctrines: [], menu: [], hide: false, cull: false };
   const ok = { ...record(1, settings, player, g.save(), "1. land"), savedAt: 1000 };
   const old = { ...record(AUTOSAVE, settings, player, { ...g.save(), version: 0 }, "3. spread"), savedAt: 2000 };
@@ -53,10 +53,24 @@ test("a save from another version is listed but never offered or loaded: Continu
 
 test("a save from a single map (the side view or the open surface) is listed but never offered: the page plays one world (PRD §55)", () => {
   const g = new Game(generateWorld(4, { ...OPEN_WORLD, size: { w: 120, h: 80 } }), { antCount: 30, rivalAnts: 30 }, mulberry32(4));
-  const settings = { seed: 4, antCount: 30, rival: true, generation: 0 };
+  const settings = { species: "generic", seed: 4, antCount: 30, rival: true, generation: 0 };
   const player = { aim: { id: "unite", text: "One colony." }, doctrines: [], menu: [], hide: false, cull: false };
   const flat = { ...record(AUTOSAVE, settings, player, g.save(), "1. land"), savedAt: 2000 };
   const one = { ...record(1, settings, player, small(4).save(), "1. land"), savedAt: 1000 };
   assert.equal(readable(flat), false);
   assert.equal(newestReadable([flat, one]), one, "Continue skips it for the newest one-world save");
+});
+
+test("a record of another species than the page plays is listed, not loaded", () => {
+  const g = small(4);
+  const settings = { species: "other", seed: 4, antCount: 30, rival: true, generation: 0 };
+  const player = {
+    aim: { id: "unite", text: "One colony." },
+    doctrines: [{ id: "forage", text: "Gather." }],
+    menu: ["food"],
+    hide: false,
+    cull: false,
+  };
+  assert.equal(readable(record(AUTOSAVE, settings, player, g.save(), "x")), false);
+  assert.equal(readable(record(AUTOSAVE, { ...settings, species: "generic" }, player, g.save(), "x")), true);
 });

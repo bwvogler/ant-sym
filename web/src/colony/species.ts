@@ -22,6 +22,19 @@ export interface Species {
   lanes: { mode?: LaneWords<Mode>; stance?: LaneWords<Stance> };
 }
 
+/**
+ * The species a save or a page names by id (Species.id; GameSettings.species): code cannot be saved, so a record keeps the id and the page builds the
+ * game with the species it names. Add a species' row here when the page can play it.
+ */
+export const SPECIES: Record<string, Species> = {};
+
+/** The species with this id, or an error for one this build does not know. */
+export function speciesById(id: string): Species {
+  const s = SPECIES[id];
+  if (!s) throw new Error(`species: no "${id}" here (known: ${Object.keys(SPECIES).join(", ")})`);
+  return s;
+}
+
 /** The ant the game has always had: no overrides, the local responses. A game plays it unless it names another species. */
 export const GENERIC_ANT: Species = {
   id: "generic",
@@ -30,3 +43,4 @@ export const GENERIC_ANT: Species = {
   responses: localResponses,
   lanes: { mode: MODE_WORDS, stance: STANCE_WORDS },
 };
+SPECIES[GENERIC_ANT.id] = GENERIC_ANT;
