@@ -3,8 +3,8 @@
 // plays Jev's answers from its first second, and the Pages build, which has no server, plays them too.
 //
 // Lanes: `mode` (every ant situation, colony.SITUATIONS, 3,888) and `stance` (every strategist view, 324), packed with
-// the browser's own packers (colonyBrain.packModeRequest, packStanceRequest) and keyed with its own keys
-// (situationKey, stanceKey), under its own contexts (policyContext, stanceContext), per preset doctrine. And `fungus`
+// the browser's own packers (packModeRequest, packStanceRequest) and keyed with its own keys (situationKey, stanceKey), under its own
+// contexts (policyContext, stanceContext), per preset doctrine: each reached through the lane registry (colony/lanes.ts), which holds them. And `fungus`
 // (ja-lo8.4): the fungal situations a recorded side-view game meets (Garden painted on both royal chambers, Lockpick at
 // both holes, 300 s; not all 648), asked with every non-lethal lever, per preset aim (fungusBrain.AIMS), side view.
 //

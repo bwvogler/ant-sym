@@ -36,19 +36,17 @@ const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324 };
 // The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
 // registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.
 test("each table above has a row for every lane of the registry that needs one", () => {
+  // As sets: the order of a table, or of the registry, is nobody's business here.
+  const sorted = (names: string[]) => [...names].sort();
+  assert.deepEqual(sorted(Object.keys(CONTEXT)), sorted(LANE_LIST.map((l) => l.name)), "a lane has no context row");
   assert.deepEqual(
-    Object.keys(CONTEXT),
-    LANE_LIST.map((l) => l.name),
-    "a lane has no context row",
-  );
-  assert.deepEqual(
-    Object.keys(VALID),
-    LANE_LIST.filter((l) => l.local).map((l) => l.name),
+    sorted(Object.keys(VALID)),
+    sorted(LANE_LIST.filter((l) => l.local).map((l) => l.name)),
     "a lane with a local rule (its answers are a fixed set) has no valid-answers row",
   );
   assert.deepEqual(
-    Object.keys(SIZE),
-    LANE_LIST.filter((l) => l.all).map((l) => l.name),
+    sorted(Object.keys(SIZE)),
+    sorted(LANE_LIST.filter((l) => l.all).map((l) => l.name)),
     "a lane that can enumerate its situations has no size row",
   );
   for (const l of LANE_LIST) if (l.all) assert.equal(l.all().length, SIZE[l.name], `${l.name}'s situations`);
