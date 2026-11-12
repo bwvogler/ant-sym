@@ -23,7 +23,7 @@ test("the age bands are shares of the species' lifespan", () => {
   assert.equal(g.params.lifespan, LIFESPAN);
   assert.equal(g.params.youngShare, YOUNG);
   assert.equal(g.params.middleShare, MIDDLE);
-  // 15 s old: young for a species whose lifespan is 100 s and whose young band is below 20 s ... and for none of the generic ant's 3,600 s.
+  // 15 s old is young for a species with a 100 s lifespan (its young band runs to 20 s), and for the generic ant too (its band runs to 540 s).
   g.age[0] = 15;
   s.age[0] = 15;
   assert.equal(g.band(0), 0, "15 s of 3,600 s is young");
@@ -32,6 +32,8 @@ test("the age bands are shares of the species' lifespan", () => {
   assert.equal(s.band(0), 1, "30 s is middle-aged for it (20-50 s)");
   g.age[0] = 30;
   assert.equal(g.band(0), 0, "and still young for the generic ant");
+  s.age[0] = 40;
+  assert.equal(s.band(0), 1, "40 s is still middle-aged for it (0.4 of 100 s is below its 0.5 share; the generic 0.35 would call it old)");
   s.age[0] = 60;
   assert.equal(s.band(0), 2, "60 s is old for it");
   assert.ok(
@@ -52,4 +54,30 @@ test("a colony with no queen (the plane) does not age out unless its species say
   const s = plane(short);
   assert.ok(g.alive.some((a) => a) && s.alive.some((a) => a), "there are ants to check");
   for (let i = 0; i < s.n; i++) if (s.alive[i]) assert.ok(Number.isFinite(s.lifespan[i]!) && s.lifespan[i]! >= 70 && s.lifespan[i]! <= 130);
+});
+
+test("a queenless colony of a species that says so ages out and is replaced from the larder; the generic ant's workers stay as they were", () => {
+  const run = (species?: Species) => {
+    const g = new Game(
+      generateWorld(1, { size: { w: 120, h: 80 } }),
+      { antCount: 20, rivalAnts: 20, rival: false, ...(species ? { species } : {}) },
+      mulberry32(3),
+    );
+    const c = g.player;
+    const first = Array.from(c.alive).filter(Boolean).length;
+    for (let k = 0; k < 30 * 240; k++) {
+      g.tick(1 / 30);
+      c.feed(0.05); // food comes in, so the dead can be replaced
+    }
+    return { c, first };
+  };
+  const s = run(short);
+  assert.ok(s.c.diedOld >= s.first, `its workers aged out (${s.c.diedOld} died of age, ${s.first} at the start)`);
+  assert.ok(
+    s.c.alive.some((a) => a),
+    "and the larder replaced them",
+  );
+  const g = run();
+  assert.equal(g.c.diedOld, 0, "the generic ant's do not age out on the plane");
+  for (let i = 0; i < g.c.n; i++) if (g.c.alive[i]) assert.equal(g.c.age[i], 0, "nor age at all");
 });

@@ -3536,6 +3536,17 @@ export class Colony {
     return s > 0 && this.#rng() < respond(s, THETA_OLD);
   }
 
+  /** Workers age and die of it (the colony's life cycle; a colony with no queen runs it only if its species is `mortalWithoutQueen`). */
+  #ageWorkers(dt: number): void {
+    for (let i = 0; i < this.n; i++) {
+      if (!this.alive[i]) continue;
+      if ((this.age[i] = this.age[i] + dt) > this.lifespan[i]) {
+        this.kill(i, false);
+        this.diedOld++;
+      }
+    }
+  }
+
   /**
    * The colony's life cycle, once a tick (the side view): workers age and die; the queen, alive, lays an egg every
    * LAY_INTERVAL while food is in the larder and there is room for more workers; eggs hatch into larvae, nurses near a
@@ -3544,13 +3555,7 @@ export class Colony {
   #nestLife(dt: number): void {
     const ch = this.map.chambers!;
     const p = this.params;
-    for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i]) continue;
-      if ((this.age[i] = this.age[i] + dt) > this.lifespan[i]) {
-        this.kill(i, false);
-        this.diedOld++;
-      }
-    }
+    this.#ageWorkers(dt);
     const q = this.queen!;
     if (q.alive) {
       cellOf(q.x, q.y);
@@ -6152,7 +6157,10 @@ export class Colony {
     if (this.queen) {
       this.#nestLife(dt);
       this.#middenSmell(dt);
-    } else while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
+    } else {
+      if (p.mortalWithoutQueen) this.#ageWorkers(dt);
+      while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
+    }
   }
 
   // ——— saving (save.ts, ja-lo8.6) ———
@@ -6411,6 +6419,7 @@ const CHAMBER_SCAN = 5;
  * In incipient Pogonomyrmex rugosus colonies nanitics take on outside work, pushed out as later nanitics eclose into
  * brood care (escholarship.org/content/qt37w2d1mh). That they forage at once, and so live shorter, is the game's own.
  */
+/** The generic ant's nanitic age: the colony reads `middleShare × lifespan` of its own params (a species' differ); kept as the default and for the founding test. */
 export const NANITIC_AGE = MIDDLE * LIFESPAN;
 /** The queen's royal mark per second; her death rate per stranger at her side. */
 const QUEEN_MARK = 10;
