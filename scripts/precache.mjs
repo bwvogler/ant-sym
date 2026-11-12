@@ -27,19 +27,10 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
 import {
-  decodeSituation,
-  SITUATIONS,
-  STANCES,
-  AIMS,
-  FUNGUS_BATCH,
+  LANE_LIST,
   FUNGUS_BRAIN_VERSION,
-  fungalKey,
-  fungusContext,
-  packFungusRequest,
-  readLevels,
   encodeFungal,
   decodeFungal,
-  askedLevers,
   DEFAULT_MENU,
   STRAINS,
   Game,
@@ -50,15 +41,7 @@ import {
   COLONY_BRAIN_VERSION,
   DOCTRINES,
   estimateTokens,
-  packModeRequest,
-  packStanceRequest,
-  policyContext,
-  readMode,
-  readStance,
-  situationKey,
   STANCE_BRAIN_VERSION,
-  stanceContext,
-  stanceKey,
 } from "../web/src/colony/index.ts";
 
 const BATCH = 100;
@@ -86,20 +69,8 @@ for (let k = 0; k < args.length; k++) {
 const KEY = process.env.JEV_API_KEY;
 if (!opts.dry && !opts.import.length && !KEY) throw new Error("JEV_API_KEY is not set (or use --dry for an estimate, or --import)");
 
-/** Every strategist view: the fields of colony.StanceSituation, every value. */
-function stanceSituations() {
-  const out = [];
-  for (const stance of STANCES)
-    for (const ants of ["few", "some", "many"])
-      for (const losses of ["none", "some", "heavy"])
-        for (const enemyNearNest of [false, true])
-          for (const intake of ["none", "some", "plenty"])
-            for (const larder of ["low", "full"]) out.push({ stance, ants, losses, enemyNearNest, intake, larder });
-  return out;
-}
-
-/** The levers the page asks in the side view for a host in situation s: every non-lethal one that means something in it (Fungus.askedFor under the default menu, with a nest). */
-const fungusAsked = (s) => askedLevers(new Set(DEFAULT_MENU), s.task === "queen");
+/** The menu the page asks the fungus under: every non-lethal lever (Fungus.askedFor under the default menu, with a nest in the side view). */
+const MENU = new Set(DEFAULT_MENU);
 
 /** The fungal situations a side-view game meets: Garden on both royal chambers and Lockpick at both holes, 300 s. */
 function fungalSituations() {
@@ -121,38 +92,25 @@ function fungalSituations() {
   return [...met].sort((a, b) => a - b).map(decodeFungal);
 }
 
-const LANES = {
-  mode: {
-    situations: () => Array.from({ length: SITUATIONS }, (_, c) => decodeSituation(c)),
-    key: situationKey,
-    pack: (items, words) => packModeRequest(items, words),
-    read: (answers, id) => readMode(answers, id),
-    context: policyContext,
-    id: "s",
-  },
-  stance: {
-    situations: stanceSituations,
-    key: stanceKey,
-    pack: (items, words) => packStanceRequest(items, words),
-    read: (answers, id) => readStance(answers, id),
-    context: stanceContext,
-    id: "c",
-  },
-  fungus: {
-    situations: fungalSituations,
-    key: (s) => fungalKey(s, fungusAsked(s)),
-    pack: (items, words) =>
-      packFungusRequest(
-        items.map((it) => ({ ...it, asked: fungusAsked(it.situation) })),
-        words,
-      ),
-    read: (answers, id, situation) => readLevels(answers, id, fungusAsked(situation)),
-    context: (words) => fungusContext(words, "side"),
-    id: "h",
-    batch: FUNGUS_BATCH,
-    words: AIMS,
-  },
-};
+// One row a lane, from the lane registry (colony/lanes.ts): the situations it is asked in (the fungus's are the ones a recorded game meets),
+// its key, packing, reading and context (the fungus's in the side view, the one the shipped answers are for), the id its items carry, its
+// request size, and whether it asks under a doctrine or an aim (and which presets).
+const LANES = Object.fromEntries(
+  LANE_LIST.map((l) => [
+    l.name,
+    {
+      situations: l.all ?? fungalSituations,
+      key: (s) => l.key(s, MENU),
+      pack: (items, words) => l.pack(items, words),
+      read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, MENU)),
+      context: (words) => l.contextOf(words, l.variants.includes("side") ? "side" : undefined),
+      id: l.kind.idPrefix,
+      batch: l.batch ?? BATCH,
+      field: l.wordsField,
+      words: l.wordsField === "aim" ? l.presets : undefined,
+    },
+  ]),
+);
 
 const lanes = opts.lanes.split(",").map((l) => {
   if (!LANES[l]) throw new Error(`unknown lane ${l}`);
@@ -185,9 +143,9 @@ for (const lane of lanes) {
         ? JSON.parse(readFileSync(fileUrl, "utf8"))
         : [],
     );
-    bundles.set(file, { lane, [L.words ? "aim" : "doctrine"]: d.id, context, file, answers: have });
+    bundles.set(file, { lane, [L.field]: d.id, context, file, answers: have });
     const todo = all.filter((s) => !have.has(L.key(s)));
-    const batch = L.batch ?? BATCH;
+    const batch = L.batch;
     for (let k = 0; k < todo.length; k += batch) {
       const items = todo.slice(k, k + batch).map((situation, n) => ({ id: `${L.id}${n}`, key: L.key(situation), situation }));
       const req = L.pack(items, d.text);
