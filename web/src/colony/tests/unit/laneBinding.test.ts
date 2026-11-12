@@ -16,7 +16,8 @@ import {
 } from "../../colonyBrain.ts";
 import { AIMS, askedIn, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "../../fungusBrain.ts";
 import { decodeSituation, localPolicy, localStance, SITUATIONS } from "../../colony.ts";
-import { LANE_KINDS, LANE_LIST, LANES, laneOfContext, SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE } from "../../lanes.ts";
+import { growthContext, growthKey, localGrowthChoice, packGrowthRequest } from "../../growthBrain.ts";
+import { LANE_KINDS, LANE_LIST, LANES, laneOfContext, SAMPLE_FUNGAL, SAMPLE_GROWTH, SAMPLE_SITUATION, SAMPLE_STANCE } from "../../lanes.ts";
 import type { FungalSituation } from "../../fungalPolicy.ts";
 import { STANCE_SCHEMA, type LaneWords, type Mode, type Situation, type Stance, type StanceSituation } from "../../vocab.ts";
 
@@ -40,10 +41,10 @@ const FUNGAL_SEEN: FungalSituation[] = [
 ];
 const MENUS = [new Set(DEFAULT_MENU), new Set(["food", "rival", "trail"])];
 
-test("the registry lists the three lanes, each with its flags, counters, variants, words and batching", () => {
+test("the registry lists the four lanes, each with its flags, counters, variants, words and batching", () => {
   assert.deepEqual(
     LANE_LIST.map((l) => l.name),
-    ["mode", "stance", "fungus"],
+    ["mode", "stance", "fungus", "growth"],
   );
   for (const l of LANE_LIST) {
     assert.equal(l.kind, LANE_KINDS[l.name], `${l.name}'s flags are LANE_KINDS' row`);
@@ -55,31 +56,35 @@ test("the registry lists the three lanes, each with its flags, counters, variant
       ["asked", "cached"],
       ["stancesAsked", "stancesCached"],
       ["fungusAsked", "fungusCached"],
+      ["growthAsked", "growthCached"],
     ],
   );
   assert.deepEqual(
     LANE_LIST.map((l) => l.variants),
-    [[""], [""], ["top", "side"]],
+    [[""], [""], ["top", "side"], [""]],
   );
   assert.deepEqual(
     LANE_LIST.map((l) => l.wordsField),
-    ["doctrine", "doctrine", "aim"],
+    ["doctrine", "doctrine", "aim", "aim"],
   );
   assert.equal(LANES.mode.presets, DOCTRINES);
   assert.equal(LANES.stance.presets, DOCTRINES);
   assert.equal(LANES.fungus.presets, AIMS);
-  // Only the fungus gathers a fuller request, and only it has a batch of its own (the ants' lanes take the client's).
+  assert.equal(LANES.growth.presets, AIMS, "the growth lane asks under the fungus's aim");
+  // Only the fungus's lanes gather a fuller request and have a batch of their own (the ants' lanes take the client's).
   assert.deepEqual(
     LANE_LIST.map((l) => [l.gather, l.batch]),
     [
       [false, null],
       [false, null],
       [true, 50],
+      [true, 24],
     ],
   );
   assert.equal(LANES.mode.sample, SAMPLE_SITUATION);
   assert.equal(LANES.stance.sample, SAMPLE_STANCE);
   assert.equal(LANES.fungus.sample, SAMPLE_FUNGAL);
+  assert.equal(LANES.growth.sample, SAMPLE_GROWTH);
   // The erased list is the typed rows themselves, not copies.
   assert.deepEqual(
     LANE_LIST.map((l) => l.name),
@@ -296,4 +301,22 @@ test("the fungus row takes no species words yet: a lane argument changes nothing
   const other = { legend: "x", criteria: {}, version: 3 };
   assert.deepEqual(l.pack([{ id: "h0", key, situation: s }], A[0]!, other), l.pack([{ id: "h0", key, situation: s }], A[0]!));
   assert.equal(l.contextOf(A[0]!, "top", other), l.contextOf(A[0]!, "top"));
+});
+
+test("the growth lane is the growth brain (ja-2bw.5): its 24 situations, its local rule, asked under the fungus's aim", () => {
+  const l = LANES.growth;
+  const all = l.all();
+  assert.equal(all.length, 24);
+  assert.equal(new Set(all.map((s) => l.key(s, undefined))).size, 24, "every situation has its own key");
+  const items = all.slice(0, 5).map((situation, i) => ({ id: `g${i}`, key: growthKey(situation), situation }));
+  for (const aim of AIMS.map((a) => a.text)) {
+    assert.deepEqual(l.pack(items, aim), packGrowthRequest(items, aim));
+    assert.equal(l.contextOf(aim), growthContext(aim));
+    assert.ok(l.contextOf(aim).startsWith(LANE_KINDS.growth.contextPrefix));
+  }
+  assert.notEqual(l.contextOf(AIMS[0]!.text), l.contextOf(AIMS[1]!.text), "another aim is another cache");
+  for (const s of all) assert.equal(l.local(s), localGrowthChoice(s));
+  assert.equal(l.read({ g0_grow: { type: "choice", choice: "fruit" } }, "g0", all[0]!, growthKey(all[0]!)), "fruit");
+  assert.equal(l.read({ g0_grow: { type: "choice", choice: "explore" } }, "g0", all[0]!, growthKey(all[0]!)), null);
+  assert.ok(l.valid("", "turn") && !l.valid("", "") && !l.valid("", "left"), "the tip's own sides are not Jev's to name");
 });

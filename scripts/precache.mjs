@@ -42,6 +42,7 @@ import {
   DOCTRINES,
   estimateTokens,
   STANCE_BRAIN_VERSION,
+  GROWTH_BRAIN_VERSION,
 } from "../web/src/colony/index.ts";
 
 const BATCH = 100;
@@ -125,7 +126,7 @@ const doctrines = opts.doctrines.split(",").map((id) => {
 mkdirSync(OUT, { recursive: true });
 const indexUrl = new URL("index.json", OUT);
 const index = existsSync(indexUrl) ? JSON.parse(readFileSync(indexUrl, "utf8")) : { bundles: [] };
-index.versions = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, fungus: FUNGUS_BRAIN_VERSION };
+index.versions = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, fungus: FUNGUS_BRAIN_VERSION, growth: GROWTH_BRAIN_VERSION };
 
 // The jobs: one request per 100 situations, per lane and doctrine; what each bundle holds already is not asked again.
 const jobs = [];
