@@ -4698,7 +4698,7 @@ Each step is one card, over the field's lower-left corner, with Skip on every ca
 5. **The outcome card:** the game pauses. The clean and limit cards point to Persistence and Stealth in the mutations.
 6. **The aim.** Its button plays at 4×.
 
-The tutorial watches its own host, so a player who stops following the ant does not end the watch. A Restart, a New world or a loaded save mid-tutorial ends it.
+The tutorial watches its own host, so a player who stops following the ant does not end the watch. A Restart, a New world or a loaded save after the first card ends it, and it then counts as done in that browser; "Play the tutorial" on the start screen replays it (the owner kept this on 2026-11-12, rather than showing it again on the next visit). On the first card (the paused landing) nothing has happened yet, so the tutorial carries on in the new game.
 
 ### 61.2 Measured: the first host's fate
 `node scripts/tutorial-first-host.mjs 1-20 240` measures the page's game on 20 seeds, offline: `buildGame`, the landing, 600 + 600 ants, 30 steps a second.
