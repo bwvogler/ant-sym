@@ -11,6 +11,8 @@ import {
   DOCTRINES,
   fungalKey,
   fungusContext,
+  laneOfContext,
+  LANE_KINDS,
   localPolicy,
   localStance,
   packFungusRequest,
@@ -31,7 +33,6 @@ import {
   type StanceSituation,
 } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
-import { laneOfContext, LANE_KINDS } from "../lanes.ts";
 import { requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE, tokensPerQuestion } from "../prompt.ts";
 import type { PrecacheIndex } from "../precache.ts";
 

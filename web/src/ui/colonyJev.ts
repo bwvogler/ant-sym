@@ -12,9 +12,11 @@ import {
   type RunSummary,
 } from "../../shared/jev.ts";
 import { apiHeaders, apiUrl } from "./backend.ts";
-import { LANE_KINDS, laneOfContext, type LaneName } from "./lanes.ts";
-export type { LaneName } from "./lanes.ts";
+export type { LaneName } from "../colony/index.ts";
 import {
+  LANE_KINDS,
+  laneOfContext,
+  type LaneName,
   localPolicy,
   localStance,
   type Colony,

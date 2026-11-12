@@ -1,5 +1,7 @@
 import type { JevRequest } from "../../shared/jev.ts";
 import {
+  LANE_KINDS,
+  type LaneName,
   type Situation,
   type StanceSituation,
   estimateTokens,
@@ -10,7 +12,6 @@ import {
   DEFAULT_MENU,
   LEVERS,
 } from "../colony/index.ts";
-import { LANE_KINDS, type LaneName } from "./lanes.ts";
 
 // What Jev is sent, pure: the Learn drawer shows the exact request for one
 // situation, and what a question costs. Requests pack many situations behind
@@ -45,7 +46,7 @@ export const SAMPLE_FUNGAL: FungalSituation = {
 };
 const MENU_ON = new Set(DEFAULT_MENU);
 
-export { PER_REQUEST } from "./lanes.ts";
+export { PER_REQUEST } from "../colony/index.ts";
 
 export type Sample =
   | { lane: "mode"; situation: Situation }
