@@ -59,9 +59,12 @@ export function useTutorial({
       if (e.speed !== undefined) patch.speed = e.speed;
       if (Object.keys(patch).length) update(patch);
       if (e.follow) {
+        // Centre first, then follow: centring the view shown ends a follow there (ColonyField centreOn: looking elsewhere
+        // unfollows), so "Follow it" on an ant already followed would drop it. A fresh object, so the field's follow ref
+        // (synced when the prop changes identity) takes it even when it is the same ant.
         const c = game.colonies[e.follow.k];
-        setFollowed(e.follow);
         if (c) showAt(c.layer[e.follow.i] ?? PLANE, c.x[e.follow.i], c.y[e.follow.i], true);
+        setFollowed({ ...e.follow });
       }
       if (e.done) {
         markTutorialDone(store());
