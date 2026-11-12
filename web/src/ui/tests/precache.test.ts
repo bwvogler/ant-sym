@@ -17,6 +17,7 @@ import {
   fungusContext,
   validLevels,
   GROWTH_CHOICES,
+  GROWTH_BRAIN_VERSION,
   growthContext,
 } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
@@ -59,8 +60,11 @@ test("every shipped bundle is under the context the code asks under, for a prese
   assert.equal(index.versions.colony, COLONY_BRAIN_VERSION, "re-run scripts/precache.mjs: the colony brain's version moved");
   assert.equal(index.versions.stance, STANCE_BRAIN_VERSION, "re-run scripts/precache.mjs: the stance brain's version moved");
   assert.equal(index.versions.fungus, FUNGUS_BRAIN_VERSION, "re-run scripts/precache.mjs --lanes fungus: the fungus brain's version moved");
+  assert.equal(index.versions.growth, GROWTH_BRAIN_VERSION, "re-run scripts/precache.mjs --lanes growth: the growth brain's version moved");
+  // A lane asked under the fungus's aim (the fungus, its tips' growth) ships a bundle per preset aim; the ants' lanes one per doctrine.
+  const byAim = new Set(LANE_LIST.filter((l) => l.wordsField === "aim").map((l) => l.name as string));
   for (const b of index.bundles as (PrecacheIndex["bundles"][number] & { aim?: string })[]) {
-    const d = b.lane === "fungus" ? AIMS.find((x) => x.id === b.aim) : DOCTRINES.find((x) => x.id === b.doctrine);
+    const d = byAim.has(b.lane) ? AIMS.find((x) => x.id === b.aim) : DOCTRINES.find((x) => x.id === b.doctrine);
     assert.ok(d, `${b.file}: no preset doctrine or aim`);
     const ctx = CONTEXT[b.lane];
     assert.ok(ctx, `${b.file}: no lane ${b.lane}`);
@@ -81,6 +85,18 @@ test("every preset doctrine ships mode and stance answers, each situation once, 
       assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
       for (const [, a] of pairs) assert.ok(VALID[lane]!.includes(a), `${b.file}: ${a}`);
     }
+});
+
+test("every preset aim ships growth answers (ja-2bw.5), each situation once, and only answers the growth question allows", () => {
+  for (const a of AIMS) {
+    const b = (index.bundles as (PrecacheIndex["bundles"][number] & { aim?: string })[]).find((x) => x.lane === "growth" && x.aim === a.id);
+    assert.ok(b, `no growth bundle for ${a.id}`);
+    const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
+    assert.equal(pairs.length, b.answers);
+    assert.ok(pairs.length > 0 && pairs.length <= SIZE.growth!, `${b.file}: ${pairs.length} answers`);
+    assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
+    for (const [, x] of pairs) assert.ok(VALID.growth!.includes(x), `${b.file}: ${x}`);
+  }
 });
 
 test("loadPrecache seeds each bundle under its context, and skips what it can't read", async () => {
