@@ -6,6 +6,8 @@ import {
   cellKey,
   growthUnit,
   AMPLE_STEPS,
+  CORD_FLOW,
+  REGRESS_PER_ROUND,
   HGU,
   HYPHA_MASS,
   Hyphae,
@@ -396,4 +398,71 @@ test("a policy's turn with both near sides blocked reaches two turns round (side
   stepTips(h, plane(), 0, { free: 1e9, tips: 1 }, () => "turn");
   assert.equal(t.heading, turn(E, -1), "turned a step toward the open side, where it stands");
   assert.equal(h.length, 5, "grew nothing this step (the cell one turn left is its own)");
+});
+
+// Cords (a web, ja-2bw.8): the hypha feeding many tips thickens, a dig doesn't cut it, dead ends fade.
+
+/** A trunk east from (0, 20) to x = 5, and five branches off its end, each two cells long: the trunk feeds five tips. */
+function fan(): Hyphae {
+  const h = new Hyphae();
+  h.root(0, 20, E);
+  const t = h.tips[0]!;
+  for (let k = 0; k < 5; k++) h.extend(t, E, 0);
+  for (const d of [NE, SE, turn(E, 2), turn(E, -2)]) {
+    const b = h.branch(t, d);
+    h.extend(b, d, 0);
+    h.extend(b, d, 0);
+  }
+  h.extend(t, E, 0);
+  return h;
+}
+
+test("a cell feeding CORD_FLOW tips or more thickens into a cord; one feeding fewer stays a hypha", () => {
+  const h = fan();
+  assert.equal(h.tips.length, 5);
+  assert.ok(h.thicken() > 0);
+  for (let x = 0; x <= 5; x++) assert.ok(h.cords.has(cellKey(x, 20)), `trunk cell ${x} is no cord`);
+  const branchTip = h.tips[1]!;
+  assert.ok(!h.cords.has(cellKey(branchTip.x, branchTip.y)), "a branch feeding one tip thickened");
+  assert.ok(5 >= CORD_FLOW, "the trunk feeds enough tips");
+});
+
+test("a dig through a cord doesn't cut it; through a thin hypha it does", () => {
+  const h = fan();
+  h.thicken();
+  for (const k of h.parent.keys()) h.soil.add(k);
+  const trunk = cellKey(3, 20);
+  const thin = cellKey(h.tips[1]!.x, h.tips[1]!.y);
+  const dug = new Set([trunk, thin]);
+  const g: Ground = { topsoil: false, kind: (x, y) => (dug.has(cellKey(x, y)) ? "open" : "soil") };
+  const lost = h.cutDug(g);
+  assert.ok(h.has(3, 20), "the cord was cut");
+  assert.equal(lost, 1, "only the thin hypha's tip cell");
+});
+
+test("dead ends nothing uses fade, a cell a round, freeing their mass; roots, cords, fusions and a spot's hypha stay", () => {
+  // A hypha east from (0, 10), cut near its end: the cells before the cut are a dead end (no tip, nothing grows from them).
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  const t = h.tips[0]!;
+  for (let k = 0; k < 6; k++) h.extend(t, E, 0);
+  h.cut(cellKey(6, 10));
+  assert.equal(h.tips.length, 0);
+  const before = h.length;
+  assert.equal(h.regress(), REGRESS_PER_ROUND);
+  assert.equal(h.length, before - REGRESS_PER_ROUND);
+  assert.ok(!h.has(5, 10), "the dead end's last cell faded first");
+  for (let r = 0; r < 20; r++) h.regress();
+  assert.ok(h.has(0, 10), "the root stayed");
+  assert.equal(h.length, 1);
+  // A spot's hypha stays: fruit at a tunnel, then nothing fades next to the spot.
+  const g: Ground = { topsoil: false, kind: (x, y) => (y < 0 ? "rock" : x === 5 ? "open" : "soil") };
+  const f = new Hyphae();
+  f.root(2, 12, E);
+  const ft = f.tips[0]!;
+  f.extend(ft, E, 0);
+  f.extend(ft, E, 0);
+  assert.ok(f.fruit(ft, g));
+  f.regress();
+  assert.ok(f.has(4, 12), "the hypha by the spot faded");
 });
