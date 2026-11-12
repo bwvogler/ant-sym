@@ -37,7 +37,7 @@ afterEach(() => {
   live.clear();
 });
 
-function setup(species: Species | undefined) {
+function setup(species: Species | undefined, before?: (g: Game) => void) {
   const g = new Game(
     generateWorld(1, { size: { w: 60, h: 40 } }),
     { antCount: 5, rival: false, species: species ?? GENERIC_ANT },
@@ -46,6 +46,7 @@ function setup(species: Species | undefined) {
   const jev = new ColonyJev({});
   live.add(jev);
   jev.setDoctrine(DOCTRINE);
+  before?.(g);
   if (species) jev.attachColonies(g.colonies, species);
   else jev.attachColonies(g.colonies);
   return { g, jev };
@@ -83,8 +84,8 @@ test("a species asks under its own lane words: its own context, and only its own
 });
 
 test("a species with no stance lane has none in the client: nothing seeded, counted or asked there", () => {
-  const { g, jev } = setup(LONE);
-  const before = g.player.stancePolicy;
+  let before: Game["player"]["stancePolicy"] | undefined;
+  const { g, jev } = setup(LONE, (game) => (before = game.player.stancePolicy)); // read before the client attaches
   assert.equal(jev.seed(stanceContext(DOCTRINE), [[stanceKey(stanceSit), "raid"]]), 0);
   assert.equal(jev.state.stancesCached, 0);
   assert.equal(g.player.stancePolicy, before, "the colony keeps the stance policy the Game gave it");
