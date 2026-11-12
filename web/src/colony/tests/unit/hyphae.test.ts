@@ -336,6 +336,10 @@ test("a cut keeps only what a fusion loop reaches: a branch beyond the cut that 
   const one = build();
   assert.equal(one.h.cut(cellKey(2, 20)), 1, "only the dug cell: the rest is round the loop");
   assert.ok(one.h.has(3, 20) && one.h.has(one.b.x, one.b.y));
+  // Cut at the branch point (4, 20): 5 and 6 are joined round the loop, the branch is not, and it dies with its tip.
+  const three = build();
+  assert.equal(three.h.cut(cellKey(4, 20)), 4, "the branch the loop doesn't reach dies");
+  assert.ok(three.h.has(5, 20) && !three.h.has(three.b.x, three.b.y));
   // A loop that joins only the far end: cut (5, 20), between the branch point and the fused cell.
   const two = build();
   const branchCells = [...two.h.parent].filter(([, p]) => p !== ROOT).length;

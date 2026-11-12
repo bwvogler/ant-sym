@@ -4774,7 +4774,7 @@ None. No legend, question or schema changed. The aim card points at presets whos
 | mutations earned | 1,501 | 1,863 | 2,075 | 2,458 | 1,687 | 94 | 1,366 | 544 | 497 | 2,063 |
 
 - A quarter at 147–509 s on nine seeds; on seed 6 the fungus never takes hold (1–3 % all game, 94 mutations), so the worst seed is "never".
-- One world's spread is wider than the side world's (156–241 s): the plane's foragers pass the landing less evenly. So **P1 is re-based** on this table: with hyphae on, no seed worse than here, and the median quarter (about 300 s) within ±25 %. Seed 6's stall is a property of today's landing on one world, not of hyphae; whether it should be fixed is a separate question.
+- One world's spread is wider than the side world's (156–241 s): the plane's foragers pass the landing less evenly. So **P1 is re-based** on this table: with hyphae on, no seed more than 10 % slower to a quarter than here, and neither the worst seed nor the median worse (the owner's wording of §63.4; first worded "no seed worse"). Seed 6's stall is a property of today's landing on one world, not of hyphae; whether it should be fixed is a separate question.
 
 **Cost (estimated).** The growth lane: 24 situations per set of words at about the fungus lane's ~770 tokens a situation, ≈ 18k tokens, **≈ $0.0008 per new aim**, once. Cached games spend nothing; no other lane changes.
 
@@ -4840,6 +4840,14 @@ The mycelium's spore output is fixed by its mass, so every cell added to where i
 
 **Measured** (seeds 1–10, 600 s, against §63.2): a quarter at 141–401 s → 140–441 s; seed 6 401 → 441 s, seed 9 380 → 398 s, the rest within a few seconds; median about 301 s. The counterplay is mild: at *a thread* the curtain's hyphae run along walls already dug, so the diggers mostly widen the tunnels beside them; it should bite harder once *a borer* takes hyphae into undug soil. P1 holds (worst 441 s against the baseline's "never").
 
+This is the build that ships (later changes touched only tests, comments and fusion, which nothing grows yet). Seeds 1–10 per seed, against §63's baseline:
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 358 | 281 | 203 | 147 | 320 | never | 288 | 500 | 509 | 219 |
+| a quarter, hyphae (s) | 342 | 285 | 204 | 140 | 315 | 441 | 288 | 319 | 398 | 206 |
+| the rival's first host, hyphae (s) | 452 | 88 | 256 | 145 | 69 | 34 | never | 181 | 413 | 384 |
+
 ### 63.4 Held out: seeds 11–20 (review of #104, D1; owner 2026-11-12)
 
 Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression.mjs --map one --evolve [--hyphae]`, 600 s, everything above: fruit, corpses, cuts):
@@ -4851,6 +4859,6 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 | the rival's first host, no hyphae (s) | 411 | 557 | 518 | 345 | 173 | 540 | 271 | 329 | 273 | 218 |
 | the rival's first host, hyphae (s) | 323 | 403 | 193 | 220 | 173 | 472 | 168 | 205 | 54 | 218 |
 
-- As on seeds 1–10: every seed takes hold (seed 20, which never did without hyphae, at 484 s); the median quarter about 262 s against about 270 s; the rival reached sooner (median about 207 s against about 366 s); mutations up on most seeds.
+- As on seeds 1–10: every seed takes hold (seed 20, which never did without hyphae, at 484 s); the median quarter about 262 s against about 270 s; the rival reached sooner (median about 212 s against about 337 s); mutations up on most seeds.
 - **P1 as worded ("no seed worse than the baseline") fails narrowly**: seed 14 is 9 s slower (243 → 252 s), seeds 12 and 17 2 s; on seeds 1–10, seeds 2 and 3 were 4 s and 1 s slower. The worst seed and the median both improve; the gate's wording, not the play, is what the owner is asked to settle (`ja-2bw.6`).
 - **Decided (owner, 2026-11-12): ship hyphae on, and P1 reads: no seed more than 10 % slower to a quarter, and neither the worst seed nor the median worse.** On all twenty seeds the largest slowdown is seed 14's 3.7 %; the worst seed (484 s against "never") and the median both improve.
