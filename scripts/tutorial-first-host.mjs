@@ -10,6 +10,8 @@
 // Usage: node scripts/tutorial-first-host.mjs [seeds=1-20] [watch=180] [ants=600]
 import { INFECTED, PLANE } from "../web/src/colony/index.ts";
 import { buildGame, GAME_STRAIN, LANDING_COLONY } from "../web/src/ui/useColony.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const [range = "1-20", watchArg = "180", antsArg = "600"] = process.argv.slice(2);
 const [lo, hi = lo] = range.split("-").map(Number);

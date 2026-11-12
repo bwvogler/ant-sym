@@ -49,6 +49,8 @@ import {
   worldExtent,
 } from "../web/src/colony/index.ts";
 import { runGame } from "../web/src/colony/experiment.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const BATCH = 100;
 const DT = 1 / 30;

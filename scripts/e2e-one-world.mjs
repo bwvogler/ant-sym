@@ -3,6 +3,8 @@
 // like the bench: `npm run e2e` (not part of `npm test`, which has no browser). It uses the `playwright` already on the
 // machine (no install, no dependency) and starts the dev server on a free port with no Jev key, so it spends nothing.
 //
+// Usage: npm run e2e   (E2E_SHOTS=<dir> saves screenshots; no other options)
+//
 //  1. a one-world game, seed fixed (Start: the page plays one world only): it opens above;
 //  2. above, below, above mid-game: each view keeps its own camera;
 //  3. a click on the line above shows below at that column; a click on the strip below shows above at P(s);
@@ -26,6 +28,8 @@ import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const require = createRequire(import.meta.url);
 let chromium;

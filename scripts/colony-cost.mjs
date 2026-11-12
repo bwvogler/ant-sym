@@ -39,6 +39,8 @@ import {
   worldExtent,
 } from "../web/src/colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const side = process.argv.includes("--side");
 const one = process.argv.includes("--one");
