@@ -4731,7 +4731,7 @@ None. No legend, question or schema changed. The aim card points at presets whos
 - **Saves are not migrated** (owner's standing rule): `SAVE_VERSION` 10 carries the species.
 - **Checked against the other candidates** (2026-11-12, species.md "Other species, checked"): the descriptor was sized from the desert ant alone. Against the notes on Pharaoh, leafcutter, army ant and termite: age structure (`LIFESPAN`, `YOUNG`, `MIDDLE`) must become parameters (`ja-fnd.5.3.6`); the queen stays out of `Species` and with the nest-kind interface, which must own queen count and structure; `undertakes` is a boolean to widen when a second species needs a third behaviour; a caste field in the situation needs per-species schemas; army ants and termites are tier 3.
 
-**Order.** `Species` and `GENERIC_ANT` bit-exact; lane words by species; the save carries the species; undertaking from the species (the queen is the nest kind, not a species property); age structure as parameters (`ja-fnd.5.3.6`, added after the check against the other species); a test species in a test file (the stage's acceptance); then the desert ant (`ja-rf5`).
+**Order.** `Species` and `GENERIC_ANT` bit-exact; lane words by species; the save carries the species; undertaking from the species (the queen is the nest kind, not a species property); age structure as parameters (built, `ja-fnd.5.3.6`: `lifespan`, `youngShare`, `middleShare`, `mortalWithoutQueen`, added after the check against the other species); a test species in a test file (the stage's acceptance); then the desert ant (`ja-rf5`).
 
 **Cost.** None for the generic ant. A species lane is a new legend and a new precache bundle set: a live check and an `--import`, at the owner's say.
 

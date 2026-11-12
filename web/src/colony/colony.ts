@@ -219,6 +219,12 @@ export const localStance: StancePolicy = (s) => {
   return "forage";
 };
 
+/** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
+export const YOUNG = 0.15;
+export const MIDDLE = 0.35;
+/** A worker's mean lifespan, seconds (each 0.7–1.3× it): an orphaned colony dwindles as its workers age out. */
+export const LIFESPAN = 3600;
+
 export interface ColonyParams {
   antCount: number;
   /** most living ants the colony can have; food beyond it waits in the larder */
@@ -386,6 +392,13 @@ export interface ColonyParams {
    * foragers waited about 3 min with none returning). 1/90: at 1/180 G′'s worst seed fell to 5 ants alive (PRD §48.4)
    */
   scoutRate: number;
+  /** a worker's mean lifespan, seconds (each 0.7-1.3x it): the age bands are shares of it. A species with another career sets it (the desert ant's forager lives days, not an hour). */
+  lifespan: number;
+  /** the age bands as shares of `lifespan`: young (nurses) below `youngShare`, middle-aged (dig and carry inside) below `middleShare`, old (forage) beyond. A colony without a queen has one band: old. */
+  youngShare: number;
+  middleShare: number;
+  /** whether workers age out when there is no queen (a plane colony): the generic ant's do not, a species with a short forager career sets true */
+  mortalWithoutQueen: boolean;
   /** whether the colony's middle-aged carry its dead out to the midden (#undertake). A species that does not (the desert ant) sets false, and its dead lie where they fell. */
   undertakes: boolean;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
@@ -462,6 +475,10 @@ export const DEFAULT_COLONY: ColonyParams = {
   raidScout: 1 / 90,
   scoutRate: 1 / 90,
   undertakes: true,
+  lifespan: LIFESPAN,
+  youngShare: YOUNG,
+  middleShare: MIDDLE,
+  mortalWithoutQueen: false,
   odour: 0,
   tolerance: TOLERANCE,
   enemyRange: 2,
@@ -1266,7 +1283,7 @@ export class Colony {
     this.sinceRole[i] = 0;
     this.restT[i] = 0;
     this.age[i] = 0;
-    this.lifespan[i] = this.queen ? LIFESPAN * (0.7 + 0.6 * this.#rng()) : Infinity;
+    this.lifespan[i] = this.queen || this.params.mortalWithoutQueen ? this.params.lifespan * (0.7 + 0.6 * this.#rng()) : Infinity;
     this.broodHeld[i] = 0;
     this.broodTo[i] = -1;
     this.holdT[i] = 0;
@@ -1510,8 +1527,8 @@ export class Colony {
    */
   band(i: number): 0 | 1 | 2 {
     if (!this.queen) return 2;
-    const a = this.age[i] / LIFESPAN;
-    return a < YOUNG ? 0 : a < MIDDLE ? 1 : 2;
+    const a = this.age[i] / this.params.lifespan;
+    return a < this.params.youngShare ? 0 : a < this.params.middleShare ? 1 : 2;
   }
 
   /** Whether ant i may go out onto the ground: the young never (they nurse); the rest may. */
@@ -3674,7 +3691,9 @@ export class Colony {
         b.stage === PUPA &&
         b.t >= T_PUPA * (b.caste === GYNE ? GYNE_TIME_X : 1) &&
         b.held < 0 &&
-        (b.caste === GYNE ? this.#eclose(b) : this.spawn(centreX(b.x, b.y), centreY(b.y), b.nanitic ? NANITIC_AGE : 0))
+        (b.caste === GYNE
+          ? this.#eclose(b)
+          : this.spawn(centreX(b.x, b.y), centreY(b.y), b.nanitic ? this.params.middleShare * this.params.lifespan : 0))
       ) {
         if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
         this.brood.items.splice(k, 1);
@@ -6305,9 +6324,6 @@ const SEARCH_START = 3;
 /** One world's plane: seconds a homing ant may get no nearer its belief before it searches on, wherever it is (see tick: it unblocks beliefs in rock, and fires far from the belief too). */
 const SEARCH_STALL = 3;
 // Zoning by age (nest slice 6): see band, #mayGoOut, #digs.
-/** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
-export const YOUNG = 0.15;
-export const MIDDLE = 0.35;
 /** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
 export const REST = 10;
 /** seconds over which the colony averages its intake (behaviour MR 5) */
@@ -6389,8 +6405,6 @@ const HOLD_MAX = 30;
 const RECEPTION_MIN = 4;
 /** Rows either side of a chamber's mean row searched for its cell nearest that mean (the founding disc is the tallest: 9 rows). */
 const CHAMBER_SCAN = 5;
-/** A worker's mean lifespan, seconds (each 0.7–1.3× it): an orphaned colony dwindles as its workers age out. */
-export const LIFESPAN = 3600;
 /**
  * A nanitic's age at eclosion (ja-lo8.10): the first workers a queen founding alone rears (brood.ts `nanitic`) eclose
  * old, so they forage from the start; with nobody bringing food in, the queen's colony grows no further until they do.
