@@ -206,10 +206,11 @@ function side(c: Colony, fungus: Fungus): SideStats {
 /** A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load). */
 export function buildGame(s: GameSettings): Game {
   // The page plays one world only (owner, 2026-11-10; PRD §55): the side and open maps stay for the assays and scripts.
+  // Its fungus grows as hyphae (ja-2bw.3, PRD §61.1): they fruit nowhere yet, so the game plays as without them.
   const map = generateOneWorld(s.seed);
   return new Game(
     map,
-    { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false },
+    { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true } },
     gameRng(s.seed, s.generation),
   );
 }
