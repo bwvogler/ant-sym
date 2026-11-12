@@ -30,7 +30,7 @@ test(
         g.colonies.forEach((c, ci) => {
           let held = 0;
           for (let i = 0; i < c.n; i++) if (c.alive[i] && c.carrying[i] && !c.porting(i) && c.since[i]! > 120) held++;
-          peak[ci] = Math.max(peak[ci]!, held);
+          peak[ci] = Math.max(peak[ci] ?? 0, held); // a colony founded during the game has no slot yet
         });
       }
       peaks.push(`seed ${seed}: ${peak.join(" / ")}`);
