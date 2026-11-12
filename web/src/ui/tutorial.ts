@@ -55,9 +55,10 @@ export const TUTORIAL_SPEED = 1;
 export const FAST_SPEED = 4;
 /**
  * Sim seconds of watching before the tutorial moves on without a clean host. Measured (scripts/tutorial-first-host.mjs,
- * seeds 1–20, PRD §61): the first host is groomed clean within this on most seeds; the rest still carry it here.
+ * seeds 1–20, PRD §61): every first host was groomed clean, 41–215 s after it was found (median about 100 s); the limit
+ * is above the worst seed, so the timeout card is for a world unlike those.
  */
-export const WATCH_LIMIT = 150;
+export const WATCH_LIMIT = 240;
 
 export const begin = (): Tutorial => ({ step: "landing", host: null, watchFrom: 0, below: false, fast: false, hosts: 0 });
 
@@ -196,7 +197,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         body: [
           "Grooming took you off it, and your strain clears fast on its own: it starts weak, as every strain does here.",
           passed,
-          "Mutations come with your body's growth. Spend them below: Persistence makes you clear slowly, Stealth hides you from groomers.",
+          "Mutations come as your body grows. Spend them in the fungus panel: Persistence makes you clear slowly, Stealth hides you from groomers.",
         ],
         next: "Next",
         highlight: "evolution",
@@ -215,7 +216,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         body: [
           "Its nestmates keep grooming it; as long as some of you is left, it passes you on to the ants it touches.",
           passed,
-          "Mutations come with your body's growth. Spend them below: Persistence makes you clear slowly, Stealth hides you from groomers.",
+          "Mutations come as your body grows. Spend them in the fungus panel: Persistence makes you clear slowly, Stealth hides you from groomers.",
         ],
         next: "Next",
         highlight: "evolution",
