@@ -386,6 +386,8 @@ export interface ColonyParams {
    * foragers waited about 3 min with none returning). 1/90: at 1/180 G′'s worst seed fell to 5 ants alive (PRD §48.4)
    */
   scoutRate: number;
+  /** whether the colony's middle-aged carry its dead out to the midden (#undertake). A species that does not (the desert ant) sets false, and its dead lie where they fell. */
+  undertakes: boolean;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
   odour: number;
   /** odours further apart than this are strangers, as a healthy ant perceives it */
@@ -459,6 +461,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   raidRecruit: 0.1,
   raidScout: 1 / 90,
   scoutRate: 1 / 90,
+  undertakes: true,
   odour: 0,
   tolerance: TOLERANCE,
   enemyRange: 2,
@@ -6094,7 +6097,7 @@ export class Colony {
         if (this.queen) {
           this.#nurse(i, dt, toEnemy !== null);
           if (this.#port(i, dt, toEnemy !== null)) h += Math.PI;
-          this.#undertake(i, dt, toEnemy === null);
+          if (this.params.undertakes) this.#undertake(i, dt, toEnemy === null);
         }
       }
       // One world: on the plane, at a hole's cell. Its own: in, if it is going in (#wantsIn). Another colony's: a raider
