@@ -43,6 +43,30 @@ From [desert-ant.md](desert-ant.md) and the decisions in PRD §60:
 
 So **the desert ant needs no new mode and no tick split, but it is not data only.** Its no-trail ant, its words and its small nest are tier 1; the plume, heat and the invitation are each a small guarded edit in the generic tick plus new state (the emitter, a heat term, a speed array), every one neutral for the generic ant. That is why heat, the invitation and the plume are separate beads (`ja-rf5.4`-`.6`), after the species descriptor.
 
+## Other species, checked (2026-11-12)
+
+The descriptor above was drawn from one species. This section tests it against the others the notes mention. What each candidate needs is taken from the existing notes only (the file is named; "not in notes" is a gap, not a negative). Termite and army-ant items rest on search results (`ja-a2m`) and Pharaoh polydomy, the termite royal pair and army-ant trails are from memory: all unverified.
+
+| | Desert ant | Pharaoh ant | Leafcutter | Army ant | Termite |
+|---|---|---|---|---|---|
+| Nest | one hole, ~200 workers (*C. fortis*); *C. bicolor* polydomous ([desert-ant](desert-ant.md)) | founds nests by budding ([queens-and-merging](queens-and-merging.md) §2) | mounds, turrets, a garden chamber ([entrances](entrances.md), [fungus-policy](fungus-policy.md) W1) | not in notes (no fixed nest: memory) | mound; humidity-built (`ja-a2m`, titles only) |
+| Queen | one; queenless lab colonies viable | several, budding (`ja-8fd.1`) | not in notes | orphans fuse (*D. molestus*) | not in notes (a royal pair: memory) |
+| Castes | short forager career (4-6 days, *C. bicolor*); fits the age bands badly | not in notes | polymorphic: minors groom, majors weed | not in notes | caste differentiation, a different developmental system |
+| Channels | none; airborne food plume, nest CO₂ | long and short attractive trails, a repellent no-entry | stridulation (substrate vibration); garden odour | not in notes | humidity; alarm pheromone (titles) |
+| Modes | no `follow`; search loops exist | none implied | cut, carry, tend, weed: not in notes as modes | raid, bivouac, emigration: all not in notes | dig, build, tend: not in notes |
+| Dead | not recorded | not in notes | to a midden; infected colonies send more | not in notes | grooming and cannibalism (consumption) |
+| Fungus | none recorded; foragers exposed | *Wolbachia* only | garden as a recognition cue; *Escovopsis* | none found | strongest literature, nothing read yet |
+
+**What recurs, and where the descriptor stands.**
+- *Age structure* (desert ant, termites, leafcutters): `LIFESPAN`, `YOUNG` and `MIDDLE` are module constants (`colony.ts`), and a plane colony has no age death (`lifespan` is `Infinity` without a queen). The desert ant already needs them (assay b). **Missing from the order of work: lift them into `ColonyParams`** (tier 1, bit-exact), new bead `ja-fnd.5.3.6`.
+- *The queen* (Pharaoh several, army-ant orphans, termites a pair): I took it out of the descriptor as "the nest kind". Against these species that holds only if the nest-kind interface (`ja-fnd.5.5`) owns queen count and structure, and it must not keep meaning "a plane colony" through `c.queen === null`. Kept out of `Species`; `ja-8fd.1` (`queens[]`) is Pharaoh's need.
+- *Corpses* (none, midden, consumption): `undertakes` is a boolean, enough for the desert ant, the first thing a second species outgrows. Left as is; widen to a policy when a species needs a third behaviour.
+- *Castes in the situation* (leafcutter, termites; `ja-jhd`): the fungus's `TASKS` and the mode lane's `Situation` are fixed, so a species with its own caste field needs a per-species schema (tier 2, the `defineSchema` mechanism, ahead of the desert ant's own `heat` field).
+- *Channels and nests that differ* (every column): `Channel` is one global list and the nest is the dug hole; per-species channel sets and nest kinds are tier 2 and 3 as already planned.
+- *The fungus's host range* lives on strains in [fungus-policy](fungus-policy.md) §10, not on the species: two places to keep in step when a second host appears.
+
+**What this changes.** The tier model and "tier 1 first" stand for the desert ant, but it was sized from one example: army ants and termites are tier 3 (different nest, modes, castes). Pharaoh needs `queens[]` and a budding rule but few new senses (its repellent channel exists): a useful second species to test the descriptor against on paper before building more. Not decided here: which species comes second (`ja-a2m` leans termites; owner decides).
+
 ## The descriptor, at tier 1
 
 A sketch, not a contract; names will change.
