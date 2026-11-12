@@ -81,12 +81,16 @@ test("a save carries the species it was played with, and a game of another speci
   again.load(JSON.parse(JSON.stringify(saved)));
   assert.equal(again.params.species, quick);
   for (let k = 0; k < 5; k++) again.tick(1 / 30);
+  const before = again.time;
   assert.throws(() => make().load(JSON.parse(JSON.stringify(saved))), /species "quick".*plays "generic"/);
   assert.throws(() => again.load(JSON.parse(JSON.stringify(make().save()))), /species "generic".*plays "quick"/);
+  assert.equal(again.time, before, "a refused load leaves the game as it was");
 });
 
 test("the species the page names by id: the generic ant is known, an unknown id is an error", () => {
   assert.equal(speciesById("generic"), GENERIC_ANT);
   assert.equal(SPECIES.generic, GENERIC_ANT);
   assert.throws(() => speciesById("nope"), /no "nope"/);
+  for (const id of ["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"])
+    assert.throws(() => speciesById(id), /no ".+" here/, `${id} is not a species`);
 });

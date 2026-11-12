@@ -26,11 +26,11 @@ export interface Species {
  * The species a save or a page names by id (Species.id; GameSettings.species): code cannot be saved, so a record keeps the id and the page builds the
  * game with the species it names. Add a species' row here when the page can play it.
  */
-export const SPECIES: Record<string, Species> = {};
+export const SPECIES: Readonly<Record<string, Species>> = {};
 
 /** The species with this id, or an error for one this build does not know. */
 export function speciesById(id: string): Species {
-  const s = SPECIES[id];
+  const s = Object.hasOwn(SPECIES, id) ? SPECIES[id] : undefined;
   if (!s) throw new Error(`species: no "${id}" here (known: ${Object.keys(SPECIES).join(", ")})`);
   return s;
 }
@@ -43,4 +43,4 @@ export const GENERIC_ANT: Species = {
   responses: localResponses,
   lanes: { mode: MODE_WORDS, stance: STANCE_WORDS },
 };
-SPECIES[GENERIC_ANT.id] = GENERIC_ANT;
+(SPECIES as Record<string, Species>)[GENERIC_ANT.id] = GENERIC_ANT;
