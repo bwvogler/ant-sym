@@ -1,9 +1,10 @@
-import { FUNGUS_BATCH } from "../colony/index.ts";
+import { FUNGUS_BATCH } from "./fungusBrain.ts";
 
-// What the page knows about each kind of question (lane) beyond its brain in colony/: the counter it feeds, the id its items carry, the
+// What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
-// many situations a request carries. One row a lane: colonyJev.ts, prompt.ts and the Learn panel read it instead of switching on a name
-// (docs/refactor.md S4). A new lane adds its row here, its lane object in colonyJev.ts and its sample in prompt.ts.
+// many situations a request carries. One row a lane: ui/colonyJev.ts, ui/prompt.ts and the Learn panel read it instead of switching on a name
+// (docs/refactor.md S4). A new lane adds its row here, its lane object in ui/colonyJev.ts and its sample in ui/prompt.ts. Never imported from
+// colony.ts or fungus.ts: it sits above the brains (a cycle otherwise).
 
 export type LaneName = "mode" | "stance" | "fungus";
 

@@ -15,6 +15,7 @@ export * from "./fungusBrain.ts";
 export * from "./game.ts";
 export * from "./hex.ts";
 export * from "./hunger.ts";
+export * from "./lanes.ts";
 export * from "./journal.ts";
 export * from "./levers.ts";
 export * from "./oneWorld.ts";
