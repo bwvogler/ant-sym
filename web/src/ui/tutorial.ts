@@ -191,7 +191,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         title: "Its nestmates groom it",
         body: [
           "Ants lick each other clean. Each time a nestmate grooms it, some of you comes off, and the groomer learns your smell: it resists you a little more.",
-          ...(t.below ? ["It has taken you down the hole into the nest: the view switched to below."] : []),
+          ...(t.below ? ["It has carried you down the hole into the nest: the view follows it below, and back up."] : []),
           `Watch its share of you on the card. The game runs at ${WATCH_SPEED}× for this.`,
         ],
         next: null,
