@@ -640,7 +640,7 @@ const COLONY_SKIP: ReadonlySet<string> = new Set([
   "perceived",
 ]);
 
-/** The newborn's resets for one colony's parameters (ants.ts antResets), worked out once. */
+/** The newborn's resets for one colony's parameters (ants.ts antResets), worked out once: a parameter a reset reads (tolerance, routeStep) is read at the first birth, so a colony does not change it afterwards (asIs reads tolerance live). */
 const SPAWN_RESETS = new WeakMap<object, [string, number][]>();
 const spawnResets = (params: ColonyParams): [string, number][] => {
   let r = SPAWN_RESETS.get(params);
@@ -2611,7 +2611,7 @@ export class Colony {
     return on;
   }
 
-  /** Ant i has no places stored: a fresh trip, or a newborn (ja-lp4.16). Its slot's places are left; routeN says none are in use. */
+  /** Ant i has no places stored: a fresh trip (ja-lp4.16). Its slot's places are left; routeN says none are in use. A newborn gets the same through the table (ants.ts `reset`): a field added here is marked there too. */
   #routeClear(i: number): void {
     this.routeN[i] = 0;
     this.routeGap[i] = this.params.routeStep;
@@ -4293,7 +4293,7 @@ export class Colony {
     this.gx[i] = NO_CELL;
   }
 
-  /** Ant i carries no pellet (or corpse) any more: the pellet, what it was, and where it was taking it, all at once. */
+  /** Ant i carries no pellet (or corpse) any more: the pellet, what it was, and where it was taking it, all at once. A newborn gets the same through the table (ants.ts `reset`): a field added here is marked there too. */
   #clearPellet(i: number): void {
     this.pellet[i] = 0;
     this.soil[i] = SOIL_DUG;

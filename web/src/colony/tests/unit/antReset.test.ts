@@ -75,3 +75,19 @@ test("the table says what asIs and spawn reset: asIs by hand (it runs for every 
   const spawn = new Set(antResets(params).map(([k]) => k));
   for (const [k] of antResets(params, true)) assert.ok(spawn.has(k), `${k} is reset by spawn too`);
 });
+
+test("a newborn's resets follow the colony's parameters: routeGap and tolerance away from the defaults", () => {
+  const g = new Game(
+    generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
+    { antCount: 10, rivalAnts: 10, rival: false },
+    gameRng(7),
+    { colony: { routeStep: 5, tolerance: 0.2 } },
+  );
+  const c = g.player;
+  const i = c.alive.indexOf(0);
+  scribble(c, i);
+  c.alive[i] = 0; // (the scribble made it alive)
+  c.spawn();
+  assert.equal(c.routeGap[i], 5, "routeGap starts at the colony's routeStep");
+  assert.ok(Math.abs(c.tolerance[i]! - 0.2) < 1e-6, "tolerance at the colony's");
+});
