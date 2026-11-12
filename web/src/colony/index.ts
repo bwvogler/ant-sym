@@ -23,6 +23,7 @@ export * from "./recognition.ts";
 export * from "./responses.ts";
 export * from "./royal.ts";
 export * from "./save.ts";
+export * from "./schema.ts";
 export * from "./transect.ts";
 export * from "./vocab.ts";
 export * from "./world.ts";

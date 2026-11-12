@@ -31,7 +31,8 @@ This is the budget the policy may draw on. Each row points to the research secti
 | Floor marks ("road signs") | which chamber this is; turns at decision points | local, underground | [nest-and-home §1](nest-and-home.md#inside-gravity-memory-and-road-signs) |
 | Queen pheromone | where the queen is; whether the colony has a queen; faint in a big nest, so new queens are reared | within the nest; carried on workers and passed by contact | [nest-and-home §1](nest-and-home.md#the-queen), [queens-and-merging §2](queens-and-merging.md#2-what-ants-do), [new-queens §2](new-queens.md#2-the-queen-holds-it-back) |
 | Brood | dig here, tend here | local | [nest-and-home §1](nest-and-home.md#nest-structure) |
-| Own body | age, hunger, load, fatigue | internal | [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants) (response thresholds) |
+| Food odour in the air (design, desert ant) | a plume from dead arthropods: climb it within several metres, crosswind runs to find it; outweighs the vector near food; no memory | air, many cells; steering only, no situation field (not built, `ja-rf5`) | [desert-ant §3](desert-ant.md#3-they-find-food-by-smell-not-by-following-one-another) |
+| Own body | age, hunger, load, fatigue; for the desert ant, body heat from the ground it crosses (design, not built) | internal | [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants) (response thresholds), [desert-ant §4](desert-ant.md#4-heat-sets-when-and-how-long-they-can-work) |
 
 **Not yet researched:** corpse odour, which matters for the midden. Write a note, with primary sources, before building on it. What a fungus senses inside its host is in [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers). Most of it is marked design: no paper shows a fungus reading those cues.
 

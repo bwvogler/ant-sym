@@ -4647,3 +4647,33 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 **Beads.** `ja-lp4.16` (epic, blocks `ja-lp4.6.3`), children in build order: `.1` read the full texts (research, does not block); `.2` assay R1 and its baseline (no behaviour change); `.3` route memory behind `routeMemory`; `.4` tune, turn on, G1 and the one-world assays; `.5` docs as built.
 
 **Still open.** The owner's calls above; R1's baseline; the tick; whether the bound of 2 is reachable on seeds 5 and 9 with this alone, or needs `ja-lp4.15`'s shorter search; the full texts to read when the network allows.
+
+## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
+
+**Research basis:** [desert-ant.md](desert-ant.md). Four papers were read in full text (Razin 2013, Dillier & Wehner 2004, Buehlmann 2012 and 2013); the rest is from abstracts or summaries (**unverified**):
+- *Cataglyphis* foragers work alone, with no trail pheromone and no recruitment to a place; they navigate by path integration, a sky compass and remembered views, and find food by smell (dead-arthropod odour, followed in crosswind runs).
+- Activity sits in a thermal window between predation and heat stress (*C. bombycina*, Wehner, Marsh & Wehner 1992); forager careers are short (*C. bicolor*, about 6 days, Schmid-Hempel & Schmid-Hempel 1984).
+- Colonies are small and mostly monogynous; between-colony aggression is at maximum (*C. iberica*, *C. niger*). No natural *Metarhizium* or *Beauveria* infection and no corpse removal were found.
+
+**The problem.** The game has one ant, built into `Situation`, `CHANNELS` and the two lanes. A species with fewer channels, its own situation fields and no stance lane cannot be added without touching about eight files ([refactor.md](refactor.md) S4). This species is the first real consumer of the descriptor in `ja-fnd.5.3`.
+
+**Decisions.**
+- Desert ant first (owner, 2026-11-11, chosen from four candidates: desert ant, Pharaoh ant, army ant, leafcutter).
+- Decided by me, on the owner's instruction to decide what I can decide well (2026-11-11; the owner can overturn any of these):
+  - **Descriptor first.** `ja-fnd.5.1`–`.5.3`, then the species on it. Why: the species' defining differences (a smaller channel set, its own situation fields, no stance lane) are exactly what the hard-coded `Situation` cannot express, so building it directly would mean a second copy of the colony's wiring to delete later; the descriptor work is bit-exact and goldens guard it.
+  - **Heat is its own bead after the first build** (`ja-rf5.5` depends on `ja-rf5.3`). Why: it is the biggest invented rule, the literature gives windows but no rates, and it can only be tuned once a species plays.
+  - **A radial food-odour gradient** before any wind field. Why: the papers give "several metres" and crosswind runs, no plume shape; a wind field is a new world system with nothing to measure it against.
+- Decided by me (2026-11-12): the game's desert ant is modelled on *C. fortis* (monodomous, about 200 workers, about 3 nests a hectare; Dillier & Wehner 2004, full text read); its heat and forager-life numbers are borrowed from *C. bombycina* and *C. bicolor* and labelled so.
+- Owner (2026-11-11): the fungus's levers on this host are host odour first and contact at an invitation (`ja-rf5.7`); heat felt by the host is left for later. The invitation (`ja-rf5.6`) is therefore built, not optional. The owner allows the journal hosts for the full-text read (`ja-rf5.1`).
+
+**The mechanic.** Food odour as a steering cue; own body heat as a sense and a return rule; the species' own lane and legend; no trail channels, no stance lane, no corpse removal. "Off": no species, so main bit for bit. Table in [desert-ant.md](desert-ant.md#the-mechanic).
+
+**Play.** Lone runners that never form lines, bursts in the cool window, and a fungus whose trail levers do nothing here. Risks: a cliff when the whole colony leaves at once, a free heat lever, a heat model that does not show on the field.
+
+**Assays and targets.** No trail forms; trips are bursts inside the heat budget; a forager on a plume finds a patch faster than a blind search. Targets are set after the full texts are read (`ja-rf5.1`).
+
+**Cost (estimated).** The species' mode lane has fewer states than the generic ant's (no trails; a heat field with two or three values), so fewer questions; no stance lane. Measure with `npm run colony-cost` once its legend exists.
+
+**Beads.** `ja-rf5` (epic): `.1` read the full texts; `.2` assays (no behaviour change); `.3` the species on the descriptor (needs `ja-fnd.5.3`); `.4` food odour; `.5` heat; `.6` invitation; `.7` the fungus's levers (owner); `.8` Learn entry.
+
+**Still open.** Full texts of Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984 and the published Buehlmann et al. 2014 (paywalled); the heat model's numbers for *C. fortis*; every number in the note not marked as read in full text.

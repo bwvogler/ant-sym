@@ -1,6 +1,6 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
-import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
+import { MODES, SITUATION_SCHEMA, STANCES, STANCE_SCHEMA, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
 import {
   CARRY,
   type Carry,
@@ -80,12 +80,12 @@ export const STANCE_CRITERIA: Record<Stance, string> = {
 
 /** The cache key for an ant's situation. */
 export function situationKey(s: Situation): string {
-  return `${s.mode}|${s.tired ? "tired" : "fresh"}|${s.foodTrail}|${s.homeTrail}|${s.alarm}|${s.enemy}|${s.stance}`;
+  return SITUATION_SCHEMA.key(s);
 }
 
 /** What a situation looks like in the request: the same fields, as Jev reads them. */
 export function situationState(s: Situation): Situation {
-  return { mode: s.mode, tired: s.tired, foodTrail: s.foodTrail, homeTrail: s.homeTrail, alarm: s.alarm, enemy: s.enemy, stance: s.stance };
+  return SITUATION_SCHEMA.state(s);
 }
 
 export function modeQuestion(id: string): JevRequest["questions"] {
@@ -114,7 +114,7 @@ export function readMode(answers: Record<string, JevAnswer>, id: string): Mode |
 
 /** The cache key for the strategist's view. */
 export function stanceKey(s: StanceSituation): string {
-  return `${s.stance}|${s.ants}|${s.losses}|${s.enemyNearNest ? "enemy" : "clear"}|intake:${s.intake}|${s.larder}`;
+  return STANCE_SCHEMA.key(s);
 }
 
 export function stanceQuestion(id: string): JevRequest["questions"] {
