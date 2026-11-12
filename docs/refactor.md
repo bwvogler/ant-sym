@@ -142,7 +142,7 @@ Each module gains direct unit tests; that is where development gets quicker.
    - `ui/colonyJev.ts` keeps only the runtime state.
    - `prompt.ts`, the token estimates, Learn, the follow card and `precache` read from it.
    - The response hooks become entries in it.
-3. **A `Species` descriptor** with:
+3. **A `Species` descriptor** (designed in [species.md](species.md): three tiers, tier 1 first, one species per game first; slices in `ja-fnd.5.3`) with:
    - the channels it lays and reads
    - its sensor layout
    - its situation schemas, and its modes with their steering

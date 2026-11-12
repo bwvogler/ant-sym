@@ -4718,3 +4718,21 @@ The tutorial watches its own host, so a player who stops following the ant does 
 
 ### 61.3 Cost
 None. No legend, question or schema changed. The aim card points at presets whose answers are already shipped (§50.19). The simulation is untouched, and the golden masters are bit-exact.
+
+## 62. The species descriptor: tier 1 first, one species per game (design, ja-fnd.5.3, 2026-11-12)
+
+**Basis:** [species.md](species.md): three read-only surveys of the colony, the game and the page. There is no species concept; `Colony` is the ant; the tick is one 1,230-line body with four hard-wired modes and no seam; the game is two colonies (`Sides` is `colony`/`rival`); lanes, legends and saves carry no species.
+
+**Decisions.**
+- **Tier 1 first** (made here, overturnable): a species is data (parameter overrides, the local response set, the Jev words of each lane, what feeds the existing sensors, the fungus's view of the host, names), plus the odd per-species ant array. The desert ant needs no new mode and no tick split, but it is not data only: its words, no-trail ant and small nest are tier 1; the food plume (steering only, an emitter), heat (a term in the fatigue block, a return rule: `ja-rf5.5`), the invitation (a speed array, a `Touch` field) and undertaking (a species flag) are small guarded tick edits and new state, each neutral for the generic ant (corrected after review). The generic ant's body is extracted as a strategy (`ja-fnd.4.4`) and the nest-kind interface built (`ja-fnd.5.5`) only when a species needs different modes or nest (termites, army ants).
+- **One species per game, mixed worlds later** (owner, 2026-11-12): a "desert" scenario has its own map and both colonies are desert ants, so the game needs only `GameParams.species`. Unity, the odour axis, names and colours, chapters and Jev doctrines stay as they are. A mixed world (`Game` over colony specs, per-colony species in saves, an odour axis per species pair, foreign-trail reading across channel sets, more than two nests, per-colony names) is `ja-fnd.5.4`.
+- **The food plume is steering only** (made here, overturnable): no situation field, as vision.md says; the policy and `follow` do not see it.
+- **Separate words and contexts per species** (made here): the generic ant's legends, contexts and shipped precache do not move; a species lane has its own.
+- **Saves are not migrated** (owner's standing rule): `SAVE_VERSION` 10 carries the species.
+
+**Order.** `Species` and `GENERIC_ANT` bit-exact; lane words by species; the save carries the species; the fungus's host properties; a test species in a test file (the stage's acceptance); then the desert ant (`ja-rf5`).
+
+**Cost.** None for the generic ant. A species lane is a new legend and a new precache bundle set: a live check and an `--import`, at the owner's say.
+
+**Beads.** `ja-fnd.5.3` (the descriptor) with children `.1`–`.5`; `ja-rf5.3` (the desert ant on it) waits on it.
+
