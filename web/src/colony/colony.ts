@@ -3146,10 +3146,11 @@ export class Colony {
           if (here < 0) here = this.#portInstead(i, cx, cy, target, dt);
         } else if (standing >= 0 && this.since[i] > STORE_AFTER) {
           // A forager long on its way (ja-3ifx: food from a pocket the nest's own tunnels opened, its chamber a maze away)
-          // puts its food down in the first of its colony's food chambers it stands in: a store, reception or the queen's.
-          // Porters carry it on from there to where it is wanted.
+          // puts its food down in the first of its colony's food chambers it stands in: a store, reception (once it is
+          // RECEPTION_MIN cells, as #foodTo: a smaller one chokes) or the queen's. Porters carry it on to where it is wanted.
           const c = ch.list[standing]!;
-          if (c.colony === this.params.nest && (c.role === "store" || c.role === "reception" || c.role === "royal")) here = standing;
+          const takes = c.role === "store" || c.role === "royal" || (c.role === "reception" && c.cells >= RECEPTION_MIN);
+          if (c.colony === this.params.nest && takes) here = standing;
         }
         if (here < 0) return false;
       }
@@ -6550,7 +6551,9 @@ export function walkable(map: WorldMap, x: number, y: number): boolean {
 
 /**
  * How many steps through open ground food at a sensor's tip may be from the ant and still be sensed: the sensor's reach
- * (sensorDistance, 3) and two more, so food round a tunnel's bend or a chamber's corner is sensed as before.
+ * (sensorDistance, 3) and two more, so food round a tunnel's bend or a chamber's corner is sensed as before. Fixed, not
+ * derived: a sensorDistance swept past SENSE_STEPS would put every tip out of reach, so raise this with it (and inReach's
+ * window, which is sized from it).
  */
 export const SENSE_STEPS = 5;
 /** inReach's window: cells within SENSE_STEPS of the start, stamped by call (a grid of offsets, so no allocation per call). */

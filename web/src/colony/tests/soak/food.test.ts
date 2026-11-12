@@ -175,3 +175,25 @@ test("a larva lying outside any chamber is taken in and raised (review of slice 
   for (let k = 0; k < 30 * 120 && stray.stage === LARVA; k++) g.tick(1 / 30);
   assert.notEqual(stray.stage, LARVA, `still a larva: in chamber ${stray.chamber}, fed ${stray.fed}`);
 });
+
+test("a forager long on its way puts its food down in the first store of its colony it stands in; a fresh one, or one in another colony's store, doesn't (ja-3ifx)", () => {
+  /** A forager standing in a four-cell store (its colony's, or `owner`'s) with `since` seconds on its trip, for 1 s. */
+  const run = (since: number, owner = 0) => {
+    const map = generateSideWorld(2, SMALL_SIDE);
+    const store = reception(map, 4);
+    store.role = "store"; // not where its food goes (no reception: the royal chamber)
+    store.colony = owner;
+    const c = forage(map);
+    const [sx, sy] = [store.x0 + 1, store.floorRow];
+    c.x[0] = centreX(sx, sy);
+    c.y[0] = centreY(sy);
+    c.since[0] = since;
+    for (let k = 0; k < 30 && c.carrying[0]; k++) c.tick(1 / 30);
+    return { stored: c.stored, got: store.food, carrying: c.carrying[0] };
+  };
+  const long = run(61);
+  assert.equal(long.got, 1, "the store got it");
+  assert.equal(long.stored, 1, "home");
+  assert.equal(run(0).got, 0, "a fresh forager carries it on to its chamber");
+  assert.equal(run(61, 1).got, 0, "not into another colony's store");
+});

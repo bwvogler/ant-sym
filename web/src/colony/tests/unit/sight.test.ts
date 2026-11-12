@@ -25,6 +25,15 @@ test("inReach: through open ground within its steps, round a bend too; never int
   assert.equal(reach([4, 1], [4, 1]), true, "its own cell");
 });
 
+test("inReach: SENSE_STEPS is 5, round a hairpin; rock seals a pocket as soil does", () => {
+  const hairpin = hexMap(["ssssssss", "s......s", "ssssss.s", "s......s", "ssssssss"]);
+  const reach = (map: WorldMap, a: [number, number], b: [number, number]) => inReach(map, at(...a).x, at(...a).y, at(...b).x, at(...b).y);
+  assert.equal(reach(hairpin, [4, 1], [3, 3]), true, "five steps round the hairpin at (6, 2), two cells apart");
+  assert.equal(reach(hairpin, [3, 1], [3, 3]), false, "six steps round it");
+  const rock = hexMap(["#####", "#.#.#", "#####"]);
+  assert.equal(reach(rock, [1, 1], [3, 1]), false, "(3, 1) is sealed off by the rock at (2, 1)");
+});
+
 const W = 26;
 const H = 12;
 
@@ -47,7 +56,7 @@ function buried(): WorldMap {
 }
 
 // On the local rule, food seen through the wall read as a strong food trail: the explorer turned follower, and followers
-// don't dig. Measured: through the wall 0 of 12 seeds took any food in 60 s; in sight only, 5 of 12.
+// don't dig. Measured: through the wall 0 of 12 seeds took any food in 60 s; through open ground only (inReach), 5 of 12.
 test("an explorer at a tunnel's end near buried food digs on and reaches it on some seeds (ja-juiu)", () => {
   let reached = 0;
   const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
