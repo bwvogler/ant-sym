@@ -403,6 +403,35 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "A third species, the desert ant Cataglyphis: solitary foragers with no trails, who find food by smell and home by path integration, and work in a window between heat and predators. Planned (not built, PRD §60).",
   },
   {
+    note: "lasius-neglectus",
+    title: "The invasive garden ant",
+    covers:
+      "Tolerant nests with several queens that bud, and the best-measured ant defences against Metarhizium: grooming that immunises, infected brood destroyed. Proposed (not built, PRD §64).",
+  },
+  {
+    note: "leafcutter",
+    title: "Leafcutter ants",
+    covers:
+      "Castes by size, the fungus garden as the store, quarantined waste workers, and plants learned harmful. Planned (not built, PRD §64).",
+  },
+  {
+    note: "pharaoh-ant",
+    title: "Pharaoh ants",
+    covers: "Many queens across budding nests, a trail that lasts a day, colonies that move house. Planned (not built, PRD §64).",
+  },
+  {
+    note: "termites",
+    title: "Termites",
+    covers:
+      "A royal pair, castes by development, drumming alarms, and a staged defence against the fungus: groom, eat, bury. Planned (not built, PRD §64).",
+  },
+  {
+    note: "army-ant",
+    title: "Army ants",
+    covers:
+      "A nest made of workers that moves, phases set by the larvae, and raids that grow with the colony. Planned (not built, PRD §64).",
+  },
+  {
     note: "nest-spacing",
     title: "Nest spacing",
     covers: "How far apart colonies sit, where young colonies survive, and how far a founding queen flies.",
