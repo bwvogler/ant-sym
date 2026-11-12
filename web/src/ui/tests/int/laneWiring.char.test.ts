@@ -220,3 +220,48 @@ test("the fungus lane waits to gather a fuller request before it sends; the ants
     "it asks once it has waited",
   );
 });
+
+test("each lane sends its own ids and feeds its own counter: ants s0.., the strategist c0.., the fungus h0..; hits are the ants' modes only (review of #101)", async () => {
+  const sent = scriptAll();
+  const j = make();
+  const g = topGame();
+  j.attach(g.player);
+  j.attachFungus(g.fungus);
+  j.setAim(AIM);
+  await j.start();
+  const asked = (key: string) => sent.some((x) => x.req.state[key]);
+  // The strategist is asked by the game when it chooses a stance: here by hand, as colonyJev.test.ts does, with a few views.
+  const views = [g.player.stanceSituation(false), g.player.stanceSituation(true)];
+  for (let round = 0; round < 20 && !(asked("ants") && asked("colony") && asked("hosts")); round++) {
+    for (let k = 0; k < 6; k++) g.tick(1 / 30);
+    for (const v of views) j.stancePolicy(v);
+    await tick(25);
+  }
+  await tick(60);
+  const ids = (key: string) => sent.flatMap((s) => Object.keys((s.req.state[key] ?? {}) as object));
+  const ants = ids("ants");
+  const strategist = ids("colony");
+  const hosts = ids("hosts");
+  assert.ok(ants.length > 0 && strategist.length > 0 && hosts.length > 0, "all three lanes asked");
+  assert.ok(
+    ants.every((id) => /^s\d+$/.test(id)),
+    "an ant's situation is s<n>",
+  );
+  assert.ok(
+    strategist.every((id) => /^c\d+$/.test(id)),
+    "the strategist's view is c<n>",
+  );
+  assert.ok(
+    hosts.every((id) => /^h\d+$/.test(id)),
+    "a host is h<n>",
+  );
+  // Each counter counts the situations its own lane sent.
+  assert.equal(j.state.asked, ants.length);
+  assert.equal(j.state.stancesAsked, strategist.length);
+  assert.equal(j.state.fungusAsked, hosts.length);
+  // Only the ants' modes are tallied as hits and misses: a strategist lookup moves neither.
+  assert.ok(j.state.hits + j.state.misses > 0, "the ants' lookups are tallied");
+  const tally = j.state.hits + j.state.misses;
+  for (const v of views) j.stancePolicy(v);
+  assert.equal(j.state.hits + j.state.misses, tally, "the strategist's lookups are not tallied");
+});
