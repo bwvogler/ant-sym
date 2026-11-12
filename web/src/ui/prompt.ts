@@ -1,16 +1,5 @@
 import type { JevRequest } from "../../shared/jev.ts";
-import {
-  type Situation,
-  type StanceSituation,
-  estimateTokens,
-  packModeRequest,
-  packStanceRequest,
-  type FungalSituation,
-  packFungusRequest,
-  DEFAULT_MENU,
-  LEVERS,
-} from "../colony/index.ts";
-import { LANE_KINDS, type LaneName } from "./lanes.ts";
+import { DEFAULT_MENU, estimateTokens, LANE_KINDS, LANE_LIST, LANES, type LaneName } from "../colony/index.ts";
 
 // What Jev is sent, pure: the Learn drawer shows the exact request for one
 // situation, and what a question costs. Requests pack many situations behind
@@ -18,65 +7,31 @@ import { LANE_KINDS, type LaneName } from "./lanes.ts";
 // is a full request's size over the situations it carries, as useColonyJev's
 // estimates have always been.
 
-export const SAMPLE_SITUATION: Situation = {
-  mode: "explore",
-  tired: false,
-  foodTrail: "faint",
-  homeTrail: "strong",
-  alarm: "none",
-  enemy: "none",
-  stance: "forage",
-};
-export const SAMPLE_STANCE: StanceSituation = {
-  stance: "forage",
-  ants: "some",
-  losses: "none",
-  enemyNearNest: false,
-  intake: "some",
-  larder: "low",
-};
-export const SAMPLE_FUNGAL: FungalSituation = {
-  arousal: "calm",
-  touch: "nestmate",
-  place: "outside",
-  task: "forager",
-  carrying: "nothing",
-  groomed: false,
-};
+export { SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE } from "../colony/index.ts";
 const MENU_ON = new Set(DEFAULT_MENU);
 
-export { PER_REQUEST } from "./lanes.ts";
+export { PER_REQUEST } from "../colony/index.ts";
 
-export type Sample =
-  | { lane: "mode"; situation: Situation }
-  | { lane: "stance"; situation: StanceSituation }
-  | { lane: "fungus"; situation: FungalSituation; menu?: ReadonlySet<string> };
+/** A sample for lane N: the situation type its row takes (the lane registry's). */
+type SampleOf<N extends LaneName> = { lane: N; situation: (typeof LANES)[N]["sample"] };
+export type Sample = SampleOf<"mode"> | SampleOf<"stance"> | (SampleOf<"fungus"> & { menu?: ReadonlySet<string> });
 
-/** The request lane `lane` would send for these situations under these words (doctrine or aim). */
+/**
+ * The request lane `lane` would send for these situations under these words (doctrine or aim): the lane's own key and pack, with the ids its
+ * items carry. The fungus's request asks the levers its key says a host in that situation is asked (the menu's, a queen's or a worker's).
+ */
 export function requestFor(sample: Sample, words: string, n = 1): JevRequest {
-  if (sample.lane === "mode")
-    return packModeRequest(
-      Array.from({ length: n }, (_, k) => ({ id: `${LANE_KINDS.mode.idPrefix}${k}`, situation: sample.situation })),
-      words,
-    );
-  if (sample.lane === "stance")
-    return packStanceRequest(
-      Array.from({ length: n }, (_, k) => ({ id: `${LANE_KINDS.stance.idPrefix}${k}`, situation: sample.situation })),
-      words,
-    );
-  const menu = sample.menu ?? MENU_ON;
-  const asked = LEVERS.filter((v) => menu.has(v.id)).map((v) => v.id);
-  return packFungusRequest(
-    Array.from({ length: n }, (_, k) => ({ id: `${LANE_KINDS.fungus.idPrefix}${k}`, situation: sample.situation, asked })),
+  const lane = LANE_LIST.find((l) => l.name === sample.lane)!;
+  const menu = sample.lane === "fungus" ? (sample.menu ?? MENU_ON) : undefined;
+  const key = lane.key(sample.situation, menu);
+  return lane.pack(
+    Array.from({ length: n }, (_, k) => ({ id: `${lane.kind.idPrefix}${k}`, key, situation: sample.situation })),
     words,
   );
 }
 
-const SAMPLES: Record<LaneName, Sample> = {
-  mode: { lane: "mode", situation: SAMPLE_SITUATION },
-  stance: { lane: "stance", situation: SAMPLE_STANCE },
-  fungus: { lane: "fungus", situation: SAMPLE_FUNGAL },
-};
+/** Each lane's own sample situation, as the Learn panel shows it and a question is costed by it. */
+const SAMPLES = Object.fromEntries(LANE_LIST.map((l) => [l.name, { lane: l.name, situation: l.sample }])) as Record<LaneName, Sample>;
 
 /** Situations a request carries in lane `lane`: PER_REQUEST, but fewer for the fungus (a question per lever each). */
 export function perRequest(lane: LaneName): number {

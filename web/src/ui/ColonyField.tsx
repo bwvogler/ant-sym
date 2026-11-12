@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
   CHUNK,
   type ChunkLayer,
@@ -73,7 +73,7 @@ import { trailSight } from "./fungusSight.ts";
 // from the plane cells under the line (P(s)), the mound's cut stacked on it and the plane's ants standing there, and a
 // faint rule at each bend. Each view keeps its own camera; only the ants, corpses and scent of the view's layer show.
 // The views are linked (U5.2): a click on the line above, or on the strip below, asks the page for the other view there
-// (onLink); a followed ant that goes through a hole is reported (onCross), and the page may carry the camera across. In
+// (onLink); a followed ant that goes through a hole is reported (onCross), and the page carries the camera across. In
 // the queen's pen the top view shows her flight's circle and, under the pointer, where she would settle.
 
 interface Props {
@@ -104,8 +104,6 @@ interface Props {
   api?: RefObject<FieldApi | null>;
   /** one world's queen's pen: her flight's circle on the plane, where she would settle, and a click to found there */
   pen?: FieldPen | null;
-  /** more buttons in the field's corner (the page's: carry across) */
-  tools?: ReactNode;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -206,7 +204,6 @@ export default function ColonyField({
   onCross,
   api,
   pen = null,
-  tools,
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
   const anyColony = colonies[0] as Colony;
@@ -236,8 +233,6 @@ export default function ColonyField({
    * two the switch takes otherwise left the view on the wrong side of it (the e2e guard caught one in twenty runs).
    */
   const carryTo = useRef<number | null>(null);
-  /** where the followed ant was last seen on the shown view, while it is on the other layer (carry off: "gone below") */
-  const lastSeen = useRef<{ f: Followed; lv: number; x: number; y: number } | null>(null);
   const penRef = useRef(pen);
   /** the pointer over the canvas (device px), for the pen's preview; null when it left */
   const hover = useRef<[number, number] | null>(null);
@@ -977,7 +972,7 @@ export default function ColonyField({
         s.aim = null;
       }
       // One world: the followed ant went through a hole, out of the view (its layer changed, not the view): the page is
-      // told, and may carry the camera across (U5.2). Where it was last seen here stays marked ("gone below").
+      // told, and carries the camera across (U5.2).
       if (f && fcol && lv >= 0) {
         const layer = fcol.layer[f.i];
         const was = antLayer.current;
@@ -987,7 +982,6 @@ export default function ColonyField({
           crossCb.current?.(layer, fcol.x[f.i], fcol.y[f.i]);
         }
         antLayer.current = { f, layer };
-        if (fHere) lastSeen.current = { f, lv, x: fcol.x[f.i], y: fcol.y[f.i] };
       } else {
         antLayer.current = null;
         carryTo.current = null;
@@ -1282,8 +1276,9 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
-      // The followed ant: a jade ring (in one world, while it is on the view's layer). Gone through a hole: a dashed ring
-      // where it was last seen here, saying where it went.
+      // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
+      // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
+      // (ja-rkse, PRD §61).
       if (f && fcol && fHere) {
         const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
         ctx.beginPath();
@@ -1291,17 +1286,6 @@ export default function ColonyField({
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2 * d;
         ctx.stroke();
-      } else if (f && fcol && lastSeen.current?.f === f && lastSeen.current.lv === lv) {
-        const [x, y] = toScreen(c, v, lastSeen.current.x, lastSeen.current.y);
-        const r = Math.max(9 * d, c.zoom * 1.6);
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.strokeStyle = theme.accent;
-        ctx.lineWidth = 2 * d;
-        ctx.setLineDash([4 * d, 4 * d]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        label(fcol.layer[f.i] === CURTAIN ? "gone below" : "gone up", x, y - r - 10 * d, Math.round(12 * d));
       }
       const pn = penRef.current;
       if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);
@@ -1628,7 +1612,6 @@ export default function ColonyField({
             {colonyName(k)} nest
           </button>
         ))}
-        {tools}
         {(world ? (view === PLANE ? world.plane : world.curtain) : anyColony.map).chambers && (
           <button
             type="button"

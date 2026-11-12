@@ -19,7 +19,7 @@ import {
   withinBudget,
 } from "../../hyphae.ts";
 
-// The hyphae's assays (docs/hyphal-growth.md "Assays and targets", PRD §61, ja-2bw.1). The measures are tested here on
+// The hyphae's assays (docs/hyphal-growth.md "Assays and targets", PRD §63, ja-2bw.1). The measures are tested here on
 // hand-built mycelia; the behaviour assays, which need the tips' local rule, run as todo until ja-2bw.2 lands it.
 
 test("a cell key round-trips, negative columns too (one world's curtain)", () => {

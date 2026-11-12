@@ -1109,7 +1109,7 @@ export class Fungus {
       if (!h) return;
       if (stepped || !this.#sporeSpots[l]) {
         // The patch fruits where it landed (its base), as without hyphae; spread over every dug cell the hyphae reach,
-        // the same spores thinned the patch below an infecting dose (6 seeds of 10 took hold against 9, PRD §61.1), so
+        // the same spores thinned the patch below an infecting dose (6 seeds of 10 took hold against 9, PRD §63.1), so
         // the hyphae fruit only where a tip chose to (the `fruit` answer, owner 2026-11-12), each spot a patch cell's share
         const L = this.#layers[l] as SporeLayer;
         const { w } = L.map.size;

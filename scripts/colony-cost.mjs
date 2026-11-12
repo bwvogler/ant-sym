@@ -20,21 +20,14 @@
 //
 // Usage: node scripts/colony-cost.mjs [--side | --one] [minutes=10] [ants=600] [seed=1]
 import {
-  localPolicy,
-  localStance,
+  LANES,
   PLANE,
   DOCTRINES,
   estimateTokens,
-  packModeRequest,
   packResponseRequest,
-  packStanceRequest,
-  policyContext,
   RESPONSE_HOOKS,
   responseContext,
   responseKey,
-  situationKey,
-  stanceContext,
-  stanceKey,
   localResponses,
   responses,
   Game,
@@ -66,7 +59,7 @@ let questions = 0;
 const phases = [];
 
 /** One kind of question, cached per doctrine like ui/colonyJev.ts. `acc`, when given, counts its cost apart from the session's. */
-function lane(key, pack, contextOf, local, acc = null) {
+function lane(key, pack, contextOf, local, acc = null, idPrefix = "s", batch = 100) {
   const asked = new Map(); // context → Set of keys
   const queue = new Map(); // key → situation, waiting for the next batch
   return {
@@ -83,11 +76,11 @@ function lane(key, pack, contextOf, local, acc = null) {
       asked.set(context, set);
       const items = [...queue.entries()].filter(([k]) => !set.has(k));
       queue.clear();
-      for (let b = 0; b < items.length; b += 100) {
-        const chunk = items.slice(b, b + 100);
+      for (let b = 0; b < items.length; b += batch) {
+        const chunk = items.slice(b, b + batch);
         const t = estimateTokens(
           pack(
-            chunk.map(([, s], n) => ({ id: `s${n}`, situation: s })),
+            chunk.map(([, s], n) => ({ id: `${idPrefix}${n}`, situation: s })),
             doctrine,
           ),
         );
@@ -107,8 +100,19 @@ function lane(key, pack, contextOf, local, acc = null) {
     seen: (context) => asked.get(context)?.size ?? 0,
   };
 }
-const modes = lane(situationKey, packModeRequest, policyContext, localPolicy);
-const stances = lane(stanceKey, packStanceRequest, stanceContext, localStance);
+/** A lane for an ant's row of the lane registry (colony/lanes.ts): its key, packing, context and local rule, the id prefix its items carry and its request size. */
+const fromRow = (row) =>
+  lane(
+    (s) => row.key(s, undefined),
+    row.pack,
+    (d) => row.contextOf(d),
+    row.local,
+    null,
+    row.kind.idPrefix,
+    row.batch ?? 100,
+  );
+const modes = fromRow(LANES.mode);
+const stances = fromRow(LANES.stance);
 const hooks = Object.fromEntries(
   RESPONSE_HOOKS.map((h) => [
     h,
@@ -151,7 +155,12 @@ for (const d of plan) {
   stances.clear();
   for (const h of RESPONSE_HOOKS) hooks[h].clear();
   colony.reconsider();
-  const before = { tokens, requests, modes: modes.seen(policyContext(doctrine)), stances: stances.seen(stanceContext(doctrine)) };
+  const before = {
+    tokens,
+    requests,
+    modes: modes.seen(LANES.mode.contextOf(doctrine)),
+    stances: stances.seen(LANES.stance.contextOf(doctrine)),
+  };
   const end = t + slice;
   for (; t < end; t += DT) {
     game.tick(DT);
@@ -165,8 +174,8 @@ for (const d of plan) {
   flush();
   phases.push({
     name: d.name,
-    newSituations: modes.seen(policyContext(doctrine)) - before.modes,
-    newStances: stances.seen(stanceContext(doctrine)) - before.stances,
+    newSituations: modes.seen(LANES.mode.contextOf(doctrine)) - before.modes,
+    newStances: stances.seen(LANES.stance.contextOf(doctrine)) - before.stances,
     tokens: tokens - before.tokens,
     requests: requests - before.requests,
   });

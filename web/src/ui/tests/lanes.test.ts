@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AIMS, DOCTRINES, fungusContext, policyContext, stanceContext } from "../../colony/index.ts";
 import { DEFAULT_COLONY_JEV } from "../colonyJev.ts";
-import { LANE_KINDS, laneOfContext, PER_REQUEST, type LaneName } from "../lanes.ts";
+import { LANE_KINDS, laneOfContext, PER_REQUEST, type LaneName } from "../../colony/index.ts";
 import { perRequest, requestFor } from "../prompt.ts";
 
-// One row a lane (ui/lanes.ts): the prefixes must be the ones the brains really put on their contexts, or a stored answer would be
+// One row a lane (colony/lanes.ts): the prefixes must be the ones the brains really put on their contexts, or a stored answer would be
 // checked against no lane.
 
 const NAMES = Object.keys(LANE_KINDS) as LaneName[];

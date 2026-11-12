@@ -23,6 +23,8 @@ import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
+import TutorialCard from "./ui/Tutorial.tsx";
+import { firstGame, skipTutorial, useTutorial } from "./ui/useTutorial.ts";
 import {
   AUTOSAVE,
   AUTOSAVE_MS,
@@ -45,6 +47,7 @@ import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
 import Help from "./ui/Help.tsx";
+import { REPO } from "./ui/guide.ts";
 import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
 import { pushToast } from "./ui/toasts.ts";
@@ -65,9 +68,10 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {
-  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve } = useColony();
+  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal } =
+    useColony();
   const backend = useBackend();
-  const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend);
+  const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend, journal);
   const [details, setDetails] = useState(false);
   const closeDetails = useCallback(() => setDetails(false), []);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
@@ -104,15 +108,19 @@ export default function ColonyApp() {
     },
     [setView],
   );
-  const onLink = useCallback((view: number, x: number, y: number) => showAt(view, x, y, true), [showAt]);
-  /** Carry the camera across with a followed ant that goes through a hole (on by default); off, the camera holds. */
-  const [carry, setCarry] = useState(true);
-  const onCross = useCallback(
-    (view: number, x: number, y: number) => {
-      if (carry) showAt(view, x, y);
+  // The first game's tutorial (ja-7x4, PRD §61).
+  const tut = useTutorial({ game, onFrame, update, setFollowed, showAt });
+  const onStart = useCallback(
+    (seed: number, withTutorial: boolean) => {
+      start(seed, withTutorial);
+      if (withTutorial) tut.run();
+      else skipTutorial();
     },
-    [carry, showAt],
+    [start, tut],
   );
+  const onLink = useCallback((view: number, x: number, y: number) => showAt(view, x, y, true), [showAt]);
+  /** A followed ant that goes through a hole takes the camera with it, to the other view (always: owner, 2026-11-12). */
+  const onCross = useCallback((view: number, x: number, y: number) => showAt(view, x, y), [showAt]);
   const games = useSaves(
     game,
     settings,
@@ -281,6 +289,15 @@ export default function ColonyApp() {
           <p className="hidden text-sm text-fg-3 sm:block">you are the fungus</p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href={REPO}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised"
+            title="The source and the research notes, on GitHub (opens in a new tab)"
+          >
+            GitHub
+          </a>
           <button
             type="button"
             className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised"
@@ -328,6 +345,7 @@ export default function ColonyApp() {
         restart={restart}
         newWorld={newWorld}
         jev={jev}
+        journal={journal}
         saves={games}
         onLoad={(r) => (continueFrom(r), closeDetails())}
       />
@@ -344,7 +362,13 @@ export default function ColonyApp() {
         />
       )}
       {!controls.started && (
-        <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />
+        <StartScreen
+          seed={controls.seed}
+          onStart={onStart}
+          firstGame={firstGame()}
+          latest={newestReadable(games.list)}
+          onContinue={continueFrom}
+        />
       )}
 
       {backend?.needsPass && <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} />}
@@ -424,20 +448,17 @@ export default function ColonyApp() {
               onCross={onCross}
               api={field}
               pen={pen}
-              tools={
-                oneWorld && (
-                  <button
-                    type="button"
-                    className={`pointer-events-auto rounded-md border bg-panel/90 px-2 py-1 text-xs shadow-sm hover:bg-raised ${carry ? "border-accent text-accent" : "border-line text-fg-2"}`}
-                    aria-pressed={carry}
-                    onClick={() => setCarry((on) => !on)}
-                    title="A followed ant that goes through a hole takes the camera with it, to the other view"
-                  >
-                    Carry across
-                  </button>
-                )
-              }
             />
+            {tut.tutorial && tut.card && (
+              <TutorialCard
+                step={tut.tutorial.step}
+                card={tut.card}
+                fast={tut.tutorial.fast}
+                onNext={tut.next}
+                onFaster={tut.faster}
+                onSkip={tut.skip}
+              />
+            )}
           </div>
           {followed ? (
             <AntCard

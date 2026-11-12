@@ -1,6 +1,6 @@
 import { hexDistance, nx, ny } from "./hex.ts";
 
-// The mycelium as hyphae (docs/hyphal-growth.md, PRD §61, ja-2bw), pure. A hypha is a chain of cells, each with its
+// The mycelium as hyphae (docs/hyphal-growth.md, PRD §63, ja-2bw), pure. A hypha is a chain of cells, each with its
 // parent, so the mycelium is a tree; its tips are where it grows. Every TIP_STEP seconds each tip senses its situation
 // (what is ahead, how exposed it is, its supply) and the growth policy answers grow, left, right, branch, rest or fuse.
 // The local rule here is the biology of docs/hyphal-growth.md §1–4: slide along a wall met at a glance, split against
@@ -41,7 +41,7 @@ export const BRANCH_RUN = 7;
 export const BRANCH_START = 2;
 /** Seconds between a tip's steps, by Mycelium level (a thread, a borer, a web): the growth factor (design). */
 export const TIP_STEP: readonly number[] = [2, 1.5, 1];
-/** The local rule fruits where a tunnel is reached only if no spore spot of its own lies within this many cells (design: keeps spots few, so the patch keeps an infecting dose, PRD §61.1). */
+/** The local rule fruits where a tunnel is reached only if no spore spot of its own lies within this many cells (design: keeps spots few, so the patch keeps an infecting dose, PRD §63.1). */
 export const FRUIT_GAP = 12;
 /** A tip's supply is ample while the free mass would pay for this many steps of every tip; less is short. */
 export const AMPLE_STEPS = 2;
@@ -155,7 +155,7 @@ export class Hyphae {
   }
 
   /**
-   * `tip` fruits (PRD §61.1, owner 2026-11-12): it ends as a spore spot on the dug cell it touches: its own cell if dug,
+   * `tip` fruits (PRD §63.1, owner 2026-11-12): it ends as a spore spot on the dug cell it touches: its own cell if dug,
    * else the first dug cell beside it (hex.ts order). Nothing where it touches none (`ground` says what is dug).
    */
   fruit(tip: Tip, ground: Ground): boolean {
@@ -493,7 +493,7 @@ function stepTip(
  * The cells a mycelium puts its spores out on (§6): in the curtain, a hypha out in a dug cell and the dug cells beside a
  * hypha in a wall. On the plane its hyphae stay under the surface and put out none: there only its patch fruits (the
  * caller adds it). Spread over every hypha cell, the spores fell below the dose that infects an ant, and the fungus took
- * hold on 2 seeds of 10 (PRD §61).
+ * hold on 2 seeds of 10 (PRD §63).
  */
 export function sporeCellsOf(h: Hyphae, g: Ground): number[] {
   const out = new Set<number>();

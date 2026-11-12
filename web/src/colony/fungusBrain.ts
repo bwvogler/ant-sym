@@ -1,5 +1,6 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
+import { legendOf } from "./schema.ts";
 import { FUNGAL_SCHEMA, type FungalSituation } from "./fungalPolicy.ts";
 import { decodeLevels, encodeLevels, LEVERS, scale } from "./levers.ts";
 
@@ -21,10 +22,26 @@ export const FUNGUS_BATCH = 50;
  */
 export const FUNGUS_GATHER_MS = 2000;
 
-export const FUNGUS_LEGEND =
-  "You are a fungus inside ants of rival colonies. You never decide what an ant does; you set how hard to pull each of your levers in the ant you are in: perception levers change what it senses, emission levers what it gives off. Each key in `hosts` is one ant, as you sense it from inside. arousal: calm, alarmed (smells alarm) or fighting (strangers close). touch: none, nestmate, or foreigner (an ant that smells of another colony). place: outside, tunnel, chamber, or queen (her mark underfoot). task: nurse (young), inside (middle-aged), forager (old), or queen (you are in the colony's queen: only her own levers are asked). carrying: nothing, food or brood. groomed: nestmates are grooming you off it. Answer one level per lever. Scored -2..+2: 0 as is, below damped, above boosted. Scored 0..2: 0 none, 1 some, 2 strong. Scored 0..1: 0 off, 1 on. Levers: " +
-  LEVERS.map((v) => `${v.id}: ${v.brief}.`).join(" ") +
-  " aim is what you want: follow it.";
+export const FUNGUS_LEGEND = legendOf(FUNGAL_SCHEMA, {
+  intro:
+    "You are a fungus inside ants of rival colonies. You never decide what an ant does; you set how hard to pull each of your levers in the ant you are in: perception levers change what it senses, emission levers what it gives off. Each key in `hosts` is one ant, as you sense it from inside. ",
+  fields: [
+    ["arousal", "arousal: calm, alarmed (smells alarm) or fighting (strangers close). "],
+    ["touch", "touch: none, nestmate, or foreigner (an ant that smells of another colony). "],
+    ["place", "place: outside, tunnel, chamber, or queen (her mark underfoot). "],
+    [
+      "task",
+      "task: nurse (young), inside (middle-aged), forager (old), or queen (you are in the colony's queen: only her own levers are asked). ",
+    ],
+    ["carrying", "carrying: nothing, food or brood. "],
+    ["groomed", "groomed: nestmates are grooming you off it. "],
+  ],
+  // What the fungus answers with: the scales, then each lever by what it does.
+  outro:
+    "Answer one level per lever. Scored -2..+2: 0 as is, below damped, above boosted. Scored 0..2: 0 none, 1 some, 2 strong. Scored 0..1: 0 off, 1 on. Levers: " +
+    LEVERS.map((v) => `${v.id}: ${v.brief}.`).join(" ") +
+    " aim is what you want: follow it.",
+});
 
 /**
  * The cache key for a fungal situation, asked with these levers. Which levers are asked is part of the question, so

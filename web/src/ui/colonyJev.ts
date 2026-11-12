@@ -12,28 +12,22 @@ import {
   type RunSummary,
 } from "../../shared/jev.ts";
 import { apiHeaders, apiUrl } from "./backend.ts";
-import { LANE_KINDS, laneOfContext, type LaneName } from "./lanes.ts";
-export type { LaneName } from "./lanes.ts";
+export type { LaneName } from "../colony/index.ts";
 import {
+  LANE_KINDS,
+  LANES,
+  laneOfContext,
+  type LaneSpec,
+  type LaneName,
   localPolicy,
   localStance,
   type Colony,
-  MODES,
-  STANCES,
   type Mode,
   type Policy,
   type Situation,
   type Stance,
   type StancePolicy,
   type StanceSituation,
-  packModeRequest,
-  packStanceRequest,
-  policyContext,
-  readMode,
-  readStance,
-  situationKey,
-  stanceContext,
-  stanceKey,
   localFungusRule,
   type FungalSituation,
   type FungusPolicy,
@@ -49,6 +43,7 @@ import {
   askedLevers,
   DEFAULT_MENU,
   type Fungus,
+  type Journal,
   PolicyCache,
 } from "../colony/index.ts";
 
@@ -176,34 +171,32 @@ interface Driven {
   stances: Lane<StanceSituation, Stance>;
 }
 
+/** A runtime lane for an ant's row of the lane registry (colony/lanes.ts), asking under `words`: the row's functions, and the words they are asked under. */
+function antLane<Sit, Ans extends string>(
+  row: Pick<LaneSpec<Sit, Ans, undefined>, "name" | "key" | "pack" | "read" | "valid" | "contextOf"> & { local: (s: Sit) => Ans },
+  words: string,
+): Lane<Sit, Ans> {
+  return lane<Sit, Ans>({
+    name: row.name,
+    key: (s) => row.key(s, undefined),
+    pack: row.pack,
+    read: row.read,
+    local: row.local,
+    valid: row.valid,
+    contextOf: (w) => row.contextOf(w),
+    words,
+  });
+}
+
 /** A colony's two lanes, asking under `words` (its doctrine). */
 function colonyLanes(words: string): Omit<Driven, "colony"> {
-  return {
-    modes: lane<Situation, Mode>({
-      name: "mode",
-      key: situationKey,
-      pack: packModeRequest,
-      read: (a, id) => readMode(a, id),
-      local: localPolicy,
-      valid: (_k, a) => (MODES as readonly string[]).includes(a),
-      contextOf: policyContext,
-      words,
-    }),
-    stances: lane<StanceSituation, Stance>({
-      name: "stance",
-      key: stanceKey,
-      pack: packStanceRequest,
-      read: (a, id) => readStance(a, id),
-      local: localStance,
-      valid: (_k, a) => (STANCES as readonly string[]).includes(a),
-      contextOf: stanceContext,
-      words,
-    }),
-  };
+  return { modes: antLane(LANES.mode, words), stances: antLane(LANES.stance, words) };
 }
 
 export class ColonyJev {
   opts: ColonyJevOptions;
+  /** the page's game journal (?log=, ui/journal.ts): each batch asked, answered or failed is a "jev" event */
+  journal: Journal | null = null;
   #driven: Driven[] = [];
   /** each colony's doctrine, by index (kept across games: a new world keeps the colonies' natures) */
   #doctrines: string[] = [];
@@ -730,6 +723,10 @@ export class ColonyJev {
     const counted = LANE_KINDS[l.name].counter;
     this.#inFlight++;
     this.#set({ [counted]: this.#state[counted] + items.length, requests: this.#state.requests + 1 });
+    this.journal?.note("jev", -1, `asked ${items.length} ${l.name} situation${items.length === 1 ? "" : "s"}`, {
+      lane: l.name,
+      keys: items.map((it) => it.key),
+    });
     let reply: JevProxyReply | null = null;
     let error: string | null = null;
     try {
@@ -774,6 +771,7 @@ export class ColonyJev {
     if (!reply || !answers) {
       // Not billed as a reply; everyone keeps the local rule and meets the situation again later.
       this.#cooldown = 5;
+      this.journal?.note("jev", -1, `${l.name} batch failed: ${error ?? `jev answered ${reply?.status ?? "?"}`}`, { lane: l.name });
       this.#set({
         failures: this.#state.failures + 1,
         lastError: error ?? `jev answered ${reply?.status ?? "?"}`,
@@ -783,10 +781,12 @@ export class ColonyJev {
     }
     // A billed answer is kept under the context it was asked under, whichever run or doctrine is current now.
     const cache = this.#cache(l, context);
+    const got: Record<string, string> = {};
     for (const it of items) {
       const a = l.read(answers, it.id, it.situation, it.key);
-      if (a) cache.put(it.key, a);
+      if (a) cache.put(it.key, (got[it.key] = a));
     }
+    this.journal?.note("jev", -1, `${l.name}: ${Object.keys(got).length} of ${items.length} answered`, { lane: l.name, answers: got });
     this.#saveSoon(context, cache as unknown as PolicyCache<string>);
     this.#set({ run: runOf(reply) ?? this.#state.run, lastError: null, ...this.#counts() });
     // The fungus asks its policy every step, so its new answers take hold by themselves; the ants reconsider.

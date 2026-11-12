@@ -131,7 +131,7 @@ Each module gains direct unit tests; that is where development gets quicker.
 1. **The situation schema as data.**
    - A table of fields (name, values, legend line) generates the encoder, the decoder, `SITUATIONS`, the cache key, the state sent to Jev, `COLONY_LEGEND` and the `policyText` rows.
    - A snapshot test proves every string is byte-identical to today's.
-2. **A lane registry (`LaneSpec`)**, declared once in `colony/lanes/`. Each lane lists:
+2. **A lane registry (`LaneSpec`)**, declared once in `colony/lanes.ts` (one file: three rows do not need a directory; slices in `ja-fnd.5.2`). Each lane lists:
    - its name, id prefix, context and version
    - its schema, question, pack/read/valid and local rule
    - its batching and reconsider rule
@@ -142,7 +142,7 @@ Each module gains direct unit tests; that is where development gets quicker.
    - `ui/colonyJev.ts` keeps only the runtime state.
    - `prompt.ts`, the token estimates, Learn, the follow card and `precache` read from it.
    - The response hooks become entries in it.
-3. **A `Species` descriptor** with:
+3. **A `Species` descriptor** (designed in [species.md](species.md): three tiers, tier 1 first, one species per game first; slices in `ja-fnd.5.3`) with:
    - the channels it lays and reads
    - its sensor layout
    - its situation schemas, and its modes with their steering

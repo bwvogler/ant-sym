@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { REPO } from "./guide.ts";
 import { colonyName } from "./names.ts";
 import { LANDING_COLONY } from "./useColony.ts";
 import { describe, type SaveRecord } from "./saves.ts";
@@ -11,9 +12,13 @@ export default function StartScreen({
   onStart,
   latest,
   onContinue,
+  firstGame,
 }: {
   seed: number;
-  onStart: (seed: number) => void;
+  /** Start; `tutorial`: with the tutorial (PRD §61) */
+  onStart: (seed: number, tutorial: boolean) => void;
+  /** no tutorial finished or skipped in this browser: Start runs it */
+  firstGame: boolean;
   latest: SaveRecord | null;
   onContinue: (r: SaveRecord) => void;
 }) {
@@ -61,12 +66,26 @@ export default function StartScreen({
           <button
             type="button"
             className="ml-auto rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover"
-            onClick={() => onStart(s)}
+            onClick={() => onStart(s, firstGame)}
             autoFocus={!latest}
           >
-            Start
+            {firstGame ? "Start the tutorial" : "Start"}
           </button>
         </div>
+        <p className="mt-2 text-right text-xs">
+          <button
+            type="button"
+            className="text-fg-3 underline-offset-2 hover:text-fg-2 hover:underline"
+            onClick={() => onStart(s, !firstGame)}
+          >
+            {firstGame ? "Start without the tutorial" : "Play the tutorial"}
+          </button>
+        </p>
+        <p className="mt-3 text-right text-xs">
+          <a href={REPO} target="_blank" rel="noopener noreferrer" className="text-fg-3 underline-offset-2 hover:text-fg-2 hover:underline">
+            Source on GitHub
+          </a>
+        </p>
         {latest && (
           <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
             <p className="min-w-0 flex-1 text-xs text-fg-3">

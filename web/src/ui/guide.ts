@@ -303,7 +303,7 @@ export const GUIDE: GuideEntry[] = [
     id: "one-world",
     title: "The line and the curtain",
     onScreen:
-      "The game is one world, seen two ways. Above: the surface from above, where ants forage, with the mound and the midden; a dashed line runs through the nests' holes, each named. Below: the ground under that line, unrolled flat, with every nest's shaft and chambers; the strip along its top is the surface under the line, with the ants standing on it, and a faint rule marks each bend of the line (“↱ 35°”). Click the line above to look below there, or the strip below to look above; a followed ant that goes through a hole takes the camera with it (Carry across).",
+      "The game is one world, seen two ways. Above: the surface from above, where ants forage, with the mound and the midden; a dashed line runs through the nests' holes, each named. Below: the ground under that line, unrolled flat, with every nest's shaft and chambers; the strip along its top is the surface under the line, with the ants standing on it, and a faint rule marks each bend of the line (“↱ 35°”). Click the line above to look below there, or the strip below to look above; a followed ant that goes through a hole takes the camera with it.",
     realAnts:
       "A ground-nesting ant's nest is descending shafts with flat chambers off them (Tschinkel's “shish-kebab”), largest near the top: one vertical sheet keeps that shape. A founding queen flies, then walks to a nest site on foot, and most founding queens fail.",
     inGame:
