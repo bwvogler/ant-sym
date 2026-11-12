@@ -101,7 +101,7 @@ Decided here (2026-11-12; the owner can overturn):
 2. **Emigration is a policy mode chosen on sensed disturbance**, not a scripted move.
 
 For the owner:
-3. Whether to build the Pharaoh ant at all once *L. neglectus* exists: it adds emigration and a long trail, not much else.
+3. ~~Whether to build the Pharaoh ant at all~~ **Owner (2026-11-12): later and optional**, built only if emigration is wanted before termites or army ants need it (PRD §64).
 4. The fungus's levers on this host (the lure, §7).
 
 Still to read (the hosts were blocked): Robinson et al. 2005 and 2008, Jackson et al. 2004 and 2006, Jeanson et al. 2003, Tay & Lee 2015; a field colony size.

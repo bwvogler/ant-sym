@@ -60,7 +60,7 @@ The game's generic ant is a trail-laying mound ant with one queen, one nest and 
 - Workers kill up to 90 % of queens at the start of the breeding season, whatever their weight, fecundity or age (Keller et al. 1989, from memory; cited in Inoue et al. 2015, *Ecol Evol* 5:4098, PMC4588641, full text).
 - Against the giant-supercolony view: Heller et al. 2008 argue nests work ecologically as small groups within 3–4 m that share food (**unverified**, abstract); secondary supercolonies do attack the main one (US1 against US2, 42 of 50 trials).
 
-**In the game:** the Argentine ant is the same tolerance at a larger scale plus **border wars between supercolonies**, a ready-made front for the fungus to end. It needs mixed or multi-colony worlds (`ja-fnd.5.4`) to show; the life-cue corpse rule is a cleaner way to make undertaking sensed (vision "corpse odour", below). **Proposed as a later variant on this epic**, not a species of its own yet.
+**In the game:** the Argentine ant is the same tolerance at a larger scale plus **border wars between supercolonies**, a ready-made front for the fungus to end. It needs mixed or multi-colony worlds (`ja-wfw0`, owner 2026-11-12) to show; the life-cue corpse rule is a cleaner way to make undertaking sensed (vision "corpse odour", below). **Proposed as a later variant on this epic**, not a species of its own yet.
 
 ## What was not found
 
@@ -103,9 +103,9 @@ Decided here (2026-11-12; the owner can overturn):
 2. **The Argentine ant is a variant on this epic** for later (it needs multi-colony worlds), not its own epic.
 
 For the owner:
-3. Whether this species comes second (PRD §64 order), ahead of the leafcutter and the Pharaoh ant.
+3. ~~Whether this species comes second~~ **Owner (2026-11-12): second, after the desert ant** (PRD §64).
 4. Whether the grooming and immunisation rules are built for every species (closing more of `ja-k4k.12`) or for this one first.
-5. The fungus's levers on this host.
+5. The fungus's levers on this host (the owner is asked when the species is built).
 
 Still to read: Ugelvig & Cremer 2007 and Tragust et al. 2013 full texts (both *Curr Biol*); Stroeymeyt et al. 2018's numbers; any account of how *L. neglectus* handles adult corpses.
 

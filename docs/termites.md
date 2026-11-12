@@ -2,7 +2,7 @@
 
 *Research note for the species epic `ja-328h` (PRD §64.5; scouting bead `ja-a2m`). Written 2026-11-12, against code at `f8afe17`. **Read in full text** (through PMC; "full text" means the PMC page was fetched and summarised by the research subagent, so a number only in a figure may have been missed; for long papers, the first 100,000 characters): Bardunias et al. 2020, Carey et al. 2021, Facchini et al. 2024, Matsuura et al. 2010, Cristaldo et al. 2015, Sun, Haynes & Zhou 2013, Neoh et al. 2012, Davis et al. 2018, Chouvenc & Su 2012, Traniello, Rosengaus & Savoie 2002, Bulmer, Franco & Fields 2019, Yanagawa et al. 2012. **Abstract or snippet only** (numbers **unverified**): Petersen et al. 2015, Green et al. 2017, Tarver et al. 2010, Haverty 1977, Saran et al. 2007, Hager & Kirchner 2013, Röhrig et al. 1999, Sun et al. 2017, Cornelius & Osbrink 2003, Rosengaus et al. 1998 and 1999, Moran et al. 2022, the colony-size and territory studies. **Not fetched** (from memory): the one-piece / separate-piece nest types, proctodeal trophallaxis, Vargo & Husseneder 2009. `doi.org`, `frontiersin.org`, `elifesciences.org`, MDPI and BioOne did not resolve from the session. None of the repo's notes mentioned termites before this one.*
 
-Termites are not ants. The ladder's third rung ([vision.md](vision.md), "Beyond ants: open") starts here if the owner chooses (`ja-a2m` leans termites next; the owner decides). The question: **what does a termite worker sense and do, and how much of the game's ant-shaped colony survives the change of order?** The answer is the measure of tier 3 ([species.md](species.md)).
+Termites are not ants. The ladder's third rung ([vision.md](vision.md), "Beyond ants: open") starts here: the owner chose termites after the leafcutter and before army ants (2026-11-12, PRD §64). The question: **what does a termite worker sense and do, and how much of the game's ant-shaped colony survives the change of order?** The answer is the measure of tier 3 ([species.md](species.md)).
 
 ## 1. Nests: tunnels to separate food, or a mound built by humidity
 
@@ -106,9 +106,9 @@ Decided here (2026-11-12; the owner can overturn):
 2. **Caste by a development rule, not age bands**, and soldiers' and workers' actions from the policy over a caste field.
 
 For the owner:
-3. **Whether to leave the ants for termites, and when** (`ja-a2m`).
-4. Whether the termite is a rival species in an ant world (mixed worlds, `ja-fnd.5.4`) or a world of its own.
-5. The fungus's levers on this host.
+3. ~~Whether to leave the ants for termites, and when~~ **Owner (2026-11-12): after the leafcutter, before army ants** (PRD §64).
+4. Whether the termite is a rival species in an ant world (mixed-species worlds, `ja-wfw0`) or a world of its own.
+5. The fungus's levers on this host (the owner is asked when the species is built).
 
 Still to read: Hager & Kirchner 2013, Rosengaus et al. 1998 and 1999, Moran et al. 2022 and Sun et al. 2017 in full text (the hosts were blocked); a primary colony size for *C. formosanus*.
 
