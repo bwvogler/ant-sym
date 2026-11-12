@@ -1,5 +1,5 @@
 import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
-import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
+import { type AntArrays, antResets, makeAntArrays, NO_KEY } from "./ants.ts";
 import { type Channel, type ChannelParams, DEFAULT_CHANNELS, type Mark, MARKS, Pheromones } from "./pheromone.ts";
 import { Brood, EGG, foodOf, GYNE, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
@@ -640,6 +640,14 @@ const COLONY_SKIP: ReadonlySet<string> = new Set([
   "perceived",
 ]);
 
+/** The newborn's resets for one colony's parameters (ants.ts antResets), worked out once: a parameter a reset reads (tolerance, routeStep) is read at the first birth, so a colony does not change it afterwards (asIs reads tolerance live). */
+const SPAWN_RESETS = new WeakMap<object, [string, number][]>();
+const spawnResets = (params: ColonyParams): [string, number][] => {
+  let r = SPAWN_RESETS.get(params);
+  if (!r) SPAWN_RESETS.set(params, (r = antResets(params)));
+  return r;
+};
+
 /** The per-ant arrays of ants.ts are the colony's own properties. */
 // The arrays are allocated in the constructor (makeAntArrays), which the compiler cannot see: that is the point of the merge.
 // eslint-disable-next-line typescript/no-unsafe-declaration-merging
@@ -1223,84 +1231,15 @@ export class Colony {
     this.x[i] = this.nest.x + Math.cos(a) * r;
     this.y[i] = this.nest.y + Math.sin(a) * r;
     this.heading[i] = a;
-    this.mode[i] = EXPLORE;
-    this.carrying[i] = 0;
-    this.#clearPellet(i);
-    this.looked[i] = NO_KEY;
-    this.cameFrom[i] = NO_KEY;
-    this.lastDug[i] = NO_KEY;
-    this.digT[i] = 0;
-    this.digAim[i] = NaN;
+    // Every field the table marks for a newborn goes back to its start (ants.ts `reset`): a newborn is clean, unprimed, nothing walked, nothing carried
+    // and born underground, in the nest's own layer.
+    const arrays = this as unknown as Record<string, { [i: number]: number }>;
+    for (const [name, value] of spawnResets(this.params)) arrays[name]![i] = value;
     this.hand[i] = this.#rng() < 0.5 ? -1 : 1;
-    this.hugT[i] = 0;
-    this.since[i] = 0;
-    this.fatigue[i] = 0;
-    this.met[i] = 0;
-    this.energy[i] = 1;
-    this.need[i] = 0;
-    this.feltLast[i] = 0;
-    this.scent[i] = 0;
-    this.scentGain[i] = 1;
-    this.foes[i] = 0;
-    this.threat[i] = 0;
-    this.crowd[i] = 0;
-    this.reporting[i] = 0;
-    this.recruited[i] = 0;
-    this.leaveOk[i] = 0;
-    this.gone[i] = 0;
-    this.pastEnd[i] = 0;
-    this.defending[i] = 0;
-    this.quality[i] = 1;
-    this.tired[i] = 0;
-    this.detour[i] = 0;
-    this.bumps[i] = 0;
-    // A newborn is clean and unprimed.
-    this.load[i] = 0;
-    this.strain[i] = 0;
-    this.resist[i] = 0;
-    this.expr[i] = 0;
-    this.fungal[i] = -1;
-    this.asIs(i);
     // A newborn smells of its colony as the colony smells now.
     this.odour[i] = this.nestOdour;
-    // Born in the chamber: nothing walked, nothing to search for (its drift is drawn when its memory first resets, there).
-    this.odoSurf[i] = 0;
-    this.odoNest[i] = 0;
-    this.driftSurf[i] = 0;
-    this.driftSurfY[i] = 0;
-    this.driftNest[i] = 0;
-    this.search[i] = 0;
-    this.searchA[i] = 0;
-    this.foodX[i] = NaN;
-    this.foodY[i] = NaN;
-    this.#routeClear(i);
-    this.under[i] = 1;
     this.layer[i] = this.home; // born in the nest, on its layer
-    this.goalKind[i] = 0; // born underground: home is the chamber
-    this.groundMin[i] = NaN;
-    this.chamberCell[i] = NO_KEY;
-    this.lastRole[i] = 0; // born in the royal chamber: it lays royal once it has been there a tick
-    this.sinceRole[i] = 0;
-    this.restT[i] = 0;
-    this.age[i] = 0;
     this.lifespan[i] = this.queen || this.params.mortalWithoutQueen ? this.params.lifespan * (0.7 + 0.6 * this.#rng()) : Infinity;
-    this.broodHeld[i] = 0;
-    this.broodTo[i] = -1;
-    this.holdT[i] = 0;
-    this.portTo[i] = -1;
-    this.porter[i] = 0;
-    this.corpse[i] = 0;
-    this.loaded[i] = 0;
-    this.putAt[i] = NO_KEY;
-    this.wall[i] = 0;
-    this.mx[i] = NaN;
-    this.untouched[i] = 0;
-    this.bestD[i] = Infinity;
-    this.stallT[i] = 0;
-    this.gx[i] = NO_CELL;
-    this.byCell[i] = 0;
-    this.asked[i] = -1;
-    this.question[i] = -1;
     this.gen[i] = (this.gen[i] + 1) >>> 0;
     this.alive[i] = 1;
   }
@@ -2673,7 +2612,7 @@ export class Colony {
     return on;
   }
 
-  /** Ant i has no places stored: a fresh trip, or a newborn (ja-lp4.16). Its slot's places are left; routeN says none are in use. */
+  /** Ant i has no places stored: a fresh trip (ja-lp4.16). Its slot's places are left; routeN says none are in use. A newborn gets the same through the table (ants.ts `reset`): a field added here is marked there too. */
   #routeClear(i: number): void {
     this.routeN[i] = 0;
     this.routeGap[i] = this.params.routeStep;
@@ -4363,7 +4302,7 @@ export class Colony {
     this.gx[i] = NO_CELL;
   }
 
-  /** Ant i carries no pellet (or corpse) any more: the pellet, what it was, and where it was taking it, all at once. */
+  /** Ant i carries no pellet (or corpse) any more: the pellet, what it was, and where it was taking it, all at once. A newborn gets the same through the table (ants.ts `reset`): a field added here is marked there too. */
   #clearPellet(i: number): void {
     this.pellet[i] = 0;
     this.soil[i] = SOIL_DUG;

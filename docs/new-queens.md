@@ -99,7 +99,7 @@
   - The known vertical symbiont of ants is a bacterium (*Wolbachia*).
   - In *Crematogaster scutellaris*, what passed from parents to offspring after *Metarhizium* exposure was enhanced **resistance**, not the fungus.
   - Founding *Formica selysi* queens were *attracted* to soil contaminated with *Beauveria* and *Metarhizium*.
-  - Paired *L. niger* foundresses showed no social immunity against *Metarhizium* (Pull & Cremer 2017).
+  - Paired *L. niger* foundresses showed no social immunity against *Metarhizium* (Brütsch, Avril & Chapuisat 2017).
 
 **The lever on queen birth: two routes, both design.** No paper shows a fungus doing either.
 
@@ -164,7 +164,7 @@ PRD §50 makes queen birth the game's middle: chapters 5 and 6 ("a new queen", "
 - **Founding:**
   - Colony Foundation. [AntWiki](https://antwiki.org/wiki/Colony_Foundation) *(secondary)*
   - Kurihara et al. (2022). Thoracic crop formation is spatiotemporally coordinated with flight muscle histolysis during claustral colony foundation of a *Lasius japonicus* queen. *Arthropod Struct. Dev.* [biorxiv.org](https://www.biorxiv.org/content/10.1101/2022.03.03.482739.full.pdf)
-- **Pathogens and founding queens:** Pull C. D. & Cremer S. (2017). No evidence for social immunity in co-founding queen associations. *BMC Evol. Biol.* 17: 219. [PMC5701228](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5701228/)
+- **Pathogens and founding queens:** Brütsch T., Avril A. & Chapuisat M. (2017). No evidence for social immunity in co-founding queen associations. *Sci. Rep.* 7: 16262. [PMC5701228](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5701228/)
 - **Juvenile hormone and task** (§4's `task` sense in fungus-policy §11):
   - Dolezal A. G. et al. (2012). Worker division of labor and endocrine physiology are associated in the harvester ant *Pogonomyrmex californicus*. *J. Exp. Biol.* 215: 454–460. [cob.silverchair.com](https://cob.silverchair.com/jeb/article/215/3/454/11168/Worker-division-of-labor-and-endocrine-physiology)
   - Effect of juvenile hormone on worker behavioral transition in *Solenopsis invicta* (2023). *Insects* 14: 934. [PMC10743645](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10743645/)

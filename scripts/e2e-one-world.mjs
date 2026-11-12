@@ -3,6 +3,8 @@
 // like the bench: `npm run e2e` (not part of `npm test`, which has no browser). It uses the `playwright` already on the
 // machine (no install, no dependency) and starts the dev server on a free port with no Jev key, so it spends nothing.
 //
+// Usage: npm run e2e   (E2E_SHOTS=<dir> saves screenshots; no other options)
+//
 //  1. a one-world game, seed fixed (Start: the page plays one world only): it opens above;
 //  2. above, below, above mid-game: each view keeps its own camera;
 //  3. a click on the line above shows below at that column; a click on the strip below shows above at P(s);
@@ -15,7 +17,8 @@
 //  6. the Fungus panel's tooltips (ui/Tip.tsx): a hover opens one, Escape closes it, Tab onto a next-level button opens that button's,
 //     and on a touch page a tap opens one, a second tap or a tap elsewhere closes it.
 //  7. the first game's tutorial (ja-7x4, PRD §61), in a fresh browser: Start runs it, paused at 1× on the landing; the first
-//     host pauses the game and is followed; the watch runs at 4×, Faster at 8×; Skip ends it at 4×, playing; a reload offers plain Start.
+//     host pauses the game and is followed, and its card hides to a strip and comes back; the watch runs at 4×, Faster at 8×;
+//     Skip ends it at 4×, playing; a reload offers plain Start.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -26,6 +29,8 @@ import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -650,8 +655,22 @@ try {
   check((await tu.getByRole("region", { name: "followed ant" }).count()) === 1, "and is followed");
   check((await tu.evaluate(() => document.documentElement.dataset.tutorial)) === "load", "its card is highlighted");
   const hostNo = Number(((await tu.getByRole("region", { name: "followed ant" }).textContent()) ?? "").match(/Ant #(\d+)/)?.[1] ?? -1);
-  await tcard.getByRole("button", { name: "Follow it", exact: true }).click();
+  // Hide: the card shrinks to a strip so the map shows (on a phone the card covers most of it); the step's button still
+  // works from the strip, and the next step opens a full card again.
+  const cardHeight = async () => (await tcard.boundingBox())?.height ?? 0;
+  const full = await cardHeight();
+  await tcard.getByRole("button", { name: "Hide the tutorial card" }).click();
+  const strip = await cardHeight();
+  check(
+    (await tcard.getByText("You never steer it").count()) === 0 && strip < full / 2,
+    `Hide shrinks the card to a strip (${full} → ${strip} px)`,
+  );
+  await tcard.getByRole("button", { name: "Show the tutorial card" }).click();
+  check((await tcard.getByText("You never steer it").count()) === 1, "Show brings the card back");
+  await tcard.getByRole("button", { name: "Hide the tutorial card" }).click();
+  await tcard.getByRole("button", { name: "Follow it", exact: true }).click(); // the step's button, from the strip
   await until(async () => /groom it/.test((await tcard.textContent()) ?? ""), "the watch card");
+  check((await tcard.getByText("Ants lick each other clean").count()) === 1, "the next step shows its card in full again");
   await sleep(300);
   check(
     (await tu.getByRole("region", { name: "followed ant" }).count()) === 1,

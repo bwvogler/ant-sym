@@ -2,7 +2,8 @@ import { hexDistance, nx, ny } from "./hex.ts";
 
 // The mycelium as hyphae (docs/hyphal-growth.md, PRD §63, ja-2bw), pure. A hypha is a chain of cells, each with its
 // parent, so the mycelium is a tree; its tips are where it grows. Every TIP_STEP seconds each tip senses its situation
-// (what is ahead, how exposed it is, its supply) and the growth policy answers grow, left, right, branch, rest or fuse.
+// (what is ahead, how exposed it is, its supply) and the growth policy answers grow, left, right, turn (the tip picks the
+// side), branch, rest, fuse or fruit: the growth lane's Jev answer under the aim (growthBrain.ts), or the local rule.
 // The local rule here is the biology of docs/hyphal-growth.md §1–4: slide along a wall met at a glance, split against
 // one met head on, turn from its own hyphae, branch once its run reaches the growth unit, drift back to its first
 // heading, rest on short supply. The hyphae embody the mycelium's mass (evolution.ts): they are at most mass ÷
@@ -60,8 +61,8 @@ export interface GrowthSituation {
   exposed: Exposure;
   supply: Supply;
 }
-/** What a tip does at its step. */
-export const GROWTH_ANSWERS = ["grow", "left", "right", "branch", "rest", "fuse", "fruit"] as const;
+/** What a tip does: `turn` is a turn to whichever side the tip finds free (the growth lane's, ja-2bw.5: only the tip knows its sides). */
+export const GROWTH_ANSWERS = ["grow", "left", "right", "turn", "branch", "rest", "fuse", "fruit"] as const;
 export type GrowthAnswer = (typeof GROWTH_ANSWERS)[number];
 
 /**
@@ -368,40 +369,53 @@ export function situationOf(h: Hyphae, g: Ground, tip: Tip, level: number, free:
  */
 export function localGrowth(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, level: number): GrowthAnswer {
   if (s.supply === "short") return "rest";
-  const free = (k: number) => {
+  if (s.ahead === "own") return sideFor(h, g, tip, s, level, false);
+  if (s.ahead === "rock") {
+    // Hit and split (Held et al. 2019): a point ahead, split round it; a flat wall, split along it both ways; a glance, slide.
+    const free = freeAt(h, g, tip, level);
+    if ((free(-1) && free(1)) || (free(-2) && free(2))) return "branch";
+    return sideFor(h, g, tip, s, level);
+  }
+  // Where it reaches a tunnel, it fruits, unless a spot of its own is near (conidiation where hyphae meet the air, §6).
+  if ((s.ahead === "open" || s.exposed === "open") && !h.fruitNear(tip.x, tip.y, FRUIT_GAP)) return "fruit";
+  // Thigmotropism: from the soil, keep to it along the tunnel's wall.
+  if (s.ahead === "open" && s.exposed !== "open") return sideFor(h, g, tip, s, level);
+  if (tip.run >= BRANCH_RUN) return "branch";
+  if (tip.heading !== tip.first) {
+    const k = turn(tip.first - tip.heading, 0) <= 3 ? 1 : -1;
+    if (freeAt(h, g, tip, level)(k)) return k > 0 ? "right" : "left";
+  }
+  return "grow";
+}
+
+/** Whether the cell `k` turns from `tip`'s heading is one it may grow into. */
+function freeAt(h: Hyphae, g: Ground, tip: Tip, level: number): (k: number) => boolean {
+  return (k) => {
     const [x, y] = ahead(tip.x, tip.y, turn(tip.heading, k));
     return enterable(h, g, x, y, level);
   };
+}
+
+/**
+ * Which way `tip` turns (`turn`, or the local rule's slide): from the soil toward a tunnel, the side that keeps it in
+ * the soil along the wall; else a free side one turn off, or (`wide`) two, along a flat wall; both free, by its own count
+ * of steps. The local rule turns from its own hypha only one turn off (`wide` false).
+ */
+export function sideFor(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, level: number, wide = true): GrowthAnswer {
+  const free = freeAt(h, g, tip, level);
   const sideWith = (want: (k: number) => boolean): GrowthAnswer => {
     const l = want(-1);
     const r = want(1);
     if (l && r) return h.steps % 2 ? "left" : "right";
     return l ? "left" : r ? "right" : "rest";
   };
-  if (s.ahead === "own") return sideWith(free);
-  if (s.ahead === "rock") {
-    // Hit and split (Held et al. 2019): a point ahead, split round it; a flat wall, split along it both ways; a glance, slide.
-    if ((free(-1) && free(1)) || (free(-2) && free(2))) return "branch";
-    const near = sideWith(free);
-    if (near !== "rest") return near;
-    return sideWith((k) => free(2 * k));
-  }
-  // Where it reaches a tunnel, it fruits, unless a spot of its own is near (conidiation where hyphae meet the air, §6).
-  if ((s.ahead === "open" || s.exposed === "open") && !h.fruitNear(tip.x, tip.y, FRUIT_GAP)) return "fruit";
-  if (s.ahead === "open" && s.exposed !== "open") {
-    // Thigmotropism: keep to the soil along the tunnel's wall.
-    const along = (k: number) => {
+  if (s.ahead === "open" && s.exposed !== "open")
+    return sideWith((k) => {
       const [x, y] = ahead(tip.x, tip.y, turn(tip.heading, k));
       return free(k) && g.kind(x, y) === "soil";
-    };
-    return sideWith(along);
-  }
-  if (tip.run >= BRANCH_RUN) return "branch";
-  if (tip.heading !== tip.first) {
-    const k = turn(tip.first - tip.heading, 0) <= 3 ? 1 : -1;
-    if (free(k)) return k > 0 ? "right" : "left";
-  }
-  return "grow";
+    });
+  const near = sideWith(free);
+  return near !== "rest" || !wide ? near : sideWith((k) => free(2 * k));
 }
 
 /** How a step went: cells grown, for the caller's mass. */
@@ -484,6 +498,12 @@ function stepTip(
     case "grow":
       grow(tip, d);
       break;
+    case "turn": {
+      const side = sideFor(h, g, tip, s, level);
+      if (side === "left") veer(turn(d, -1));
+      else if (side === "right") veer(turn(d, 1));
+      break;
+    }
     case "left":
       veer(turn(d, -1));
       break;
@@ -491,6 +511,9 @@ function stepTip(
       veer(turn(d, 1));
       break;
     case "branch": {
+      // Short of mass, a branch rests: a tip costs nothing to put out, so a policy that branched while short would double the
+      // tips every round without growing a cell (review of #115, S1: 5.2 million tips 40 s into a game). The local rule never does.
+      if (s.supply === "short") break;
       // A branch one turn aside (60°, §2); blocked ahead, the tip splits: the branch one way, the tip the other.
       const side = h.steps % 2 ? 1 : -1;
       const open = (k: number) => {

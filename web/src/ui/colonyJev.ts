@@ -43,6 +43,8 @@ import {
   askedLevers,
   DEFAULT_MENU,
   type Fungus,
+  type GrowthAnswer,
+  type GrowthSituation,
   type Journal,
   PolicyCache,
 } from "../colony/index.ts";
@@ -104,6 +106,9 @@ export interface ColonyJevState {
   /** this run: fungal situations sent to Jev; answers cached for the current aim (under every menu asked) */
   fungusAsked: number;
   fungusCached: number;
+  /** this run: hyphal tips' situations sent to Jev; answers cached for the current aim (the growth lane, ja-2bw.5) */
+  growthAsked: number;
+  growthCached: number;
   failures: number;
   lastError: string | null;
 }
@@ -146,6 +151,9 @@ interface Lane<S, A extends string> {
   fallback: string[];
   queue: Map<string, S>;
 }
+
+/** The growth lane's `local` while a situation has no answer: not an answer (validGrowth rejects it), so the tip plays its own rule. */
+const NO_ANSWER = "";
 
 /** How many earlier contexts a lane falls back on. */
 export const FALLBACKS = 3;
@@ -223,6 +231,20 @@ export class ColonyJev {
     batch: FUNGUS_BATCH,
     gather: true,
   });
+  // The growth lane (ja-2bw.5), under the fungus's aim. While a situation has no answer its `local` is NO_ANSWER: the tip then plays its
+  // own local rule (hyphae.ts localGrowth), which reads its body as well as its situation.
+  #growth = lane<GrowthSituation, string>({
+    name: "growth",
+    key: (s) => LANES.growth.key(s, undefined),
+    pack: (items, aim) => LANES.growth.pack(items, aim),
+    read: (a, id, s, key) => LANES.growth.read(a, id, s, key),
+    valid: LANES.growth.valid,
+    local: () => NO_ANSWER,
+    contextOf: (aim) => LANES.growth.contextOf(aim),
+    words: "",
+    batch: LANES.growth.batch ?? undefined,
+    gather: true,
+  });
   /** The levers the fungus lane asks for a host in situation s: the menu's, a queen's or a worker's, in table order. */
   #asked(s?: FungalSituation): string[] {
     return askedLevers(this.#menu, s?.task === "queen");
@@ -263,6 +285,8 @@ export class ColonyJev {
     doctrineCached: [],
     fungusAsked: 0,
     fungusCached: 0,
+    growthAsked: 0,
+    growthCached: 0,
     failures: 0,
     lastError: null,
   };
@@ -330,13 +354,14 @@ export class ColonyJev {
   }
 
   /** The cache sizes the panel shows. */
-  #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "doctrineCached" | "fungusCached"> {
+  #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "doctrineCached" | "fungusCached" | "growthCached"> {
     const first = this.#driven[0];
     return {
       cached: first ? this.#cache(first.modes).size : 0,
       stancesCached: first ? this.#cache(first.stances).size : 0,
       doctrineCached: this.#driven.map((d) => this.#cache(d.modes).size),
       fungusCached: this.#cache(this.#fungal).size,
+      growthCached: this.#cache(this.#growth).size,
     };
   }
 
@@ -409,6 +434,15 @@ export class ColonyJev {
   /** The fungus's policy, the same way, on its own lane: what the fungus does to a host in this fungal situation. */
   readonly fungusPolicy: FungusPolicy = (s) => this.#lookup(this.#fungal, s);
 
+  /**
+   * The fungus's growth policy (ja-2bw.5): what a hyphal tip in situation `s` does, Jev's cached answer under the aim, or
+   * null while there is none (the tip plays its own local rule; the miss is queued as any other lane's).
+   */
+  readonly growthPolicy = (s: GrowthSituation): GrowthAnswer | null => {
+    const a = this.#lookup(this.#growth, s);
+    return a === NO_ANSWER ? null : (a as GrowthAnswer);
+  };
+
   /** Who decides what the fungus does in situation `s` right now (the follow card). */
   explainFungus(s: FungalSituation): { answer: string; by: DecidedBy } {
     return this.#explain(this.#fungal, s);
@@ -436,6 +470,7 @@ export class ColonyJev {
   attachFungus(fungus: Fungus): void {
     this.#fungus = fungus;
     fungus.policy = this.fungusPolicy;
+    fungus.growthPolicy = this.growthPolicy;
     this.setMenu(fungus.menu);
     this.#recontext(this.#fungal, this.#fungal.words); // the view is part of the fungus's context (fungusContext)
   }
@@ -443,6 +478,7 @@ export class ColonyJev {
   /** The player's aim for the fungus: its own caches (free if used before). */
   setAim(text: string): void {
     this.#recontext(this.#fungal, text);
+    this.#recontext(this.#growth, text); // the growth lane asks under the same aim
   }
 
   /**
@@ -501,6 +537,7 @@ export class ColonyJev {
   #laneFor(context: string): Lane<unknown, string> | null {
     const kind = laneOfContext(context);
     if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
+    if (kind === "growth") return this.#growth as Lane<unknown, string>;
     const d = this.#driven[0] ?? colonyLanes("");
     return kind === "mode" ? (d.modes as Lane<unknown, string>) : kind === "stance" ? (d.stances as Lane<unknown, string>) : null;
   }
@@ -590,6 +627,7 @@ export class ColonyJev {
       asked: 0,
       stancesAsked: 0,
       fungusAsked: 0,
+      growthAsked: 0,
       requests: 0,
       hits: 0,
       misses: 0,
@@ -655,7 +693,7 @@ export class ColonyJev {
   #lanes(): Lane<unknown, string>[] {
     const out: Lane<unknown, string>[] = [];
     for (const d of this.#driven) out.push(d.stances as Lane<unknown, string>, d.modes as Lane<unknown, string>);
-    out.push(this.#fungal as Lane<unknown, string>);
+    out.push(this.#fungal as Lane<unknown, string>, this.#growth as Lane<unknown, string>);
     return out;
   }
 
