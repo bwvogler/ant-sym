@@ -109,8 +109,8 @@ Decided here (2026-11-12; the owner can overturn):
 3. **Plant-quality learning is its own late bead**: it needs food kinds on the map.
 
 For the owner:
-4. Whether the leafcutter comes before or after *Lasius neglectus* (PRD §64 order).
-5. The fungus's levers on this host (as for the desert ant, `ja-rf5.7`).
+4. ~~Whether the leafcutter comes before or after *Lasius neglectus*~~ **Owner (2026-11-12): third, after *L. neglectus*** (PRD §64).
+5. The fungus's levers on this host (the owner is asked when the species is built, as for the desert ant, `ja-rf5.7`).
 6. Whether stridulation is built (its function is contested).
 
 Still to read: Wilson 1980 (the size–task curves), Hughes et al. 2002 full text (mortality), Hart & Ratnieks 2001 and 2002 full text, Camargo et al. 2007, Moser et al. 1968.
