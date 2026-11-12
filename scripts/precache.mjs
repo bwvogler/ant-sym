@@ -6,7 +6,10 @@
 // the browser's own packers (packModeRequest, packStanceRequest) and keyed with its own keys (situationKey, stanceKey), under its own
 // contexts (policyContext, stanceContext), per preset doctrine: each reached through the lane registry (colony/lanes.ts), which holds them. And `fungus`
 // (ja-lo8.4): the fungal situations a recorded side-view game meets (Garden painted on both royal chambers, Lockpick at
-// both holes, 300 s; not all 648), asked with every non-lethal lever, per preset aim (fungusBrain.AIMS), side view.
+// both holes, 300 s; not all 648), asked with every non-lethal lever, per preset aim (fungusBrain.AIMS), side view. And
+// `growth` (ja-2bw.5): every hyphal tip's situation (24), per preset aim, under the same aims. It is not in the default
+// `--lanes` (a plain re-run asks nothing new for it); after a GROWTH_BRAIN_VERSION bump, re-ship it with `--lanes growth`
+// (≈ $0.0009 for the three aims): colony-live.mjs doesn't run this lane, so `--import` can't ship it for free.
 //
 // Writes web/public/precache/<lane>-<doctrine>.json ([key, answer] pairs, cacheStore's format) and index.json (each
 // bundle's lane, doctrine, context and size, and the brain versions). tests/precache.test.ts fails when a bundle's
@@ -42,6 +45,7 @@ import {
   DOCTRINES,
   estimateTokens,
   STANCE_BRAIN_VERSION,
+  GROWTH_BRAIN_VERSION,
 } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
@@ -127,7 +131,7 @@ const doctrines = opts.doctrines.split(",").map((id) => {
 mkdirSync(OUT, { recursive: true });
 const indexUrl = new URL("index.json", OUT);
 const index = existsSync(indexUrl) ? JSON.parse(readFileSync(indexUrl, "utf8")) : { bundles: [] };
-index.versions = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, fungus: FUNGUS_BRAIN_VERSION };
+index.versions = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, fungus: FUNGUS_BRAIN_VERSION, growth: GROWTH_BRAIN_VERSION };
 
 // The jobs: one request per 100 situations, per lane and doctrine; what each bundle holds already is not asked again.
 const jobs = [];

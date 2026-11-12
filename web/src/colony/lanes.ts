@@ -26,6 +26,18 @@ import {
   validLevels,
   worthAsking,
 } from "./fungusBrain.ts";
+import {
+  GROWTH_BATCH,
+  GROWTH_SCHEMA,
+  growthContext,
+  growthKey,
+  localGrowthChoice,
+  packGrowthRequest,
+  readGrowth,
+  validGrowth,
+  type GrowthChoice,
+} from "./growthBrain.ts";
+import type { GrowthSituation } from "./hyphae.ts";
 import { type LaneWords, STANCE_SCHEMA, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
@@ -34,10 +46,10 @@ import { type LaneWords, STANCE_SCHEMA, type Mode, type Situation, type Stance, 
 // (docs/refactor.md S4). A new lane adds its row here and its lane object in ui/colonyJev.ts. Never imported from
 // colony.ts or fungus.ts: it sits above the brains (a cycle otherwise).
 
-export type LaneName = "mode" | "stance" | "fungus";
+export type LaneName = "mode" | "stance" | "fungus" | "growth";
 
 /** The counters of ColonyJevState that count situations sent, by lane. */
-export type SentCounter = "asked" | "stancesAsked" | "fungusAsked";
+export type SentCounter = "asked" | "stancesAsked" | "fungusAsked" | "growthAsked";
 
 export interface LaneKind {
   /** the first character of the ids its situations carry in a request (s0, s1, …) */
@@ -75,6 +87,15 @@ export const LANE_KINDS: Record<LaneName, LaneKind> = {
     reconsiders: false,
     perRequest: FUNGUS_BATCH,
   },
+  // The fungus's hyphal tips (ja-2bw.5): a tip asks its policy at every step, so answers take hold by themselves.
+  growth: {
+    idPrefix: "g",
+    counter: "growthAsked",
+    contextPrefix: "growth-",
+    countsHits: false,
+    reconsiders: false,
+    perRequest: GROWTH_BATCH,
+  },
 };
 
 /** The lane whose cache contexts start this way, if any. */
@@ -92,7 +113,7 @@ export function laneOfContext(context: string): LaneName | null {
 // (laneRegistry.char.test.ts and laneWiring.char.test.ts pin that, laneBinding.test.ts that the rows agree).
 
 /** The counters of ColonyJevState that count answers kept, by lane. */
-export type CachedCounter = "cached" | "stancesCached" | "fungusCached";
+export type CachedCounter = "cached" | "stancesCached" | "fungusCached" | "growthCached";
 
 /** A lane spec that is known to have the optional members `K` (the ants' lanes have a local rule and enumerate their situations; the fungus has `asks`). */
 type Has<L, K extends keyof L> = L & { [P in K]-?: NonNullable<L[P]> };
@@ -224,8 +245,31 @@ const fungusLane: Has<LaneSpec<FungalSituation, string, ReadonlySet<string>, Fun
   asks: (s, menu) => worthAsking(askedLevers(menu, s.task === "queen")),
 };
 
+export const SAMPLE_GROWTH: GrowthSituation = { ahead: "soil", exposed: "wall", supply: "ample" };
+
+// The growth lane (ja-2bw.5): asked under the fungus's aim, the same words as the fungus lane. Its `local` is the rule as a function of the
+// situation alone (what a live check compares Jev with); a tip in the game plays the fuller rule while a situation has no answer.
+const growthLane: Has<LaneSpec<GrowthSituation, GrowthChoice, undefined>, "local" | "all"> = {
+  name: "growth",
+  kind: LANE_KINDS.growth,
+  counters: { asked: "growthAsked", cached: "growthCached" },
+  variants: [""],
+  sample: SAMPLE_GROWTH,
+  wordsField: "aim",
+  presets: AIMS,
+  gather: true,
+  batch: GROWTH_BATCH,
+  key: (s) => growthKey(s),
+  pack: (items, words) => packGrowthRequest(items, words),
+  read: (answers, id) => readGrowth(answers, id),
+  valid: validGrowth,
+  contextOf: (words) => growthContext(words),
+  local: localGrowthChoice,
+  all: () => Array.from({ length: GROWTH_SCHEMA.size }, (_, c) => GROWTH_SCHEMA.decode(c)),
+};
+
 /** Every lane, by name, typed. */
-export const LANES = { mode: modeLane, stance: stanceLane, fungus: fungusLane } as const;
+export const LANES = { mode: modeLane, stance: stanceLane, fungus: fungusLane, growth: growthLane } as const;
 
 /**
  * A lane with its situation type forgotten, for code that loops over the lanes (the scripts' tables, the Learn panel): the one place the
@@ -251,4 +295,4 @@ export interface ErasedLane {
   all?(): unknown[];
 }
 /** Every lane, in the order the page asks them. */
-export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.stance, LANES.fungus];
+export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.stance, LANES.fungus, LANES.growth];

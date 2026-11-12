@@ -4864,6 +4864,28 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **P1 as worded ("no seed worse than the baseline") fails narrowly**: seed 14 is 9 s slower (243 → 252 s), seeds 12 and 17 2 s; on seeds 1–10, seeds 2 and 3 were 4 s and 1 s slower. The worst seed and the median both improve; the gate's wording, not the play, is what the owner is asked to settle (`ja-2bw.6`).
 - **Decided (owner, 2026-11-12): ship hyphae on, and P1 reads: no seed more than 10 % slower to a quarter, and neither the worst seed nor the median worse.** On all twenty seeds the largest slowdown is seed 14's 3.7 %; the worst seed (484 s against "never") and the median both improve.
 
+### 63.5 The growth lane (ja-2bw.5, 2026-11-12)
+
+**Built.** `colony/growthBrain.ts`: the growth situation as a schema (`ahead` × `exposed` × `supply` = 24), its legend, one choice question a tip (grow, turn, branch, rest, fuse, fruit; `turn` leaves the side to the tip, which alone knows which side is free), asked under the fungus's aim (`growth-v1-…`, 24 situations to a request). The registry has its row (`colony/lanes.ts`: id `g`, `growthAsked`/`growthCached`); the client (`ui/colonyJev.ts`) hands a tip Jev's cached answer, or null, and then the tip plays its own fuller local rule (its run, its first heading, spots near it). Its `local` row (`localGrowthChoice`) is the rule as a function of the situation alone, for scripts and live checks.
+
+**Cost.** The owner approved asking every situation for the three preset aims (`node scripts/precache.mjs --lanes growth`): 3 requests, **$0.0009** (about 21k input tokens, about 300 a situation; estimated 27k). Shipped as `public/precache/growth-<aim>.json`. A new aim of the player's own asks 24 situations once, about $0.0003; cached games spend nothing. No other lane changes.
+
+**What Jev chose.** It agrees with the local rule on 6 (unite), 9 (spread) and 13 (peace) of the 24 situations. Under unite and spread it fruits wherever it is on a wall or out in a dug cell (6 and 8 situations), turns at rock rather than splitting, and fuses into its own hypha (unite: every case); under peace it rests in 12 of 24.
+
+**Measured** (`progression.mjs --map one --evolve --hyphae [--growth] --aim <aim>`, seeds 1–10, 600 s; a quarter of the landing colony):
+
+| aim | local rule: median / worst | growth answers: median / worst |
+|---|---|---|
+| unite | ≈ 301 s / 441 s | ≈ 284 s / 353 s |
+| spread | ≈ 249 s / 368 s | ≈ 248 s / 274 s |
+| peace | ≈ 281 s / 392 s | ≈ 294 s / 552 s |
+
+- Under unite and spread the answers help the slow seeds and change nothing at the fast end (seed 4: 140 → 140 s, 117 → 118 s): no cliff, and the spots Jev fruits without the local rule's spacing do not thin the patch below the dose. No spacing guard is added to the body.
+- Under peace the fungus spreads more slowly (seed 6 315 → 552 s), though every seed still takes hold: the aim asks to calm the colonies first, and Jev rests. **Owner decision:** keep it as the aim's choice, or word the peace aim so the mycelium keeps growing. The fungus lane and the growth lane share the aim's words, so rewording peace re-asks both: its 24 growth situations (≈ $0.0003) and the fungus lane's 130 shipped peace answers (≈ $0.004, a third of §50.19's $0.0126 for three aims), unless the growth lane is given words of its own.
+- Against P1 (no hyphae, unite): every seed within 1.8 % of the baseline or faster; the worst seed 353 s against "never".
+
+**Review of #115 (agent, 2026-11-12).** S1: a `branch` answer while supply was short still put out a tip (a tip costs no mass), so a policy that branched while short doubled the tips every round: 5.2 million 40 s into a one-world game under such an aim. The shipped presets never answer it and the local rule never does; a branch the body can't afford now rests (`hyphae.ts`), and the local rule's growth is unchanged (same hash). S2: tests now hold the page's wiring, the left turn and the two-turn side step. Nits fixed; the Details screen shows the growth answers cached.
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.

@@ -22,6 +22,27 @@
       "answers": 130
     },
     {
+      "lane": "growth",
+      "aim": "peace",
+      "context": "growth-v1-17c7689e",
+      "file": "growth-peace.json",
+      "answers": 24
+    },
+    {
+      "lane": "growth",
+      "aim": "spread",
+      "context": "growth-v1-21bb1fd3",
+      "file": "growth-spread.json",
+      "answers": 24
+    },
+    {
+      "lane": "growth",
+      "aim": "unite",
+      "context": "growth-v1-7fd0ad37",
+      "file": "growth-unite.json",
+      "answers": 24
+    },
+    {
       "lane": "mode",
       "doctrine": "cautious",
       "context": "colony-v7-9c64e74d",
@@ -67,6 +88,7 @@
   "versions": {
     "colony": 7,
     "stance": 4,
-    "fungus": 8
+    "fungus": 8,
+    "growth": 1
   }
 }
