@@ -20,7 +20,7 @@ const WAIT = 300; // give up on a first host after this many seconds
 
 const rows = [];
 for (let seed = lo; seed <= hi; seed++) {
-  const g = buildGame({ seed, antCount, rival: true, generation: 0 });
+  const g = buildGame({ species: "generic", seed, antCount, rival: true, generation: 0 });
   g.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
   const c = g.colonies[LANDING_COLONY];
   let t = 0;

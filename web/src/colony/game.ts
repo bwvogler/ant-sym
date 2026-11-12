@@ -1,6 +1,6 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
+import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, type StancePolicy } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
@@ -78,9 +78,9 @@ export const DEFAULT_GAME: GameParams = {
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
  * 6: the gate at the top of the shaft (ja-web: each ant's pass, the carriers down the hole, the raid counters); 7: each
- * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
+ * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 /** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
 function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
@@ -150,6 +150,8 @@ export interface Founding {
 /** A saved game (Game.save): JSON. */
 export interface GameSave {
   version: number;
+  /** the id of the species the game was played with (Species.id): a game built for another is refused (Game.load) */
+  species: string;
   time: number;
   strategyChoices: number;
   landed: unknown;
@@ -387,6 +389,14 @@ export class Game {
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
+    // The midden's corpses, for a hypha that reaches one (ja-2bw.7): every colony's, on the layer they are buried on.
+    const middenLayer = one ? PLANE : 0;
+    this.fungus.corpseAt = (layer, x, y) => {
+      if (layer !== middenLayer) return 0;
+      let n = 0;
+      for (const c of this.colonies) n += c.midden.get(colonyCell(x, y)) ?? 0;
+      return n;
+    };
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
@@ -407,6 +417,14 @@ export class Game {
       c.onBury = (d, layer = 0) => {
         if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates)
           this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
+        // With hyphae, a host that died of the evolving fungus is a new start on the midden (ja-2bw.7).
+        if (d.load >= INFECTED && d.strain === this.fungus.evolution?.strain) this.fungus.colonise(layer, d.x, d.y);
+      };
+      // One world: a host that dies of the evolving fungus on the plane, outside, is a new start where it lies (owner,
+      // 2026-11-12): no corpse is kept there, and none carried in, so the fungus grows out of it at once.
+      c.onDie = (i, layer, x, y) => {
+        if (this.world && layer === PLANE && c.load[i]! >= INFECTED && c.strain[i] === this.fungus.evolution?.strain)
+          this.fungus.colonise(PLANE, x, y);
       };
       if (this.colonies.length > 1) {
         this.layers.forEach((_, l) => {
@@ -653,6 +671,7 @@ export class Game {
       if (this.fungus.evolution?.strain === f.fungus.strain) {
         const at = this.#byHole(c);
         this.fungus.root(at.x, at.y, LANDING.radius);
+        this.#rootShaft(c);
       }
     }
     return k;
@@ -1033,8 +1052,15 @@ export class Game {
     if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
     this.fungus.root(x, y, LANDING.radius);
+    this.#rootShaft(this.colonies[k] ?? this.player);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
+  }
+
+  /** One world, with hyphae (ja-2bw.2): the fungus also roots on the walls of the shaft under colony c's hole, in the curtain. */
+  #rootShaft(c: Colony): void {
+    const e = this.world ? (c.layers[CURTAIN] as Layer | undefined)?.nest.entrance : undefined;
+    if (e) this.fungus.rootShaft(CURTAIN, e.x, e.y);
   }
 
   /** Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim). */
@@ -1099,6 +1125,7 @@ export class Game {
     const world = this.world;
     return {
       version: SAVE_VERSION,
+      species: this.params.species.id,
       time: this.time,
       strategyChoices: this.strategyChoices,
       landed: encode(this.landed),
@@ -1143,6 +1170,8 @@ export class Game {
    */
   load(saved: GameSave): void {
     if (saved.version !== SAVE_VERSION) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
+    if (saved.species !== this.params.species.id)
+      throw new Error(`save: a save of species "${saved.species}", and this game plays "${this.params.species.id}"`);
     const world = this.world;
     const sw = saved.world;
     if (!!sw !== !!world)

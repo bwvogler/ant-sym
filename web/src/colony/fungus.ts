@@ -32,8 +32,20 @@ import {
   type Reach,
 } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
-import { CELL, cellOf, discOffsets } from "./hex.ts";
-import { clampCol, disc, inBounds, rockAt, type WorldMap } from "./world.ts";
+import { CELL, cellOf, discOffsets, E, nx, ny, NW, SE, SW, W } from "./hex.ts";
+import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type WorldMap } from "./world.ts";
+import {
+  cellKey,
+  type Ground,
+  type GrowthAnswer,
+  type GrowthSituation,
+  HYPHA_MASS,
+  Hyphae,
+  type HyphaeSave,
+  keyCell,
+  stepRound,
+  TIP_STEP,
+} from "./hyphae.ts";
 
 // The fungus, pure: the player. It is spores on the ground and load inside ants
 // (docs/fungus-policy.md), and in the game a mycelium where it landed, which
@@ -162,6 +174,11 @@ export interface FungusParams {
   groomedAt: number;
   /** ground is home (or foreign) where a colony's home scent is at least this many times the strongest other's (or another's than its own); else border. In the side view, the same test says whose tunnel a host is in. */
   borderRatio: number;
+  /**
+   * the evolving fungus's mycelium grows as hyphae (docs/hyphal-growth.md, ja-2bw.2): tips that extend, turn and branch
+   * from where it roots, and its spores go out where they are; off, its patch puts out its spores as before
+   */
+  hyphae: boolean;
 }
 
 export const DEFAULT_FUNGUS: FungusParams = {
@@ -177,10 +194,23 @@ export const DEFAULT_FUNGUS: FungusParams = {
   interval: 0.1,
   groomedAt: 0.05,
   borderRatio: 2,
+  hyphae: false,
 };
 
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
 export const DORMANT_SHOW = 0.25;
+
+/** The headings of the tips a landing's hyphae set out on: three, a third of the way round from each other (hex.ts E, SW, NW). */
+const ROOT_HEADINGS = [E, SW, NW];
+/**
+ * A corpse the fungus grows out of (ja-2bw.7, docs/hyphal-growth.md §6): the spores it puts out on its cell, free (paid
+ * by the cadaver, not the mycelium: Khun et al. 2021 counted about 1.3 × 10⁸ conidia a cadaver; the amount is design),
+ * how fast, the mass it adds to the mycelium, and the tips that set out from it (east and west).
+ */
+export const CORPSE = { spores: 12, rate: 0.2, mass: 1, headings: [E, W] as readonly number[] };
+
+/** How far down the shaft under a hole rootShaft looks for its walls, in rows. */
+const SHAFT_ROWS = 8;
 
 /** The queen's royal mark at or above which the fungus in a host feels it underfoot: place "queen". */
 const ROYAL_FELT = 1;
@@ -328,6 +358,16 @@ export class Fungus {
   readonly #layers: SporeLayer[];
   /** fungus the evolving strain made in hosts this step (load passed on by contact) */
   #made = 0;
+  /** each map's hyphae (params.hyphae): null until the evolving fungus roots there */
+  readonly #hyphae: (Hyphae | null)[];
+  /** each map's spore spots: its patch and the dug spots its tips fruited on, refreshed each round of tip steps */
+  #sporeSpots: (number[] | null)[] = [];
+  /** each map's corpses the fungus grows out of (ja-2bw.7): cell (hyphae.ts cellKey) → free spores still to put out there; 0 once spent (it is not colonised again) */
+  #corpses: Map<number, number>[];
+  /** the corpses lying at (x, y) on map `layer` (the midden's), for a hypha that reaches one; set by the game */
+  corpseAt: ((layer: number, x: number, y: number) => number) | null = null;
+  /** the growth policy (ja-2bw.5): a tip's answer in its situation, or null for the local rule (hyphae.ts localGrowth) */
+  growthPolicy: ((s: GrowthSituation) => GrowthAnswer | null) | null = null;
   /** loaded ants after the last step or paint: zero (and no spores) means the step has nothing to do */
   hosts = 0;
   /** the fungus policy: null for the local rule with `rule`; the Jev lane sets its own (ui/colonyJev.ts) */
@@ -368,6 +408,8 @@ export class Fungus {
       visible: [],
       taken: [],
     }));
+    this.#hyphae = maps.map(() => null);
+    this.#corpses = maps.map(() => new Map());
     this.params = { ...DEFAULT_FUNGUS, ...params };
     this.#listed = strains.map((s) => ({ ...s }));
     this.strains = strains.map((s) => ({ ...s }));
@@ -381,6 +423,44 @@ export class Fungus {
   sporesOn(layer: number): { readonly spores: ChunkLayer<Float32Array>; readonly sporeStrain: ChunkLayer<Uint8Array> } | null {
     const L = this.#layers[layer];
     return L ? { spores: L.spores, sporeStrain: L.sporeStrain } : null;
+  }
+
+  /**
+   * The evolving fungus's patch on map `layer` (its base: where it rooted), as cells x0, y0, x1, y1, …, for the renderer
+   * to grow its mycelium from. Empty without one.
+   */
+  patchOn(layer: number): number[] {
+    const L = this.#layers[layer];
+    if (!L) return [];
+    const { w } = L.map.size;
+    const { x0 } = L.map;
+    const out: number[] = [];
+    for (const key of L.base) {
+      const col = key % w;
+      out.push(col + x0, (key - col) / w);
+    }
+    return out;
+  }
+
+  /** Map `layer`'s hyphae (params.hyphae), for the renderer and the assays: read only; null where none has rooted. */
+  hyphaeOn(layer: number): Hyphae | null {
+    return this.#hyphae[layer] ?? null;
+  }
+
+  /**
+   * Map `layer`'s ground as a hypha feels it (hyphae.ts Ground): a map with no sky (the plane, a top-down map) is read as
+   * the topsoil just under its surface (owner, 2026-11-12); a map with sky (the curtain, the side view) is soil, dug
+   * cells and rock.
+   */
+  #ground(layer: number): Ground {
+    const map = (this.#layers[layer] as SporeLayer).map;
+    return {
+      topsoil: !map.sky,
+      kind: (x, y) => {
+        const t = rockAt(map, x, y);
+        return t === OPEN ? "open" : t === SOIL ? "soil" : "rock";
+      },
+    };
   }
 
   /** Whether there is anything for a step to do: spores on the ground or load in any ant. */
@@ -637,6 +717,11 @@ export class Fungus {
     const p = this.params;
     const before = e.growth;
     e.replicate(this.#made);
+    if (p.hyphae && this.#hyphae.some((h) => h)) {
+      this.#growHyphae(dt, e);
+      e.pace(e.growth - before, dt);
+      return;
+    }
     let cells = 0;
     for (const L of this.#layers) cells += L.base.length;
     if (cells) {
@@ -958,6 +1043,121 @@ export class Fungus {
   }
 
   /**
+   * The mycelium as hyphae (params.hyphae, docs/hyphal-growth.md): every map's tips step every TIP_STEP seconds (by the
+   * Mycelium level) on the mass the body has grown and not yet embodied in hypha, shared by all their tips; then the
+   * spores it puts out spread evenly over its patch and the dug spots its tips fruited on (the `fruit` answer).
+   */
+  #growHyphae(dt: number, e: Evolution): void {
+    const p = this.params;
+    const level = Math.min(TIP_STEP.length - 1, e.level("mycelium"));
+    const every = TIP_STEP[level] as number;
+    let length = 0;
+    let tips = 0;
+    for (const h of this.#hyphae)
+      if (h) {
+        length += h.length;
+        tips += h.tips.length;
+      }
+    const budget = { free: Math.max(0, e.mass - length * HYPHA_MASS), tips };
+    // Every map's tips step together, in turns (hyphae.ts stepRound), on the first map's clock.
+    const maps: { h: Hyphae; g: Ground }[] = [];
+    this.#hyphae.forEach((h, l) => {
+      if (h) maps.push({ h, g: this.#ground(l) });
+    });
+    const clock = maps[0]!.h;
+    clock.clock += dt;
+    let stepped = false;
+    while (clock.clock >= every) {
+      clock.clock -= every;
+      stepRound(maps, level, budget, this.growthPolicy);
+      stepped = true;
+    }
+    // Hypha the ants have dug through is cut, and the mass it held is lost (ja-2bw.4: the colonies' counterplay).
+    if (stepped)
+      for (const { h, g } of maps) {
+        const lost = h.cutDug(g);
+        if (lost > 0) e.lose(lost * HYPHA_MASS);
+      }
+    // A tip that has reached a corpse (the midden's) colonises it.
+    if (stepped && this.corpseAt)
+      this.#hyphae.forEach((h, l) => {
+        if (!h) return;
+        for (const t of h.tips.slice())
+          if (!(this.#corpses[l] as Map<number, number>).has(cellKey(t.x, t.y)) && this.corpseAt!(l, t.x, t.y) > 0)
+            this.colonise(l, t.x, t.y);
+      });
+    // The corpses fruit, free: paid by the cadaver, not the mycelium.
+    this.#corpses.forEach((corpses, l) => {
+      const L = this.#layers[l] as SporeLayer;
+      const { w } = L.map.size;
+      const { x0 } = L.map;
+      for (const [k, left] of corpses) {
+        if (left <= 0) continue;
+        const [x, y] = keyCell(k);
+        const v = L.spores.get(x, y);
+        const put = Math.max(0, Math.min(left, CORPSE.rate * dt, p.maxSpores - v));
+        corpses.set(k, left - Math.min(left, CORPSE.rate * dt));
+        if (put <= 0) continue;
+        L.spores.set(x, y, v + put);
+        L.sporeStrain.set(x, y, e.strain);
+        L.sporeCells.add(y * w + x - x0);
+      }
+    });
+    const spots: { L: SporeLayer; cells: number[] }[] = [];
+    let cells = 0;
+    this.#hyphae.forEach((h, l) => {
+      if (!h) return;
+      if (stepped || !this.#sporeSpots[l]) {
+        // The patch fruits where it landed (its base), as without hyphae; spread over every dug cell the hyphae reach,
+        // the same spores thinned the patch below an infecting dose (6 seeds of 10 took hold against 9, PRD §63.1), so
+        // the hyphae fruit only where a tip chose to (the `fruit` answer, owner 2026-11-12), each spot a patch cell's share
+        const L = this.#layers[l] as SporeLayer;
+        const { w } = L.map.size;
+        const { x0 } = L.map;
+        const g = this.#ground(l);
+        // and the spots where its tips fruited, while they are still dug (a spot filled in puts out nothing)
+        const spots = h.fruits.filter((k) => {
+          const [x, y] = keyCell(k);
+          return g.kind(x, y) === "open";
+        });
+        this.#sporeSpots[l] = [
+          ...new Set([
+            ...L.base.map((key) => {
+              const col = key % w;
+              return cellKey(col + x0, (key - col) / w);
+            }),
+            ...spots,
+          ]),
+        ];
+      }
+      const c = this.#sporeSpots[l] as number[];
+      cells += c.length;
+      spots.push({ L: this.#layers[l] as SporeLayer, cells: c });
+    });
+    const out = e.grow(dt);
+    if (!cells) {
+      if (out > 0) e.refund(out);
+      return;
+    }
+    const each = out / cells;
+    let unplaced = 0;
+    for (const { L, cells: c } of spots) {
+      const { w } = L.map.size;
+      const { x0 } = L.map;
+      for (const k of c) {
+        const [x, y] = keyCell(k);
+        const v = L.spores.get(x, y);
+        const put = Math.max(0, Math.min(each, p.maxSpores - v));
+        unplaced += each - put;
+        L.spores.set(x, y, v + put);
+        L.sporeStrain.set(x, y, e.strain);
+        L.sporeCells.add(y * w + x - x0);
+      }
+    }
+    if (unplaced > 0) e.refund(unplaced);
+  }
+
+  /**
    * Strain `strain` becomes the game's fungus and starts to evolve from its weakest (evolution.ts): its spread traits
    * and every lever's reach come from what it has bought from then on. Once only: a fungus already evolving keeps on.
    */
@@ -982,6 +1182,88 @@ export class Fungus {
       if (!rockAt(map, cx, cy) && !have.has(cy * w + cx - x0)) L.base.push(cy * w + cx - x0);
     });
     this.#evolution.root();
+    if (!this.params.hyphae) return;
+    // As hyphae: the patch is the hyphae's first cells, and three tips set out from its rim, going outward (a weak start).
+    const h = (this.#hyphae[layer] ??= new Hyphae());
+    for (const key of L.base) {
+      const col = key % w;
+      h.addCell(col + x0, (key - col) / w);
+    }
+    cellOf(x, y);
+    const cx = CELL[0];
+    const cy = CELL[1];
+    if (rockAt(map, cx, cy)) return;
+    for (const d of ROOT_HEADINGS) {
+      // Out from the middle along d to the patch's last cell that way.
+      let px = cx;
+      let py = cy;
+      for (let k = 0; k <= radius + 1; k++) {
+        const qx = nx(px, py, d);
+        const qy = ny(py, d);
+        if (!h.has(qx, qy)) break;
+        px = qx;
+        py = qy;
+      }
+      if (h.has(px, py)) h.root(px, py, d);
+    }
+  }
+
+  /**
+   * The fungus grows out of a corpse at cell (x, y) on map `layer` (ja-2bw.7, owner 2026-11-12): a new start, whose
+   * tips set out from it; the cadaver's substance joins the mycelium (Evolution.feed); and it fruits there for free,
+   * CORPSE.spores in all at CORPSE.rate a second, paid by the corpse. Another corpse on a cell already colonised adds its
+   * spores. Nothing without hyphae and an evolving fungus, or on rock.
+   */
+  colonise(layer: number, x: number, y: number): void {
+    const e = this.#evolution;
+    if (!e || !this.params.hyphae) return;
+    const L = this.#layers[layer];
+    if (!L || rockAt(L.map, x, y)) return;
+    const h = (this.#hyphae[layer] ??= new Hyphae());
+    const k = cellKey(x, y);
+    const corpses = this.#corpses[layer] as Map<number, number>;
+    const fresh = !corpses.has(k);
+    corpses.set(k, (corpses.get(k) ?? 0) + CORPSE.spores);
+    e.feed(CORPSE.mass);
+    if (!fresh) return;
+    if (!h.has(x, y)) h.addCell(x, y);
+    for (const d of CORPSE.headings) h.root(x, y, d);
+  }
+
+  /** Map `layer`'s corpses the fungus has grown out of, and the free spores each still has (the renderer, the tests). */
+  corpsesOn(layer: number): ReadonlyMap<number, number> {
+    return this.#corpses[layer] ?? new Map();
+  }
+
+  /**
+   * One world: the hyphae also root on the walls of the shaft under a hole (layer `layer`, the curtain; `x`, `y` the
+   * hole's entrance there), where `ja-yo3` put the mycelium: walking down the shaft from the entrance, the first soil
+   * cell on each side takes a tip heading down. Nothing without hyphae and an evolving fungus.
+   */
+  rootShaft(layer: number, x: number, y: number): void {
+    if (!this.#evolution || !this.params.hyphae) return;
+    const L = this.#layers[layer];
+    if (!L) return;
+    const g = this.#ground(layer);
+    cellOf(x, y);
+    const sx = CELL[0];
+    const sy = CELL[1];
+    const h = (this.#hyphae[layer] ??= new Hyphae());
+    let left = false;
+    let right = false;
+    for (let yy = sy; yy <= sy + SHAFT_ROWS && !(left && right); yy++) {
+      if (g.kind(sx, yy) !== "open") continue;
+      if (!left && g.kind(sx - 1, yy) === "soil") {
+        h.root(sx - 1, yy, SW);
+        h.soil.add(cellKey(sx - 1, yy));
+        left = true;
+      }
+      if (!right && g.kind(sx + 1, yy) === "soil") {
+        h.root(sx + 1, yy, SE);
+        h.soil.add(cellKey(sx + 1, yy));
+        right = true;
+      }
+    }
   }
 
   /**
@@ -1160,6 +1442,8 @@ export class Fungus {
       clock: this.#clock,
       evolution: this.#evolution?.save() ?? null,
       base: [...L.base],
+      hyphae: this.#hyphae.map((h) => h?.save() ?? null),
+      corpses: this.#corpses.map((m) => [...m]),
     };
     // One world (U4b): every other map's spores, their cells and the base there (SPORE_LAYER_STATE), from layer 1 on.
     if (this.#layers.length > 1)
@@ -1196,6 +1480,17 @@ export class Fungus {
           else fillLike(M[key], x[key]);
       });
     }
+    const hy = (r.hyphae as (HyphaeSave | null)[] | undefined) ?? [];
+    this.#hyphae.forEach((_, l) => {
+      const x = hy[l];
+      this.#hyphae[l] = x ? Hyphae.load(x) : null;
+    });
+    this.#sporeSpots = [];
+    const corpses = (r.corpses as [number, number][][] | undefined) ?? [];
+    this.#corpses.forEach((m, l) => {
+      m.clear();
+      for (const [k, v] of corpses[l] ?? []) m.set(k, v);
+    });
     this.#evolved();
   }
 }
