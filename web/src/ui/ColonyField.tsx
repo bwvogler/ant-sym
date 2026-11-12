@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
   CHUNK,
   type ChunkLayer,
@@ -100,8 +100,6 @@ interface Props {
   api?: RefObject<FieldApi | null>;
   /** one world's queen's pen: her flight's circle on the plane, where she would settle, and a click to found there */
   pen?: FieldPen | null;
-  /** more buttons in the field's corner (the page's: carry across) */
-  tools?: ReactNode;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -202,7 +200,6 @@ export default function ColonyField({
   onCross,
   api,
   pen = null,
-  tools,
 }: Props) {
   const colony = colonies[0] as Colony;
   const count = colonies.length;
@@ -231,7 +228,7 @@ export default function ColonyField({
    * two the switch takes otherwise left the view on the wrong side of it (the e2e guard caught one in twenty runs).
    */
   const carryTo = useRef<number | null>(null);
-  /** where the followed ant was last seen on the shown view, while it is on the other layer (carry off: "gone below") */
+  /** where the followed ant was last seen on the shown view, while it is on the other layer (the player switched views by hand: "gone below") */
   const lastSeen = useRef<{ f: Followed; lv: number; x: number; y: number } | null>(null);
   const penRef = useRef(pen);
   /** the pointer over the canvas (device px), for the pen's preview; null when it left */
@@ -1546,7 +1543,6 @@ export default function ColonyField({
             {colonyName(k)} nest
           </button>
         ))}
-        {tools}
         {(world ? (view === PLANE ? world.plane : world.curtain) : colony.map).chambers && (
           <button
             type="button"
