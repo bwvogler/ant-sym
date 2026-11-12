@@ -32,9 +32,13 @@ This is the budget the policy may draw on. Each row points to the research secti
 | Queen pheromone | where the queen is; whether the colony has a queen; faint in a big nest, so new queens are reared | within the nest; carried on workers and passed by contact | [nest-and-home §1](nest-and-home.md#the-queen), [queens-and-merging §2](queens-and-merging.md#2-what-ants-do), [new-queens §2](new-queens.md#2-the-queen-holds-it-back) |
 | Brood | dig here, tend here | local | [nest-and-home §1](nest-and-home.md#nest-structure) |
 | Food odour in the air (design, desert ant) | a plume from dead arthropods: climb it within several metres, crosswind runs to find it; outweighs the vector near food; no memory | air, many cells; steering only, no situation field (not built, `ja-rf5`) | [desert-ant §3](desert-ant.md#3-they-find-food-by-smell-not-by-following-one-another) |
+| Sickness cues on a nestmate or pupa (design, several species) | a nestmate or a pupa carries the pathogen: grooming rises with the load; an infected pupa, smelled by its own changed cuticle 2–10 days after exposure, is destroyed or discarded | contact | [lasius-neglectus §3](lasius-neglectus.md#3-a-sick-nestmate-is-groomed-and-the-colony-is-immunised-by-it), [§4](lasius-neglectus.md#4-infected-brood-is-unpacked-bitten-and-sprayed-destructive-disinfection), [termites §6](termites.md#6-against-metarhizium-groom-then-eat-the-sick-then-bury-the-dead) (not built, `ja-e668.4`) |
+| Corpse odour, fresh or decayed (design, termites) | a fresh corpse is eaten, an old one buried in place; a foreign corpse draws a crowd | contact; the switch at about 1–3 days | [termites §5](termites.md#5-the-dead-eaten-fresh-buried-old-and-the-switch-is-smelled) (not built, `ja-328h.4`) |
+| Humidity at a building face (design, termite mounds) | where to put soil down: at the edge of the humid zone | local, near open air | [termites §1](termites.md#1-nests-tunnels-to-separate-food-or-a-mound-built-by-humidity) (not built, `ja-328h.9`) |
+| A learned plant odour (design, leafcutter) | a food kind the garden or the dump has turned against: leave it | learned in hours, held for weeks | [leafcutter §6](leafcutter.md#6-the-garden-tells-the-ants-what-harms-it) (not built, `ja-vq14.7`) |
 | Own body | age, hunger, load, fatigue; for the desert ant, body heat from the ground it crosses (design, not built) | internal | [fungus-policy §3](fungus-policy.md#3-what-real-parasites-do-to-ants) (response thresholds), [desert-ant §4](desert-ant.md#4-heat-sets-when-and-how-long-they-can-work) |
 
-**Not yet researched:** corpse odour, which matters for the midden. Write a note, with primary sources, before building on it. What a fungus senses inside its host is in [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers). Most of it is marked design: no paper shows a fungus reading those cues.
+**Not yet researched:** corpse odour for the generic ant, which matters for the midden (termites have theirs, [termites §5](termites.md#5-the-dead-eaten-fresh-buried-old-and-the-switch-is-smelled); the Argentine ant removes corpses on the loss of a life cue, [lasius-neglectus §7](lasius-neglectus.md#7-the-argentine-ant-the-same-tolerance-at-continental-scale-and-war-at-its-borders)). Write a note, with primary sources, before building on it. What a fungus senses inside its host is in [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers). Most of it is marked design: no paper shows a fungus reading those cues.
 
 ## Where the code is today
 
@@ -92,7 +96,8 @@ The biology and the full catalogue of levers:
 2. **Species ally without merging (parabiosis).**
    - Each species keeps its own odour.
    - Strains get a host range ([fungus-policy §10](fungus-policy.md#10-more-colonies-and-other-species-planned-with-mr-8-ja-8fd); species framework `ja-8fd`, waves `ja-jhd`, `ja-v06`).
-3. **Beyond ants: open.** Each new organism brings:
+   - The species after the desert ant, researched and ordered: [species.md](species.md#other-species-checked-2026-11-12-sourced-the-same-day), PRD §64 (`ja-e668` *Lasius neglectus*, `ja-vq14` leafcutter, `ja-n70l` Pharaoh ant, `ja-ehuv` army ants).
+3. **Beyond ants: open.** Termites are researched as the first candidate ([termites](termites.md), `ja-328h`; the owner decides). Each new organism brings:
    - its own sense table, a new version of the one above;
    - its own action set;
    - its own species parameters over the same policy shape.
