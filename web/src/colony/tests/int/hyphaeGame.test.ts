@@ -136,3 +136,29 @@ test("with hyphae off, a corpse is no start", () => {
   g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: 0, load: 0.5, strain: g.fungus.evolution!.strain }, PLANE);
   assert.equal(g.fungus.corpsesOn(PLANE).size, 0);
 });
+
+test("a host that dies on the plane is a new start where it lies; a clean ant leaves nothing", () => {
+  const g = game(true);
+  const c = g.colonies[0]!;
+  const plane = (i: number) => c.alive[i] && c.layer[i] === PLANE;
+  const pick = (from: number) => {
+    for (let i = from; i < c.n; i++) if (plane(i)) return i;
+    return -1;
+  };
+  let i = pick(0);
+  if (i < 0) {
+    runFor(g, 30);
+    i = pick(0);
+  }
+  assert.ok(i >= 0, "no ant on the plane");
+  c.load[i] = 0.5;
+  c.strain[i] = g.fungus.evolution!.strain;
+  const before = g.fungus.corpsesOn(PLANE).size;
+  c.kill(i);
+  assert.equal(g.fungus.corpsesOn(PLANE).size, before + 1);
+  const j = pick(i + 1);
+  assert.ok(j >= 0);
+  c.load[j] = 0;
+  c.kill(j);
+  assert.equal(g.fungus.corpsesOn(PLANE).size, before + 1);
+});
