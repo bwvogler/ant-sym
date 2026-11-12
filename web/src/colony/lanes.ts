@@ -2,6 +2,7 @@ import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { decodeSituation, localPolicy, localStance, SITUATIONS } from "./colony.ts";
 import {
   DOCTRINES,
+  MODE_CRITERIA,
   packModeRequest,
   packStanceRequest,
   policyContext,
@@ -10,6 +11,7 @@ import {
   situationKey,
   stanceContext,
   stanceKey,
+  STANCE_CRITERIA,
 } from "./colonyBrain.ts";
 import type { FungalSituation } from "./fungalPolicy.ts";
 import { askedLevers } from "./fungus.ts";
@@ -24,7 +26,7 @@ import {
   validLevels,
   worthAsking,
 } from "./fungusBrain.ts";
-import { MODES, STANCE_SCHEMA, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
+import { type LaneWords, STANCE_SCHEMA, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -115,14 +117,14 @@ export interface LaneSpec<Sit, Ans extends string, Ctx, Variant extends string =
   readonly batch: number | null;
   /** the cache key for a situation; `ctx` is the lane's own context: the fungus's menu (the levers asked are in the key), nothing for an ant */
   key(s: Sit, ctx: Ctx): string;
-  /** one request for many situations, each with the key it was asked under, under `words` */
-  pack(items: { id: string; key: string; situation: Sit }[], words: string): JevRequest;
-  /** the answer to item `id`, asked under `key`, or null when it is not one the question allowed */
-  read(answers: Record<string, JevAnswer>, id: string, situation: Sit, key: string): Ans | null;
+  /** one request for many situations, each with the key it was asked under, under `words`; `lane` is a species' own legend and criteria (absent: the generic ant's; the fungus's has none yet) */
+  pack(items: { id: string; key: string; situation: Sit }[], words: string, lane?: LaneWords): JevRequest;
+  /** the answer to item `id`, asked under `key`, or null when it is not one the question allowed (the choices of `lane`'s criteria, when given) */
+  read(answers: Record<string, JevAnswer>, id: string, situation: Sit, key: string, lane?: LaneWords): Ans | null;
   /** whether a stored answer is one this lane's question could have given for `key` */
-  valid(key: string, answer: string): boolean;
-  /** the cache context under `words`, for a variant of the lane (see `variants`; none: the first) */
-  contextOf(words: string, variant?: Variant): string;
+  valid(key: string, answer: string, lane?: LaneWords): boolean;
+  /** the cache context under `words`, for a variant of the lane (see `variants`; none: the first), and a species' own `lane` words */
+  contextOf(words: string, variant?: Variant, lane?: LaneWords): string;
   /** whether a situation is worth asking at all (absent: always) */
   asks?(s: Sit, ctx: Ctx): boolean;
   /** the local rule's answer (absent: the lane's local rule is not a pure function of the situation: the fungus's is a Game method) */
@@ -168,10 +170,10 @@ const modeLane: Has<LaneSpec<Situation, Mode, undefined>, "local" | "all"> = {
   gather: false,
   batch: null,
   key: (s) => situationKey(s),
-  pack: (items, words) => packModeRequest(items, words),
-  read: (answers, id) => readMode(answers, id),
-  valid: (_key, answer) => (MODES as readonly string[]).includes(answer),
-  contextOf: (words) => policyContext(words),
+  pack: (items, words, lane) => packModeRequest(items, words, lane),
+  read: (answers, id, _situation, _key, lane) => readMode(answers, id, lane ? Object.keys(lane.criteria) : undefined),
+  valid: (_key, answer, lane) => Object.keys(lane?.criteria ?? MODE_CRITERIA).includes(answer),
+  contextOf: (words, _variant, lane) => policyContext(words, lane),
   local: localPolicy,
   all: () => Array.from({ length: SITUATIONS }, (_, c) => decodeSituation(c)),
 };
@@ -187,10 +189,10 @@ const stanceLane: Has<LaneSpec<StanceSituation, Stance, undefined>, "local" | "a
   gather: false,
   batch: null,
   key: (s) => stanceKey(s),
-  pack: (items, words) => packStanceRequest(items, words),
-  read: (answers, id) => readStance(answers, id),
-  valid: (_key, answer) => (STANCES as readonly string[]).includes(answer),
-  contextOf: (words) => stanceContext(words),
+  pack: (items, words, lane) => packStanceRequest(items, words, lane),
+  read: (answers, id, _situation, _key, lane) => readStance(answers, id, lane ? Object.keys(lane.criteria) : undefined),
+  valid: (_key, answer, lane) => Object.keys(lane?.criteria ?? STANCE_CRITERIA).includes(answer),
+  contextOf: (words, _variant, lane) => stanceContext(words, lane),
   local: localStance,
   all: () => Array.from({ length: STANCE_SCHEMA.size }, (_, c) => STANCE_SCHEMA.decode(c)),
 };
@@ -240,10 +242,10 @@ export interface ErasedLane {
   readonly gather: boolean;
   readonly batch: number | null;
   key(s: unknown, ctx: ReadonlySet<string> | undefined): string;
-  pack(items: { id: string; key: string; situation: unknown }[], words: string): JevRequest;
-  read(answers: Record<string, JevAnswer>, id: string, situation: unknown, key: string): string | null;
-  valid(key: string, answer: string): boolean;
-  contextOf(words: string, variant?: string): string;
+  pack(items: { id: string; key: string; situation: unknown }[], words: string, lane?: LaneWords): JevRequest;
+  read(answers: Record<string, JevAnswer>, id: string, situation: unknown, key: string, lane?: LaneWords): string | null;
+  valid(key: string, answer: string, lane?: LaneWords): boolean;
+  contextOf(words: string, variant?: string, lane?: LaneWords): string;
   asks?(s: unknown, ctx: ReadonlySet<string> | undefined): boolean;
   local?(s: unknown): string;
   all?(): unknown[];

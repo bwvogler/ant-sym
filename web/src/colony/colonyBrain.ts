@@ -1,7 +1,17 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { legendOf } from "./schema.ts";
-import { MODES, SITUATION_SCHEMA, STANCES, STANCE_SCHEMA, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
+import {
+  type LaneWords,
+  MODES,
+  SITUATION_SCHEMA,
+  STANCES,
+  STANCE_SCHEMA,
+  type Mode,
+  type Situation,
+  type Stance,
+  type StanceSituation,
+} from "./vocab.ts";
 import {
   CARRY,
   type Carry,
@@ -122,6 +132,10 @@ export const STANCE_CRITERIA: Record<Stance, string> = {
   raid: "raid: send spare ants to fight at the rival's nest",
 };
 
+/** The generic ant's words for the mode lane and the strategist's lane: what a species that names none asks under (species.ts). */
+export const MODE_WORDS: LaneWords = { legend: COLONY_LEGEND, criteria: MODE_CRITERIA, version: COLONY_BRAIN_VERSION };
+export const STANCE_WORDS: LaneWords = { legend: STRATEGY_LEGEND, criteria: STANCE_CRITERIA, version: STANCE_BRAIN_VERSION };
+
 /** The cache key for an ant's situation. */
 export function situationKey(s: Situation): string {
   return SITUATION_SCHEMA.key(s);
@@ -132,28 +146,36 @@ export function situationState(s: Situation): Situation {
   return SITUATION_SCHEMA.state(s);
 }
 
-export function modeQuestion(id: string): JevRequest["questions"] {
+export function modeQuestion(id: string, criteria: Readonly<Record<string, string>> = MODE_CRITERIA): JevRequest["questions"] {
   return {
-    [`${id}_mode`]: { type: "choice", instructions: `Going by the doctrine, what should ant \`${id}\` do now?`, criteria: MODE_CRITERIA },
+    [`${id}_mode`]: {
+      type: "choice",
+      instructions: `Going by the doctrine, what should ant \`${id}\` do now?`,
+      criteria: criteria as Record<string, string>,
+    },
   };
 }
 
 /** One request for many ant situations: one shared state (legend, doctrine, situations), one choice each. */
-export function packModeRequest(items: { id: string; situation: Situation }[], doctrine: string): JevRequest {
+export function packModeRequest(
+  items: { id: string; situation: Situation }[],
+  doctrine: string,
+  words: LaneWords = MODE_WORDS,
+): JevRequest {
   const ants: Record<string, Situation> = {};
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
     ants[it.id] = situationState(it.situation);
-    Object.assign(questions, modeQuestion(it.id));
+    Object.assign(questions, modeQuestion(it.id, words.criteria));
   }
-  return { state: { legend: COLONY_LEGEND, doctrine, ants }, questions };
+  return { state: { legend: words.legend, doctrine, ants }, questions };
 }
 
 /** A situation's mode from a reply, or null when it is missing or not a mode (not cached; the local rule covers it). */
-export function readMode(answers: Record<string, JevAnswer>, id: string): Mode | null {
+export function readMode(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = MODES): Mode | null {
   const a = answers[`${id}_mode`];
   if (!a || a.type !== "choice") return null;
-  return (MODES as readonly string[]).includes(a.choice) ? (a.choice as Mode) : null;
+  return allowed.includes(a.choice) ? (a.choice as Mode) : null;
 }
 
 /** The cache key for the strategist's view. */
@@ -161,41 +183,45 @@ export function stanceKey(s: StanceSituation): string {
   return STANCE_SCHEMA.key(s);
 }
 
-export function stanceQuestion(id: string): JevRequest["questions"] {
+export function stanceQuestion(id: string, criteria: Readonly<Record<string, string>> = STANCE_CRITERIA): JevRequest["questions"] {
   return {
     [`${id}_stance`]: {
       type: "choice",
       instructions: `Going by the doctrine, what should colony \`${id}\` do now?`,
-      criteria: STANCE_CRITERIA,
+      criteria: criteria as Record<string, string>,
     },
   };
 }
 
 /** One request for many strategist views (normally one or two). */
-export function packStanceRequest(items: { id: string; situation: StanceSituation }[], doctrine: string): JevRequest {
+export function packStanceRequest(
+  items: { id: string; situation: StanceSituation }[],
+  doctrine: string,
+  words: LaneWords = STANCE_WORDS,
+): JevRequest {
   const colony: Record<string, StanceSituation> = {};
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
     colony[it.id] = { ...it.situation };
-    Object.assign(questions, stanceQuestion(it.id));
+    Object.assign(questions, stanceQuestion(it.id, words.criteria));
   }
-  return { state: { legend: STRATEGY_LEGEND, doctrine, colony }, questions };
+  return { state: { legend: words.legend, doctrine, colony }, questions };
 }
 
-export function readStance(answers: Record<string, JevAnswer>, id: string): Stance | null {
+export function readStance(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = STANCES): Stance | null {
   const a = answers[`${id}_stance`];
   if (!a || a.type !== "choice") return null;
-  return (STANCES as readonly string[]).includes(a.choice) ? (a.choice as Stance) : null;
+  return allowed.includes(a.choice) ? (a.choice as Stance) : null;
 }
 
 /** What a cached mode was asked under: a different doctrine, legend or question wording is a different cache. */
-export function policyContext(doctrine: string): string {
-  return `colony-v${COLONY_BRAIN_VERSION}-${hash(COLONY_LEGEND + JSON.stringify(modeQuestion("s0")) + doctrine.trim())}`;
+export function policyContext(doctrine: string, words: LaneWords = MODE_WORDS): string {
+  return `colony-v${words.version}-${hash(words.legend + JSON.stringify(modeQuestion("s0", words.criteria)) + doctrine.trim())}`;
 }
 
 /** The same for cached stances. */
-export function stanceContext(doctrine: string): string {
-  return `stance-v${STANCE_BRAIN_VERSION}-${hash(STRATEGY_LEGEND + JSON.stringify(stanceQuestion("c0")) + doctrine.trim())}`;
+export function stanceContext(doctrine: string, words: LaneWords = STANCE_WORDS): string {
+  return `stance-v${words.version}-${hash(words.legend + JSON.stringify(stanceQuestion("c0", words.criteria)) + doctrine.trim())}`;
 }
 
 /** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */

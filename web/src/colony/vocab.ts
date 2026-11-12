@@ -10,6 +10,17 @@ export type Mode = (typeof MODES)[number];
 export const STANCES = ["forage", "defend", "raid"] as const;
 export type Stance = (typeof STANCES)[number];
 
+/**
+ * The words one species asks one lane under (docs/species.md, ja-fnd.5.3.2): the legend Jev reads, the choices it may give with the sentence
+ * that describes each (the question's criteria), and the version that retires its cached answers. A context is a hash of all three and the
+ * doctrine, so a species with other words has its own cache, and the generic ant's never moves. The functions stay the lane registry's.
+ */
+export interface LaneWords {
+  readonly legend: string;
+  readonly criteria: Readonly<Record<string, string>>;
+  readonly version: number;
+}
+
 export const TRAILS = ["none", "faint", "strong"] as const;
 export type Trail = (typeof TRAILS)[number];
 /** Sensor readings at or above these are a faint / strong trail. */

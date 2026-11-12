@@ -88,8 +88,14 @@ test("each lane's cache key for fixed situations", () => {
 });
 
 test("each lane's cache context, under two doctrines or aims, and the fungus's two views", () => {
-  assert.deepEqual(DOCTRINE_TEXTS.map(policyContext), ["colony-v7-47f9dbc6", "colony-v7-97971313"]);
-  assert.deepEqual(DOCTRINE_TEXTS.map(stanceContext), ["stance-v4-657ca221", "stance-v4-a2c72d8e"]);
+  assert.deepEqual(
+    DOCTRINE_TEXTS.map((d) => policyContext(d)),
+    ["colony-v7-47f9dbc6", "colony-v7-97971313"],
+  );
+  assert.deepEqual(
+    DOCTRINE_TEXTS.map((d) => stanceContext(d)),
+    ["stance-v4-657ca221", "stance-v4-a2c72d8e"],
+  );
   assert.deepEqual(
     AIM_TEXTS.flatMap((a) => (["top", "side"] as const).map((v) => fungusContext(a, v))),
     ["fungus-v8-ec1a7461", "fungus-v8-side-ec1a7461", "fungus-v8-0859ac1c", "fungus-v8-side-0859ac1c"],
