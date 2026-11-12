@@ -177,5 +177,8 @@ test("a fungus question is packed and read against the levers its key asked, wha
   assert.equal(l.read(answers, "h0", s, key), readLevels(answers, "h0", asked));
   assert.equal(l.read(answers, "h0", s, key)?.split(",").length, asked.length);
   assert.equal(l.valid(key, "1,1,1"), validLevels(key, "1,1,1"));
+  const whole = asked.map(() => "1").join(",");
+  assert.equal(l.valid(key, whole), true, "an answer with a level for every lever asked is valid");
+  assert.equal(validLevels(key, whole), true);
   assert.equal(l.valid(key, "1"), false, "an answer short of the levers asked is not valid");
 });
