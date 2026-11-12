@@ -4,8 +4,7 @@ import { localResponses, type Responses } from "./responses.ts";
 import type { LaneWords, Mode, Stance } from "./vocab.ts";
 
 // A species (docs/species.md, ja-fnd.5.3): what one kind of ant is, as data the Game hands its colonies. Step 1 of the order of work holds
-// the physiology (parameter overrides) and the local rule set; the lane words, the sense sources, the fungus's host properties and the
-// names are added by the next beads (.2-.4). The Game hands a species' params and responses to its colonies (Colony stays free of the idea). GameParams.species is code, so the save leaves it out until step 3 saves its id. A game has one species (owner, 2026-11-12); mixed worlds are ja-fnd.5.4.
+// the physiology (parameter overrides) and the local rule set; the lane words, undertaking and the names came with the next beads (.2-.4). The Game hands a species' params and responses to its colonies (Colony stays free of the idea). GameParams.species is code, so the save leaves it out until step 3 saves its id. A game has one species (owner, 2026-11-12); mixed worlds are ja-fnd.5.4.
 
 export interface Species {
   id: string;
