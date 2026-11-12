@@ -117,14 +117,8 @@ export default function ColonyApp() {
     [start, tut],
   );
   const onLink = useCallback((view: number, x: number, y: number) => showAt(view, x, y, true), [showAt]);
-  /** Carry the camera across with a followed ant that goes through a hole (on by default); off, the camera holds. */
-  const [carry, setCarry] = useState(true);
-  const onCross = useCallback(
-    (view: number, x: number, y: number) => {
-      if (carry) showAt(view, x, y);
-    },
-    [carry, showAt],
-  );
+  /** A followed ant that goes through a hole takes the camera with it, to the other view (always: owner, 2026-11-12). */
+  const onCross = useCallback((view: number, x: number, y: number) => showAt(view, x, y), [showAt]);
   const games = useSaves(
     game,
     settings,
@@ -442,19 +436,6 @@ export default function ColonyApp() {
               onCross={onCross}
               api={field}
               pen={pen}
-              tools={
-                oneWorld && (
-                  <button
-                    type="button"
-                    className={`pointer-events-auto rounded-md border bg-panel/90 px-2 py-1 text-xs shadow-sm hover:bg-raised ${carry ? "border-accent text-accent" : "border-line text-fg-2"}`}
-                    aria-pressed={carry}
-                    onClick={() => setCarry((on) => !on)}
-                    title="A followed ant that goes through a hole takes the camera with it, to the other view"
-                  >
-                    Carry across
-                  </button>
-                )
-              }
             />
             {tut.tutorial && tut.card && (
               <TutorialCard
