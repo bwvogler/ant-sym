@@ -1195,8 +1195,8 @@ export default function ColonyField({
       }
 
       // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
-      // the camera goes with it through a hole, and the "gone below / up" ring, a frame's flash once that was always so,
-      // went (owner, 2026-11-12; PR #94 review D1).
+      // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
+      // (ja-rkse, PRD §61).
       if (f && fcol && fHere) {
         const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
         ctx.beginPath();
