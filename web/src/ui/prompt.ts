@@ -19,31 +19,8 @@ import {
 // is a full request's size over the situations it carries, as useColonyJev's
 // estimates have always been.
 
-export const SAMPLE_SITUATION: Situation = {
-  mode: "explore",
-  tired: false,
-  foodTrail: "faint",
-  homeTrail: "strong",
-  alarm: "none",
-  enemy: "none",
-  stance: "forage",
-};
-export const SAMPLE_STANCE: StanceSituation = {
-  stance: "forage",
-  ants: "some",
-  losses: "none",
-  enemyNearNest: false,
-  intake: "some",
-  larder: "low",
-};
-export const SAMPLE_FUNGAL: FungalSituation = {
-  arousal: "calm",
-  touch: "nestmate",
-  place: "outside",
-  task: "forager",
-  carrying: "nothing",
-  groomed: false,
-};
+export { SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE } from "../colony/index.ts";
+import { SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE } from "../colony/index.ts";
 const MENU_ON = new Set(DEFAULT_MENU);
 
 export { PER_REQUEST } from "../colony/index.ts";
