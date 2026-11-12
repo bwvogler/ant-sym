@@ -307,6 +307,17 @@ export class Evolution {
     this.mass += spores * BODY.sporeMass;
   }
 
+  /** Hypha cut and lost (ja-2bw.4: ants digging through it): the mass it held is gone. */
+  lose(mass: number): void {
+    this.mass = Math.max(0, this.mass - mass);
+  }
+
+  /** A corpse it grows out of (ja-2bw.7): the cadaver's substance joins the mycelium, as new fungus that counts toward mutations. */
+  feed(mass: number): void {
+    this.mass += mass;
+    this.growth += mass;
+  }
+
   /** Fungus grown in hosts (load passed on by contact): it counts toward mutations. */
   replicate(load: number): void {
     this.growth += load;

@@ -23,7 +23,7 @@ import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 
-// Owns the one Game (the player's colony and the rival) and its animation
+// Owns the one Game (its colonies and the fungus, the player) and its animation
 // loop: React state carries only what the
 // panel shows, the renderer reads the colonies' typed arrays every frame. A
 // new seed, ant count or rival setting is a new game on a fresh map.
@@ -209,10 +209,19 @@ function side(c: Colony, fungus: Fungus): SideStats {
 /** A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load). */
 export function buildGame(s: GameSettings): Game {
   // The page plays one world only (owner, 2026-11-10; PRD §55): the side and open maps stay for the assays and scripts.
+  // Its fungus grows as hyphae (ja-2bw, PRD §63): they fruit where they reach a tunnel, and its dead hosts are new starts.
   const map = generateOneWorld(s.seed);
   return new Game(
     map,
-    { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false, species: speciesById(s.species) },
+    {
+      antCount: s.antCount,
+      rivalAnts: s.antCount,
+      rival: s.rival,
+      regrow: GAME_REGROW,
+      autoFound: false,
+      fungus: { hyphae: true },
+      species: speciesById(s.species),
+    },
     gameRng(s.seed, s.generation),
   );
 }
