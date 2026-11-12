@@ -6504,7 +6504,8 @@ const SIGHT_STEP = 0.25;
 /**
  * Whether world point (x1, y1) is in sight from (x0, y0): every cell the straight line between them crosses, after the one it
  * starts in and before the one it ends in, is open ground below any surface rows (one world's curtain). A sensor at the
- * line's end reads what lies there only through open ground: no ant sees or smells food through soil or rock.
+ * line's end sees food there only through open ground: no ant sees food through soil or rock. (Scent is read where the sensor
+ * is, wall or no wall: a scent field doesn't cross soil, but a sensor round a bend reads its own tunnel's.)
  */
 export function inSight(map: WorldMap, x0: number, y0: number, x1: number, y1: number): boolean {
   const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / SIGHT_STEP);

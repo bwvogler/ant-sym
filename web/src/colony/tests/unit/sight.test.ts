@@ -21,6 +21,7 @@ test("inSight: along open ground yes; through soil or rock no; the end cells don
   assert.equal(look([1, 3], [7, 3]), false, "through rock at (4, 3)");
   assert.equal(look([1, 1], [0, 1]), true, "into a solid end cell: the line crosses nothing between");
   assert.equal(look([3, 2], [4, 2]), true, "to a neighbour");
+  assert.equal(look([3, 1], [5, 2]), false, "across the corner of the soil cell (4, 2)");
 });
 
 const W = 26;
