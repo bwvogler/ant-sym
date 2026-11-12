@@ -82,6 +82,12 @@ export const DEFAULT_GAME: GameParams = {
  */
 export const SAVE_VERSION = 9;
 
+/** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
+function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
+  const { species: _code, ...rest } = p;
+  return rest;
+}
+
 /**
  * Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony).
  * A founding chamber reaches up to 7 columns from its hole (the shaft slants at most about 2.5 over its 14 rows, the
@@ -610,7 +616,7 @@ export class Game {
       {
         ...this.params.species.params,
         antCount: f.antCount,
-        maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)),
+        maxAnts: f.maxAnts ?? this.params.species.params.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)),
         nest: at,
         odour: f.odour,
         tolerance: this.recognition.params.tolerance,
@@ -1100,7 +1106,8 @@ export class Game {
       revealed: [...this.revealed],
       founded: this.founded.map((f) => JSON.parse(JSON.stringify(f)) as Founding),
       flights: this.flights.map((f) => ({ ...f })),
-      params: encode(this.params),
+      // The species is code (functions), not data: the save leaves it out (docs/species.md step 3 saves its id) and a load keeps the game's own.
+      params: encode(withoutSpecies(this.params)),
       map: encode(map),
       colonies: this.colonies.map((c) => c.saveState()),
       raids: this.colonies.map((c) => this.colonies.findIndex((o) => o.ph === c.raidMarks)),
@@ -1167,7 +1174,7 @@ export class Game {
     this.regrown = saved.regrown;
     this.revealed = [...(saved.revealed ?? [])];
     this.flights = (saved.flights ?? []).map((f) => ({ ...f }));
-    this.params = decode(saved.params) as GameParams;
+    this.params = { ...(decode(saved.params) as GameParams), species: this.params.species };
     fillLike(this.map, saved.map);
     if (world && sw) fillLike(world.curtain, sw.curtain);
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));

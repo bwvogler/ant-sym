@@ -70,7 +70,7 @@ export const GENERIC_ANT: Species = { /* today's defaults, bit-exact */ };
 
 ## Order of work (each step keeps the generic ant's goldens bit-exact)
 
-1. **`Species` and `GENERIC_ANT`.** The type, the generic ant as a species whose fields equal today's defaults; `Colony` reads its params and responses from it; `GameParams.species`. No behaviour change.
+1. **`Species` and `GENERIC_ANT`.** The type, the generic ant as a species whose fields equal today's defaults; `Game` hands its params and responses to its colonies (`Colony` stays free of the idea; a colony built outside a `Game` has none); `GameParams.species`, which the save leaves out until step 3. No behaviour change.
 2. **Lane words by species.** The registry rows take a species; the generic ant's legends, contexts and precache stay byte-identical (the pins in `schema.test.ts` and `precache.test.ts` hold); a test species gets its own.
 3. **The save carries the species.** `GameSettings.species`, `SAVE_VERSION` 10 (no migration).
 4. **Host properties** (`undertakes`, `queen`): Colony reads `undertakes` where it calls `#undertake`, and the fungus reads `queen`, from the species instead of assumed. Defaults equal today's.
