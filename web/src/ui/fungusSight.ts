@@ -39,24 +39,50 @@ function hash(a: number, b: number, c: number): number {
 /** The threads' cells, by chunk ("cx,cy"): each chunk's cells (row-major, CHUNK²) at 0…1, a thread's strength there. */
 export type Threads = Map<string, Float32Array>;
 
+/** How the mycelium is drawn at each level of the Mycelium upgrade: a thread, a mat, a web (evolution.ts). */
+export interface Form {
+  /** threads it grows from its patch */
+  trunks: number;
+  /** chance a step of a thread branches */
+  branch: number;
+  /** how many times a branch may branch again (0: trunks only branch once) */
+  depth: number;
+  /** filled out to the cells around each thread: a mat, not single lines */
+  fill: boolean;
+  /** shown on the open ground above as well as underground */
+  above: boolean;
+}
+
+/** The forms by Mycelium level: thin threads underground only until the mat is unlocked; then a mat, above too; then a web. */
+export const FORMS: readonly Form[] = [
+  { trunks: 3, branch: 0.04, depth: 0, fill: false, above: false },
+  { trunks: 6, branch: 0.08, depth: 1, fill: true, above: true },
+  { trunks: 10, branch: 0.1, depth: 1, fill: true, above: true },
+];
+
+/** The form at Mycelium level `level` (clamped to the table). */
+export function formAt(level: number): Form {
+  return FORMS[Math.max(0, Math.min(FORMS.length - 1, Math.floor(level)))]!;
+}
+
 /**
- * The mycelium's threads from origin cells `origins` (x0, y0, x1, y1, …): `trunks` of them (by default one a cell), dealt
- * round the origins in turn, each `reach` cells long. `down`: they grow
- * into the ground below (the side view: down, fanning ±50°); else out every way across it (a top view). A thread walks
- * a cell at a time, its heading wandering by a hash of where it started, and now and then branches; it stops at a cell
- * `stop` says it can't enter. Prefix-stable: a longer reach only extends the same threads, so the web grows, not
- * reshuffles. Strength fades from 1 at the patch to 0.4 at a tip; branches are a little fainter.
+ * The mycelium from origin cells `origins` (x0, y0, x1, y1, …) in form `form`: its trunks dealt round the origins in
+ * turn, each `reach` cells long. `down`: they grow into the ground below (the side view: down, fanning ±50°); else out
+ * every way across it (a top view). A thread walks a cell at a time, its heading wandering by a hash of where it
+ * started, and now and then branches; it stops at a cell `stop` says it can't enter. A filled form also takes the
+ * cells round each thread, at half its strength. Prefix-stable: a longer reach only extends the same threads, so the
+ * mycelium grows, not reshuffles. Strength fades from 1 at the patch to 0.4 at a tip; branches are a little fainter.
  */
 export function threads(
   origins: readonly number[],
   reach: number,
   down: boolean,
   stop: (x: number, y: number) => boolean,
-  trunks = origins.length >> 1,
+  form: Form = FORMS[0]!,
 ): Threads {
   const out: Threads = new Map();
   if (reach <= 0) return out;
-  const mark = (x: number, y: number, s: number) => {
+  const set = (x: number, y: number, s: number) => {
     const cx = Math.floor(x / CHUNK);
     const cy = Math.floor(y / CHUNK);
     const key = `${cx},${cy}`;
@@ -67,6 +93,21 @@ export function threads(
     }
     const i = (y - cy * CHUNK) * CHUNK + (x - cx * CHUNK);
     if (s > a[i]!) a[i] = s;
+  };
+  // A cell of a thread, and in a filled form its six neighbours (odd rows sit half a cell right) at half strength.
+  const mark = (x: number, y: number, s: number) => {
+    set(x, y, s);
+    if (!form.fill) return;
+    const d = y & 1 ? 1 : -1;
+    for (const [nx, ny] of [
+      [x - 1, y],
+      [x + 1, y],
+      [x, y - 1],
+      [x, y + 1],
+      [x + d, y - 1],
+      [x + d, y + 1],
+    ] as const)
+      if (!stop(nx, ny)) set(nx, ny, s * 0.5);
   };
   // A thread from (x, y) heading `ang`, `len` cells, seeded by `seed`; `gen` 0 for a trunk, 1+ for its branches.
   const walk = (x: number, y: number, ang: number, len: number, seed: number, gen: number, from: number) => {
@@ -83,15 +124,14 @@ export function threads(
       if (stop(cx, cy)) return;
       const step = from + j + 1;
       mark(cx, cy, (1 - (0.6 * step) / reach) * (gen ? 0.8 : 1));
-      if (gen < 2 && j > 1 && hash(seed, j, 2) < 0.08) {
+      if (gen <= form.depth && j > 1 && hash(seed, j, 2) < form.branch) {
         const side = hash(seed, j, 3) < 0.5 ? -1 : 1;
         walk(cx, cy, a + side * (0.6 + 0.5 * hash(seed, j, 4)), len - j - 1, Math.floor(hash(seed, j, 5) * 1e9), gen + 1, step);
       }
     }
   };
   const n = origins.length >> 1;
-  for (let k = 0; k < n; k++) mark(origins[2 * k]!, origins[2 * k + 1]!, 1);
-  for (let k = 0; n > 0 && k < trunks; k++) {
+  for (let k = 0; n > 0 && k < form.trunks; k++) {
     const x = origins[2 * (k % n)]!;
     const y = origins[2 * (k % n) + 1]!;
     const seed = Math.floor(hash(x, y, 7 + k) * 1e9);

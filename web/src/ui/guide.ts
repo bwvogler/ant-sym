@@ -237,7 +237,7 @@ export const GUIDE: GuideEntry[] = [
     title: "The fungus",
     swatch: ["var(--spore)"],
     onScreen:
-      "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). Fainter purple threads are its mycelium, growing out from where it landed and, below, down into the soil; they reach further as it grows. You are the fungus.",
+      "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). Below, purple threads in the soil are its mycelium, growing down from where it landed and reaching further as it grows; once you keep the mat, it fills out and shows on the ground above too. You are the fungus.",
     realAnts:
       "Real parasites change what an ant perceives, gives off and can do, not its plans. Rickia makes its hosts carry more of one alkane, and they are attacked less by strangers. Ophiocordyceps hosts lose their daily rhythm and communicate less. Grooming off Metarhizium passes low doses that immunise nestmates.",
     inGame:

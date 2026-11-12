@@ -20,7 +20,7 @@ import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 
-// Owns the one Game (the player's colony and the rival) and its animation
+// Owns the one Game (its colonies and the fungus, the player) and its animation
 // loop: React state carries only what the
 // panel shows, the renderer reads the colonies' typed arrays every frame. A
 // new seed, ant count or rival setting is a new game on a fresh map.

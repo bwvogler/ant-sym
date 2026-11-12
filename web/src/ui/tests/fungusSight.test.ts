@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CHUNK } from "../../colony/index.ts";
-import { MAX_REACH, myceliumReach, threads, trailSight, TRAIL_FLOOR, type Threads } from "../fungusSight.ts";
+import { formAt, FORMS, MAX_REACH, myceliumReach, threads, trailSight, TRAIL_FLOOR, type Threads } from "../fungusSight.ts";
 
 // What the field shows of the fungus (ja-vyu): trails by how far the fungus is into a colony, and its mycelium's threads.
 
@@ -39,7 +39,7 @@ const open = () => false;
 
 test("threads grow down into the ground from the surface, and stop where they can't go", () => {
   const surface = 40;
-  const t = cells(threads([10, surface, 11, surface], 20, true, (_x, y) => y < surface));
+  const t = cells(threads([10, surface, 11, surface], 20, true, (_x, y) => y < surface, FORMS[2]));
   assert.ok(t.size > 20, `${t.size} cells`);
   for (const key of t.keys()) {
     const [x, y] = key.split(",").map(Number) as [number, number];
@@ -57,15 +57,28 @@ test("threads grow down into the ground from the surface, and stop where they ca
 });
 
 test("a longer reach extends the same threads rather than reshuffling them", () => {
-  const short = cells(threads([100, 100], 8, false, open));
-  const long = cells(threads([100, 100], 16, false, open));
+  const short = cells(threads([100, 100], 8, false, open, FORMS[1]));
+  const long = cells(threads([100, 100], 16, false, open, FORMS[1]));
   for (const k of short.keys()) assert.ok(long.has(k), `${k} dropped as it grew`);
   assert.ok(long.size > short.size);
 });
 
-test("threads are strongest at the patch and work on negative columns (one world's curtain)", () => {
+test("threads are strongest near the patch and work on negative columns (one world's curtain)", () => {
   const t = cells(threads([-3, 40], 12, true, open));
-  assert.equal(t.get("-3,40"), 1);
+  assert.ok(t.size > 0);
+  assert.ok([...t.keys()].every((k) => Number(k.split(",")[0]) < 20));
   for (const s of t.values()) assert.ok(s >= 0.4 * 0.8 - 1e-6 && s <= 1);
   assert.equal(threads([1, 1], 0, false, open).size, 0);
+});
+
+test("a thread is thin and stays underground; the mat fills out and shows above; the web is the most", () => {
+  assert.equal(formAt(0).above, false);
+  assert.equal(formAt(0).fill, false);
+  assert.ok(formAt(1).above && formAt(1).fill);
+  assert.equal(formAt(9), FORMS[FORMS.length - 1]);
+  assert.equal(formAt(-1), FORMS[0]);
+  const at = (level: number) => cells(threads([50, 40], 25, true, (_x, y) => y < 40, formAt(level))).size;
+  assert.ok(at(0) < at(1) && at(1) < at(2), `${at(0)} ${at(1)} ${at(2)}`);
+  // Thin: about one cell per step of each trunk, plus a branch or two.
+  assert.ok(at(0) <= FORMS[0]!.trunks * 25 * 1.6, `${at(0)} cells`);
 });
