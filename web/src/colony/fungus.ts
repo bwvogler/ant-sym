@@ -43,7 +43,6 @@ import {
   Hyphae,
   type HyphaeSave,
   keyCell,
-  sporeCellsOf,
   stepRound,
   TIP_STEP,
 } from "./hyphae.ts";
@@ -1066,15 +1065,16 @@ export class Fungus {
     this.#hyphae.forEach((h, l) => {
       if (!h) return;
       if (stepped || !this.#sporeSpots[l]) {
-        // The patch fruits where it landed (its base); the hyphae add the dug cells they reach.
+        // The patch fruits where it landed (its base), as without hyphae. The hyphae put out none of their own yet: spread
+        // over the dug cells they reach, the same spores thinned the patch below an infecting dose, and the fungus took
+        // hold on 6 seeds of 10 against 9 (PRD §61). Where they fruit is the open decision of ja-2bw.6 (sporeCellsOf).
         const L = this.#layers[l] as SporeLayer;
         const { w } = L.map.size;
         const { x0 } = L.map;
-        const base = L.base.map((key) => {
+        this.#sporeSpots[l] = L.base.map((key) => {
           const col = key % w;
           return cellKey(col + x0, (key - col) / w);
         });
-        this.#sporeSpots[l] = [...new Set([...base, ...sporeCellsOf(h, this.#ground(l))])];
       }
       const c = this.#sporeSpots[l] as number[];
       cells += c.length;

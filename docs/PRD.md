@@ -4723,3 +4723,23 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 **Beads.** `ja-2bw` (epic): `.1` assays and the progression baseline; `.2` hyphae in the soil on the local rule, spores where they are exposed (`ja-yo3` to discuss); `.3` the picture: lines through the hexagons, nothing on the plane; `.4` digging cuts hyphae; `.7` corpses colonised; `.8` cords (*a web*); `.9` knots; `.10` stalks; fusion is in `.2` (the body) and `.5` (the answer); `.5` the growth lane; `.6` tune and turn on. Related: `ja-yo3`, `ja-2qv`, `ja-lo8.13` (toward food: chemotropism, which the evidence calls limited), `ja-k4k.8`.
 
 **Still open.** The new upgrades' costs and panel names; whether ants walking through a dug cell break an exposed hypha (proposed: no, they pick spores off it); `HGU`, `TIP_STEP` per level and `HYPHA_MASS` against the progression band; the tick cost of a few hundred tips; Trinci 1974's full text for the growth unit.
+
+### 61.1 The body on its local rule (ja-2bw.2, 2026-11-12)
+
+**Built** (behind `params.hyphae`, off by default: every golden master bit-exact, 215 unit and 327 int tests green).
+- `colony/hyphae.ts`: tips step every `TIP_STEP` s (2, 1.5, 1 by *Mycelium* level) on the situation `ahead` × `exposed` × `supply` (24) and the answers grow, left, right, branch, rest, fuse. The local rule: split round a point, split wide along a flat wall, slide at a glance (a blocked veer turns the tip where it stands), turn from its own hyphae, keep to a tunnel's wall from the soil, branch every `BRANCH_RUN` (7) cells with branches starting `BRANCH_START` (2) cells in, rest on short supply. A thread keeps to dug walls in the curtain; a borer pushes into undug soil.
+- **Branching was tuned to the growth unit.** With every tip branching at run 8, the mycelium branched in lockstep and length ÷ tips see-sawed 8.7–15 (an exponential steady state of 1 / (2^(1/b) − 1) ≈ 11, not 8). Branching every 7 with branches staggered 2 cells in settles at 7.9–8.3 (H1).
+- **Mass.** The hyphae embody the mycelium's mass rather than drain it: at most mass ÷ `HYPHA_MASS` (0.25) cells, and a tip extends only on mass not yet embodied, judged once a round so the first tip doesn't take it all. Every map's tips take turns in one round: stepped map by map, the plane's tips took every cell of mass and the curtain's never grew.
+- **Rooting.** The plane's landing patch becomes the first hypha cells, with three tips from its rim (from its middle they were boxed in by their own cells); in one world, the shaft's walls under the hole take a tip on each side (`Game.#rootShaft`, from `ja-yo3`).
+- **Cost.** A round of ~1,000 tips takes under 1 ms (bench, `stepTips`, 996 tips, 8,103 cells); rounds come every 1–2 s.
+
+**Where the spores go: measured, and left to the owner.** `progression.mjs --map one --evolve --hyphae`, seeds 1–10, 600 s, against the baseline above (a quarter on 9 seeds of 10):
+
+| spores put out on | seeds where the fungus took hold (a quarter) |
+|---|---|
+| no hyphae (baseline) | 9 of 10 (147–509 s) |
+| every hypha cell on the plane, and the dug cells the curtain's reach | 2 of 10 |
+| the landing patch, and the dug cells the curtain's hyphae reach | 6 of 10 (152–489 s) |
+| the landing patch only (shipped in this slice) | as the baseline: seeds 1–3 identical to the second |
+
+The mycelium's spore output is fixed by its mass, so every cell added to where it fruits thins the patch the foragers walk through below the dose that infects an ant (`minDose`). This slice ships the patch only: hyphae grow and are saved but change no play yet. Where they fruit (a share kept for the patch, fruiting as a growth-policy answer, corpses and stalks) is `ja-2bw.11`, an owner decision.
