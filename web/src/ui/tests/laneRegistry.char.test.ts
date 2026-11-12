@@ -206,6 +206,9 @@ test("each lane's local answer, and how each lane reads a reply, a bad one and n
   assert.deepEqual([validLevels(key, "2,1,1"), validLevels(key, "9,1,1")], [true, false]);
 });
 
+// Changed on purpose by the lane registry's slice 3 (ja-fnd.5.2.4): the fungus sample used to ask every lever on the menu (15 under the default
+// menu), but a worker host's key asks the 14 that are not a queen's, so the Learn panel's sample request and its cost per question (758 → 706
+// tokens) now match what the page sends. The ants' lanes, and the fungus's request under a custom menu, are byte for byte as before.
 test("what the Learn panel and the cost estimates send: the sample requests and the tokens a question costs", () => {
   const samples = [
     requestFor({ lane: "mode", situation: SAMPLE_SITUATION }, DOCTRINE_TEXTS[0]!, 3),
@@ -215,21 +218,28 @@ test("what the Learn panel and the cost estimates send: the sample requests and 
   assert.deepEqual(samples.map(idOf), [
     ["d08b5e29ecdab99a", 3741],
     ["5412af7a49137dcb", 2150],
-    ["2d6065573ea781b2", 6690],
+    ["6325a426a255b960", 6366],
   ]);
+  // The sample asks what a host in that situation is asked: a worker's levers, not a queen's.
+  const workerLevers = askedLevers(new Set(DEFAULT_MENU), false);
+  assert.equal(workerLevers.length, 14);
+  assert.deepEqual(
+    Object.keys(samples[2]!.questions).filter((q) => q.startsWith("h0_")),
+    workerLevers.map((id) => `h0_${id}`),
+  );
   // The fungus sample takes a menu (the Learn panel shows the levers the player has on): the request asks only those.
   assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL, menu: new Set(MENUS[1]) }, AIM_TEXTS[0]!, 2)), [
     "0a8d8be9e2350816",
     2869,
   ]);
-  assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL }, AIM_TEXTS[0]!, 2)), ["07db7a08ecbdf6c3", 5157]);
+  assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL }, AIM_TEXTS[0]!, 2)), ["5fd1111c0ab03d17", 4941]);
   assert.deepEqual(
     [
       tokensPerQuestion("mode", DOCTRINE_TEXTS[0]!),
       tokensPerQuestion("stance", DOCTRINE_TEXTS[0]!),
       tokensPerQuestion("fungus", AIM_TEXTS[0]!),
     ],
-    [240, 197, 758],
+    [240, 197, 706],
   );
 });
 
