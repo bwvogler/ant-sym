@@ -11,7 +11,7 @@ Today the fungus's mycelium is a number: a mass on its patch by the hole that gr
 - **A tip senses contact.** It slides along a wall it meets at a shallow angle, splits in two against one it meets head on, then goes back to its old heading. It turns away from hyphae of its own nearby (§3).
 - **The network feeds the tips.** Supply to a hypha goes with the number of tips it feeds; resources move out to the foraging edge (§4).
 - **Against the idea:** in soil, *Metarhizium* is found mostly as spores and on roots, not as a free-foraging mycelium. The game takes a licence here, as fungus-body.md already does for its mycelium by the hole (§5).
-- **In the game:** a mycelium of hyphae in the curtain's soil, rooted beside the shaft under the hole, each tip a few cells long a step; a **growth policy** chooses for each tip (grow on, veer, branch, rest) from what that tip senses at its point (what is ahead, ants passing beside it, its supply). The local rule is the biology above; Jev answers it under the player's aim. Spores go out where hyphae meet the tunnels.
+- **In the game:** a mycelium of hyphae in the curtain's soil, rooted beside the shaft under the hole, each tip a few cells long a step; a **growth policy** chooses for each tip (grow on, veer, branch, rest) from what that tip senses at its point (what is ahead, whether it is buried in soil, on a tunnel's wall or out in a dug cell, and its supply). The local rule is the biology above; Jev answers it under the player's aim. Hyphae may grow along tunnels and across them; spores go out where they are exposed to air.
 
 ## 1. A tip extends at a steady average rate, in pulses
 
@@ -41,7 +41,7 @@ Today the fungus's mycelium is a number: a mass on its patch by the hole that gr
 - **Negative autotropism:** hyphae turn away from a neighbour within about 24–30 µm (Trinci et al. 1979; **unverified**, a textbook excerpt). The mechanism is unproven (Brand & Gow 2009), and a 2025 preprint reports apex–hypha interactions as intermittent, sometimes toward and sometimes away (arXiv 2507.06280; preprint, **unverified**, not fetched).
 - **Chemotropism** outside mating is "limited" in the evidence (Brand & Gow 2009); none was found for *Metarhizium* toward insects. **Gravitropism** of vegetative hyphae: not found.
 
-**In the game:** a tip senses only what touches it: the cell ahead (soil to grow through, an open tunnel or chamber, rock, or a hypha of its own) and the cells beside it. These are contact senses, sourced above; that a tip in soil senses *ants walking in the tunnel beside it* (their footprints' hydrocarbons, or the vibration) is **design**, marked so, and the cue the player's aim would most want. The local rule follows Held et al.: rock ahead head-on, split (a branch each way); at a glancing angle, slide (turn one hex along it); its own hypha ahead, turn away; otherwise drift back to its first heading. Growing toward food (`ja-lo8.13`) would be chemotropism, which the evidence above calls limited: it stays a design choice for that bead.
+**In the game:** a tip senses only what touches it: the cell ahead (soil to grow through, an open tunnel or chamber, rock, or a hypha of its own) and whether it is **exposed**: buried in soil, in soil with a dug cell beside it (a tunnel's wall), or out in a dug cell itself (open to the air of a tunnel or chamber). These are contact senses, sourced above: walls steer a tip (Held et al.) and hyphae follow grooves and pores (thigmotropism). A tip may grow along a tunnel's wall, or out into the tunnel and across it (owner, 2026-11-12). That an exposed hypha is where the fungus sporulates follows *Metarhizium*'s conidiation on surfaces open to the air, **design** here (from memory; not fetched). What ants are doing in the tunnel is not sensed. The local rule follows Held et al.: rock ahead head-on, split (a branch each way); at a glancing angle, slide (turn one hex along it); its own hypha ahead, turn away; a tunnel ahead from the soil, slide along its wall (thigmotropism); otherwise drift back to its first heading. Growing toward food (`ja-lo8.13`) would be chemotropism, which the evidence above calls limited: it stays a design choice for that bead.
 
 ## 4. The network feeds the tips; resources move out to the edge
 
@@ -65,28 +65,28 @@ Today the fungus's mycelium is a number: a mass on its patch by the hole that gr
 - *Metarhizium* or *Beauveria* tip speed in soil; their hyphal length density in soil.
 - *Metarhizium* chemotropism toward insects or nutrients; gravitropism of vegetative hyphae.
 - Per-species hyphal growth unit values; when a tip stops for want of supply; regression times; translocation speeds.
-- Any fungus sensing ants in a tunnel beside its hyphae (the `traffic` cue below is design).
+- Conidiation of *Metarhizium* on exposed hyphae in soil pores (the `exposed` cue's role for spores is design).
 
 ## The mechanic
 
 Cheapest first; everything behind a setting (`hyphae`) whose "off" plays as main does bit for bit (the golden masters never land a fungus; the progression script is the play baseline).
 
-1. **The body: hyphae in the soil** (`colony/hyphae.ts`, pure). A set of hypha cells in the curtain's soil, each with its parent (so a hypha is a chain and the mycelium a tree), and a list of tips, each with its heading (one of six hex directions), its first heading (directional memory) and its run since its last branch. The landing roots a few tips in the soil beside the shaft under the hole (the zone `ja-yo3` defines). Each tip steps every `TIP_STEP` seconds (the growth factor: shorter with each *Mycelium* level), paid out of the mycelium's mass at `HYPHA_MASS` a cell, shared among the tips (§4). **Spores** go out onto open cells touching a hypha (the tunnel walls it has reached), at the *Fruiting body* rate, replacing today's fixed patch. **Ants digging** a hypha cell cut it: the cell is gone, and tips beyond the cut stop (counterplay; **design**).
+1. **The body: hyphae in the soil** (`colony/hyphae.ts`, pure). A set of hypha cells in the curtain's soil, each with its parent (so a hypha is a chain and the mycelium a tree), and a list of tips, each with its heading (one of six hex directions), its first heading (directional memory) and its run since its last branch. The landing roots a few tips in the soil beside the shaft under the hole (the zone `ja-yo3` defines). Each tip steps every `TIP_STEP` seconds (the growth factor: shorter with each *Mycelium* level), paid out of the mycelium's mass at `HYPHA_MASS` a cell, shared among the tips (§4). Tips may grow into dug cells (along a tunnel or across it). **Spores** go out onto open cells where a hypha is exposed (a hypha in a dug cell, or on a tunnel's wall), at the *Fruiting body* rate, replacing today's fixed patch. **Ants digging** a hypha cell cut it: the cell is gone, and tips beyond the cut stop (counterplay; **design**).
 2. **The growth policy.** The fungus's choice for a tip at its step, from what that tip senses:
 
    | Cue (sensed by the tip) | Values | Source |
    |---|---|---|
    | `ahead`: the cell it would grow into | soil, open (a tunnel or chamber), rock, hypha (its own) | contact: Held et al. 2019; autotropism (Trinci et al. 1979, unverified) |
-   | `traffic`: ants passing in an open cell beside it lately | none, some | **design** (no paper shows it) |
+   | `exposed`: where the tip is | buried (soil all round), wall (soil, a dug cell beside), open (in a dug cell) | thigmotropism and pore following (Brand & Gow 2009; 1997 study, unverified); Held et al. 2019 (walls) |
    | `supply`: its share of the network's mass this step | short, ample | Roper et al. 2013 (flow ∝ tips fed) |
 
-   4 × 2 × 2 = **16 situations**. Answers: `grow` (on, straight), `left`, `right` (veer one hex), `branch` (a new tip one hex aside), `rest` (no step; it keeps its mass). The tip's local rule (Jev's stand-in, and the "preset"): rock head-on, branch both ways (split); rock at a glance, slide (veer along it); own hypha ahead, veer away; open ahead, rest (it has reached a tunnel, where its spores go out); supply short, rest; run ≥ `HGU`, branch; else drift back toward the first heading. The `traffic` cue is ignored by the local rule (it is the aim's to use).
+   4 × 3 × 2 = **24 situations**. Answers: `grow` (on, straight), `left`, `right` (veer one hex), `branch` (a new tip one hex aside), `rest` (no step; it keeps its mass). The tip's local rule (Jev's stand-in, and the "preset"): rock head-on, branch both ways (split); rock at a glance, slide (veer along it); own hypha ahead, veer away; open ahead from the soil, slide along the tunnel's wall (thigmotropism); in a dug cell, grow on across it toward soil; supply short, rest; run ≥ `HGU`, branch; else drift back toward the first heading. Growing out into a tunnel instead of along it is the aim's choice (Jev may answer `grow` there).
 3. **The lane.** A new Jev lane, `growth`, under the fungus's aim (the player's words): one question per situation, cached like the fungus lane; a tip whose situation has no answer under the words in force plays the local rule until the answer arrives (ja-lo8.15). Precached for the preset aims (`scripts/precache.mjs`, from a live check's caches).
 4. **The picture.** The renderer draws each hypha as lines through the hexagons' centres (parent to child), thin, tips as a dot; the *Mycelium* level thickens them. It replaces the hashed threads of `ui/fungusSight.ts`, and nothing is drawn on the plane.
 
 | Cue | Sense row | Response | Local rule | Off | Retires |
 |---|---|---|---|---|---|
-| ahead, traffic, supply (a tip's contact and its supply) | fungus senses, [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers), extended by this note | grow, left, right, branch, rest | Held et al.'s slide and split, autotropism, the growth unit, supply | `hyphae` off: the patch by the hole as today | the fixed patch (`Fungus.root`'s base) and its spores' missing terrain check; the hashed threads in `ui/fungusSight.ts`; the fungus has its first choice of where its spores go out (part of `ja-k4k.8`) |
+| ahead, exposed, supply (a tip's contact and its supply) | fungus senses, [fungus-policy §11](fungus-policy.md#11-what-the-fungus-senses-inside-an-ant-and-its-levers), extended by this note | grow, left, right, branch, rest | Held et al.'s slide and split, autotropism, the growth unit, supply | `hyphae` off: the patch by the hole as today | the fixed patch (`Fungus.root`'s base) and its spores' missing terrain check; the hashed threads in `ui/fungusSight.ts`; the fungus has its first choice of where its spores go out (part of `ja-k4k.8`) |
 
 **Assays and targets** (they land first, with `hyphae` off measuring nothing, then on):
 - **H1, the growth unit:** under the local rule in open soil, length ÷ tips settles to within ±20 % of `HGU` once past 20 tips (Trinci 1974, unverified).
@@ -96,24 +96,22 @@ Cheapest first; everything behind a setting (`hyphae`) whose "off" plays as main
 - **Play (P1):** with `hyphae` on, `scripts/lab/progression.mjs`'s worst seed to a quarter of the colony stays inside PRD §50.14's band (156–241 s; the build re-measures it first).
 - **Bench:** a tip step is O(1); a few hundred tips stepping every few ticks fits the tick budget (measured in the PR).
 
-**Cost (estimated).** The lane's request is the fungus lane's shape with a smaller legend: about 16 situations per set of words, at roughly the fungus lane's ~770 tokens a situation (PRD §50.19), about 12k tokens, **≈ $0.0005 per new aim**, once; cached games spend nothing. The fungus lane is unchanged.
+**Cost (estimated).** The lane's request is the fungus lane's shape with a smaller legend: about 24 situations per set of words, at roughly the fungus lane's ~770 tokens a situation (PRD §50.19), about 18k tokens, **≈ $0.0008 per new aim**, once; cached games spend nothing. The fungus lane is unchanged.
 
 ## Play
 
-- **See:** threads growing in the side view as lines through the hexagons, tips creeping on, splitting at stones, turning from each other, and reaching a tunnel, where spores begin to show on its floor. Ants digging cut them. Followed through the views, the mycelium is under the hole, never on the plane. The Learn entry "The fungus's body" gains what you see (lines, tips, splits) and the biology above.
-- **Choose:** the aim in words now reaches the fungus's body: "grow toward the tunnels the ants use" or "stay deep and out of their way" changes where the hyphae go, and so where ants pick spores up. It is the fungus's first say in where its spores go out (`ja-k4k.8`). The *Mycelium* upgrade becomes the growth factor (tip speed and how many tips the body feeds), so it shows on the field.
-- **Counterplay and progression:** ants digging cut hyphae; a colony that digs a lot keeps clearing its own walls. The start stays weak: a few tips, slow, a few cells from the shaft; the slope is the *Mycelium* upgrade. The cue the player would use most, `traffic`, is design and costs nothing to ignore.
-- **Cost:** about $0.0005 a new aim (16 situations), once; cached games spend nothing. No other lane changes.
+- **See:** threads growing in the side view as lines through the hexagons, tips creeping on, splitting at stones, turning from each other, running along tunnel walls or out across them, and spores showing where they are exposed. Ants digging cut them. Followed through the views, the mycelium is under the hole, never on the plane. The Learn entry "The fungus's body" gains what you see (lines, tips, splits) and the biology above.
+- **Choose:** the aim in words now reaches the fungus's body: "run along the tunnels" or "stay buried and out of their way" changes where the hyphae go, and so where ants pick spores up. It is the fungus's first say in where its spores go out (`ja-k4k.8`). The *Mycelium* upgrade becomes the growth factor (tip speed and how many tips the body feeds), so it shows on the field.
+- **Counterplay and progression:** ants digging cut hyphae; a colony that digs a lot keeps clearing its own walls. The start stays weak: a few tips, slow, a few cells from the shaft; the slope is the *Mycelium* upgrade. A hypha out in a tunnel is where ants can reach it.
+- **Cost:** about $0.0008 a new aim (24 situations), once; cached games spend nothing. No other lane changes.
 - **Risks:** a **cliff** if hyphae reach every tunnel at once and spores go out everywhere; the number to watch is the progression worst seed (P1). A **runaway** body if growth outpaces mass: H4 forbids it. **Invisible** above: the effect shows only in the side view, so the top view's ants carrying spores must still read as the fungus's doing. **Mills:** a tip resting at a tunnel forever does nothing harmful; a tip veering left and right forever would stall, which H1 would show as too few branches.
 - **Owner decisions needed:** listed below.
 
 ## Open questions
 
-- **Owner:** a Jev lane for growth (proposed: yes, after the body runs on its local rule), or the local rule only?
-- **Owner:** nothing on the plane (proposed, following the owner's UV decision of 2026-11-08). The mat drawn above since `ja-6jg` would go.
-- **Owner:** does this epic absorb `ja-yo3` (root the mycelium in the shaft's soil walls)? Proposed: yes, as part of its body child (`ja-2bw.2`); `ja-2qv`'s UV research is linked, not blocking, since the soil is already the owner's decision.
-- **Owner:** ants cut hyphae by digging (proposed: yes, as counterplay; design).
-- **Owner:** the `traffic` cue is design: keep it (it gives the aim something to work with) or leave tips with contact and supply only?
+- **Decided (owner, 2026-11-12):** soil only, nothing on the plane (the mat drawn above since `ja-6jg` goes); the local rule first, then a Jev growth lane; no cue for ants: instead whether the tip is buried, on a tunnel's wall or out in a dug cell, and tips may grow along tunnels or across them; ants digging cut hyphae.
+- **Owner, to discuss:** `ja-yo3` (root the mycelium in the shaft's soil walls) folding into the body child `ja-2bw.2`: the owner leans yes but wants more discussion first.
+- **Owner:** do ants walking through a dug cell break a hypha out in it, or only pick spores off it? Proposed: only pick spores off it in the first build.
 - To measure: `HGU`, `TIP_STEP` per *Mycelium* level and `HYPHA_MASS` against the progression band; the tick cost of a few hundred tips.
 
 ## Sources
