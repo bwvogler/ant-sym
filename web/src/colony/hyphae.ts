@@ -383,16 +383,18 @@ function stepTip(
   return grown;
 }
 
-/** The cells a mycelium puts its spores out on (§6): on the plane every hypha cell (the surface above it); in the curtain a hypha out in a dug cell, and the dug cells beside a hypha in a wall. */
+/**
+ * The cells a mycelium puts its spores out on (§6): in the curtain, a hypha out in a dug cell and the dug cells beside a
+ * hypha in a wall. On the plane its hyphae stay under the surface and put out none: there only its patch fruits (the
+ * caller adds it). Spread over every hypha cell, the spores fell below the dose that infects an ant, and the fungus took
+ * hold on 2 seeds of 10 (PRD §61).
+ */
 export function sporeCellsOf(h: Hyphae, g: Ground): number[] {
   const out = new Set<number>();
+  if (g.topsoil) return [];
   for (const k of h.parent.keys()) {
     const [x, y] = keyCell(k);
     const kind = g.kind(x, y);
-    if (g.topsoil) {
-      if (kind !== "rock") out.add(k);
-      continue;
-    }
     if (kind === "open") out.add(k);
     else if (kind === "soil")
       for (let d = 0; d < 6; d++) {

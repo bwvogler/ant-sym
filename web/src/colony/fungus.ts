@@ -35,6 +35,7 @@ import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.
 import { CELL, cellOf, discOffsets, E, nx, ny, NW, SE, SW } from "./hex.ts";
 import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type WorldMap } from "./world.ts";
 import {
+  cellKey,
   type Ground,
   type GrowthAnswer,
   type GrowthSituation,
@@ -1064,7 +1065,17 @@ export class Fungus {
     let cells = 0;
     this.#hyphae.forEach((h, l) => {
       if (!h) return;
-      if (stepped || !this.#sporeSpots[l]) this.#sporeSpots[l] = sporeCellsOf(h, this.#ground(l));
+      if (stepped || !this.#sporeSpots[l]) {
+        // The patch fruits where it landed (its base); the hyphae add the dug cells they reach.
+        const L = this.#layers[l] as SporeLayer;
+        const { w } = L.map.size;
+        const { x0 } = L.map;
+        const base = L.base.map((key) => {
+          const col = key % w;
+          return cellKey(col + x0, (key - col) / w);
+        });
+        this.#sporeSpots[l] = [...new Set([...base, ...sporeCellsOf(h, this.#ground(l))])];
+      }
       const c = this.#sporeSpots[l] as number[];
       cells += c.length;
       spots.push({ L: this.#layers[l] as SporeLayer, cells: c });
