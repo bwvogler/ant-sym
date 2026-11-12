@@ -4899,16 +4899,16 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
   - **The leafcutter is modelled on *Atta*** (one queen; *Acromyrmex* immunity numbers borrowed and labelled); **the termite is a separate-piece subterranean termite** in the dug curtain, the mound later.
   - **Caste is a situation field, not a fixed task per size** (a fixed task is a scripted choice); **army-ant phases come from sensed larvae, not a clock**; **raids by size are an assay of today's rules first**.
   - **"No entry" stays at the generic ant's strength** for the Pharaoh ant, because the repellent signal is unreplicated.
-  - The old wave epics (`ja-8fd`, `ja-jhd`, `ja-v06`) are related to the new epics and left open; closing them is the owner's.
-- **For the owner** (`ja-5zfl`):
-  1. **Which species is second after the desert ant.** Recommendation: *L. neglectus*. Why: generic lanes (one live check at about the generic mode lane's ~$0.0065), its structures (`queens[]`, several nests, the sickness cue) are the ones three later species reuse, and its counterplay is measured. Alternative: the leafcutter (more spectacle, the widest tier 2, a caste field ~2–3× the questions).
-  2. **Whether to build the Pharaoh ant at all.** Recommendation: only after *L. neglectus*, and only if emigration is wanted before termites or army ants need it. The army ants' bivouac (`ja-ehuv.6`) waits on its emigration bead (`ja-n70l.6`); if the Pharaoh ant is declined, that bead moves to the army-ant epic (review of #114, D1).
-  3. **Whether and when to leave the ants for termites** (`ja-a2m`). Recommendation: after the leafcutter, so the caste field and the nest-kind interface exist and termites test tier 3 on them; build termites before army ants (stronger literature, the dug curtain stays).
-  4. **When mixed worlds come** (`ja-fnd.5.4`). Recommendation: after *L. neglectus*' budding, when a colony already has several nests.
-  5. **Spend**: each species' precache is a live check (estimates below), at the owner's say.
-  6. **The fungus's levers on each host** (each epic has a child).
+  - The old wave epics (`ja-8fd`, `ja-jhd`, `ja-v06`) are related to the new epics. **Owner (2026-11-12): close them as superseded.** `ja-jhd` and `ja-v06` are closed; `queens[]` (`ja-8fd.1`) moved under `ja-e668`; `ja-8fd` stays open only for its three multi-colony children (`ja-8fd.2`–`.4`), which belong with mixed worlds.
+- **For the owner** (`ja-5zfl`; all answered by the owner on 2026-11-12, as recommended):
+  1. **Which species is second after the desert ant.** Recommendation: *L. neglectus*. Why: generic lanes (one live check at about the generic mode lane's ~$0.0065), its structures (`queens[]`, several nests, the sickness cue) are the ones three later species reuse, and its counterplay is measured. Alternative: the leafcutter (more spectacle, the widest tier 2, a caste field ~2–3× the questions). **Owner: *L. neglectus*.**
+  2. **Whether to build the Pharaoh ant at all.** Recommendation: only after *L. neglectus*, and only if emigration is wanted before termites or army ants need it. The army ants' bivouac (`ja-ehuv.6`) waits on its emigration bead (`ja-n70l.6`); if the Pharaoh ant is declined, that bead moves to the army-ant epic (review of #114, D1). **Owner: later and optional; the epic stays open.**
+  3. **Whether and when to leave the ants for termites** (`ja-a2m`). Recommendation: after the leafcutter, so the caste field and the nest-kind interface exist and termites test tier 3 on them; build termites before army ants (stronger literature, the dug curtain stays). **Owner: after the leafcutter, before army ants.**
+  4. **When mixed worlds come** (`ja-fnd.5.4`). Recommendation: after *L. neglectus*' budding, when a colony already has several nests. **Owner: so; `ja-fnd.5.4` now waits on `ja-e668.6`.**
+  5. **Spend**: each species' precache is a live check (estimates below), at the owner's say. **Owner: ask before each species' live check; until then it plays the local rule** (a note on each species-row bead).
+  6. **The fungus's levers on each host** (each epic has a child). **Owner: ask for each species when it is built.**
 
-**Recommended order.** Desert ant (`ja-rf5`) → *L. neglectus* (`ja-e668`) → leafcutter (`ja-vq14`) → [Pharaoh ant (`ja-n70l`), optional] → termites (`ja-328h`) → army ants (`ja-ehuv`). The bead dependencies follow it (each species row on the one before; the owner's decision bead first) and change if the owner picks another.
+**Order (owner, 2026-11-12).** Desert ant (`ja-rf5`) → *L. neglectus* (`ja-e668`) → leafcutter (`ja-vq14`) → [Pharaoh ant (`ja-n70l`), optional] → termites (`ja-328h`) → army ants (`ja-ehuv`). The bead dependencies follow it (each species row on the one before).
 
 **Cost (estimated from request size; none measured).** From the generic mode lane on one world (~122 distinct situations a game, ~783 tokens a question, ~$0.074/h while a doctrine is new, §51, `colony-cost --one`; a full live run of all lanes ~$0.0065, §54.4, so a mode-lane check costs less):
 
