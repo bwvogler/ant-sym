@@ -3138,11 +3138,18 @@ export class Colony {
       if (target < 0) return false; // no chamber to take it to (a colony always has its royal one: can't happen)
       // In its chamber, or beside it (a store a cell or two wide is passed by more often than stood in: review of slice 5).
       if (here !== target) {
+        const standing = here;
         here = -1;
         // (Porters only: a forager put down beside its chamber is an explorer in a tunnel, and dug at its ends.)
         if (this.porter[i]) {
           for (let d = 0; d < 6 && here < 0; d++) if (ch.at(stepX(cx, cy, d), stepY(cy, d)) === target) here = target;
           if (here < 0) here = this.#portInstead(i, cx, cy, target, dt);
+        } else if (standing >= 0 && this.since[i] > STORE_AFTER) {
+          // A forager long on its way (ja-3ifx: food from a pocket the nest's own tunnels opened, its chamber a maze away)
+          // puts its food down in the first of its colony's food chambers it stands in: a store, reception or the queen's.
+          // Porters carry it on from there to where it is wanted.
+          const c = ch.list[standing]!;
+          if (c.colony === this.params.nest && (c.role === "store" || c.role === "reception" || c.role === "royal")) here = standing;
         }
         if (here < 0) return false;
       }
@@ -6412,6 +6419,11 @@ const PICK_BROOD = 0.5;
 const HOLD_MAX = 30;
 /** A forager's food goes to reception only once it is a chamber of this many cells (see #foodTo); until then, to the royal chamber. */
 const RECEPTION_MIN = 4;
+/**
+ * Seconds a forager carries its food before it will put it down in any of its colony's food chambers it stands in, not
+ * only the one it takes food to (see #port; ja-3ifx). A trip from a pocket by the nest is under a minute when it finds its way.
+ */
+const STORE_AFTER = 60;
 /** Rows either side of a chamber's mean row searched for its cell nearest that mean (the founding disc is the tallest: 9 rows). */
 const CHAMBER_SCAN = 5;
 /**
