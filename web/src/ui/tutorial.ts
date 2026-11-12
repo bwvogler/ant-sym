@@ -56,7 +56,7 @@ export const TUTORIAL_SPEED = 1;
  * at 1× was too slow to watch (owner, 2026-11-12); at 4× about 25 s, under a minute on the slowest seed.
  */
 export const WATCH_SPEED = 4;
-/** "Faster" while waiting or watching: the top speed. */
+/** "Faster" while waiting or watching: the speed bar's top speed (useColony MAX_SPEED; a test holds them equal). */
 export const FAST_SPEED = 8;
 /**
  * Sim seconds of watching before the tutorial moves on without a clean host. Measured (scripts/tutorial-first-host.mjs,
@@ -165,7 +165,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         title: "You are a fungus",
         body: [
           `The purple specks by the ${ink} colony's hole are your spores. You can't move. You wait for an ant to walk through you.`,
-          "The game is paused, and runs slowly while this tutorial shows you around.",
+          "The game is paused. It runs at 1× until an ant picks you up.",
         ],
         next: "Let it play",
       };
@@ -192,7 +192,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         body: [
           "Ants lick each other clean. Each time a nestmate grooms it, some of you comes off, and the groomer learns your smell: it resists you a little more.",
           ...(t.below ? ["It has taken you down the hole into the nest: the view switched to below."] : []),
-          "Watch its share of you on the card. The game runs at 4× for this.",
+          `Watch its share of you on the card. The game runs at ${WATCH_SPEED}× for this.`,
         ],
         next: null,
         highlight: "load",

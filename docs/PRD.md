@@ -4681,7 +4681,7 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
-- **Speed:** 1× while the tutorial runs, then back to the game's 4×. `GAME_SPEED` is unchanged.
+- **Speed:** 1× for the landing and the wait for the first host; the watch at 4× (§61.2: 1× was too slow there); then the game's own 4×. `GAME_SPEED` is unchanged.
 - **Who gets it:** a player's first Start runs it. A browser flag (`localStorage`, `jev-ants.tutorial`) marks it finished or skipped. The start screen offers "Start without the tutorial", and afterwards "Play the tutorial".
 - **Scope:** from the landing to the first host clearing, then the aim. After that the goal line (§50.4) takes over.
 
