@@ -47,6 +47,7 @@ import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
 import Help from "./ui/Help.tsx";
+import { REPO } from "./ui/guide.ts";
 import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
 import { pushToast } from "./ui/toasts.ts";
@@ -288,6 +289,15 @@ export default function ColonyApp() {
           <p className="hidden text-sm text-fg-3 sm:block">you are the fungus</p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href={REPO}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised"
+            title="The source and the research notes, on GitHub (opens in a new tab)"
+          >
+            GitHub
+          </a>
           <button
             type="button"
             className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg hover:bg-raised"
