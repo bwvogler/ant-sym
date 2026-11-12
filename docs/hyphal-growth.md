@@ -71,12 +71,28 @@ Today the fungus's mycelium is a number: a mass on its patch by the hole that gr
 
 **In the game** (owner, 2026-11-12): the plane is read as the topsoil and litter just under the surface, not its sunlit top. Hyphae thread through it round the hole (drawn faint, as under the ground) and down the shaft's and tunnels' walls into the curtain, the dug surfaces first; pushing into undug soil needs the *Mycelium* upgrade's second level, renamed **a borer**. Nothing grows on top in the sun: spores laid out in the open die faster there (`ja-6ip`). A hypha that reaches a **corpse** (on the midden or anywhere) grows over it and puts out many spores; ants tending a corpse hold it back (Kesäniemi et al. 2019), which is also their counterplay.
 
+## 7. Structures: cords, knots, stalks, and fusion
+
+*From a third search the same day (2026-11-12): Bebber et al. 2007, Heaton et al. 2010, Tlalka et al. 2008, Paixão et al. 2021, Marciano et al. 2021, Hughes et al. 2011, Roca et al. 2005 and Simonin et al. 2012 read in full; a "[bio]" filter refused two searches on microsclerotia, and Jackson & Jaronski 2009 and Araújo et al. 2018 were not read.*
+
+- **Cords thicken where flow runs and thin where it doesn't.** *Phanerochaete velutina* networks on soil reached about 700 nodes; their material per area fell from about 1.0–1.2 to 0.6–0.7 mm³/cm² between days 18 and 39 by "selective reinforcement and recycling", and kept a larger connected core than uniform or minimal networks once over 30 % of cord area was broken (Bebber et al. 2007, full text). A cord's cross-section tracked its predicted flow (ρ = 0.46) better than its age or distance (Heaton et al. 2010, full text). Label moved up to 13 mm/h along a *Serpula lacrymans* cord (Tlalka et al. 2008, full text). Grazed networks grew cross-links between radial cords (springtail studies, **unverified**, abstracts). **No ascomycete or entomopathogen is known to form cords**: for *Metarhizium* they are a licence.
+- **Knots (microsclerotia) are *Metarhizium*'s own survival bodies.** *M. robertsii* microsclerotia are hard pigmented aggregates of 174–226 µm that form within a day in liquid culture under oxidative stress; under UV-B they still made more conidia than loose mycelial pellets, and they sporulate from their own reserves with no outside carbon (Paixão et al. 2021, full text). In soil, granules put out hyphae after 3–5 days and about 1.2 × 10⁹ conidia a gram in non-sterile soil (13× less than sterile), and persisted 336 days (Marciano et al. 2021, full text). More resistant to desiccation than conidia (Jackson & Jaronski 2009, via Marciano; **unverified**).
+- **Stalks raise spores from a corpse, outside the nest.** *Ophiocordyceps unilateralis* hyphae left the dead ant's joints 2–3 days after death, then a stalk grew from the back of its head and released spores; ants remove their dead fast, so a death in the nest leaves no time for one (Hughes et al. 2011, full text). *Metarhizium* sporulates as a flat mat on the corpse; stalks (synnemata) belong to some relatives (from memory; not fetched): a licence for *Metarhizium*.
+- **Fusion carries food to the edge.** *Neurospora* spore fusion tubes form only in a dense crowd and peak at 58 % of spores at 7 h (Roca et al. 2005, full text); a mutant that cannot fuse grew almost as fast but could not move a nutrient to its edge (Simonin et al. 2012, full text). Fusing with an incompatible strain kills cells (*Colletotrichum*, Ishikawa et al. 2012, **unverified**). *M. anisopliae* forms heterokaryons, so its hyphae fuse (1980 study, **unverified**, snippet).
+
+**In the game** (owner, 2026-11-12: more than one structure, each its own upgrade):
+- **Fusion is a policy answer, not an upgrade:** a tip whose `ahead` is its own hypha may answer `fuse` (join it, closing a loop) as well as turn away; the local rule turns away (autotropism, §3). A loop gives the cells beyond a cut a second way to be fed (Simonin et al.): digging that cuts one path no longer stops their tips.
+- **Cords** are the *Mycelium* upgrade's third level, *a web*: a hypha cell carrying supply to many tips thickens into a cord (Heaton et al.), drawn thicker; supply reaches tips beyond a cord at once, and a cord takes several digs to cut; thin hyphae no tip uses any more fade and give their mass back (Bebber et al.; **design** rates).
+- **Knots** (microsclerotia), a new upgrade: a hypha cell left on short supply or out in the sun hardens into a knot that digging, grooming and the sun don't clear; in damp soil, after a few game-seconds standing in for days, it sprouts a tip again and puts out spores from its own store (Paixão et al.; Marciano et al.). The colony's clearing is answered, not undone: a knot is slow.
+- **Stalks** (synnemata), a new upgrade, after corpses (`ja-2bw.7`): a colonised corpse left outside the nest grows a stalk after a while that sends spores over a wider ring (Hughes et al. 2011); a corpse the ants carry or tend never gets one.
+
 ## What was not found
 
 - *Metarhizium* or *Beauveria* tip speed in soil; their hyphal length density in soil.
 - *Metarhizium* chemotropism toward insects or nutrients; gravitropism of vegetative hyphae.
 - Per-species hyphal growth unit values; when a tip stops for want of supply; regression times; translocation speeds.
 - Conidiation of *Metarhizium* on exposed hyphae in soil pores (the `exposed` cue's role for spores is design).
+- Cords in any entomopathogen; spores per microsclerotium; stalk height and timing of release; spore fusion tubes in *Metarhizium*; rhizomorph growth rates.
 - A sun-against-shade field test of spores; a UV test on hyphae; *Metarhizium* per depth (refused); *Metarhizium* on burrow walls or a bare surface; counts in ant middens; a measured humidity threshold for sporulation on cadavers.
 
 ## The mechanic
@@ -92,7 +108,7 @@ Cheapest first; everything behind a setting (`hyphae`) whose "off" plays as main
    | `exposed`: where the tip is | buried (soil all round), wall (soil, a dug cell beside), open (in a dug cell) | thigmotropism and pore following (Brand & Gow 2009; 1997 study, unverified); Held et al. 2019 (walls) |
    | `supply`: its share of the network's mass this step | short, ample | Roper et al. 2013 (flow ∝ tips fed) |
 
-   4 × 3 × 2 = **24 situations**. Answers: `grow` (on, straight), `left`, `right` (veer one hex), `branch` (a new tip one hex aside), `rest` (no step; it keeps its mass). The tip's local rule (Jev's stand-in, and the "preset"): rock head-on, branch both ways (split); rock at a glance, slide (veer along it); own hypha ahead, veer away; open ahead from the soil, slide along the tunnel's wall (thigmotropism); in a dug cell, grow on across it toward soil; supply short, rest; run ≥ `HGU`, branch; else drift back toward the first heading. Growing out into a tunnel instead of along it is the aim's choice (Jev may answer `grow` there).
+   4 × 3 × 2 = **24 situations**. Answers: `grow` (on, straight), `left`, `right` (veer one hex), `branch` (a new tip one hex aside), `rest` (no step; it keeps its mass), `fuse` (into its own hypha ahead, closing a loop: §7). The tip's local rule (Jev's stand-in, and the "preset"): rock head-on, branch both ways (split); rock at a glance, slide (veer along it); own hypha ahead, veer away; open ahead from the soil, slide along the tunnel's wall (thigmotropism); in a dug cell, grow on across it toward soil; supply short, rest; run ≥ `HGU`, branch; else drift back toward the first heading. Growing out into a tunnel instead of along it is the aim's choice (Jev may answer `grow` there).
 3. **The lane.** A new Jev lane, `growth`, under the fungus's aim (the player's words): one question per situation, cached like the fungus lane; a tip whose situation has no answer under the words in force plays the local rule until the answer arrives (ja-lo8.15). Precached for the preset aims (`scripts/precache.mjs`, from a live check's caches).
 4. **The picture.** The renderer draws each hypha as lines through the hexagons' centres (parent to child), thin, tips as a dot; on the plane faint, as under the ground. It replaces the hashed threads of `ui/fungusSight.ts` and the mat drawn on the plane.
 
@@ -123,7 +139,8 @@ Cheapest first; everything behind a setting (`hyphae`) whose "off" plays as main
 
 - **Decided (owner, 2026-11-12, after §6):** the plane is the topsoil just under the surface: hyphae thread there first, round the hole and to the midden, then down the dug walls; *a borer* (the renamed second *Mycelium* level) lets them push into undug soil; corpses they reach sporulate, in this epic. Earlier the same day: the local rule first, then a Jev growth lane; no cue for ants: instead whether the tip is buried, on a tunnel's wall or out in a dug cell, and tips may grow along tunnels or across them; ants digging cut hyphae.
 - **Decided:** `ja-yo3` folds into `ja-2bw.2`.
-- **Owner, open:** what *a web*, the third *Mycelium* level, unlocks.
+- **Decided (owner, 2026-11-12, after §7):** *a web* is cords; knots and stalks are their own upgrades; fusion is a growth-policy answer (`fuse`), not an upgrade.
+- **Owner, open:** the new upgrades' costs and names on the panel (first guesses with the tuning, `ja-2bw.6`).
 - **Owner:** do ants walking through a dug cell break a hypha out in it, or only pick spores off it? Proposed: only pick spores off it in the first build.
 - To measure: `HGU`, `TIP_STEP` per *Mycelium* level and `HYPHA_MASS` against the progression band; the tick cost of a few hundred tips.
 
@@ -159,3 +176,13 @@ Cheapest first; everything behind a setting (`hyphae`) whose "off" plays as main
 - Diez L, Lejeune P, Detrain C (2014). *Biol Lett* 10:20140306. [PMC4126623](https://pmc.ncbi.nlm.nih.gov/articles/PMC4126623/)
 - Leclerc J-B, Pinto Silva J, Detrain C (2018). *R Soc Open Sci* 5:180267. [PMC6083733](https://pmc.ncbi.nlm.nih.gov/articles/PMC6083733/)
 - Ontario ant-nest *Metarhizium* study (2018). *J Invertebr Pathol* 156:73–76 (snippet; authors not confirmed).
+- Bebber DP, Hynes J, Darrah PR, Boddy L, Fricker MD (2007). Biological solutions to transport network design. *Proc R Soc B* 274:2307–2315. [doi:10.1098/rspb.2007.0459](https://doi.org/10.1098/rspb.2007.0459) ([PMC2288531](https://pmc.ncbi.nlm.nih.gov/articles/PMC2288531/))
+- Heaton LLM, López E, Maini PK, Fricker MD, Jones NS (2010). Growth-induced mass flows in fungal networks. *Proc R Soc B* 277:3265–3274. [doi:10.1098/rspb.2010.0735](https://doi.org/10.1098/rspb.2010.0735) ([PMC2981926](https://pmc.ncbi.nlm.nih.gov/articles/PMC2981926/))
+- Tlalka M, Fricker M, Watkinson S (2008). *Appl Environ Microbiol* 74:2700–2708. [doi:10.1128/AEM.02765-07](https://doi.org/10.1128/AEM.02765-07) ([PMC2394889](https://pmc.ncbi.nlm.nih.gov/articles/PMC2394889/))
+- Paixão FRS et al. (2021). *Front Fungal Biol* 2:654737. [doi:10.3389/ffunb.2021.654737](https://doi.org/10.3389/ffunb.2021.654737) ([PMC10512246](https://pmc.ncbi.nlm.nih.gov/articles/PMC10512246/))
+- Marciano AF, Mascarin GM et al. (2021). *Sci Rep* 11. [doi:10.1038/s41598-021-84142-8](https://doi.org/10.1038/s41598-021-84142-8) ([PMC7925645](https://pmc.ncbi.nlm.nih.gov/articles/PMC7925645/))
+- Jackson MA, Jaronski ST (2009). *Mycol Res* 113:842–850. [doi:10.1016/j.mycres.2009.03.004](https://doi.org/10.1016/j.mycres.2009.03.004) (not read)
+- Hughes DP et al. (2011). Behavioral mechanisms and morphological symptoms of zombie ants dying from fungal infection. *BMC Ecol* 11:13. [doi:10.1186/1472-6785-11-13](https://doi.org/10.1186/1472-6785-11-13) ([PMC3118224](https://pmc.ncbi.nlm.nih.gov/articles/PMC3118224/))
+- Araújo JPM, Evans HC, Kepler R, Hughes DP (2018). *Stud Mycol* 90:119–160. [doi:10.1016/j.simyco.2017.12.002](https://doi.org/10.1016/j.simyco.2017.12.002) (not read)
+- Roca MG, Arlt J, Jeffree CE, Read ND (2005). Cell biology of conidial anastomosis tubes in *Neurospora crassa*. *Eukaryot Cell* 4:911–919. [PMC1140100](https://pmc.ncbi.nlm.nih.gov/articles/PMC1140100/)
+- Ishikawa FH et al. (2012). *PLoS One* (*Colletotrichum* fusion; abstract only, not linked).
