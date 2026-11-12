@@ -15,6 +15,7 @@ import {
   type Mode,
   type Policy,
   type Situation,
+  SITUATION_SCHEMA,
   type Stance,
   STANCES,
   type StancePolicy,
@@ -6229,47 +6230,34 @@ export class Colony {
   }
 }
 
-/** Every situation a mode choice can be asked in: mode × tired × food × home × alarm × enemy × stance = 4 × 2 × 3 × 9 × 3 × 2 × 3 = 3,888 (home: 3 trail levels or 6 places in the nest). */
-export const SITUATIONS = MODES.length * 2 * TRAILS.length * HOMES.length * TRAILS.length * 2 * STANCES.length;
+/** Every situation a mode choice can be asked in (vocab.ts SITUATION_SCHEMA): 3,888. */
+export const SITUATIONS = SITUATION_SCHEMA.size;
 
 /** A situation from its index in SITUATIONS: the inverse of encode. */
-export function decodeSituation(code: number): Situation {
-  let c = code;
-  const stance = STANCES[c % 3] as Stance;
-  c = Math.floor(c / 3);
-  const enemy = c % 2 ? "near" : "none";
-  c = Math.floor(c / 2);
-  const alarm = TRAILS[c % 3] as Trail;
-  c = Math.floor(c / 3);
-  const homeTrail = HOMES[c % HOMES.length] as Home;
-  c = Math.floor(c / HOMES.length);
-  const foodTrail = TRAILS[c % 3] as Trail;
-  c = Math.floor(c / 3);
-  const tired = c % 2 === 1;
-  const mode = MODES[Math.floor(c / 2)] as Mode;
-  return { mode, tired, foodTrail, homeTrail, alarm, enemy, stance };
-}
+export const decodeSituation = (code: number): Situation => SITUATION_SCHEMA.decode(code);
 
-export function encodeSituation(s: Situation): number {
-  return packSituation(
-    MODES.indexOf(s.mode),
-    s.tired,
-    s.foodTrail,
-    s.homeTrail,
-    s.alarm,
-    s.enemy === "near" ? 1 : 0,
-    STANCES.indexOf(s.stance),
-  );
-}
+export const encodeSituation = (s: Situation): number => SITUATION_SCHEMA.encode(s);
 
-/** encode's step per mode: encode(m, …) = encode(0, …) + m × MODE_STRIDE. */
-const MODE_STRIDE = 2 * 3 * HOMES.length * 3 * 2 * 3;
+// The schema's steps, for the per-ant hot path below (the same numbers encode adds up, without building a situation).
+const [MODE_STRIDE, TIRED_STRIDE, FOOD_STRIDE, HOME_STRIDE, ALARM_STRIDE, ENEMY_STRIDE, STANCE_STRIDE] = SITUATION_SCHEMA.strides as [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
+/** encode's code from a situation's parts: mode, enemy and stance as their indices. encode(m, …) = encode(0, …) + m × MODE_STRIDE. */
 function packSituation(mode: number, tired: boolean, food: Trail, home: Home, alarm: Trail, enemy: number, stance: number): number {
   return (
-    (((((mode * 2 + (tired ? 1 : 0)) * 3 + TRAILS.indexOf(food)) * HOMES.length + HOMES.indexOf(home)) * 3 + TRAILS.indexOf(alarm)) * 2 +
-      enemy) *
-      3 +
-    stance
+    mode * MODE_STRIDE +
+    (tired ? TIRED_STRIDE : 0) +
+    TRAILS.indexOf(food) * FOOD_STRIDE +
+    HOMES.indexOf(home) * HOME_STRIDE +
+    TRAILS.indexOf(alarm) * ALARM_STRIDE +
+    enemy * ENEMY_STRIDE +
+    stance * STANCE_STRIDE
   );
 }
 

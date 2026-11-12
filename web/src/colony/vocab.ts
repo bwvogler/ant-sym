@@ -2,6 +2,7 @@
 // and the few constants those words carry. A leaf: it imports only the pheromone mark list, so colony.ts, responses.ts, recognition.ts,
 // battle.ts and the brains can all use it without importing each other (docs/refactor.md S1).
 import { MARKS } from "./pheromone.ts";
+import { defineSchema } from "./schema.ts";
 
 export const MODES = ["explore", "follow", "return", "fight"] as const;
 export type Mode = (typeof MODES)[number];
@@ -44,6 +45,20 @@ export interface Situation {
   stance: Stance;
 }
 
+/**
+ * The mode lane's fields in the order a code and a cache key read them: 4 × 2 × 3 × 9 × 3 × 2 × 3 = 3,888 situations
+ * (home: 3 trail levels or 6 places in the nest). The cache key is `explore|fresh|none|none|none|none|forage`-shaped.
+ */
+export const SITUATION_SCHEMA = defineSchema<Situation>([
+  { name: "mode", values: MODES },
+  { name: "tired", values: [false, true], key: (v) => (v ? "tired" : "fresh") },
+  { name: "foodTrail", values: TRAILS },
+  { name: "homeTrail", values: HOMES },
+  { name: "alarm", values: TRAILS },
+  { name: "enemy", values: ["none", "near"] },
+  { name: "stance", values: STANCES },
+]);
+
 export type Policy = (s: Situation) => Mode;
 
 /** Counts per cell, read by integer cell coordinates (the game's enemy grid). */
@@ -74,6 +89,16 @@ export interface StanceSituation {
   /** food stored but not yet turned into ants (the colony is at its cap) */
   larder: "low" | "full";
 }
+
+/** The strategist's fields: 3 × 3 × 3 × 2 × 3 × 2 = 324 views. */
+export const STANCE_SCHEMA = defineSchema<StanceSituation>([
+  { name: "stance", values: STANCES },
+  { name: "ants", values: ["few", "some", "many"] },
+  { name: "losses", values: ["none", "some", "heavy"] },
+  { name: "enemyNearNest", values: [false, true], key: (v) => (v ? "enemy" : "clear") },
+  { name: "intake", values: ["none", "some", "plenty"], key: (v) => `intake:${v}` },
+  { name: "larder", values: ["low", "full"] },
+]);
 
 export type StancePolicy = (s: StanceSituation) => Stance;
 
