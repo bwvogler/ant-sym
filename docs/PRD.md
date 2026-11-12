@@ -4745,3 +4745,13 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 The mycelium's spore output is fixed by its mass, so every cell added to where it fruits thins the patch the foragers walk through below the dose that infects an ant (`minDose`). This slice ships the patch only: hyphae grow and are saved but change no play yet. Where they fruit (a share kept for the patch, fruiting as a growth-policy answer, corpses and stalks) is `ja-2bw.11`, an owner decision.
 
 **Decided (owner, 2026-11-12).** A tip where it is exposed (on a tunnel's wall or in a dug cell) may answer **fruit** and become a spore spot, taking its share of the mycelium's spores while the patch keeps the rest: few spots, chosen, so each stays above the dose. Fruiting on the **midden is free**: a colonised corpse's spores come from the corpse (Khun et al. 2021: about 1.3 × 10⁸ conidia a cadaver), not the mycelium, so they add to the total (`ja-2bw.7`). `fruit` joins the growth answers (seven).
+
+**Built: the `fruit` answer (`ja-2bw.12`).** A tip on a tunnel's wall or in a dug cell may answer `fruit` and end as a spore spot on the dug cell it touches, taking a patch cell's share; never under the plane's surface or buried. The local rule fruits where a tunnel is reached unless a spot of its own lies within `FRUIT_GAP` (12) cells, so spots stay few (one in the shaft within 100 s on seed 1). Measured (`progression.mjs --map one --evolve --hyphae`, seeds 1–10, 600 s):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, baseline (s) | 358 | 281 | 203 | 147 | 320 | never | 288 | 500 | 509 | 219 |
+| a quarter, hyphae + fruit (s) | 335 | 290 | 202 | 146 | 294 | 369 | 282 | 399 | 380 | 206 |
+| the queen, hyphae + fruit (s) | 360 | 330 | 245 | 188 | 325 | 388 | 296 | 441 | 404 | 237 |
+
+- **P1 passes:** every seed takes hold (seed 6, which stalled at 1–3 % in the baseline, reaches a quarter at 369 s); the worst seed is 399 s against "never"; the median quarter is about 292 s against about 304 s. A spot in the shaft, where every forager passes, is what reaches the ants the patch outside missed.
