@@ -4686,7 +4686,7 @@ The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and t
 - **Scope:** from the landing to the first host clearing, then the aim. After that the goal line (§50.4) takes over.
 
 ### 61.1 The steps
-Each step is one card, over the field's lower-left corner, with Skip on every card. The machine is `ui/tutorial.ts`: pure, driven by what the game shows each frame. The page runs it from `ui/useTutorial.ts`.
+Each step is one card, over the field's lower-left corner, with Skip on every full card. Hide (owner, 2026-11-12) shrinks the card to a one-line strip with the step's button, because on a phone the card covers most of the map; the next step opens a full card again. The machine is `ui/tutorial.ts`: pure, driven by what the game shows each frame. The page runs it from `ui/useTutorial.ts`.
 
 1. **The landing, paused:** what the spores are.
 2. **Waiting, at 1×.**
