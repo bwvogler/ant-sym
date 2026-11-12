@@ -1,6 +1,6 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { growthContext, growthKey, type GrowthSituation } from "../../colony/index.ts";
+import { growthContext, growthKey, type Fungus, type GrowthSituation } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
 import type { RunSummary } from "../../../shared/jev.ts";
 
@@ -94,4 +94,13 @@ test("answers shipped for an aim play without a run; one the growth question can
   const other: GrowthSituation = { ahead: "soil", exposed: "buried", supply: "ample" };
   assert.equal(j.seed(growthContext(aim), [[growthKey(other), "left"]]), 0, "the tip's sides are not Jev's to name");
   assert.equal(j.growthPolicy(other), null);
+});
+
+test("attaching the fungus wires its tips to the growth lane (review of #115, S2)", () => {
+  const j = new ColonyJev({ intervalMs: 10, gatherMs: 0 });
+  live.add(j);
+  // A stand-in fungus: what attachFungus reads and sets.
+  const fungus = { menu: new Set<string>(), hasNest: true, policy: null, growthPolicy: null } as unknown as Fungus;
+  j.attachFungus(fungus);
+  assert.equal(fungus.growthPolicy, j.growthPolicy);
 });

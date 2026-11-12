@@ -17,6 +17,7 @@ import {
   fungusContext,
   validLevels,
   GROWTH_CHOICES,
+  LANES,
   GROWTH_BRAIN_VERSION,
   growthContext,
 } from "../../colony/index.ts";
@@ -96,6 +97,9 @@ test("every preset aim ships growth answers (ja-2bw.5), each situation once, and
     assert.ok(pairs.length > 0 && pairs.length <= SIZE.growth!, `${b.file}: ${pairs.length} answers`);
     assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
     for (const [, x] of pairs) assert.ok(VALID.growth!.includes(x), `${b.file}: ${x}`);
+    // Every key is a real situation's (review of #115, N6): a key in another field order would never be hit.
+    const keys = new Set(LANES.growth.all().map((sit) => LANES.growth.key(sit, undefined)));
+    for (const [k] of pairs) assert.ok(keys.has(k), `${b.file}: ${k} is no growth situation`);
   }
 });
 
