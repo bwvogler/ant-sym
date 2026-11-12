@@ -104,7 +104,7 @@ The top-down and side maps are retired.
 
 ## Stage 3: take `Colony` apart (bit-exact)
 
-1. **An ant store.** Each per-ant field is declared once: name, array type, initial value, saved or not, reset on spawn, reset by `asIs`. The store allocates the arrays and drives spawn, `asIs`, save and load. It replaces four hand-kept lists, and a schema test replaces the source-scanning guards in `save.test.ts`.
+1. **An ant store.** Each per-ant field is declared once: name, array type, initial value, saved or not, reset on spawn, reset by `asIs`. The store allocates the arrays and drives spawn, save and load; `asIs` stays hand-written (it runs for every healthy host each step) and a test ties it to the table. It replaces four hand-kept lists, and a schema test replaces the source-scanning guards in `save.test.ts`.
 2. **Private state reachable from other modules.** The `#private` fields move to a context object, so behaviour can live in other files.
 3. **Modules by seam**, each a set of functions over the context:
 
