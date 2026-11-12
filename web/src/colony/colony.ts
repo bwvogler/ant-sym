@@ -6249,7 +6249,7 @@ const [MODE_STRIDE, TIRED_STRIDE, FOOD_STRIDE, HOME_STRIDE, ALARM_STRIDE, ENEMY_
   number,
 ];
 /** encode's code from a situation's parts: mode, enemy and stance as their indices. encode(m, …) = encode(0, …) + m × MODE_STRIDE. */
-function packSituation(mode: number, tired: boolean, food: Trail, home: Home, alarm: Trail, enemy: number, stance: number): number {
+export function packSituation(mode: number, tired: boolean, food: Trail, home: Home, alarm: Trail, enemy: number, stance: number): number {
   return (
     mode * MODE_STRIDE +
     (tired ? TIRED_STRIDE : 0) +

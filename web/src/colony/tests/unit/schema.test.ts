@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { defineSchema } from "../../schema.ts";
 import { situationKey, situationState, stanceKey } from "../../colonyBrain.ts";
-import { decodeSituation, encodeSituation, SITUATIONS } from "../../colony.ts";
-import { HOMES, MODES, STANCES, TRAILS, type Situation, type StanceSituation } from "../../vocab.ts";
+import { decodeSituation, encodeSituation, packSituation, SITUATIONS } from "../../colony.ts";
+import { HOMES, MODES, STANCE_SCHEMA, STANCES, TRAILS, type Situation, type StanceSituation } from "../../vocab.ts";
 
 // The situation's code, key and state as they were written by hand before they came from the schema (docs/refactor.md S4.1):
 // the schema must reproduce every one of them, so no cached Jev answer is bought again.
@@ -40,9 +40,32 @@ test("the mode lane's schema reproduces the hand-written decode, key and state o
   }
 });
 
+test("the hot path's packSituation gives the code encode gives, for every situation", () => {
+  for (let code = 0; code < SITUATIONS; code++) {
+    const s = decodeSituation(code);
+    // Mode, enemy and stance go in as their indices, as colony.ts's tick passes them.
+    const packed = packSituation(
+      MODES.indexOf(s.mode),
+      s.tired,
+      s.foodTrail,
+      s.homeTrail,
+      s.alarm,
+      s.enemy === "near" ? 1 : 0,
+      STANCES.indexOf(s.stance),
+    );
+    assert.equal(packed, code);
+  }
+});
+
 test("the strategist's schema has 324 views and reproduces the hand-written key of each", () => {
-  const stanceSchemaSize = 3 * 3 * 3 * 2 * 3 * 2;
-  assert.equal(stanceSchemaSize, 324);
+  assert.equal(STANCE_SCHEMA.size, 324);
+  // The values the views take are the schema's fields: a value added to one would be a view no loop below reaches.
+  const values = (name: string) => STANCE_SCHEMA.fields.find((f) => f.name === name)?.values;
+  assert.deepEqual(values("ants"), ["few", "some", "many"]);
+  assert.deepEqual(values("losses"), ["none", "some", "heavy"]);
+  assert.deepEqual(values("intake"), ["none", "some", "plenty"]);
+  assert.deepEqual(values("larder"), ["low", "full"]);
+  assert.deepEqual(values("enemyNearNest"), [false, true]);
   let n = 0;
   for (const stance of STANCES)
     for (const ants of ["few", "some", "many"] as const)

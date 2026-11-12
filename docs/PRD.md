@@ -4650,7 +4650,7 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
-**Research basis:** [desert-ant.md](desert-ant.md), all from abstracts (**unverified**; the network blocked full text):
+**Research basis:** [desert-ant.md](desert-ant.md). Four papers were read in full text (Razin 2013, Dillier & Wehner 2004, Buehlmann 2012 and 2013); the rest is from abstracts or summaries (**unverified**):
 - *Cataglyphis* foragers work alone, with no trail pheromone and no recruitment to a place; they navigate by path integration, a sky compass and remembered views, and find food by smell (dead-arthropod odour, followed in crosswind runs).
 - Activity sits in a thermal window between predation and heat stress (*C. bombycina*, Wehner, Marsh & Wehner 1992); forager careers are short (*C. bicolor*, about 6 days, Schmid-Hempel & Schmid-Hempel 1984).
 - Colonies are small and mostly monogynous; between-colony aggression is at maximum (*C. iberica*, *C. niger*). No natural *Metarhizium* or *Beauveria* infection and no corpse removal were found.
