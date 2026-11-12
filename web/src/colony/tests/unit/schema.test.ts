@@ -1,21 +1,23 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
-import { defineSchema } from "../../schema.ts";
-import { situationKey, situationState, stanceKey } from "../../colonyBrain.ts";
+import { defineSchema, legendOf } from "../../schema.ts";
+import { COLONY_LEGEND, STRATEGY_LEGEND, situationKey, situationState, stanceKey } from "../../colonyBrain.ts";
 import {
   AROUSALS,
   CARRYING,
   decodeFungal,
   encodeFungal,
   FUNGAL_PLACES,
+  FUNGAL_SCHEMA,
   FUNGAL_SITUATIONS,
   TASKS,
   TOUCHES,
   type FungalSituation,
 } from "../../fungalPolicy.ts";
-import { fungalKey } from "../../fungusBrain.ts";
+import { FUNGUS_LEGEND, fungalKey } from "../../fungusBrain.ts";
 import { decodeSituation, encodeSituation, packSituation, SITUATIONS } from "../../colony.ts";
-import { HOMES, MODES, STANCE_SCHEMA, STANCES, TRAILS, type Situation, type StanceSituation } from "../../vocab.ts";
+import { HOMES, MODES, SITUATION_SCHEMA, STANCE_SCHEMA, STANCES, TRAILS, type Situation, type StanceSituation } from "../../vocab.ts";
 
 // The situation's code, key and state as they were written by hand before they came from the schema (docs/refactor.md S4.1):
 // the schema must reproduce every one of them, so no cached Jev answer is bought again.
@@ -150,4 +152,70 @@ test("the fungal schema has 864 situations and reproduces the hand-written code 
               n++;
             }
   assert.equal(n, 864);
+});
+
+// The legends Jev reads, as they were when written as one string each: a change to a byte is a change to every cached
+// answer's context (policyContext hashes the legend), so these are pinned. A deliberate change re-ships the precache
+// (CLAUDE.md) and updates the hash and length here.
+const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+test("the legends built from the schemas' field passages are byte for byte the ones written whole", () => {
+  assert.equal(COLONY_LEGEND.length, 2062);
+  assert.equal(sha(COLONY_LEGEND), "887b107af8d7635325fe0a9e079687e1d3e5168147e1de2269642eb0771e9037");
+  assert.equal(STRATEGY_LEGEND.length, 706);
+  assert.equal(sha(STRATEGY_LEGEND), "7c647d29c54104aa9aa3d7ae19c660f32a913c6e31684010521f8ce3a0194668");
+  assert.equal(FUNGUS_LEGEND.length, 1939);
+  assert.equal(sha(FUNGUS_LEGEND), "c00f981f484dd807fd3e936aa8f7736dbe74b77887a918d7cb48a9fb9c6c519f");
+});
+
+test("each legend names every field of its schema", () => {
+  for (const [legend, schema] of [
+    [COLONY_LEGEND, SITUATION_SCHEMA],
+    [STRATEGY_LEGEND, STANCE_SCHEMA],
+    [FUNGUS_LEGEND, FUNGAL_SCHEMA],
+  ] as const)
+    for (const f of schema.fields) assert.ok(legend.includes(String(f.name)), `the legend never names "${String(f.name)}"`);
+});
+
+test("a legend with no words for a field, words for a stranger, a field twice, or words under the wrong field does not build", () => {
+  const schema = defineSchema<{ a: 1 | 2; b: 1 | 2 }>([
+    { name: "a", values: [1, 2] },
+    { name: "b", values: [1, 2] },
+  ]);
+  const build = (fields: readonly (readonly [keyof { a: 1; b: 1 }, string])[]) => () => legendOf(schema, { intro: "", fields });
+  assert.equal(
+    legendOf(schema, {
+      intro: "I ",
+      fields: [
+        ["b", "b is it "],
+        ["a", ""],
+      ],
+      outro: "O",
+    }),
+    "I b is it O",
+  );
+  assert.throws(build([["a", "a is it"]]), /no words for the field "b"/);
+  assert.throws(
+    build([
+      ["a", "a"],
+      ["b", "b"],
+      ["c" as never, "c"],
+    ]),
+    /"c", which is not a field/,
+  );
+  assert.throws(
+    build([
+      ["a", "a"],
+      ["a", "a"],
+      ["b", "b"],
+    ]),
+    /twice/,
+  );
+  // Words that don't open with their field's name are under the wrong field (the legends read "mode is …", "tired means …").
+  assert.throws(
+    build([
+      ["a", "b is one"],
+      ["b", "b is two"],
+    ]),
+    /words for "a" should begin with its name/,
+  );
 });

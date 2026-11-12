@@ -68,3 +68,24 @@ export function defineSchema<S extends object>(fields: readonly FieldOf<S>[]): S
     },
   };
 }
+
+/**
+ * The words a legend uses for a schema's fields, in the order the prose reads them: an intro, one passage per field (an empty
+ * one for a field another passage already covers), an outro. Every field must have a passage and none may repeat, so a field
+ * added to a schema without its words fails when the module loads, not when Jev answers oddly. The result is the legend
+ * Jev reads, byte for byte (a change to it is a change to every cached answer's context: see colonyBrain.policyContext).
+ */
+export function legendOf<S extends object>(
+  schema: Schema<S>,
+  parts: { intro: string; fields: readonly (readonly [keyof S, string])[]; outro?: string },
+): string {
+  const names = schema.fields.map((f) => String(f.name));
+  const given = parts.fields.map(([n]) => String(n));
+  for (const n of names) if (!given.includes(n)) throw new Error(`legend: no words for the field "${n}"`);
+  for (const n of given) if (!names.includes(n)) throw new Error(`legend: words for "${n}", which is not a field`);
+  if (new Set(given).size !== given.length) throw new Error("legend: a field has words twice");
+  // A passage opens with its own field's name (the legends read "mode is …", "tired means …"), so words can't sit under the wrong field.
+  for (const [n, text] of parts.fields)
+    if (text !== "" && !text.startsWith(String(n))) throw new Error(`legend: the words for "${String(n)}" should begin with its name`);
+  return parts.intro + parts.fields.map(([, text]) => text).join("") + (parts.outro ?? "");
+}

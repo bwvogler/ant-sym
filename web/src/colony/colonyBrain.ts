@@ -1,5 +1,6 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
+import { legendOf } from "./schema.ts";
 import { MODES, SITUATION_SCHEMA, STANCES, STANCE_SCHEMA, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
 import {
   CARRY,
@@ -35,11 +36,54 @@ export const COLONY_BRAIN_VERSION = 7;
 /** The strategist's: its view didn't change with the nest (slice 3), so its cached stances keep (it shared the ants' version before). */
 export const STANCE_BRAIN_VERSION = 4;
 
-export const COLONY_LEGEND =
-  "Each key in `ants` is the situation of one worker ant of a colony. mode is what the ant is doing now: explore (wander looking for new food, marking the way home, digging tunnels through soil), follow (walk up a food scent toward food), return (walk home) or fight (go for enemy ants, or follow the colony's alarm scent to a fight, or raid the enemy nest). tired means it has searched outside a long time without finding food; only staying inside the nest a while rests it. Going home when tired is how the colony stops searching where food has run out and stops following trails to food that is gone. return means walk home: an ant already inside the nest and not tired has finished its trip, and the colony needs it out searching again. Caution means going home from danger (alarm scent, strangers near), not staying home from food: a rested ant with a food trail ahead and no danger near is a forager the colony needs out. foodTrail and alarm say how strong each scent is just ahead of the ant: none, faint or strong. Food scent is laid by ants carrying food home, so it leads to food; alarm scent is laid by ants in a fight, or by the fungus, and marks danger. homeTrail, on the ground, is how strong the home scent ahead is (none, faint or strong; it leads home); inside the nest it says where the ant is: in a tunnel, or in one of the nest's chambers by what the chamber is for (royal: the queen's; brood; store: food kept; reception: where food comes in; midden: refuse). An ant inside the nest is home. enemy is near when an ant of the rival colony is within two steps. stance, on open ground, is this ant's own: forage, the usual one (gather food); defend, only while it smells alarm or meets strangers close to its own nest; or raid, once a scout's raid trail has recruited it or it has gone out as a raid scout. In an underground nest stance is what the colony asks of it: forage, defend or raid. An ant carrying something is not asked here: it answers a separate question about its load. doctrine is how the colony wants its ants to behave: follow it.";
+export const COLONY_LEGEND = legendOf(SITUATION_SCHEMA, {
+  intro: "Each key in `ants` is the situation of one worker ant of a colony. ",
+  fields: [
+    [
+      "mode",
+      "mode is what the ant is doing now: explore (wander looking for new food, marking the way home, digging tunnels through soil), follow (walk up a food scent toward food), return (walk home) or fight (go for enemy ants, or follow the colony's alarm scent to a fight, or raid the enemy nest). ",
+    ],
+    [
+      "tired",
+      "tired means it has searched outside a long time without finding food; only staying inside the nest a while rests it. Going home when tired is how the colony stops searching where food has run out and stops following trails to food that is gone. return means walk home: an ant already inside the nest and not tired has finished its trip, and the colony needs it out searching again. Caution means going home from danger (alarm scent, strangers near), not staying home from food: a rested ant with a food trail ahead and no danger near is a forager the colony needs out. ",
+    ],
+    [
+      "foodTrail",
+      "foodTrail and alarm say how strong each scent is just ahead of the ant: none, faint or strong. Food scent is laid by ants carrying food home, so it leads to food; alarm scent is laid by ants in a fight, or by the fungus, and marks danger. ",
+    ],
+    // alarm is described with foodTrail, above: the two scents are one passage.
+    ["alarm", ""],
+    [
+      "homeTrail",
+      "homeTrail, on the ground, is how strong the home scent ahead is (none, faint or strong; it leads home); inside the nest it says where the ant is: in a tunnel, or in one of the nest's chambers by what the chamber is for (royal: the queen's; brood; store: food kept; reception: where food comes in; midden: refuse). An ant inside the nest is home. ",
+    ],
+    ["enemy", "enemy is near when an ant of the rival colony is within two steps. "],
+    [
+      "stance",
+      "stance, on open ground, is this ant's own: forage, the usual one (gather food); defend, only while it smells alarm or meets strangers close to its own nest; or raid, once a scout's raid trail has recruited it or it has gone out as a raid scout. In an underground nest stance is what the colony asks of it: forage, defend or raid. An ant carrying something is not asked here: it answers a separate question about its load. ",
+    ],
+  ],
+  outro: "doctrine is how the colony wants its ants to behave: follow it.",
+});
 
-export const STRATEGY_LEGEND =
-  "`colony` describes an ant colony at war with a rival colony over the same food. stance is what it is doing now: forage (gather food), defend (fight near home) or raid (send fighters to the rival's nest). ants is how many ants it has against how many it can feed: few, some or many. losses is how many ants it lost lately: none, some or heavy. enemyNearNest says whether rival ants are close to home. intake is how much food its foragers have brought home lately for its size: none, some or plenty (the colony never knows how much food is left out there, only how fast it comes in). larder is food stored at home beyond what new ants need: low or full. doctrine is how the colony wants to behave: follow it.";
+export const STRATEGY_LEGEND = legendOf(STANCE_SCHEMA, {
+  intro: "`colony` describes an ant colony at war with a rival colony over the same food. ",
+  fields: [
+    [
+      "stance",
+      "stance is what it is doing now: forage (gather food), defend (fight near home) or raid (send fighters to the rival's nest). ",
+    ],
+    ["ants", "ants is how many ants it has against how many it can feed: few, some or many. "],
+    ["losses", "losses is how many ants it lost lately: none, some or heavy. "],
+    ["enemyNearNest", "enemyNearNest says whether rival ants are close to home. "],
+    [
+      "intake",
+      "intake is how much food its foragers have brought home lately for its size: none, some or plenty (the colony never knows how much food is left out there, only how fast it comes in). ",
+    ],
+    ["larder", "larder is food stored at home beyond what new ants need: low or full. "],
+  ],
+  outro: "doctrine is how the colony wants to behave: follow it.",
+});
 
 export interface Doctrine {
   id: string;
