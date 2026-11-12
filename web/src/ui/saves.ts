@@ -1,4 +1,4 @@
-import { SAVE_VERSION, type GameSave } from "../colony/index.ts";
+import { GENERIC_ANT, SAVE_VERSION, type GameSave } from "../colony/index.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
 // Saved games (the fungus game, ja-lo8.6): a game is long (queen births are rare: PRD §50), so it is kept between
@@ -9,6 +9,8 @@ import type { DoctrineChoice } from "./useColonyJev.ts";
 
 /** What builds the same game again: useColony's game is made from these (and its Restart count). */
 export interface GameSettings {
+  /** the species the game is played with (Species.id; colony/species.ts SPECIES): the page builds the game with it, and Game.load refuses a save of another */
+  species: string;
   seed: number;
   antCount: number;
   rival: boolean;
@@ -103,7 +105,8 @@ export function record(slot: number, settings: GameSettings, player: PlayerState
  * page plays one world only (PRD §55).
  */
 export function readable(r: SaveRecord): boolean {
-  return r.game?.version === SAVE_VERSION && r.game.world != null;
+  // The page plays the generic ant until it can choose a species (docs/species.md; the start card, S5): a record of another is listed, not loaded.
+  return r.game?.version === SAVE_VERSION && r.game.world != null && r.settings?.species === GENERIC_ANT.id;
 }
 
 /** The newest save this game can read, or null: what Continue offers. */

@@ -4,8 +4,7 @@ import { localResponses, type Responses } from "./responses.ts";
 import type { LaneWords, Mode, Stance } from "./vocab.ts";
 
 // A species (docs/species.md, ja-fnd.5.3): what one kind of ant is, as data the Game hands its colonies. Step 1 of the order of work holds
-// the physiology (parameter overrides) and the local rule set; the lane words, the sense sources, the fungus's host properties and the
-// names are added by the next beads (.2-.4). The Game hands a species' params and responses to its colonies (Colony stays free of the idea). GameParams.species is code, so the save leaves it out until step 3 saves its id. A game has one species (owner, 2026-11-12); mixed worlds are ja-fnd.5.4.
+// the physiology (parameter overrides) and the local rule set; the lane words, undertaking and the names came with the next beads (.2-.4). The Game hands a species' params and responses to its colonies (Colony stays free of the idea). GameParams.species is code, so the save leaves it out until step 3 saves its id. A game has one species (owner, 2026-11-12); mixed worlds are ja-fnd.5.4.
 
 export interface Species {
   id: string;
@@ -22,6 +21,19 @@ export interface Species {
   lanes: { mode?: LaneWords<Mode>; stance?: LaneWords<Stance> };
 }
 
+/**
+ * The species a save or a page names by id (Species.id; GameSettings.species): code cannot be saved, so a record keeps the id and the page builds the
+ * game with the species it names. Add a species' row here when the page can play it.
+ */
+export const SPECIES: Readonly<Record<string, Species>> = {};
+
+/** The species with this id, or an error for one this build does not know. */
+export function speciesById(id: string): Species {
+  const s = Object.hasOwn(SPECIES, id) ? SPECIES[id] : undefined;
+  if (!s) throw new Error(`species: no "${id}" here (known: ${Object.keys(SPECIES).join(", ")})`);
+  return s;
+}
+
 /** The ant the game has always had: no overrides, the local responses. A game plays it unless it names another species. */
 export const GENERIC_ANT: Species = {
   id: "generic",
@@ -30,3 +42,4 @@ export const GENERIC_ANT: Species = {
   responses: localResponses,
   lanes: { mode: MODE_WORDS, stance: STANCE_WORDS },
 };
+(SPECIES as Record<string, Species>)[GENERIC_ANT.id] = GENERIC_ANT;

@@ -225,6 +225,7 @@ test("a single-map save's shape: the game's keys with the grids, colony saves as
     "recognition",
     "regrown",
     "revealed",
+    "species",
     "strategyChoices",
     "time",
     "version",

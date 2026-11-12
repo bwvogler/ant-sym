@@ -4,7 +4,7 @@ import { DEFAULT_GAME, Game } from "../../game.ts";
 import { generateWorld, mulberry32 } from "../../world.ts";
 import { MODE_WORDS, STANCE_WORDS } from "../../colonyBrain.ts";
 import { localResponses } from "../../responses.ts";
-import { GENERIC_ANT, type Species } from "../../species.ts";
+import { GENERIC_ANT, SPECIES, speciesById, type Species } from "../../species.ts";
 
 // The generic ant is a species that changes nothing (docs/species.md step 1): a game that names no species plays today's ant.
 
@@ -65,4 +65,32 @@ test("a loaded game keeps the species it was built with: the save holds no funct
   const c = b.colonies[b.addColony({ x: 80, y: 50, antCount: 5, odour: 0.5 })]!;
   assert.equal(c.responses, localResponses);
   for (let k = 0; k < 10; k++) b.tick(1 / 30);
+});
+
+test("a save carries the species it was played with, and a game of another species refuses it", () => {
+  const quick: Species = { id: "quick", name: "Quick", params: { speed: 9.5 }, responses: localResponses, lanes: {} };
+  const world = () => generateWorld(1, { size: { w: 160, h: 100 } });
+  const make = (species?: Species) => new Game(world(), { antCount: 10, rivalAnts: 10, ...(species ? { species } : {}) }, mulberry32(3));
+  const fast = make(quick);
+  for (let k = 0; k < 20; k++) fast.tick(1 / 30);
+  const saved = JSON.parse(JSON.stringify(fast.save())) as ReturnType<Game["save"]>;
+  assert.equal(saved.species, "quick");
+  assert.equal(JSON.parse(JSON.stringify(make().save())).species, "generic");
+  // The same species reads it and plays on; another is refused with a reason.
+  const again = make(quick);
+  again.load(JSON.parse(JSON.stringify(saved)));
+  assert.equal(again.params.species, quick);
+  for (let k = 0; k < 5; k++) again.tick(1 / 30);
+  const before = again.time;
+  assert.throws(() => make().load(JSON.parse(JSON.stringify(saved))), /species "quick".*plays "generic"/);
+  assert.throws(() => again.load(JSON.parse(JSON.stringify(make().save()))), /species "generic".*plays "quick"/);
+  assert.equal(again.time, before, "a refused load leaves the game as it was");
+});
+
+test("the species the page names by id: the generic ant is known, an unknown id is an error", () => {
+  assert.equal(speciesById("generic"), GENERIC_ANT);
+  assert.equal(SPECIES.generic, GENERIC_ANT);
+  assert.throws(() => speciesById("nope"), /no "nope"/);
+  for (const id of ["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"])
+    assert.throws(() => speciesById(id), /no ".+" here/, `${id} is not a species`);
 });
