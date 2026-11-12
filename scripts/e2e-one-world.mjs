@@ -14,6 +14,9 @@
 //     flies while Jev can't read words opens no pen.
 //  6. the Fungus panel's tooltips (ui/Tip.tsx): a hover opens one, Escape closes it, Tab onto a next-level button opens that button's,
 //     and on a touch page a tap opens one, a second tap or a tap elsewhere closes it.
+//  7. the first game's tutorial (ja-7x4, PRD §61), in a fresh browser: Start runs it, paused at 1× on the landing; the first
+//     host pauses the game and is followed; Faster runs at 4×; Skip ends it at 4×, playing; a reload offers plain Start.
+// Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
 
@@ -146,7 +149,7 @@ try {
   // ——— 1. A one-world game, seed fixed: it opens above ———
   console.log("1. a one-world game");
   await page.getByLabel("world seed").fill(String(SEED));
-  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(() => page.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null), "the one-world game, landed");
   check((await page.evaluate(() => window.jevAnts.view())) === "above", "a one-world game opens above");
   check((await page.getByRole("button", { name: "above", exact: true }).getAttribute("aria-pressed")) === "true", "the switch shows above");
@@ -611,7 +614,7 @@ try {
   const tpage = await touch.newPage();
   tpage.on("pageerror", (e) => errors.push(String(e)));
   await tpage.goto(url);
-  await tpage.getByRole("button", { name: "Start", exact: true }).click();
+  await tpage.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(
     () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
     "the touch page's game, landed",
@@ -626,6 +629,37 @@ try {
   await tpage.touchscreen.tap(20, 20);
   await until(async () => (await tips(tpage)) === 0, "a tap elsewhere closes it", 3000, 50);
   await touch.close();
+
+  // ——— 7. The first game's tutorial ———
+  console.log("7. the tutorial");
+  const tctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const tu = await tctx.newPage();
+  tu.on("pageerror", (e) => errors.push(String(e)));
+  await tu.goto(url);
+  await tu.getByLabel("world seed").fill(String(SEED));
+  await tu.getByRole("button", { name: "Start the tutorial", exact: true }).click();
+  const tcard = tu.getByRole("dialog", { name: "tutorial" });
+  const bar = (name) => tu.getByRole("group", { name: "speed" }).getByRole("button", { name, exact: true });
+  const paused = async () => (await tu.getByRole("button", { name: "Play", exact: true }).count()) === 1;
+  await until(async () => /You are a fungus/.test((await tcard.textContent()) ?? ""), "the tutorial's first card");
+  check(await paused(), "the landing card waits, paused");
+  check((await bar("1×").getAttribute("aria-pressed")) === "true", "at 1×");
+  await tcard.getByRole("button", { name: "Let it play", exact: true }).click();
+  await until(async () => /carries you/.test((await tcard.textContent()) ?? ""), "the first host", 60_000);
+  check(await paused(), "the first host pauses the game");
+  check((await tu.getByRole("region", { name: "followed ant" }).count()) === 1, "and is followed");
+  check((await tu.evaluate(() => document.documentElement.dataset.tutorial)) === "load", "its card is highlighted");
+  await tcard.getByRole("button", { name: "Follow it", exact: true }).click();
+  await until(async () => /groom it/.test((await tcard.textContent()) ?? ""), "the watch card");
+  check(!(await paused()), "watching, the game plays");
+  await tcard.getByRole("button", { name: "Faster", exact: true }).click();
+  await until(async () => (await bar("4×").getAttribute("aria-pressed")) === "true", "Faster runs at 4×");
+  await tcard.getByRole("button", { name: "Skip tutorial", exact: true }).click();
+  await until(async () => (await tcard.count()) === 0, "Skip ends the tutorial");
+  check(!(await paused()) && (await bar("4×").getAttribute("aria-pressed")) === "true", "playing at 4× after Skip");
+  await tu.reload();
+  await until(async () => (await tu.getByRole("button", { name: "Start", exact: true }).count()) === 1, "after a reload, plain Start");
+  await tctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

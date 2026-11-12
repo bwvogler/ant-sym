@@ -23,6 +23,8 @@ import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
 import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
+import TutorialCard from "./ui/Tutorial.tsx";
+import { firstGame, skipTutorial, useTutorial } from "./ui/useTutorial.ts";
 import {
   AUTOSAVE,
   AUTOSAVE_MS,
@@ -103,6 +105,16 @@ export default function ColonyApp() {
       setView(view === PLANE ? "above" : "below");
     },
     [setView],
+  );
+  // The first game's tutorial (ja-7x4, PRD §61).
+  const tut = useTutorial({ game, onFrame, update, setFollowed, showAt });
+  const onStart = useCallback(
+    (seed: number, withTutorial: boolean) => {
+      start(seed, withTutorial);
+      if (withTutorial) tut.run();
+      else skipTutorial();
+    },
+    [start, tut],
   );
   const onLink = useCallback((view: number, x: number, y: number) => showAt(view, x, y, true), [showAt]);
   /** Carry the camera across with a followed ant that goes through a hole (on by default); off, the camera holds. */
@@ -344,7 +356,13 @@ export default function ColonyApp() {
         />
       )}
       {!controls.started && (
-        <StartScreen seed={controls.seed} onStart={start} latest={newestReadable(games.list)} onContinue={continueFrom} />
+        <StartScreen
+          seed={controls.seed}
+          onStart={onStart}
+          firstGame={firstGame()}
+          latest={newestReadable(games.list)}
+          onContinue={continueFrom}
+        />
       )}
 
       {backend?.needsPass && <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} />}
@@ -438,6 +456,16 @@ export default function ColonyApp() {
                 )
               }
             />
+            {tut.tutorial && tut.card && (
+              <TutorialCard
+                step={tut.tutorial.step}
+                card={tut.card}
+                fast={tut.tutorial.fast}
+                onNext={tut.next}
+                onFaster={tut.faster}
+                onSkip={tut.skip}
+              />
+            )}
           </div>
           {followed ? (
             <AntCard
