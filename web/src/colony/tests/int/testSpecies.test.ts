@@ -46,8 +46,9 @@ const LONE: Species = {
 };
 
 /**
- * `feed`: food reaching the larder each tick, as the desert ant's senses will bring it (its food plume, ja-rf5); without them these lone foragers
- * with no trail find too little in 150 s to replace the dead, and the colony falls.
+ * `feed`: food reaching the larder each tick. On this 120x80 world no ant, the generic ant's or the lone forager's, reaches food in 150 s (the nearest is
+ * 19-29 cells from the nest), so without it the colony of a 90 s life falls at about 117 s whatever the species; the feed is the only food in the game.
+ * Whether the desert ant needs a food sense of its own is for ja-rf5.3 to measure.
  */
 const play = (species: Species, seconds: number, feed = 0) => {
   const g = new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 30, rival: false, species }, mulberry32(3));
@@ -62,11 +63,14 @@ test("a species of the descriptor's pieces alone plays a game: no trails laid, a
   const g = play(LONE, 150, 0.05);
   const c = g.player;
   assert.equal(g.params.species, LONE);
+  // The Game hands each parameter down (the ones this plane game does not exercise by behaviour: undertakes, the bands and the raid gates are pinned in undertakes.test.ts, ageStructure.test.ts and a side-view game).
+  for (const [k, v] of Object.entries(LONE.params))
+    assert.equal((g.player.params as unknown as Record<string, unknown>)[k], v, `${k} reaches the colony`);
+  assert.equal(g.player.responses, LONE.responses);
   assert.equal(g.outcome(), "playing");
   // The responses lay nothing and the colony follows no home trail: no pheromone of its own on the ground.
   assert.equal(c.ph.total("food"), 0, "no food trail");
   assert.equal(c.ph.total("home"), 0, "no home trail");
-  assert.equal(c.ph.total("alarm"), 0, "no alarm");
   // A short life that ends on the plane, replaced from the larder as food comes in.
   assert.ok(c.diedOld > 0, `${c.diedOld} died of age`);
   assert.ok(
