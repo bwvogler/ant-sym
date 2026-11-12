@@ -4839,3 +4839,17 @@ The mycelium's spore output is fixed by its mass, so every cell added to where i
 **Built** (with `params.hyphae`). Hyphae remember the cells that were soil when they grew in (and the shaft-wall roots); each round, a cell the ants have dug open is cut (`Hyphae.cutDug`). The cell and everything that grew from it die with their tips, the fusions they held and the spore spots only they touched, and the mass the lost hypha held is gone (`Evolution.lose`). A fusion loop that joins the cut-off part to the rest saves it: only the dug cell is lost (Simonin et al. 2012; the rule is design).
 
 **Measured** (seeds 1–10, 600 s, against §63.2): a quarter at 141–401 s → 140–441 s; seed 6 401 → 441 s, seed 9 380 → 398 s, the rest within a few seconds; median about 301 s. The counterplay is mild: at *a thread* the curtain's hyphae run along walls already dug, so the diggers mostly widen the tunnels beside them; it should bite harder once *a borer* takes hyphae into undug soil. P1 holds (worst 441 s against the baseline's "never").
+
+### 63.4 Held out: seeds 11–20 (review of #104, D1; owner 2026-11-12)
+
+Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression.mjs --map one --evolve [--hyphae]`, 600 s, everything above: fruit, corpses, cuts):
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 240 | 269 | 318 | 243 | 381 | 435 | 191 | 270 | 262 | never |
+| a quarter, hyphae (s) | 236 | 271 | 288 | 252 | 287 | 420 | 193 | 243 | 212 | 484 |
+| the rival's first host, no hyphae (s) | 411 | 557 | 518 | 345 | 173 | 540 | 271 | 329 | 273 | 218 |
+| the rival's first host, hyphae (s) | 323 | 403 | 193 | 220 | 173 | 472 | 168 | 205 | 54 | 218 |
+
+- As on seeds 1–10: every seed takes hold (seed 20, which never did without hyphae, at 484 s); the median quarter about 262 s against about 270 s; the rival reached sooner (median about 207 s against about 366 s); mutations up on most seeds.
+- **P1 as worded ("no seed worse than the baseline") fails narrowly**: seed 14 is 9 s slower (243 → 252 s), seeds 12 and 17 2 s; on seeds 1–10, seeds 2 and 3 were 4 s and 1 s slower. The worst seed and the median both improve; the gate's wording, not the play, is what the owner is asked to settle (`ja-2bw.6`).
