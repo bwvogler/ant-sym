@@ -33,7 +33,7 @@ export interface BroodItem {
   caste: number;
   /** seconds of the caste cue so far (royal.ts): toward a gyne while bipotent, toward a cull once a gyne */
   cue: number;
-  /** laid by a queen founding alone (ja-lo8.10): it ecloses as a nanitic, who forages from the start (colony.ts NANITIC_AGE) */
+  /** laid by a queen founding alone (ja-lo8.10): it ecloses as a nanitic, who forages from the start (NANITIC_AGE: a share MIDDLE of the lifespan) */
   nanitic: boolean;
 }
 
