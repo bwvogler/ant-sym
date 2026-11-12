@@ -43,6 +43,8 @@ import {
   estimateTokens,
   STANCE_BRAIN_VERSION,
 } from "../web/src/colony/index.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const BATCH = 100;
 const OUT = new URL("../web/public/precache/", import.meta.url);

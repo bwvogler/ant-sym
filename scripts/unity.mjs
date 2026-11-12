@@ -12,6 +12,8 @@
 //   (≤ 0.34 % met in 10 min, PRD §53).
 import { availableParallelism } from "node:os";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 if (isMainThread) await main();
 else await work();

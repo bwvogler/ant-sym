@@ -30,6 +30,8 @@ import {
   OPEN_WORLD,
   SIDE_WORLD,
 } from "../web/src/colony/index.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const one = process.argv.includes("--one");
 const page = process.argv.includes("--page");
