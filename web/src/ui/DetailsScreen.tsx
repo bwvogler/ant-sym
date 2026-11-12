@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { SITUATIONS, DOCTRINES, LETHAL, LEVERS, NEST_ONLY, upgradeFor, MET, type Game, DEFAULT_RECOGNITION } from "../colony/index.ts";
+import {
+  SITUATIONS,
+  DOCTRINES,
+  LETHAL,
+  LEVERS,
+  NEST_ONLY,
+  upgradeFor,
+  MET,
+  type Game,
+  DEFAULT_RECOGNITION,
+  type Journal,
+} from "../colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import Help from "./Help.tsx";
+import { journalLine } from "./journal.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { seg } from "./styles.ts";
 import { MAX_SPEED, type ColonyControls, type ColonyStats, type SideStats } from "./useColony.ts";
@@ -26,6 +38,8 @@ interface Props {
   restart: () => void;
   newWorld: () => void;
   jev: Jev;
+  /** the game journal, when ?log= asked for one (ui/journal.ts) */
+  journal: Journal | null;
   saves: { list: SaveRecord[]; save: (slot: number) => Promise<void> };
   onLoad: (r: SaveRecord) => void;
 }
@@ -74,6 +88,7 @@ export default function DetailsScreen(props: Props) {
           <SavedGames {...props} />
           <Lab {...props} />
           <Debug {...props} />
+          {props.journal && <JournalCard journal={props.journal} />}
         </div>
       </div>
     </div>
@@ -507,6 +522,29 @@ function Debug({ stats, fps }: Props) {
         <dt className="text-fg-3">fps</dt>
         <dd className="text-right">{fps}</dd>
       </dl>
+    </Card>
+  );
+}
+
+/** The newest journal events, newest first; it reads the journal about twice a second while Details is open. */
+function JournalCard({ journal }: { journal: Journal }) {
+  const [, setWritten] = useState(journal.written);
+  useEffect(() => {
+    const id = setInterval(() => setWritten(journal.written), 500);
+    return () => clearInterval(id);
+  }, [journal]);
+  const shown = journal.events.slice(-200).reverse();
+  return (
+    <Card label="journal" title="Journal" wide>
+      <p className="mt-1 text-xs text-fg-3">
+        ?log= {[...journal.filter.categories].join(", ")}
+        {journal.filter.colony !== undefined && ` · colony ${journal.filter.colony}`}
+        {journal.filter.ant !== undefined && ` · ant ${journal.filter.ant}`} · {journal.written.toLocaleString()} events (all of them in the
+        console, at the debug level)
+      </p>
+      <pre className="mt-2 max-h-96 overflow-auto font-mono text-xs leading-5 text-fg-2">
+        {shown.length ? shown.map(journalLine).join("\n") : "nothing yet"}
+      </pre>
     </Card>
   );
 }
