@@ -1,6 +1,6 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
+import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, type StancePolicy } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
@@ -377,6 +377,14 @@ export class Game {
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
+    // The midden's corpses, for a hypha that reaches one (ja-2bw.7): every colony's, on the layer they are buried on.
+    const middenLayer = one ? PLANE : 0;
+    this.fungus.corpseAt = (layer, x, y) => {
+      if (layer !== middenLayer) return 0;
+      let n = 0;
+      for (const c of this.colonies) n += c.midden.get(colonyCell(x, y)) ?? 0;
+      return n;
+    };
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
@@ -397,6 +405,8 @@ export class Game {
       c.onBury = (d, layer = 0) => {
         if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates)
           this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
+        // With hyphae, a host that died of the evolving fungus is a new start on the midden (ja-2bw.7).
+        if (d.load >= INFECTED && d.strain === this.fungus.evolution?.strain) this.fungus.colonise(layer, d.x, d.y);
       };
       if (this.colonies.length > 1) {
         this.layers.forEach((_, l) => {

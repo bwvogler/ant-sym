@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
-import { STRAINS } from "../../fungus.ts";
+import { CORPSE, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
-import { HYPHA_MASS, keyCell } from "../../hyphae.ts";
+import { cellKey as hyphaKey, HYPHA_MASS, keyCell } from "../../hyphae.ts";
+import { nx, ny } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { OPEN, rockAt } from "../../world.ts";
 
@@ -81,4 +82,57 @@ test("with hyphae off, the fungus grows none", () => {
   runFor(g, 10);
   assert.equal(g.fungus.hyphaeOn(PLANE), null);
   assert.equal(g.fungus.hyphaeOn(CURTAIN), null);
+});
+
+test("a host that died of the fungus, buried on the midden, is a new start that fruits for free", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  const plane = g.fungus.hyphaeOn(PLANE)!;
+  const tips = plane.tips.length;
+  const mass = e.mass;
+  // The burial hook as an undertaker calls it, a cell clear of the landing patch.
+  const [x, y] = [60, 40];
+  g.colonies[0]!.onBury!({ x, y, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
+  assert.equal(plane.tips.length, tips + 2, "two tips set out from the corpse");
+  assert.ok(plane.has(x, y));
+  assert.equal(g.fungus.corpsesOn(PLANE).get(hyphaKey(x, y)), CORPSE.spores);
+  assert.ok(e.mass >= mass + CORPSE.mass - 1e-9, "the cadaver fed the mycelium");
+  runFor(g, 10);
+  assert.ok(g.fungus.sporesOn(PLANE)!.spores.get(x, y) > 0, "no spores on the corpse");
+  const left = g.fungus.corpsesOn(PLANE).get(hyphaKey(x, y))!;
+  assert.ok(left < CORPSE.spores && left > 0, `${left} left`);
+  // An uninfected corpse is not a start.
+  g.colonies[0]!.onBury!({ x: 80, y: 40, held: -1, died: g.time, load: 0, strain: e.strain }, PLANE);
+  assert.equal(g.fungus.corpsesOn(PLANE).has(hyphaKey(80, 40)), false);
+});
+
+test("a hypha that reaches a corpse on the midden colonises it", () => {
+  const g = game(true);
+  const plane = g.fungus.hyphaeOn(PLANE)!;
+  const tip = plane.tips[0]!;
+  // A corpse two cells ahead of the first tip.
+  const ax = nx(tip.x, tip.y, tip.heading);
+  const ay = ny(tip.y, tip.heading);
+  const cx = nx(ax, ay, tip.heading);
+  const cy = ny(ay, tip.heading);
+  const was = g.fungus.corpseAt!;
+  g.fungus.corpseAt = (l, x, y) => (l === PLANE && x === cx && y === cy ? 1 : was(l, x, y));
+  runFor(g, 60);
+  assert.ok(g.fungus.corpsesOn(PLANE).has(hyphaKey(cx, cy)), "not colonised");
+});
+
+test("corpses colonised are saved", () => {
+  const g = game(true);
+  g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: 0, load: 0.5, strain: g.fungus.evolution!.strain }, PLANE);
+  runFor(g, 5);
+  const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
+  const back = game(true);
+  back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
+  assert.deepEqual([...back.fungus.corpsesOn(PLANE)], [...g.fungus.corpsesOn(PLANE)]);
+});
+
+test("with hyphae off, a corpse is no start", () => {
+  const g = game(false);
+  g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: 0, load: 0.5, strain: g.fungus.evolution!.strain }, PLANE);
+  assert.equal(g.fungus.corpsesOn(PLANE).size, 0);
 });
