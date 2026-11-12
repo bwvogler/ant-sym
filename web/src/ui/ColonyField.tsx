@@ -69,7 +69,7 @@ import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 // from the plane cells under the line (P(s)), the mound's cut stacked on it and the plane's ants standing there, and a
 // faint rule at each bend. Each view keeps its own camera; only the ants, corpses and scent of the view's layer show.
 // The views are linked (U5.2): a click on the line above, or on the strip below, asks the page for the other view there
-// (onLink); a followed ant that goes through a hole is reported (onCross), and the page may carry the camera across. In
+// (onLink); a followed ant that goes through a hole is reported (onCross), and the page carries the camera across. In
 // the queen's pen the top view shows her flight's circle and, under the pointer, where she would settle.
 
 interface Props {
@@ -228,7 +228,11 @@ export default function ColonyField({
    * two the switch takes otherwise left the view on the wrong side of it (the e2e guard caught one in twenty runs).
    */
   const carryTo = useRef<number | null>(null);
-  /** where the followed ant was last seen on the shown view, while it is on the other layer (the player switched views by hand: "gone below") */
+  /**
+   * Where the followed ant was last seen on the view being drawn. The "gone below / up" ring is drawn from it while the ant
+   * is on the other layer; with the camera always carried across, that is only the frame or two before the switch. It
+   * does not mark a follow after a hand switch (it still points at the view just left): PR #94 review S1, D1 to the owner.
+   */
   const lastSeen = useRef<{ f: Followed; lv: number; x: number; y: number } | null>(null);
   const penRef = useRef(pen);
   /** the pointer over the canvas (device px), for the pen's preview; null when it left */
