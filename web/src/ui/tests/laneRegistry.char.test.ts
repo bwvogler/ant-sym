@@ -207,8 +207,8 @@ test("each lane's local answer, and how each lane reads a reply, a bad one and n
 });
 
 // Changed on purpose by the lane registry's slice 3 (ja-fnd.5.2.4): the fungus sample used to ask every lever on the menu (15 under the default
-// menu), but a worker host's key asks the 14 that are not a queen's, so the Learn panel's sample request and its cost per question (758 → 706
-// tokens) now match what the page sends. The ants' lanes, and the fungus's request under a custom menu, are byte for byte as before.
+// menu), but a worker host's key asks the 14 that are not a queen's (and a queen's, her two), so the Learn panel's sample request and its cost per
+// question (758 → 706 tokens) now match what the page sends. The ants' lanes, and the fungus's request under a custom menu, are byte for byte as before.
 test("what the Learn panel and the cost estimates send: the sample requests and the tokens a question costs", () => {
   const samples = [
     requestFor({ lane: "mode", situation: SAMPLE_SITUATION }, DOCTRINE_TEXTS[0]!, 3),
@@ -227,6 +227,9 @@ test("what the Learn panel and the cost estimates send: the sample requests and 
     Object.keys(samples[2]!.questions).filter((q) => q.startsWith("h0_")),
     workerLevers.map((id) => `h0_${id}`),
   );
+  // The Learn panel shows a followed host's own situation, a queen's too: she is asked her two levers (what the page sends her), not the menu's.
+  const queenRequest = requestFor({ lane: "fungus", situation: { ...SAMPLE_FUNGAL, task: "queen" } }, AIM_TEXTS[0]!, 1);
+  assert.deepEqual(Object.keys(queenRequest.questions), ["h0_show", "h0_queenSignal"]);
   // The fungus sample takes a menu (the Learn panel shows the levers the player has on): the request asks only those.
   assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL, menu: new Set(MENUS[1]) }, AIM_TEXTS[0]!, 2)), [
     "0a8d8be9e2350816",
