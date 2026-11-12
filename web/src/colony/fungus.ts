@@ -1072,6 +1072,12 @@ export class Fungus {
       stepRound(maps, level, budget, this.growthPolicy);
       stepped = true;
     }
+    // Hypha the ants have dug through is cut, and the mass it held is lost (ja-2bw.4: the colonies' counterplay).
+    if (stepped)
+      for (const { h, g } of maps) {
+        const lost = h.cutDug(g);
+        if (lost > 0) e.lose(lost * HYPHA_MASS);
+      }
     // A tip that has reached a corpse (the midden's) colonises it.
     if (stepped && this.corpseAt)
       this.#hyphae.forEach((h, l) => {
@@ -1249,10 +1255,12 @@ export class Fungus {
       if (g.kind(sx, yy) !== "open") continue;
       if (!left && g.kind(sx - 1, yy) === "soil") {
         h.root(sx - 1, yy, SW);
+        h.soil.add(cellKey(sx - 1, yy));
         left = true;
       }
       if (!right && g.kind(sx + 1, yy) === "soil") {
         h.root(sx + 1, yy, SE);
+        h.soil.add(cellKey(sx + 1, yy));
         right = true;
       }
     }

@@ -218,3 +218,58 @@ test("fruit needs a dug cell: never under the plane's surface, nor buried in soi
   assert.equal(b.fruits.length, 0);
   assert.equal(b.tips.length, 1);
 });
+
+test("digging a hypha cell cuts it: what grew beyond it dies with its tips, unless a fusion loop joins it to the rest", () => {
+  // A straight hypha east from (0, 20): cells x = 0…6, its tip at the end; and a branch from x = 2 going south-east.
+  const line = (): Hyphae => {
+    const h = new Hyphae();
+    h.root(0, 20, E);
+    const t = h.tips[0]!;
+    for (let k = 0; k < 6; k++) h.extend(t, E, 0);
+    return h;
+  };
+  const h = line();
+  assert.equal(h.cut(cellKey(3, 20)), 4, "cells 3…6 lost");
+  assert.equal(h.tips.length, 0, "the tip beyond the cut stopped");
+  assert.ok(h.has(2, 20) && !h.has(4, 20));
+  assert.equal(h.cutCells, 4);
+  // A loop: a second hypha from (0, 22) fused into cell (5, 20), beyond the cut.
+  const l = line();
+  l.root(0, 22, E);
+  const other = l.tips[1]!;
+  for (let k = 0; k < 4; k++) l.extend(other, E, 0);
+  l.fusions.push(cellKey(other.x, other.y), cellKey(5, 20));
+  assert.equal(l.cut(cellKey(3, 20)), 1, "only the dug cell");
+  assert.ok(l.has(4, 20) && l.has(6, 20));
+  assert.equal(l.parent.get(cellKey(4, 20)), ROOT, "fed by the loop now");
+  assert.equal(l.tips.length, 2);
+});
+
+test("a cut takes the spore spots only the dead part touched", () => {
+  const g: Ground = { topsoil: false, kind: (x, y) => (y < 10 ? "rock" : x === 5 ? "open" : "soil") };
+  const h = new Hyphae();
+  h.root(2, 12, E);
+  const t = h.tips[0]!;
+  h.extend(t, E, 0);
+  h.extend(t, E, 0);
+  assert.ok(h.fruit(t, g));
+  assert.equal(h.fruits.length, 1);
+  h.cut(cellKey(3, 12));
+  assert.equal(h.fruits.length, 0);
+});
+
+test("cutDug cuts only cells that were soil and are dug now", () => {
+  let dug = false;
+  const g: Ground = { topsoil: false, kind: (x) => (dug && x === 3 ? "open" : "soil") };
+  const h = new Hyphae();
+  h.root(0, 12, E);
+  stepTips(h, g, 1, { free: 1e9, tips: 1 });
+  stepTips(h, g, 1, { free: 1e9, tips: 1 });
+  stepTips(h, g, 1, { free: 1e9, tips: 1 });
+  stepTips(h, g, 1, { free: 1e9, tips: 1 });
+  assert.ok(h.has(3, 12) && h.has(4, 12));
+  assert.equal(h.cutDug(g), 0);
+  dug = true;
+  assert.equal(h.cutDug(g), 2, "cells 3 and 4");
+  assert.ok(h.has(2, 12) && !h.has(3, 12));
+});

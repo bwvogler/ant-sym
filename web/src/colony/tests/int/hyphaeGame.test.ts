@@ -162,3 +162,21 @@ test("a host that dies on the plane is a new start where it lies; a clean ant le
   c.kill(j);
   assert.equal(g.fungus.corpsesOn(PLANE).size, before + 1);
 });
+
+test("ants digging through a hypha in the curtain cut it, and the mycelium loses the mass it held", () => {
+  const g = game(true);
+  runFor(g, 40);
+  const h = g.fungus.hyphaeOn(CURTAIN)!;
+  const soil = [...h.soil];
+  assert.ok(soil.length > 0, "no hypha in the curtain's soil");
+  const e = g.fungus.evolution!;
+  // Dig the first soil cell a hypha holds, as a digger would.
+  const [x, y] = keyCell(soil[0]!);
+  g.world!.curtain.rock.set(x, y, OPEN);
+  const before = h.length;
+  const mass = e.mass;
+  runFor(g, 3);
+  assert.ok(h.length < before || !h.has(x, y), "not cut");
+  assert.ok(h.cutCells > 0);
+  assert.ok(e.mass < mass + 0.5, "no mass lost");
+});

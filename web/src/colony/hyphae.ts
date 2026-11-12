@@ -86,6 +86,10 @@ export class Hyphae {
   fusions: number[] = [];
   /** spore spots: dug cells where a tip fruited (the `fruit` answer), each taking a patch cell's share of the spores */
   fruits: number[] = [];
+  /** hypha cells that were soil when it grew into them (the curtain's): one the ants dig open is cut (ja-2bw.4) */
+  readonly soil = new Set<number>();
+  /** hypha cells lost to cuts, over the game */
+  cutCells = 0;
   /** mass spent on hypha (each cell at its price) */
   spent = 0;
   /** tip extensions tried, and how many of them ran into the mycelium's own cells (assay H3) */
@@ -183,9 +187,67 @@ export class Hyphae {
   }
 
   /** The hyphae for a save (save.ts): plain arrays. */
+  /**
+   * The ants have dug cell `k` open (ja-2bw.4, design): the hypha there is cut. The cell and everything that grew from
+   * it die, with their tips and the spore spots only they touched, unless a loop closed by fusion joins that part to
+   * the rest (Simonin et al. 2012: fusion carries the network round a break); then only the cell is lost, and what grew
+   * from it is fed by the loop (its first cells start afresh as roots). Returns the cells lost.
+   */
+  cut(k: number): number {
+    if (!this.parent.has(k)) return 0;
+    const children = new Map<number, number[]>();
+    for (const [c, p] of this.parent)
+      if (p !== ROOT) {
+        const list = children.get(p);
+        if (list) list.push(c);
+        else children.set(p, [c]);
+      }
+    const beyond = new Set<number>([k]);
+    const stack = [k];
+    while (stack.length) for (const c of children.get(stack.pop()!) ?? []) if (!beyond.has(c)) (beyond.add(c), stack.push(c));
+    let looped = false;
+    for (let i = 0; i + 1 < this.fusions.length && !looped; i += 2) {
+      const a = this.fusions[i]!;
+      const b = this.fusions[i + 1]!;
+      if (a !== k && b !== k && beyond.has(a) !== beyond.has(b)) looped = true;
+    }
+    const dead = looped ? new Set([k]) : beyond;
+    for (const c of dead) {
+      this.parent.delete(c);
+      this.soil.delete(c);
+    }
+    if (looped) for (const c of children.get(k) ?? []) this.parent.set(c, ROOT);
+    this.tips = this.tips.filter((t) => !dead.has(cellKey(t.x, t.y)));
+    const kept: number[] = [];
+    for (let i = 0; i + 1 < this.fusions.length; i += 2)
+      if (!dead.has(this.fusions[i]!) && !dead.has(this.fusions[i + 1]!)) kept.push(this.fusions[i]!, this.fusions[i + 1]!);
+    this.fusions = kept;
+    this.fruits = this.fruits.filter((f) => {
+      if (this.parent.has(f)) return true;
+      const [x, y] = keyCell(f);
+      for (let d = 0; d < 6; d++) if (this.parent.has(cellKey(nx(x, y, d), ny(y, d)))) return true;
+      return false;
+    });
+    this.cutCells += dead.size;
+    return dead.size;
+  }
+
+  /** Cut every hypha cell that was soil and the ants have dug open since (`ground` says what is dug now). Returns the cells lost. */
+  cutDug(ground: Ground): number {
+    let lost = 0;
+    for (const k of [...this.soil]) {
+      if (!this.soil.has(k)) continue;
+      const [x, y] = keyCell(k);
+      if (ground.kind(x, y) === "open") lost += this.cut(k);
+    }
+    return lost;
+  }
+
   save(): HyphaeSave {
     return {
       parent: [...this.parent],
+      soil: [...this.soil],
+      cutCells: this.cutCells,
       tips: this.tips.map((t) => [t.x, t.y, t.heading, t.first, t.run]),
       fusions: [...this.fusions],
       fruits: [...this.fruits],
@@ -199,6 +261,8 @@ export class Hyphae {
   static load(r: HyphaeSave): Hyphae {
     const h = new Hyphae();
     for (const [k, p] of r.parent) h.parent.set(k, p);
+    for (const k of r.soil) h.soil.add(k);
+    h.cutCells = r.cutCells;
     h.tips = r.tips.map(([x, y, heading, first, run]) => ({ x, y, heading, first, run }) as Tip);
     h.fusions = [...r.fusions];
     h.fruits = [...r.fruits];
@@ -212,6 +276,8 @@ export class Hyphae {
 
 export interface HyphaeSave {
   parent: [number, number][];
+  soil: number[];
+  cutCells: number;
   tips: [number, number, number, number, number][];
   fusions: number[];
   fruits: number[];
@@ -374,6 +440,7 @@ function stepTip(
     }
     if (!enterable(h, g, x, y, level)) return false;
     if (!h.extend(t, d, HYPHA_MASS)) return false;
+    if (!g.topsoil && g.kind(x, y) === "soil") h.soil.add(cellKey(x, y));
     budget.free -= HYPHA_MASS;
     grown++;
     return true;
