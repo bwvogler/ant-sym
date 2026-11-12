@@ -4775,3 +4775,9 @@ The mycelium's spore output is fixed by its mass, so every cell added to where i
 
 - **No cliff in the landing colony:** a quarter at 141–401 s (median about 302 s, against about 292 s); P1 still holds against the baseline (worst 401 s against "never").
 - **The fungus crosses to the rival.** The plane's dead are mostly fight deaths at the border between the colonies; a host dying there is a spore spot where the rival's foragers walk. The rival's first host comes on every seed (5 of 10 before), and minutes sooner on seeds 2 and 5. Mutations rose on seeds 4 and 8 (4,424 and 2,819, against 2,427 and 1,148): corpses feed the mycelium and count as growth.
+
+### 61.3 Ants digging through a hypha cut it (ja-2bw.4, 2026-11-12)
+
+**Built** (with `params.hyphae`). Hyphae remember the cells that were soil when they grew in (and the shaft-wall roots); each round, a cell the ants have dug open is cut (`Hyphae.cutDug`). The cell and everything that grew from it die with their tips, the fusions they held and the spore spots only they touched, and the mass the lost hypha held is gone (`Evolution.lose`). A fusion loop that joins the cut-off part to the rest saves it: only the dug cell is lost (Simonin et al. 2012; the rule is design).
+
+**Measured** (seeds 1–10, 600 s, against §61.2): a quarter at 140–401 s → 140–441 s; seed 6 401 → 441 s, seed 9 380 → 398 s, the rest within a few seconds; median about 301 s. The counterplay is mild: at *a thread* the curtain's hyphae run along walls already dug, so the diggers mostly widen the tunnels beside them; it should bite harder once *a borer* takes hyphae into undug soil. P1 holds (worst 441 s against the baseline's "never").
