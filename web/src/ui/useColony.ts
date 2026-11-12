@@ -16,6 +16,7 @@ import {
   UPGRADES,
   generateOneWorld,
 } from "../colony/index.ts";
+import { journalFromUrl } from "./journal.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
@@ -219,6 +220,8 @@ const MAX_STEP = 1 / 30;
 
 export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const [controls, setControls] = useState<ColonyControls>(initial);
+  // The game journal, when the URL asks for one (?log=, ui/journal.ts): it outlives games, and starts afresh on each.
+  const journal = useMemo(() => journalFromUrl(), []);
   // Bumped by Restart: the same seed again, from scratch.
   const [generation, setGeneration] = useState(0);
   // A saved game to pour into the next game built (loadSave): built from its own settings, then restored (save.ts).
@@ -285,6 +288,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         const steps = Math.max(1, Math.ceil(total / MAX_STEP));
         for (let k = 0; k < steps; k++) {
           game.tick(total / steps);
+          journal?.observe(game);
           // A new queen has flown (ja-lo8.9): the game waits for the page to found her (the queen's pen, or her mother's words).
           if (game.flights.length) {
             setControls((c) => ({ ...c, playing: false }));
@@ -334,7 +338,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [game, colony, controls.playing, controls.speed]);
+  }, [game, colony, controls.playing, controls.speed, journal]);
 
   // The dev hook (window.jevAnts, the game and the page's views) is the page's: ColonyApp.
   // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
@@ -358,9 +362,16 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** What builds this game again (saves.ts). */
   const settings: GameSettings = { seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation };
 
-  /** The start screen's Start: this seed, playing, the fungus lands. */
+  /** The start screen's Start: this seed, the fungus lands; playing at the game's speed, or paused at 1× for the tutorial (PRD §61). */
   const start = useCallback(
-    (seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })),
+    (seed: number, tutorial = false) =>
+      setControls((c) => ({
+        ...c,
+        seed: Math.max(1, Math.floor(seed) || 1),
+        started: true,
+        playing: !tutorial,
+        speed: tutorial ? 1 : GAME_SPEED,
+      })),
     [],
   );
 
@@ -374,7 +385,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** Give adaptations to the next level of upgrade `id` (evolution.UPGRADES); false when the fungus can't. */
   const evolve = useCallback((id: string) => game.fungus.upgrade(id), [game]);
 
-  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve };
+  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal };
 }
 
 /** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */

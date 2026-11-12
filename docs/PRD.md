@@ -4677,3 +4677,44 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 **Beads.** `ja-rf5` (epic): `.1` read the full texts; `.2` assays (no behaviour change); `.3` the species on the descriptor (needs `ja-fnd.5.3`); `.4` food odour; `.5` heat; `.6` invitation; `.7` the fungus's levers (owner); `.8` Learn entry.
 
 **Still open.** Full texts of Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984 and the published Buehlmann et al. 2014 (paywalled); the heat model's numbers for *C. fortis*; every number in the note not marked as read in full text.
+
+## 61. The first game's tutorial (ja-7x4, 2026-11-12)
+
+The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
+- **Speed:** 1× for the landing and the wait for the first host; the watch at 4× (§61.2: 1× was too slow there); then the game's own 4×. `GAME_SPEED` is unchanged.
+- **Who gets it:** a player's first Start runs it. A browser flag (`localStorage`, `jev-ants.tutorial`) marks it finished or skipped. The start screen offers "Start without the tutorial", and afterwards "Play the tutorial".
+- **Scope:** from the landing to the first host clearing, then the aim. After that the goal line (§50.4) takes over.
+
+### 61.1 The steps
+Each step is one card, over the field's lower-left corner, with Skip on every card. The machine is `ui/tutorial.ts`: pure, driven by what the game shows each frame. The page runs it from `ui/useTutorial.ts`.
+
+1. **The landing, paused:** what the spores are.
+2. **Waiting, at 1×.**
+3. **The first host:** the game pauses, and the tutorial follows the first Ink ant whose load reaches `INFECTED` and highlights its card.
+4. **Watching it, at 4×, with Faster (8×) offered.** Ends on the first of:
+   - clean (load back to 0);
+   - dead;
+   - `WATCH_LIMIT` reached.
+5. **The outcome card:** the game pauses. The clean and limit cards point to Persistence and Stealth in the mutations.
+6. **The aim.** Its button plays at 4×.
+
+The tutorial watches its own host, so a player who stops following the ant does not end the watch. A followed ant that goes through a hole always takes the camera with it, in the tutorial and out of it: the "Carry across" toggle went (owner, 2026-11-12), and so did the dashed "gone below / up" ring, which then only flashed for a frame (ja-rkse). A Restart, a New world or a loaded save after the first card ends it, and it then counts as done in that browser; "Play the tutorial" on the start screen replays it (the owner kept this on 2026-11-12, rather than showing it again on the next visit). On the first card (the paused landing) nothing has happened yet, so the tutorial carries on in the new game.
+
+### 61.2 Measured: the first host's fate
+`node scripts/tutorial-first-host.mjs 1-20 240` measures the page's game on 20 seeds, offline: `buildGame`, the landing, 600 + 600 ants, 30 steps a second.
+
+| Measure | Result |
+|---|---|
+| First host appears | every seed, 3.3–6.9 s after the landing |
+| First host groomed clean | every seed, 41–215 s after it was found (median about 100 s) |
+| First host died | none |
+| Went below before clearing | 17 of 20 |
+| Peak load | 0.08–0.62 |
+| Other Ink ants carrying the fungus when it cleared | none on 13 of 20 seeds, 1–14 on the rest |
+
+- **The infection dies out at first.** The cards say so: the mycelium by the hole keeps fruiting, so new ants pick the fungus up. That is the "it goes away" the owner asked to show.
+- **`WATCH_LIMIT` = 240 s**, above the worst seed (215 s), so the clean card is the one players see.
+- **The watch runs at 4×.** At 1× it took about 1.5 minutes, too slow to watch (owner, 2026-11-12). At 4× it takes about 25 s, and 54 s on the slowest seed. Faster takes it to 8×.
+
+### 61.3 Cost
+None. No legend, question or schema changed. The aim card points at presets whose answers are already shipped (§50.19). The simulation is untouched, and the golden masters are bit-exact.

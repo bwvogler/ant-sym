@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Colony, type Situation, DOCTRINES, type FungalSituation, AIMS, type Fungus } from "../colony/index.ts";
+import { type Colony, type Situation, DOCTRINES, type FungalSituation, AIMS, type Fungus, type Journal } from "../colony/index.ts";
 import { COLONY_NAMES } from "./names.ts";
 import { browserCache } from "./cacheStore.ts";
 import { ColonyJev, type ColonyJevState } from "./colonyJev.ts";
@@ -36,8 +36,15 @@ export interface DoctrineChoice {
 /** Every colony starts foraging: one doctrine, one shared cache, no extra spend. */
 const FIRST_DOCTRINES: DoctrineChoice[] = COLONY_NAMES.map(() => ({ id: DOCTRINES[0]!.id, text: DOCTRINES[0]!.text }));
 
-export function useColonyJev(colonies: readonly Colony[], fungus: Fungus, menu: readonly string[], backend: Backend | null = null) {
+export function useColonyJev(
+  colonies: readonly Colony[],
+  fungus: Fungus,
+  menu: readonly string[],
+  backend: Backend | null = null,
+  journal: Journal | null = null,
+) {
   const jev = useMemo(() => new ColonyJev({}, browserCache), []);
+  jev.journal = journal;
   const [state, setState] = useState<ColonyJevState>(jev.state);
   const [doctrines, setDoctrinesState] = useState<DoctrineChoice[]>(FIRST_DOCTRINES);
   const [aim, setAimState] = useState<DoctrineChoice>({ id: AIMS[0]!.id, text: AIMS[0]!.text });

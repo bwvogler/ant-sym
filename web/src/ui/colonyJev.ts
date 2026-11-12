@@ -49,6 +49,7 @@ import {
   askedLevers,
   DEFAULT_MENU,
   type Fungus,
+  type Journal,
   PolicyCache,
 } from "../colony/index.ts";
 
@@ -204,6 +205,8 @@ function colonyLanes(words: string): Omit<Driven, "colony"> {
 
 export class ColonyJev {
   opts: ColonyJevOptions;
+  /** the page's game journal (?log=, ui/journal.ts): each batch asked, answered or failed is a "jev" event */
+  journal: Journal | null = null;
   #driven: Driven[] = [];
   /** each colony's doctrine, by index (kept across games: a new world keeps the colonies' natures) */
   #doctrines: string[] = [];
@@ -730,6 +733,10 @@ export class ColonyJev {
     const counted = LANE_KINDS[l.name].counter;
     this.#inFlight++;
     this.#set({ [counted]: this.#state[counted] + items.length, requests: this.#state.requests + 1 });
+    this.journal?.note("jev", -1, `asked ${items.length} ${l.name} situation${items.length === 1 ? "" : "s"}`, {
+      lane: l.name,
+      keys: items.map((it) => it.key),
+    });
     let reply: JevProxyReply | null = null;
     let error: string | null = null;
     try {
@@ -774,6 +781,7 @@ export class ColonyJev {
     if (!reply || !answers) {
       // Not billed as a reply; everyone keeps the local rule and meets the situation again later.
       this.#cooldown = 5;
+      this.journal?.note("jev", -1, `${l.name} batch failed: ${error ?? `jev answered ${reply?.status ?? "?"}`}`, { lane: l.name });
       this.#set({
         failures: this.#state.failures + 1,
         lastError: error ?? `jev answered ${reply?.status ?? "?"}`,
@@ -783,10 +791,12 @@ export class ColonyJev {
     }
     // A billed answer is kept under the context it was asked under, whichever run or doctrine is current now.
     const cache = this.#cache(l, context);
+    const got: Record<string, string> = {};
     for (const it of items) {
       const a = l.read(answers, it.id, it.situation, it.key);
-      if (a) cache.put(it.key, a);
+      if (a) cache.put(it.key, (got[it.key] = a));
     }
+    this.journal?.note("jev", -1, `${l.name}: ${Object.keys(got).length} of ${items.length} answered`, { lane: l.name, answers: got });
     this.#saveSoon(context, cache as unknown as PolicyCache<string>);
     this.#set({ run: runOf(reply) ?? this.#state.run, lastError: null, ...this.#counts() });
     // The fungus asks its policy every step, so its new answers take hold by themselves; the ants reconsider.
