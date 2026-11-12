@@ -148,9 +148,11 @@ export interface Card {
 export function cardFor(t: Tutorial, landing = 0): Card {
   const ink = colonyName(landing);
   const ant = t.host ? `Ant #${t.host.i}` : "The ant";
+  // The clean or dead host no longer counts among the carriers; at the limit it still does.
+  const others = t.step === "timeout" ? t.hosts - 1 : t.hosts;
   const passed =
-    t.hosts > 1
-      ? `While it carried you, it passed you on: ${t.hosts} ${ink} ants carry you now.`
+    others > 0
+      ? `While it carried you, it passed you on: ${others} other ${ink} ${others === 1 ? "ant carries" : "ants carry"} you now.`
       : "Your mycelium by the hole keeps fruiting, so other ants will pick you up.";
   switch (t.step) {
     case "landing":

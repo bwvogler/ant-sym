@@ -52,7 +52,10 @@ test("watching ends when the host is clean, and says how many carry the fungus t
   assert.equal(r.t.step, "cleared");
   assert.equal(r.t.hosts, 5);
   assert.deepEqual(r.effect, { playing: false });
-  assert.match(cardFor(r.t).body.join(" "), /5 Ink ants carry you now/);
+  assert.match(cardFor(r.t).body.join(" "), /5 other Ink ants carry you now/);
+  // One other carrier when the host is clean; at the limit the host itself is still one of the count.
+  assert.match(cardFor({ ...r.t, hosts: 1 }).body.join(" "), /1 other Ink ant carries you now/);
+  assert.match(cardFor({ ...r.t, step: "timeout", hosts: 1 }).body.join(" "), /mycelium by the hole/);
 });
 
 test("a host still carrying a little is not clean", () => {
@@ -129,6 +132,7 @@ test("in a real game the first host is found within seconds of the landing, and 
   const s = seenOf(g, { ...t, step: "watch" });
   assert.equal(s.host?.alive, true);
   assert.ok((s.host?.load ?? 0) > 0);
+  assert.ok(s.hosts >= 1, "the host is counted among the ants carrying the fungus");
   // Its slot taken by a newborn (another generation) is another ant: the host is gone, not clean.
   const reborn = seenOf(g, { ...t, step: "watch", host: { ...t.host!, gen: t.host!.gen + 1 } });
   assert.equal(reborn.host?.alive, false);
