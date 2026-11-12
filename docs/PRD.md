@@ -4663,6 +4663,7 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
   - **Descriptor first.** `ja-fnd.5.1`–`.5.3`, then the species on it. Why: the species' defining differences (a smaller channel set, its own situation fields, no stance lane) are exactly what the hard-coded `Situation` cannot express, so building it directly would mean a second copy of the colony's wiring to delete later; the descriptor work is bit-exact and goldens guard it.
   - **Heat is its own bead after the first build** (`ja-rf5.5` depends on `ja-rf5.3`). Why: it is the biggest invented rule, the literature gives windows but no rates, and it can only be tuned once a species plays.
   - **A radial food-odour gradient** before any wind field. Why: the papers give "several metres" and crosswind runs, no plume shape; a wind field is a new world system with nothing to measure it against.
+- Decided by me (2026-11-12): the game's desert ant is modelled on *C. fortis* (monodomous, about 200 workers, about 3 nests a hectare; Dillier & Wehner 2004, full text read); its heat and forager-life numbers are borrowed from *C. bombycina* and *C. bicolor* and labelled so.
 - Owner (2026-11-11): the fungus's levers on this host are host odour first and contact at an invitation (`ja-rf5.7`); heat felt by the host is left for later. The invitation (`ja-rf5.6`) is therefore built, not optional. The owner allows the journal hosts for the full-text read (`ja-rf5.1`).
 
 **The mechanic.** Food odour as a steering cue; own body heat as a sense and a return rule; the species' own lane and legend; no trail channels, no stance lane, no corpse removal. "Off": no species, so main bit for bit. Table in [desert-ant.md](desert-ant.md#the-mechanic).
@@ -4675,4 +4676,4 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 
 **Beads.** `ja-rf5` (epic): `.1` read the full texts; `.2` assays (no behaviour change); `.3` the species on the descriptor (needs `ja-fnd.5.3`); `.4` food odour; `.5` heat; `.6` invitation; `.7` the fungus's levers (owner); `.8` Learn entry.
 
-**Still open.** The owner's calls above; the full texts; every number in the note.
+**Still open.** Full texts of Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984 and the published Buehlmann et al. 2014 (paywalled); the heat model's numbers for *C. fortis*; every number in the note not marked as read in full text.
