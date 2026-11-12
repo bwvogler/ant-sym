@@ -1,27 +1,28 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, inSight } from "../../colony.ts";
+import { Colony, inReach } from "../../colony.ts";
 import { mulberry32, OPEN, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, hexMap, nestAt, put } from "../hexmaps.ts";
 
-// ja-juiu: food is seen only through open ground. Seen through soil, a buried pocket turned explorers off their tunnels
+// ja-juiu: food is sensed only through open ground. Sensed through soil, a buried pocket turned explorers off their tunnels
 // three cells short of it (they steered at the food, into the wall), and no tunnel ever reached one.
 
-test("inSight: along open ground yes; through soil or rock no; the end cells don't count", () => {
+test("inReach: through open ground within its steps, round a bend too; never into a sealed pocket", () => {
   const map = hexMap([
-    "sssssssss", //
-    "s.......s",
-    "s...s...s",
-    "s...#...s",
-    "sssssssss",
+    "sssssssssss", //
+    "s.........s",
+    "sssssssss.s",
+    "s.s.......s",
+    "sssssssssss",
   ]);
-  const look = (a: [number, number], b: [number, number]) => inSight(map, at(...a).x, at(...a).y, at(...b).x, at(...b).y);
-  assert.equal(look([1, 1], [7, 1]), true, "along the open row");
-  assert.equal(look([1, 2], [7, 2]), false, "through soil at (4, 2)");
-  assert.equal(look([1, 3], [7, 3]), false, "through rock at (4, 3)");
-  assert.equal(look([1, 1], [0, 1]), true, "into a solid end cell: the line crosses nothing between");
-  assert.equal(look([3, 2], [4, 2]), true, "to a neighbour");
-  assert.equal(look([3, 1], [5, 2]), false, "across the corner of the soil cell (4, 2)");
+  const reach = (a: [number, number], b: [number, number], steps?: number) =>
+    inReach(map, at(...a).x, at(...a).y, at(...b).x, at(...b).y, steps);
+  assert.equal(reach([1, 1], [4, 1]), true, "along the open row");
+  assert.equal(reach([3, 3], [1, 3]), false, "(1, 3) is sealed off by the soil at (2, 3), two cells away");
+  assert.equal(reach([7, 1], [8, 3]), true, "round the bend at (9, 2): three steps");
+  assert.equal(reach([7, 1], [8, 3], 2), false, "the same bend with two steps");
+  assert.equal(reach([1, 1], [7, 1]), false, "six steps: past its reach");
+  assert.equal(reach([4, 1], [4, 1]), true, "its own cell");
 });
 
 const W = 26;

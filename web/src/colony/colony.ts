@@ -1916,9 +1916,8 @@ export class Colony {
     }
     // Scent is read through the ant's perception (gains of 1 and no foreign reading: as it is, exactly).
     const f = this.ph.fields;
-    // Food is seen only in sight: buried food behind soil (or food round a rock) is not (ja-juiu: seen through the wall, it
-    // turned explorers off their tunnels three cells short of every pocket, which no tunnel then reached).
-    if (map.food.get(cx, cy) > 0 && inSight(map, this.x[i], this.y[i], sx, sy)) s[slot] = SEEN;
+    // Food is sensed only through open ground: a pocket sealed off by soil is not, however near (ja-juiu, see inReach).
+    if (map.food.get(cx, cy) > 0 && inReach(map, this.x[i], this.y[i], sx, sy)) s[slot] = SEEN;
     else {
       const wf = this.foreignFood[i];
       s[slot] = f.food.get(cx, cy) * this.gainFood[i] + (wf > 0 && this.foreign ? wf * this.foreign.fields.food.get(cx, cy) : 0);
@@ -6537,32 +6536,62 @@ export function walkable(map: WorldMap, x: number, y: number): boolean {
   return t === OPEN || (t === AIR && map.surfaceRows !== undefined && y === map.surfaceRows - 1);
 }
 
-/** How finely inSight walks its line, in world units: a quarter of a cell (a line that only shaves a cell's corner may miss it). */
-const SIGHT_STEP = 0.25;
+/**
+ * How many steps through open ground food at a sensor's tip may be from the ant and still be sensed: the sensor's reach
+ * (sensorDistance, 3) and two more, so food round a tunnel's bend or a chamber's corner is sensed as before.
+ */
+export const SENSE_STEPS = 5;
+/** inReach's window: cells within SENSE_STEPS of the start, stamped by call (a grid of offsets, so no allocation per call). */
+const REACH_SPAN = 2 * SENSE_STEPS + 3;
+const reachStamp = new Uint32Array(REACH_SPAN * REACH_SPAN);
+const reachQueue = new Int32Array(REACH_SPAN * REACH_SPAN * 2);
+let reachCall = 0;
 
 /**
- * Whether world point (x1, y1) is in sight from (x0, y0): every cell the straight line between them crosses, after the one it
- * starts in and before the one it ends in, is open ground below any surface rows (one world's curtain). A sensor at the
- * line's end sees food there only through open ground: no ant sees food through soil or rock. (Scent is read where the sensor
- * is, wall or no wall: a scent field doesn't cross soil, but a sensor round a bend reads its own tunnel's.)
+ * Whether world point (x1, y1) can be reached from (x0, y0) through open ground below any surface rows (one world's
+ * curtain) in at most `steps` steps between cells (`steps` ≤ SENSE_STEPS): how a sensor at (x1, y1) senses food there.
+ * Food in a pocket sealed off by soil or rock is not sensed, however near (ja-juiu: sensed through the wall, it turned
+ * explorers off their tunnels three cells short of every pocket, which no tunnel then reached); food round a bend is.
  */
-export function inSight(map: WorldMap, x0: number, y0: number, x1: number, y1: number): boolean {
-  const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / SIGHT_STEP);
-  cellOf(x0, y0);
-  const ax = CELL[0];
-  const ay = CELL[1];
+export function inReach(map: WorldMap, x0: number, y0: number, x1: number, y1: number, steps = SENSE_STEPS): boolean {
   cellOf(x1, y1);
   const bx = CELL[0];
   const by = CELL[1];
+  cellOf(x0, y0);
+  const ax = CELL[0];
+  const ay = CELL[1];
+  if (ax === bx && ay === by) return true;
+  if (hexDistance(ax, ay, bx, by) > steps) return false;
   const top = map.surfaceRows ?? 0;
-  for (let k = 1; k < n; k++) {
-    cellOf(x0 + ((x1 - x0) * k) / n, y0 + ((y1 - y0) * k) / n);
-    const x = CELL[0];
-    const y = CELL[1];
-    if ((x === ax && y === ay) || (x === bx && y === by)) continue;
-    if (rockAt(map, x, y) !== OPEN || y < top) return false;
+  const half = SENSE_STEPS + 1;
+  const stamp = ++reachCall;
+  reachStamp[half * REACH_SPAN + half] = stamp;
+  reachQueue[0] = ax;
+  reachQueue[1] = ay;
+  let head = 0;
+  let tail = 2;
+  for (let depth = 0; depth < steps; depth++) {
+    const end = tail;
+    for (; head < end; head += 2) {
+      const x = reachQueue[head]!;
+      const y = reachQueue[head + 1]!;
+      for (let d = 0; d < 6; d++) {
+        const tx = stepX(x, y, d);
+        const ty = stepY(y, d);
+        const ox = tx - ax + half;
+        const oy = ty - ay + half;
+        if (ox < 0 || oy < 0 || ox >= REACH_SPAN || oy >= REACH_SPAN) continue;
+        const k = oy * REACH_SPAN + ox;
+        if (reachStamp[k] === stamp) continue;
+        reachStamp[k] = stamp;
+        if (rockAt(map, tx, ty) !== OPEN || ty < top) continue;
+        if (tx === bx && ty === by) return true;
+        reachQueue[tail++] = tx;
+        reachQueue[tail++] = ty;
+      }
+    }
   }
-  return true;
+  return false;
 }
 
 /** Whether cell (x, y)'s neighbour the way `d` is open (walkable). */
