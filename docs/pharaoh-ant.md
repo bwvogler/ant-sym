@@ -83,7 +83,7 @@ Cheapest first; every row's "off" is the generic ant (main bit for bit).
 
 **Assays** (land first, no behaviour change). P1: **the trail threshold**: colonies under about 600 ants fail to form a trail to a feeder at the game's equivalent of 50 cm, above 700 succeed (Beekman et al. 2001). P2: **age switch**: nursing to foraging at 9–12 days of scaled age (Mikheyev & Linksvayer 2015). P3: **queen signal**: gyne rearing falls only once several queens' worth of signal is present (Oliveira et al. 2020). P4: **emigration**: a disturbed colony moves nearly all brood within a game-day (Tay & Lee 2015, unverified).
 
-**Cost (estimated from request size; not measured).** The generic shape: ~122 situations a game, ~783 tokens a question, ~$0.074/h while the doctrine is new, $0 cached; a fifth mode adds words to the legend (~5 % on request size) and no situation field. Live check for its precache: about one generic mode-lane run (~$0.0065, PRD §54.4).
+**Cost (estimated from request size; not measured).** The generic shape: ~122 situations a game, ~783 tokens a question, ~$0.074/h while the doctrine is new, $0 cached; a fifth mode adds words to the legend (~5 % on request size) and no situation field. Live check for its precache: at most one full live run of all lanes (~$0.0065, PRD §54.4).
 
 ## Play
 

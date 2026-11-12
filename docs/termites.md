@@ -120,7 +120,7 @@ Still to read: Hager & Kirchner 2013, Rosengaus et al. 1998 and 1999, Moran et a
 - Matsuura K et al. (2010). Identification of a pheromone regulating caste differentiation in termites. *PNAS* 107:12963–12968. [PMC2919916](https://pmc.ncbi.nlm.nih.gov/articles/PMC2919916/) (full text)
 - Cristaldo PF et al. (2015). *Biol Open* 4:1649–1659. [PMC4736033](https://pmc.ncbi.nlm.nih.gov/articles/PMC4736033/) (full text)
 - Sun Q, Haynes KF, Zhou X (2013). Differential undertaking response of a lower termite to congeneric and conspecific corpses. *Sci Rep* 3:1650. [PMC3629736](https://pmc.ncbi.nlm.nih.gov/articles/PMC3629736/) (full text)
-- Neoh K-B et al. (2012). Behavioral responses of termites to their dead. *PLoS ONE* 7:e36375. [PMC3338677](https://pmc.ncbi.nlm.nih.gov/articles/PMC3338677/) (full text)
+- Neoh K-B, Yeap B-K, Tsunoda K, Yoshimura T, Lee C-Y (2012). Do termites avoid carcasses? Behavioral responses depend on the nature of the carcasses. *PLoS ONE* 7:e36375. [PMC3338677](https://pmc.ncbi.nlm.nih.gov/articles/PMC3338677/) (full text)
 - Davis HE, Meconcelli S, Radek R, McMahon DP (2018). Termites shape their collective behavioural response based on stage of infection. *Sci Rep* 8:14433. [PMC6158180](https://pmc.ncbi.nlm.nih.gov/articles/PMC6158180/) (full text)
 - Chouvenc T, Su N-Y (2012). When subterranean termites challenge the rules of fungal epizootics. *PLoS ONE* 7:e34484. [PMC3314638](https://pmc.ncbi.nlm.nih.gov/articles/PMC3314638/) (full text)
 - Traniello JFA, Rosengaus RB, Savoie K (2002). The development of immunity in a social insect: evidence for the group facilitation of disease resistance. *PNAS* 99:6838–6842. [PMC124490](https://pmc.ncbi.nlm.nih.gov/articles/PMC124490/) (full text)
