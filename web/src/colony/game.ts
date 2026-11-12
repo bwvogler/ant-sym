@@ -7,6 +7,7 @@ import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
+import { GENERIC_ANT, type Species } from "./species.ts";
 import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Cell, type End, nearestValid, outward } from "./transect.ts";
 import { cellOf, CELL } from "./hex.ts";
@@ -56,6 +57,8 @@ export interface GameParams {
    * assays and the tests. The page sets it off: it pauses, shows the queen's pen, and calls found() or lose() itself.
    */
   autoFound: boolean;
+  /** The species of every colony in the game (species.ts, docs/species.md): its parameters and local responses. One per game. */
+  species: Species;
 }
 
 export const DEFAULT_GAME: GameParams = {
@@ -69,6 +72,7 @@ export const DEFAULT_GAME: GameParams = {
   recognition: {},
   regrow: 0,
   autoFound: true,
+  species: GENERIC_ANT,
 };
 
 /**
@@ -354,26 +358,26 @@ export class Game {
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
     const mine = new Colony(
       home,
-      { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony },
+      { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...this.params.species.params, ...player.colony },
       rng,
       player.policy ?? localPolicy,
       player.stance ?? localStance,
       layered,
     );
-    if (player.responses) mine.responses = player.responses;
+    mine.responses = player.responses ?? this.params.species.responses;
     this.colonies = [mine];
     if (this.params.rival && home.nests.length > 1)
       this.colonies.push(
         new Colony(
           home,
-          { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 },
+          { antCount: this.params.rivalAnts, odour: 1, tolerance, ...this.params.species.params, ...player.rival, nest: 1 },
           rng,
           player.rivalPolicy ?? localPolicy,
           player.rivalStance ?? localStance,
           layered,
         ),
       );
-    if (player.rivalResponses && this.colonies[1]) this.colonies[1].responses = player.rivalResponses;
+    if (this.colonies[1]) this.colonies[1].responses = player.rivalResponses ?? this.params.species.responses;
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
@@ -604,6 +608,7 @@ export class Game {
     const c = new Colony(
       home,
       {
+        ...this.params.species.params,
         antCount: f.antCount,
         maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)),
         nest: at,
@@ -615,6 +620,7 @@ export class Game {
       localStance,
       world ? { plane: world.plane, line: world.line } : null,
     );
+    c.responses = this.params.species.responses;
     if (f.mother !== undefined && c.queen && !f.nest) {
       // A daughter (ja-lo8.9): her queen founds alone on her reserve, at her mother's odour, which drifts away from it
       // from now on (ja-lo8.9.1); what the fungus put in her is given below (Founding.fungus). (Not when a save founds
