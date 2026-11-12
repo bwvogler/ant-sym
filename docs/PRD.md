@@ -4755,3 +4755,11 @@ The mycelium's spore output is fixed by its mass, so every cell added to where i
 | the queen, hyphae + fruit (s) | 360 | 330 | 245 | 188 | 325 | 388 | 296 | 441 | 404 | 237 |
 
 - **P1 passes:** every seed takes hold (seed 6, which stalled at 1–3 % in the baseline, reaches a quarter at 369 s); the worst seed is 399 s against "never"; the median quarter is about 292 s against about 304 s. A spot in the shaft, where every forager passes, is what reaches the ants the patch outside missed.
+
+### 61.2 Corpses: new starts that fruit for free (ja-2bw.7, 2026-11-12)
+
+**Built** (with `params.hyphae`). `Fungus.colonise`: a corpse is a new start (two tips, east and west), the cadaver joins the mycelium (`Evolution.feed`, `CORPSE.mass` 1, counted as growth), and it fruits on its cell for free, `CORPSE.spores` 12 at `CORPSE.rate` 0.2 a second, paid by the corpse, not the mycelium (owner, 2026-11-12; Khun et al. 2021). A host that died of the evolving fungus is colonised as it is buried on the midden (`onBury`); a tip that reaches a midden cell holding corpses colonises it (`fungus.corpseAt`, every colony's midden). Corpses still carried or lying in the nest are tended, and are not (Kesäniemi et al. 2019).
+
+**Measured: nothing changes in the first ten minutes.** With corpses, `progression.mjs --map one --evolve --hyphae` gave the same seconds on every seed as §61.1's fruiting run. On seed 4 no worker died underground in 600 s, so nothing was buried: a worker lives 0.7–1.3 × `LIFESPAN` (3,600 s) and the founders start at up to half of theirs, so the first can die of age only after about 1,260 s; Garden kills no host; and an ant that dies on the plane leaves no corpse (U3c). Corpses are a late-game source, until the fungus kills (the lethal levers) or a death outside leaves a corpse.
+
+**Owner decision needed:** should an infected host that dies on the plane (a forager, outside) leave a corpse there that the fungus grows out of? It is what real cadavers do (a dying *Ophiocordyceps* host outside the nest, Hughes et al. 2011), and it would bring corpses into the first minutes.
