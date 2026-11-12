@@ -67,9 +67,10 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {
-  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve } = useColony();
+  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal } =
+    useColony();
   const backend = useBackend();
-  const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend);
+  const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend, journal);
   const [details, setDetails] = useState(false);
   const closeDetails = useCallback(() => setDetails(false), []);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
@@ -340,6 +341,7 @@ export default function ColonyApp() {
         restart={restart}
         newWorld={newWorld}
         jev={jev}
+        journal={journal}
         saves={games}
         onLoad={(r) => (continueFrom(r), closeDetails())}
       />

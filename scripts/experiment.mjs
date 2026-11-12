@@ -5,7 +5,7 @@
 //
 // Usage: node scripts/experiment.mjs <assay ...|all> [--one] [--seeds 1-10] [--seconds N]
 //          [--set colony.deposit=2,4,8] [--set game.fight.rate=1,2] [--json out.json] [--jobs N]
-//          [--policy cache:<file>]
+//          [--policy cache:<file>] [--log <spec>]
 //
 // --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
 // with a hole at each nest and the curtain under the line through them (oneArena); A8 in the curtain; G1 (game1), the
@@ -23,9 +23,19 @@
 // situations). Anything the cache lacks falls back to the local rule, so each
 // result says how much of it was Jev: cache hits per lane. An assay that sets
 // its own policy or stance (A6's raiders) keeps it.
-import { readFileSync, writeFileSync } from "node:fs";
+//
+// --log <spec> keeps a game journal of each run (colony/journal.ts, ja-8tb): what happened, as events. The spec is
+// a level (summary; detail adds births, deaths, infections; verbose adds every mode change), categories (colony, queen, stance, birth, death, mode, infection) and filters
+// (colony=<k>, ant=<i>), comma-separated: --log summary, --log death,mode,colony=0, --log verbose,ant=42. Each run
+// writes experiments/out/journal/<assay>-<n>-seed<s>.jsonl (one event a line) and a .txt beside it to read; n is the
+// --set combination's index. Watching changes nothing in the run. Verbose on a whole game is ~1500 events a second
+// (300 MB in 600 s of `game`): narrow it with ant=<i>.
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
+
+/** Where --log writes each run's journal. */
+const JOURNAL_DIR = "experiments/out/journal";
 
 if (isMainThread) await main();
 else await work();
@@ -74,6 +84,7 @@ async function main() {
   let jobs = availableParallelism();
   let policy = null;
   let one = false;
+  let log = null;
   const sets = [];
   for (let k = 0; k < args.length; k++) {
     const a = args[k];
@@ -83,13 +94,25 @@ async function main() {
     else if (a === "--jobs") jobs = Number(args[++k]);
     else if (a === "--policy") policy = args[++k];
     else if (a === "--one") one = true;
-    else if (a === "--set") {
+    else if (a === "--log") {
+      log = args[++k];
+      if (log === undefined) fail("--log <spec>");
+    } else if (a === "--set") {
       const [path, values] = args[++k].split("=");
       sets.push({ path, values: values.split(",").map(parse) });
     } else if (a.startsWith("--")) fail(`unknown option ${a}`);
     else ids.push(a);
   }
   const { ASSAYS, ONE_ASSAYS, ONE_PENDING } = await import("../web/src/colony/experiment.ts");
+  if (log !== null) {
+    const { parseJournalSpec } = await import("../web/src/colony/index.ts");
+    try {
+      if (parseJournalSpec(log).categories.size === 0) fail(`--log ${log}: logs nothing`);
+    } catch (e) {
+      fail(`--log: ${e.message}`);
+    }
+    mkdirSync(JOURNAL_DIR, { recursive: true });
+  }
   // Each chosen assay with the list it is run from (the worker finds it there): one world's, or the legacy ones (G1 only in one world's).
   const list = one ? ONE_ASSAYS : ASSAYS;
   const pending = [];
@@ -138,7 +161,7 @@ async function main() {
   const queue = [];
   for (const { assay, one: inOne } of picked)
     for (const [ci, c] of cs.entries())
-      for (const seed of seeds) queue.push({ id: assay.id, one: inOne, ci, o: c.o, seed, seconds, policy });
+      for (const seed of seeds) queue.push({ id: assay.id, one: inOne, ci, o: c.o, seed, seconds, policy, log });
   queue.sort((a, b) => secondsOf(b.id) - secondsOf(a.id));
   const results = new Map(); // `${id}|${ci}` → runs
   const t0 = performance.now();
@@ -206,6 +229,7 @@ async function main() {
     `${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`,
   );
   if (json) writeFileSync(json, JSON.stringify(out, null, 1));
+  if (log !== null) console.error(`journals in ${JOURNAL_DIR}/`);
 }
 
 function inWorker(job) {
@@ -226,7 +250,7 @@ function loadCache(file) {
 }
 
 async function work() {
-  const { id, one, o, seed, seconds, policy } = workerData;
+  const { id, one, ci, o, seed, seconds, policy, log } = workerData;
   const { ASSAYS, ONE_ASSAYS, runAssay } = await import("../web/src/colony/experiment.ts");
   const lookups = {};
   const count = (lane, hit) => {
@@ -248,11 +272,23 @@ async function work() {
     brains.stance = lane(cache.stances, stanceKey, localStance, "stance");
     brains.responses = responsesFromAnswers(cache.responses ?? {}, undefined, count);
   }
+  let journal;
+  if (log !== null) {
+    const { Journal } = await import("../web/src/colony/index.ts");
+    journal = new Journal(log, Infinity);
+  }
   const run = runAssay(
     (one ? ONE_ASSAYS : ASSAYS).find((x) => x.id === id),
     seed,
     { ...o, ...brains },
     seconds,
+    journal,
   );
+  if (journal) {
+    const { formatJournalEvent } = await import("../web/src/colony/index.ts");
+    const base = `${JOURNAL_DIR}/${id}-${ci}-seed${seed}`;
+    writeFileSync(`${base}.jsonl`, journal.events.map((e) => JSON.stringify(e)).join("\n") + "\n");
+    writeFileSync(`${base}.txt`, journal.events.map(formatJournalEvent).join("\n") + "\n");
+  }
   parentPort.postMessage({ ...run, lookups });
 }

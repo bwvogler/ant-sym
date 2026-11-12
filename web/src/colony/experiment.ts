@@ -15,6 +15,7 @@ import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
+import type { Journal } from "./journal.ts";
 import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, responses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
@@ -474,10 +475,16 @@ function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOption
   return { ...a, ...b, channels };
 }
 
-/** Run one assay on one seed. */
-export function runAssay(assay: Assay, seed: number, o: Overrides = {}, seconds?: number): RunResult {
+/** A journal (journal.ts, ja-8tb) as a probe: it observes after every tick and adds no metrics. */
+export function journalProbe(j: Journal): Probe {
+  return { tick: (game) => j.observe(game), summary: () => ({}) };
+}
+
+/** Run one assay on one seed; with a journal, it watches the run (`experiment.mjs --log`). */
+export function runAssay(assay: Assay, seed: number, o: Overrides = {}, seconds?: number, journal?: Journal): RunResult {
   const spec = withOverrides(assay.spec(seed), o);
   if (seconds !== undefined) spec.seconds = seconds;
+  if (journal) spec.probes = [...(spec.probes ?? []), journalProbe(journal)];
   const { game, result } = runGame(spec);
   Object.assign(result.metrics, assay.score(result, game));
   return result;
