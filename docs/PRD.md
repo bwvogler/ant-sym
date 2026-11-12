@@ -4762,4 +4762,16 @@ The mycelium's spore output is fixed by its mass, so every cell added to where i
 
 **Measured: nothing changes in the first ten minutes.** With corpses, `progression.mjs --map one --evolve --hyphae` gave the same seconds on every seed as §61.1's fruiting run. On seed 4 no worker died underground in 600 s, so nothing was buried: a worker lives 0.7–1.3 × `LIFESPAN` (3,600 s) and the founders start at up to half of theirs, so the first can die of age only after about 1,260 s; Garden kills no host; and an ant that dies on the plane leaves no corpse (U3c). Corpses are a late-game source, until the fungus kills (the lethal levers) or a death outside leaves a corpse.
 
-**Owner decision needed:** should an infected host that dies on the plane (a forager, outside) leave a corpse there that the fungus grows out of? It is what real cadavers do (a dying *Ophiocordyceps* host outside the nest, Hughes et al. 2011), and it would bring corpses into the first minutes.
+**Decided (owner, 2026-11-12): a host that dies on the plane is a new start where it lies.** `Colony.onDie` (called as an ant dies, with its cell and layer): in one world a host of the evolving fungus dying on the plane is colonised there at once; the plane keeps no corpse, so nothing is carried or rots. A clean ant leaves nothing.
+
+**Measured** (seeds 1–10, 600 s, against §61.1's fruiting run):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Ink a quarter, fruiting (s) | 335 | 290 | 202 | 146 | 294 | 369 | 282 | 399 | 380 | 206 |
+| Ink a quarter, + corpses (s) | 335 | 290 | 202 | 141 | 315 | 401 | 282 | 319 | 380 | 206 |
+| the rival's first host, fruiting (s) | never | 489 | 291 | 278 | 415 | 34 | never | never | never | 492 |
+| the rival's first host, + corpses (s) | 436 | 88 | 232 | 145 | 69 | 34 | 449 | 181 | 428 | 399 |
+
+- **No cliff in the landing colony:** a quarter at 141–401 s (median about 302 s, against about 292 s); P1 still holds against the baseline (worst 401 s against "never").
+- **The fungus crosses to the rival.** The plane's dead are mostly fight deaths at the border between the colonies; a host dying there is a spore spot where the rival's foragers walk. The rival's first host comes on every seed (5 of 10 before), and minutes sooner on seeds 2 and 5. Mutations rose on seeds 4 and 8 (4,424 and 2,819, against 2,427 and 1,148): corpses feed the mycelium and count as growth.
