@@ -14,6 +14,8 @@
 //   groomed  — nestmates grooming the fungus off its cuticle
 // Coarse, so an answer is cached per situation (the Jev lane, fungusBrain.ts) and asked only as hosts meet it.
 
+import { defineSchema } from "./schema.ts";
+
 export const AROUSALS = ["calm", "alarmed", "fighting"] as const;
 export type Arousal = (typeof AROUSALS)[number];
 export const TOUCHES = ["none", "nestmate", "foreigner"] as const;
@@ -40,39 +42,27 @@ export interface FungalSituation {
  */
 export type FungusPolicy = (s: FungalSituation) => string;
 
-/** Situations: 3 × 3 × 4 × 4 × 3 × 2 = 864 (a queen's are a few of them: she is always by herself, at home). */
-export const FUNGAL_SITUATIONS = AROUSALS.length * TOUCHES.length * FUNGAL_PLACES.length * TASKS.length * CARRYING.length * 2;
+/**
+ * The fungal situation's fields in the order a code and a cache key read them: 3 × 3 × 4 × 4 × 3 × 2 = 864 situations (a queen's
+ * are a few of them: she is always by herself, at home). Declared once; see schema.ts.
+ */
+export const FUNGAL_SCHEMA = defineSchema<FungalSituation>([
+  { name: "arousal", values: AROUSALS },
+  { name: "touch", values: TOUCHES },
+  { name: "place", values: FUNGAL_PLACES },
+  { name: "task", values: TASKS },
+  { name: "carrying", values: CARRYING },
+  { name: "groomed", values: [false, true], key: (v) => (v ? "groomed" : "unseen") },
+]);
+export const FUNGAL_SITUATIONS = FUNGAL_SCHEMA.size;
 
 /** A load at or past this is "high": where cull takes full effect (Fungus.express). */
 export const HIGH_LOAD = 0.7;
 
 /** The fungal situation as one number (0 .. FUNGAL_SITUATIONS − 1): what a host keeps of what it was last asked. */
-export function encodeFungal(s: FungalSituation): number {
-  return (
-    ((((AROUSALS.indexOf(s.arousal) * TOUCHES.length + TOUCHES.indexOf(s.touch)) * FUNGAL_PLACES.length + FUNGAL_PLACES.indexOf(s.place)) *
-      TASKS.length +
-      TASKS.indexOf(s.task)) *
-      CARRYING.length +
-      CARRYING.indexOf(s.carrying)) *
-      2 +
-    (s.groomed ? 1 : 0)
-  );
-}
+export const encodeFungal = (s: FungalSituation): number => FUNGAL_SCHEMA.encode(s);
 
-export function decodeFungal(code: number): FungalSituation {
-  let c = code;
-  const groomed = c % 2 === 1;
-  c = Math.floor(c / 2);
-  const carrying = CARRYING[c % CARRYING.length] as Carrying;
-  c = Math.floor(c / CARRYING.length);
-  const task = TASKS[c % TASKS.length] as Task;
-  c = Math.floor(c / TASKS.length);
-  const place = FUNGAL_PLACES[c % FUNGAL_PLACES.length] as FungalPlace;
-  c = Math.floor(c / FUNGAL_PLACES.length);
-  const touch = TOUCHES[c % TOUCHES.length] as FungalTouch;
-  const arousal = AROUSALS[Math.floor(c / TOUCHES.length)] as Arousal;
-  return { arousal, touch, place, task, carrying, groomed };
-}
+export const decodeFungal = (code: number): FungalSituation => FUNGAL_SCHEMA.decode(code);
 
 /** The local rule's settings: the player's thresholds on the free policy (§5.1, lever 5). */
 export interface FungusRule {
