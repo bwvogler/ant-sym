@@ -2,6 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { defineSchema } from "../../schema.ts";
 import { situationKey, situationState, stanceKey } from "../../colonyBrain.ts";
+import {
+  AROUSALS,
+  CARRYING,
+  decodeFungal,
+  encodeFungal,
+  FUNGAL_PLACES,
+  FUNGAL_SITUATIONS,
+  TASKS,
+  TOUCHES,
+  type FungalSituation,
+} from "../../fungalPolicy.ts";
+import { fungalKey } from "../../fungusBrain.ts";
 import { decodeSituation, encodeSituation, packSituation, SITUATIONS } from "../../colony.ts";
 import { HOMES, MODES, STANCE_SCHEMA, STANCES, TRAILS, type Situation, type StanceSituation } from "../../vocab.ts";
 
@@ -103,4 +115,39 @@ test("a field's own key wording and the state's field order come from the schema
   // Fields given in another order, and an extra one, still come out as the schema's two, in its order.
   const state = schema.state({ n: 1, hot: false, extra: "x" } as never);
   assert.equal(JSON.stringify(state), '{"hot":false,"n":1}');
+});
+
+// The fungal situation as it was written by hand before it came from the schema.
+function legacyEncodeFungal(s: FungalSituation): number {
+  return (
+    ((((AROUSALS.indexOf(s.arousal) * TOUCHES.length + TOUCHES.indexOf(s.touch)) * FUNGAL_PLACES.length + FUNGAL_PLACES.indexOf(s.place)) *
+      TASKS.length +
+      TASKS.indexOf(s.task)) *
+      CARRYING.length +
+      CARRYING.indexOf(s.carrying)) *
+      2 +
+    (s.groomed ? 1 : 0)
+  );
+}
+const legacyFungalKey = (s: FungalSituation, asked: readonly string[]) =>
+  `${s.arousal}|${s.touch}|${s.place}|${s.task}|${s.carrying}|${s.groomed ? "groomed" : "unseen"}|${asked.join(",")}`;
+
+test("the fungal schema has 864 situations and reproduces the hand-written code and key of each", () => {
+  assert.equal(FUNGAL_SITUATIONS, 864);
+  let n = 0;
+  for (const arousal of AROUSALS)
+    for (const touch of TOUCHES)
+      for (const place of FUNGAL_PLACES)
+        for (const task of TASKS)
+          for (const carrying of CARRYING)
+            for (const groomed of [false, true]) {
+              const s: FungalSituation = { arousal, touch, place, task, carrying, groomed };
+              const code = encodeFungal(s);
+              assert.equal(code, legacyEncodeFungal(s));
+              assert.deepEqual(decodeFungal(code), s);
+              assert.equal(fungalKey(s, ["a", "b"]), legacyFungalKey(s, ["a", "b"]));
+              assert.equal(fungalKey(s, []), legacyFungalKey(s, []));
+              n++;
+            }
+  assert.equal(n, 864);
 });

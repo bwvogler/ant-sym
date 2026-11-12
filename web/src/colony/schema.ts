@@ -39,9 +39,10 @@ export function defineSchema<S extends object>(fields: readonly FieldOf<S>[]): S
     strides,
     encode(s) {
       let code = 0;
-      fields.forEach((f, i) => {
+      for (let i = 0; i < fields.length; i++) {
+        const f = fields[i] as FieldOf<S>;
         code += (f.values as readonly unknown[]).indexOf(read(s, f)) * (strides[i] as number);
-      });
+      }
       return code;
     },
     decode(code) {

@@ -1,6 +1,6 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
-import type { FungalSituation } from "./fungalPolicy.ts";
+import { FUNGAL_SCHEMA, type FungalSituation } from "./fungalPolicy.ts";
 import { decodeLevels, encodeLevels, LEVERS, scale } from "./levers.ts";
 
 // The fungus's Jev lane, pure (ja-t4d.5; levers, ja-lo8.4). Its own lane, its own cache, its own words: the player's
@@ -31,7 +31,7 @@ export const FUNGUS_LEGEND =
  * it is part of the key: switching a lever on asks again, and switching it back off finds the old answers.
  */
 export function fungalKey(s: FungalSituation, asked: readonly string[]): string {
-  return `${s.arousal}|${s.touch}|${s.place}|${s.task}|${s.carrying}|${s.groomed ? "groomed" : "unseen"}|${asked.join(",")}`;
+  return `${FUNGAL_SCHEMA.key(s)}|${asked.join(",")}`;
 }
 
 /** The levers the question under this key asked. */
