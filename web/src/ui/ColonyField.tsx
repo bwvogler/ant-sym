@@ -52,6 +52,7 @@ import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
+import { myceliumReach, threads, trailSight, type Threads } from "./fungusSight.ts";
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -176,6 +177,9 @@ const PICK_PX = 14;
 const LINK_ZOOM = 8;
 /** No chunk column: drawHexes' "none yet" (−1 is a real chunk column on one world's curtain). */
 const NO_CHUNK = -0x80000000;
+/** The mycelium's threads (ja-vyu): this many trunks from its patch, and the side view takes the strip's columns within this of it. */
+const TRUNKS = 6;
+const PATCH_REACH = 8;
 
 interface ChunkCanvas {
   canvas: HTMLCanvasElement;
@@ -283,6 +287,11 @@ export default function ColonyField({
     let ph = colony.ph;
     let spores: ChunkLayer<Float32Array> = fungus.spores;
     let strip = false;
+    // Each colony's trails on the shown layer and how strongly they show: by how far the fungus is into it (ja-vyu).
+    let trails: { sight: number; food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array> }[] = [];
+    // The mycelium's threads from its patch, into the ground: rebuilt when its reach, its patch or the view changes.
+    let myc: Threads = new Map();
+    let mycKey = "";
     // The map's size and first column: its columns run gx0 … gx0 + gw − 1 (gx0 < 0 on one world's curtain, whose column
     // is the line's s), and the extent the camera fits; set again (rebuild) when the map or its size changes.
     let gx0 = m.x0;
@@ -322,6 +331,40 @@ export default function ColonyField({
       miniImg = miniCtx.createImageData(mini.width, mini.height);
       miniAt = -Infinity;
     };
+    /**
+     * The mycelium's threads on the shown map (ja-vyu): from the fungus's patch, grown as far as its mass reaches. The
+     * side view grows them down into the soil from the strip's columns over the plane's patch (and from any patch of
+     * its own); the plane, or a top-down map, out across the open ground. They stop at rock and the sky.
+     */
+    const grow = () => {
+      const e = fungus.evolution;
+      const reach = e ? myceliumReach(e.mass, e.patches) : 0;
+      const down = lv === CURTAIN || (lv < 0 && !!m.sky);
+      let origins: number[] = [];
+      if (reach > 0) {
+        if (world && lv === CURTAIN) {
+          // The patch lies by the hole, not always on the line: the strip's columns nearest each of its cells.
+          const plane = fungus.patchOn(PLANE);
+          const cols = new Set<number>();
+          for (let k = 0; k + 1 < plane.length; k += 2) {
+            const s = columnNear(world.line, centreX(plane[k]!, plane[k + 1]!), centreY(plane[k + 1]!), PATCH_REACH);
+            if (s !== null) cols.add(s);
+          }
+          for (const s of [...cols].sort((a, b) => a - b)) origins.push(s, STRIP);
+          origins.push(...fungus.patchOn(CURTAIN));
+        } else origins = fungus.patchOn(lv < 0 ? 0 : lv);
+      }
+      const key = `${lv}|${reach}|${m.x0},${m.size.w},${m.size.h}|${origins.join(",")}`;
+      if (key === mycKey) return;
+      mycKey = key;
+      const map = m;
+      const stop = (x: number, y: number) => {
+        if (x < map.x0 || y < 0 || x >= map.x0 + map.size.w || y >= map.size.h) return true;
+        const t = rockAt(map, x, y);
+        return t !== OPEN && t !== SOIL;
+      };
+      myc = threads(origins, reach, down, stop, TRUNKS);
+    };
     /** Read the shown view: its layer, map, scent and spores (each frame). */
     const bind = () => {
       lv = world ? shown.current : -1;
@@ -330,6 +373,14 @@ export default function ColonyField({
       ph = lv < 0 ? colony.ph : (colony.layers[lv] ?? colony.layers[0]!).ph;
       spores = lv < 0 ? fungus.spores : (fungus.sporesOn(lv)?.spores ?? fungus.spores);
       strip = world !== null && lv === CURTAIN;
+      trails = [];
+      for (const col of colonies) {
+        const { infected, living } = fungus.census(col);
+        const sight = trailSight(infected, living);
+        const p = lv < 0 ? col.ph : col.layers[lv]?.ph;
+        if (sight > 0 && p) trails.push({ sight, food: p.fields.food, home: p.fields.home });
+      }
+      grow();
     };
     bind();
 
@@ -415,8 +466,14 @@ export default function ColonyField({
     const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array) => {
       const fc = m.food.chunk(cx, cy);
       const lc = m.loose?.chunk(cx, cy);
-      const foodC = ph.fields.food.chunk(cx, cy);
-      const homeC = ph.fields.home.chunk(cx, cy);
+      // Every colony's food and home trails here, with how strongly each shows (by its infection).
+      const trailC: { sight: number; food: Float32Array | undefined; home: Float32Array | undefined }[] = [];
+      for (const t of trails) {
+        const food = t.food.chunk(cx, cy);
+        const home = t.home.chunk(cx, cy);
+        if (food || home) trailC.push({ sight: t.sight, food, home });
+      }
+      const mycC = myc.get(`${cx},${cy}`);
       const alarmC = ph.fields.alarm.chunk(cx, cy);
       const sporeC = spores.chunk(cx, cy);
       // One world's plane: the mound, a height field of spoil (oneWorld.ts), washed in by its height.
@@ -436,11 +493,14 @@ export default function ColonyField({
             px[o + 3] = 0; // past the edge of the map
             continue;
           }
+          const hy = mycC ? mycC[i]! : 0;
           if (rc[i]) {
             const solid = rc[i] === SOIL ? (lc && lc[i] ? theme.spoil : theme.soil) : rc[i] === AIR ? theme.sky : theme.rock;
-            px[o] = solid[0];
-            px[o + 1] = solid[1];
-            px[o + 2] = solid[2];
+            // The mycelium in the soil: its threads mixed into the earth, stronger near the patch.
+            const t = rc[i] === SOIL && hy > 0 ? 0.35 + 0.45 * hy : 0;
+            px[o] = Math.round(solid[0] + (theme.sporeRgb[0] - solid[0]) * t);
+            px[o + 1] = Math.round(solid[1] + (theme.sporeRgb[1] - solid[1]) * t);
+            px[o + 2] = Math.round(solid[2] + (theme.sporeRgb[2] - solid[2]) * t);
             px[o + 3] = 255;
             continue;
           }
@@ -478,9 +538,14 @@ export default function ColonyField({
             px[o + 3] = Math.min(255, 110 + heap * 45);
             continue;
           }
-          const f = show.food && foodC ? Math.min(1, foodC[i] / 4) : 0;
-          // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
-          const h = show.home && homeC ? Math.min(1, homeC[i] / 12) : 0;
+          // Each colony's trails as strongly as the fungus is in it; where two overlap, the stronger shows.
+          let f = 0;
+          let h = 0;
+          for (const t of trailC) {
+            if (show.food && t.food) f = Math.max(f, t.sight * Math.min(1, t.food[i]! / 4));
+            // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
+            if (show.home && t.home) h = Math.max(h, t.sight * Math.min(1, t.home[i]! / 12));
+          }
           if (f >= h && f > 0.02) {
             px[o] = theme.trail[0];
             px[o + 1] = theme.trail[1];
@@ -491,6 +556,12 @@ export default function ColonyField({
             px[o + 1] = HOME_RGB[1];
             px[o + 2] = HOME_RGB[2];
             px[o + 3] = Math.round(h * 90);
+          } else if (hy > 0.02) {
+            // The mycelium on open ground (the plane, the side view's tunnels): its threads under the trails.
+            px[o] = theme.sporeRgb[0];
+            px[o + 1] = theme.sporeRgb[1];
+            px[o + 2] = theme.sporeRgb[2];
+            px[o + 3] = Math.round(30 + hy * 90);
           } else if (chamberC && chamberC[i]) {
             const role = chambers!.list[chamberC[i] - 1]?.role ?? "none";
             const tint = ROLE_RGB[role] ?? theme.chamber;

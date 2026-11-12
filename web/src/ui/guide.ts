@@ -40,7 +40,8 @@ export const GUIDE: GuideEntry[] = [
     id: "food-trail",
     title: "Food trail",
     swatch: [HEAT],
-    onScreen: "The green wash (Trails: “to food”). Ants carrying food home lay it, so it leads out to food.",
+    onScreen:
+      "The green wash (Trails: “to food”). Ants carrying food home lay it, so it leads out to food. You see a colony's trails through your hosts: none until the fungus is in it, faint at the first host, full when every ant carries it.",
     realAnts:
       "Recruitment trails last minutes, about as long as a trip; long-lived “route memory” trails last hours to days. Black garden ants (Lasius niger) lay about 43 % more trail marks for rich sugar than for weak, and that alone lets a colony pick the richer of two sources.",
     inGame:
@@ -54,7 +55,8 @@ export const GUIDE: GuideEntry[] = [
     id: "home-trail",
     title: "Home trail and the way home",
     swatch: [css(HOME_RGB)],
-    onScreen: "The orange wash (Trails: “to home”). Ants walking out lay it, so it leads carriers back.",
+    onScreen:
+      "The orange wash (Trails: “to home”). Ants walking out lay it, so it leads carriers back. Like the food trail, each colony's shows as strongly as the fungus is in it.",
     realAnts:
       "Outside, home is a small hole. A forager keeps a running home vector from its steps and a sky compass, with an error of roughly 10 % of the distance walked; landmarks and an odour at the entrance correct it near home, and the vector resets only inside the nest.",
     inGame:
@@ -234,7 +236,8 @@ export const GUIDE: GuideEntry[] = [
     id: "fungus",
     title: "The fungus",
     swatch: ["var(--spore)"],
-    onScreen: "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). You are the fungus.",
+    onScreen:
+      "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). Fainter purple threads are its mycelium, growing out from where it landed and, below, down into the soil; they reach further as it grows. You are the fungus.",
     realAnts:
       "Real parasites change what an ant perceives, gives off and can do, not its plans. Rickia makes its hosts carry more of one alkane, and they are attacked less by strangers. Ophiocordyceps hosts lose their daily rhythm and communicate less. Grooming off Metarhizium passes low doses that immunise nestmates.",
     inGame:

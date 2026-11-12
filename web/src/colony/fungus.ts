@@ -383,6 +383,23 @@ export class Fungus {
     return L ? { spores: L.spores, sporeStrain: L.sporeStrain } : null;
   }
 
+  /**
+   * The evolving fungus's patch on map `layer` (its base: where it rooted), as cells x0, y0, x1, y1, …, for the renderer
+   * to grow its mycelium from. Empty without one.
+   */
+  patchOn(layer: number): number[] {
+    const L = this.#layers[layer];
+    if (!L) return [];
+    const { w } = L.map.size;
+    const { x0 } = L.map;
+    const out: number[] = [];
+    for (const key of L.base) {
+      const col = key % w;
+      out.push(col + x0, (key - col) / w);
+    }
+    return out;
+  }
+
   /** Whether there is anything for a step to do: spores on the ground or load in any ant. */
   get active(): boolean {
     if (this.hosts > 0) return true;
