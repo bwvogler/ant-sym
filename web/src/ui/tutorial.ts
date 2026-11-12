@@ -51,8 +51,13 @@ export interface Effect {
 export const AFTER_SPEED = 4;
 /** The tutorial's speed: 1×, so a step can be seen. */
 export const TUTORIAL_SPEED = 1;
-/** "Faster" while waiting or watching. */
-export const FAST_SPEED = 4;
+/**
+ * The watch's speed: the first host takes about 100 sim-seconds to be groomed clean (41–215 s, PRD §61.2), 1.5 minutes
+ * at 1× was too slow to watch (owner, 2026-11-12); at 4× about 25 s, under a minute on the slowest seed.
+ */
+export const WATCH_SPEED = 4;
+/** "Faster" while waiting or watching: the speed bar's top speed (useColony MAX_SPEED; a test holds them equal). */
+export const FAST_SPEED = 8;
 /**
  * Sim seconds of watching before the tutorial moves on without a clean host. Measured (scripts/tutorial-first-host.mjs,
  * seeds 1–20, PRD §61): every first host was groomed clean, 41–215 s after it was found (median about 100 s); the limit
@@ -94,7 +99,7 @@ export function next(t: Tutorial, time: number): { t: Tutorial; effect: Effect }
     case "host":
       return {
         t: { ...t, step: "watch", watchFrom: time, fast: false },
-        effect: { playing: true, speed: TUTORIAL_SPEED, ...(t.host ? { follow: t.host } : {}) },
+        effect: { playing: true, speed: WATCH_SPEED, ...(t.host ? { follow: t.host } : {}) },
       };
     case "cleared":
     case "died":
@@ -160,7 +165,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         title: "You are a fungus",
         body: [
           `The purple specks by the ${ink} colony's hole are your spores. You can't move. You wait for an ant to walk through you.`,
-          "The game is paused, and runs at 1× while this tutorial shows you around.",
+          "The game is paused. It runs at 1× until an ant picks you up.",
         ],
         next: "Let it play",
       };
@@ -187,7 +192,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         body: [
           "Ants lick each other clean. Each time a nestmate grooms it, some of you comes off, and the groomer learns your smell: it resists you a little more.",
           ...(t.below ? ["It has taken you down the hole into the nest: the view switched to below."] : []),
-          "Watch its share of you on the card.",
+          `Watch its share of you on the card. The game runs at ${WATCH_SPEED}× for this.`,
         ],
         next: null,
         highlight: "load",

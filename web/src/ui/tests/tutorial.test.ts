@@ -13,12 +13,13 @@ import {
   observe,
   seenOf,
   TUTORIAL_SPEED,
+  WATCH_SPEED,
   tutorialDone,
   WATCH_LIMIT,
   type Seen,
   type Tutorial,
 } from "../tutorial.ts";
-import { buildGame, GAME_STRAIN, LANDING_COLONY } from "../useColony.ts";
+import { buildGame, GAME_SPEED, GAME_STRAIN, LANDING_COLONY, MAX_SPEED } from "../useColony.ts";
 
 // The tutorial's machine (ja-7x4, PRD §61), driven by hand-made frames: what each step waits for and what it asks the page.
 
@@ -44,7 +45,11 @@ test("the first host found pauses the game and is followed", () => {
   const w = next(r.t, 12);
   assert.equal(w.t.step, "watch");
   assert.equal(w.t.watchFrom, 12);
-  assert.deepEqual(w.effect, { playing: true, speed: TUTORIAL_SPEED, follow: host }, "Follow it follows again, in case the player let go");
+  assert.deepEqual(
+    w.effect,
+    { playing: true, speed: WATCH_SPEED, follow: host },
+    "Follow it follows again, in case the player let go; the watch runs at 4×",
+  );
 });
 
 test("watching ends when the host is clean, and says how many carry the fungus then", () => {
@@ -80,7 +85,7 @@ test("a host that goes below is noted on the card, once, without leaving the wat
   assert.match(cardFor(r.t).body.join(" "), /down the hole/);
 });
 
-test("Faster only while the game decides; the next card is at 1× again", () => {
+test("Faster only while the game decides, and only until the next card", () => {
   const f = faster(watching());
   assert.equal(f.t.fast, true);
   assert.deepEqual(f.effect, { speed: FAST_SPEED });
@@ -136,4 +141,9 @@ test("in a real game the first host is found within seconds of the landing, and 
   // Its slot taken by a newborn (another generation) is another ant: the host is gone, not clean.
   const reborn = seenOf(g, { ...t, step: "watch", host: { ...t.host!, gen: t.host!.gen + 1 } });
   assert.equal(reborn.host?.alive, false);
+});
+
+test("the tutorial's copies of the page's speeds match them: back to the game's speed, Faster at the top speed", () => {
+  assert.equal(AFTER_SPEED, GAME_SPEED);
+  assert.equal(FAST_SPEED, MAX_SPEED);
 });

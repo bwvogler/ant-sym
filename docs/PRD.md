@@ -4681,7 +4681,7 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
-- **Speed:** 1× while the tutorial runs, then back to the game's 4×. `GAME_SPEED` is unchanged.
+- **Speed:** 1× for the landing and the wait for the first host; the watch at 4× (§61.2: 1× was too slow there); then the game's own 4×. `GAME_SPEED` is unchanged.
 - **Who gets it:** a player's first Start runs it. A browser flag (`localStorage`, `jev-ants.tutorial`) marks it finished or skipped. The start screen offers "Start without the tutorial", and afterwards "Play the tutorial".
 - **Scope:** from the landing to the first host clearing, then the aim. After that the goal line (§50.4) takes over.
 
@@ -4691,7 +4691,7 @@ Each step is one card, over the field's lower-left corner, with Skip on every ca
 1. **The landing, paused:** what the spores are.
 2. **Waiting, at 1×.**
 3. **The first host:** the game pauses, and the tutorial follows the first Ink ant whose load reaches `INFECTED` and highlights its card.
-4. **Watching it, at 1×, with Faster offered.** Ends on the first of:
+4. **Watching it, at 4×, with Faster (8×) offered.** Ends on the first of:
    - clean (load back to 0);
    - dead;
    - `WATCH_LIMIT` reached.
@@ -4714,7 +4714,7 @@ The tutorial watches its own host, so a player who stops following the ant does 
 
 - **The infection dies out at first.** The cards say so: the mycelium by the hole keeps fruiting, so new ants pick the fungus up. That is the "it goes away" the owner asked to show.
 - **`WATCH_LIMIT` = 240 s**, above the worst seed (215 s), so the clean card is the one players see.
-- **At 1× the watch takes about 1.5 minutes,** which is why the watch card offers Faster (4×).
+- **The watch runs at 4×.** At 1× it took about 1.5 minutes, too slow to watch (owner, 2026-11-12). At 4× it takes about 25 s, and 54 s on the slowest seed. Faster takes it to 8×.
 
 ### 61.3 Cost
 None. No legend, question or schema changed. The aim card points at presets whose answers are already shipped (§50.19). The simulation is untouched, and the golden masters are bit-exact.
