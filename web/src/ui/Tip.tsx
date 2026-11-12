@@ -78,7 +78,7 @@ export default function Tip({
       onPointerEnter={(e) => e.pointerType === "mouse" && show()}
       onPointerLeave={(e) => e.pointerType === "mouse" && hide()}
       // Focus from the keyboard opens it; a tap focuses too, but a tap is handled by its click below.
-      onFocus={(e) => e.currentTarget.matches(":focus-visible") && show()}
+      onFocus={(e) => (e.target as Element).matches(":focus-visible") && show()}
       onBlur={hide}
       onClick={(e) => tapToOpen && pointer.current !== "mouse" && !bubble.current?.contains(e.target as Node) && setOpen((o) => !o)}
     >

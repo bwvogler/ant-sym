@@ -12,6 +12,8 @@
 //     click outside her flight is refused, and a click inside founds her colony where the preview (Game.settleAt) said;
 //     "Let her fly", by the keyboard, sends the next one on her own flight; and with the hook's flight gone, a queen who
 //     flies while Jev can't read words opens no pen.
+//  6. the Fungus panel's tooltips (ui/Tip.tsx): a hover opens one, Escape closes it, Tab onto a next-level button opens that button's,
+//     and on a touch page a tap opens one, a second tap or a tap elsewhere closes it.
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
 
@@ -577,6 +579,53 @@ try {
     5000,
   );
   check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
+
+  // ——— 6. The Fungus panel's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
+  console.log("6. the Fungus panel's tooltips");
+  const tips = (p) => p.getByRole("tooltip").count();
+  const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first();
+  const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first();
+  await nameOf(page).hover();
+  await until(async () => (await tips(page)) === 1, "a hover opens an upgrade's tooltip", 3000, 50);
+  await page.keyboard.press("Escape");
+  check((await tips(page)) === 0, "Escape closes a tooltip");
+  await page.mouse.move(2, 2);
+  // Give the fungus mutations to keep (a disabled button takes no focus), and wait for the panel to show them.
+  await page.evaluate(() => {
+    const e = window.jevAnts.game.fungus.evolution;
+    if (e) e.growth += 100;
+  });
+  const buy = firstUpgrade(page).getByRole("button");
+  await until(() => buy.isEnabled(), "the next-level button, once mutations are to keep", 5000, 100);
+  await nameOf(page).focus();
+  await page.keyboard.press("Tab"); // from the name onto its next-level button: a keyboard focus opens that button's tooltip
+  await until(async () => (await tips(page)) === 1, "Tab onto the next-level button opens its tooltip", 3000, 50);
+  check(
+    /^Infectivity: fair for \d+ mutations?/.test(await page.getByRole("tooltip").innerText()),
+    "the next-level tooltip (not the name's) says what it costs",
+  );
+  await page.keyboard.press("Escape");
+  check((await tips(page)) === 0, "Escape closes it");
+  // A finger: a tap opens, a second tap or a tap elsewhere closes, and a tap inside the bubble leaves it open.
+  const touch = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const tpage = await touch.newPage();
+  tpage.on("pageerror", (e) => errors.push(String(e)));
+  await tpage.goto(url);
+  await tpage.getByRole("button", { name: "Start", exact: true }).click();
+  await until(
+    () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
+    "the touch page's game, landed",
+  );
+  const tname = nameOf(tpage);
+  await tname.tap();
+  await until(async () => (await tips(tpage)) === 1, "a tap opens an upgrade's tooltip", 3000, 50);
+  await tname.tap();
+  await until(async () => (await tips(tpage)) === 0, "a second tap closes it", 3000, 50);
+  await tname.tap();
+  await until(async () => (await tips(tpage)) === 1, "a tap opens it again", 3000, 50);
+  await tpage.touchscreen.tap(20, 20);
+  await until(async () => (await tips(tpage)) === 0, "a tap elsewhere closes it", 3000, 50);
+  await touch.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
