@@ -4700,7 +4700,19 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 
 **Play.** Threads creep through the side view, split at stones, run along tunnels or across them, and spores show where they are exposed; ants digging cut them. The aim in words reaches the fungus's body ("run along the tunnels", "stay buried"), and the *Mycelium* upgrade shows on the field as the growth factor. Risk: a cliff if hyphae reach every tunnel at once; watch the progression worst seed.
 
-**Assays and targets.** H1 the growth unit (length ÷ tips within ±20 % of `HGU` past 20 tips); H2 slide and split at rock; H3 under 5 % of tip steps run into its own cells; H4 hypha × `HYPHA_MASS` never exceeds the mass grown; P1 `scripts/lab/progression.mjs` worst seed to a quarter inside §50.14's band (re-measured first). Assays land first, with no behaviour change.
+**Assays and targets.** H1 the growth unit (length ÷ tips within ±20 % of `HGU` past 20 tips); H2 slide and split at rock; H3 under 5 % of tip steps run into its own cells; H4 hypha × `HYPHA_MASS` never exceeds the mass grown; P1 `scripts/lab/progression.mjs --map one`: no seed worse than the baseline below, and the median quarter within ±25 % of it. Assays land first, with no behaviour change.
+
+**Baseline (measured 2026-11-12, `ja-2bw.1`, before any change).** §50.14's band was measured on the side world, which the page no longer plays. On one world as the page plays it (`node scripts/lab/progression.mjs --map one --evolve --seeds 1-10 --seconds 600`: 600 + 600 ants, aim unite, Garden, the default upgrade order):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| first host (s) | 4 | 4 | 6 | 4 | 6 | 5 | 5 | 7 | 6 | 5 |
+| a quarter (s) | 358 | 281 | 203 | 147 | 320 | never | 288 | 500 | 509 | 219 |
+| the queen (s) | 372 | 333 | 248 | 188 | 368 | never | 301 | 542 | 515 | 260 |
+| mutations earned | 1,501 | 1,863 | 2,075 | 2,458 | 1,687 | 94 | 1,366 | 544 | 497 | 2,063 |
+
+- A quarter at 147–509 s on nine seeds; on seed 6 the fungus never takes hold (1–3 % all game, 94 mutations), so the worst seed is "never".
+- One world's spread is wider than the side world's (156–241 s): the plane's foragers pass the landing less evenly. So **P1 is re-based** on this table: with hyphae on, no seed worse than here, and the median quarter (about 300 s) within ±25 %. Seed 6's stall is a property of today's landing on one world, not of hyphae; whether it should be fixed is a separate question.
 
 **Cost (estimated).** The growth lane: 24 situations per set of words at about the fungus lane's ~770 tokens a situation, ≈ 18k tokens, **≈ $0.0008 per new aim**, once. Cached games spend nothing; no other lane changes.
 
