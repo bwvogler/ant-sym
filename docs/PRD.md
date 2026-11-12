@@ -4677,3 +4677,33 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 **Beads.** `ja-rf5` (epic): `.1` read the full texts; `.2` assays (no behaviour change); `.3` the species on the descriptor (needs `ja-fnd.5.3`); `.4` food odour; `.5` heat; `.6` invitation; `.7` the fungus's levers (owner); `.8` Learn entry.
 
 **Still open.** Full texts of Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984 and the published Buehlmann et al. 2014 (paywalled); the heat model's numbers for *C. fortis*; every number in the note not marked as read in full text.
+
+## 61. The mycelium grows as hyphae: tips that extend, turn and branch (design, ja-2bw, 2026-11-12)
+
+**Research basis:** [hyphal-growth.md](hyphal-growth.md):
+- Each tip extends on its own at a steady average rate, in pulses: *Metarhizium anisopliae* 1.3 µm/min in channels (Hopke et al. 2021); the apical compartment drives itself (Tegelaar et al. 2020).
+- Branching keeps pace with extension (the hyphal growth unit, Trinci 1974, **unverified**); the tip holds back branches near itself (Semighini & Harris 2008); branches leave at about 45–60° (Held et al. 2019; Simonin et al. 2012).
+- A tip senses contact: it slides along a wall met at a glance, splits in two against one met head on, and returns to its old heading (Held et al. 2019); it turns from its own hyphae (Trinci et al. 1979, **unverified**). The network feeds its tips in proportion to their number (Roper et al. 2013).
+- Against the idea: in soil *Metarhizium* is mostly spores and root-associated hyphae (Hu & St. Leger 2002, **unverified**); a foraging network in the soil is a licence the game takes.
+
+**The problem.** The mycelium is a number on a fixed patch (`Evolution.mass`, `Fungus.root`); the threads drawn since `ja-vyu`/`ja-6jg` are a hashed picture of it. Nothing grows, nothing chooses, and ants never touch it. The patch also lies on the walkway by the hole, where the owner's UV decision (§51, 2026-11-08) says it can't live.
+
+**Decisions.**
+- Actual threads, lines through the hexagons, grown by a policy asked every few ticks, at a rate set by a growth factor, able to branch and turn (owner, 2026-11-12).
+- The mycelium lives in the soil, not on the surface (owner, 2026-11-08; `ja-yo3`). So hyphae grow in the curtain only, and nothing is drawn on the plane (proposed: needs the owner, since `ja-6jg` draws a mat there).
+- A growth lane under the fungus's aim, after the body runs on its local rule (proposed: needs the owner).
+- Ants digging cut hyphae (proposed: needs the owner; design).
+- The `traffic` cue (ants passing beside a tip) is design (proposed: needs the owner).
+- `ja-yo3` folds into the body child `ja-2bw.2` (proposed: needs the owner).
+
+**The mechanic.** Hyphae in the curtain's soil, rooted beside the shaft under the hole; a tip steps every `TIP_STEP` s (shorter with each *Mycelium* level), each cell paid from the mycelium's mass at `HYPHA_MASS`, the mass shared among the tips. At its step a tip's **growth policy** answers `grow`, `left`, `right`, `branch` or `rest` from its situation: `ahead` (soil, open, rock, own hypha) × `traffic` (none, some; design) × `supply` (short, ample) = 16 situations. The local rule: split on rock head-on, slide at a glance, veer from its own hypha, rest at open ground or short supply, branch once its run reaches `HGU`, else drift back to its first heading. Spores go out onto open cells touching a hypha. Off (`hyphae` off) is main bit for bit; on, it retires `Fungus.root`'s fixed base and the hashed threads, and gives the fungus its first say in where its spores go out (part of `ja-k4k.8`).
+
+**Play.** Threads creep through the side view, split at stones and reach the tunnels, where spores begin to show; ants digging cut them. The aim in words reaches the fungus's body ("grow toward the tunnels the ants use", "stay deep"), and the *Mycelium* upgrade shows on the field as the growth factor. Risk: a cliff if hyphae reach every tunnel at once; watch the progression worst seed.
+
+**Assays and targets.** H1 the growth unit (length ÷ tips within ±20 % of `HGU` past 20 tips); H2 slide and split at rock; H3 under 5 % of tip steps run into its own cells; H4 hypha × `HYPHA_MASS` never exceeds the mass grown; P1 `scripts/lab/progression.mjs` worst seed to a quarter inside §50.14's band (re-measured first). Assays land first, with no behaviour change.
+
+**Cost (estimated).** The growth lane: 16 situations per set of words at about the fungus lane's ~770 tokens a situation, ≈ 12k tokens, **≈ $0.0005 per new aim**, once. Cached games spend nothing; no other lane changes.
+
+**Beads.** `ja-2bw` (epic): `.1` assays and the progression baseline; `.2` hyphae in the soil on the local rule, spores where they meet tunnels (absorbs `ja-yo3`); `.3` the picture: lines through the hexagons, nothing on the plane; `.4` digging cuts hyphae; `.5` the growth lane; `.6` tune and turn on. Related: `ja-yo3`, `ja-2qv`, `ja-lo8.13` (toward food: chemotropism, which the evidence calls limited), `ja-k4k.8`.
+
+**Still open.** The owner's calls above; `HGU`, `TIP_STEP` per level and `HYPHA_MASS` against the progression band; the tick cost of a few hundred tips; Trinci 1974's full text for the growth unit.
