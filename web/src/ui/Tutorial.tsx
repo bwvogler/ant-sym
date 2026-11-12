@@ -46,6 +46,7 @@ export default function TutorialCard({
           className="rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised"
           onClick={() => setHiddenAt(null)}
           aria-label="Show the tutorial card"
+          autoFocus
         >
           Show
         </button>
