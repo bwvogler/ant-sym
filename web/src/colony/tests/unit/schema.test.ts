@@ -176,45 +176,46 @@ test("each legend names every field of its schema", () => {
     for (const f of schema.fields) assert.ok(legend.includes(String(f.name)), `the legend never names "${String(f.name)}"`);
 });
 
-test("a legend with no words for a field, words for a stranger, or a field twice does not build", () => {
+test("a legend with no words for a field, words for a stranger, a field twice, or words under the wrong field does not build", () => {
   const schema = defineSchema<{ a: 1 | 2; b: 1 | 2 }>([
     { name: "a", values: [1, 2] },
     { name: "b", values: [1, 2] },
   ]);
+  const build = (fields: readonly (readonly [keyof { a: 1; b: 1 }, string])[]) => () => legendOf(schema, { intro: "", fields });
   assert.equal(
     legendOf(schema, {
       intro: "I ",
       fields: [
-        ["b", "B "],
+        ["b", "b is it "],
         ["a", ""],
       ],
       outro: "O",
     }),
-    "I B O",
+    "I b is it O",
   );
-  assert.throws(() => legendOf(schema, { intro: "", fields: [["a", "A"]] }), /no words for the field "b"/);
+  assert.throws(build([["a", "a is it"]]), /no words for the field "b"/);
   assert.throws(
-    () =>
-      legendOf(schema, {
-        intro: "",
-        fields: [
-          ["a", "A"],
-          ["b", "B"],
-          ["c" as never, "C"],
-        ],
-      }),
+    build([
+      ["a", "a"],
+      ["b", "b"],
+      ["c" as never, "c"],
+    ]),
     /"c", which is not a field/,
   );
   assert.throws(
-    () =>
-      legendOf(schema, {
-        intro: "",
-        fields: [
-          ["a", "A"],
-          ["a", "A"],
-          ["b", "B"],
-        ],
-      }),
+    build([
+      ["a", "a"],
+      ["a", "a"],
+      ["b", "b"],
+    ]),
     /twice/,
+  );
+  // Words that don't open with their field's name are under the wrong field (the legends read "mode is …", "tired means …").
+  assert.throws(
+    build([
+      ["a", "b is one"],
+      ["b", "b is two"],
+    ]),
+    /words for "a" should begin with its name/,
   );
 });

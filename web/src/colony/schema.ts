@@ -84,5 +84,8 @@ export function legendOf<S extends object>(
   for (const n of names) if (!given.includes(n)) throw new Error(`legend: no words for the field "${n}"`);
   for (const n of given) if (!names.includes(n)) throw new Error(`legend: words for "${n}", which is not a field`);
   if (new Set(given).size !== given.length) throw new Error("legend: a field has words twice");
+  // A passage opens with its own field's name (the legends read "mode is …", "tired means …"), so words can't sit under the wrong field.
+  for (const [n, text] of parts.fields)
+    if (text !== "" && !text.startsWith(String(n))) throw new Error(`legend: the words for "${String(n)}" should begin with its name`);
   return parts.intro + parts.fields.map(([, text]) => text).join("") + (parts.outro ?? "");
 }
