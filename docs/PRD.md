@@ -4718,3 +4718,148 @@ The tutorial watches its own host, so a player who stops following the ant does 
 
 ### 61.3 Cost
 None. No legend, question or schema changed. The aim card points at presets whose answers are already shipped (§50.19). The simulation is untouched, and the golden masters are bit-exact.
+
+## 62. The species descriptor: tier 1 first, one species per game (design, ja-fnd.5.3, 2026-11-12)
+
+**Basis:** [species.md](species.md): three read-only surveys of the colony, the game and the page. There is no species concept; `Colony` is the ant; the tick is one 1,230-line body with four hard-wired modes and no seam; the game is two colonies (`Sides` is `colony`/`rival`); lanes, legends and saves carry no species.
+
+**Decisions.**
+- **Tier 1 first** (made here, overturnable): a species is data (parameter overrides, the local response set, the Jev words of each lane, what feeds the existing sensors, names), plus the odd per-species ant array. The desert ant needs no new mode and no tick split, but it is not data only: its words, no-trail ant and small nest are tier 1; the food plume (steering only, an emitter), heat (a term in the fatigue block, a return rule: `ja-rf5.5`), and the invitation (a speed array, a `Touch` field) are small guarded tick edits and new state, each neutral for the generic ant (corrected after review); undertaking is a plain `ColonyParams.undertakes` a species sets (built, `ja-fnd.5.3.4`). The generic ant's body is extracted as a strategy (`ja-fnd.4.4`) and the nest-kind interface built (`ja-fnd.5.5`) only when a species needs different modes or nest (termites, army ants).
+- **One species per game, mixed worlds later** (owner, 2026-11-12): a "desert" scenario has its own map and both colonies are desert ants, so the game needs only `GameParams.species`. Unity, the odour axis, names and colours, chapters and Jev doctrines stay as they are. A mixed world (`Game` over colony specs, per-colony species in saves, an odour axis per species pair, foreign-trail reading across channel sets, more than two nests, per-colony names) is `ja-fnd.5.4`.
+- **The food plume is steering only** (made here, overturnable): no situation field, as vision.md says; the policy and `follow` do not see it.
+- **Separate words and contexts per species** (made here): the generic ant's legends, contexts and shipped precache do not move; a species lane has its own.
+- **Saves are not migrated** (owner's standing rule): `SAVE_VERSION` 10 carries the species.
+- **Checked against the other candidates** (2026-11-12, species.md "Other species, checked"): the descriptor was sized from the desert ant alone. Against the notes on Pharaoh, leafcutter, army ant and termite: age structure (`LIFESPAN`, `YOUNG`, `MIDDLE`) must become parameters (`ja-fnd.5.3.6`); the queen stays out of `Species` and with the nest-kind interface, which must own queen count and structure; `undertakes` is a boolean to widen when a second species needs a third behaviour; a caste field in the situation needs per-species schemas; army ants and termites are tier 3.
+
+**Order.** `Species` and `GENERIC_ANT` bit-exact; lane words by species; the save carries the species; undertaking from the species (the queen is the nest kind, not a species property); age structure as parameters (built, `ja-fnd.5.3.6`: `lifespan`, `youngShare`, `middleShare`, `mortalWithoutQueen`, added after the check against the other species); a test species in a test file (built, `ja-fnd.5.3.5`; the stage's acceptance); then the desert ant (`ja-rf5`).
+
+**Cost.** None for the generic ant. A species lane is a new legend and a new precache bundle set: a live check and an `--import`, at the owner's say.
+
+**Beads.** `ja-fnd.5.3` (the descriptor) with children `.1`–`.5`; `ja-rf5.3` (the desert ant on it) waits on it.
+
+## 63. The mycelium grows as hyphae: tips that extend, turn and branch (design, ja-2bw, 2026-11-12)
+
+**Research basis:** [hyphal-growth.md](hyphal-growth.md):
+- Each tip extends on its own at a steady average rate, in pulses: *Metarhizium anisopliae* 1.3 µm/min in channels (Hopke et al. 2021); the apical compartment drives itself (Tegelaar et al. 2020).
+- Branching keeps pace with extension (the hyphal growth unit, Trinci 1974, **unverified**); the tip holds back branches near itself (Semighini & Harris 2008); branches leave at about 45–60° (Held et al. 2019; Simonin et al. 2012).
+- A tip senses contact: it slides along a wall met at a glance, splits in two against one met head on, and returns to its old heading (Held et al. 2019); it turns from its own hyphae (Trinci et al. 1979, **unverified**). The network feeds its tips in proportion to their number (Roper et al. 2013).
+- Against the idea: in soil *Metarhizium* is mostly spores and root-associated hyphae (Hu & St. Leger 2002); a foraging network in the soil is a licence the game takes.
+- Where it lives (a second search, closing `ja-2qv`'s question): simulated noon sun killed every isolate's spores within 60 min (Acheampong et al. 2025); these fungi are densest in the top few cm and litter (Majchrowska-Safaryan & Tkaczuk 2021); burrow walls are microbial hotspots (Lipiec et al. 2016); corpses are where it grows out (about 10⁸ conidia a cadaver, Khun et al. 2021), and corpses ants tend grow nothing (Kesäniemi et al. 2019).
+
+**The problem.** The mycelium is a number on a fixed patch (`Evolution.mass`, `Fungus.root`); the threads drawn since `ja-vyu`/`ja-6jg` are a hashed picture of it. Nothing grows, nothing chooses, and ants never touch it. The patch also lies on the walkway by the hole, where the owner's UV decision (§51, 2026-11-08) says it can't live.
+
+**Decisions.**
+- Actual threads, lines through the hexagons, grown by a policy asked every few ticks, at a rate set by a growth factor, able to branch and turn (owner, 2026-11-12).
+- The mycelium lives in the soil, not on the surface (owner, 2026-11-08; `ja-yo3`). The plane is read as the topsoil just under the surface: hyphae thread there first, round the hole and to the midden, drawn faint, then down the dug walls of the shaft and tunnels; nothing grows on top in the sun; the mat `ja-6jg` draws on the plane goes (owner, 2026-11-12, after the habitat search).
+- The *Mycelium* upgrade's second level, renamed **a borer**, lets tips push into undug soil; the first (*a thread*) follows the topsoil and dug surfaces only; what *a web* unlocks is open (owner, 2026-11-12).
+- A hypha that reaches a corpse colonises it and sporulates heavily; ants tending a corpse prevent it; in this epic (owner, 2026-11-12).
+- The local rule first, then a growth lane under the fungus's aim (owner, 2026-11-12).
+- No cue for ants. A tip senses whether it is buried, on a tunnel's wall or out in a dug cell, and may grow along tunnels or across them (owner, 2026-11-12).
+- Ants digging cut hyphae (owner, 2026-11-12; design).
+- `ja-yo3` folds into the body child `ja-2bw.2` (owner, 2026-11-12).
+- Structures, each its own upgrade, not one to choose (owner, 2026-11-12; [hyphal-growth §7](hyphal-growth.md#7-structures-cords-knots-stalks-and-fusion)): **cords** are *a web*, the third *Mycelium* level (thicken with flow, feed far tips, take several digs to cut; Bebber et al. 2007, Heaton et al. 2010; a licence for *Metarhizium*); **knots** (microsclerotia, *Metarhizium*'s own: Paixão et al. 2021, Marciano et al. 2021) survive digging, grooming and the sun and sprout again; **stalks** on corpses left outside the nest spread spores wider (Hughes et al. 2011; a licence). **Fusion** is a growth-policy answer (`fuse`, into its own hypha ahead), not an upgrade.
+
+**The mechanic.** Hyphae in the topsoil under the plane and in the curtain's soil, rooted by the hole and on the shaft's walls; a tip steps every `TIP_STEP` s (shorter with each *Mycelium* level), each cell paid from the mycelium's mass at `HYPHA_MASS`, the mass shared among the tips. At its step a tip's **growth policy** answers `grow`, `left`, `right`, `branch`, `rest`, `fuse` or `fruit` (the last two added by the owner's decisions below) from its situation: `ahead` (soil, open, rock, own hypha) × `exposed` (buried, wall, open) × `supply` (short, ample) = 24 situations. The local rule: split on rock head-on, slide at a glance, veer from its own hypha, slide along a tunnel's wall, cross a dug cell it is in, rest on short supply, branch once its run reaches `HGU`, else drift back to its first heading. Spores go out on the landing patch and on the dug spots tips fruited on (§63.1: spread wider, they thinned the patch below an infecting dose). Off (`hyphae` off) is main bit for bit; on, it retires `Fungus.root`'s fixed base and the hashed threads, and gives the fungus its first say in where its spores go out (part of `ja-k4k.8`).
+
+**Play.** Threads creep through the side view, split at stones, run along tunnels or across them, and spores show where they are exposed; ants digging cut them. The aim in words reaches the fungus's body ("run along the tunnels", "stay buried"), and the *Mycelium* upgrade shows on the field as the growth factor. Risk: a cliff if hyphae reach every tunnel at once; watch the progression worst seed.
+
+**Assays and targets.** H1 the growth unit (length ÷ tips within ±20 % of `HGU` past 20 tips); H2 slide and split at rock; H3 under 5 % of tip steps run into its own cells; H4 hypha × `HYPHA_MASS` never exceeds the mass grown; P1 `scripts/lab/progression.mjs --map one`, seeds 1–10 and 11–20: no seed more than 10 % slower to a quarter than without hyphae, and neither the worst seed nor the median worse (reworded by the owner, §63.4). Assays land first, with no behaviour change.
+
+**Baseline (measured 2026-11-12, `ja-2bw.1`, before any change).** §50.14's band was measured on the side world, which the page no longer plays. On one world as the page plays it (`node scripts/lab/progression.mjs --map one --evolve --seeds 1-10 --seconds 600`: 600 + 600 ants, aim unite, Garden, the default upgrade order):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| first host (s) | 4 | 4 | 6 | 4 | 6 | 5 | 5 | 7 | 6 | 5 |
+| a quarter (s) | 358 | 281 | 203 | 147 | 320 | never | 288 | 500 | 509 | 219 |
+| the queen (s) | 372 | 333 | 248 | 188 | 368 | never | 301 | 542 | 515 | 260 |
+| mutations earned | 1,501 | 1,863 | 2,075 | 2,458 | 1,687 | 94 | 1,366 | 544 | 497 | 2,063 |
+
+- A quarter at 147–509 s on nine seeds; on seed 6 the fungus never takes hold (1–3 % all game, 94 mutations), so the worst seed is "never".
+- One world's spread is wider than the side world's (156–241 s): the plane's foragers pass the landing less evenly. So **P1 is re-based** on this table: with hyphae on, no seed more than 10 % slower to a quarter than here, and neither the worst seed nor the median worse (the owner's wording of §63.4; first worded "no seed worse"). Seed 6's stall is a property of today's landing on one world, not of hyphae; whether it should be fixed is a separate question.
+
+**Cost (estimated).** The growth lane: 24 situations per set of words at about the fungus lane's ~770 tokens a situation, ≈ 18k tokens, **≈ $0.0008 per new aim**, once. Cached games spend nothing; no other lane changes.
+
+**Beads.** `ja-2bw` (epic): `.1` assays and the progression baseline; `.2` hyphae in the soil on the local rule, spores where they are exposed (`ja-yo3` to discuss); `.3` the picture: lines through the hexagons, nothing on the plane; `.4` digging cuts hyphae; `.7` corpses colonised; `.8` cords (*a web*); `.9` knots; `.10` stalks; fusion is in `.2` (the body) and `.5` (the answer); `.5` the growth lane; `.6` tune and turn on. Related: `ja-yo3`, `ja-2qv`, `ja-lo8.13` (toward food: chemotropism, which the evidence calls limited), `ja-k4k.8`.
+
+**Still open.** The new upgrades' costs and panel names; whether ants walking through a dug cell break an exposed hypha (proposed: no, they pick spores off it); `HGU`, `TIP_STEP` per level and `HYPHA_MASS` against the progression band; the tick cost of a few hundred tips; Trinci 1974's full text for the growth unit.
+
+### 63.1 The body on its local rule (ja-2bw.2, 2026-11-12)
+
+**Built** (behind `params.hyphae`, off by default: every golden master bit-exact, 215 unit and 327 int tests green).
+- `colony/hyphae.ts`: tips step every `TIP_STEP` s (2, 1.5, 1 by *Mycelium* level) on the situation `ahead` × `exposed` × `supply` (24) and the answers grow, left, right, branch, rest, fuse. The local rule: split round a point, split wide along a flat wall, slide at a glance (a blocked veer turns the tip where it stands), turn from its own hyphae, keep to a tunnel's wall from the soil, branch every `BRANCH_RUN` (7) cells with branches starting `BRANCH_START` (2) cells in, rest on short supply. A thread keeps to dug walls in the curtain; a borer pushes into undug soil.
+- **Branching was tuned to the growth unit.** With every tip branching at run 8, the mycelium branched in lockstep and length ÷ tips see-sawed 8.7–15 (an exponential steady state of 1 / (2^(1/b) − 1) ≈ 11, not 8). Branching every 7 with branches staggered 2 cells in settles at 7.9–8.3 (H1).
+- **Mass.** The hyphae embody the mycelium's mass rather than drain it: at most mass ÷ `HYPHA_MASS` (0.25) cells, and a tip extends only on mass not yet embodied, judged once a round so the first tip doesn't take it all. Every map's tips take turns in one round: stepped map by map, the plane's tips took every cell of mass and the curtain's never grew.
+- **Rooting.** The plane's landing patch becomes the first hypha cells, with three tips from its rim (from its middle they were boxed in by their own cells); in one world, the shaft's walls under the hole take a tip on each side (`Game.#rootShaft`, from `ja-yo3`).
+- **Cost.** A round of ~1,000 tips takes under 1 ms (bench, `stepTips`, 996 tips, 8,103 cells); rounds come every 1–2 s.
+
+**Where the spores go: measured, and left to the owner.** `progression.mjs --map one --evolve --hyphae`, seeds 1–10, 600 s, against the baseline above (a quarter on 9 seeds of 10):
+
+| spores put out on | seeds where the fungus took hold (a quarter) |
+|---|---|
+| no hyphae (baseline) | 9 of 10 (147–509 s) |
+| every hypha cell on the plane, and the dug cells the curtain's reach | 2 of 10 |
+| the landing patch, and the dug cells the curtain's hyphae reach | 6 of 10 (152–489 s) |
+| the landing patch only (shipped in this slice) | as the baseline: seeds 1–3 identical to the second |
+
+The mycelium's spore output is fixed by its mass, so every cell added to where it fruits thins the patch the foragers walk through below the dose that infects an ant (`minDose`). This slice ships the patch only: hyphae grow and are saved but change no play yet. Where they fruit (a share kept for the patch, fruiting as a growth-policy answer, corpses and stalks) is `ja-2bw.11`, an owner decision.
+
+**Decided (owner, 2026-11-12).** A tip where it is exposed (on a tunnel's wall or in a dug cell) may answer **fruit** and become a spore spot, taking its share of the mycelium's spores while the patch keeps the rest: few spots, chosen, so each stays above the dose. Fruiting on the **midden is free**: a colonised corpse's spores come from the corpse (Khun et al. 2021: about 1.3 × 10⁸ conidia a cadaver), not the mycelium, so they add to the total (`ja-2bw.7`). `fruit` joins the growth answers (seven).
+
+**Built: the `fruit` answer (`ja-2bw.12`).** A tip on a tunnel's wall or in a dug cell may answer `fruit` and end as a spore spot on the dug cell it touches, taking a patch cell's share; never under the plane's surface or buried. The local rule fruits where a tunnel is reached unless a spot of its own lies within `FRUIT_GAP` (12) cells, so spots stay few (one in the shaft within 100 s on seed 1). Measured (`progression.mjs --map one --evolve --hyphae`, seeds 1–10, 600 s):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, baseline (s) | 358 | 281 | 203 | 147 | 320 | never | 288 | 500 | 509 | 219 |
+| a quarter, hyphae + fruit (s) | 335 | 290 | 202 | 146 | 294 | 369 | 282 | 399 | 380 | 206 |
+| the queen, hyphae + fruit (s) | 360 | 330 | 245 | 188 | 325 | 388 | 296 | 441 | 404 | 237 |
+
+- **P1 passes:** every seed takes hold (seed 6, which stalled at 1–3 % in the baseline, reaches a quarter at 369 s); the worst seed is 399 s against "never"; the median quarter is about 292 s against about 304 s. A spot in the shaft, where every forager passes, is what reaches the ants the patch outside missed.
+
+### 63.2 Corpses: new starts that fruit for free (ja-2bw.7, 2026-11-12)
+
+**Built** (with `params.hyphae`). `Fungus.colonise`: a corpse is a new start (two tips, east and west), the cadaver joins the mycelium (`Evolution.feed`, `CORPSE.mass` 1, counted as growth), and it fruits on its cell for free, `CORPSE.spores` 12 at `CORPSE.rate` 0.2 a second, paid by the corpse, not the mycelium (owner, 2026-11-12; Khun et al. 2021). A host that died of the evolving fungus is colonised as it is buried on the midden (`onBury`); a tip that reaches a midden cell holding corpses colonises it (`fungus.corpseAt`, every colony's midden). Corpses still carried or lying in the nest are tended, and are not (Kesäniemi et al. 2019).
+
+**Measured: nothing changes in the first ten minutes.** With corpses, `progression.mjs --map one --evolve --hyphae` gave the same seconds on every seed as §63.1's fruiting run. On seed 4 no worker died underground in 600 s, so nothing was buried: a worker lives 0.7–1.3 × `LIFESPAN` (3,600 s) and the founders start at up to half of theirs, so the first can die of age only after about 1,260 s; Garden kills no host; and an ant that dies on the plane leaves no corpse (U3c). Corpses are a late-game source, until the fungus kills (the lethal levers) or a death outside leaves a corpse.
+
+**Decided (owner, 2026-11-12): a host that dies on the plane is a new start where it lies.** `Colony.onDie` (called as an ant dies, with its cell and layer): in one world a host of the evolving fungus dying on the plane is colonised there at once; the plane keeps no corpse, so nothing is carried or rots. A clean ant leaves nothing.
+
+**Measured** (seeds 1–10, 600 s, against §63.1's fruiting run):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Ink a quarter, fruiting (s) | 335 | 290 | 202 | 146 | 294 | 369 | 282 | 399 | 380 | 206 |
+| Ink a quarter, + corpses (s) | 335 | 290 | 202 | 141 | 315 | 401 | 282 | 319 | 380 | 206 |
+| the rival's first host, fruiting (s) | never | 489 | 291 | 278 | 415 | 34 | never | never | never | 492 |
+| the rival's first host, + corpses (s) | 436 | 88 | 232 | 145 | 69 | 34 | 449 | 181 | 428 | 399 |
+
+- **No cliff in the landing colony:** a quarter at 141–401 s (median about 302 s, against about 292 s); P1 still holds against the baseline (worst 401 s against "never").
+- **The fungus crosses to the rival.** The plane's dead are mostly fight deaths at the border between the colonies; a host dying there is a spore spot where the rival's foragers walk. The rival's first host comes on every seed (5 of 10 before), and minutes sooner on seeds 2 and 5. Mutations rose on seeds 4 and 8 (4,424 and 2,819, against 2,427 and 1,148): corpses feed the mycelium and count as growth.
+
+### 63.3 Ants digging through a hypha cut it (ja-2bw.4, 2026-11-12)
+
+**Built** (with `params.hyphae`). Hyphae remember the cells that were soil when they grew in (and the shaft-wall roots); each round, a cell the ants have dug open is cut (`Hyphae.cutDug`). The cell and everything that grew from it die with their tips, the fusions they held and the spore spots only they touched, and the mass the lost hypha held is gone (`Evolution.lose`). A fusion loop that joins the cut-off part to the rest saves it: only the dug cell is lost (Simonin et al. 2012; the rule is design).
+
+**Measured** (seeds 1–10, 600 s, against §63.2): a quarter at 141–401 s → 140–441 s; seed 6 401 → 441 s, seed 9 380 → 398 s, the rest within a few seconds; median about 301 s. The counterplay is mild: at *a thread* the curtain's hyphae run along walls already dug, so the diggers mostly widen the tunnels beside them; it should bite harder once *a borer* takes hyphae into undug soil. P1 holds (worst 441 s against the baseline's "never").
+
+This is the build that ships (later changes touched only tests, comments and fusion, which nothing grows yet). Seeds 1–10 per seed, against §63's baseline:
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 358 | 281 | 203 | 147 | 320 | never | 288 | 500 | 509 | 219 |
+| a quarter, hyphae (s) | 342 | 285 | 204 | 140 | 315 | 441 | 288 | 319 | 398 | 206 |
+| the rival's first host, hyphae (s) | 452 | 88 | 256 | 145 | 69 | 34 | never | 181 | 413 | 384 |
+
+### 63.4 Held out: seeds 11–20 (review of #104, D1; owner 2026-11-12)
+
+Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression.mjs --map one --evolve [--hyphae]`, 600 s, everything above: fruit, corpses, cuts):
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 240 | 269 | 318 | 243 | 381 | 435 | 191 | 270 | 262 | never |
+| a quarter, hyphae (s) | 236 | 271 | 288 | 252 | 287 | 420 | 193 | 243 | 212 | 484 |
+| the rival's first host, no hyphae (s) | 411 | 557 | 518 | 345 | 173 | 540 | 271 | 329 | 273 | 218 |
+| the rival's first host, hyphae (s) | 323 | 403 | 193 | 220 | 173 | 472 | 168 | 205 | 54 | 218 |
+
+- As on seeds 1–10: every seed takes hold (seed 20, which never did without hyphae, at 484 s); the median quarter about 262 s against about 270 s; the rival reached sooner (median about 212 s against about 337 s); mutations up on most seeds.
+- **P1 as worded ("no seed worse than the baseline") fails narrowly**: seed 14 is 9 s slower (243 → 252 s), seeds 12 and 17 2 s; on seeds 1–10, seeds 2 and 3 were 4 s and 1 s slower. The worst seed and the median both improve; the gate's wording, not the play, is what the owner is asked to settle (`ja-2bw.6`).
+- **Decided (owner, 2026-11-12): ship hyphae on, and P1 reads: no seed more than 10 % slower to a quarter, and neither the worst seed nor the median worse.** On all twenty seeds the largest slowdown is seed 14's 3.7 %; the worst seed (484 s against "never") and the median both improve.

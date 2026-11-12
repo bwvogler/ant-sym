@@ -29,24 +29,17 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
 import {
-  localPolicy,
-  localStance,
+  LANES as ROWS,
   cacheContexts,
   COLONY_BRAIN_VERSION,
   DOCTRINES,
   estimateTokens,
-  packModeRequest,
   packResponseRequest,
-  packStanceRequest,
-  readMode,
   readResponse,
-  readStance,
   RESPONSE_BRAIN_VERSION,
   RESPONSE_HOOKS,
   responseKey,
-  situationKey,
   STANCE_BRAIN_VERSION,
-  stanceKey,
   localResponses,
   responses,
   generateSideWorld,
@@ -103,9 +96,11 @@ if (!KEY && !opts.dry) {
 if (!(opts.budget > 0 && opts.budget <= 1)) throw new Error("--budget must be in (0, 1] dollars");
 
 // The lanes: how to key, pack, read and answer locally.
+// An ant's lane is its row of the lane registry (colony/lanes.ts); the responses are asked only from here, so their table stays here.
+const antLane = (row) => ({ key: (s) => row.key(s, undefined), pack: row.pack, read: row.read, local: row.local });
 const LANES = {
-  mode: { key: situationKey, pack: packModeRequest, read: readMode, local: localPolicy },
-  stance: { key: stanceKey, pack: packStanceRequest, read: readStance, local: localStance },
+  mode: antLane(ROWS.mode),
+  stance: antLane(ROWS.stance),
   ...Object.fromEntries(
     RESPONSE_HOOKS.map((h) => [
       h,

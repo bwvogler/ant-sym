@@ -75,6 +75,7 @@ This is the budget the policy may draw on. Each row points to the research secti
 The gaps:
 - ~~**The fungal situation reads things a fungus can't sense** (its host's mode; the chamber table's owner)~~: closed by `ja-lo8.4` (`ja-k4k.7`). Most of the new senses are marked design in §11: no paper shows a fungus reading them.
 - **The fungus has no scent of its own on the ground,** and no choice of where or when to sporulate, such as summiting (`ja-k4k.8`).
+- **The mycelium is a number, not a body.** It grows nowhere and chooses nothing. [hyphal-growth](hyphal-growth.md) designs it as hyphae in the soil whose tips sense contact (what is ahead, their own hyphae) and their supply, steered by a growth policy; the spores go out where they reach the tunnels, its first say in where (`ja-2bw`).
 
 The biology and the full catalogue of levers:
 - [fungus-policy §2](fungus-policy.md#2-two-policies-and-the-perceived-state-between-them): two policies, and the perceived state between them;

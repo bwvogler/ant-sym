@@ -1,0 +1,122 @@
+# Species: what one is in this code, and how to add one
+
+*Design note for `ja-fnd.5.3` (S4.3, [refactor.md](refactor.md), PRD §62). Written 2026-11-12 against code at `d9db43a`, from three read-only surveys of the colony, the game and the page; corrected the same day after a fresh review of PR #103 (line numbers re-read). It is a refactor design, not a mechanic: what a species' biology is lives in its own note ([desert-ant.md](desert-ant.md)). Line numbers are into `web/src/colony/` unless a path says otherwise and will drift; the symbols will not.*
+
+The game has one kind of ant. There is no species concept: `grep species` finds only prose in the Learn guide, and the fungus has no host range. The class `Colony` *is* the ant. This note says what a second species would have to touch today, sorts it by how deep it goes, and proposes the cheapest descriptor that carries the desert ant now and does not block a termite or an army ant later.
+
+## What is true today
+
+- **Channels.** `Channel = food | home | alarm | noEntry | raid | marks` is one module-wide list (`pheromone.ts:26-34`). Each colony owns its own `Pheromones` per layer (`colony.ts:894`, `:911`); nothing is shared by default. A "foreign" trail is a wired reference to another colony's field (`Game.#aimAt`, `game.ts:752-763`), read only on the `food` channel. A channel nobody lays is nearly free in time (its awake set is empty: an early return at `pheromone.ts:194`) and costs only a few empty structures.
+- **Sensors.** Three antennae, each reading three channels into a 9-slot buffer: food, home, alarm (`#sense`, `colony.ts:1870`, `:4947-4964`). `raid`, `noEntry` and the marks are read apart. The policy's `foodTrail`, `homeTrail` and `alarm` come from that buffer.
+- **The tick.** `Colony.tick()` is about 1,230 lines (`colony.ts:4895-6121`) in a class that spans `627-6231` of a 6,875-line file: sensing, stance, carry, the policy ask, the contact response, then one `if/else` chain of per-mode steering (about 240 lines for `RETURN` alone, `5234-5474`), body physics, nest life, fatigue. `Mode` is four constants (`EXPLORE..FIGHT = 0..3`, `colony.ts:124-127`) compared on about 47 lines; there is no per-mode dispatch.
+- **Situations and lanes.** The mode lane's `Situation` is a fixed seven-field schema (`SITUATION_SCHEMA`, built with `defineSchema` in `schema.ts`, S4.1; the mechanism a per-species `Situation` would use), 3,888 situations; the `Situation` literal the tick builds for the policy (`colony.ts:5149-5159`) and `packSituation` are still fixed, so a different situation means editing them; the legends Jev reads name trails and nests; the lane registry (`lanes.ts`, merged in #92–#102) is global, not per species.
+- **Per-ant state.** `ANT_FIELDS` (`ants.ts:35-297`) is one table of 123 arrays allocated for every colony. About 100 are generic-ant specific (route memory, digging, wall following, nest, brood, hunger); the fungus reads another group (`load`, `strain`, `resist`, `expr`, the gains).
+- **Parameters.** `ColonyParams` (`colony.ts:222`) carries speed, sensors, patience, deposit rates, per-channel overrides, odour, tolerance. Physiology constants (`LIFESPAN`, the hunger constants in `hunger.ts`) are module constants. `Game` sets parameters for colony 0 (`nest: 0, odour: 0`) and, if `rival`, colony 1 (`Sides`, `game.ts:355-363`). Lifespan is `Infinity` for a colony without a queen (`colony.ts:1260`), so a plane colony has no age death at all.
+- **The game is two colonies.** `Sides` is literally `colony`/`rival`; `Game.player` is `colonies[0]` and `Game.rival` is `colonies[1]`; `oneWorld.ts` throws on more than two nests; unity assumes one shared odour axis; the page names and colours colonies by index (`ui/names.ts`, `ColonyField.tsx`); Jev doctrines are a `string[]` by colony index. `Game.addColony` already supports more (founding), and `MAX_COLONIES` caps it.
+- **The nest is the ant's.** Queen, brood, chambers, roles, mound and digging live in `Colony`. On the plane a colony already runs without a queen or chambers: the nest is a disc round the hole and "the larder becomes ants directly" (`colony.ts:699`, `:903-917`).
+- **The fungus** reads age bands (`TASKS[c.band(i)]`), the queen as a host, grooming, burying (`onBury`), place and odour touch. It is one `Fungus` for every colony. No host range. (Undertaking is Colony tick code, `#undertake`, called once in the tick; `onBury` is a callback `Game` wires at `game.ts:397`, which the fungus does not read.)
+- **The save** has no species id; `SAVE_VERSION = 9` (`game.ts:79`) is checked strictly, and `GameSettings` lives in the page (`ui/saves.ts:11`); and the owner has said no compatibility is needed while nobody plays (`bd memories no-backward-compat`).
+- **Goldens and the random stream.** One seeded `rng` is shared by the game and every colony. Every living ant draws once a tick for steering noise (`colony.ts:5210`); many branches draw conditionally. The goldens hash `x, y, heading, mode, carrying, pellet, alive` and the pheromone chunks (`tests/goldens.ts:90-91`), so a new ant array or an unlaid channel does not change them, but a change that adds, drops or reorders a draw on the generic path does; a species that draws only in its own code path does not.
+
+## Three tiers of difference
+
+What a species can differ in, by how deep the change goes:
+
+1. **Parameters and words (data).** `ColonyParams` overrides, the local rule set (`Responses`: what it lays, how it reacts), the Jev words for each lane (legend, criteria, brain version), names and Learn text. The tick does not change.
+2. **Structure and small guarded tick edits.** Which channels exist, which groups of per-ant arrays (a guarded allocation: `ANT_FIELDS` allocates every array for every colony and `saveState` is generated from it, `ants.ts:303`; `perAnt`, `ants.ts:83`, may give a generic colony a zero-length array, not tried), which fields the `Situation` has, a world field and what emits it, a term in a tick block that is exactly neutral for the generic ant. The generic path's draws and outputs stay as they are.
+3. **Behaviour code.** The set of modes and how each steers, the nest kind. Today this means a different tick body, which does not exist as a seam: the generic ant's body is not separable from `Colony`.
+
+## What the desert ant needs, by tier
+
+From [desert-ant.md](desert-ant.md) and the decisions in PRD §60:
+
+| Needs | Tier | How, with what exists, and what is new |
+|---|---|---|
+| No trails, no alarm | 1 | A `Responses` whose `trail`, `alarmGain`, `raiseAlarm` and `noEntry` lay nothing (`resp.noEntry` returning 0 stops the laying, `colony.ts:5513-5518`; `noEntryAvoid` defaults to 0). The unlaid channels cost almost nothing. Params: `homeTrail: 0` (a carrier otherwise follows food-channel levels within `homeTrailCone`, `colony.ts:5278-5289`), `raidGate: 0`, `stanceGate: 0`. |
+| Path integration, search loops, route memory | 0 | Already there (`#integrate`, `#searchOn`; route memory is `ja-lp4.16`). |
+| Food plume in the air | 2 (world) | **Steering only, no situation field** (D1, below): an explorer's heading is biased by a plume inside the tick, a new sense-table row. New: an emitter over the food cells (a world field, in Game or Colony), a guarded steering branch in EXPLORE. Not data: nothing lays a field from food items today, and an explorer steers on food only when a sensor reads SEEN (`colony.ts:5582-5584`). |
+| Heat as a limit on being out | 2 (tick) | **No new mode**: heat feeds the existing `fatigue`/`tired`, so a hot ant is `tired`, the local rule answers "return" and it rests (`colony.ts:1416-1423`, `5132-5138`, `157`, `5998-6006`). New: a heat term in the fatigue block (`fatigue += dt / clock[i]`, `colony.ts:6022`; a multiplier exactly 1 for the generic ant keeps the goldens, but it is a tick edit, not a parameter; `clock` cannot carry it, the fungus writes it, `fungus.ts:1110`, and it divides the rest rate, `6020`); heat counted while carrying (fatigue grows only in EXPLORE/FOLLOW/FIGHT, `6021-6022`); a find must not clear it (`5897-5898`); and, if the budget is a limit, a forced return or death rule, because `tired` is advice (`5144`, `5165`) and fatigue stops at 2x patience. Its own bead (`ja-rf5.5`), not folded into the first build. |
+| The invitation (speed passed on by contact) | 2 (tick) | **Not** the existing `leave` over `returns`: `returns` is a leaky count of food-carrying nestmates met at home (`colony.ts:5862-5871`, `1363-1365`), which is Gordon-style activation the generic ant already has. Razin et al. is speed copying between any ants, a soft speed threshold, and a density term. New: a per-ant speed array (guarded allocation), a `Touch` field fed to `leave`, and a neighbour update in the tick (like `#returnsAround`, `colony.ts:4626`). Named fallback if the owner prefers the cheaper reading: "met a carrier" on `returns`, which is tier 1. |
+| No corpse removal | 1 (built) | `ColonyParams.undertakes`, default true, read at `#undertake`'s call: a species sets `undertakes: false` through its `params` (`ja-fnd.5.3.4`). |
+| One small nest, about 200 workers, a short forager life | 1 and a gap | Params cover speed, `sensorDistance`/`sensorAngle`, `patience`/`restTime`/`planePatience`, `antCount`/`maxAnts`, `channels` (evaporation, diffusion, max), `leaveGate`. They do not cover lifespan (`LIFESPAN` is a module constant, `colony.ts:6377`), `REST`, the age bands or a heat term; assay (b) wants a forager life of 4-6 days and about 16 % loss a day, so a species needs a lifespan the plane colony does not have today (`colony.ts:1260`). |
+| Its own Jev words (the generic legend says "food scent is laid by ants carrying food home", false for it) | 1 | A per-species legend, criteria and brain version. A context is already a hash of legend, question and doctrine under the `colony-` prefix (`colonyBrain.ts:192-194`), so a species with its own legend gets its own context with no change to routing; step 2 decides whether its lane is the "mode" lane with species words or a new `LaneName`. |
+
+So **the desert ant needs no new mode and no tick split, but it is not data only.** Its no-trail ant, its words and its small nest are tier 1; the plume, heat and the invitation are each a small guarded edit in the generic tick plus new state (the emitter, a heat term, a speed array), every one neutral for the generic ant. That is why heat, the invitation and the plume are separate beads (`ja-rf5.4`-`.6`), after the species descriptor.
+
+## Other species, checked (2026-11-12)
+
+The descriptor above was drawn from one species. This section tests it against the others the notes mention. What each candidate needs is taken from the existing notes only (the file is named; "not in notes" is a gap, not a negative). Termite and army-ant items rest on search results (`ja-a2m`) and Pharaoh polydomy, the termite royal pair and army-ant trails are from memory: all unverified.
+
+| | Desert ant | Pharaoh ant | Leafcutter | Army ant | Termite |
+|---|---|---|---|---|---|
+| Nest | one hole, ~200 workers (*C. fortis*); *C. bicolor* polydomous ([desert-ant](desert-ant.md)) | founds nests by budding ([queens-and-merging](queens-and-merging.md) §2) | mounds with turrets ([entrances](entrances.md)); the garden as a game lever, not a nest fact ([fungus-policy](fungus-policy.md) W1) | not in notes (no fixed nest: memory) | mound; humidity-built (`ja-a2m`, titles only) |
+| Queen | one; queenless lab colonies were studied (*C. niger*, Razin 2013) | several, budding (`ja-8fd.1`) | not in notes | orphans fuse (*D. molestus*) | not in notes (a royal pair: memory) |
+| Castes | short forager career (4-6 days, *C. bicolor*); fits the age bands badly | not in notes | polymorphic: minors groom, majors weed | not in notes | caste differentiation, a different developmental system |
+| Channels | no trails recorded (unverified: Wolf & Wehner 2000); airborne food plume, nest CO₂ | long and short attractive trails, a repellent no-entry | stridulation (substrate vibration); garden odour | not in notes | humidity; alarm pheromone (titles) |
+| Modes | no `follow`; search loops exist | none implied | cut, carry, tend, weed: not in notes as modes | raid (the generic ant has a raid stance; one 2018 raid model cited, `raid-recruitment.md`), bivouac, emigration: not in notes | dig, build, tend: not in notes |
+| Dead | not recorded | not in notes | to a midden; infected colonies send more | not in notes | grooming and cannibalism of infected nestmates (title only, unverified); dead handling not in notes |
+| Fungus | none recorded; foragers exposed | *Wolbachia* only | garden as a recognition cue; *Escovopsis* | none found | strongest literature, nothing read yet |
+
+**What recurs, and where the descriptor stands.**
+- *Age structure* (the desert ant; leafcutters and termites differ by caste, below, not by age bands): `LIFESPAN`, `YOUNG` and `MIDDLE` are module constants (`colony.ts`), and a plane colony has no age death (`lifespan` is `Infinity` without a queen). The desert ant already needs them (assay b). **Not in the first order of work, now step 5: lift them into `ColonyParams`** (tier 1, bit-exact), new bead `ja-fnd.5.3.6`.
+- *The queen* (Pharaoh several, army-ant orphans, termites a pair): I took it out of the descriptor as "the nest kind". Against these species that holds only if the nest-kind interface (`ja-fnd.5.5`) owns queen count and structure, and it must not keep meaning "a plane colony" through `c.queen === null`. Kept out of `Species`; `ja-8fd.1` (`queens[]`) is Pharaoh's need.
+- *Corpses* (none, midden, consumption): `undertakes` is a boolean, enough for the desert ant, the first thing a second species outgrows. Left as is; widen to a policy when a species needs a third behaviour.
+- *Castes in the situation* (leafcutter, termites; `ja-jhd`): the fungus's `TASKS` and the mode lane's `Situation` are fixed, so a species with its own caste field needs a per-species schema (tier 2, the `defineSchema` mechanism, ahead of the desert ant's own `heat` field).
+- *Channels and nests that differ* (every column): `Channel` is one global list and the nest is the dug hole; per-species channel sets and nest kinds are tier 2 and 3 as already planned.
+- *The fungus's host range* lives on strains in [fungus-policy](fungus-policy.md) §10, not on the species: two places to keep in step when a second host appears.
+
+**What this changes.** The tier model and "tier 1 first" stand for the desert ant, but it was sized from one example: army ants (a nomadic bivouac with no fixed nest, not raiding, which exists) and termites (nest and castes) are tier 3. Pharaoh needs `queens[]` and a budding rule but few new senses (its repellent channel exists): a useful second species to test the descriptor against on paper before building more. Not decided here: which species comes second (`ja-a2m` leans termites; owner decides).
+
+## The descriptor, at tier 1
+
+A sketch, not a contract; names will change.
+
+```ts
+interface Species {
+  id: string; name: string;
+  /** physiology and sizes: overrides of DEFAULT_COLONY (speed, patience, maxAnts, deposit rates, per-channel params) */
+  params: Partial<ColonyParams>;
+  /** the local rule set: what it lays, how it answers contact, leaving, alarm */
+  responses: Responses;
+  /** the Jev words of each lane it has: legend, criteria, version (the functions stay the lane registry's) */
+  lanes: Partial<Record<LaneName, LaneWords>>;
+  /** what the food sense reads: the laid trail (the generic ant) or a world plume (steering only, no situation field) */
+  senses: { food: "trail" | "plume" };
+  /** names and Learn text */
+  words: { colonyNames: string[]; learn: string };
+}
+export const GENERIC_ANT: Species = { /* today's defaults, bit-exact */ };
+```
+
+`GameParams.species` picks one for the game (default `GENERIC_ANT`); `Colony` takes its parameters and responses from it. Species params sit under `Sides.colony` (`game.ts:355-357`) so an experiment's overrides still win, and `GENERIC_ANT.responses` reuses `localResponses`' own functions (`colony.ts:5052` compares `this.responses.carry !== localResponses.carry`). ("Plume", not "odour": `ColonyParams.odour` is the recognition odour.) The lane registry's rows gain "words by species": `contextOf(words, variant)` becomes species-aware, so the desert ant's mode lane has its own legend, hence its own context hash under the same `colony-` prefix (`laneOfContext` matches by prefix, `lanes.ts:79-81`; `LaneName` is a closed union of three, `lanes.ts:35`, so a new lane kind would be an edit there), its own precache bundles and its own cost line. `ColonyJev.#laneFor` reads only the first colony's lanes (`ui/colonyJev.ts:500-506`): fine for one species per game, a flag for `ja-fnd.5.4`.
+
+## Order of work (each step keeps the generic ant's goldens bit-exact)
+
+1. **`Species` and `GENERIC_ANT`.** The type, the generic ant as a species whose fields equal today's defaults; `Game` hands its params and responses to its colonies (`Colony` stays free of the idea; a colony built outside a `Game` has none); `GameParams.species`, which the save leaves out until step 3. No behaviour change.
+2. **Lane words by species.** The registry rows take a species; the generic ant's legends, contexts and precache stay byte-identical (the pins in `schema.test.ts` and `precache.test.ts` hold); a test species gets its own. (`LaneWords<Mode>` / `LaneWords<Stance>`: legend, criteria as a subset of the lane's choices, version; the rows' optional `lane` argument. A caller checks `Species.lanes.stance` before asking: absent there is no lane, absent as an argument is the generic ant's words. The situation key, the state sent, `all()` and `local` are still the generic ant's: a per-species `Situation` is tier 2 and widens the row signatures with the desert ant's own lane, `ja-rf5.3`.)
+3. **The save carries the species.** `GameSettings.species`, `SAVE_VERSION` 10 (no migration).
+4. **Undertaking** (built, `ja-fnd.5.3.4`): `ColonyParams.undertakes` (default true), read where the tick calls `#undertake`; a species sets it through its `params`. There is no `host` field in the descriptor: the fungus reads nothing of the species (it reads `c.queen`, and the queen is the nest kind, not a species property: whether a colony has one is woven through dozens of places of `Colony` (about thirty reads of `this.queen` in `colony.ts` alone), so it waits for `ja-fnd.5.5`, the nest-kind interface).
+5. **Age structure as parameters** (built, `ja-fnd.5.3.6`, added after the check against the other species): `ColonyParams.lifespan`, `youngShare`, `middleShare` (defaults `LIFESPAN`, `YOUNG`, `MIDDLE`, which stay exported) and `mortalWithoutQueen` (default false: a colony with no queen has `Infinity` lifespans, so a plane colony does not age out; a species with a short forager career sets it). `band()`, a worker's own lifespan at birth and a nanitic's age read the params, and a queenless colony of a `mortalWithoutQueen` species ages its workers in the tick's growth branch (`#ageWorkers`, shared with the queen's `#nestLife`) and replaces them from the larder. A queenless colony still has one band, old: a species' bands apply where it has a queen. `ja-rf5.3` depends on it.
+6. **The test species**: in a test file, with different params, responses and legend, plays a short game; nothing outside `species/` and its own lane edited. This is the stage's acceptance, now with the desert ant as the real consumer. (built, `ja-fnd.5.3.5`, `tests/int/testSpecies.test.ts`): a lone forager made only of the pieces above, with no colony code edited: no trail laid (its `Responses` lay nothing, `homeTrail: 0`), `undertakes: false`, a 90 s life that ends on the plane, its own mode-lane words with no `follow`, no stance lane. It plays a plane game and lays no food or home trail, where the generic ant on the same world lays a home trail; the Game hands every parameter down (pinned), and the ones a plane colony cannot exercise (`undertakes`, the bands) are pinned by `undertakes.test.ts` and `ageStructure.test.ts`. **What it found:** the descriptor carries all of that as data. Three things it does not yet do, all the desert ant's own work (`ja-rf5.3`): `ColonyJev` still asks under the generic words (it does not read `Species.lanes`); on this 120×80 world no ant, generic or lone, reaches food in 150 s, so with a 90 s life the colony falls at about 117 s and the test feeds the larder (whether the desert ant needs a food sense is for `ja-rf5.3` to measure); and the local rule can still send an ant to FOLLOW (`localPolicy` on a strong food trail, an ant that puts a load down), so a species whose lane words drop `follow` can disagree with its own behaviour (measured: 55 and 354 ant-ticks of FOLLOW on other worlds) until `Species` carries its own local policy and arrival mode.
+7. Then **the desert ant** (`ja-rf5`): its row; then, each its own bead, the plume (emitter and steering branch), heat (`ja-rf5.5`: a ground-temperature field, body heat, a heat term in the fatigue block and a return rule), the invitation (a speed array, a `Touch` field, a neighbour update).
+
+Later, when a species needs it (a termite mound, an army ant's bivouac): tier 2 (optional channels, per-species ant-array groups, guarded reads) and tier 3 (the generic ant's body extracted verbatim as a strategy, the tick pipeline `ja-fnd.4.4`, the nest-kind interface `ja-fnd.5.5`). Doing them before a species needs them is the over-engineering the lane registry's reviews warned about.
+
+## Decisions
+
+Made here (the owner can overturn):
+- **Tier 1 first.** The desert ant ships as data plus a little tier 2, not as a new tick.
+- **The tick split waits for a species that needs it** (different modes or nest kind: termites, army ants).
+- **Species words and contexts are separate from the generic ant's**, so shipped Jev answers and cached answers for the generic ant never move.
+- **No migration** for saves (`SAVE_VERSION` bump), per the owner's standing rule.
+
+- **The food plume is steering only** (D1, overturnable): vision.md's odour row says "steering only, no situation field" and desert-ant.md assumes it, so the policy and `follow` do not see it, `Situation` and the lane's `follow` value stay as they are (the desert ant's lane drops `follow` and the trail fields by its own legend), and the fungus's food lever does not act on it. The alternative, routing it through the food sensor and `foodTrail`, would amend vision.md and desert-ant.md, need channel overrides (evaporation about 0.005, diffusion about 0.8: a plume about 8 cells wide, still only none/faint/strong to the policy; the review's scratch run, an order of magnitude only) and an emitter all the same, and let the fungus's `gainFood` act on it (`fungus.ts:1106`).
+
+Made by the owner:
+- **One species per game, mixed worlds later** (owner, 2026-11-12, asked in the session and answered). One species per game (a "desert" scenario: its own map, both colonies desert ants) needs only `GameParams.species`; unity, the recognition odour, the page's names and colours, chapters and Jev doctrines stay as they are. Mixed worlds (an ant colony and a desert-ant colony on one map, the ladder's parabiosis) need `Game` over a list of colony specs instead of `player`/`rival`, per-colony species in `GameSettings`, a recognition-odour axis per species pair, `foreign` trail reading across different channel sets (a guard on the missing channel), more than two nests in one world, per-colony names and colours, and chapters that do not assume a queen. That is a stage of its own (`ja-fnd.5.4`).
+
+## Risks
+
+- **Random draws.** A species draws only inside its own code path; the generic path's draws, and the order of colonies' ticks, do not change. A mixed-species game has its own goldens.
+- **Jev words cost money.** Each species lane is a new legend and a new precache: a live check (`colony-live`, owner's say) and `--import` to ship. The generic ant's are untouched.
+- **The page is generic-ant prose** (Learn, the start card, chapters): a species' words are a content task of their own (`ja-fnd.6.6`).

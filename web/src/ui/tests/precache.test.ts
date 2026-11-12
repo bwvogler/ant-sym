@@ -12,6 +12,7 @@ import {
   STANCE_BRAIN_VERSION,
   stanceContext,
   AIMS,
+  LANE_LIST,
   FUNGUS_BRAIN_VERSION,
   fungusContext,
   validLevels,
@@ -31,6 +32,25 @@ const CONTEXT: Record<string, (words: string) => string> = {
 };
 const VALID: Record<string, readonly string[]> = { mode: MODES, stance: STANCES };
 const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324 };
+
+// The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
+// registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.
+test("each table above has a row for every lane of the registry that needs one", () => {
+  // As sets: the order of a table, or of the registry, is nobody's business here.
+  const sorted = (names: string[]) => [...names].sort();
+  assert.deepEqual(sorted(Object.keys(CONTEXT)), sorted(LANE_LIST.map((l) => l.name)), "a lane has no context row");
+  assert.deepEqual(
+    sorted(Object.keys(VALID)),
+    sorted(LANE_LIST.filter((l) => l.local).map((l) => l.name)),
+    "a lane with a local rule (its answers are a fixed set) has no valid-answers row",
+  );
+  assert.deepEqual(
+    sorted(Object.keys(SIZE)),
+    sorted(LANE_LIST.filter((l) => l.all).map((l) => l.name)),
+    "a lane that can enumerate its situations has no size row",
+  );
+  for (const l of LANE_LIST) if (l.all) assert.equal(l.all().length, SIZE[l.name], `${l.name}'s situations`);
+});
 
 test("every shipped bundle is under the context the code asks under, for a preset doctrine", () => {
   assert.equal(index.versions.colony, COLONY_BRAIN_VERSION, "re-run scripts/precache.mjs: the colony brain's version moved");

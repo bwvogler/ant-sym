@@ -15,13 +15,15 @@ import {
   type ChapterView,
   UPGRADES,
   generateOneWorld,
+  GENERIC_ANT,
+  speciesById,
 } from "../colony/index.ts";
 import { journalFromUrl } from "./journal.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 
-// Owns the one Game (the player's colony and the rival) and its animation
+// Owns the one Game (its colonies and the fungus, the player) and its animation
 // loop: React state carries only what the
 // panel shows, the renderer reads the colonies' typed arrays every frame. A
 // new seed, ant count or rival setting is a new game on a fresh map.
@@ -207,10 +209,19 @@ function side(c: Colony, fungus: Fungus): SideStats {
 /** A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load). */
 export function buildGame(s: GameSettings): Game {
   // The page plays one world only (owner, 2026-11-10; PRD §55): the side and open maps stay for the assays and scripts.
+  // Its fungus grows as hyphae (ja-2bw, PRD §63): they fruit where they reach a tunnel, and its dead hosts are new starts.
   const map = generateOneWorld(s.seed);
   return new Game(
     map,
-    { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false },
+    {
+      antCount: s.antCount,
+      rivalAnts: s.antCount,
+      rival: s.rival,
+      regrow: GAME_REGROW,
+      autoFound: false,
+      fungus: { hyphae: true },
+      species: speciesById(s.species),
+    },
     gameRng(s.seed, s.generation),
   );
 }
@@ -228,7 +239,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const pending = useRef<SaveRecord | null>(null);
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
-    const build = () => buildGame({ seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
+    const build = () =>
+      buildGame({ species: GENERIC_ANT.id, seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
     const g = build();
     const r = pending.current;
     if (
@@ -360,7 +372,13 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     setLoads((n) => n + 1);
   }, []);
   /** What builds this game again (saves.ts). */
-  const settings: GameSettings = { seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation };
+  const settings: GameSettings = {
+    species: GENERIC_ANT.id,
+    seed: controls.seed,
+    antCount: controls.antCount,
+    rival: controls.rival,
+    generation,
+  };
 
   /** The start screen's Start: this seed, the fungus lands; playing at the game's speed, or paused at 1× for the tutorial (PRD §61). */
   const start = useCallback(

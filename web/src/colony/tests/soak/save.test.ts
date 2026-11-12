@@ -225,11 +225,25 @@ test("a single-map save's shape: the game's keys with the grids, colony saves as
     "recognition",
     "regrown",
     "revealed",
+    "species",
     "strategyChoices",
     "time",
     "version",
   ];
-  const fungus = ["base", "clock", "evolution", "hosts", "menu", "params", "rule", "sporeCells", "sporeStrain", "spores"];
+  const fungus = [
+    "base",
+    "clock",
+    "corpses",
+    "evolution",
+    "hosts",
+    "hyphae",
+    "menu",
+    "params",
+    "rule",
+    "sporeCells",
+    "sporeStrain",
+    "spores",
+  ];
   for (const view of ["top", "side"] as const) {
     const g = build(view, 5);
     g.land(0, GARDEN, { evolve: true });

@@ -6,6 +6,7 @@ import { Game, FOUNDING_RESERVE, MET, QUIET } from "../../game.ts";
 import { INFECTED, STRAINS } from "../../fungus.ts";
 import { driftAim } from "../../recognition.ts";
 import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, GYNE_SPACING, scentShare, type Flight } from "../../royal.ts";
+import { GENERIC_ANT, type Species } from "../../species.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
 import { DT, SMALL_SIDE, broodChamber } from "../builders.ts";
@@ -149,9 +150,9 @@ test("a gyne larva is fed three times a worker's food; nurses who perceive the s
 });
 
 /** A small solo side-view game; colony 0's queen has an alate ready to walk out. */
-function flying(paint = false) {
+function flying(paint = false, species?: Species) {
   const map = generateSideWorld(2, SMALL_SIDE);
-  const g = new Game(map, { antCount: 60, rival: false }, mulberry32(2 * 7919));
+  const g = new Game(map, { antCount: 60, rival: false, ...(species ? { species } : {}) }, mulberry32(2 * 7919));
   const c = g.player;
   if (paint) {
     const garden = STRAINS.findIndex((s) => s.id === "garden");
@@ -161,6 +162,27 @@ function flying(paint = false) {
   c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: ALATE_WAIT - 5, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
   return { g, c };
 }
+
+test("a nanitic ecloses at the species' middle share of its lifespan, not the generic constant (ja-fnd.5.3.6)", () => {
+  const species: Species = { ...GENERIC_ANT, id: "short", params: { lifespan: 1000, youngShare: 0.1, middleShare: 0.2 } };
+  const { g, c } = flying(false, species);
+  let t = 0;
+  while (!c.flights && t < 300) {
+    g.tick(DT);
+    t += DT;
+  }
+  const d = g.colonies[1]!;
+  for (let k = 0; k < 30 * 150 && d.founding; k++) g.tick(DT);
+  assert.equal(d.founding, false, "her first worker eclosed");
+  let nanitics = 0;
+  for (let i = 0; i < d.n; i++)
+    if (d.alive[i]) {
+      nanitics++;
+      // 0.2 x 1,000 s at eclosion, and the seconds since: nowhere near the generic 0.35 x 3,600 s.
+      assert.ok(d.age[i]! >= 200 && d.age[i]! < 260, `nanitic ${i}: age ${d.age[i]}`);
+    }
+  assert.ok(nanitics >= 1);
+});
 
 test("an alate waits, walks out along the tunnels and flies; she founds a daughter alone, at her mother's odour, which drifts away", () => {
   const { g, c } = flying();

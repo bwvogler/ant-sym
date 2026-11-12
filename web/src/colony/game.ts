@@ -1,12 +1,13 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
+import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, type StancePolicy } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
+import { GENERIC_ANT, type Species } from "./species.ts";
 import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Cell, type End, nearestValid, outward } from "./transect.ts";
 import { cellOf, CELL } from "./hex.ts";
@@ -56,6 +57,8 @@ export interface GameParams {
    * assays and the tests. The page sets it off: it pauses, shows the queen's pen, and calls found() or lose() itself.
    */
   autoFound: boolean;
+  /** The species of every colony in the game (species.ts, docs/species.md): its parameters and local responses. One per game. */
+  species: Species;
 }
 
 export const DEFAULT_GAME: GameParams = {
@@ -69,14 +72,21 @@ export const DEFAULT_GAME: GameParams = {
   recognition: {},
   regrow: 0,
   autoFound: true,
+  species: GENERIC_ANT,
 };
 
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
  * 6: the gate at the top of the shaft (ja-web: each ant's pass, the carriers down the hole, the raid counters); 7: each
- * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
+ * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
+
+/** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
+function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
+  const { species: _code, ...rest } = p;
+  return rest;
+}
 
 /**
  * Columns between two holes at the least (side view): a founding nearer an existing hole moves along (Game.addColony).
@@ -140,6 +150,8 @@ export interface Founding {
 /** A saved game (Game.save): JSON. */
 export interface GameSave {
   version: number;
+  /** the id of the species the game was played with (Species.id): a game built for another is refused (Game.load) */
+  species: string;
   time: number;
   strategyChoices: number;
   landed: unknown;
@@ -354,29 +366,37 @@ export class Game {
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
     const mine = new Colony(
       home,
-      { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...player.colony },
+      { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...this.params.species.params, ...player.colony },
       rng,
       player.policy ?? localPolicy,
       player.stance ?? localStance,
       layered,
     );
-    if (player.responses) mine.responses = player.responses;
+    mine.responses = player.responses ?? this.params.species.responses;
     this.colonies = [mine];
     if (this.params.rival && home.nests.length > 1)
       this.colonies.push(
         new Colony(
           home,
-          { antCount: this.params.rivalAnts, odour: 1, tolerance, ...player.rival, nest: 1 },
+          { antCount: this.params.rivalAnts, odour: 1, tolerance, ...this.params.species.params, ...player.rival, nest: 1 },
           rng,
           player.rivalPolicy ?? localPolicy,
           player.rivalStance ?? localStance,
           layered,
         ),
       );
-    if (player.rivalResponses && this.colonies[1]) this.colonies[1].responses = player.rivalResponses;
+    if (this.colonies[1]) this.colonies[1].responses = player.rivalResponses ?? this.params.species.responses;
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
+    // The midden's corpses, for a hypha that reaches one (ja-2bw.7): every colony's, on the layer they are buried on.
+    const middenLayer = one ? PLANE : 0;
+    this.fungus.corpseAt = (layer, x, y) => {
+      if (layer !== middenLayer) return 0;
+      let n = 0;
+      for (const c of this.colonies) n += c.midden.get(colonyCell(x, y)) ?? 0;
+      return n;
+    };
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
@@ -397,6 +417,14 @@ export class Game {
       c.onBury = (d, layer = 0) => {
         if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates)
           this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
+        // With hyphae, a host that died of the evolving fungus is a new start on the midden (ja-2bw.7).
+        if (d.load >= INFECTED && d.strain === this.fungus.evolution?.strain) this.fungus.colonise(layer, d.x, d.y);
+      };
+      // One world: a host that dies of the evolving fungus on the plane, outside, is a new start where it lies (owner,
+      // 2026-11-12): no corpse is kept there, and none carried in, so the fungus grows out of it at once.
+      c.onDie = (i, layer, x, y) => {
+        if (this.world && layer === PLANE && c.load[i]! >= INFECTED && c.strain[i] === this.fungus.evolution?.strain)
+          this.fungus.colonise(PLANE, x, y);
       };
       if (this.colonies.length > 1) {
         this.layers.forEach((_, l) => {
@@ -604,8 +632,9 @@ export class Game {
     const c = new Colony(
       home,
       {
+        ...this.params.species.params,
         antCount: f.antCount,
-        maxAnts: f.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)),
+        maxAnts: f.maxAnts ?? this.params.species.params.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)),
         nest: at,
         odour: f.odour,
         tolerance: this.recognition.params.tolerance,
@@ -615,6 +644,7 @@ export class Game {
       localStance,
       world ? { plane: world.plane, line: world.line } : null,
     );
+    c.responses = this.params.species.responses;
     if (f.mother !== undefined && c.queen && !f.nest) {
       // A daughter (ja-lo8.9): her queen founds alone on her reserve, at her mother's odour, which drifts away from it
       // from now on (ja-lo8.9.1); what the fungus put in her is given below (Founding.fungus). (Not when a save founds
@@ -641,6 +671,7 @@ export class Game {
       if (this.fungus.evolution?.strain === f.fungus.strain) {
         const at = this.#byHole(c);
         this.fungus.root(at.x, at.y, LANDING.radius);
+        this.#rootShaft(c);
       }
     }
     return k;
@@ -1021,8 +1052,15 @@ export class Game {
     if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
     this.fungus.root(x, y, LANDING.radius);
+    this.#rootShaft(this.colonies[k] ?? this.player);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
+  }
+
+  /** One world, with hyphae (ja-2bw.2): the fungus also roots on the walls of the shaft under colony c's hole, in the curtain. */
+  #rootShaft(c: Colony): void {
+    const e = this.world ? (c.layers[CURTAIN] as Layer | undefined)?.nest.entrance : undefined;
+    if (e) this.fungus.rootShaft(CURTAIN, e.x, e.y);
   }
 
   /** Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim). */
@@ -1087,6 +1125,7 @@ export class Game {
     const world = this.world;
     return {
       version: SAVE_VERSION,
+      species: this.params.species.id,
       time: this.time,
       strategyChoices: this.strategyChoices,
       landed: encode(this.landed),
@@ -1094,7 +1133,8 @@ export class Game {
       revealed: [...this.revealed],
       founded: this.founded.map((f) => JSON.parse(JSON.stringify(f)) as Founding),
       flights: this.flights.map((f) => ({ ...f })),
-      params: encode(this.params),
+      // The species is code (functions), not data: the save leaves it out (docs/species.md step 3 saves its id) and a load keeps the game's own.
+      params: encode(withoutSpecies(this.params)),
       map: encode(map),
       colonies: this.colonies.map((c) => c.saveState()),
       raids: this.colonies.map((c) => this.colonies.findIndex((o) => o.ph === c.raidMarks)),
@@ -1130,6 +1170,8 @@ export class Game {
    */
   load(saved: GameSave): void {
     if (saved.version !== SAVE_VERSION) throw new Error(`save: version ${saved.version}, this game reads ${SAVE_VERSION}`);
+    if (saved.species !== this.params.species.id)
+      throw new Error(`save: a save of species "${saved.species}", and this game plays "${this.params.species.id}"`);
     const world = this.world;
     const sw = saved.world;
     if (!!sw !== !!world)
@@ -1161,7 +1203,7 @@ export class Game {
     this.regrown = saved.regrown;
     this.revealed = [...(saved.revealed ?? [])];
     this.flights = (saved.flights ?? []).map((f) => ({ ...f }));
-    this.params = decode(saved.params) as GameParams;
+    this.params = { ...(decode(saved.params) as GameParams), species: this.params.species };
     fillLike(this.map, saved.map);
     if (world && sw) fillLike(world.curtain, sw.curtain);
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));

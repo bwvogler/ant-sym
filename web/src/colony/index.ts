@@ -15,6 +15,8 @@ export * from "./fungusBrain.ts";
 export * from "./game.ts";
 export * from "./hex.ts";
 export * from "./hunger.ts";
+// Only what the page needs: hyphae.ts's cellKey would clash with colony.ts's.
+export { Hyphae, keyCell as hyphaCell, ROOT as HYPHA_ROOT, type Tip } from "./hyphae.ts";
 export * from "./journal.ts";
 export * from "./lanes.ts";
 export * from "./levers.ts";
@@ -26,6 +28,7 @@ export * from "./responses.ts";
 export * from "./royal.ts";
 export * from "./save.ts";
 export * from "./schema.ts";
+export * from "./species.ts";
 export * from "./transect.ts";
 export * from "./vocab.ts";
 export * from "./world.ts";

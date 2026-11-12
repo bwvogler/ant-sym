@@ -25,6 +25,7 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 | [new-queens.md](new-queens.md) | research + design (built: `ja-lo8.7`, `ja-lo8.9`; PRD §50.19) | When a colony rears new queens (size, the queen's pheromone, workers culling gyne larvae); the nuptial flight and claustral founding; the fungus's two levers on queen birth. |
 | [desert-ant.md](desert-ant.md) | research + design (not built, `ja-rf5`) | A third species, the desert ant *Cataglyphis*: solitary foragers with no trails, path integration plus food-odour plumes, a thermal window, small colonies, aggression between colonies. Four papers read in full text (Razin 2013, Dillier & Wehner 2004, Buehlmann 2012 and 2013); the rest from abstracts or summaries (unverified). Basis for the species epic and what the species descriptor must express (PRD §60). |
 | [fungus-body.md](fungus-body.md) | research + design (built, `ja-lo8.12`) | What the fungus is made of and what its progress rests on: *Metarhizium* living off-host in soil, spores paid out of mycelium (design), adapting in its hosts over passages, diminishing returns; grooming triggered by sensing the pathogen. Basis for the mycelium at the landing and adaptations from growth in hosts. |
+| [hyphal-growth.md](hyphal-growth.md) | research + design (built in part: body, fruit, corpses, cuts; `ja-2bw`, PRD §63) | How a mycelium explores: tips extend at a steady average rate (Hopke 2021: *Metarhizium* 1.3 µm/min), branch to keep length per tip constant (Trinci 1974), slide along or split at obstacles and turn from their own hyphae (Held 2019), fed by the network in proportion to their number (Roper 2013). Basis for hyphae in the soil and the growth policy. |
 
 The page's **Learn** drawer quotes these notes in its field guide (`web/src/ui/guide.ts`), linking their headings. `guide.test.ts` fails when a cited heading is renamed or a gap the guide calls scripted is closed: update the entry with the note.
 
@@ -37,6 +38,7 @@ A new mechanic starts with a note here. The `adding-mechanics` skill ([.claude/s
 - [hosting.md](./hosting.md) (operations, not a research note, so not in the field guide): GitHub Pages for `main`, a preview per PR, and the Cloudflare Worker that hosts Jev for them behind a passphrase and a daily cap. Setup steps.
 - [agent-guide.md](./agent-guide.md) (how agent instructions are written, and the code style an agent follows; its size budget is held by `ui/tests/agentDocs.test.ts`).
 - [refactor.md](./refactor.md) (a roadmap, not a research note): the foundation refactor before new species, structures and UI, stages S0–S6 (`ja-fnd`, PRD §57).
+- [species.md](./species.md) (a design, not a research note): what a species is in this code, the three tiers a species can differ in, the `Species` descriptor at tier 1 and the order of work (`ja-fnd.5.3`, PRD §62).
 - [PRD.md](PRD.md) is the decision log. It holds every product decision, why it was made, and the measured Jev numbers, milestone by milestone. §1–8 are the removed picture mode.
 
 ## Citation convention
