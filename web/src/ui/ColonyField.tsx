@@ -228,12 +228,6 @@ export default function ColonyField({
    * two the switch takes otherwise left the view on the wrong side of it (the e2e guard caught one in twenty runs).
    */
   const carryTo = useRef<number | null>(null);
-  /**
-   * Where the followed ant was last seen on the view being drawn. The "gone below / up" ring is drawn from it while the ant
-   * is on the other layer; with the camera always carried across, that is only the frame or two before the switch. It
-   * does not mark a follow after a hand switch (it still points at the view just left): PR #94 review S1, D1 to the owner.
-   */
-  const lastSeen = useRef<{ f: Followed; lv: number; x: number; y: number } | null>(null);
   const penRef = useRef(pen);
   /** the pointer over the canvas (device px), for the pen's preview; null when it left */
   const hover = useRef<[number, number] | null>(null);
@@ -898,7 +892,7 @@ export default function ColonyField({
         s.aim = null;
       }
       // One world: the followed ant went through a hole, out of the view (its layer changed, not the view): the page is
-      // told, and may carry the camera across (U5.2). Where it was last seen here stays marked ("gone below").
+      // told, and carries the camera across (U5.2).
       if (f && fcol && lv >= 0) {
         const layer = fcol.layer[f.i];
         const was = antLayer.current;
@@ -908,7 +902,6 @@ export default function ColonyField({
           crossCb.current?.(layer, fcol.x[f.i], fcol.y[f.i]);
         }
         antLayer.current = { f, layer };
-        if (fHere) lastSeen.current = { f, lv, x: fcol.x[f.i], y: fcol.y[f.i] };
       } else {
         antLayer.current = null;
         carryTo.current = null;
@@ -1201,8 +1194,9 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
-      // The followed ant: a jade ring (in one world, while it is on the view's layer). Gone through a hole: a dashed ring
-      // where it was last seen here, saying where it went.
+      // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
+      // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
+      // (ja-rkse, PRD §61).
       if (f && fcol && fHere) {
         const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
         ctx.beginPath();
@@ -1210,17 +1204,6 @@ export default function ColonyField({
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2 * d;
         ctx.stroke();
-      } else if (f && fcol && lastSeen.current?.f === f && lastSeen.current.lv === lv) {
-        const [x, y] = toScreen(c, v, lastSeen.current.x, lastSeen.current.y);
-        const r = Math.max(9 * d, c.zoom * 1.6);
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.strokeStyle = theme.accent;
-        ctx.lineWidth = 2 * d;
-        ctx.setLineDash([4 * d, 4 * d]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        label(fcol.layer[f.i] === CURTAIN ? "gone below" : "gone up", x, y - r - 10 * d, Math.round(12 * d));
       }
       const pn = penRef.current;
       if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);
