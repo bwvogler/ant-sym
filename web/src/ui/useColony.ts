@@ -358,9 +358,16 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** What builds this game again (saves.ts). */
   const settings: GameSettings = { seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation };
 
-  /** The start screen's Start: this seed, playing, the fungus lands. */
+  /** The start screen's Start: this seed, the fungus lands; playing at the game's speed, or paused at 1× for the tutorial (PRD §61). */
   const start = useCallback(
-    (seed: number) => setControls((c) => ({ ...c, seed: Math.max(1, Math.floor(seed) || 1), started: true, playing: true })),
+    (seed: number, tutorial = false) =>
+      setControls((c) => ({
+        ...c,
+        seed: Math.max(1, Math.floor(seed) || 1),
+        started: true,
+        playing: !tutorial,
+        speed: tutorial ? 1 : GAME_SPEED,
+      })),
     [],
   );
 

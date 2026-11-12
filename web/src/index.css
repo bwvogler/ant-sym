@@ -118,3 +118,12 @@ input[type="range"],
 input[type="checkbox"] {
   accent-color: var(--accent);
 }
+
+/* The tutorial's highlight (ui/useTutorial.ts sets data-tutorial on the root): a ring on the panel its card points at. */
+:root[data-tutorial="load"] [aria-label="followed ant"],
+:root[data-tutorial="evolution"] [aria-label="evolution"],
+:root[data-tutorial="aim"] [aria-label="fungus aim"] {
+  outline: 2px solid var(--spore);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
