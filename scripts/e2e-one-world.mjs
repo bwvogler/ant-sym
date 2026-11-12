@@ -341,8 +341,8 @@ try {
   await until(async () => (await view()) === "below", "below");
   check((await page.getByRole("button", { name: "Play", exact: true }).count()) === 1, "the game is paused");
   check(
-    (await page.getByRole("button", { name: "Carry across" }).getAttribute("aria-pressed")) === "true",
-    "carry across is on by default",
+    (await page.getByRole("button", { name: "Carry across" }).count()) === 0,
+    "no Carry across toggle: a followed ant always carries the camera",
   );
   let next = null;
   for (let n = 0; n < 4 && !next; n++) {
@@ -649,12 +649,44 @@ try {
   check(await paused(), "the first host pauses the game");
   check((await tu.getByRole("region", { name: "followed ant" }).count()) === 1, "and is followed");
   check((await tu.evaluate(() => document.documentElement.dataset.tutorial)) === "load", "its card is highlighted");
+  const hostNo = Number(((await tu.getByRole("region", { name: "followed ant" }).textContent()) ?? "").match(/Ant #(\d+)/)?.[1] ?? -1);
   await tcard.getByRole("button", { name: "Follow it", exact: true }).click();
   await until(async () => /groom it/.test((await tcard.textContent()) ?? ""), "the watch card");
+  await sleep(300);
+  check(
+    (await tu.getByRole("region", { name: "followed ant" }).count()) === 1,
+    "Follow it keeps the host followed (centring the view shown no longer drops it)",
+  );
+  // The field follows it too, not only the card: the camera of the view showing it sits on the host (any seed; PR #93 review N1).
+  const off = await tu.evaluate((i) => {
+    const c = window.jevAnts.game.colonies[0];
+    const v = window.jevAnts.view();
+    if ((c.layer[i] === 0) !== (v === "above")) return null;
+    const cam = window.jevAnts.camera(v);
+    return cam ? Math.hypot(cam.x - c.x[i], cam.y - c.y[i]) : null;
+  }, hostNo);
+  check(off !== null && off < 1, `the camera sits on the host (${off === null ? "not in view" : off.toFixed(2)} away)`);
   check(!(await paused()), "watching, the game plays");
   check((await bar("4×").getAttribute("aria-pressed")) === "true", "the watch runs at 4×");
   await tcard.getByRole("button", { name: "Faster", exact: true }).click();
   await until(async () => (await bar("8×").getAttribute("aria-pressed")) === "true", "Faster runs at 8×");
+  // Most first hosts go below before they are clean (17 of 20 seeds, PRD §61.2): the camera goes with it.
+  const wentBelow = await until(
+    () =>
+      tu.evaluate(
+        (i) =>
+          window.jevAnts.game.colonies[0].layer[i] !== 0 ||
+          !/groom it/.test(document.querySelector('[aria-label="tutorial"]')?.textContent ?? ""),
+        hostNo,
+      ),
+    "the host below, or the watch over",
+    40_000,
+    100,
+  ).then(() => tu.evaluate((i) => window.jevAnts.game.colonies[0].layer[i] !== 0, hostNo));
+  if (wentBelow) {
+    await until(async () => (await tu.evaluate(() => window.jevAnts.view())) === "below", "the view follows the host below", 3000, 50);
+    check(true, "the host went below, and the view followed it");
+  } else console.log("  --  the host did not go below before the watch ended: the view-follows-below check was not exercised");
   await tcard.getByRole("button", { name: "Skip tutorial", exact: true }).click();
   await until(async () => (await tcard.count()) === 0, "Skip ends the tutorial");
   check(!(await paused()) && (await bar("4×").getAttribute("aria-pressed")) === "true", "playing at 4× after Skip");
