@@ -1065,16 +1065,27 @@ export class Fungus {
     this.#hyphae.forEach((h, l) => {
       if (!h) return;
       if (stepped || !this.#sporeSpots[l]) {
-        // The patch fruits where it landed (its base), as without hyphae. The hyphae put out none of their own yet: spread
-        // over the dug cells they reach, the same spores thinned the patch below an infecting dose, and the fungus took
-        // hold on 6 seeds of 10 against 9 (PRD §61). Where they fruit is the open decision of ja-2bw.6 (sporeCellsOf).
+        // The patch fruits where it landed (its base), as without hyphae; spread over every dug cell the hyphae reach,
+        // the same spores thinned the patch below an infecting dose (6 seeds of 10 took hold against 9, PRD §61.1), so
+        // the hyphae fruit only where a tip chose to (the `fruit` answer, owner 2026-11-12), each spot a patch cell's share
         const L = this.#layers[l] as SporeLayer;
         const { w } = L.map.size;
         const { x0 } = L.map;
-        this.#sporeSpots[l] = L.base.map((key) => {
-          const col = key % w;
-          return cellKey(col + x0, (key - col) / w);
+        const g = this.#ground(l);
+        // and the spots where its tips fruited, while they are still dug (a spot filled in puts out nothing)
+        const spots = h.fruits.filter((k) => {
+          const [x, y] = keyCell(k);
+          return g.kind(x, y) === "open";
         });
+        this.#sporeSpots[l] = [
+          ...new Set([
+            ...L.base.map((key) => {
+              const col = key % w;
+              return cellKey(col + x0, (key - col) / w);
+            }),
+            ...spots,
+          ]),
+        ];
       }
       const c = this.#sporeSpots[l] as number[];
       cells += c.length;

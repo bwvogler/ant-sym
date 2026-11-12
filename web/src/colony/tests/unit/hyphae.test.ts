@@ -188,3 +188,33 @@ test("hyphae save and load as they were", () => {
   const back = Hyphae.load(JSON.parse(JSON.stringify(h.save())));
   assert.deepEqual(back.save(), h.save());
 });
+
+test("a tip that reaches a tunnel fruits there, ending as a spore spot; another close by slides along the wall instead", () => {
+  // Soil, with a dug tunnel along column 5 (rows 10 on); tips in the soil heading east, toward it.
+  const g: Ground = { topsoil: false, kind: (x, y) => (y < 10 ? "rock" : x === 5 ? "open" : "soil") };
+  const h = new Hyphae();
+  h.root(4, 12, E);
+  stepTips(h, g, 1, { free: 1e9, tips: 1 });
+  assert.equal(h.tips.length, 0, "the tip fruited and ended");
+  assert.deepEqual(h.fruits.map(keyCell), [[5, 12]]);
+  // A second tip a few rows down meets the same tunnel within FRUIT_GAP of the spot: no second spot.
+  h.root(4, 16, E);
+  stepTips(h, g, 1, { free: 1e9, tips: 1 });
+  assert.equal(h.fruits.length, 1);
+  assert.equal(h.tips.length, 1, "it kept growing (along the wall)");
+});
+
+test("fruit needs a dug cell: never under the plane's surface, nor buried in soil", () => {
+  const plane: Ground = { topsoil: true, kind: () => "open" };
+  const p = new Hyphae();
+  p.root(0, 0, E);
+  stepTips(p, plane, 1, { free: 1e9, tips: 1 }, () => "fruit");
+  assert.equal(p.fruits.length, 0);
+  assert.equal(p.tips.length, 1);
+  const soil: Ground = { topsoil: false, kind: () => "soil" };
+  const b = new Hyphae();
+  b.root(0, 0, E);
+  stepTips(b, soil, 1, { free: 1e9, tips: 1 }, () => "fruit");
+  assert.equal(b.fruits.length, 0);
+  assert.equal(b.tips.length, 1);
+});

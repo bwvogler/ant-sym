@@ -1,4 +1,4 @@
-import { nx, ny } from "./hex.ts";
+import { hexDistance, nx, ny } from "./hex.ts";
 
 // The mycelium as hyphae (docs/hyphal-growth.md, PRD §61, ja-2bw), pure. A hypha is a chain of cells, each with its
 // parent, so the mycelium is a tree; its tips are where it grows. Every TIP_STEP seconds each tip senses its situation
@@ -41,6 +41,8 @@ export const BRANCH_RUN = 7;
 export const BRANCH_START = 2;
 /** Seconds between a tip's steps, by Mycelium level (a thread, a borer, a web): the growth factor (design). */
 export const TIP_STEP: readonly number[] = [2, 1.5, 1];
+/** The local rule fruits where a tunnel is reached only if no spore spot of its own lies within this many cells (design: keeps spots few, so the patch keeps an infecting dose, PRD §61.1). */
+export const FRUIT_GAP = 12;
 /** A tip's supply is ample while the free mass would pay for this many steps of every tip; less is short. */
 export const AMPLE_STEPS = 2;
 
@@ -59,7 +61,7 @@ export interface GrowthSituation {
   supply: Supply;
 }
 /** What a tip does at its step. */
-export const GROWTH_ANSWERS = ["grow", "left", "right", "branch", "rest", "fuse"] as const;
+export const GROWTH_ANSWERS = ["grow", "left", "right", "branch", "rest", "fuse", "fruit"] as const;
 export type GrowthAnswer = (typeof GROWTH_ANSWERS)[number];
 
 /**
@@ -82,6 +84,8 @@ export class Hyphae {
   tips: Tip[] = [];
   /** loops closed by fusion: pairs of cell keys, the tip's cell and the hypha it fused into */
   fusions: number[] = [];
+  /** spore spots: dug cells where a tip fruited (the `fruit` answer), each taking a patch cell's share of the spores */
+  fruits: number[] = [];
   /** mass spent on hypha (each cell at its price) */
   spent = 0;
   /** tip extensions tried, and how many of them ran into the mycelium's own cells (assay H3) */
@@ -146,6 +150,33 @@ export class Hyphae {
     this.tips = this.tips.filter((t) => t !== tip);
   }
 
+  /**
+   * `tip` fruits (PRD §61.1, owner 2026-11-12): it ends as a spore spot on the dug cell it touches: its own cell if dug,
+   * else the first dug cell beside it (hex.ts order). Nothing where it touches none (`ground` says what is dug).
+   */
+  fruit(tip: Tip, ground: Ground): boolean {
+    let spot = -1;
+    if (ground.kind(tip.x, tip.y) === "open") spot = cellKey(tip.x, tip.y);
+    else
+      for (let d = 0; d < 6 && spot < 0; d++) {
+        const x = nx(tip.x, tip.y, d);
+        const y = ny(tip.y, d);
+        if (ground.kind(x, y) === "open") spot = cellKey(x, y);
+      }
+    if (spot < 0 || ground.topsoil) return false;
+    if (!this.fruits.includes(spot)) this.fruits.push(spot);
+    this.tips = this.tips.filter((t) => t !== tip);
+    return true;
+  }
+
+  /** Whether a spore spot of its own lies within `gap` cells of (x, y). */
+  fruitNear(x: number, y: number, gap: number): boolean {
+    return this.fruits.some((k) => {
+      const [fx, fy] = keyCell(k);
+      return hexDistance(x, y, fx, fy) <= gap;
+    });
+  }
+
   /** Hypha cells: the mycelium's length in cells. */
   get length(): number {
     return this.parent.size;
@@ -157,6 +188,7 @@ export class Hyphae {
       parent: [...this.parent],
       tips: this.tips.map((t) => [t.x, t.y, t.heading, t.first, t.run]),
       fusions: [...this.fusions],
+      fruits: [...this.fruits],
       spent: this.spent,
       steps: this.steps,
       selfHits: this.selfHits,
@@ -169,6 +201,7 @@ export class Hyphae {
     for (const [k, p] of r.parent) h.parent.set(k, p);
     h.tips = r.tips.map(([x, y, heading, first, run]) => ({ x, y, heading, first, run }) as Tip);
     h.fusions = [...r.fusions];
+    h.fruits = [...r.fruits];
     h.spent = r.spent;
     h.steps = r.steps;
     h.selfHits = r.selfHits;
@@ -181,6 +214,7 @@ export interface HyphaeSave {
   parent: [number, number][];
   tips: [number, number, number, number, number][];
   fusions: number[];
+  fruits: number[];
   spent: number;
   steps: number;
   selfHits: number;
@@ -254,6 +288,8 @@ export function localGrowth(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, 
     if (near !== "rest") return near;
     return sideWith((k) => free(2 * k));
   }
+  // Where it reaches a tunnel, it fruits, unless a spot of its own is near (conidiation where hyphae meet the air, §6).
+  if ((s.ahead === "open" || s.exposed === "open") && !h.fruitNear(tip.x, tip.y, FRUIT_GAP)) return "fruit";
   if (s.ahead === "open" && s.exposed !== "open") {
     // Thigmotropism: keep to the soil along the tunnel's wall.
     const along = (k: number) => {
@@ -376,6 +412,9 @@ function stepTip(
         h.fuse(tip, d);
         budget.tips--;
       }
+      break;
+    case "fruit":
+      if (s.exposed !== "buried" && h.fruit(tip, g)) budget.tips--;
       break;
     case "rest":
       break;
