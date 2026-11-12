@@ -1,6 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
-import { localPolicy, localStance } from "./colony.ts";
+import { decodeSituation, localPolicy, localStance, SITUATIONS } from "./colony.ts";
 import {
+  DOCTRINES,
   packModeRequest,
   packStanceRequest,
   policyContext,
@@ -12,8 +13,18 @@ import {
 } from "./colonyBrain.ts";
 import type { FungalSituation } from "./fungalPolicy.ts";
 import { askedLevers } from "./fungus.ts";
-import { askedIn, FUNGUS_BATCH, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "./fungusBrain.ts";
-import { MODES, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
+import {
+  AIMS,
+  askedIn,
+  FUNGUS_BATCH,
+  fungalKey,
+  fungusContext,
+  packFungusRequest,
+  readLevels,
+  validLevels,
+  worthAsking,
+} from "./fungusBrain.ts";
+import { MODES, STANCE_SCHEMA, STANCES, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -70,35 +81,21 @@ export function laneOfContext(context: string): LaneName | null {
   return null;
 }
 
-// ——— What each lane does, bound to its inputs (docs/refactor.md S4.2, ja-fnd.5.2.3) ———
+// ——— What each lane does (docs/refactor.md S4.2, ja-fnd.5.2.3) ———
 //
-// A lane is a recipe over its own inputs, its frame: a colony's lanes are asked under its doctrine (`{ words }`), the fungus's under its aim
-// and the menu of levers it asks (`{ words, menu }`). `bind(frame)` closes the brain's functions over the frame and gives them one shape, so a
-// consumer can loop over the lanes without knowing which is which. Nothing here is new behaviour: each function is the brain's own, as
-// colonyJev.ts wires it today (laneRegistry.char.test.ts and laneWiring.char.test.ts pin that, laneBinding.test.ts that this agrees).
+// A lane's row holds its brain's own functions in one shape, so a consumer can loop over the lanes without knowing which is which. They are
+// stateless: the words a lane asks under (a colony's doctrine, the fungus's aim) and the fungus's menu are the caller's, passed in where a
+// function needs them, because both change while a game runs (ui/colonyJev.ts re-contexts a lane when its words change and rebuilds the
+// fungus's asked levers when its menu does). Nothing here is new behaviour: each function is the brain's own, as colonyJev.ts wires it today
+// (laneRegistry.char.test.ts and laneWiring.char.test.ts pin that, laneBinding.test.ts that the rows agree).
 
 /** The counters of ColonyJevState that count answers kept, by lane. */
 export type CachedCounter = "cached" | "stancesCached" | "fungusCached";
 
-/** A lane's brain functions, bound to a frame. */
-export interface Bound<Sit, Ans extends string> {
-  /** the cache key for a situation */
-  key(s: Sit): string;
-  /** one request for many situations (each with the key it was asked under), under the frame's words */
-  pack(items: { id: string; key: string; situation: Sit }[]): JevRequest;
-  /** the answer to item `id`, asked under `key`, or null when it is not one the question allowed */
-  read(answers: Record<string, JevAnswer>, id: string, situation: Sit, key: string): Ans | null;
-  /** whether a stored answer is one this lane's question could have given for `key` */
-  valid(key: string, answer: string): boolean;
-  /** the cache context under the frame's words, for a variant of the lane (see LaneSpec.variants) */
-  context(variant?: string): string;
-  /** whether a situation is worth asking at all (absent: always) */
-  asks?(s: Sit): boolean;
-  /** the local rule's answer (absent: the lane's local rule is not a pure function of the situation) */
-  local?(s: Sit): Ans;
-}
+/** A lane spec that is known to have the optional members `K` (the ants' lanes have a local rule and enumerate their situations; the fungus has `asks`). */
+type Has<L, K extends keyof L> = L & { [P in K]-?: NonNullable<L[P]> };
 
-export interface LaneSpec<Frame, Sit, Ans extends string> {
+export interface LaneSpec<Sit, Ans extends string, Ctx> {
   readonly name: LaneName;
   /** the flags and sizes of the lane (LANE_KINDS) */
   readonly kind: LaneKind;
@@ -108,17 +105,30 @@ export interface LaneSpec<Frame, Sit, Ans extends string> {
   readonly variants: readonly string[];
   /** a situation the Learn panel shows and costs a question by */
   readonly sample: Sit;
-  bind(frame: Frame): Bound<Sit, Ans>;
-}
-
-/** A colony's lanes ask under its doctrine. */
-export interface WordsFrame {
-  words: string;
-}
-/** The fungus's lane asks under its aim and the levers on its menu. */
-export interface FungusFrame {
-  words: string;
-  menu: ReadonlySet<string>;
+  /** the name of the words in a request's state and in the shipped precache's bundles: a colony's doctrine, the fungus's aim */
+  readonly wordsField: "doctrine" | "aim";
+  /** the preset words the page ships answers for */
+  readonly presets: readonly { readonly id: string; readonly text: string }[];
+  /** whether the lane lets its queue fill before it sends less than a full batch (the fungus: its legend is most of a small request) */
+  readonly gather: boolean;
+  /** situations to a request when not the client's batch (absent: the client's; ColonyJevOptions.batch, 100) */
+  readonly batch: number | null;
+  /** the cache key for a situation; `ctx` is the lane's own context: the fungus's menu (the levers asked are in the key), nothing for an ant */
+  key(s: Sit, ctx: Ctx): string;
+  /** one request for many situations, each with the key it was asked under, under `words` */
+  pack(items: { id: string; key: string; situation: Sit }[], words: string): JevRequest;
+  /** the answer to item `id`, asked under `key`, or null when it is not one the question allowed */
+  read(answers: Record<string, JevAnswer>, id: string, situation: Sit, key: string): Ans | null;
+  /** whether a stored answer is one this lane's question could have given for `key` */
+  valid(key: string, answer: string): boolean;
+  /** the cache context under `words`, for a variant of the lane (see `variants`; none: the first) */
+  contextOf(words: string, variant?: string): string;
+  /** whether a situation is worth asking at all (absent: always) */
+  asks?(s: Sit, ctx: Ctx): boolean;
+  /** the local rule's answer (absent: the lane's local rule is not a pure function of the situation: the fungus's is a Game method) */
+  local?(s: Sit): Ans;
+  /** every situation the lane can be asked in (absent: not enumerable: the fungus's are the ones a game meets) */
+  all?(): Sit[];
 }
 
 export const SAMPLE_SITUATION: Situation = {
@@ -147,67 +157,93 @@ export const SAMPLE_FUNGAL: FungalSituation = {
   groomed: false,
 };
 
-const modeLane: LaneSpec<WordsFrame, Situation, Mode> = {
+const modeLane: Has<LaneSpec<Situation, Mode, undefined>, "local" | "all"> = {
   name: "mode",
   kind: LANE_KINDS.mode,
   counters: { asked: "asked", cached: "cached" },
   variants: [""],
   sample: SAMPLE_SITUATION,
-  bind: ({ words }) => ({
-    key: situationKey,
-    pack: (items) => packModeRequest(items, words),
-    read: (answers, id) => readMode(answers, id),
-    valid: (_key, answer) => (MODES as readonly string[]).includes(answer),
-    context: () => policyContext(words),
-    local: localPolicy,
-  }),
+  wordsField: "doctrine",
+  presets: DOCTRINES,
+  gather: false,
+  batch: null,
+  key: (s) => situationKey(s),
+  pack: (items, words) => packModeRequest(items, words),
+  read: (answers, id) => readMode(answers, id),
+  valid: (_key, answer) => (MODES as readonly string[]).includes(answer),
+  contextOf: (words) => policyContext(words),
+  local: localPolicy,
+  all: () => Array.from({ length: SITUATIONS }, (_, c) => decodeSituation(c)),
 };
 
-const stanceLane: LaneSpec<WordsFrame, StanceSituation, Stance> = {
+const stanceLane: Has<LaneSpec<StanceSituation, Stance, undefined>, "local" | "all"> = {
   name: "stance",
   kind: LANE_KINDS.stance,
   counters: { asked: "stancesAsked", cached: "stancesCached" },
   variants: [""],
   sample: SAMPLE_STANCE,
-  bind: ({ words }) => ({
-    key: stanceKey,
-    pack: (items) => packStanceRequest(items, words),
-    read: (answers, id) => readStance(answers, id),
-    valid: (_key, answer) => (STANCES as readonly string[]).includes(answer),
-    context: () => stanceContext(words),
-    local: localStance,
-  }),
+  wordsField: "doctrine",
+  presets: DOCTRINES,
+  gather: false,
+  batch: null,
+  key: (s) => stanceKey(s),
+  pack: (items, words) => packStanceRequest(items, words),
+  read: (answers, id) => readStance(answers, id),
+  valid: (_key, answer) => (STANCES as readonly string[]).includes(answer),
+  contextOf: (words) => stanceContext(words),
+  local: localStance,
+  all: () => Array.from({ length: STANCE_SCHEMA.size }, (_, c) => STANCE_SCHEMA.decode(c)),
 };
 
 // The levers asked (the menu's, a queen's or a worker's, in table order) are in each key, so a question is packed and its answer read and kept
-// against the levers it asked, whatever the menu is by the time it lands. The fungus's local rule is a method on its Game (Fungus.local), so it
-// is not here: colonyJev wires it.
-const fungusLane: LaneSpec<FungusFrame, FungalSituation, string> = {
+// against the levers it asked, whatever the menu is by the time it lands: only `key` and `asks` read the menu.
+const fungusLane: Has<LaneSpec<FungalSituation, string, ReadonlySet<string>>, "asks"> = {
   name: "fungus",
   kind: LANE_KINDS.fungus,
   counters: { asked: "fungusAsked", cached: "fungusCached" },
   variants: ["top", "side"],
   sample: SAMPLE_FUNGAL,
-  bind: ({ words, menu }) => {
-    const asked = (s: FungalSituation) => askedLevers(menu, s.task === "queen");
-    return {
-      key: (s) => fungalKey(s, asked(s)),
-      pack: (items) =>
-        packFungusRequest(
-          items.map((it) => ({ ...it, asked: askedIn(it.key) })),
-          words,
-        ),
-      read: (answers, id, _situation, key) => readLevels(answers, id, askedIn(key)),
-      valid: validLevels,
-      context: (variant) => fungusContext(words, variant === "side" ? "side" : "top"),
-      asks: (s) => worthAsking(asked(s)),
-    };
-  },
+  wordsField: "aim",
+  presets: AIMS,
+  gather: true,
+  batch: FUNGUS_BATCH,
+  key: (s, menu) => fungalKey(s, askedLevers(menu, s.task === "queen")),
+  pack: (items, words) =>
+    packFungusRequest(
+      items.map((it) => ({ ...it, asked: askedIn(it.key) })),
+      words,
+    ),
+  read: (answers, id, _situation, key) => readLevels(answers, id, askedIn(key)),
+  valid: validLevels,
+  contextOf: (words, variant) => fungusContext(words, variant === "side" ? "side" : "top"),
+  asks: (s, menu) => worthAsking(askedLevers(menu, s.task === "queen")),
 };
 
-/** Every lane, by name. */
+/** Every lane, by name, typed. */
 export const LANES = { mode: modeLane, stance: stanceLane, fungus: fungusLane } as const;
-/** One lane, whichever it is. */
-export type AnyLane = (typeof LANES)[LaneName];
+
+/**
+ * A lane with its situation type forgotten, for code that loops over the lanes (the scripts' tables, the Learn panel): the one place the
+ * cast is made, so no consumer repeats it. Each function takes the lane's own situation; `ctx` is the fungus's menu and unused by an ant's lane.
+ */
+export interface ErasedLane {
+  readonly name: LaneName;
+  readonly kind: LaneKind;
+  readonly counters: { readonly asked: SentCounter; readonly cached: CachedCounter };
+  readonly variants: readonly string[];
+  readonly sample: unknown;
+  readonly wordsField: "doctrine" | "aim";
+  readonly presets: readonly { readonly id: string; readonly text: string }[];
+  readonly gather: boolean;
+  readonly batch: number | null;
+  key(s: unknown, ctx?: ReadonlySet<string>): string;
+  pack(items: { id: string; key: string; situation: unknown }[], words: string): JevRequest;
+  read(answers: Record<string, JevAnswer>, id: string, situation: unknown, key: string): string | null;
+  valid(key: string, answer: string): boolean;
+  contextOf(words: string, variant?: string): string;
+  asks?(s: unknown, ctx?: ReadonlySet<string>): boolean;
+  local?(s: unknown): string;
+  all?(): unknown[];
+}
 /** Every lane, in the order the page asks them. */
-export const LANE_LIST: readonly AnyLane[] = [LANES.mode, LANES.stance, LANES.fungus];
+export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.stance, LANES.fungus] as unknown as readonly ErasedLane[];
