@@ -118,13 +118,13 @@ export interface LaneSpec<Sit, Ans extends string, Ctx, Variant extends string =
   /** the cache key for a situation; `ctx` is the lane's own context: the fungus's menu (the levers asked are in the key), nothing for an ant */
   key(s: Sit, ctx: Ctx): string;
   /** one request for many situations, each with the key it was asked under, under `words`; `lane` is a species' own legend and criteria (absent: the generic ant's; the fungus's has none yet) */
-  pack(items: { id: string; key: string; situation: Sit }[], words: string, lane?: LaneWords): JevRequest;
+  pack(items: { id: string; key: string; situation: Sit }[], words: string, lane?: LaneWords<Ans>): JevRequest;
   /** the answer to item `id`, asked under `key`, or null when it is not one the question allowed (the choices of `lane`'s criteria, when given) */
-  read(answers: Record<string, JevAnswer>, id: string, situation: Sit, key: string, lane?: LaneWords): Ans | null;
+  read(answers: Record<string, JevAnswer>, id: string, situation: Sit, key: string, lane?: LaneWords<Ans>): Ans | null;
   /** whether a stored answer is one this lane's question could have given for `key` */
-  valid(key: string, answer: string, lane?: LaneWords): boolean;
+  valid(key: string, answer: string, lane?: LaneWords<Ans>): boolean;
   /** the cache context under `words`, for a variant of the lane (see `variants`; none: the first), and a species' own `lane` words */
-  contextOf(words: string, variant?: Variant, lane?: LaneWords): string;
+  contextOf(words: string, variant?: Variant, lane?: LaneWords<Ans>): string;
   /** whether a situation is worth asking at all (absent: always) */
   asks?(s: Sit, ctx: Ctx): boolean;
   /** the local rule's answer (absent: the lane's local rule is not a pure function of the situation: the fungus's is a Game method) */

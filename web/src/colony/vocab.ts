@@ -15,9 +15,10 @@ export type Stance = (typeof STANCES)[number];
  * that describes each (the question's criteria), and the version that retires its cached answers. A context is a hash of all three and the
  * doctrine, so a species with other words has its own cache, and the generic ant's never moves. The functions stay the lane registry's.
  */
-export interface LaneWords {
+export interface LaneWords<C extends string = string> {
   readonly legend: string;
-  readonly criteria: Readonly<Record<string, string>>;
+  /** a choice of the lane (a `Mode`, a `Stance`) with its sentence; a species may offer a subset, and a key that is not a choice of the lane fails to compile */
+  readonly criteria: Readonly<Partial<Record<C, string>>>;
   readonly version: number;
 }
 

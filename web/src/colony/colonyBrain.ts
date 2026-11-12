@@ -133,8 +133,8 @@ export const STANCE_CRITERIA: Record<Stance, string> = {
 };
 
 /** The generic ant's words for the mode lane and the strategist's lane: what a species that names none asks under (species.ts). */
-export const MODE_WORDS: LaneWords = { legend: COLONY_LEGEND, criteria: MODE_CRITERIA, version: COLONY_BRAIN_VERSION };
-export const STANCE_WORDS: LaneWords = { legend: STRATEGY_LEGEND, criteria: STANCE_CRITERIA, version: STANCE_BRAIN_VERSION };
+export const MODE_WORDS: LaneWords<Mode> = { legend: COLONY_LEGEND, criteria: MODE_CRITERIA, version: COLONY_BRAIN_VERSION };
+export const STANCE_WORDS: LaneWords<Stance> = { legend: STRATEGY_LEGEND, criteria: STANCE_CRITERIA, version: STANCE_BRAIN_VERSION };
 
 /** The cache key for an ant's situation. */
 export function situationKey(s: Situation): string {
@@ -146,7 +146,7 @@ export function situationState(s: Situation): Situation {
   return SITUATION_SCHEMA.state(s);
 }
 
-export function modeQuestion(id: string, criteria: Readonly<Record<string, string>> = MODE_CRITERIA): JevRequest["questions"] {
+export function modeQuestion(id: string, criteria: LaneWords<Mode>["criteria"] = MODE_CRITERIA): JevRequest["questions"] {
   return {
     [`${id}_mode`]: {
       type: "choice",
@@ -160,7 +160,7 @@ export function modeQuestion(id: string, criteria: Readonly<Record<string, strin
 export function packModeRequest(
   items: { id: string; situation: Situation }[],
   doctrine: string,
-  words: LaneWords = MODE_WORDS,
+  words: LaneWords<Mode> = MODE_WORDS,
 ): JevRequest {
   const ants: Record<string, Situation> = {};
   const questions: JevRequest["questions"] = {};
@@ -175,7 +175,7 @@ export function packModeRequest(
 export function readMode(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = MODES): Mode | null {
   const a = answers[`${id}_mode`];
   if (!a || a.type !== "choice") return null;
-  return allowed.includes(a.choice) ? (a.choice as Mode) : null;
+  return allowed.includes(a.choice) && (MODES as readonly string[]).includes(a.choice) ? (a.choice as Mode) : null;
 }
 
 /** The cache key for the strategist's view. */
@@ -183,7 +183,7 @@ export function stanceKey(s: StanceSituation): string {
   return STANCE_SCHEMA.key(s);
 }
 
-export function stanceQuestion(id: string, criteria: Readonly<Record<string, string>> = STANCE_CRITERIA): JevRequest["questions"] {
+export function stanceQuestion(id: string, criteria: LaneWords<Stance>["criteria"] = STANCE_CRITERIA): JevRequest["questions"] {
   return {
     [`${id}_stance`]: {
       type: "choice",
@@ -197,7 +197,7 @@ export function stanceQuestion(id: string, criteria: Readonly<Record<string, str
 export function packStanceRequest(
   items: { id: string; situation: StanceSituation }[],
   doctrine: string,
-  words: LaneWords = STANCE_WORDS,
+  words: LaneWords<Stance> = STANCE_WORDS,
 ): JevRequest {
   const colony: Record<string, StanceSituation> = {};
   const questions: JevRequest["questions"] = {};
@@ -211,16 +211,16 @@ export function packStanceRequest(
 export function readStance(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = STANCES): Stance | null {
   const a = answers[`${id}_stance`];
   if (!a || a.type !== "choice") return null;
-  return allowed.includes(a.choice) ? (a.choice as Stance) : null;
+  return allowed.includes(a.choice) && (STANCES as readonly string[]).includes(a.choice) ? (a.choice as Stance) : null;
 }
 
 /** What a cached mode was asked under: a different doctrine, legend or question wording is a different cache. */
-export function policyContext(doctrine: string, words: LaneWords = MODE_WORDS): string {
+export function policyContext(doctrine: string, words: LaneWords<Mode> = MODE_WORDS): string {
   return `colony-v${words.version}-${hash(words.legend + JSON.stringify(modeQuestion("s0", words.criteria)) + doctrine.trim())}`;
 }
 
 /** The same for cached stances. */
-export function stanceContext(doctrine: string, words: LaneWords = STANCE_WORDS): string {
+export function stanceContext(doctrine: string, words: LaneWords<Stance> = STANCE_WORDS): string {
   return `stance-v${words.version}-${hash(words.legend + JSON.stringify(stanceQuestion("c0", words.criteria)) + doctrine.trim())}`;
 }
 
