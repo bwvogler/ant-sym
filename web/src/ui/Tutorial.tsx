@@ -1,5 +1,5 @@
 import { openLearn } from "./learn.ts";
-import type { Card, TutorialStep } from "./tutorial.ts";
+import { FAST_SPEED, type Card, type TutorialStep } from "./tutorial.ts";
 
 // The tutorial's coach card (ja-7x4, PRD §61), over the field's lower-left corner: one step at a time, the step's
 // button (or nothing while the game decides), Faster on a live step, and Skip.
@@ -55,7 +55,7 @@ export default function TutorialCard({
             disabled={fast}
             aria-pressed={fast}
           >
-            {fast ? "running at 4×" : "Faster"}
+            {fast ? `running at ${FAST_SPEED}×` : "Faster"}
           </button>
         )}
         {card.learn && (

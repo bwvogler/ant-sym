@@ -13,6 +13,7 @@ import {
   observe,
   seenOf,
   TUTORIAL_SPEED,
+  WATCH_SPEED,
   tutorialDone,
   WATCH_LIMIT,
   type Seen,
@@ -44,7 +45,11 @@ test("the first host found pauses the game and is followed", () => {
   const w = next(r.t, 12);
   assert.equal(w.t.step, "watch");
   assert.equal(w.t.watchFrom, 12);
-  assert.deepEqual(w.effect, { playing: true, speed: TUTORIAL_SPEED, follow: host }, "Follow it follows again, in case the player let go");
+  assert.deepEqual(
+    w.effect,
+    { playing: true, speed: WATCH_SPEED, follow: host },
+    "Follow it follows again, in case the player let go; the watch runs at 4×",
+  );
 });
 
 test("watching ends when the host is clean, and says how many carry the fungus then", () => {
