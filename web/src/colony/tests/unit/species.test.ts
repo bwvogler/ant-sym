@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_GAME, Game } from "../../game.ts";
 import { generateWorld, mulberry32 } from "../../world.ts";
+import { MODE_WORDS, STANCE_WORDS } from "../../colonyBrain.ts";
 import { localResponses } from "../../responses.ts";
 import { GENERIC_ANT, type Species } from "../../species.ts";
 
@@ -10,12 +11,14 @@ import { GENERIC_ANT, type Species } from "../../species.ts";
 test("the generic ant overrides no parameter and reuses the local responses themselves", () => {
   assert.deepEqual(GENERIC_ANT.params, {});
   assert.equal(GENERIC_ANT.responses, localResponses, "Colony compares its response functions by identity");
+  assert.equal(GENERIC_ANT.lanes.mode, MODE_WORDS, "the generic ant asks under the words the brains have always had");
+  assert.equal(GENERIC_ANT.lanes.stance, STANCE_WORDS);
   assert.equal(DEFAULT_GAME.species, GENERIC_ANT, "a game plays the generic ant unless it names another");
 });
 
 test("a species' parameters and responses reach every colony of the game, and a game's own settings still win", () => {
   const mine = { ...localResponses, trailRate: () => 0 };
-  const quick: Species = { id: "quick", name: "Quick", params: { speed: 9.5, patience: 77 }, responses: mine };
+  const quick: Species = { id: "quick", name: "Quick", params: { speed: 9.5, patience: 77 }, responses: mine, lanes: {} };
   const world = generateWorld(1, { size: { w: 120, h: 80 } });
   const g = new Game(world, { antCount: 10, rivalAnts: 10, species: quick }, mulberry32(3));
   for (const c of g.colonies) {
@@ -38,7 +41,7 @@ test("a species' parameters and responses reach every colony of the game, and a 
 
 test("a colony founded mid-game is of the game's species, and a species' maxAnts sizes it", () => {
   const mine = { ...localResponses, trailRate: () => 0 };
-  const small: Species = { id: "small", name: "Small", params: { speed: 9.5, maxAnts: 31 }, responses: mine };
+  const small: Species = { id: "small", name: "Small", params: { speed: 9.5, maxAnts: 31 }, responses: mine, lanes: {} };
   const world = generateWorld(1, { size: { w: 160, h: 100 } });
   const g = new Game(world, { antCount: 10, rivalAnts: 10, species: small }, mulberry32(3));
   const at = g.addColony({ x: 80, y: 50, antCount: 5, odour: 0.5 });
