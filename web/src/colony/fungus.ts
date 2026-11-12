@@ -360,7 +360,7 @@ export class Fungus {
   #made = 0;
   /** each map's hyphae (params.hyphae): null until the evolving fungus roots there */
   readonly #hyphae: (Hyphae | null)[];
-  /** each map's spore cells under its hyphae (hyphae.ts sporeCellsOf), refreshed each round of tip steps (the ground a tip feels may be dug meanwhile) */
+  /** each map's spore spots: its patch and the dug spots its tips fruited on, refreshed each round of tip steps */
   #sporeSpots: (number[] | null)[] = [];
   /** each map's corpses the fungus grows out of (ja-2bw.7): cell (hyphae.ts cellKey) → free spores still to put out there; 0 once spent (it is not colonised again) */
   #corpses: Map<number, number>[];
@@ -1045,7 +1045,7 @@ export class Fungus {
   /**
    * The mycelium as hyphae (params.hyphae, docs/hyphal-growth.md): every map's tips step every TIP_STEP seconds (by the
    * Mycelium level) on the mass the body has grown and not yet embodied in hypha, shared by all their tips; then the
-   * spores it puts out spread evenly over the cells its hyphae reach the air at (hyphae.ts sporeCellsOf).
+   * spores it puts out spread evenly over its patch and the dug spots its tips fruited on (the `fruit` answer).
    */
   #growHyphae(dt: number, e: Evolution): void {
     const p = this.params;

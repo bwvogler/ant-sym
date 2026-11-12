@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { E, NE, SE, W } from "../../hex.ts";
+import { E, NE, nx, ny, SE, W } from "../../hex.ts";
 import type { Ground } from "../../hyphae.ts";
 import {
   cellKey,
@@ -11,16 +11,19 @@ import {
   Hyphae,
   isWall,
   keyCell,
+  localGrowth,
   opposite,
   ROOT,
   selfHitShare,
+  situationOf,
   stepTips,
+  turn,
   tipsAt,
   withinBudget,
 } from "../../hyphae.ts";
 
-// The hyphae's assays (docs/hyphal-growth.md "Assays and targets", PRD §63, ja-2bw.1). The measures are tested here on
-// hand-built mycelia; the behaviour assays, which need the tips' local rule, run as todo until ja-2bw.2 lands it.
+// The hyphae's assays (docs/hyphal-growth.md "Assays and targets", PRD §63, ja-2bw.1): the measures on hand-built
+// mycelia, then the behaviour assays H1–H4 and the local rule's other parts.
 
 test("a cell key round-trips, negative columns too (one world's curtain)", () => {
   for (const [x, y] of [
@@ -156,7 +159,7 @@ test("H4 supply: the hypha never costs more than the mass it was given; short of
   const left = run(h, plane(), 100, mass);
   assert.ok(withinBudget(h, mass));
   // Tips rest once the free mass would not pay AMPLE_STEPS rounds of them all: a small reserve stays.
-  assert.ok(left.free >= 0 && left.free < HYPHA_MASS * AMPLE_STEPS * h.tips.length, `${left.free} left`);
+  assert.ok(left.free > 0 && left.free < HYPHA_MASS * AMPLE_STEPS * h.tips.length, `${left.free} left: no reserve kept`);
   const length = h.length;
   run(h, plane(), 10, HYPHA_MASS * 0.5);
   assert.equal(h.length, length, "grew with less than a cell's mass");
@@ -272,4 +275,75 @@ test("cutDug cuts only cells that were soil and are dug now", () => {
   dug = true;
   assert.equal(h.cutDug(g), 2, "cells 3 and 4");
   assert.ok(h.has(2, 12) && !h.has(3, 12));
+});
+
+test("a tip turned aside by a stone drifts back to its first heading (directional memory)", () => {
+  // One stone ahead of a tip heading east: it splits round it, and the tip goes back to east within a few steps.
+  const h = new Hyphae();
+  h.root(0, 20, E);
+  const tip = h.tips[0]!;
+  run(
+    h,
+    plane((x, y) => x === 3 && y === 20),
+    6,
+  );
+  assert.equal(tip.heading, E, `heading ${tip.heading}`);
+  assert.ok(h.tips.length >= 2, "it split round the stone");
+});
+
+test("against a flat wall (rock ahead and one turn either way, two turns open) the local rule splits along it", () => {
+  const h = new Hyphae();
+  h.root(5, 20, E);
+  const tip = h.tips[0]!;
+  const blocked = new Set([E, turn(E, -1), turn(E, 1)].map((d) => cellKey(nx(5, 20, d), ny(20, d))));
+  const g = plane((x, y) => blocked.has(cellKey(x, y)));
+  const s = situationOf(h, g, tip, 0, 1e9, 1);
+  assert.equal(s.ahead, "rock");
+  assert.equal(localGrowth(h, g, tip, s, 0), "branch");
+});
+
+test("supply is judged at the round's start: two tips with just enough for both each step", () => {
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  h.root(0, 30, E);
+  const budget = { free: HYPHA_MASS * AMPLE_STEPS * 2, tips: 2 };
+  stepTips(h, plane(), 0, budget);
+  assert.deepEqual(
+    h.tips.map((t) => t.x),
+    [1, 1],
+    "the second tip rested: supply was judged after the first had grown",
+  );
+});
+
+test("a cut keeps only what a fusion loop reaches: a branch beyond the cut that the loop doesn't join dies", () => {
+  // A hypha east from (0, 20) to x = 6, with a branch from (4, 20) going south-east three cells; a second hypha from
+  // (0, 24) fused into (6, 20). Cutting (2, 20): 3…6 are joined round the loop, and so is the branch (it grew from 4).
+  // Cutting the branch's own first cell instead loses the branch, and nothing else.
+  const build = () => {
+    const h = new Hyphae();
+    h.root(0, 20, E);
+    const t = h.tips[0]!;
+    for (let k = 0; k < 4; k++) h.extend(t, E, 0);
+    const b = h.branch(t, SE);
+    for (let k = 0; k < 3; k++) h.extend(b, SE, 0);
+    for (let k = 0; k < 2; k++) h.extend(t, E, 0);
+    h.root(0, 24, E);
+    const o = h.tips[2]!;
+    for (let k = 0; k < 4; k++) h.extend(o, E, 0);
+    h.fusions.push(cellKey(o.x, o.y), cellKey(6, 20));
+    return { h, b };
+  };
+  const one = build();
+  assert.equal(one.h.cut(cellKey(2, 20)), 1, "only the dug cell: the rest is round the loop");
+  assert.ok(one.h.has(3, 20) && one.h.has(one.b.x, one.b.y));
+  // A loop that joins only the far end: cut (5, 20), between the branch point and the fused cell.
+  const two = build();
+  const branchCells = [...two.h.parent].filter(([, p]) => p !== ROOT).length;
+  assert.ok(branchCells > 0);
+  assert.equal(two.h.cut(cellKey(5, 20)), 1, "the fused end (6, 20) survives; 5 alone is lost");
+  // Now cut the branch's first cell: no loop reaches it, so the branch dies, with its tip.
+  const [bx, by] = [nx(4, 20, SE), ny(20, SE)];
+  const tipsBefore = two.h.tips.length;
+  assert.equal(two.h.cut(cellKey(bx, by)), 3);
+  assert.equal(two.h.tips.length, tipsBefore - 1);
 });

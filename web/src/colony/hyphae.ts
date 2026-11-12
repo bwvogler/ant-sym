@@ -104,7 +104,7 @@ export class Hyphae {
     this.tips.push({ x, y, heading, first: heading, run: 0 });
   }
 
-  /** A root cell with no tip of its own (a landing's patch: the base). Free: the landing's start pays for it. */
+  /** A root cell with no tip of its own (a landing's patch: the base). Not paid from `spent`, but it embodies HYPHA_MASS like any cell. */
   addCell(x: number, y: number): void {
     const k = cellKey(x, y);
     if (!this.parent.has(k)) this.parent.set(k, ROOT);
@@ -186,12 +186,12 @@ export class Hyphae {
     return this.parent.size;
   }
 
-  /** The hyphae for a save (save.ts): plain arrays. */
   /**
-   * The ants have dug cell `k` open (ja-2bw.4, design): the hypha there is cut. The cell and everything that grew from
-   * it die, with their tips and the spore spots only they touched, unless a loop closed by fusion joins that part to
-   * the rest (Simonin et al. 2012: fusion carries the network round a break); then only the cell is lost, and what grew
-   * from it is fed by the loop (its first cells start afresh as roots). Returns the cells lost.
+   * The ants have dug cell `k` open (ja-2bw.4, design): the hypha there is cut. The cell dies, and so does everything
+   * that grew from it, with their tips and the spore spots only they touched, except the cells a loop closed by fusion
+   * still joins to the rest (Simonin et al. 2012: fusion carries the network round a break): those reached through a
+   * fusion pair to a cell outside the cut-off part, and on from them along the hypha and other fusion pairs. A survivor
+   * whose parent died starts afresh as a root, fed by the loop. Returns the cells lost.
    */
   cut(k: number): number {
     if (!this.parent.has(k)) return 0;
@@ -202,21 +202,52 @@ export class Hyphae {
         if (list) list.push(c);
         else children.set(p, [c]);
       }
+    // The part cut off: k and everything that grew from it.
     const beyond = new Set<number>([k]);
     const stack = [k];
-    while (stack.length) for (const c of children.get(stack.pop()!) ?? []) if (!beyond.has(c)) (beyond.add(c), stack.push(c));
-    let looped = false;
-    for (let i = 0; i + 1 < this.fusions.length && !looped; i += 2) {
+    while (stack.length) {
+      for (const c of children.get(stack.pop()!) ?? []) {
+        if (beyond.has(c)) continue;
+        beyond.add(c);
+        stack.push(c);
+      }
+    }
+    // Its links inside (hypha and fusion, k left out), and the cells a fusion pair joins to the rest.
+    const links = new Map<number, number[]>();
+    const link = (a: number, b: number) => {
+      if (a === k || b === k || !beyond.has(a) || !beyond.has(b)) return;
+      (links.get(a) ?? links.set(a, []).get(a)!).push(b);
+      (links.get(b) ?? links.set(b, []).get(b)!).push(a);
+    };
+    for (const c of beyond) {
+      const p = this.parent.get(c)!;
+      if (p !== ROOT) link(c, p);
+    }
+    const reached = new Set<number>();
+    for (let i = 0; i + 1 < this.fusions.length; i += 2) {
       const a = this.fusions[i]!;
       const b = this.fusions[i + 1]!;
-      if (a !== k && b !== k && beyond.has(a) !== beyond.has(b)) looped = true;
+      link(a, b);
+      for (const [inside, outside] of [
+        [a, b],
+        [b, a],
+      ] as const)
+        if (inside !== k && beyond.has(inside) && !beyond.has(outside) && this.parent.has(outside)) reached.add(inside);
     }
-    const dead = looped ? new Set([k]) : beyond;
+    const walk = [...reached];
+    while (walk.length) {
+      for (const c of links.get(walk.pop()!) ?? []) {
+        if (reached.has(c)) continue;
+        reached.add(c);
+        walk.push(c);
+      }
+    }
+    const dead = new Set([...beyond].filter((c) => !reached.has(c)));
     for (const c of dead) {
       this.parent.delete(c);
       this.soil.delete(c);
     }
-    if (looped) for (const c of children.get(k) ?? []) this.parent.set(c, ROOT);
+    for (const c of reached) if (dead.has(this.parent.get(c)!)) this.parent.set(c, ROOT);
     this.tips = this.tips.filter((t) => !dead.has(cellKey(t.x, t.y)));
     const kept: number[] = [];
     for (let i = 0; i + 1 < this.fusions.length; i += 2)
@@ -243,6 +274,7 @@ export class Hyphae {
     return lost;
   }
 
+  /** The hyphae for a save (save.ts): plain arrays. */
   save(): HyphaeSave {
     return {
       parent: [...this.parent],
@@ -487,29 +519,6 @@ function stepTip(
       break;
   }
   return grown;
-}
-
-/**
- * The cells a mycelium puts its spores out on (§6): in the curtain, a hypha out in a dug cell and the dug cells beside a
- * hypha in a wall. On the plane its hyphae stay under the surface and put out none: there only its patch fruits (the
- * caller adds it). Spread over every hypha cell, the spores fell below the dose that infects an ant, and the fungus took
- * hold on 2 seeds of 10 (PRD §63).
- */
-export function sporeCellsOf(h: Hyphae, g: Ground): number[] {
-  const out = new Set<number>();
-  if (g.topsoil) return [];
-  for (const k of h.parent.keys()) {
-    const [x, y] = keyCell(k);
-    const kind = g.kind(x, y);
-    if (kind === "open") out.add(k);
-    else if (kind === "soil")
-      for (let d = 0; d < 6; d++) {
-        const ax = nx(x, y, d);
-        const ay = ny(y, d);
-        if (g.kind(ax, ay) === "open") out.add(cellKey(ax, ay));
-      }
-  }
-  return [...out].sort((a, b) => a - b);
 }
 
 /** Assay H1: the hyphal growth unit, length ÷ tips (Trinci 1974); 0 with no tips. */

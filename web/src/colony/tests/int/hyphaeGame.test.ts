@@ -6,7 +6,7 @@ import { Game, gameRng, type GameSave } from "../../game.ts";
 import { cellKey as hyphaKey, HYPHA_MASS, keyCell } from "../../hyphae.ts";
 import { nx, ny } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
-import { OPEN, rockAt } from "../../world.ts";
+import { OPEN, rockAt, SOIL } from "../../world.ts";
 
 // The mycelium as hyphae in a one-world game (docs/hyphal-growth.md, ja-2bw.2): rooted by the hole on the plane (the
 // topsoil) and on the shaft's walls in the curtain, it grows on both maps from the mass the body has grown, puts its
@@ -161,6 +161,14 @@ test("a host that dies on the plane is a new start where it lies; a clean ant le
   c.load[j] = 0;
   c.kill(j);
   assert.equal(g.fungus.corpsesOn(PLANE).size, before + 1);
+  // A host dying underground is no start on the plane (its cell is the curtain's).
+  let u = -1;
+  for (let k = 0; k < c.n; k++) if (c.alive[k] && c.layer[k] === CURTAIN) u = k;
+  assert.ok(u >= 0, "no ant underground");
+  c.load[u] = 0.5;
+  c.strain[u] = g.fungus.evolution!.strain;
+  c.kill(u);
+  assert.equal(g.fungus.corpsesOn(PLANE).size, before + 1);
 });
 
 test("ants digging through a hypha in the curtain cut it, and the mycelium loses the mass it held", () => {
@@ -178,5 +186,22 @@ test("ants digging through a hypha in the curtain cut it, and the mycelium loses
   runFor(g, 3);
   assert.ok(h.length < before || !h.has(x, y), "not cut");
   assert.ok(h.cutCells > 0);
-  assert.ok(e.mass < mass + 0.5, "no mass lost");
+  assert.ok(e.mass < mass, "no mass lost");
+});
+
+test("a spore spot a tip fruited on puts out spores, until it is filled in", () => {
+  const g = game(true);
+  const h = g.fungus.hyphaeOn(CURTAIN)!;
+  for (let t = 0; t < 240 && h.fruits.length === 0; t += 10) runFor(g, 10);
+  assert.ok(h.fruits.length > 0, "no tip fruited in 240 s");
+  const [x, y] = keyCell(h.fruits[0]!);
+  const { spores } = g.fungus.sporesOn(CURTAIN)!;
+  runFor(g, 5);
+  assert.ok(spores.get(x, y) > 0, "the spot puts out no spores");
+  // Filled in (backfill): it fruits no more, and its spores only fade.
+  g.world!.curtain.rock.set(x, y, SOIL);
+  runFor(g, 3);
+  const was = spores.get(x, y);
+  runFor(g, 5);
+  assert.ok(spores.get(x, y) <= was, "a filled spot kept fruiting");
 });
