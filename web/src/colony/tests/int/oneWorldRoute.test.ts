@@ -520,7 +520,7 @@ test("route memory: not on a top-down map, which has no vector to fail", () => {
 });
 
 test("route memory: a save carries the places and the retrace, and the game runs on to the same", () => {
-  assert.equal(SAVE_VERSION, 9);
+  assert.equal(SAVE_VERSION, 10);
   const make = (): Game =>
     new Game(
       generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),

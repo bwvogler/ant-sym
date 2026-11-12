@@ -15,6 +15,8 @@ import {
   type ChapterView,
   UPGRADES,
   generateOneWorld,
+  GENERIC_ANT,
+  speciesById,
 } from "../colony/index.ts";
 import { journalFromUrl } from "./journal.ts";
 import { colonyName } from "./names.ts";
@@ -211,7 +213,15 @@ export function buildGame(s: GameSettings): Game {
   const map = generateOneWorld(s.seed);
   return new Game(
     map,
-    { antCount: s.antCount, rivalAnts: s.antCount, rival: s.rival, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true } },
+    {
+      antCount: s.antCount,
+      rivalAnts: s.antCount,
+      rival: s.rival,
+      regrow: GAME_REGROW,
+      autoFound: false,
+      fungus: { hyphae: true },
+      species: speciesById(s.species),
+    },
     gameRng(s.seed, s.generation),
   );
 }
@@ -229,7 +239,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const pending = useRef<SaveRecord | null>(null);
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
-    const build = () => buildGame({ seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
+    const build = () =>
+      buildGame({ species: GENERIC_ANT.id, seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
     const g = build();
     const r = pending.current;
     if (
@@ -361,7 +372,13 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     setLoads((n) => n + 1);
   }, []);
   /** What builds this game again (saves.ts). */
-  const settings: GameSettings = { seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation };
+  const settings: GameSettings = {
+    species: GENERIC_ANT.id,
+    seed: controls.seed,
+    antCount: controls.antCount,
+    rival: controls.rival,
+    generation,
+  };
 
   /** The start screen's Start: this seed, the fungus lands; playing at the game's speed, or paused at 1× for the tutorial (PRD §61). */
   const start = useCallback(

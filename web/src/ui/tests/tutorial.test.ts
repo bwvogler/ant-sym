@@ -123,7 +123,7 @@ test("the done flag: kept in storage, and a storage that throws just shows the t
 });
 
 test("in a real game the first host is found within seconds of the landing, and is the tutorial's whether followed or not", () => {
-  const g = buildGame({ seed: 1, antCount: 100, rival: false, generation: 0 });
+  const g = buildGame({ species: "generic", seed: 1, antCount: 100, rival: false, generation: 0 });
   g.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
   let t: Tutorial = { ...begin(), step: "waiting" };
   for (let k = 0; k < 30 * 30 && t.step === "waiting"; k++) {
