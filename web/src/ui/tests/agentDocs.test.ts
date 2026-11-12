@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // The agent files are read in every session, so their size is a cost (docs/agent-guide.md). CLAUDE.md is held to Anthropic's
@@ -40,5 +40,35 @@ test("the agent guide names files and symbols that exist", () => {
       assert.ok(guide.includes(sym), `the guide mentions ${sym}`);
       assert.ok(src.includes(sym), `${path} still has ${sym}`);
     }
+  }
+});
+
+// How an agent finds a tool (docs/agent-guide.md; Anthropic's Claude Code docs): every skill's name and description sit in
+// context from the start, and the description alone decides when it is used, so it must say when. A directory CLAUDE.md loads
+// when its files are read, so it must stay small.
+
+const skillDirs = readdirSync(join(ROOT, ".claude/skills"), { withFileTypes: true }).filter((d) => d.isDirectory());
+
+for (const d of skillDirs) {
+  test(`skill ${d.name}: its name is its folder, and its description says what it does and when to use it`, () => {
+    const text = readFileSync(join(ROOT, ".claude/skills", d.name, "SKILL.md"), "utf8");
+    const front = text.split("\n---")[0] ?? "";
+    assert.equal(/^name:\s*(\S+)\s*$/m.exec(front)?.[1], d.name, "name: matches the folder");
+    const description = /^description:\s*"?(.+?)"?\s*$/m.exec(front)?.[1] ?? "";
+    assert.match(description, /\bUse (whenever|when)\b/, "the description names when to use it");
+    assert.ok(description.length <= 1000, `${description.length} characters: the listing truncates long descriptions`);
+  });
+}
+
+test("the directory CLAUDE.md files stay small, and the root one names the skills it points at", () => {
+  const colony = readFileSync(join(ROOT, "web/src/colony/CLAUDE.md"), "utf8");
+  assert.ok(colony.split("\n").length <= 20, "web/src/colony/CLAUDE.md loads whenever a colony file is read: keep it to a few lines");
+  const root = readFileSync(join(ROOT, "CLAUDE.md"), "utf8");
+  for (const [text, name] of [
+    [root, "watching-a-game"],
+    [colony, "watching-a-game"],
+  ] as const) {
+    assert.ok(text.includes(name), `names the ${name} skill`);
+    assert.ok(existsSync(join(ROOT, ".claude/skills", name, "SKILL.md")), `${name} exists`);
   }
 });
