@@ -27,7 +27,7 @@ export interface UpgradeTip {
 /** The "why it matters" line of each upgrade: what it changes for the player's fungus. */
 const WHY: Record<string, string> = {
   infectivity:
-    "The fungus starts too weak to take hold: it passes on more slowly than four grooming nestmates take it off a visible host. This is the first thing that lets a nest carry it.",
+    "The Garden strain you land with starts too weak to take hold: it passes on more slowly than four grooming nestmates take it off a visible host. This is the first thing that lets a nest carry it.",
   persistence:
     "A host that clears it slowly keeps it longer, so it stays infectious longer and nestmates have more time to catch it from a host before it is gone. Grooming still takes it off at the same rate.",
   mycelium:
@@ -41,7 +41,7 @@ const WHY: Record<string, string> = {
   senses:
     "Widens how far a host's sense of food, rival trails, home, alarm, floor marks and time out can be turned up or down. Jev is asked for the full range either way; this sets how much of its answer takes effect.",
   recognition:
-    "Widens how far it can change who a host takes for a stranger. Between colonies this is how odours move toward each other, which is what unity needs.",
+    "Widens how far it can change who a host takes for a stranger. Between colonies this is how odours move toward each other, which is what the \u201cone colony\u201d bar needs.",
   trails:
     "Widens how far it can change what a host lays on the ground: its trail, trail leaked to rivals, and alarm in a fight. This is how a host's scent can pull other colonies' ants along.",
   royal:
@@ -74,7 +74,7 @@ function reachLine(u: Upgrade, k: number): string {
   if (top === 1) return r === 0 ? "a host runs as is, whatever Jev answers" : "Jev's answer takes effect";
   if (r === 0) return "these levers are held at as is, whatever Jev answers";
   if (r === top) return "Jev's answer takes effect at any level";
-  return "a bigger answer is held back to one step either side of as is";
+  return "a bigger answer is held back to within one step of as is";
 }
 
 /** What an upgrade's levels each mean. Index 0 is where the fungus starts. */

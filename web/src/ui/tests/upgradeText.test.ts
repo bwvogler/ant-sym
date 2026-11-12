@@ -20,11 +20,16 @@ test("every level of every upgrade is explained, in words that carry its number 
   }
   // The spread levels quote the table's own values, so the text can't drift from what the game does.
   const infectivity = levelTexts(UPGRADES.find((u) => u.id === "infectivity")!);
-  assert.match(infectivity[0]!.line, /12 %/);
+  assert.match(infectivity[0]!.line, /12 %.*scaled by how many of the ants around carry it/);
   assert.match(infectivity[3]!.line, /30 %/);
   const persistence = levelTexts(UPGRADES.find((u) => u.id === "persistence")!);
   assert.match(persistence[0]!.line, /3 %.*about 23 s/);
   assert.match(persistence[2]!.line, /never clears it on its own/);
+  const fruiting = levelTexts(UPGRADES.find((u) => u.id === "fruiting")!);
+  assert.match(fruiting[0]!.line, /^0\.6 % of the mycelium's mass becomes spores/);
+  assert.match(fruiting[2]!.line, /^2 % of the mycelium's mass/);
+  const mycelium = levelTexts(UPGRADES.find((u) => u.id === "mycelium")!);
+  assert.match(mycelium[1]!.line, /60 units of mycelium/);
   const evasion = levelTexts(UPGRADES.find((u) => u.id === "evasion")!);
   assert.match(evasion[1]!.line, /35 %/);
 });

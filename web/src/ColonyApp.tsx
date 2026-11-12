@@ -626,7 +626,7 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
               {cost === undefined ? (
                 <span className="shrink-0 text-fg-3">at its most</span>
               ) : (
-                <Tip tip={<NextBody u={u} level={level} />} className="shrink-0">
+                <Tip tip={<NextBody u={u} level={level} />} className="shrink-0" dotted={false} tapToOpen={false} tabStop={false}>
                   <button
                     type="button"
                     className="rounded-md border border-line px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40"
