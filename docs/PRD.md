@@ -4762,7 +4762,7 @@ None. No legend, question or schema changed. The aim card points at presets whos
 
 **Play.** Threads creep through the side view, split at stones, run along tunnels or across them, and spores show where they are exposed; ants digging cut them. The aim in words reaches the fungus's body ("run along the tunnels", "stay buried"), and the *Mycelium* upgrade shows on the field as the growth factor. Risk: a cliff if hyphae reach every tunnel at once; watch the progression worst seed.
 
-**Assays and targets.** H1 the growth unit (length ÷ tips within ±20 % of `HGU` past 20 tips); H2 slide and split at rock; H3 under 5 % of tip steps run into its own cells; H4 hypha × `HYPHA_MASS` never exceeds the mass grown; P1 `scripts/lab/progression.mjs --map one`: no seed worse than the baseline below, and the median quarter within ±25 % of it. Assays land first, with no behaviour change.
+**Assays and targets.** H1 the growth unit (length ÷ tips within ±20 % of `HGU` past 20 tips); H2 slide and split at rock; H3 under 5 % of tip steps run into its own cells; H4 hypha × `HYPHA_MASS` never exceeds the mass grown; P1 `scripts/lab/progression.mjs --map one`, seeds 1–10 and 11–20: no seed more than 10 % slower to a quarter than without hyphae, and neither the worst seed nor the median worse (reworded by the owner, §63.4). Assays land first, with no behaviour change.
 
 **Baseline (measured 2026-11-12, `ja-2bw.1`, before any change).** §50.14's band was measured on the side world, which the page no longer plays. On one world as the page plays it (`node scripts/lab/progression.mjs --map one --evolve --seeds 1-10 --seconds 600`: 600 + 600 ants, aim unite, Garden, the default upgrade order):
 
@@ -4853,3 +4853,4 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 - As on seeds 1–10: every seed takes hold (seed 20, which never did without hyphae, at 484 s); the median quarter about 262 s against about 270 s; the rival reached sooner (median about 207 s against about 366 s); mutations up on most seeds.
 - **P1 as worded ("no seed worse than the baseline") fails narrowly**: seed 14 is 9 s slower (243 → 252 s), seeds 12 and 17 2 s; on seeds 1–10, seeds 2 and 3 were 4 s and 1 s slower. The worst seed and the median both improve; the gate's wording, not the play, is what the owner is asked to settle (`ja-2bw.6`).
+- **Decided (owner, 2026-11-12): ship hyphae on, and P1 reads: no seed more than 10 % slower to a quarter, and neither the worst seed nor the median worse.** On all twenty seeds the largest slowdown is seed 14's 3.7 %; the worst seed (484 s against "never") and the median both improve.

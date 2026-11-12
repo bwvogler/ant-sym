@@ -121,7 +121,7 @@ Cheapest first; everything behind a setting (`hyphae`) whose "off" plays as main
 - **H2, slide and split:** a tip meeting rock head-on leaves two tips going opposite ways; one meeting it at a glance follows it (Held et al. 2019).
 - **H3, autotropism:** under the local rule, under 5 % of tip steps run into the mycelium's own cells.
 - **H4, supply:** total hypha × `HYPHA_MASS` never exceeds the mass grown; with supply short, no tip extends.
-- **Play (P1):** with `hyphae` on, `scripts/lab/progression.mjs --map one`: no seed worse than PRD §63's one-world baseline (a quarter at 147–509 s on nine seeds, never on seed 6), and the median quarter within ±25 % of it. (§50.14's band was the side world's.)
+- **Play (P1, reworded by the owner 2026-11-12, PRD §63.4):** with `hyphae` on, `scripts/lab/progression.mjs --map one` on seeds 1–10 and 11–20: no seed more than 10 % slower to a quarter of the colony than without hyphae, and neither the worst seed nor the median quarter worse. (First worded "no seed worse"; noise of a few seconds failed it. §50.14's band was the side world's.)
 - **Bench:** a tip step is O(1); a few hundred tips stepping every few ticks fits the tick budget (measured in the PR).
 
 **Cost (estimated).** The lane's request is the fungus lane's shape with a smaller legend: about 24 situations per set of words, at roughly the fungus lane's ~770 tokens a situation (PRD §50.19), about 18k tokens, **≈ $0.0008 per new aim**, once; cached games spend nothing. The fungus lane is unchanged.
