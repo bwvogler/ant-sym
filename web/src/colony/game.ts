@@ -1,6 +1,6 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
+import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, type StancePolicy } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
@@ -387,6 +387,14 @@ export class Game {
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
+    // The midden's corpses, for a hypha that reaches one (ja-2bw.7): every colony's, on the layer they are buried on.
+    const middenLayer = one ? PLANE : 0;
+    this.fungus.corpseAt = (layer, x, y) => {
+      if (layer !== middenLayer) return 0;
+      let n = 0;
+      for (const c of this.colonies) n += c.midden.get(colonyCell(x, y)) ?? 0;
+      return n;
+    };
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
@@ -407,6 +415,14 @@ export class Game {
       c.onBury = (d, layer = 0) => {
         if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates)
           this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
+        // With hyphae, a host that died of the evolving fungus is a new start on the midden (ja-2bw.7).
+        if (d.load >= INFECTED && d.strain === this.fungus.evolution?.strain) this.fungus.colonise(layer, d.x, d.y);
+      };
+      // One world: a host that dies of the evolving fungus on the plane, outside, is a new start where it lies (owner,
+      // 2026-11-12): no corpse is kept there, and none carried in, so the fungus grows out of it at once.
+      c.onDie = (i, layer, x, y) => {
+        if (this.world && layer === PLANE && c.load[i]! >= INFECTED && c.strain[i] === this.fungus.evolution?.strain)
+          this.fungus.colonise(PLANE, x, y);
       };
       if (this.colonies.length > 1) {
         this.layers.forEach((_, l) => {
@@ -653,6 +669,7 @@ export class Game {
       if (this.fungus.evolution?.strain === f.fungus.strain) {
         const at = this.#byHole(c);
         this.fungus.root(at.x, at.y, LANDING.radius);
+        this.#rootShaft(c);
       }
     }
     return k;
@@ -1033,8 +1050,15 @@ export class Game {
     if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
     this.fungus.root(x, y, LANDING.radius);
+    this.#rootShaft(this.colonies[k] ?? this.player);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
+  }
+
+  /** One world, with hyphae (ja-2bw.2): the fungus also roots on the walls of the shaft under colony c's hole, in the curtain. */
+  #rootShaft(c: Colony): void {
+    const e = this.world ? (c.layers[CURTAIN] as Layer | undefined)?.nest.entrance : undefined;
+    if (e) this.fungus.rootShaft(CURTAIN, e.x, e.y);
   }
 
   /** Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim). */

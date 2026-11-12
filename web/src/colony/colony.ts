@@ -605,6 +605,7 @@ const COLONY_SKIP: ReadonlySet<string> = new Set([
   "stancePolicy",
   "responses",
   "onBury",
+  "onDie",
   "enemies",
   "foreign",
   "friends",
@@ -743,6 +744,11 @@ export class Colony {
   readonly midden = new Map<number, number>();
   /** called with each corpse as it is put on the midden (the game: a sporulating strain's spores there), and the layer it lies on (absent: layer 0) */
   onBury: ((k: Corpse, layer?: number) => void) | null = null;
+  /**
+   * called as ant i dies, with the layer and cell it dies on, before its slot is cleared (its load and strain still
+   * read): the game's fungus grows out of a host dead on the plane, where no corpse is kept (ja-2bw.7, owner 2026-11-12)
+   */
+  onDie: ((i: number, layer: number, x: number, y: number) => void) | null = null;
   /** Whether ant i carries a corpse (drawn as one, not as soil). */
   carriesCorpse(i: number): boolean {
     return this.corpse[i] === 1;
@@ -1748,6 +1754,13 @@ export class Colony {
     }
     if (this.carrying[i]) dropFood(this.map, this.x[i], this.y[i], 1, this.quality[i]);
     this.antCell(i);
+    if (this.onDie) {
+      const x = CELL[0];
+      const y = CELL[1];
+      this.onDie(i, this.layer[i] as number, x, y);
+      CELL[0] = x;
+      CELL[1] = y;
+    }
     if (this.corpse[i]) {
       // The corpse it carried falls where it falls, with it (one world: on the layer it was on; on the plane it lies there and rots).
       for (const k of this.corpses) if (k.held === i) ((k.held = -1), (k.x = CELL[0]), (k.y = CELL[1]), (k.layer = this.layer[i]));

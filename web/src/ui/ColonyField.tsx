@@ -16,6 +16,9 @@ import {
   SIDE,
   INFECTED,
   type Fungus,
+  type Hyphae,
+  hyphaCell,
+  HYPHA_ROOT,
   type OneWorld,
   STRIP,
   BINS,
@@ -52,6 +55,7 @@ import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
+import { trailSight } from "./fungusSight.ts";
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -201,7 +205,8 @@ export default function ColonyField({
   api,
   pen = null,
 }: Props) {
-  const colony = colonies[0] as Colony;
+  // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
+  const anyColony = colonies[0] as Colony;
   const count = colonies.length;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** chamber names drawn on the side view's nests (the Labels button); a click on a chamber then inspects it */
@@ -238,7 +243,7 @@ export default function ColonyField({
     return s;
   };
   /** The shown view's map: one world's plane or curtain, or the game's one map (the colony's, between ticks). */
-  const shownMap = (): WorldMap => (world ? (shown.current === PLANE ? world.plane : world.curtain) : colony.map);
+  const shownMap = (): WorldMap => (world ? (shown.current === PLANE ? world.plane : world.curtain) : anyColony.map);
   /** The shown map's extent, read afresh: one world's curtain widens when a colony is founded. */
   const extent = () => extentOf(shownMap());
   // A new game starts zoomed out, in both views.
@@ -271,13 +276,15 @@ export default function ColonyField({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    // The shown map, read each frame (bind): which layer (`lv`: one world's PLANE or CURTAIN, −1 on one map), its map, the
-    // player's scent and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
+    // The shown map, read each frame (bind): which layer (`lv`: one world's PLANE or CURTAIN, −1 on one map), its map, every
+    // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
     let lv = -1;
-    let m: WorldMap = colony.map;
-    let ph = colony.ph;
+    let m: WorldMap = anyColony.map;
+    let alarms: ChunkLayer<Float32Array>[] = [];
     let spores: ChunkLayer<Float32Array> = fungus.spores;
     let strip = false;
+    // Each colony's trails on the shown layer and how strongly they show: by how far the fungus is into it (ja-vyu).
+    let trails: { sight: number; food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array> }[] = [];
     // The map's size and first column: its columns run gx0 … gx0 + gw − 1 (gx0 < 0 on one world's curtain, whose column
     // is the line's s), and the extent the camera fits; set again (rebuild) when the map or its size changes.
     let gx0 = m.x0;
@@ -320,11 +327,20 @@ export default function ColonyField({
     /** Read the shown view: its layer, map, scent and spores (each frame). */
     const bind = () => {
       lv = world ? shown.current : -1;
-      m = world ? (lv === PLANE ? world.plane : world.curtain) : colony.map;
+      m = world ? (lv === PLANE ? world.plane : world.curtain) : anyColony.map;
       if (m !== geoMap || m.x0 !== gx0 || m.size.w !== gw || m.size.h !== gh) rebuild(m);
-      ph = lv < 0 ? colony.ph : (colony.layers[lv] ?? colony.layers[0]!).ph;
       spores = lv < 0 ? fungus.spores : (fungus.sporesOn(lv)?.spores ?? fungus.spores);
       strip = world !== null && lv === CURTAIN;
+      trails = [];
+      alarms = [];
+      for (const col of colonies) {
+        const p = lv < 0 ? col.ph : col.layers[lv]?.ph;
+        if (!p) continue;
+        alarms.push(p.fields.alarm);
+        const { infected, living } = fungus.census(col);
+        const sight = trailSight(infected, living);
+        if (sight > 0) trails.push({ sight, food: p.fields.food, home: p.fields.home });
+      }
     };
     bind();
 
@@ -410,9 +426,18 @@ export default function ColonyField({
     const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array) => {
       const fc = m.food.chunk(cx, cy);
       const lc = m.loose?.chunk(cx, cy);
-      const foodC = ph.fields.food.chunk(cx, cy);
-      const homeC = ph.fields.home.chunk(cx, cy);
-      const alarmC = ph.fields.alarm.chunk(cx, cy);
+      // Every colony's food and home trails here, with how strongly each shows (by its infection).
+      const trailC: { sight: number; food: Float32Array | undefined; home: Float32Array | undefined }[] = [];
+      for (const t of trails) {
+        const food = t.food.chunk(cx, cy);
+        const home = t.home.chunk(cx, cy);
+        if (food || home) trailC.push({ sight: t.sight, food, home });
+      }
+      const alarmC: Float32Array[] = [];
+      for (const a of alarms) {
+        const ac = a.chunk(cx, cy);
+        if (ac) alarmC.push(ac);
+      }
       const sporeC = spores.chunk(cx, cy);
       // One world's plane: the mound, a height field of spoil (oneWorld.ts), washed in by its height.
       const spoilC = m.spoil?.chunk(cx, cy);
@@ -447,8 +472,9 @@ export default function ColonyField({
             px[o + 3] = 120 + Math.min(135, fv * 12);
             continue;
           }
-          // Alarm is always shown: the player painted it, or a fight laid it, and it fades in seconds.
-          const al = alarmC ? Math.min(1, alarmC[i] / 6) : 0;
+          // Every colony's alarm is always shown: a fight laid it, and it fades in seconds.
+          let al = 0;
+          for (const ac of alarmC) al = Math.max(al, Math.min(1, ac[i]! / 6));
           if (al > 0.03) {
             px[o] = theme.alarm[0];
             px[o + 1] = theme.alarm[1];
@@ -473,9 +499,14 @@ export default function ColonyField({
             px[o + 3] = Math.min(255, 110 + heap * 45);
             continue;
           }
-          const f = show.food && foodC ? Math.min(1, foodC[i] / 4) : 0;
-          // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
-          const h = show.home && homeC ? Math.min(1, homeC[i] / 12) : 0;
+          // Each colony's trails as strongly as the fungus is in it; where two overlap, the stronger shows.
+          let f = 0;
+          let h = 0;
+          for (const t of trailC) {
+            if (show.food && t.food) f = Math.max(f, t.sight * Math.min(1, t.food[i]! / 4));
+            // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
+            if (show.home && t.home) h = Math.max(h, t.sight * Math.min(1, t.home[i]! / 12));
+          }
           if (f >= h && f > 0.02) {
             px[o] = theme.trail[0];
             px[o + 1] = theme.trail[1];
@@ -661,6 +692,55 @@ export default function ColonyField({
       }
     };
 
+    /**
+     * The mycelium's hyphae (ja-2bw.3, docs/hyphal-growth.md): each cell joined to the one it grew from by a line through
+     * the hexagons' centres, the loops fusion closed, and a dot at each tip. On the plane (`under`) faint, as threads just
+     * under the surface; in the curtain plainer. Only the cells in view (rows ry0…ry1, columns rx0…rx1, a cell's margin).
+     */
+    const drawHyphae = (
+      h: Hyphae,
+      c: Camera,
+      v: Viewport,
+      d: number,
+      under: boolean,
+      rx0: number,
+      rx1: number,
+      ry0: number,
+      ry1: number,
+    ) => {
+      const inView = (x: number, y: number) => x >= rx0 - 1 && x <= rx1 + 1 && y >= ry0 - 1 && y <= ry1 + 1;
+      const path = new Path2D();
+      const segment = (a: number, b: number) => {
+        const [ax, ay] = hyphaCell(a);
+        const [bx, by] = hyphaCell(b);
+        if (!inView(ax, ay) && !inView(bx, by)) return;
+        const [sx, sy] = toScreen(c, v, centreX(ax, ay), centreY(ay));
+        const [tx, ty] = toScreen(c, v, centreX(bx, by), centreY(by));
+        path.moveTo(sx, sy);
+        path.lineTo(tx, ty);
+      };
+      for (const [k, p] of h.parent) if (p !== HYPHA_ROOT) segment(p, k);
+      for (let i = 0; i + 1 < h.fusions.length; i += 2) segment(h.fusions[i]!, h.fusions[i + 1]!);
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = theme.spore;
+      ctx.globalAlpha = under ? 0.45 : 0.9;
+      ctx.lineWidth = Math.max(1 * d, Math.min(3 * d, c.zoom * 0.12));
+      ctx.stroke(path);
+      ctx.fillStyle = theme.spore;
+      ctx.globalAlpha = under ? 0.6 : 1;
+      const r = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));
+      for (const t of h.tips) {
+        if (!inView(t.x, t.y)) continue;
+        const [x, y] = toScreen(c, v, centreX(t.x, t.y), centreY(t.y));
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    };
+
     /** Text with a paper halo, centred at screen (x, y). */
     const label = (text: string, x: number, y: number, px: number, alpha = 1, fill = theme.ink) => {
       ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
@@ -721,7 +801,7 @@ export default function ColonyField({
 
     /** One world's top view: each hole named by the colony whose hole it is (holeCells), "empty hole" if none. */
     const drawHoleNames = (w: OneWorld, c: Camera, v: Viewport, d: number, inView: (x: number, y: number) => boolean) => {
-      const holes = colony.holeCells;
+      const holes = anyColony.holeCells;
       const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
       for (const h of w.line.holes) {
         const wx = centreX(h.x, h.y);
@@ -942,6 +1022,8 @@ export default function ColonyField({
           }
         }
       if (hexes) drawHexes(c, v, rx0, rx1, ry0, ry1);
+      const hy = fungus.hyphaeOn(lv < 0 ? 0 : lv);
+      if (hy) drawHyphae(hy, c, v, d, lv === PLANE || (lv < 0 && !m.sky), rx0, rx1, ry0, ry1);
 
       // Nests and ants in view, coloured by odour (recognition.ts): the first colony (Ink) starts in ink, the second (Amber) in the
       // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier,
@@ -1281,7 +1363,7 @@ export default function ColonyField({
     s.fitted = cam.zoom <= fz * 1.0001;
   };
   /** View `v`'s map: one world's plane or curtain, or the game's one map. */
-  const mapOf = (v: number): WorldMap => (world ? (v === PLANE ? world.plane : world.curtain) : colony.map);
+  const mapOf = (v: number): WorldMap => (world ? (v === PLANE ? world.plane : world.curtain) : anyColony.map);
   // The page's handle on the cameras: a view opens where it is asked (a linked click, an ant carried across).
   useEffect(() => {
     if (!api) return;
@@ -1486,7 +1568,7 @@ export default function ColonyField({
   };
   /** Centre on colony k's nest (n cycles through them). */
   const goNest = (k: number) => {
-    const col = colonies[k] ?? colony;
+    const col = colonies[k] ?? anyColony;
     nestTurn.current = k;
     unfollow();
     // The side view: between the entrance and the chamber, so both the ground line and the nest are in view. One world:
@@ -1530,7 +1612,7 @@ export default function ColonyField({
             {colonyName(k)} nest
           </button>
         ))}
-        {(world ? (view === PLANE ? world.plane : world.curtain) : colony.map).chambers && (
+        {(world ? (view === PLANE ? world.plane : world.curtain) : anyColony.map).chambers && (
           <button
             type="button"
             className={labels ? button.replace("border-line", "border-accent").replace("text-fg-2", "text-accent") : button}
