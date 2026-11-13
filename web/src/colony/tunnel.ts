@@ -37,6 +37,7 @@ import {
   WIDEN,
   WIDEN_DEPTH,
 } from "./tuning.ts";
+import { crust } from "./dig.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { AIR, OPEN, SOIL, isSky, markFork, rockAt, takeFork, tunnelHeading, type Nest } from "./world.ts";
 
@@ -479,7 +480,7 @@ export function chamberFace(col: Colony, x: number, y: number, c: Chamber | null
   return (
     rockAt(col.map, x, y) === SOIL &&
     col.map.loose?.get(x, y) !== 1 &&
-    !col.crust(x, y) &&
+    !crust(col, x, y) &&
     !refilled(col.map, x, y, col.time, col.params.backfill.hold) &&
     col.chamberSpot(c, x, y)
   );

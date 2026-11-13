@@ -3,8 +3,8 @@ import { type AntArrays, antResets, makeAntArrays, NO_KEY } from "./ants.ts";
 import { type Channel, type Mark, MARKS, Pheromones } from "./pheromone.ts";
 import { Brood, LARVA } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
-import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
-import { CELL, cellOf, centreX, centreY, DIR_ANGLE, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
+import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
+import { CELL, cellOf, centreX, centreY, DIR_ANGLE, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import {
   type CellCounts,
   ENEMY,
@@ -26,6 +26,8 @@ import {
   FIGHT,
   FOLLOW,
   RETURN,
+  PLANE,
+  CURTAIN,
 } from "./vocab.ts";
 import type { Schema } from "./schema.ts";
 import {
@@ -49,16 +51,11 @@ import {
   blocked,
   digCell,
   dropFood,
-  fillCell,
   groundTop,
-  heapMound,
-  heapPlane,
   inBounds,
   isSky,
   OPEN,
-  openCell,
   takeLoose,
-  takePlane,
   rockAt,
   setTunnelHeading,
   SOIL,
@@ -74,7 +71,6 @@ import {
   CHAMBER_GAP,
   CHAMBER_GAP_GROWTH,
   CHAMBER_MIN_DEPTH,
-  CHAMBER_SCAN,
   CHAMBER_SPREAD,
   CORPSE_GIVE_UP,
   CROWD_HALF,
@@ -104,7 +100,6 @@ import {
   MET_HALF,
   MIDDEN_AT,
   MIDDEN_AVOID,
-  MIDDEN_MARK,
   MIDDEN_MIN,
   MIDDEN_SPREAD,
   MILL_WAYS,
@@ -117,9 +112,7 @@ import {
   OUT_FIELD_EVERY,
   PI_DRIFT,
   PI_DRIFT_2D,
-  PLANE_STEEP,
   QUEEN_STOCK,
-  RECEPTION_ABOVE,
   RECEPTION_MIN,
   REST,
   RETURNS_MANY,
@@ -132,8 +125,6 @@ import {
   SPOIL_GIVE_UP,
   START,
   START_FACE,
-  STORE_BELOW,
-  SWELL,
   THREAT_HALF,
   TUNNEL_STALL,
   WAIT_RIM,
@@ -152,16 +143,12 @@ import {
   choose,
   climb,
   crossedDir,
-  floorGround,
   gauss,
   handOnWall,
   inReach,
-  keyX,
-  keyY,
   planeMoundReach,
   refilled,
   soilFace,
-  stub,
   tunnel,
   turnToward,
   walkable,
@@ -170,6 +157,7 @@ import {
 import { DEFAULT_COLONY, LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN, channelParams, type ColonyParams } from "./params.ts";
 import { walkTunnel } from "./tunnel.ts";
 import { middenSmell, nestLife, nurse, port, undertake } from "./nestWork.ts";
+import { backfill, chamberDug, chamberGoal, crust, dropOut, dropPlane, enterStale, pickPlane, putDown, staleStep, unbury } from "./dig.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -382,9 +370,7 @@ export const LAYER_STATE = ["ph", "holes", "outDist", "outCells", "outVersion", 
 /** A layer's own copy of its state, held while another layer is bound (see Colony.layers). */
 type LayerSlots = { -readonly [K in keyof Layer]: Layer[K] };
 
-/** One world's layers (docs/one-world.md §2): the plane, the surface, is layer 0; the curtain, underground, layer 1 (a colony's home there). */
-export const PLANE = 0;
-export const CURTAIN = 1;
+export { CURTAIN, PLANE } from "./vocab.ts";
 
 /**
  * One nest's hole on both layers (one world): its cell in the curtain (the crust's open cell, under the line) and the
@@ -1429,11 +1415,6 @@ export class Colony {
     return t && this.entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.entrance.x))) : MIDDEN_AT;
   }
 
-  /** The middle of the midden: its column (side view). */
-  middenCol(): number {
-    return this.entranceCol + this.middenSide() * this.middenAt();
-  }
-
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
   outbound(i: number): boolean {
     return this.queen !== null && this.band(i) === 2;
@@ -1741,198 +1722,6 @@ export class Colony {
   clearTo(x: number, y: number, tx: number, ty: number): boolean {
     const steps = Math.ceil(Math.hypot(tx - x, ty - y) * 2);
     for (let k = 1; k < steps; k++) if (blocked(this.map, x + ((tx - x) * k) / steps, y + ((ty - y) * k) / steps)) return false;
-    return true;
-  }
-
-  /**
-   * Ant i dug its chamber face (x, y): it joins that chamber, or founds one. The face was chosen a while ago, and chambers
-   * round it may have grown since, so it is judged again now it is open (review of slice 2: two chambers joined at 73 s
-   * and 352 s on seed 5): if it would join another chamber, lie outside its chamber's rows, or lie too near the ground,
-   * it stays a plain tunnel.
-   */
-  chamberDug(i: number, x: number, y: number): void {
-    const ch = this.map.chambers!;
-    let id = this.chamberFor[i] - 1;
-    if (id < 0) {
-      if (!this.chamberRoom(x, y, y - this.soilTop(x)) || !this.chamberSpot(null, x, y)) return; // another was started near it meanwhile: a tunnel stub
-      id = ch.add(this.params.nest, y, this.roleFor(y)).id;
-    } else {
-      const c = ch.list[id];
-      if (!c || c.colony !== this.params.nest || !this.chamberSpot(c, x, y)) return;
-    }
-    ch.claim(id, x, y, openCell(this.map));
-  }
-
-  /**
-   * Backfill: a pellet carrier at cell (cx, cy) drops its pellet into a neighbouring cell that nobody
-   * uses, filling it back with soil, instead of hauling it all the way out. Leaf-cutting ants put most of
-   * their soil back inside this way, refilling unused space (Pielström & Roces); harvester ants very
-   * little (≈ 2.5 %, Tschinkel et al. 2015). A cell may be filled when:
-   * - its open neighbours form one unbroken run (stub with BACKFILL.maxOpen), so no passage is cut;
-   * - it smells unused against the path: its home + food scent is under staleBelow (judged from where
-   *   the carrier stands, raised next to fresh pellets);
-   * - it holds no food and no ant of either colony, and is not by any nest;
-   * - it is not the cell this carrier dug its pellet from (that would undo its own dig), nor any cell dug in the
-   *   last BACKFILL.young seconds: fresh digging is where the colony is going (tunnels toward food), not excess
-   *   space. Leaf-cutters refill older galleries they no longer use (Pielström & Roces). Except the ground a
-   *   chamber's floor stands on (see floorGround): filling a tunnel dug down out of a chamber builds its floor
-   *   back, which is construction, not spare soil put away. Put back under a chamber cell, it stays (see builtFloor).
-   */
-  backfill(i: number, cx: number, cy: number): boolean {
-    const { map } = this;
-    const home = this.ph.fields.home;
-    const food = this.ph.fields.food;
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(cx, cy, d);
-      const ty = stepY(cy, d);
-      if (cellKey(tx, ty) === this.lastDug[i]) continue; // the cell it just dug: not straight back in
-      if (this.time - map.dugAt.get(tx, ty) < this.params.backfill.young && !floorGround(map, tx, ty)) continue; // dug lately: the live frontier, not excess
-      if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, this.params.backfill.maxOpen)) continue;
-      if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= this.staleBelow(cx, cy, tx, ty)) continue;
-      this.enemies?.look?.(this.odour[i], -1); // any ant of another colony, stranger or not (a tolerance below 0 counts every band)
-      if ((this.friends?.get(tx, ty) ?? 0) > 0 || (this.enemies?.get(tx, ty) ?? 0) > 0) continue;
-      if (this.byANest(tx, ty)) continue;
-      if (this.brood.items.some((b) => b.held < 0 && b.x === tx && b.y === ty)) continue; // brood lies there (a nurse died carrying it)
-      if (this.entrance && (isSky(map, tx, ty) || this.byAnEntrance(tx, ty))) continue; // the ground line and the holes stay open
-      // The grids are a tick old: a nestmate that stepped in earlier this tick isn't in them (and walling it
-      // in would bury it). Rare enough (every other test passed) to look at each ant.
-      if (this.occupied(tx, ty)) continue;
-      if (!fillCell(map, tx, ty, this.time)) continue;
-      // A fresh trip out from here. (Letting its trip clock run on instead, so it lays only faint home scent
-      // this deep, was measured worse: it soon tires and walks home empty. Seeds 3, 4, 6–8: 12 % less food home.)
-      if (this.soil[i] !== SOIL_DUG) this.looseFilled++;
-      else this.soilFilled++;
-      this.clearPellet(i);
-      this.since[i] = 0;
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * The scent (home + food) below which cell (tx, ty), seen from the carrier's cell (cx, cy), counts as
-   * unused. Scent diffuses into every side passage, so a fixed threshold (FAINT) finds almost nothing
-   * unused (0.6 % of dug soil, MR 11); what an ant can tell is that a side passage smells far fainter than
-   * the path it is on. Fresh pellets nearby raise it: workers build where building is going on (pellets
-   * carry a building pheromone, Khuong et al. 2016; fresh pellets draw more work, Pielström & Roces 2013).
-   */
-  staleBelow(cx: number, cy: number, tx: number, ty: number): number {
-    const f = this.ph.fields;
-    const here = f.home.get(cx, cy) + f.food.get(cx, cy);
-    const base = Math.max(FAINT, this.params.backfill.staleRatio * here);
-    // Never above the scent where it stands: a cell as busy as its own is in use, fresh pellets or not.
-    return Math.min(base * (1 + this.params.backfill.pelletPull * this.pelletScent(tx, ty)), Math.max(base, here));
-  }
-
-  /** The smell of fresh pellets at cell (x, y): from the freshest fill among it and its neighbours, fading over BACKFILL.pelletTau seconds. */
-  pelletScent(x: number, y: number): number {
-    const at = this.map.filledAt;
-    let t = at.get(x, y);
-    for (let d = 0; d < 6; d++) t = Math.max(t, at.get(stepX(x, y, d), stepY(y, d)));
-    return t === -Infinity ? 0 : Math.exp(-(this.time - t) / this.params.backfill.pelletTau);
-  }
-
-  /**
-   * A pellet carrier walking a stale branch (see enterStale) goes on along it, by the stalest way ahead (never
-   * back), to its end, where it fills the last cell (backfill, on arriving beside it): unused branches are
-   * filled back from the tip, a cell per pellet, as leaf-cutting ants refill the excess space they dug
-   * (Pielström & Roces). Only early in the trip home (BACKFILL.staleSearch), so a carrier that finds nothing to
-   * fill still gets home; at the branch's end with nothing filled (an ant in its last cell, say) it heads home.
-   * Decided here, not in walkTunnel: a branch's first cells touch the tunnel it leaves, so they are no tunnel
-   * cells. True while it walks the branch (its target cell is gx, gy).
-   */
-  staleStep(i: number, step: number): boolean {
-    const s = this.since[i];
-    if (s <= this.params.backfill.after || s >= this.params.backfill.staleSearch) {
-      this.staleWalk[i] = 0;
-      return false;
-    }
-    const { map } = this;
-    const x = this.x[i];
-    const y = this.y[i];
-    this.antCell(i);
-    const hx = CELL[0];
-    const hy = CELL[1];
-    const gx = this.gx[i];
-    const gy = this.gy[i];
-    const live = gx !== NO_CELL && rockAt(map, gx, gy) === OPEN && hexDistance(gx, gy, hx, hy) <= 1;
-    if (live && Math.hypot(centreX(gx, gy) - x, centreY(gy) - y) > step) return true; // on its way to the next cell
-    const cx = live ? gx : hx;
-    const cy = live ? gy : hy;
-    const f = this.ph.fields;
-    const ahead = this.gdir[i];
-    let way = -1;
-    let wayV = Infinity;
-    for (const turn of [0, 1, -1, 2, -2]) {
-      const d = (ahead + turn + 6) % 6;
-      const tx = stepX(cx, cy, d);
-      const ty = stepY(cy, d);
-      if (rockAt(map, tx, ty) !== OPEN) continue;
-      const v = f.home.get(tx, ty) + f.food.get(tx, ty);
-      if (v < wayV) {
-        wayV = v;
-        way = d;
-      }
-    }
-    if (way < 0) {
-      this.staleWalk[i] = 0;
-      this.gx[i] = NO_CELL;
-      return false;
-    }
-    this.gdir[i] = way;
-    this.gx[i] = stepX(cx, cy, way);
-    this.gy[i] = stepY(cy, way);
-    return true;
-  }
-
-  /**
-   * At a cell it has just entered, a pellet carrier that sees a far staler way than where it stands (a branch
-   * nobody walks) now and then turns into it (BACKFILL.enterStale), to fill its end (see staleStep). Forks
-   * are never tunnel cells on hexes (the branch's mouth sits beside the way on), so this is looked at on
-   * arrival, not in walkTunnel. True if it turned in: its target cell (gx, gy) is the branch's first cell.
-   *
-   * Never back the way it came: home scent falls away from the nest along every path, so the cell behind
-   * always smells fainter than here, and judged against here alone it passed for a stale branch (40 % of
-   * turn-ins were straight reversals, MR 12's review). A branch must smell stale against the way it came
-   * too: only then is it a side way nobody walks, not just the path's own far end.
-   */
-  enterStale(i: number, cx: number, cy: number): boolean {
-    const s = this.since[i];
-    if (this.staleWalk[i] || s >= this.params.backfill.staleSearch) return false;
-    const { map } = this;
-    const f = this.ph.fields;
-    // The way it came: the cell it looked from last, if that is beside it; else the way behind its heading.
-    const from = this.cameFrom[i];
-    let bx = keyX(from);
-    let by = keyY(from);
-    if (from === NO_KEY || hexDistance(bx, by, cx, cy) !== 1) {
-      const back = dirOf(this.heading[i] + Math.PI);
-      bx = stepX(cx, cy, back);
-      by = stepY(cy, back);
-    }
-    let way = -1;
-    let wayV = Infinity;
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(cx, cy, d);
-      const ty = stepY(cy, d);
-      if ((tx === bx && ty === by) || rockAt(map, tx, ty) !== OPEN) continue;
-      const v = f.home.get(tx, ty) + f.food.get(tx, ty);
-      if (v < wayV) {
-        wayV = v;
-        way = d;
-      }
-    }
-    if (way < 0) return false;
-    const tx = stepX(cx, cy, way);
-    const ty = stepY(cy, way);
-    if (wayV >= this.staleBelow(cx, cy, tx, ty)) return false;
-    if (rockAt(map, bx, by) === OPEN && wayV >= this.staleBelow(bx, by, tx, ty)) return false; // no staler than the path behind
-    if (this.rng() >= this.params.backfill.enterStale) return false;
-    this.staleWalk[i] = 1;
-    this.gdir[i] = way;
-    this.gx[i] = tx;
-    this.gy[i] = ty;
-    this.wall[i] = 0;
     return true;
   }
 
@@ -2391,33 +2180,6 @@ export class Colony {
    */
   chamberNest: Nest = { x: 0, y: 0, r: 1.5 };
   goalCells = new Map<number, { cells: number; x: number; y: number }>();
-  chamberGoal(id: number): Nest {
-    const ch = this.map.chambers;
-    const c = ch?.list[id];
-    if (!ch || !c || c.cells === 0) return this.nest;
-    let g = this.goalCells.get(id);
-    if (!g || g.cells !== c.cells) {
-      const mx = c.sumX / c.cells;
-      const my = c.sumY / c.cells;
-      g = { cells: c.cells, x: centreX(Math.round(mx), Math.round(my)), y: centreY(Math.round(my)) };
-      let best = Infinity;
-      for (let y = Math.floor(my) - CHAMBER_SCAN; y <= Math.ceil(my) + CHAMBER_SCAN; y++)
-        for (let x = c.x0; x <= c.x1; x++) {
-          if (ch.at(x, y) !== id) continue;
-          const d = (x - mx) ** 2 + (y - my) ** 2;
-          if (d < best) {
-            best = d;
-            g.x = centreX(x, y);
-            g.y = centreY(y);
-          }
-        }
-      this.goalCells.set(id, g);
-    }
-    this.chamberNest.x = g.x;
-    this.chamberNest.y = g.y;
-    return this.chamberNest;
-  }
-
   /** Food wanted per chamber, and food on its way to each (porters carrying it there): for port, worked out once a tick. */
   want = new Map<number, number>();
   enRouteTo = new Map<number, number>();
@@ -2632,17 +2394,6 @@ export class Colony {
     return s;
   }
 
-  /** The role a new chamber with its floor on row y takes (its column plays no part): the colony's first one well above the royal chamber is reception; below it, store; else brood. */
-  roleFor(y: number): Role {
-    const ch = this.map.chambers!;
-    const mine = ch.list.filter((c) => c.colony === this.params.nest && c.cells > 0);
-    const royal = mine.find((c) => c.role === "royal");
-    if (!royal) return "brood";
-    if (y < royal.floorRow - RECEPTION_ABOVE && !mine.some((c) => c.role === "reception")) return "reception";
-    if (y > royal.floorRow + STORE_BELOW) return "store";
-    return "brood";
-  }
-
   /**
    * Whether the nest is crowded (the side view, nest slice 2): fewer floor cells in the colony's chambers than
    * FLOOR_PER_ANT for each ant underground. A crowded nest digs (chambers first); a roomy one barely digs at all
@@ -2708,60 +2459,6 @@ export class Colony {
     return !this.entrance || !isSky(this.map, cx, cy);
   }
 
-  /**
-   * The side view: whether soil cell (x, y) is the ground line's crust (it touches the sky). Ants leave it: digging
-   * it would undermine the walkway or hole the ground everywhere; the hole they keep is their entrance. Loose soil
-   * (the mound) is no crust.
-   */
-  crust(x: number, y: number): boolean {
-    const ent = this.entrance;
-    if (!ent) return false;
-    if (this.map.loose?.get(x, y) === 1) return false; // the mound: loose pellets, never dug (picked up off its top: pickLoose)
-    // Round the hole too: it is their way in already, and digging round it once hollowed the ground under the walkway
-    // above the hole, which fell to sky and left the hole with no way out onto the ground.
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(x, y, d);
-      const ty = stepY(y, d);
-      // The ground under the mound is crust too: dug out under a blanket of spoil, the next pellet picked off the
-      // top opened a new hole into the tunnels, away from every entrance (agent review of MR 15).
-      if (isSky(this.map, tx, ty) || this.map.loose?.get(tx, ty) === 1) return true;
-    }
-    return false;
-  }
-
-  /**
-   * The side view: an ant whose cell has become solid (spoil heaped on it, or round it by the other colony) climbs
-   * out to an open neighbour, upward first; one left in the sky (the spoil under it picked up) drops to the ground. Six heaps round an ant, three a second by the hole, could otherwise
-   * wall it in for good (agent review of MR 14: ants buried for the rest of the run).
-   */
-  unbury(i: number): void {
-    this.antCell(i);
-    const cx = CELL[0];
-    const cy = CELL[1];
-    if (rockAt(this.map, cx, cy) === OPEN) return;
-    // Never up into one world's surface rows (the plane's: crossUp is the only way there).
-    const surface = this.map.surfaceRows ?? 0;
-    for (const d of [4, 5, 3, 0, 2, 1]) {
-      const tx = stepX(cx, cy, d);
-      const ty = stepY(cy, d);
-      if (rockAt(this.map, tx, ty) !== OPEN || ty < surface) continue;
-      this.x[i] = centreX(tx, ty);
-      this.y[i] = centreY(ty);
-      this.gx[i] = NO_CELL;
-      this.digT[i] = 0;
-      return;
-    }
-    // Buried deeper (several heaps in one tick), or left in the air (the mound taken from under it): up or down its
-    // column to the ground line.
-    const top = groundTop(this.map, cx) - 1;
-    if (top >= surface && top !== cy && rockAt(this.map, cx, top) === OPEN) {
-      this.x[i] = centreX(cx, top);
-      this.y[i] = centreY(top);
-      this.gx[i] = NO_CELL;
-      this.digT[i] = 0;
-    }
-  }
-
   /** Whether ant i is in a cell it hasn't looked round yet this trip (leaves its cell in CELL; the cell it looked from before goes in cameFrom). */
   enteredCell(i: number): boolean {
     this.antCell(i);
@@ -2770,13 +2467,6 @@ export class Colony {
     this.cameFrom[i] = this.looked[i];
     this.looked[i] = packed;
     return true;
-  }
-
-  /** Whether cell (x, y) is within a nest's radius + 2 (any colony's: a rival's chamber is no dead end to fill either). */
-  byANest(x: number, y: number): boolean {
-    if ((this.map.chambers?.at(x, y) ?? -1) >= 0) return true; // a chamber is never filled
-    for (const n of this.map.nests ?? [this.nest]) if (Math.hypot(centreX(x, y) - n.x, centreY(y) - n.y) < n.r + 2) return true;
-    return false;
   }
 
   /**
@@ -2814,67 +2504,6 @@ export class Colony {
   }
 
   /**
-   * The side view: drop ant i's pellet on the ground where it stands, in column `col`: heaped there and slid
-   * downhill to the angle of repose. A dug pellet is the soil brought out (soilOut), every whole cell of it
-   * (× SWELL) heaped; a loose one, moved, is one cell back on the mound.
-   */
-  dropOut(i: number, col: number): void {
-    const { map, ph } = this;
-    if (this.corpse[i]) {
-      // On the midden: the corpse lies on the ground there, and the midden smells of the colony (a boundary: see raids).
-      // A carrier that gave up short of it (SPOIL_GIVE_UP) leaves the corpse lying, unmarked, for another to take on.
-      const row = groundTop(map, col) - 1;
-      const onMidden = Math.abs(col - this.middenCol()) <= 3;
-      for (let n = this.corpses.length - 1; n >= 0; n--) {
-        const k = this.corpses[n] as Corpse;
-        if (k.held !== i) continue;
-        k.held = -1;
-        k.x = col;
-        k.y = row;
-        if (onMidden) {
-          this.corpses.splice(n, 1);
-          const key = cellKey(col, row);
-          this.midden.set(key, (this.midden.get(key) ?? 0) + 1);
-          this.markMidden(col, MIDDEN_MARK);
-          this.buried++;
-          this.onBury?.(k);
-        }
-      }
-      this.clearPellet(i);
-      return;
-    }
-    const side = (this.spoilSide[i] || 1) as -1 | 1;
-    const heap = (): void => {
-      const cell =
-        heapMound(map, this.entranceCol, side, 0, this.holes, col) ??
-        heapMound(map, this.entranceCol, side === 1 ? -1 : 1, 0, this.holes, col);
-      if (!cell) {
-        this.moundLost++;
-        return;
-      }
-      // The trail lying on the walkway cell just buried rides up onto the new one above it, so heaps don't cut trails.
-      for (const ch of ["food", "home"] as const) {
-        const v = ph.fields[ch].get(cell[0], cell[1]);
-        const above = ph.fields[ch].get(cell[0], cell[1] - 1);
-        if (v > above) ph.depositCell(ch, cell[0], cell[1] - 1, v - above);
-      }
-    };
-    if (this.soil[i] !== SOIL_DUG) {
-      this.looseDropped++;
-      heap();
-    } else {
-      this.soilOut++;
-      const due = Math.floor(this.soilOut * SWELL + 1e-9); // counted, not summed: 1.2 added five times isn't 6 in floats
-      while (this.heaped < due) {
-        this.heaped++;
-        heap();
-      }
-    }
-    this.clearPellet(i);
-    this.since[i] = 0;
-  }
-
-  /**
    * One world's plane (U3c): how far ant i believes it is from home, by its own vector (U3b): from where it believes its
    * hole is, the hole plus odoSurf × (driftSurf, driftSurfY). Not its search's point: that is where it looks, not where
    * it believes home is. With the plane bound.
@@ -2884,72 +2513,6 @@ export class Colony {
     const bx = this.nest.x + odo * this.driftSurf[i];
     const by = this.nest.y + odo * this.driftSurfY[i];
     return Math.hypot(this.x[i] - bx, this.y[i] - by);
-  }
-
-  /**
-   * One world's plane (U3c): whether ant i, at plane cell (cx, cy), is out on its midden ring: at least MIDDEN_MIN from
-   * home by its own vector, and off the mound (no spoil underfoot, which it can feel). With the plane bound.
-   */
-  onMiddenRing(i: number, cx: number, cy: number): boolean {
-    return this.fromHomePlane(i) >= MIDDEN_MIN && (this.map.spoil?.get(cx, cy) ?? 0) === 0;
-  }
-
-  /** One world: every nest's hole on the plane (its cell), whose ring no mound fills (heapPlane). */
-  planeHoles(): { x: number; y: number }[] {
-    return this.holeCells.map((h) => ({ x: h.px, y: h.py }));
-  }
-
-  /**
-   * One world's plane (U3c): ant i puts down the pellet or corpse it carries out where it stands, with the plane bound.
-   * Spoil is heaped there (heapPlane: it slides to the angle of repose, clear of every hole's ring), counted as dropOut
-   * counts it: a dug pellet is soil brought out (soilOut), every whole cell of it × SWELL heaped; a loose one is one back
-   * on the mound. A corpse goes on the midden there (U3c's stopgap: a ring set by the ant's own vector; one pile by corpse
-   * scent is a follow-up), marked on the plane's scent, and a sporulating host's spores land there (onBury).
-   * `atWill`: put down by the ant's own answer (carry "put down", contact "drop and run"), not at the end of its walk out.
-   * Then a corpse goes on the midden only out on its ring (onMiddenRing); anywhere else it lies on the plane, unmarked,
-   * as a corpse whose carrier died there does (owner, 2026-11-09, review of #61 D1).
-   */
-  dropPlane(i: number, atWill = false): void {
-    this.antCell(i);
-    const cx = CELL[0];
-    const cy = CELL[1];
-    if (this.corpse[i]) {
-      const midden = !atWill || this.onMiddenRing(i, cx, cy);
-      for (let n = this.corpses.length - 1; n >= 0; n--) {
-        const k = this.corpses[n] as Corpse;
-        if (k.held !== i) continue;
-        k.held = -1;
-        k.x = cx;
-        k.y = cy;
-        k.layer = PLANE;
-        if (!midden) continue; // it lies here
-        this.corpses.splice(n, 1);
-        const key = cellKey(cx, cy);
-        this.midden.set(key, (this.midden.get(key) ?? 0) + 1);
-        this.markMiddenPlane(cx, cy, MIDDEN_MARK);
-        this.buried++;
-        this.onBury?.(k, PLANE);
-      }
-      this.clearPellet(i);
-      return;
-    }
-    const holes = this.planeHoles();
-    const heap = (): void => {
-      if (!heapPlane(this.map, cx, cy, holes)) this.moundLost++;
-    };
-    if (this.soil[i] !== SOIL_DUG) {
-      this.looseDropped++;
-      heap();
-    } else {
-      this.soilOut++;
-      const due = Math.floor(this.soilOut * SWELL + 1e-9);
-      while (this.heaped < due) {
-        this.heaped++;
-        heap();
-      }
-    }
-    this.clearPellet(i);
-    this.since[i] = 0;
   }
 
   /**
@@ -2968,99 +2531,6 @@ export class Colony {
       this.spoilTo[i] = 2 + planeMoundReach(this.heaped) * Math.sqrt(this.rng());
     }
     this.wall[i] = 0;
-    this.mx[i] = NaN;
-    this.gx[i] = NO_CELL;
-  }
-
-  /**
-   * One world's plane (U3c): the side view's pickLoose on the plane's height field. An explorer on a mound cell, not
-   * within ENTRANCE_ZONE of any hole, now and then picks a pellet off it: from a flank at the angle of repose (a cell out
-   * from its hole a level lower or more beside it), LOOSE_SPREAD_PICK, to carry it LOOSE_SPREAD × (0.5 + u) farther out by
-   * its vector and heap it there; from anywhere on it, LOOSE_FILL_PICK, to take it home and down to backfill (ja-lft).
-   * Asked by the `get` response with soil offered, as pickLoose is. True if it picked one up. With the plane bound.
-   */
-  pickPlane(i: number, cx: number, cy: number, enemy: boolean): boolean {
-    const { map } = this;
-    const spoil = map.spoil;
-    if (!spoil) return false;
-    const here = spoil.get(cx, cy);
-    if (here === 0) return false;
-    const u = this.rng();
-    if (u >= LOOSE_SPREAD_PICK + LOOSE_FILL_PICK) return false;
-    const fill = u < LOOSE_FILL_PICK;
-    const hc = this.holeCells[this.params.nest] as HoleCell;
-    for (const h of this.holeCells)
-      if (Math.hypot(centreX(cx, cy) - centreX(h.px, h.py), centreY(cy) - centreY(h.py)) < ENTRANCE_ZONE) return false;
-    if (!fill) {
-      const out = hexDistance(cx, cy, hc.px, hc.py);
-      let steep = false;
-      for (let d = 0; d < 6 && !steep; d++) {
-        const tx = stepX(cx, cy, d);
-        const ty = stepY(cy, d);
-        steep = hexDistance(tx, ty, hc.px, hc.py) > out && rockAt(map, tx, ty) === OPEN && spoil.get(tx, ty) <= here - PLANE_STEEP;
-      }
-      if (!steep) return false;
-    }
-    if (!this.responses.get(this.touch(i, enemy, this.mode[i], "none", "soil"))) return false;
-    if (!takePlane(map, cx, cy)) return false;
-    this.pellet[i] = 1;
-    this.soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;
-    this.loosePicked++;
-    this.since[i] = 0;
-    this.homeAfresh(i);
-    this.gx[i] = NO_CELL;
-    if (fill) this.looseDown++;
-    else {
-      // Away from where its vector says home is, farther out by LOOSE_SPREAD on average.
-      const odo = this.odoSurf[i];
-      const bx = this.nest.x + odo * this.driftSurf[i];
-      const by = this.nest.y + odo * this.driftSurfY[i];
-      this.spoilA[i] = Math.atan2(this.y[i] - by, this.x[i] - bx);
-      this.spoilTo[i] = this.fromHomePlane(i) + LOOSE_SPREAD * (0.5 + this.rng());
-      this.spoilT[i] = 0;
-    }
-    return true;
-  }
-
-  /**
-   * Ant i puts its load down where it stands (its carry response said so). Food lies on the ground for anyone to take
-   * (a porter's only in one of its chambers, where it is stocked: it was counted home already, and on the floor a
-   * forager would bring it home twice); soil and corpses only on the ground (soil heaps there, a corpse lies there, or
-   * goes on the midden if that is where it is; underground the walls have no room for them); brood where it is.
-   * What it can't put down here it keeps.
-   */
-  putDown(i: number): void {
-    this.antCell(i);
-    const cx = CELL[0];
-    const cy = CELL[1];
-    if (this.carrying[i]) {
-      if (this.porter[i]) {
-        const here = this.map.chambers ? this.map.chambers.at(cx, cy) : -1;
-        const c = here >= 0 ? this.map.chambers!.list[here]! : null;
-        if (!c || c.colony !== this.params.nest) return;
-        this.stock(c, 1);
-        this.portTrips++;
-        this.inJaws -= 1;
-        this.porter[i] = 0;
-        this.portTo[i] = -1;
-      } else {
-        dropFood(this.map, this.x[i], this.y[i], 1, this.quality[i]);
-        this.putAt[i] = cellKey(cx, cy);
-      }
-      this.carrying[i] = 0;
-    } else if (this.pellet[i]) {
-      if (this.line !== null && this.cur === PLANE)
-        this.dropPlane(i, true); // one world's plane: spoil heaped where it stands, a corpse on the midden if out on its ring
-      else if (!this.entrance) {
-        // Top-down: a pellet is only a count: put down at the nest it is soil out (as the nest branch counts it), elsewhere lost.
-        const dx = this.x[i] - this.nest.x;
-        const dy = this.y[i] - this.nest.y;
-        if (dx * dx + dy * dy < this.nest.r * this.nest.r) this.soilOut++;
-        else this.soilLost++;
-        this.clearPellet(i);
-      } else if (isSky(this.map, cx, cy)) this.dropOut(i, cx);
-      else return;
-    } else if (this.broodHeld[i]) this.dropBrood(i);
     this.mx[i] = NaN;
     this.gx[i] = NO_CELL;
   }
@@ -3126,16 +2596,6 @@ export class Colony {
   byAnEntrance(x: number, y: number): boolean {
     for (const n of this.map.nests ?? [this.nest])
       if (n.entrance && Math.hypot(centreX(x, y) - n.entrance.x, centreY(y) - n.entrance.y) < ENTRANCE_ZONE) return true;
-    return false;
-  }
-
-  /** Whether any of this colony's ants stands in cell (x, y) now. */
-  occupied(x: number, y: number): boolean {
-    for (let j = 0; j < this.n; j++) {
-      if (!this.alive[j]) continue;
-      this.antCell(j);
-      if (CELL[0] === x && CELL[1] === y) return true;
-    }
     return false;
   }
 
@@ -3688,7 +3148,7 @@ export class Colony {
         home = this.nest;
         ({ gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.cur]!);
       }
-      if (map.sky) this.unbury(i);
+      if (map.sky) unbury(this, i);
       let h = this.heading[i];
       // Three sensors (left, front, right), each read on every channel at once.
       const sn = this.s;
@@ -3803,7 +3263,7 @@ export class Colony {
         (this.carrying[i] || this.pellet[i] || this.broodHeld[i]) &&
         this.responses.carry(this.touch(i, toEnemy !== null)) === "put down"
       )
-        this.putDown(i);
+        putDown(this, i);
 
       // The mode choice, only when the situation changed since the ant was last asked.
       // A carrying ant goes home: a mechanic, never asked (and asked afresh once it puts the food down).
@@ -3844,10 +3304,10 @@ export class Colony {
       let goal = this.goal(i, pellet);
       // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant. Only
       // where there is a hole into the layer: one world's plane has no chambers (its carriers home to the hole: crossDown).
-      if (nursing && goal === this.nest && this.entrance) goal = this.chamberGoal(this.broodTo[i]);
+      if (nursing && goal === this.nest && this.entrance) goal = chamberGoal(this, this.broodTo[i]);
       // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
       // its food to (a forager: reception, or the royal chamber until there is one).
-      else if (carrying && this.queen && goal === this.nest && this.entrance) goal = this.chamberGoal(this.foodTo(i));
+      else if (carrying && this.queen && goal === this.nest && this.entrance) goal = chamberGoal(this, this.foodTo(i));
       let nest = goal;
       const x0 = this.x[i];
       const y0 = this.y[i];
@@ -3966,7 +3426,7 @@ export class Colony {
         if (answer === "fight" && !reporting) {
           if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
         } else {
-          if (answer === "drop and run" && (carrying || pellet || nursing)) this.putDown(i);
+          if (answer === "drop and run" && (carrying || pellet || nursing)) putDown(this, i);
           if (mode !== RETURN) this.homeAfresh(i);
           mode = RETURN;
           // A carrier flees by taking its load home: turned straight away from the strangers, on the side view's ground
@@ -4092,15 +3552,15 @@ export class Colony {
           this.enteredCell(i);
         const lx = CELL[0];
         const ly = CELL[1];
-        if (look && this.backfill(i, lx, ly)) {
+        if (look && backfill(this, i, lx, ly)) {
           // Dropped its pellet into unused space beside it: the trip is done; turned round, it is asked afresh next tick.
           h += Math.PI;
           this.gx[i] = NO_CELL;
           this.wall[i] = 0;
           this.mx[i] = NaN;
-        } else if (look && Number.isNaN(this.spoilTo[i]) && this.enterStale(i, lx, ly)) {
+        } else if (look && Number.isNaN(this.spoilTo[i]) && enterStale(this, i, lx, ly)) {
           h = this.towardTarget(i); // into a stale branch, to fill its end
-        } else if (this.staleWalk[i] && this.staleStep(i, p.speed * dt)) {
+        } else if (this.staleWalk[i] && staleStep(this, i, p.speed * dt)) {
           h = this.towardTarget(i); // on along it
         } else if (side === 0 && !(detouring && this.detour[i] > 0) && walkTunnel(this, i, RETURN, p.speed * dt)) {
           h = this.towardTarget(i); // in a tunnel: back the way it came (a wall it is already following, it keeps following)
@@ -4513,7 +3973,7 @@ export class Colony {
           cellOf(nx, ny);
           const fx = CELL[0];
           const fy = CELL[1];
-          if (left <= 0 && this.crust(fx, fy)) {
+          if (left <= 0 && crust(this, fx, fy)) {
             // The side view: the ground line's crust is left (see crust); it turns along it instead.
             this.digT[i] = 0;
             this.digAim[i] = NaN;
@@ -4521,7 +3981,7 @@ export class Colony {
             this.gx[i] = NO_CELL;
           } else if (left <= 0 && digCell(map, fx, fy, this.time)) {
             // A chamber face: the cell joins its chamber (or founds a new one, if there is still room for one there).
-            if (this.chamberCell[i] === cellKey(fx, fy) && map.chambers) this.chamberDug(i, fx, fy);
+            if (this.chamberCell[i] === cellKey(fx, fy) && map.chambers) chamberDug(this, i, fx, fy);
             this.chamberCell[i] = NO_KEY;
             // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
             const aim = this.digAim[i];
@@ -4686,7 +4146,7 @@ export class Colony {
         this.spoilT[i] = this.spoilT[i] + dt;
         const corpse = this.corpse[i] === 1;
         const far = this.fromHomePlane(i) >= this.spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
-        if (far || this.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) this.dropPlane(i);
+        if (far || this.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) dropPlane(this, i);
       } else if (pellet && ent && !Number.isNaN(this.spoilTo[i])) {
         // Carrying a pellet out along the ground (side view): dropped where it stands once far enough out (or stuck).
         this.spoilT[i] = this.spoilT[i] + dt;
@@ -4696,7 +4156,7 @@ export class Colony {
           (onGround && this.spoilSide[i] * (col - this.entranceCol) >= this.spoilTo[i]) ||
           this.spoilT[i] > (this.corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)
         )
-          this.dropOut(i, col);
+          dropOut(this, i, col);
         // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
         // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
       } else if (pellet && atEntrance && this.soil[i] !== SOIL_FILL && this.line !== null) {
@@ -4746,7 +4206,7 @@ export class Colony {
         !pellet &&
         mode === EXPLORE &&
         this.enteredCell(i) &&
-        this.pickPlane(i, CELL[0], CELL[1], toEnemy !== null)
+        pickPlane(this, i, CELL[0], CELL[1], toEnemy !== null)
       ) {
         // One world's plane: picked up a pellet off the mound (see pickPlane).
       } else if (atNest && !(pellet && ent)) {
