@@ -304,3 +304,13 @@ test("a daughter founded with the fungus in her queen gets a patch by her own ho
   const t = plane.tips[tips]!;
   assert.equal(t.heading, dirOf(Math.atan2(nest.y - centreY(t.y), nest.x - centreX(t.x, t.y))), "her first tip does not head for her hole");
 });
+
+test("the patch's tip aimed at the hole never starts with its own patch ahead (ja-2bw.17: seed 9's fused at once and no hypha reached the hole)", () => {
+  for (const seed of [7, 9, 12]) {
+    const g = new Game(generateOneWorld(seed), { antCount: 8, rivalAnts: 8, autoFound: false, fungus: { hyphae: true } }, gameRng(seed));
+    g.land(0, GARDEN, { evolve: true });
+    const plane = g.fungus.hyphaeOn(PLANE)!;
+    const t = plane.tips[0]!;
+    assert.ok(!plane.has(nx(t.x, t.y, t.heading), ny(t.y, t.heading)), `seed ${seed}: its own patch ahead of the aimed tip`);
+  }
+});
