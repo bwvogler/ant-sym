@@ -6,25 +6,19 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { bodyHeatAfter, feelsHot, groundHeat, pastCritical } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
-import { CELL, cellOf, centreX, centreY, DIR_ANGLE, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, DIR_ANGLE, discOffsets, hexDistance, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
   type CellCounts,
-  FAINT,
   MODES,
   type Mode,
   type Policy,
   type Situation,
   type SpeciesSituation,
   type Stance,
-  STANCES,
   type StancePolicy,
   type StanceSituation,
-  STRONG,
   type Trail,
-  trailLevel,
-  EXPLORE,
   FIGHT,
-  FOLLOW,
   RETURN,
   PLANE,
   CURTAIN,
@@ -33,44 +27,21 @@ import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, type Responses, type Where, type Touch } from "./responses.ts";
-import {
-  blocked,
-  digCell,
-  groundTop,
-  isSky,
-  OPEN,
-  takeLoose,
-  rockAt,
-  setTunnelHeading,
-  SOIL,
-  takeFoodCell,
-  qualityAt,
-  type Nest,
-  type WorldMap,
-} from "./world.ts";
+import { blocked, groundTop, isSky, OPEN, takeLoose, rockAt, type Nest, type WorldMap } from "./world.ts";
 import { cellAt, type Transect } from "./transect.ts";
-import { MODE_STRIDE, SITUATIONS, decodeSituation, packSituation } from "./situation.ts";
+import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
-  BY_VECTOR,
   CHAMBER_GAP,
   CHAMBER_GAP_GROWTH,
   CHAMBER_MIN_DEPTH,
   CHAMBER_SPREAD,
-  CORPSE_GIVE_UP,
   CROWD_HALF,
-  DIG_FACE,
-  DIG_TIME,
   EDGE,
   ENTRANCE_R,
   ENTRANCE_ZONE,
   FLOOR_PER_ANT,
   FOES_HALF,
-  FOLLOW_FLIP,
-  FOLLOW_GIVE_UP,
-  GAIN,
-  GLANCE,
   HOLE_SIGHT,
-  HUG_TIME,
   INTAKE_NONE,
   INTAKE_PLENTY,
   INTAKE_WINDOW,
@@ -81,85 +52,31 @@ import {
   LOOSE_SPREAD_PICK,
   MET_HALF,
   MIDDEN_AT,
-  MIDDEN_AVOID,
   MIDDEN_SPREAD,
   MILL_WAYS,
-  MOUND_HEIGHT,
-  MOUND_REACH,
   M_LINE_WIDTH,
-  NEST_SIGHT,
-  NO_FACE,
-  NO_GAIN,
   PI_DRIFT,
   RECEPTION_MIN,
-  REST,
-  ROAD_SIGN,
-  ROOMY_DIG,
   SEARCH_GROW_2D,
-  SEARCH_STALL,
   SEARCH_START,
-  SPOIL_GIVE_UP,
-  START,
-  START_FACE,
   THREAT_HALF,
-  TUNNEL_STALL,
-  WAIT_RIM,
   WAIT_STEPS,
-  WALL_LOST,
-  WALL_PROBE,
 } from "./tuning.ts";
-import {
-  NO_CELL,
-  SOIL_DUG,
-  SOIL_FILL,
-  SOIL_LOOSE,
-  avoid,
-  cellKey,
-  choose,
-  climb,
-  crossedDir,
-  gauss,
-  handOnWall,
-  planeMoundReach,
-  refilled,
-  soilFace,
-  tunnel,
-  turnToward,
-  wallSide,
-} from "./grid.ts";
-import { DEFAULT_COLONY, LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN, channelParams, type ColonyParams } from "./params.ts";
-import { walkTunnel } from "./tunnel.ts";
-import { middenSmell, nestLife, nurse, port, undertake } from "./nestWork.ts";
-import { backfill, chamberDug, chamberGoal, crust, dropOut, dropPlane, enterStale, pickPlane, putDown, staleStep, unbury } from "./dig.ts";
-import {
-  atHome,
-  believe,
-  homeGoal,
-  destMark,
-  fromHomePlane,
-  homeField,
-  homeScentNear,
-  integrate,
-  outDistAt,
-  routeFail,
-  routeRecord,
-  searchOn,
-} from "./homing.ts";
-import {
-  enemyHeading,
-  layMark,
-  nestmatesAround,
-  odds,
-  placeOn,
-  raidLevel,
-  raidSmelt,
-  returnsAround,
-  sense,
-  touch,
-  touchProbe,
-} from "./sense.ts";
+import { NO_CELL, SOIL_DUG, SOIL_FILL, SOIL_LOOSE, cellKey, climb, planeMoundReach } from "./grid.ts";
+import { DEFAULT_COLONY, LOOP_AT, channelParams, type ColonyParams } from "./params.ts";
+import { middenSmell, nestLife } from "./nestWork.ts";
+import { unbury } from "./dig.ts";
+import { outDistAt } from "./homing.ts";
+import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
-import { atGate, carryOut, crossDown, crossUp, crossed, holdsAt, mayCrossUp } from "./crossing.ts";
+import { perceive } from "./perceive.ts";
+import { stanceStep } from "./stance.ts";
+import { decide } from "./decide.ts";
+import { steer } from "./steer.ts";
+import { moveDig } from "./move.ts";
+import { arrive } from "./arrive.ts";
+import { AntStep } from "./step.ts";
+import { atGate, crossed } from "./crossing.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -2027,6 +1944,7 @@ export class Colony {
     if (this.queen) body(this, dt);
     // Heat (ja-rf5.5): only a species with a day of heat.
     if (this.params.heatDay > 0) this.heatStep(dt);
+    const s = new AntStep();
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       // An ant on another layer than the one bound: bind its own (a colony on one layer never does).
@@ -2037,1210 +1955,151 @@ export class Colony {
         ({ gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.cur]!);
       }
       if (map.sky) unbury(this, i);
-      let h = this.heading[i];
-      // Three sensors (left, front, right), each read on every channel at once.
-      const sn = this.s;
-      const ch = Math.cos(h);
-      const sh = Math.sin(h);
-      sense(this, i, ch * ca + sh * sa, sh * ca - ch * sa, 0); // h − a
-      sense(this, i, ch, sh, 1);
-      sense(this, i, ch * ca - sh * sa, sh * ca + ch * sa, 2); // h + a
-      const fl = sn[0];
-      const ff = sn[1];
-      const fr = sn[2];
-      const hl = sn[3];
-      const hf = sn[4];
-      const hr = sn[5];
-      const al = sn[6];
-      // What this ant smells of alarm, for its Touch this tick (behaviour MR 4: graded alarm).
-      this.alarmAnt = i;
-      this.alarmSmelt = trailLevel(Math.max(sn[6], sn[7], sn[8]));
-      const af = sn[7];
-      const ar = sn[8];
-      const toEnemy = enemyHeading(this, i);
-      this.oddsNow = toEnemy === null ? "none" : odds(this, i);
-      // One world (ja-web): an outgoing forager at the top of its own shaft, its jaws empty and with no pass, is held at the
-      // gate there (holdsAt): it waits as a forager home on open ground does, and is asked `leave` (below). With a
-      // stranger near it isn't waiting: it isn't asked, and it fights or flees in the shaft as anywhere; but the gate still
-      // bars the way out (mayCrossUp asks holdsAt, which doesn't look for strangers), so it doesn't climb out without a
-      // pass. Intended: a stranger at the top of the shaft is met there, not left behind.
-      const held = hold && toEnemy === null && holdsAt(this, i);
-      if (held) heldNow++;
-      if (rgate) {
-        this.foes[i] = this.foes[i] * foeLeak + (toEnemy === null ? 0 : dt);
-        // (One world, ja-web: a finder lays its trail on to its hole, and is done telling once it goes down it, crossDown:
-        // ended at the disc round the hole, the trail never reached the ants held at the top of the shaft.)
-        if (this.reporting[i] === 1 && this.line === null && this.atNestTop(i)) this.reporting[i] = 0;
-      }
-      // Defence is the ant's own (docs/stance.md): alarm smelt or strangers in reach raise its threat, which fades; past defendAt,
-      // on home ground (within homeGround of its nest by its home vector), it defends. Far out, it forages as before.
-      if (sgate) {
-        const felt = toEnemy !== null || this.alarmSmelt !== "none";
-        const th = this.threat[i] * threatLeak + (felt ? dt : 0);
-        this.threat[i] = th;
-        this.defending[i] = th >= p.defendAt && Math.hypot(this.x[i] - this.nest.x, this.y[i] - this.nest.y) <= p.homeGround ? 1 : 0;
-      }
-      // Raid stance (behaviour MR 5.2): a raid is a bias, not an order. An ant is recruited by smelling a scout's raid trail, or goes out
-      // as a scout at raidScout when it is home with empty jaws; the others forage. A recruited ant's raid ends when it comes home
-      // with no trail under it: no trail was laid for it, or the trail has faded.
-      if (rgate && (sgate || this.stance === "raid")) {
-        const homeNow = this.atNestTop(i);
-        if (!homeNow) this.gone[i] = 1;
-        if (this.recruited[i] === 0) {
-          // Where each ant's stance is its own, the trail recruits at home (docs/stance.md; Polyergus scouts recruit the workers at their
-          // own nest): an ant out at its work crosses it and carries on. Recruiting anywhere ran away: G′ seed 1, 773 of 899 raiding.
-          // And it recruits by degrees: at raidRecruit a second on a strong trail, less on a faint one (thresholds differ between ants,
-          // as Pheidole majors answer only intense recruitment). All at once, one scout's trail called the 150-200 ants idle at home,
-          // and every raid was a war (G′ seeds 1-4: 880 lost against no raids' 170).
-          if (
-            raidSmelt(this, i) !== "none" &&
-            (!sgate ||
-              (this.raidable &&
-                homeNow &&
-                !this.carrying[i] &&
-                this.rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, raidLevel(this, i) / STRONG) * dt)))
-          ) {
-            this.recruited[i] = 1;
-            this.gone[i] = 0;
-            this.recruits++;
-          } else if (
-            !sgate &&
-            homeNow &&
-            !this.carrying[i] &&
-            !this.pellet[i] &&
-            !this.broodHeld[i] &&
-            this.rng() < 1 - Math.exp(-p.raidScout * dt)
-          ) {
-            this.recruited[i] = 1;
-            this.gone[i] = 0;
-            this.mode[i] = FIGHT; // out it goes
-            this.raidScouts++;
-          }
-        } else if (homeNow && this.gone[i] === 1 && raidSmelt(this, i) === "none") {
-          this.recruited[i] = 0;
-          this.gone[i] = 0;
-        }
-        if (homeNow || this.recruited[i] === 0) this.pastEnd[i] = 0;
-      } else if (this.recruited[i] === 1 && this.line === null) {
-        // (In one world a raider keeps its stance underground: its raid ends at home on the plane.)
-        this.recruited[i] = 0;
-        this.pastEnd[i] = 0;
-      }
-      // One world (ja-web): an ant held at the gate smells the plane's raid trail where it ends, at its own hole (raidSmelt:
-      // a finder recruits at its own entrance, Topoff et al. 1987), and is recruited by it by degrees, as an idle ant at
-      // home on open ground is.
-      if (
-        held &&
-        this.recruited[i] === 0 &&
-        p.raidGate > 0 &&
-        p.stanceGate > 0 &&
-        this.raidable &&
-        raidSmelt(this, i) !== "none" &&
-        rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, raidLevel(this, i) / STRONG) * dt)
-      ) {
-        this.recruited[i] = 1;
-        this.gone[i] = 0;
-        this.recruits++;
-      }
-      // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
-      // this step (its trip is over: see `arrive`).
-      // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
-      // the side view ~11 % a tick for nothing, review of #35.)
-      if (
-        this.responses.carry !== localResponses.carry &&
-        (this.carrying[i] || this.pellet[i] || this.broodHeld[i]) &&
-        this.responses.carry(touch(this, i, toEnemy !== null)) === "put down"
-      )
-        putDown(this, i);
+      s.ca = ca;
+      s.sa = sa;
+      perceive(this, i, s);
+      let h = s.h;
+      const fl = s.fl;
+      const ff = s.ff;
+      const fr = s.fr;
+      const hl = s.hl;
+      const hf = s.hf;
+      const hr = s.hr;
+      const al = s.al;
+      const af = s.af;
+      const ar = s.ar;
+      const toEnemy = s.toEnemy;
+      s.p = p;
+      s.rng = rng;
+      s.dt = dt;
+      s.hold = hold;
+      s.rgate = rgate;
+      s.foeLeak = foeLeak;
+      s.sgate = sgate;
+      s.threatLeak = threatLeak;
+      s.heldNow = heldNow;
+      s.toEnemy = toEnemy;
+      stanceStep(this, i, s);
+      heldNow = s.heldNow;
+      const held = s.held;
+      const carrying = s.carrying;
+      const pellet = s.pellet;
+      const nursing = s.nursing;
+      const outward = s.outward;
+      const reporting = s.reporting;
+      s.p = p;
+      s.dt = dt;
+      s.gate = gate;
+      s.fl = fl;
+      s.ff = ff;
+      s.fr = fr;
+      s.hl = hl;
+      s.hf = hf;
+      s.hr = hr;
+      s.al = al;
+      s.af = af;
+      s.ar = ar;
+      s.toEnemy = toEnemy;
+      s.held = held;
+      s.carrying = carrying;
+      s.pellet = pellet;
+      s.nursing = nursing;
+      s.reporting = reporting;
+      decide(this, i, s);
+      const goal = s.goal;
+      let nest = s.nest;
+      const x0 = s.x0;
+      const y0 = s.y0;
+      const mode = s.mode;
+      const prevMode = s.prevMode;
+      const item = s.item;
+      const resp = s.resp;
+      const waiting = s.waiting;
+      let rolled = s.rolled;
+      const fleeFrom = s.fleeFrom;
+      s.p = p;
+      s.rng = rng;
+      s.map = map;
+      s.ph = ph;
+      s.home = home;
+      s.a = a;
+      s.dt = dt;
+      s.gate = gate;
+      s.rgate = rgate;
+      s.h = h;
+      s.fl = fl;
+      s.ff = ff;
+      s.fr = fr;
+      s.hl = hl;
+      s.hf = hf;
+      s.hr = hr;
+      s.al = al;
+      s.af = af;
+      s.ar = ar;
+      s.toEnemy = toEnemy;
+      s.held = held;
+      s.carrying = carrying;
+      s.pellet = pellet;
+      s.outward = outward;
+      s.reporting = reporting;
+      s.goal = goal;
+      s.nest = nest;
+      s.mode = mode;
+      s.prevMode = prevMode;
+      s.item = item;
+      s.resp = resp;
+      s.waiting = waiting;
+      s.fleeFrom = fleeFrom;
+      steer(this, i, s);
+      h = s.h;
+      nest = s.nest;
+      const digging = s.digging;
+      s.p = p;
+      s.rng = rng;
+      s.map = map;
+      s.dt = dt;
+      s.h = h;
+      s.carrying = carrying;
+      s.pellet = pellet;
+      s.outward = outward;
+      s.nest = nest;
+      s.x0 = x0;
+      s.y0 = y0;
+      s.mode = mode;
+      s.digging = digging;
+      const moveDigDone = moveDig(this, i, s);
+      h = s.h;
+      if (moveDigDone) continue;
 
-      // The mode choice, only when the situation changed since the ant was last asked.
-      // A carrying ant goes home: a mechanic, never asked (and asked afresh once it puts the food down).
-      // So does one carrying a soil pellet it dug, to drop on the mound.
-      const carrying = this.carrying[i] === 1;
-      const pellet = this.pellet[i] === 1;
-      const nursing = this.broodHeld[i] === 1;
-      // One world's plane (U3c): carrying spoil or a corpse out from its hole, by its own vector (carryOut). Spoil or a
-      // corpse on the plane is always on its way out (one put there some other way, a test's, sets out now); only a loose
-      // pellet taken home to backfill is not.
-      if (pellet && this.line !== null && this.cur === PLANE && this.soil[i] !== SOIL_FILL && Number.isNaN(this.spoilTo[i]))
-        carryOut(this, i);
-      const outward = pellet && this.line !== null && this.cur === PLANE && !Number.isNaN(this.spoilTo[i]);
-      if (!pellet) this.staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
-      // A finder (behaviour MR 5.2): a raider outside, its jaws empty, no raid trail under it, that has been in contact with
-      // strangers for findAt seconds goes home to tell, laying the raid trail on the way. (A raider on the trail meeting
-      // strangers fights them: the trail is where the scout was before.)
-      if (
-        rgate &&
-        toEnemy !== null &&
-        this.reporting[i] === 0 &&
-        !carrying &&
-        !pellet &&
-        !nursing &&
-        this.stanceOf(i) === "raid" &&
-        this.foes[i] >= p.findAt &&
-        !this.atNestTop(i) &&
-        raidSmelt(this, i) === "none"
-      ) {
-        this.reporting[i] = 1;
-        this.since[i] = 0;
-        this.homeAfresh(i);
-        this.finds++;
-      }
-      const reporting = this.reporting[i] === 1;
-      // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
-      // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
-      let goal = homeGoal(this, i, pellet);
-      // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant. Only
-      // where there is a hole into the layer: one world's plane has no chambers (its carriers home to the hole: crossDown).
-      if (nursing && goal === this.nest && this.entrance) goal = chamberGoal(this, this.broodTo[i]);
-      // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
-      // its food to (a forager: reception, or the royal chamber until there is one).
-      else if (carrying && this.queen && goal === this.nest && this.entrance) goal = chamberGoal(this, this.foodTo(i));
-      let nest = goal;
-      const x0 = this.x[i];
-      const y0 = this.y[i];
-      let mode = this.mode[i];
-      const prevMode = mode;
-      const item: Item = carrying ? "food" : pellet ? (this.corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
-      const resp = this.responses;
-      let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
-      let modeStride = MODE_STRIDE; // the mode field's step in that code: the species' own schema's, when it has one
-      let waiting = false;
-      let rolled = false; // asked `leave` this step already (behaviour MR 5): one roll a step, at the rate it answers
-      if (carrying || pellet || nursing || reporting) {
-        // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
-        // question comes once the load is down.
-        mode = RETURN;
-        this.mode[i] = mode;
-        this.asked[i] = -1;
-        this.question[i] = -1;
-        if (!reporting) this.loaded[i] = 1;
-      } else {
-        // Its load just put down, wherever that was (spoil on the mound, a corpse on the midden, food in the larder): the
-        // carrying trip is over, so it is not returning any more (ja-qnx; `arrive`). It heads back out along its trail: a
-        // follower, which a fresh ant is asked as the local rule asked a returner (both follow a trail, explore without
-        // one). As an explorer, the middle-aged diggers no longer followed the carriers' scent down to reception, where
-        // they port its food on: food piled up there (A8, seeds 5-6: 30-37 % of the nest's food carried on, main 87-100 %).
-        if (this.loaded[i]) {
-          this.loaded[i] = 0;
-          if (p.arrive !== "return" && mode === RETURN) {
-            mode = p.follows ? FOLLOW : EXPLORE;
-            this.mode[i] = mode;
-          }
-        }
-        const tired = this.isTired(i);
-        const food = trailLevel(Math.max(fl, ff, fr));
-        const home = homeField(this, i, hl, hf, hr);
-        const alarm = trailLevel(Math.max(al, af, ar));
-        const enemy = toEnemy === null ? 0 : 1;
-        const stance = STANCES.indexOf(this.stanceOf(i));
-        // A species' own situation (ja-fnd.5.10): the generic fields and its own, encoded by its schema; the generic ant's stays packSituation.
-        const own = this.own;
-        let asks: SpeciesSituation | null = null;
-        if (own) {
-          asks = {
-            mode: MODES[mode] as Mode,
-            tired,
-            foodTrail: food,
-            homeTrail: home,
-            alarm,
-            enemy: enemy ? "near" : "none",
-            stance: STANCES[stance] as Stance,
-          };
-          if (own.sense) {
-            const sensed = own.sense(this, i);
-            for (const name in sensed) {
-              const ok = own.allowed.get(name);
-              if (ok && !ok.includes(sensed[name]))
-                throw new Error(`sense: "${name}" is ${String(sensed[name])}, not one of its field's values`);
-            }
-            asks = { ...asks, ...sensed };
-          }
-          // Its policy is handed only the fields its schema asks (owner, review of #122 D1): an ant chooses only from what its species senses.
-          asks = own.schema.state(asks);
-          modeStride = own.modeStride;
-        }
-        const before = own ? own.schema.encode(asks!) : packSituation(mode, tired, food, home, alarm, enemy, stance);
-        situation0 = before - mode * modeStride;
-        // Waiting at home (behaviour MR 5): where the colony gates leaving, a forager home in "return" is asked `leave`
-        // (below), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
-        // One world (ja-web): nobody waits on the plane (every returner goes down its hole); an ant held at the gate at the
-        // top of its shaft waits, and rolls `leave` once a step, asked as a returning forager (as a raider if recruited).
-        // A yes is its pass: it climbs out, and its mode policy is asked afresh next step.
-        waiting = held || (gate && mode === RETURN && !enemy && this.atNestTop(i) && !this.inbound(i, mode));
-        if (held) {
-          rolled = true;
-          if (this.leaves(i, dt, false)) {
-            this.leaveOk[i] = 1;
-            this.asked[i] = -1;
-          }
-        }
-        if (before !== this.asked[i] && !waiting) {
-          mode = MODES.indexOf(
-            this.policy(
-              asks ?? {
-                mode: MODES[mode] as Mode,
-                tired,
-                foodTrail: food,
-                homeTrail: home,
-                alarm,
-                enemy: enemy ? "near" : "none",
-                stance: this.stanceOf(i),
-              },
-            ),
-          );
-          if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
-          if (mode === FOLLOW && !p.follows) mode = EXPLORE; // a species with no follow mode can't follow (ja-fnd.5.9)
-          // Zoned by age: an ant that may not go out is no raider. Sent raiding, a young one climbed to its hole, was put
-          // back down the shaft, and climbed again (review of #26: 70–93 of ~110 young raiders parked at the hole). With
-          // no enemy near, it explores (with one near, it fights where it is).
-          if (mode === FIGHT && !enemy && this.stanceOf(i) === "raid" && this.queen && !this.mayGoOut(i)) mode = EXPLORE;
-          if (mode === RETURN && this.mode[i] !== RETURN) this.homeAfresh(i);
-          this.mode[i] = mode;
-          this.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
-          this.seen[before] = 1;
-          // The generic code of the situation it was asked in (its mode before the answer), whatever the species asks: the fungus, the journal and the
-          // ant card read the generic situation (review of #122, S1, S3).
-          this.question[i] = own ? packSituation(MODES.indexOf(asks!.mode), tired, food, home, alarm, enemy, stance) : before;
-          this.decisions++;
-        }
-      }
-      let fleeFrom: number | null = null;
-      // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
-      // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
-      // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
-      if (toEnemy !== null) {
-        const answer = resp.contact(touch(this, i, true, mode, item));
-        if (answer === "fight" && !reporting) {
-          if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
-        } else {
-          if (answer === "drop and run" && (carrying || pellet || nursing)) putDown(this, i);
-          if (mode !== RETURN) this.homeAfresh(i);
-          mode = RETURN;
-          // A carrier flees by taking its load home: turned straight away from the strangers, on the side view's ground
-          // line that was often away from its hole (G seed 5, raid stance: 3–5 carriers held over 120 s between the nests).
-          if (!carrying && !pellet && !nursing) fleeFrom = toEnemy;
-        }
-        this.mode[i] = mode;
-        // The situation as answered, with the mode the contact response set: else the mode policy, asked again next step,
-        // put the ant back on its trail and contact turned it round again, resetting its homing every other step (review
-        // of #38: 6,170 flips in 150 s on G′ seed 1).
-        if (situation0 >= 0) this.asked[i] = situation0 + mode * modeStride;
-      }
-      // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
-      // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
-      // (Steering it by a drifted one left carriers surfacing off target and dropping spoil in pits beside the hole.)
-      // (On one world's plane a loose pellet taken home to backfill homes by its vector, as any returner there.)
-      if (mode === RETURN && (!pellet || (this.line !== null && this.cur === PLANE && this.soil[i] === SOIL_FILL)))
-        nest = believe(this, i, goal);
-      this.goalX = nest.x;
-      this.goalY = nest.y;
-      this.holeX = goal === this.entrance ? nest.x : (this.entrance?.x ?? 0);
-      // Steer by mode. An explorer at a soil face keeps its heading while it digs.
-      const noise = (rng() - 0.5) * 2 * dt;
-      const detouring = this.detour[i] > 0;
-      if (mode !== EXPLORE) this.digT[i] = 0;
-      if (mode !== EXPLORE || pellet) this.hugT[i] = 0;
-      else this.hugT[i] = Math.max(0, this.hugT[i] - dt);
-      if (mode !== prevMode) {
-        this.gx[i] = NO_CELL;
-        this.digAim[i] = NaN;
-        this.chamberCell[i] = NO_KEY; // a face aimed at as an explorer: stale once it does something else (review of slice 2)
-      }
-      const digging = this.digT[i] > 0;
-      if (mode !== RETURN) {
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
-      }
-      if (held && this.leaveOk[i] === 0) {
-        // One world (ja-web): held at the gate, it mills among the top cells of its shaft (mill), where the carriers come
-        // down past it.
-        if (this.mill(i, p.speed * dt)) h = this.towardTarget(i);
-        else h += noise * p.wander;
-      } else if (outward) {
-        // Out on its heading; a bump turned it (below), and while it wanders after one, it wanders.
-        if (detouring) h += noise * p.wander;
-        else h = turnToward(h, this.spoilA[i], p.turnRate * dt) + noise * p.wander * 0.25;
-      } else if (mode === RETURN) {
-        // Homing uses only what an ant has: its home vector (path integration: real ants count steps
-        // against a sky compass), its antennae, and touch. A straight line home walks into the same
-        // wall forever (reviews reproduced games where every homing ant of a colony was stuck), so a
-        // blocked step starts wall-following by touch (the Bug2 rule, set up where the step is blocked
-        // below): keep the wall on one side until the ant is nearer home than where it met the wall
-        // and the way home is open.
-        const x = this.x[i];
-        const y = this.y[i];
-        const toNest = Math.atan2(nest.y - y, nest.x - x);
-        // Progress: no cell nearer its goal in TUNNEL_STALL seconds (home scent can lead round a ring of tunnels for
-        // ever), and the tunnel walker picks branches by its home vector for BY_VECTOR seconds (see walkTunnel); then by scent again.
-        const near = Math.hypot(nest.x - x, nest.y - y);
-        if (near < this.bestD[i] - 1) {
-          this.bestD[i] = near;
-          this.stallT[i] = 0;
-        } else if ((this.stallT[i] = this.stallT[i] + dt) > TUNNEL_STALL + BY_VECTOR) {
-          this.bestD[i] = near;
-          this.stallT[i] = 0;
-        }
-        // One world's plane (U3b): any returner no nearer where it believes the hole is for SEARCH_STALL seconds searches on as
-        // if it had got there. That is what unblocks a belief in rock or walled off (following the wall, one went round the
-        // plane's edge), but most firings are away from the belief: on seed 1 (120 s) 596, 81 % more than 10 cells from it,
-        // 92 cutting short a walk round rock (review of #60). Narrower versions delivered about the same (seeds 1–3), so
-        // it stays a general "search sooner when blocked" rule.
-        if (nest !== goal && this.stallT[i] > SEARCH_STALL && this.line !== null && this.cur === PLANE && !routeFail(this, i, true))
-          searchOn(this, i, true);
-        if (this.entrance && (this.wall[i] !== 0 || detouring)) {
-          // On the ground line it homes cell by cell (see walkTunnel): no walls to follow, no detour to wander (an
-          // explorer's detour, run up bumping round, used to carry on once it had food, and walk it away from the hole).
-          this.antCell(i);
-          if (isSky(map, CELL[0], CELL[1])) {
-            this.wall[i] = 0;
-            this.detour[i] = 0;
-          }
-        }
-        // A carrier with food on a top-down map takes the food trail home where it agrees with its home vector (ja-00t,
-        // docs/trails.md: foragers combine route cues and pheromone, path integration the fallback): each sensor's trail
-        // counts only if its direction is within homeTrailCone of the way home. At a fork the vector can't tell the branches
-        // apart (both lie off its line); the trail picks, not the wall a vector-led carrier walks into. Never the trail
-        // alone: all-trail carriers milled on their own trail (PRD §45.3).
-        let tl = 0;
-        let tf = 0;
-        let tr = 0;
-        if (
-          p.homeTrail > 0 &&
-          carrying &&
-          this.entrance === null &&
-          !detouring &&
-          Math.max(fl, ff, fr) >= FAINT &&
-          Math.max(fl, ff, fr) < SEEN
-        ) {
-          const agrees = (b: number) => Math.cos(b - toNest) >= Math.cos(p.homeTrailCone);
-          tl = agrees(h - a) ? fl : 0;
-          tf = agrees(h) ? ff : 0;
-          tr = agrees(h + a) ? fr : 0;
-        }
-        let onTrail = Math.max(tl, tf, tr) >= FAINT;
-        if (onTrail && this.wall[i] !== 0) {
-          // Following a wall: let go only where the trail's way is open. Letting go into rock, it met the same wall again
-          // every step and never got round it (G′ seed 4: 59 carriers held over 120 s within 40 cells of home).
-          const way = tl >= tf && tl >= tr ? h - a : tr > tf ? h + a : h;
-          if (touchProbe(this, x, y, way, 1.2)) onTrail = false;
-          else {
-            this.wall[i] = 0; // the trail leads on: let go of the wall
-            this.mx[i] = NaN;
-          }
-        }
-        const side = this.wall[i];
-        // Carrying a pellet out to the mound, it doesn't look for space to fill on the way (it has chosen the mound).
-        const look =
-          pellet &&
-          !this.corpse[i] &&
-          map.hasSoil &&
-          Number.isNaN(this.spoilTo[i]) &&
-          this.since[i] > this.params.backfill.after &&
-          this.enteredCell(i);
-        const lx = CELL[0];
-        const ly = CELL[1];
-        if (look && backfill(this, i, lx, ly)) {
-          // Dropped its pellet into unused space beside it: the trip is done; turned round, it is asked afresh next tick.
-          h += Math.PI;
-          this.gx[i] = NO_CELL;
-          this.wall[i] = 0;
-          this.mx[i] = NaN;
-        } else if (look && Number.isNaN(this.spoilTo[i]) && enterStale(this, i, lx, ly)) {
-          h = this.towardTarget(i); // into a stale branch, to fill its end
-        } else if (this.staleWalk[i] && staleStep(this, i, p.speed * dt)) {
-          h = this.towardTarget(i); // on along it
-        } else if (side === 0 && !(detouring && this.detour[i] > 0) && walkTunnel(this, i, RETURN, p.speed * dt)) {
-          h = this.towardTarget(i); // in a tunnel: back the way it came (a wall it is already following, it keeps following)
-        } else if (side === 0) {
-          // Free: the home vector, with the home trail as a hint only (climbing it at full rate let
-          // clusters of homing ants circle on their own trail). After giving up on a wall, wander a while.
-          if (detouring) h += noise * p.wander;
-          else if (onTrail) {
-            h += choose(tl, tf, tr, p.turnRate * dt * p.homeTrail, p.followChoice || 1, rng) + noise * p.wander * 0.25;
-            h = turnToward(h, toNest, p.turnRate * dt * 0.8 * (1 - p.homeTrail));
-          } else {
-            // Where it believed home was, and nothing there (the side view's drifting vector): search round it.
-            // (On one world's plane with loops, within LOOP_AT: at its speed it turns no tighter than ~1.2 cells, and circled
-            // a point 1 away until it stalled.)
-            if (
-              nest !== goal &&
-              Math.hypot(nest.x - x, nest.y - y) < (p.searchLoops > 0 && this.line !== null && this.cur === PLANE ? LOOP_AT : 1) &&
-              !routeFail(this, i, false)
-            )
-              searchOn(this, i);
-            // On one world's plane, searching (its vector ran out where no hole was) with the home trail under its antennae and
-            // its hole not yet in sight (in sight, it steers for the hole itself: review of #60), the trail leads, with the share
-            // of its turning a carrier gives a food trail (homeTrail): route cues and scent first, the vector the fallback
-            // (docs/trails.md). Led by its loops alone, colonies delivered up to 44 % less food than U3a's in the spike
-            // (one-world §4, U3b as built).
-            const lead =
-              nest !== goal && this.search[i] !== 0 && this.line !== null && this.cur === PLANE && Math.max(hl, hf, hr) >= FAINT
-                ? p.homeTrail
-                : 0;
-            h += climb(hl, hf, hr, p.turnRate * dt * (lead || 0.25)) + noise * p.wander * 0.25;
-            h = turnToward(h, toNest, p.turnRate * dt * 0.8 * (1 - lead));
-          }
-        } else {
-          const t0 = this.followT[i];
-          const t = t0 + dt;
-          this.followT[i] = t;
-          if (t0 < FOLLOW_FLIP && t >= FOLLOW_FLIP) {
-            // Probably the long way round (a big rock mass, or the map's edge): try the other side, same line home.
-            this.wall[i] = -side as -1 | 1;
-            this.gdir[i] = (this.gdir[i] + 3) % 6;
-            this.gx[i] = NO_CELL; // decide afresh from here
-          }
-          if (!this.byCell[i]) {
-            // In a tunnel now (the ground round it was filled in, or it followed the wall into one): by cell from
-            // here. Steering by touch can't walk a passage one cell wide; it turns on the spot until it gives up.
-            this.antCell(i);
-            if (tunnel(map, CELL[0], CELL[1])) {
-              this.byCell[i] = 1;
-              this.gx[i] = NO_CELL;
-            }
-          }
-          if (!this.byCell[i]) {
-            // Round rock in open ground: steer by touch.
-            if (t0 < FOLLOW_FLIP && t >= FOLLOW_FLIP) h += Math.PI;
-            const dist = Math.hypot(nest.x - x, nest.y - y);
-            if (dist < this.hitDist[i] - 1 && this.onMLine(i, x, y) && !touchProbe(this, x, y, toNest, 1.5)) {
-              this.wall[i] = 0; // back on its line home, nearer than where it met this wall, and the way is open
-              h = turnToward(h, toNest, p.turnRate * dt * 0.8);
-            } else if (t >= FOLLOW_GIVE_UP) this.giveUp(i);
-            else {
-              // Keep the wall on its side (+1 = right: the ant turns left round it; angles grow clockwise, y down).
-              const sd = this.wall[i];
-              const ahead = touchProbe(this, x, y, h, 1);
-              if (ahead)
-                h -= sd * p.turnRate * dt * 2; // wall ahead: turn away
-              else if (!touchProbe(this, x, y, h + sd * 0.9, 1.2)) h += sd * p.turnRate * dt; // the wall fell away: hug round the corner
-              // Touching nothing, ahead or on the wall side (alarm or a thin rock tip threw it off): the hug
-              // would only circle in the open. Let go and walk the home vector; the line home is kept.
-              if (ahead || touchProbe(this, x, y, h + sd * (Math.PI / 2), 1.2)) this.untouched[i] = 0;
-              else if ((this.untouched[i] = this.untouched[i] + dt) > WALL_LOST) this.wall[i] = 0;
-            }
-          } else if (t >= FOLLOW_GIVE_UP) this.giveUp(i);
-          else {
-            // Soil, or a tunnel: cell by cell, a hand on the wall. At each cell's centre, feel round from
-            // the hand side to the other (six ways), and take the first open one. In a tunnel this
-            // walks the tunnel (steering by touch can't, one cell wide); in a tree of tunnels it visits every branch.
-            // A target cell filled since (backfill), or no longer beside it (it was pushed off its cell), is decided
-            // afresh too: steering for it would pin the ant against the filled ground between.
-            this.antCell(i);
-            const lost =
-              this.gx[i] !== NO_CELL &&
-              (rockAt(map, this.gx[i], this.gy[i]) !== OPEN || hexDistance(this.gx[i], this.gy[i], CELL[0], CELL[1]) > 1);
-            const reached =
-              this.gx[i] === NO_CELL || lost || Math.hypot(centreX(this.gx[i], this.gy[i]) - x, centreY(this.gy[i]) - y) <= p.speed * dt;
-            if (reached) {
-              cellOf(x, y);
-              // A lost target: the next way is felt from the cell it is in (the wall's first cell stays its first).
-              const own = this.gx[i] === NO_CELL || lost;
-              const cx = own ? CELL[0] : this.gx[i];
-              const cy = own ? CELL[1] : this.gy[i];
-              const ox = centreX(cx, cy);
-              const oy = centreY(cy);
-              const dist = Math.hypot(nest.x - ox, nest.y - oy);
-              const open = !touchProbe(this, ox, oy, Math.atan2(nest.y - oy, nest.x - ox), 1.5);
-              if (this.gx[i] === NO_CELL) {
-                // The first cell of this wall: coming back to it means it has been all the way round.
-                this.loopX[i] = cx;
-                this.loopY[i] = cy;
-              }
-              const looped = t > 2 && this.gx[i] !== NO_CELL && cx === this.loopX[i] && cy === this.loopY[i];
-              cellOf(this.mx[i], this.my[i]);
-              const hit = this.hitDist[i];
-              const open2 = open && !touchProbe(this, ox, oy, Math.atan2(nest.y - oy, nest.x - ox), 2);
-              // Back on its line home, nearer than the nearest it has been on this trip, with the way open.
-              const onLine = dist < hit - 1 && this.onMLine(i, ox, oy, SIDE) && open;
-              // Round an island and back where it met it, with the way home open (it met it turning, not heading home).
-              const island = t > 2 && cx === CELL[0] && cy === CELL[1] && open;
-              // In dug ground, the way home open two cells on and some way nearer than its best this trip.
-              const nearer = t > 1 && dist < hit - GAIN && open2;
-              // Or, a few times a trip, after 3 s of following wherever the way home is open: a hand on the wall
-              // in a dug-out cavern drifts from speck to speck farther from home, and a speck needn't be walked
-              // round. Only a few: a release that makes no progress could leave and meet the same wall for ever.
-              const anywhere = t > 3 && this.noGain[i] < NO_GAIN && open2;
-              const sight = Math.hypot(goal.x - ox, goal.y - oy) < NEST_SIGHT && this.clearTo(ox, oy, goal.x, goal.y);
-              const leave = this.gx[i] !== NO_CELL && (onLine || island || nearer || anywhere || sight);
-              // Into a tunnel with home scent: the scent leads from here (counted like a release: it may lead
-              // back to this same wall, so after a few that gain nothing, only progress lets it go).
-              const scent = !leave && (dist < hit - GAIN || this.noGain[i] < NO_GAIN) && tunnel(map, cx, cy) && homeScentNear(this, cx, cy);
-              if (looped && !leave && !scent && this.byCell[i]) {
-                // All the way round this wall (a speck of soil) and nowhere on it nearer home: it can't be the
-                // way. Give up on it now (wander a while, then try afresh) rather than after FOLLOW_GIVE_UP.
-                this.giveUp(i);
-              } else if (leave || scent) {
-                // Progress is kept from wall to wall: the next wall it meets is judged against the nearest it has been
-                // (a give-up, which wanders, starts the trip's count afresh). A release that gains nothing counts
-                // against the few allowed, an island's too (review of #10: leave, meet the same spot, go round, leave).
-                if (dist < hit - GAIN) this.noGain[i] = 0;
-                else if (!onLine && !nearer && !sight) this.noGain[i] = this.noGain[i] + 1;
-                this.hitDist[i] = Math.min(hit, dist);
-              }
-              if (leave) {
-                // Back on its line home, nearer than where it met this wall, and the way is open; or the nest
-                // itself is in plain view.
-                this.wall[i] = 0;
-                h = turnToward(h, toNest, p.turnRate * dt * 0.8);
-              } else if (scent) {
-                // Into a tunnel with home scent to lead it: the tunnel walker takes it on from here (see
-                // walkTunnel). Not the home vector: from a tunnel it can point into soil, and the blocked
-                // step would start a new wall at once, every tick, with the give-up clock at zero (review of #8).
-                this.wall[i] = 0;
-                this.gx[i] = NO_CELL;
-                if (walkTunnel(this, i, RETURN, p.speed * dt)) h = this.towardTarget(i);
-              } else if (this.wall[i] !== 0) {
-                const d = handOnWall(map, cx, cy, this.gdir[i], this.wall[i]);
-                this.gdir[i] = d;
-                this.gx[i] = stepX(cx, cy, d);
-                this.gy[i] = stepY(cy, d);
-              }
-            }
-            if (this.wall[i] !== 0) h = this.towardTarget(i);
-          }
-        }
-      } else if (mode === FOLLOW && this.staysIn(i)) {
-        // An inside worker (zoned by age) doesn't follow a food trail: it leads out, where it may not go. It explores.
-        if (walkTunnel(this, i, EXPLORE, p.speed * dt)) h = this.towardTarget(i);
-        else h += noise * p.wander;
-      } else if (mode === FOLLOW) {
-        if (!digging && walkTunnel(this, i, FOLLOW, p.speed * dt)) h = this.towardTarget(i);
-        else {
-          // "No entry" ahead (behaviour MR 3): the food scent it marks counts for less. Read only where some was laid, and
-          // only outside (a top-down map, or the side view's ground), where food trails lead to food.
-          const outside = this.entrance === null || !this.under[i];
-          let gl = fl;
-          let gf = ff;
-          let gr = fr;
-          if (p.noEntryAvoid > 0 && ph.live("noEntry") && outside) {
-            const x = this.x[i];
-            const y = this.y[i];
-            const d = p.sensorDistance;
-            const ne = (b: number) => p.noEntryAvoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
-            if (gl < SEEN) gl = Math.max(0, gl - ne(h - a));
-            if (gf < SEEN) gf = Math.max(0, gf - ne(h));
-            if (gr < SEEN) gr = Math.max(0, gr - ne(h + a));
-          }
-          // Which way along the trail: by strength, not just to the strongest sensor (Deneubourg's choice: see choose).
-          // Top-down maps only. In the side view's chambers food scent leads to stores and brood, and a chance turn there
-          // kept porters from the food (the hour-long economy test: no porter trips, larvae starved); on its ground line,
-          // where trails don't fork, it still halved the colony's births (PRD §45.3).
-          h +=
-            (p.followChoice > 0 && this.entrance === null
-              ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng)
-              : climb(gl, gf, gr, p.turnRate * dt)) +
-            noise * p.wander * 0.25;
-          // The trail ends here, strong, falling away all round, and no food in sight: the patch is spent. Mark it "no entry" (Robinson et al. 2005).
-          if (p.noEntryAvoid > 0 && !carrying && outside && Math.max(fl, ff, fr) < SEEN) {
-            this.antCell(i);
-            const here = ph.fields.food.get(CELL[0], CELL[1]);
-            // Only walking out, by its home vector (home behind it): walking in, the food trail fades ahead as it should.
-            const ox = this.x[i] - nest.x;
-            const oy = this.y[i] - nest.y;
-            const outbound = Math.cos(h) * ox + Math.sin(h) * oy > 0.5 * Math.hypot(ox, oy);
-            if (outbound && here >= NO_ENTRY_TRAIL && Math.max(fl, ff, fr) < here * NO_ENTRY_DROP) {
-              const lay = resp.noEntry(touch(this, i, toEnemy !== null, mode, item));
-              if (lay > 0) {
-                this.antCell(i);
-                ph.depositCell(
-                  "noEntry",
-                  CELL[0],
-                  CELL[1],
-                  p.deposit * (this.entrance === null ? p.foodTrailTop : 1) * lay * dt * NO_ENTRY_RATE,
-                );
-              }
-            }
-          }
-        }
-      } else if (mode === FIGHT) {
-        // A calm ant (the fungus's cue) does not charge.
-        // A raider in the side view walks on to the raided nest, cell by cell, past the alarm of fights behind it: steering
-        // freely up the alarm left raiders in the pits by the rival's mound, 12–13 columns short of its hole (none got in).
-        const sideRaid = this.stanceOf(i) === "raid" && this.raidTarget !== null && this.entrance !== null;
-        if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - this.calm[i]));
-        else if (Math.max(al, af, ar) >= FAINT && !sideRaid) h += climb(al, af, ar, p.turnRate * dt);
-        else if (sideRaid && ((this.detour[i] = 0), walkTunnel(this, i, FIGHT, p.speed * dt))) h = this.towardTarget(i);
-        else if (this.stanceOf(i) === "raid" && this.raidTarget && this.entrance && this.under[i]) {
-          // A raider in a chamber (no tunnel: free steering): out of its own nest by its hole, or on into the rival's.
-          // Steering straight at the rival's hole through soil left nearly every raider bumping inside its own nest.
-          this.antCell(i);
-          const own = this.inOwnNest(CELL[0], CELL[1]);
-          const aim = own ? this.entrance : (this.raidNest ?? this.raidTarget);
-          h = turnToward(h, Math.atan2(aim.y - this.y[i], aim.x - this.x[i]), p.turnRate * dt) + noise * p.wander * 0.25;
-        } else if (rgate && this.stanceOf(i) === "raid" && !detouring) {
-          // Raiding by trail (behaviour MR 5.2): up the raid trail where there is one; without one, out and away from the home
-          // trail, searching (the scouts). No coordinates: the trail runs where a scout walked, so it goes round rock.
-          const x = this.x[i];
-          const y = this.y[i];
-          const d = p.sensorDistance;
-          const rl = Math.max(0, ph.read("raid", x + Math.cos(h - a) * d, y + Math.sin(h - a) * d));
-          const rf = Math.max(0, ph.read("raid", x + Math.cos(h) * d, y + Math.sin(h) * d));
-          const rr = Math.max(0, ph.read("raid", x + Math.cos(h + a) * d, y + Math.sin(h + a) * d));
-          const top = Math.max(rl, rf, rr);
-          // Nothing ahead as strong as underfoot, facing along the trail (the front sensor strongest): the raider leaves the trail and
-          // searches on (raidOnward) as a scout does (a run out, then a search), until home. Mostly near home, where the trail is weak
-          // and patchy (review of #44: a median 0.05–0.19 of the way out); gated on a strong end instead, A11 gained less (1.67, 2.01).
-          if (p.raidOnward > 0 && rf >= FAINT && rf === top && this.pastEnd[i] === 0 && rf < ph.read("raid", x, y)) this.pastEnd[i] = 1;
-          if (top >= FAINT && this.pastEnd[i] === 0) h += climb(rl, rf, rr, p.turnRate * dt) + noise * p.wander * 0.25;
-          else if (this.pastEnd[i] === 1 && top >= FAINT) h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
-          else h += avoid(hl, hf, hr, p.turnRate * dt * 0.5) + noise * p.wander;
-          // One world's plane (U3c): the raided colony's midden marks its ground there too, and raiders shy from it, as the
-          // side view's do (Pogonomyrmex badius; slice 7).
-          const m = this.raidMarks;
-          if (this.line !== null && m?.live("midden")) {
-            const read = (b: number) => m.read("midden", x + Math.cos(b) * d, y + Math.sin(b) * d);
-            h += avoid(read(h - a), read(h), read(h + a), p.turnRate * dt * MIDDEN_AVOID);
-          }
-        } else if (!rgate && this.stance === "raid" && this.raidTarget && !detouring) {
-          // At the rival hole's coordinates: the side view, or raidGate 0 (review of #41: an ant not recruited, put in FIGHT by Jev's
-          // mode lane or a contact, walked here on a top-down map).
-          const t = this.raidTarget;
-          h = turnToward(h, Math.atan2(t.y - this.y[i], t.x - this.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
-          // The rival's midden marks its ground: raiders shy from it (Pogonomyrmex badius; slice 7).
-          const m = this.raidMarks;
-          if (m) {
-            const x = this.x[i];
-            const y = this.y[i];
-            const d = p.sensorDistance;
-            const read = (a: number) => m.read("midden", x + Math.cos(a) * d, y + Math.sin(a) * d);
-            h += avoid(read(h - p.sensorAngle), read(h), read(h + p.sensorAngle), p.turnRate * dt * MIDDEN_AVOID);
-          }
-        } else h += noise * p.wander;
-      } else if (!digging) {
-        const seen = Math.max(fl, ff, fr) >= SEEN;
-        // Food in sight, unless soil stands between (it touched soil a moment ago): then keep a hand on the wall.
-        if (seen && !(this.hugT[i] > 0)) h += climb(fl, ff, fr, p.turnRate * dt);
-        else if (walkTunnel(this, i, EXPLORE, p.speed * dt)) h = this.towardTarget(i);
-        else if (this.queen?.alive && this.band(i) === 0 && this.under[i])
-          h = turnToward(h, Math.atan2(this.queen.y - this.y[i], this.queen.x - this.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
-        else if (this.entrance && this.outbound(i) && this.under[i])
-          h =
-            turnToward(h, Math.atan2(this.entrance.y - this.y[i], this.entrance.x - this.x[i]), p.turnRate * dt * 0.5) +
-            noise * p.wander * 0.5;
-        else if (
-          p.foodPlume > 0 &&
-          !carrying &&
-          (this.entrance === null || (this.line !== null && this.cur === PLANE)) &&
-          this.smellsFood(i, h, a, p.turnRate * dt)
-        )
-          h += this.plumeTurn + noise * p.wander * 0.25;
-        else if (p.siteFidelity > 0 && this.line !== null && this.cur === PLANE && !Number.isNaN(this.foodX[i]))
-          h = turnToward(h, this.siteAim(i), p.turnRate * dt) + noise * p.wander * 0.25;
-        else h += noise * p.wander;
-      }
-      // Fleeing (behaviour MR 4): straight away from the strangers while they are in reach (then it resumes). Homing alone, the
-      // fleeing ant often walked along them, or toward them, and died: G′ seed 2, 1,127 of the dead were fleeing.
-      if (fleeFrom !== null && (this.entrance === null || !this.under[i])) h = turnToward(h, fleeFrom + Math.PI, p.turnRate * dt * 2);
-      // Smelling alarm: the alarmGain response says how hard to shy from it (locally: every mode but fighting, unless digging).
-      if (Math.max(al, af, ar) >= FAINT) {
-        const gain = resp.alarmGain(touch(this, i, toEnemy !== null, mode, item));
-        // On the side view's ground line a carrier can't go round alarm, only turn back: it carries on home through it.
-        // Shying, carriers turned back from fights at their own hole and held their food (G seeds 4, 8: raids, 3 held).
-        const noWayRound = carrying && this.entrance !== null && !this.under[i];
-        if (gain > 0 && !noWayRound) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
-        // A faint alarm draws it: top-down only. In the side view the drawn explorers crowded the tunnels and the ground
-        // line round the nest's fights (G seeds 1–20: 15/20 against 18/20 without the pull).
-        else if (gain < 0 && this.entrance === null) h += climb(al, af, ar, p.turnRate * p.alarmDraw * -gain * dt);
-      }
-
-      // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none, and
-      // nor does a porter (food moved between chambers is no food to recruit to: its trail drew 4–5× as many ants to
-      // follow food scent underground, review of slice 5; it lays its chamber's mark like any ant inside, layMark).
-      // The fungus can make it louder or quieter, and have a food carrier leak its food trail into the other colony's
-      // field (exact as-is: × 1, nothing leaked).
-      // Which trail, and how much, are the trail and trailRate responses.
-      const tt = touch(this, i, toEnemy !== null, mode, item);
-      const trail = resp.trail(tt);
-      if (trail !== "none") {
-        const laid =
-          p.deposit *
-          (trail === "food" && this.entrance === null ? p.foodTrailTop : 1) *
-          resp.trailRate(tt) *
-          Math.exp(-this.since[i] / p.depositDecay) *
-          dt *
-          this.layGain[i];
-        this.antCell(i);
-        ph.depositCell(trail, CELL[0], CELL[1], laid);
-        const leak = this.crossLay[i];
-        if (carrying && leak > 0 && this.foreign) this.foreign.depositCell("food", CELL[0], CELL[1], laid * leak);
-      }
-
-      // A finder lays the raid trail home (behaviour MR 5.2), strongest where it met the strangers, more the more it met.
-      if (reporting && rgate) {
-        this.antCell(i);
-        ph.depositCell(
-          "raid",
-          CELL[0],
-          CELL[1],
-          p.deposit * p.raidLay * Math.min(3, 0.5 + this.foes[i]) * Math.exp(-this.since[i] / p.depositDecay) * dt,
-        );
-      }
-
-      // Waiting at home (behaviour MR 5) it stays in, milling as far as the nest's rim, where foragers come home: past
-      // WAIT_RIM of the radius it turns back in. Wandering out of the nest, it was asked its mode, and the mode policy
-      // sent it out exploring with nothing coming in; kept to half the radius, it never met a carrier, who puts its food
-      // down on reaching the rim, so only scouts went out.
-      if (waiting && gate) {
-        const dx = home.x - this.x[i];
-        const dy = home.y - this.y[i];
-        if (dx * dx + dy * dy > WAIT_RIM * WAIT_RIM * home.r * home.r) h = Math.atan2(dy, dx);
-      }
-      // One world: going in, within the disc round its hole, it makes straight for the hole's cell. Steering for the
-      // nest's centre at the turn rate, it circled the hole it was over.
-      if (this.inbound(i, mode)) {
-        const hc = this.holeCells[p.nest] as HoleCell;
-        const dx = centreX(hc.px, hc.py) - this.x[i];
-        const dy = centreY(hc.py) - this.y[i];
-        if (dx * dx + dy * dy < home.r * home.r) h = Math.atan2(dy, dx);
-      }
-      // Move; rock or the edge turns the ant back somewhere random.
-      // Rounded to float32 first, as stored: checked in float64, 192.999996 is open ground, and stored as
-      // 193.0 it would land the ant inside the soil cell beyond, where every step is blocked.
-      const nx = Math.fround(this.x[i] + Math.cos(h) * p.speed * dt);
-      const ny = Math.fround(this.y[i] + Math.sin(h) * p.speed * dt);
-      this.detour[i] = this.detour[i] - dt;
-      this.bumps[i] = Math.max(0, this.bumps[i] - dt / 4);
-      // The cell the step lands in: open ground (most steps) moves at once, with no more to check.
-      cellOf(Math.fround(nx), Math.fround(ny)); // as stored (Float32), so the cached cell is the stored position's
-      const lx = CELL[0];
-      const ly = CELL[1];
-      // One world's curtain: a step up into its surface rows (sky; the side view draws the strip from the plane, it is
-      // stored nowhere, one-world §8 item 6) is a crossing, judged below (mayCrossUp), whatever the cell holds.
-      const up = map.surfaceRows !== undefined && ly < map.surfaceRows;
-      let landOpen = up || rockAt(map, lx, ly) === OPEN;
-      if (!landOpen) {
-        // A step that stays in the ant's own cell moves even if that cell is solid: a cell filled round an
-        // ant (another colony's ant backfilling, its grids a tick old) must not bury it.
-        this.antCell(i);
-        if (CELL[0] === lx && CELL[1] === ly) landOpen = true;
-      }
-      let face =
-        !landOpen && mode === EXPLORE && !carrying && !pellet
-          ? soilFace(map, this.x[i], this.y[i], nx, ny, h, this.gx[i], this.gy[i], this.time, this.params.backfill.hold)
-          : NO_FACE;
-      if (face === START_FACE) face = digging || (this.digs(i) && rng() < START * (this.crowded() ? 1 : ROOMY_DIG)) ? DIG_FACE : GLANCE;
-      // Zoned by age (slice 6): only the middle-aged dig; others meeting a face turn along it.
-      else if (face === DIG_FACE && !digging && !this.digs(i)) face = GLANCE;
-      // A roomy nest (ja-wii): a tunnel's end met head-on is dug only now and then; turned along the wall otherwise, so the
-      // next tick doesn't simply try again.
-      else if (face === DIG_FACE && !digging && Number.isNaN(this.digAim[i]) && map.chambers && !this.crowded() && rng() > ROOMY_DIG)
-        face = GLANCE; // (an aimed face passed ROOMY_DIG when it was chosen)
-      // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say,
-      // but not soil put back moments ago (see refilled: #17's hold on refilled cells).
-      if (face !== NO_FACE && this.chamberCell[i] !== NO_KEY && mode === EXPLORE && !carrying && !pellet) {
-        cellOf(nx, ny);
-        if (
-          this.chamberCell[i] === cellKey(CELL[0], CELL[1]) &&
-          rockAt(map, CELL[0], CELL[1]) === SOIL &&
-          this.digs(i) &&
-          this.crowded() &&
-          !refilled(map, CELL[0], CELL[1], this.time, this.params.backfill.hold)
-        )
-          face = DIG_FACE;
-      }
-      if (face === DIG_FACE && map.sky) {
-        cellOf(nx, ny);
-        const looseFace = map.loose?.get(CELL[0], CELL[1]) === 1;
-        this.antCell(i);
-        // Loose soil is picked up only by the rules of pickLoose (spreading, backfill), never dug at head-on: explorers on
-        // the ground line chewed the mound and carried it to the hole and out again. (From below it can't be met: the ground
-        // under the mound is crust, see crust. Digging it "from below in a quarter of the time" never ran: review of MR 15.)
-        if (looseFace || !this.mayDig(CELL[0], CELL[1])) face = GLANCE;
-      }
-      if (face !== NO_FACE) {
-        // Digging: an explorer that meets soil head-on bites at it for DIG_TIME (1–2 s), then the cell
-        // is open and the ant carries the pellet home. Any other touch of soil puts a hand on the wall.
-        if (face === GLANCE) {
-          this.digT[i] = 0; // a face that stopped being diggable (a neighbour dug beside it) is left
-          this.digAim[i] = NaN;
-          this.hugT[i] = HUG_TIME;
-          // Facing along the wall, the soil it touched ahead on its hand side.
-          this.gdir[i] = (crossedDir(map, this.x[i], this.y[i], nx, ny) - this.hand[i] + 6) % 6;
-          this.gx[i] = NO_CELL;
-        } else if (!digging) {
-          cellOf(nx, ny);
-          this.digT[i] = DIG_TIME * (1 + rng());
-        } else {
-          const left = this.digT[i] - dt;
-          this.digT[i] = Math.max(0, left);
-          cellOf(nx, ny);
-          const fx = CELL[0];
-          const fy = CELL[1];
-          if (left <= 0 && crust(this, fx, fy)) {
-            // The side view: the ground line's crust is left (see crust); it turns along it instead.
-            this.digT[i] = 0;
-            this.digAim[i] = NaN;
-            this.hugT[i] = HUG_TIME;
-            this.gx[i] = NO_CELL;
-          } else if (left <= 0 && digCell(map, fx, fy, this.time)) {
-            // A chamber face: the cell joins its chamber (or founds a new one, if there is still room for one there).
-            if (this.chamberCell[i] === cellKey(fx, fy) && map.chambers) chamberDug(this, i, fx, fy);
-            this.chamberCell[i] = NO_KEY;
-            // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
-            const aim = this.digAim[i];
-            setTunnelHeading(
-              map,
-              fx,
-              fy,
-              Number.isNaN(aim) ? DIR_ANGLE[crossedDir(map, this.x[i], this.y[i], nx, ny)] + gauss(rng) * this.params.tunnelDrift : aim,
-            );
-            this.digAim[i] = NaN;
-            this.soilDug++;
-            this.pellet[i] = 1;
-            this.since[i] = 0;
-            this.lastDug[i] = cellKey(fx, fy);
-            this.looked[i] = NO_KEY; // a new trip home: every cell on it is looked round afresh
-            this.cameFrom[i] = NO_KEY;
-            this.homeAfresh(i); // a fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it
-            h += Math.PI;
-          }
-        }
-      } else if (!landOpen) {
-        this.digT[i] = 0;
-        // Read afresh: a give-up earlier this tick has just started a wander, and must not start a new wall.
-        const wandering = this.detour[i] > 0;
-        if (mode === RETURN && !wandering && !outward) {
-          // Homing: start (or keep) following this wall by touch instead of turning at random.
-          const x = this.x[i];
-          const y = this.y[i];
-          if (this.wall[i] === 0) {
-            const toNest = Math.atan2(nest.y - y, nest.x - x);
-            // Underground, every wall (soil, or rock in dug ground) is followed cell by cell, and re-anchors the
-            // line home: the review of #10 found carriers circling rock specks in caverns by touch for up to
-            // 120 s, out of reach of every release the cell-by-cell follower has. On open ground, rock keeps the
-            // touch rule. The cell is the landing cell the step was judged on (lx, ly: float32, as stored).
-            const cellWall = map.hasSoil || rockAt(map, lx, ly) === SOIL;
-            const newTrip = Number.isNaN(this.mx[i]);
-            if (newTrip) this.noGain[i] = 0;
-            if (newTrip || cellWall) {
-              // The first rock this trip: remember where, so the line from here to the nest is the way home it
-              // keeps returning to. Walls underground re-anchor it at every wall: in dug ground the ant meets speck
-              // after speck, and heading home from wherever it left the last one it is rarely back on the
-              // first wall's line, so it would circle a speck until it gave up (review of MR 8).
-              this.mx[i] = x;
-              this.my[i] = y;
-            }
-            this.wall[i] = wallSide(
-              touchProbe(this, x, y, toNest - WALL_PROBE, 1.2),
-              touchProbe(this, x, y, toNest + WALL_PROBE, 1.2),
-              rng,
-            );
-            // Underground, the distance to beat is the nearest it has been this trip (re-anchoring the line at
-            // every wall must not forget progress, or it could leave a wall and meet it again for ever).
-            const d = Math.hypot(nest.x - x, nest.y - y);
-            this.hitDist[i] = cellWall && !newTrip ? Math.min(this.hitDist[i], d) : d;
-            // Back on a wall it lost touch with: the clock runs on, or let-go and re-bump would never give up.
-            if (!(this.untouched[i] > WALL_LOST)) this.followT[i] = 0;
-            this.untouched[i] = 0;
-            // Facing the wall it met, turned away from the side it keeps the wall on; the first cell decides the way on.
-            this.gdir[i] = (crossedDir(map, x, y, nx, ny) - this.wall[i] + 6) % 6;
-            this.gx[i] = NO_CELL;
-            cellOf(x, y);
-            const hx = CELL[0];
-            const hy = CELL[1];
-            this.byCell[i] = cellWall || tunnel(map, hx, hy) ? 1 : 0;
-          }
-          if (!this.byCell[i])
-            h -= this.wall[i] * (Math.PI / 2); // by touch: turn away from the wall, along it
-          else {
-            // By cell and blocked: it stands right on its cell's edge (a straight line from inside a cell to a neighbour's
-            // centre never leaves the two), so the way to the next cell grazes the solid one beside it and every step lands
-            // there. A quarter of the way back to its own cell's centre takes it off the edge. Not only when it was already
-            // following a wall (the first rule): where the wall is let go of before the next step (every tick
-            // on the ground line; a release into scent in a tunnel), the ant was blocked the same way every tick, for good
-            // (review of #17: about 20 homing ants frozen in the walkway cell above the hole; 21 at one cell in a tunnel on
-            // seed 3 with the fixes of PRD §40, before this).
-            this.antCell(i);
-            this.x[i] = x + (centreX(CELL[0], CELL[1]) - x) * 0.25;
-            this.y[i] = y + (centreY(CELL[1]) - y) * 0.25;
-          }
-        } else {
-          h += Math.PI / 2 + rng() * Math.PI;
-          // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
-          // Not for a homing ant already on one (after giving up on a wall): in a tunnel it bumps all
-          // the time, and topping the detour up would keep it from ever trying for home again.
-          this.bumps[i] = Math.min(5, this.bumps[i] + 1);
-          if (mode !== RETURN || outward) this.detour[i] = Math.max(this.detour[i], 0.5 * 2 ** Math.floor(this.bumps[i]) * (0.5 + rng()));
-          // Carrying out on the plane (U3c): on from here the way it turned, not back into the rock.
-          if (outward) this.spoilA[i] = h;
-        }
-      } else if (up) {
-        // One world's curtain: a step up out of a hole (the crust is open nowhere else) is onto the surface, the plane's.
-        // Up it goes if it may (mayCrossUp); else it is pointed back down the shaft, as the side view's young are. Either
-        // way its step ends here.
-        if (mayCrossUp(this, i)) {
-          cellOf(x0, y0);
-          crossUp(this, i, CELL[0], CELL[1]);
-        } else {
-          h = this.pointDown(i, x0, y0, h);
-          // It has touched the surface, as the side view's young step onto the ground before they are put back: its floor
-          // marks start afresh at the next chamber (layMark). Laying on, the young turned back at the hole marked the
-          // shaft's top with brood and royal, which drew more young there (toBrood): in the spike up to 13 were held
-          // there for minutes.
-          this.lastRole[i] = 0;
-        }
-        this.heading[i] = h;
-        continue;
-      } else {
-        this.digT[i] = 0; // the face it was digging opened (another ant dug it), or it turned off it (its aim stays: it is walking up to the face)
-        this.x[i] = nx;
-        this.y[i] = ny;
-        this.cellX[i] = lx;
-        this.cellY[i] = ly;
-        this.cellAtX[i] = this.x[i];
-        this.cellAtY[i] = this.y[i];
-      }
-
-      // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
-      const ndx = this.x[i] - home.x;
-      const ndy = this.y[i] - home.y;
-      const atNest = ndx * ndx + ndy * ndy < home.r * home.r;
-      const ent = this.entrance;
-      const atEntrance = ent !== null && Math.hypot(this.x[i] - ent.x, this.y[i] - ent.y) < ent.r;
-      this.antCell(i);
-      // Activation (behaviour MR 5, docs/activation.md): an empty-jawed ant at home meets each nestmate that comes home
-      // with food beside it (its cell and the six round it) once, in a count that leaks away; only successful returns
-      // count. Counted as seconds of contact instead, a carrier, which turns round the moment its food is down, was met
-      // for a tick: the count stayed under the threshold, and only scouts went out.
-      // One world (ja-web): held at the gate, it meets every carrier that came down the hole last tick (holeSeen): each
-      // walks down the shaft past all of them. Its count leaks on both layers, so a wait's count fades on its trip out.
-      if (leak) {
-        let m = this.met[i] * metLeak;
-        if (gate ? atNest && !carrying : held) m += gate ? returnsAround(this, CELL[0], CELL[1]) : this.holeSeen;
-        this.met[i] = m;
-      }
-      // How crowded home is (docs/stance.md), felt by a waiting ant: nestmates in its cell and the six round it, but itself.
-      // (One world, ja-web: by an ant held at the gate, at the top of its shaft.)
-      if (sgate || hold) {
-        const c = this.crowd[i];
-        this.crowd[i] = (sgate ? atNest && !carrying : held)
-          ? c * crowdKeep + (nestmatesAround(this, CELL[0], CELL[1]) - 1) * (1 - crowdKeep)
-          : c * crowdKeep;
-      }
-      // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
-      const here = cellKey(CELL[0], CELL[1]);
-      if (this.putAt[i] !== here) this.putAt[i] = NO_KEY;
-      if (
-        !carrying &&
-        !pellet &&
-        this.putAt[i] === NO_KEY &&
-        map.food.get(CELL[0], CELL[1]) > 0 &&
-        resp.get(touch(this, i, toEnemy !== null, mode, item, "food")) &&
-        takeFoodCell(map, CELL[0], CELL[1])
-      ) {
-        this.carrying[i] = 1;
-        this.quality[i] = qualityAt(map, CELL[0], CELL[1]);
-        if (p.siteFidelity > 0 && this.line !== null && this.cur === PLANE) this.rememberSite(i);
-        this.homeAfresh(i);
-        this.since[i] = 0;
-        this.fatigue[i] = 0; // found food: the search succeeded
-        this.tired[i] = 0;
-        h += Math.PI;
-      } else if (outward) {
-        // One world's plane (U3c): carrying out by its own vector. Spoil is heaped once it believes itself spoilTo from
-        // home; a corpse goes on the midden once it is at least that far and off the mound (no spoil underfoot, which it can
-        // feel). Either is put down where it stands after its give-up time.
-        this.spoilT[i] = this.spoilT[i] + dt;
-        const corpse = this.corpse[i] === 1;
-        const far = fromHomePlane(this, i) >= this.spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
-        if (far || this.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) dropPlane(this, i);
-      } else if (pellet && ent && !Number.isNaN(this.spoilTo[i])) {
-        // Carrying a pellet out along the ground (side view): dropped where it stands once far enough out (or stuck).
-        this.spoilT[i] = this.spoilT[i] + dt;
-        const col = CELL[0];
-        const onGround = isSky(map, col, CELL[1]);
-        if (
-          (onGround && this.spoilSide[i] * (col - this.entranceCol) >= this.spoilTo[i]) ||
-          this.spoilT[i] > (this.corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)
-        )
-          dropOut(this, i, col);
-        // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
-        // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
-      } else if (pellet && atEntrance && this.soil[i] !== SOIL_FILL && this.line !== null) {
-        // One world: the spoil (or the dead) goes up the hole onto the plane, where it is put down (crossUp).
-        crossUp(this, i, this.entranceCol, this.entranceRow);
-        this.heading[i] = h;
-        continue;
-      } else if (pellet && atEntrance && this.soil[i] !== SOIL_FILL) {
-        // Up and out of the hole: it carries the pellet on out along the ground to drop it, farther as the mound grows
-        // (MOUND_REACH at most; more of them farther out, √ of a uniform draw), so the mound spreads as a disc, its area
-        // tracking the nest's volume (Tschinkel 2015), where you see them drop it.
-        const reach = Math.min(MOUND_REACH, 3 + this.heaped / (2 * MOUND_HEIGHT));
-        if (this.corpse[i]) {
-          // A corpse goes to the midden: one heap just past the mound's edge (harvesters: at the edge of the cleared disc).
-          this.spoilTo[i] = this.middenAt();
-          this.spoilSide[i] = this.middenSide();
-        } else {
-          this.spoilTo[i] = 2 + reach * Math.sqrt(rng());
-          this.spoilSide[i] = rng() < 0.5 ? -1 : 1;
-        }
-        this.spoilT[i] = 0;
-        this.staleWalk[i] = 0;
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
-        this.gx[i] = NO_CELL;
-      } else if (pellet && this.soil[i] === SOIL_FILL && atNest && !(this.line !== null && this.cur === PLANE)) {
-        // A loose pellet taken down to fill unused space, and none found on the way: it carries it back out. Most do (over
-        // 90 %: PRD §40), and that is the rule as meant: see LOOSE_FILL_PICK.
-        this.soil[i] = SOIL_LOOSE;
-        this.looseBack++;
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
-      } else if (
-        ent &&
-        !carrying &&
-        !pellet &&
-        mode === EXPLORE &&
-        isSky(map, CELL[0], CELL[1]) &&
-        this.enteredCell(i) &&
-        this.pickLoose(i, CELL[0], CELL[1], toEnemy !== null)
-      ) {
-        // Picked up a loose pellet off the mound (see pickLoose).
-      } else if (
-        this.line !== null &&
-        this.cur === PLANE &&
-        !carrying &&
-        !pellet &&
-        mode === EXPLORE &&
-        this.enteredCell(i) &&
-        pickPlane(this, i, CELL[0], CELL[1], toEnemy !== null)
-      ) {
-        // One world's plane: picked up a pellet off the mound (see pickPlane).
-      } else if (atNest && !(pellet && ent)) {
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
-        this.untouched[i] = 0;
-        this.bestD[i] = Infinity;
-        this.stallT[i] = 0;
-        if (this.since[i] > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
-        if (carrying && !this.queen && resp.drop(touch(this, i, toEnemy !== null, mode, item))) {
-          this.carrying[i] = 0;
-          this.stored++;
-          this.larder++;
-          if (gate) this.returning.set(here, (this.returning.get(here) ?? 0) + 1);
-          h += Math.PI;
-        } else if (pellet && !ent && this.line === null) {
-          // The soil goes on the mound: real ants dump it round the entrance, which is how mounds grow. (One world's plane:
-          // spoil is carried out by vector, dropPlane; a pellet going home to backfill goes on down its hole.)
-          this.pellet[i] = 0;
-          this.soilOut++;
-          h += Math.PI;
-        }
-        this.since[i] = 0;
-        // Home and resting in "return" (its policy said so, or a cached answer did: ja-qnx): after REST seconds it is
-        // asked afresh as an explorer, once it is no longer tired (fatigue rests it first: ja-q47).
-        // (One world's returners on the plane don't rest at the hole: they go in, crossDown.)
-        if (
-          mode === RETURN &&
-          !carrying &&
-          !pellet &&
-          !this.isTired(i) &&
-          !this.inbound(i, mode) &&
-          (this.restT[i] = this.restT[i] + dt) > REST &&
-          (!gate || ((rolled = true), this.leaves(i, dt, toEnemy !== null)))
-        ) {
-          this.mode[i] = EXPLORE;
-          this.asked[i] = -1;
-          this.restT[i] = 0;
-        }
-      } else this.since[i] = this.since[i] + dt;
-      if (!atNest) this.restT[i] = 0;
-      // Fatigue (ja-q47, docs/tiredness.md): what makes a forager tired is an unsuccessful search, and rest is a stay
-      // inside. It grows only while the ant is out with empty jaws, exploring, following or fighting (a raid or a defence
-      // tires it too: with fights left out, nothing sent a fighter home, raids never ended and combat losses rose 56-72 %,
-      // review of #36), and falls while it is inside its own nest (its hole on the ground or its tunnels and chambers),
-      // a full rest taking restTime. Finding food clears it (above). Digging, carrying spoil or nursing
-      // neither tire nor rest it. Before, a timer that only the hole reset made every inside worker "tired".
-      {
-        const inside = atNest || (ent !== null && this.under[i] === 1 && this.ownNestHere(i));
-        // Both run on the ant's clock (the fungus's lever slows tiring and resting alike), and fatigue stops at twice
-        // patience, so an ant kept out (by Jev, say) needs no more than twice restTime to rest (review of #36).
-        const m = this.mode[i];
-        if (inside) this.fatigue[i] = Math.max(0, this.fatigue[i] - ((p.patience / p.restTime) * dt) / this.clock[i]);
-        else if (!this.carrying[i] && !this.pellet[i] && !this.broodHeld[i] && (m === EXPLORE || m === FOLLOW || m === FIGHT))
-          this.fatigue[i] = Math.min(2 * p.patience, this.fatigue[i] + dt / this.clock[i]);
-        // Tired once past patience, and until fully rested: resting only to just under the line sent foragers out to
-        // tire again at once (G: up to 8 held, food home -9 %, in the first sweep).
-        if (this.fatigue[i] > this.patience(i)) {
-          // Tired where it searches round its last find's spot, with nothing found: that spot is spent (ja-lp4.15).
-          if (this.tired[i] === 0 && p.siteFidelity > 0 && this.search[i] !== 0 && this.line !== null && this.cur === PLANE)
-            this.foodX[i] = this.foodY[i] = NaN;
-          this.tired[i] = 1;
-        } else if (this.fatigue[i] === 0) this.tired[i] = 0;
-      }
-      // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
-      // returning (Jev answered "return" to every returner, home or not: PRD §42.4), so a fresh one that has got home with
-      // empty jaws is no longer returning: it is asked afresh as `arrive` says. In the side view a tired one stays in, as
-      // before: nothing underground rests it, so the colony's tired foragers retire inside (resting them sent them out
-      // again, and more food than the porters could carry piled up at reception, A8). On a top-down map rest is instant:
-      // the nest has just reset `since` above, so every returner there reads fresh and goes out at once (a timer artefact
-      // that ja-q47 replaces). Home is the nest on a top-down
-      // map. In the side view it is the royal chamber, where a returner homes to, and only for foragers (the old, zoned
-      // by age), as measured:
-      // - at its hole (passed on the way in, where a returner is asked afresh anyway) the trip's end sent explorers down
-      //   the carriers' food scent into the nest, where they jammed carriers (A8);
-      // - in any chamber, it left the young off the queen's side (zoning.test);
-      // - for the young and middle-aged, who work inside, it sent porters out and the queen starved on 1-2 of 4 worlds in
-      //   the hour-long economy run (slow/economy.test).
-      // (One world: a returner's trip ends inside, as the side view's does; on the plane it is still going in.)
-      if (
-        p.arrive !== "return" &&
-        this.mode[i] === RETURN &&
-        !carrying &&
-        !pellet &&
-        !nursing &&
-        !this.isTired(i) &&
-        !this.inbound(i, RETURN) &&
-        (ent === null ? atNest : this.under[i] === 1 && this.band(i) === 2 && atHome(this, i)) &&
-        (!gate || (!rolled && this.leaves(i, dt, toEnemy !== null)))
-      ) {
-        // A raid scout starts exploring, not on a food trail (review of #53, N6).
-        // `p.follows`: defensive, as at the gated hole (review of #121, N1).
-        this.mode[i] = p.arrive === "follow" && p.follows && !this.recruited[i] ? FOLLOW : EXPLORE;
-        this.asked[i] = -1;
-        this.restT[i] = 0;
-      }
-      if (ent) {
-        // Zoned by age (slice 6): an ant not to go out that has just stepped up out of the hole onto the ground goes
-        // back down (carriers aside: soil goes out to the mound; food is on its way in).
-        if (this.queen && this.under[i] && !carrying && !pellet && !this.mayGoOut(i)) {
-          this.antCell(i);
-          if (isSky(map, CELL[0], CELL[1])) h = this.pointDown(i, x0, y0, h);
-        }
-        integrate(this, i, x0, y0, atNest);
-        // Road signs: underground, a strong nest trail where it stands tells it where it is, and its memory's error fades
-        // (Heyman et al. 2017; slice 3 gives each chamber its own mark). Outside, the hole's sight and smell do it (believe).
-        // Read on the floor where it stands (a road sign is under its antennae; the sensors ahead are often in soil in a tunnel).
-        if (
-          this.under[i] &&
-          (ph.fields.home.get(CELL[0], CELL[1]) * this.gainHome[i] >= STRONG ||
-            ph.fields[destMark(this, i)].get(CELL[0], CELL[1]) * this.gainHome[i] * this.gainMarks[i] >= STRONG)
-        )
-          this.odoNest[i] = this.odoNest[i] * Math.exp(-dt / ROAD_SIGN);
-        if (this.map.chambers) layMark(this, i, dt);
-        if (this.queen) {
-          nurse(this, i, dt, toEnemy !== null);
-          if (port(this, i, dt, toEnemy !== null)) h += Math.PI;
-          if (this.params.undertakes) undertake(this, i, dt, toEnemy === null);
-        }
-      }
-      // One world: on the plane, at a hole's cell. Its own: in, if it is going in (wantsIn). Another colony's: a raider
-      // goes down that shaft (one-world §4). Crossing is where it stands; it reads nothing else.
-      if (this.line !== null && this.cur === PLANE) {
-        // Path integration on the plane (U3b): it counts its way out, as integrate does on the side view's ground; once it
-        // heads home the vector is fixed.
-        // Carrying spoil or a corpse out (U3c), it counts too: it is on its way out, and drops by the vector it brought.
-        if (this.mode[i] !== RETURN || outward) this.odoSurf[i] = this.odoSurf[i] + Math.hypot(this.x[i] - x0, this.y[i] - y0);
-        if (p.routeMemory > 0 && (this.mode[i] === EXPLORE || this.mode[i] === FOLLOW) && !this.carrying[i]) routeRecord(this, i);
-        this.antCell(i);
-        const k = this.holeAt(CELL[0], CELL[1]);
-        if (k >= 0 && (k === p.nest ? this.wantsIn(i, this.mode[i]) : this.mode[i] === FIGHT && this.stanceOf(i) === "raid")) {
-          crossDown(this, i, k);
-          continue;
-        }
-      }
+      s.p = p;
+      s.rng = rng;
+      s.map = map;
+      s.ph = ph;
+      s.home = home;
+      s.dt = dt;
+      s.gate = gate;
+      s.hold = hold;
+      s.leak = leak;
+      s.metLeak = metLeak;
+      s.sgate = sgate;
+      s.crowdKeep = crowdKeep;
+      s.h = h;
+      s.toEnemy = toEnemy;
+      s.held = held;
+      s.carrying = carrying;
+      s.pellet = pellet;
+      s.nursing = nursing;
+      s.outward = outward;
+      s.x0 = x0;
+      s.y0 = y0;
+      s.mode = mode;
+      s.item = item;
+      s.resp = resp;
+      s.rolled = rolled;
+      const arriveDone = arrive(this, i, s);
+      h = s.h;
+      rolled = s.rolled;
+      if (arriveDone) continue;
       this.heading[i] = h;
     }
     this.gateHeld = heldNow;

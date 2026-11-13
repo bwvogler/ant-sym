@@ -204,23 +204,31 @@ test("a host that dies on the plane is a new start where it lies; a clean ant le
   assert.equal(g.fungus.corpsesOn(PLANE).size, before + 1);
 });
 
-test("ants digging through a hypha in the curtain cut it, and the mycelium loses the mass it held", () => {
+test("ants digging through a hypha in the curtain cut that cell, and the mycelium loses the mass it held; what grew beyond lives on (ja-2bw.19)", () => {
   const g = game(true);
   crossDown(g);
   runFor(g, 30);
   const h = g.fungus.hyphaeOn(CURTAIN)!;
-  const soil = [...h.soil];
-  assert.ok(soil.length > 0, "no hypha in the curtain's soil");
+  // A soil cell a hypha holds that something grew from.
+  const parents = new Set(h.parent.values());
+  const k = [...h.soil].find((c) => parents.has(c));
+  assert.ok(k !== undefined, "no hypha in the curtain's soil with a cell grown from it");
+  const beyond = [...h.parent].filter(([, p]) => p === k).map(([c]) => c);
   const e = g.fungus.evolution!;
-  // Dig the first soil cell a hypha holds, as a digger would.
-  const [x, y] = keyCell(soil[0]!);
+  const lost: number[] = [];
+  const lose = e.lose.bind(e);
+  e.lose = (m: number) => {
+    lost.push(m);
+    lose(m);
+  };
+  // Dig it, as a digger would.
+  const [x, y] = keyCell(k);
   g.world!.curtain.rock.set(x, y, OPEN);
-  const before = h.length;
-  const mass = e.mass;
-  runFor(g, 3);
-  assert.ok(h.length < before || !h.has(x, y), "not cut");
-  assert.ok(h.cutCells > 0);
-  assert.ok(e.mass < mass, "no mass lost");
+  const cut = h.cutCells;
+  while (h.has(x, y)) runFor(g, 1 / 30);
+  assert.equal(h.cutCells, cut + 1, "more than the dug cell was cut");
+  assert.deepEqual(lost, [HYPHA_MASS], "the mass lost is the dug cell's");
+  for (const c of beyond) assert.ok(h.has(...keyCell(c)), `${keyCell(c)} beyond the cut died`);
 });
 
 test("a spore spot a tip fruited on puts out spores, until it is filled in", () => {
@@ -313,4 +321,22 @@ test("the patch's tip aimed at the hole never starts with its own patch ahead (j
     const t = plane.tips[0]!;
     assert.ok(!plane.has(nx(t.x, t.y, t.heading), ny(t.y, t.heading)), `seed ${seed}: its own patch ahead of the aimed tip`);
   }
+});
+
+test("in the game, a hypha dug through in the curtain regrows from its stump into the dug cell (ja-2bw.15)", () => {
+  const g = game(true);
+  crossDown(g);
+  runFor(g, 30);
+  const h = g.fungus.hyphaeOn(CURTAIN)!;
+  // A soil cell a hypha holds that grew from another (not a root), so it leaves a stump.
+  const k = [...h.soil].find((c) => (h.parent.get(c) ?? -1) !== -1)!;
+  assert.ok(k !== undefined, "no hypha grown in the curtain's soil");
+  const [x, y] = keyCell(k);
+  g.world!.curtain.rock.set(x, y, OPEN);
+  runFor(g, 3);
+  assert.ok(!h.has(x, y), "not cut");
+  assert.ok(h.stumps.size > 0, "no stump left");
+  for (let t = 0; t < 60 && !h.has(x, y); t++) runFor(g, 1);
+  assert.ok(h.has(x, y), "nothing regrew into the dug cell in 60 s");
+  assert.equal(rockAt(g.world!.curtain, x, y), OPEN, "the cell is still dug: the hypha runs on its back wall");
 });

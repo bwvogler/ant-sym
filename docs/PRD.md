@@ -4925,6 +4925,8 @@ The mycelium's spore output is fixed by its mass, so every cell added to where i
 
 ### 63.3 Ants digging through a hypha cut it (ja-2bw.4, 2026-11-12)
 
+*(Superseded by §63.10: a cut loses only the dug cell; what grew beyond it lives on as its own piece.)*
+
 **Built** (with `params.hyphae`). Hyphae remember the cells that were soil when they grew in (and the shaft-wall roots); each round, a cell the ants have dug open is cut (`Hyphae.cutDug`). The cell and everything that grew from it die with their tips, the fusions they held and the spore spots only they touched, and the mass the lost hypha held is gone (`Evolution.lose`). A fusion loop that joins the cut-off part to the rest saves it: only the dug cell is lost (Simonin et al. 2012; the rule is design).
 
 **Measured** (seeds 1–10, 600 s, against §63.2): a quarter at 141–401 s → 140–441 s; seed 6 401 → 441 s, seed 9 380 → 398 s, the rest within a few seconds; median about 301 s. The counterplay is mild: at *a thread* the curtain's hyphae run along walls already dug, so the diggers mostly widen the tunnels beside them; it should bite harder once *a borer* takes hyphae into undug soil. P1 holds (worst 441 s against the baseline's "never").
@@ -5025,6 +5027,48 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - Branching is near neutral against `main`'s hyphae: faster on seeds 1 and 8 (by 20 and 32 s), slower on seeds 2, 5 and 7 (+4 %, +5 %, +10 %), the rest within 3 s; median 289 → 293 s.
 - **`main` had already drifted.** Against no hyphae on the same `main`, its own hyphae are 29 % slower on seed 7 (277 → 358 s): P1 fails there before this change (§63.7 measured 397 vs 389 on its branch, before `main`'s merges of the day). Filed as `ja-2bw.19`. The worst seed improves with hyphae (two "never" become 493 and 373 s).
 - **Owner (2026-11-13): ship, record, and file the drift.**
+
+### 63.9 Hyphae along the tunnels, regrowing after a dig (ja-2bw.15, 2026-11-13)
+
+**Built.** In the side view a dug cell has a back wall: a hypha in it runs there, where the ants walk.
+- **Tunnels followed.** A tip in a dug cell follows the tunnel: where it bends, the local rule and a policy's `turn` take the side that stays in it (one turn off, or two); where it ends, the tip grows on into the soil. From the soil, the local rule enters a tunnel ahead unless its own hypha already runs in a dug cell within `ENTER_GAP` (6); then it slides along the wall as before.
+- **Regrowth.** A cut leaves the cell the hypha grew from as a stump. `REGROW_ROUNDS` (5) rounds later the stump puts out a tip that grows straight into the dug cell, paid from the free mass (or waits on the stump while the mass is short). Injured hyphae put out new tips behind the wound; the pause makes a dig cost something.
+- **Safe on the back wall.** Ants walking past do not harm hyphae in dug cells; only digging cuts (owner, 2026-11-13).
+- **The growth legend, v3.** Under #137's answers the two shaft-wall tips ended in a few steps (`fruit` when short, `fuse`), so the side view under *unite* kept about 6 cells and no tips. **Owner: reword and re-ask.** The legend now says that only tips grow, a tip that fruits or fuses is gone, and where the last tips end the mycelium grows no further; `fuse` says it ends the tip. Asked for the three aims: **$0.0020** (`GROWTH_BRAIN_VERSION` 3). The lane per new aim: about 15.9k input tokens measured, **≈ $0.0007**; `--dry` estimates 21.6k tokens, $0.0009 (v2: 63.3k for three aims, +2.4 %). Jev now fruits in no situation under any aim.
+- **Spots in the body.** With no `fruit` answers the hyphae made no spore spots and infection slowed. **Owner: spots in the body.** Where a tip still growing has come to a tunnel (on its wall or in it), grown `FRUIT_RUN` cells and with no spot of its own within `FRUIT_GAP`, the body puts a spot on the dug cell and the tip grows on. A `fruit` answer still ends a tip where the spacing allows it.
+
+**Seen.** Full maps, *unite*, the page's answers, 300 s (seeds 1–6): the side view holds 17–36 hypha cells, 9–25 of them in dug cells, with 1–4 tips still growing and 1–2 spots; under #137's answers it was about 6 cells with no tips. Where ants dug through (seeds 2 and 4: 6 and 13 cells cut) the hyphae grew back.
+
+**Measured** (`progression.mjs --map one --evolve`, 600 s; the no-hyphae run and `main`'s hyphae from §63.8):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 357 | 363 | 289 | 173 | 228 | never | 277 | never | 240 | 216 |
+| a quarter, §63.8's hyphae (s) | 333 | 299 | 287 | 161 | 220 | 493 | 393 | 373 | 253 | 217 |
+| a quarter, along tunnels (s) | 370 | 305 | 298 | 162 | 205 | 474 | 318 | 355 | 262 | 246 |
+
+- Against §63.8: seed 7 much faster (393 → 318 s), seeds 5, 6 and 8 faster; seeds 1 and 10 slower (+11 %, +13 %); median 293 → 302 s.
+- Against no hyphae: P1 fails on seeds 7 (+15 %) and 10 (+14 %) and on the median (283 → 302 s); the worst seed improves (never → 474 s). `main` already failed P1 on seed 7 (+42 %, `ja-2bw.19`).
+- **Owner (2026-11-13): ship, record, and tune in `ja-2bw.6`** (`ENTER_GAP`, `REGROW_ROUNDS`, `FRUIT_GAP` join its knobs).
+- Held out, seeds 11–20 (no hyphae → along tunnels): 11 353 → 399, 12 242 → 243, 13 259 → 223, 14 165 → 146, 15 343 → 285, 16 324 → 280, 17 252 → 264, 18 252 → 226, 19 315 → 308, 20 475 → 314 s. Median 287 → 272 s, worst seed 475 → 399 s; P1 fails only on seed 11 (+13 %).
+
+### 63.10 Seed 7 traced; a cut loses only the dug cell (ja-2bw.19, 2026-11-13)
+
+**The baseline moved.** §63.8 found seed 7 29 % slower to a quarter with hyphae than without, on `main`, where §63.7 had them level. Bisected over `main`'s merges between them (#107 to #130, with #130's landing applied at each point): seed 7 without hyphae reaches a quarter at 397 s before #107 (food sensed only through open ground) and at 277 s from #107 on; the hyphae did not get slower.
+
+**Why the hyphae lagged.** From Mycelium level 1 (bought at 23 s) side-view tips grow through undug soil, and on seed 7 the colony digs where they grow. A cut used to kill everything that grew beyond it, with its mass: 14 cells at 90 s, 25 at 112 s from a single trunk cell, 49 by 120 s. The mycelium fell from 19.6 to 12.4 mass while without hyphae it reached 24.5; spores follow mass, so at minute 5 7 % were infected against 47 %.
+
+**Built.** **Owner (2026-11-13): the severed part lives on.** A severed hypha seals the wound and grows on from what it holds: a cut now loses only the dug cell (its `HYPHA_MASS`), and each cell that grew from it becomes a root, with its tips, cords and spots. The stump still regrows into the dug cell (§63.9); a cord still takes `CORD_DIGS` digs; a spot goes only once no hypha touches it. On seed 7: 7 cells cut by 120 s and mass 22.9, against 24.5 without hyphae.
+
+**Measured** (`progression.mjs --map one --evolve`, 600 s, `main` at `b789e8c`):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 357 | 363 | 289 | 173 | 228 | never | 277 | never | 240 | 216 |
+| a quarter, hyphae (s) | 361 | 278 | 293 | 162 | 205 | 475 | 261 | 355 | 241 | 230 |
+
+- **P1 holds on seeds 1–10:** no seed more than 10 % slower (seed 10 +6.5 %, seeds 1 and 3 +1 %), the median 283 → 270 s, the worst seed never → 475 s. Seed 7 is now faster with hyphae (277 → 261 s).
+- Held out, seeds 11–20 (no hyphae → hyphae): 11 353 → 391, 12 242 → 244, 13 259 → 218, 14 165 → 150, 15 343 → 274, 16 324 → 279, 17 252 → 254, 18 252 → 219, 19 315 → 305, 20 475 → 297 s. Median 287 → 264 s, worst seed 475 → 391 s; only seed 11 misses P1, by a hair (+10.8 %, against +13 % in §63.9). `ja-2bw.6` keeps it.
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 

@@ -24,21 +24,21 @@
     {
       "lane": "growth",
       "aim": "peace",
-      "context": "growth-v2-9c810716",
+      "context": "growth-v3-f8e41472",
       "file": "growth-peace.json",
       "answers": 48
     },
     {
       "lane": "growth",
       "aim": "spread",
-      "context": "growth-v2-84f5a29b",
+      "context": "growth-v3-45ee3c17",
       "file": "growth-spread.json",
       "answers": 48
     },
     {
       "lane": "growth",
       "aim": "unite",
-      "context": "growth-v2-19463c4f",
+      "context": "growth-v3-18f23733",
       "file": "growth-unite.json",
       "answers": 48
     },
@@ -113,6 +113,6 @@
     "colony": 7,
     "stance": 4,
     "fungus": 8,
-    "growth": 2
+    "growth": 3
   }
 }

@@ -30,7 +30,7 @@ test("the agent guide names files and symbols that exist", () => {
     ["web/src/colony/vocab.ts", []],
     ["web/src/colony/tests/builders.ts", ["SMALL_SIDE", "smallOne", "arena", "placedAt", "editPrivate"]],
     ["web/shared/jev.ts", ["isRunSummary", "readHealth"]],
-    ["web/src/colony/colony.ts", ["backfill", "tunnelDrift"]],
+    ["web/src/colony/params.ts", ["backfill", "tunnelDrift"]], // ColonyParams, where the guide points
   ];
   for (const [path, symbols] of named) {
     if (symbols.length === 0) assert.ok(guide.includes(path.split("/").pop()!), `the guide mentions ${path}`);
