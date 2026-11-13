@@ -14,6 +14,7 @@ import {
   type Flight,
   CELL,
   cellOf,
+  GENERIC_ANT,
 } from "./colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -120,7 +121,8 @@ export default function ColonyApp() {
     (seed: number, withTutorial: boolean, species?: string) => {
       start(seed, withTutorial, species);
       if (withTutorial) tut.run();
-      else skipTutorial();
+      // The tutorial is the generic ant's: only a generic start without it marks it done (review of #142, S1).
+      else if ((species ?? GENERIC_ANT.id) === GENERIC_ANT.id) skipTutorial();
     },
     [start, tut],
   );

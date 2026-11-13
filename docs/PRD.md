@@ -4716,7 +4716,7 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 
 ### 60.3 Playing the desert ant: the start screen's species choice (ja-rf5.10, ja-fnd.5.15, 2026-11-13)
 
-- **The choice:** the start screen offers the species both colonies are ("Ant" or "Desert ant", with a line on each). The desert ant starts without the tutorial, which walks through the generic ant's trails and raids. The choice is in the game's settings and its saves; a save of any species this build plays loads (`SPECIES`: the generic ant and, registered now, the desert ant).
+- **The choice:** the start screen offers the species both colonies are ("Ant" or "Desert ant", with a line on each). The desert ant starts without the tutorial, which walks through the generic ant's trails and raids. Starting it leaves the tutorial unplayed, so a later generic start still offers it. The choice is in the game's settings and its saves; a save of any species this build plays loads (`SPECIES`: the generic ant and, registered now, the desert ant).
 - **Shipped answers, each against its own species** (`ja-fnd.5.15`): `loadPrecache` hands each bundle's species to `ColonyJev.seed`, which checks its answers against that species' words, not the game's. Before, a page that seeded while playing the desert ant dropped the generic bundles' follow answers for the rest of the page.
 - **Caught by the e2e run:** the game was not rebuilt when only the species changed (its memo didn't list it), so Start built a generic game. `npm run e2e`'s new step 8 chooses the desert ant, starts, plays 20 s and checks the game is the desert ant's with no food or home trail.
 - No behaviour change for the generic ant (goldens bit-exact); no cost change.

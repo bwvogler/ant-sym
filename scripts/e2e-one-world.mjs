@@ -20,7 +20,8 @@
 //     host pauses the game and is followed, and its card hides to a strip and comes back; the watch runs at 4×, Faster at 8×;
 //     Skip ends it at 4×, playing; a reload offers plain Start.
 //  8. the desert ant (ja-rf5): chosen on the start screen, which then offers plain Start (no tutorial: it is the generic ant's); its
-//     game is the desert ant's, plays 20 s of game time at 4× and lays no food or home trail on the plane.
+//     game is the desert ant's, plays 20 s of game time at 4× and lays no food or home trail on the plane; a reload still offers
+//     the generic ant's tutorial.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -792,6 +793,15 @@ try {
   check(
     await dp.evaluate(() => window.jevAnts.game.colonies.every((c) => !c.layers[0].ph.live("food") && !c.layers[0].ph.live("home"))),
     "no food or home trail on the plane",
+  );
+  await dp.reload();
+  await dp
+    .getByRole("button", { name: "Start the tutorial", exact: true })
+    .waitFor({ timeout: 10_000 })
+    .catch(() => {});
+  check(
+    (await dp.getByRole("button", { name: "Start the tutorial", exact: true }).count()) === 1,
+    "a desert game leaves the generic ant's tutorial unplayed",
   );
   await dctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
