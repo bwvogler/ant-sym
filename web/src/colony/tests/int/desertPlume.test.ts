@@ -29,7 +29,7 @@ function bare() {
 /** The desert ant's plume range (cells). */
 const PLUME = DESERT_ANT.params.foodPlume ?? 0;
 
-const fresh = (): PlumeState => ({ plume: null, plumeCells: [], plumeEpoch: -1, plumeFood: -1 });
+const fresh = (): PlumeState => ({ plume: null, plumeEpoch: -1, plumeFood: -1 });
 
 test("the plume: 1 on food, falling with steps through open ground, none past the range or behind rock", () => {
   const map = bare();
@@ -93,13 +93,37 @@ test("a desert game's plume is saved: a save made between rebuilds runs on exact
   assert.notEqual(c.plumeFood, whole.map.foodLeft, "food taken since it was built (the test's own check)");
   const saved = copy(whole.save());
   const kept = Int16Array.from(c.plume);
+  const keptEpoch = c.plumeEpoch;
+  const keptFood = c.plumeFood;
   run(whole, 10);
   const unbroken = hashGame(whole);
   const again = desert();
   again.load(copy(saved));
   assert.deepEqual(again.player.plume, kept, "the plume as built, not rebuilt from the food at the save");
+  assert.equal(again.player.plumeEpoch, keptEpoch, "and the period it was built in");
+  assert.equal(again.player.plumeFood, keptFood);
   run(again, 10);
   assert.equal(hashGame(again), unbroken, "run on: as if never saved");
+});
+
+test("the plume is the plane's: an ant in the nest (the curtain) never smells it, and it is only ever built over the plane (review of #143, S2)", () => {
+  const g = desert();
+  const c = g.player;
+  const plane = c.layers[PLANE]!.map;
+  const at: number[] = [];
+  const smells = c.smellsFood.bind(c);
+  c.smellsFood = (i, h, a, max) => (at.push(c.cur), smells(i, h, a, max));
+  run(g, 30);
+  assert.ok(at.length > 0, "it smelt for food (the test's own check)");
+  assert.ok(
+    c.layer.some((l, i) => c.alive[i] === 1 && l !== PLANE),
+    "ants in the nest too (the test's own check)",
+  );
+  assert.ok(
+    at.every((l) => l === PLANE),
+    "read only on the plane",
+  );
+  assert.equal(c.plume!.length, plane.size.w * plane.size.h, "built over the plane");
 });
 
 test("the generic ant has no plume: none is built", () => {

@@ -1297,12 +1297,10 @@ export class Colony {
     return t && this.entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.entrance.x))) : MIDDEN_AT;
   }
 
-  /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
   /** The turn up the food plume (smellsFood's answer, radians), read by the caller at once. */
   plumeTurn = 0;
   /** The food plume on the plane (ja-rf5.4, plume.ts PlumeState): built only for a species with foodPlume. */
   plume: Int16Array | null = null;
-  plumeCells: number[] = [];
   plumeEpoch = -1;
   plumeFood = -1;
   /**
@@ -1329,6 +1327,7 @@ export class Colony {
     return true;
   }
 
+  /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
   outbound(i: number): boolean {
     return this.queen !== null && this.band(i) === 2;
   }

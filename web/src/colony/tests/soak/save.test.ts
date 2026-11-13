@@ -181,7 +181,6 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
     "params",
     "ph",
     "plume", // the food plume (ja-rf5.4): built at fixed times, so a loaded game must have it as built
-    "plumeCells",
     "plumeEpoch",
     "plumeFood",
     "portTrips",

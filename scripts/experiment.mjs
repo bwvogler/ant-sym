@@ -100,8 +100,10 @@ async function main() {
     else if (a === "--jobs") jobs = Number(args[++k]);
     else if (a === "--policy") policy = args[++k];
     else if (a === "--one") one = true;
-    else if (a === "--species") species = args[++k];
-    else if (a === "--log") {
+    else if (a === "--species") {
+      species = args[++k];
+      if (species === undefined) fail("--species <id>");
+    } else if (a === "--log") {
       log = args[++k];
       if (log === undefined) fail("--log <spec>");
     } else if (a === "--set") {

@@ -6,18 +6,20 @@ import { nx as stepX, ny as stepY } from "./hex.ts";
 import { OPEN, isSky, rockAt, type WorldMap } from "./world.ts";
 
 /**
- * How often the plume is rebuilt while the food changes (game seconds): odour lags the food a little, as air does. Built only at
- * multiples of this in game time, from the state then, so a saved game rebuilds at the same ticks as the unbroken one. A build is
+ * How often the plume is rebuilt while the food changes (game seconds): odour lags the food a little, as air does. Built at most once
+ * in each period of this length, at the first read after the food changed, from the saved state, so a loaded game rebuilds at the
+ * same ticks as the unbroken one. A build is
  * ~10 ms on one world's plane (512 × 368, seed 1): every second it cost a desert game +25 % ms/tick, every 4 s +8 %.
  */
 export const PLUME_EVERY = 4;
+
+/** The build's queue of cells: scratch, emptied at each build (not state: a save needn't carry it). */
+const QUEUE: number[] = [];
 
 /** A colony's plume: what it keeps between ticks (public colony fields, so a save keeps them: colony.ts saveFields). */
 export interface PlumeState {
   /** per cell (row-major over the map's size), steps from the nearest food cell through open ground; −1 beyond the range; null before the first build */
   plume: Int16Array | null;
-  /** the cells `plume` reaches (reset before the next build) */
-  plumeCells: number[];
   /** the PLUME_EVERY period it was built in; −1 never */
   plumeEpoch: number;
   /** map.foodLeft when built: the food changed if it moved */
@@ -30,9 +32,9 @@ export function updatePlume(s: PlumeState, map: WorldMap, range: number, t: numb
   const epoch = Math.floor(t / PLUME_EVERY);
   const have = s.plume && s.plume.length === w * h ? s.plume : null;
   if (have && (epoch === s.plumeEpoch || s.plumeFood === map.foodLeft)) return have;
-  const dist = have ?? new Int16Array(w * h).fill(-1);
-  const cells = s.plumeCells;
-  if (have) for (const k of cells) dist[k] = -1;
+  const dist = have ?? new Int16Array(w * h);
+  dist.fill(-1);
+  const cells = QUEUE;
   cells.length = 0;
   s.plume = dist;
   s.plumeEpoch = epoch;
