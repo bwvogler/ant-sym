@@ -15,6 +15,8 @@ import {
   R,
   SIDE,
   INFECTED,
+  SPORE_FULL,
+  SPORE_SHOWN,
   type Fungus,
   type Hyphae,
   hyphaCell,
@@ -498,8 +500,9 @@ export default function ColonyField({
             continue;
           }
           // Spores: the fungus's own mark on the ground, under food and alarm, over the trails.
-          const sp = sporeC ? Math.min(1, sporeC[i] / 3) : 0;
-          if (sp > 0.02) {
+          const sv = sporeC ? sporeC[i] : 0;
+          if (sv >= SPORE_SHOWN) {
+            const sp = Math.min(1, sv / SPORE_FULL);
             px[o] = theme.sporeRgb[0];
             px[o + 1] = theme.sporeRgb[1];
             px[o + 2] = theme.sporeRgb[2];
@@ -579,10 +582,14 @@ export default function ColonyField({
       c.ctx.putImageData(c.img, 0, 0);
     };
 
-    /** The minimap's picture: each pixel the cell under its centre (food, rock, soil or open ground); ants as dots. */
+    /**
+     * The minimap's picture: each pixel the cell under its centre (food, rock, soil or open ground), washed with the
+     * fungus's colour where it has spores the field would draw; ants as dots, infected ones in the fungus's colour (ja-hcq).
+     */
     const paintMini = () => {
       const px = miniImg.data;
       const food = theme.accentRgb;
+      const spore = theme.sporeRgb;
       for (let my = 0; my < mini.height; my++)
         for (let mx = 0; mx < mini.width; mx++) {
           cellOf(gx0 + mx * 2 + 1, my * 2 + 1);
@@ -609,26 +616,31 @@ export default function ColonyField({
                     : heap > 0
                       ? theme.spoil
                       : theme.paperRgb);
-          px[o] = c[0];
-          px[o + 1] = c[1];
-          px[o + 2] = c[2];
+          // Spores over the ground, as strongly as the field draws them (a pixel is too small for its fading in alpha).
+          const sv = off || cut ? 0 : spores.get(x, y);
+          const a = sv >= SPORE_SHOWN ? 0.35 + 0.5 * Math.min(1, sv / SPORE_FULL) : 0;
+          px[o] = Math.round(c[0] + (spore[0] - c[0]) * a);
+          px[o + 1] = Math.round(c[1] + (spore[1] - c[1]) * a);
+          px[o + 2] = Math.round(c[2] + (spore[2] - c[2]) * a);
           px[o + 3] = 255;
         }
-      for (let k = colonies.length - 1; k >= 0; k--) {
-        const col = colonies[k] as Colony;
-        // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
-        const tone = odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
-          const mx = Math.floor((col.x[i] - gx0) / 2);
-          const my = Math.floor(col.y[i] / 2);
-          if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
-          const o = (my * mini.width + mx) * 4;
-          px[o] = tone[0];
-          px[o + 1] = tone[1];
-          px[o + 2] = tone[2];
+      // Every colony's ants, then the infected over them, so a healthy nestmate on the same pixel doesn't hide one.
+      for (const sick of [false, true])
+        for (let k = colonies.length - 1; k >= 0; k--) {
+          const col = colonies[k] as Colony;
+          // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
+          const tone = sick ? spore : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
+          for (let i = 0; i < col.n; i++) {
+            if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || col.load[i] >= INFECTED !== sick) continue;
+            const mx = Math.floor((col.x[i] - gx0) / 2);
+            const my = Math.floor(col.y[i] / 2);
+            if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
+            const o = (my * mini.width + mx) * 4;
+            px[o] = tone[0];
+            px[o + 1] = tone[1];
+            px[o + 2] = tone[2];
+          }
         }
-      }
       miniCtx.putImageData(miniImg, 0, 0);
     };
 

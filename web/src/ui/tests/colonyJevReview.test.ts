@@ -1,6 +1,15 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, type Situation, type FungalSituation, generateWorld, mulberry32, OPEN_WORLD } from "../../colony/index.ts";
+import {
+  Colony,
+  DEFAULT_RULE,
+  Fungus,
+  type Situation,
+  type FungalSituation,
+  generateWorld,
+  mulberry32,
+  OPEN_WORLD,
+} from "../../colony/index.ts";
 import { ColonyJev, type CacheStore } from "../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
@@ -183,4 +192,84 @@ test("a 409 ends the run and cancels what is still in flight: Start again asks i
   release();
   await tick(30);
   assert.equal(j.explain(a).by, "jev");
+});
+
+test("one menu: Fungus.configure alone changes the levers Jev asks (ja-d87)", async () => {
+  const { reqs } = proxy({ answer: () => "1" });
+  const j = make();
+  const f = new Fungus(generateWorld(1, OPEN_WORLD));
+  f.configure(DEFAULT_RULE, ["calm", "alarm"]);
+  j.attachFungus(f);
+  j.setAim("x");
+  await j.start();
+  f.configure(DEFAULT_RULE, ["calm"]); // a script or test, with no setMenu
+  j.fungusPolicy(fungal());
+  await tick(40);
+  assert.equal(fungusRequests(reqs).length, 1);
+  assert.deepEqual(
+    Object.keys(fungusRequests(reqs)[0]!.questions),
+    ["h0_calm"],
+    "asked under the fungus's menu, not the one Jev saw first",
+  );
+  assert.deepEqual(j.explainFungus(fungal()), { answer: "1", by: "jev" });
+  f.menu = ["alarm"];
+  assert.notEqual(j.explainFungus(fungal()).by, "jev", "the answer was for calm: the fungus's new menu has no answer yet");
+  j.setMenu(new Set(["calm"]));
+  assert.deepEqual([...f.menu], ["calm"], "setMenu writes the fungus's menu: one source");
+  assert.deepEqual(j.explainFungus(fungal()), { answer: "1", by: "jev" });
+});
+
+test("a new fungus whose menu counter matches the old one's: Jev still takes the new fungus's menu (review of #156 S1)", async () => {
+  const { reqs } = proxy({ answer: () => "1" });
+  const j = make();
+  const a = new Fungus(generateWorld(1, OPEN_WORLD));
+  const b = new Fungus(generateWorld(1, OPEN_WORLD));
+  a.configure(DEFAULT_RULE, ["calm", "alarm"]);
+  b.configure(DEFAULT_RULE, ["calm"]);
+  assert.equal(a.menuSeq, b.menuSeq, "the case: equal counters on two fungi");
+  j.attachFungus(a);
+  j.attachFungus(b); // a new game
+  j.setAim("x");
+  await j.start();
+  j.fungusPolicy(fungal());
+  await tick(40);
+  assert.deepEqual(Object.keys(fungusRequests(reqs)[0]!.questions), ["h0_calm"]);
+});
+
+test("a menu change drops the questions queued under the old one, by configure or by setMenu with no fungus (review of #156 S2)", async () => {
+  const { reqs } = proxy({ answer: () => "1" });
+  const j = make();
+  const f = new Fungus(generateWorld(1, OPEN_WORLD));
+  f.configure(DEFAULT_RULE, ["calm", "alarm"]);
+  j.attachFungus(f);
+  j.setAim("x");
+  await j.start();
+  j.fungusPolicy(fungal()); // queued under calm and alarm
+  f.configure(DEFAULT_RULE, ["calm"]); // before the next cycle sends it
+  await tick(40);
+  assert.equal(fungusRequests(reqs).length, 0, "the question asked under the old menu is not sent");
+  j.fungusPolicy(fungal());
+  await tick(40);
+  assert.deepEqual(
+    fungusRequests(reqs).map((r) => Object.keys(r.questions)),
+    [["h0_calm"]],
+  );
+  // With no fungus attached, setMenu clears the queue itself.
+  const k = make();
+  k.setAim("x");
+  k.setMenu(new Set(["calm", "alarm"]));
+  await k.start();
+  const before = fungusRequests(reqs).length;
+  k.fungusPolicy(fungal());
+  k.setMenu(new Set(["calm"]));
+  await tick(40);
+  assert.equal(fungusRequests(reqs).length, before, "dropped");
+});
+
+test("changing only hide or cull keeps the menu counter and Jev's queue (review of #156 N1)", () => {
+  const f = new Fungus(generateWorld(1, OPEN_WORLD));
+  f.configure(DEFAULT_RULE, ["calm"]);
+  const seq = f.menuSeq;
+  f.configure({ hide: true, cull: true }, ["calm"]);
+  assert.equal(f.menuSeq, seq);
 });
