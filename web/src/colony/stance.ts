@@ -21,7 +21,7 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
   let heldNow = s.heldNow;
   const toEnemy = s.toEnemy;
   // One world (ja-web): an outgoing forager at the top of its own shaft, its jaws empty and with no pass, is held at the
-  // gate there (holdsAt): it waits as a forager home on open ground does, and is asked `leave` (in tick, after decide). With a
+  // gate there (holdsAt): it waits as a forager home on open ground does, and is asked `leave` (in decide). With a
   // stranger near it isn't waiting: it isn't asked, and it fights or flees in the shaft as anywhere; but the gate still
   // bars the way out (mayCrossUp asks holdsAt, which doesn't look for strangers), so it doesn't climb out without a
   // pass. Intended: a stranger at the top of the shaft is met there, not left behind.
@@ -114,7 +114,7 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
   )
     putDown(col, i);
 
-  // What it carries now, for the mode choice in tick (asked only when the situation changed since the ant was last asked).
+  // What it carries now, for decide's mode choice (asked only when the situation changed since the ant was last asked).
   // A carrying ant goes home: a mechanic, never asked (and asked afresh once it puts the food down).
   // So does one carrying a soil pellet it dug, to drop on the mound.
   const carrying = col.carrying[i] === 1;

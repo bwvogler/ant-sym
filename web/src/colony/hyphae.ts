@@ -230,84 +230,35 @@ export class Hyphae {
   }
 
   /**
-   * The ants have dug cell `k` open (ja-2bw.4, design): the hypha there is cut. The cell dies, and so does everything
-   * that grew from it, with their tips and the spore spots only they touched, except the cells a loop closed by fusion
-   * still joins to the rest (Simonin et al. 2012: fusion carries the network round a break): those reached through a
-   * fusion pair to a cell outside the cut-off part, and on from them along the hypha and other fusion pairs. A survivor
-   * whose parent died starts afresh as a root, fed by the loop. Returns the cells lost.
+   * The ants have dug cell `k` open (ja-2bw.4): the hypha there is cut, and only that cell is lost. What grew beyond it
+   * lives on as a piece of its own (owner, 2026-11-13, ja-2bw.19): a severed hypha seals the wound and keeps growing from
+   * what it holds, so each cell that grew from `k` becomes a root, with its tips, cords and spots. The cell it grew from
+   * is a stump, which regrows into the cut cell in REGROW_ROUNDS rounds (resprout). Returns the cells lost (1, or 0 when
+   * `k` holds no hypha).
    */
   cut(k: number): number {
-    if (!this.parent.has(k)) return 0;
-    const stump = this.parent.get(k)!;
-    const children = new Map<number, number[]>();
-    for (const [c, p] of this.parent)
-      if (p !== ROOT) {
-        const list = children.get(p);
-        if (list) list.push(c);
-        else children.set(p, [c]);
-      }
-    // The part cut off: k and everything that grew from it.
-    const beyond = new Set<number>([k]);
-    const stack = [k];
-    while (stack.length) {
-      for (const c of children.get(stack.pop()!) ?? []) {
-        if (beyond.has(c)) continue;
-        beyond.add(c);
-        stack.push(c);
-      }
-    }
-    // Its links inside (hypha and fusion, k left out), and the cells a fusion pair joins to the rest.
-    const links = new Map<number, number[]>();
-    const link = (a: number, b: number) => {
-      if (a === k || b === k || !beyond.has(a) || !beyond.has(b)) return;
-      (links.get(a) ?? links.set(a, []).get(a)!).push(b);
-      (links.get(b) ?? links.set(b, []).get(b)!).push(a);
-    };
-    for (const c of beyond) {
-      const p = this.parent.get(c)!;
-      if (p !== ROOT) link(c, p);
-    }
-    const reached = new Set<number>();
-    for (let i = 0; i + 1 < this.fusions.length; i += 2) {
-      const a = this.fusions[i]!;
-      const b = this.fusions[i + 1]!;
-      link(a, b);
-      for (const [inside, outside] of [
-        [a, b],
-        [b, a],
-      ] as const)
-        if (inside !== k && beyond.has(inside) && !beyond.has(outside) && this.parent.has(outside)) reached.add(inside);
-    }
-    const walk = [...reached];
-    while (walk.length) {
-      for (const c of links.get(walk.pop()!) ?? []) {
-        if (reached.has(c)) continue;
-        reached.add(c);
-        walk.push(c);
-      }
-    }
-    const dead = new Set([...beyond].filter((c) => !reached.has(c)));
-    for (const c of dead) {
-      this.parent.delete(c);
-      this.soil.delete(c);
-    }
-    for (const c of reached) if (dead.has(this.parent.get(c)!)) this.parent.set(c, ROOT);
-    this.tips = this.tips.filter((t) => !dead.has(cellKey(t.x, t.y)));
+    const stump = this.parent.get(k);
+    if (stump === undefined) return 0;
+    this.parent.delete(k);
+    this.soil.delete(k);
+    for (const [c, p] of this.parent) if (p === k) this.parent.set(c, ROOT);
+    const [kx, ky] = keyCell(k);
+    this.tips = this.tips.filter((t) => t.x !== kx || t.y !== ky);
     const kept: number[] = [];
     for (let i = 0; i + 1 < this.fusions.length; i += 2)
-      if (!dead.has(this.fusions[i]!) && !dead.has(this.fusions[i + 1]!)) kept.push(this.fusions[i]!, this.fusions[i + 1]!);
+      if (this.fusions[i] !== k && this.fusions[i + 1] !== k) kept.push(this.fusions[i]!, this.fusions[i + 1]!);
     this.fusions = kept;
+    // A spot stays while a hypha still touches it.
     this.fruits = this.fruits.filter((f) => {
       if (this.parent.has(f)) return true;
       const [x, y] = keyCell(f);
       for (let d = 0; d < 6; d++) if (this.parent.has(cellKey(nx(x, y, d), ny(y, d)))) return true;
       return false;
     });
-    this.cutCells += dead.size;
-    // The cell it grew from is a stump, and regrows into the cut cell in REGROW_ROUNDS rounds (resprout).
+    this.cutCells++;
     if (stump !== ROOT && this.parent.has(stump)) this.stumps.set(stump, { to: k, wait: REGROW_ROUNDS });
     for (const s of this.stumps.keys()) if (!this.parent.has(s)) this.stumps.delete(s);
-    return dead.size;
+    return 1;
   }
 
   /**
@@ -350,7 +301,6 @@ export class Hyphae {
   cutDug(ground: Ground): number {
     let lost = 0;
     for (const k of [...this.soil]) {
-      if (!this.soil.has(k)) continue;
       const [x, y] = keyCell(k);
       if (ground.kind(x, y) !== "open") {
         this.digs.delete(k); // filled back in: a cord's count starts again (review of #119, N6)
@@ -366,6 +316,7 @@ export class Hyphae {
       this.digs.delete(k);
       lost += this.cut(k);
     }
+    // Defensive: a cut takes only its own cell's count (above), so this drops counts only for cells gone some other way.
     for (const k of this.digs.keys()) if (!this.parent.has(k)) this.digs.delete(k);
     return lost;
   }
@@ -392,6 +343,8 @@ export class Hyphae {
    * Unused hypha fades (Bebber et al. 2007: links that carry nothing are recycled): up to REGRESS_PER_ROUND dead ends a
    * round, a cell no tip stands on and nothing grew from, unless it is a root, a cord, in a fusion, touching a spore spot,
    * or `keep` holds it (a corpse). Its mass is the body's to spend again (it no longer counts in `length`). Returns the cells faded.
+   * A root never fades, and since §63.10 every piece a cut leaves has one: a piece with no tip left fades down to its
+   * root and keeps that cell (one HYPHA_MASS a piece; review of #152, N3, carried by ja-2bw.6).
    */
   regress(keep: (k: number) => boolean = () => false): number {
     const parents = new Set(this.parent.values());

@@ -248,33 +248,27 @@ test("fruit needs a dug cell: never under the plane's surface, nor buried in soi
   assert.equal(b.tips.length, 1);
 });
 
-test("digging a hypha cell cuts it: what grew beyond it dies with its tips, unless a fusion loop joins it to the rest", () => {
-  // A straight hypha east from (0, 20): cells x = 0…6, its tip at the end; and a branch from x = 2 going south-east.
-  const line = (): Hyphae => {
-    const h = new Hyphae();
-    h.root(0, 20, E);
-    const t = h.tips[0]!;
-    for (let k = 0; k < 6; k++) h.extend(t, E, 0);
-    return h;
-  };
-  const h = line();
-  assert.equal(h.cut(cellKey(3, 20)), 4, "cells 3…6 lost");
-  assert.equal(h.tips.length, 0, "the tip beyond the cut stopped");
-  assert.ok(h.has(2, 20) && !h.has(4, 20));
-  assert.equal(h.cutCells, 4);
-  // A loop: a second hypha from (0, 22) fused into cell (5, 20), beyond the cut.
-  const l = line();
-  l.root(0, 22, E);
-  const other = l.tips[1]!;
-  for (let k = 0; k < 4; k++) l.extend(other, E, 0);
-  l.fusions.push(cellKey(other.x, other.y), cellKey(5, 20));
-  assert.equal(l.cut(cellKey(3, 20)), 1, "only the dug cell");
-  assert.ok(l.has(4, 20) && l.has(6, 20));
-  assert.equal(l.parent.get(cellKey(4, 20)), ROOT, "fed by the loop now");
-  assert.equal(l.tips.length, 2);
+test("digging a hypha cell cuts only that cell: what grew beyond lives on as a piece of its own, with its tip (ja-2bw.19)", () => {
+  // A straight hypha east from (0, 20): cells x = 0…6, its tip at the end.
+  const h = new Hyphae();
+  h.root(0, 20, E);
+  const t = h.tips[0]!;
+  for (let k = 0; k < 6; k++) h.extend(t, E, 0);
+  assert.equal(h.cut(cellKey(3, 20)), 1, "only the dug cell");
+  assert.ok(!h.has(3, 20) && h.has(2, 20) && h.has(4, 20) && h.has(6, 20));
+  assert.equal(h.parent.get(cellKey(4, 20)), ROOT, "the severed part roots where it was cut");
+  assert.deepEqual(
+    h.tips.map((u) => [u.x, u.y]),
+    [[6, 20]],
+    "its tip grows on",
+  );
+  assert.equal(h.cutCells, 1);
+  // A tip standing on the cut cell goes with it.
+  assert.equal(h.cut(cellKey(6, 20)), 1);
+  assert.equal(h.tips.length, 0);
 });
 
-test("a cut takes the spore spots only the dead part touched", () => {
+test("a cut takes a spore spot only once no hypha touches it", () => {
   const g: Ground = { topsoil: false, kind: (x, y) => (y < 10 ? "rock" : x === 5 ? "open" : "soil") };
   const h = new Hyphae();
   h.root(2, 12, E);
@@ -284,6 +278,8 @@ test("a cut takes the spore spots only the dead part touched", () => {
   assert.ok(h.fruit(t, g));
   assert.equal(h.fruits.length, 1);
   h.cut(cellKey(3, 12));
+  assert.equal(h.fruits.length, 1, "(4, 12) lives on beside the spot");
+  h.cut(cellKey(4, 12));
   assert.equal(h.fruits.length, 0);
 });
 
@@ -299,8 +295,8 @@ test("cutDug cuts only cells that were soil and are dug now", () => {
   assert.ok(h.has(3, 12) && h.has(4, 12));
   assert.equal(h.cutDug(g), 0);
   dug = true;
-  assert.equal(h.cutDug(g), 2, "cells 3 and 4");
-  assert.ok(h.has(2, 12) && !h.has(3, 12));
+  assert.equal(h.cutDug(g), 1, "cell 3 alone");
+  assert.ok(h.has(2, 12) && !h.has(3, 12) && h.has(4, 12));
 });
 
 test("a tip turned aside by a stone drifts back to its first heading (directional memory)", () => {
@@ -341,41 +337,22 @@ test("supply is judged at the round's start: two tips with just enough for both 
   );
 });
 
-test("a cut keeps only what a fusion loop reaches: a branch beyond the cut that the loop doesn't join dies", () => {
-  // A hypha east from (0, 20) to x = 6, with a branch from (4, 20) going south-east three cells; a second hypha from
-  // (0, 24) fused into (6, 20). Cutting (2, 20): 3…6 are joined round the loop, and so is the branch (it grew from 4).
-  // Cutting the branch's own first cell instead loses the branch, and nothing else.
-  const build = () => {
-    const h = new Hyphae();
-    h.root(0, 20, E);
-    const t = h.tips[0]!;
-    for (let k = 0; k < 4; k++) h.extend(t, E, 0);
-    const b = h.branch(t, SE);
-    for (let k = 0; k < 3; k++) h.extend(b, SE, 0);
-    for (let k = 0; k < 2; k++) h.extend(t, E, 0);
-    h.root(0, 24, E);
-    const o = h.tips[2]!;
-    for (let k = 0; k < 4; k++) h.extend(o, E, 0);
-    h.fusions.push(cellKey(o.x, o.y), cellKey(6, 20));
-    return { h, b };
-  };
-  const one = build();
-  assert.equal(one.h.cut(cellKey(2, 20)), 1, "only the dug cell: the rest is round the loop");
-  assert.ok(one.h.has(3, 20) && one.h.has(one.b.x, one.b.y));
-  // Cut at the branch point (4, 20): 5 and 6 are joined round the loop, the branch is not, and it dies with its tip.
-  const three = build();
-  assert.equal(three.h.cut(cellKey(4, 20)), 4, "the branch the loop doesn't reach dies");
-  assert.ok(three.h.has(5, 20) && !three.h.has(three.b.x, three.b.y));
-  // A loop that joins only the far end: cut (5, 20), between the branch point and the fused cell.
-  const two = build();
-  const branchCells = [...two.h.parent].filter(([, p]) => p !== ROOT).length;
-  assert.ok(branchCells > 0);
-  assert.equal(two.h.cut(cellKey(5, 20)), 1, "the fused end (6, 20) survives; 5 alone is lost");
-  // Now cut the branch's first cell: no loop reaches it, so the branch dies, with its tip.
+test("a cut at a branch point loses that cell alone: the trunk beyond and the branch each live on as a piece (ja-2bw.19)", () => {
+  // A hypha east from (0, 20) to x = 6, with a branch from (4, 20) going south-east three cells.
+  const h = new Hyphae();
+  h.root(0, 20, E);
+  const t = h.tips[0]!;
+  for (let k = 0; k < 4; k++) h.extend(t, E, 0);
+  const b = h.branch(t, SE);
+  for (let k = 0; k < 3; k++) h.extend(b, SE, 0);
+  for (let k = 0; k < 2; k++) h.extend(t, E, 0);
+  const cells = h.length;
+  assert.equal(h.cut(cellKey(4, 20)), 1);
+  assert.equal(h.length, cells - 1);
   const [bx, by] = [nx(4, 20, SE), ny(20, SE)];
-  const tipsBefore = two.h.tips.length;
-  assert.equal(two.h.cut(cellKey(bx, by)), 3);
-  assert.equal(two.h.tips.length, tipsBefore - 1);
+  assert.equal(h.parent.get(cellKey(5, 20)), ROOT);
+  assert.equal(h.parent.get(cellKey(bx, by)), ROOT);
+  assert.equal(h.tips.length, 2, "both tips grow on");
 });
 
 test("a policy's turn: the tip turns to whichever side is free (away from its own hypha; along a tunnel's wall)", () => {
@@ -465,7 +442,7 @@ test("a cord takes CORD_DIGS digs to cut (a dig a round it lies in a dug cell); 
     assert.ok(h.has(3, 20), `the cord was cut at dig ${d}`);
   }
   assert.ok(h.has(3, 20), "a cord was cut before CORD_DIGS");
-  assert.ok(h.cutDug(g) > 1, "the cord's cut takes what grew from it");
+  assert.equal(h.cutDug(g), 1, "the cord's cut loses that cell alone (ja-2bw.19)");
   assert.ok(!h.has(3, 20), "the cord survived its CORD_DIGS-th dig");
   assert.equal(h.digs.size, 0);
 });
@@ -540,13 +517,16 @@ test("a cord that thins back while it lies dug is cut at once; its count is save
   assert.ok(!h.has(3, 20));
 });
 
-test("a dug cord cut from upstream leaves no dig count behind; one filled back in starts again", () => {
+test("a dug cord keeps its count while it lives, a cut upstream or not, and its count goes with it; one filled back in starts again", () => {
   const h = fan();
   h.thicken();
   for (const k of h.parent.keys()) h.soil.add(k);
   assert.equal(h.cutDug(dugAt(cellKey(4, 20))), 0);
   h.cords.delete(cellKey(2, 20)); // a thin cell upstream
-  assert.ok(h.cutDug(dugAt(cellKey(4, 20), cellKey(2, 20))) > 0);
+  assert.equal(h.cutDug(dugAt(cellKey(4, 20), cellKey(2, 20))), 1, "the thin cell upstream alone (ja-2bw.19)");
+  assert.ok(h.has(4, 20) && h.digs.has(cellKey(4, 20)), "the cord beyond lives on, its digs counted");
+  for (let d = 0; d < CORD_DIGS && h.has(4, 20); d++) h.cutDug(dugAt(cellKey(4, 20), cellKey(2, 20)));
+  assert.ok(!h.has(4, 20), "cut at CORD_DIGS");
   assert.equal(h.digs.size, 0, "a cut cord's dig count stayed");
   const f = fan();
   f.thicken();
@@ -641,20 +621,24 @@ test("a hypha cut by digging regrows from its stump into the dug cell after REGR
   const tip = h.tips[0]!;
   for (let i = 0; i < 6; i++) assert.ok(h.extend(tip, E, 0));
   for (let x = 0; x <= 6; x++) h.soil.add(cellKey(x, 10));
-  // The ants dig cell (3, 10): it and what grew from it are cut; (2, 10) is the stump.
+  // The ants dig cell (3, 10): it alone is cut, what grew beyond lives on; (2, 10) is the stump.
   dug.add(cellKey(3, 10));
-  assert.ok(h.cutDug(g) > 0);
-  assert.equal(h.tips.length, 0);
+  assert.equal(h.cutDug(g), 1);
+  assert.deepEqual(
+    h.tips.map((t) => [t.x, t.y]),
+    [[6, 10]],
+    "the tip beyond grows on",
+  );
   assert.deepEqual([...h.stumps.keys()], [cellKey(2, 10)]);
   const back = Hyphae.load(JSON.parse(JSON.stringify(h.save())));
   assert.deepEqual([...back.stumps], [...h.stumps]);
   for (let r = 1; r < REGROW_ROUNDS; r++) assert.equal(h.resprout(g, 0), 0, `regrew after ${r} rounds`);
   assert.equal(h.resprout(g, 0), 1);
   assert.deepEqual(
-    h.tips.map((t) => [t.x, t.y, t.heading]),
+    h.tips.filter((t) => t.x === 2).map((t) => [t.x, t.y, t.heading]),
     [[2, 10, E]],
   );
-  stepTips(h, g, 0, { free: 1e9, tips: 1 });
+  stepTips(h, g, 0, { free: 1e9, tips: 2 });
   assert.ok(h.has(3, 10), "it grew back into the dug cell");
   assert.equal(h.stumps.size, 0);
 });
@@ -677,7 +661,11 @@ test("with the mass to pay for it, a stump regrows straight into its dug cell, e
   assert.equal(budget.free, 1 - HYPHA_MASS);
   assert.deepEqual(
     h.tips.map((t) => [t.x, t.y]),
-    [[3, 10]],
+    [
+      [6, 10],
+      [3, 10],
+    ],
+    "the severed part's tip, and the regrown one in the dug cell",
   );
   // Without the mass, the tip waits on the stump.
   const poor = new Hyphae();
@@ -755,12 +743,12 @@ test("a stump puts out no tip where one stands already, nor into a cell it can't
   const a = cutAt();
   a.tips.push({ x: 2, y: 10, heading: E, first: E, run: 0 });
   assert.equal(a.resprout(g, 0), 0);
-  assert.equal(a.tips.length, 1);
+  assert.equal(a.tips.filter((t) => t.x === 2).length, 1);
   // The cut cell holds hypha again (grown back another way): no tip into it.
   const b = cutAt();
   b.addCell(3, 10);
   assert.equal(b.resprout(g, 0), 0);
-  assert.equal(b.tips.length, 0);
+  assert.equal(b.tips.filter((t) => t.x === 2).length, 0);
   // From the soil, its own hypha down the tunnel: 5 cells from the cell ahead it slides along the wall, 8 cells it goes in.
   const { g: t } = tunnel(6, 8, [[SE, 10]]);
   const near = (steps: number) => {
@@ -777,4 +765,21 @@ test("a stump puts out no tip where one stands already, nor into a cell it can't
   assert.equal(ENTER_GAP, 6);
   assert.notEqual(near(5), "grow");
   assert.equal(near(8), "grow");
+});
+
+test("a cut drops the fusions that name the dug cell, so the partner's dead end can fade (review of #152 S2)", () => {
+  // A hypha east from (0, 20) to x = 6; a second from (0, 24) east four cells, fused into (5, 20).
+  const h = new Hyphae();
+  h.root(0, 20, E);
+  for (let k = 0; k < 6; k++) h.extend(h.tips[0]!, E, 0);
+  h.root(0, 24, E);
+  const o = h.tips[1]!;
+  for (let k = 0; k < 4; k++) h.extend(o, E, 0);
+  const partner = cellKey(o.x, o.y);
+  h.fusions.push(partner, cellKey(5, 20));
+  h.tips.length = 0; // nothing grows: only fading moves
+  h.cut(cellKey(5, 20));
+  assert.deepEqual(h.fusions, [], "a fusion pair kept the dug cell");
+  for (let r = 0; r < 20; r++) h.regress();
+  assert.ok(!h.parent.has(partner), "the partner's dead end never faded");
 });

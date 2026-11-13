@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, inReach } from "../../colony.ts";
+import { sense } from "../../sense.ts";
 import { CELL, cellOf, nx, ny, R } from "../../hex.ts";
 import { mulberry32, OPEN, rockAt, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, hexMap, nestAt, put } from "../hexmaps.ts";
@@ -33,6 +34,30 @@ test("inReach: SENSE_STEPS is 5, round a hairpin; rock seals a pocket as soil do
   assert.equal(reach(hairpin, [3, 1], [3, 3]), false, "six steps round it");
   const rock = hexMap(["#####", "#.#.#", "#####"]);
   assert.equal(reach(rock, [1, 1], [3, 1]), false, "(3, 1) is sealed off by the rock at (2, 1)");
+});
+
+// ja-uvhw: scent, like food, is read only where the sensor's tip can be reached through open ground. Read through the
+// soil, a trail in the next tunnel over drew ants at a wall.
+test("sense: a food trail in the next tunnel, one cell of soil away, reads nothing with scentReach; without it, the trail", () => {
+  const map = hexMap([
+    "ssssssssss", //
+    "sN.......s",
+    "ssssssssss",
+    "s........s",
+    "ssssssssss",
+  ]);
+  const read = (scentReach: number) => {
+    const from = at(5, 1);
+    const to = at(5, 3);
+    const d = Math.hypot(to.x - from.x, to.y - from.y);
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, scentReach, sensorDistance: d }, mulberry32(1));
+    for (let x = 1; x <= 8; x++) c.ph.depositCell("food", x, 3, 5);
+    put(c, 0, 5, 1);
+    sense(c, 0, (to.x - from.x) / d, (to.y - from.y) / d, 0);
+    return c.s[0];
+  };
+  assert.equal(read(1), 0, "out of reach: nothing");
+  assert.ok(read(0) > 1, `read through the soil: ${read(0)}`);
 });
 
 const W = 26;

@@ -102,8 +102,9 @@ export function fetches(col: Colony, i: number): boolean {
 }
 
 /**
- * Whether ant i, resting in the nest (returning with empty jaws, underground) and feeling hunger enough to fetch, gets up
- * to fetch (restFetch, ja-4rfr): the old foragers retire inside in "return", and they were the ones who felt it.
+ * Whether ant i, in "return" with empty jaws underground and hungry enough to fetch, may take food on from a store it is
+ * by, as an explorer does (restFetch, ja-4rfr: the old foragers retire inside in "return", and they were the ones who
+ * felt it).
  */
 export function restFetches(col: Colony, i: number, mode: number, cx: number, cy: number): boolean {
   return (
@@ -258,10 +259,6 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       dir = (dir + 3) % 6;
     }
     dir = best < 0 ? groundHand(col, cx, cy, dir, -col.hand[i]) : best;
-  } else if (restFetches(col, i, mode, cx, cy) && toFood(col, cx, cy, dir) >= 0) {
-    // Resting, and feeling the colony's hunger (ja-4rfr): along the stores' marks, as a hungry explorer goes (below).
-    dir = toFood(col, cx, cy, dir);
-    col.digAim[i] = NaN;
   } else if (mode === RETURN || mode === FOLLOW) {
     // The way ahead (not back, unless it's a dead end) with the most scent: home scent, laid by
     // ants walking out, for a homing ant; food scent for a follower. No scent at all: a hand on the wall.

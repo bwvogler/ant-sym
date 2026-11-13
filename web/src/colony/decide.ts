@@ -48,7 +48,7 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   let waiting = false;
   let rolled = false; // asked `leave` this step already (behaviour MR 5): one roll a step, at the rate it answers
   if (carrying || pellet || nursing || reporting) {
-    // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
+    // A carrier takes its load where it belongs (the carry response, in stanceStep, said so): home, not a mode choice; the next
     // question comes once the load is down.
     mode = RETURN;
     col.mode[i] = mode;
@@ -103,7 +103,7 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     const before = own ? own.schema.encode(asks!) : packSituation(mode, tired, food, home, alarm, enemy, stance);
     situation0 = before - mode * modeStride;
     // Waiting at home (behaviour MR 5): where the colony gates leaving, a forager home in "return" is asked `leave`
-    // (below), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
+    // (in tick, after this stage), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
     // One world (ja-web): nobody waits on the plane (every returner goes down its hole); an ant held at the gate at the
     // top of its shaft waits, and rolls `leave` once a step, asked as a returning forager (as a raider if recruited).
     // A yes is its pass: it climbs out, and its mode policy is asked afresh next step.

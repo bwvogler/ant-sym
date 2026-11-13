@@ -167,12 +167,11 @@ export interface ColonyParams {
    */
   scentReach: number;
   /**
-   * ja-4rfr: 1 = a hungry ant resting in the nest (returning, empty-jawed, underground: an old forager retired inside)
-   * fetches as a hungry explorer does: it follows the stores' marks (toFood) and, at a store, takes food on to where it is
-   * wanted (port); its own hunger (below ADULT_BEG_BELOW) counts as well as what it feels; in a chamber it steers by the
-   * stores' marks its sensors reach, and stays in; and hunger ends a tired ant's rest. 0 = only explorers fetch, by felt
-   * need, and only in tunnels (main before ja-4rfr): the old sat in the royal chamber, or climbed out, while the colony
-   * starved beside a full store.
+   * ja-4rfr: 1 = hunger gets an ant to the stores. Its own hunger (below ADULT_BEG_BELOW) counts as well as what it feels
+   * from others; in a chamber, hungry, it steers by the stores' marks its sensors reach, and stays in; hunger ends a tired
+   * ant's rest; and an ant in "return" by a store takes food on from it (port), as an explorer does. 0 = only explorers
+   * fetch, by felt need, and only in tunnels (main before ja-4rfr): the old sat in the royal chamber, or climbed out,
+   * while the colony starved beside a full store.
    */
   restFetch: number;
   /** One world's plane, with routeMemory: cells walked between two stored places. */
