@@ -33,11 +33,21 @@ function fnv(arrays: ArrayBufferView[]): string {
   return (h >>> 0).toString(16);
 }
 
-/** Every allocated chunk of a chunked field, with where it is, in table order. */
+/**
+ * Every chunk of a chunked field that holds something, with where it is, in (cy, cx) order. A chunk bit-identical to the
+ * layer's empty fill reads the same as no chunk, so it is left out: whether a layer keeps or drops a chunk that holds
+ * nothing (endless-world §7, ja-qpv.1), and how its table is laid out, is storage, not behaviour.
+ */
 function chunked(layer: ChunkLayer<Float32Array>): ArrayBufferView[] {
-  const out: ArrayBufferView[] = [];
-  layer.forEach((cx, cy, a) => out.push(new Int32Array([cx, cy]), a));
-  return out;
+  const blank = new Float32Array(1).fill(layer.empty);
+  const bits = new Uint32Array(blank.buffer)[0]!;
+  const chunks: [number, number, Float32Array][] = [];
+  layer.forEach((cx, cy, a) => {
+    const words = new Uint32Array(a.buffer, a.byteOffset, a.length);
+    if (!words.every((w) => w === bits)) chunks.push([cx, cy, a]);
+  });
+  chunks.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  return chunks.flatMap(([cx, cy, a]) => [new Int32Array([cx, cy]), a]);
 }
 
 export type Sample = {
