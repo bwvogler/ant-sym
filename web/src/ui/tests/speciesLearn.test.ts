@@ -1,6 +1,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  DESERT_ANT,
   defineSchema,
   Game,
   GENERIC_ANT,
@@ -114,4 +115,8 @@ test("situations are counted out of the species' own, and its questions cost its
   const generic = tokensPerQuestion("mode", "forage");
   assert.ok(own > 0 && own < generic, `its smaller legend and fields cost less a question (${own} against ${generic})`);
   assert.equal(tokensPerQuestion("mode", "forage", undefined), generic, "no words: the generic estimate");
+});
+
+test("the desert ant's rule text says what its rule does, in every situation it has (ja-rf5.3)", () => {
+  assert.deepEqual(ruleTextAgrees(DESERT_ANT), []);
 });

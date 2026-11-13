@@ -4696,6 +4696,22 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **D1 and D2 run as `todo`** in `tests/slow/assays.test.ts`, naming `ja-rf5.3` and `ja-rf5.6`. D3 and D4 have no pass mark until the plume and heat exist.
 - **Cost:** none (offline; no lane changed).
 
+### 60.2 The desert ant on the descriptor (ja-rf5.3, 2026-11-13)
+
+**Built** (`colony/desertAnt.ts`, `DESERT_ANT`), made only of the descriptor's pieces (docs/species.md; `ja-fnd.5.8`–`.14`):
+- **Its own lane and situation:** `DESERT_MODE_WORDS` (its legend, through `legendOf`; choices explore, return, fight: no follow) over `DESERT_SCHEMA`, mode × tired × enemy: 16 situations against the generic ant's 3,888. Heat joins it with `ja-rf5.5`. No stance lane.
+- **No trail or alarm:** `channelSet` is the nest's floor marks only; its responses lay nothing. The fungus's food, rival, leak, alarm and alarm-laid levers are inert on it; home and trail still reach its road signs (#127).
+- **Its own local rule and rule text:** home when tired or a fight is over, else out searching alone; `ruleTextAgrees` holds the words to the rule over all 16 situations.
+- **No corpse removal** (`undertakes: false`), **about 200 workers** (`maxAnts`, *C. fortis*).
+- **No stance, and fights strangers** (review of #138): with no stance lane the colony-wide strategist no longer picks a stance from counts no ant senses (it had chosen raid about 93 % of the time at 600 ants); the colony forages. An ant with nothing in its jaws fights a stranger it touches whatever the odds, a carrier takes its load home (owner, 2026-11-13: aggression between *Cataglyphis* colonies is at its maximum, desert-ant.md §5, **unverified**).
+- Not in `SPECIES` yet: the registry takes a species when the page can play it, and the page has no species picker (a start-card task, S5).
+
+**Results** (one world, 60 ants alone, 300 s, seeds 1–3, against the generic ant): no food, home or alarm scent anywhere; asked only its own three fields, never following; it finds food and grows on its own, storing less without recruitment (76–153 against the generic ant's 129–360), with births 14–30 and no losses. So it does not need a food sense to live (`ja-rf5.3`'s question); the plume (`ja-rf5.4`) is for finding food faster. **D1 passes** with it (seeds 1–3; `tests/slow/assays.test.ts`); the generic ant's baseline still fails.
+
+**Cost** (`node scripts/colony-cost.mjs --one --species desert`, offline; `--species` new here): ~479 tokens a question, 9 of its 16 situations met in a 10-minute session, **≈ $0.004/h** while a doctrine is new, against the generic ant's ~828 tokens a question and ≈ $0.11/h on the same run. Cached games spend nothing.
+
+**Not yet:** its precache. Shipping Jev's answers needs a live check (`colony-live`), about 16 situations × 3 preset doctrines ≈ 23,000 tokens ≈ $0.001, at the owner's say (§64); until then it plays its local rule.
+
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
