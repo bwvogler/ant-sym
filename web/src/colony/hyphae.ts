@@ -297,6 +297,7 @@ export class Hyphae {
     const flow = new Map<number, number>();
     for (const t of this.tips) {
       let k = cellKey(t.x, t.y);
+      // The guard is defensive: extend only links a new cell to an existing one and cut only makes roots, so no chain cycles.
       for (let guard = this.parent.size; guard >= 0 && k !== ROOT; guard--) {
         flow.set(k, (flow.get(k) ?? 0) + 1);
         k = this.parent.get(k) ?? ROOT;
@@ -324,6 +325,7 @@ export class Hyphae {
     let faded = 0;
     for (const [k, p] of this.parent) {
       if (faded >= REGRESS_PER_ROUND) break;
+      // (A leaf with no tip feeds none, so it is never a cord after thicken: that check is defensive, for a caller that skips it.)
       if (p === ROOT || parents.has(k) || tipCells.has(k) || this.cords.has(k) || fused.has(k) || nearSpot(k) || keep(k)) continue;
       this.parent.delete(k);
       this.soil.delete(k);
@@ -360,7 +362,7 @@ export class Hyphae {
     h.fusions = [...r.fusions];
     h.fruits = [...r.fruits];
     h.cords = new Set(r.cords);
-    h.fadedCells = r.fadedCells;
+    h.fadedCells = r.fadedCells ?? 0;
     h.spent = r.spent;
     h.steps = r.steps;
     h.selfHits = r.selfHits;

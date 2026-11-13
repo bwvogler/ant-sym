@@ -466,3 +466,30 @@ test("dead ends nothing uses fade, a cell a round, freeing their mass; roots, co
   f.regress();
   assert.ok(f.has(4, 12), "the hypha by the spot faded");
 });
+
+test("a tip's cell, a fusion's cells and a kept (corpse) cell don't fade (review of #119, S1)", () => {
+  const a = new Hyphae();
+  a.root(0, 5, E);
+  const ta = a.tips[0]!;
+  for (let i = 0; i < 4; i++) a.extend(ta, E, 0);
+  assert.equal(a.regress(), 0, "a growing tip's cell faded");
+  const b = new Hyphae();
+  b.root(0, 5, E);
+  const tb = b.tips[0]!;
+  for (let i = 0; i < 4; i++) b.extend(tb, E, 0);
+  const br = b.branch(tb, turn(E, 1));
+  b.extend(br, turn(E, 1), 0);
+  b.extend(br, turn(E, 2), 0);
+  b.fuse(br, turn(E, 3));
+  assert.equal(b.regress(), 0, "a fusion's cell faded");
+  const c = new Hyphae();
+  c.root(0, 5, E);
+  const tc = c.tips[0]!;
+  for (let i = 0; i < 3; i++) c.extend(tc, E, 0);
+  c.cut(cellKey(3, 5));
+  assert.equal(
+    c.regress((k) => k === cellKey(2, 5)),
+    0,
+    "a kept cell faded",
+  );
+});
