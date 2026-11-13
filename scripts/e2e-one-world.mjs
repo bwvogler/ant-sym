@@ -794,6 +794,14 @@ try {
     await dp.evaluate(() => window.jevAnts.game.colonies.every((c) => !c.layers[0].ph.live("food") && !c.layers[0].ph.live("home"))),
     "no food or home trail on the plane",
   );
+  await dp.getByRole("button", { name: "Details", exact: true }).click();
+  const det = dp.getByRole("dialog", { name: "Details" });
+  await det.getByText("Trails drawn").waitFor({ timeout: 5_000 });
+  check(
+    (await det.getByRole("button", { name: "Learn: trails" }).count()) === 0,
+    "Details: no link to the trail entries it lacks (review of #144, S1)",
+  );
+  await det.getByRole("button", { name: "Close Details" }).click();
   await dp.getByRole("button", { name: "Learn", exact: true }).click();
   const learn = dp.getByRole("dialog", { name: "Learn" });
   await learn.getByRole("heading", { name: "Strangers and battles" }).waitFor({ timeout: 5_000 });

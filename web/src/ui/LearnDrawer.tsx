@@ -32,7 +32,7 @@ import {
 import { LeverChips } from "./DetailsScreen.tsx";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
-import { docUrl, guideFor, NOTES, type GuideEntry } from "./guide.ts";
+import { docUrl, guideFor, guideNote, NOTES, type GuideEntry } from "./guide.ts";
 import Help from "./Help.tsx";
 import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
@@ -170,13 +170,12 @@ function GuideTab({ focus, game }: { focus?: string; game: Props["game"] }) {
   // A species that lays no trail of a kind doesn't see the entries about it (owner, ja-rf5.11): its colonies' scent says which it lays.
   const ph = game.player.ph;
   const entries = guideFor((c) => ph.has(c));
-  const hidden = entries.length < guideFor(() => true).length;
+  const note = guideNote((c) => ph.has(c), game.params.species.name);
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-fg-3">
         What you see on the field, what real ants do, and how the game models it. Each claim comes from a research note in the repository,
-        linked under <em>Sources</em>.
-        {hidden && <> The {game.params.species.name.toLowerCase()} lays no trails of some kinds: the entries about them are left out.</>}
+        linked under <em>Sources</em>.{note && <> {note}</>}
       </p>
       {entries.map((e) => (
         <Entry key={e.id} e={e} hot={focus === e.id} />

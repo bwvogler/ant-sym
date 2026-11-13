@@ -330,7 +330,8 @@ function World({ game, controls, update, restart, newWorld }: Props) {
       />
       <div className="mt-3 flex items-center justify-between">
         <span className="flex items-center gap-1.5">
-          Trails drawn <Help to={{ tab: "guide", id: "food-trail" }} label="trails" />
+          Trails drawn {/* the guide's trail entries are left out for a species that lays no food trail (ja-rf5.11): no link to nowhere */}
+          {game.player.ph.has("food") && <Help to={{ tab: "guide", id: "food-trail" }} label="trails" />}
         </span>
         <div className="flex overflow-hidden rounded-md border border-line text-sm">
           <button

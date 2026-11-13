@@ -466,3 +466,10 @@ export function guideEntry(id: string): GuideEntry | undefined {
 export function guideFor(has: (channel: Channel) => boolean): GuideEntry[] {
   return GUIDE.filter((e) => e.trail === undefined || has(e.trail));
 }
+
+/** The line above the guide's entries for a species that lays no trails of some kinds (ja-rf5.11); null when it sees every entry. */
+export function guideNote(has: (channel: Channel) => boolean, species: string): string | null {
+  return guideFor(has).length < GUIDE.length
+    ? `The ${species.toLowerCase()} lays no trails of some kinds: the entries about them are left out.`
+    : null;
+}
