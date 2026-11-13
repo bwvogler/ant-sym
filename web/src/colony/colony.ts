@@ -828,7 +828,7 @@ export class Colony {
     const chans = channelParams(this.params.channels);
     if (this.#entrance === null && this.params.channels.food?.max === undefined)
       chans.food = { ...chans.food, max: this.params.foodCapTop };
-    this.ph = new Pheromones(map, chans);
+    this.ph = new Pheromones(map, chans, this.params.channelSet);
     const slots = {} as LayerSlots;
     if (world) {
       // One world: home is the curtain, bound now and between ticks.
@@ -845,7 +845,7 @@ export class Colony {
       if (!nest) throw new Error(`one world: the plane has no nest ${this.params.nest}`);
       const plane: LayerSlots = {
         map: world.plane,
-        ph: new Pheromones(world.plane, top),
+        ph: new Pheromones(world.plane, top, this.params.channelSet),
         nest,
         entrance: null,
         entranceCol: 0,
@@ -2761,6 +2761,8 @@ export class Colony {
   /** A chamber's role as ant i smells it (nest slice 8): the fungus can blunt its floor marks (it can't tell) or swap brood and store. */
   #perceivedPlace(i: number, role: Mark | null): Mark | null {
     if (!role) return null;
+    // A species without this chamber's mark can't smell which chamber it is in: it reads plain tunnel (owner, review of #127 D1).
+    if (!this.ph.has(role)) return null;
     if (this.gainMarks[i] < 0.5) return null;
     return this.swapMarks[i] >= 0.5 ? swapBroodStore(role) : role;
   }
