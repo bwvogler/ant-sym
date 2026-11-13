@@ -120,7 +120,7 @@ export function inReach(map: WorldMap, x0: number, y0: number, x1: number, y1: n
   if (ax === bx && ay === by) return true;
   if (hexDistance(ax, ay, bx, by) > steps) return false;
   const top = map.surfaceRows ?? 0;
-  if (straightReach(map, x0, y0, x1, y1, ax, ay, bx, by, steps, top)) return true;
+  if (straightReach(map, ax, ay, bx, by, top)) return true;
   const half = SENSE_STEPS + 1;
   const stamp = ++reachCall;
   reachStamp[half * REACH_SPAN + half] = stamp;
@@ -153,33 +153,23 @@ export function inReach(map: WorldMap, x0: number, y0: number, x1: number, y1: n
 }
 
 /**
- * inReach's fast path: the straight line from (x0, y0) to (x1, y1), walked in quarter-cell steps, crosses only open cells
- * below `top`, each a neighbour of the last, and at most `steps` of them after the first: a path inReach's search would
+ * inReach's fast path: the hex line from cell (ax, ay) to cell (bx, by), centre to centre (nudged off ties), crosses only
+ * open cells below `top`, each a neighbour of the last: a path of hexDistance (≤ steps) moves that inReach's search would
  * find too, so it answers the same (false here only means "search"). Most sensor tips lie straight along a tunnel.
  */
-function straightReach(
-  map: WorldMap,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-  steps: number,
-  top: number,
-): boolean {
-  const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 0.25);
+function straightReach(map: WorldMap, ax: number, ay: number, bx: number, by: number, top: number): boolean {
+  const n = hexDistance(ax, ay, bx, by);
+  const x0 = centreX(ax, ay) + 1e-6;
+  const y0 = centreY(ay) + 2e-6;
+  const dx = centreX(bx, by) - centreX(ax, ay);
+  const dy = centreY(by) - centreY(ay);
   let px = ax;
   let py = ay;
-  let moves = 0;
   for (let k = 1; k <= n; k++) {
-    cellOf(x0 + ((x1 - x0) * k) / n, y0 + ((y1 - y0) * k) / n);
+    cellOf(x0 + (dx * k) / n, y0 + (dy * k) / n);
     const x = CELL[0];
     const y = CELL[1];
-    if (x === px && y === py) continue;
-    if (hexDistance(px, py, x, y) !== 1 || ++moves > steps || rockAt(map, x, y) !== OPEN || y < top) return false;
+    if (hexDistance(px, py, x, y) !== 1 || rockAt(map, x, y) !== OPEN || y < top) return false;
     px = x;
     py = y;
   }
