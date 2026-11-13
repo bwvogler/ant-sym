@@ -58,7 +58,7 @@ function proxy(choice: string): { questions: string[] } {
   return seen;
 }
 
-const tip: GrowthSituation = { ahead: "open", exposed: "wall", supply: "ample" };
+const tip: GrowthSituation = { ahead: "open", exposed: "wall", supply: "ample", run: "short" };
 
 test("with no answer and no run, a tip plays its own rule: the growth policy answers null", () => {
   const j = new ColonyJev({ intervalMs: 10, gatherMs: 0 });
@@ -91,7 +91,7 @@ test("answers shipped for an aim play without a run; one the growth question can
   j.setAim(aim);
   assert.equal(j.seed(growthContext(aim), [[growthKey(tip), "turn"]]), 1);
   assert.equal(j.growthPolicy(tip), "turn");
-  const other: GrowthSituation = { ahead: "soil", exposed: "buried", supply: "ample" };
+  const other: GrowthSituation = { ahead: "soil", exposed: "buried", supply: "ample", run: "short" };
   assert.equal(j.seed(growthContext(aim), [[growthKey(other), "left"]]), 0, "the tip's sides are not Jev's to name");
   assert.equal(j.growthPolicy(other), null);
 });

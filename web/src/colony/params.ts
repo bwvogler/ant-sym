@@ -147,6 +147,12 @@ export interface ColonyParams {
    */
   siteGive: number;
   /**
+   * Food odour in the air (ja-rf5.4, docs/desert-ant.md §3): an outside forager with empty jaws and no food in sight climbs the
+   * smell of food within this many cells of it (a gradient through open ground; plume.ts), ahead of its search and of its vector
+   * to a remembered spot. 0 = no food odour (the generic ant: main bit for bit).
+   */
+  foodPlume: number;
+  /**
    * One world's plane (ja-lp4.16, docs/route-memory.md, PRD §59): a forager keeps its own way out, places stored every
    * `routeStep` cells while it walks out (at most `routeMax`), and a carrier whose home vector fails walks back through
    * them, recognising a place within `routeSee` cells (a stand-in, by design, for a familiar view; Collett et al. 2013;
@@ -295,6 +301,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   moundSmell: 1,
   siteFidelity: 0,
   siteGive: 0,
+  foodPlume: 0,
   routeMemory: 0,
   scentReach: 1,
   restFetch: 1,

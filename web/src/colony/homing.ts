@@ -18,6 +18,7 @@ import {
 } from "./tuning.ts";
 import { FAINT, PLANE, RETURN, trailLevel, type Home } from "./vocab.ts";
 import { OPEN, isSky, rockAt, type Nest } from "./world.ts";
+import { perceivedPlace } from "./sense.ts";
 
 /** Whether ant i, underground, is home: in its royal chamber, where it homes to. Leaves the shared CELL as it found it. */
 export function atHome(c: Colony, i: number): boolean {
@@ -26,7 +27,7 @@ export function atHome(c: Colony, i: number): boolean {
   c.antCell(i);
   const cx = CELL[0];
   const cy = CELL[1];
-  const at = c.inOwnNest(cx, cy) ? c.perceivedPlace(i, c.placeAt(cx, cy)) : null;
+  const at = c.inOwnNest(cx, cy) ? perceivedPlace(c, i, c.placeAt(cx, cy)) : null;
   CELL[0] = keepX;
   CELL[1] = keepY;
   return at === "royal";
@@ -384,7 +385,7 @@ export function homeField(c: Colony, i: number, hl: number, hf: number, hr: numb
     c.antCell(i);
     const cx = CELL[0];
     const cy = CELL[1];
-    if (!isSky(c.map, cx, cy)) return c.perceivedPlace(i, c.placeAt(cx, cy)) ?? "tunnel";
+    if (!isSky(c.map, cx, cy)) return perceivedPlace(c, i, c.placeAt(cx, cy)) ?? "tunnel";
   }
   return trailLevel(Math.max(hl, hf, hr));
 }

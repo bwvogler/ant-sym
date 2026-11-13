@@ -7,9 +7,9 @@
 // contexts (policyContext, stanceContext), per preset doctrine: each reached through the lane registry (colony/lanes.ts), which holds them. And `fungus`
 // (ja-lo8.4): the fungal situations a recorded side-view game meets (Garden painted on both royal chambers, Lockpick at
 // both holes, 300 s; not all 648), asked with every non-lethal lever, per preset aim (fungusBrain.AIMS), side view. And
-// `growth` (ja-2bw.5): every hyphal tip's situation (24), per preset aim, under the same aims. It is not in the default
+// `growth` (ja-2bw.5): every hyphal tip's situation (48), per preset aim, under the same aims. It is not in the default
 // `--lanes` (a plain re-run asks nothing new for it); after a GROWTH_BRAIN_VERSION bump, re-ship it with `--lanes growth`
-// (≈ $0.0009 for the three aims): colony-live.mjs doesn't run this lane, so `--import` can't ship it for free.
+// (≈ $0.002 for the three aims): colony-live.mjs doesn't run this lane, so `--import` can't ship it for free.
 //
 // Writes web/public/precache/<lane>-<doctrine>.json ([key, answer] pairs, cacheStore's format) and index.json (each
 // bundle's lane, doctrine, context and size, and the brain versions). tests/precache.test.ts fails when a bundle's
@@ -26,6 +26,11 @@
 // Usage: node scripts/precache.mjs [--lanes mode,stance] [--doctrines forage,cautious,warlike] [--budget 0.35]
 //        [--in-flight 4] [--dry]
 //        node scripts/precache.mjs --import <cache.json> [<cache.json> ...]
+//        node scripts/precache.mjs --species desert [--doctrines …] [--budget …] [--dry]
+//
+// --species <id> (ja-rf5.9): ask every situation of that species' own mode lane (its lane words and schema: the desert ant's 16) under each
+// preset doctrine, and ship them as mode-<species>-<doctrine>.json, marked with the species in index.json. Its lanes are small, so the live
+// check is this run itself (the desert ant: ~16 × 3 questions ≈ $0.001). Known: desert.
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
@@ -46,6 +51,7 @@ import {
   estimateTokens,
   STANCE_BRAIN_VERSION,
   GROWTH_BRAIN_VERSION,
+  DESERT_ANT,
 } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
@@ -61,6 +67,7 @@ const opts = {
   inFlight: 4,
   dry: false,
   import: [],
+  species: null,
 };
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
@@ -70,6 +77,7 @@ for (let k = 0; k < args.length; k++) {
   else if (a === "--in-flight") opts.inFlight = Math.max(1, Number(args[++k]));
   else if (a === "--dry") opts.dry = true;
   else if (a === "--import") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.import.push(args[++k]);
+  else if (a === "--species") opts.species = args[++k];
   else throw new Error(`unknown argument ${a}`);
 }
 const KEY = process.env.JEV_API_KEY;
@@ -118,6 +126,28 @@ const LANES = Object.fromEntries(
   ]),
 );
 
+// A species' own mode lane (ja-rf5.9): its words bound into the row's key, packing, reading and context, its situations its schema's.
+const SPECIES_KNOWN = { desert: DESERT_ANT };
+const species = opts.species ? SPECIES_KNOWN[opts.species] : null;
+if (opts.species && !species) throw new Error(`--species: no "${opts.species}" (known: ${Object.keys(SPECIES_KNOWN).join(", ")})`);
+// --import ships colony-live caches, which are the generic ant's: a species' answers come from this script's own run (review of #140).
+if (species && opts.import.length)
+  throw new Error("--species and --import do not go together: run --species on its own (it is the live check)");
+if (species) {
+  const l = LANE_LIST.find((x) => x.name === "mode");
+  const lw = species.lanes.mode;
+  LANES.mode = {
+    ...LANES.mode,
+    situations: () => l.all(lw),
+    key: (s) => l.key(s, undefined, lw),
+    pack: (items, words) => l.pack(items, words, lw),
+    read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, undefined, lw), lw),
+    context: (words) => l.contextOf(words, undefined, lw),
+  };
+  opts.lanes = "mode";
+}
+const prefix = species ? `-${species.id}` : "";
+
 const lanes = opts.lanes.split(",").map((l) => {
   if (!LANES[l]) throw new Error(`unknown lane ${l}`);
   return l;
@@ -131,7 +161,12 @@ const doctrines = opts.doctrines.split(",").map((id) => {
 mkdirSync(OUT, { recursive: true });
 const indexUrl = new URL("index.json", OUT);
 const index = existsSync(indexUrl) ? JSON.parse(readFileSync(indexUrl, "utf8")) : { bundles: [] };
-index.versions = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, fungus: FUNGUS_BRAIN_VERSION, growth: GROWTH_BRAIN_VERSION };
+index.versions = {
+  colony: COLONY_BRAIN_VERSION,
+  stance: STANCE_BRAIN_VERSION,
+  fungus: FUNGUS_BRAIN_VERSION,
+  growth: GROWTH_BRAIN_VERSION,
+};
 
 // The jobs: one request per 100 situations, per lane and doctrine; what each bundle holds already is not asked again.
 const jobs = [];
@@ -142,18 +177,29 @@ for (const lane of lanes) {
   const all = L.situations();
   for (const d of L.words ?? doctrines) {
     const context = L.context(d.text);
-    const file = `${lane}-${d.id}.json`;
+    const file = `${lane}${prefix}-${d.id}.json`;
     const fileUrl = new URL(file, OUT);
     const have = new Map(
       existsSync(fileUrl) && index.bundles.some((b) => b.file === file && b.context === context)
         ? JSON.parse(readFileSync(fileUrl, "utf8"))
         : [],
     );
-    bundles.set(file, { lane, [L.field]: d.id, context, file, answers: have });
+    bundles.set(file, {
+      lane,
+      [L.field]: d.id,
+      ...(species ? { species: species.id } : {}),
+      context,
+      file,
+      answers: have,
+    });
     const todo = all.filter((s) => !have.has(L.key(s)));
     const batch = L.batch;
     for (let k = 0; k < todo.length; k += batch) {
-      const items = todo.slice(k, k + batch).map((situation, n) => ({ id: `${L.id}${n}`, key: L.key(situation), situation }));
+      const items = todo.slice(k, k + batch).map((situation, n) => ({
+        id: `${L.id}${n}`,
+        key: L.key(situation),
+        situation,
+      }));
       const req = L.pack(items, d.text);
       estimate += estimateTokens(req);
       jobs.push({ lane, file, items, req });
@@ -188,6 +234,7 @@ if (opts.import.length) {
   for (const b of bundles.values()) console.log(`  ${b.file}: ${b.answers.size} answers`);
   process.exit(0);
 }
+const startAnswers = [...bundles.values()].reduce((n, b) => n + b.answers.size, 0);
 console.log(
   `${jobs.length} requests, ≈ ${Math.round(estimate).toLocaleString()} tokens ≈ $${(estimate * USD_PER_INPUT_TOKEN).toFixed(4)} (budget $${opts.budget.toFixed(2)})`,
 );
@@ -204,6 +251,7 @@ function save() {
     index.bundles.push({
       lane: b.lane,
       ...(b.aim ? { aim: b.aim } : { doctrine: b.doctrine }),
+      ...(b.species ? { species: b.species } : {}),
       context: b.context,
       file: b.file,
       answers: b.answers.size,
@@ -246,4 +294,8 @@ async function worker() {
 await Promise.all(Array.from({ length: opts.inFlight }, worker));
 save();
 console.log(`done: $${spent.toFixed(4)} spent, ${failed} failed requests`);
+// Over the questions answered, not those planned: a run stopped by the budget or a failure asked fewer (review of #140).
+const answeredNow = [...bundles.values()].reduce((n, b) => n + b.answers.size, 0) - startAnswers;
+if (answeredNow > 0)
+  console.log(`real ≈ ${Math.round(spent / USD_PER_INPUT_TOKEN / answeredNow)} input tokens a question over ${answeredNow} answered`);
 for (const b of bundles.values()) console.log(`  ${b.file}: ${b.answers.size} answers`);

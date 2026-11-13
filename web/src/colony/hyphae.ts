@@ -44,6 +44,17 @@ export const BRANCH_START = 2;
 export const TIP_STEP: readonly number[] = [2, 1.5, 1];
 /** A tip fruits only if no spore spot of its own lies within this many cells (design: keeps spots few, so the patch keeps an infecting dose, PRD §63.1; the body holds Jev's answers to it too, ja-2bw.16). */
 export const FRUIT_GAP = 12;
+/**
+ * Regrowth (ja-2bw.15, owner 2026-11-13): a hypha cut by digging regrows from its stump, the cell it grew from, into the
+ * dug cell this many rounds after the cut (design: injured hyphae put out new tips behind the wound; a short pause so
+ * a dig is seen to cost something). The tunnel it then runs along is safe from walking ants (owner: only digging cuts).
+ */
+export const REGROW_ROUNDS = 5;
+/**
+ * From the soil, the local rule enters a tunnel ahead unless a hypha of its own already lies in a dug cell within this
+ * many cells; then it slides along the wall instead (design, ja-2bw.15: tunnels get hyphae along them, spaced).
+ */
+export const ENTER_GAP = 6;
 /** A tip fruits only once it has grown this many cells since it set out or last branched (design, ja-2bw.16: a tip rooted on a wall would otherwise end there at once). */
 export const FRUIT_RUN = 2;
 
@@ -74,11 +85,15 @@ export const EXPOSURES = ["buried", "wall", "open"] as const;
 export type Exposure = (typeof EXPOSURES)[number];
 export const SUPPLIES = ["short", "ample"] as const;
 export type Supply = (typeof SUPPLIES)[number];
-/** What a tip senses at its step (the growth lane's situation, ja-2bw.5): 4 × 3 × 2 = 24. */
+/** How far a tip has grown since it set out or last branched: long from BRANCH_RUN cells (the growth unit, Trinci 1974; ja-2bw.18). */
+export const RUNS = ["short", "long"] as const;
+export type Run = (typeof RUNS)[number];
+/** What a tip senses at its step (the growth lane's situation, ja-2bw.5, ja-2bw.18): 4 × 3 × 2 × 2 = 48. */
 export interface GrowthSituation {
   ahead: Ahead;
   exposed: Exposure;
   supply: Supply;
+  run: Run;
 }
 /** What a tip does: `turn` is a turn to whichever side the tip finds free (the growth lane's, ja-2bw.5: only the tip knows its sides). */
 export const GROWTH_ANSWERS = ["grow", "left", "right", "turn", "branch", "rest", "fuse", "fruit"] as const;
@@ -114,6 +129,8 @@ export class Hyphae {
   cords = new Set<number>();
   /** hypha cells faded away unused, over the game (regress) */
   fadedCells = 0;
+  /** stumps (ja-2bw.15): a cut hypha's surviving cell, the dug cell it lost, and the rounds before it regrows into it */
+  stumps = new Map<number, { to: number; wait: number }>();
   /** digs taken by cords lying in dug cells (cutDug): a cord is cut at CORD_DIGS */
   digs = new Map<number, number>();
   /** mass spent on hypha (each cell at its price) */
@@ -184,7 +201,7 @@ export class Hyphae {
    * `tip` fruits (PRD §63.1, owner 2026-11-12): it ends as a spore spot on the dug cell it touches: its own cell if dug,
    * else the first dug cell beside it (hex.ts order). Nothing where it touches none (`ground` says what is dug).
    */
-  fruit(tip: Tip, ground: Ground): boolean {
+  fruit(tip: Tip, ground: Ground, end = true): boolean {
     let spot = -1;
     if (ground.kind(tip.x, tip.y) === "open") spot = cellKey(tip.x, tip.y);
     else
@@ -195,7 +212,7 @@ export class Hyphae {
       }
     if (spot < 0 || ground.topsoil) return false;
     if (!this.fruits.includes(spot)) this.fruits.push(spot);
-    this.tips = this.tips.filter((t) => t !== tip);
+    if (end) this.tips = this.tips.filter((t) => t !== tip);
     return true;
   }
 
@@ -221,6 +238,7 @@ export class Hyphae {
    */
   cut(k: number): number {
     if (!this.parent.has(k)) return 0;
+    const stump = this.parent.get(k)!;
     const children = new Map<number, number[]>();
     for (const [c, p] of this.parent)
       if (p !== ROOT) {
@@ -286,7 +304,43 @@ export class Hyphae {
       return false;
     });
     this.cutCells += dead.size;
+    // The cell it grew from is a stump, and regrows into the cut cell in REGROW_ROUNDS rounds (resprout).
+    if (stump !== ROOT && this.parent.has(stump)) this.stumps.set(stump, { to: k, wait: REGROW_ROUNDS });
+    for (const s of this.stumps.keys()) if (!this.parent.has(s)) this.stumps.delete(s);
     return dead.size;
+  }
+
+  /**
+   * A round of regrowth (ja-2bw.15): each stump whose wait is over puts out a tip into the cell it lost, if that cell is
+   * one a tip may enter now (dug open, or soil it may grow through) and no tip stands on the stump. With `budget`, the tip
+   * grows straight into that cell when the free mass pays for it (else it waits on the stump, a tip like any other), so
+   * the cut is regrown whatever the rule would say of a tunnel already holding hypha. Returns the tips put out.
+   */
+  resprout(g: Ground, level: number, budget: { free: number } | null = null): number {
+    let n = 0;
+    for (const [s, r] of [...this.stumps]) {
+      if (!this.parent.has(s)) {
+        this.stumps.delete(s);
+        continue;
+      }
+      if (--r.wait > 0) continue;
+      this.stumps.delete(s);
+      const [sx, sy] = keyCell(s);
+      const [tx, ty] = keyCell(r.to);
+      if (this.tips.some((t) => t.x === sx && t.y === sy) || !enterable(this, g, tx, ty, level)) continue;
+      for (let d = 0; d < 6; d++)
+        if (nx(sx, sy, d) === tx && ny(sy, d) === ty) {
+          const tip: Tip = { x: sx, y: sy, heading: d, first: d, run: 0 };
+          this.tips.push(tip);
+          n++;
+          if (budget && budget.free >= HYPHA_MASS && this.extend(tip, d, HYPHA_MASS)) {
+            budget.free -= HYPHA_MASS;
+            if (g.kind(tx, ty) === "soil") this.soil.add(cellKey(tx, ty));
+          }
+          break;
+        }
+    }
+    return n;
   }
 
   /**
@@ -374,6 +428,7 @@ export class Hyphae {
       cords: [...this.cords],
       fadedCells: this.fadedCells,
       digs: [...this.digs],
+      stumps: [...this.stumps].map(([s, r]) => [s, r.to, r.wait]),
       spent: this.spent,
       steps: this.steps,
       selfHits: this.selfHits,
@@ -392,6 +447,7 @@ export class Hyphae {
     h.cords = new Set(r.cords);
     h.fadedCells = r.fadedCells ?? 0;
     h.digs = new Map(r.digs ?? []);
+    h.stumps = new Map((r.stumps ?? []).map(([s, to, wait]) => [s, { to, wait }]));
     h.spent = r.spent;
     h.steps = r.steps;
     h.selfHits = r.selfHits;
@@ -410,6 +466,7 @@ export interface HyphaeSave {
   cords: number[];
   fadedCells: number;
   digs?: [number, number][];
+  stumps?: [number, number, number][];
   spent: number;
   steps: number;
   selfHits: number;
@@ -454,14 +511,17 @@ export function situationOf(h: Hyphae, g: Ground, tip: Tip, level: number, free:
     ahead: what,
     exposed: exposureAt(g, tip.x, tip.y),
     supply: free >= HYPHA_MASS * AMPLE_STEPS * Math.max(1, tips) ? "ample" : "short",
+    run: tip.run >= BRANCH_RUN ? "long" : "short",
   };
 }
 
 /**
  * The local rule (docs/hyphal-growth.md §3): what a tip does, from its situation and its own body (its heading, first
  * heading, run, and the cells it touches). Short supply: rest. Its own hypha ahead: turn away (autotropism). Blocked
- * ahead: both sides free, split (branch); one, slide to it; none, rest. A tunnel ahead from the soil: slide along its
- * wall. Run at the growth unit: branch. Off its first heading: drift back one turn. Else grow on.
+ * ahead: both sides free, split (branch); one, slide to it; none, rest. A tunnel ahead from the soil: go in, unless its
+ * own hypha already runs in a dug cell within ENTER_GAP; then slide along its wall. In a dug cell: follow the tunnel
+ * round its bends, grow on into the soil where it ends (ja-2bw.15). Run at the growth unit: branch. Off its first
+ * heading: drift back one turn. Else grow on.
  */
 export function localGrowth(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, level: number): GrowthAnswer {
   if (s.supply === "short") return "rest";
@@ -474,14 +534,45 @@ export function localGrowth(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, 
   }
   // Where it reaches a tunnel, it fruits, unless a spot of its own is near (conidiation where hyphae meet the air, §6).
   if ((s.ahead === "open" || s.exposed === "open") && mayFruit(h, tip)) return "fruit";
-  // Thigmotropism: from the soil, keep to it along the tunnel's wall.
-  if (s.ahead === "open" && s.exposed !== "open") return sideFor(h, g, tip, s, level);
+  // From the soil, a tunnel ahead: go in, unless its own hypha already runs in a dug cell near; then keep to the soil
+  // along the tunnel's wall (thigmotropism).
+  if (s.ahead === "open" && s.exposed !== "open") {
+    const [ax, ay] = ahead(tip.x, tip.y, tip.heading);
+    return inTunnelNear(h, g, ax, ay, ENTER_GAP) ? sideFor(h, g, tip, s, level) : "grow";
+  }
+  // In a tunnel: follow it (ja-2bw.15). Where it bends, turn with it; where it ends, grow on into the soil.
+  if (s.exposed === "open" && s.ahead !== "open") {
+    const along = sideFor(h, g, tip, s, level);
+    if (along !== "rest" && tunnelSide(g, tip, along)) return along;
+  }
+  if (s.exposed === "open") return tip.run >= BRANCH_RUN ? "branch" : "grow";
   if (tip.run >= BRANCH_RUN) return "branch";
   if (tip.heading !== tip.first) {
     const k = turn(tip.first - tip.heading, 0) <= 3 ? 1 : -1;
     if (freeAt(h, g, tip, level)(k)) return k > 0 ? "right" : "left";
   }
   return "grow";
+}
+
+/** Whether a hypha of `h` lies in a dug cell within `gap` cells of (x, y) (ENTER_GAP). */
+function inTunnelNear(h: Hyphae, g: Ground, x: number, y: number, gap: number): boolean {
+  for (let dy = -gap; dy <= gap; dy++)
+    for (let dx = -gap - 1; dx <= gap + 1; dx++) {
+      const cx = x + dx;
+      const cy = y + dy;
+      if (hexDistance(x, y, cx, cy) <= gap && h.has(cx, cy) && g.kind(cx, cy) === "open") return true;
+    }
+  return false;
+}
+
+/** Whether the turn `side` (left or right) from `tip` leads into a dug cell, one turn off or two. */
+function tunnelSide(g: Ground, tip: Tip, side: GrowthAnswer): boolean {
+  const k = side === "left" ? -1 : 1;
+  for (const m of [1, 2]) {
+    const [x, y] = ahead(tip.x, tip.y, turn(tip.heading, k * m));
+    if (g.kind(x, y) === "open") return true;
+  }
+  return false;
 }
 
 /** Whether the cell `k` turns from `tip`'s heading is one it may grow into. */
@@ -494,8 +585,9 @@ function freeAt(h: Hyphae, g: Ground, tip: Tip, level: number): (k: number) => b
 
 /**
  * Which way `tip` turns (`turn`, or the local rule's slide): from the soil toward a tunnel, the side that keeps it in
- * the soil along the wall; else a free side one turn off, or (`wide`) two, along a flat wall; both free, by its own count
- * of steps. The local rule turns from its own hypha only one turn off (`wide` false).
+ * the soil along the wall; in a tunnel that bends or ends ahead, the side that keeps it in the tunnel, one turn off or
+ * two (ja-2bw.15); else a free side one turn off, or (`wide`) two, along a flat wall; both free, by its own count of
+ * steps. The local rule turns from its own hypha only one turn off (`wide` false).
  */
 export function sideFor(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, level: number, wide = true): GrowthAnswer {
   const free = freeAt(h, g, tip, level);
@@ -510,6 +602,17 @@ export function sideFor(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, leve
       const [x, y] = ahead(tip.x, tip.y, turn(tip.heading, k));
       return free(k) && g.kind(x, y) === "soil";
     });
+  // In a tunnel that bends or ends ahead, the side that keeps it in the tunnel (ja-2bw.15), one turn off or two.
+  if (s.exposed === "open" && s.ahead !== "open") {
+    const open = (k: number) => {
+      const [x, y] = ahead(tip.x, tip.y, turn(tip.heading, k));
+      return free(k) && g.kind(x, y) === "open";
+    };
+    const one = sideWith(open);
+    if (one !== "rest") return one;
+    const two = sideWith((k) => open(2 * k));
+    if (two !== "rest") return two;
+  }
   const near = sideWith(free);
   return near !== "rest" || !wide ? near : sideWith((k) => free(2 * k));
 }
@@ -640,6 +743,10 @@ function stepTip(
     case "rest":
       break;
   }
+  // Where a tip still growing has come to a tunnel, grown FRUIT_RUN cells and with no spot of its own within FRUIT_GAP,
+  // the body puts a spore spot on the dug cell and the tip grows on (ja-2bw.15, owner 2026-11-13: spots spaced in the
+  // body, whatever the policy answers; conidiation where hyphae meet the air, docs/hyphal-growth.md §6).
+  if (!g.topsoil && h.tips.includes(tip) && exposureAt(g, tip.x, tip.y) !== "buried" && mayFruit(h, tip)) h.fruit(tip, g, false);
   return grown;
 }
 

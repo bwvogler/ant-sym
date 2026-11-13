@@ -14,6 +14,7 @@ import {
 import { type Item, localResponses, responses, touchKey, type Touch } from "../../responses.ts";
 import { dropFood, foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, nestAt, put } from "../hexmaps.ts";
+import { touch as senseTouch } from "../../sense.ts";
 
 // The ant's response hooks (responses.ts): the local ones are the rules the colony had (the golden masters
 // pin that whole games are unchanged); here, each hook swapped on its own changes what it should, and only
@@ -164,8 +165,8 @@ test("touch: what a response sees of an ant", () => {
   const c = new Colony(corridor(3), { antCount: 2, maxAnts: 2 }, mulberry32(1));
   c.carrying[1] = 1;
   put(c, 1, 30, 6);
-  assert.deepEqual({ ...c.touch(0, false) }, touch({ place: "hole", raid: "none" }));
-  assert.deepEqual({ ...c.touch(1, true) }, touch({ carrying: "food", enemy: true, raid: "none" }));
+  assert.deepEqual({ ...senseTouch(c, 0, false) }, touch({ place: "hole", raid: "none" }));
+  assert.deepEqual({ ...senseTouch(c, 1, true) }, touch({ carrying: "food", enemy: true, raid: "none" }));
   assert.equal(c.item(1), "food");
 });
 
