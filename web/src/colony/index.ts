@@ -23,6 +23,7 @@ export * from "./lanes.ts";
 export * from "./levers.ts";
 export * from "./oneWorld.ts";
 export * from "./pheromone.ts";
+export * from "./heat.ts";
 export * from "./policyCache.ts";
 export * from "./recognition.ts";
 export * from "./responses.ts";

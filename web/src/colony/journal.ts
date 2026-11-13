@@ -274,7 +274,15 @@ export class Journal {
   #death(c: Colony, k: number, i: number, s: Seen): void {
     // A dead ant's arrays keep their last values until its slot is reused; a reused slot's are the newborn's.
     const reused = c.gen[i] !== s.gen[i];
-    const cause = reused ? "died" : c.age[i] > c.lifespan[i] ? "died of old age" : c.energy[i] <= 0 ? "starved" : c.params.heatDay > 0 && pastCritical(c.params, c.bodyHeat[i]!) ? "died of heat" : "killed";
+    const cause = reused
+      ? "died"
+      : c.age[i] > c.lifespan[i]
+        ? "died of old age"
+        : c.energy[i] <= 0
+          ? "starved"
+          : c.params.heatDay > 0 && pastCritical(c.params, c.bodyHeat[i]!)
+            ? "died of heat"
+            : "killed";
     const data = reused ? {} : { age: c.age[i], load: c.load[i], mode: MODES[c.mode[i]], x: c.x[i], y: c.y[i], layer: c.layer[i] };
     this.#write({ t: this.#game?.time ?? 0, cat: "death", colony: k, ant: i, gen: s.gen[i], text: cause, data });
   }
