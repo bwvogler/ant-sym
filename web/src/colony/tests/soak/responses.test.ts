@@ -247,17 +247,20 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
     }
     return { offered, held, loose: c.loosePicked, ticks: k };
   };
-  // The local rule's run stops once it has seen everything; each refusing run goes as long, so it was offered its item as often.
+  // The local rule's run stops once it has seen everything; each refusing run goes 30 s past that, so its item is offered
+  // (and refused) many times over, not just the once or twice before the local run stopped (review of #126: a refusal that
+  // gave way after two asks passed).
   const local = run(null, null);
+  const span = local.ticks + 30 * 30;
   for (const it of ["food", "soil", "corpse", "brood"] as const) assert.ok(local.offered.has(it), `get was offered ${it}`);
   assert.ok((local.held.corpse ?? 0) > 0 && (local.held.brood ?? 0) > 0 && local.loose > 0, JSON.stringify(local));
-  const corpse = run("corpse", local.ticks);
+  const corpse = run("corpse", span);
   assert.ok(corpse.offered.has("corpse"), "offered a corpse to refuse");
   assert.equal(corpse.held.corpse ?? 0, 0, "no corpse taken up");
-  const brood = run("brood", local.ticks);
+  const brood = run("brood", span);
   assert.ok(brood.offered.has("brood"), "offered brood to refuse");
   assert.equal(brood.held.brood ?? 0, 0, "no brood taken up");
-  const soil = run("soil", local.ticks);
+  const soil = run("soil", span);
   assert.ok(soil.offered.has("soil"), "offered soil to refuse");
   assert.equal(soil.loose, 0, "no loose pellet taken up");
 });
