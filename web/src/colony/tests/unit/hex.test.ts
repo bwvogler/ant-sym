@@ -220,6 +220,9 @@ test("hexRuns: a line along a way is one run; a 30° slant turns about every 12 
   const slant = hexRuns(0, 0, 75, 50, 3);
   assert.equal(hexDistance(0, 0, 75, 50), 100);
   assert.ok(turnsOf(slant) <= 10, `${turnsOf(slant)} turns`);
+  // A tie (exactly 30° between E and SE) leaves and arrives along the clockwise way, SE; a tile exactly LINE_BAND off keeps the run.
+  assert.deepEqual([wayAt(slant, 0), wayAt(slant, 99)], [1, 1]);
+  assert.deepEqual([...hexRuns(0, 0, -17, 11, 3)].slice(24, 28), [-9, 7, -9, 8]);
   assert.ok(turnsOf(hexLine(0, 0, 75, 50)) >= 50, `hexLine: ${turnsOf(hexLine(0, 0, 75, 50))} turns`);
   // A wider band turns less; a narrower one keeps nearer the line.
   assert.ok(turnsOf(hexRuns(0, 0, 75, 50, 8)) < turnsOf(slant));

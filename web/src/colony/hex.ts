@@ -117,8 +117,9 @@ const x2 = (x: number, y: number): number => 2 * x + 1 + (y & 1);
 /**
  * The way (0–5) nearest the direction (dX2, dY), in half-cells across and rows down (2 × world x, world y ÷ R): the one
  * whose unit step has the largest dot product with it, 4 × which is a whole number for each way. A tie (a direction
- * exactly between two ways) goes to the clockwise one, the same way round in every direction, so the way nearest the
- * reverse direction is always the reverse way: the way lies in (θ − 30°, θ + 30°].
+ * exactly between two ways) goes to the clockwise one, the same way round in every direction, so the way always lies in
+ * (θ − 30°, θ + 30°]: at a hole, the runs in and out then differ by less than the turn + 60°, so at most 120° (transect.ts).
+ * (hexRuns is reversible by its orientation swap, not by this.)
  */
 function nearestWay(dX2: number, dY: number): number {
   const dots = [2 * dX2, dX2 + 3 * dY, -dX2 + 3 * dY, -2 * dX2, -dX2 - 3 * dY, dX2 - 3 * dY];
@@ -132,7 +133,8 @@ function nearestWay(dX2: number, dY: number): number {
  * One half of hexRuns: `steps` steps from cell (sx, sy) toward cell (tx, ty), written to `out` from pair index i0 on, by
  * `di` (+1 forward, −1 backward). Every step cuts the distance to the target by one (a geodesic). It starts along `way`
  * and keeps on while the next centre stays within the band of the straight line (`off` false), else takes the other way
- * that cuts the distance; with both outside, the one nearer the line.
+ * that cuts the distance. With both outside, the one nearer the line: defensive, since at a band of 1 or more one of the
+ * two always stays within it (measured at 3: no tile ever lies past the band, PR #129 review).
  */
 function runHalf(
   out: Int32Array,
@@ -183,8 +185,8 @@ function runHalf(
  * hexLine, `hexDistance + 1` cells, each a neighbour of the last (a shortest path), but stepping only along the two ways
  * either side of the straight line and turning only when the next centre would lie more than `band` (world units) off it,
  * so it goes in long runs with occasional turns instead of hexLine's zigzag. Both ends leave along the way nearest the
- * straight line (nearestWay): the path is built as two halves, from each end to hexLine's middle cell, which lies on a
- * shortest path. The band is tested in whole numbers, so a path is the same on every machine; the path from b to a is
+ * straight line (nearestWay; on a path of 3 steps or more: at 2 the middle cell can decide a tie): the path is built as
+ * two halves, from each end to hexLine's middle cell, which lies on a shortest path. The band is tested in whole numbers, so a path is the same on every machine; the path from b to a is
  * the path from a to b reversed.
  */
 export function hexRuns(ax: number, ay: number, bx: number, by: number, band: number): Int32Array {

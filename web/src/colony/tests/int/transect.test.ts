@@ -386,6 +386,20 @@ test("property: the line's tiles keep within LINE_BAND of the straight line betw
   assert.ok(turns / steps < 1 / 8, `${turns} turns in ${steps} steps`);
 });
 
+test("property: the margins are runs too (ja-lp4.17)", () => {
+  let steps = 0;
+  let turns = 0;
+  for (let seed = 1; seed <= 120; seed++) {
+    const t = randomLine(seed, 6);
+    for (const [lo, hi] of [
+      [t.sMin, t.sHole[0]!],
+      [t.sHole[t.holes.length - 1]!, t.sMax],
+    ] as const)
+      for (let s = lo + 1; s < hi; s++, steps++) if (Math.abs(stepAngle(t, s) - stepAngle(t, s - 1)) > 1) turns++;
+  }
+  assert.ok(turns / steps < 1 / 8, `${turns} turns in ${steps} steps`);
+});
+
 test("property: at every interior hole the line turns by at most 120° tile to tile, so a segment never runs back over the last (ja-lp4.17)", () => {
   let bends = 0;
   for (let seed = 1; seed <= 120; seed++) {

@@ -278,6 +278,7 @@ function endRule(t: Transect, end: End): EndRule {
     const y = keep[i + 1]!;
     grid[(y - gy) * gw + x - gx]! |= ON;
     if (dist4(x, y, v.x, v.y) < EXCUSE4) continue;
+    // Strictly nearer than CLEARANCE, as the straight-line rule was: a tile exactly 12 away keeps clear.
     const offs = roundDisc(CLEARANCE, y & 1, true);
     for (let j = 0; j < offs.length; j += 2) grid[(y + offs[j + 1]! - gy) * gw + x + offs[j]! - gx]! |= NEAR;
   }
