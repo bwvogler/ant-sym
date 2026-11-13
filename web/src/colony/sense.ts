@@ -9,7 +9,6 @@ import { qualityOf, type Item, type Odds, type Touch, type Where } from "./respo
 import { MARK_DECAY, RETURNS_MANY } from "./tuning.ts";
 import { ENEMY, MODES, PLANE, trailLevel, type CellCounts, type Mode } from "./vocab.ts";
 import { OPEN, blocked, inBounds, isSky, qualityAt, rockAt } from "./world.ts";
-import { atGate } from "./crossing.ts";
 
 /**
  * Ant i's situation for a response, in the shared Touch object (read it, don't keep it): its mode, load and where it
@@ -70,7 +69,7 @@ export function placeOn(c: Colony, i: number): Where {
     const cx = CELL[0];
     const cy = CELL[1];
     // (One world, ja-web: at the gate at the top of its shaft it is at its nest's mouth, as on open ground.)
-    p = !c.inOwnNest(cx, cy) ? "out" : atGate(c, i) ? "hole" : perceivedPlace(c, i, c.placeAt(cx, cy)) ? "chamber" : "tunnel";
+    p = !c.inOwnNest(cx, cy) ? "out" : c.atGate(i) ? "hole" : perceivedPlace(c, i, c.placeAt(cx, cy)) ? "chamber" : "tunnel";
   } else {
     const dx = c.x[i] - c.nest.x;
     const dy = c.y[i] - c.nest.y;
@@ -165,7 +164,7 @@ export function touchProbe(c: Colony, x: number, y: number, angle: number, d: nu
 export function raidSmelt(c: Colony, i: number): "none" | "faint" | "strong" {
   if (c.params.raidGate <= 0) return "strong";
   // One world (ja-web): at the gate at the top of its shaft, the plane's trail where it ends, at its hole.
-  if (c.entrance !== null) return atGate(c, i) ? trailLevel(holeRaid(c)) : "strong";
+  if (c.entrance !== null) return c.atGate(i) ? trailLevel(holeRaid(c)) : "strong";
   return trailLevel(raidLevel(c, i));
 }
 

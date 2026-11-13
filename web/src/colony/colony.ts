@@ -157,7 +157,7 @@ import {
   touchProbe,
 } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
-import { carryOut, crossDown, crossUp, crossed, holdsAt, mayCrossUp } from "./crossing.ts";
+import { atGate, carryOut, crossDown, crossUp, crossed, holdsAt, mayCrossUp } from "./crossing.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -1913,6 +1913,11 @@ export class Colony {
    * Put living ant i on layer `layer` at world (x, y), as if it had crossed there (tests: one world's crossings). Out of
    * the nest's layer it is on the surface (`under` 0), on it underground.
    */
+  /** crossing.ts atGate, for sense.ts (importing crossing.ts there would close a cycle through homing.ts). */
+  atGate(i: number): boolean {
+    return atGate(this, i);
+  }
+
   putAnt(i: number, layer: number, x: number, y: number): void {
     this.layer[i] = layer;
     this.x[i] = x;
