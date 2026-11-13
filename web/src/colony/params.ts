@@ -1,4 +1,4 @@
-// The colony's parameters (docs/refactor.md S3.3): what a species or a game sets for a colony, and the defaults. Moved out of colony.ts as they were.
+// The colony's parameters (a step of docs/refactor.md S3, ja-fnd.4.7): what a species or a game sets for a colony, and the defaults. Moved out of colony.ts as they were.
 
 import { DEFAULT_CHANNELS, type Channel, type ChannelParams } from "./pheromone.ts";
 import { TOLERANCE } from "./vocab.ts";
@@ -241,7 +241,7 @@ export interface ColonyParams {
 export const LOOP_AT = 2;
 
 /** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
-export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 export const DEFAULT_COLONY: ColonyParams = {
   antCount: 800,

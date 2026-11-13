@@ -1,4 +1,4 @@
-// The mode lane's situation as an index (docs/refactor.md S3.3): the colony's encoding of what an ant senses, over SITUATION_SCHEMA.
+// The mode lane's situation as an index (a step of docs/refactor.md S3, ja-fnd.4.7): the colony's encoding of what an ant senses, over SITUATION_SCHEMA.
 
 import { HOMES, SITUATION_SCHEMA, TRAILS, type Home, type Situation, type Trail } from "./vocab.ts";
 

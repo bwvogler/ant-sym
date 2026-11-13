@@ -153,7 +153,6 @@ import {
   M_LINE_WIDTH,
   NEST_SIGHT,
   NEW_CHAMBER,
-  NO_CELL,
   NO_FACE,
   NO_GAIN,
   OUT_FIELD_EVERY,
@@ -177,9 +176,6 @@ import {
   SEARCH_STALL,
   SEARCH_START,
   SIGN_WEIGHT,
-  SOIL_DUG,
-  SOIL_FILL,
-  SOIL_LOOSE,
   SPOIL_GIVE_UP,
   START,
   START_FACE,
@@ -200,6 +196,10 @@ import {
   WIDEN_DEPTH,
 } from "./tuning.ts";
 import {
+  NO_CELL,
+  SOIL_DUG,
+  SOIL_FILL,
+  SOIL_LOOSE,
   UP_FIRST,
   avoid,
   besideRefill,

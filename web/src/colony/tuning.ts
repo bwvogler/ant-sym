@@ -1,6 +1,5 @@
-// The colony's tuning constants, by the behaviour they tune (docs/refactor.md S3.5): moved out of colony.ts as they were, values and comments unchanged.
+// The colony's tuning constants: moved out of colony.ts as they were, in their old order, values and comments unchanged. A first, flat step toward tuning by domain (docs/refactor.md S3.5).
 
-import { NO_KEY } from "./ants.ts";
 import { LIFESPAN, MIDDLE } from "./params.ts";
 
 /** Seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round). */
@@ -115,7 +114,7 @@ export const FEED_RATE = 0.5;
 export const PICK_CORPSE = 1;
 
 /** The midden lies at least this many cells past the mound's reach. */
-export const MIDDEN_PAST = 3;
+const MIDDEN_PAST = 3;
 
 /** Corpses on the ground are taken to the midden from within this many columns of the hole (out to the midden). */
 export const MIDDEN_NEAR = 100;
@@ -247,17 +246,6 @@ export const EDGE = 0.75;
 /** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */
 export const WALL_PROBE = Math.PI / 3;
 
-/** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
-export const NO_CELL = NO_KEY;
-
-/** No cell: a key no cell takes (it would be row −32768). −1 was the old "none", but that is cell (−1, 0). */
-/** What a pellet is (Colony soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
-export const SOIL_DUG = 0;
-
-export const SOIL_LOOSE = 1;
-
-export const SOIL_FILL = 2;
-
 /**
  * How many steps through open ground food at a sensor's tip may be from the ant and still be sensed: the sensor's reach
  * (sensorDistance, 3) and two more, so food round a tunnel's bend or a chamber's corner is sensed as before. Fixed, not
@@ -265,9 +253,6 @@ export const SOIL_FILL = 2;
  * window, which is sized from it).
  */
 export const SENSE_STEPS = 5;
-
-/** inReach's window: cells within SENSE_STEPS of the start, stamped by call (a grid of offsets, so no allocation per call). */
-export const REACH_SPAN = 2 * SENSE_STEPS + 3;
 
 /**
  * How much more room dug soil takes loose than in place (its swell): sand 10–15 %, loam 20–30 %, clay

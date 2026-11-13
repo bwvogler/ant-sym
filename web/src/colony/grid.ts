@@ -1,6 +1,7 @@
-// The colony's free functions over the map (cells, tunnels, soil, walls, steering helpers): pure, moved out of colony.ts as they were (docs/refactor.md S3.3).
+// The colony's free functions over the map (cells, tunnels, soil, walls, steering helpers): pure, moved out of colony.ts as they were (docs/refactor.md S3.3, the `grid` module).
 
 import { CELL, DIR_ANGLE, R, cellOf, centreX, centreY, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
+import { NO_KEY } from "./ants.ts";
 import { BACKFILL } from "./params.ts";
 import {
   DIG_ALONE,
@@ -10,15 +11,27 @@ import {
   GROUND_FLIP,
   MOUND_HEIGHT,
   MOUND_REACH,
-  NO_CELL,
   NO_FACE,
-  REACH_SPAN,
   SENSE_STEPS,
   START_FACE,
   SWELL,
 } from "./tuning.ts";
 import { FAINT, type CellCounts } from "./vocab.ts";
 import { AIR, OPEN, SOIL, rockAt, type WorldMap } from "./world.ts";
+
+/** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
+export const NO_CELL = NO_KEY;
+
+/** No cell: a key no cell takes (it would be row −32768). −1 was the old "none", but that is cell (−1, 0). */
+/** What a pellet is (Colony soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
+export const SOIL_DUG = 0;
+
+export const SOIL_LOOSE = 1;
+
+export const SOIL_FILL = 2;
+
+/** inReach's window: cells within SENSE_STEPS of the start, stamped by call (a grid of offsets, so no allocation per call). */
+export const REACH_SPAN = 2 * SENSE_STEPS + 3;
 
 /** Whether, after `t` cells on the ground's surface, the ant turns back with the other hand: at GROUND_FLIP × (1, 3, 7, 15, ...) cells, so each leg is twice the last and passes where the one before began. */
 export function flipDue(t: number): boolean {
@@ -85,11 +98,11 @@ export function walkable(map: WorldMap, x: number, y: number): boolean {
   return t === OPEN || (t === AIR && map.surfaceRows !== undefined && y === map.surfaceRows - 1);
 }
 
-export const reachStamp = new Uint32Array(REACH_SPAN * REACH_SPAN);
+const reachStamp = new Uint32Array(REACH_SPAN * REACH_SPAN);
 
-export const reachQueue = new Int32Array(REACH_SPAN * REACH_SPAN * 2);
+const reachQueue = new Int32Array(REACH_SPAN * REACH_SPAN * 2);
 
-export let reachCall = 0;
+let reachCall = 0;
 
 /**
  * Whether world point (x1, y1) can be reached from (x0, y0) through open ground below any surface rows (one world's
@@ -139,7 +152,7 @@ export function inReach(map: WorldMap, x0: number, y0: number, x1: number, y1: n
 }
 
 /** Whether cell (x, y)'s neighbour the way `d` is open (walkable). */
-export function openAt(map: WorldMap, x: number, y: number, d: number): boolean {
+function openAt(map: WorldMap, x: number, y: number, d: number): boolean {
   return walkable(map, stepX(x, y, ((d % 6) + 6) % 6), stepY(y, ((d % 6) + 6) % 6));
 }
 
