@@ -7,7 +7,7 @@ import { LANES, SAMPLE_SITUATION } from "../../lanes.ts";
 import { localResponses } from "../../responses.ts";
 import { defineSchema, legendOf } from "../../schema.ts";
 import type { Species } from "../../species.ts";
-import { MODES, STANCES, TRAILS, type LaneWords, type Mode, type Policy, type SpeciesSituation } from "../../vocab.ts";
+import { MODES, SITUATION_SCHEMA, STANCES, TRAILS, type LaneWords, type Mode, type Policy, type SpeciesSituation } from "../../vocab.ts";
 import { generateWorld, mulberry32 } from "../../world.ts";
 import { smallOne } from "../builders.ts";
 
@@ -70,18 +70,40 @@ test("its ants are asked about their own situation, and keep its codes", () => {
   assert.equal(c.seen.length, SCHEMA.size, "situations seen are counted over its own");
   assert.ok(c.situationsSeen > 0);
   assert.ok(asked.length > 0, "its policy was asked");
+  const fields = ["mode", "tired", "foodTrail", "enemy", "stance", "age"];
+  assert.ok(
+    asked.every((s) => JSON.stringify(Object.keys(s)) === JSON.stringify(fields)),
+    "its policy sees only its schema's fields (review of #122, D1)",
+  );
   assert.ok(
     asked.every((s) => AGES.includes(s.age as (typeof AGES)[number])),
-    "with its own field",
+    "with its own field, in its values",
   );
   let decoded = 0;
   for (let i = 0; i < c.n; i++) {
     const q = c.lastQuestion(i);
     if (!q) continue;
     decoded++;
-    assert.deepEqual(Object.keys(q), ["mode", "tired", "foodTrail", "enemy", "stance", "age"], "its last question decodes by its schema");
+    assert.ok(
+      q.alarm === "none" || q.alarm === "faint" || q.alarm === "strong",
+      "the generic situation stays whole for the fungus and the journal (S1)",
+    );
+    assert.ok(q.homeTrail !== undefined);
   }
   assert.ok(decoded > 0);
+  // The codes each ant keeps are consistent (review of #122, S2): its species code decodes to its mode now, and shares the sensed fields with its
+  // generic last question.
+  let checked = 0;
+  for (let i = 0; i < c.n; i++) {
+    const code = c.asked[i]!;
+    const q = c.lastQuestion(i);
+    if (!c.alive[i] || code < 0 || !q) continue;
+    const own = SCHEMA.decode(code);
+    assert.equal(own.mode, MODES[c.mode[i]!], `ant ${i}: its kept code holds its mode`);
+    for (const f of ["tired", "foodTrail", "enemy", "stance"] as const) assert.equal(own[f], q[f], `ant ${i}: ${f}`);
+    checked++;
+  }
+  assert.ok(checked > 0, "some ants hold a code");
 });
 
 test("a schema without every mode, or too big for an ant's question code, is refused", () => {
@@ -95,4 +117,39 @@ test("a schema without every mode, or too big for an ant's question code, is ref
   assert.throws(() => c.setSituation({ schema: defineSchema<SpeciesSituation>([{ name: "mode", values: MODES }, ...big]) }), /32,767/);
   c.setSituation(null);
   assert.equal(c.seen.length, 3888, "null: the generic situation again");
+});
+
+test("a species that re-declares the generic fields plays exactly as the generic ant (review of #122, S2)", () => {
+  const same = defineSchema<SpeciesSituation>(SITUATION_SCHEMA.fields as never);
+  const words: LaneWords<Mode> = { ...WORDS, legend: "the same fields", schema: same };
+  const mirror: Species = { id: "mirror", name: "Mirror", params: {}, responses: localResponses, lanes: { mode: words } };
+  const play = (species?: Species) => {
+    const g = new Game(smallOne(7), species ? { antCount: 40, species } : { antCount: 40 }, mulberry32(2));
+    for (let k = 0; k < 30 * 35; k++) g.tick(1 / 30);
+    return g;
+  };
+  // and in another order (mode last: its step in the code is 1, not the generic 972), so a code built with the wrong step shows
+  const reordered = defineSchema<SpeciesSituation>([...SITUATION_SCHEMA.fields.slice(1), SITUATION_SCHEMA.fields[0]!] as never);
+  const shuffled: Species = { ...mirror, id: "shuffled", lanes: { mode: { ...words, schema: reordered } } };
+  const generic = play();
+  // What the ants do, as the golden masters compare it (the save's question codes differ by design when the fields are reordered).
+  const behaviour = (g: Game) =>
+    JSON.stringify(g.colonies.map((c) => [c.x, c.y, c.heading, c.mode, c.carrying, c.alive].map((a) => Array.from(a.subarray(0, c.n)))));
+  for (const g of [play(mirror), play(shuffled)]) {
+    assert.equal(behaviour(g), behaviour(generic));
+    assert.equal(g.player.decisions, generic.player.decisions, "as many questions");
+  }
+  assert.ok(generic.player.decisions > 0);
+});
+
+test("a sensed value outside its field's values is refused (review of #122, nit)", () => {
+  const bad: Species = { ...AGED, sense: () => ({ age: "ancient" }) };
+  const g = new Game(smallOne(7), { antCount: 20, rival: false, species: bad }, mulberry32(1));
+  assert.throws(() => {
+    for (let k = 0; k < 30 * 5; k++) g.tick(1 / 30);
+  }, /"age" is ancient/);
+});
+
+test("a species that leaves generic fields out brings its own local rule (review of #122, D1)", () => {
+  assert.throws(() => new Game(smallOne(7), { antCount: 10, species: { ...AGED, policy: undefined } }, mulberry32(1)), /homeTrail, alarm/);
 });

@@ -120,7 +120,7 @@ test("a species with its own situation schema is cached under its own keys (ja-f
     { name: "age", values: ["young", "old"] },
   ]);
   const words: LaneWords<Mode> = { ...LONE_MODE, legend: "Its own legend. ", schema };
-  const { g, jev } = setup({ ...LONE, lanes: { mode: words } });
+  const { g, jev } = setup({ ...LONE, lanes: { mode: words }, policy: () => "explore" }); // it leaves generic fields out: its own rule (review of #122, D1)
   const s = { ...sit, age: "old" } as SpeciesSituation;
   const answer = notLocal(Object.keys(LONE_MODE.criteria));
   assert.equal(jev.seed(policyContext(DOCTRINE, words), [[schema.key(s), answer]]), 1);

@@ -1,7 +1,7 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
-import { type Policy, type StancePolicy } from "./vocab.ts";
+import { type Policy, SITUATION_SCHEMA, type StancePolicy } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
@@ -410,7 +410,15 @@ export class Game {
   #ownSituation(c: Colony): void {
     const sp = this.params.species;
     const schema = sp.lanes.mode?.schema;
-    if (schema) c.setSituation({ schema, sense: sp.sense });
+    if (!schema) return;
+    // Its policy sees only its schema's fields (owner, review of #122 D1), so a species that leaves generic fields out brings its own local rule.
+    const kept = new Set(schema.fields.map((f) => String(f.name)));
+    const dropped = SITUATION_SCHEMA.fields.map((f) => String(f.name)).filter((n) => !kept.has(n));
+    if (dropped.length && !sp.policy)
+      throw new Error(
+        `species "${sp.id}": its situation leaves out ${dropped.join(", ")}, so it needs a local rule of its own (Species.policy)`,
+      );
+    c.setSituation({ schema, sense: sp.sense });
   }
 
   /** The species' colony parameters, with whether it follows trails derived from its mode words (ja-fnd.5.9); its own params can still set it. */

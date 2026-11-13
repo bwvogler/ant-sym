@@ -904,6 +904,8 @@ export class Colony {
     schema: Schema<SpeciesSituation>;
     sense: ((c: Colony, i: number) => Readonly<Record<string, unknown>>) | null;
     modeStride: number;
+    /** the values each of its fields may take, by name: a sensed value outside them is refused (it would encode as another situation) */
+    allowed: ReadonlyMap<string, readonly unknown[]>;
   } | null = null;
   #rng: () => number;
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
@@ -1299,7 +1301,8 @@ export class Colony {
       throw new Error("setSituation: a species' schema keeps the mode field, with every mode in order");
     if (own.schema.size > 0x7fff)
       throw new Error(`setSituation: ${own.schema.size} situations; an ant's question code holds at most 32,767`);
-    this.#own = { schema: own.schema, sense: own.sense ?? null, modeStride: own.schema.strides[at]! };
+    const allowed = new Map(own.schema.fields.map((f) => [String(f.name), f.values as readonly unknown[]] as const));
+    this.#own = { schema: own.schema, sense: own.sense ?? null, modeStride: own.schema.strides[at]!, allowed };
     this.seen = new Uint8Array(own.schema.size);
   }
 
@@ -1854,7 +1857,7 @@ export class Colony {
   /** The situation ant i was in when its policy last chose its mode, or null if it never chose (a carrier going home is not asked). */
   lastQuestion(i: number): Situation | null {
     const q = this.question[i];
-    return this.alive[i] && q >= 0 ? (this.#own ? (this.#own.schema.decode(q) as Situation) : decodeSituation(q)) : null;
+    return this.alive[i] && q >= 0 ? decodeSituation(q) : null;
   }
 
   /** Distinct situations the policy has been asked about. */
@@ -5189,7 +5192,17 @@ export class Colony {
             enemy: enemy ? "near" : "none",
             stance: STANCES[stance] as Stance,
           };
-          if (own.sense) asks = { ...asks, ...own.sense(this, i) };
+          if (own.sense) {
+            const sensed = own.sense(this, i);
+            for (const name in sensed) {
+              const ok = own.allowed.get(name);
+              if (ok && !ok.includes(sensed[name]))
+                throw new Error(`sense: "${name}" is ${String(sensed[name])}, not one of its field's values`);
+            }
+            asks = { ...asks, ...sensed };
+          }
+          // Its policy is handed only the fields its schema asks (owner, review of #122 D1): an ant chooses only from what its species senses.
+          asks = own.schema.state(asks);
           modeStride = own.modeStride;
         }
         const before = own ? own.schema.encode(asks!) : packSituation(mode, tired, food, home, alarm, enemy, stance);
@@ -5231,7 +5244,8 @@ export class Colony {
           this.mode[i] = mode;
           this.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
-          this.question[i] = before;
+          // The generic code, whatever the species asks: the fungus, the journal and the ant card read the generic situation (review of #122, S1).
+          this.question[i] = own ? packSituation(MODES.indexOf(asks!.mode), tired, food, home, alarm, enemy, stance) : before;
           this.decisions++;
         }
       }
