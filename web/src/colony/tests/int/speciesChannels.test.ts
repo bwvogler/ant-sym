@@ -39,6 +39,8 @@ test("the fungus's levers on channels a species lacks are inert", () => {
   assert.ok(!inertLevers(["food", ...MARKS]).includes("home"));
   assert.ok(inertLevers(["food"]).includes("home"), "nor home trail nor marks: home is inert");
   assert.ok(inertLevers(["alarm", "noEntry", "raid"]).includes("trail"), "nothing it lays: trail is inert");
+  assert.ok(!inertLevers(["royal"]).includes("trail"), "a species with only a mark still lays it (review of #127, S3)");
+  assert.ok(!inertLevers(["food"]).includes("trail"), "a species with only the food trail still lays it");
   assert.ok(!inertLevers(["home", "royal"]).includes("marks"), "a lever on several channels still acts while the species has one of them");
 });
 
