@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridge, contact, faintAlarm, raidFind, raidStop, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
+import {
+  bridge,
+  contact,
+  desertInvitation,
+  desertNoTrail,
+  faintAlarm,
+  raidFind,
+  raidStop,
+  regulate,
+  regulateStop,
+  richPoor,
+  runAssay,
+  twin,
+} from "../../experiment.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
@@ -76,4 +89,16 @@ test("A12 a raid no one can find doesn't starve the colony", () => {
 test("A10 faint alarm draws explorers", { todo: "ja-je8: the draw is weak (median +1.3 ants)" }, () => {
   const m = runAssay(faintAlarm, 1).metrics;
   assert.equal(m.pass, 1, `draw ${m.draw}`);
+});
+
+// The desert ant's assays (ja-rf5.2, PRD §60.1): landed before the species, so today they measure the generic ant, which fails both.
+// Baselines, seeds 1–10: D1 lays food trail on a median 2,036 cells and home trail on 7,530; D2's ratio is a median 0.97 (0.88–1.05).
+test("D1 a desert ant lays no trail", { todo: "ja-rf5.3: the desert ant on the descriptor lays no trail" }, () => {
+  const m = runAssay(desertNoTrail, 1).metrics;
+  assert.equal(m.pass, 1, `food trail on ${m.foodCells} cells, home trail on ${m.homeCells}`);
+});
+
+test("D2 a returning finder invites nestmates out", { todo: "ja-rf5.6: the invitation (speed passed on by contact)" }, () => {
+  const m = runAssay(desertInvitation, 1).metrics;
+  assert.equal(m.pass, 1, `ratio ${m.ratio}`);
 });

@@ -4122,7 +4122,7 @@ The owner asked for the top-down view and the side view to be two views of one g
   - Everything underground lives in one vertical sheet under the line, with today's side-view physics, and the side view shows all of it.
   - A hole is the only way between the two.
   - A full 3D underground was set aside: depth-times the memory and tick cost, 3D digging and homing, and a side view that would miss tunnels.
-- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it, it is a 2D hole gap from every hole, and the ground is open.
+- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it (between the line's tiles since `ja-lp4.17`, one-world §3), it is a 2D hole gap from every hole, and the ground is open.
 - **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
 
 **The note's open questions, answered (owner, 2026-11-08):**
@@ -4678,6 +4678,24 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 
 **Still open.** Full texts of Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984 and the published Buehlmann et al. 2014 (paywalled); the heat model's numbers for *C. fortis*; every number in the note not marked as read in full text.
 
+### 60.1 The assays, before the species (ja-rf5.2, 2026-11-13)
+
+**Decided (owner, 2026-11-13):** land the assays with the targets the papers read in full support, and mark the rest unverified, rather than wait for the paywalled texts (`ja-rf5.1`).
+
+Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d4 --one`), on one world's default plane with its own food, a player colony of 60 alone, 120 s. No behaviour change: today they measure the generic ant, the baseline. The species comes in as `game.species` through an override once it exists (`ja-rf5.3`). Target (c) of [desert-ant.md](desert-ant.md#the-mechanic), a forager whose vector fails finds home by search loops, is S1 (`search1`, §56).
+
+| Assay | Target | Source | Generic ant, seeds 1–10 (median, range) | Seeds 11–20 |
+|---|---|---|---|---|
+| D1 no trail | no cell of the plane at a faint food or home trail | Razin et al. 2013 (full text); Wolf & Wehner 2000 (**unverified**) | food trail on 2,036 cells (1,012–2,664), home on 7,530 (3,967–10,193); pass 0/10 | 2,088 and 6,137; 0/10 |
+| D2 invitation | departures in the 10 s after a return with food ≥ 7× those in the 10 s before | Razin et al. 2013 (full text: sevenfold in the next minute, *C. niger*, nests of 4–8); the window is shorter because the game's returns come every second or so (**provisional**) | ratio 0.97 (0.88–1.05); pass 0/10 | 0.95 (0.84–1.17); 0/10 |
+| D3 first find (the plume's baseline) | none yet: with the plume (`ja-rf5.4`) the first find comes sooner | Buehlmann et al. 2014 (a draft only: **unverified**) | first find at 8.5 s (6.4–19.8) | 9.1 s (6.0–13.0) |
+| D4 trips (the heat budget's baseline) | none yet: trips inside a heat budget once heat exists (`ja-rf5.5`) | Wehner, Marsh & Wehner 1992 (abstract); Schmid-Hempel & Schmid-Hempel 1984 (summary): **unverified** | 62 trips completed, 37.5 still out at the end, none died out; over completed and open: median 34.1 s, 90th percentile 82.0 s, longest 116 s (completed only: median 35.5 s) | 62, 39, 0; 33.9, 90.8, 117 (33.0) |
+
+- **D2's first form failed for a reason worth keeping.** Departures in the minute after a return against the rest of the time read 0.5, because the colony pours out at the start before anyone has come back; counted from the end of the first minute, every second lay within a minute of some return, so there was nothing to compare against. Hence the event-triggered form: after against before, summed over returns, about 1 when returns invite nobody. The generic ant's activation (a leaky count of returns, [activation.md](activation.md)) is gradual, so it reads about 1, as expected.
+- **Review of #134:** D2 first counted a returner's own trip back out as one it invited (568 of 8,476 departures over seeds 1–10; the ratio read 1.09), and D4 dropped trips still out at the end (383 against 803 completed) and any that ended in death. Both fixed; the rows above are re-measured.
+- **D1 and D2 run as `todo`** in `tests/slow/assays.test.ts`, naming `ja-rf5.3` and `ja-rf5.6`. D3 and D4 have no pass mark until the plume and heat exist.
+- **Cost:** none (offline; no lane changed).
+
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
@@ -4898,6 +4916,31 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Measured.** In a one-world game with *a web* bought at the start (seed 7, 600 + 600 ants), cords appear about 120 s in, once a lineage feeds four tips: 8 cells at 120 s, 45 at 180 s on the plane; dead ends cut in the curtain fade (5 cells by 150 s). With the progression script's own upgrade order, *a web* comes at 268–471 s, mostly after the quarter, and `progression.mjs --map one --evolve --hyphae --growth` (seeds 1–10, 600 s) gives **the same seconds, mutations and mycelium on every seed** as §63.5's run: cords change neither the mass nor where spores go, only what a dig takes and how much hypha lingers. P1 holds trivially. What cords are worth will show once digging bites harder (a borer's hyphae in undug soil) and with `ja-2bw.13`.
 
+### 63.7 Hyphae reach the curtain by growing; fruiting spaced in the body (ja-2bw.14, ja-2bw.16, 2026-11-13)
+
+**Built.** The landing patch lies by colony 0's hole as before (`LANDING.offset` past the nest's rim) but on its inner side: along the line toward the neighbouring hole, so never over the margin past an end hole, which `growWorld` can re-aim (owner, 2026-11-13). The curtain gets no hyphae at landing. A plane tip that grows into the hole's mouth (the nest's disc on the plane, radius 3) crosses down it (`Fungus.crossAt`, set by the game): it leaves the plane and roots on the shaft's walls (`rootShaft`). So the side view shows the hyphae arriving at the hole and growing down. The rim tip facing the hole aims at it from its own cell; with the mouth as wide as the disc this changes no outcome measured (review of #130, N3: 14 of 40 landings re-aimed, crossing times identical), and it is kept for a narrower mouth.
+
+**The wall tips fruited at once (`ja-2bw.16`).** Under *unite* the shipped growth answers fruit a tip on a wall with soil ahead (and *spread* does when short), so both wall tips ended as spots on their first step: on seed 1 the curtain held 3 cells from the crossing (22 s) to 200 s, the same on `main`. **Owner (2026-11-13): space it in the body, keep the answers.** A `fruit` answer, Jev's or the local rule's, now takes only once the tip has grown `FRUIT_RUN` (2) cells since it set out or branched and no spot of its own lies within `FRUIT_GAP`; otherwise the tip plays its own rule. Seed 1 under *unite*: 14 cells down the wall by 112 s, until ants dig through the tip. A later crossing puts a fresh tip on a wall cell whose tip is gone; regrowth from the hyphae left in the curtain is `ja-2bw.15`.
+
+**Measured** (`progression.mjs --map one --evolve [--hyphae --growth]`, aim unite, 600 s). The landing moved, so the baseline is re-run with it (without hyphae the patch is the old disc at the new spot):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 355 | 403 | 278 | 145 | 151 | never | 397 | 470 | 240 | 217 |
+| a quarter, hyphae (s) | 289 | 303 | 308 | 158 | 132 | 325 | 389 | 263 | 253 | 211 |
+| the queen, hyphae (s) | 314 | 351 | 354 | 197 | 173 | 363 | 400 | 325 | 273 | 249 |
+
+- With hyphae the worst seed improves (never → 389 s) and the median too (317 → 276 s); seed 6 takes hold with hyphae.
+- **Seed 3 is 10.8 % slower** (278 → 308 s), just past P1's 10 %; before the fruiting fix it was 276 s. Seeds 4 (+9 %) and 9 (+5 %) are slower within the gate.
+- Held out, seeds 11–20:
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 451 | 286 | 221 | 165 | 425 | 417 | 199 | 331 | 291 | 376 |
+| a quarter, hyphae (s) | 471 | 247 | 184 | 150 | 272 | 359 | 190 | 251 | 270 | 325 |
+
+  Nine of ten faster; the median improves (311 → 261 s). **The worst seed is seed 11 both ways, and 20 s worse with hyphae** (451 → 471 s, +4.4 %), so "the worst seed no worse" fails here, as "no seed over 10 %" fails on seed 3 above. **Owner (2026-11-13): ship, and record the two narrow misses**; `ja-2bw.6` (tuning) carries them.
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
@@ -5010,3 +5053,74 @@ The owner saw one colony's trails all the time and disliked that Ink (colony 0) 
   - The dev hook's `fly(mother = 0)` and the lab's `foundBetween` are tools.
 - **Cost:** none. No legend, question or schema changed.
 
+## 66. An endless world: chunks from the seed, many lines, far ground frozen (design, ja-qpv, 2026-11-13)
+
+**Basis.** [endless-world.md](endless-world.md), a design note on [one-world](one-world.md). The wild colonies' density reads [nest-spacing](nest-spacing.md):
+- mature harvester-ant nests sit 9–14 m apart (one U, 140 cells), overdispersed, about 30–37 a hectare (**unverified**: abstracts and citing pages);
+- a young colony does well about 8 m (0.6–0.9 U) from a mature one;
+- queens fly 5 U or more;
+- desert ants nest much sparser, about 3 a hectare.
+
+No new research was needed; the owner sets the density.
+
+**The problem.** The owner asked (2026-11-13) to start on an endless world (`ja-qpv`, MR 9, which `ja-1vg`, the lifetime layer, waits on). One world is bounded: a 512 × 368 plane and one curtain under one line that grows only from its ends (§51). Generation is part pure (rock, curtain ground, food's random streams per chunk) and part whole-map: nest placement, the reach checks that prune food and set `foodTotal`, `mainGround`, `growWorld`'s curtain pass. Some state is dense or flat-keyed by the map's width: `Colony.#outField`, the fungus's spore cells, regrowth piles, the minimap. Memory only grows: sleeping pheromone chunks stay allocated, `SensedMap` (§65) is never dropped, and the chunk table is a dense bounding box. A wild colony off the line has no underground to live in.
+
+**Decisions (owner, 2026-11-13):**
+- **Many lines.** Each group of nests has its own line and curtain. A founding far from every line starts a new line; one near a line's end grows it. Lines keep a clearance from each other, so no plane cell lies over two curtains.
+- **Far ground is frozen.** Only ground near awake things is stepped. A wild colony waits frozen until it is woken. A coarse far-away model and simulating everything were declined.
+- **Design first.** The note, this section and the beads come before code, as §51 did for one world.
+- **Only the fungus wakes far ground** (review of #124, D1). The awake fungus (its body and its awake hosts) wakes colonies; other ants never do, the start colonies' included. With wild sites ~238 units apart and W = 2 U, any ant waking ground would chain through every colony and pin the awake cap.
+- **A host wakes a colony only by entering its nest ground** (third review of #124, D4): a disc of about 16 cells round a hole. The fungus's body still wakes within W. A host foraging past wild sites wakes nothing, so the cap doesn't churn.
+- **Queens fly farther on the endless plane** (review of #124, D2). At 140 a daughter lands exactly the new-line gap (140) from her mother's line, so she could never start a line of her own. The flight lengthens towards real queens' 5 U; 2 U is proposed, and E6 sets it.
+- **The awake cap may freeze a colony the fungus lives in, by rank** (re-review of #124, D3). The rank is how long since the fungus last touched the colony (a host entering, a new host, its body growing near). The lowest-ranked groups freeze first, a cap-frozen colony may not wake for T, and when a slot frees the highest-ranked cap-frozen colony holding the fungus wakes. At the cap the awake set rotates no faster than once a T.
+
+**The design** (proposed, endless-world §2–§8):
+- **The world is the seed plus deltas.** A chunk is generated from `(seed, chunk)` reading only pure inputs (neighbours' `chunkRock` before food clears it, wild-site candidates), so any order of visits gives the same world (`ja-r84`). Underground it is pure given the line, and each line's ground is salted by its first hole. What ants change is kept per chunk.
+- **Scent stays where it is.** Scent, floor marks included, is kept in awake and frozen chunks, unstepped while frozen, and dropped only once faded below `SLEEP`.
+- **Local checks replace whole-map ones.** Food's reach checks look at a 3 × 3-chunk window on the plane, and at a block and its neighbours underground. Start nests are placed by the wild sites' local rule. Founding rule 4 becomes a bounded `escapes` check. Food totals count generated chunks, and `foodHome` divides by the food first generated within 2 U of the hole.
+- **Wild sites** are pure, one candidate per region of chunks. A site wakes into a mature colony of the game's species under a preset doctrine, on a line of its own.
+- **New lines first.** The founding rule tests for a new line (farther than 140 from every hole, the clearance kept from every line) before growing a line's end. The first line's salt is 0, so a one-line game keeps today's curtain. Every wild site is a reserved one-hole line from the start, more than 140 from the start nests, so foundings never land in a site's way. With 2 U flights most daughters start lines of their own.
+- **Freezing is per colony** (its ants, its scent unstepped, its curtain). Colonies in contact form a group that freezes and wakes together. A group freezes after T seconds without the awake fungus within W. Frozen hosts wake nothing. Food regrowth steps only near awake colonies or the fungus. The ranked cap bounds the tick. The camera never changes the simulation.
+- **Storage:** chunks generated on a miss and dropped when far, and a table that doesn't grow with the square of the spread (hashed or two-level, by bench). Flat keys are re-keyed, `cellKey` is widened, and `SensedMap` keeps full detail only in chunks sensed within `SENSED_FADE`, with a revealed bit per chunk beyond.
+- **Saves** keep the seed, the lines, the kept scent and the deltas.
+- **The page:** an unclamped camera, a minimap window, a fog of war from `SensedMap`, and the side view on the line clicked.
+
+**Play.** The world opens outward as the fungus spreads; what it hasn't reached stays still. Wild colonies are mature, so reaching them takes the levers the fungus earns. Where to spread now matters: towards a strong stranger, or away so daughters can found, 2 U out, on lines of their own. Risks:
+- an empty world, measured as hosts' meetings with strangers per hour;
+- a world too full to found in, measured as flights landing near strangers;
+- a cost that only grows, held by the awake cap and the memory soak.
+
+**Assays and targets** (land with their stages):
+- generation in any order is bit-identical (E2);
+- a one-line game stays bit-exact, two lines' curtains differ, and no woken site's line overlaps another curtain (E3, E4);
+- the memory-budget soak: heap and chunks grow with awake plus changed area, not explored area (E4);
+- a freeze and thaw leaves a colony's journal unchanged (E4);
+- two colonies in contact freeze together after T; at the cap no colony freezes and wakes more than once within T; with every awake host dead, a cap-frozen colony holding the fungus wakes when a slot frees (E4);
+- a wild colony's ants never wake another (E4);
+- a host foraging past a site within W wakes nothing; entering its nest ground wakes it (E4);
+- the tick at the awake cap against the 10 ms gate (E4);
+- 60 fps far from the start (E5);
+- `scripts/lab/flight-failure.mjs` on the endless plane, setting the flight and `FOUND_RADIUS` without edges (E6);
+- wild density tuned by flights landing within 0.6–0.9 U of a stranger and meetings per hour, and foundings counted by new line against grown line (E6);
+- assays on seeds 1–10, confirmed on 11–20 (E6).
+
+**Cost (estimated).** None in Jev:
+- no situation, legend or question changes;
+- wild colonies of the game's species ask under a preset doctrine whose answers ship;
+- Jev's cost is per distinct situation, not per colony (§21).
+
+The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; nothing measures memory today.
+
+**Beads.**
+- `ja-qpv` (this epic), after S2 (`ja-fnd.3`) and N colony specs (`ja-fnd.5.4.2`). The old dependency on `ja-8fd` was dropped, since §64 superseded its scope.
+- The stages, in build order: E1 storage (`ja-qpv.1`), E2 local generation (`ja-r84`), E3 many lines (`ja-qpv.2`), E4 awake and frozen (`ja-qpv.3`), E5 the page (`ja-qpv.4`, after E2 and E4), E6 switch and assays (`ja-qpv.5`).
+- The bounded game's golden masters stay bit-exact through E1–E5, except E1's one change of the golden hash's format.
+
+**Still open** (endless-world §10, each with a recommendation):
+1. wild density: one site per 4 × 4 chunks to start;
+2. a wild colony's size on waking: a start colony's at 10 minutes;
+3. what reveals the fog: `SensedMap`'s sensed ground plus the start nests;
+4. W, T and the awake cap: 2 U, 60 s and 6;
+5. the flight distance: 2 U to start;
+6. lines joining: not yet;
+7. whether the bounded game stays: as a test bed until E6.

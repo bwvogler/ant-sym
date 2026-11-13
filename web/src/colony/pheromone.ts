@@ -111,10 +111,14 @@ export class Pheromones {
   #nbRock: (Uint8Array | undefined)[] = new Array(9);
   #nbField: (Float32Array | undefined)[] = new Array(9);
 
-  /** `params`: per channel; channels left out keep their defaults. */
-  constructor(map: WorldMap, params: Partial<Record<Channel, ChannelParams>> = DEFAULT_CHANNELS) {
+  /** the channels a species lacks (ja-fnd.5.11): never laid, so they hold nothing and every read of them is 0; null: it has them all */
+  readonly #absent: ReadonlySet<Channel> | null;
+
+  /** `params`: per channel; channels left out keep their defaults. `has`: the channels the species lays and reads (null: all). */
+  constructor(map: WorldMap, params: Partial<Record<Channel, ChannelParams>> = DEFAULT_CHANNELS, has: readonly Channel[] | null = null) {
     this.map = map;
     this.params = { ...DEFAULT_CHANNELS, ...params };
+    this.#absent = has ? new Set(CHANNELS.filter((ch) => !has.includes(ch))) : null;
     this.fields = perChannel(() => new ChunkLayer((n) => new Float32Array(n), 0));
     this.#awake = perChannel(() => new Set<number>());
   }
@@ -129,6 +133,7 @@ export class Pheromones {
   depositCell(channel: Channel, cx: number, cy: number, amount: number): void {
     const { map } = this;
     if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return;
+    if (this.#absent !== null && this.#absent.has(channel)) return; // a channel the species lacks: nothing is laid, nothing wakes
     const f = this.fields[channel];
     f.set(cx, cy, Math.min(this.params[channel].max ?? MAX_LEVEL, f.get(cx, cy) + amount));
     this.#awake[channel].add(chunkKey(cx >> CHUNK_BITS, cy >> CHUNK_BITS));
@@ -142,6 +147,11 @@ export class Pheromones {
     const { map } = this;
     if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return -1;
     return this.fields[channel].get(cx, cy);
+  }
+
+  /** Whether the species has this channel at all (ja-fnd.5.11). */
+  has(channel: Channel): boolean {
+    return this.#absent === null || !this.#absent.has(channel);
   }
 
   /** Whether any of a channel's chunks is awake: false, and it holds nothing anywhere (a sensor need not read it). */
@@ -370,4 +380,9 @@ export class Pheromones {
     this.#clock = fillLike(this.#clock, r.clock) as Record<Channel, number>;
     this.#head = fillLike(this.#head, r.head) as Record<Channel, number>;
   }
+}
+
+/** Brood read as store and store as brood (the fungus's muddle, nest slice 8); any other mark as it is. */
+export function swapBroodStore(m: Mark): Mark {
+  return m === "brood" ? "store" : m === "store" ? "brood" : m;
 }

@@ -42,8 +42,15 @@ export const BRANCH_RUN = 7;
 export const BRANCH_START = 2;
 /** Seconds between a tip's steps, by Mycelium level (a thread, a borer, a web): the growth factor (design). */
 export const TIP_STEP: readonly number[] = [2, 1.5, 1];
-/** The local rule fruits where a tunnel is reached only if no spore spot of its own lies within this many cells (design: keeps spots few, so the patch keeps an infecting dose, PRD §63.1). */
+/** A tip fruits only if no spore spot of its own lies within this many cells (design: keeps spots few, so the patch keeps an infecting dose, PRD §63.1; the body holds Jev's answers to it too, ja-2bw.16). */
 export const FRUIT_GAP = 12;
+/** A tip fruits only once it has grown this many cells since it set out or last branched (design, ja-2bw.16: a tip rooted on a wall would otherwise end there at once). */
+export const FRUIT_RUN = 2;
+
+/** Whether a tip may end as a spore spot here: grown a few cells, and no spot of its own near (ja-2bw.16). */
+export function mayFruit(h: Hyphae, tip: Tip): boolean {
+  return tip.run >= FRUIT_RUN && !h.fruitNear(tip.x, tip.y, FRUIT_GAP);
+}
 /**
  * Cords (a web, ja-2bw.8, docs/hyphal-growth.md §7): a hypha cell that feeds at least this many tips downstream is a
  * cord (design: Heaton et al. 2010 found a cord's thickness tracks the flow it carries).
@@ -466,7 +473,7 @@ export function localGrowth(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, 
     return sideFor(h, g, tip, s, level);
   }
   // Where it reaches a tunnel, it fruits, unless a spot of its own is near (conidiation where hyphae meet the air, §6).
-  if ((s.ahead === "open" || s.exposed === "open") && !h.fruitNear(tip.x, tip.y, FRUIT_GAP)) return "fruit";
+  if ((s.ahead === "open" || s.exposed === "open") && mayFruit(h, tip)) return "fruit";
   // Thigmotropism: from the soil, keep to it along the tunnel's wall.
   if (s.ahead === "open" && s.exposed !== "open") return sideFor(h, g, tip, s, level);
   if (tip.run >= BRANCH_RUN) return "branch";
@@ -581,7 +588,10 @@ function stepTip(
     return true;
   };
   const s = situationOf(h, g, tip, level, start.free, start.tips);
-  const a = policy?.(s) ?? localGrowth(h, g, tip, s, level);
+  let a = policy?.(s) ?? localGrowth(h, g, tip, s, level);
+  // The body spaces fruiting whoever chose it (ja-2bw.16, owner 2026-11-13): an answer to fruit too soon or too near a
+  // spot plays the tip's own rule instead, so wall tips under an aim that fruits on every wall still grow down it.
+  if (a === "fruit" && !mayFruit(h, tip)) a = localGrowth(h, g, tip, s, level);
   const d = tip.heading;
   switch (a) {
     case "grow":
