@@ -507,7 +507,6 @@ function gatesFor(p: ColonyParams, open: boolean, one: boolean, dt: number): Gat
   };
 }
 
-/** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices), the layers (the maps and scents again) and the policies. */
 /** The colony's own state that is not a public field or an ants.ts array, saved by name in `private` (a field added to the colony that carries state between ticks is listed here, or in COLONY_SKIP when it is code or rebuilt on load; tests/soak/save.test.ts holds that). */
 export const COLONY_STATE = [
   "cur",
@@ -544,6 +543,7 @@ export const COLONY_STATE = [
   "portViewAt",
 ] as const;
 
+/** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices), the layers (the maps and scents again) and the policies. */
 export const COLONY_SKIP: ReadonlySet<string> = new Set([
   ...COLONY_STATE,
   "rng",
@@ -757,8 +757,8 @@ export class Colony {
   intakeRate = 0;
   storedSeen = 0;
   /**
-   * Foragers home with food, per cell where each put it down, keyed by cellKey (behaviour MR 5): `#returning` fills
-   * this tick, `#returned` holds last tick's, which the waiting ants round each one meet, once each.
+   * Foragers home with food, per cell where each put it down, keyed by cellKey (behaviour MR 5): `returning` fills
+   * this tick, `returned` holds last tick's, which the waiting ants round each one meet, once each.
    */
   returning = new Map<number, number>();
   returned = new Map<number, number>();
@@ -6110,8 +6110,8 @@ export class Colony {
 
   /**
    * This colony's state for a save: its public data (not the references the game wires: the map, other colonies'
-   * scent, the grids, its policies; its own scent saves itself), and every private field but its random stream (the game saves that,
-   * shared by every colony). Generated from the field declarations; tests/save.test.ts fails on any field missed.
+   * scent, the grids, its policies; its own scent saves itself), and the state COLONY_STATE lists, by name in `private` (not its random stream: the game saves that,
+   * shared by every colony). tests/soak/save.test.ts holds the lists to the colony's own properties.
    */
   saveState(): Record<string, unknown> {
     return {

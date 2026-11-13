@@ -135,6 +135,73 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
     "an ants.ts array not saved with the public fields",
   );
   assert.deepEqual([...saved].sort(), [...COLONY_STATE].sort(), "`private` is COLONY_STATE");
+  // The public properties a save writes into `fields` by default, pinned: a new property of the colony that holds a reference (a map, a cache, the
+  // game) would otherwise be written into every save and poured back on load. Adding one is an edit here, or to COLONY_SKIP when it is code or rebuilt.
+  const SAVED_FIELDS = [
+    "alates",
+    "births",
+    "brood",
+    "broodKilled",
+    "broodStarved",
+    "buried",
+    "carriedDown",
+    "carriedUp",
+    "corpses",
+    "crossedDown",
+    "crossedUp",
+    "decisions",
+    "diedHungry",
+    "diedOld",
+    "eaten",
+    "finds",
+    "flights",
+    "flown",
+    "founding",
+    "gateHeld",
+    "gynes",
+    "gynesCulled",
+    "handedOn",
+    "inNest",
+    "incipient",
+    "intakeRate",
+    "larder",
+    "looseBack",
+    "looseDown",
+    "looseDropped",
+    "looseFilled",
+    "looseLost",
+    "loosePicked",
+    "losses",
+    "midden",
+    "moundLost",
+    "n",
+    "nestOdour",
+    "odourAim",
+    "outside",
+    "params",
+    "ph",
+    "portTrips",
+    "queen",
+    "raidScouts",
+    "raidable",
+    "recentLosses",
+    "recruits",
+    "seen",
+    "soilDug",
+    "soilFilled",
+    "soilLost",
+    "soilOut",
+    "stance",
+    "stored",
+    "time",
+  ];
+  assert.deepEqual(
+    fields.filter((k) => !(k in ANT_FIELDS)).sort(),
+    SAVED_FIELDS,
+    "the colony's saved public properties changed: name the new one here, or in COLONY_SKIP",
+  );
+  // What is code, wired again or the random stream is never saved, whatever a game has in it: `own` is null in this game, so it is held by name.
+  for (const k of ["rng", "own"]) assert.ok(COLONY_SKIP.has(k), `${k} is skipped by name`);
   const own = Object.keys(c0);
   assert.ok(own.length > 120, `found the colony's properties (${own.length})`);
   for (const k of COLONY_STATE) assert.ok(own.includes(k), `${k} is a property of the colony`);
