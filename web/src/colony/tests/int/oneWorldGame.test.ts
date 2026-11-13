@@ -491,7 +491,7 @@ const royalOf = (g: Game, c: Colony): number =>
   g.world!.curtain.chambers!.list.find((r) => r.role === "royal" && r.colony === c.params.nest)!.id;
 
 test("one world: an old ant holding brood, and an old porter, at the top of a shaft are turned back down it", () => {
-  // At the top of the rival's shaft: lost in another nest's tunnels, a homing ant heads for the hole and climbs out (#goal),
+  // At the top of the rival's shaft: lost in another nest's tunnels, a homing ant heads for the hole and climbs out (homeGoal),
   // so only this guard keeps brood and moved food in. (At its own, it homes to its chamber and is turned back for that.)
   const g = game();
   const c = g.player;

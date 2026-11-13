@@ -20,6 +20,7 @@ import {
 } from "./tuning.ts";
 import { FAINT, PLANE } from "./vocab.ts";
 import { OPEN, dropFood, fillCell, groundTop, heapMound, heapPlane, isSky, openCell, rockAt, takePlane, type Nest } from "./world.ts";
+import { fromHomePlane } from "./homing.ts";
 
 /** The middle of the midden: its column (side view). */
 export function middenCol(self: Colony): number {
@@ -383,7 +384,7 @@ export function dropOut(self: Colony, i: number, col: number): void {
  * home by its own vector, and off the mound (no spoil underfoot, which it can feel). With the plane bound.
  */
 export function onMiddenRing(self: Colony, i: number, cx: number, cy: number): boolean {
-  return self.fromHomePlane(i) >= MIDDEN_MIN && (self.map.spoil?.get(cx, cy) ?? 0) === 0;
+  return fromHomePlane(self, i) >= MIDDEN_MIN && (self.map.spoil?.get(cx, cy) ?? 0) === 0;
 }
 
 /** One world: every nest's hole on the plane (its cell), whose ring no mound fills (heapPlane). */
@@ -488,7 +489,7 @@ export function pickPlane(self: Colony, i: number, cx: number, cy: number, enemy
     const bx = self.nest.x + odo * self.driftSurf[i];
     const by = self.nest.y + odo * self.driftSurfY[i];
     self.spoilA[i] = Math.atan2(self.y[i] - by, self.x[i] - bx);
-    self.spoilTo[i] = self.fromHomePlane(i) + LOOSE_SPREAD * (0.5 + self.rng());
+    self.spoilTo[i] = fromHomePlane(self, i) + LOOSE_SPREAD * (0.5 + self.rng());
     self.spoilT[i] = 0;
   }
   return true;
