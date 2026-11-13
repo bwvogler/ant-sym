@@ -1,4 +1,4 @@
-// Sensing (docs/refactor.md S3.3): what an ant feels around it (nestmates, returning foragers, enemies and their heading), what it touches and holds, the raid smell, and the floor marks it reads and lays. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c`.
+// Sensing (docs/refactor.md S3.3): what an ant feels around it (nestmates, returning foragers, enemies and their heading), the situation it touches, the raid smell, and the floor marks it reads and lays. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c` (and `around`, which never read the colony, losing that parameter).
 
 import type { Colony, HoleCell, Layer } from "./colony.ts";
 import { cellKey, inReach } from "./grid.ts";
