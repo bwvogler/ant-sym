@@ -38,6 +38,9 @@ const i0 = body.indexOf(seg[0]);
 const i1 = body.indexOf(seg[seg.length - 1]);
 if (i1 - i0 + 1 !== seg.length) throw new Error("not contiguous");
 const segStart = seg[0].getFullStart();
+// The first statement's leading comment moves with it.
+const lead = ts.getLeadingCommentRanges(text, seg[0].getFullStart());
+const segFrom = lead && lead.length ? lead[0].pos : seg[0].getStart();
 const segEnd = seg[seg.length - 1].getEnd();
 const inSeg = (n) => n.getStart() >= segStart && n.getEnd() <= segEnd;
 const loopVar = loop.initializer.declarations[0].symbol ?? checker.getSymbolAtLocation(loop.initializer.declarations[0].name);
@@ -148,7 +151,7 @@ const visitSeg = (n, inLoop) => {
 seg.forEach((s) => visitSeg(s, false));
 edits.sort((a, b) => a.pos - b.pos);
 let segText = "";
-let cur = seg[0].getStart();
+let cur = segFrom;
 for (const e of edits) {
   segText += text.slice(cur, e.pos) + e.text;
   cur = e.end;
@@ -182,7 +185,7 @@ if (hasContinue) {
 }
 for (const v of outputs) callLines.push(`${v.reassignedAfter ? "let" : "const"} ${v.name} = s.${v.name};`);
 const callText = callLines.map((l, k) => (k ? pad : "") + l).join("\n");
-let rest = text.slice(0, seg[0].getStart()) + callText + text.slice(segEnd);
+let rest = text.slice(0, segFrom) + callText + text.slice(segEnd);
 // The step record (step.ts): fields for every crossing local, merged with what is there.
 const stepPath = dir + "/step.ts";
 const fields = new Map(); // name -> its declaration line
