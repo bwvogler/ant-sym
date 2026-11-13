@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   bridge,
   contact,
+  desertFirstFind,
   desertInvitation,
   desertNoTrail,
   faintAlarm,
@@ -99,6 +100,18 @@ test("D1 a desert ant lays no trail", () => {
   for (const seed of [1, 2, 3]) {
     const m = runAssay(desertNoTrail, seed, { game: { species: DESERT_ANT } }).metrics;
     assert.equal(m.pass, 1, `seed ${seed}: food trail on ${m.foodCells} cells, home trail on ${m.homeCells}`);
+  }
+});
+
+// ja-rf5.4 (PRD §60.4): the desert ant climbs food odour in the air. Seeds 1–20 all find sooner than its blind search (foodPlume 0):
+// worst seed of 1–10 13.2 → 11.6 s, of 11–20 12.9 → 12.1 s.
+test("D3 food odour brings the first find sooner than a blind search", () => {
+  for (const seed of [1, 2, 3]) {
+    const first = (blind: boolean) =>
+      runAssay(desertFirstFind, seed, { game: { species: DESERT_ANT }, ...(blind ? { colony: { foodPlume: 0 } } : {}) }).metrics.firstFind;
+    const smelt = first(false);
+    const blind = first(true);
+    assert.ok(smelt < blind, `seed ${seed}: first find at ${smelt} s with the plume, ${blind} s blind`);
   }
 });
 

@@ -4,6 +4,7 @@ import { type Channel, type Mark, Pheromones } from "./pheromone.ts";
 import { Brood } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
+import { plumeAt, updatePlume } from "./plume.ts";
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE, discOffsets, hexDistance, nx as stepX, ny as stepY, R, SIDE } from "./hex.ts";
 import {
   type CellCounts,
@@ -466,6 +467,7 @@ export const COLONY_STATE = [
 /** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices), the layers (the maps and scents again) and the policies. */
 export const COLONY_SKIP: ReadonlySet<string> = new Set([
   ...COLONY_STATE,
+  "plumeTurn", // smellsFood's answer, read in the same tick
   "rng",
   "own",
   "map",
@@ -1293,6 +1295,36 @@ export class Colony {
     // Never past 40 % of the way to the nearest neighbour on that side: each midden on its own colony's ground (nests close together).
     const t = this.neighbour();
     return t && this.entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.entrance.x))) : MIDDEN_AT;
+  }
+
+  /** The turn up the food plume (smellsFood's answer, radians), read by the caller at once. */
+  plumeTurn = 0;
+  /** The food plume on the plane (ja-rf5.4, plume.ts PlumeState): built only for a species with foodPlume. */
+  plume: Int16Array | null = null;
+  plumeEpoch = -1;
+  plumeFood = -1;
+  /**
+   * Whether ant i, heading h, smells food in the air (ja-rf5.4, plume.ts) on any of its three sensors (h − a, h, h + a); if so, the
+   * turn of at most `max` toward the strongest is left in plumeTurn. Leaves the shared CELL as it found it.
+   */
+  smellsFood(i: number, h: number, a: number, max: number): boolean {
+    const keepX = CELL[0];
+    const keepY = CELL[1];
+    const range = this.params.foodPlume;
+    const plume = updatePlume(this, this.map, range, this.time);
+    const d = this.params.sensorDistance;
+    const read = (b: number) => {
+      cellOf(this.x[i] + Math.cos(b) * d, this.y[i] + Math.sin(b) * d);
+      return plumeAt(plume, this.map, range, CELL[0], CELL[1]);
+    };
+    const l = read(h - a);
+    const f = read(h);
+    const r = read(h + a);
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    if (Math.max(l, f, r) <= 0) return false;
+    this.plumeTurn = climb(l, f, r, max);
+    return true;
   }
 
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
@@ -2662,6 +2694,13 @@ export class Colony {
           h =
             turnToward(h, Math.atan2(this.entrance.y - this.y[i], this.entrance.x - this.x[i]), p.turnRate * dt * 0.5) +
             noise * p.wander * 0.5;
+        else if (
+          p.foodPlume > 0 &&
+          !carrying &&
+          (this.entrance === null || (this.line !== null && this.cur === PLANE)) &&
+          this.smellsFood(i, h, a, p.turnRate * dt)
+        )
+          h += this.plumeTurn + noise * p.wander * 0.25;
         else if (p.siteFidelity > 0 && this.line !== null && this.cur === PLANE && !Number.isNaN(this.foodX[i]))
           h = turnToward(h, this.siteAim(i), p.turnRate * dt) + noise * p.wander * 0.25;
         else h += noise * p.wander;

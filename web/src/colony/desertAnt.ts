@@ -70,6 +70,10 @@ export const DESERT_ANT: Species = {
     raidGate: 0,
     stanceGate: 0,
     undertakes: false,
+    // Food odour in the air (ja-rf5.4, docs/desert-ant.md §3): C. fortis turns in to food odour up to about 6 m (5.9 m the longest;
+    // Buehlmann et al. 2014, a pre-publication draft: unverified). One world's nests are 140 cells apart against C. fortis's ~40 m,
+    // about 3.5 cells a metre: 6 m is 21 cells. D3 (PRD §60.4): the first find comes sooner on every seed of 1–20.
+    foodPlume: 21,
   },
   // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
