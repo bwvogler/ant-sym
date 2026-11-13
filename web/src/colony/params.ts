@@ -160,6 +160,13 @@ export interface ColonyParams {
    * wall), it reads none. 0 = scent is read at the tip whatever lies between (main before ja-uvhw; kept for ablation).
    */
   scentReach: number;
+  /**
+   * ja-4rfr: 1 = a hungry ant resting in the nest (returning, empty-jawed, underground: an old forager retired inside)
+   * fetches as a hungry explorer does: it follows the stores' marks (toFood) and, at a store, takes food on to where it is
+   * wanted (port). 0 = only explorers fetch (main before ja-4rfr): the old, who feel the colony's hunger most, sat in the
+   * royal chamber while it starved beside a full store.
+   */
+  restFetch: number;
   /** One world's plane, with routeMemory: cells walked between two stored places. */
   routeStep: number;
   /** One world's plane, with routeMemory: a stored place this close counts as recognised (0: only the next place in order, within LOOP_AT). */
@@ -288,6 +295,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   siteGive: 0,
   routeMemory: 0,
   scentReach: 1,
+  restFetch: 0,
   routeStep: 8,
   routeSee: 5,
   routeMax: 64,

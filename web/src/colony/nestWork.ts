@@ -53,6 +53,7 @@ import {
   T_PUPA,
 } from "./tuning.ts";
 import { ENEMY, EXPLORE, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
+import { restFetches } from "./tunnel.ts";
 import { isSky } from "./world.ts";
 import { climbOut } from "./homing.ts";
 
@@ -212,7 +213,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
     return true; // put down: it turns back (the tick turns it: its heading is written after)
   }
   if (
-    col.mode[i] !== EXPLORE ||
+    (col.mode[i] !== EXPLORE && !restFetches(col, i, col.mode[i], cx, cy)) ||
     col.pellet[i] ||
     col.broodHeld[i] ||
     isSky(col.map, cx, cy) ||
