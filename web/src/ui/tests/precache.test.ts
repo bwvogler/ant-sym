@@ -172,6 +172,7 @@ test("a species' own bundles: under its own context, every situation of its sche
     assert.equal(pairs.length, b.answers);
     const keys = new Set(Array.from({ length: words.schema!.size }, (_, c) => words.schema!.key(words.schema!.decode(c))));
     assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
+    assert.equal(pairs.length, words.schema!.size, `${b.file}: every situation of its schema (review of #140, S1)`);
     for (const [k, a] of pairs) {
       assert.ok(keys.has(k), `${b.file}: ${k} is none of its situations`);
       assert.ok(Object.keys(words.criteria).includes(a), `${b.file}: ${a} is not one of its choices`);

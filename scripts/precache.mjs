@@ -130,6 +130,9 @@ const LANES = Object.fromEntries(
 const SPECIES_KNOWN = { desert: DESERT_ANT };
 const species = opts.species ? SPECIES_KNOWN[opts.species] : null;
 if (opts.species && !species) throw new Error(`--species: no "${opts.species}" (known: ${Object.keys(SPECIES_KNOWN).join(", ")})`);
+// --import ships colony-live caches, which are the generic ant's: a species' answers come from this script's own run (review of #140).
+if (species && opts.import.length)
+  throw new Error("--species and --import do not go together: run --species on its own (it is the live check)");
 if (species) {
   const l = LANE_LIST.find((x) => x.name === "mode");
   const lw = species.lanes.mode;
@@ -231,6 +234,7 @@ if (opts.import.length) {
   for (const b of bundles.values()) console.log(`  ${b.file}: ${b.answers.size} answers`);
   process.exit(0);
 }
+const startAnswers = [...bundles.values()].reduce((n, b) => n + b.answers.size, 0);
 console.log(
   `${jobs.length} requests, ≈ ${Math.round(estimate).toLocaleString()} tokens ≈ $${(estimate * USD_PER_INPUT_TOKEN).toFixed(4)} (budget $${opts.budget.toFixed(2)})`,
 );
@@ -290,6 +294,8 @@ async function worker() {
 await Promise.all(Array.from({ length: opts.inFlight }, worker));
 save();
 console.log(`done: $${spent.toFixed(4)} spent, ${failed} failed requests`);
-const asked = jobs.reduce((n, j) => n + j.items.length, 0);
-if (asked) console.log(`real ≈ ${Math.round(spent / USD_PER_INPUT_TOKEN / asked)} input tokens a question over ${asked} questions`);
+// Over the questions answered, not those planned: a run stopped by the budget or a failure asked fewer (review of #140).
+const answeredNow = [...bundles.values()].reduce((n, b) => n + b.answers.size, 0) - startAnswers;
+if (answeredNow > 0)
+  console.log(`real ≈ ${Math.round(spent / USD_PER_INPUT_TOKEN / answeredNow)} input tokens a question over ${answeredNow} answered`);
 for (const b of bundles.values()) console.log(`  ${b.file}: ${b.answers.size} answers`);
