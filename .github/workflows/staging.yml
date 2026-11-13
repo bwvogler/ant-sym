@@ -1,0 +1,43 @@
+# Every push to the long-lived `staging` branch (experiments; it takes main in by merge, never rebase) publishes
+# its build to https://<owner>.github.io/<repo>/pr-preview/staging/. It lives under pr-preview/ because main's
+# deploy (pages.yml) cleans everything else on gh-pages, and the PR previews only touch pr-preview/pr-<n>/.
+# Same Jev proxy and passphrase as main (JEV_API_URL; same origin), and the same daily cap: answers under words
+# that changed on staging aren't in its precache, so they are asked live. It does not deploy the Worker, and
+# no test gates it: a staging build is for playing an idea, not for merging (pages.yml stays main's gate).
+name: Staging
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: staging-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - run: npm --prefix web run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/pr-preview/staging/
+          VITE_JEV_API: ${{ vars.JEV_API_URL }}
+      # Third-party, with write access to the repo: pinned to a commit, not a movable tag (as in pages.yml).
+      - uses: JamesIves/github-pages-deploy-action@fa24774553152dd7873cd16ebd8d959b010c5445 # v4.9.0
+        with:
+          folder: web/dist
+          branch: gh-pages
+          target-folder: pr-preview/staging
+          # Don't overwrite a main or PR-preview deploy pushed meanwhile.
+          force: false
