@@ -2550,7 +2550,8 @@ export const D5_SECONDS = 1200;
 export const desertHeat: Assay = {
   id: "d5",
   title: "D5 heat: the desert ant forages in the cooler hours and few die of heat (one world, two days)",
-  target: "out at noon ≤ 0.75 × out at dawn; heat deaths ≤ 16 % of the colony a day; food every 30 s outside the high sun (design; borrowings unverified)",
+  target:
+    "out at noon ≤ 0.75 × out at dawn; heat deaths ≤ 16 % of the colony a day; food every 30 s outside the high sun (design; borrowings unverified)",
   seconds: D5_SECONDS,
   spec: (seed) => {
     let noon = 0;
