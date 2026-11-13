@@ -7,6 +7,7 @@ import { CELL, cellOf } from "../../hex.ts";
 import { atHome } from "../../homing.ts";
 import { MIDDEN_MIN } from "../../tuning.ts";
 import { responses, type Touch } from "../../responses.ts";
+import { RETURN } from "../../vocab.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
 
 // Guards for moved code that the golden masters do not reach (reviews of #133 and #136; ja-fnd.4.8): each test fails if the
@@ -22,7 +23,7 @@ function dropAsked(withEnemy: boolean): Touch[] {
   c.x[0] = c.queen!.x;
   c.y[0] = c.queen!.y;
   c.carrying[0] = 1;
-  c.mode[0] = 2;
+  c.mode[0] = RETURN;
   if (withEnemy) {
     cellOf(c.x[0]!, c.y[0]!);
     const cx = CELL[0]!;
@@ -59,7 +60,7 @@ test("atHome: in its royal chamber, yes; in a chamber of another mark, or out of
   assert.equal(atHome(c, 0), false, "out of its nest");
 });
 
-test("onMiddenRing: out from home by MIDDEN_MIN or more and off the spoil, yes; short of it, no", () => {
+test("onMiddenRing: out from home by MIDDEN_MIN or more, yes; short of it, no", () => {
   const c = new Colony(generateSideWorld(2, SMALL), { antCount: 1, maxAnts: 1 }, mulberry32(1));
   c.odoSurf[0] = 0; // its vector says home is the nest itself
   const at = (d: number) => {
