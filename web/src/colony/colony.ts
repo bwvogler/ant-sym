@@ -1,6 +1,6 @@
 import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
 import { type AntArrays, antResets, makeAntArrays, NO_KEY } from "./ants.ts";
-import { type Channel, type ChannelParams, DEFAULT_CHANNELS, type Mark, MARKS, Pheromones } from "./pheromone.ts";
+import { type Channel, type Mark, MARKS, Pheromones } from "./pheromone.ts";
 import { Brood, EGG, foodOf, GYNE, isFed, LARVA, LARVA_FOOD, owed, PUPA, type BroodItem } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers, type Role } from "./chambers.ts";
@@ -9,22 +9,18 @@ import {
   type CellCounts,
   ENEMY,
   FAINT,
-  HOMES,
   type Home,
   MODES,
   type Mode,
   type Policy,
   type Situation,
-  SITUATION_SCHEMA,
   type SpeciesSituation,
   type Stance,
   STANCES,
   type StancePolicy,
   type StanceSituation,
   STRONG,
-  TOLERANCE,
   type Trail,
-  TRAILS,
   trailLevel,
 } from "./vocab.ts";
 import type { Schema } from "./schema.ts";
@@ -100,6 +96,210 @@ import {
   type WorldMap,
 } from "./world.ts";
 import { cellAt, type Transect } from "./transect.ts";
+import { MODE_STRIDE, SITUATIONS, decodeSituation, packSituation } from "./situation.ts";
+import {
+  BROOD_PULL,
+  BY_VECTOR,
+  CHAMBER_DEPTH,
+  CHAMBER_GAP,
+  CHAMBER_GAP_GROWTH,
+  CHAMBER_MIN_DEPTH,
+  CHAMBER_SCAN,
+  CHAMBER_SPREAD,
+  CORPSE_GIVE_UP,
+  CORPSE_ROT,
+  CROWD_HALF,
+  CROWN_RATE,
+  DIG_FACE,
+  DIG_TIME,
+  EDGE,
+  EGG_FOOD,
+  ENTRANCE_R,
+  ENTRANCE_ZONE,
+  FEED_RATE,
+  FLOOR_PER_ANT,
+  FOES_HALF,
+  FOLLOW_FLIP,
+  FOLLOW_GIVE_UP,
+  FORK,
+  GAIN,
+  GLANCE,
+  GROUND_LOOK,
+  HOLD_MAX,
+  HOLE_SIGHT,
+  HUG_TIME,
+  INTAKE_NONE,
+  INTAKE_PLENTY,
+  INTAKE_WINDOW,
+  LAY_INTERVAL,
+  LEAVE_NOW,
+  LEAVE_SOON,
+  LOOSE_FILL_PICK,
+  LOOSE_SPREAD,
+  LOOSE_SPREAD_PICK,
+  MARK_DECAY,
+  MET_HALF,
+  MIDDEN_AT,
+  MIDDEN_AVOID,
+  MIDDEN_CROWD,
+  MIDDEN_MARK,
+  MIDDEN_MIN,
+  MIDDEN_NEAR,
+  MIDDEN_SCALE,
+  MIDDEN_SPREAD,
+  MILL_WAYS,
+  MOUND_HEIGHT,
+  MOUND_REACH,
+  M_LINE_WIDTH,
+  NEST_SIGHT,
+  NEW_CHAMBER,
+  NO_CELL,
+  NO_FACE,
+  NO_GAIN,
+  OUT_FIELD_EVERY,
+  PICK_BROOD,
+  PICK_CORPSE,
+  PI_DRIFT,
+  PI_DRIFT_2D,
+  PLANE_STEEP,
+  PORT_RATE,
+  QUEEN_FIGHT,
+  QUEEN_MARK,
+  QUEEN_STOCK,
+  RECEPTION_ABOVE,
+  RECEPTION_MIN,
+  REST,
+  RETURNS_MANY,
+  ROAD_SIGN,
+  ROOMY_DIG,
+  SEARCH_GROW,
+  SEARCH_GROW_2D,
+  SEARCH_STALL,
+  SEARCH_START,
+  SIGN_WEIGHT,
+  SOIL_DUG,
+  SOIL_FILL,
+  SOIL_LOOSE,
+  SPOIL_GIVE_UP,
+  START,
+  START_FACE,
+  START_HUG,
+  STORE_AFTER,
+  STORE_BELOW,
+  SWELL,
+  THREAT_HALF,
+  TUNNEL_STALL,
+  T_EGG,
+  T_LARVA,
+  T_PUPA,
+  WAIT_RIM,
+  WAIT_STEPS,
+  WALL_LOST,
+  WALL_PROBE,
+  WIDEN,
+  WIDEN_DEPTH,
+} from "./tuning.ts";
+import {
+  UP_FIRST,
+  avoid,
+  besideRefill,
+  cellKey,
+  choose,
+  chooseDig,
+  climb,
+  crossedDir,
+  digChance,
+  flipDue,
+  floorGround,
+  gauss,
+  handOnWall,
+  inReach,
+  keyX,
+  keyY,
+  planeMoundReach,
+  refilled,
+  soilFace,
+  startable,
+  stub,
+  tunnel,
+  tunnelEnd,
+  turnToward,
+  walkable,
+  wallSide,
+} from "./grid.ts";
+import { DEFAULT_COLONY, LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN, channelParams, type ColonyParams } from "./params.ts";
+export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
+export {
+  BY_VECTOR,
+  CHAMBER_MIN_DEPTH,
+  CORPSE_ROT,
+  CROWD_HALF,
+  CROWN_RATE,
+  DIG_FACE,
+  DIG_TIME,
+  FLOOR_PER_ANT,
+  FOES_HALF,
+  FOLLOW_FLIP,
+  FOLLOW_GIVE_UP,
+  GLANCE,
+  HOLE_SIGHT,
+  INTAKE_NONE,
+  INTAKE_PLENTY,
+  INTAKE_WINDOW,
+  LEAVE_NOW,
+  LEAVE_SOON,
+  MET_HALF,
+  MIDDEN_AT,
+  MIDDEN_MIN,
+  NANITIC_AGE,
+  NO_FACE,
+  PI_DRIFT,
+  REST,
+  RETURNS_MANY,
+  ROOMY_DIG,
+  SENSE_STEPS,
+  START_FACE,
+  SWELL,
+  THREAT_HALF,
+  TUNNEL_STALL,
+  T_EGG,
+  T_LARVA,
+  T_PUPA,
+  WAIT_RIM,
+  WAIT_STEPS,
+  WALL_LOST,
+} from "./tuning.ts";
+export {
+  angleDiff,
+  avoid,
+  besideRefill,
+  builtFloor,
+  cellKey,
+  choose,
+  chooseDig,
+  climb,
+  crossedDir,
+  digChance,
+  diggable,
+  floorGround,
+  handOnWall,
+  inReach,
+  keyX,
+  keyY,
+  moundRadius,
+  narrow,
+  planeMoundReach,
+  refilled,
+  soilFace,
+  startable,
+  stub,
+  tunnel,
+  tunnelEnd,
+  turnToward,
+  walkable,
+  wallSide,
+} from "./grid.ts";
+export { BACKFILL, DEFAULT_COLONY, LIFESPAN, MIDDLE, YOUNG, channelParams, type BackfillTuning, type ColonyParams } from "./params.ts";
 
 // A colony, pure. Ants are structure-of-arrays, with a
 // fixed capacity and an `alive` flag: ants die in fights and are born from
@@ -190,29 +390,6 @@ export interface Queen {
   held: number;
 }
 
-/**
- * Backfill tuning (frozen; tests and sweeps change it only through ColonyParams.backfill, per colony). A pellet carrier may fill only
- * `after` seconds into its trip home, and never the cell it dug. A side passage counts as unused when its scent is
- * under staleRatio × the scent where the carrier stands (or FAINT), raised up to (1 + pelletPull)× next to pellets
- * filled in the last pelletTau seconds or so. A carrier takes a stale way at a fork with chance enterStale, until
- * staleSearch seconds into its trip home. A filled cell is not dug again for `hold` seconds (see refilled), and a cell
- * dug in the last `young` seconds is not filled.
- */
-export const BACKFILL = Object.freeze({
-  after: 2.5,
-  staleRatio: 0.5,
-  enterStale: 0.3,
-  staleSearch: 20,
-  pelletTau: 60,
-  pelletPull: 6,
-  maxOpen: 5,
-  hold: 600,
-  young: 200,
-} as const);
-
-/** The backfill tuning as a type, each number free to vary (ColonyParams.backfill). */
-export type BackfillTuning = { readonly [K in keyof typeof BACKFILL]: number };
-
 /** The local strategist: defend a nest under attack; raid when no food comes in or the colony is full and fed; else forage. */
 export const localStance: StancePolicy = (s) => {
   if (s.enemyNearNest && s.losses !== "none") return "defend";
@@ -220,298 +397,6 @@ export const localStance: StancePolicy = (s) => {
   if (s.larder === "full" && s.ants === "many") return "raid";
   return "forage";
 };
-
-/** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
-export const YOUNG = 0.15;
-export const MIDDLE = 0.35;
-/** A worker's mean lifespan, seconds (each 0.7–1.3× it): an orphaned colony dwindles as its workers age out. */
-export const LIFESPAN = 3600;
-
-export interface ColonyParams {
-  antCount: number;
-  /** most living ants the colony can have; food beyond it waits in the larder */
-  maxAnts: number;
-  /** stored food per new ant */
-  foodPerAnt: number;
-  /** which of the map's nests is home */
-  nest: number;
-  /** cells per second */
-  speed: number;
-  /** how far ahead the three sensors sit, cells */
-  sensorDistance: number;
-  /** left and right sensors, radians off the heading */
-  sensorAngle: number;
-  /** fastest turn, radians per second */
-  turnRate: number;
-  /** random turning while exploring, radians per second (scale of the noise) */
-  wander: number;
-  /** pheromone laid per second just after leaving the nest or the food */
-  deposit: number;
-  /** seconds for that deposit to fall by e: older steps lay less, so a trail rises toward its source */
-  depositDecay: number;
-  /** seconds out without food before an ant counts as tired */
-  patience: number;
-  /**
-   * One world's plane (ja-lp4.15, docs/forager-trips.md §1): a forager on the plane tires at `patience` × this (the
-   * fungus's `clock` still scales it); in the nest, and in the side view and top-down maps, at `patience`. On the plane
-   * the home vector's error grows with every cell walked, so a long search ends sooner. 1 = `patience` everywhere.
-   */
-  planePatience: number;
-  /**
-   * seconds of rest inside its own nest that take a tired forager's fatigue from `patience` back to nothing (ja-q47,
-   * docs/tiredness.md): rest is a stay inside, not a step through the hole
-   */
-  restTime: number;
-  /**
-   * a follower's choice of way by trail strength, the constant k of (k + C)² (see choose); 0 = always the strongest
-   * sensor (before behaviour MR 3). Small k: strength counts for much; large: choices near even.
-   */
-  followChoice: number;
-  /**
-   * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
-   * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
-   * is raised instead: foodCapTop.)
-   */
-  foodTrailTop: number;
-  /** on a top-down map, the most food trail a cell holds (behaviour MR 3; the other channels and the side view: MAX_LEVEL 20) */
-  foodCapTop: number;
-  /**
-   * a food carrier's pull toward the food trail on its way home, top-down (ja-00t): the share of its turning given to the
-   * trail where the trail agrees with its home vector, the rest to the vector; 0 = the vector alone (before MR 3)
-   */
-  homeTrail: number;
-  /** how far off its home vector (radians) a carrier still takes the food trail home (ja-00t) */
-  homeTrailCone: number;
-  /**
-   * how hard a follower shies from "no entry" (behaviour MR 3): each sensor's food scent counts less by this many times
-   * its "no entry" reading; 0 = ignore it, and lay none. Off by default: on the assays it cost A2a more than it gained
-   * on A3, which the trail's evaporation and tiredness already clear (PRD §45.4)
-   */
-  noEntryAvoid: number;
-  /** how hard a faint alarm draws an ant whose alarmGain is negative, as a share of turnRate (behaviour MR 4) */
-  alarmDraw: number;
-  /** how hard ants turn away from alarm, as a share of turnRate */
-  alarmAvoid: number;
-  /**
-   * Activation (behaviour MR 5, docs/activation.md): encounters with nestmates coming home with food, in the ant's
-   * leaky count `met`, from which a waiting forager senses returns as "few" (RETURNS_MANY times as many: "many"). A
-   * rested forager home with empty jaws is then asked `leave` instead of going straight out. 0 = off: it goes straight
-   * out. Top-down maps, and one world, where an outgoing forager is held at the gate at the top of its shaft (ja-web,
-   * PRD §48.6). 1 (PRD §48.4: G′ seeds 1–20 lost 5.2 % fewer ants for 2.9 % less food home; A5 passes).
-   */
-  leaveGate: number;
-  /**
-   * One world's plane (ja-lp4.11, docs/nest-search.md): a homing ant whose vector ran out where no hole was searches in
-   * loops out from that spot and back (Wehner & Srinivasan 1981; Müller & Wehner 1994), the first reaching this many σ
-   * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × odoSurf; Merkle & Wehner 2010: the
-   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §56: the loops,
-   * tuned to 1.5, won S1 but lost G1 and A1 to the spiral with the mound's smell).
-   */
-  searchLoops: number;
-  /** One world's plane: each next loop reaches this many σ further out than the last (searchLoops) */
-  searchGrow: number;
-  /** One world's plane: radians between one loop's heading and the next's (the golden angle spreads them evenly round) */
-  searchTurn: number;
-  /** One world's plane: a loop's width (radians): out at its heading − half of it, across to + half, back to the centre */
-  searchPetal: number;
-  /**
-   * One world's plane, with searchLoops: a homing ant no nearer its search's point for SEARCH_STALL seconds moves on to the
-   * loop's next point (1), or starts the next, wider loop (0: U3b's widening on a stall, as loops).
-   */
-  searchStall: number;
-  /**
-   * One world's plane (ja-lp4.11, docs/nest-search.md): a searching ant (its vector ran out at no hole) on its own mound
-   * smells its colony's hydrocarbons there, strongest at the hole (Sturgis, Greene & Gordon 2011), and walks up them to
-   * its hole, as it does in sight of it; only while searching (Buehlmann, Hansson & Knaden 2012). 1 = on; 0 = HOLE_SIGHT only.
-   */
-  moundSmell: number;
-  /**
-   * One world's plane (ja-lp4.15, docs/forager-trips.md §3): a forager that picks up food keeps its own vector to the spot
-   * (where it believes the food is, relative to its hole: what its home vector said at pickup, drift and all). On its
-   * next trip out it walks that vector straight, and searches round the spot when it gets there; a food trail it meets
-   * still takes over. It forgets the spot when it tires there without finding food, and replaces it at its next find
-   * (Wolf, Wittlinger & Bolek 2012; Cheng, Narendra & Wehner 2006). 1 = on; 0 = no memory of a find (main bit for bit).
-   */
-  siteFidelity: number;
-  /**
-   * One world's plane, with siteFidelity (ja-lp4.15): a forager gives up the spot it searches round once the search's reach
-   * has widened past this many σ of the vector that led it there (σ = PI_DRIFT × that vector's length: an ant widens its
-   * search with its vector's length, Merkle & Wehner 2010), not waiting to tire. 0 = only tiring ends it.
-   */
-  siteGive: number;
-  /**
-   * One world's plane (ja-lp4.16, docs/route-memory.md, PRD §59): a forager keeps its own way out, places stored every
-   * `routeStep` cells while it walks out (at most `routeMax`), and a carrier whose home vector fails walks back through
-   * them, recognising a place within `routeSee` cells (a stand-in, by design, for a familiar view; Collett et al. 2013;
-   * backtracking, Wystrach et al. 2013). 1 = when the vector stalls (no nearer its belief for SEARCH_STALL); 2 = also on
-   * reaching its belief with no hole there; 0 = nothing recorded, main bit for bit. Once a trip. Steering only.
-   */
-  routeMemory: number;
-  /** One world's plane, with routeMemory: cells walked between two stored places. */
-  routeStep: number;
-  /** One world's plane, with routeMemory: a stored place this close counts as recognised (0: only the next place in order, within LOOP_AT). */
-  routeSee: number;
-  /** One world's plane, with routeMemory: places an ant stores (when full it keeps every second and doubles its spacing). Read when the colony is built (the arrays' size). */
-  routeMax: number;
-  /**
-   * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
-   * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
-   * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
-   */
-  raidGate: number;
-  /** the raid trail a finder lays, as a share of `deposit` (more after meeting more strangers) */
-  raidLay: number;
-  /** seconds of contact with strangers that make a scout a finder */
-  findAt: number;
-  /**
-   * a raider on the raid trail that finds nothing ahead as strong as underfoot leaves it and searches on, out and away from home,
-   * as a scout does (1; 0: it keeps climbing, and mills at the trail's end). It happens mostly near home, where the trail is
-   * weak and patchy: the trail recruits and points the way, and the search does the rest (ja-sf1, review of #44)
-   */
-  raidOnward: number;
-  /**
-   * on a top-down map, each ant's stance is its own, from what it senses (1, docs/stance.md): raid once recruited, defend while
-   * it senses a threat on home ground, else forage; and raid scouts go out on the `leave` answer "raid". 0: the colony's
-   * strategist chooses one stance for every ant, as on the side view
-   */
-  stanceGate: number;
-  /** seconds of threat (alarm smelt, strangers in reach; leaking, THREAT_HALF) that make an ant on home ground defend (docs/stance.md) */
-  defendAt: number;
-  /** how far from its nest an ant is on home ground, by its home vector (world units) */
-  homeGround: number;
-  /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
-  crowdAt: number;
-  /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
-  raidRecruit: number;
-  /**
-   * the rate per second an ant at home goes out to look for the rival: answering `leave` "raid" (each ant's own stance,
-   * docs/stance.md), or, where the colony's stance is broadcast, on a raid stance with no raid trail under it (a scout: a
-   * spontaneous rate, like `scoutRate`; the rest carry on foraging until a scout's trail reaches them)
-   */
-  raidScout: number;
-  /**
-   * a waiting forager whose `leave` answer is "wait" still goes out at this rate per second: a scout (Gordon's patrollers;
-   * foragers waited about 3 min with none returning). 1/90: at 1/180 G′'s worst seed fell to 5 ants alive (PRD §48.4)
-   */
-  scoutRate: number;
-  /** a worker's mean lifespan, seconds (each 0.7-1.3x it): the age bands are shares of it. A species with another career sets it (the desert ant's forager lives days, not an hour). */
-  lifespan: number;
-  /** the age bands as shares of `lifespan`: young (nurses) below `youngShare`, middle-aged (dig and carry inside) below `middleShare`, old (forage) beyond. A colony without a queen has one band: old. */
-  youngShare: number;
-  middleShare: number;
-  /** whether workers age out when there is no queen (a plane colony): the generic ant's do not, a species with a short forager career sets true */
-  mortalWithoutQueen: boolean;
-  /** whether the colony's middle-aged carry its dead out to the midden (#undertake). A species that does not (the desert ant) sets false, and its dead lie where they fell. */
-  undertakes: boolean;
-  /**
-   * Whether the species has a follow mode (ja-fnd.5.9): the generic ant does. A species whose mode words drop `follow` (the Game derives this
-   * from them) never enters FOLLOW: an ant that put its load down heads out exploring, a returner leaves as an explorer, and a policy's
-   * `follow` (a stale answer, a rule that offers it) is read as explore. Its action set, not a choice: the policy chooses among the rest.
-   */
-  follows: boolean;
-  /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
-  odour: number;
-  /** odours further apart than this are strangers, as a healthy ant perceives it */
-  tolerance: number;
-  /** cells round an ant it checks for enemies (the hex disc of this radius) */
-  enemyRange: number;
-  /** evaporation and spread of the colony's pheromone channels, per channel and field; those left out keep their defaults */
-  channels: Partial<Record<Channel, Partial<ChannelParams>>>;
-  /**
-   * Trips end (ja-qnx): with "explore" or "follow", a fresh forager going home with empty jaws is that once it gets there
-   * (the nest on a top-down map; the royal chamber in the side view, the old only), and asked afresh; and any value but
-   * "return" also makes an ant that has just put its load down a follower (whatever this says: see the tick). "return"
-   * keeps the old behaviour, bit for bit: returning until REST sends it out.
-   */
-  arrive: "explore" | "follow" | "return";
-  /** the backfill tuning (BACKFILL): a test or sweep changes it for the colonies it builds, not for the process */
-  backfill: BackfillTuning;
-  /** how much a tunnel's run drifts per cell dug (radians, standard deviation): the meander. 0 = tunnels run straight. */
-  tunnelDrift: number;
-}
-
-/** One world's plane, with loops (searchLoops): within this (world units) of a loop's point, the ant is there and goes on to the next. */
-const LOOP_AT = 2;
-/** π(3 − √5), ~137.5°: successive turns by it never line up, so loops headed so spread evenly round their centre (searchTurn). */
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-
-export const DEFAULT_COLONY: ColonyParams = {
-  antCount: 800,
-  maxAnts: 1200,
-  foodPerAnt: 4,
-  nest: 0,
-  speed: 7,
-  sensorDistance: 3,
-  sensorAngle: 0.6,
-  turnRate: 6,
-  wander: 4,
-  deposit: 4,
-  depositDecay: 20,
-  patience: 60,
-  planePatience: 1,
-  restTime: 30,
-  followChoice: 1,
-  foodTrailTop: 1,
-  foodCapTop: 80,
-  homeTrail: 0.8,
-  homeTrailCone: Math.PI / 2,
-  noEntryAvoid: 0,
-  alarmDraw: 2,
-  alarmAvoid: 1.5,
-  leaveGate: 1,
-  searchLoops: 0,
-  searchGrow: 0.125,
-  searchTurn: GOLDEN_ANGLE,
-  searchPetal: Math.PI / 3,
-  searchStall: 1,
-  moundSmell: 1,
-  siteFidelity: 0,
-  siteGive: 0,
-  routeMemory: 0,
-  routeStep: 8,
-  routeSee: 5,
-  routeMax: 64,
-  raidGate: 1,
-  raidLay: 1,
-  findAt: 0.3,
-  raidOnward: 1,
-  stanceGate: 1,
-  defendAt: 1,
-  homeGround: 10,
-  crowdAt: 40,
-  raidRecruit: 0.1,
-  raidScout: 1 / 90,
-  scoutRate: 1 / 90,
-  undertakes: true,
-  follows: true,
-  lifespan: LIFESPAN,
-  youngShare: YOUNG,
-  middleShare: MIDDLE,
-  mortalWithoutQueen: false,
-  odour: 0,
-  tolerance: TOLERANCE,
-  enemyRange: 2,
-  channels: Object.freeze({}),
-  arrive: "explore",
-  backfill: BACKFILL,
-  tunnelDrift: 0.2,
-};
-
-/** A food cell seen by a sensor, or the nest seen by a homing ant, beats any trail. */
-const SEEN = 100;
-/** Food scent under a follower at least this strong, and weaker all round, is a trail's end (behaviour MR 3: "no entry"). */
-const NO_ENTRY_TRAIL = 1;
-/** ...and every sensor reads under this share of it: the trail drops away ahead and to both sides (not a bend). */
-const NO_ENTRY_DROP = 0.5;
-/** "No entry" laid per second at a spent trail's end, as a multiple of the colony's deposit. */
-const NO_ENTRY_RATE = 4;
-
-/** Every channel's params: the defaults, with `over` merged in per channel and per field. */
-export function channelParams(over: Partial<Record<Channel, Partial<ChannelParams>>> = {}): Record<Channel, ChannelParams> {
-  const out = { ...DEFAULT_CHANNELS };
-  for (const [ch, p] of Object.entries(over) as [Channel, Partial<ChannelParams>][]) out[ch] = { ...DEFAULT_CHANNELS[ch], ...p };
-  return out;
-}
 
 /**
  * One map a colony lives on, and what goes with it (one world, docs/one-world.md §2, §4): the map, the colony's scent on
@@ -6307,709 +6192,4 @@ export class Colony {
       });
     }
   }
-}
-
-/** Every situation a mode choice can be asked in (vocab.ts SITUATION_SCHEMA): 3,888. */
-export const SITUATIONS = SITUATION_SCHEMA.size;
-
-/** A situation from its index in SITUATIONS: the inverse of encode. */
-export const decodeSituation = (code: number): Situation => SITUATION_SCHEMA.decode(code);
-
-export const encodeSituation = (s: Situation): number => SITUATION_SCHEMA.encode(s);
-
-// The schema's steps, for the per-ant hot path below (the same numbers encode adds up, without building a situation).
-const [MODE_STRIDE, TIRED_STRIDE, FOOD_STRIDE, HOME_STRIDE, ALARM_STRIDE, ENEMY_STRIDE, STANCE_STRIDE] = SITUATION_SCHEMA.strides as [
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-];
-/** encode's code from a situation's parts: mode, enemy and stance as their indices. encode(m, …) = encode(0, …) + m × MODE_STRIDE. */
-export function packSituation(mode: number, tired: boolean, food: Trail, home: Home, alarm: Trail, enemy: number, stance: number): number {
-  return (
-    mode * MODE_STRIDE +
-    (tired ? TIRED_STRIDE : 0) +
-    TRAILS.indexOf(food) * FOOD_STRIDE +
-    HOMES.indexOf(home) * HOME_STRIDE +
-    TRAILS.indexOf(alarm) * ALARM_STRIDE +
-    enemy * ENEMY_STRIDE +
-    stance * STANCE_STRIDE
-  );
-}
-
-/** Seconds of wall-following before giving up on this wall for a while (a big rock mass can take over a minute to walk round). */
-export const FOLLOW_GIVE_UP = 120;
-/** Seconds of wall-following before trying the other side once (same line home). */
-export const FOLLOW_FLIP = 45;
-/** Seconds a wall-following ant may touch no rock before it lets go of the wall (the hug would circle in the open). */
-export const WALL_LOST = 1.5;
-/** Seconds a homing ant may get no nearer its goal before tunnel branches are picked by its home vector, and for how long. */
-export const TUNNEL_STALL = 20;
-export const BY_VECTOR = 15;
-/** How near (cells) an ant must be to its line home to count as back on it: a step is ~0.23 cells, so it can't skip over. */
-const M_LINE_WIDTH = 0.6;
-/** Releases from a soil wall a trip may make without getting any nearer home, before only progress counts. */
-const NO_GAIN = 3;
-/** Nearer home than its best by this much (world units) counts as progress: it resets the no-gain count. */
-const GAIN = 0.5;
-/** A wall-follower this near the nest, with a clear way to it, sees (or smells) it and leaves the wall. */
-const NEST_SIGHT = 8;
-/** Path integration's drift (σ, per unit walked): the error is ~10 % of the distance walked (Wehner 2006; docs/nest-and-home.md §1). */
-export const PI_DRIFT = 0.1;
-/** One world's plane: each part (x, y) of the 2D drift, so its length's RMS is PI_DRIFT (U3b). */
-const PI_DRIFT_2D = PI_DRIFT / Math.SQRT2;
-/** Within this (world units) across the ground of the hole (and twice it up or down: the crater) an ant sees it and smells the entrance: its vector no longer matters. */
-export const HOLE_SIGHT = 6;
-/** The search round a believed goal that wasn't there: the first loop's reach (cells), each next one SEARCH_GROW times wider, to at most the map's width. */
-const SEARCH_START = 3;
-/** One world's plane: seconds a homing ant may get no nearer its belief before it searches on, wherever it is (see tick: it unblocks beliefs in rock, and fires far from the belief too). */
-const SEARCH_STALL = 3;
-// Zoning by age (nest slice 6): see band, #mayGoOut, #digs.
-/** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
-export const REST = 10;
-/** seconds over which the colony averages its intake (behaviour MR 5) */
-export const INTAKE_WINDOW = 60;
-/** food stored per ant per second below which the strategist reads "no intake" (behaviour MR 5; tuned, PRD §48) */
-export const INTAKE_NONE = 0.0005;
-/** and above which "plenty" */
-export const INTAKE_PLENTY = 0.01;
-/** half-life (s) of an ant's count of contacts with nestmates bringing food (behaviour MR 5: a rise is felt within seconds, gone in a minute or so) */
-export const MET_HALF = 20;
-/** half-life (s) of a scout's count of seconds in contact with strangers (behaviour MR 5.2) */
-export const FOES_HALF = 20;
-/** half-life (s) of an ant's threat (docs/stance.md: the fading internal state behind a defender's threshold) */
-export const THREAT_HALF = 20;
-/** half-life (s) over which a waiting ant feels how crowded home is (docs/stance.md) */
-export const CROWD_HALF = 5;
-/** "many" returns: this many times the colony's leaveGate */
-export const RETURNS_MANY = 4;
-/** leave answered "now": the rate per second a waiting forager goes out (one left 3–8 s after a rise in contacts: Pinter-Wollman et al. 2013) */
-export const LEAVE_NOW = 1;
-/** leave answered "soon" */
-export const LEAVE_SOON = 0.2;
-/** how far out a waiting forager mills, as a share of the nest's radius (behaviour MR 5) */
-export const WAIT_RIM = 0.9;
-/**
- * One world (ja-web): the gate is the top of the ant's own shaft, cells within this many steps of its hole along its
- * tunnels. An outgoing forager is held there, milling, until it is asked out (`leave`) or has a pass.
- */
-export const WAIT_STEPS = 3;
-/** #mill's scratch: the ways open from a cell (no allocation per step) */
-const MILL_WAYS = new Int8Array(6);
-// The queen and brood (nest slice 4): see #nestLife, #nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
-/** Food in an egg, and fed to a larva before it pupates. */
-const EGG_FOOD = 1;
-/** Seconds as an egg; at least this long as a larva (and fed); as a pupa. */
-export const T_EGG = 15;
-export const T_LARVA = 20;
-export const T_PUPA = 20;
-/** At most one egg this often (seconds), while there is food and room. */
-const LAY_INTERVAL = 0.5;
-/** The fungus's crown (nest slice 8): the chance a second that a host by the queen, or by a brood item, kills it, at full load (× its load). */
-export const CROWN_RATE = 0.05;
-/** Food a larva takes per second with two nurses or more by it. */
-const FEED_RATE = 0.5;
-// The midden (nest slice 7): see #undertake, #dropOut, #middenSmell.
-/** Chance per second an idle middle-aged ant underground picks up a corpse within two cells of it. */
-const PICK_CORPSE = 1;
-/** The midden lies at least this many cells past the mound's reach. */
-const MIDDEN_PAST = 3;
-/** Corpses on the ground are taken to the midden from within this many columns of the hole (out to the midden). */
-const MIDDEN_NEAR = 100;
-/** Seconds an undertaker walks a corpse out before it puts it down short of the midden (a pellet's 15 s fell short of it on hilly ground). */
-const CORPSE_GIVE_UP = 60;
-/** Seconds after death a corpse not on the midden rots away (the dead in the field would otherwise pile up all game). */
-export const CORPSE_ROT = 900;
-/** Midden mark laid when a corpse is put on the midden; a tenth of it a second while it lies there. Each is spread over
- *  the cell's column and MIDDEN_SPREAD columns either side, tapering (review of #26: one cell at the saturated level). */
-const MIDDEN_MARK = 20;
-/** Columns either side of a midden cell its mark is laid over. */
-const MIDDEN_SPREAD = 3;
-/** How hard raiders turn away from the rival's midden mark, as a share of turnRate (alarm avoidance is alarmAvoid). */
-const MIDDEN_AVOID = 1.5;
-/**
- * A raider on the ground turns back from a cell of the rival's midden with chance 1 − exp(−mark / MIDDEN_SCALE), times
- * MIDDEN_CROWD / (its own colony's ants within two cells, itself included) once they are more than MIDDEN_CROWD: a scout
- * or a handful shies, a raid in force presses on (see #middenTurn).
- */
-const MIDDEN_SCALE = 5;
-const MIDDEN_CROWD = 3;
-/** Chance per second an idle ant in reception or a store, with food there, carries a unit on (see #port). */
-const PORT_RATE = 3;
-/** Food the royal chamber is kept stocked with for the queen (a few eggs' worth, and the larvae lying with her). */
-const QUEEN_STOCK = 8;
-/** Chance per second an idle ant in the royal chamber picks up an egg near it to take to a brood chamber. */
-const PICK_BROOD = 0.5;
-/** Seconds a nurse holds brood before it puts it down wherever it is; a porter, its food, in whichever of its chambers it is by. */
-const HOLD_MAX = 30;
-/** A forager's food goes to reception only once it is a chamber of this many cells (see #foodTo); until then, to the royal chamber. */
-const RECEPTION_MIN = 4;
-/**
- * Seconds a forager carries its food before it will put it down in any of its colony's food chambers it stands in, not
- * only the one it takes food to (see #port; ja-3ifx). A trip from a pocket by the nest is under a minute when it finds its way.
- */
-const STORE_AFTER = 60;
-/** Rows either side of a chamber's mean row searched for its cell nearest that mean (the founding disc is the tallest: 9 rows). */
-const CHAMBER_SCAN = 5;
-/**
- * A nanitic's age at eclosion (ja-lo8.10): the first workers a queen founding alone rears (brood.ts `nanitic`) eclose
- * old, so they forage from the start; with nobody bringing food in, the queen's colony grows no further until they do.
- * In incipient Pogonomyrmex rugosus colonies nanitics take on outside work, pushed out as later nanitics eclose into
- * brood care (escholarship.org/content/qt37w2d1mh). That they forage at once, and so live shorter, is the game's own.
- */
-/** The generic ant's nanitic age: the colony reads `middleShare × lifespan` of its own params (a species' differ); kept as the default and for the founding test. */
-export const NANITIC_AGE = MIDDLE * LIFESPAN;
-/** The queen's royal mark per second; her death rate per stranger at her side. */
-const QUEEN_MARK = 10;
-const QUEEN_FIGHT = 1;
-// Floor marks (nest slice 3): see #layMark, #destMark, #roleFor.
-/** Marks are laid at the colony's trail deposit per second just out of a chamber, falling to 1/e after MARK_DECAY seconds away from it. */
-const MARK_DECAY = 30;
-/** How much more a homing ant in a tunnel goes by its destination's mark than by the home trail. */
-const SIGN_WEIGHT = 4;
-/** A new chamber this many rows above the royal one may be the reception (the colony's first); this many below, a store. */
-const RECEPTION_ABOVE = 4;
-const STORE_BELOW = 2;
-// Chambers (nest slice 2): see crowded(), #widenWay, #newChamberWay.
-/** Floor cells a nest keeps per ant underground: below it the nest is crowded and digs (Odontomachus ~2 cm² per worker, at the sim's scale). */
-export const FLOOR_PER_ANT = 0.1;
-/** Chance an explorer touching its crowded chamber's wall widens it there; brood lying in it makes it likelier (× 1 + BROOD_PULL per brood, up to 10). */
-const WIDEN = 0.3;
-const BROOD_PULL = 0.2;
-/** Widening falls off with a chamber's depth (rows) as exp(−depth / WIDEN_DEPTH). */
-const WIDEN_DEPTH = 30;
-/** Chance per tunnel cell (at the surface; × exp(−depth / CHAMBER_DEPTH)) that a crowded explorer starts a new chamber there. */
-const NEW_CHAMBER = 0.04;
-const CHAMBER_DEPTH = 40;
-/** No chamber within the top rows (the crust and mound), and none within CHAMBER_GAP + depth × CHAMBER_GAP_GROWTH rows (and CHAMBER_SPREAD columns) of another. */
-export const CHAMBER_MIN_DEPTH = 8;
-const CHAMBER_GAP = 4;
-const CHAMBER_GAP_GROWTH = 0.15;
-const CHAMBER_SPREAD = 10;
-/** A roomy nest digs this share as often as before (tunnels at dead ends, starts off walls, head-on). */
-export const ROOMY_DIG = 0.15;
-/** Cells a homing ant follows the ground's surface round spoil before trying the other hand (then twice as far each time: see flipDue). */
-const GROUND_FLIP = 24;
-/** Whether, after `t` cells on the ground's surface, the ant turns back with the other hand: at GROUND_FLIP × (1, 3, 7, 15, ...) cells, so each leg is twice the last and passes where the one before began. */
-function flipDue(t: number): boolean {
-  if (t % GROUND_FLIP !== 0) return false;
-  const k = t / GROUND_FLIP + 1;
-  return (k & (k - 1)) === 0;
-}
-/** The ways from a cell, upward ones first (NW, NE), then level, then down: gravity breaks ties when climbing out. */
-const UP_FIRST = [4, 5, 0, 3, 1, 2] as const;
-/** Seconds between rebuilds of the way-out field (#outField) while the ground keeps changing; a cell dug since steps straight toward the hole meanwhile. */
-const OUT_FIELD_EVERY = 0.5;
-/** Cells an ant feels ahead along the surface, each way, to choose which hand to follow it with. */
-const GROUND_LOOK = 16;
-/** Seconds on a strong nest trail for the in-nest memory's error to fall to 1/e. */
-const ROAD_SIGN = 2;
-const SEARCH_GROW = 1.6;
-/** One world's plane: the search's reach grows SEARCH_GROW times a loop, a full turn of four points a quarter turn apart. */
-const SEARCH_GROW_2D = Math.sqrt(Math.sqrt(SEARCH_GROW));
-/** A believed hole is never nearer the map's side than this (world units): the walkway's end columns' centres are within 1 of it, so an ant there counts as at its belief. */
-const EDGE = 0.75;
-/** The two touch probes that pick which side to keep a newly met wall on: this far either side of the home vector. */
-const WALL_PROBE = Math.PI / 3;
-
-/**
- * Which side to keep a newly met wall on, from touch probes left and right of the home vector:
- * turn toward the open side, so the wall stays on the other (+1 = wall on the right). Both open or
- * both blocked: either.
- */
-export function wallSide(leftBlocked: boolean, rightBlocked: boolean, rng: () => number): -1 | 1 {
-  if (leftBlocked !== rightBlocked) return leftBlocked ? -1 : 1;
-  return rng() < 0.5 ? -1 : 1;
-}
-
-/** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
-const NO_CELL = NO_KEY;
-
-/**
- * A cell as one number, y·65536 + x: the midden's and returns' keys, and an ant's remembered cells. A column may be
- * negative (one world's curtain, whose columns start at the line's sMin), down to −32768; rows never are.
- */
-export function cellKey(x: number, y: number): number {
-  return y * 65536 + x;
-}
-/** The row of a cellKey: right for negative columns too (a plain floor of k / 65536 would give the row above). */
-export function keyY(k: number): number {
-  return Math.floor((k + 32768) / 65536);
-}
-/** The column of a cellKey. */
-export function keyX(k: number): number {
-  return k - keyY(k) * 65536;
-}
-/** No cell: a key no cell takes (it would be row −32768). −1 was the old "none", but that is cell (−1, 0). */
-/** What a pellet is (Colony soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
-const SOIL_DUG = 0;
-const SOIL_LOOSE = 1;
-const SOIL_FILL = 2;
-
-/** A standard normal draw (Box–Muller). */
-function gauss(rng: () => number): number {
-  return Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
-}
-
-/** The signed difference a − b, wrapped into −π..π. */
-export function angleDiff(a: number, b: number): number {
-  let d = (a - b) % (2 * Math.PI);
-  if (d > Math.PI) d -= 2 * Math.PI;
-  if (d < -Math.PI) d += 2 * Math.PI;
-  return d;
-}
-
-/**
- * Whether an ant may choose to step into cell (x, y): open ground, or one world's ground strip (the curtain's last surface
- * row, sky: the side view draws the plane there, one-world §8 item 6), where a step from the hole under it is a crossing
- * up onto the plane (tick). The strip touches the curtain's open cells only at the holes, the crust being solid elsewhere,
- * so it reads as the walkway over a hole, as the side view's ground does. On every other map, open ground alone.
- * openAt and #walkTunnel need it (an ant at a hole's top must see the way up). #upOut, the scent walk and #towardHole use
- * it only to agree with openAt: none meets the strip today (PR #64 review N1: 0 disagreements with the open check, seeds
- * 1-3, 300 s), since a step into it crosses up at once.
- */
-export function walkable(map: WorldMap, x: number, y: number): boolean {
-  const t = rockAt(map, x, y);
-  return t === OPEN || (t === AIR && map.surfaceRows !== undefined && y === map.surfaceRows - 1);
-}
-
-/**
- * How many steps through open ground food at a sensor's tip may be from the ant and still be sensed: the sensor's reach
- * (sensorDistance, 3) and two more, so food round a tunnel's bend or a chamber's corner is sensed as before. Fixed, not
- * derived: a sensorDistance swept past SENSE_STEPS would put every tip out of reach, so raise this with it (and inReach's
- * window, which is sized from it).
- */
-export const SENSE_STEPS = 5;
-/** inReach's window: cells within SENSE_STEPS of the start, stamped by call (a grid of offsets, so no allocation per call). */
-const REACH_SPAN = 2 * SENSE_STEPS + 3;
-const reachStamp = new Uint32Array(REACH_SPAN * REACH_SPAN);
-const reachQueue = new Int32Array(REACH_SPAN * REACH_SPAN * 2);
-let reachCall = 0;
-
-/**
- * Whether world point (x1, y1) can be reached from (x0, y0) through open ground below any surface rows (one world's
- * curtain) in at most `steps` steps between cells (`steps` ≤ SENSE_STEPS): how a sensor at (x1, y1) senses food there.
- * Food in a pocket sealed off by soil or rock is not sensed, however near (ja-juiu: sensed through the wall, it turned
- * explorers off their tunnels three cells short of every pocket, which no tunnel then reached); food round a bend is.
- */
-export function inReach(map: WorldMap, x0: number, y0: number, x1: number, y1: number, steps = SENSE_STEPS): boolean {
-  cellOf(x1, y1);
-  const bx = CELL[0];
-  const by = CELL[1];
-  cellOf(x0, y0);
-  const ax = CELL[0];
-  const ay = CELL[1];
-  if (ax === bx && ay === by) return true;
-  if (hexDistance(ax, ay, bx, by) > steps) return false;
-  const top = map.surfaceRows ?? 0;
-  const half = SENSE_STEPS + 1;
-  const stamp = ++reachCall;
-  reachStamp[half * REACH_SPAN + half] = stamp;
-  reachQueue[0] = ax;
-  reachQueue[1] = ay;
-  let head = 0;
-  let tail = 2;
-  for (let depth = 0; depth < steps; depth++) {
-    const end = tail;
-    for (; head < end; head += 2) {
-      const x = reachQueue[head]!;
-      const y = reachQueue[head + 1]!;
-      for (let d = 0; d < 6; d++) {
-        const tx = stepX(x, y, d);
-        const ty = stepY(y, d);
-        const ox = tx - ax + half;
-        const oy = ty - ay + half;
-        if (ox < 0 || oy < 0 || ox >= REACH_SPAN || oy >= REACH_SPAN) continue;
-        const k = oy * REACH_SPAN + ox;
-        if (reachStamp[k] === stamp) continue;
-        reachStamp[k] = stamp;
-        if (rockAt(map, tx, ty) !== OPEN || ty < top) continue;
-        if (tx === bx && ty === by) return true;
-        reachQueue[tail++] = tx;
-        reachQueue[tail++] = ty;
-      }
-    }
-  }
-  return false;
-}
-
-/** Whether cell (x, y)'s neighbour the way `d` is open (walkable). */
-function openAt(map: WorldMap, x: number, y: number, d: number): boolean {
-  return walkable(map, stepX(x, y, ((d % 6) + 6) % 6), stepY(y, ((d % 6) + 6) % 6));
-}
-
-/**
- * Which way to dig on from tunnel cell (x, y) toward heading `aim`: of the two ways either side of
- * it, the far one with probability ∝ how near the heading is to it (`u` uniform in 0..1), so over
- * many cells the tunnel runs at the heading itself, not along one of the six ways. If that cell can't
- * be dug, the other; failing both, the diggable way nearest the heading; −1 if none. A cell filled
- * back less than BACKFILL.hold seconds before `now` is never dug (see refilled).
- */
-export function chooseDig(
-  map: WorldMap,
-  x: number,
-  y: number,
-  aim: number,
-  u: number,
-  now = Infinity,
-  hold: number = BACKFILL.hold,
-): number {
-  const a = (((aim / (Math.PI / 3)) % 6) + 6) % 6;
-  const lo = Math.floor(a) % 6;
-  const hi = (lo + 1) % 6;
-  const first = u < a - Math.floor(a) ? hi : lo;
-  let dug = -1;
-  let off = Infinity;
-  for (const d of [first, first === lo ? hi : lo, 0, 1, 2, 3, 4, 5]) {
-    const tx = stepX(x, y, d);
-    const ty = stepY(y, d);
-    if (rockAt(map, tx, ty) !== SOIL || !diggable(map, tx, ty, d) || refilled(map, tx, ty, now, hold)) continue;
-    if (d === hi || d === lo) return d;
-    const o = Math.abs(angleDiff(DIR_ANGLE[d], aim));
-    if (o < off) {
-      off = o;
-      dug = d;
-    }
-  }
-  return dug;
-}
-
-/**
- * Whether cell (x, y) is in a tunnel: one cell wide wherever it is, so no two of its neighbours next to
- * each other are both open (three open cells round a corner are a chamber's, the hex grid's 2×2).
- * Junctions and crossings of tunnels count; a chamber's edge doesn't.
- */
-export function narrow(map: WorldMap, x: number, y: number): boolean {
-  let prev = openAt(map, x, y, 5);
-  for (let d = 0; d < 6; d++) {
-    const o = openAt(map, x, y, d);
-    if (o && prev) return false;
-    prev = o;
-  }
-  return true;
-}
-
-/** A cell of a dug tunnel: narrow, with soil on at least one side. (A gap between rocks on the open surface isn't one.) */
-export function tunnel(map: WorldMap, x: number, y: number): boolean {
-  if (!map.hasSoil || !narrow(map, x, y)) return false;
-  for (let d = 0; d < 6; d++) if (rockAt(map, stepX(x, y, d), stepY(y, d)) === SOIL) return true;
-  return false;
-}
-
-/**
- * The way (0–5) a step from world (x, y) to (px, py) crossed into the next cell: toward the solid it
- * ran into. Not into a neighbour (no crossing): the way nearest the step's own direction.
- */
-export function crossedDir(map: WorldMap, x: number, y: number, px: number, py: number): number {
-  cellOf(x, y);
-  const cx = CELL[0];
-  const cy = CELL[1];
-  cellOf(px, py);
-  const tx = CELL[0];
-  const ty = CELL[1];
-  for (let d = 0; d < 6; d++) if (stepX(cx, cy, d) === tx && stepY(cy, d) === ty) return d;
-  void map;
-  return dirOf(Math.atan2(py - y, px - x));
-}
-
-/**
- * The wall-follower's next way from cell (x, y), facing `dir`, keeping the wall on `side` (+1 right,
- * −1 left): the first open one going round from the hand side (60°) through straight on to the
- * other side, then the sharp turn hand-ward (120°), back last. It turns hand-ward only round a wall that is there (a solid cell on
- * the hand side): in open ground, turning hand-ward every cell would circle three cells for ever.
- */
-export function handOnWall(map: WorldMap, x: number, y: number, dir: number, side: number): number {
-  const lost = openAt(map, x, y, dir + side) && openAt(map, x, y, dir + 2 * side);
-  // The sharp 120° turn hand-ward comes last but for going back: it always leads into a cell touching
-  // the one it came from, so taking it first spins round three open cells that meet at a corner (the
-  // stall scan of MR 9 found carriers doing that for over a minute). One-cell tunnels never need it.
-  const order = lost ? [0, -side, -2 * side, side, 2 * side, 3] : [side, 0, -side, -2 * side, 2 * side, 3];
-  for (const turn of order) {
-    const d = (((dir + turn) % 6) + 6) % 6;
-    if (openAt(map, x, y, d)) return d;
-  }
-  return dir;
-}
-
-/**
- * How much more room dug soil takes loose than in place (its swell): sand 10–15 %, loam 20–30 %, clay
- * 30–40 % in earthwork references; the sim's soil is unspecified, so 20 %.
- */
-export const SWELL = 1.2;
-
-/**
- * The outer radius (world units) of the mound of `pellets` dug cells heaped round a nest of radius
- * `nestR`: excavated soil goes up and out and is dumped round the entrance (Tschinkel 2015), so the
- * mound holds every pellet, loosened by SWELL. Its area is pellets × SWELL × a hex cell's area (√3/2).
- */
-export function moundRadius(pellets: number, nestR: number): number {
-  return Math.sqrt(nestR * nestR + (Math.max(0, pellets) * SWELL * R) / Math.PI);
-}
-
-/** The side view: about how high (rows) the spoil disc stands as it spreads: a steep cone halved the food brought home, six rows cost a third. */
-const MOUND_HEIGHT = 3;
-/** The side view: the farthest (columns) a pellet is carried from the hole; past it the disc grows higher, not wider. */
-const MOUND_REACH = 90;
-/**
- * One world's plane (U3c, #carryOut): the reach of the disc spoil is spread over once `heaped` pellets are out: grown so
- * its area tracks the soil brought out at MOUND_HEIGHT levels deep (Tschinkel 2015), at most MOUND_REACH. A pellet goes
- * 2 + reach × √u out.
- */
-export function planeMoundReach(heaped: number): number {
-  return Math.min(MOUND_REACH, 3 + Math.sqrt((heaped * R) / (Math.PI * MOUND_HEIGHT)));
-}
-/** The midden lies this many columns from the hole, toward the nearest other colony (see #middenSide): just past the mound's largest reach. */
-export const MIDDEN_AT = MOUND_REACH + MIDDEN_PAST;
-/**
- * One world's plane (U3c): a corpse is put on the midden no nearer home than this by the undertaker's own vector, and off
- * the mound: a ring at the edge of the cleared ground (the owner's stopgap, 2026-11-09, until corpse scent lets undertakers
- * find one pile).
- */
-export const MIDDEN_MIN = 8;
-/**
- * One world's plane: a mound cell is a flank to spread from where a cell beside it, farther from the hole, is this many
- * levels lower: at the angle of repose, as the side view's "the next column out a row lower". (heapPlane's slide keeps
- * neighbours within a level, so a flank two levels steep forms only where pellets were taken.)
- */
-const PLANE_STEEP = 1;
-/** The side view: seconds a carrier walks a pellet out before it drops it wherever it is (heaped on top of its column, clear of the crater). */
-const SPOIL_GIVE_UP = 15;
-/** The side view: an explorer on the ground beside a steep flank of the mound picks a pellet off it to spread, with this chance a cell. */
-const LOOSE_SPREAD_PICK = 0.01;
-/**
- * The side view: an explorer on the ground beside the mound takes a pellet of it down to backfill, with this chance a cell.
- * Most such trips find nowhere to fill and carry the pellet back out: 92–97 % at 600 s and 99 % over an hour on the app's
- * map (PRD §41; the review of MR 15 saw 60–90 %), since nothing dug in the last BACKFILL.young is filled and the shaft and chamber smell busy. Kept as
- * the owner asked for it (spoil taken down to backfill); see bead ja-lft.
- */
-const LOOSE_FILL_PICK = 0.005;
-/** The side view: how much farther out (columns, on average) a loose pellet is spread. */
-const LOOSE_SPREAD = 12;
-/** The side view: how near its entrance (world units) an ant counts as at it, to drop a pellet. */
-const ENTRANCE_R = 1.5;
-/** The side view: how near its entrance an ant on the ground line may dig (and how much ground round the hole stays unfilled). */
-const ENTRANCE_ZONE = 4;
-
-/** A lone ant's chance to dig at a tunnel's end; each nestmate within two cells adds 1 / DIG_CROWD. */
-const DIG_ALONE = 0.1;
-const DIG_CROWD = 6;
-
-/** The chance an ant at tunnel cell (x, y) digs on, from the nestmates within two cells of it (itself not counted). */
-export function digChance(friends: CellCounts, x: number, y: number): number {
-  let n = -1;
-  const o = discOffsets(2)[y & 1] as Int16Array;
-  for (let k = 0; k < o.length; k += 2) n += friends.get(x + o[k], y + o[k + 1]);
-  return Math.min(1, DIG_ALONE + Math.max(0, n) / DIG_CROWD);
-}
-
-/** At a dead end, the chance an ant digs 60° to a side instead of on along the tunnel's run: how often tunnels fork. */
-const FORK = 0.15;
-/** Seconds an ant takes to dig one cell of soil open, at least (up to twice this, at random). */
-export const DIG_TIME = 1;
-export const NO_FACE = 0;
-export const DIG_FACE = 1;
-/** Soil touched at a slant: slide along it, a hand on the wall. */
-export const GLANCE = 2;
-/** A flat wall (a chamber's, or a tunnel's side) met head-on: where a new tunnel may start, now and then (START). */
-export const START_FACE = 4;
-/** The chance an explorer meeting a flat wall head-on starts a tunnel into it. */
-const START = 0.05;
-/** The chance, per cell of chamber wall an explorer walks along, that it starts a tunnel into the wall there. */
-const START_HUG = 0.1;
-/** Seconds an explorer keeps a hand on a chamber's wall after touching soil. */
-const HUG_TIME = 8;
-
-/**
- * What a step from world (x, y) to (px, py) heading `h` does at soil: NO_FACE (it doesn't cross into
- * soil), DIG_FACE (it meets a tunnel's end head-on, or the cell it is walking to (aimX, aimY): dig it),
- * START_FACE (it meets a flat wall head-on: a tunnel may start here), or GLANCE (it touches the soil
- * at a slant: slide along it). Head-on is crossing the edge the heading points at: every heading is
- * within 30° of one of the six. Only a tunnel's end is dug (see tunnelEnd): that is what makes
- * tunnels rather than caverns. Soil put back less than BACKFILL.hold seconds before `now` is only
- * ever glanced off (see refilled).
- */
-export function soilFace(
-  map: WorldMap,
-  x: number,
-  y: number,
-  px: number,
-  py: number,
-  h: number,
-  aimX = NO_CELL,
-  aimY = 0,
-  now = Infinity,
-  hold: number = BACKFILL.hold,
-): number {
-  cellOf(px, py);
-  const tx = CELL[0];
-  const ty = CELL[1];
-  if (rockAt(map, tx, ty) !== SOIL) return NO_FACE;
-  if (refilled(map, tx, ty, now, hold)) return GLANCE;
-  cellOf(x, y);
-  const cx = CELL[0];
-  const cy = CELL[1];
-  let d = -1;
-  for (let k = 0; k < 6; k++) if (stepX(cx, cy, k) === tx && stepY(cy, k) === ty) d = k;
-  if (d < 0) return NO_FACE;
-  const headOn = dirOf(h) === d;
-  const aimed = aimX === tx && aimY === ty;
-  if ((headOn || aimed) && diggable(map, tx, ty, d)) return DIG_FACE;
-  if (aimed && startable(map, tx, ty, d)) return DIG_FACE;
-  if (headOn && startable(map, tx, ty, d)) return START_FACE;
-  return GLANCE;
-}
-
-/**
- * Whether cell (x, y) was filled back with soil less than BACKFILL.hold seconds before `now` (the
- * default, Infinity: long after any fill). Such soil is left alone: a pellet put back is not dug out
- * again for a good while. Without this, 38–46 % of all digs re-dug filled cells (MR 12's review). Soil put back under
- * a chamber cell (builtFloor) is left for good.
- */
-export function refilled(map: WorldMap, x: number, y: number, now: number, hold: number): boolean {
-  return now - map.filledAt.get(x, y) < hold || builtFloor(map, x, y);
-}
-
-/** Whether any neighbour of cell (x, y) was filled back less than BACKFILL.hold seconds before `now` (a branch being filled from its tip; floor built back for good doesn't count). */
-export function besideRefill(map: WorldMap, x: number, y: number, now: number, hold: number): boolean {
-  for (let d = 0; d < 6; d++) if (now - map.filledAt.get(stepX(x, y, d), stepY(y, d)) < hold) return true;
-  return false;
-}
-
-/**
- * The side view: whether cell (x, y) is ground a chamber's floor stands on: directly under a chamber cell, or beside
- * one on that chamber's floor row (a tunnel dug down, or out at floor level, from a chamber). Open, it takes floor
- * from the chamber; filled back, it gives it back (see Colony #backfill: it may be filled however lately it was dug).
- */
-export function floorGround(map: WorldMap, x: number, y: number): boolean {
-  const ch = map.chambers;
-  if (!ch) return false;
-  if (ch.at(stepX(x, y, 4), stepY(y, 4)) >= 0 || ch.at(stepX(x, y, 5), stepY(y, 5)) >= 0) return true;
-  for (const d of [0, 3]) {
-    const id = ch.at(stepX(x, y, d), stepY(y, d));
-    if (id >= 0 && ch.list[id]!.floorRow === y) return true;
-  }
-  return false;
-}
-
-/**
- * Whether soil cell (x, y) was put back (filled, and not dug since) right under a chamber cell: floor the colony built
- * back, which stays for good. Held only for BACKFILL.hold like any fill, floor fills were dug out again at 2–7× the rate
- * of other fills once the hold ran out (35–49 % against 5–17 % over 1,200 s, with #14's guards merged into the nest:
- * PRD §31), and the floor went with them. (Not a cell beside a chamber on its floor row: that is where it widens.)
- */
-export function builtFloor(map: WorldMap, x: number, y: number): boolean {
-  const ch = map.chambers;
-  if (!ch || map.filledAt.get(x, y) === -Infinity) return false;
-  return ch.at(stepX(x, y, 4), stepY(y, 4)) >= 0 || ch.at(stepX(x, y, 5), stepY(y, 5)) >= 0;
-}
-
-/** Whether soil cell (x, y), entered going `d`, may be dug: a tunnel's end, or a wall with open ground straight beyond it (breaking through). */
-export function diggable(map: WorldMap, x: number, y: number, d: number): boolean {
-  return tunnelEnd(map, x, y) || openAt(map, x, y, d);
-}
-
-/**
- * Whether a new tunnel may start into wall cell (x, y), going `d`: no open ground within two steps
- * of it except on the side it is dug from (the side its own open neighbours are on: the chamber).
- * New tunnels keep their distance from other passages, so the ground isn't combed into parallel slots.
- */
-export function startable(map: WorldMap, x: number, y: number, d: number): boolean {
-  const fx = centreX(x, y);
-  const fy = centreY(y);
-  // Which way the chamber lies: toward the face's open neighbours (or back the way it is dug from).
-  let nx = 0;
-  let ny = 0;
-  for (let k = 0; k < 6; k++)
-    if (openAt(map, x, y, k)) {
-      nx += Math.cos(DIR_ANGLE[k]);
-      ny += Math.sin(DIR_ANGLE[k]);
-    }
-  if (Math.hypot(nx, ny) < 1e-6) {
-    nx = -Math.cos(DIR_ANGLE[d]);
-    ny = -Math.sin(DIR_ANGLE[d]);
-  }
-  const len = Math.hypot(nx, ny);
-  const o = discOffsets(2)[y & 1] as Int16Array;
-  for (let k = 2; k < o.length; k += 2) {
-    const ax = x + o[k];
-    const ay = y + o[k + 1];
-    if (rockAt(map, ax, ay) !== OPEN) continue;
-    if (((centreX(ax, ay) - fx) * nx + (centreY(ay) - fy) * ny) / len > 0.25) continue; // on the chamber's side
-    return false;
-  }
-  return true;
-}
-
-/**
- * Whether open cell (x, y) is a stub: a dead end whose open neighbours (one or two) lie next to each
- * other, so filling it can't cut any passage (on offset rows a one-cell stub off a straight tunnel
- * touches two cells of it). With a larger maxOpen, any cell whose open neighbours (up to maxOpen) form one
- * unbroken run: the edge of a chamber, the side of a wide tunnel. Filling such a cell never cuts a passage
- * either (in digital topology, a "simple" cell: the ground stays connected the same way).
- */
-export function stub(map: WorldMap, x: number, y: number, maxOpen = 2): boolean {
-  let open = 0;
-  let runs = 0;
-  let prev = openAt(map, x, y, 5);
-  for (let d = 0; d < 6; d++) {
-    const o = openAt(map, x, y, d);
-    if (o) open++;
-    if (o && !prev) runs++;
-    prev = o;
-  }
-  if (open === 6) runs = 1;
-  return open >= 1 && open <= maxOpen && runs === 1;
-}
-
-/**
- * Whether soil cell (x, y) is a tunnel's end: just one of its six neighbours open (`most`). The cell
- * past a tunnel's end is, and so is a fork's first cell beside it; a tunnel's side wall (two open,
- * next to each other) or a chamber's wall is not. So tunnels lengthen and branch but stay one cell
- * wide, turning at most 60° a cell.
- */
-export function tunnelEnd(map: WorldMap, x: number, y: number, most = 1): boolean {
-  let open = 0;
-  for (let d = 0; d < 6; d++) if (openAt(map, x, y, d) && ++open > most) return false;
-  return true;
-}
-
-/**
- * A follower's turn by Deneubourg's choice function (Deneubourg et al. 1990; Goss et al. 1989; docs/trails.md): left,
- * ahead or right with chances (k + C)², each sensor's scent C. Where two trails part, the stronger takes more than its
- * share of followers, which is what lets a colony settle on one of two sources (A2a) and on the richer (A2b). On one
- * trail the sides read alike and it turns either way, held on by the trail's centre. (`climb`, always to the
- * strongest, sent followers down whichever trail lay ahead of them: behaviour MR 3, PRD §45.)
- */
-export function choose(left: number, front: number, right: number, max: number, k: number, rng: () => number): number {
-  const wl = (k + left) ** 2;
-  const wf = (k + front) ** 2;
-  const wr = (k + right) ** 2;
-  const u = rng() * (wl + wf + wr);
-  return u < wl ? -max : u < wl + wf ? 0 : max;
-}
-
-/** Turn toward the strongest of three sensors, at most `max` radians. */
-export function climb(left: number, front: number, right: number, max: number): number {
-  if (front >= left && front >= right) return 0;
-  return left > right ? -max : max;
-}
-
-/** Turn toward the weakest of three alarm sensors, at most `max` radians; nothing when no sensor smells alarm. */
-export function avoid(left: number, front: number, right: number, max: number): number {
-  if (Math.max(left, front, right) < FAINT) return 0;
-  // Rock or the map's edge reads −1: never the way out of alarm (ja-dul: it read as the least, and steered ants into walls).
-  const l = left < 0 ? Infinity : left;
-  const f = front < 0 ? Infinity : front;
-  const r = right < 0 ? Infinity : right;
-  if (f <= l && f <= r) return 0;
-  return l < r ? -max : max;
-}
-
-/** Turn `h` toward `target` by at most `max` radians, the short way round. */
-export function turnToward(h: number, target: number, max: number): number {
-  const d = Math.atan2(Math.sin(target - h), Math.cos(target - h));
-  return h + Math.max(-max, Math.min(max, d));
 }
