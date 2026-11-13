@@ -49,6 +49,11 @@ export const FRUIT_GAP = 12;
  * cord (design: Heaton et al. 2010 found a cord's thickness tracks the flow it carries).
  */
 export const CORD_FLOW = 4;
+/**
+ * Digs a cord takes to cut (owner, 2026-11-12, review of #119): a cell is dug open once, so each round a cord lies in a
+ * dug cell counts as a dig against it (the ants keep working the tunnel); at this many it is cut like any hypha (design).
+ */
+export const CORD_DIGS = 3;
 /** Dead-end hypha cells that fade each round once cords are grown: unused links recycled (design: Bebber et al. 2007). */
 export const REGRESS_PER_ROUND = 1;
 /** A tip's supply is ample while the free mass would pay for this many steps of every tip; less is short. */
@@ -102,6 +107,8 @@ export class Hyphae {
   cords = new Set<number>();
   /** hypha cells faded away unused, over the game (regress) */
   fadedCells = 0;
+  /** digs taken by cords lying in dug cells (cutDug): a cord is cut at CORD_DIGS */
+  digs = new Map<number, number>();
   /** mass spent on hypha (each cell at its price) */
   spent = 0;
   /** tip extensions tried, and how many of them ran into the mycelium's own cells (assay H3) */
@@ -276,16 +283,26 @@ export class Hyphae {
   }
 
   /**
-   * Cut every hypha cell that was soil and the ants have dug open since (`ground` says what is dug now), except a cord,
-   * which spans the dug cell (ja-2bw.8). Returns the cells lost.
+   * Cut every hypha cell that was soil and the ants have dug open since (`ground` says what is dug now). A cord spans the
+   * dug cell and takes a dig a round there, and is cut at its CORD_DIGS-th (ja-2bw.8; owner, review of #119). Returns the cells lost.
    */
   cutDug(ground: Ground): number {
     let lost = 0;
     for (const k of [...this.soil]) {
-      if (!this.soil.has(k) || this.cords.has(k)) continue;
+      if (!this.soil.has(k)) continue;
       const [x, y] = keyCell(k);
-      if (ground.kind(x, y) === "open") lost += this.cut(k);
+      if (ground.kind(x, y) !== "open") continue;
+      if (this.cords.has(k)) {
+        const dug = (this.digs.get(k) ?? 0) + 1;
+        if (dug < CORD_DIGS) {
+          this.digs.set(k, dug);
+          continue;
+        }
+      }
+      this.digs.delete(k);
+      lost += this.cut(k);
     }
+    for (const k of this.digs.keys()) if (!this.parent.has(k)) this.digs.delete(k);
     return lost;
   }
 
@@ -346,6 +363,7 @@ export class Hyphae {
       fruits: [...this.fruits],
       cords: [...this.cords],
       fadedCells: this.fadedCells,
+      digs: [...this.digs],
       spent: this.spent,
       steps: this.steps,
       selfHits: this.selfHits,
@@ -363,6 +381,7 @@ export class Hyphae {
     h.fruits = [...r.fruits];
     h.cords = new Set(r.cords);
     h.fadedCells = r.fadedCells ?? 0;
+    h.digs = new Map(r.digs ?? []);
     h.spent = r.spent;
     h.steps = r.steps;
     h.selfHits = r.selfHits;
@@ -380,6 +399,7 @@ export interface HyphaeSave {
   fruits: number[];
   cords: number[];
   fadedCells: number;
+  digs?: [number, number][];
   spent: number;
   steps: number;
   selfHits: number;

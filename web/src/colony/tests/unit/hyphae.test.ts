@@ -6,6 +6,7 @@ import {
   cellKey,
   growthUnit,
   AMPLE_STEPS,
+  CORD_DIGS,
   CORD_FLOW,
   REGRESS_PER_ROUND,
   HGU,
@@ -427,7 +428,7 @@ test("a cell feeding CORD_FLOW tips or more thickens into a cord; one feeding fe
   assert.ok(5 >= CORD_FLOW, "the trunk feeds enough tips");
 });
 
-test("a dig through a cord doesn't cut it; through a thin hypha it does", () => {
+test("a cord takes CORD_DIGS digs to cut (a dig a round it lies in a dug cell); a thin hypha one", () => {
   const h = fan();
   h.thicken();
   for (const k of h.parent.keys()) h.soil.add(k);
@@ -435,9 +436,15 @@ test("a dig through a cord doesn't cut it; through a thin hypha it does", () => 
   const thin = cellKey(h.tips[1]!.x, h.tips[1]!.y);
   const dug = new Set([trunk, thin]);
   const g: Ground = { topsoil: false, kind: (x, y) => (dug.has(cellKey(x, y)) ? "open" : "soil") };
-  const lost = h.cutDug(g);
-  assert.ok(h.has(3, 20), "the cord was cut");
-  assert.equal(lost, 1, "only the thin hypha's tip cell");
+  assert.equal(h.cutDug(g), 1, "the thin hypha's tip cell, at the first dig");
+  for (let d = 2; d < CORD_DIGS; d++) {
+    h.cutDug(g);
+    assert.ok(h.has(3, 20), `the cord was cut at dig ${d}`);
+  }
+  assert.ok(h.has(3, 20), "a cord was cut before CORD_DIGS");
+  assert.ok(h.cutDug(g) > 1, "the cord's cut takes what grew from it");
+  assert.ok(!h.has(3, 20), "the cord survived its CORD_DIGS-th dig");
+  assert.equal(h.digs.size, 0);
 });
 
 test("dead ends nothing uses fade, a cell a round, freeing their mass; roots, cords, fusions and a spot's hypha stay", () => {
