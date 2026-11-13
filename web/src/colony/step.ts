@@ -1,5 +1,7 @@
 // The per-ant step record (docs/refactor.md S3.4): tick's stages (perceive, stance, decide, steer, move and dig, arrive) pass what one
-// computed for the ant to the next through it. One record per tick, reused for every ant: each field is written before it is read (initialised only so V8 keeps the numbers unboxed: review of #147).
+// computed for the ant to the next through it. One record per tick, reused for every ant: each stage reads what an earlier stage wrote for this ant (a per-ant field is
+// written before it is read: tick's stages were checked with every per-ant field poisoned between ants, ja-fnd.4.4.8), or
+// what tick set for the whole tick or layer (no stage writes those: ui/tests/stageWrites.test.ts). Each field is written before it is read (initialised only so V8 keeps the numbers unboxed: review of #147).
 
 import type { ColonyParams } from "./params.ts";
 import type { Item, Responses } from "./responses.ts";
