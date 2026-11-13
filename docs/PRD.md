@@ -4957,6 +4957,27 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
   Nine of ten faster; the median improves (311 → 261 s). **The worst seed is seed 11 both ways, and 20 s worse with hyphae** (451 → 471 s, +4.4 %), so "the worst seed no worse" fails here, as "no seed over 10 %" fails on seed 3 above. **Owner (2026-11-13): ship, and record the two narrow misses**; `ja-2bw.6` (tuning) carries them.
 
+### 63.8 Into the hole on every seed; Jev branches once it senses a tip's run (ja-2bw.17, ja-2bw.18, 2026-11-13)
+
+**Into the hole (`ja-2bw.17`).** After §63.7, 19 of 20 seeds (one world, *unite*, the page's answers) had a hypha cross down the hole at 8–32 s. On seed 9 the rim tip re-aimed at the hole had a cell of its own patch straight ahead, *unite* answered `fuse`, and it ended on its first step; the other two tips grew away, and nothing crossed in 180 s. That tip now walks along its aim to the patch's last cell before it sets out. Seed 9 crosses at 16 s; the other 19 seeds are unchanged to the second.
+
+**Branching (`ja-2bw.18`).** On the page tips never branched: no shipped growth answer under any aim said `branch`, because nothing in the situation made one step a better time to branch than another. The owner chose to let Jev see it (2026-11-13). The situation gains `run`: short, or long once the tip has grown `BRANCH_RUN` (7) cells since it set out or last branched (the growth unit, docs/hyphal-growth.md §2): **48 situations**, `GROWTH_BRAIN_VERSION` 2; the local rule's preset (`localGrowthChoice`) branches at a long run.
+- First ask ($0.0018): still no `branch` anywhere; where the run changed an answer, Jev read a long run as time to end the tip (`fruit` under unite and spread; `rest` or `turn` under peace).
+- **Owner: reword and re-ask.** The legend now says a mycelium spreads by branching (tips that never branch stay a few threads), `branch` is "the only way the mycelium gains tips, and what a real hypha does after a long run", and `fruit` ends a tip for good. Second ask ($0.0019): `branch` in 15 of 48 situations under *unite* and 1 under *peace*, all at a long run, and 19 under *spread* (18 at a long run, 1 at a short) (which mostly turns or rests, as before); *unite* now fruits in 2 situations, not 15.
+- **Cost.** The two asks spent **$0.0037**. A new aim costs one request of 48 situations, about 14–15k input tokens: **≈ $0.0006 measured** (three aims $0.0018–0.0019 a time; `--dry` estimates 21k tokens, $0.0009), was ≈ $0.0003 at 24; cached games spend nothing.
+
+**Measured** (`progression.mjs --map one --evolve`, seeds 1–10, 600 s, on `main` at `80771a9` and on this branch):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 357 | 363 | 289 | 173 | 228 | never | 277 | never | 240 | 216 |
+| a quarter, `main`'s hyphae (s) | 353 | 287 | 290 | 162 | 209 | 493 | 358 | 405 | 253 | 217 |
+| a quarter, hyphae that branch (s) | 333 | 299 | 287 | 161 | 220 | 493 | 393 | 373 | 253 | 217 |
+
+- Branching is near neutral against `main`'s hyphae: faster on seeds 1 and 8 (by 20 and 32 s), slower on seeds 2, 5 and 7 (+4 %, +5 %, +10 %), the rest within 3 s; median 289 → 293 s.
+- **`main` had already drifted.** Against no hyphae on the same `main`, its own hyphae are 29 % slower on seed 7 (277 → 358 s): P1 fails there before this change (§63.7 measured 397 vs 389 on its branch, before `main`'s merges of the day). Filed as `ja-2bw.19`. The worst seed improves with hyphae (two "never" become 493 and 373 s).
+- **Owner (2026-11-13): ship, record, and file the drift.**
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.

@@ -256,7 +256,7 @@ const fungusLane: Has<LaneSpec<FungalSituation, string, ReadonlySet<string>, Fun
   asks: (s, menu) => worthAsking(askedLevers(menu, s.task === "queen")),
 };
 
-export const SAMPLE_GROWTH: GrowthSituation = { ahead: "soil", exposed: "wall", supply: "ample" };
+export const SAMPLE_GROWTH: GrowthSituation = { ahead: "soil", exposed: "wall", supply: "ample", run: "short" };
 
 // The growth lane (ja-2bw.5): asked under the fungus's aim, the same words as the fungus lane. Its `local` is the rule as a function of the
 // situation alone (what a live check compares Jev with); a tip in the game plays the fuller rule while a situation has no answer.
