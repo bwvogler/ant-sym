@@ -9,6 +9,8 @@ import {
   STANCE_SCHEMA,
   type Mode,
   type Situation,
+  type SpeciesSituation,
+  modeSchema,
   type Stance,
   type StanceSituation,
 } from "./vocab.ts";
@@ -142,8 +144,8 @@ export function situationKey(s: Situation): string {
 }
 
 /** What a situation looks like in the request: the same fields, as Jev reads them. */
-export function situationState(s: Situation): Situation {
-  return SITUATION_SCHEMA.state(s);
+export function situationState(s: Situation, words?: LaneWords<Mode>): Situation {
+  return modeSchema(words).state(s as SpeciesSituation);
 }
 
 export function modeQuestion(id: string, criteria: LaneWords<Mode>["criteria"] = MODE_CRITERIA): JevRequest["questions"] {
@@ -165,7 +167,7 @@ export function packModeRequest(
   const ants: Record<string, Situation> = {};
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
-    ants[it.id] = situationState(it.situation);
+    ants[it.id] = situationState(it.situation, words);
     Object.assign(questions, modeQuestion(it.id, words.criteria));
   }
   return { state: { legend: words.legend, doctrine, ants }, questions };

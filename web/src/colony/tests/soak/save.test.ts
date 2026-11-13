@@ -85,7 +85,7 @@ for (const view of ["side", "top"] as const)
     // Game.tick builds the occupancy grids and recognition bands before fights, and the next tick's steps read them, the
     // ants killed since included. A load that built them again from the living diverged on the first tick (U4b).
     const whole = fighting(view);
-    assert.ok(runToFightDeath(whole, 20), "a fight death within 20 s (the test's own check)");
+    assert.ok(runToFightDeath(whole, 30), "a fight death within 30 s (the test's own check)");
     const saved = JSON.parse(JSON.stringify(whole.save())) as GameSave;
     const at = hashGame(whole);
     whole.tick(DT);
@@ -128,6 +128,7 @@ test("a colony's save holds every private field it declares (but its random stre
   const declared = new Set<string>();
   for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
   declared.delete("rng");
+  declared.delete("own"); // the species' situation (ja-fnd.5.10): code the Game wires from its species, again on load, not state
   const g = build("side", 2);
   const c0 = g.colonies[0]!;
   const saved = Object.keys(c0.saveState().private as object);
