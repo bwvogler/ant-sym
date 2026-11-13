@@ -20,7 +20,7 @@ import {
   walkable,
 } from "./grid.ts";
 import { CELL, DIR_ANGLE, centreX, centreY, dirOf, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
-import { NEED_FETCH, THETA_OLD } from "./hunger.ts";
+import { ADULT_BEG_BELOW, NEED_FETCH, THETA_OLD } from "./hunger.ts";
 import {
   BROOD_PULL,
   CHAMBER_DEPTH,
@@ -95,7 +95,28 @@ export function toFood(col: Colony, cx: number, cy: number, dir: number): number
  * answer a fainter need, NEED_FETCH). There it takes food on to where it is wanted (port), and eats if it is hungry.
  */
 export function fetches(col: Colony, i: number): boolean {
+  // With restFetch (ja-4rfr), its own hunger too: a worker hungry enough to beg goes for food. Without it, the old felt
+  // their nestmates' hunger just under THETA_OLD while starving themselves, and climbed out to forage, and died.
+  if (col.params.restFetch > 0 && col.energy[i] < ADULT_BEG_BELOW) return true;
   return col.need[i] >= (col.band(i) === 2 ? THETA_OLD : NEED_FETCH);
+}
+
+/**
+ * Whether ant i, in "return" with empty jaws underground and hungry enough to fetch, may take food on from a store it is
+ * by, as an explorer does (restFetch, ja-4rfr: the old foragers retire inside in "return", and they were the ones who
+ * felt it).
+ */
+export function restFetches(col: Colony, i: number, mode: number, cx: number, cy: number): boolean {
+  return (
+    col.params.restFetch > 0 &&
+    mode === RETURN && // its one caller (port) asks only for ants not exploring: this keeps it to returners
+    col.queen !== null &&
+    !col.carrying[i] &&
+    !col.pellet[i] &&
+    !col.broodHeld[i] &&
+    !isSky(col.map, cx, cy) &&
+    fetches(col, i)
+  );
 }
 
 /** The way from cell (cx, cy), underground away from its own nest (in at another's hole), up toward the ground: onto it if it can, else the open neighbour highest up; −1 if none is higher. */

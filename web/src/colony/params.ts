@@ -160,6 +160,20 @@ export interface ColonyParams {
    * reaching its belief with no hole there; 0 = nothing recorded, main bit for bit. Once a trip. Steering only.
    */
   routeMemory: number;
+  /**
+   * ja-uvhw: 1 = a sensor reads scent (food, home and alarm trails, and the nest in sight) only where its tip can be reached
+   * through open ground within SENSE_STEPS (inReach), as food itself is (ja-juiu); out of reach (another tunnel, behind a
+   * wall), it reads none. 0 = scent is read at the tip whatever lies between (main before ja-uvhw; kept for ablation).
+   */
+  scentReach: number;
+  /**
+   * ja-4rfr: 1 = hunger gets an ant to the stores. Its own hunger (below ADULT_BEG_BELOW) counts as well as what it feels
+   * from others; in a chamber, hungry, it steers by the stores' marks its sensors reach, and stays in; hunger ends a tired
+   * ant's rest; and an ant in "return" by a store takes food on from it (port), as an explorer does. 0 = only explorers
+   * fetch, by felt need, and only in tunnels (main before ja-4rfr): the old sat in the royal chamber, or climbed out,
+   * while the colony starved beside a full store.
+   */
+  restFetch: number;
   /** One world's plane, with routeMemory: cells walked between two stored places. */
   routeStep: number;
   /** One world's plane, with routeMemory: a stored place this close counts as recognised (0: only the next place in order, within LOOP_AT). */
@@ -288,6 +302,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   siteGive: 0,
   foodPlume: 0,
   routeMemory: 0,
+  scentReach: 1,
+  restFetch: 1,
   routeStep: 8,
   routeSee: 5,
   routeMax: 64,
