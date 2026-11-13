@@ -4678,6 +4678,24 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 
 **Still open.** Full texts of Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984 and the published Buehlmann et al. 2014 (paywalled); the heat model's numbers for *C. fortis*; every number in the note not marked as read in full text.
 
+### 60.1 The assays, before the species (ja-rf5.2, 2026-11-13)
+
+**Decided (owner, 2026-11-13):** land the assays with the targets the papers read in full support, and mark the rest unverified, rather than wait for the paywalled texts (`ja-rf5.1`).
+
+Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d4 --one`), on one world's default plane with its own food, a player colony of 60 alone, 120 s. No behaviour change: today they measure the generic ant, the baseline. The species comes in as `game.species` through an override once it exists (`ja-rf5.3`). Target (c) of [desert-ant.md](desert-ant.md#the-mechanic), a forager whose vector fails finds home by search loops, is S1 (`search1`, §56).
+
+| Assay | Target | Source | Generic ant, seeds 1–10 (median, range) | Seeds 11–20 |
+|---|---|---|---|---|
+| D1 no trail | no cell of the plane at a faint food or home trail | Razin et al. 2013 (full text); Wolf & Wehner 2000 (**unverified**) | food trail on 2,036 cells (1,012–2,664), home on 7,530 (3,967–10,193); pass 0/10 | 2,088 and 6,137; 0/10 |
+| D2 invitation | departures in the 10 s after a return with food ≥ 7× those in the 10 s before | Razin et al. 2013 (full text: sevenfold in the next minute, *C. niger*, nests of 4–8); the window is shorter because the game's returns come every second or so (**provisional**) | ratio 0.97 (0.88–1.05); pass 0/10 | 0.95 (0.84–1.17); 0/10 |
+| D3 first find (the plume's baseline) | none yet: with the plume (`ja-rf5.4`) the first find comes sooner | Buehlmann et al. 2014 (a draft only: **unverified**) | first find at 8.5 s (6.4–19.8) | 9.1 s (6.0–13.0) |
+| D4 trips (the heat budget's baseline) | none yet: trips inside a heat budget once heat exists (`ja-rf5.5`) | Wehner, Marsh & Wehner 1992 (abstract); Schmid-Hempel & Schmid-Hempel 1984 (summary): **unverified** | 62 trips completed, 37.5 still out at the end, none died out; over completed and open: median 34.1 s, 90th percentile 82.0 s, longest 116 s (completed only: median 35.5 s) | 62, 39, 0; 33.9, 90.8, 117 (33.0) |
+
+- **D2's first form failed for a reason worth keeping.** Departures in the minute after a return against the rest of the time read 0.5, because the colony pours out at the start before anyone has come back; counted from the end of the first minute, every second lay within a minute of some return, so there was nothing to compare against. Hence the event-triggered form: after against before, summed over returns, about 1 when returns invite nobody. The generic ant's activation (a leaky count of returns, [activation.md](activation.md)) is gradual, so it reads about 1, as expected.
+- **Review of #134:** D2 first counted a returner's own trip back out as one it invited (568 of 8,476 departures over seeds 1–10; the ratio read 1.09), and D4 dropped trips still out at the end (383 against 803 completed) and any that ended in death. Both fixed; the rows above are re-measured.
+- **D1 and D2 run as `todo`** in `tests/slow/assays.test.ts`, naming `ja-rf5.3` and `ja-rf5.6`. D3 and D4 have no pass mark until the plume and heat exist.
+- **Cost:** none (offline; no lane changed).
+
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:

@@ -7,6 +7,12 @@ import { defineSchema, type Schema } from "./schema.ts";
 export const MODES = ["explore", "follow", "return", "fight"] as const;
 export type Mode = (typeof MODES)[number];
 
+/** A mode's index in MODES (the per-ant `mode` array holds these). */
+export const EXPLORE = 0;
+export const FOLLOW = 1;
+export const RETURN = 2;
+export const FIGHT = 3;
+
 export const STANCES = ["forage", "defend", "raid"] as const;
 export type Stance = (typeof STANCES)[number];
 
@@ -132,3 +138,7 @@ export type StancePolicy = (s: StanceSituation) => Stance;
 
 /** How far an odour may sit from an ant's own before it is a stranger. Tied to MAX_MASK, FUNGAL and BINS (above); colonies built alone use it too. */
 export const TOLERANCE = 0.35;
+
+/** One world's layers (docs/one-world.md §2): the plane, the surface, is layer 0; the curtain, underground, layer 1 (a colony's home there). */
+export const PLANE = 0;
+export const CURTAIN = 1;

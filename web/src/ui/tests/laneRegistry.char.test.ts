@@ -272,6 +272,7 @@ test("the client's state carries these fields, in this order (the page shows and
     "misses",
     "cached",
     "stancesCached",
+    "stanceLane", // whether there is a stance lane at all (ja-fnd.5.12)
     "doctrineCached",
     "fungusAsked",
     "fungusCached",
