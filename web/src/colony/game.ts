@@ -265,9 +265,6 @@ export const MET = 0.01;
 /** The fungus's landing (Game.land): this far past the hole (cells, along the ground), spores over this radius. */
 export const LANDING = { offset: 3, radius: 2, spores: 3 };
 
-/** One world (ja-2bw.14): a plane hypha within this many cells of a hole, or inside its disc if wider, is at its mouth, and crosses down it (design). */
-export const HOLE_MOUTH = 2;
-
 /** The app's old spore brush, per paint event (removed, ja-260): radius in cells, spores laid per cell, load dosed into each ant under it. Scripts replay it. */
 export const BRUSH = { radius: 3, spores: 2, dose: 0.15 } as const;
 
@@ -1125,9 +1122,9 @@ export class Game {
       const down = (c.layers[CURTAIN] as Layer | undefined)?.nest.entrance;
       if (!plane || !down) continue;
       cellOf(plane.nest.x, plane.nest.y);
-      // The hole's mouth: its disc (the colony's ground round the hole on the plane, at least HOLE_MOUTH cells), where the
-      // ground runs down into the shaft. A tip set off toward the hole passes within a cell or two of it, not through it.
-      if (hexDistance(x, y, CELL[0], CELL[1]) <= Math.max(HOLE_MOUTH, Math.round(plane.nest.r))) return { x: down.x, y: down.y };
+      // The hole's mouth: its disc (the colony's ground round the hole on the plane), where the ground runs down into the
+      // shaft. A tip set off toward the hole passes within a cell or two of it, not through it.
+      if (hexDistance(x, y, CELL[0], CELL[1]) <= Math.round(plane.nest.r)) return { x: down.x, y: down.y };
     }
     return null;
   }

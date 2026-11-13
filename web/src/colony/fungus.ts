@@ -1,7 +1,7 @@
 import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
-import type { Colony, Layer } from "./colony.ts";
+import { CURTAIN, type Colony, type Layer } from "./colony.ts";
 import {
   DEFAULT_RULE,
   HIGH_LOAD,
@@ -1105,14 +1105,14 @@ export class Fungus {
         if (lost > 0) e.lose(lost * HYPHA_MASS);
       }
     // A plane tip that has come to a hole crosses down it (one world, ja-2bw.14): it leaves the plane, and the hyphae root
-    // on the shaft's walls in the curtain (once: a second tip adds nothing).
+    // on the shaft's walls in the curtain (a wall cell whose tip is gone takes a fresh one, ja-2bw.16).
     if (stepped && this.crossAt && this.#hyphae[0] && this.#layers.length > 1) {
       const plane = this.#hyphae[0];
       for (const t of plane.tips.slice()) {
-        const e = this.crossAt(t.x, t.y);
-        if (!e) continue;
+        const down = this.crossAt(t.x, t.y);
+        if (!down) continue;
         plane.tips = plane.tips.filter((u) => u !== t);
-        this.rootShaft(1, e.x, e.y);
+        this.rootShaft(CURTAIN, down.x, down.y);
       }
     }
     // A tip that has reached a corpse (the midden's) colonises it.
