@@ -19,6 +19,9 @@
 //  7. the first game's tutorial (ja-7x4, PRD §61), in a fresh browser: Start runs it, paused at 1× on the landing; the first
 //     host pauses the game and is followed, and its card hides to a strip and comes back; the watch runs at 4×, Faster at 8×;
 //     Skip ends it at 4×, playing; a reload offers plain Start.
+//  8. the desert ant (ja-rf5): chosen on the start screen, which then offers plain Start (no tutorial: it is the generic ant's); its
+//     game is the desert ant's, plays 20 s of game time at 4× and lays no food or home trail on the plane; a reload still offers
+//     the generic ant's tutorial.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -140,7 +143,10 @@ try {
   console.log(`dev server on ${url} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
 
   browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 1,
+  });
   const page = await ctx.newPage();
   await page.addInitScript(`window.__clampCam = ${clampCam.toString()};`);
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -254,7 +260,10 @@ try {
     const cy = line.cells[2 * i + 1];
     const wx = cx + 0.5 + 0.5 * (cy & 1);
     const wy = (cy + 0.5) * (Math.sqrt(3) / 2);
-    return { sx: r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k, sy: r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k };
+    return {
+      sx: r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k,
+      sy: r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k,
+    };
   }, whole);
   await page.mouse.move(mid.sx, mid.sy);
   await page.mouse.wheel(0, -400);
@@ -415,7 +424,12 @@ try {
           return Math.abs(f.cam.x - e.x) <= 1.5 && Math.abs(f.cam.y - e.y) <= 1.5;
         };
         const on = t.slice(up).find((f) => f.layer === 0 && f.view === "above" && f.cam && onAnt(f));
-        if (on) return { below: t.slice(0, up).filter((f) => f.layer === 1 && f.view === "below").length, up: t[up], on };
+        if (on)
+          return {
+            below: t.slice(0, up).filter((f) => f.layer === 1 && f.view === "below").length,
+            up: t[up],
+            on,
+          };
         // Up for 2 s of frames and the view never on it: the carry failed.
         return t.length - up > 120 ? { stuck: t.slice(up, up + 4).concat(t.slice(-2)) } : null;
       }),
@@ -450,7 +464,10 @@ try {
   const circle = await page.evaluate(() => {
     const m = window.jevAnts.game.colonies[0];
     const h = m.holeCells[m.params.nest];
-    return { x: h.px + 0.5 + 0.5 * (h.py & 1), y: (h.py + 0.5) * (Math.sqrt(3) / 2) };
+    return {
+      x: h.px + 0.5 + 0.5 * (h.py & 1),
+      y: (h.py + 0.5) * (Math.sqrt(3) / 2),
+    };
   });
   check((await page.getByRole("button", { name: "Stop following" }).count()) === 0, "the pen ends a follow");
   // The circle's centre, clamped to the plane in the box as it is now (at the zoom the pen chose to fit the circle).
@@ -580,7 +597,15 @@ try {
     const g = window.jevAnts.game;
     const m = g.colonies[0];
     g.revealed[0] = true;
-    g.flights.push({ mother: 0, x: m.nest.x, y: m.nest.y, load: 1, strain: g.fungus.evolution?.strain ?? 0, at: g.time, food: 24 });
+    g.flights.push({
+      mother: 0,
+      x: m.nest.x,
+      y: m.nest.y,
+      load: 1,
+      strain: g.fungus.evolution?.strain ?? 0,
+      at: g.time,
+      food: 24,
+    });
   });
   await until(
     () =>
@@ -621,7 +646,11 @@ try {
   await page.keyboard.press("Escape");
   check((await tips(page)) === 0, "Escape closes it");
   // A finger: a tap opens, a second tap or a tap elsewhere closes, and a tap inside the bubble leaves it open.
-  const touch = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const touch = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
   const tpage = await touch.newPage();
   tpage.on("pageerror", (e) => errors.push(String(e)));
   await tpage.goto(url);
@@ -643,7 +672,10 @@ try {
 
   // ——— 7. The first game's tutorial ———
   console.log("7. the tutorial");
-  const tctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const tctx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 1,
+  });
   const tu = await tctx.newPage();
   await tu.addInitScript(`window.__clampCam = ${clampCam.toString()};`);
   tu.on("pageerror", (e) => errors.push(String(e)));
@@ -737,6 +769,41 @@ try {
   await tu.reload();
   await until(async () => (await tu.getByRole("button", { name: "Start", exact: true }).count()) === 1, "after a reload, plain Start");
   await tctx.close();
+
+  // ——— 8. The desert ant (ja-rf5) ———
+  console.log("8. the desert ant");
+  const dctx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 1,
+  });
+  const dp = await dctx.newPage();
+  dp.on("pageerror", (e) => errors.push(String(e)));
+  await dp.goto(url);
+  await dp.getByRole("combobox", { name: "species" }).selectOption("desert");
+  check(
+    (await dp.getByRole("button", { name: "Start without the tutorial", exact: true }).count()) === 0,
+    "no tutorial for the desert ant",
+  );
+  await dp.getByRole("button", { name: "Start", exact: true }).click();
+  await until(
+    () => dp.evaluate(() => window.jevAnts?.game.params.species.id === "desert" && window.jevAnts.game.landed !== null),
+    "a desert game, landed",
+  );
+  await until(() => dp.evaluate(() => (window.jevAnts?.game.time ?? 0) > 20), "it plays 20 s of game time", 30_000, 250);
+  check(
+    await dp.evaluate(() => window.jevAnts.game.colonies.every((c) => !c.layers[0].ph.live("food") && !c.layers[0].ph.live("home"))),
+    "no food or home trail on the plane",
+  );
+  await dp.reload();
+  await dp
+    .getByRole("button", { name: "Start the tutorial", exact: true })
+    .waitFor({ timeout: 10_000 })
+    .catch(() => {});
+  check(
+    (await dp.getByRole("button", { name: "Start the tutorial", exact: true }).count()) === 1,
+    "a desert game leaves the generic ant's tutorial unplayed",
+  );
+  await dctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
