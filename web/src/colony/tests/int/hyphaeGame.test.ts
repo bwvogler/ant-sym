@@ -6,6 +6,7 @@ import { Game, gameRng, type GameSave } from "../../game.ts";
 import { cellKey as hyphaKey, HYPHA_MASS, keyCell } from "../../hyphae.ts";
 import { nx, ny } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
+import { columnsOver } from "../../transect.ts";
 import { OPEN, rockAt, SOIL } from "../../world.ts";
 
 // The mycelium as hyphae in a one-world game (docs/hyphal-growth.md, ja-2bw.2): rooted by the hole on the plane (the
@@ -30,13 +31,43 @@ const runFor = (g: Game, seconds: number) => {
   while (g.time < end) g.tick(1 / 30);
 };
 
-test("hyphae root on the plane and on the shaft's walls, and grow on both from the mycelium's mass", () => {
+/** Run until a plane tip has come to the hole and crossed down it (ja-2bw.14), at most `limit` s; returns when. */
+function crossDown(g: Game, limit = 90): number {
+  while (!g.fungus.hyphaeOn(CURTAIN) && g.time < limit) runFor(g, 1);
+  assert.ok(g.fungus.hyphaeOn(CURTAIN), `no tip crossed down the hole in ${limit} s`);
+  return g.time;
+}
+
+test("the patch lands on the hole's inner side, and its hyphae reach the curtain by growing down the hole (ja-2bw.14)", () => {
+  const g = game(true);
+  const line = g.world!.line;
+  const plane = g.fungus.hyphaeOn(PLANE)!;
+  // Every patch cell on the line lies over a column between the holes, never the margin past an end hole.
+  let onLine = 0;
+  for (const k of plane.parent.keys()) {
+    const [x, y] = keyCell(k);
+    for (const s of columnsOver(line, x, y)) {
+      onLine++;
+      assert.ok(s > line.sHole[0]! && s < line.sHole[line.sHole.length - 1]!, `patch cell over column ${s}, outside the holes`);
+    }
+  }
+  assert.ok(onLine > 0, "the patch is not on the line");
+  assert.equal(g.fungus.hyphaeOn(CURTAIN), null, "hyphae in the curtain before any tip reached the hole");
+  const t = crossDown(g);
+  const curtain = g.fungus.hyphaeOn(CURTAIN)!;
+  // Its first tips root on the shaft's walls: soil, below the surface, beside the dug shaft.
+  assert.ok(curtain.tips.length > 0, `no tip in the curtain after crossing at ${t} s`);
+  for (const [k, p] of curtain.parent)
+    if (p === -1) assert.equal(rockAt(g.world!.curtain, ...keyCell(k)), SOIL, `a root off the wall at ${keyCell(k)}`);
+});
+
+test("hyphae grow on both maps from the mycelium's mass", () => {
   const g = game(true);
   const plane0 = g.fungus.hyphaeOn(PLANE)!.length;
-  const curtain0 = g.fungus.hyphaeOn(CURTAIN)?.length ?? 0;
   assert.ok(plane0 > 0, "no hyphae on the plane");
-  assert.ok(curtain0 > 0, "no hyphae on the shaft's walls");
-  runFor(g, 90);
+  crossDown(g);
+  const curtain0 = g.fungus.hyphaeOn(CURTAIN)!.length;
+  runFor(g, 60);
   const plane = g.fungus.hyphaeOn(PLANE)!;
   const curtain = g.fungus.hyphaeOn(CURTAIN)!;
   assert.ok(plane.length > plane0, `the plane's hyphae did not grow (${plane.length})`);
@@ -47,7 +78,8 @@ test("hyphae root on the plane and on the shaft's walls, and grow on both from t
 
 test("with hyphae, spores go out only on open cells, never into soil, rock or sky", () => {
   const g = game(true);
-  runFor(g, 60);
+  crossDown(g);
+  runFor(g, 30);
   for (const l of [PLANE, CURTAIN]) {
     const map = l === PLANE ? g.world!.plane : g.world!.curtain;
     const { spores } = g.fungus.sporesOn(l)!;
@@ -69,7 +101,8 @@ test("with hyphae, spores go out only on open cells, never into soil, rock or sk
 
 test("a game with hyphae saves and loads as it was", () => {
   const g = game(true);
-  runFor(g, 30);
+  crossDown(g);
+  runFor(g, 10);
   const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
   const back = game(true);
   back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
@@ -173,7 +206,8 @@ test("a host that dies on the plane is a new start where it lies; a clean ant le
 
 test("ants digging through a hypha in the curtain cut it, and the mycelium loses the mass it held", () => {
   const g = game(true);
-  runFor(g, 40);
+  crossDown(g);
+  runFor(g, 30);
   const h = g.fungus.hyphaeOn(CURTAIN)!;
   const soil = [...h.soil];
   assert.ok(soil.length > 0, "no hypha in the curtain's soil");
@@ -191,6 +225,7 @@ test("ants digging through a hypha in the curtain cut it, and the mycelium loses
 
 test("a spore spot a tip fruited on puts out spores, until it is filled in", () => {
   const g = game(true);
+  crossDown(g);
   const h = g.fungus.hyphaeOn(CURTAIN)!;
   for (let t = 0; t < 240 && h.fruits.length === 0; t += 10) runFor(g, 10);
   assert.ok(h.fruits.length > 0, "no tip fruited in 240 s");
