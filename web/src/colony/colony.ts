@@ -1795,7 +1795,14 @@ export class Colony {
     // Scent is read through the ant's perception (gains of 1 and no foreign reading: as it is, exactly).
     const f = this.ph.fields;
     // Food is sensed only through open ground: a pocket sealed off by soil is not, however near (ja-juiu, see inReach).
-    if (map.food.get(cx, cy) > 0 && inReach(map, this.x[i], this.y[i], sx, sy)) s[slot] = SEEN;
+    // With scentReach, so is scent: a tip out of reach (another tunnel, behind a wall) reads none (ja-uvhw).
+    const hasFood = map.food.get(cx, cy) > 0;
+    const reach = hasFood || this.params.scentReach > 0 ? inReach(map, this.x[i], this.y[i], sx, sy) : true;
+    if (!reach && this.params.scentReach > 0) {
+      s[slot] = s[slot + 3] = s[slot + 6] = 0;
+      return;
+    }
+    if (hasFood && reach) s[slot] = SEEN;
     else {
       const wf = this.foreignFood[i];
       s[slot] = f.food.get(cx, cy) * this.gainFood[i] + (wf > 0 && this.foreign ? wf * this.foreign.fields.food.get(cx, cy) : 0);
