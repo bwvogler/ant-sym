@@ -13,12 +13,12 @@ import { MODES, type LaneWords, type Mode, type Policy, type SpeciesSituation } 
 // has no follow mode and no stance lane; no corpse removal was found (desert-ant.md §5), so it leaves its dead. Built since: food odour in the air
 // (ja-rf5.4), heat with the sun's height and the night (ja-rf5.5, ja-rf5.12; docs/desert-heat.md). Still to come: the invitation (ja-rf5.6).
 
-/** Its mode lane's fields: what it does, whether it is tired, whether it feels hot (ja-rf5.5), whether the sun stands high (ja-rf5.12), whether strangers are near. No trails, alarm or stance to sense. */
+/** Its mode lane's fields: what it does, whether it is tired, whether it feels hot (ja-rf5.5), what it sees of the sun (ja-rf5.12), whether strangers are near. No trails, alarm or stance to sense. */
 export const DESERT_SCHEMA = defineSchema<SpeciesSituation>([
   { name: "mode", values: MODES },
   { name: "tired", values: [false, true], key: (v) => (v ? "tired" : "fresh") },
   { name: "hot", values: [false, true], key: (v) => (v ? "hot" : "cool") },
-  { name: "sun", values: ["low", "high", "down"] },
+  { name: "sun", values: ["unseen", "low", "high", "down"] },
   { name: "enemy", values: ["none", "near"] },
 ]);
 
@@ -36,7 +36,7 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
       ],
       [
         "sun",
-        "sun is how high the sun stands, as it sees the sky from the open ground or the top of its shaft (deeper in the nest it reads low). low: the ground is bearable. high: the ground is at its hottest, and an ant that sets out or stays out then heats past what it can bear and dies before it gets home. down: night, when a desert ant, which steers by the sky, cannot find food or its way in the dark. ",
+        "sun is how high the sun stands, as it sees the sky from the open ground or the top of its shaft; deeper in the nest it cannot see the sky (unseen), and goes up to look. high: the ground is at its hottest, and desert ants are made for it: their rivals and predators are in, and they forage then, coming home when their own body is hot. low: morning or evening, the time for other ants, not for them: they stay in. down: night, when a desert ant, which steers by the sky, cannot find food or its way in the dark. ",
       ],
       [
         "enemy",
@@ -46,7 +46,7 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
     outro: "doctrine is how the colony wants its ants to behave: follow it.",
   }),
   criteria: {
-    explore: "explore: go out, or keep searching, alone for food (only while the sun is low and it is not hot)",
+    explore: "explore: go out, or keep searching, alone for food (only while the sun is high or unseen, and it is not hot)",
     return: "return: walk home",
     fight: "fight: attack a stranger within reach (only when enemy is near)",
   },
@@ -54,14 +54,15 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
   // 3: the hot field (ja-rf5.5); 4: the sun field (ja-rf5.12); 5: the sun down at night (owner, 2026-11-13); 6: the sun's consequence spelled
   // out (v5's answers sent a fresh, cool explorer out at high sun and at night: owner, reword and re-ask)
   // 7: explore conditioned on a low sun and a cool body, as fight on a stranger near (v6's answers still sent foragers out at night: owner)
-  version: 7,
+  // 8: the papers' direction (owner, review of #155 D1): out under a high sun, in at a low or set one; unseen deeper in, where it goes up to look
+  version: 8,
   schema: DESERT_SCHEMA,
 };
 
 /** Its local rule: home when hot or tired or a fight is over; otherwise out searching, alone (nothing to follow). Strangers in reach are its contact response's. */
 export const desertPolicy: Policy = (s) => {
   if ((s as SpeciesSituation).hot) return "return";
-  if ((s as SpeciesSituation).sun === "high" || (s as SpeciesSituation).sun === "down") return "return";
+  if ((s as SpeciesSituation).sun === "low" || (s as SpeciesSituation).sun === "down") return "return";
   if (s.tired) return "return";
   if (s.mode === "fight") return "return";
   return "explore";
@@ -71,7 +72,7 @@ export const desertPolicy: Policy = (s) => {
 export const DESERT_RULE_TEXT: ModeRuleText = {
   rows: [
     { when: "it is hot (its body near the heat that kills it)", then: "return", test: (s) => (s as SpeciesSituation).hot === true },
-    { when: "the sun stands high (a trip out would cook it)", then: "return", test: (s) => (s as SpeciesSituation).sun === "high" },
+    { when: "the sun is low (morning or evening: not its time)", then: "return", test: (s) => (s as SpeciesSituation).sun === "low" },
     { when: "the sun is down (night: it steers by the sky)", then: "return", test: (s) => (s as SpeciesSituation).sun === "down" },
     { when: "it is tired (searched long outside without finding food)", then: "return", test: (s) => s.tired },
     { when: "it was fighting", then: "return", test: (s) => s.mode === "fight" },
@@ -111,8 +112,8 @@ export const DESERT_ANT: Species = {
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
   // nothing in its jaws fights a stranger it touches, whatever the odds; a carrier takes its load home (owner, review of #138 D1).
   // It senses its own heat (the sense table's own-body row): hot near the heat that kills it.
-  // It sees the sun's height where the sky is in view: out on the plane, or at the top of its own shaft (desert-heat.md §2).
-  sense: (c, i) => ({ hot: c.hot[i] === 1, sun: c.layer[i] === PLANE || atGate(c, i) ? sunSeen(c.params, c.time) : "low" }),
+  // It sees the sun's height where the sky is in view: out on the plane, or at the top of its own shaft; deeper in, unseen (desert-heat.md §2).
+  sense: (c, i) => ({ hot: c.hot[i] === 1, sun: c.layer[i] === PLANE || atGate(c, i) ? sunSeen(c.params, c.time) : "unseen" }),
   responses: { ...localResponses, contact: (t) => (t.carrying === "none" ? "fight" : "flee") },
   lanes: { mode: DESERT_MODE_WORDS },
   policy: desertPolicy,

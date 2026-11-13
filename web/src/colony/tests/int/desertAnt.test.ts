@@ -14,9 +14,9 @@ import type { Policy, SpeciesSituation } from "../../vocab.ts";
 // ja-rf5.3: the desert ant on the descriptor (docs/desert-ant.md, PRD §60.2). A species made only of the descriptor's pieces: its own lane words
 // and situation (mode, tired, enemy), no follow and no stance lane, no trail or alarm channel, no corpse removal, its own local rule.
 
-test("its lane is its own: its context, its 96 situations, no follow, no stance lane", () => {
+test("its lane is its own: its context, its 128 situations, no follow, no stance lane", () => {
   assert.notEqual(policyContext("forage", DESERT_MODE_WORDS), policyContext("forage", MODE_WORDS));
-  assert.equal(DESERT_SCHEMA.size, 96);
+  assert.equal(DESERT_SCHEMA.size, 128);
   assert.equal(LANES.mode.valid("k", "follow", DESERT_MODE_WORDS), false);
   assert.equal(DESERT_ANT.lanes.stance, undefined);
   assert.deepEqual(

@@ -52,7 +52,7 @@ const desert = (over: Partial<ColonyParams> = {}): Game =>
 
 test("a desert ant sees the sun high only where the sky is in view: out on the plane or at the top of its own shaft", () => {
   const g = desert();
-  run(g, 150); // mid-morning: ants out on the plane (by noon the cue has them all in)
+  run(g, 150); // the high sun of the morning: ants out on the plane
   const c = g.player;
   (c.params as { heatSunHigh: number }).heatSunHigh = 0.1; // the sun counts as high from here, for the sense alone
   assert.ok(sunHigh(c.params, c.time), "the test's own check");
@@ -73,7 +73,7 @@ test("a desert ant sees the sun high only where the sky is in view: out on the p
       assert.equal(sun, "high", `ant ${i} at the top of its shaft (review of #155, S2)`);
       top++;
     } else {
-      assert.equal(sun, "low", `ant ${i} deeper in the nest`);
+      assert.equal(sun, "unseen", `ant ${i} deeper in the nest`);
       deep++;
     }
   }
@@ -86,40 +86,51 @@ test("the local rule sends a hot ant home, whatever else it senses (review of #1
     const hot = sit as SpeciesSituation;
     if (hot.hot === true) assert.equal(desertPolicy(sit), "return", DESERT_SCHEMA.key(sit));
   }
-  // A cool, fresh explorer under a low sun with nobody near goes on: the rule above is the heat's, not every answer.
+  // A cool, fresh explorer under a high sun with nobody near goes on: the rule above is the heat's, not every answer.
   assert.equal(
-    desertPolicy({ mode: "explore", tired: false, hot: false, sun: "low", enemy: "none" } as unknown as SpeciesSituation),
+    desertPolicy({ mode: "explore", tired: false, hot: false, sun: "high", enemy: "none" } as unknown as SpeciesSituation),
     "explore",
   );
 });
 
 test("heat kills an ant past its critical heat, and it is counted", () => {
-  const g = desert({ heatNoon: 70, heatSunHigh: 1.1 }); // a scorching noon, and no sun cue to keep it in
+  const g = desert({ heatNoon: 70 }); // a scorching noon, under which the desert ant still goes out
   run(g, P.heatDay / 2);
   assert.ok(g.player.diedHot > 0, `died of heat: ${g.player.diedHot}`);
 });
 
-test("the sun's cue keeps foragers in at noon and saves lives: fewer heat deaths than with no cue", () => {
-  const deaths = (sunCue: boolean) => {
-    const g = desert(sunCue ? {} : { heatSunHigh: 1.1 });
-    run(g, P.heatDay);
-    return g.player.diedHot;
-  };
-  const withCue = deaths(true);
-  const without = deaths(false);
-  assert.ok(withCue < without, `heat deaths over a day: ${withCue} with the sun's cue, ${without} without`);
+test("the papers' direction: more desert ants out under the high sun than in the low sun of the morning (owner, review of #155 D1)", () => {
+  const g = desert();
+  const light = (1 - P.heatNight) * P.heatDay;
+  const onPlane = () => g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE).length;
+  let low = 0;
+  let noon = 0;
+  for (let t = 0; t < P.heatDay; t += 5) {
+    run(g, 5);
+    const at = g.time - Math.floor(g.time / P.heatDay) * P.heatDay;
+    if (at < light / 8) low += onPlane();
+    else if (Math.abs(at - light / 2) < light / 8) noon += onPlane();
+  }
+  assert.ok(noon > low, `ant-samples on the plane: ${noon} at noon, ${low} in the morning's low sun`);
+});
+
+test("the sun read as unseen deeper in sends the ant up to look; seen low or down at the top, it turns back", () => {
+  const s = (sun: string) => desertPolicy({ mode: "explore", tired: false, hot: false, sun, enemy: "none" } as unknown as SpeciesSituation);
+  assert.equal(s("unseen"), "explore");
+  assert.equal(s("low"), "return");
+  assert.equal(s("down"), "return");
 });
 
 test("at night no ant sets out: on the plane in the dark, only ants on their way home (lost carriers searching for the hole)", () => {
   const g = desert();
   const light = (1 - P.heatNight) * P.heatDay;
   const onPlane = () => g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE).length;
-  run(g, light / 6); // mid-morning
+  run(g, light / 2); // noon: out under the high sun
   const morning = onPlane();
-  run(g, light + (P.heatNight * P.heatDay) / 2 - light / 6); // midnight
+  run(g, light / 2 + (P.heatNight * P.heatDay) / 2); // midnight
   const midnight = onPlane();
   const away = g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE && g.player.mode[i] !== RETURN).length;
-  assert.ok(morning > 10, `on the plane in the morning: ${morning}`);
+  assert.ok(morning > 10, `on the plane at noon: ${morning}`);
   assert.equal(away, 0, `at midnight ${midnight} on the plane, ${away} of them not on their way home`);
 });
 

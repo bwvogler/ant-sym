@@ -1,5 +1,5 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { dayPhase, sunDown, sunHigh } from "./heat.ts";
+import { dayPhase, sunHigh } from "./heat.ts";
 import { DESERT_ANT } from "./desertAnt.ts";
 import {
   type Colony,
@@ -2540,20 +2540,19 @@ export const desertTrips: Assay = {
 export const D5_SECONDS = 1200;
 
 /**
- * D5 — heat (ja-rf5.5, docs/desert-ant.md §4, PRD §60.5): the desert ant over two days. Its ground heats toward noon; an ant out heats with it,
- * comes back when it feels hot and dies past its critical heat (53.6 °C, C. bombycina, a borrowing: unverified). Target (b) of desert-ant.md:
- * the colony forages in the cooler hours and few foragers outlast their heat budget. Pass, all three: ants out on the plane at noon (the day's
- * hottest quarter) no more than 0.75 of those out at dawn (its coolest); heat deaths a day no more than 16 % of the colony (C. bicolor loses
- * about 16 % of its foragers a day to every cause: Schmid-Hempel & Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in
- * every 30 s after the first minute outside the high sun and the night (ja-rf5.12, desert-heat.md: a midday lull is the biology, a day without
- * intake a cliff); and at night (the sun down: owner, 2026-11-13) no more than a tenth as many out, and not on their way home, as out in
- * the low sun of the daylight.
+ * D5 — heat (ja-rf5.5, ja-rf5.12; docs/desert-heat.md, PRD §60.5): the desert ant over two days. Its ground heats toward noon; an ant out heats
+ * with it, comes back when it feels hot and dies past its critical heat (53.6 °C, C. bombycina, a borrowing: unverified). The papers' direction
+ * (owner, review of #155 D1): the hot-adapted Cataglyphis forage at the hottest hours, close to their limit (desert-heat.md §1), and the sun's
+ * height sets the nest's day (Amor 2011, unverified). Pass, all four: more ants out on the plane at noon (the daylight's middle quarter) than in
+ * the low sun (its first and last eighth); at night (the sun down) no more setting out (not on their way home) than a tenth of those out at
+ * noon; heat deaths a day no more than 16 % of the colony (C. bicolor loses about 16 % of its foragers a day to every cause: Schmid-Hempel &
+ * Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in every 30 s while the sun is high, after the first minute.
  */
 export const desertHeat: Assay = {
   id: "d5",
-  title: "D5 heat: the desert ant forages in the cooler hours and few die of heat (one world, two days)",
+  title: "D5 heat: the desert ant forages under the high sun, stays in at night, and few die of heat (one world, two days)",
   target:
-    "out at noon ≤ 0.75 × in the low sun; at night ≤ 0.1 ×; heat deaths ≤ 16 % of the colony a day; food every 30 s outside high sun and night (design; borrowings unverified)",
+    "out at noon > in the low sun; at night ≤ 0.1 × noon; heat deaths ≤ 16 % of the colony a day; food every 30 s under the high sun (Amor 2011, borrowings: unverified)",
   seconds: D5_SECONDS,
   spec: (seed) => {
     let noon = 0;
@@ -2619,7 +2618,7 @@ export const desertHeat: Assay = {
         // The 30-s windows after the first minute, but those in the high sun (any moment of them), where a lull is the biology (desert-heat.md §1).
         const after = bins
           .slice(0, Math.floor(game.time / 30))
-          .filter((_, b) => b >= 2 && ![0, 10, 20, 30].some((s) => sunHigh(c.params, b * 30 + s) || sunDown(c.params, b * 30 + s)));
+          .filter((_, b) => b >= 2 && [0, 10, 20, 30].every((s) => sunHigh(c.params, b * 30 + s)));
         const minPickups = after.length ? Math.min(...after) : NaN;
         return {
           outNoon,
@@ -2629,7 +2628,7 @@ export const desertHeat: Assay = {
           heatDeaths: c.diedHot,
           deathsADay,
           minPickups,
-          pass: ratio <= 0.75 && outNight <= 0.1 * outDawn && deathsADay <= 0.16 && minPickups > 0 ? 1 : 0,
+          pass: ratio > 1 && outNight <= 0.1 * outNoon && deathsADay <= 0.16 && minPickups > 0 ? 1 : 0,
         };
       },
     });
