@@ -111,6 +111,115 @@ export function hexLine(ax: number, ay: number, bx: number, by: number): Int32Ar
   return out;
 }
 
+/** 2 × the world x of cell (x, y)'s centre: a whole number, so the straight line's band can be tested exactly. */
+const x2 = (x: number, y: number): number => 2 * x + 1 + (y & 1);
+
+/**
+ * The way (0–5) nearest the direction (dX2, dY), in half-cells across and rows down (2 × world x, world y ÷ R): the one
+ * whose unit step has the largest dot product with it, 4 × which is a whole number for each way. A tie (a direction
+ * exactly between two ways) goes to the clockwise one, the same way round in every direction, so the way nearest the
+ * reverse direction is always the reverse way: the way lies in (θ − 30°, θ + 30°].
+ */
+function nearestWay(dX2: number, dY: number): number {
+  const dots = [2 * dX2, dX2 + 3 * dY, -dX2 + 3 * dY, -2 * dX2, -dX2 - 3 * dY, dX2 - 3 * dY];
+  const top = Math.max(...dots);
+  // Of two tied ways (always neighbours), the clockwise one: the one whose anticlockwise neighbour also ties.
+  for (let d = 0; d < 6; d++) if (dots[d] === top && dots[(d + 5) % 6] === top) return d;
+  return dots.indexOf(top);
+}
+
+/**
+ * One half of hexRuns: `steps` steps from cell (sx, sy) toward cell (tx, ty), written to `out` from pair index i0 on, by
+ * `di` (+1 forward, −1 backward). Every step cuts the distance to the target by one (a geodesic). It starts along `way`
+ * and keeps on while the next centre stays within the band of the straight line (`off` false), else takes the other way
+ * that cuts the distance; with both outside, the one nearer the line.
+ */
+function runHalf(
+  out: Int32Array,
+  i0: number,
+  di: number,
+  sx: number,
+  sy: number,
+  tx: number,
+  ty: number,
+  steps: number,
+  way: number,
+  off: (x: number, y: number) => number,
+): void {
+  let x = sx;
+  let y = sy;
+  out[2 * i0] = x;
+  out[2 * i0 + 1] = y;
+  for (let j = 1; j <= steps; j++) {
+    const left = hexDistance(x, y, tx, ty) - 1;
+    let pick = -1;
+    let pickOff = Infinity;
+    // The way we are going first, then the others in order: the first within the band wins; else the least outside.
+    for (let k = 0; k < 6; k++) {
+      const d = (way + k) % 6;
+      const qx = nx(x, y, d);
+      const qy = ny(y, d);
+      if (hexDistance(qx, qy, tx, ty) !== left) continue;
+      const o = off(qx, qy);
+      if (o <= 0) {
+        pick = d;
+        break;
+      }
+      if (o < pickOff) {
+        pick = d;
+        pickOff = o;
+      }
+    }
+    way = pick;
+    x = nx(x, y, way);
+    y = ny(y, way);
+    out[2 * (i0 + di * j)] = x;
+    out[2 * (i0 + di * j) + 1] = y;
+  }
+}
+
+/**
+ * The cells of a path of straight runs from cell (ax, ay) to cell (bx, by), both included, as flat x, y pairs: like
+ * hexLine, `hexDistance + 1` cells, each a neighbour of the last (a shortest path), but stepping only along the two ways
+ * either side of the straight line and turning only when the next centre would lie more than `band` (world units) off it,
+ * so it goes in long runs with occasional turns instead of hexLine's zigzag. Both ends leave along the way nearest the
+ * straight line (nearestWay): the path is built as two halves, from each end to hexLine's middle cell, which lies on a
+ * shortest path. The band is tested in whole numbers, so a path is the same on every machine; the path from b to a is
+ * the path from a to b reversed.
+ */
+export function hexRuns(ax: number, ay: number, bx: number, by: number, band: number): Int32Array {
+  // One orientation computes, the other reverses it: the middle cell (and so the path) is the same both ways.
+  if (by < ay || (by === ay && bx < ax)) {
+    const fwd = hexRuns(bx, by, ax, ay, band);
+    const out = new Int32Array(fwd.length);
+    for (let i = 0; i < fwd.length; i += 2) {
+      out[i] = fwd[fwd.length - 2 - i]!;
+      out[i + 1] = fwd[fwd.length - 1 - i]!;
+    }
+    return out;
+  }
+  const n = hexDistance(ax, ay, bx, by);
+  const out = new Int32Array(2 * (n + 1));
+  const dX2 = x2(bx, by) - x2(ax, ay);
+  const dY = by - ay;
+  // A centre (x, y) is off by k·R/2 across the line, k = dX2·(y − ay) − dY·(x2 − x2a); more than `band` off when
+  // 3k² > 4·band²·(dX2² + 3·dY²). `off` gives how far past the band, in those units (0 or less: within it).
+  const limit = 4 * band * band * (dX2 * dX2 + 3 * dY * dY);
+  const ax2 = x2(ax, ay);
+  const off = (x: number, y: number): number => {
+    const k = dX2 * (y - ay) - dY * (x2(x, y) - ax2);
+    return 3 * k * k - limit;
+  };
+  const mid = hexLine(ax, ay, bx, by);
+  const h = n >> 1;
+  const mx = mid[2 * h]!;
+  const my = mid[2 * h + 1]!;
+  const way = nearestWay(dX2, dY);
+  runHalf(out, 0, 1, ax, ay, mx, my, h, way, off);
+  runHalf(out, n, -1, bx, by, mx, my, n - h, (way + 3) % 6, off);
+  return out;
+}
+
 const discs = new Map<number, Int16Array[]>();
 
 /**

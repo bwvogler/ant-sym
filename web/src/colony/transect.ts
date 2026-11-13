@@ -1,14 +1,16 @@
 // One world's line (docs/one-world.md §3, U1 `ja-lp4.1`), pure: the nests' holes in order, V₀ … V_k, joined by
-// straight segments on the hex grid, with a margin past each end. The curtain (everything underground) hangs under
+// segments over the hex grid's tiles, with a margin past each end. The curtain (everything underground) hangs under
 // it: column s of the curtain lies under P(s), the plane cell the line passes through there.
 //
-// Columns are hex steps (owner, 2026-11-08): a segment's columns are the hex line between its two holes, one per step,
-// so neighbouring columns always lie over the same or neighbouring cells. A segment is hexDistance columns long:
-// the same as its length running east–west, up to ~15% more at a slant, never less, so the curtain is no shortcut.
+// Columns are hex steps (owner, 2026-11-08): a segment's columns are a shortest hex path between its two holes, one per
+// step, so neighbouring columns always lie over the same or neighbouring cells. A segment is hexDistance columns long:
+// the same as its length running east–west, up to ~15% more at a slant, never less, so the curtain is no shortcut. The
+// path goes in straight runs along the grid with occasional turns, never more than LINE_BAND off the straight line
+// between the holes (hex.ts hexRuns; owner, 2026-11-13, ja-lp4.17), and the founding rule is measured on its tiles.
 //
 // s is signed. V₀ starts at s = 0 and the line grows at V₀ into negative s, so what is dug underground never renumbers.
 
-import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance, hexLine } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance, hexRuns } from "./hex.ts";
 
 /** A plane cell. */
 export interface Cell {
@@ -29,6 +31,12 @@ export const CLEARANCE = 12;
  * against the dig.
  */
 export const HOLE_GAP_2D = 16;
+/**
+ * How far the line's tiles may stray from the straight line between two holes, in world units (cells): the band its runs
+ * turn within (hex.ts hexRuns). 3 (owner, 2026-11-13, ja-lp4.17): a 30° slant turns about every 12 cells, one near a
+ * grid axis runs 35 or more, and the tiles stay well inside the founding rule's CLEARANCE of the straight line.
+ */
+export const LINE_BAND = 3;
 /** The sharpest turn back a new segment may make on the end segment (one-world §3 rule 2): 120°. */
 export const MAX_TURN = (2 * Math.PI) / 3;
 
@@ -69,7 +77,12 @@ export function outward(holes: readonly Cell[], end: End): [number, number] {
   return [dx / len, dy / len];
 }
 
-/** The `margin` cells past an end hole, nearest first: a hex line aimed straight on, far enough to have them all. */
+/** The tiles of the segment from hole a to hole b, both included: hexDistance + 1 cells in runs (LINE_BAND). */
+export function segmentCells(a: Cell, b: Cell): Int32Array {
+  return hexRuns(a.x, a.y, b.x, b.y, LINE_BAND);
+}
+
+/** The `margin` cells past an end hole, nearest first: runs aimed straight on, far enough to have them all. */
 function marginCells(holes: readonly Cell[], end: End, margin: number): Int32Array {
   const v = end === "start" ? holes[0]! : holes[holes.length - 1]!;
   const [ux, uy] = outward(holes, end);
@@ -77,7 +90,7 @@ function marginCells(holes: readonly Cell[], end: End, margin: number): Int32Arr
   const fx = cx(v) + ux * 2 * margin;
   const fy = cy(v) + uy * 2 * margin;
   cellOf(fx, fy);
-  const line = hexLine(v.x, v.y, CELL[0]!, CELL[1]!);
+  const line = hexRuns(v.x, v.y, CELL[0]!, CELL[1]!, LINE_BAND);
   return line.subarray(2, 2 + 2 * margin);
 }
 
@@ -101,7 +114,7 @@ export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0
   for (let i = 1; i < holes.length; i++) {
     const a = holes[i - 1]!;
     const b = holes[i]!;
-    const seg = hexLine(a.x, a.y, b.x, b.y);
+    const seg = segmentCells(a, b);
     for (let j = 2; j < seg.length; j++) parts.push(seg[j]!);
     s += seg.length / 2 - 1;
     sHole.push(s);
@@ -182,87 +195,6 @@ export function grow(t: Transect, end: End, cell: Cell): Transect {
   return makeTransect([cell, ...t.holes], { margin: t.margin, s0: t.sHole[0]! - hexDistance(cell.x, cell.y, v0.x, v0.y) });
 }
 
-type Seg = [number, number, number, number];
-
-function cross(ax: number, ay: number, bx: number, by: number): number {
-  return ax * by - ay * bx;
-}
-
-/** Whether segments p and q meet (touching counts). */
-function meets(p: Seg, q: Seg): boolean {
-  const [x1, y1, x2, y2] = p;
-  const [x3, y3, x4, y4] = q;
-  const d1 = cross(x4 - x3, y4 - y3, x1 - x3, y1 - y3);
-  const d2 = cross(x4 - x3, y4 - y3, x2 - x3, y2 - y3);
-  const d3 = cross(x2 - x1, y2 - y1, x3 - x1, y3 - y1);
-  const d4 = cross(x2 - x1, y2 - y1, x4 - x1, y4 - y1);
-  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
-  return (
-    (d1 === 0 && onSeg(q, x1, y1)) || (d2 === 0 && onSeg(q, x2, y2)) || (d3 === 0 && onSeg(p, x3, y3)) || (d4 === 0 && onSeg(p, x4, y4))
-  );
-}
-
-function onSeg([x1, y1, x2, y2]: Seg, px: number, py: number): boolean {
-  return Math.min(x1, x2) <= px && px <= Math.max(x1, x2) && Math.min(y1, y2) <= py && py <= Math.max(y1, y2);
-}
-
-function pointSeg(px: number, py: number, [x1, y1, x2, y2]: Seg): number {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const l2 = dx * dx + dy * dy;
-  const u = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l2));
-  return Math.hypot(px - x1 - u * dx, py - y1 - u * dy);
-}
-
-/** The least distance between two segments that don't meet. */
-function segSeg(p: Seg, q: Seg): number {
-  return Math.min(pointSeg(p[0], p[1], q), pointSeg(p[2], p[3], q), pointSeg(q[0], q[1], p), pointSeg(q[2], q[3], p));
-}
-
-/**
- * The line as it will stay when it grows at `end`: every segment between holes, and the far end's margin. The near
- * end's margin is left out (the new segment replaces it), and the part within the clearance of the end hole is cut
- * off: that is the shared vertex, which rule 2 excuses.
- */
-function standing(t: Transect, end: End): Seg[] {
-  const h = t.holes;
-  const k = h.length - 1;
-  const v = end === "start" ? h[0]! : h[k]!;
-  const vx = cx(v);
-  const vy = cy(v);
-  const segs: Seg[] = [];
-  for (let i = 0; i < k; i++) segs.push([cx(h[i]!), cy(h[i]!), cx(h[i + 1]!), cy(h[i + 1]!)]);
-  const far: End = end === "start" ? "end" : "start";
-  const fv = far === "start" ? h[0]! : h[k]!;
-  const [ux, uy] = outward(h, far);
-  segs.push([cx(fv), cy(fv), cx(fv) + ux * t.margin, cy(fv) + uy * t.margin]);
-  // Cut every part of the line within the clearance of the vertex: not only the end segment, since the one before it
-  // can pass near it when this hole was founded close to the last at the turn limit (at a hole gap of 12, as near as
-  // 12·sin 60° ≈ 10.4; at today's 16, 13.9: kept, so the rule doesn't hang on the gap).
-  return segs.flatMap((sg) => outsideDisc(sg, vx, vy, CLEARANCE));
-}
-
-/** The parts of segment `sg` outside the disc of radius r round (ox, oy): none, one or two pieces. */
-function outsideDisc(sg: Seg, ox: number, oy: number, r: number): Seg[] {
-  const [x1, y1, x2, y2] = sg;
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const a = dx * dx + dy * dy;
-  const b = 2 * ((x1 - ox) * dx + (y1 - oy) * dy);
-  const c = (x1 - ox) ** 2 + (y1 - oy) ** 2 - r * r;
-  const disc = b * b - 4 * a * c;
-  if (a === 0 || disc <= 0) return [sg];
-  const root = Math.sqrt(disc);
-  const t1 = (-b - root) / (2 * a);
-  const t2 = (-b + root) / (2 * a);
-  if (t2 <= 0 || t1 >= 1) return [sg];
-  const at = (t: number): [number, number] => [x1 + dx * t, y1 + dy * t];
-  const out: Seg[] = [];
-  if (t1 > 0) out.push([x1, y1, ...at(t1)]);
-  if (t2 < 1) out.push([...at(t2), x2, y2]);
-  return out;
-}
-
 /** 4 × the squared distance between two cells' centres: a whole number (half-cells across, rows of height √3/2 down), so ties are exact. */
 function dist4(ax: number, ay: number, bx: number, by: number): number {
   const dx = 2 * (ax - bx) + (ay & 1) - (by & 1);
@@ -270,11 +202,39 @@ function dist4(ax: number, ay: number, bx: number, by: number): number {
   return dx * dx + 3 * dy * dy;
 }
 
-/** The parts of rule 2 that depend only on the line and the end it grows: built once per transect and end. */
+/** Within the clearance: 4 × the squared distance between centres under this is nearer than CLEARANCE. */
+const NEAR4 = 4 * CLEARANCE * CLEARANCE;
+/**
+ * How far round the shared vertex rule 2 excuses the clearance, in world units: CLEARANCE, and twice the most a tile lies
+ * off its straight line (LINE_BAND and the half cell round the middle), and a cell's slack: 20. The turn limit keeps
+ * the two segments' straight lines r apart at r from the vertex (120°: 60° between them), so beyond 20 their tiles are
+ * at least 12 apart and the clearance agrees with the turn limit, as it did between straight lines with only CLEARANCE
+ * excused. Crossing is still checked beyond CLEARANCE.
+ */
+export const VERTEX_EXCUSE = CLEARANCE + 2 * LINE_BAND + 2;
+const EXCUSE4 = 4 * VERTEX_EXCUSE * VERTEX_EXCUSE;
+/** endRule's grid: a tile of the line as it stays, beyond CLEARANCE of the vertex (crossing it refuses). */
+const ON = 2;
+/** endRule's grid: nearer than CLEARANCE to such a tile beyond VERTEX_EXCUSE of the vertex (coming there refuses). */
+const NEAR = 1;
+
+/**
+ * The parts of rule 2 that depend only on the line and the end it grows, built once per transect and end: the end
+ * segment's direction (for the turn), and a grid over the standing line's tiles and their surroundings, flags ON and
+ * NEAR. The line as it will stay is every tile but the growing end's margin (the new segment replaces it). Round the end
+ * hole, the shared vertex, rule 2 excuses crossing within CLEARANCE and the clearance within VERTEX_EXCUSE. Every part of
+ * the line there is excused, not only the end segment, since the one before it can pass near the vertex when this hole
+ * was founded close to the last at the turn limit.
+ */
 interface EndRule {
   ex: number;
   ey: number;
-  old: Seg[];
+  /** the grid's first cell and size */
+  gx: number;
+  gy: number;
+  gw: number;
+  gh: number;
+  grid: Uint8Array;
 }
 const endRules = new WeakMap<Transect, Partial<Record<End, EndRule>>>();
 
@@ -284,22 +244,73 @@ function endRule(t: Transect, end: End): EndRule {
   const got = have[end];
   if (got) return got;
   const [ex, ey] = outward(t.holes, end);
-  return (have[end] = { ex, ey, old: standing(t, end) });
+  const k = t.holes.length - 1;
+  const v = end === "start" ? t.holes[0]! : t.holes[k]!;
+  const [lo, hi] = end === "start" ? [t.sHole[0]!, t.sMax] : [t.sMin, t.sHole[k]!];
+  const keep: number[] = [];
+  for (let s = lo; s <= hi; s++) {
+    const i = s - t.sMin;
+    const x = t.cells[2 * i]!;
+    const y = t.cells[2 * i + 1]!;
+    if (dist4(x, y, v.x, v.y) >= NEAR4) keep.push(x, y);
+  }
+  // A cell nearer than CLEARANCE is fewer than CLEARANCE + 1 columns across and CLEARANCE / R + 1 rows down.
+  const padX = CLEARANCE + 1;
+  const padY = Math.ceil(CLEARANCE / (Math.sqrt(3) / 2)) + 1;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (let i = 0; i < keep.length; i += 2) {
+    x0 = Math.min(x0, keep[i]!);
+    x1 = Math.max(x1, keep[i]!);
+    y0 = Math.min(y0, keep[i + 1]!);
+    y1 = Math.max(y1, keep[i + 1]!);
+  }
+  if (keep.length === 0) return (have[end] = { ex, ey, gx: 0, gy: 0, gw: 0, gh: 0, grid: new Uint8Array(0) });
+  const gx = x0 - padX;
+  const gy = y0 - padY;
+  const gw = x1 - x0 + 1 + 2 * padX;
+  const gh = y1 - y0 + 1 + 2 * padY;
+  const grid = new Uint8Array(gw * gh);
+  for (let i = 0; i < keep.length; i += 2) {
+    const x = keep[i]!;
+    const y = keep[i + 1]!;
+    grid[(y - gy) * gw + x - gx]! |= ON;
+    if (dist4(x, y, v.x, v.y) < EXCUSE4) continue;
+    const offs = roundDisc(CLEARANCE, y & 1, true);
+    for (let j = 0; j < offs.length; j += 2) grid[(y + offs[j + 1]! - gy) * gw + x + offs[j]! - gx]! |= NEAR;
+  }
+  return (have[end] = { ex, ey, gx, gy, gw, gh, grid });
 }
 
-/** Rule 2's verdict for a new segment from vertex (vx, vy) by (nx, ny), length nl: null when it holds. */
-function fold(t: Transect, end: End, vx: number, vy: number, nx: number, ny: number, nl: number): Refusal | null {
-  const { ex, ey, old } = endRule(t, end);
-  const turn = Math.acos(Math.max(-1, Math.min(1, (ex * nx + ey * ny) / nl)));
+/**
+ * Rule 2's verdict for a new hole at `p` beyond end hole `v`: null when it holds. The turn is measured between the
+ * holes' centres; crossing and clearance between tiles: the new segment's and its margin's to come (exactly what grow
+ * would lay), against the line as it will stay (endRule), with the shared vertex excused as endRule says. Two shortest
+ * hex paths that cross share a tile (hex cells meet only edge to edge), so meeting a tile is crossing.
+ */
+function fold(t: Transect, end: End, v: Cell, p: Cell): Refusal | null {
+  const { ex, ey, gx, gy, gw, gh, grid } = endRule(t, end);
+  const nx = cx(p) - cx(v);
+  const ny = cy(p) - cy(v);
+  const turn = Math.acos(Math.max(-1, Math.min(1, (ex * nx + ey * ny) / Math.hypot(nx, ny))));
   if (turn > MAX_TURN + 1e-12) return "turn";
-  // The new segment and its margin to come run straight on from the vertex: one segment, from the edge of the
-  // vertex's clearance (excused) to the margin's far end.
-  const reach = nl + t.margin;
-  const fresh: Seg = [vx + (nx / nl) * CLEARANCE, vy + (ny / nl) * CLEARANCE, vx + (nx / nl) * reach, vy + (ny / nl) * reach];
-  for (const b of old) if (meets(fresh, b)) return "crosses";
-  // A hair of slack: at the 120° limit the clearance holds exactly, and rounding must not refuse it.
-  for (const b of old) if (segSeg(fresh, b) < CLEARANCE - 1e-9) return "clearance";
-  return null;
+  const pair = end === "start" ? [p, v] : [v, p];
+  const tiles = [segmentCells(v, p), marginCells(pair, end, t.margin)];
+  let near = false;
+  for (const cells of tiles)
+    for (let i = 0; i < cells.length; i += 2) {
+      const x = cells[i]! - gx;
+      const y = cells[i + 1]! - gy;
+      if (x < 0 || y < 0 || x >= gw || y >= gh) continue;
+      const g = grid[y * gw + x]!;
+      if (g === 0) continue;
+      const r4 = dist4(cells[i]!, cells[i + 1]!, v.x, v.y);
+      if (g & ON && r4 >= NEAR4) return "crosses";
+      if (g & NEAR && r4 >= EXCUSE4) near = true;
+    }
+  return near ? "clearance" : null;
 }
 
 /**
@@ -307,9 +318,9 @@ function fold(t: Transect, end: End, vx: number, vy: number, nx: number, ny: num
  * The rules:
  *  1. its nearest hole (2D, between cell centres, compared exactly) is an end: a tie with an interior hole is refused;
  *     a tie between the two ends grows at V₀;
- *  2. the new segment turns back on the end segment by at most 120°, and away from the shared vertex (beyond the
- *     clearance) neither it nor its margin to come crosses the line or comes within the clearance of it, the far end's
- *     margin included;
+ *  2. the new segment turns back on the end segment by at most 120° (between the holes' centres), and away from the
+ *     shared vertex (beyond the clearance) neither its tiles nor its margin's to come cross the line's or come within
+ *     the clearance of them (between tile centres), the far end's margin included;
  *  3. `p` is at least HOLE_GAP_2D from every hole;
  *  4. `p` is open ground (`open`): in a game, the plane's main open ground (oneWorld.ts mainGround: the open region
  *     the world's holes share, not a pocket closed in by rock; owner, 2026-11-10, PR #62 review D1).
@@ -330,12 +341,7 @@ export function canFound(t: Transect, p: Cell, open: (x: number, y: number) => b
   if (!open(p.x, p.y)) return { ok: false, reason: "ground" };
   // 2. No folding back: the turn, then crossing and clearance. With one hole there is no line yet to fold back on.
   if (k === 0) return { ok: true, end };
-  const v = end === "start" ? h[0]! : h[k]!;
-  const vx = cx(v);
-  const vy = cy(v);
-  const nx = cx(p) - vx;
-  const ny = cy(p) - vy;
-  const folded = fold(t, end, vx, vy, nx, ny, Math.hypot(nx, ny));
+  const folded = fold(t, end, end === "start" ? h[0]! : h[k]!, p);
   return folded ? { ok: false, reason: folded } : { ok: true, end };
 }
 
@@ -343,10 +349,11 @@ const rounds = new Map<string, Int16Array>();
 
 /**
  * Offsets (dx, dy pairs, flat) of every cell whose centre is within `radius` (world units) of a cell's on an even
- * (parity 0) or odd row, nearest first, ties in discOffsets' order: a round disc, not a hexagon of steps. Cached.
+ * (parity 0) or odd row (`strict`: nearer than it), nearest first, ties in discOffsets' order: a round disc, not a
+ * hexagon of steps. Cached.
  */
-function roundDisc(radius: number, parity: number): Int16Array {
-  const key = `${radius}:${parity}`;
+function roundDisc(radius: number, parity: number, strict = false): Int16Array {
+  const key = `${radius}:${parity}:${strict}`;
   const have = rounds.get(key);
   if (have) return have;
   // A cell `radius` away is at most radius·2/√3 steps away (the long way round a hexagon).
@@ -355,7 +362,7 @@ function roundDisc(radius: number, parity: number): Int16Array {
   const order: [number, number][] = [];
   for (let i = 0; i < offs.length; i += 2) {
     const d = dist4(offs[i]!, parity + offs[i + 1]!, 0, parity);
-    if (d <= limit) order.push([d, i]);
+    if (strict ? d < limit : d <= limit) order.push([d, i]);
   }
   order.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const out = Int16Array.from(order.flatMap(([, i]) => [offs[i]!, offs[i + 1]!]));
