@@ -4908,7 +4908,14 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 - With hyphae the worst seed improves (never → 389 s) and the median too (317 → 276 s); seed 6 takes hold with hyphae.
 - **Seed 3 is 10.8 % slower** (278 → 308 s), just past P1's 10 %; before the fruiting fix it was 276 s. Seeds 4 (+9 %) and 9 (+5 %) are slower within the gate.
-- SEEDS_11_20
+- Held out, seeds 11–20:
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 451 | 286 | 221 | 165 | 425 | 417 | 199 | 331 | 291 | 376 |
+| a quarter, hyphae (s) | 471 | 247 | 184 | 150 | 272 | 359 | 190 | 251 | 270 | 325 |
+
+  Nine of ten faster; the median improves (311 → 261 s). **The worst seed is seed 11 both ways, and 20 s worse with hyphae** (451 → 471 s, +4.4 %), so "the worst seed no worse" fails here, as "no seed over 10 %" fails on seed 3 above. **Owner (2026-11-13): ship, and record the two narrow misses**; `ja-2bw.6` (tuning) carries them.
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
