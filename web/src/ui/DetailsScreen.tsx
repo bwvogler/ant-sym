@@ -18,6 +18,7 @@ import { colonyName, colonyTone } from "./names.ts";
 import { seg } from "./styles.ts";
 import { MAX_SPEED, type ColonyControls, type ColonyStats, type SideStats } from "./useColony.ts";
 import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
+import { tokensPerQuestion } from "./prompt.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
 
@@ -356,7 +357,11 @@ function World({ game, controls, update, restart, newWorld }: Props) {
 
 /** For experiments, not play: the fungus's menu, and each colony's doctrine. */
 function Lab({ game, controls, update, stats, jev }: Props) {
-  const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
+  // A re-ask costs the game's species' own questions (ja-fnd.5.12, review of #132 S2): its words and fields, not the generic ant's.
+  const perSituation = game.params.species.lanes.mode?.schema
+    ? tokensPerQuestion("mode", DOCTRINES[0]!.text, game.params.species.lanes.mode)
+    : TOKENS_PER_SITUATION;
+  const retune = stats ? stats.situationsSeen * perSituation : 0;
   const [showDoctrines, setShowDoctrines] = useState(false);
   // Why the last lab founding beyond an end founded nothing (one world: no room within the radius), until the next try.
   // Kept with a token for its game: a new game (another world, a restart, a load) shows no note, the last one being about
@@ -632,7 +637,7 @@ export function LeverChips({
                 type="button"
                 aria-pressed={on}
                 disabled={locked}
-                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through opacity-50" : ""}disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through opacity-50" : ""} disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
                 title={
                   locked
                     ? (lock ?? undefined)

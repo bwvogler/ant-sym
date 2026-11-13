@@ -177,6 +177,11 @@ function sumCounts(colonies: readonly Colony[]): Record<Mode, number> {
   return out;
 }
 
+/** Every situation the colonies' mode lane can be asked in: the species' own schema's size (Colony.seen is sized by it), or SITUATIONS. */
+export function situationsOf(colonies: readonly Colony[]): number {
+  return colonies[0]?.seen.length ?? 0;
+}
+
 /** Situations any colony has been asked in: what one shared doctrine would pay for (the caches are shared by context). */
 function seenTogether(colonies: readonly Colony[]): number {
   let n = 0;
@@ -328,7 +333,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           counts: sumCounts(game.colonies),
           choicesPerSecond: rate,
           situationsSeen: seenTogether(game.colonies),
-          situations: game.colonies[0]?.seen.length ?? 0,
+          situations: situationsOf(game.colonies),
           sides: game.colonies.map((c) => side(c, game.fungus)),
           fallen: game.fallen(),
           outcome: game.outcome(),

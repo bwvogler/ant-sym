@@ -18,7 +18,8 @@ import {
 } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
 import { ruleTextAgrees } from "../policyText.ts";
-import { requestFor } from "../prompt.ts";
+import { requestFor, tokensPerQuestion } from "../prompt.ts";
+import { situationsOf } from "../useColony.ts";
 
 // ja-fnd.5.12 and .13: the page says what a species has and does. The client reports whether there is a stance lane at all (Details shows
 // "no stance lane", not "0 stances"); a species' rule text is checked against its own rule over every situation of its schema; the request
@@ -102,4 +103,15 @@ test("the request the drawer shows for a species is its own: its legend, its fie
     state: { legend: string };
   };
   assert.notEqual(generic.state.legend, WORDS.legend, "no words: the generic request");
+});
+
+test("situations are counted out of the species' own, and its questions cost its own tokens (review of #132)", () => {
+  const game = (species: Species) =>
+    new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));
+  assert.equal(situationsOf(game(GENERIC_ANT).colonies), 3888);
+  assert.equal(situationsOf(game(LONE).colonies), SCHEMA.size);
+  const own = tokensPerQuestion("mode", "forage", WORDS);
+  const generic = tokensPerQuestion("mode", "forage");
+  assert.ok(own > 0 && own < generic, `its smaller legend and fields cost less a question (${own} against ${generic})`);
+  assert.equal(tokensPerQuestion("mode", "forage", undefined), generic, "no words: the generic estimate");
 });

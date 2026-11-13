@@ -40,7 +40,10 @@ export function perRequest(lane: LaneName): number {
 }
 
 /** Estimated input tokens per question (one situation) in lane `lane`, packed as the page packs them. */
-export function tokensPerQuestion(lane: LaneName, words: string): number {
+export function tokensPerQuestion(lane: LaneName, words: string, laneWords?: LaneWords): number {
   const n = perRequest(lane);
-  return Math.round(estimateTokens(requestFor(SAMPLES[lane], words, n)) / n);
+  // A species' own mode words (ja-fnd.5.12, review of #132 S2): its sample has its own fields, at their first values.
+  const schema = lane === "mode" ? laneWords?.schema : undefined;
+  const sample = schema ? ({ lane: "mode", situation: { ...schema.decode(0), ...SAMPLES.mode.situation } } as Sample) : SAMPLES[lane];
+  return Math.round(estimateTokens(requestFor(sample, words, n, laneWords)) / n);
 }

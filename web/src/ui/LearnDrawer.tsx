@@ -490,18 +490,26 @@ function ModeExplainer(props: Props) {
     return [name, own ? own.values.map(String).join(" · ") : values, about];
   });
   const choices = Object.entries(words?.criteria ?? MODE_CRITERIA) as [string, string][];
-  const live = rules ? rules.rows.findIndex((r) => r.test(s)) : -1;
+  // The last question an ant keeps is the generic situation (S1 of #122): a species with fields of its own can't be read from it, so no row is lit.
+  const readable = fields.every((f) => f in MODE_SENSES);
+  const live = rules && readable ? rules.rows.findIndex((r) => r.test(s)) : -1;
+  const generic = rules?.rows === LOCAL_MODE_RULES;
   return (
     <>
       <Senses
         rows={senses}
         note={
           <>
-            Stance is the ant's own, from what it senses (
-            <a className="underline" href={docUrl("stance")} target="_blank" rel="noreferrer">
-              docs/stance.md
-            </a>
-            ). An ant carrying something is not asked: it answers its load's responses instead.
+            {fields.includes("stance") ? (
+              <>
+                Stance is the ant's own, from what it senses (
+                <a className="underline" href={docUrl("stance")} target="_blank" rel="noreferrer">
+                  docs/stance.md
+                </a>
+                ).{" "}
+              </>
+            ) : null}
+            An ant carrying something is not asked: it answers its load's responses instead.
           </>
         }
       />
@@ -509,12 +517,14 @@ function ModeExplainer(props: Props) {
       {rules ? (
         <>
           <RuleTable rows={rules.rows} otherwise={rules.otherwise} live={live >= 0 ? live : rules.rows.length} />
-          <p className="-mt-1 text-xs text-fg-3">{LOCAL_MODE_STRANGERS}</p>
-          <p className="-mt-1 text-xs text-fg-3">
-            Highlighted: the line that decides{" "}
-            {fol?.s ? `ant #${fol.i}'s last situation` : "a sample situation (follow an ant to see its own)"}:{" "}
-            {byRows(rules.rows, rules.fn, s)}.
-          </p>
+          {generic ? <p className="-mt-1 text-xs text-fg-3">{LOCAL_MODE_STRANGERS}</p> : null}
+          {readable ? (
+            <p className="-mt-1 text-xs text-fg-3">
+              Highlighted: the line that decides{" "}
+              {fol?.s ? `ant #${fol.i}'s last situation` : "a sample situation (follow an ant to see its own)"}:{" "}
+              {byRows(rules.rows, rules.fn, s)}.
+            </p>
+          ) : null}
         </>
       ) : (
         <p className="text-xs text-fg-3">
@@ -678,7 +688,7 @@ function SentExplainer(props: Props) {
       words: doctrine,
       laneWords: own,
       about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation",
-      tokens: tokensPerQuestion("mode", doctrine),
+      tokens: tokensPerQuestion("mode", doctrine, own),
     },
     {
       name: "The fungus, in one host",
