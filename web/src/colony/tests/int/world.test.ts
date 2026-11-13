@@ -27,7 +27,7 @@ import {
   worldFromArrays,
   type WorldMap,
 } from "../../world.ts";
-import { MAX_LEVEL, Pheromones, SLEEP, type ChannelParams, type Channel } from "../../pheromone.ts";
+import { MAX_LEVEL, Pheromones, type ChannelParams, type Channel } from "../../pheromone.ts";
 
 const SMALL = { w: 160, h: 100 };
 
@@ -292,8 +292,11 @@ test("asleep costs nothing: untouched chunks never wake, and faded ones go back 
   assert.equal(ph.awakeChunks(), 1);
   for (let s = 0; s < 30 * 10; s++) ph.step(1 / 30);
   assert.equal(ph.awakeChunks(), 0, "faded below SLEEP: asleep again");
-  assert.ok(ph.read("food", m.nest.x, m.nest.y) < SLEEP);
-  assert.ok(ph.fields.food.count <= 9, `only the chunk and its neighbours were ever touched (${ph.fields.food.count})`);
+  assert.equal(ph.read("food", m.nest.x, m.nest.y), 0, "a chunk asleep reads 0");
+  assert.equal(ph.fields.food.count, 0, "a chunk that falls asleep is dropped: faded ground holds no memory (endless-world §2)");
+  ph.deposit("food", m.nest.x, m.nest.y, 5);
+  assert.equal(ph.fields.food.count, 1, "laying scent again wakes it");
+  assert.equal(ph.read("food", m.nest.x, m.nest.y), 5);
 });
 
 test("advance steps each channel on its own clock: 1/6 s means every 5 ticks at 30 Hz, and a phased start never steps time that did not pass", () => {

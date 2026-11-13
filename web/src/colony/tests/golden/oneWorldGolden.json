@@ -3,8 +3,8 @@
   {
    "t": 10,
    "food": [
-    "5d48da50",
-    "1846baaf"
+    "8ae7b243",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -40,8 +40,8 @@
   {
    "t": 20,
    "food": [
-    "83090507",
-    "1846baaf"
+    "84661534",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -53,7 +53,7 @@
      "ants": "7c1492a7",
      "fields": [
       "27a63eac",
-      "8731936c"
+      "648b1e80"
      ],
      "crossedUp": 86,
      "crossedDown": 6
@@ -77,8 +77,8 @@
   {
    "t": 30,
    "food": [
-    "8bced7a7",
-    "1846baaf"
+    "f57ab3d4",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -114,8 +114,8 @@
   {
    "t": 40,
    "food": [
-    "8a7151e0",
-    "1846baaf"
+    "740507d3",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -141,7 +141,7 @@
      "ants": "4c5d84f6",
      "fields": [
       "3f088eb5",
-      "122b148e"
+      "23b60bf1"
      ],
      "crossedUp": 167,
      "crossedDown": 97
@@ -151,8 +151,8 @@
   {
    "t": 50,
    "food": [
-    "a119eea0",
-    "1846baaf"
+    "491cc93",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -163,7 +163,7 @@
      "population": 149,
      "ants": "7e372815",
      "fields": [
-      "731c26a6",
+      "c60dd387",
       "17c6361e"
      ],
      "crossedUp": 114,
@@ -178,7 +178,7 @@
      "ants": "bc0c2849",
      "fields": [
       "2c57b86d",
-      "517495c8"
+      "f3105713"
      ],
      "crossedUp": 215,
      "crossedDown": 142
@@ -188,8 +188,8 @@
   {
    "t": 60,
    "food": [
-    "d7bd67c9",
-    "1846baaf"
+    "78f7a9ba",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -200,7 +200,7 @@
      "population": 149,
      "ants": "2514938f",
      "fields": [
-      "afd3514d",
+      "b93a5ad",
       "f2bfbd3f"
      ],
      "crossedUp": 149,
@@ -214,7 +214,7 @@
      "population": 149,
      "ants": "c81f6f93",
      "fields": [
-      "ee66f352",
+      "736ba372",
       "8b5f4bbe"
      ],
      "crossedUp": 266,
@@ -225,8 +225,8 @@
   {
    "t": 70,
    "food": [
-    "95d6b554",
-    "1846baaf"
+    "7c48c0c7",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -237,7 +237,7 @@
      "population": 149,
      "ants": "5817d4ba",
      "fields": [
-      "e69c9a18",
+      "2a0a4638",
       "b578607d"
      ],
      "crossedUp": 166,
@@ -251,7 +251,7 @@
      "population": 149,
      "ants": "e6ea6347",
      "fields": [
-      "708d4ce1",
+      "3c5d4741",
       "50dbddbe"
      ],
      "crossedUp": 317,
@@ -262,8 +262,8 @@
   {
    "t": 80,
    "food": [
-    "21691fa",
-    "1846baaf"
+    "a28386a9",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -274,7 +274,7 @@
      "population": 150,
      "ants": "47069515",
      "fields": [
-      "134d9bb4",
+      "5a5c0508",
       "bae4b086"
      ],
      "crossedUp": 182,
@@ -288,7 +288,7 @@
      "population": 149,
      "ants": "687e949a",
      "fields": [
-      "23266d7b",
+      "f87c295f",
       "18f4ed54"
      ],
      "crossedUp": 336,
@@ -299,8 +299,8 @@
   {
    "t": 90,
    "food": [
-    "5d1e5c29",
-    "1846baaf"
+    "e033f21a",
+    "2f1047f4"
    ],
    "colonies": [
     {
@@ -311,7 +311,7 @@
      "population": 153,
      "ants": "d4da66f2",
      "fields": [
-      "e915c7c",
+      "e888f306",
       "9da23014"
      ],
      "crossedUp": 197,
@@ -325,7 +325,7 @@
      "population": 161,
      "ants": "cb80233b",
      "fields": [
-      "c86525ca",
+      "7a39c9dc",
       "68503581"
      ],
      "crossedUp": 362,
