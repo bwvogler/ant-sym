@@ -18,12 +18,7 @@
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
-import {
-  Worker,
-  isMainThread,
-  parentPort,
-  workerData,
-} from "node:worker_threads";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -79,47 +74,17 @@ if (isMainThread) {
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
-  const worst = (k) =>
-    results.some((r) => r[k] < 0)
-      ? "never (some seed)"
-      : `${Math.max(...results.map((r) => r[k]))} s`;
-  console.log(
-    `worst seed: quarter ${worst("quarter")}, queen ${worst("queen")}`,
-  );
+  const worst = (k) => (results.some((r) => r[k] < 0) ? "never (some seed)" : `${Math.max(...results.map((r) => r[k]))} s`);
+  console.log(`worst seed: quarter ${worst("quarter")}, queen ${worst("queen")}`);
 } else {
-  const { Game, GAME_REGROW, gameRng } =
-    await import("../../web/src/colony/game.ts");
-  const { INFECTED, STRAINS, askedLevers } =
-    await import("../../web/src/colony/fungus.ts");
+  const { Game, GAME_REGROW, gameRng } = await import("../../web/src/colony/game.ts");
+  const { INFECTED, STRAINS, askedLevers } = await import("../../web/src/colony/fungus.ts");
   const { fungalKey } = await import("../../web/src/colony/fungusBrain.ts");
-  const { STRAIN_DEFAULT } =
-    await import("../../web/src/colony/fungalPolicy.ts");
+  const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateSideWorld } = await import("../../web/src/colony/world.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const {
-    seed,
-    seconds,
-    aim,
-    evolve,
-    buy,
-    order,
-    strain,
-    map,
-    hyphae,
-    growth,
-    grant,
-  } = workerData;
-  const answers = new Map(
-    JSON.parse(
-      readFileSync(
-        new URL(
-          `../../web/public/precache/fungus-${aim}.json`,
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    ),
-  );
+  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant } = workerData;
+  const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
   const g =
     map === "one"
       ? new Game(
@@ -134,31 +99,12 @@ if (isMainThread) {
           },
           gameRng(seed, 0),
         )
-      : new Game(
-          generateSideWorld(seed),
-          { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW },
-          gameRng(seed, 0),
-        );
+      : new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
   const menu = g.fungus.menu;
-  g.fungus.bindPolicy(
-    "fungus",
-    (s) =>
-      answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ??
-      STRAIN_DEFAULT,
-  );
+  g.fungus.bindPolicy("fungus", (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT);
   if (growth) {
     const { growthKey } = await import("../../web/src/colony/growthBrain.ts");
-    const grows = new Map(
-      JSON.parse(
-        readFileSync(
-          new URL(
-            `../../web/public/precache/growth-${aim}.json`,
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-      ),
-    );
+    const grows = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/growth-${aim}.json`, import.meta.url), "utf8")));
     g.fungus.bindPolicy("growth", (s) => grows.get(growthKey(s)) ?? null);
   }
   g.land(
@@ -219,8 +165,7 @@ if (isMainThread) {
     if (r.half < 0 && a.s >= 0.5) r.half = t;
     if (r.queen < 0 && g.revealed[0]) r.queen = t;
     if (r.rival < 0 && b && b.n > 0) r.rival = t;
-    if (k % (30 * 60) === 0 && k > 0)
-      r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
+    if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
   }
   r.earned = Math.round(g.fungus.evolution?.earned ?? 0);
   r.spent = g.fungus.evolution?.spent ?? 0;
