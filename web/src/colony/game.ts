@@ -1058,6 +1058,12 @@ export class Game {
         this.#aimRaids(k);
         // On open ground each ant's stance is its own, from what it senses (docs/stance.md): nobody chooses one for the colony.
         if (c.ownStances) return;
+        // A species with no stance lane (the desert ant) has no stance to choose: it forages, and no colony-wide count (intake, larder,
+        // head count, enemies by the nest: nothing an ant senses) picks one for it (review of #138, S1).
+        if (!this.params.species.lanes.stance) {
+          c.stance = "forage";
+          return;
+        }
         // A stance is part of every ant's situation: a change re-asks the ants by itself.
         c.stance = c.stancePolicy(c.stanceSituation(this.enemiesNearNest(k) > 0));
         this.strategyChoices++;
