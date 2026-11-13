@@ -3816,7 +3816,9 @@ export class Colony {
           mode === RETURN &&
           !carrying &&
           !pellet &&
-          !this.isTired(i) &&
+          // Tired, it rests; hungry enough to fetch, it gets up (restFetch, ja-4rfr: the old retired inside sat by
+          // the starving brood).
+          (!this.isTired(i) || (p.restFetch > 0 && this.under[i] === 1 && fetches(this, i))) &&
           !this.inbound(i, mode) &&
           (this.restT[i] = this.restT[i] + dt) > REST &&
           (!gate || ((rolled = true), this.leaves(i, dt, toEnemy !== null)))
