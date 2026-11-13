@@ -314,3 +314,21 @@ test("the patch's tip aimed at the hole never starts with its own patch ahead (j
     assert.ok(!plane.has(nx(t.x, t.y, t.heading), ny(t.y, t.heading)), `seed ${seed}: its own patch ahead of the aimed tip`);
   }
 });
+
+test("in the game, a hypha dug through in the curtain regrows from its stump into the dug cell (ja-2bw.15)", () => {
+  const g = game(true);
+  crossDown(g);
+  runFor(g, 30);
+  const h = g.fungus.hyphaeOn(CURTAIN)!;
+  // A soil cell a hypha holds that grew from another (not a root), so it leaves a stump.
+  const k = [...h.soil].find((c) => (h.parent.get(c) ?? -1) !== -1)!;
+  assert.ok(k !== undefined, "no hypha grown in the curtain's soil");
+  const [x, y] = keyCell(k);
+  g.world!.curtain.rock.set(x, y, OPEN);
+  runFor(g, 3);
+  assert.ok(!h.has(x, y), "not cut");
+  assert.ok(h.stumps.size > 0, "no stump left");
+  for (let t = 0; t < 60 && !h.has(x, y); t++) runFor(g, 1);
+  assert.ok(h.has(x, y), "nothing regrew into the dug cell in 60 s");
+  assert.equal(rockAt(g.world!.curtain, x, y), OPEN, "the cell is still dug: the hypha runs on its back wall");
+});

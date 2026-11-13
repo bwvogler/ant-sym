@@ -11,7 +11,7 @@ import { AHEADS, EXPOSURES, RUNS, SUPPLIES, type GrowthSituation } from "./hypha
 // (its run since branching, its first heading, the spots near it).
 
 /** Bump when the growth situation, the legend or the question changes: old cached answers no longer apply. */
-export const GROWTH_BRAIN_VERSION = 2;
+export const GROWTH_BRAIN_VERSION = 3;
 
 /** The growth situation's fields in the order a code and a cache key read them: 4 × 3 × 2 × 2 = 48 (run since ja-2bw.18). */
 export const GROWTH_SCHEMA = defineSchema<GrowthSituation>([
@@ -32,7 +32,7 @@ export const GROWTH_CRITERIA: Record<GrowthChoice, string> = {
   branch:
     "branch: put out a second tip beside it, both growing on (against a wall met head on, split both ways): the only way the mycelium gains tips, and what a real hypha does after a long run",
   rest: "rest: grow nothing this time, and keep the mass",
-  fuse: "fuse: join its own hypha ahead, closing a loop (only when ahead is own): a loop keeps the far part fed if ants cut the hypha",
+  fuse: "fuse: join its own hypha ahead, closing a loop (only when ahead is own), and end this tip: a loop keeps the far part fed if ants cut the hypha",
   fruit:
     "fruit: end this tip for good as a spore spot on the dug cell it touches (only on a wall or in a dug cell): ants walking there pick up spores, but the tip grows no more",
 };
@@ -42,7 +42,7 @@ export const GROWTH_BATCH = GROWTH_SITUATIONS;
 
 export const GROWTH_LEGEND = legendOf(GROWTH_SCHEMA, {
   intro:
-    "You are a fungus whose mycelium grows through the soil round an ant nest as hyphae: threads whose tips grow a cell at a time. Each key in `tips` is one growing tip, as it senses its point. ",
+    "You are a fungus whose mycelium grows through the soil round an ant nest as hyphae: threads whose tips grow a cell at a time. Each key in `tips` is one growing tip, as it senses its point. Only tips grow: a tip that fruits or fuses is gone, and where the last tips end the mycelium grows no further, down a nest's tunnels too, until ants cut it and it regrows. Early on there are only a few tips. ",
   fields: [
     [
       "ahead",
