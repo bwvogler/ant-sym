@@ -114,6 +114,10 @@ Still to read (`ja-rf5.1`; the papers are paywalled, so the routes are interlibr
 
 Leads not yet followed: Knaden & Wehner 2003 (*J Insect Behav* 16:717) and 2004 (*Science* 305:60) on aggression near the nest; Wehner, Meier & Zollikofer 2004 (*Ecol Entomol* 29:240) on forager lifetime; Schmid-Hempel 1984 (*Behav Ecol Sociobiol* 14:263), cited for returning successful foragers (context unread); Pinter-Wollman et al. 2013 (*Anim Behav*) for the nearest analogue of entrance contact (harvester ants, not *Cataglyphis*). No field follow-up of Razin et al. 2013 was found, and no field record of fungal infection or corpse removal in *Cataglyphis*.
 
+## What ja-rf5.3 built from this (PRD §60.2)
+
+The species on the descriptor (`colony/desertAnt.ts`): its own words and 16-situation lane (mode, tired, enemy), no follow and no stance lane, no trail or alarm channel, its own local rule with rule text, no corpse removal, about 200 workers. On one world it lays no trail (D1 passes), asks only its own fields, and finds and stores food on its own (less than the generic ant, without recruitment), so it needs no food sense to live; the plume (`ja-rf5.4`) is for finding food sooner. Its Jev lane costs about $0.004 an hour while a doctrine is new; its shipped answers wait on a live check at the owner's say.
+
 ## Sources
 
 - Razin N, Eckmann J-P, Feinerman O (2013). Desert ants achieve reliable recruitment across noisy interactions. *J R Soc Interface* 10:20130079. [doi:10.1098/rsif.2013.0079](https://doi.org/10.1098/rsif.2013.0079), [PMC3627090](https://pmc.ncbi.nlm.nih.gov/articles/PMC3627090/) (full text read 2026-11-11)

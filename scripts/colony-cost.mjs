@@ -18,7 +18,10 @@
 // are estimated too, as if each were asked like the modes; they are not asked
 // by the page yet, so they are reported apart and not in the session's total.
 //
-// Usage: node scripts/colony-cost.mjs [--side | --one] [minutes=10] [ants=600] [seed=1]
+// --species <id> plays that species (ja-rf5.3): its lane words, situations and local rule, and its stance lane only if it has one; the
+// generic ant without it. Known here: generic, desert (docs/desert-ant.md).
+//
+// Usage: node scripts/colony-cost.mjs [--side | --one] [--species <id>] [minutes=10] [ants=600] [seed=1]
 import {
   LANES,
   PLANE,
@@ -37,6 +40,8 @@ import {
   generateWorld,
   mulberry32,
   worldExtent,
+  GENERIC_ANT,
+  DESERT_ANT,
 } from "../web/src/colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { helpAndExit } from "./lib/usage.mjs";
@@ -44,9 +49,14 @@ helpAndExit(import.meta.url);
 
 const side = process.argv.includes("--side");
 const one = process.argv.includes("--one");
+const KNOWN = { generic: GENERIC_ANT, desert: DESERT_ANT };
+const sAt = process.argv.indexOf("--species");
+const speciesId = sAt >= 0 ? process.argv[sAt + 1] : "generic";
+const species = KNOWN[speciesId];
+if (!species) throw new Error(`--species: no "${speciesId}" (known: ${Object.keys(KNOWN).join(", ")})`);
 const [minutes = 10, ants = 600, seed = 1] = process.argv
   .slice(2)
-  .filter((a) => a !== "--side" && a !== "--one")
+  .filter((a, k, all) => a !== "--side" && a !== "--one" && a !== "--species" && all[k - 1] !== "--species")
   .map(Number);
 const USD = USD_PER_INPUT_TOKEN;
 const DT = 1 / 30;
@@ -103,18 +113,21 @@ function lane(key, pack, contextOf, local, acc = null, idPrefix = "s", batch = 1
   };
 }
 /** A lane for an ant's row of the lane registry (colony/lanes.ts): its key, packing, context and local rule, the id prefix its items carry and its request size. */
-const fromRow = (row) =>
+const fromRow = (row, lw, local = row.local) =>
   lane(
-    (s) => row.key(s, undefined),
-    row.pack,
-    (d) => row.contextOf(d),
-    row.local,
+    (s) => row.key(s, undefined, lw),
+    (items, d) => row.pack(items, d, lw),
+    (d) => row.contextOf(d, undefined, lw),
+    local,
     null,
     row.kind.idPrefix,
     row.batch ?? 100,
   );
-const modes = fromRow(LANES.mode);
-const stances = fromRow(LANES.stance);
+// The species' own words and local rule (the generic ant's are the rows' defaults); no stance lane where it has none.
+const modes = fromRow(LANES.mode, species.lanes.mode, species.policy ?? LANES.mode.local);
+const stances = species.lanes.stance ? fromRow(LANES.stance, species.lanes.stance) : null;
+const modeContext = (d) => LANES.mode.contextOf(d, undefined, species.lanes.mode);
+const stanceContext = (d) => LANES.stance.contextOf(d, undefined, species.lanes.stance);
 const hooks = Object.fromEntries(
   RESPONSE_HOOKS.map((h) => [
     h,
@@ -122,20 +135,20 @@ const hooks = Object.fromEntries(
       (t) => responseKey(h, t),
       (items, d) => packResponseRequest(h, items, d),
       (d) => responseContext(h, d),
-      localResponses[h],
+      species.responses[h] ?? localResponses[h],
       { tokens: 0, requests: 0, questions: 0 },
     ),
   ]),
 );
-const game = new Game(world, { antCount: ants, rivalAnts: ants }, side || one ? gameRng(seed) : mulberry32(seed + 7), {
+const game = new Game(world, { antCount: ants, rivalAnts: ants, species }, side || one ? gameRng(seed) : mulberry32(seed + 7), {
   policy: modes.policy,
-  stance: stances.policy,
+  ...(stances ? { stance: stances.policy } : {}),
   responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
 });
 const colony = game.player;
 const flush = () => {
   modes.flush();
-  stances.flush();
+  stances?.flush();
   for (const h of RESPONSE_HOOKS) hooks[h].flush();
 };
 
@@ -144,7 +157,11 @@ const plan = [
   DOCTRINES[0],
   DOCTRINES[1],
   DOCTRINES[2],
-  { id: "custom", name: "Custom", text: "Hoard food: follow any food scent, even faint; explore otherwise; flee home at strong alarm." },
+  {
+    id: "custom",
+    name: "Custom",
+    text: "Hoard food: follow any food scent, even faint; explore otherwise; flee home at strong alarm.",
+  },
   DOCTRINES[0],
 ];
 const slice = (minutes * 60) / plan.length;
@@ -154,14 +171,14 @@ let t = 0;
 for (const d of plan) {
   doctrine = d.text;
   modes.clear();
-  stances.clear();
+  stances?.clear();
   for (const h of RESPONSE_HOOKS) hooks[h].clear();
   colony.reconsider();
   const before = {
     tokens,
     requests,
-    modes: modes.seen(LANES.mode.contextOf(doctrine)),
-    stances: stances.seen(LANES.stance.contextOf(doctrine)),
+    modes: modes.seen(modeContext(doctrine)),
+    stances: stances ? stances.seen(stanceContext(doctrine)) : 0,
   };
   const end = t + slice;
   for (; t < end; t += DT) {
@@ -176,8 +193,8 @@ for (const d of plan) {
   flush();
   phases.push({
     name: d.name,
-    newSituations: modes.seen(LANES.mode.contextOf(doctrine)) - before.modes,
-    newStances: stances.seen(LANES.stance.contextOf(doctrine)) - before.stances,
+    newSituations: modes.seen(modeContext(doctrine)) - before.modes,
+    newStances: stances ? stances.seen(stanceContext(doctrine)) - before.stances : 0,
     tokens: tokens - before.tokens,
     requests: requests - before.requests,
   });
@@ -186,7 +203,7 @@ for (const d of plan) {
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
 const r = game.rival;
 console.log(
-  `game cost, offline (${one ? "one world" : side ? "side view" : "top-down"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
+  `game cost, offline (${one ? "one world" : side ? "side view" : "top-down"}${species === GENERIC_ANT ? "" : `, ${species.name}`}${stances ? "" : ", no stance lane"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
 );
 console.log(
   `you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`,
