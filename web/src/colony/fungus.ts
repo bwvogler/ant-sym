@@ -1084,6 +1084,15 @@ export class Fungus {
       stepRound(maps, level, budget, this.growthPolicy);
       stepped = true;
     }
+    // At a web (the Mycelium upgrade's third level, ja-2bw.8): the hyphae feeding many tips thicken into cords, which take
+    // CORD_DIGS digs to cut, and dead ends nothing uses fade, freeing their mass (a corpse's cell is kept).
+    if (stepped && e.level("mycelium") >= 2)
+      for (const [l, h] of this.#hyphae.entries()) {
+        if (!h) continue;
+        h.thicken();
+        const corpses = this.#corpses[l] as Map<number, number>;
+        h.regress((k) => corpses.has(k));
+      }
     // Hypha the ants have dug through is cut, and the mass it held is lost (ja-2bw.4: the colonies' counterplay).
     if (stepped)
       for (const { h, g } of maps) {
