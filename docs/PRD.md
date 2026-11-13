@@ -4737,14 +4737,28 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
   Every seed of 1–20 finds sooner with the plume. `tests/slow/assays.test.ts` holds D3 on seeds 1–3.
 - **Tests:** `tests/int/desertPlume.test.ts`. Mutations, each failing it: leave the plume out of the save; drop the steering line; rebuild every tick; let it run off the plane (the nest's layer).
 
-### 60.5 Heat: the body's limit and the sun's height (ja-rf5.5, ja-rf5.12; plan, 2026-11-13)
+### 60.5 Heat: the body's limit, the sun's height and the night (ja-rf5.5, ja-rf5.12, 2026-11-13)
 
-- **Problem.** Heat as a body rule alone (`heat.ts`, on the branch): a 10-minute day (ground 25 °C at dawn), body heat toward the ground's on the plane and the nest's inside, the `hot` field felt from `heatFelt` until back under `heatCool`, death past 53.6 °C. On D5 (two days, seeds 1–10) the best setting (noon 56 °C, a 30 s body, hot at 45 °C) passes 6 of 10: the colony avoids noon (out at noon ≤ 0.75 × dawn) but heat kills 17–30 % of the colony a day on 4 seeds, against 16 %. An ant inside is always cool, so it sets out at noon.
+- **Problem.** Heat as a body rule alone (`heat.ts`): an ant inside is always cool, so it sets out at noon. On D5 (two days, seeds 1–10) the best body-only setting passed 6 of 10, with heat killing 17–30 % of the colony a day on 4 seeds against 16 %; the dead were ants already on their way home.
 - **Research** ([desert-heat.md](desert-heat.md)): the hot-adapted *Cataglyphis* forage near their limit (full text: de Souza Araujo 2023, Sánchez-García 2022); the sun's elevation seen at the entrance, not the ground's temperature, sets when the nest opens and closes (*C. floricola*, Amor et al. 2011: **unverified**, abstract only); no antennal thermoreceptor measured covers desert heat (Nagel & Kleineidam 2015, full text: silent above 38 °C).
-- **Decisions (owner, 2026-11-13):** a day cycle; heat sensed as a situation field, with the shipped answers asked again; heat kills; the cue at the hole is **the sun's height**, not the ground's heat.
-- **Plan:** a `sun` field (low, high) in the desert lane, seen on the plane and at the top of the ant's own shaft (low deeper in), 32 → 64 situations, words version 4; its local rule returns when hot, or when the sun is high with empty jaws. The sun's threshold is **design**, tuned on D5. The shipped answers are asked again (about $0.001, owner approved). The warm wash on the plane shows the day's heat (built).
-- **Assay D5** (`experiment.ts`): out at noon ≤ 0.75 × at dawn; heat deaths ≤ 16 % of the colony a day (a borrowing, unverified); food picked up in every 30 s outside the high-sun window. Seeds 1–10 by the worst seed, confirmed on 11–20.
-- **Open:** the threshold; Amor 2011 in full (`ja-rf5.13`).
+- **Decisions (owner, 2026-11-13):** a day cycle; heat sensed as situation fields, the shipped answers asked again; heat kills; the cue at the hole is **the sun's height**, not the ground's heat; **a night** (the sun down), added after the plan.
+- **Built.** `heat.ts`; `ColonyParams.heat*` (all off for the generic ant: `heatDay` 0; goldens bit-exact); the ants' `bodyHeat` and `hot` arrays; `Colony.heatStep` before the tick's per-ant loop, killing past `heatDeath` (`diedHot`, the journal's "died of heat").
+  - **The day:** 600 s, the last third night. The sun's height is sin² over the daylight, 0 all night; the ground follows it, 25 °C from sunset to sunrise, 56 °C at noon (the air at ant height: a surface of about 70 °C less 6–7 °C, unverified).
+  - **The body:** closes on its surroundings with a 30 s time constant (the plane's ground out there, the nest's 30 °C inside); hot from 45 °C until back under 34 °C (the way a tired ant rests until fully rested); dies at 53.6 °C (*C. bombycina*, a borrowing, unverified).
+  - **The desert lane:** `hot` (cool, hot) and `sun` (low, high, down), seen on the plane and at the top of its own shaft (`atGate`), low deeper in; the sun counts as high from 0.6 of its noon height. 16 → 96 situations; words version 7. Its local rule returns when hot, at a high sun and at night.
+  - **On the field:** a warm wash over the plane deepens toward noon; a dark wash at night.
+- **D5** (`npm run exp -- d5 --one`), local rule, pass 10/10 on seeds 1–10 and 10/10 on 11–20:
+
+| seeds | out at noon ÷ in the low sun (median, worst) | set out at night | heat deaths a day (median, worst) | fewest pickups in a 30 s window (outside high sun and night) | food home (median) |
+|---|---|---|---|---|---|
+| 1–10 | 0.08, 0.25 | 0 | 2.4 %, 11.3 % | 15 | 788 |
+| 11–20 | 0.07, 0.25 | 0 | 1.1 %, 13.5 % | 4 | 923 |
+
+  Less food home than with no night (the body-only build's median was about 1,600): a third of the day is dark. 0.55 ms/tick.
+- **Jev's answers, asked three times** ($0.0018 each, $0.0054 in all, owner approved each). v5 and v6 answers ignored the sun: a fresh, cool explorer kept exploring at a high sun and at night (Forage: 7 such situations under v6), and replayed offline they failed D5 on all of seeds 1–5 (about 20 ants out at night, up to 28 % dead a day). v7 conditions the answer, as fight's "(only when enemy is near)" did (§60.2): "explore: go out, or keep searching, alone for food (only while the sun is low and it is not hot)". Under Cautious and Warlike no situation with a high or set sun or a hot body answers explore; under Forage two do, both an ant whose fight is over. Replayed offline (each doctrine's answers for the mode lane, seeds 1–5), D5 passes 5/5 under every doctrine; with no rival the three doctrines play alike (they differ only with a stranger near).
+- **Cost:** about 680 tokens a question (`colony-cost --species desert`), $0.0029 an hour while a doctrine is new (was about $0.004 for the 16-situation lane at its earlier pace; this estimate's pace differs). A cached game spends nothing.
+- **Tests:** `tests/int/desertHeat.test.ts` (the day, the body, the sun seen only where the sky is, heat deaths counted, the sun's cue saving lives, nobody setting out at night, no heat for the generic ant). Mutations, each failing it: heat deaths not counted; the ant blind to the sun.
+- **Open:** Amor 2011 in full (`ja-rf5.13`); lost carriers still caught out at night (the game's lost-carrier problem, G1), counted as on their way home.
 
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 

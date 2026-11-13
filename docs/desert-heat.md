@@ -65,6 +65,10 @@ Cheapest first:
 - **To measure:** the sun's threshold (design), and whether intake keeps running outside the high-sun window.
 - **To read:** Amor et al. 2011 in full (or Amor's 2011 thesis, its chapter on nest opening and closing) for the manipulation and the times; Wehner & Wehner 2011 for the start and stop temperatures.
 
+## What ja-rf5.5 and ja-rf5.12 built (PRD §60.5)
+
+Body heat and the sun's height, plus a night the owner added after this note: the sun is down for the last third of each 10-minute day, and the `sun` field reads low, high or down. The colony comes in at a high sun and stays in at night, and D5 passes on all of seeds 1–20 with the local rule, and on seeds 1–5 with Jev's shipped answers. What the measurements overturned: the ant's own heat alone was not enough (§1's plan, PRD §60.5), and Jev drew no consequence from the sun's words until the answer itself named it ("explore … only while the sun is low and it is not hot"). The sun's threshold (0.6 of its noon height) and the night's length are design.
+
 ## Sources
 
 - Amor F, Ortega P, Cerdá X, Boulay R (2011). Solar elevation triggers foraging activity in a thermophilic ant. *Ethology* 117:1031–1039. [doi:10.1111/j.1439-0310.2011.01955.x](https://doi.org/10.1111/j.1439-0310.2011.01955.x) (abstract only)
