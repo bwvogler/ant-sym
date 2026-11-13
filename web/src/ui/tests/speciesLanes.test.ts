@@ -15,6 +15,9 @@ import {
   type LaneWords,
   type Mode,
   type Species,
+  defineSchema,
+  MODES,
+  type SpeciesSituation,
 } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
 
@@ -108,4 +111,19 @@ test("a species with no mode words of its own still has its local rule in the cl
   assert.equal(jev.explain(sit).mode, "fight", "explain falls back to the species' rule");
   assert.equal(jev.explain(sit).by, "local");
   assert.equal(jev.policy(sit), "fight", "and so does the client's policy");
+});
+
+test("a species with its own situation schema is cached under its own keys (ja-fnd.5.10)", () => {
+  const schema = defineSchema<SpeciesSituation>([
+    { name: "mode", values: MODES },
+    { name: "enemy", values: ["none", "near"] },
+    { name: "age", values: ["young", "old"] },
+  ]);
+  const words: LaneWords<Mode> = { ...LONE_MODE, legend: "Its own legend. ", schema };
+  const { g, jev } = setup({ ...LONE, lanes: { mode: words } });
+  const s = { ...sit, age: "old" } as SpeciesSituation;
+  const answer = notLocal(Object.keys(LONE_MODE.criteria));
+  assert.equal(jev.seed(policyContext(DOCTRINE, words), [[schema.key(s), answer]]), 1);
+  assert.equal(g.player.policy(s), answer, "looked up by the species' own key");
+  assert.equal(schema.key(s), "explore|none|old");
 });

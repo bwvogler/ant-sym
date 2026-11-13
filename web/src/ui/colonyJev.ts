@@ -195,7 +195,7 @@ function antLane<Sit, Ans extends string>(
 ): Lane<Sit, Ans> {
   return lane<Sit, Ans>({
     name: row.name,
-    key: (s) => row.key(s, undefined),
+    key: (s) => row.key(s, undefined, lw),
     pack: (items, w) => row.pack(items, w, lw),
     read: (a, id, s, key) => row.read(a, id, s, key, lw),
     local,

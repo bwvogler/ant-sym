@@ -38,7 +38,15 @@ import {
   type GrowthChoice,
 } from "./growthBrain.ts";
 import type { GrowthSituation } from "./hyphae.ts";
-import { type LaneWords, STANCE_SCHEMA, type Mode, type Situation, type Stance, type StanceSituation } from "./vocab.ts";
+import {
+  type LaneWords,
+  STANCE_SCHEMA,
+  type Mode,
+  type Situation,
+  type SpeciesSituation,
+  type Stance,
+  type StanceSituation,
+} from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -137,7 +145,7 @@ export interface LaneSpec<Sit, Ans extends string, Ctx, Variant extends string =
   /** situations to a request when not the client's batch (absent: the client's; ColonyJevOptions.batch, 100) */
   readonly batch: number | null;
   /** the cache key for a situation; `ctx` is the lane's own context: the fungus's menu (the levers asked are in the key), nothing for an ant */
-  key(s: Sit, ctx: Ctx): string;
+  key(s: Sit, ctx: Ctx, lane?: LaneWords<Ans>): string;
   /** one request for many situations, each with the key it was asked under, under `words`; `lane` is a species' own legend and criteria (absent: the generic ant's; the fungus's has none yet) */
   pack(items: { id: string; key: string; situation: Sit }[], words: string, lane?: LaneWords<Ans>): JevRequest;
   /** the answer to item `id`, asked under `key`, or null when it is not one the question allowed (the choices of `lane`'s criteria, when given) */
@@ -151,7 +159,7 @@ export interface LaneSpec<Sit, Ans extends string, Ctx, Variant extends string =
   /** the local rule's answer (absent: the lane's local rule is not a pure function of the situation: the fungus's is a Game method) */
   local?(s: Sit): Ans;
   /** every situation the lane can be asked in (absent: not enumerable: the fungus's are the ones a game meets) */
-  all?(): Sit[];
+  all?(lane?: LaneWords<Ans>): Sit[];
 }
 
 export const SAMPLE_SITUATION: Situation = {
@@ -190,13 +198,16 @@ const modeLane: Has<LaneSpec<Situation, Mode, undefined>, "local" | "all"> = {
   presets: DOCTRINES,
   gather: false,
   batch: null,
-  key: (s) => situationKey(s),
+  key: (s, _ctx, lane) => (lane?.schema ? lane.schema.key(s as SpeciesSituation) : situationKey(s)),
   pack: (items, words, lane) => packModeRequest(items, words, lane),
   read: (answers, id, _situation, _key, lane) => readMode(answers, id, lane ? Object.keys(lane.criteria) : undefined),
   valid: (_key, answer, lane) => Object.keys(lane?.criteria ?? MODE_CRITERIA).includes(answer),
   contextOf: (words, _variant, lane) => policyContext(words, lane),
   local: localPolicy,
-  all: () => Array.from({ length: SITUATIONS }, (_, c) => decodeSituation(c)),
+  all: (lane) =>
+    lane?.schema
+      ? Array.from({ length: lane.schema.size }, (_, c) => lane.schema!.decode(c))
+      : Array.from({ length: SITUATIONS }, (_, c) => decodeSituation(c)),
 };
 
 const stanceLane: Has<LaneSpec<StanceSituation, Stance, undefined>, "local" | "all"> = {
@@ -285,14 +296,14 @@ export interface ErasedLane {
   readonly presets: readonly { readonly id: string; readonly text: string }[];
   readonly gather: boolean;
   readonly batch: number | null;
-  key(s: unknown, ctx: ReadonlySet<string> | undefined): string;
+  key(s: unknown, ctx: ReadonlySet<string> | undefined, lane?: LaneWords): string;
   pack(items: { id: string; key: string; situation: unknown }[], words: string, lane?: LaneWords): JevRequest;
   read(answers: Record<string, JevAnswer>, id: string, situation: unknown, key: string, lane?: LaneWords): string | null;
   valid(key: string, answer: string, lane?: LaneWords): boolean;
   contextOf(words: string, variant?: string, lane?: LaneWords): string;
   asks?(s: unknown, ctx: ReadonlySet<string> | undefined): boolean;
   local?(s: unknown): string;
-  all?(): unknown[];
+  all?(lane?: LaneWords): unknown[];
 }
 /** Every lane, in the order the page asks them. */
 export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.stance, LANES.fungus, LANES.growth];

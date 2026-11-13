@@ -1,0 +1,98 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { Colony, localPolicy } from "../../colony.ts";
+import { MODE_CRITERIA, packModeRequest, situationKey } from "../../colonyBrain.ts";
+import { Game } from "../../game.ts";
+import { LANES, SAMPLE_SITUATION } from "../../lanes.ts";
+import { localResponses } from "../../responses.ts";
+import { defineSchema, legendOf } from "../../schema.ts";
+import type { Species } from "../../species.ts";
+import { MODES, STANCES, TRAILS, type LaneWords, type Mode, type Policy, type SpeciesSituation } from "../../vocab.ts";
+import { generateWorld, mulberry32 } from "../../world.ts";
+import { smallOne } from "../builders.ts";
+
+// ja-fnd.5.10's acceptance: a species asks its mode lane about its own situation. This one leaves two generic fields out (homeTrail, alarm) and adds one
+// it senses itself (its age band, own body): its key, its question, the codes its ants keep and what its policy reads are all its own, and the generic
+// ant's are untouched (the goldens, the schema and precache pins hold that).
+
+const AGES = ["young", "middle", "old"] as const;
+const SCHEMA = defineSchema<SpeciesSituation>([
+  { name: "mode", values: MODES },
+  { name: "tired", values: [false, true], key: (v) => (v ? "tired" : "fresh") },
+  { name: "foodTrail", values: TRAILS },
+  { name: "enemy", values: ["none", "near"] },
+  { name: "stance", values: STANCES },
+  { name: "age", values: AGES },
+]);
+const WORDS: LaneWords<Mode> = {
+  legend: legendOf(SCHEMA, {
+    intro: "Each key in `ants` is the situation of one worker. ",
+    fields: [
+      ["mode", "mode is what it is doing. "],
+      ["tired", "tired says whether it is tired. "],
+      ["foodTrail", "foodTrail is the food scent it smells. "],
+      ["enemy", "enemy says whether strangers are near. "],
+      ["stance", "stance is its own stance. "],
+      ["age", "age is how old it is: young, middle or old. "],
+    ],
+  }),
+  criteria: MODE_CRITERIA,
+  version: 1,
+  schema: SCHEMA,
+};
+const asked: SpeciesSituation[] = [];
+const spy: Policy = (s) => (asked.push(s as SpeciesSituation), localPolicy(s));
+const AGED: Species = {
+  id: "aged",
+  name: "Aged",
+  params: {},
+  responses: localResponses,
+  lanes: { mode: WORDS },
+  policy: spy,
+  sense: (c, i) => ({ age: AGES[c.band(i)] }),
+};
+
+test("its schema is its own: a key and a question over its fields, the generic ant's unchanged", () => {
+  const s: SpeciesSituation = { ...SAMPLE_SITUATION, age: "old" };
+  assert.equal(LANES.mode.key(s, undefined, WORDS), "explore|fresh|faint|none|forage|old");
+  assert.equal(LANES.mode.key(s, undefined), situationKey(SAMPLE_SITUATION), "no words: the generic key");
+  const req = packModeRequest([{ id: "a0", situation: s }], "forage", WORDS) as { state: { ants: Record<string, object>; legend: string } };
+  assert.deepEqual(Object.keys(req.state.ants.a0!), ["mode", "tired", "foodTrail", "enemy", "stance", "age"]);
+  assert.equal(req.state.legend, WORDS.legend);
+  assert.equal(LANES.mode.all!(WORDS).length, SCHEMA.size, "every situation it can be asked in");
+});
+
+test("its ants are asked about their own situation, and keep its codes", () => {
+  asked.length = 0;
+  const g = new Game(smallOne(7), { antCount: 40, rival: false, species: AGED }, mulberry32(1));
+  for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
+  const c = g.player;
+  assert.equal(c.seen.length, SCHEMA.size, "situations seen are counted over its own");
+  assert.ok(c.situationsSeen > 0);
+  assert.ok(asked.length > 0, "its policy was asked");
+  assert.ok(
+    asked.every((s) => AGES.includes(s.age as (typeof AGES)[number])),
+    "with its own field",
+  );
+  let decoded = 0;
+  for (let i = 0; i < c.n; i++) {
+    const q = c.lastQuestion(i);
+    if (!q) continue;
+    decoded++;
+    assert.deepEqual(Object.keys(q), ["mode", "tired", "foodTrail", "enemy", "stance", "age"], "its last question decodes by its schema");
+  }
+  assert.ok(decoded > 0);
+});
+
+test("a schema without every mode, or too big for an ant's question code, is refused", () => {
+  const c = new Colony(generateWorld(1, { size: { w: 60, h: 40 } }), {}, mulberry32(1));
+  assert.throws(() => c.setSituation({ schema: defineSchema<SpeciesSituation>([{ name: "tired", values: [false, true] }]) }), /mode field/);
+  assert.throws(
+    () => c.setSituation({ schema: defineSchema<SpeciesSituation>([{ name: "mode", values: ["explore", "return", "fight"] }]) }),
+    /every mode/,
+  );
+  const big = Array.from({ length: 16 }, (_, k) => ({ name: `f${k}`, values: [0, 1] }));
+  assert.throws(() => c.setSituation({ schema: defineSchema<SpeciesSituation>([{ name: "mode", values: MODES }, ...big]) }), /32,767/);
+  c.setSituation(null);
+  assert.equal(c.seen.length, 3888, "null: the generic situation again");
+});
