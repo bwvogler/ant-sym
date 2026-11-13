@@ -58,17 +58,32 @@ export const GUIDE: GuideEntry[] = [
   {
     id: "home-trail",
     trail: "home",
-    title: "Home trail and the way home",
+    title: "Home trail",
     swatch: [css(HOME_RGB)],
     onScreen:
       "The orange wash (Trails: “to home”). Ants walking out lay it, so it leads carriers back. Like the food trail, it shows only where your hosts have smelled it lately.",
     realAnts:
-      "Outside, home is a small hole. A forager keeps a running home vector from its steps and a sky compass, with an error of roughly 10 % of the distance walked; landmarks and an odour at the entrance correct it near home, and the vector resets only inside the nest.",
+      "Some ants mark the ground while exploring as well as on the way home with food (Argentine ants; unverified). Whatever the trail, a forager also has its own sense of where home is (see The way home).",
     inGame:
       "Ants walking out lay the home trail; on the surface a carrier follows the food trail where it agrees with its home vector, and the vector otherwise.",
+    sources: [{ note: "trails", anchor: "which-journeys-lay-trail", label: "Which journeys lay trail" }],
+  },
+  {
+    // Every species' (owner, ja-rf5.11): how a forager gets home without a trail, which is all a desert ant has.
+    id: "way-home",
+    title: "The way home",
+    onScreen: "A forager heading back with food walks a fairly straight line toward its hole, whether or not any trail is there.",
+    realAnts:
+      "Outside, home is a small hole. A forager keeps a running home vector from its steps and a sky compass, with an error of roughly 10 % of the distance walked; landmarks and an odour at the entrance correct it near home, and the vector resets only inside the nest.",
+    inGame:
+      "On the surface each ant keeps its own home vector, which drifts with the distance it walks. Where the vector runs out with no hole in sight, it searches in a widening spiral round that point; on its own mound's spoil it steers for its hole.",
     sources: [
       { note: "nest-and-home", anchor: "outside-home-is-the-hole", label: "Outside: home is the hole" },
-      { note: "trails", anchor: "which-journeys-lay-trail", label: "Which journeys lay trail" },
+      {
+        note: "nest-search",
+        anchor: "near-the-nest-an-ant-whose-vector-has-run-out-follows-the-nests-own-smell",
+        label: "Near the nest, the nest's own smell",
+      },
     ],
   },
   {

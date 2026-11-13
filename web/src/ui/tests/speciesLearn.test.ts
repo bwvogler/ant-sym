@@ -134,6 +134,7 @@ test("the field guide leaves out the entries on trails a species doesn't lay: th
   );
   const gone = GUIDE.map((e) => e.id).filter((id) => !ids(DESERT_ANT).includes(id));
   assert.deepEqual(gone, ["food-trail", "home-trail", "food-quality", "double-bridge", "no-entry", "alarm"]);
+  assert.ok(ids(DESERT_ANT).includes("way-home"), "the way home, without a trail, is every species' (owner, review of #144 D1)");
   const note = (species: Species) => {
     const g = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));
     return guideNote((c) => g.player.ph.has(c), species.name);
