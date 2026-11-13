@@ -67,7 +67,7 @@ The descriptor above was drawn from one species. This section tests it against t
 - *Corpses*: the boolean `undertakes` is outgrown by termites (eat fresh, bury old, by odour) and the leafcutter (brood to the dump): widen it to "what a species does with a corpse, by its odour".
 - *Castes in the situation*: leafcutter and termites need a caste field: per-species schemas (`ja-fnd.5.10`).
 - *New modes*: emigration (Pharaoh ant, army ant) is the first time `MODES` grows; it needs per-species modes (`ja-fnd.5.9`) and the tick split (`ja-fnd.4.4`).
-- *Channels*: a long-lived trail (Pharaoh) and a relayed vibration (termites) are the only new channels (`ja-fnd.5.11`).
+- *Channels*: a long-lived trail (Pharaoh) and a relayed vibration (termites) are the only new channels (`ja-fnd.5.11`). **Channel sets built** (`ja-fnd.5.11`, 2026-11-13): `ColonyParams.channelSet` names the channels a species lays and reads (null: all, the generic ant); a channel left out is never laid on any layer, so it holds nothing and reads 0, and `inertLevers` names the fungus's levers that then have nothing to bend. New channels themselves are still to add when a species needs one.
 
 **What this changes.** The tier model holds. *L. neglectus* is the cheapest second consumer (generic lanes, wide tolerance as data, `queens[]` and the sickness cue, both shared with later species), the leafcutter the third (a caste field and a garden: tier 2 at its widest), and termites and army ants are tier 3 as expected. The Pharaoh ant, once *L. neglectus* exists, adds only emigration and a long trail. The order and the owner's decisions are in PRD §64.
 

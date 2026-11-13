@@ -418,6 +418,11 @@ export interface ColonyParams {
   /** evaporation and spread of the colony's pheromone channels, per channel and field; those left out keep their defaults */
   channels: Partial<Record<Channel, Partial<ChannelParams>>>;
   /**
+   * The channels the species lays and reads (ja-fnd.5.11), or null for every channel (the generic ant). A channel left out is never laid on
+   * any layer, so it holds nothing, wakes no chunk, and reads 0 to the colony's sensors and to the fungus's levers on it (inertLevers).
+   */
+  channelSet: readonly Channel[] | null;
+  /**
    * Trips end (ja-qnx): with "explore" or "follow", a fresh forager going home with empty jaws is that once it gets there
    * (the nest on a top-down map; the royal chamber in the side view, the old only), and asked afresh; and any value but
    * "return" also makes an ant that has just put its load down a follower (whatever this says: see the tick). "return"
@@ -492,6 +497,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   tolerance: TOLERANCE,
   enemyRange: 2,
   channels: Object.freeze({}),
+  channelSet: null,
   arrive: "explore",
   backfill: BACKFILL,
   tunnelDrift: 0.2,
@@ -943,7 +949,7 @@ export class Colony {
     const chans = channelParams(this.params.channels);
     if (this.#entrance === null && this.params.channels.food?.max === undefined)
       chans.food = { ...chans.food, max: this.params.foodCapTop };
-    this.ph = new Pheromones(map, chans);
+    this.ph = new Pheromones(map, chans, this.params.channelSet);
     const slots = {} as LayerSlots;
     if (world) {
       // One world: home is the curtain, bound now and between ticks.
@@ -960,7 +966,7 @@ export class Colony {
       if (!nest) throw new Error(`one world: the plane has no nest ${this.params.nest}`);
       const plane: LayerSlots = {
         map: world.plane,
-        ph: new Pheromones(world.plane, top),
+        ph: new Pheromones(world.plane, top, this.params.channelSet),
         nest,
         entrance: null,
         entranceCol: 0,
