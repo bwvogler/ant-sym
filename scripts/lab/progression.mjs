@@ -7,10 +7,11 @@
 //
 // --map one plays one world as the page does (ui/useColony.ts buildGame: generateOneWorld, no auto-founding); the
 // default, side, is the side world the earlier PRD sections (§50.12–14) measured on. --hyphae grows the mycelium as
-// hyphae (docs/hyphal-growth.md, ja-2bw.2).
+// hyphae (docs/hyphal-growth.md, ja-2bw.2). --growth plays the growth lane's shipped answers for the aim (public/precache/
+// growth-<aim>.json, ja-2bw.5); a situation with none plays the tip's own rule, as on the page.
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
-//          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--map side|one] [--hyphae]
+//          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--map side|one] [--hyphae] [--growth]
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -37,6 +38,7 @@ if (isMainThread) {
     strain: opt("strain", "garden"),
     map: opt("map", "side"),
     hyphae: flag("hyphae"),
+    growth: flag("growth"),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -56,7 +58,7 @@ if (isMainThread) {
   });
   results.sort((x, y) => x.seed - y.seed);
   console.log(
-    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
+    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
   );
   for (const r of results) {
     console.log(
@@ -74,7 +76,7 @@ if (isMainThread) {
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateSideWorld } = await import("../../web/src/colony/world.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae } = workerData;
+  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth } = workerData;
   const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
   const g =
     map === "one"
@@ -86,6 +88,11 @@ if (isMainThread) {
       : new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
   const menu = g.fungus.menu;
   g.fungus.bindPolicy("fungus", (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT);
+  if (growth) {
+    const { growthKey } = await import("../../web/src/colony/growthBrain.ts");
+    const grows = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/growth-${aim}.json`, import.meta.url), "utf8")));
+    g.fungus.bindPolicy("growth", (s) => grows.get(growthKey(s)) ?? null);
+  }
   g.land(
     0,
     STRAINS.findIndex((s) => s.id === strain),

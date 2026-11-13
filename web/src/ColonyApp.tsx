@@ -71,7 +71,7 @@ export default function ColonyApp() {
   const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal } =
     useColony();
   const backend = useBackend();
-  const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend, journal);
+  const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend, journal, game.params.species);
   const [details, setDetails] = useState(false);
   const closeDetails = useCallback(() => setDetails(false), []);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.

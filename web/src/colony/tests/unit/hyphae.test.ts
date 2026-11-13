@@ -351,3 +351,49 @@ test("a cut keeps only what a fusion loop reaches: a branch beyond the cut that 
   assert.equal(two.h.cut(cellKey(bx, by)), 3);
   assert.equal(two.h.tips.length, tipsBefore - 1);
 });
+
+test("a policy's turn: the tip turns to whichever side is free (away from its own hypha; along a tunnel's wall)", () => {
+  // Its own hypha ahead and to one side: a turn takes the other.
+  const h = new Hyphae();
+  h.root(5, 20, E);
+  const t = h.tips[0]!;
+  h.addCell(nx(5, 20, E), ny(20, E));
+  h.addCell(nx(5, 20, turn(E, -1)), ny(20, turn(E, -1)));
+  stepTips(h, plane(), 0, { free: 1e9, tips: 1 }, () => "turn");
+  assert.equal(t.heading, turn(E, 1));
+  assert.ok(h.has(nx(5, 20, turn(E, 1)), ny(20, turn(E, 1))));
+  // No answer: the tip's own rule plays.
+  const l = new Hyphae();
+  l.root(0, 0, E);
+  stepTips(l, plane(), 0, { free: 1e9, tips: 1 }, () => null);
+  assert.equal(l.length, 2);
+});
+
+test("a policy that branches while short makes no tips (review of #115, S1): a branch the body can't afford rests", () => {
+  const h = new Hyphae();
+  h.root(0, 0, E);
+  const budget = { free: HYPHA_MASS * AMPLE_STEPS * 0.5, tips: 1 }; // short from the first round
+  for (let r = 0; r < 20; r++) stepTips(h, plane(), 0, budget, () => "branch");
+  assert.equal(h.tips.length, 1, `${h.tips.length} tips`);
+});
+
+test("a policy's turn goes left when the right is blocked (the mirror of the turn above)", () => {
+  const h = new Hyphae();
+  h.root(5, 20, E);
+  const t = h.tips[0]!;
+  h.addCell(nx(5, 20, E), ny(20, E));
+  h.addCell(nx(5, 20, turn(E, 1)), ny(20, turn(E, 1)));
+  stepTips(h, plane(), 0, { free: 1e9, tips: 1 }, () => "turn");
+  assert.equal(t.heading, turn(E, -1));
+});
+
+test("a policy's turn with both near sides blocked reaches two turns round (sideFor's wide step), turning where it stands", () => {
+  const h = new Hyphae();
+  h.root(5, 20, E);
+  const t = h.tips[0]!;
+  for (const k of [0, -1, 1, 2]) h.addCell(nx(5, 20, turn(E, k)), ny(20, turn(E, k)));
+  // Only two turns to the left (-2) is open of the near five.
+  stepTips(h, plane(), 0, { free: 1e9, tips: 1 }, () => "turn");
+  assert.equal(t.heading, turn(E, -1), "turned a step toward the open side, where it stands");
+  assert.equal(h.length, 5, "grew nothing this step (the cell one turn left is its own)");
+});

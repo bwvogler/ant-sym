@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Game } from "../../game.ts";
 import { generateWorld, mulberry32 } from "../../world.ts";
 import { ticks } from "../builders.ts";
@@ -41,7 +42,16 @@ test("the fungus's policy and growth policy are bound through bindPolicy", () =>
 test("no code outside the colony assigns a policy field: the page, the server and the maintained scripts bind it", () => {
   const WEB = new URL("../../../../", import.meta.url).pathname; // web/
   const roots = [join(WEB, "src"), join(WEB, "server"), join(WEB, "worker"), join(WEB, "..", "scripts")];
-  const ASSIGN = /\.(policy|stancePolicy|growthPolicy)\s*=[^=>]/;
+  // An assignment to the field by dot or bracket (plain, `||=`, `??=`, `&&=`, with a line break before the `=`) or `Object.assign(x, { policy })`: read as
+  // the whole file, not line by line. `readonly` stops the dotted forms in checked code; the scripts that are not type-checked (scripts/lab, e2e) and
+  // Object.assign are what this test is for.
+  const NAME = "(?:policy|stancePolicy|growthPolicy)";
+  const ASSIGN = new RegExp(
+    `(?:\\.|\\[["'])\\s*${NAME}["']?\\]?\\s*(?:\\|\\||\\?\\?|&&)?=(?![=>])|Object\\.assign\\([^)]*\\b${NAME}\\b`,
+    "g",
+  );
+  // Fields of other objects (experiment options and sides: `sides.policy`, `brains.policy`), allowed by file, not by variable name.
+  const OTHER_OBJECTS = new Set([join(WEB, "src", "colony", "experiment.ts"), join(WEB, "..", "scripts", "experiment.mjs")]);
   function* walk(dir: string): Generator<string> {
     for (const name of readdirSync(dir)) {
       if (name === "node_modules" || name === "dist") continue;
@@ -53,16 +63,29 @@ test("no code outside the colony assigns a policy field: the page, the server an
   const bad: string[] = [];
   for (const r of roots)
     for (const f of walk(r)) {
-      if (f.startsWith(join(WEB, "src", "colony") + sep)) continue; // the colony's own constructors and its tests' sides
-      readFileSync(f, "utf8")
-        .split("\n")
-        // `sides.policy` / `brains.policy` / `o.policy` are other objects' fields (experiment options), not a colony's or the fungus's
-        .forEach(
-          (l, n) =>
-            ASSIGN.test(l) &&
-            !/\b(sides|brains|o|opts|options|spec)\.(policy|stancePolicy)\s*=/.test(l) &&
-            bad.push(`${f}:${n + 1}: ${l.trim()}`),
-        );
+      if (f.startsWith(join(WEB, "src", "colony") + sep) || OTHER_OBJECTS.has(f) || f === fileURLToPath(import.meta.url)) continue; // the colony's own constructors and tests
+      const text = readFileSync(f, "utf8");
+      for (const m of text.matchAll(ASSIGN)) bad.push(`${f}:${text.slice(0, m.index).split("\n").length}: ${m[0].trim()}`);
     }
   assert.deepEqual(bad, []);
+});
+
+test("the scan sees every way to assign a policy field", () => {
+  const NAME = "(?:policy|stancePolicy|growthPolicy)";
+  const ASSIGN = new RegExp(
+    `(?:\\.|\\[["'])\\s*${NAME}["']?\\]?\\s*(?:\\|\\||\\?\\?|&&)?=(?![=>])|Object\\.assign\\([^)]*\\b${NAME}\\b`,
+    "g",
+  );
+  for (const bad of [
+    "x.policy = f;",
+    "x.stancePolicy ||= f;",
+    "x.policy ??= f",
+    'x["policy"] = f',
+    "x['growthPolicy'] = f",
+    "x.policy\n  = f",
+    "Object.assign(x, { policy: f })",
+  ])
+    assert.ok([...bad.matchAll(ASSIGN)].length > 0, `${JSON.stringify(bad)} is caught`);
+  for (const ok of ["x.policy == f", "x.policy === f", "const f = (s) => s.policy => 1", "x.bindPolicy('mode', f)", "policy = f"])
+    assert.equal([...ok.matchAll(ASSIGN)].length, 0, `${JSON.stringify(ok)} is not an assignment`);
 });

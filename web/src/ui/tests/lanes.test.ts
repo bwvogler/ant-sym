@@ -30,21 +30,21 @@ test("ids and counters are distinct per lane, and the request sizes are what the
   assert.ok(DEFAULT_COLONY_JEV.batch >= 1);
 });
 
-test("only the ants' mode lane is tallied as hits and misses; the fungus's replies do not make the ants reconsider", () => {
+test("only the ants' mode lane is tallied as hits and misses; the fungus's replies (its levers, its tips) do not make the ants reconsider", () => {
   assert.deepEqual(
     NAMES.filter((n) => LANE_KINDS[n].countsHits),
     ["mode"],
   );
   assert.deepEqual(
     NAMES.filter((n) => !LANE_KINDS[n].reconsiders),
-    ["fungus"],
+    ["fungus", "growth"],
   );
 });
 
-test("a request's items carry the ids of their lane's row: s0 for ants' modes, c0 for stances, h0 for the fungus", () => {
+test("a request's items carry the ids of their lane's row: s0 for ants' modes, c0 for stances, h0 for the fungus, g0 for its tips", () => {
   assert.deepEqual(
     Object.fromEntries(NAMES.map((n) => [n, LANE_KINDS[n].idPrefix])),
-    { mode: "s", stance: "c", fungus: "h" },
+    { mode: "s", stance: "c", fungus: "h", growth: "g" },
     "these are on the wire and in the cached requests",
   );
   const sample = {

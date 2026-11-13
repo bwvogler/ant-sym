@@ -4725,7 +4725,7 @@ None. No legend, question or schema changed. The aim card points at presets whos
 
 **Decisions.**
 - **Tier 1 first** (made here, overturnable): a species is data (parameter overrides, the local response set, the Jev words of each lane, what feeds the existing sensors, names), plus the odd per-species ant array. The desert ant needs no new mode and no tick split, but it is not data only: its words, no-trail ant and small nest are tier 1; the food plume (steering only, an emitter), heat (a term in the fatigue block, a return rule: `ja-rf5.5`), and the invitation (a speed array, a `Touch` field) are small guarded tick edits and new state, each neutral for the generic ant (corrected after review); undertaking is a plain `ColonyParams.undertakes` a species sets (built, `ja-fnd.5.3.4`). The generic ant's body is extracted as a strategy (`ja-fnd.4.4`) and the nest-kind interface built (`ja-fnd.5.5`) only when a species needs different modes or nest (termites, army ants).
-- **One species per game, mixed worlds later** (owner, 2026-11-12): a "desert" scenario has its own map and both colonies are desert ants, so the game needs only `GameParams.species`. Unity, the odour axis, names and colours, chapters and Jev doctrines stay as they are. A mixed world (`Game` over colony specs, per-colony species in saves, an odour axis per species pair, foreign-trail reading across channel sets, more than two nests, per-colony names) is `ja-fnd.5.4`.
+- **One species per game, mixed worlds later** (owner, 2026-11-12): a "desert" scenario has its own map and both colonies are desert ants, so the game needs only `GameParams.species`. Unity, the odour axis, names and colours, chapters and Jev doctrines stay as they are. A mixed world (`Game` over colony specs, per-colony species in saves, an odour axis per species pair, foreign-trail reading across channel sets, more than two nests, per-colony names) is `ja-fnd.5.4.2` (Game over colony specs) and `ja-wfw0` (mixed-species worlds; split 2026-11-12, §64).
 - **The food plume is steering only** (made here, overturnable): no situation field, as vision.md says; the policy and `follow` do not see it.
 - **Separate words and contexts per species** (made here): the generic ant's legends, contexts and shipped precache do not move; a species lane has its own.
 - **Saves are not migrated** (owner's standing rule): `SAVE_VERSION` 10 carries the species.
@@ -4863,3 +4863,113 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - As on seeds 1–10: every seed takes hold (seed 20, which never did without hyphae, at 484 s); the median quarter about 262 s against about 270 s; the rival reached sooner (median about 212 s against about 337 s); mutations up on most seeds.
 - **P1 as worded ("no seed worse than the baseline") fails narrowly**: seed 14 is 9 s slower (243 → 252 s), seeds 12 and 17 2 s; on seeds 1–10, seeds 2 and 3 were 4 s and 1 s slower. The worst seed and the median both improve; the gate's wording, not the play, is what the owner is asked to settle (`ja-2bw.6`).
 - **Decided (owner, 2026-11-12): ship hyphae on, and P1 reads: no seed more than 10 % slower to a quarter, and neither the worst seed nor the median worse.** On all twenty seeds the largest slowdown is seed 14's 3.7 %; the worst seed (484 s against "never") and the median both improve.
+
+### 63.5 The growth lane (ja-2bw.5, 2026-11-12)
+
+**Built.** `colony/growthBrain.ts`: the growth situation as a schema (`ahead` × `exposed` × `supply` = 24), its legend, one choice question a tip (grow, turn, branch, rest, fuse, fruit; `turn` leaves the side to the tip, which alone knows which side is free), asked under the fungus's aim (`growth-v1-…`, 24 situations to a request). The registry has its row (`colony/lanes.ts`: id `g`, `growthAsked`/`growthCached`); the client (`ui/colonyJev.ts`) hands a tip Jev's cached answer, or null, and then the tip plays its own fuller local rule (its run, its first heading, spots near it). Its `local` row (`localGrowthChoice`) is the rule as a function of the situation alone, for scripts and live checks.
+
+**Cost.** The owner approved asking every situation for the three preset aims (`node scripts/precache.mjs --lanes growth`): 3 requests, **$0.0009** (about 21k input tokens, about 300 a situation; estimated 27k). Shipped as `public/precache/growth-<aim>.json`. A new aim of the player's own asks 24 situations once, about $0.0003; cached games spend nothing. No other lane changes.
+
+**What Jev chose.** It agrees with the local rule on 6 (unite), 9 (spread) and 13 (peace) of the 24 situations. Under unite and spread it fruits wherever it is on a wall or out in a dug cell (6 and 8 situations), turns at rock rather than splitting, and fuses into its own hypha (unite: every case); under peace it rests in 12 of 24.
+
+**Measured** (`progression.mjs --map one --evolve --hyphae [--growth] --aim <aim>`, seeds 1–10, 600 s; a quarter of the landing colony):
+
+| aim | local rule: median / worst | growth answers: median / worst |
+|---|---|---|
+| unite | ≈ 301 s / 441 s | ≈ 284 s / 353 s |
+| spread | ≈ 249 s / 368 s | ≈ 248 s / 274 s |
+| peace | ≈ 281 s / 392 s | ≈ 294 s / 552 s |
+
+- Under unite and spread the answers help the slow seeds and change nothing at the fast end (seed 4: 140 → 140 s, 117 → 118 s): no cliff, and the spots Jev fruits without the local rule's spacing do not thin the patch below the dose. No spacing guard is added to the body.
+- Under peace the fungus spreads more slowly (seed 6 315 → 552 s), though every seed still takes hold: the aim asks to calm the colonies first, and Jev rests. **Owner decision:** keep it as the aim's choice, or word the peace aim so the mycelium keeps growing. The fungus lane and the growth lane share the aim's words, so rewording peace re-asks both: its 24 growth situations (≈ $0.0003) and the fungus lane's 130 shipped peace answers (≈ $0.004, a third of §50.19's $0.0126 for three aims), unless the growth lane is given words of its own.
+- Against P1 (no hyphae, unite): every seed within 1.8 % of the baseline or faster; the worst seed 353 s against "never".
+
+**Review of #115 (agent, 2026-11-12).** S1: a `branch` answer while supply was short still put out a tip (a tip costs no mass), so a policy that branched while short doubled the tips every round: 5.2 million 40 s into a one-world game under such an aim. The shipped presets never answer it and the local rule never does; a branch the body can't afford now rests (`hyphae.ts`), and the local rule's growth is unchanged (same hash). S2: tests now hold the page's wiring, the left turn and the two-turn side step. Nits fixed; the Details screen shows the growth answers cached.
+
+## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
+
+**Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
+
+**What the research changed.**
+- **A species not on the list is the best second step: the invasive garden ant, *Lasius neglectus*.** Its colonies tolerate nests that smell alike (no aggression within a population; graded between: Ugelvig et al. 2008), it has several queens and buds (Cremer et al. 2008), and nearly every measured number on ant social immunity against *Metarhizium* comes from it: grooming that immunises nestmates (2 % of nestmates die against about half of exposed ants, Konrad et al. 2012), infected pupae destroyed on the smell of their own changed cuticle (Pull et al. 2018), care adjusted to risk (Konrad et al. 2018). All read in full. It is the fungus game's natural opponent and the unity goal's natural ally.
+- **The Pharaoh ant overlaps it.** Its many queens and budding are the same structures; what it adds is emigration (a new mode) and a trail that lasts a day or two. Its repellent "no entry" signal, the repo's trail lever's basis, has never been replicated (Zanola et al. 2025, citing a failed replication). No grooming or corpse study exists for it; its one fungus result is that colonies **chose** a nest with sporulating fungus-killed nestmates (84 %, Pontieri et al. 2014).
+- **Army ants are less thin than `ja-a2m` feared, in the lab.** *Ooceraea biroi*: phases are driven by larvae the workers meet, not a clock (Ulrich et al. 2016); mass raids emerge from colony size with the same individual rules (Chandra et al. 2021); exposed ants get about six times the grooming and are drawn in, not excluded (Alciatore et al. 2021). No field record of an entomopathogen in *Eciton* or *Dorylus*.
+- **Termites have the strongest fungus literature of all** (12 papers in full): groom, then eat the moribund, then bury the dead in place (Davis et al. 2018), with a capacity threshold, spores reaching the living only past about 75 % dead (Chouvenc & Su 2012), and a corpse odour that switches eating to burial (Neoh et al. 2012; Sun et al. 2013). They are tier 3 throughout: a royal pair with neotenics held back by a queen-and-egg volatile (Matsuura et al. 2010), castes by development.
+- **The leafcutter is the widest tier 2.** Castes by size (Wilson 1980, not reached), the garden as the store, waste workers who never forage again (Brown et al. 2006), exposed brood to the dump by 36 h (Armitage et al. 2016), and foragers who learn a plant is harmful at the garden or the dump (Arenas & Roces 2017).
+
+**Shared infrastructure, and what forces each piece first.**
+
+| Infrastructure | Bead | First forced by | Then |
+|---|---|---|---|
+| ColonyJev asks under the game's species' lane words; no stance lane where none | `ja-fnd.5.8` (new) | desert ant | every species |
+| A species' own local policy and mode set | `ja-fnd.5.9` (new) | desert ant (no follow) | Pharaoh, army ant (emigrate) |
+| Per-species `Situation` schema | `ja-fnd.5.10` (new; after `ja-fnd.5.6`) | desert ant (heat) | leafcutter, termite (caste) |
+| Channels per species, fungus levers by channel | `ja-fnd.5.11` (new) | desert ant (none laid) | Pharaoh (long trail), termite (vibration) |
+| Sickness cues by contact; grooming by load | `ja-e668.4` | *L. neglectus* | leafcutter, termite, army ant; part of `ja-k4k.12` |
+| `queens[]` and budding | `ja-8fd.1`, `ja-e668.6` | *L. neglectus* | Pharaoh; termite (royal pair) |
+| The nest kind owns queens, nests, chamber roles | `ja-fnd.5.5` | *L. neglectus* (several nests) | leafcutter (garden), termite, army ant (bivouac) |
+| Corpses by odour (widen `undertakes`) | `ja-328h.4` | leafcutter (exposed brood to the dump, `ja-vq14.6`, by a boolean-plus-brood rule) | termite (eat fresh, bury old: the full widening) |
+| New modes; the tick split | `ja-fnd.4.4` | Pharaoh (emigration) | termite, army ant |
+| Mixed worlds | `ja-wfw0` (on `ja-fnd.5.4.2` and `ja-e668.6`) | Argentine-ant variant (`ja-e668.7`) | parabiosis, `ja-506` |
+
+`ja-rf5.3` (the desert ant on the descriptor) now depends on `ja-fnd.5.8`–`.11`: `.8`–`.10` are the gaps the test species found (§62), `.11` its smaller channel set; the desert ant is the first consumer of all four. Every infrastructure bead keeps the generic ant's goldens bit-exact.
+
+**Decisions.**
+- Made here (2026-11-12; the owner can overturn each):
+  - **Propose *L. neglectus*** as a species, with the **Argentine ant** as a later variant on its epic (it needs multi-colony worlds).
+  - **One note and one epic per species**; each epic's species row waits on the desert ant's (`ja-rf5.3`) and on the species before it in the owner's order.
+  - **The leafcutter is modelled on *Atta*** (one queen; *Acromyrmex* immunity numbers borrowed and labelled); **the termite is a separate-piece subterranean termite** in the dug curtain, the mound later.
+  - **Caste is a situation field, not a fixed task per size** (a fixed task is a scripted choice); **army-ant phases come from sensed larvae, not a clock**; **raids by size are an assay of today's rules first**.
+  - **"No entry" stays at the generic ant's strength** for the Pharaoh ant, because the repellent signal is unreplicated.
+  - The old wave epics (`ja-8fd`, `ja-jhd`, `ja-v06`) are related to the new epics. **Owner (2026-11-12): close them as superseded.** `ja-jhd` and `ja-v06` are closed; `queens[]` (`ja-8fd.1`) moved under `ja-e668`; `ja-8fd` stays open only for its merging children (`ja-8fd.2`, `.4`), related to `ja-wfw0`. `ja-azo` (MR 13, world events and fungus powers), which waited on `ja-v06`, is left ready (owner).
+- **For the owner** (`ja-5zfl`; all answered by the owner on 2026-11-12, as recommended):
+  1. **Which species is second after the desert ant.** Recommendation: *L. neglectus*. Why: generic lanes (one live check at about the generic mode lane's ~$0.0065), its structures (`queens[]`, several nests, the sickness cue) are the ones three later species reuse, and its counterplay is measured. Alternative: the leafcutter (more spectacle, the widest tier 2, a caste field ~2–3× the questions). **Owner: *L. neglectus*.**
+  2. **Whether to build the Pharaoh ant at all.** Recommendation: only after *L. neglectus*, and only if emigration is wanted before termites or army ants need it. The army ants' bivouac (`ja-ehuv.6`) waits on its emigration bead (`ja-n70l.6`); if the Pharaoh ant is declined, that bead moves to the army-ant epic (review of #114, D1). **Owner: later and optional; the epic stays open.**
+  3. **Whether and when to leave the ants for termites** (`ja-a2m`). Recommendation: after the leafcutter, so the caste field and the nest-kind interface exist and termites test tier 3 on them; build termites before army ants (stronger literature, the dug curtain stays). **Owner: after the leafcutter, before army ants.**
+  4. **When mixed worlds come** (`ja-fnd.5.4`). Recommendation: after *L. neglectus*' budding, when a colony already has several nests. **Owner: so.** After review of #117 (owner, 2026-11-12) the wait sits on a bead of its own, mixed-species worlds (`ja-wfw0`), which waits on `ja-fnd.5.4.2` (Game over N colony specs) and `ja-e668.6` (budding); the Argentine-ant variant (`ja-e668.7`) and `ja-506` wait on it, and the refactor stage `ja-fnd.5.4` finishes on its own schedule. `ja-8fd.3` closed as a duplicate of `ja-fnd.5.4.2`.
+  5. **Spend**: each species' precache is a live check (estimates below), at the owner's say. **Owner: ask before each species' live check; until then it plays the local rule** (a note on each species-row bead).
+  6. **The fungus's levers on each host** (each epic has a child). **Owner: ask for each species when it is built.**
+
+**Order (owner, 2026-11-12).** Desert ant (`ja-rf5`) → *L. neglectus* (`ja-e668`) → leafcutter (`ja-vq14`) → [Pharaoh ant (`ja-n70l`), optional] → termites (`ja-328h`) → army ants (`ja-ehuv`). The bead dependencies follow it (each species row on the one before).
+
+**Cost (estimated from request size; none measured).** From the generic mode lane on one world (~122 distinct situations a game, ~783 tokens a question, ~$0.074/h while a doctrine is new, §51, `colony-cost --one`; a full live run of all lanes ~$0.0065, §54.4, so a mode-lane check costs less):
+
+| Species | Lane shape | $/h while new | Live check to ship precache |
+|---|---|---|---|
+| *L. neglectus* | generic; a `sick` value in the response lanes | ~$0.075 (+ ~$0.01 response) | ~$0.0065 |
+| Leafcutter | generic + caste (×3) | ~$0.15–0.22 | ~$0.02 |
+| Pharaoh ant | generic + one mode | ~$0.078 | ~$0.0065 |
+| Termite | generic sizes + caste (×2), no stance | ~$0.15 | ~$0.01–0.02 |
+| Army ant | generic + one mode, maybe a ×2 field | up to ~$0.15 | ~$0.01 |
+
+Cached games spend nothing; each species' lane is its own context, so no generic answer is bought again. Each species-row bead measures its lane with `npm run colony-cost` once the legend exists.
+
+**Senses added to [vision.md](vision.md)** (all design, not built): sickness cues on a nestmate or a pupa (*L. neglectus*, termites, army ants, leafcutter); corpse odour, fresh and decayed (termites; it was "not yet researched"); humidity at a building face (termite mounds); a learned plant odour (leafcutter).
+
+**Beads.** Epics `ja-e668` (*L. neglectus*, 9 children), `ja-vq14` (leafcutter, 10), `ja-n70l` (Pharaoh ant, 8), `ja-328h` (termites, 11), `ja-ehuv` (army ants, 8): each research, assays (no behaviour change), the species row, the behaviours, the fungus's levers (owner), a Learn entry. Infrastructure `ja-fnd.5.8`–`.11`. Owner decisions `ja-5zfl`.
+
+**Still open.** The full texts each note lists under Open questions (mostly behind the blocked hosts: Wilson 1980, Robinson et al. 2005/2008, Hager & Kirchner 2013, Ugelvig & Cremer 2007, Tragust et al. 2013); every cost above, once a legend exists.
+
+### 64.1 The order of work, as beads
+
+Infrastructure first (`ja-fnd.5.8`–`.11`, with `ja-fnd.5.6` before `.10`), then the desert ant (`ja-rf5.3`), then each species' **research and assays** (free to start: no behaviour change), and its **species row** only after the owner's order (`ja-5zfl`) and the species before it. Assays land before behaviour in every epic, and every species row measures its lane's cost with `colony-cost` in its PR.
+
+### 64.2 *Lasius neglectus* (`ja-e668`; [lasius-neglectus.md](lasius-neglectus.md))
+
+Tier 1 for the species (wide tolerance, its words, the generic schema) and tier 2–3 for what it brings everyone: sickness cues by contact with grooming by load and an immunising dose (`.4`), destructive disinfection of brood (`.5`), several queens and budding on foot (`.6`, on `ja-8fd.1` and `ja-fnd.5.5`). Assays N1 immunisation (Konrad et al. 2012), N2 disinfection (Pull et al. 2018), N3 graded tolerance (Ugelvig et al. 2008), N4 budding (`.2`). The Argentine ant (`.7`) waits on mixed-species worlds (`ja-wfw0`).
+
+### 64.3 Leafcutter (`ja-vq14`; [leafcutter.md](leafcutter.md))
+
+A caste field (minim, media, major) in its own schema and a size array (`.3`, on `ja-fnd.5.10`), the garden as a chamber role (`.4`, on `ja-fnd.5.5`), one-way waste workers and waste-odour rejection (`.5`), exposed brood to the dump (`.6`), plant learning with food kinds (`.7`, late). Stridulation (`.8`) waits on the owner: its function is contested. Assays L1 division of labour by size, L2 one-way waste work (Brown et al. 2006), L3 brood removal by 36 h (Armitage et al. 2016), L4 the garden fed (`.2`).
+
+### 64.4 Pharaoh ant (`ja-n70l`; [pharaoh-ant.md](pharaoh-ant.md))
+
+Data on the age bands (9–12-day switch) and tolerance (`.3`), a long-lived trail (`.4`), gyne rearing held back by several queens' summed signal (`.5`), emigration as the first new mode (`.6`, on `ja-fnd.4.4` and `ja-fnd.5.9`, shared with the army ant). Assays P1 the trail threshold by colony size (Beekman et al. 2001), P2 the age switch, P3 the queen signal, P4 emigration (`.2`). Optional once *L. neglectus* exists.
+
+### 64.5 Termites (`ja-328h`; [termites.md](termites.md))
+
+Tier 3: its own lane with a caste field and no stance (`.3`, on `ja-fnd.5.10`, `.5.5`, `.4.4`), corpses by odour, eaten fresh and buried old (`.4`, widening `undertakes`), the staged defence (`.5`), relayed drumming (`.6`, on `ja-fnd.5.11`), a royal pair and neotenics (`.7`), soldiers by development (`.8`), the mound and humidity (`.9`, late). Assays T1 staged defence (Davis et al. 2018), T2 capacity threshold (Chouvenc & Su 2012), T3 group protection (Yanagawa et al. 2012), T4 royal replacement (Matsuura et al. 2010) (`.2`). Whether to build it is the owner's (`ja-a2m`, `ja-5zfl`).
+
+### 64.6 Army ants (`ja-ehuv`; [army-ant.md](army-ant.md))
+
+Tier 3, last: foraging that rises with larvae met (`.4`), front recruitment only if raids by size don't emerge from today's rules (`.5`), the bivouac as a nest kind that moves (`.6`, on the Pharaoh ant's emigration and `ja-fnd.5.5`). Assays R1 phases from larvae (Ulrich et al. 2016), R2 raids by size (Chandra et al. 2021), R3 grooming of the exposed (Alciatore et al. 2021) (`.2`). The model (*Eciton* or *O. biroi*) is the owner's.

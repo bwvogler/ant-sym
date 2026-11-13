@@ -203,7 +203,7 @@ function JevCard({ jev }: Props) {
         <Stat label="situations asked" value={String(jev.state.asked)} />
         <Stat
           label="answers cached"
-          value={`${jev.state.cached} · ${jev.state.stancesCached} stances · ${jev.state.fungusCached} fungus`}
+          value={`${jev.state.cached} · ${jev.state.stancesCached} stances · ${jev.state.fungusCached} fungus · ${jev.state.growthCached} growth`}
         />
         <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
         <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>

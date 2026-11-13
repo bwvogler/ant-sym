@@ -31,6 +31,7 @@ export function copyOf(game: Game, fresh: Game): Game {
     d.responses = c.responses;
   });
   fresh.fungus.bindPolicy("fungus", game.fungus.policy);
+  fresh.fungus.bindPolicy("growth", game.fungus.growthPolicy);
   return fresh;
 }
 

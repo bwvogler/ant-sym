@@ -28,6 +28,8 @@ import {
   mulberry32,
 } from "../web/src/colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const play = process.argv[2] ?? "lockpick";
 const [minutes = 5, ants = 600, seed = 1, strokes = 6] = process.argv.slice(3).map(Number);
