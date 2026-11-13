@@ -440,7 +440,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "endless-world",
     title: "Endless world",
     covers:
-      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when something comes near. Planned (not built, PRD §65).",
+      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. Planned (not built, PRD §66).",
   },
   {
     note: "new-queens",
