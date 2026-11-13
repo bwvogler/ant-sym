@@ -1,6 +1,8 @@
 // The per-ant step record (docs/refactor.md S3.4): tick's stages (perceive, stance, decide, steer, move and dig, arrive) pass what one
 // computed for the ant to the next through it. One record per tick, reused for every ant: each field is written before it is read (initialised only so V8 keeps the numbers unboxed: review of #147).
 
+import type { ColonyParams } from "./params.ts";
+
 export class AntStep {
   ca = 0;
   sa = 0;
@@ -15,4 +17,19 @@ export class AntStep {
   af = 0;
   ar = 0;
   toEnemy: number | null = null;
+  p!: ColonyParams;
+  rng!: () => number;
+  dt = 0;
+  hold = false;
+  rgate = false;
+  foeLeak = 0;
+  sgate = false;
+  threatLeak = 0;
+  heldNow = 0;
+  held = false;
+  carrying = false;
+  pellet = false;
+  nursing = false;
+  outward = false;
+  reporting = false;
 }

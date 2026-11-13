@@ -144,11 +144,12 @@ import {
   routeRecord,
   searchOn,
 } from "./homing.ts";
-import { layMark, nestmatesAround, placeOn, raidLevel, raidSmelt, returnsAround, touch, touchProbe } from "./sense.ts";
+import { layMark, nestmatesAround, placeOn, returnsAround, touch, touchProbe } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
+import { stanceStep } from "./stance.ts";
 import { AntStep } from "./step.ts";
-import { atGate, carryOut, crossDown, crossUp, crossed, holdsAt, mayCrossUp } from "./crossing.ts";
+import { atGate, crossDown, crossUp, crossed, mayCrossUp } from "./crossing.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -2017,134 +2018,24 @@ export class Colony {
       const af = s.af;
       const ar = s.ar;
       const toEnemy = s.toEnemy;
-      // One world (ja-web): an outgoing forager at the top of its own shaft, its jaws empty and with no pass, is held at the
-      // gate there (holdsAt): it waits as a forager home on open ground does, and is asked `leave` (below). With a
-      // stranger near it isn't waiting: it isn't asked, and it fights or flees in the shaft as anywhere; but the gate still
-      // bars the way out (mayCrossUp asks holdsAt, which doesn't look for strangers), so it doesn't climb out without a
-      // pass. Intended: a stranger at the top of the shaft is met there, not left behind.
-      const held = hold && toEnemy === null && holdsAt(this, i);
-      if (held) heldNow++;
-      if (rgate) {
-        this.foes[i] = this.foes[i] * foeLeak + (toEnemy === null ? 0 : dt);
-        // (One world, ja-web: a finder lays its trail on to its hole, and is done telling once it goes down it, crossDown:
-        // ended at the disc round the hole, the trail never reached the ants held at the top of the shaft.)
-        if (this.reporting[i] === 1 && this.line === null && this.atNestTop(i)) this.reporting[i] = 0;
-      }
-      // Defence is the ant's own (docs/stance.md): alarm smelt or strangers in reach raise its threat, which fades; past defendAt,
-      // on home ground (within homeGround of its nest by its home vector), it defends. Far out, it forages as before.
-      if (sgate) {
-        const felt = toEnemy !== null || this.alarmSmelt !== "none";
-        const th = this.threat[i] * threatLeak + (felt ? dt : 0);
-        this.threat[i] = th;
-        this.defending[i] = th >= p.defendAt && Math.hypot(this.x[i] - this.nest.x, this.y[i] - this.nest.y) <= p.homeGround ? 1 : 0;
-      }
-      // Raid stance (behaviour MR 5.2): a raid is a bias, not an order. An ant is recruited by smelling a scout's raid trail, or goes out
-      // as a scout at raidScout when it is home with empty jaws; the others forage. A recruited ant's raid ends when it comes home
-      // with no trail under it: no trail was laid for it, or the trail has faded.
-      if (rgate && (sgate || this.stance === "raid")) {
-        const homeNow = this.atNestTop(i);
-        if (!homeNow) this.gone[i] = 1;
-        if (this.recruited[i] === 0) {
-          // Where each ant's stance is its own, the trail recruits at home (docs/stance.md; Polyergus scouts recruit the workers at their
-          // own nest): an ant out at its work crosses it and carries on. Recruiting anywhere ran away: G′ seed 1, 773 of 899 raiding.
-          // And it recruits by degrees: at raidRecruit a second on a strong trail, less on a faint one (thresholds differ between ants,
-          // as Pheidole majors answer only intense recruitment). All at once, one scout's trail called the 150-200 ants idle at home,
-          // and every raid was a war (G′ seeds 1-4: 880 lost against no raids' 170).
-          if (
-            raidSmelt(this, i) !== "none" &&
-            (!sgate ||
-              (this.raidable &&
-                homeNow &&
-                !this.carrying[i] &&
-                this.rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, raidLevel(this, i) / STRONG) * dt)))
-          ) {
-            this.recruited[i] = 1;
-            this.gone[i] = 0;
-            this.recruits++;
-          } else if (
-            !sgate &&
-            homeNow &&
-            !this.carrying[i] &&
-            !this.pellet[i] &&
-            !this.broodHeld[i] &&
-            this.rng() < 1 - Math.exp(-p.raidScout * dt)
-          ) {
-            this.recruited[i] = 1;
-            this.gone[i] = 0;
-            this.mode[i] = FIGHT; // out it goes
-            this.raidScouts++;
-          }
-        } else if (homeNow && this.gone[i] === 1 && raidSmelt(this, i) === "none") {
-          this.recruited[i] = 0;
-          this.gone[i] = 0;
-        }
-        if (homeNow || this.recruited[i] === 0) this.pastEnd[i] = 0;
-      } else if (this.recruited[i] === 1 && this.line === null) {
-        // (In one world a raider keeps its stance underground: its raid ends at home on the plane.)
-        this.recruited[i] = 0;
-        this.pastEnd[i] = 0;
-      }
-      // One world (ja-web): an ant held at the gate smells the plane's raid trail where it ends, at its own hole (raidSmelt:
-      // a finder recruits at its own entrance, Topoff et al. 1987), and is recruited by it by degrees, as an idle ant at
-      // home on open ground is.
-      if (
-        held &&
-        this.recruited[i] === 0 &&
-        p.raidGate > 0 &&
-        p.stanceGate > 0 &&
-        this.raidable &&
-        raidSmelt(this, i) !== "none" &&
-        rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, raidLevel(this, i) / STRONG) * dt)
-      ) {
-        this.recruited[i] = 1;
-        this.gone[i] = 0;
-        this.recruits++;
-      }
-      // The carry response (ja-1pm): a load is taken where it belongs, or put down here; put down, the ant is not carrying
-      // this step (its trip is over: see `arrive`).
-      // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
-      // the side view ~11 % a tick for nothing, review of #35.)
-      if (
-        this.responses.carry !== localResponses.carry &&
-        (this.carrying[i] || this.pellet[i] || this.broodHeld[i]) &&
-        this.responses.carry(touch(this, i, toEnemy !== null)) === "put down"
-      )
-        putDown(this, i);
-
-      // The mode choice, only when the situation changed since the ant was last asked.
-      // A carrying ant goes home: a mechanic, never asked (and asked afresh once it puts the food down).
-      // So does one carrying a soil pellet it dug, to drop on the mound.
-      const carrying = this.carrying[i] === 1;
-      const pellet = this.pellet[i] === 1;
-      const nursing = this.broodHeld[i] === 1;
-      // One world's plane (U3c): carrying spoil or a corpse out from its hole, by its own vector (carryOut). Spoil or a
-      // corpse on the plane is always on its way out (one put there some other way, a test's, sets out now); only a loose
-      // pellet taken home to backfill is not.
-      if (pellet && this.line !== null && this.cur === PLANE && this.soil[i] !== SOIL_FILL && Number.isNaN(this.spoilTo[i]))
-        carryOut(this, i);
-      const outward = pellet && this.line !== null && this.cur === PLANE && !Number.isNaN(this.spoilTo[i]);
-      if (!pellet) this.staleWalk[i] = 0; // a stale walk is part of one trip home with a pellet
-      // A finder (behaviour MR 5.2): a raider outside, its jaws empty, no raid trail under it, that has been in contact with
-      // strangers for findAt seconds goes home to tell, laying the raid trail on the way. (A raider on the trail meeting
-      // strangers fights them: the trail is where the scout was before.)
-      if (
-        rgate &&
-        toEnemy !== null &&
-        this.reporting[i] === 0 &&
-        !carrying &&
-        !pellet &&
-        !nursing &&
-        this.stanceOf(i) === "raid" &&
-        this.foes[i] >= p.findAt &&
-        !this.atNestTop(i) &&
-        raidSmelt(this, i) === "none"
-      ) {
-        this.reporting[i] = 1;
-        this.since[i] = 0;
-        this.homeAfresh(i);
-        this.finds++;
-      }
-      const reporting = this.reporting[i] === 1;
+      s.p = p;
+      s.rng = rng;
+      s.dt = dt;
+      s.hold = hold;
+      s.rgate = rgate;
+      s.foeLeak = foeLeak;
+      s.sgate = sgate;
+      s.threatLeak = threatLeak;
+      s.heldNow = heldNow;
+      s.toEnemy = toEnemy;
+      stanceStep(this, i, s);
+      heldNow = s.heldNow;
+      const held = s.held;
+      const carrying = s.carrying;
+      const pellet = s.pellet;
+      const nursing = s.nursing;
+      const outward = s.outward;
+      const reporting = s.reporting;
       // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
       // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
       let goal = homeGoal(this, i, pellet);
