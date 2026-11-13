@@ -104,6 +104,8 @@ export interface ColonyJevState {
   /** answers cached under every colony's doctrine (modes, stances): a doctrine two colonies share counts once */
   cached: number;
   stancesCached: number;
+  /** whether the colonies driven have a stance lane at all (a species may not: Species.lanes, ja-fnd.5.12): the panel says so rather than "0 stances" */
+  stanceLane: boolean;
   /** mode answers cached for each colony's doctrine */
   doctrineCached: number[];
   /** this run: fungal situations sent to Jev; answers cached for the current aim (under every menu asked) */
@@ -298,6 +300,7 @@ export class ColonyJev {
     misses: 0,
     cached: 0,
     stancesCached: 0,
+    stanceLane: true,
     doctrineCached: [],
     fungusAsked: 0,
     fungusCached: 0,
@@ -370,7 +373,7 @@ export class ColonyJev {
   }
 
   /** The cache sizes the panel shows. */
-  #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "doctrineCached" | "fungusCached" | "growthCached"> {
+  #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "stanceLane" | "doctrineCached" | "fungusCached" | "growthCached"> {
     // Every colony's, not the first's (PRD §65): one cache per context, so colonies of one doctrine count once.
     const modes = new Map<string, number>();
     const stances = new Map<string, number>();
@@ -382,6 +385,7 @@ export class ColonyJev {
     return {
       cached: sum(modes),
       stancesCached: sum(stances),
+      stanceLane: this.#species.lanes.stance !== undefined,
       doctrineCached: this.#driven.map((d) => (d.modes ? this.#cache(d.modes).size : 0)),
       fungusCached: this.#cache(this.#fungal).size,
       growthCached: this.#cache(this.#growth).size,

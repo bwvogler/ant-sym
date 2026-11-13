@@ -1,7 +1,7 @@
 import type { Colony, ColonyParams } from "./colony.ts";
 import { MODE_WORDS, STANCE_WORDS } from "./colonyBrain.ts";
 import { localResponses, type Responses } from "./responses.ts";
-import type { LaneWords, Mode, Policy, Stance } from "./vocab.ts";
+import type { LaneWords, Mode, Policy, Situation, Stance } from "./vocab.ts";
 
 // A species (docs/species.md, ja-fnd.5.3): what one kind of ant is, as data the Game hands its colonies. Step 1 of the order of work holds
 // the physiology (parameter overrides) and the local rule set; the lane words, undertaking and the names came with the next beads (.2-.4). The Game hands a species' params and responses to its colonies (Colony stays free of the idea). GameParams.species is code, so the save leaves it out until step 3 saves its id. A game has one species (owner, 2026-11-12); mixed worlds are ja-fnd.5.4.
@@ -30,6 +30,20 @@ export interface Species {
    * (`lanes.mode.schema`) names which of these and of the generic fields it asks. It reads the colony, never draws from the game's random stream.
    */
   sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>>;
+  /**
+   * Its local rule in words, for the Learn drawer (ja-fnd.5.13): rows read top to bottom, the first that holds decides, then `otherwise`. Kept
+   * honest by a test that walks every situation its schema has and checks the rows give what `policy` gives (ui/policyText.ts ruleTextAgrees).
+   * Absent with a `policy` of its own: the drawer says it plays its own rule and shows no generic rows.
+   */
+  ruleText?: ModeRuleText;
+}
+
+/** A local mode rule in words: the same shape as the generic ant's (ui/policyText.ts LOCAL_MODE_RULES), so the drawer shows either. */
+export interface ModeRuleText {
+  rows: readonly { when: string; then: Mode; test: (s: Situation) => boolean }[];
+  /** what the rule does when no row holds, in words, and as a function */
+  otherwise: string;
+  otherwiseMode: (s: Situation) => Mode;
 }
 
 /** Whether a species has a follow mode: its mode words offer `follow`, or it has no mode words of its own (ColonyParams.follows, ja-fnd.5.9). */

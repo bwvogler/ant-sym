@@ -1,4 +1,4 @@
-import type { Mode, Situation } from "../colony/index.ts";
+import { modeSchema, type Mode, type Situation, type Species } from "../colony/index.ts";
 
 // The local rules in words, for the Learn drawer's Policy tab. Each mode and
 // stance rule is a row the drawer shows ("when …, then …") with the test it
@@ -77,3 +77,24 @@ export const LOCAL_RESPONSE_RULES: [hook: string, rule: string][] = [
     "Rested and waiting at home: many nestmates coming home with food, go now; a few, go soon; none, and home crowded, now and then go out as a raid scout; none, wait, and only now and then go out to scout. An ant that defends goes out whatever comes back. A raider waits for a scout's raid trail, and goes on it.",
   ],
 ];
+
+/**
+ * Where a species' rule text (Species.ruleText, ja-fnd.5.13) disagrees with its own local rule: every situation its mode schema has, read
+ * through the rows as the drawer shows them, against what its policy answers. Empty when the words match the code; the test of each species
+ * that ships its own rule asserts it, as policyText.test.ts does for the generic ant.
+ */
+export function ruleTextAgrees(species: Species): string[] {
+  const text = species.ruleText;
+  const rule = species.policy;
+  if (!text || !rule) return [];
+  const schema = modeSchema(species.lanes.mode);
+  const out: string[] = [];
+  for (let code = 0; code < schema.size; code++) {
+    const own = schema.decode(code);
+    const s = own as Situation;
+    const said = byRows(text.rows, text.otherwiseMode, s);
+    const did = rule(s);
+    if (said !== did) out.push(`${schema.key(own)}: the words say ${said}, the rule ${did}`);
+  }
+  return out;
+}

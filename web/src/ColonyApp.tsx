@@ -480,6 +480,7 @@ export default function ColonyApp() {
               explain={jev.explain}
               explainFungus={jev.explainFungus}
               onClose={() => setFollowed(null)}
+              fields={game.params.species.lanes.mode?.schema?.fields.map((f) => String(f.name))}
             />
           ) : (
             <p className="text-xs text-fg-3">
