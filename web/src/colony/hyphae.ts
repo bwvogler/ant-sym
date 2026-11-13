@@ -44,6 +44,18 @@ export const BRANCH_START = 2;
 export const TIP_STEP: readonly number[] = [2, 1.5, 1];
 /** The local rule fruits where a tunnel is reached only if no spore spot of its own lies within this many cells (design: keeps spots few, so the patch keeps an infecting dose, PRD §63.1). */
 export const FRUIT_GAP = 12;
+/**
+ * Cords (a web, ja-2bw.8, docs/hyphal-growth.md §7): a hypha cell that feeds at least this many tips downstream is a
+ * cord (design: Heaton et al. 2010 found a cord's thickness tracks the flow it carries).
+ */
+export const CORD_FLOW = 4;
+/**
+ * Digs a cord takes to cut (owner, 2026-11-12, review of #119): a cell is dug open once, so each round a cord lies in a
+ * dug cell counts as a dig against it (the ants keep working the tunnel); at this many it is cut like any hypha (design).
+ */
+export const CORD_DIGS = 3;
+/** Dead-end hypha cells that fade each round once cords are grown: unused links recycled (design: Bebber et al. 2007). */
+export const REGRESS_PER_ROUND = 1;
 /** A tip's supply is ample while the free mass would pay for this many steps of every tip; less is short. */
 export const AMPLE_STEPS = 2;
 
@@ -91,6 +103,12 @@ export class Hyphae {
   readonly soil = new Set<number>();
   /** hypha cells lost to cuts, over the game */
   cutCells = 0;
+  /** cords (ja-2bw.8): cells feeding CORD_FLOW tips or more, refreshed each round at a web; a cord takes CORD_DIGS digs to cut */
+  cords = new Set<number>();
+  /** hypha cells faded away unused, over the game (regress) */
+  fadedCells = 0;
+  /** digs taken by cords lying in dug cells (cutDug): a cord is cut at CORD_DIGS */
+  digs = new Map<number, number>();
   /** mass spent on hypha (each cell at its price) */
   spent = 0;
   /** tip extensions tried, and how many of them ran into the mycelium's own cells (assay H3) */
@@ -264,15 +282,77 @@ export class Hyphae {
     return dead.size;
   }
 
-  /** Cut every hypha cell that was soil and the ants have dug open since (`ground` says what is dug now). Returns the cells lost. */
+  /**
+   * Cut every hypha cell that was soil and the ants have dug open since (`ground` says what is dug now). A cord spans the
+   * dug cell and takes a dig a round there, and is cut at its CORD_DIGS-th (ja-2bw.8; owner, review of #119). Returns the cells lost.
+   */
   cutDug(ground: Ground): number {
     let lost = 0;
     for (const k of [...this.soil]) {
       if (!this.soil.has(k)) continue;
       const [x, y] = keyCell(k);
-      if (ground.kind(x, y) === "open") lost += this.cut(k);
+      if (ground.kind(x, y) !== "open") {
+        this.digs.delete(k); // filled back in: a cord's count starts again (review of #119, N6)
+        continue;
+      }
+      if (this.cords.has(k)) {
+        const dug = (this.digs.get(k) ?? 0) + 1;
+        if (dug < CORD_DIGS) {
+          this.digs.set(k, dug);
+          continue;
+        }
+      }
+      this.digs.delete(k);
+      lost += this.cut(k);
     }
+    for (const k of this.digs.keys()) if (!this.parent.has(k)) this.digs.delete(k);
     return lost;
+  }
+
+  /**
+   * Cords (ja-2bw.8): count the tips each cell feeds (every cell from a tip back to its root carries it) and make every
+   * cell feeding CORD_FLOW or more a cord; one that no longer does thins back to a hypha. Returns how many are cords.
+   */
+  thicken(): number {
+    const flow = new Map<number, number>();
+    for (const t of this.tips) {
+      let k = cellKey(t.x, t.y);
+      // The guard is defensive: extend only links a new cell to an existing one and cut only makes roots, so no chain cycles.
+      for (let guard = this.parent.size; guard >= 0 && k !== ROOT; guard--) {
+        flow.set(k, (flow.get(k) ?? 0) + 1);
+        k = this.parent.get(k) ?? ROOT;
+      }
+    }
+    this.cords = new Set([...flow].filter(([, n]) => n >= CORD_FLOW).map(([k]) => k));
+    return this.cords.size;
+  }
+
+  /**
+   * Unused hypha fades (Bebber et al. 2007: links that carry nothing are recycled): up to REGRESS_PER_ROUND dead ends a
+   * round, a cell no tip stands on and nothing grew from, unless it is a root, a cord, in a fusion, touching a spore spot,
+   * or `keep` holds it (a corpse). Its mass is the body's to spend again (it no longer counts in `length`). Returns the cells faded.
+   */
+  regress(keep: (k: number) => boolean = () => false): number {
+    const parents = new Set(this.parent.values());
+    const tipCells = new Set(this.tips.map((t) => cellKey(t.x, t.y)));
+    const fused = new Set(this.fusions);
+    const nearSpot = (k: number) => {
+      if (this.fruits.length === 0) return false;
+      const [x, y] = keyCell(k);
+      for (let d = 0; d < 6; d++) if (this.fruits.includes(cellKey(nx(x, y, d), ny(y, d)))) return true;
+      return this.fruits.includes(k);
+    };
+    let faded = 0;
+    for (const [k, p] of this.parent) {
+      if (faded >= REGRESS_PER_ROUND) break;
+      // (A leaf with no tip feeds none, so it is never a cord after thicken: that check is defensive, for a caller that skips it.)
+      if (p === ROOT || parents.has(k) || tipCells.has(k) || this.cords.has(k) || fused.has(k) || nearSpot(k) || keep(k)) continue;
+      this.parent.delete(k);
+      this.soil.delete(k);
+      faded++;
+    }
+    this.fadedCells += faded;
+    return faded;
   }
 
   /** The hyphae for a save (save.ts): plain arrays. */
@@ -284,6 +364,9 @@ export class Hyphae {
       tips: this.tips.map((t) => [t.x, t.y, t.heading, t.first, t.run]),
       fusions: [...this.fusions],
       fruits: [...this.fruits],
+      cords: [...this.cords],
+      fadedCells: this.fadedCells,
+      digs: [...this.digs],
       spent: this.spent,
       steps: this.steps,
       selfHits: this.selfHits,
@@ -299,6 +382,9 @@ export class Hyphae {
     h.tips = r.tips.map(([x, y, heading, first, run]) => ({ x, y, heading, first, run }) as Tip);
     h.fusions = [...r.fusions];
     h.fruits = [...r.fruits];
+    h.cords = new Set(r.cords);
+    h.fadedCells = r.fadedCells ?? 0;
+    h.digs = new Map(r.digs ?? []);
     h.spent = r.spent;
     h.steps = r.steps;
     h.selfHits = r.selfHits;
@@ -314,6 +400,9 @@ export interface HyphaeSave {
   tips: [number, number, number, number, number][];
   fusions: number[];
   fruits: number[];
+  cords: number[];
+  fadedCells: number;
+  digs?: [number, number][];
   spent: number;
   steps: number;
   selfHits: number;

@@ -710,16 +710,18 @@ export default function ColonyField({
     ) => {
       const inView = (x: number, y: number) => x >= rx0 - 1 && x <= rx1 + 1 && y >= ry0 - 1 && y <= ry1 + 1;
       const path = new Path2D();
-      const segment = (a: number, b: number) => {
+      // Cords (a web, ja-2bw.8): the segments into a cord cell, drawn thicker.
+      const cords = new Path2D();
+      const segment = (a: number, b: number, into: Path2D = path) => {
         const [ax, ay] = hyphaCell(a);
         const [bx, by] = hyphaCell(b);
         if (!inView(ax, ay) && !inView(bx, by)) return;
         const [sx, sy] = toScreen(c, v, centreX(ax, ay), centreY(ay));
         const [tx, ty] = toScreen(c, v, centreX(bx, by), centreY(by));
-        path.moveTo(sx, sy);
-        path.lineTo(tx, ty);
+        into.moveTo(sx, sy);
+        into.lineTo(tx, ty);
       };
-      for (const [k, p] of h.parent) if (p !== HYPHA_ROOT) segment(p, k);
+      for (const [k, p] of h.parent) if (p !== HYPHA_ROOT) segment(p, k, h.cords.has(k) ? cords : path);
       for (let i = 0; i + 1 < h.fusions.length; i += 2) segment(h.fusions[i]!, h.fusions[i + 1]!);
       ctx.save();
       ctx.lineCap = "round";
@@ -728,6 +730,8 @@ export default function ColonyField({
       ctx.globalAlpha = under ? 0.45 : 0.9;
       ctx.lineWidth = Math.max(1 * d, Math.min(3 * d, c.zoom * 0.12));
       ctx.stroke(path);
+      ctx.lineWidth = Math.max(2.5 * d, Math.min(8 * d, c.zoom * 0.32));
+      ctx.stroke(cords);
       ctx.fillStyle = theme.spore;
       ctx.globalAlpha = under ? 0.6 : 1;
       const r = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));

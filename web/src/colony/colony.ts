@@ -1906,7 +1906,8 @@ export class Colony {
     }
     // Scent is read through the ant's perception (gains of 1 and no foreign reading: as it is, exactly).
     const f = this.ph.fields;
-    if (map.food.get(cx, cy) > 0) s[slot] = SEEN;
+    // Food is sensed only through open ground: a pocket sealed off by soil is not, however near (ja-juiu, see inReach).
+    if (map.food.get(cx, cy) > 0 && inReach(map, this.x[i], this.y[i], sx, sy)) s[slot] = SEEN;
     else {
       const wf = this.foreignFood[i];
       s[slot] = f.food.get(cx, cy) * this.gainFood[i] + (wf > 0 && this.foreign ? wf * this.foreign.fields.food.get(cx, cy) : 0);
@@ -3127,11 +3128,19 @@ export class Colony {
       if (target < 0) return false; // no chamber to take it to (a colony always has its royal one: can't happen)
       // In its chamber, or beside it (a store a cell or two wide is passed by more often than stood in: review of slice 5).
       if (here !== target) {
+        const standing = here;
         here = -1;
         // (Porters only: a forager put down beside its chamber is an explorer in a tunnel, and dug at its ends.)
         if (this.porter[i]) {
           for (let d = 0; d < 6 && here < 0; d++) if (ch.at(stepX(cx, cy, d), stepY(cy, d)) === target) here = target;
           if (here < 0) here = this.#portInstead(i, cx, cy, target, dt);
+        } else if (standing >= 0 && this.since[i] > STORE_AFTER) {
+          // A forager long on its way (ja-3ifx: food from a pocket the nest's own tunnels opened, its chamber a maze away)
+          // puts its food down in the first of its colony's food chambers it stands in: a store, reception (once it is
+          // RECEPTION_MIN cells, as #foodTo: a smaller one chokes) or the queen's. Porters carry it on to where it is wanted.
+          const c = ch.list[standing]!;
+          const takes = c.role === "store" || c.role === "royal" || (c.role === "reception" && c.cells >= RECEPTION_MIN);
+          if (c.colony === this.params.nest && takes) here = standing;
         }
         if (here < 0) return false;
       }
@@ -6423,6 +6432,11 @@ const PICK_BROOD = 0.5;
 const HOLD_MAX = 30;
 /** A forager's food goes to reception only once it is a chamber of this many cells (see #foodTo); until then, to the royal chamber. */
 const RECEPTION_MIN = 4;
+/**
+ * Seconds a forager carries its food before it will put it down in any of its colony's food chambers it stands in, not
+ * only the one it takes food to (see #port; ja-3ifx). A trip from a pocket by the nest is under a minute when it finds its way.
+ */
+const STORE_AFTER = 60;
 /** Rows either side of a chamber's mean row searched for its cell nearest that mean (the founding disc is the tallest: 9 rows). */
 const CHAMBER_SCAN = 5;
 /**
@@ -6545,6 +6559,66 @@ export function angleDiff(a: number, b: number): number {
 export function walkable(map: WorldMap, x: number, y: number): boolean {
   const t = rockAt(map, x, y);
   return t === OPEN || (t === AIR && map.surfaceRows !== undefined && y === map.surfaceRows - 1);
+}
+
+/**
+ * How many steps through open ground food at a sensor's tip may be from the ant and still be sensed: the sensor's reach
+ * (sensorDistance, 3) and two more, so food round a tunnel's bend or a chamber's corner is sensed as before. Fixed, not
+ * derived: a sensorDistance swept past SENSE_STEPS would put every tip out of reach, so raise this with it (and inReach's
+ * window, which is sized from it).
+ */
+export const SENSE_STEPS = 5;
+/** inReach's window: cells within SENSE_STEPS of the start, stamped by call (a grid of offsets, so no allocation per call). */
+const REACH_SPAN = 2 * SENSE_STEPS + 3;
+const reachStamp = new Uint32Array(REACH_SPAN * REACH_SPAN);
+const reachQueue = new Int32Array(REACH_SPAN * REACH_SPAN * 2);
+let reachCall = 0;
+
+/**
+ * Whether world point (x1, y1) can be reached from (x0, y0) through open ground below any surface rows (one world's
+ * curtain) in at most `steps` steps between cells (`steps` ≤ SENSE_STEPS): how a sensor at (x1, y1) senses food there.
+ * Food in a pocket sealed off by soil or rock is not sensed, however near (ja-juiu: sensed through the wall, it turned
+ * explorers off their tunnels three cells short of every pocket, which no tunnel then reached); food round a bend is.
+ */
+export function inReach(map: WorldMap, x0: number, y0: number, x1: number, y1: number, steps = SENSE_STEPS): boolean {
+  cellOf(x1, y1);
+  const bx = CELL[0];
+  const by = CELL[1];
+  cellOf(x0, y0);
+  const ax = CELL[0];
+  const ay = CELL[1];
+  if (ax === bx && ay === by) return true;
+  if (hexDistance(ax, ay, bx, by) > steps) return false;
+  const top = map.surfaceRows ?? 0;
+  const half = SENSE_STEPS + 1;
+  const stamp = ++reachCall;
+  reachStamp[half * REACH_SPAN + half] = stamp;
+  reachQueue[0] = ax;
+  reachQueue[1] = ay;
+  let head = 0;
+  let tail = 2;
+  for (let depth = 0; depth < steps; depth++) {
+    const end = tail;
+    for (; head < end; head += 2) {
+      const x = reachQueue[head]!;
+      const y = reachQueue[head + 1]!;
+      for (let d = 0; d < 6; d++) {
+        const tx = stepX(x, y, d);
+        const ty = stepY(y, d);
+        const ox = tx - ax + half;
+        const oy = ty - ay + half;
+        if (ox < 0 || oy < 0 || ox >= REACH_SPAN || oy >= REACH_SPAN) continue;
+        const k = oy * REACH_SPAN + ox;
+        if (reachStamp[k] === stamp) continue;
+        reachStamp[k] = stamp;
+        if (rockAt(map, tx, ty) !== OPEN || ty < top) continue;
+        if (tx === bx && ty === by) return true;
+        reachQueue[tail++] = tx;
+        reachQueue[tail++] = ty;
+      }
+    }
+  }
+  return false;
 }
 
 /** Whether cell (x, y)'s neighbour the way `d` is open (walkable). */
