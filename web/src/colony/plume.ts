@@ -8,8 +8,8 @@ import { OPEN, isSky, rockAt, type WorldMap } from "./world.ts";
 /**
  * How often the plume is rebuilt while the food changes (game seconds): odour lags the food a little, as air does. Built at most once
  * in each period of this length, at the first read after the food changed, from the saved state, so a loaded game rebuilds at the
- * same ticks as the unbroken one. A build is
- * ~10 ms on one world's plane (512 × 368, seed 1): every second it cost a desert game +25 % ms/tick, every 4 s +8 %.
+ * same ticks as the unbroken one. A build is ~10 ms on one world's plane (512 × 368, seed 1): every second it cost a desert game
+ * +25 % ms/tick, every 4 s +8 %.
  */
 export const PLUME_EVERY = 4;
 
