@@ -25,16 +25,20 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
     fields: [
       ["mode", "mode is what it is doing: explore (out searching for food alone), return (home) or fight; follow does not apply to it. "],
       ["tired", "tired means it has searched long outside without finding food: a desert forager's trips are short. "],
-      ["enemy", "enemy says whether ants of another colony are within a few steps: desert ant colonies are hostile to one another. "],
+      [
+        "enemy",
+        "enemy says whether ants of another colony are within a few steps: desert ant colonies are hostile to one another. With enemy none there is nobody to fight: an ant that fights then stands where it is and does nothing, and a fight that is over sends it home or back out. ",
+      ],
     ],
     outro: "doctrine is how the colony wants its ants to behave: follow it.",
   }),
   criteria: {
     explore: "explore: go out, or keep searching, alone for food",
     return: "return: walk home",
-    fight: "fight: attack the stranger",
+    fight: "fight: attack a stranger within reach (only when enemy is near)",
   },
-  version: 1,
+  // 2: fight only with a stranger near (review of #140 D1, owner 2026-11-13: v1 under Warlike fought with nobody near and stalled)
+  version: 2,
   schema: DESERT_SCHEMA,
 };
 

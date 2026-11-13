@@ -9,6 +9,8 @@ export interface PrecacheBundle {
   /** the preset doctrine (mode, stance) or aim (fungus) it was asked under */
   doctrine?: string;
   aim?: string;
+  /** the species whose own lane words it was asked under (ja-rf5.9); absent: the generic ant's */
+  species?: string;
   context: string;
   file: string;
   answers: number;
