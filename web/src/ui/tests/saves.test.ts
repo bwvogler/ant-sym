@@ -73,4 +73,9 @@ test("a record of another species than the page plays is listed, not loaded", ()
   };
   assert.equal(readable(record(AUTOSAVE, settings, player, g.save(), "x")), false);
   assert.equal(readable(record(AUTOSAVE, { ...settings, species: "generic" }, player, g.save(), "x")), true);
+  assert.equal(
+    readable(record(AUTOSAVE, { ...settings, species: "desert" }, player, g.save(), "x")),
+    true,
+    "the desert ant is playable now",
+  );
 });

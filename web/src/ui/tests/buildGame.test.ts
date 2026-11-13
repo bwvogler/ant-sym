@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GENERIC_ANT } from "../../colony/index.ts";
+import { DESERT_ANT, GENERIC_ANT } from "../../colony/index.ts";
 import { buildGame } from "../useColony.ts";
 
 test("the page builds one world, whatever the settings (PRD §55)", () => {
@@ -13,4 +13,5 @@ test("the page builds the game with the species its settings name, and refuses o
   const settings = { seed: 3, antCount: 20, rival: true, generation: 0 };
   assert.equal(buildGame({ ...settings, species: "generic" }).params.species, GENERIC_ANT);
   assert.throws(() => buildGame({ ...settings, species: "nope" }), /no "nope"/);
+  assert.equal(buildGame({ ...settings, species: "desert" }).params.species, DESERT_ANT, "the start screen's other choice");
 });

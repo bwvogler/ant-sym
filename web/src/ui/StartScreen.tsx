@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { GENERIC_ANT, SPECIES } from "../colony/index.ts";
 import { REPO } from "./guide.ts";
 import { colonyName } from "./names.ts";
 import { landingColony } from "./useColony.ts";
@@ -6,6 +7,12 @@ import { describe, type SaveRecord } from "./saves.ts";
 
 // The fungus game's first screen (ja-lo8.5): what the player is, Start, and Continue the last saved game (ja-lo8.6).
 // The field waits behind it, paused.
+
+/** One line on each species the start screen offers: what makes it play differently. */
+const SPECIES_BLURB: Record<string, string> = {
+  generic: "trails, recruitment and raids",
+  desert: "Cataglyphis: lone foragers with no trails, hostile to strangers (docs/desert-ant.md)",
+};
 
 export default function StartScreen({
   seed,
@@ -18,14 +25,18 @@ export default function StartScreen({
   /** the colonies a game starts with: the seed chooses which one the fungus lands by */
   colonies: number;
   seed: number;
-  /** Start; `tutorial`: with the tutorial (PRD §61) */
-  onStart: (seed: number, tutorial: boolean) => void;
+  /** Start; `tutorial`: with the tutorial (PRD §61); `species`: the one both colonies are (Species.id) */
+  onStart: (seed: number, tutorial: boolean, species: string) => void;
   /** no tutorial finished or skipped in this browser: Start runs it */
   firstGame: boolean;
   latest: SaveRecord | null;
   onContinue: (r: SaveRecord) => void;
 }) {
   const [s, setS] = useState(seed);
+  const [species, setSpecies] = useState(GENERIC_ANT.id);
+  // The tutorial walks through the generic ant's trails and raids: another species starts without it.
+  const generic = species === GENERIC_ANT.id;
+  const tutorial = generic && firstGame;
   const ink = colonyName(landingColony(s, colonies));
   return (
     <div
@@ -47,7 +58,23 @@ export default function StartScreen({
           </p>
           <p>The colonies' own minds are closed to you, until you reach a queen.</p>
         </div>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <label className="mt-4 flex flex-wrap items-center gap-2 text-sm text-fg-2">
+          <span>Ants</span>
+          <select
+            className="rounded-md border border-line bg-paper px-2 py-1 text-fg outline-none focus:border-accent"
+            value={species}
+            onChange={(e) => setSpecies(e.target.value)}
+            aria-label="species"
+          >
+            {Object.values(SPECIES).map((sp) => (
+              <option key={sp.id} value={sp.id}>
+                {sp.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-fg-3">{SPECIES_BLURB[species] ?? ""}</span>
+        </label>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-fg-2">
             <span>World</span>
             <input
@@ -69,21 +96,23 @@ export default function StartScreen({
           <button
             type="button"
             className="ml-auto rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hover"
-            onClick={() => onStart(s, firstGame)}
+            onClick={() => onStart(s, tutorial, species)}
             autoFocus={!latest}
           >
-            {firstGame ? "Start the tutorial" : "Start"}
+            {tutorial ? "Start the tutorial" : "Start"}
           </button>
         </div>
-        <p className="mt-2 text-right text-xs">
-          <button
-            type="button"
-            className="text-fg-3 underline-offset-2 hover:text-fg-2 hover:underline"
-            onClick={() => onStart(s, !firstGame)}
-          >
-            {firstGame ? "Start without the tutorial" : "Play the tutorial"}
-          </button>
-        </p>
+        {generic ? (
+          <p className="mt-2 text-right text-xs">
+            <button
+              type="button"
+              className="text-fg-3 underline-offset-2 hover:text-fg-2 hover:underline"
+              onClick={() => onStart(s, !firstGame, species)}
+            >
+              {firstGame ? "Start without the tutorial" : "Play the tutorial"}
+            </button>
+          </p>
+        ) : null}
         <p className="mt-3 text-right text-xs">
           <a href={REPO} target="_blank" rel="noopener noreferrer" className="text-fg-3 underline-offset-2 hover:text-fg-2 hover:underline">
             Source on GitHub

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  SPECIES,
   type Colony,
   type Situation,
   DOCTRINES,
@@ -85,7 +86,11 @@ export function useColonyJev(
   useEffect(() => {
     if (seeded.current) return; // once per page: StrictMode runs effects twice
     seeded.current = true;
-    void loadPrecache((context, entries) => jev.seed(context, entries));
+    // Each bundle against its own species' words (ja-fnd.5.15); one this build doesn't know is skipped.
+    void loadPrecache((context, entries, id) => {
+      const sp = id === undefined ? GENERIC_ANT : SPECIES[id];
+      return sp ? jev.seed(context, entries, sp) : 0;
+    });
   }, [jev]);
   // A colony founded mid-game is pushed onto the same array (Game.addColony): its length drives a re-attach too.
   const count = colonies.length;

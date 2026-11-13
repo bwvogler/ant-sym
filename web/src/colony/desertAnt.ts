@@ -1,7 +1,7 @@
 import { localResponses } from "./responses.ts";
 import { MARKS } from "./pheromone.ts";
 import { defineSchema, legendOf } from "./schema.ts";
-import type { ModeRuleText, Species } from "./species.ts";
+import { SPECIES, type ModeRuleText, type Species } from "./species.ts";
 import { MODES, type LaneWords, type Mode, type Policy, type SpeciesSituation } from "./vocab.ts";
 
 // The desert ant, Cataglyphis (docs/desert-ant.md, PRD §60; ja-rf5.3): the first real species on the descriptor (docs/species.md), made only of
@@ -70,6 +70,10 @@ export const DESERT_ANT: Species = {
     raidGate: 0,
     stanceGate: 0,
     undertakes: false,
+    // Food odour in the air (ja-rf5.4, docs/desert-ant.md §3): C. fortis turns in to food odour up to about 6 m (5.9 m the longest;
+    // Buehlmann et al. 2014, a pre-publication draft: unverified). One world's nests are 140 cells apart against C. fortis's ~40 m,
+    // about 3.5 cells a metre: 6 m is 21 cells. D3 (PRD §60.4): the first find comes sooner on every seed of 1–20.
+    foodPlume: 21,
   },
   // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
@@ -79,3 +83,6 @@ export const DESERT_ANT: Species = {
   policy: desertPolicy,
   ruleText: DESERT_RULE_TEXT,
 };
+
+// The page can play it (the start screen's species choice): a save names it by id (species.ts SPECIES).
+(SPECIES as Record<string, Species>)[DESERT_ANT.id] = DESERT_ANT;
