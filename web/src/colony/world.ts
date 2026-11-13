@@ -91,7 +91,7 @@ export interface WorldMap {
    * sky (AIR), the plane's: the side view draws the plane under the line on the strip, which stores nothing (one-world
    * §8 item 6). updateSurface leaves them be, nothing fills them, no spoil is heaped there (the mound is the plane's,
    * one-world §4), and no search passes through them; a step up into them from a hole is a crossing onto the plane
-   * (colony.ts walkable). No cell in them is soil, so none is dug. The crust under them is soil touching their sky, which ants leave (colony.ts #crust) as
+   * (colony.ts walkable). No cell in them is soil, so none is dug. The crust under them is soil touching their sky, which ants leave (dig.ts crust) as
    * they leave today's ground line. Absent elsewhere.
    */
   surfaceRows?: number;

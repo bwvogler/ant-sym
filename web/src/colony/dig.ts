@@ -1,6 +1,6 @@
 // Digging and spoil (docs/refactor.md S3.3): picking up and putting down pellets, dropping spoil on the mound or the midden, backfilling stale tunnels, unburying, the crust and where a chamber is dug. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `self`.
 
-import type { Colony } from "./colony.ts";
+import type { Colony, Corpse, HoleCell } from "./colony.ts";
 import { NO_KEY } from "./ants.ts";
 import { type Role } from "./chambers.ts";
 import { NO_CELL, SOIL_DUG, SOIL_FILL, SOIL_LOOSE, cellKey, floorGround, keyX, keyY, stub } from "./grid.ts";
@@ -19,7 +19,6 @@ import {
   SWELL,
 } from "./tuning.ts";
 import { FAINT, PLANE } from "./vocab.ts";
-import type { Corpse, HoleCell } from "./colony.ts";
 import { OPEN, dropFood, fillCell, groundTop, heapMound, heapPlane, isSky, openCell, rockAt, takePlane, type Nest } from "./world.ts";
 
 /** The middle of the midden: its column (side view). */
