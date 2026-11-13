@@ -170,6 +170,8 @@ export interface ColonyParams {
   heatFelt: number;
   /** once hot, an ant feels hot until its body is back below this (°C): it rests to cool, as a tired ant rests until fully rested */
   heatCool: number;
+  /** the sun's height (0 at dawn, 1 at noon) from which an ant that can see the sky sees it stand high (desert-heat.md §2: design) */
+  heatSunHigh: number;
   /** the critical body heat (°C): past it, the ant dies */
   heatDeath: number;
   /**
@@ -314,6 +316,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   heatTau: 20,
   heatFelt: 48,
   heatCool: 34,
+  heatSunHigh: 0.8,
   heatDeath: 53.6,
   routeMemory: 0,
   routeStep: 8,

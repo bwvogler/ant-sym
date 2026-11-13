@@ -1,4 +1,5 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
+import { sunHigh } from "./heat.ts";
 import { DESERT_ANT } from "./desertAnt.ts";
 import {
   type Colony,
@@ -2544,12 +2545,12 @@ export const D5_SECONDS = 1200;
  * the colony forages in the cooler hours and few foragers outlast their heat budget. Pass, all three: ants out on the plane at noon (the day's
  * hottest quarter) no more than 0.75 of those out at dawn (its coolest); heat deaths a day no more than 16 % of the colony (C. bicolor loses
  * about 16 % of its foragers a day to every cause: Schmid-Hempel & Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in
- * every 30 s after the first minute.
+ * every 30 s after the first minute outside the high sun (ja-rf5.12, desert-heat.md: a midday lull is the biology, a day without intake a cliff).
  */
 export const desertHeat: Assay = {
   id: "d5",
   title: "D5 heat: the desert ant forages in the cooler hours and few die of heat (one world, two days)",
-  target: "out at noon ≤ 0.75 × out at dawn; heat deaths ≤ 16 % of the colony a day; food every 30 s (design; borrowings unverified)",
+  target: "out at noon ≤ 0.75 × out at dawn; heat deaths ≤ 16 % of the colony a day; food every 30 s outside the high sun (design; borrowings unverified)",
   seconds: D5_SECONDS,
   spec: (seed) => {
     let noon = 0;
@@ -2603,7 +2604,10 @@ export const desertHeat: Assay = {
         const outDawn = dawn / Math.max(1, dawnN);
         const ratio = outNoon / outDawn;
         const deathsADay = c.diedHot / days / (aliveSum / Math.max(1, aliveN));
-        const after = bins.slice(2, Math.floor(game.time / 30));
+        // The 30-s windows after the first minute, but those in the high sun (any moment of them), where a lull is the biology (desert-heat.md §1).
+        const after = bins
+          .slice(0, Math.floor(game.time / 30))
+          .filter((_, b) => b >= 2 && ![0, 10, 20, 30].some((s) => sunHigh(c.params, b * 30 + s)));
         const minPickups = after.length ? Math.min(...after) : NaN;
         return {
           outNoon,

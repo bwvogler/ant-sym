@@ -5,9 +5,19 @@
 
 import type { ColonyParams } from "./params.ts";
 
-/** The ground's heat on the plane at game time t (°C): `heatDawn` at t = 0 and every heatDay after, `heatNoon` half a day on. */
+/** The sun's height at game time t, 0 at dawn (t = 0 and every heatDay after) to 1 at noon (half a day on): the day's one curve. */
+export function sunHeight(p: ColonyParams, t: number): number {
+  return (1 - Math.cos((2 * Math.PI * t) / p.heatDay)) / 2;
+}
+
+/** The ground's heat on the plane at game time t (°C): `heatDawn` at dawn, `heatNoon` at noon, following the sun's height. */
 export function groundHeat(p: ColonyParams, t: number): number {
-  return p.heatDawn + ((p.heatNoon - p.heatDawn) * (1 - Math.cos((2 * Math.PI * t) / p.heatDay))) / 2;
+  return p.heatDawn + (p.heatNoon - p.heatDawn) * sunHeight(p, t);
+}
+
+/** Whether the sun stands high at game time t, as an ant that can see the sky sees it (desert-heat.md §2; the threshold is design). */
+export function sunHigh(p: ColonyParams, t: number): boolean {
+  return p.heatDay > 0 && sunHeight(p, t) >= p.heatSunHigh;
 }
 
 /**

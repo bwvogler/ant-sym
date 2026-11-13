@@ -1,3 +1,6 @@
+import { atGate } from "./crossing.ts";
+import { sunHigh } from "./heat.ts";
+import { PLANE } from "./vocab.ts";
 import { localResponses } from "./responses.ts";
 import { MARKS } from "./pheromone.ts";
 import { defineSchema, legendOf } from "./schema.ts";
@@ -10,11 +13,12 @@ import { MODES, type LaneWords, type Mode, type Policy, type SpeciesSituation } 
 // has no follow mode and no stance lane; no corpse removal was found (desert-ant.md §5), so it leaves its dead. Still to come, each its own
 // bead: food odour in the air (ja-rf5.4), heat (ja-rf5.5, a field of its situation), the invitation (ja-rf5.6).
 
-/** Its mode lane's fields: what it does, whether it is tired, whether it feels hot (ja-rf5.5), whether strangers are near. No trails, alarm or stance to sense. */
+/** Its mode lane's fields: what it does, whether it is tired, whether it feels hot (ja-rf5.5), whether the sun stands high (ja-rf5.12), whether strangers are near. No trails, alarm or stance to sense. */
 export const DESERT_SCHEMA = defineSchema<SpeciesSituation>([
   { name: "mode", values: MODES },
   { name: "tired", values: [false, true], key: (v) => (v ? "tired" : "fresh") },
   { name: "hot", values: [false, true], key: (v) => (v ? "hot" : "cool") },
+  { name: "sun", values: ["low", "high"] },
   { name: "enemy", values: ["none", "near"] },
 ]);
 
@@ -31,6 +35,10 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
         "hot means its own body is near the heat that kills it: the ground heats over the day, an ant out in the open heats with it and cools only back in the nest, and one that stays out too hot dies. ",
       ],
       [
+        "sun",
+        "sun is how high the sun stands, as it sees the sky from the open ground or the top of its shaft (deeper in the nest it reads low): the ground is hottest while the sun is high, and a trip out then can kill. ",
+      ],
+      [
         "enemy",
         "enemy says whether ants of another colony are within a few steps: desert ant colonies are hostile to one another. With enemy none there is nobody to fight: an ant that fights then stands where it is and does nothing, and a fight that is over sends it home or back out. ",
       ],
@@ -43,14 +51,15 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
     fight: "fight: attack a stranger within reach (only when enemy is near)",
   },
   // 2: fight only with a stranger near (review of #140 D1, owner 2026-11-13: v1 under Warlike fought with nobody near and stalled)
-  // 3: the hot field (ja-rf5.5)
-  version: 3,
+  // 3: the hot field (ja-rf5.5); 4: the sun field (ja-rf5.12)
+  version: 4,
   schema: DESERT_SCHEMA,
 };
 
 /** Its local rule: home when hot or tired or a fight is over; otherwise out searching, alone (nothing to follow). Strangers in reach are its contact response's. */
 export const desertPolicy: Policy = (s) => {
   if ((s as SpeciesSituation).hot) return "return";
+  if ((s as SpeciesSituation).sun === "high") return "return";
   if (s.tired) return "return";
   if (s.mode === "fight") return "return";
   return "explore";
@@ -60,6 +69,7 @@ export const desertPolicy: Policy = (s) => {
 export const DESERT_RULE_TEXT: ModeRuleText = {
   rows: [
     { when: "it is hot (its body near the heat that kills it)", then: "return", test: (s) => (s as SpeciesSituation).hot === true },
+    { when: "the sun stands high (a trip out would cook it)", then: "return", test: (s) => (s as SpeciesSituation).sun === "high" },
     { when: "it is tired (searched long outside without finding food)", then: "return", test: (s) => s.tired },
     { when: "it was fighting", then: "return", test: (s) => s.mode === "fight" },
   ],
@@ -91,7 +101,8 @@ export const DESERT_ANT: Species = {
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
   // nothing in its jaws fights a stranger it touches, whatever the odds; a carrier takes its load home (owner, review of #138 D1).
   // It senses its own heat (the sense table's own-body row): hot near the heat that kills it.
-  sense: (c, i) => ({ hot: c.hot[i] === 1 }),
+  // It sees the sun's height where the sky is in view: out on the plane, or at the top of its own shaft (desert-heat.md §2).
+  sense: (c, i) => ({ hot: c.hot[i] === 1, sun: (c.layer[i] === PLANE || atGate(c, i)) && sunHigh(c.params, c.time) ? "high" : "low" }),
   responses: { ...localResponses, contact: (t) => (t.carrying === "none" ? "fight" : "flee") },
   lanes: { mode: DESERT_MODE_WORDS },
   policy: desertPolicy,
