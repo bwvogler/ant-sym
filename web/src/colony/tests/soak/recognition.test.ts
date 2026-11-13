@@ -208,7 +208,7 @@ test("the fungus writes calm, tolerance and the fungal share: Lockpick soothes, 
   c.strain[1] = garden;
   const f = new Fungus(map, { grooming: 0 });
   f.hosts = 2;
-  f.policy = strainDefault; // these tests are about levers, not the policy
+  f.bindPolicy("fungus", strainDefault); // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
   assert.equal(c.expr[0], preset("soothe"));
   assert.ok(Math.abs(c.calm[0] - 0.8) < 1e-5);
@@ -427,7 +427,7 @@ test("a colony whose nest smells like ours is no rival: the strategist forages i
   const [a, b] = g.colonies as [Colony, Colony];
   // A strategist that would always raid a rival (the colony's stance, told to every ant: on open ground only with stanceGate 0).
   for (const c of [a, b]) {
-    c.stancePolicy = () => "raid";
+    c.bindPolicy("stance", () => "raid");
     c.params.stanceGate = 0;
   }
   g.tick(1 / 30);

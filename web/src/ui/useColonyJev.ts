@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Colony, type Situation, DOCTRINES, type FungalSituation, AIMS, type Fungus, type Journal } from "../colony/index.ts";
+import {
+  type Colony,
+  type Situation,
+  DOCTRINES,
+  type FungalSituation,
+  AIMS,
+  type Fungus,
+  type Journal,
+  GENERIC_ANT,
+  type Species,
+} from "../colony/index.ts";
 import { COLONY_NAMES } from "./names.ts";
 import { browserCache } from "./cacheStore.ts";
 import { ColonyJev, type ColonyJevState } from "./colonyJev.ts";
@@ -42,6 +52,7 @@ export function useColonyJev(
   menu: readonly string[],
   backend: Backend | null = null,
   journal: Journal | null = null,
+  species: Species = GENERIC_ANT,
 ) {
   const jev = useMemo(() => new ColonyJev({}, browserCache), []);
   jev.journal = journal;
@@ -79,7 +90,7 @@ export function useColonyJev(
   // A colony founded mid-game is pushed onto the same array (Game.addColony): its length drives a re-attach too.
   const count = colonies.length;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => jev.attachColonies(colonies), [jev, colonies, count]);
+  useEffect(() => jev.attachColonies(colonies, species), [jev, colonies, count, species]);
   // The fungus spans the game: the lane drives each new game's, under the player's menu.
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
   useEffect(() => jev.setMenu(new Set(menu)), [jev, menu]);

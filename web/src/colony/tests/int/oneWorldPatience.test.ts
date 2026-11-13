@@ -26,7 +26,7 @@ function plane(params: Partial<Colony["params"]>): { g: Game; c: Colony } {
   for (const k of g.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
   const c = g.player;
   Object.assign(c.params, { scoutRate: 0, raidScout: 0, ...params });
-  c.policy = () => "explore";
+  c.bindPolicy("mode", () => "explore");
   const hc = c.holeCells[c.params.nest] as HoleCell;
   c.age[0] = 0.5 * LIFESPAN;
   c.putAnt(0, PLANE, centreX(hc.px, hc.py) + 20, centreY(hc.py));

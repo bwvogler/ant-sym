@@ -28,6 +28,9 @@ import {
   type Stance,
   type StancePolicy,
   type StanceSituation,
+  GENERIC_ANT,
+  type LaneWords,
+  type Species,
   localFungusRule,
   type FungalSituation,
   type FungusPolicy,
@@ -172,33 +175,39 @@ function lane<S, A extends string>(
   return { ...spec, context: spec.contextOf(spec.words), fallback: [], queue: new Map() };
 }
 
-/** A colony this client drives: its two lanes. */
+/** A colony this client drives: its lanes, null for a lane its species does not have (Species.lanes): nothing is asked or counted there. */
 interface Driven {
   colony: Colony;
-  modes: Lane<Situation, Mode>;
-  stances: Lane<StanceSituation, Stance>;
+  modes: Lane<Situation, Mode> | null;
+  stances: Lane<StanceSituation, Stance> | null;
 }
 
-/** A runtime lane for an ant's row of the lane registry (colony/lanes.ts), asking under `words`: the row's functions, and the words they are asked under. */
+/**
+ * A runtime lane for an ant's row of the lane registry (colony/lanes.ts), asking under `words` (the doctrine) in the species' lane words
+ * `lw` (legend, criteria, version: Species.lanes, ja-fnd.5.8): the row's functions with `lw` bound, so its context, question and the
+ * answers it accepts are the species'. The generic ant's words are the rows' defaults, so its contexts and requests are unchanged.
+ */
 function antLane<Sit, Ans extends string>(
   row: Pick<LaneSpec<Sit, Ans, undefined>, "name" | "key" | "pack" | "read" | "valid" | "contextOf"> & { local: (s: Sit) => Ans },
   words: string,
+  lw: LaneWords<Ans>,
 ): Lane<Sit, Ans> {
   return lane<Sit, Ans>({
     name: row.name,
     key: (s) => row.key(s, undefined),
-    pack: row.pack,
-    read: row.read,
+    pack: (items, w) => row.pack(items, w, lw),
+    read: (a, id, s, key) => row.read(a, id, s, key, lw),
     local: row.local,
-    valid: row.valid,
-    contextOf: (w) => row.contextOf(w),
+    valid: (key, a) => row.valid(key, a, lw),
+    contextOf: (w) => row.contextOf(w, undefined, lw),
     words,
   });
 }
 
-/** A colony's two lanes, asking under `words` (its doctrine). */
-function colonyLanes(words: string): Omit<Driven, "colony"> {
-  return { modes: antLane(LANES.mode, words), stances: antLane(LANES.stance, words) };
+/** A colony's lanes, asking under `words` (its doctrine) in its species' lane words; a lane the species lacks is null. */
+function colonyLanes(words: string, species: Species): Omit<Driven, "colony"> {
+  const { mode, stance } = species.lanes;
+  return { modes: mode ? antLane(LANES.mode, words, mode) : null, stances: stance ? antLane(LANES.stance, words, stance) : null };
 }
 
 export class ColonyJev {
@@ -206,6 +215,8 @@ export class ColonyJev {
   /** the page's game journal (?log=, ui/journal.ts): each batch asked, answered or failed is a "jev" event */
   journal: Journal | null = null;
   #driven: Driven[] = [];
+  /** the species of the colonies driven (one per game: GameParams.species), whose lane words the colony lanes ask in */
+  #species: Species = GENERIC_ANT;
   /** each colony's doctrine, by index (kept across games: a new world keeps the colonies' natures) */
   #doctrines: string[] = [];
   #store: CacheStore | null;
@@ -357,9 +368,9 @@ export class ColonyJev {
   #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "doctrineCached" | "fungusCached" | "growthCached"> {
     const first = this.#driven[0];
     return {
-      cached: first ? this.#cache(first.modes).size : 0,
-      stancesCached: first ? this.#cache(first.stances).size : 0,
-      doctrineCached: this.#driven.map((d) => this.#cache(d.modes).size),
+      cached: first?.modes ? this.#cache(first.modes).size : 0,
+      stancesCached: first?.stances ? this.#cache(first.stances).size : 0,
+      doctrineCached: this.#driven.map((d) => (d.modes ? this.#cache(d.modes).size : 0)),
       fungusCached: this.#cache(this.#fungal).size,
       growthCached: this.#cache(this.#growth).size,
     };
@@ -415,7 +426,7 @@ export class ColonyJev {
   /** Who decides an ant of colony k in situation `s` right now (the follow card). */
   explain(s: Situation, k = 0): { mode: Mode; by: DecidedBy } {
     const d = this.#driven[k];
-    if (!d) return { mode: localPolicy(s), by: "local" };
+    if (!d?.modes) return { mode: localPolicy(s), by: "local" };
     const e = this.#explain(d.modes, s);
     return { mode: e.answer, by: e.by };
   }
@@ -423,12 +434,12 @@ export class ColonyJev {
   /** The first colony's ants' policy (kept for a single colony; each attached colony is given its own). */
   readonly policy: Policy = (s) => {
     const d = this.#driven[0];
-    return d ? this.#lookup(d.modes, s) : localPolicy(s);
+    return d?.modes ? this.#lookup(d.modes, s) : localPolicy(s);
   };
   /** The first colony's strategist's policy, the same way. */
   readonly stancePolicy: StancePolicy = (s) => {
     const d = this.#driven[0];
-    return d ? this.#lookup(d.stances, s) : localStance(s);
+    return d?.stances ? this.#lookup(d.stances, s) : localStance(s);
   };
 
   /** The fungus's policy, the same way, on its own lane: what the fungus does to a host in this fungal situation. */
@@ -469,8 +480,8 @@ export class ColonyJev {
   /** Drive the game's fungus: its policy becomes this lane (Jev's cached answer while a run is on, else the fungus's local rule). */
   attachFungus(fungus: Fungus): void {
     this.#fungus = fungus;
-    fungus.policy = this.fungusPolicy;
-    fungus.growthPolicy = this.growthPolicy;
+    fungus.bindPolicy("fungus", this.fungusPolicy);
+    fungus.bindPolicy("growth", this.growthPolicy);
     this.setMenu(fungus.menu);
     this.#recontext(this.#fungal, this.#fungal.words); // the view is part of the fungus's context (fungusContext)
   }
@@ -538,8 +549,12 @@ export class ColonyJev {
     const kind = laneOfContext(context);
     if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
     if (kind === "growth") return this.#growth as Lane<unknown, string>;
-    const d = this.#driven[0] ?? colonyLanes("");
-    return kind === "mode" ? (d.modes as Lane<unknown, string>) : kind === "stance" ? (d.stances as Lane<unknown, string>) : null;
+    const d = this.#driven[0] ?? colonyLanes("", this.#species);
+    return kind === "mode"
+      ? (d.modes as Lane<unknown, string> | null)
+      : kind === "stance"
+        ? (d.stances as Lane<unknown, string> | null)
+        : null;
   }
 
   /** Drive this one colony (kept for a single colony; see attachColonies). */
@@ -551,12 +566,15 @@ export class ColonyJev {
    * Drive these colonies, each under its own doctrine (a new world is new colonies; the caches carry over:
    * situations depend on neither the colony nor the map). Each colony's policies become its own lanes.
    */
-  attachColonies(colonies: readonly Colony[]): void {
+  attachColonies(colonies: readonly Colony[], species: Species = GENERIC_ANT): void {
+    this.#species = species;
     this.#driven = colonies.map((colony, k) => {
       const words = this.#doctrines[k] ?? this.#doctrines[0] ?? "";
-      const d: Driven = { colony, ...colonyLanes(words) };
-      colony.policy = (s) => this.#lookup(d.modes, s);
-      colony.stancePolicy = (s) => this.#lookup(d.stances, s);
+      const d: Driven = { colony, ...colonyLanes(words, species) };
+      // A lane the species lacks is never asked: the colony keeps the policy the Game gave it (its local rule).
+      const { modes, stances } = d;
+      if (modes) colony.bindPolicy("mode", (s) => this.#lookup(modes, s));
+      if (stances) colony.bindPolicy("stance", (s) => this.#lookup(stances, s));
       colony.reconsider();
       return d;
     });
@@ -578,8 +596,8 @@ export class ColonyJev {
     this.#doctrines[k] = text;
     this.#driven.forEach((d, j) => {
       if (j !== k && !(k === 0 && this.#doctrines[j] === undefined)) return;
-      const a = this.#recontext(d.modes, text);
-      const b = this.#recontext(d.stances, text);
+      const a = d.modes ? this.#recontext(d.modes, text) : false;
+      const b = d.stances ? this.#recontext(d.stances, text) : false;
       if (a || b) d.colony.reconsider();
     });
   }
@@ -692,7 +710,10 @@ export class ColonyJev {
 
   #lanes(): Lane<unknown, string>[] {
     const out: Lane<unknown, string>[] = [];
-    for (const d of this.#driven) out.push(d.stances as Lane<unknown, string>, d.modes as Lane<unknown, string>);
+    for (const d of this.#driven) {
+      if (d.stances) out.push(d.stances as Lane<unknown, string>);
+      if (d.modes) out.push(d.modes as Lane<unknown, string>);
+    }
     out.push(this.#fungal as Lane<unknown, string>, this.#growth as Lane<unknown, string>);
     return out;
   }
