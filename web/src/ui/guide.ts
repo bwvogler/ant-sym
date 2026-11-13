@@ -1,3 +1,4 @@
+import type { Channel } from "../colony/index.ts";
 import { BROOD_RGB, css, HOME_RGB, ROLE_RGB } from "./palette.ts";
 
 // The Learn drawer's field guide: one entry per thing on screen, in three
@@ -28,6 +29,8 @@ export interface GuideEntry {
   onScreen: string;
   realAnts: string;
   inGame: string;
+  /** the trail this entry is about: a species that lays no such trail (the desert ant) doesn't see the entry (owner, ja-rf5.11) */
+  trail?: Channel;
   /** still scripted: a vision gap (docs/vision.md "Where the code is today"), its bead and what the script reads */
   scripted?: { bead: string; reads: string };
   sources: Source[];
@@ -38,6 +41,7 @@ const HEAT = "rgb(var(--heat))";
 export const GUIDE: GuideEntry[] = [
   {
     id: "food-trail",
+    trail: "food",
     title: "Food trail",
     swatch: [HEAT],
     onScreen:
@@ -53,6 +57,7 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "home-trail",
+    trail: "home",
     title: "Home trail and the way home",
     swatch: [css(HOME_RGB)],
     onScreen:
@@ -68,6 +73,7 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "food-quality",
+    trail: "food",
     title: "Tasting food",
     swatch: ["var(--accent)"],
     onScreen: "A jade crumb at an ant's head: it is carrying food. Food on the map varies in how good it is.",
@@ -78,6 +84,7 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "double-bridge",
+    trail: "food",
     title: "Choosing a branch",
     onScreen: "Where trails fork, traffic piles onto one branch.",
     realAnts:
@@ -88,6 +95,7 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "no-entry",
+    trail: "noEntry",
     title: "The “no entry” mark",
     onScreen: "Not drawn: the mark is built, but switched off.",
     realAnts:
@@ -98,6 +106,7 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "alarm",
+    trail: "alarm",
     title: "Alarm",
     swatch: ["var(--warn)"],
     onScreen: "Brown haze where ants fight, shown, like the trails, only where your hosts have smelled it lately.",
@@ -451,4 +460,9 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
 
 export function guideEntry(id: string): GuideEntry | undefined {
   return GUIDE.find((e) => e.id === id);
+}
+
+/** The guide's entries for a species whose colonies lay the trails `has` says: one about a trail it lacks is left out (owner, ja-rf5.11). */
+export function guideFor(has: (channel: Channel) => boolean): GuideEntry[] {
+  return GUIDE.filter((e) => e.trail === undefined || has(e.trail));
 }
