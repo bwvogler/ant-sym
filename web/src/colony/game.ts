@@ -7,7 +7,7 @@ import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
-import { GENERIC_ANT, type Species } from "./species.ts";
+import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Cell, type End, nearestValid, outward } from "./transect.ts";
 import { cellOf, CELL } from "./hex.ts";
@@ -366,9 +366,9 @@ export class Game {
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
     const mine = new Colony(
       home,
-      { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...this.params.species.params, ...player.colony },
+      { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...this.#speciesParams(), ...player.colony },
       rng,
-      player.policy ?? localPolicy,
+      player.policy ?? this.params.species.policy ?? localPolicy,
       player.stance ?? localStance,
       layered,
     );
@@ -378,9 +378,9 @@ export class Game {
       this.colonies.push(
         new Colony(
           home,
-          { antCount: this.params.rivalAnts, odour: 1, tolerance, ...this.params.species.params, ...player.rival, nest: 1 },
+          { antCount: this.params.rivalAnts, odour: 1, tolerance, ...this.#speciesParams(), ...player.rival, nest: 1 },
           rng,
-          player.rivalPolicy ?? localPolicy,
+          player.rivalPolicy ?? this.params.species.policy ?? localPolicy,
           player.rivalStance ?? localStance,
           layered,
         ),
@@ -403,6 +403,12 @@ export class Game {
   }
 
   /** Wire every colony to the game: its grids, burials, enemies, the other nests, its raids. Again whenever a colony is added. */
+  /** The species' colony parameters, with whether it follows trails derived from its mode words (ja-fnd.5.9); its own params can still set it. */
+  #speciesParams(): Partial<ColonyParams> {
+    const sp = this.params.species;
+    return { follows: speciesFollows(sp), ...sp.params };
+  }
+
   #wire(): void {
     this.colonies.forEach((c, k) => {
       // One world: the line as it stands (it grows with every founding), before the holes are read off it.
@@ -632,7 +638,7 @@ export class Game {
     const c = new Colony(
       home,
       {
-        ...this.params.species.params,
+        ...this.#speciesParams(),
         antCount: f.antCount,
         maxAnts: f.maxAnts ?? this.params.species.params.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)),
         nest: at,
@@ -640,7 +646,7 @@ export class Game {
         tolerance: this.recognition.params.tolerance,
       },
       this.#rng,
-      localPolicy,
+      this.params.species.policy ?? localPolicy,
       localStance,
       world ? { plane: world.plane, line: world.line } : null,
     );
