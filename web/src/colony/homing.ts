@@ -1,4 +1,4 @@
-// Homing (docs/refactor.md S3.3): path integration, where an ant believes home is, route memory and search, the home field, and the way to and out of the hole. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c`.
+// Homing (docs/refactor.md S3.3): path integration, where an ant believes home is, route memory and search, the home field, and the way to and out of the hole. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c` and `goal` becoming `homeGoal`.
 
 import type { Colony } from "./colony.ts";
 import { NO_CELL, SOIL_FILL, UP_FIRST, gauss, walkable } from "./grid.ts";

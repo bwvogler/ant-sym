@@ -678,7 +678,7 @@ export class Colony {
   looseLost = 0;
   /** the side view: cells of mound heaped so far, or tried (no room at the sky's top): ⌊pellets out × SWELL⌋ once caught up */
   heaped = 0;
-  /** the point the current ant is homing to (see goal): the m-line runs to it */
+  /** the point the current ant is homing to (see homeGoal): the m-line runs to it */
   goalX = 0;
   goalY = 0;
   /** the side view: where the ant being stepped believes the hole is, across the ground (see believe, towardHole) */

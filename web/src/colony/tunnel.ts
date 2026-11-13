@@ -151,7 +151,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
   // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
   const raiding = mode === FIGHT && col.entrance !== null && col.stanceOf(i) === "raid" && col.raidTarget !== null;
   const onSky = isSky(map, fresh ? hx : col.gx[i], fresh ? hy : col.gy[i]);
-  // Homing underground with the hole still its goal: in at another hole than its own (see goal). It climbs back out.
+  // Homing underground with the hole still its goal: in at another hole than its own (see homeGoal). It climbs back out.
   const climbing = mode === RETURN && col.entrance !== null && !onSky && col.goalKind[i] === 1 && col.pellet[i] === 0;
   const groundHome = carryingOut || climbing || ((mode === RETURN || raiding) && col.entrance !== null && onSky);
   if (fresh && !hugging && !groundHome && col.noTunnel[i] === packed) {
