@@ -54,6 +54,7 @@ import {
 } from "./tuning.ts";
 import { ENEMY, EXPLORE, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { isSky } from "./world.ts";
+import { climbOut } from "./homing.ts";
 
 export function portView(col: Colony): void {
   if (col.portViewAt === col.time) return;
@@ -666,7 +667,7 @@ export function alatesOut(col: Colony, dt: number): void {
       cellOf(a.x, a.y);
       const cx = CELL[0];
       const cy = CELL[1];
-      const d = isSky(col.map, cx, cy) ? -1 : col.climbOut(cx, cy);
+      const d = isSky(col.map, cx, cy) ? -1 : climbOut(col, cx, cy);
       if (d < 0) {
         col.alates.splice(k, 1);
         col.flown.push(a);

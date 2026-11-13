@@ -381,3 +381,8 @@ export class Pheromones {
     this.#head = fillLike(this.#head, r.head) as Record<Channel, number>;
   }
 }
+
+/** Brood read as store and store as brood (the fungus's muddle, nest slice 8); any other mark as it is. */
+export function swapBroodStore(m: Mark): Mark {
+  return m === "brood" ? "store" : m === "store" ? "brood" : m;
+}
