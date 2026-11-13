@@ -117,8 +117,8 @@ export default function ColonyApp() {
   const sensed = useMemo(() => new SensedMap(), [game]);
   useEffect(() => onFrame(() => sensed.stamp(game.colonies, game.time)), [onFrame, game, sensed]);
   const onStart = useCallback(
-    (seed: number, withTutorial: boolean) => {
-      start(seed, withTutorial);
+    (seed: number, withTutorial: boolean, species?: string) => {
+      start(seed, withTutorial, species);
       if (withTutorial) tut.run();
       else skipTutorial();
     },

@@ -543,8 +543,10 @@ export class ColonyJev {
    * so answers this browser got from Jev win. Only answers this lane's question could give are kept (`valid`). The
    * colonies reconsider, so shipped answers take hold at once.
    */
-  seed(context: string, entries: readonly [string, string][]): number {
-    const l = this.#laneFor(context);
+  seed(context: string, entries: readonly [string, string][], species: Species = GENERIC_ANT): number {
+    // Checked against the bundle's own species' words, not the game's (ja-fnd.5.15): a page that seeds while playing one species keeps
+    // every other species' answers for a later game.
+    const l = this.#laneFor(context, species);
     if (!l) return 0;
     const cache = this.#cache(l, context);
     let added = 0;
@@ -561,11 +563,11 @@ export class ColonyJev {
   }
 
   /** A lane whose kind of context this is (by its prefix: colony-, stance-, fungus-), to check answers against. */
-  #laneFor(context: string): Lane<unknown, string> | null {
+  #laneFor(context: string, species: Species): Lane<unknown, string> | null {
     const kind = laneOfContext(context);
     if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
     if (kind === "growth") return this.#growth as Lane<unknown, string>;
-    const d = this.#driven[0] ?? colonyLanes("", this.#species);
+    const d = colonyLanes("", species);
     return kind === "mode"
       ? (d.modes as Lane<unknown, string> | null)
       : kind === "stance"

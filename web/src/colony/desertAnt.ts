@@ -1,7 +1,7 @@
 import { localResponses } from "./responses.ts";
 import { MARKS } from "./pheromone.ts";
 import { defineSchema, legendOf } from "./schema.ts";
-import type { ModeRuleText, Species } from "./species.ts";
+import { SPECIES, type ModeRuleText, type Species } from "./species.ts";
 import { MODES, type LaneWords, type Mode, type Policy, type SpeciesSituation } from "./vocab.ts";
 
 // The desert ant, Cataglyphis (docs/desert-ant.md, PRD §60; ja-rf5.3): the first real species on the descriptor (docs/species.md), made only of
@@ -79,3 +79,6 @@ export const DESERT_ANT: Species = {
   policy: desertPolicy,
   ruleText: DESERT_RULE_TEXT,
 };
+
+// The page can play it (the start screen's species choice): a save names it by id (species.ts SPECIES).
+(SPECIES as Record<string, Species>)[DESERT_ANT.id] = DESERT_ANT;
