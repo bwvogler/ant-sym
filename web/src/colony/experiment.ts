@@ -2445,14 +2445,15 @@ export const desertInvitation: Assay = {
 };
 
 /**
- * D3 — the blind-search baseline a food plume must beat. No pass mark until the plume exists (ja-rf5.4), which is to bring the first
- * find sooner than this. The first finder is blind whatever the colony lays (no trail leads to food nobody has found). Target for the
- * plume: a forager turns in to food odour up to about 6 m (Buehlmann et al. 2014, a pre-publication draft only: unverified).
+ * D3 — the first find. With no pass mark of its own: the plume (ja-rf5.4) is to bring it sooner than the same seed's blind search
+ * (`colony: { foodPlume: 0 }`), as tests/slow/assays.test.ts checks with the desert ant. The first finder is otherwise blind whatever the
+ * colony lays (no trail leads to food nobody has found). A forager turns in to food odour up to about 6 m (Buehlmann et al. 2014, a
+ * pre-publication draft only: unverified).
  */
 export const desertFirstFind: Assay = {
   id: "d3",
-  title: "D3 the first find, by blind search (one world; the plume's baseline)",
-  target: "baseline only: with a plume (ja-rf5.4) the first find comes sooner (Buehlmann 2014, draft: unverified)",
+  title: "D3 the first find (one world; with the desert ant's food plume, against its blind search)",
+  target: "with the plume (ja-rf5.4) the first find comes sooner than with foodPlume 0, seed for seed (Buehlmann 2014, draft: unverified)",
   seconds: D_SECONDS,
   spec: (seed) => {
     let first = Infinity;
