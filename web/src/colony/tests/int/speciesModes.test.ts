@@ -6,7 +6,7 @@ import { localResponses } from "../../responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "../../species.ts";
 import type { LaneWords, Mode, Policy } from "../../vocab.ts";
 import { smallOne } from "../builders.ts";
-import { mulberry32 } from "../../world.ts";
+import { generateSideWorld, mulberry32 } from "../../world.ts";
 
 // ja-fnd.5.9: a species' mode set and local rule are its own. Words that drop `follow` mean its ants never enter FOLLOW (ColonyParams.follows,
 // derived by the Game), and the Game hands its colonies the species' local rule. Before this, a no-follow species spent thousands of ant-ticks
@@ -64,4 +64,24 @@ test("a no-follow species is never asked about a situation in which it is follow
   followTicks({ ...LONE, policy: spy }, 40);
   assert.ok(asked.has("explore"), `it was asked (${[...asked]})`);
   assert.ok(!asked.has("follow"), "never in mode follow");
+});
+
+test("a colony founded mid-game takes the species' rule and mode set too (review of #121, S1)", () => {
+  const g = new Game(generateSideWorld(2), { antCount: 60, rivalAnts: 60, species: LONE }, mulberry32(11));
+  const a = g.colonies[0]!.nest.entrance!;
+  const b = g.colonies[1]!.nest.entrance!;
+  const k = g.addColony({ x: a.x + 0.25 * (b.x - a.x), y: a.y, antCount: 20, odour: 0 });
+  const c = g.colonies[k]!;
+  assert.equal(c.policy, lonePolicy);
+  assert.equal(c.params.follows, false);
+});
+
+test("a returner leaves as an explorer, not a follower, even where the species' arrive asks for followers (review of #121, N1)", () => {
+  // arrive: "follow" makes the generic ant's returners leave as followers; a no-follow species' leave as explorers (the guards at both leaving points).
+  assert.ok(followTicks({ ...GENERIC_ANT, params: { arrive: "follow" } }, 40) > 0, "the generic ant follows under arrive: follow");
+  assert.equal(followTicks({ ...LONE, policy: undefined, params: { arrive: "follow" } }, 40), 0);
+  const asked = new Set<string>();
+  const spy: Policy = (s) => (asked.add(s.mode), lonePolicy(s));
+  followTicks({ ...LONE, policy: spy, params: { arrive: "follow" } }, 40);
+  assert.ok(asked.size > 0 && !asked.has("follow"), `never asked in mode follow (${[...asked]})`);
 });

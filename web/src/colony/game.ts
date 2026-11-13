@@ -402,13 +402,13 @@ export class Game {
     if (this.params.regrow > 0) this.#notePiles();
   }
 
-  /** Wire every colony to the game: its grids, burials, enemies, the other nests, its raids. Again whenever a colony is added. */
   /** The species' colony parameters, with whether it follows trails derived from its mode words (ja-fnd.5.9); its own params can still set it. */
   #speciesParams(): Partial<ColonyParams> {
     const sp = this.params.species;
     return { follows: speciesFollows(sp), ...sp.params };
   }
 
+  /** Wire every colony to the game: its grids, burials, enemies, the other nests, its raids. Again whenever a colony is added. */
   #wire(): void {
     this.colonies.forEach((c, k) => {
       // One world: the line as it stands (it grows with every founding), before the holes are read off it.

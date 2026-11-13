@@ -101,3 +101,11 @@ test("the species' own local rule stands in while a situation is unanswered (ja-
   assert.equal(jev.explain(sit).mode, "fight");
   assert.equal(jev.explain(sit).by, "local");
 });
+
+test("a species with no mode words of its own still has its local rule in the client's fallbacks (review of #121, S2)", () => {
+  const rule = () => "fight" as const;
+  const { jev } = setup({ ...LONE, lanes: {}, policy: rule });
+  assert.equal(jev.explain(sit).mode, "fight", "explain falls back to the species' rule");
+  assert.equal(jev.explain(sit).by, "local");
+  assert.equal(jev.policy(sit), "fight", "and so does the client's policy");
+});

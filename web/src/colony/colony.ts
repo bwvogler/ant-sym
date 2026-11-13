@@ -4832,6 +4832,7 @@ export class Colony {
         this.leaveOk[i] = 1;
       }
     } else if (gated && p.arrive !== "return" && this.mode[i] === RETURN && !this.pellet[i] && this.band(i) === 2 && !this.#isTired(i)) {
+      // `p.follows` here is defensive (review of #121, N1): no shipped species sets arrive "follow", and the policy guard turns a follower to explore anyway.
       this.mode[i] = p.arrive === "follow" && p.follows && !this.recruited[i] ? FOLLOW : EXPLORE;
       this.asked[i] = -1;
       this.restT[i] = 0;
@@ -6056,6 +6057,7 @@ export class Colony {
         (!gate || (!rolled && this.#leaves(i, dt, toEnemy !== null)))
       ) {
         // A raid scout starts exploring, not on a food trail (review of #53, N6).
+        // `p.follows`: defensive, as at the gated hole (review of #121, N1).
         this.mode[i] = p.arrive === "follow" && p.follows && !this.recruited[i] ? FOLLOW : EXPLORE;
         this.asked[i] = -1;
         this.restT[i] = 0;
