@@ -5002,6 +5002,30 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **`main` had already drifted.** Against no hyphae on the same `main`, its own hyphae are 29 % slower on seed 7 (277 → 358 s): P1 fails there before this change (§63.7 measured 397 vs 389 on its branch, before `main`'s merges of the day). Filed as `ja-2bw.19`. The worst seed improves with hyphae (two "never" become 493 and 373 s).
 - **Owner (2026-11-13): ship, record, and file the drift.**
 
+### 63.9 Hyphae along the tunnels, regrowing after a dig (ja-2bw.15, 2026-11-13)
+
+**Built.** In the side view a dug cell has a back wall: a hypha in it runs there, where the ants walk.
+- **Tunnels followed.** A tip in a dug cell follows the tunnel: where it bends, the local rule and a policy's `turn` take the side that stays in it (one turn off, or two); where it ends, the tip grows on into the soil. From the soil, the local rule enters a tunnel ahead unless its own hypha already runs in a dug cell within `ENTER_GAP` (6); then it slides along the wall as before.
+- **Regrowth.** A cut leaves the cell the hypha grew from as a stump. `REGROW_ROUNDS` (5) rounds later the stump puts out a tip that grows straight into the dug cell, paid from the free mass (or waits on the stump while the mass is short). Injured hyphae put out new tips behind the wound; the pause makes a dig cost something.
+- **Safe on the back wall.** Ants walking past do not harm hyphae in dug cells; only digging cuts (owner, 2026-11-13).
+- **The growth legend, v3.** Under #137's answers the two shaft-wall tips ended in a few steps (`fruit` when short, `fuse`), so the side view under *unite* kept about 6 cells and no tips. **Owner: reword and re-ask.** The legend now says that only tips grow, a tip that fruits or fuses is gone, and where the last tips end the mycelium grows no further; `fuse` says it ends the tip. Asked for the three aims: **$0.0020** (`GROWTH_BRAIN_VERSION` 3). Jev now fruits in no situation under any aim.
+- **Spots in the body.** With no `fruit` answers the hyphae made no spore spots and infection slowed. **Owner: spots in the body.** Where a tip still growing has come to a tunnel (on its wall or in it), grown `FRUIT_RUN` cells and with no spot of its own within `FRUIT_GAP`, the body puts a spot on the dug cell and the tip grows on. A `fruit` answer still ends a tip where the spacing allows it.
+
+**Seen.** Full maps, *unite*, the page's answers, 300 s (seeds 1–6): the side view holds 17–36 hypha cells, 9–25 of them in dug cells, with 1–4 tips still growing and 1–2 spots; under #137's answers it was about 6 cells with no tips. Where ants dug through (seeds 2 and 4: 6 and 13 cells cut) the hyphae grew back.
+
+**Measured** (`progression.mjs --map one --evolve`, 600 s; the no-hyphae run and `main`'s hyphae from §63.8):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 357 | 363 | 289 | 173 | 228 | never | 277 | never | 240 | 216 |
+| a quarter, §63.8's hyphae (s) | 333 | 299 | 287 | 161 | 220 | 493 | 393 | 373 | 253 | 217 |
+| a quarter, along tunnels (s) | 370 | 305 | 298 | 162 | 205 | 474 | 318 | 355 | 262 | 246 |
+
+- Against §63.8: seed 7 much faster (393 → 318 s), seeds 5, 6 and 8 faster; seeds 1 and 10 slower (+11 %, +13 %); median 293 → 302 s.
+- Against no hyphae: P1 fails on seeds 7 (+15 %) and 10 (+14 %) and on the median (283 → 302 s); the worst seed improves (never → 474 s). `main` already failed P1 on seed 7 (+42 %, `ja-2bw.19`).
+- **Owner (2026-11-13): ship, record, and tune in `ja-2bw.6`** (`ENTER_GAP`, `REGROW_ROUNDS`, `FRUIT_GAP` join its knobs).
+- SEEDS_11_20
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
