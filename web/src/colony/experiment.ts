@@ -6,6 +6,7 @@ import {
   type HoleCell,
   type Layer,
   LIFESPAN,
+  CURTAIN,
   PI_DRIFT,
   PLANE,
   planeMoundReach,
@@ -2318,6 +2319,220 @@ const nestFlowOne: Assay = {
   spec: (seed) => ({ ...nestFlow.spec(seed), map: (s) => generateOneWorld(s) }),
 };
 
+// ---------------------------------------------------------------- the desert ant (ja-rf5.2, docs/desert-ant.md "The mechanic")
+//
+// Assays for the desert ant, landed before it (no behaviour change): today they measure the generic ant, the baseline. Each runs
+// one world's default plane with its own food for D_SECONDS; the species comes in as `game.species` through an override once it
+// exists (ja-rf5.3). Targets read in full text are marked so; the rest are unverified (owner, 2026-11-13: mark them, don't wait for the
+// paywalled papers). Target (c), a forager whose vector fails finds home by search loops, is S1 (search1).
+
+/** D1–D4: seconds of play. */
+export const D_SECONDS = 120;
+
+/** One world's default plane, a player colony alone, `probe` watching. */
+function desertSpec(seed: number, probe: Probe): RunSpec {
+  return { seed, seconds: D_SECONDS, map: (s) => generateOneWorld(s), game: { antCount: 60, rival: false }, probes: [probe] };
+}
+
+/** Cells of the plane at or above a faint trail on `channel`. */
+function trailCells(game: Game, channel: Channel): number {
+  const L = game.player.layers[PLANE] as Layer;
+  const { w, h } = L.map.size;
+  let n = 0;
+  for (let y = 0; y < h; y++) for (let x = L.map.x0; x < L.map.x0 + w; x++) if (L.ph.fields[channel].get(x, y) >= FAINT) n++;
+  return n;
+}
+
+/**
+ * D1 — a desert ant lays no trail. Target: no cell of the plane holds a food or home trail at the end. *Cataglyphis* has no trail
+ * pheromone (Wolf & Wehner 2000, unverified) and Razin et al. 2013 (full text) open with *C. niger* as a species that lacks
+ * pheromone-based recruitment. Today's ant lays both: a todo until the desert ant (ja-rf5.3).
+ */
+export const desertNoTrail: Assay = {
+  id: "d1",
+  title: "D1 a desert ant lays no trail (one world)",
+  target: "no food or home trail on the plane after 120 s (Razin 2013, full text; Wolf & Wehner 2000, unverified)",
+  seconds: D_SECONDS,
+  spec: (seed) =>
+    desertSpec(seed, {
+      tick() {},
+      summary(game) {
+        const food = trailCells(game, "food");
+        const home = trailCells(game, "home");
+        return { foodCells: food, homeCells: home, pass: food === 0 && home === 0 ? 1 : 0 };
+      },
+    }),
+  score: () => ({}),
+};
+
+/**
+ * Departures (curtain to plane), returns (plane to curtain, with whether the ant carried food) and deaths out on the plane of the
+ * player's ants, with the time. A slot an ant dies in may be reused by a birth (in the curtain): it starts a fresh record.
+ */
+function crossingsProbe(
+  onSummary: (
+    game: Game,
+    out: { t: number; ant: number }[],
+    back: { t: number; ant: number; food: boolean }[],
+    died: { t: number; ant: number }[],
+  ) => Record<string, number>,
+): Probe {
+  let was: Uint8Array = new Uint8Array(0);
+  const out: { t: number; ant: number }[] = [];
+  const back: { t: number; ant: number; food: boolean }[] = [];
+  const died: { t: number; ant: number }[] = [];
+  return {
+    tick(game) {
+      const c = game.player;
+      if (was.length < c.n) {
+        // New slots start as "no ant" (255), not as PLANE (0), so a slot filled later is not read as a return (review of #134).
+        const grown = new Uint8Array(Math.max(c.n, 64)).fill(255);
+        grown.set(was);
+        was = grown;
+      }
+      for (let i = 0; i < c.n; i++) {
+        const l = c.alive[i] ? c.layer[i]! : 255;
+        const before = was[i];
+        if (before === CURTAIN && l === PLANE) out.push({ t: game.time, ant: i });
+        else if (before === PLANE && l === CURTAIN) back.push({ t: game.time, ant: i, food: c.carrying[i] === 1 });
+        else if (before === PLANE && l === 255) died.push({ t: game.time, ant: i });
+        was[i] = l;
+      }
+    },
+    summary: (game) => onSummary(game, out, back, died),
+  };
+}
+
+/** D2: the seconds after (and before) each return with food that departures are counted in. */
+export const D2_WINDOW = 10;
+
+/**
+ * D2 — a returning finder invites nestmates out. For each forager that comes home with food, the departures in the D2_WINDOW seconds
+ * after it against the D2_WINDOW seconds before it, summed over every such return: about 1 when returns invite nobody. Target: at least 7.
+ * Razin, Eckmann & Feinerman 2013 (full text): a recruiter's entry raises the idle ants leaving in the next minute sevenfold over a
+ * spontaneous mover (*C. niger*, lab nests of 4–8 ants). The game's returns come every second or so, so a minute on either side would
+ * overlap every other return's: the window is shorter, and the mark is provisional; meeting it is the invitation's (ja-rf5.6).
+ */
+export const desertInvitation: Assay = {
+  id: "d2",
+  title: "D2 a returning finder invites nestmates out (one world)",
+  target: "departures in the 10 s after a return with food ≥ 7× those in the 10 s before (Razin 2013, full text; provisional window)",
+  seconds: D_SECONDS,
+  spec: (seed) =>
+    desertSpec(
+      seed,
+      crossingsProbe((game, out, back) => {
+        // A returner's own trip back out is not one it invited (review of #134, S1); one in the return's own tick counts as after (N2).
+        const count = (lo: number, hi: number, self: number): number => {
+          let n = 0;
+          for (const o of out) if (o.ant !== self && o.t >= lo && o.t < hi) n++;
+          return n;
+        };
+        let after = 0;
+        let before = 0;
+        let returns = 0;
+        for (const b of back) {
+          if (!b.food || b.t < D2_WINDOW || b.t > game.time - D2_WINDOW) continue;
+          returns++;
+          after += count(b.t, b.t + D2_WINDOW, b.ant);
+          before += count(b.t - D2_WINDOW, b.t, b.ant);
+        }
+        const ratio = before > 0 ? after / before : after > 0 ? Infinity : NaN;
+        return { departures: out.length, returnsWithFood: returns, after, before, ratio, pass: ratio >= 7 ? 1 : 0 };
+      }),
+    ),
+  score: () => ({}),
+};
+
+/**
+ * D3 — the blind-search baseline a food plume must beat. No pass mark until the plume exists (ja-rf5.4), which is to bring the first
+ * find sooner than this. The first finder is blind whatever the colony lays (no trail leads to food nobody has found). Target for the
+ * plume: a forager turns in to food odour up to about 6 m (Buehlmann et al. 2014, a pre-publication draft only: unverified).
+ */
+export const desertFirstFind: Assay = {
+  id: "d3",
+  title: "D3 the first find, by blind search (one world; the plume's baseline)",
+  target: "baseline only: with a plume (ja-rf5.4) the first find comes sooner (Buehlmann 2014, draft: unverified)",
+  seconds: D_SECONDS,
+  spec: (seed) => {
+    let first = Infinity;
+    let finds = 0;
+    let held: Uint8Array = new Uint8Array(0);
+    return desertSpec(seed, {
+      tick(game) {
+        const c = game.player;
+        if (held.length < c.n) {
+          const grown = new Uint8Array(Math.max(c.n, 64));
+          grown.set(held);
+          held = grown;
+        }
+        for (let i = 0; i < c.n; i++) {
+          const has = c.alive[i] && c.layer[i] === PLANE && c.carrying[i] === 1 ? 1 : 0;
+          if (has && !held[i]) {
+            finds++;
+            if (first === Infinity) first = game.time;
+          }
+          held[i] = has;
+        }
+      },
+      summary: () => ({ firstFind: Number.isFinite(first) ? first : NaN, found: Number.isFinite(first) ? 1 : 0, pickups: finds }),
+    });
+  },
+  score: () => ({}),
+};
+
+/**
+ * D4 — trips, the heat budget's baseline. No pass mark until heat exists (ja-rf5.5): its trips are to be bursts inside a heat budget.
+ * Unset targets, all unverified: the thermal window and how fast heat kills (*C. bombycina*: Wehner, Marsh & Wehner 1992, abstract
+ * only); a forager life of 4–6 days and about 16 % of foragers lost a day (*C. bicolor*: Schmid-Hempel & Schmid-Hempel 1984, a summary).
+ * Reported: trips completed (out of the hole and back), still out at the end (`open`), and ended by death out on the plane (`diedOut`);
+ * the median, 90th percentile and longest over completed and open trips (an open one counted to the end, as at least that long), in
+ * seconds, and the completed trips' median.
+ */
+export const desertTrips: Assay = {
+  id: "d4",
+  title: "D4 trips out of the hole and back (one world; the heat budget's baseline)",
+  target: "baseline only: trips inside a heat budget once heat exists (ja-rf5.5; Wehner 1992, Schmid-Hempel 1984: unverified)",
+  seconds: D_SECONDS,
+  spec: (seed) =>
+    desertSpec(
+      seed,
+      crossingsProbe((game, out, back, died) => {
+        const done: number[] = [];
+        const left = new Map<number, number>();
+        let diedOut = 0;
+        const events = [
+          ...out.map((o) => ({ t: o.t, ant: o.ant, k: 0 })),
+          ...back.map((b) => ({ t: b.t, ant: b.ant, k: 1 })),
+          ...died.map((d) => ({ t: d.t, ant: d.ant, k: 2 })),
+        ].sort((a, b) => a.t - b.t);
+        for (const e of events) {
+          if (e.k === 0) left.set(e.ant, e.t);
+          else if (left.has(e.ant)) {
+            if (e.k === 1) done.push(e.t - left.get(e.ant)!);
+            else diedOut++; // a trip that ended in death: what the heat budget is about (review of #134, S2)
+            left.delete(e.ant);
+          }
+        }
+        // Trips still out at the end count to the end, as at least that long: dropping them made the median short (S2).
+        const open = [...left.values()].map((t) => game.time - t);
+        const all = [...done, ...open].sort((a, b) => a - b);
+        done.sort((a, b) => a - b);
+        const at = (v: number[], q: number): number => (v.length ? v[Math.min(v.length - 1, Math.floor(q * v.length))]! : NaN);
+        return {
+          trips: done.length,
+          open: open.length,
+          diedOut,
+          median: at(all, 0.5),
+          p90: at(all, 0.9),
+          longest: all.length ? all[all.length - 1]! : NaN,
+          completedMedian: at(done, 0.5),
+        };
+      }),
+    ),
+  score: () => ({}),
+};
+
 /**
  * The assays rerun on one world (`experiment.mjs --one`): A1, A2a, A2b, A3, A4, A5, A5b, A6, A9 and A10 on their arenas
  * made the plane (onPlane), A8 in the curtain, and G1. Same ids as the legacy ones, so `--one bridge` is A1 on the plane.
@@ -2336,6 +2551,10 @@ export const ONE_ASSAYS: Assay[] = [
   search1,
   forage1,
   route1,
+  desertNoTrail,
+  desertInvitation,
+  desertFirstFind,
+  desertTrips,
 ];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). */
