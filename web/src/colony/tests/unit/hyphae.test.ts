@@ -401,7 +401,7 @@ test("a policy's turn with both near sides blocked reaches two turns round (side
   assert.equal(h.length, 5, "grew nothing this step (the cell one turn left is its own)");
 });
 
-// Cords (a web, ja-2bw.8): the hypha feeding many tips thickens, a dig doesn't cut it, dead ends fade.
+// Cords (a web, ja-2bw.8): the hypha feeding many tips thickens, takes CORD_DIGS digs to cut, dead ends fade.
 
 /** A trunk east from (0, 20) to x = 5, and five branches off its end, each two cells long: the trunk feeds five tips. */
 function fan(): Hyphae {
@@ -499,4 +499,36 @@ test("a tip's cell, a fusion's cells and a kept (corpse) cell don't fade (review
     0,
     "a kept cell faded",
   );
+});
+
+const dugAt = (...cells: number[]): Ground => ({ topsoil: false, kind: (x, y) => (cells.includes(cellKey(x, y)) ? "open" : "soil") });
+
+test("a cord that thins back while it lies dug is cut at once; its count is saved (review of #119, S2)", () => {
+  const h = fan();
+  h.thicken();
+  for (const k of h.parent.keys()) h.soil.add(k);
+  const trunk = cellKey(3, 20);
+  assert.equal(h.cutDug(dugAt(trunk)), 0, "the cord took its first dig");
+  assert.deepEqual([...Hyphae.load(JSON.parse(JSON.stringify(h.save()))).digs], [[trunk, 1]], "the dig count was not saved");
+  for (const t of h.tips.slice(1, 3)) h.cut(cellKey(t.x, t.y)); // two branches go: the trunk feeds three tips
+  h.thicken();
+  assert.ok(!h.cords.has(trunk));
+  assert.ok(h.cutDug(dugAt(trunk)) > 0, "a thinned cord kept its digs");
+  assert.ok(!h.has(3, 20));
+});
+
+test("a dug cord cut from upstream leaves no dig count behind; one filled back in starts again", () => {
+  const h = fan();
+  h.thicken();
+  for (const k of h.parent.keys()) h.soil.add(k);
+  assert.equal(h.cutDug(dugAt(cellKey(4, 20))), 0);
+  h.cords.delete(cellKey(2, 20)); // a thin cell upstream
+  assert.ok(h.cutDug(dugAt(cellKey(4, 20), cellKey(2, 20))) > 0);
+  assert.equal(h.digs.size, 0, "a cut cord's dig count stayed");
+  const f = fan();
+  f.thicken();
+  for (const k of f.parent.keys()) f.soil.add(k);
+  f.cutDug(dugAt(cellKey(3, 20)));
+  f.cutDug(dugAt()); // filled back with soil
+  assert.equal(f.digs.size, 0, "a filled cell kept its count");
 });

@@ -65,7 +65,8 @@ test("at a web the game fades dead ends but keeps a corpse's cell; cords survive
   for (const [k, p] of h.parent) {
     if (p === -1 || h.cords.has(k) || children.get(p) !== 1) continue;
     const pp = h.parent.get(p);
-    // The corpse's cell, too, has no other branch and is no root: so it becomes a dead end itself, and only the corpse keeps it.
+    // The corpse's cell, too, has no other branch and is no root. (In play its own tips stand on it, so they hold it as much as
+    // the corpse does: `keep` itself is held by the unit test; review of #119, N5.)
     if (pp === undefined || pp === -1 || children.get(pp) !== 1 || h.parent.get(pp) === -1 || h.cords.has(pp)) continue;
     chain.push(pp, p, k);
     break;

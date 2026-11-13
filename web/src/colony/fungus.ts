@@ -1084,8 +1084,8 @@ export class Fungus {
       stepRound(maps, level, budget, this.growthPolicy);
       stepped = true;
     }
-    // At a web (the Mycelium upgrade's third level, ja-2bw.8): the hyphae feeding many tips thicken into cords, which a dig
-    // doesn't cut, and dead ends nothing uses fade, freeing their mass (a corpse's cell is kept).
+    // At a web (the Mycelium upgrade's third level, ja-2bw.8): the hyphae feeding many tips thicken into cords, which take
+    // CORD_DIGS digs to cut, and dead ends nothing uses fade, freeing their mass (a corpse's cell is kept).
     if (stepped && e.level("mycelium") >= 2)
       for (const [l, h] of this.#hyphae.entries()) {
         if (!h) continue;

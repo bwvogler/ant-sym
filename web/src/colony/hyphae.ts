@@ -103,7 +103,7 @@ export class Hyphae {
   readonly soil = new Set<number>();
   /** hypha cells lost to cuts, over the game */
   cutCells = 0;
-  /** cords (ja-2bw.8): cells feeding CORD_FLOW tips or more, refreshed each round at a web; a dig doesn't cut a cord */
+  /** cords (ja-2bw.8): cells feeding CORD_FLOW tips or more, refreshed each round at a web; a cord takes CORD_DIGS digs to cut */
   cords = new Set<number>();
   /** hypha cells faded away unused, over the game (regress) */
   fadedCells = 0;
@@ -291,7 +291,10 @@ export class Hyphae {
     for (const k of [...this.soil]) {
       if (!this.soil.has(k)) continue;
       const [x, y] = keyCell(k);
-      if (ground.kind(x, y) !== "open") continue;
+      if (ground.kind(x, y) !== "open") {
+        this.digs.delete(k); // filled back in: a cord's count starts again (review of #119, N6)
+        continue;
+      }
       if (this.cords.has(k)) {
         const dug = (this.digs.get(k) ?? 0) + 1;
         if (dug < CORD_DIGS) {
