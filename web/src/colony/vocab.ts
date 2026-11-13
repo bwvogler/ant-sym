@@ -2,7 +2,7 @@
 // and the few constants those words carry. A leaf: it imports only the pheromone mark list and the schema helper, so colony.ts, responses.ts, recognition.ts,
 // battle.ts and the brains can all use it without importing each other (docs/refactor.md S1).
 import { MARKS } from "./pheromone.ts";
-import { defineSchema } from "./schema.ts";
+import { defineSchema, type Schema } from "./schema.ts";
 
 export const MODES = ["explore", "follow", "return", "fight"] as const;
 export type Mode = (typeof MODES)[number];
@@ -20,6 +20,11 @@ export interface LaneWords<C extends string = string> {
   /** a choice of the lane (a `Mode`, a `Stance`) with its sentence; a species may offer a subset, and a key that is not a choice of the lane fails to compile */
   readonly criteria: Readonly<Partial<Record<C, string>>>;
   readonly version: number;
+  /**
+   * The mode lane's fields when a species asks its own situation (ja-fnd.5.10): a schema over the generic fields it keeps and the ones it senses
+   * itself (Species.sense). Its legend must describe exactly these (build it with legendOf). Absent: the generic SITUATION_SCHEMA. Other lanes ignore it.
+   */
+  readonly schema?: Schema<SpeciesSituation>;
 }
 
 export const TRAILS = ["none", "faint", "strong"] as const;
@@ -72,6 +77,17 @@ export const SITUATION_SCHEMA = defineSchema<Situation>([
 ]);
 
 export type Policy = (s: Situation) => Mode;
+
+/**
+ * A mode-lane situation as a species asks it (ja-fnd.5.10): every generic field (the tick always senses them; a species' schema may leave some out of
+ * its key and its question) and the fields of its own that its sensor adds. A species' policy reads its own fields by name.
+ */
+export type SpeciesSituation = Situation & { readonly [field: string]: unknown };
+
+/** The mode lane's schema under a species' words: its own, or the generic SITUATION_SCHEMA (the same functions, so the generic ant's keys are unchanged). */
+export function modeSchema(words?: { readonly schema?: Schema<SpeciesSituation> }): Schema<SpeciesSituation> {
+  return words?.schema ?? (SITUATION_SCHEMA as unknown as Schema<SpeciesSituation>);
+}
 
 /** Counts per cell, read by integer cell coordinates (the game's enemy grid). */
 export interface CellCounts {

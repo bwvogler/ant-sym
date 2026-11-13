@@ -1,4 +1,4 @@
-import type { ColonyParams } from "./colony.ts";
+import type { Colony, ColonyParams } from "./colony.ts";
 import { MODE_WORDS, STANCE_WORDS } from "./colonyBrain.ts";
 import { localResponses, type Responses } from "./responses.ts";
 import type { LaneWords, Mode, Policy, Stance } from "./vocab.ts";
@@ -25,6 +25,11 @@ export interface Species {
    * (`ColonyParams.follows`, which the Game derives from the words).
    */
   policy?: Policy;
+  /**
+   * The fields of its own its ants sense for the mode lane (ja-fnd.5.10), by name, for ant i of colony c; its mode words' schema
+   * (`lanes.mode.schema`) names which of these and of the generic fields it asks. It reads the colony, never draws from the game's random stream.
+   */
+  sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>>;
 }
 
 /** Whether a species has a follow mode: its mode words offer `follow`, or it has no mode words of its own (ColonyParams.follows, ja-fnd.5.9). */
