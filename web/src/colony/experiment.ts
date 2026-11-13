@@ -2365,31 +2365,41 @@ export const desertNoTrail: Assay = {
   score: () => ({}),
 };
 
-/** Departures (curtain to plane) and returns (plane to curtain) of the player's ants, with the time and whether a return carried food. */
+/**
+ * Departures (curtain to plane), returns (plane to curtain, with whether the ant carried food) and deaths out on the plane of the
+ * player's ants, with the time. A slot an ant dies in may be reused by a birth (in the curtain): it starts a fresh record.
+ */
 function crossingsProbe(
-  onSummary: (game: Game, out: { t: number; ant: number }[], back: { t: number; ant: number; food: boolean }[]) => Record<string, number>,
+  onSummary: (
+    game: Game,
+    out: { t: number; ant: number }[],
+    back: { t: number; ant: number; food: boolean }[],
+    died: { t: number; ant: number }[],
+  ) => Record<string, number>,
 ): Probe {
-  let was: Uint8Array | null = null;
+  let was: Uint8Array = new Uint8Array(0);
   const out: { t: number; ant: number }[] = [];
   const back: { t: number; ant: number; food: boolean }[] = [];
+  const died: { t: number; ant: number }[] = [];
   return {
     tick(game) {
       const c = game.player;
-      if (!was || was.length < c.n) {
-        const grown = new Uint8Array(Math.max(c.n, 64));
-        if (was) grown.set(was);
-        else grown.fill(255);
+      if (was.length < c.n) {
+        // New slots start as "no ant" (255), not as PLANE (0), so a slot filled later is not read as a return (review of #134).
+        const grown = new Uint8Array(Math.max(c.n, 64)).fill(255);
+        grown.set(was);
         was = grown;
       }
       for (let i = 0; i < c.n; i++) {
-        const l = c.alive[i] ? c.layer[i] : 255;
+        const l = c.alive[i] ? c.layer[i]! : 255;
         const before = was[i];
         if (before === CURTAIN && l === PLANE) out.push({ t: game.time, ant: i });
         else if (before === PLANE && l === CURTAIN) back.push({ t: game.time, ant: i, food: c.carrying[i] === 1 });
+        else if (before === PLANE && l === 255) died.push({ t: game.time, ant: i });
         was[i] = l;
       }
     },
-    summary: (game) => onSummary(game, out, back),
+    summary: (game) => onSummary(game, out, back, died),
   };
 }
 
@@ -2412,10 +2422,10 @@ export const desertInvitation: Assay = {
     desertSpec(
       seed,
       crossingsProbe((game, out, back) => {
-        const times = out.map((o) => o.t).sort((a, b) => a - b);
-        const count = (lo: number, hi: number): number => {
+        // A returner's own trip back out is not one it invited (review of #134, S1); one in the return's own tick counts as after (N2).
+        const count = (lo: number, hi: number, self: number): number => {
           let n = 0;
-          for (const t of times) if (t > lo && t <= hi) n++;
+          for (const o of out) if (o.ant !== self && o.t >= lo && o.t < hi) n++;
           return n;
         };
         let after = 0;
@@ -2424,8 +2434,8 @@ export const desertInvitation: Assay = {
         for (const b of back) {
           if (!b.food || b.t < D2_WINDOW || b.t > game.time - D2_WINDOW) continue;
           returns++;
-          after += count(b.t, b.t + D2_WINDOW);
-          before += count(b.t - D2_WINDOW, b.t);
+          after += count(b.t, b.t + D2_WINDOW, b.ant);
+          before += count(b.t - D2_WINDOW, b.t, b.ant);
         }
         const ratio = before > 0 ? after / before : after > 0 ? Infinity : NaN;
         return { departures: out.length, returnsWithFood: returns, after, before, ratio, pass: ratio >= 7 ? 1 : 0 };
@@ -2475,7 +2485,9 @@ export const desertFirstFind: Assay = {
  * D4 — trips, the heat budget's baseline. No pass mark until heat exists (ja-rf5.5): its trips are to be bursts inside a heat budget.
  * Unset targets, all unverified: the thermal window and how fast heat kills (*C. bombycina*: Wehner, Marsh & Wehner 1992, abstract
  * only); a forager life of 4–6 days and about 16 % of foragers lost a day (*C. bicolor*: Schmid-Hempel & Schmid-Hempel 1984, a summary).
- * Reported: the trips completed (out of the hole and back), their median, 90th percentile and longest, in seconds.
+ * Reported: trips completed (out of the hole and back), still out at the end (`open`), and ended by death out on the plane (`diedOut`);
+ * the median, 90th percentile and longest over completed and open trips (an open one counted to the end, as at least that long), in
+ * seconds, and the completed trips' median.
  */
 export const desertTrips: Assay = {
   id: "d4",
@@ -2485,22 +2497,37 @@ export const desertTrips: Assay = {
   spec: (seed) =>
     desertSpec(
       seed,
-      crossingsProbe((_game, out, back) => {
-        const trips: number[] = [];
+      crossingsProbe((game, out, back, died) => {
+        const done: number[] = [];
         const left = new Map<number, number>();
-        const events = [...out.map((o) => ({ ...o, dir: 1 })), ...back.map((b) => ({ t: b.t, ant: b.ant, dir: -1 }))].sort(
-          (a, b) => a.t - b.t,
-        );
+        let diedOut = 0;
+        const events = [
+          ...out.map((o) => ({ t: o.t, ant: o.ant, k: 0 })),
+          ...back.map((b) => ({ t: b.t, ant: b.ant, k: 1 })),
+          ...died.map((d) => ({ t: d.t, ant: d.ant, k: 2 })),
+        ].sort((a, b) => a.t - b.t);
         for (const e of events) {
-          if (e.dir === 1) left.set(e.ant, e.t);
+          if (e.k === 0) left.set(e.ant, e.t);
           else if (left.has(e.ant)) {
-            trips.push(e.t - left.get(e.ant)!);
+            if (e.k === 1) done.push(e.t - left.get(e.ant)!);
+            else diedOut++; // a trip that ended in death: what the heat budget is about (review of #134, S2)
             left.delete(e.ant);
           }
         }
-        trips.sort((a, b) => a - b);
-        const at = (q: number): number => (trips.length ? trips[Math.min(trips.length - 1, Math.floor(q * trips.length))]! : NaN);
-        return { trips: trips.length, median: at(0.5), p90: at(0.9), longest: trips.length ? trips[trips.length - 1]! : NaN };
+        // Trips still out at the end count to the end, as at least that long: dropping them made the median short (S2).
+        const open = [...left.values()].map((t) => game.time - t);
+        const all = [...done, ...open].sort((a, b) => a - b);
+        done.sort((a, b) => a - b);
+        const at = (v: number[], q: number): number => (v.length ? v[Math.min(v.length - 1, Math.floor(q * v.length))]! : NaN);
+        return {
+          trips: done.length,
+          open: open.length,
+          diedOut,
+          median: at(all, 0.5),
+          p90: at(all, 0.9),
+          longest: all.length ? all[all.length - 1]! : NaN,
+          completedMedian: at(done, 0.5),
+        };
       }),
     ),
   score: () => ({}),

@@ -92,7 +92,7 @@ test("A10 faint alarm draws explorers", { todo: "ja-je8: the draw is weak (media
 });
 
 // The desert ant's assays (ja-rf5.2, PRD §60.1): landed before the species, so today they measure the generic ant, which fails both.
-// Baselines, seeds 1–10: D1 lays food trail on a median 2,036 cells and home trail on 7,530; D2's ratio is a median 1.09 (0.96–1.24).
+// Baselines, seeds 1–10: D1 lays food trail on a median 2,036 cells and home trail on 7,530; D2's ratio is a median 0.97 (0.88–1.05).
 test("D1 a desert ant lays no trail", { todo: "ja-rf5.3: the desert ant on the descriptor lays no trail" }, () => {
   const m = runAssay(desertNoTrail, 1).metrics;
   assert.equal(m.pass, 1, `food trail on ${m.foodCells} cells, home trail on ${m.homeCells}`);
