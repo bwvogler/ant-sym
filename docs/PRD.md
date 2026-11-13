@@ -5010,3 +5010,64 @@ The owner saw one colony's trails all the time and disliked that Ink (colony 0) 
   - The dev hook's `fly(mother = 0)` and the lab's `foundBetween` are tools.
 - **Cost:** none. No legend, question or schema changed.
 
+## 66. An endless world: chunks from the seed, many lines, far ground frozen (design, ja-qpv, 2026-11-13)
+
+**Basis.** [endless-world.md](endless-world.md), a design note on [one-world](one-world.md). The wild colonies' density reads [nest-spacing](nest-spacing.md):
+- mature harvester-ant nests sit 9–14 m apart (one U, 140 cells), overdispersed, about 30–37 a hectare (**unverified**: abstracts and citing pages);
+- a young colony does well about 8 m (0.6–0.9 U) from a mature one;
+- desert ants nest much sparser, about 3 a hectare.
+
+No new research was needed; the owner sets the density.
+
+**The problem.** The owner asked (2026-11-13) to start on an endless world (`ja-qpv`, MR 9, which `ja-1vg`, the lifetime layer, waits on). One world is bounded: a 512 × 368 plane and one curtain under one line that grows only from its ends (§51). Generation is part pure (rock, curtain ground, food's random streams per chunk) and part whole-map: nest placement, the reach checks that prune food, `mainGround`, `growWorld`'s curtain pass. Some state is dense or flat-keyed by the map's width: `Colony.#outField`, the fungus's spore cells, regrowth piles, the minimap. Memory only grows: sleeping pheromone chunks stay allocated, nothing is dropped, and the chunk table is a dense bounding box. A wild colony off the line has no underground to live in.
+
+**Decisions (owner, 2026-11-13):**
+- **Many lines.** Each group of nests has its own line and curtain. A founding near a line's end grows that line by today's rule; one far from every line starts a new line. Lines keep a clearance from each other, so no plane cell lies over two curtains.
+- **Far ground is frozen.** Only ground near awake things (colonies, ants, the fungus) is stepped and stored in full. Farther chunks keep only what changed against the seed. A wild colony waits frozen until something awake comes near. A coarse far-away model and simulating everything were declined.
+- **Design first.** The note, this section and the beads come before code, as §51 did for one world.
+
+**The design** (proposed, endless-world §2–§8):
+- **The world is the seed plus deltas.** A chunk is generated from `(seed, chunk)` reading only pure inputs, so any order of visits gives the same world (`ja-r84`). What ants change is kept per chunk; faded scent is dropped.
+- **Food's reach checks become local** (a 3 × 3-chunk window on the plane, a block and its neighbours underground).
+- **Wild sites** are pure, one candidate per region of chunks. A site wakes into a mature colony of the game's species under a preset doctrine, on a line of its own.
+- **Awake ground** is within W of an awake colony's holes, ant or the fungus's body. A colony freezes after T seconds with no outside contact, and a cap on awake colonies bounds the tick.
+- **The camera never changes the simulation.**
+- **Storage:** chunks generated on a miss, dropped when frozen or faded, and a table that doesn't grow with the square of the spread (hashed or two-level, by bench). Flat keys are re-keyed and `cellKey` widened.
+- **Saves** keep the seed and the deltas.
+- **The page:** an unclamped camera, a minimap window, a fog of war revealed per chunk, and the side view on the line clicked.
+
+**Play.** The world opens outward through the fungus's hosts. Wild colonies are mature, so reaching them takes the levers the fungus earns. Where to spread now matters: towards a strong stranger, or away to found. Risks:
+- an empty world, measured as contacts per hour;
+- a world too full to found in, measured as flights landing near strangers;
+- a cost that only grows, held by the awake cap and the memory soak.
+
+**Assays and targets** (land with their stages):
+- generation in any order is bit-identical (E2);
+- a one-line game stays bit-exact (E3);
+- the memory-budget soak: heap and chunks grow with awake plus changed area, not explored area (E4);
+- a freeze and thaw leaves a colony's journal unchanged (E4);
+- the tick at the awake cap against the 10 ms gate (E4);
+- 60 fps far from the start (E5);
+- `flight-failure.mjs` on the endless plane, rechecking `FOUND_RADIUS` without edges (E6);
+- wild density tuned by flights landing within 0.6–0.9 U of a stranger and contacts per hour (E6);
+- assays on seeds 1–10, confirmed on 11–20 (E6).
+
+**Cost (estimated).** None in Jev:
+- no situation, legend or question changes;
+- wild colonies of the game's species ask under a preset doctrine whose answers ship;
+- Jev's cost is per distinct situation, not per colony (§21).
+
+The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; nothing measures memory today.
+
+**Beads.**
+- `ja-qpv` (this epic), after S2 (`ja-fnd.3`) and N colony specs (`ja-fnd.5.4.2`). The old dependency on `ja-8fd` was dropped, since §64 superseded its scope.
+- The stages, in build order: E1 storage (`ja-qpv.1`), E2 local generation (`ja-r84`), E3 many lines (`ja-qpv.2`), E4 awake and frozen (`ja-qpv.3`), E5 the page (`ja-qpv.4`), E6 switch and assays (`ja-qpv.5`).
+- The bounded game's golden masters stay bit-exact through E1–E5, except E1's one change of the golden hash's format.
+
+**Still open** (endless-world §10, each with a recommendation):
+1. wild density: one site per 4 × 4 chunks to start;
+2. a wild colony's size on waking: a start colony's at 10 minutes;
+3. what reveals the fog: the fungus's hosts' walks plus the start nests;
+4. W, T and the awake cap: 2 U, 60 s and 6;
+5. lines joining: not yet;
+6. whether the bounded game stays: as a test bed until E6.
