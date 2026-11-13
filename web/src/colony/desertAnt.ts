@@ -67,14 +67,10 @@ export const DESERT_ANT: Species = {
     stanceGate: 0,
     undertakes: false,
   },
-  responses: {
-    ...localResponses,
-    trail: () => "none",
-    trailRate: () => 0,
-    alarmGain: () => 0,
-    raiseAlarm: () => 0,
-    noEntry: () => 0,
-  },
+  // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is
+  // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
+  // nothing in its jaws fights a stranger it touches, whatever the odds; a carrier takes its load home (owner, review of #138 D1).
+  responses: { ...localResponses, contact: (t) => (t.carrying === "none" ? "fight" : "flee") },
   lanes: { mode: DESERT_MODE_WORDS },
   policy: desertPolicy,
   ruleText: DESERT_RULE_TEXT,

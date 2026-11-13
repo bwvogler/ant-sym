@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { PLANE } from "../../colony.ts";
 import { MODE_WORDS, policyContext } from "../../colonyBrain.ts";
 import { DESERT_ANT, DESERT_MODE_WORDS, DESERT_SCHEMA } from "../../desertAnt.ts";
+import { localResponses, type Touch } from "../../responses.ts";
 import { desertNoTrail, runAssay } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { LANES } from "../../lanes.ts";
@@ -50,4 +51,21 @@ test("it plays a game alone: no trail, its own situations, food found and brough
 
 test("D1: a desert ant lays no trail (the assay, with the species)", () => {
   for (const seed of [1, 2]) assert.equal(runAssay(desertNoTrail, seed, { game: { species: DESERT_ANT } }).metrics.pass, 1, `seed ${seed}`);
+});
+
+test("no stance lane: the colony forages, and no colony-wide count picks a stance (review of #138, S1)", () => {
+  const g = new Game(generateOneWorld(1), { antCount: 60, rivalAnts: 60, species: DESERT_ANT }, gameRng(1));
+  for (let k = 0; k < 30 * 60; k++) {
+    g.tick(1 / 30);
+    for (const c of g.colonies) assert.equal(c.stance, "forage");
+  }
+  assert.equal(g.strategyChoices, 0, "the strategist chose nothing");
+  assert.equal(g.player.params.maxAnts, 200, "about 200 workers (C. fortis)");
+});
+
+test("it fights a stranger it touches with nothing in its jaws, whatever the odds; a carrier takes its load home (owner, review of #138 D1)", () => {
+  const t = { carrying: "none", stance: "forage", mode: "explore", odds: "outnumbered" } as Touch;
+  assert.equal(localResponses.contact(t), "flee", "the generic ant turns away here");
+  assert.equal(DESERT_ANT.responses.contact(t), "fight");
+  assert.equal(DESERT_ANT.responses.contact({ ...t, carrying: "food" } as Touch), "flee");
 });
