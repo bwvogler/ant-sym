@@ -154,8 +154,14 @@ try {
   // ——— 1. A one-world game, seed fixed: it opens above ———
   console.log("1. a one-world game");
   await page.getByLabel("world seed").fill(String(SEED));
+  // The seed chooses the colony the fungus lands by (PRD §65): seed 3 of two colonies lands by the second, Amber.
+  check(
+    /hole of the Amber colony/.test((await page.getByRole("dialog", { name: "Start" }).textContent()) ?? ""),
+    "the start screen names the seed's colony (Amber)",
+  );
   await page.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(() => page.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null), "the one-world game, landed");
+  check((await page.evaluate(() => window.jevAnts.game.landed.colony)) === 1, "and the fungus lands there");
   check((await page.evaluate(() => window.jevAnts.view())) === "above", "a one-world game opens above");
   check((await page.getByRole("button", { name: "above", exact: true }).getAttribute("aria-pressed")) === "true", "the switch shows above");
   const canvas = page.locator("canvas").first();
@@ -639,6 +645,7 @@ try {
   console.log("7. the tutorial");
   const tctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   const tu = await tctx.newPage();
+  await tu.addInitScript(`window.__clampCam = ${clampCam.toString()};`);
   tu.on("pageerror", (e) => errors.push(String(e)));
   await tu.goto(url);
   await tu.getByLabel("world seed").fill(String(SEED));
@@ -648,6 +655,11 @@ try {
   const paused = async () => (await tu.getByRole("button", { name: "Play", exact: true }).count()) === 1;
   await until(async () => /You are a fungus/.test((await tcard.textContent()) ?? ""), "the tutorial's first card");
   check(await paused(), "the landing card waits, paused");
+  // What the field shows of scent is what hosts sensed (PRD §65): before any host, nothing, even at the landing.
+  check(
+    (await tu.evaluate(() => window.jevAnts.sensed("above", window.jevAnts.game.landed.x, window.jevAnts.game.landed.y))) === 0,
+    "before any host, no scent shows at the landing",
+  );
   check((await bar("1×").getAttribute("aria-pressed")) === "true", "at 1×");
   await tcard.getByRole("button", { name: "Let it play", exact: true }).click();
   await until(async () => /carries you/.test((await tcard.textContent()) ?? ""), "the first host", 60_000);
@@ -655,6 +667,12 @@ try {
   check((await tu.getByRole("region", { name: "followed ant" }).count()) === 1, "and is followed");
   check((await tu.evaluate(() => document.documentElement.dataset.tutorial)) === "load", "its card is highlighted");
   const hostNo = Number(((await tu.getByRole("region", { name: "followed ant" }).textContent()) ?? "").match(/Ant #(\d+)/)?.[1] ?? -1);
+  const hostSensed = await tu.evaluate((i) => {
+    const g = window.jevAnts.game;
+    const c = g.colonies[g.landed.colony];
+    return window.jevAnts.sensed(c.layer[i] === 0 ? "above" : "below", c.x[i], c.y[i]);
+  }, hostNo);
+  check(hostSensed > 0.9, `around the first host, its scent shows (${hostSensed.toFixed(2)})`);
   // Hide: the card shrinks to a strip so the map shows (on a phone the card covers most of it); the step's button still
   // works from the strip, and the next step opens a full card again.
   const cardHeight = async () => (await tcard.boundingBox())?.height ?? 0;
@@ -676,15 +694,22 @@ try {
     (await tu.getByRole("region", { name: "followed ant" }).count()) === 1,
     "Follow it keeps the host followed (centring the view shown no longer drops it)",
   );
-  // The field follows it too, not only the card: the camera of the view showing it sits on the host (any seed; PR #93 review N1).
+  // The field follows it too, not only the card: the camera of the view showing it sits on the host, or as near as the
+  // map's edge lets it (camera.ts clamp: a host by a hole at the edge, as Amber's on seed 3), on any seed (PR #93 review N1).
   const off = await tu.evaluate((i) => {
-    const c = window.jevAnts.game.colonies[0];
+    const g = window.jevAnts.game;
+    const c = g.colonies[g.landed.colony];
     const v = window.jevAnts.view();
     if ((c.layer[i] === 0) !== (v === "above")) return null;
     const cam = window.jevAnts.camera(v);
-    return cam ? Math.hypot(cam.x - c.x[i], cam.y - c.y[i]) : null;
+    if (!cam) return null;
+    const e = window.__clampCam(v, c.x[i], c.y[i], cam.zoom);
+    return Math.hypot(cam.x - e.x, cam.y - e.y);
   }, hostNo);
-  check(off !== null && off < 1, `the camera sits on the host (${off === null ? "not in view" : off.toFixed(2)} away)`);
+  check(
+    off !== null && off < 1,
+    `the camera sits on the host, as near as the map's edge allows (${off === null ? "not in view" : off.toFixed(2)} away)`,
+  );
   check(!(await paused()), "watching, the game plays");
   check((await bar("4×").getAttribute("aria-pressed")) === "true", "the watch runs at 4×");
   await tcard.getByRole("button", { name: "Faster", exact: true }).click();
@@ -694,14 +719,14 @@ try {
     () =>
       tu.evaluate(
         (i) =>
-          window.jevAnts.game.colonies[0].layer[i] !== 0 ||
+          window.jevAnts.game.colonies[window.jevAnts.game.landed.colony].layer[i] !== 0 ||
           !/groom it/.test(document.querySelector('[aria-label="tutorial"]')?.textContent ?? ""),
         hostNo,
       ),
     "the host below, or the watch over",
     40_000,
     100,
-  ).then(() => tu.evaluate((i) => window.jevAnts.game.colonies[0].layer[i] !== 0, hostNo));
+  ).then(() => tu.evaluate((i) => window.jevAnts.game.colonies[window.jevAnts.game.landed.colony].layer[i] !== 0, hostNo));
   if (wentBelow) {
     await until(async () => (await tu.evaluate(() => window.jevAnts.view())) === "below", "the view follows the host below", 3000, 50);
     check(true, "the host went below, and the view followed it");

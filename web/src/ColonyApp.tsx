@@ -12,6 +12,8 @@ import {
   type Game,
   AIMS,
   type Flight,
+  CELL,
+  cellOf,
 } from "./colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +26,7 @@ import { seg } from "./ui/styles.ts";
 import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
+import { SensedMap } from "./ui/fungusSight.ts";
 import { firstGame, skipTutorial, useTutorial } from "./ui/useTutorial.ts";
 import {
   AUTOSAVE,
@@ -68,8 +71,7 @@ const usd = (v: number) => `$${v.toFixed(4)}`;
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {
-  const { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal } =
-    useColony();
+  const { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal } = useColony();
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend, journal, game.params.species);
   const [details, setDetails] = useState(false);
@@ -97,7 +99,7 @@ export default function ColonyApp() {
     return () => window.removeEventListener("keydown", key);
   }, [oneWorld, controls.view, setView]);
   // The map the field shows: its aspect is the box's.
-  const shownMap = oneWorld ? (controls.view === "above" ? oneWorld.plane : oneWorld.curtain) : colony.map;
+  const shownMap = oneWorld ? (controls.view === "above" ? oneWorld.plane : oneWorld.curtain) : game.map;
   // The views linked (one-world §5, U5.2): the field's cameras, a click across, and an ant followed through a hole.
   const field = useRef<FieldApi | null>(null);
   /** Show `view` (PLANE or CURTAIN) centred on (x, y) there; `close`: near enough to see the place (a linked click). */
@@ -110,6 +112,9 @@ export default function ColonyApp() {
   );
   // The first game's tutorial (ja-7x4, PRD §61).
   const tut = useTutorial({ game, onFrame, update, setFollowed, showAt });
+  // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
+  const sensed = useMemo(() => new SensedMap(), [game]);
+  useEffect(() => onFrame(() => sensed.stamp(game.colonies, game.time)), [onFrame, game, sensed]);
   const onStart = useCallback(
     (seed: number, withTutorial: boolean) => {
       start(seed, withTutorial);
@@ -256,6 +261,10 @@ export default function ColonyApp() {
         return true;
       },
       view: () => controls.view,
+      sensed: (v: View, x: number, y: number) => {
+        cellOf(x, y);
+        return sensed.sight(v === "above" ? PLANE : CURTAIN, CELL[0], CELL[1]);
+      },
       nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(settings), maxSeconds, minTicks),
       step: (n = 1) => {
         for (let t = 0; t < n; t++) game.tick(REHEARSE_DT);
@@ -279,7 +288,7 @@ export default function ColonyApp() {
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, controls.view, setFollowed]);
+  }, [game, controls.view, setFollowed, sensed]);
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   return (
     <main className="mx-auto flex h-full max-w-7xl flex-col gap-3 px-4 py-4">
@@ -366,6 +375,7 @@ export default function ColonyApp() {
           seed={controls.seed}
           onStart={onStart}
           firstGame={firstGame()}
+          colonies={game.colonies.length}
           latest={newestReadable(games.list)}
           onContinue={continueFrom}
         />
@@ -436,6 +446,7 @@ export default function ColonyApp() {
             <ColonyField
               colonies={game.colonies}
               fungus={game.fungus}
+              sensed={sensed}
               onFrame={onFrame}
               showFoodTrail={controls.showFoodTrail}
               showHomeTrail={controls.showHomeTrail}

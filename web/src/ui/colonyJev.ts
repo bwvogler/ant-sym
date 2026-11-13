@@ -101,7 +101,7 @@ export interface ColonyJevState {
   /** this run: mode choices answered from the cache, and by the local rule while a situation was unanswered */
   hits: number;
   misses: number;
-  /** answers cached for the first colony's doctrine (modes, stances) */
+  /** answers cached under every colony's doctrine (modes, stances): a doctrine two colonies share counts once */
   cached: number;
   stancesCached: number;
   /** mode answers cached for each colony's doctrine */
@@ -371,10 +371,17 @@ export class ColonyJev {
 
   /** The cache sizes the panel shows. */
   #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "doctrineCached" | "fungusCached" | "growthCached"> {
-    const first = this.#driven[0];
+    // Every colony's, not the first's (PRD §65): one cache per context, so colonies of one doctrine count once.
+    const modes = new Map<string, number>();
+    const stances = new Map<string, number>();
+    for (const d of this.#driven) {
+      if (d.modes) modes.set(d.modes.context, this.#cache(d.modes).size);
+      if (d.stances) stances.set(d.stances.context, this.#cache(d.stances).size);
+    }
+    const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
     return {
-      cached: first?.modes ? this.#cache(first.modes).size : 0,
-      stancesCached: first?.stances ? this.#cache(first.stances).size : 0,
+      cached: sum(modes),
+      stancesCached: sum(stances),
       doctrineCached: this.#driven.map((d) => (d.modes ? this.#cache(d.modes).size : 0)),
       fungusCached: this.#cache(this.#fungal).size,
       growthCached: this.#cache(this.#growth).size,

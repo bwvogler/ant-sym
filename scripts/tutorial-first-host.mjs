@@ -2,14 +2,14 @@
 // The tutorial's first host (ja-7x4, PRD §61): what becomes of the first ant the fungus gets into, as the page plays
 // a fresh game (buildGame, the landing, the local rules, 30 steps a second). Offline, spends nothing.
 //
-// For each seed: the sim-seconds from the landing to the first host (load ≥ INFECTED, the Ink colony), and that ant's
+// For each seed: the sim-seconds from the landing to the first host (load ≥ INFECTED, in the colony the seed landed it by), and that ant's
 // fate over the next `watch` seconds, whichever comes first: cleared (its load back to 0), died (old, hungry, or else,
 // as the colony's counters tell), or still carrying the fungus at the end; and whether it went below (off the plane)
 // first. The tutorial's waiting hint and its watch timeout are chosen by the worst seed.
 //
 // Usage: node scripts/tutorial-first-host.mjs [seeds=1-20] [watch=180] [ants=600]
 import { INFECTED, PLANE } from "../web/src/colony/index.ts";
-import { buildGame, GAME_STRAIN, LANDING_COLONY } from "../web/src/ui/useColony.ts";
+import { buildGame, GAME_STRAIN, landingOf } from "../web/src/ui/useColony.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
 
@@ -23,8 +23,9 @@ const WAIT = 300; // give up on a first host after this many seconds
 const rows = [];
 for (let seed = lo; seed <= hi; seed++) {
   const g = buildGame({ species: "generic", seed, antCount, rival: true, generation: 0 });
-  g.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
-  const c = g.colonies[LANDING_COLONY];
+  const k = landingOf(g); // the colony the seed chose, as the page lands it (PRD §65)
+  g.land(k, GAME_STRAIN, { evolve: true });
+  const c = g.colonies[k];
   let t = 0;
   let host = -1;
   while (host < 0 && t < WAIT) {
@@ -64,17 +65,17 @@ for (let seed = lo; seed <= hi; seed++) {
     }
   }
   const hosts = g.fungus.census(c).infected;
-  rows.push({ seed, first, fate, at, below, peak, hosts });
+  rows.push({ seed, k, first, fate, at, below, peak, hosts });
 }
 
 const f1 = (x) => (x === null ? "—" : x.toFixed(1));
 console.log(`First host and its fate: seeds ${lo}–${hi}, ${antCount} + ${antCount} ants, watched ${watch} s after the first host\n`);
-console.log("seed  first host (s)  fate         after (s)  below at (s)  peak load  Ink hosts then");
+console.log("seed  colony  first host (s)  fate         after (s)  below at (s)  peak load  hosts then");
 for (const r of rows) {
   if (r.first === null) console.log(`${String(r.seed).padStart(4)}  none in ${WAIT} s`);
   else
     console.log(
-      `${String(r.seed).padStart(4)}  ${f1(r.first).padStart(14)}  ${r.fate.padEnd(11)}  ${f1(r.at).padStart(9)}  ${f1(r.below).padStart(12)}  ${r.peak.toFixed(3).padStart(9)}  ${String(r.hosts).padStart(14)}`,
+      `${String(r.seed).padStart(4)}  ${String(r.k).padStart(6)}  ${f1(r.first).padStart(14)}  ${r.fate.padEnd(11)}  ${f1(r.at).padStart(9)}  ${f1(r.below).padStart(12)}  ${r.peak.toFixed(3).padStart(9)}  ${String(r.hosts).padStart(14)}`,
     );
 }
 const found = rows.filter((r) => r.first !== null);

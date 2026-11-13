@@ -19,7 +19,7 @@ import {
   type Seen,
   type Tutorial,
 } from "../tutorial.ts";
-import { buildGame, GAME_SPEED, GAME_STRAIN, LANDING_COLONY, MAX_SPEED } from "../useColony.ts";
+import { buildGame, GAME_SPEED, GAME_STRAIN, landingColony, landingOf, MAX_SPEED } from "../useColony.ts";
 
 // The tutorial's machine (ja-7x4, PRD §61), driven by hand-made frames: what each step waits for and what it asks the page.
 
@@ -122,17 +122,32 @@ test("the done flag: kept in storage, and a storage that throws just shows the t
   assert.equal(tutorialDone(null), false);
 });
 
+test("the seed chooses the colony the fungus lands by: none is the player's (PRD §65)", () => {
+  assert.deepEqual(
+    [1, 2, 3, 4].map((s) => landingColony(s, 2)),
+    [1, 0, 1, 0],
+  );
+  assert.equal(landingColony(7, 1), 0, "one colony: that one");
+  const g = buildGame({ species: "generic", seed: 3, antCount: 50, rival: true, generation: 0 });
+  assert.equal(landingOf(g), 1, "before the landing, the seed's colony");
+  g.land(0, GAME_STRAIN, { evolve: true });
+  assert.equal(landingOf(g), 0, "after it, where it landed");
+});
+
 test("in a real game the first host is found within seconds of the landing, and is the tutorial's whether followed or not", () => {
-  const g = buildGame({ species: "generic", seed: 1, antCount: 100, rival: false, generation: 0 });
-  g.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
+  // Seed 1 lands by the second colony (Amber): the tutorial follows whichever the fungus is in.
+  const g = buildGame({ species: "generic", seed: 1, antCount: 100, rival: true, generation: 0 });
+  const k = landingOf(g);
+  assert.equal(k, 1);
+  g.land(k, GAME_STRAIN, { evolve: true });
   let t: Tutorial = { ...begin(), step: "waiting" };
   for (let k = 0; k < 30 * 30 && t.step === "waiting"; k++) {
     g.tick(1 / 30);
     t = observe(t, seenOf(g, t)).t;
   }
   assert.equal(t.step, "host", "a host within 30 s");
-  const c = g.colonies[0]!;
-  assert.deepEqual(t.host, firstHost(c, 0));
+  const c = g.colonies[k]!;
+  assert.deepEqual(t.host, firstHost(c, k));
   // Nothing on the page follows it here: the tutorial reads its own host, so it is alive and carrying the fungus.
   const s = seenOf(g, { ...t, step: "watch" });
   assert.equal(s.host?.alive, true);

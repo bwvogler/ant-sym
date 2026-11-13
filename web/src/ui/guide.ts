@@ -41,7 +41,7 @@ export const GUIDE: GuideEntry[] = [
     title: "Food trail",
     swatch: [HEAT],
     onScreen:
-      "The green wash (Trails: “to food”). Ants carrying food home lay it, so it leads out to food. You see a colony's trails through your hosts: none until the fungus is in it, faint at the first host, full when every ant carries it.",
+      "The green wash (Trails: “to food”). Ants carrying food home lay it, so it leads out to food. You see any colony's trails only where your hosts have smelled them: around the paths infected ants walk, fading over about 20 s once they move on.",
     realAnts:
       "Recruitment trails last minutes, about as long as a trip; long-lived “route memory” trails last hours to days. Black garden ants (Lasius niger) lay about 43 % more trail marks for rich sugar than for weak, and that alone lets a colony pick the richer of two sources.",
     inGame:
@@ -56,7 +56,7 @@ export const GUIDE: GuideEntry[] = [
     title: "Home trail and the way home",
     swatch: [css(HOME_RGB)],
     onScreen:
-      "The orange wash (Trails: “to home”). Ants walking out lay it, so it leads carriers back. Like the food trail, each colony's shows as strongly as the fungus is in it.",
+      "The orange wash (Trails: “to home”). Ants walking out lay it, so it leads carriers back. Like the food trail, it shows only where your hosts have smelled it lately.",
     realAnts:
       "Outside, home is a small hole. A forager keeps a running home vector from its steps and a sky compass, with an error of roughly 10 % of the distance walked; landmarks and an odour at the entrance correct it near home, and the vector resets only inside the nest.",
     inGame:
@@ -100,7 +100,7 @@ export const GUIDE: GuideEntry[] = [
     id: "alarm",
     title: "Alarm",
     swatch: ["var(--warn)"],
-    onScreen: "Brown haze where ants fight.",
+    onScreen: "Brown haze where ants fight, shown, like the trails, only where your hosts have smelled it lately.",
     realAnts:
       "Alarm is volatile: it reaches a few centimetres and fades fast, so it calls the nearby ants, not the colony. Its meaning depends on strength: faint attracts, strong triggers attack or digging.",
     inGame:

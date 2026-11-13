@@ -801,6 +801,11 @@ export class Game {
     });
   }
 
+  /** Food left on the map, every layer's (one world: the plane's and the curtain's buried food), as each colony counts it. */
+  get foodLeft(): number {
+    return this.world ? this.world.plane.foodLeft + this.world.curtain.foodLeft : this.map.foodLeft;
+  }
+
   /** The first colony (Ink on the page). Not the player's: the player is the fungus. */
   get player(): Colony {
     return this.colonies[0] as Colony;
