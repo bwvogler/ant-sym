@@ -4898,6 +4898,31 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Measured.** In a one-world game with *a web* bought at the start (seed 7, 600 + 600 ants), cords appear about 120 s in, once a lineage feeds four tips: 8 cells at 120 s, 45 at 180 s on the plane; dead ends cut in the curtain fade (5 cells by 150 s). With the progression script's own upgrade order, *a web* comes at 268–471 s, mostly after the quarter, and `progression.mjs --map one --evolve --hyphae --growth` (seeds 1–10, 600 s) gives **the same seconds, mutations and mycelium on every seed** as §63.5's run: cords change neither the mass nor where spores go, only what a dig takes and how much hypha lingers. P1 holds trivially. What cords are worth will show once digging bites harder (a borer's hyphae in undug soil) and with `ja-2bw.13`.
 
+### 63.7 Hyphae reach the curtain by growing; fruiting spaced in the body (ja-2bw.14, ja-2bw.16, 2026-11-13)
+
+**Built.** The landing patch lies by colony 0's hole as before (`LANDING.offset` past the nest's rim) but on its inner side: along the line toward the neighbouring hole, so never over the margin past an end hole, which `growWorld` can re-aim (owner, 2026-11-13). The curtain gets no hyphae at landing. A plane tip that grows into the hole's mouth (the nest's disc on the plane, radius 3) crosses down it (`Fungus.crossAt`, set by the game): it leaves the plane and roots on the shaft's walls (`rootShaft`). So the side view shows the hyphae arriving at the hole and growing down. The rim tip facing the hole aims at it from its own cell; with the mouth as wide as the disc this changes no outcome measured (review of #130, N3: 14 of 40 landings re-aimed, crossing times identical), and it is kept for a narrower mouth.
+
+**The wall tips fruited at once (`ja-2bw.16`).** Under *unite* the shipped growth answers fruit a tip on a wall with soil ahead (and *spread* does when short), so both wall tips ended as spots on their first step: on seed 1 the curtain held 3 cells from the crossing (22 s) to 200 s, the same on `main`. **Owner (2026-11-13): space it in the body, keep the answers.** A `fruit` answer, Jev's or the local rule's, now takes only once the tip has grown `FRUIT_RUN` (2) cells since it set out or branched and no spot of its own lies within `FRUIT_GAP`; otherwise the tip plays its own rule. Seed 1 under *unite*: 14 cells down the wall by 112 s, until ants dig through the tip. A later crossing puts a fresh tip on a wall cell whose tip is gone; regrowth from the hyphae left in the curtain is `ja-2bw.15`.
+
+**Measured** (`progression.mjs --map one --evolve [--hyphae --growth]`, aim unite, 600 s). The landing moved, so the baseline is re-run with it (without hyphae the patch is the old disc at the new spot):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 355 | 403 | 278 | 145 | 151 | never | 397 | 470 | 240 | 217 |
+| a quarter, hyphae (s) | 289 | 303 | 308 | 158 | 132 | 325 | 389 | 263 | 253 | 211 |
+| the queen, hyphae (s) | 314 | 351 | 354 | 197 | 173 | 363 | 400 | 325 | 273 | 249 |
+
+- With hyphae the worst seed improves (never → 389 s) and the median too (317 → 276 s); seed 6 takes hold with hyphae.
+- **Seed 3 is 10.8 % slower** (278 → 308 s), just past P1's 10 %; before the fruiting fix it was 276 s. Seeds 4 (+9 %) and 9 (+5 %) are slower within the gate.
+- Held out, seeds 11–20:
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 451 | 286 | 221 | 165 | 425 | 417 | 199 | 331 | 291 | 376 |
+| a quarter, hyphae (s) | 471 | 247 | 184 | 150 | 272 | 359 | 190 | 251 | 270 | 325 |
+
+  Nine of ten faster; the median improves (311 → 261 s). **The worst seed is seed 11 both ways, and 20 s worse with hyphae** (451 → 471 s, +4.4 %), so "the worst seed no worse" fails here, as "no seed over 10 %" fails on seed 3 above. **Owner (2026-11-13): ship, and record the two narrow misses**; `ja-2bw.6` (tuning) carries them.
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
