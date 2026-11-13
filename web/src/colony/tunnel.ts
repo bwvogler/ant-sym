@@ -109,7 +109,7 @@ export function fetches(col: Colony, i: number): boolean {
 export function restFetches(col: Colony, i: number, mode: number, cx: number, cy: number): boolean {
   return (
     col.params.restFetch > 0 &&
-    mode === RETURN &&
+    mode === RETURN && // its one caller (port) asks only for ants not exploring: this keeps it to returners
     col.queen !== null &&
     !col.carrying[i] &&
     !col.pellet[i] &&

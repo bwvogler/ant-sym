@@ -144,7 +144,7 @@ test('restFetch: a starving ant in "return" by a store takes food on from it; wi
 });
 
 test("restFetch: a tired, starving ant resting at home is got up by its hunger; without it, it rests on", () => {
-  // Hunger ends a tired ant's rest (colony.ts): it is asked afresh as an explorer, here the moment REST is up.
+  // Hunger ends a tired ant's rest (arrive.ts): it is asked afresh as an explorer, here the moment REST is up.
   const run = (rf: number) => {
     const { c, map } = colony(rf, 1, "far");
     cellOf(map.nest.x, map.nest.y);

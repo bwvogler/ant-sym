@@ -52,4 +52,7 @@ export class AntStep {
   home!: Nest;
   a = 0;
   digging = false;
+  leak = false;
+  metLeak = 0;
+  crowdKeep = 0;
 }

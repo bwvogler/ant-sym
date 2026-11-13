@@ -16,11 +16,8 @@ import {
   type Stance,
   type StancePolicy,
   type StanceSituation,
-  STRONG,
   type Trail,
-  EXPLORE,
   FIGHT,
-  FOLLOW,
   RETURN,
   PLANE,
   CURTAIN,
@@ -29,7 +26,7 @@ import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, type Responses, type Where, type Touch } from "./responses.ts";
-import { blocked, groundTop, isSky, OPEN, takeLoose, rockAt, takeFoodCell, qualityAt, type Nest, type WorldMap } from "./world.ts";
+import { blocked, groundTop, isSky, OPEN, takeLoose, rockAt, type Nest, type WorldMap } from "./world.ts";
 import { cellAt, type Transect } from "./transect.ts";
 import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
@@ -37,7 +34,6 @@ import {
   CHAMBER_GAP_GROWTH,
   CHAMBER_MIN_DEPTH,
   CHAMBER_SPREAD,
-  CORPSE_GIVE_UP,
   CROWD_HALF,
   EDGE,
   ENTRANCE_R,
@@ -57,34 +53,29 @@ import {
   MIDDEN_AT,
   MIDDEN_SPREAD,
   MILL_WAYS,
-  MOUND_HEIGHT,
-  MOUND_REACH,
   M_LINE_WIDTH,
   PI_DRIFT,
   RECEPTION_MIN,
-  REST,
-  ROAD_SIGN,
   SEARCH_GROW_2D,
   SEARCH_START,
-  SPOIL_GIVE_UP,
   THREAT_HALF,
   WAIT_STEPS,
 } from "./tuning.ts";
 import { NO_CELL, SOIL_DUG, SOIL_FILL, SOIL_LOOSE, cellKey, climb, planeMoundReach } from "./grid.ts";
 import { DEFAULT_COLONY, LOOP_AT, channelParams, type ColonyParams } from "./params.ts";
-import { middenSmell, nestLife, nurse, port, undertake } from "./nestWork.ts";
-import { fetches } from "./tunnel.ts";
-import { dropOut, dropPlane, pickPlane, unbury } from "./dig.ts";
-import { atHome, destMark, fromHomePlane, integrate, outDistAt, routeRecord } from "./homing.ts";
-import { layMark, nestmatesAround, placeOn, returnsAround, touch } from "./sense.ts";
+import { middenSmell, nestLife } from "./nestWork.ts";
+import { unbury } from "./dig.ts";
+import { outDistAt } from "./homing.ts";
+import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
 import { stanceStep } from "./stance.ts";
 import { decide } from "./decide.ts";
 import { steer } from "./steer.ts";
 import { moveDig } from "./move.ts";
+import { arrive } from "./arrive.ts";
 import { AntStep } from "./step.ts";
-import { atGate, crossDown, crossUp, crossed } from "./crossing.ts";
+import { atGate, crossed } from "./crossing.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -2055,256 +2046,35 @@ export class Colony {
       h = s.h;
       if (moveDigDone) continue;
 
-      // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
-      const ndx = this.x[i] - home.x;
-      const ndy = this.y[i] - home.y;
-      const atNest = ndx * ndx + ndy * ndy < home.r * home.r;
-      const ent = this.entrance;
-      const atEntrance = ent !== null && Math.hypot(this.x[i] - ent.x, this.y[i] - ent.y) < ent.r;
-      this.antCell(i);
-      // Activation (behaviour MR 5, docs/activation.md): an empty-jawed ant at home meets each nestmate that comes home
-      // with food beside it (its cell and the six round it) once, in a count that leaks away; only successful returns
-      // count. Counted as seconds of contact instead, a carrier, which turns round the moment its food is down, was met
-      // for a tick: the count stayed under the threshold, and only scouts went out.
-      // One world (ja-web): held at the gate, it meets every carrier that came down the hole last tick (holeSeen): each
-      // walks down the shaft past all of them. Its count leaks on both layers, so a wait's count fades on its trip out.
-      if (leak) {
-        let m = this.met[i] * metLeak;
-        if (gate ? atNest && !carrying : held) m += gate ? returnsAround(this, CELL[0], CELL[1]) : this.holeSeen;
-        this.met[i] = m;
-      }
-      // How crowded home is (docs/stance.md), felt by a waiting ant: nestmates in its cell and the six round it, but itself.
-      // (One world, ja-web: by an ant held at the gate, at the top of its shaft.)
-      if (sgate || hold) {
-        const c = this.crowd[i];
-        this.crowd[i] = (sgate ? atNest && !carrying : held)
-          ? c * crowdKeep + (nestmatesAround(this, CELL[0], CELL[1]) - 1) * (1 - crowdKeep)
-          : c * crowdKeep;
-      }
-      // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
-      const here = cellKey(CELL[0], CELL[1]);
-      if (this.putAt[i] !== here) this.putAt[i] = NO_KEY;
-      if (
-        !carrying &&
-        !pellet &&
-        this.putAt[i] === NO_KEY &&
-        map.food.get(CELL[0], CELL[1]) > 0 &&
-        resp.get(touch(this, i, toEnemy !== null, mode, item, "food")) &&
-        takeFoodCell(map, CELL[0], CELL[1])
-      ) {
-        this.carrying[i] = 1;
-        this.quality[i] = qualityAt(map, CELL[0], CELL[1]);
-        if (p.siteFidelity > 0 && this.line !== null && this.cur === PLANE) this.rememberSite(i);
-        this.homeAfresh(i);
-        this.since[i] = 0;
-        this.fatigue[i] = 0; // found food: the search succeeded
-        this.tired[i] = 0;
-        h += Math.PI;
-      } else if (outward) {
-        // One world's plane (U3c): carrying out by its own vector. Spoil is heaped once it believes itself spoilTo from
-        // home; a corpse goes on the midden once it is at least that far and off the mound (no spoil underfoot, which it can
-        // feel). Either is put down where it stands after its give-up time.
-        this.spoilT[i] = this.spoilT[i] + dt;
-        const corpse = this.corpse[i] === 1;
-        const far = fromHomePlane(this, i) >= this.spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
-        if (far || this.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) dropPlane(this, i);
-      } else if (pellet && ent && !Number.isNaN(this.spoilTo[i])) {
-        // Carrying a pellet out along the ground (side view): dropped where it stands once far enough out (or stuck).
-        this.spoilT[i] = this.spoilT[i] + dt;
-        const col = CELL[0];
-        const onGround = isSky(map, col, CELL[1]);
-        if (
-          (onGround && this.spoilSide[i] * (col - this.entranceCol) >= this.spoilTo[i]) ||
-          this.spoilT[i] > (this.corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)
-        )
-          dropOut(this, i, col);
-        // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
-        // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
-      } else if (pellet && atEntrance && this.soil[i] !== SOIL_FILL && this.line !== null) {
-        // One world: the spoil (or the dead) goes up the hole onto the plane, where it is put down (crossUp).
-        crossUp(this, i, this.entranceCol, this.entranceRow);
-        this.heading[i] = h;
-        continue;
-      } else if (pellet && atEntrance && this.soil[i] !== SOIL_FILL) {
-        // Up and out of the hole: it carries the pellet on out along the ground to drop it, farther as the mound grows
-        // (MOUND_REACH at most; more of them farther out, √ of a uniform draw), so the mound spreads as a disc, its area
-        // tracking the nest's volume (Tschinkel 2015), where you see them drop it.
-        const reach = Math.min(MOUND_REACH, 3 + this.heaped / (2 * MOUND_HEIGHT));
-        if (this.corpse[i]) {
-          // A corpse goes to the midden: one heap just past the mound's edge (harvesters: at the edge of the cleared disc).
-          this.spoilTo[i] = this.middenAt();
-          this.spoilSide[i] = this.middenSide();
-        } else {
-          this.spoilTo[i] = 2 + reach * Math.sqrt(rng());
-          this.spoilSide[i] = rng() < 0.5 ? -1 : 1;
-        }
-        this.spoilT[i] = 0;
-        this.staleWalk[i] = 0;
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
-        this.gx[i] = NO_CELL;
-      } else if (pellet && this.soil[i] === SOIL_FILL && atNest && !(this.line !== null && this.cur === PLANE)) {
-        // A loose pellet taken down to fill unused space, and none found on the way: it carries it back out. Most do (over
-        // 90 %: PRD §40), and that is the rule as meant: see LOOSE_FILL_PICK.
-        this.soil[i] = SOIL_LOOSE;
-        this.looseBack++;
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
-      } else if (
-        ent &&
-        !carrying &&
-        !pellet &&
-        mode === EXPLORE &&
-        isSky(map, CELL[0], CELL[1]) &&
-        this.enteredCell(i) &&
-        this.pickLoose(i, CELL[0], CELL[1], toEnemy !== null)
-      ) {
-        // Picked up a loose pellet off the mound (see pickLoose).
-      } else if (
-        this.line !== null &&
-        this.cur === PLANE &&
-        !carrying &&
-        !pellet &&
-        mode === EXPLORE &&
-        this.enteredCell(i) &&
-        pickPlane(this, i, CELL[0], CELL[1], toEnemy !== null)
-      ) {
-        // One world's plane: picked up a pellet off the mound (see pickPlane).
-      } else if (atNest && !(pellet && ent)) {
-        this.wall[i] = 0;
-        this.mx[i] = NaN;
-        this.untouched[i] = 0;
-        this.bestD[i] = Infinity;
-        this.stallT[i] = 0;
-        if (this.since[i] > 0) this.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
-        if (carrying && !this.queen && resp.drop(touch(this, i, toEnemy !== null, mode, item))) {
-          this.carrying[i] = 0;
-          this.stored++;
-          this.larder++;
-          if (gate) this.returning.set(here, (this.returning.get(here) ?? 0) + 1);
-          h += Math.PI;
-        } else if (pellet && !ent && this.line === null) {
-          // The soil goes on the mound: real ants dump it round the entrance, which is how mounds grow. (One world's plane:
-          // spoil is carried out by vector, dropPlane; a pellet going home to backfill goes on down its hole.)
-          this.pellet[i] = 0;
-          this.soilOut++;
-          h += Math.PI;
-        }
-        this.since[i] = 0;
-        // Home and resting in "return" (its policy said so, or a cached answer did: ja-qnx): after REST seconds it is
-        // asked afresh as an explorer, once it is no longer tired (fatigue rests it first: ja-q47).
-        // (One world's returners on the plane don't rest at the hole: they go in, crossDown.)
-        if (
-          mode === RETURN &&
-          !carrying &&
-          !pellet &&
-          // Tired, it rests; hungry enough to fetch, it gets up (restFetch, ja-4rfr: the old retired inside sat by
-          // the starving brood).
-          (!this.isTired(i) || (p.restFetch > 0 && this.under[i] === 1 && fetches(this, i))) &&
-          !this.inbound(i, mode) &&
-          (this.restT[i] = this.restT[i] + dt) > REST &&
-          (!gate || ((rolled = true), this.leaves(i, dt, toEnemy !== null)))
-        ) {
-          this.mode[i] = EXPLORE;
-          this.asked[i] = -1;
-          this.restT[i] = 0;
-        }
-      } else this.since[i] = this.since[i] + dt;
-      if (!atNest) this.restT[i] = 0;
-      // Fatigue (ja-q47, docs/tiredness.md): what makes a forager tired is an unsuccessful search, and rest is a stay
-      // inside. It grows only while the ant is out with empty jaws, exploring, following or fighting (a raid or a defence
-      // tires it too: with fights left out, nothing sent a fighter home, raids never ended and combat losses rose 56-72 %,
-      // review of #36), and falls while it is inside its own nest (its hole on the ground or its tunnels and chambers),
-      // a full rest taking restTime. Finding food clears it (above). Digging, carrying spoil or nursing
-      // neither tire nor rest it. Before, a timer that only the hole reset made every inside worker "tired".
-      {
-        const inside = atNest || (ent !== null && this.under[i] === 1 && this.ownNestHere(i));
-        // Both run on the ant's clock (the fungus's lever slows tiring and resting alike), and fatigue stops at twice
-        // patience, so an ant kept out (by Jev, say) needs no more than twice restTime to rest (review of #36).
-        const m = this.mode[i];
-        if (inside) this.fatigue[i] = Math.max(0, this.fatigue[i] - ((p.patience / p.restTime) * dt) / this.clock[i]);
-        else if (!this.carrying[i] && !this.pellet[i] && !this.broodHeld[i] && (m === EXPLORE || m === FOLLOW || m === FIGHT))
-          this.fatigue[i] = Math.min(2 * p.patience, this.fatigue[i] + dt / this.clock[i]);
-        // Tired once past patience, and until fully rested: resting only to just under the line sent foragers out to
-        // tire again at once (G: up to 8 held, food home -9 %, in the first sweep).
-        if (this.fatigue[i] > this.patience(i)) {
-          // Tired where it searches round its last find's spot, with nothing found: that spot is spent (ja-lp4.15).
-          if (this.tired[i] === 0 && p.siteFidelity > 0 && this.search[i] !== 0 && this.line !== null && this.cur === PLANE)
-            this.foodX[i] = this.foodY[i] = NaN;
-          this.tired[i] = 1;
-        } else if (this.fatigue[i] === 0) this.tired[i] = 0;
-      }
-      // Home (ja-qnx): going home is a trip, and it ends there. An ant asked what to do with "return" as its mode keeps
-      // returning (Jev answered "return" to every returner, home or not: PRD §42.4), so a fresh one that has got home with
-      // empty jaws is no longer returning: it is asked afresh as `arrive` says. In the side view a tired one stays in, as
-      // before: nothing underground rests it, so the colony's tired foragers retire inside (resting them sent them out
-      // again, and more food than the porters could carry piled up at reception, A8). On a top-down map rest is instant:
-      // the nest has just reset `since` above, so every returner there reads fresh and goes out at once (a timer artefact
-      // that ja-q47 replaces). Home is the nest on a top-down
-      // map. In the side view it is the royal chamber, where a returner homes to, and only for foragers (the old, zoned
-      // by age), as measured:
-      // - at its hole (passed on the way in, where a returner is asked afresh anyway) the trip's end sent explorers down
-      //   the carriers' food scent into the nest, where they jammed carriers (A8);
-      // - in any chamber, it left the young off the queen's side (zoning.test);
-      // - for the young and middle-aged, who work inside, it sent porters out and the queen starved on 1-2 of 4 worlds in
-      //   the hour-long economy run (slow/economy.test).
-      // (One world: a returner's trip ends inside, as the side view's does; on the plane it is still going in.)
-      if (
-        p.arrive !== "return" &&
-        this.mode[i] === RETURN &&
-        !carrying &&
-        !pellet &&
-        !nursing &&
-        !this.isTired(i) &&
-        !this.inbound(i, RETURN) &&
-        (ent === null ? atNest : this.under[i] === 1 && this.band(i) === 2 && atHome(this, i)) &&
-        (!gate || (!rolled && this.leaves(i, dt, toEnemy !== null)))
-      ) {
-        // A raid scout starts exploring, not on a food trail (review of #53, N6).
-        // `p.follows`: defensive, as at the gated hole (review of #121, N1).
-        this.mode[i] = p.arrive === "follow" && p.follows && !this.recruited[i] ? FOLLOW : EXPLORE;
-        this.asked[i] = -1;
-        this.restT[i] = 0;
-      }
-      if (ent) {
-        // Zoned by age (slice 6): an ant not to go out that has just stepped up out of the hole onto the ground goes
-        // back down (carriers aside: soil goes out to the mound; food is on its way in).
-        if (this.queen && this.under[i] && !carrying && !pellet && !this.mayGoOut(i)) {
-          this.antCell(i);
-          if (isSky(map, CELL[0], CELL[1])) h = this.pointDown(i, x0, y0, h);
-        }
-        integrate(this, i, x0, y0, atNest);
-        // Road signs: underground, a strong nest trail where it stands tells it where it is, and its memory's error fades
-        // (Heyman et al. 2017; slice 3 gives each chamber its own mark). Outside, the hole's sight and smell do it (believe).
-        // Read on the floor where it stands (a road sign is under its antennae; the sensors ahead are often in soil in a tunnel).
-        if (
-          this.under[i] &&
-          (ph.fields.home.get(CELL[0], CELL[1]) * this.gainHome[i] >= STRONG ||
-            ph.fields[destMark(this, i)].get(CELL[0], CELL[1]) * this.gainHome[i] * this.gainMarks[i] >= STRONG)
-        )
-          this.odoNest[i] = this.odoNest[i] * Math.exp(-dt / ROAD_SIGN);
-        if (this.map.chambers) layMark(this, i, dt);
-        if (this.queen) {
-          nurse(this, i, dt, toEnemy !== null);
-          if (port(this, i, dt, toEnemy !== null)) h += Math.PI;
-          if (this.params.undertakes) undertake(this, i, dt, toEnemy === null);
-        }
-      }
-      // One world: on the plane, at a hole's cell. Its own: in, if it is going in (wantsIn). Another colony's: a raider
-      // goes down that shaft (one-world §4). Crossing is where it stands; it reads nothing else.
-      if (this.line !== null && this.cur === PLANE) {
-        // Path integration on the plane (U3b): it counts its way out, as integrate does on the side view's ground; once it
-        // heads home the vector is fixed.
-        // Carrying spoil or a corpse out (U3c), it counts too: it is on its way out, and drops by the vector it brought.
-        if (this.mode[i] !== RETURN || outward) this.odoSurf[i] = this.odoSurf[i] + Math.hypot(this.x[i] - x0, this.y[i] - y0);
-        if (p.routeMemory > 0 && (this.mode[i] === EXPLORE || this.mode[i] === FOLLOW) && !this.carrying[i]) routeRecord(this, i);
-        this.antCell(i);
-        const k = this.holeAt(CELL[0], CELL[1]);
-        if (k >= 0 && (k === p.nest ? this.wantsIn(i, this.mode[i]) : this.mode[i] === FIGHT && this.stanceOf(i) === "raid")) {
-          crossDown(this, i, k);
-          continue;
-        }
-      }
+      s.p = p;
+      s.rng = rng;
+      s.map = map;
+      s.ph = ph;
+      s.home = home;
+      s.dt = dt;
+      s.gate = gate;
+      s.hold = hold;
+      s.leak = leak;
+      s.metLeak = metLeak;
+      s.sgate = sgate;
+      s.crowdKeep = crowdKeep;
+      s.h = h;
+      s.toEnemy = toEnemy;
+      s.held = held;
+      s.carrying = carrying;
+      s.pellet = pellet;
+      s.nursing = nursing;
+      s.outward = outward;
+      s.x0 = x0;
+      s.y0 = y0;
+      s.mode = mode;
+      s.item = item;
+      s.resp = resp;
+      s.rolled = rolled;
+      const arriveDone = arrive(this, i, s);
+      h = s.h;
+      rolled = s.rolled;
+      if (arriveDone) continue;
       this.heading[i] = h;
     }
     this.gateHeld = heldNow;
