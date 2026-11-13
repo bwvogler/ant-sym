@@ -4737,6 +4737,15 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
   Every seed of 1–20 finds sooner with the plume. `tests/slow/assays.test.ts` holds D3 on seeds 1–3.
 - **Tests:** `tests/int/desertPlume.test.ts`. Mutations, each failing it: leave the plume out of the save; drop the steering line; rebuild every tick; let it run off the plane (the nest's layer).
 
+### 60.5 Heat: the body's limit and the sun's height (ja-rf5.5, ja-rf5.12; plan, 2026-11-13)
+
+- **Problem.** Heat as a body rule alone (`heat.ts`, on the branch): a 10-minute day (ground 25 °C at dawn), body heat toward the ground's on the plane and the nest's inside, the `hot` field felt from `heatFelt` until back under `heatCool`, death past 53.6 °C. On D5 (two days, seeds 1–10) the best setting (noon 56 °C, a 30 s body, hot at 45 °C) passes 6 of 10: the colony avoids noon (out at noon ≤ 0.75 × dawn) but heat kills 17–30 % of the colony a day on 4 seeds, against 16 %. An ant inside is always cool, so it sets out at noon.
+- **Research** ([desert-heat.md](desert-heat.md)): the hot-adapted *Cataglyphis* forage near their limit (full text: de Souza Araujo 2023, Sánchez-García 2022); the sun's elevation seen at the entrance, not the ground's temperature, sets when the nest opens and closes (*C. floricola*, Amor et al. 2011: **unverified**, abstract only); no antennal thermoreceptor measured covers desert heat (Nagel & Kleineidam 2015, full text: silent above 38 °C).
+- **Decisions (owner, 2026-11-13):** a day cycle; heat sensed as a situation field, with the shipped answers asked again; heat kills; the cue at the hole is **the sun's height**, not the ground's heat.
+- **Plan:** a `sun` field (low, high) in the desert lane, seen on the plane and at the top of the ant's own shaft (low deeper in), 32 → 64 situations, words version 4; its local rule returns when hot, or when the sun is high with empty jaws. The sun's threshold is **design**, tuned on D5. The shipped answers are asked again (about $0.001, owner approved). The warm wash on the plane shows the day's heat (built).
+- **Assay D5** (`experiment.ts`): out at noon ≤ 0.75 × at dawn; heat deaths ≤ 16 % of the colony a day (a borrowing, unverified); food picked up in every 30 s outside the high-sun window. Seeds 1–10 by the worst seed, confirmed on 11–20.
+- **Open:** the threshold; Amor 2011 in full (`ja-rf5.13`).
+
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
