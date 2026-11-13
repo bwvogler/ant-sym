@@ -111,8 +111,8 @@ export function growthContext(aim: string): string {
 /**
  * The local rule as a function of the situation alone (the lane's preset, what a live check compares Jev with): short
  * supply rests; its own hypha ahead, turn away; rock ahead, branch (split); a tunnel reached from the soil, fruit; a
- * long run, branch; else grow. A tip in the game plays the fuller rule (hyphae.ts localGrowth), which reads its body too: its run (branching
- * at the growth unit), its first heading, and the spots near it (fruiting spaced).
+ * long run, branch; else grow. A tip in the game plays the fuller rule (hyphae.ts localGrowth), which reads its body
+ * too: its run (branching at the growth unit), its first heading, and the spots near it (fruiting spaced).
  */
 export function localGrowthChoice(s: GrowthSituation): GrowthChoice {
   if (s.supply === "short") return "rest";

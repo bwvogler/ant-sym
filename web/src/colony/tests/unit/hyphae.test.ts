@@ -1,11 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { E, NE, nx, ny, SE, W } from "../../hex.ts";
+import { localGrowthChoice } from "../../growthBrain.ts";
 import type { Ground } from "../../hyphae.ts";
 import {
   cellKey,
   growthUnit,
   AMPLE_STEPS,
+  BRANCH_RUN,
   CORD_DIGS,
   CORD_FLOW,
   FRUIT_RUN,
@@ -556,4 +558,17 @@ test("a dug cord cut from upstream leaves no dig count behind; one filled back i
   f.cutDug(dugAt(cellKey(3, 20)));
   f.cutDug(dugAt()); // filled back with soil
   assert.equal(f.digs.size, 0, "a filled cell kept its count");
+});
+
+test("a tip senses its run: short below BRANCH_RUN, long from it; the preset branches at a long run (ja-2bw.18, review of #137 S2)", () => {
+  const h = new Hyphae();
+  h.root(5, 20, E);
+  const tip = h.tips[0]!;
+  const g: Ground = { topsoil: true, kind: () => "soil" };
+  tip.run = BRANCH_RUN - 1;
+  assert.equal(situationOf(h, g, tip, 0, 1e9, 1).run, "short");
+  tip.run = BRANCH_RUN;
+  assert.equal(situationOf(h, g, tip, 0, 1e9, 1).run, "long");
+  assert.equal(localGrowthChoice({ ahead: "soil", exposed: "buried", supply: "ample", run: "long" }), "branch");
+  assert.equal(localGrowthChoice({ ahead: "soil", exposed: "buried", supply: "ample", run: "short" }), "grow");
 });
