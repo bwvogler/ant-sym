@@ -36,7 +36,7 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
       ],
       [
         "sun",
-        "sun is how high the sun stands, as it sees the sky from the open ground or the top of its shaft (deeper in the nest it reads low): the ground is hottest while the sun is high, and a trip out then can kill; down is night, when a desert ant, which steers by the sky, cannot find its way. ",
+        "sun is how high the sun stands, as it sees the sky from the open ground or the top of its shaft (deeper in the nest it reads low). low: the ground is bearable. high: the ground is at its hottest, and an ant that sets out or stays out then heats past what it can bear and dies before it gets home. down: night, when a desert ant, which steers by the sky, cannot find food or its way in the dark. ",
       ],
       [
         "enemy",
@@ -46,13 +46,15 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
     outro: "doctrine is how the colony wants its ants to behave: follow it.",
   }),
   criteria: {
-    explore: "explore: go out, or keep searching, alone for food",
+    explore: "explore: go out, or keep searching, alone for food (only while the sun is low and it is not hot)",
     return: "return: walk home",
     fight: "fight: attack a stranger within reach (only when enemy is near)",
   },
   // 2: fight only with a stranger near (review of #140 D1, owner 2026-11-13: v1 under Warlike fought with nobody near and stalled)
-  // 3: the hot field (ja-rf5.5); 4: the sun field (ja-rf5.12); 5: the sun down at night (owner, 2026-11-13)
-  version: 5,
+  // 3: the hot field (ja-rf5.5); 4: the sun field (ja-rf5.12); 5: the sun down at night (owner, 2026-11-13); 6: the sun's consequence spelled
+  // out (v5's answers sent a fresh, cool explorer out at high sun and at night: owner, reword and re-ask)
+  // 7: explore conditioned on a low sun and a cool body, as fight on a stranger near (v6's answers still sent foragers out at night: owner)
+  version: 7,
   schema: DESERT_SCHEMA,
 };
 
@@ -93,10 +95,17 @@ export const DESERT_ANT: Species = {
     // Buehlmann et al. 2014, a pre-publication draft: unverified). One world's nests are 140 cells apart against C. fortis's ~40 m,
     // about 3.5 cells a metre: 6 m is 21 cells. D3 (PRD §60.4): the first find comes sooner on every seed of 1–20.
     foodPlume: 21,
-    // Heat (ja-rf5.5, docs/desert-ant.md §4, PRD §60.5): all design but the critical heat, 53.6 °C (C. bombycina, Gehring & Wehner 1995, read
-    // through later papers: a borrowing, unverified). A 10-minute day, the ground 25 °C at dawn and 60 °C at noon (surfaces reach about 70 °C,
-    // unverified), the nest 30 °C; the body closes on its surroundings in about 20 s, and feels hot at 48 °C.
+    // Heat and the sun (ja-rf5.5, ja-rf5.12; docs/desert-heat.md, PRD §60.5): all design but the critical heat, 53.6 °C (C. bombycina, Gehring &
+    // Wehner 1995, read through later papers: a borrowing, unverified; the params.ts default). A 10-minute day, a third of it night (owner,
+    // 2026-11-13); the ground 25 °C from sunset to sunrise and 56 °C at noon (the air at ant height, 6–7 °C under a surface of about 70 °C:
+    // unverified); the nest 30 °C; the body closes on its surroundings in about 30 s, feels hot from 45 °C until back under 34 °C; the sun
+    // counts as high from 0.6 of its noon height. Chosen on D5: seeds 1–10 pass 10/10 by the worst seed.
     heatDay: 600,
+    heatNight: 1 / 3,
+    heatNoon: 56,
+    heatTau: 30,
+    heatFelt: 45,
+    heatSunHigh: 0.6,
   },
   // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
