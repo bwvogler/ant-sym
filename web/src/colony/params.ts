@@ -155,9 +155,9 @@ export interface ColonyParams {
    */
   routeMemory: number;
   /**
-   * ja-uvhw: 1 = a sensor reads scent (food, home, alarm trails, and the nest in sight) only where its tip can be reached
-   * through open ground within SENSE_STEPS (inReach), as food itself is (ja-juiu); unreachable, it reads none. 0 = scent is
-   * read at the tip whatever lies between: main bit for bit. 2 = as 1, but alarm is read at the tip as before.
+   * ja-uvhw: 1 = a sensor reads scent (food, home and alarm trails, and the nest in sight) only where its tip can be reached
+   * through open ground within SENSE_STEPS (inReach), as food itself is (ja-juiu); out of reach (another tunnel, behind a
+   * wall), it reads none. 0 = scent is read at the tip whatever lies between (main before ja-uvhw; kept for ablation).
    */
   scentReach: number;
   /** One world's plane, with routeMemory: cells walked between two stored places. */
@@ -287,7 +287,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   siteFidelity: 0,
   siteGive: 0,
   routeMemory: 0,
-  scentReach: 0,
+  scentReach: 1,
   routeStep: 8,
   routeSee: 5,
   routeMax: 64,

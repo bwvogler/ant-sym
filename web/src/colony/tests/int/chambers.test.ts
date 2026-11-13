@@ -88,11 +88,11 @@ test("soil put back under a chamber cell stays put for good; put back elsewhere,
 });
 
 test("a roomy nest barely digs (ja-wii): the same few ants dig far less when their chambers have floor enough", () => {
-  // Summed over four games: 30 ants dig little, so one game's ratio is noisy (over 30 games, 0.32 ± 0.15 before #17 was
+  // Summed over eight games (four sat on the bound: 46 vs 307 = 0.1498 with ja-uvhw, 0.37 over twelve): 30 ants dig little, so one game's ratio is noisy (over 30 games, 0.32 ± 0.15 before #17 was
   // merged in and 0.40 ± 0.22 after; one game in eight was over 0.5 even before).
   const dug = (chambers: boolean) => {
     let s = 0;
-    for (const seed of [6, 7, 8, 9]) {
+    for (const seed of [6, 7, 8, 9, 10, 11, 12, 13]) {
       const map = generateSideWorld(2, SMALL_SIDE);
       if (!chambers) map.chambers = undefined; // no chambers: never roomy (as before slice 2)
       const c = new Colony(map, { antCount: 30, maxAnts: 30 }, mulberry32(seed));
