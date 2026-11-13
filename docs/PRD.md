@@ -4122,7 +4122,7 @@ The owner asked for the top-down view and the side view to be two views of one g
   - Everything underground lives in one vertical sheet under the line, with today's side-view physics, and the side view shows all of it.
   - A hole is the only way between the two.
   - A full 3D underground was set aside: depth-times the memory and tick cost, 3D digging and homing, and a side view that would miss tunnels.
-- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it, it is a 2D hole gap from every hole, and the ground is open.
+- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it (between the line's tiles since `ja-lp4.17`, one-world §3), it is a 2D hole gap from every hole, and the ground is open.
 - **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
 
 **The note's open questions, answered (owner, 2026-11-08):**
