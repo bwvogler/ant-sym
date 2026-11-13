@@ -4719,6 +4719,7 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **The choice:** the start screen offers the species both colonies are ("Ant" or "Desert ant", with a line on each). The desert ant starts without the tutorial, which walks through the generic ant's trails and raids. Starting it leaves the tutorial unplayed, so a later generic start still offers it. The choice is in the game's settings and its saves; a save of any species this build plays loads (`SPECIES`: the generic ant and, registered now, the desert ant).
 - **Shipped answers, each against its own species** (`ja-fnd.5.15`): `loadPrecache` hands each bundle's species to `ColonyJev.seed`, which checks its answers against that species' words, not the game's. Before, a page that seeded while playing the desert ant dropped the generic bundles' follow answers for the rest of the page.
 - **Caught by the e2e run:** the game was not rebuilt when only the species changed (its memo didn't list it), so Start built a generic game. `npm run e2e`'s new step 8 chooses the desert ant, starts, plays 20 s and checks the game is the desert ant's with no food or home trail.
+- **The field guide by species** (`ja-rf5.11`, owner 2026-11-13, from the review of #142): each Learn → Field guide entry about one trail names it (`GuideEntry.trail`); a species whose colonies lay no such trail doesn't see it (`guideFor`, read from the colony's own scent channels, as the Details screen greys inert levers). The desert ant's guide leaves out six: the food trail, the home trail, tasting food, choosing a branch, "no entry" and alarm, and says so above the entries. The way home (the home vector and the search) is an entry of its own that every species sees, split from the home trail's (owner, review of #144, D1); no link on the page leads to a hidden entry (the Details screen's "?" by Trails drawn shows only where there is a food trail). Desert-ant entries of its own wait for its Learn entry (`ja-rf5.8`).
 - No behaviour change for the generic ant (goldens bit-exact); no cost change.
 
 ### 60.4 Food odour in the air: the desert ant's plume (ja-rf5.4, 2026-11-13)
@@ -5001,6 +5002,30 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - Branching is near neutral against `main`'s hyphae: faster on seeds 1 and 8 (by 20 and 32 s), slower on seeds 2, 5 and 7 (+4 %, +5 %, +10 %), the rest within 3 s; median 289 → 293 s.
 - **`main` had already drifted.** Against no hyphae on the same `main`, its own hyphae are 29 % slower on seed 7 (277 → 358 s): P1 fails there before this change (§63.7 measured 397 vs 389 on its branch, before `main`'s merges of the day). Filed as `ja-2bw.19`. The worst seed improves with hyphae (two "never" become 493 and 373 s).
 - **Owner (2026-11-13): ship, record, and file the drift.**
+
+### 63.9 Hyphae along the tunnels, regrowing after a dig (ja-2bw.15, 2026-11-13)
+
+**Built.** In the side view a dug cell has a back wall: a hypha in it runs there, where the ants walk.
+- **Tunnels followed.** A tip in a dug cell follows the tunnel: where it bends, the local rule and a policy's `turn` take the side that stays in it (one turn off, or two); where it ends, the tip grows on into the soil. From the soil, the local rule enters a tunnel ahead unless its own hypha already runs in a dug cell within `ENTER_GAP` (6); then it slides along the wall as before.
+- **Regrowth.** A cut leaves the cell the hypha grew from as a stump. `REGROW_ROUNDS` (5) rounds later the stump puts out a tip that grows straight into the dug cell, paid from the free mass (or waits on the stump while the mass is short). Injured hyphae put out new tips behind the wound; the pause makes a dig cost something.
+- **Safe on the back wall.** Ants walking past do not harm hyphae in dug cells; only digging cuts (owner, 2026-11-13).
+- **The growth legend, v3.** Under #137's answers the two shaft-wall tips ended in a few steps (`fruit` when short, `fuse`), so the side view under *unite* kept about 6 cells and no tips. **Owner: reword and re-ask.** The legend now says that only tips grow, a tip that fruits or fuses is gone, and where the last tips end the mycelium grows no further; `fuse` says it ends the tip. Asked for the three aims: **$0.0020** (`GROWTH_BRAIN_VERSION` 3). The lane per new aim: about 15.9k input tokens measured, **≈ $0.0007**; `--dry` estimates 21.6k tokens, $0.0009 (v2: 63.3k for three aims, +2.4 %). Jev now fruits in no situation under any aim.
+- **Spots in the body.** With no `fruit` answers the hyphae made no spore spots and infection slowed. **Owner: spots in the body.** Where a tip still growing has come to a tunnel (on its wall or in it), grown `FRUIT_RUN` cells and with no spot of its own within `FRUIT_GAP`, the body puts a spot on the dug cell and the tip grows on. A `fruit` answer still ends a tip where the spacing allows it.
+
+**Seen.** Full maps, *unite*, the page's answers, 300 s (seeds 1–6): the side view holds 17–36 hypha cells, 9–25 of them in dug cells, with 1–4 tips still growing and 1–2 spots; under #137's answers it was about 6 cells with no tips. Where ants dug through (seeds 2 and 4: 6 and 13 cells cut) the hyphae grew back.
+
+**Measured** (`progression.mjs --map one --evolve`, 600 s; the no-hyphae run and `main`'s hyphae from §63.8):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 357 | 363 | 289 | 173 | 228 | never | 277 | never | 240 | 216 |
+| a quarter, §63.8's hyphae (s) | 333 | 299 | 287 | 161 | 220 | 493 | 393 | 373 | 253 | 217 |
+| a quarter, along tunnels (s) | 370 | 305 | 298 | 162 | 205 | 474 | 318 | 355 | 262 | 246 |
+
+- Against §63.8: seed 7 much faster (393 → 318 s), seeds 5, 6 and 8 faster; seeds 1 and 10 slower (+11 %, +13 %); median 293 → 302 s.
+- Against no hyphae: P1 fails on seeds 7 (+15 %) and 10 (+14 %) and on the median (283 → 302 s); the worst seed improves (never → 474 s). `main` already failed P1 on seed 7 (+42 %, `ja-2bw.19`).
+- **Owner (2026-11-13): ship, record, and tune in `ja-2bw.6`** (`ENTER_GAP`, `REGROW_ROUNDS`, `FRUIT_GAP` join its knobs).
+- Held out, seeds 11–20 (no hyphae → along tunnels): 11 353 → 399, 12 242 → 243, 13 259 → 223, 14 165 → 146, 15 343 → 285, 16 324 → 280, 17 252 → 264, 18 252 → 226, 19 315 → 308, 20 475 → 314 s. Median 287 → 272 s, worst seed 475 → 399 s; P1 fails only on seed 11 (+13 %).
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 

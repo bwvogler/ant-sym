@@ -18,6 +18,7 @@ import {
   type SpeciesSituation,
 } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
+import { GUIDE, guideFor, guideNote } from "../guide.ts";
 import { ruleTextAgrees } from "../policyText.ts";
 import { requestFor, tokensPerQuestion } from "../prompt.ts";
 import { situationsOf } from "../useColony.ts";
@@ -119,4 +120,25 @@ test("situations are counted out of the species' own, and its questions cost its
 
 test("the desert ant's rule text says what its rule does, in every situation it has (ja-rf5.3)", () => {
   assert.deepEqual(ruleTextAgrees(DESERT_ANT), []);
+});
+
+test("the field guide leaves out the entries on trails a species doesn't lay: the desert ant's has no trail entries (owner, ja-rf5.11)", () => {
+  const ids = (species: Species) => {
+    const g = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));
+    return guideFor((c) => g.player.ph.has(c)).map((e) => e.id);
+  };
+  assert.deepEqual(
+    ids(GENERIC_ANT),
+    GUIDE.map((e) => e.id),
+    "the generic ant sees every entry",
+  );
+  const gone = GUIDE.map((e) => e.id).filter((id) => !ids(DESERT_ANT).includes(id));
+  assert.deepEqual(gone, ["food-trail", "home-trail", "food-quality", "double-bridge", "no-entry", "alarm"]);
+  assert.ok(ids(DESERT_ANT).includes("way-home"), "the way home, without a trail, is every species' (owner, review of #144 D1)");
+  const note = (species: Species) => {
+    const g = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));
+    return guideNote((c) => g.player.ph.has(c), species.name);
+  };
+  assert.equal(note(GENERIC_ANT), null, "no note for the generic ant (review of #144, S2)");
+  assert.match(note(DESERT_ANT) ?? "", /^The desert ant lays no trails of some kinds/);
 });

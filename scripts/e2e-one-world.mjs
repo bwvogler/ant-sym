@@ -21,7 +21,7 @@
 //     Skip ends it at 4×, playing; a reload offers plain Start.
 //  8. the desert ant (ja-rf5): chosen on the start screen, which then offers plain Start (no tutorial: it is the generic ant's); its
 //     game is the desert ant's, plays 20 s of game time at 4× and lays no food or home trail on the plane; a reload still offers
-//     the generic ant's tutorial.
+//     the generic ant's tutorial. Its field guide leaves out the trail entries (ja-rf5.11).
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -793,6 +793,22 @@ try {
   check(
     await dp.evaluate(() => window.jevAnts.game.colonies.every((c) => !c.layers[0].ph.live("food") && !c.layers[0].ph.live("home"))),
     "no food or home trail on the plane",
+  );
+  await dp.getByRole("button", { name: "Details", exact: true }).click();
+  const det = dp.getByRole("dialog", { name: "Details" });
+  await det.getByText("Trails drawn").waitFor({ timeout: 5_000 });
+  check(
+    (await det.getByRole("button", { name: "Learn: trails" }).count()) === 0,
+    "Details: no link to the trail entries it lacks (review of #144, S1)",
+  );
+  await det.getByRole("button", { name: "Close Details" }).click();
+  await dp.getByRole("button", { name: "Learn", exact: true }).click();
+  const learn = dp.getByRole("dialog", { name: "Learn" });
+  await learn.getByRole("heading", { name: "Strangers and battles" }).waitFor({ timeout: 5_000 });
+  check(
+    (await learn.getByRole("heading", { name: "Food trail", exact: true }).count()) === 0 &&
+      (await learn.getByText("lays no trails of some kinds").count()) === 1,
+    "the field guide leaves out the trail entries, and says so",
   );
   await dp.reload();
   await dp
