@@ -26,6 +26,8 @@ import {
   cellAt,
   columnsOver,
   turnAt,
+  segmentCells,
+  type Transect,
   AIR,
   OPEN,
   rockAt,
@@ -778,33 +780,35 @@ export default function ColonyField({
       ctx.textBaseline = "alphabetic";
     };
 
-    /** One world's top view: the line, dashed through the holes in order, fainter along its margins; a marker at each hole. */
+    /**
+     * Columns lo … hi of the line as one dashed stretch through the centres of the plane cells they lie under (P(s)), so it
+     * turns where its tiles turn (ja-lp4.17).
+     */
+    const traceColumns = (line: Transect, lo: number, hi: number, c: Camera, v: Viewport) => {
+      for (let s = lo; s <= hi; s++) {
+        cellAt(line, s);
+        const [x, y] = toScreen(c, v, centreX(CELL[0], CELL[1]), centreY(CELL[1]));
+        if (s === lo) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    };
+
+    /** One world's top view: the line, dashed over its tiles through the holes in order, fainter along its margins; a marker at each hole. */
     const drawLine = (w: OneWorld, c: Camera, v: Viewport, d: number) => {
       const line = w.line;
+      const k = line.holes.length - 1;
       ctx.strokeStyle = theme.ink;
       ctx.lineWidth = Math.max(1, d * 1.2);
       ctx.setLineDash([6 * d, 5 * d]);
       // The margins: from each end hole to the line's end, P(sMin) and P(sMax).
       ctx.globalAlpha = 0.25;
       ctx.beginPath();
-      for (const [s, h] of [
-        [line.sMin, line.holes[0]!],
-        [line.sMax, line.holes[line.holes.length - 1]!],
-      ] as const) {
-        cellAt(line, s);
-        const [ax, ay] = toScreen(c, v, centreX(CELL[0], CELL[1]), centreY(CELL[1]));
-        const [bx, by] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
-        ctx.moveTo(ax, ay);
-        ctx.lineTo(bx, by);
-      }
+      traceColumns(line, line.sMin, line.sHole[0]!, c, v);
+      traceColumns(line, line.sHole[k]!, line.sMax, c, v);
       ctx.stroke();
       ctx.globalAlpha = 0.6;
       ctx.beginPath();
-      line.holes.forEach((h, j) => {
-        const [x, y] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
-        if (j === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
+      traceColumns(line, line.sHole[0]!, line.sHole[k]!, c, v);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 0.9;
@@ -942,13 +946,17 @@ export default function ColonyField({
       const [sx, sy] = toScreen(c, v, tx, ty);
       const holes = w.line.holes;
       const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
-      const [ex, ey] = toScreen(c, v, centreX(e.x, e.y), centreY(e.y));
       ctx.strokeStyle = theme.accent;
       ctx.lineWidth = Math.max(1.5, d * 1.5);
       ctx.setLineDash([6 * d, 5 * d]);
+      // The new segment over the tiles it would lie on (segmentCells: what the founding lays).
+      const seg = segmentCells(e, at.cell);
       ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(sx, sy);
+      for (let i = 0; i < seg.length; i += 2) {
+        const [x, y] = toScreen(c, v, centreX(seg[i]!, seg[i + 1]!), centreY(seg[i + 1]!));
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
       ctx.stroke();
       ctx.setLineDash([]);
       // From where she lands to where she settles, when she walks on.

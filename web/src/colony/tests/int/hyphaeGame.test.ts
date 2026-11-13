@@ -4,12 +4,13 @@ import { CURTAIN, PLANE } from "../../colony.ts";
 import { CORPSE, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { cellKey as hyphaKey, HYPHA_MASS, keyCell } from "../../hyphae.ts";
-import { nx, ny } from "../../hex.ts";
+import { CELL, cellOf, centreX, centreY, dirOf, hexDistance, nx, ny } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
+import { columnsOver } from "../../transect.ts";
 import { OPEN, rockAt, SOIL } from "../../world.ts";
 
 // The mycelium as hyphae in a one-world game (docs/hyphal-growth.md, ja-2bw.2): rooted by the hole on the plane (the
-// topsoil) and on the shaft's walls in the curtain, it grows on both maps from the mass the body has grown, puts its
+// topsoil), it reaches the curtain by growing down the hole onto the shaft's walls (ja-2bw.14), grows on both maps from the mass the body has grown, puts its
 // spores out only on open cells, and saves and loads as it was.
 
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
@@ -30,13 +31,43 @@ const runFor = (g: Game, seconds: number) => {
   while (g.time < end) g.tick(1 / 30);
 };
 
-test("hyphae root on the plane and on the shaft's walls, and grow on both from the mycelium's mass", () => {
+/** Run until a plane tip has come to the hole and crossed down it (ja-2bw.14), at most `limit` s; returns when. */
+function crossDown(g: Game, limit = 90): number {
+  while (!g.fungus.hyphaeOn(CURTAIN) && g.time < limit) runFor(g, 1);
+  assert.ok(g.fungus.hyphaeOn(CURTAIN), `no tip crossed down the hole in ${limit} s`);
+  return g.time;
+}
+
+test("the patch lands on the hole's inner side, and its hyphae reach the curtain by growing down the hole (ja-2bw.14)", () => {
+  const g = game(true);
+  const line = g.world!.line;
+  const plane = g.fungus.hyphaeOn(PLANE)!;
+  // Every patch cell on the line lies over a column between the holes, never the margin past an end hole.
+  let onLine = 0;
+  for (const k of plane.parent.keys()) {
+    const [x, y] = keyCell(k);
+    for (const s of columnsOver(line, x, y)) {
+      onLine++;
+      assert.ok(s > line.sHole[0]! && s < line.sHole[line.sHole.length - 1]!, `patch cell over column ${s}, outside the holes`);
+    }
+  }
+  assert.ok(onLine > 0, "the patch is not on the line");
+  assert.equal(g.fungus.hyphaeOn(CURTAIN), null, "hyphae in the curtain before any tip reached the hole");
+  const t = crossDown(g);
+  const curtain = g.fungus.hyphaeOn(CURTAIN)!;
+  // Its first tips root on the shaft's walls: soil, below the surface, beside the dug shaft.
+  assert.ok(curtain.tips.length > 0, `no tip in the curtain after crossing at ${t} s`);
+  for (const [k, p] of curtain.parent)
+    if (p === -1) assert.equal(rockAt(g.world!.curtain, ...keyCell(k)), SOIL, `a root off the wall at ${keyCell(k)}`);
+});
+
+test("hyphae grow on both maps from the mycelium's mass", () => {
   const g = game(true);
   const plane0 = g.fungus.hyphaeOn(PLANE)!.length;
-  const curtain0 = g.fungus.hyphaeOn(CURTAIN)?.length ?? 0;
   assert.ok(plane0 > 0, "no hyphae on the plane");
-  assert.ok(curtain0 > 0, "no hyphae on the shaft's walls");
-  runFor(g, 90);
+  crossDown(g);
+  const curtain0 = g.fungus.hyphaeOn(CURTAIN)!.length;
+  runFor(g, 60);
   const plane = g.fungus.hyphaeOn(PLANE)!;
   const curtain = g.fungus.hyphaeOn(CURTAIN)!;
   assert.ok(plane.length > plane0, `the plane's hyphae did not grow (${plane.length})`);
@@ -47,7 +78,8 @@ test("hyphae root on the plane and on the shaft's walls, and grow on both from t
 
 test("with hyphae, spores go out only on open cells, never into soil, rock or sky", () => {
   const g = game(true);
-  runFor(g, 60);
+  crossDown(g);
+  runFor(g, 30);
   for (const l of [PLANE, CURTAIN]) {
     const map = l === PLANE ? g.world!.plane : g.world!.curtain;
     const { spores } = g.fungus.sporesOn(l)!;
@@ -69,7 +101,8 @@ test("with hyphae, spores go out only on open cells, never into soil, rock or sk
 
 test("a game with hyphae saves and loads as it was", () => {
   const g = game(true);
-  runFor(g, 30);
+  crossDown(g);
+  runFor(g, 10);
   const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
   const back = game(true);
   back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
@@ -173,7 +206,8 @@ test("a host that dies on the plane is a new start where it lies; a clean ant le
 
 test("ants digging through a hypha in the curtain cut it, and the mycelium loses the mass it held", () => {
   const g = game(true);
-  runFor(g, 40);
+  crossDown(g);
+  runFor(g, 30);
   const h = g.fungus.hyphaeOn(CURTAIN)!;
   const soil = [...h.soil];
   assert.ok(soil.length > 0, "no hypha in the curtain's soil");
@@ -191,6 +225,7 @@ test("ants digging through a hypha in the curtain cut it, and the mycelium loses
 
 test("a spore spot a tip fruited on puts out spores, until it is filled in", () => {
   const g = game(true);
+  crossDown(g);
   const h = g.fungus.hyphaeOn(CURTAIN)!;
   for (let t = 0; t < 240 && h.fruits.length === 0; t += 10) runFor(g, 10);
   assert.ok(h.fruits.length > 0, "no tip fruited in 240 s");
@@ -204,4 +239,68 @@ test("a spore spot a tip fruited on puts out spores, until it is filled in", () 
   const was = spores.get(x, y);
   runFor(g, 5);
   assert.ok(spores.get(x, y) <= was, "a filled spot kept fruiting");
+});
+
+test("a later tip crossing down the hole puts a fresh tip on a wall cell whose tip is gone, never a second one beside a tip (ja-2bw.16)", () => {
+  const g = game(true);
+  crossDown(g);
+  const h = g.fungus.hyphaeOn(CURTAIN)!;
+  const nest = g.colonies[0]!.layers[PLANE]!.nest;
+  cellOf(nest.x, nest.y);
+  const e = g.fungus.crossAt!(CELL[0], CELL[1])!;
+  const walls = [...h.parent].filter(([, p]) => p === -1).map(([k]) => k);
+  assert.ok(walls.length > 0);
+  // A crossing puts no tip on a cell that has one.
+  g.fungus.rootShaft(CURTAIN, e.x, e.y);
+  const cells = h.tips.map((t) => hyphaKey(t.x, t.y));
+  assert.equal(new Set(cells).size, cells.length, "two tips on one wall cell");
+  // Every tip gone (grown on, fruited or cut): the next crossing seeds each wall cell again.
+  h.tips.length = 0;
+  g.fungus.rootShaft(CURTAIN, e.x, e.y);
+  assert.deepEqual(h.tips.map((t) => hyphaKey(t.x, t.y)).sort(), [...walls].sort(), "fresh tips on the walls");
+});
+
+test("a crossing tip leaves the plane: no plane tip stays in a hole's mouth, so the walls are rooted once, not every round (review of #130, S1)", () => {
+  const g = game(true);
+  let rooted = 0;
+  const was = g.fungus.rootShaft.bind(g.fungus);
+  g.fungus.rootShaft = (l, x, y) => {
+    rooted++;
+    was(l, x, y);
+  };
+  const plane = g.fungus.hyphaeOn(PLANE)!;
+  const end = g.time + 120;
+  while (g.time < end) {
+    g.tick(1 / 30);
+    for (const t of plane.tips) assert.equal(g.fungus.crossAt!(t.x, t.y), null, `a plane tip left in the hole's mouth at ${t.x},${t.y}`);
+  }
+  assert.ok(rooted >= 1 && rooted <= 4, `the shaft's walls rooted ${rooted} times in 120 s`);
+});
+
+test("a daughter founded with the fungus in her queen gets a patch by her own hole, and her curtain's hyphae come only by crossing (review of #130, S2)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  const f = { mother: 0, x: g.colonies[0]!.nest.x, y: g.colonies[0]!.nest.y, load: 0.5, strain: e.strain, at: g.time, food: 2 };
+  g.flights.push(f);
+  const plane = g.fungus.hyphaeOn(PLANE)!;
+  const cells = plane.length;
+  const tips = plane.tips.length;
+  const curtain = g.fungus.hyphaeOn(CURTAIN)?.length ?? 0;
+  const k = g.found(f);
+  assert.ok(k > 0, "she founded");
+  const nest = g.colonies[k]!.layers[PLANE]!.nest;
+  cellOf(nest.x, nest.y);
+  const [hx, hy] = [CELL[0], CELL[1]];
+  // A new patch by her hole, its tips set out; nothing new in the curtain yet.
+  assert.ok(plane.length > cells && plane.tips.length > tips, "no patch for her");
+  const near = [...plane.parent.keys()].filter((key) => hexDistance(...keyCell(key), hx, hy) <= Math.round(nest.r) + 6);
+  assert.ok(near.length > 0, "her patch is not by her hole");
+  assert.equal(g.fungus.hyphaeOn(CURTAIN)?.length ?? 0, curtain, "her curtain rooted at founding");
+  // Her patch lies on her hole's inner side (toward the neighbouring hole), and its first tip aims at her hole from its rim cell.
+  const others = g.colonies.filter((_, i) => i !== k).map((o) => o.layers[PLANE]!.nest);
+  const next = others.reduce((a, b) => (Math.hypot(b.x - nest.x, b.y - nest.y) < Math.hypot(a.x - nest.x, a.y - nest.y) ? b : a));
+  const mid = near.map(keyCell).reduce(([sx, sy], [x, y]) => [sx + centreX(x, y) / near.length, sy + centreY(y) / near.length], [0, 0]);
+  assert.ok(Math.hypot(next.x - mid[0]!, next.y - mid[1]!) < Math.hypot(next.x - nest.x, next.y - nest.y), "her patch is past her hole");
+  const t = plane.tips[tips]!;
+  assert.equal(t.heading, dirOf(Math.atan2(nest.y - centreY(t.y), nest.x - centreX(t.x, t.y))), "her first tip does not head for her hole");
 });

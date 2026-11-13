@@ -4122,7 +4122,7 @@ The owner asked for the top-down view and the side view to be two views of one g
   - Everything underground lives in one vertical sheet under the line, with today's side-view physics, and the side view shows all of it.
   - A hole is the only way between the two.
   - A full 3D underground was set aside: depth-times the memory and tick cost, 3D digging and homing, and a side view that would miss tunnels.
-- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it, it is a 2D hole gap from every hole, and the ground is open.
+- **The founding rule.** A colony may be founded only where its nearest hole is an end of the line (ties to an interior hole are invalid; ties between ends grow at V₀), its segment from that end turns back by at most 120° and, away from the shared vertex, neither crosses the line nor comes within a clearance of it (between the line's tiles since `ja-lp4.17`, one-world §3), it is a 2D hole gap from every hole, and the ground is open.
 - **Design first.** `docs/one-world.md` holds the model, the rule, what changes in the colony code, the two linked views, the stages U1–U6 with their guards, and the open questions. Nothing is built yet. The legacy side and open maps stay as test beds until U6 re-baselines the assays.
 
 **The note's open questions, answered (owner, 2026-11-08):**
@@ -4897,6 +4897,31 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 **Built.** At the *Mycelium* upgrade's third level (*a web*), each round: every hypha cell feeding `CORD_FLOW` (4) tips or more is a cord (`Hyphae.thicken`; Heaton et al. 2010: a cord's thickness tracks its flow), drawn thicker; a cord takes `CORD_DIGS` (3) digs to cut: a cell is dug open only once, so each round a cord lies in a dug cell counts as a dig against it (owner, review of #119; built immune at first). So a dug cord is cut about 2 s after its cell is opened, whatever the ants do next; a cell filled back in starts its count again. The owner kept this over counting real ant digs or a longer hold (review of #119, D2); with `ja-2bw.15` the hyphae then regrow along the tunnel's back wall; and up to `REGRESS_PER_ROUND` (1) dead end a round fades (`Hyphae.regress`; Bebber et al. 2007: unused links recycled), never a root, cord, fusion, a spot's hypha or a corpse's cell, its mass the body's to spend again. Cords feeding far tips faster (a flow model) is split off as `ja-2bw.13`.
 
 **Measured.** In a one-world game with *a web* bought at the start (seed 7, 600 + 600 ants), cords appear about 120 s in, once a lineage feeds four tips: 8 cells at 120 s, 45 at 180 s on the plane; dead ends cut in the curtain fade (5 cells by 150 s). With the progression script's own upgrade order, *a web* comes at 268–471 s, mostly after the quarter, and `progression.mjs --map one --evolve --hyphae --growth` (seeds 1–10, 600 s) gives **the same seconds, mutations and mycelium on every seed** as §63.5's run: cords change neither the mass nor where spores go, only what a dig takes and how much hypha lingers. P1 holds trivially. What cords are worth will show once digging bites harder (a borer's hyphae in undug soil) and with `ja-2bw.13`.
+
+### 63.7 Hyphae reach the curtain by growing; fruiting spaced in the body (ja-2bw.14, ja-2bw.16, 2026-11-13)
+
+**Built.** The landing patch lies by colony 0's hole as before (`LANDING.offset` past the nest's rim) but on its inner side: along the line toward the neighbouring hole, so never over the margin past an end hole, which `growWorld` can re-aim (owner, 2026-11-13). The curtain gets no hyphae at landing. A plane tip that grows into the hole's mouth (the nest's disc on the plane, radius 3) crosses down it (`Fungus.crossAt`, set by the game): it leaves the plane and roots on the shaft's walls (`rootShaft`). So the side view shows the hyphae arriving at the hole and growing down. The rim tip facing the hole aims at it from its own cell; with the mouth as wide as the disc this changes no outcome measured (review of #130, N3: 14 of 40 landings re-aimed, crossing times identical), and it is kept for a narrower mouth.
+
+**The wall tips fruited at once (`ja-2bw.16`).** Under *unite* the shipped growth answers fruit a tip on a wall with soil ahead (and *spread* does when short), so both wall tips ended as spots on their first step: on seed 1 the curtain held 3 cells from the crossing (22 s) to 200 s, the same on `main`. **Owner (2026-11-13): space it in the body, keep the answers.** A `fruit` answer, Jev's or the local rule's, now takes only once the tip has grown `FRUIT_RUN` (2) cells since it set out or branched and no spot of its own lies within `FRUIT_GAP`; otherwise the tip plays its own rule. Seed 1 under *unite*: 14 cells down the wall by 112 s, until ants dig through the tip. A later crossing puts a fresh tip on a wall cell whose tip is gone; regrowth from the hyphae left in the curtain is `ja-2bw.15`.
+
+**Measured** (`progression.mjs --map one --evolve [--hyphae --growth]`, aim unite, 600 s). The landing moved, so the baseline is re-run with it (without hyphae the patch is the old disc at the new spot):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 355 | 403 | 278 | 145 | 151 | never | 397 | 470 | 240 | 217 |
+| a quarter, hyphae (s) | 289 | 303 | 308 | 158 | 132 | 325 | 389 | 263 | 253 | 211 |
+| the queen, hyphae (s) | 314 | 351 | 354 | 197 | 173 | 363 | 400 | 325 | 273 | 249 |
+
+- With hyphae the worst seed improves (never → 389 s) and the median too (317 → 276 s); seed 6 takes hold with hyphae.
+- **Seed 3 is 10.8 % slower** (278 → 308 s), just past P1's 10 %; before the fruiting fix it was 276 s. Seeds 4 (+9 %) and 9 (+5 %) are slower within the gate.
+- Held out, seeds 11–20:
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 451 | 286 | 221 | 165 | 425 | 417 | 199 | 331 | 291 | 376 |
+| a quarter, hyphae (s) | 471 | 247 | 184 | 150 | 272 | 359 | 190 | 251 | 270 | 325 |
+
+  Nine of ten faster; the median improves (311 → 261 s). **The worst seed is seed 11 both ways, and 20 s worse with hyphae** (451 → 471 s, +4.4 %), so "the worst seed no worse" fails here, as "no seed over 10 %" fails on seed 3 above. **Owner (2026-11-13): ship, and record the two narrow misses**; `ja-2bw.6` (tuning) carries them.
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 

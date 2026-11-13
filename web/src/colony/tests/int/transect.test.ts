@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CELL, centreX, centreY, hexDistance } from "../../hex.ts";
+import { CELL, cellOf, centreX, centreY, hexDistance } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import {
   canFound,
@@ -8,9 +8,12 @@ import {
   columnsOver,
   grow,
   HOLE_GAP_2D,
+  LINE_BAND,
   makeTransect,
   MARGIN,
   nearestValid,
+  outward,
+  VERTEX_EXCUSE,
   turnAt,
   type Cell,
   type Transect,
@@ -150,12 +153,13 @@ test("rule 2, crossing and clearance: the new segment and its margin keep clear 
   // About 15° below due west from C: well inside the turn limit (105°), but with a 200-cell margin the line runs on across
   // the margin west of Ink.
   assert.deepEqual(canFound(long, { x: 161, y: 52 }, open), { ok: false, reason: "crosses" });
-  // About 10° below west: it never crosses, but its margin ends within 12 of Ink's.
-  assert.deepEqual(canFound(long, { x: 161, y: 48 }, open), { ok: false, reason: "clearance" });
+  // About 12° below west: its tiles never meet the line's, but its margin's end within 12 of Ink's margin's (measured
+  // between tiles, ja-lp4.17: 49–51 are refused for clearance, 52 on cross).
+  assert.deepEqual(canFound(long, { x: 161, y: 50 }, open), { ok: false, reason: "clearance" });
   // With the usual 64-cell margin, both stop short of Ink's margin.
   const t = makeTransect([A, B, C]);
   assert.deepEqual(canFound(t, { x: 161, y: 52 }, open), { ok: true, end: "end" });
-  assert.deepEqual(canFound(t, { x: 161, y: 48 }, open), { ok: true, end: "end" });
+  assert.deepEqual(canFound(t, { x: 161, y: 50 }, open), { ok: true, end: "end" });
 });
 
 test("rules 3 and 4: a hole gap from every hole, on open ground", () => {
@@ -183,7 +187,10 @@ test("one hole: no line to fold back on yet, so any open spot a hole gap away gr
   // Its first founding re-aims both margins straight on from the new segment: a lone hole has no direction yet.
   const g = grow(t, "start", { x: 100, y: 30 });
   assert.equal(g.sHole[1], 0);
-  assert.deepEqual(at(g, 10), [100, 110], "past the old hole, the line runs on away from the new one");
+  // Ten columns past the old hole the line is ten rows on, away from the new one, within the band of straight down.
+  const [x10, y10] = at(g, 10);
+  assert.equal(y10, 110, "past the old hole, the line runs on away from the new one");
+  assert.ok(Math.abs(centreX(x10, y10) - centreX(100, 100)) <= LINE_BAND, `column 10 at x ${x10} keeps within the band`);
   assert.throws(() => makeTransect([A, A]), /same cell/);
   assert.throws(() => grow(makeTransect([A, B]), "end", B), /same cell/);
   assert.throws(() => makeTransect([A, B], { margin: 2.5 }), /margin/);
@@ -345,3 +352,157 @@ test("property: no valid founding makes the curtain overlap itself (a cell over 
   }
   assert.ok(lines >= 100, `most random lines grew (${lines} of 120)`);
 });
+
+/** The world direction of the step from column s to s + 1, in degrees (clockwise from east: the plane's y runs down). */
+const stepAngle = (t: Transect, s: number): number => {
+  const [x0, y0] = at(t, s);
+  const [x1, y1] = at(t, s + 1);
+  return (Math.atan2(centreY(y1) - centreY(y0), centreX(x1, y1) - centreX(x0, y0)) * 180) / Math.PI;
+};
+
+test("property: the line's tiles keep within LINE_BAND of the straight line between its holes, in long runs (ja-lp4.17)", () => {
+  let steps = 0;
+  let turns = 0;
+  for (let seed = 1; seed <= 120; seed++) {
+    const t = randomLine(seed, 6);
+    for (let j = 1; j < t.holes.length; j++) {
+      const a = t.holes[j - 1]!;
+      const b = t.holes[j]!;
+      const [ax, ay, bx, by] = [centreX(a.x, a.y), centreY(a.y), centreX(b.x, b.y), centreY(b.y)];
+      const len = Math.hypot(bx - ax, by - ay);
+      for (let s = t.sHole[j - 1]!; s <= t.sHole[j]!; s++) {
+        const [x, y] = at(t, s);
+        const off = Math.abs(((centreX(x, y) - ax) * (by - ay) - (centreY(y) - ay) * (bx - ax)) / len);
+        // The band, and half a cell more round the middle cell both halves run to (hexLine's: on the line within ½).
+        assert.ok(off <= LINE_BAND + 0.5 + 1e-9, `seed ${seed}: column ${s} is ${off.toFixed(2)} off the straight line`);
+        if (s < t.sHole[j]!) {
+          steps++;
+          if (s > t.sHole[j - 1]! && Math.abs(stepAngle(t, s) - stepAngle(t, s - 1)) > 1) turns++;
+        }
+      }
+    }
+  }
+  // A turn every ~12 cells at worst (a 30° slant); hexLine turned on most steps.
+  assert.ok(turns / steps < 1 / 8, `${turns} turns in ${steps} steps`);
+});
+
+test("property: the margins are runs too (ja-lp4.17)", () => {
+  let steps = 0;
+  let turns = 0;
+  for (let seed = 1; seed <= 120; seed++) {
+    const t = randomLine(seed, 6);
+    for (const [lo, hi] of [
+      [t.sMin, t.sHole[0]!],
+      [t.sHole[t.holes.length - 1]!, t.sMax],
+    ] as const)
+      for (let s = lo + 1; s < hi; s++, steps++) if (Math.abs(stepAngle(t, s) - stepAngle(t, s - 1)) > 1) turns++;
+  }
+  assert.ok(turns / steps < 1 / 8, `${turns} turns in ${steps} steps`);
+});
+
+test("property: at every interior hole the line turns by at most 120° tile to tile, so a segment never runs back over the last (ja-lp4.17)", () => {
+  let bends = 0;
+  for (let seed = 1; seed <= 120; seed++) {
+    const t = randomLine(seed, 6);
+    for (let j = 1; j < t.holes.length - 1; j++) {
+      const s = t.sHole[j]!;
+      let d = Math.abs(stepAngle(t, s) - stepAngle(t, s - 1)) % 360;
+      if (d > 180) d = 360 - d;
+      assert.ok(d <= 120 + 1e-6, `seed ${seed}: the line turns ${d.toFixed(0)}° at hole ${j}`);
+      bends++;
+    }
+  }
+  assert.ok(bends >= 200, `${bends} bends`);
+});
+
+/**
+ * Rule 2's crossing and clearance by brute force, from the line grow would make: the new columns' tiles against the
+ * old line's as it stays, every pair compared; a shared tile crosses beyond 12 of the shared vertex, a pair nearer than
+ * 12 is too close when both lie beyond VERTEX_EXCUSE of it.
+ */
+function crossingByHand(t: Transect, end: "start" | "end", p: Cell): "crosses" | "clearance" | null {
+  const g = grow(t, end, p);
+  const k = t.holes.length - 1;
+  const v = end === "start" ? t.holes[0]! : t.holes[k]!;
+  const d = (x0: number, y0: number, x1: number, y1: number) => Math.hypot(centreX(x0, y0) - centreX(x1, y1), centreY(y0) - centreY(y1));
+  const tiles = (u: Transect, lo: number, hi: number) => {
+    const out: [number, number, number][] = [];
+    for (let s = lo; s <= hi; s++) {
+      const c = at(u, s);
+      out.push([c[0], c[1], d(c[0], c[1], v.x, v.y)]);
+    }
+    return out;
+  };
+  const fresh = end === "end" ? tiles(g, t.sHole[k]! + 1, g.sMax) : tiles(g, g.sMin, t.sHole[0]! - 1);
+  const old = end === "end" ? tiles(t, t.sMin, t.sHole[k]!) : tiles(t, t.sHole[0]!, t.sMax);
+  let near = false;
+  for (const [x, y, r] of fresh)
+    for (const [ox, oy, or] of old) {
+      if (x === ox && y === oy && r >= 12 - 1e-9) return "crosses";
+      if (r >= VERTEX_EXCUSE - 1e-9 && or >= VERTEX_EXCUSE - 1e-9 && d(x, y, ox, oy) < 12 - 1e-9) near = true;
+    }
+  return near ? "clearance" : null;
+}
+
+test("property: rule 2 measures crossing and clearance between the tiles grow would lay and the line's (ja-lp4.17)", () => {
+  const seen = { ok: 0, crosses: 0, clearance: 0 };
+  for (let seed = 1; seed <= 40; seed++) {
+    const t = randomLine(seed, 3);
+    const rng = mulberry32(seed * 7919);
+    for (let n = 0; n < 60; n++) {
+      // Mostly at a sharp turn from an end, where the new segment runs back alongside the line.
+      const e = rng() < 0.5 ? "start" : "end";
+      const v = e === "start" ? t.holes[0]! : t.holes[t.holes.length - 1]!;
+      const [ux, uy] = outward(t.holes, e);
+      const g = Math.atan2(uy, ux) + (rng() < 0.5 ? -1 : 1) * (Math.PI / 3 + rng() * (Math.PI / 3));
+      const r = 16 + rng() * 140;
+      const p = { x: Math.round(v.x + r * Math.cos(g)), y: Math.round(v.y + r * Math.sin(g)) };
+      const f = canFound(t, p, open);
+      if (!f.ok && f.reason !== "crosses" && f.reason !== "clearance") continue;
+      // A refusal on rule 2 grows the end rule 1 chose: the nearer, V₀ on a tie.
+      const end = f.ok ? f.end : dist(t.holes[0]!, p) <= dist(t.holes[t.holes.length - 1]!, p) ? "start" : "end";
+      const want = crossingByHand(t, end, p);
+      assert.equal(f.ok ? null : f.reason, want, `seed ${seed}: (${p.x}, ${p.y}) beyond the ${end}`);
+      seen[want ?? "ok"]++;
+    }
+  }
+  assert.ok(seen.ok > 50 && seen.crosses > 15 && seen.clearance > 5, JSON.stringify(seen));
+});
+
+const dist = (a: Cell, b: Cell) => Math.hypot(centreX(a.x, a.y) - centreX(b.x, b.y), centreY(a.y) - centreY(b.y));
+
+test("the clearance agrees with the 120° limit at the shared vertex: a turn within it is never refused for clearance on a lone segment (ja-lp4.17)", () => {
+  // Tiles lie up to LINE_BAND + ½ off their straight lines, so with only CLEARANCE excused, turns of 105–120° were refused
+  // (407 of 24,600 spots here, measured); VERTEX_EXCUSE (20) restores the agreement the straight lines had.
+  assert.equal(VERTEX_EXCUSE, 20);
+  let checked = 0;
+  for (const b of [
+    { x: 200, y: 100 },
+    { x: 170, y: 160 },
+    { x: 130, y: 170 },
+    { x: 190, y: 130 },
+    { x: 160, y: 40 },
+  ]) {
+    const t = makeTransect([A, b]);
+    const base = Math.atan2(centreY(b.y) - centreY(A.y), centreX(b.x, b.y) - centreX(A.x, A.y));
+    for (let deg = 90; deg <= 119.5; deg += 1.5)
+      for (const sgn of [1, -1])
+        for (let r = 18; r <= 140; r += 4) {
+          const a = base + (sgn * deg * Math.PI) / 180;
+          const p = cellNear(centreX(b.x, b.y) + r * Math.cos(a), centreY(b.y) + r * Math.sin(a));
+          const f = canFound(t, p, open);
+          assert.ok(
+            f.ok || f.reason === "turn" || f.reason === "hole-gap",
+            `(${p.x}, ${p.y}), ${deg}° from (${b.x}, ${b.y}): ${f.ok ? "" : f.reason}`,
+          );
+          checked++;
+        }
+  }
+  assert.ok(checked > 3000);
+});
+
+/** The cell under world point (x, y). */
+function cellNear(x: number, y: number): Cell {
+  cellOf(x, y);
+  return { x: CELL[0]!, y: CELL[1]! };
+}

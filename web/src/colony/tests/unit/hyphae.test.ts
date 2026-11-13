@@ -8,6 +8,7 @@ import {
   AMPLE_STEPS,
   CORD_DIGS,
   CORD_FLOW,
+  FRUIT_RUN,
   REGRESS_PER_ROUND,
   HGU,
   HYPHA_MASS,
@@ -199,8 +200,9 @@ test("a tip that reaches a tunnel fruits there, ending as a spore spot; another 
   // Soil, with a dug tunnel along column 5 (rows 10 on); tips in the soil heading east, toward it.
   const g: Ground = { topsoil: false, kind: (x, y) => (y < 10 ? "rock" : x === 5 ? "open" : "soil") };
   const h = new Hyphae();
-  h.root(4, 12, E);
-  stepTips(h, g, 1, { free: 1e9, tips: 1 });
+  // Two cells to the wall (FRUIT_RUN), then the tunnel.
+  h.root(2, 12, E);
+  for (let r = 0; r < 3; r++) stepTips(h, g, 1, { free: 1e9, tips: 1 });
   assert.equal(h.tips.length, 0, "the tip fruited and ended");
   assert.deepEqual(h.fruits.map(keyCell), [[5, 12]]);
   // A second tip a few rows down meets the same tunnel within FRUIT_GAP of the spot: no second spot.
@@ -208,6 +210,29 @@ test("a tip that reaches a tunnel fruits there, ending as a spore spot; another 
   stepTips(h, g, 1, { free: 1e9, tips: 1 });
   assert.equal(h.fruits.length, 1);
   assert.equal(h.tips.length, 1, "it kept growing (along the wall)");
+});
+
+test("the body spaces fruiting whoever answers it (ja-2bw.16): not in a tip's first FRUIT_RUN cells, nor within FRUIT_GAP of a spot", () => {
+  // A shaft's wall: dug column 5, soil beside it; a tip rooted on the wall heading down it, under a policy that fruits always.
+  const g: Ground = { topsoil: false, kind: (x) => (x === 5 ? "open" : "soil") };
+  const always = () => "fruit" as const;
+  const h = new Hyphae();
+  h.root(4, 10, SE);
+  for (let r = 0; r < FRUIT_RUN; r++) {
+    assert.equal(h.tips[0]!.run, r);
+    stepTips(h, g, 1, { free: 1e9, tips: 1 }, always);
+    assert.equal(h.fruits.length, 0, `fruited ${r} cells from its root`);
+  }
+  assert.ok(h.length > 1, "it grew instead");
+  stepTips(h, g, 1, { free: 1e9, tips: 1 }, always);
+  assert.equal(h.fruits.length, 1, "fruited once grown FRUIT_RUN cells");
+  // A second wall tip, grown on but within FRUIT_GAP of the spot: it plays its own rule, and never fruits there.
+  const [fx, fy] = keyCell(h.fruits[0]!);
+  h.root(4, fy + 2, SE);
+  h.tips[0]!.run = FRUIT_RUN;
+  stepTips(h, g, 1, { free: 1e9, tips: 1 }, always);
+  assert.equal(h.fruits.length, 1, `a second spot ${fx},${fy + 2} beside the first`);
+  assert.equal(h.tips.length, 1);
 });
 
 test("fruit needs a dug cell: never under the plane's surface, nor buried in soil", () => {
