@@ -5054,6 +5054,7 @@ No new research was needed; the owner sets the density.
 - a freeze and thaw leaves a colony's journal unchanged (E4);
 - two colonies in contact freeze together after T; at the cap no colony freezes and wakes more than once within T; with every awake host dead, a cap-frozen colony holding the fungus wakes when a slot frees (E4);
 - a wild colony's ants never wake another (E4);
+- a host foraging past a site within W wakes nothing; entering its nest ground wakes it (E4);
 - the tick at the awake cap against the 10 ms gate (E4);
 - 60 fps far from the start (E5);
 - `scripts/lab/flight-failure.mjs` on the endless plane, setting the flight and `FOUND_RADIUS` without edges (E6);

@@ -7,7 +7,7 @@
 - **The world is the seed plus what the game changed.** Every chunk can be generated alone, in any order, from `(seed, chunk)` and pure inputs. What ants change (dug cells, food taken, spoil, chambers) is kept per chunk as a delta. Faded scent is dropped.
 - **Many lines** (owner, 2026-11-13). Underground stays a curtain under a line through holes ([one-world §2](one-world.md#2-the-model-a-plane-and-a-curtain)), but the world holds as many lines as it needs. A founding far from every line starts a new line; one near a line's end grows it. Each line's ground has its own salt.
 - **Queens fly farther** (owner, 2026-11-13). The 1 U flight was forced by the bounded plane's edges. On the endless plane it lengthens towards real queens' 5 U or more ([nest-spacing §3](nest-spacing.md#3-how-far-a-founding-queen-flies)), so daughters start lines of their own. The distance is measured at E6.
-- **Far colonies are frozen, and only the fungus wakes them** (owner, 2026-11-13). Freezing is per colony: its ants, its scent and its curtain stop. Colonies in contact freeze together. A wild colony is a point on the map until the fungus's body or an awake host comes within reach. Then it wakes, generated mature from its own seed. Other ants never wake anything, so waking can't chain. A cap on awake colonies may freeze even a colony the fungus lives in, by rank (owner, 2026-11-13).
+- **Far colonies are frozen, and only the fungus wakes them** (owner, 2026-11-13). Freezing is per colony: its ants, its scent and its curtain stop. Colonies in contact freeze together. A wild colony is a point on the map until the fungus's body comes within reach or an awake host enters its nest ground. Then it wakes, generated mature from its own seed. Other ants never wake anything, so waking can't chain. A cap on awake colonies may freeze even a colony the fungus lives in, by rank (owner, 2026-11-13).
 - **Wild colonies** come from a pure lattice of sites, sparser than real harvester-ant fields ([nest-spacing §1](nest-spacing.md#1-how-far-apart-mature-nests-are)), so foundings have room.
 - **Cost** is CPU and memory, not Jev. No situation field changes, and wild colonies of the game's species ask under a preset doctrine whose answers ship. The awake set, not the explored area, bounds the tick.
 - **Six stages, E1–E6** (§9), after S2 (one world only, `ja-fnd.3`) and N colony specs (`ja-fnd.5.4.2`). The bounded game stays bit-exact until E6 switches the page.
@@ -28,7 +28,7 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 - `mainGround` (`oneWorld.ts:256`): one pass over the whole plane per founding (~14 ms), for founding rule 4. `growWorld` (`oneWorld.ts:209`) runs `reachableFrom` over the whole curtain.
 
 **Dense or flat state that assumes a size:**
-- `Colony.#outField` (`colony.ts:1671`): an `Int32Array(w·h)` of the home curtain per colony, rebuilt at most every 0.5 s.
+- `Colony.#outField` (`colony.ts:1556`): an `Int32Array(w·h)` of the home curtain per colony, rebuilt at most every 0.5 s.
 - The fungus's `sporeCells` and `base`: flat `y·w + x − x0` keys, re-keyed by `regrid` when the curtain grows (`fungus.ts:1294`).
 - Regrowth: `#notePiles` scans every cell once and keeps flat indices (`game.ts:754`).
 - The minimap: one bitmap of the whole map, resampled cell by cell twice a second (`ui/ColonyField.tsx`).
@@ -64,7 +64,7 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 ## 3. Local generation
 
 **Plane food** keeps its per-chunk stream and its 1.5 patches per chunk (PRD §12). The two whole-map checks become local:
-- **Reachable:** a patch is kept when its cells join open ground that leaves the chunk's 3 × 3 neighbourhood (an `escapes`-style check, `world.ts:639`, over the window). The check reads `chunkRock` before any patch clears it. A patch clears a disc of radius 2–4 (`world.ts:799-802`) that can spill into a neighbour, but setting food and clearing rock are idempotent, so the order patches land in doesn't matter. Food sealed in a rock pocket inside the window is dropped. A pocket larger than the window can still hold food no colony reaches. That is accepted: the endless plane has no "main ground" to measure against, and a pocket nobody can enter costs nothing.
+- **Reachable:** a patch is kept when its cells join open ground that leaves the chunk's 3 × 3 neighbourhood (an `escapes`-style check, `world.ts:639`, over the window). The check reads `chunkRock` before any patch clears it. A patch clears a disc of radius 2–4 (`world.ts:790-797`) that can spill into a neighbour, but setting food and clearing rock are idempotent, so the order patches land in doesn't matter. Food sealed in a rock pocket inside the window is dropped. A pocket larger than the window can still hold food no colony reaches. That is accepted: the endless plane has no "main ground" to measure against, and a pocket nobody can enter costs nothing.
 - **Away from nests:** 24 cells from every nest the *world* placed (the start nests and the wild sites of §4, both pure). Foundings are history, so they don't count. A queen may found beside food, as real ones do.
 
 **The start nests** are placed by the same rule as wild sites (§4), near the origin: the first candidate that passes the local `escapes` check, then the second about `nestGap` (140) from it. No whole-map pass.
@@ -82,7 +82,7 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 **Sites are pure.** The plane is divided into regions of R × R chunks, R ≥ 3 (proposed 4, one site per region at most). At R ≥ 3 a site's reserved line (its hole and 64 cells each way, plus the 12-cell clearance) reaches only the eight regions round its own, which are the ones its check reads. Each region draws one candidate point from `hash(seed, region)` and keeps it when:
 - it is open ground, and an `escapes` check within the region's neighbourhood says ants could walk out of it;
 - it is more than `NEW_LINE_GAP` (140, §5) from the start nests, and at least `WILD_GAP` from its neighbours' candidates (proposed: 140 too);
-- the one-hole line it will start (its hole plus a margin each way along a heading drawn from the same hash) keeps the clearance from the start line and from its neighbours' sites' lines;
+- the one-hole line it will start (its hole plus a margin each way along a heading drawn from the same hash) keeps the clearance from the start line and from the reserved lines of its neighbours' candidates (pure, so the check never recurses);
 - a density draw from the same hash accepts it.
 
 Both the candidate and its neighbours' candidates are pure, so a region can be judged alone.
@@ -150,7 +150,7 @@ Rule 2's clearance holds between lines as well as within one: no new segment or 
 
 **Only the fungus wakes** (owner, 2026-11-13). A frozen group, or an unwoken wild site, wakes in two ways:
 - **The fungus's body** (on the plane, or in an awake curtain) comes within W of one of its holes.
-- **An awake host enters its nest ground** (owner, 2026-11-13, D4 of the third review): a disc round a hole where it meets the residents, proposed at 16 cells (`HOLE_GAP_2D`, about the mound's reach). A host merely foraging past, within W, wakes nothing.
+- **An awake host enters its nest ground** (owner, 2026-11-13, D4 of the third review): a disc round a hole where it meets the residents, proposed at 16 cells, about the reach of a young colony's mound (U3c measured 95 % of pellets within 10–21 cells of the hole); E4 sets it. A host merely foraging past, within W, wakes nothing.
 
 Frozen hosts and the fungus's body inside a frozen curtain wake nothing. A wild site is generated the first time it wakes (§4). Other ants never wake anything, so waking can't chain from one colony to the next, however close the sites are. **Proposed:** W = 2 U (280 cells), the far end of a forager's reach ([nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game)). A host forages past many sites (1–2 U out, within W of about 8–16), but enters few nests, so waking stays rare.
 
