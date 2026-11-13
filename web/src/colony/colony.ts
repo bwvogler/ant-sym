@@ -5244,7 +5244,8 @@ export class Colony {
           this.mode[i] = mode;
           this.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
-          // The generic code, whatever the species asks: the fungus, the journal and the ant card read the generic situation (review of #122, S1).
+          // The generic code of the situation it was asked in (its mode before the answer), whatever the species asks: the fungus, the journal and the
+          // ant card read the generic situation (review of #122, S1, S3).
           this.question[i] = own ? packSituation(MODES.indexOf(asks!.mode), tired, food, home, alarm, enemy, stance) : before;
           this.decisions++;
         }
