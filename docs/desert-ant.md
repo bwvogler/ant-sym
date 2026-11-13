@@ -118,6 +118,10 @@ Leads not yet followed: Knaden & Wehner 2003 (*J Insect Behav* 16:717) and 2004 
 
 The species on the descriptor (`colony/desertAnt.ts`): its own words and 16-situation lane (mode, tired, enemy), no follow and no stance lane, no trail or alarm channel, its own local rule with rule text, no corpse removal, about 200 workers. On one world it lays no trail (D1 passes), asks only its own fields, and finds and stores food on its own (less than the generic ant, without recruitment), so it needs no food sense to live; the plume (`ja-rf5.4`) is for finding food sooner. Its Jev lane costs about $0.004 an hour while a doctrine is new; its shipped answers wait on a live check at the owner's say.
 
+## What ja-rf5.4 built (PRD §60.4)
+
+Food odour in the air (`colony/plume.ts`, `foodPlume`): every food cell on the plane is a source, and the odour falls step by step through open ground (rock stops it) to nothing at the range, a radial gradient with no wind (Open questions 3). An outside forager with empty jaws and no food in sight climbs it with its three sensors, ahead of its search and of its vector to a remembered spot. The range is **21 cells**: the turn-in distance of about 6 m (Buehlmann et al. 2014, draft) at one world's scale, whose nests are 140 cells apart against *C. fortis*'s about 40 m. The plume is rebuilt at most every 4 s of game time, when the food has changed: odour lags its source, and a rebuild costs about 10 ms. D3: the first find comes sooner than the same seed's blind search on all of seeds 1–20, and about 4.5× as much food is home after 120 s.
+
 ## Sources
 
 - Razin N, Eckmann J-P, Feinerman O (2013). Desert ants achieve reliable recruitment across noisy interactions. *J R Soc Interface* 10:20130079. [doi:10.1098/rsif.2013.0079](https://doi.org/10.1098/rsif.2013.0079), [PMC3627090](https://pmc.ncbi.nlm.nih.gov/articles/PMC3627090/) (full text read 2026-11-11)

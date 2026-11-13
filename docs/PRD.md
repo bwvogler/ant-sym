@@ -4721,7 +4721,22 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **Caught by the e2e run:** the game was not rebuilt when only the species changed (its memo didn't list it), so Start built a generic game. `npm run e2e`'s new step 8 chooses the desert ant, starts, plays 20 s and checks the game is the desert ant's with no food or home trail.
 - No behaviour change for the generic ant (goldens bit-exact); no cost change.
 
-## 61. The first game's tutorial (ja-7x4, 2026-11-12)
+### 60.4 Food odour in the air: the desert ant's plume (ja-rf5.4, 2026-11-13)
+
+- **The mechanic** (`colony/plume.ts`, `ColonyParams.foodPlume`): a radial odour gradient from every food cell through open ground, out to `foodPlume` cells (0 = none: the generic ant, goldens bit-exact). An outside forager in EXPLORE with empty jaws and no food in sight climbs it with its three sensors (`Colony.smellsFood`), before its search and its vector to a remembered spot. Steering only: no situation field, so no lane, legend or cost change.
+- **The range:** 21 cells for the desert ant. *C. fortis* turns in to food odour up to about 6 m (Buehlmann et al. 2014, from a pre-publication draft: **unverified**); one world's nests are 140 cells apart against *C. fortis*'s about 40 m ([desert-ant.md](desert-ant.md), its colony section: full text), about 3.5 cells a metre. Swept 6–30 cells: longer ranges find sooner still (30: worst seed 10.9 s), but the range is set from the paper's scale, not the sweep.
+- **When it is rebuilt:** only at multiples of 4 s of game time (`PLUME_EVERY`), and only if the food has changed. A build is about 10 ms on the default plane (512 × 368); rebuilt every second it cost +25 % ms/tick, every 4 s +8 % (0.74 → 0.81 ms/tick, seeds 1–10). The plume is public colony state, so a save keeps it and a loaded game runs on exactly (`tests/int/desertPlume.test.ts`).
+- **D3** (`npm run exp -- d3 --one --species desert --set colony.foodPlume=0,21`; `--species` is new in `experiment.mjs`), first find in seconds, blind → plume:
+
+| seeds | median | worst | food home at 120 s (median) |
+|---|---|---|---|
+| 1–10 | 8.7 → 8.1 | 13.2 → 11.6 | 42.5 → 194 |
+| 11–20 | 10.6 → 7.6 | 12.9 → 12.1 | 43.5 → 209.5 |
+
+  Every seed of 1–20 finds sooner with the plume. `tests/slow/assays.test.ts` holds D3 on seeds 1–3.
+- **Tests:** `tests/int/desertPlume.test.ts`. Mutations, each failing it: leave the plume out of the save; drop the steering line; rebuild every tick.
+
+
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
 - **Speed:** 1× for the landing and the wait for the first host; the watch at 4× (§61.2: 1× was too slow there); then the game's own 4×. `GAME_SPEED` is unchanged.

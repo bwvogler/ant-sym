@@ -5,12 +5,15 @@
 //
 // Usage: node scripts/experiment.mjs <assay ...|all> [--one] [--seeds 1-10] [--seconds N]
 //          [--set colony.deposit=2,4,8] [--set game.fight.rate=1,2] [--json out.json] [--jobs N]
-//          [--policy cache:<file>] [--log <spec>]
+//          [--policy cache:<file>] [--log <spec>] [--species <id>]
 //
 // --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
 // with a hole at each nest and the curtain under the line through them (oneArena); A8 in the curtain; G1 (game1), the
 // whole one-world game. The ids are the legacy ones; those not rerun yet (ONE_PENDING: A11, A12) are listed
 // with why. Without --one, `game1` still names G1.
+//
+// --species <id> plays every run's colonies as that species (colony/species.ts SPECIES, e.g. desert); --set's colony values
+// still apply over its own. Not with --policy (a replayed cache holds the generic ant's answers).
 //
 // --set takes a dotted path under colony / rival / game and a comma list of
 // values; several --set flags run their cross product. Pheromone channels are
@@ -87,6 +90,7 @@ async function main() {
   let policy = null;
   let one = false;
   let log = null;
+  let species = null;
   const sets = [];
   for (let k = 0; k < args.length; k++) {
     const a = args[k];
@@ -96,6 +100,7 @@ async function main() {
     else if (a === "--jobs") jobs = Number(args[++k]);
     else if (a === "--policy") policy = args[++k];
     else if (a === "--one") one = true;
+    else if (a === "--species") species = args[++k];
     else if (a === "--log") {
       log = args[++k];
       if (log === undefined) fail("--log <spec>");
@@ -106,6 +111,11 @@ async function main() {
     else ids.push(a);
   }
   const { ASSAYS, ONE_ASSAYS, ONE_PENDING } = await import("../web/src/colony/experiment.ts");
+  if (species !== null) {
+    const { SPECIES } = await import("../web/src/colony/index.ts");
+    if (!Object.hasOwn(SPECIES, species)) fail(`--species ${species}: have ${Object.keys(SPECIES).join(", ")}`);
+    if (policy) fail("--species and --policy: a replayed cache holds the generic ant's answers");
+  }
   if (log !== null) {
     const { parseJournalSpec } = await import("../web/src/colony/index.ts");
     try {
@@ -163,7 +173,7 @@ async function main() {
   const queue = [];
   for (const { assay, one: inOne } of picked)
     for (const [ci, c] of cs.entries())
-      for (const seed of seeds) queue.push({ id: assay.id, one: inOne, ci, o: c.o, seed, seconds, policy, log });
+      for (const seed of seeds) queue.push({ id: assay.id, one: inOne, ci, o: c.o, seed, seconds, policy, log, species });
   queue.sort((a, b) => secondsOf(b.id) - secondsOf(a.id));
   const results = new Map(); // `${id}|${ci}` → runs
   const t0 = performance.now();
@@ -252,7 +262,7 @@ function loadCache(file) {
 }
 
 async function work() {
-  const { id, one, ci, o, seed, seconds, policy, log } = workerData;
+  const { id, one, ci, o, seed, seconds, policy, log, species } = workerData;
   const { ASSAYS, ONE_ASSAYS, runAssay } = await import("../web/src/colony/experiment.ts");
   const lookups = {};
   const count = (lane, hit) => {
@@ -261,6 +271,10 @@ async function work() {
     else l.miss++;
   };
   const brains = {};
+  if (species !== null) {
+    const { SPECIES } = await import("../web/src/colony/index.ts");
+    o.game = { ...o.game, species: SPECIES[species] };
+  }
   if (policy) {
     const { localPolicy, localStance } = await import("../web/src/colony/index.ts");
     const { responsesFromAnswers, situationKey, stanceKey } = await import("../web/src/colony/index.ts");
