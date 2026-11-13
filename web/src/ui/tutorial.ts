@@ -1,4 +1,5 @@
 import { INFECTED, PLANE, type Colony, type Game } from "../colony/index.ts";
+import { landingOf } from "./landing.ts";
 import { colonyName } from "./names.ts";
 
 // The first game's tutorial (ja-7x4, PRD §61): the landing, the first ant the fungus gets into, paused and followed
@@ -121,7 +122,7 @@ export function firstHost(c: Colony, k: number): HostRef | null {
 
 /** What `game` shows the tutorial now. Cheap: it scans for a candidate only while waiting. */
 export function seenOf(game: Game, t: Tutorial): Seen {
-  const k = game.landed?.colony ?? 0;
+  const k = landingOf(game);
   const c = game.colonies[k];
   if (!c) return { time: game.time, candidate: null, host: null, hosts: 0 };
   const h = t.host;

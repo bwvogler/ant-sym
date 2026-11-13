@@ -55,7 +55,7 @@ import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
-import { trailSight } from "./fungusSight.ts";
+import { sightOf, type SensedMap } from "./fungusSight.ts";
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -82,6 +82,8 @@ interface Props {
 
   /** the fungus: spores drawn on the ground, infected ants marked */
   fungus: Fungus;
+  /** what the fungus's hosts have sensed (PRD §65): every colony's trails and alarm show only there, fading */
+  sensed: SensedMap;
   onFrame: (fn: () => void) => () => void;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
@@ -162,10 +164,14 @@ function rgb(hex: string): [number, number, number] {
   return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : [128, 128, 128];
 }
 
-/** The colour of an odour: the first colony's ink at 0, the second's warn tone at 1, mixed between. */
+/** A colony's tone by its odour t (0…1): ink at 0, the warn tone at 1, mixed between. */
+function odourRgb(ink: [number, number, number], warn: [number, number, number], t: number): [number, number, number] {
+  const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * Math.min(1, Math.max(0, t)));
+  return [m(0), m(1), m(2)];
+}
 function odourColour(ink: [number, number, number], warn: [number, number, number], t: number): string {
-  const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * t);
-  return `rgb(${m(0)}, ${m(1)}, ${m(2)})`;
+  const [r, g, b] = odourRgb(ink, warn, t);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
@@ -192,6 +198,7 @@ const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 export default function ColonyField({
   colonies,
   fungus,
+  sensed,
   onFrame,
   showFoodTrail,
   showHomeTrail,
@@ -283,8 +290,9 @@ export default function ColonyField({
     let alarms: ChunkLayer<Float32Array>[] = [];
     let spores: ChunkLayer<Float32Array> = fungus.spores;
     let strip = false;
-    // Each colony's trails on the shown layer and how strongly they show: by how far the fungus is into it (ja-vyu).
-    let trails: { sight: number; food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array> }[] = [];
+    // Each colony's trails on the shown layer; a cell shows them as strongly as a host sensed it lately (PRD §65).
+    let trails: { food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array> }[] = [];
+    let sensedLayer: ChunkLayer<Float32Array> | null = null;
     // The map's size and first column: its columns run gx0 … gx0 + gw − 1 (gx0 < 0 on one world's curtain, whose column
     // is the line's s), and the extent the camera fits; set again (rebuild) when the map or its size changes.
     let gx0 = m.x0;
@@ -333,13 +341,12 @@ export default function ColonyField({
       strip = world !== null && lv === CURTAIN;
       trails = [];
       alarms = [];
+      sensedLayer = sensed.layer(lv < 0 ? 0 : lv);
       for (const col of colonies) {
         const p = lv < 0 ? col.ph : col.layers[lv]?.ph;
         if (!p) continue;
         alarms.push(p.fields.alarm);
-        const { infected, living } = fungus.census(col);
-        const sight = trailSight(infected, living);
-        if (sight > 0) trails.push({ sight, food: p.fields.food, home: p.fields.home });
+        trails.push({ food: p.fields.food, home: p.fields.home });
       }
     };
     bind();
@@ -426,17 +433,22 @@ export default function ColonyField({
     const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array) => {
       const fc = m.food.chunk(cx, cy);
       const lc = m.loose?.chunk(cx, cy);
-      // Every colony's food and home trails here, with how strongly each shows (by its infection).
-      const trailC: { sight: number; food: Float32Array | undefined; home: Float32Array | undefined }[] = [];
-      for (const t of trails) {
-        const food = t.food.chunk(cx, cy);
-        const home = t.home.chunk(cx, cy);
-        if (food || home) trailC.push({ sight: t.sight, food, home });
-      }
+      // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
+      const sensedC = sensedLayer?.chunk(cx, cy);
+      const now = sensed.now;
+      // Every colony's food and home trails and alarm here, read only where something was sensed.
+      const trailC: { food: Float32Array | undefined; home: Float32Array | undefined }[] = [];
       const alarmC: Float32Array[] = [];
-      for (const a of alarms) {
-        const ac = a.chunk(cx, cy);
-        if (ac) alarmC.push(ac);
+      if (sensedC) {
+        for (const t of trails) {
+          const food = t.food.chunk(cx, cy);
+          const home = t.home.chunk(cx, cy);
+          if (food || home) trailC.push({ food, home });
+        }
+        for (const a of alarms) {
+          const ac = a.chunk(cx, cy);
+          if (ac) alarmC.push(ac);
+        }
       }
       const sporeC = spores.chunk(cx, cy);
       // One world's plane: the mound, a height field of spoil (oneWorld.ts), washed in by its height.
@@ -472,9 +484,10 @@ export default function ColonyField({
             px[o + 3] = 120 + Math.min(135, fv * 12);
             continue;
           }
-          // Every colony's alarm is always shown: a fight laid it, and it fades in seconds.
+          // How freshly a host sensed this cell: its scent shows that strongly (trails and alarm alike).
+          const w = sensedC ? sightOf(sensedC[i]!, now) : 0;
           let al = 0;
-          for (const ac of alarmC) al = Math.max(al, Math.min(1, ac[i]! / 6));
+          if (w > 0) for (const ac of alarmC) al = Math.max(al, w * Math.min(1, ac[i]! / 6));
           if (al > 0.03) {
             px[o] = theme.alarm[0];
             px[o + 1] = theme.alarm[1];
@@ -499,14 +512,15 @@ export default function ColonyField({
             px[o + 3] = Math.min(255, 110 + heap * 45);
             continue;
           }
-          // Each colony's trails as strongly as the fungus is in it; where two overlap, the stronger shows.
+          // Every colony's trails, as freshly as a host sensed them; where two overlap, the stronger shows.
           let f = 0;
           let h = 0;
-          for (const t of trailC) {
-            if (show.food && t.food) f = Math.max(f, t.sight * Math.min(1, t.food[i]! / 4));
-            // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
-            if (show.home && t.home) h = Math.max(h, t.sight * Math.min(1, t.home[i]! / 12));
-          }
+          if (w > 0)
+            for (const t of trailC) {
+              if (show.food && t.food) f = Math.max(f, w * Math.min(1, t.food[i]! / 4));
+              // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
+              if (show.home && t.home) h = Math.max(h, w * Math.min(1, t.home[i]! / 12));
+            }
           if (f >= h && f > 0.02) {
             px[o] = theme.trail[0];
             px[o + 1] = theme.trail[1];
@@ -600,7 +614,8 @@ export default function ColonyField({
         }
       for (let k = colonies.length - 1; k >= 0; k--) {
         const col = colonies[k] as Colony;
-        const tone = k === 0 ? theme.inkRgb : k === 1 ? theme.warnRgb : col.nestOdour < 0.5 ? theme.inkRgb : theme.warnRgb;
+        // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
+        const tone = odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
           const mx = Math.floor((col.x[i] - gx0) / 2);
@@ -1343,7 +1358,7 @@ export default function ColonyField({
     // `count`: a colony founded mid-game is pushed onto the same array (Game.addColony). The view is read each frame
     // (`shown`), so switching it builds nothing again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colonies, count, fungus, onFrame, world]);
+  }, [colonies, count, fungus, onFrame, world, sensed]);
 
   // ——— input: one pointer drags (pans), two pinch; a click picks an ant; the minimap jumps ———
 

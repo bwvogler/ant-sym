@@ -1042,6 +1042,42 @@ test("a colony with no doctrine of its own follows the first colony's when it ch
   assert.deepEqual(j.state.doctrineCached, [1, 0], "once it has its own doctrine, it keeps it");
 });
 
+test("the cached count is every colony's, a doctrine two colonies share counted once (PRD §65: no colony is the player's)", () => {
+  const store = memoryStore();
+  store.data.set(policyContext("Mine."), [[situationKey(sit()), "follow"]]);
+  store.data.set(policyContext("Theirs."), [
+    [situationKey(sit()), "explore"],
+    [situationKey({ ...sit(), mode: "follow" }), "explore"],
+  ]);
+  const j = make(store);
+  const [a, b] = twoColonies(5);
+  j.setDoctrineFor(0, "Mine.");
+  j.setDoctrineFor(1, "Theirs.");
+  j.attachColonies([a!, b!]);
+  assert.equal(j.state.cached, 3, "the first colony's 1 and the second's 2");
+  j.setDoctrineFor(1, "Mine.");
+  assert.equal(j.state.cached, 1, "one shared doctrine: its answers once");
+});
+
+test("the stance count is every colony's too, a shared doctrine counted once (PRD §65)", () => {
+  const store = memoryStore();
+  const [a, b] = twoColonies(5);
+  const calm = a!.stanceSituation(false);
+  const raided = a!.stanceSituation(true);
+  store.data.set(stanceContext("Mine."), [[stanceKey(calm), "forage"]]);
+  store.data.set(stanceContext("Theirs."), [
+    [stanceKey(calm), "defend"],
+    [stanceKey(raided), "defend"],
+  ]);
+  const j = make(store);
+  j.setDoctrineFor(0, "Mine.");
+  j.setDoctrineFor(1, "Theirs.");
+  j.attachColonies([a!, b!]);
+  assert.equal(j.state.stancesCached, 3, "the first colony's 1 and the second's 2");
+  j.setDoctrineFor(1, "Mine.");
+  assert.equal(j.state.stancesCached, 1, "one shared doctrine: its stances once");
+});
+
 test("lanes take turns at any request latency: a long mode queue does not keep the fungus waiting (ja-ytc)", async () => {
   // Mocked intervals, so the cycle count is exact (a wall-clock version flaked under load). Latency in cycles: the
   // first cut moved its pointer every cycle, so a 3-cycle request found the mode lane first at every free slot.

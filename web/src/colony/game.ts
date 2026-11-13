@@ -1,7 +1,7 @@
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
-import { type Policy, type StancePolicy } from "./vocab.ts";
+import { type Policy, SITUATION_SCHEMA, type StancePolicy } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
@@ -373,6 +373,7 @@ export class Game {
       layered,
     );
     mine.responses = player.responses ?? this.params.species.responses;
+    this.#ownSituation(mine);
     this.colonies = [mine];
     if (this.params.rival && home.nests.length > 1)
       this.colonies.push(
@@ -385,7 +386,10 @@ export class Game {
           layered,
         ),
       );
-    if (this.colonies[1]) this.colonies[1].responses = player.rivalResponses ?? this.params.species.responses;
+    if (this.colonies[1]) {
+      this.colonies[1].responses = player.rivalResponses ?? this.params.species.responses;
+      this.#ownSituation(this.colonies[1]);
+    }
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
@@ -400,6 +404,21 @@ export class Game {
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
+  }
+
+  /** A colony asks its mode policy about the species' own situation, when its mode words have a schema of their own (ja-fnd.5.10). */
+  #ownSituation(c: Colony): void {
+    const sp = this.params.species;
+    const schema = sp.lanes.mode?.schema;
+    if (!schema) return;
+    // Its policy sees only its schema's fields (owner, review of #122 D1), so a species that leaves generic fields out brings its own local rule.
+    const kept = new Set(schema.fields.map((f) => String(f.name)));
+    const dropped = SITUATION_SCHEMA.fields.map((f) => String(f.name)).filter((n) => !kept.has(n));
+    if (dropped.length && !sp.policy)
+      throw new Error(
+        `species "${sp.id}": its situation leaves out ${dropped.join(", ")}, so it needs a local rule of its own (Species.policy)`,
+      );
+    c.setSituation({ schema, sense: sp.sense });
   }
 
   /** The species' colony parameters, with whether it follows trails derived from its mode words (ja-fnd.5.9); its own params can still set it. */
@@ -651,6 +670,7 @@ export class Game {
       world ? { plane: world.plane, line: world.line } : null,
     );
     c.responses = this.params.species.responses;
+    this.#ownSituation(c);
     if (f.mother !== undefined && c.queen && !f.nest) {
       // A daughter (ja-lo8.9): her queen founds alone on her reserve, at her mother's odour, which drifts away from it
       // from now on (ja-lo8.9.1); what the fungus put in her is given below (Founding.fungus). (Not when a save founds
@@ -799,6 +819,11 @@ export class Game {
         foreign: ph,
       });
     });
+  }
+
+  /** Food left on the map, every layer's (one world: the plane's and the curtain's buried food), as each colony counts it. */
+  get foodLeft(): number {
+    return this.world ? this.world.plane.foodLeft + this.world.curtain.foodLeft : this.map.foodLeft;
   }
 
   /** The first colony (Ink on the page). Not the player's: the player is the fungus. */

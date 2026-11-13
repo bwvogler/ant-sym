@@ -16,6 +16,7 @@ import {
   type Policy,
   type Situation,
   SITUATION_SCHEMA,
+  type SpeciesSituation,
   type Stance,
   STANCES,
   type StancePolicy,
@@ -26,6 +27,7 @@ import {
   TRAILS,
   trailLevel,
 } from "./vocab.ts";
+import type { Schema } from "./schema.ts";
 import {
   ADULT_BEG_BELOW,
   ADULT_DRAIN,
@@ -897,6 +899,14 @@ export class Colony {
   decisions = 0;
   /** which of the SITUATIONS the policy has been asked about: what a cached Jev policy would pay for */
   seen = new Uint8Array(SITUATIONS);
+  /** the species' own mode-lane situation (ja-fnd.5.10, setSituation), or null: the generic one, encoded by packSituation */
+  #own: {
+    schema: Schema<SpeciesSituation>;
+    sense: ((c: Colony, i: number) => Readonly<Record<string, unknown>>) | null;
+    modeStride: number;
+    /** the values each of its fields may take, by name: a sensed value outside them is refused (it would encode as another situation) */
+    allowed: ReadonlyMap<string, readonly unknown[]>;
+  } | null = null;
   #rng: () => number;
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   #s = new Float64Array(9);
@@ -1272,6 +1282,30 @@ export class Colony {
    * Bind a lane's policy to this colony (the one place a policy is set after the constructor: the page's Jev client, the assays and the tests go through it,
    * not a field). "mode": an ant's choice in its situation; "stance": the colony's strategist.
    */
+  /**
+   * Ask the mode policy about the species' own situation (ja-fnd.5.10): `schema` names the fields its key and its question hold, `sense` adds the
+   * fields of its own (it must read, not draw from the game's random stream, so the game plays on as before). Null: the generic situation. The
+   * schema keeps the mode field with every mode (the tick reads a situation's mode off its code), and stays small enough for the ants' question codes.
+   */
+  setSituation(
+    own: { schema: Schema<SpeciesSituation>; sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>> } | null,
+  ): void {
+    if (!own) {
+      this.#own = null;
+      this.seen = new Uint8Array(SITUATIONS);
+      return;
+    }
+    const at = own.schema.fields.findIndex((f) => f.name === "mode");
+    const values = at < 0 ? [] : (own.schema.fields[at]!.values as readonly unknown[]);
+    if (at < 0 || values.length !== MODES.length || MODES.some((m, k) => values[k] !== m))
+      throw new Error("setSituation: a species' schema keeps the mode field, with every mode in order");
+    if (own.schema.size > 0x7fff)
+      throw new Error(`setSituation: ${own.schema.size} situations; an ant's question code holds at most 32,767`);
+    const allowed = new Map(own.schema.fields.map((f) => [String(f.name), f.values as readonly unknown[]] as const));
+    this.#own = { schema: own.schema, sense: own.sense ?? null, modeStride: own.schema.strides[at]!, allowed };
+    this.seen = new Uint8Array(own.schema.size);
+  }
+
   bindPolicy(lane: "mode", fn: Policy): void;
   bindPolicy(lane: "stance", fn: StancePolicy): void;
   bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
@@ -5115,6 +5149,7 @@ export class Colony {
       const item: Item = carrying ? "food" : pellet ? (this.corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
       const resp = this.responses;
       let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
+      let modeStride = MODE_STRIDE; // the mode field's step in that code: the species' own schema's, when it has one
       let waiting = false;
       let rolled = false; // asked `leave` this step already (behaviour MR 5): one roll a step, at the rate it answers
       if (carrying || pellet || nursing || reporting) {
@@ -5144,8 +5179,34 @@ export class Colony {
         const alarm = trailLevel(Math.max(al, af, ar));
         const enemy = toEnemy === null ? 0 : 1;
         const stance = STANCES.indexOf(this.#stanceOf(i));
-        const before = packSituation(mode, tired, food, home, alarm, enemy, stance);
-        situation0 = before - mode * MODE_STRIDE;
+        // A species' own situation (ja-fnd.5.10): the generic fields and its own, encoded by its schema; the generic ant's stays packSituation.
+        const own = this.#own;
+        let asks: SpeciesSituation | null = null;
+        if (own) {
+          asks = {
+            mode: MODES[mode] as Mode,
+            tired,
+            foodTrail: food,
+            homeTrail: home,
+            alarm,
+            enemy: enemy ? "near" : "none",
+            stance: STANCES[stance] as Stance,
+          };
+          if (own.sense) {
+            const sensed = own.sense(this, i);
+            for (const name in sensed) {
+              const ok = own.allowed.get(name);
+              if (ok && !ok.includes(sensed[name]))
+                throw new Error(`sense: "${name}" is ${String(sensed[name])}, not one of its field's values`);
+            }
+            asks = { ...asks, ...sensed };
+          }
+          // Its policy is handed only the fields its schema asks (owner, review of #122 D1): an ant chooses only from what its species senses.
+          asks = own.schema.state(asks);
+          modeStride = own.modeStride;
+        }
+        const before = own ? own.schema.encode(asks!) : packSituation(mode, tired, food, home, alarm, enemy, stance);
+        situation0 = before - mode * modeStride;
         // Waiting at home (behaviour MR 5): where the colony gates leaving, a forager home in "return" is asked `leave`
         // (below), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
         // One world (ja-web): nobody waits on the plane (every returner goes down its hole); an ant held at the gate at the
@@ -5161,15 +5222,17 @@ export class Colony {
         }
         if (before !== this.asked[i] && !waiting) {
           mode = MODES.indexOf(
-            this.policy({
-              mode: MODES[mode] as Mode,
-              tired,
-              foodTrail: food,
-              homeTrail: home,
-              alarm,
-              enemy: enemy ? "near" : "none",
-              stance: this.#stanceOf(i),
-            }),
+            this.policy(
+              asks ?? {
+                mode: MODES[mode] as Mode,
+                tired,
+                foodTrail: food,
+                homeTrail: home,
+                alarm,
+                enemy: enemy ? "near" : "none",
+                stance: this.#stanceOf(i),
+              },
+            ),
           );
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
           if (mode === FOLLOW && !p.follows) mode = EXPLORE; // a species with no follow mode can't follow (ja-fnd.5.9)
@@ -5179,9 +5242,11 @@ export class Colony {
           if (mode === FIGHT && !enemy && this.#stanceOf(i) === "raid" && this.queen && !this.#mayGoOut(i)) mode = EXPLORE;
           if (mode === RETURN && this.mode[i] !== RETURN) this.#homeAfresh(i);
           this.mode[i] = mode;
-          this.asked[i] = packSituation(mode, tired, food, home, alarm, enemy, stance);
+          this.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
           this.seen[before] = 1;
-          this.question[i] = before;
+          // The generic code of the situation it was asked in (its mode before the answer), whatever the species asks: the fungus, the journal and the
+          // ant card read the generic situation (review of #122, S1, S3).
+          this.question[i] = own ? packSituation(MODES.indexOf(asks!.mode), tired, food, home, alarm, enemy, stance) : before;
           this.decisions++;
         }
       }
@@ -5205,7 +5270,7 @@ export class Colony {
         // The situation as answered, with the mode the contact response set: else the mode policy, asked again next step,
         // put the ant back on its trail and contact turned it round again, resetting its homing every other step (review
         // of #38: 6,170 flips in 150 s on G′ seed 1).
-        if (situation0 >= 0) this.asked[i] = situation0 + mode * MODE_STRIDE;
+        if (situation0 >= 0) this.asked[i] = situation0 + mode * modeStride;
       }
       // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
       // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
