@@ -10,6 +10,7 @@ import {
   BRANCH_RUN,
   CORD_DIGS,
   CORD_FLOW,
+  ENTER_GAP,
   REGROW_ROUNDS,
   sideFor,
   FRUIT_RUN,
@@ -687,4 +688,93 @@ test("with the mass to pay for it, a stump regrows straight into its dug cell, e
   for (const r of poor.stumps.values()) r.wait = 1;
   assert.equal(poor.resprout(g, 0, { free: 0 }), 1);
   assert.ok(!poor.has(3, 10));
+});
+
+test("in a tunnel the local rule grows on where it ends, keeps on down it off its first heading, and takes a sharp bend two turns off (ja-2bw.15, review of #146 S1)", () => {
+  const at = (legs: [number, number][], x: number, y: number, heading: number, first = heading) => {
+    const { g } = tunnel(0, 10, legs);
+    const h = new Hyphae();
+    h.root(x, y, heading);
+    h.tips[0]!.first = first;
+    h.fruits.push(cellKey(x, y)); // a spot here, so fruiting is no choice
+    const tip = h.tips[0]!;
+    const s = situationOf(h, g, tip, 0, 1e9, 1);
+    return { local: localGrowth(h, g, tip, s, 0), turn: sideFor(h, g, tip, s, 0) };
+  };
+  // The tunnel ends ahead: on into the soil.
+  assert.equal(at([[E, 3]], 3, 10, E).local, "grow");
+  // Down the tunnel's second leg, off the tip's first heading: on down it, not back toward its first heading.
+  const [bx, by] = [nx(3, 10, SE), ny(10, SE)];
+  assert.equal(
+    at(
+      [
+        [E, 3],
+        [SE, 3],
+      ],
+      bx,
+      by,
+      SE,
+      E,
+    ).local,
+    "grow",
+  );
+  // A bend of 120°: two turns off, the way the tunnel goes.
+  for (const [bend, want] of [
+    [turn(E, 2), "right"],
+    [turn(E, -2), "left"],
+  ] as const) {
+    const r = at(
+      [
+        [E, 3],
+        [bend, 3],
+      ],
+      3,
+      10,
+      E,
+    );
+    assert.equal(r.local, want, `local, bend ${bend}`);
+    assert.equal(r.turn, want, `turn, bend ${bend}`);
+  }
+});
+
+test("a stump puts out no tip where one stands already, nor into a cell it can't enter; ENTER_GAP spaces tunnel entries (review of #146 N3)", () => {
+  const dug = new Set<number>();
+  const g: Ground = { topsoil: false, kind: (x, y) => (dug.has(cellKey(x, y)) ? "open" : "soil") };
+  const cutAt = () => {
+    const h = new Hyphae();
+    h.root(0, 10, E);
+    for (let i = 0; i < 6; i++) assert.ok(h.extend(h.tips[0]!, E, 0));
+    for (let x = 0; x <= 6; x++) h.soil.add(cellKey(x, 10));
+    dug.clear();
+    dug.add(cellKey(3, 10));
+    h.cutDug(g);
+    for (const r of h.stumps.values()) r.wait = 1;
+    return h;
+  };
+  // A tip already stands on the stump: no second one.
+  const a = cutAt();
+  a.tips.push({ x: 2, y: 10, heading: E, first: E, run: 0 });
+  assert.equal(a.resprout(g, 0), 0);
+  assert.equal(a.tips.length, 1);
+  // The cut cell holds hypha again (grown back another way): no tip into it.
+  const b = cutAt();
+  b.addCell(3, 10);
+  assert.equal(b.resprout(g, 0), 0);
+  assert.equal(b.tips.length, 0);
+  // From the soil, its own hypha down the tunnel: 5 cells from the cell ahead it slides along the wall, 8 cells it goes in.
+  const { g: t } = tunnel(6, 8, [[SE, 10]]);
+  const near = (steps: number) => {
+    const h = new Hyphae();
+    h.root(5, 8, E);
+    const tip = h.tips[0]!;
+    tip.run = 3;
+    h.fruits.push(cellKey(tip.x, tip.y));
+    let [fx, fy] = [6, 8];
+    for (let i = 0; i < steps; i++) [fx, fy] = [nx(fx, fy, SE), ny(fy, SE)];
+    h.addCell(fx, fy);
+    return localGrowth(h, t, tip, situationOf(h, t, tip, 0, 1e9, 1), 0);
+  };
+  assert.equal(ENTER_GAP, 6);
+  assert.notEqual(near(5), "grow");
+  assert.equal(near(8), "grow");
 });

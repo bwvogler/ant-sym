@@ -518,8 +518,10 @@ export function situationOf(h: Hyphae, g: Ground, tip: Tip, level: number, free:
 /**
  * The local rule (docs/hyphal-growth.md §3): what a tip does, from its situation and its own body (its heading, first
  * heading, run, and the cells it touches). Short supply: rest. Its own hypha ahead: turn away (autotropism). Blocked
- * ahead: both sides free, split (branch); one, slide to it; none, rest. A tunnel ahead from the soil: slide along its
- * wall. Run at the growth unit: branch. Off its first heading: drift back one turn. Else grow on.
+ * ahead: both sides free, split (branch); one, slide to it; none, rest. A tunnel ahead from the soil: go in, unless its
+ * own hypha already runs in a dug cell within ENTER_GAP; then slide along its wall. In a dug cell: follow the tunnel
+ * round its bends, grow on into the soil where it ends (ja-2bw.15). Run at the growth unit: branch. Off its first
+ * heading: drift back one turn. Else grow on.
  */
 export function localGrowth(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, level: number): GrowthAnswer {
   if (s.supply === "short") return "rest";
@@ -583,8 +585,9 @@ function freeAt(h: Hyphae, g: Ground, tip: Tip, level: number): (k: number) => b
 
 /**
  * Which way `tip` turns (`turn`, or the local rule's slide): from the soil toward a tunnel, the side that keeps it in
- * the soil along the wall; else a free side one turn off, or (`wide`) two, along a flat wall; both free, by its own count
- * of steps. The local rule turns from its own hypha only one turn off (`wide` false).
+ * the soil along the wall; in a tunnel that bends or ends ahead, the side that keeps it in the tunnel, one turn off or
+ * two (ja-2bw.15); else a free side one turn off, or (`wide`) two, along a flat wall; both free, by its own count of
+ * steps. The local rule turns from its own hypha only one turn off (`wide` false).
  */
 export function sideFor(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, level: number, wide = true): GrowthAnswer {
   const free = freeAt(h, g, tip, level);
