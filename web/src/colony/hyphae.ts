@@ -74,11 +74,15 @@ export const EXPOSURES = ["buried", "wall", "open"] as const;
 export type Exposure = (typeof EXPOSURES)[number];
 export const SUPPLIES = ["short", "ample"] as const;
 export type Supply = (typeof SUPPLIES)[number];
-/** What a tip senses at its step (the growth lane's situation, ja-2bw.5): 4 × 3 × 2 = 24. */
+/** How far a tip has grown since it set out or last branched: long from BRANCH_RUN cells (the growth unit, Trinci 1974; ja-2bw.18). */
+export const RUNS = ["short", "long"] as const;
+export type Run = (typeof RUNS)[number];
+/** What a tip senses at its step (the growth lane's situation, ja-2bw.5, ja-2bw.18): 4 × 3 × 2 × 2 = 48. */
 export interface GrowthSituation {
   ahead: Ahead;
   exposed: Exposure;
   supply: Supply;
+  run: Run;
 }
 /** What a tip does: `turn` is a turn to whichever side the tip finds free (the growth lane's, ja-2bw.5: only the tip knows its sides). */
 export const GROWTH_ANSWERS = ["grow", "left", "right", "turn", "branch", "rest", "fuse", "fruit"] as const;
@@ -454,6 +458,7 @@ export function situationOf(h: Hyphae, g: Ground, tip: Tip, level: number, free:
     ahead: what,
     exposed: exposureAt(g, tip.x, tip.y),
     supply: free >= HYPHA_MASS * AMPLE_STEPS * Math.max(1, tips) ? "ample" : "short",
+    run: tip.run >= BRANCH_RUN ? "long" : "short",
   };
 }
 

@@ -40,7 +40,7 @@ const CONTEXT: Record<string, (words: string) => string> = {
   growth: growthContext,
 };
 const VALID: Record<string, readonly string[]> = { mode: MODES, stance: STANCES, growth: GROWTH_CHOICES };
-const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 24 };
+const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48 };
 
 // The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
 // registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.

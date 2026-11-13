@@ -1246,8 +1246,18 @@ export class Fungus {
       }
       if (!h.has(px, py)) continue;
       // The tip that heads for `toward` aims from its own cell on the rim, not from the patch's middle (a line from the
-      // middle, set off from the rim, runs past the hole beside it).
-      const aim = toward && d === first ? dirOf(Math.atan2(toward.y - centreY(py), toward.x - centreX(px, py))) : d;
+      // middle, set off from the rim, runs past the hole beside it); while its own patch lies ahead along that aim, it
+      // starts from that cell instead, or it would meet its own hypha at once and fuse there (ja-2bw.17, seed 9).
+      let aim = d;
+      if (toward && d === first)
+        for (let k = 0; k <= 2 * radius + 2; k++) {
+          aim = dirOf(Math.atan2(toward.y - centreY(py), toward.x - centreX(px, py)));
+          const qx = nx(px, py, aim);
+          const qy = ny(py, aim);
+          if (!h.has(qx, qy)) break;
+          px = qx;
+          py = qy;
+        }
       h.root(px, py, aim);
     }
   }
