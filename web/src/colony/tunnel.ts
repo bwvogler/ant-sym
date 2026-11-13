@@ -41,6 +41,7 @@ import { crust } from "./dig.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { AIR, OPEN, SOIL, isSky, markFork, rockAt, takeFork, tunnelHeading, type Nest } from "./world.ts";
 import { believe, climbOut, destMark, holeMetric, searchOn, targetHole, towardHole } from "./homing.ts";
+import { around } from "./sense.ts";
 
 /**
  * The chance a raider about to step onto a cell of the raided colony's midden (mark v there) turns back. A lone scout
@@ -48,7 +49,7 @@ import { believe, climbOut, destMark, holeMetric, searchOn, targetHole, towardHo
  * got into the rival's nest): the chance falls with its own colony's ants around it (`friends`, within two cells).
  */
 export function middenTurn(col: Colony, v: number, cx: number, cy: number): number {
-  const company = col.friends ? col.around(col.friends, cx, cy) : 1;
+  const company = col.friends ? around(col.friends, cx, cy) : 1;
   return (1 - Math.exp(-v / MIDDEN_SCALE)) * Math.min(1, MIDDEN_CROWD / company);
 }
 
