@@ -1,6 +1,6 @@
 // Extract a run of top-level statements of tick()'s per-ant loop into a stage function (docs/refactor.md S3.4).
 // From the repo root: node scripts/lab/tick-stage.mjs <firstLine> <lastLine> <name> <file.ts> "<header comment>" [--write]
-// (lines of web/src/colony/colony.ts; without --write it prints what crosses and changes nothing). Imports of the new file
+// (lines of web/src/colony/colony.ts; without --write it prints what crosses and changes nothing). Imports of the new file,
 // the call's import in colony.ts, and the type imports new step.ts fields need are left to add by hand (tsc names them).
 // Locals crossing the boundary are copied into the per-ant AntStep record (step.ts) before the call and back after it:
 // the code moves verbatim (but `this` -> col), so the RNG draw order is unchanged.
@@ -132,12 +132,22 @@ const typeOf = (sym) => {
   return checker.typeToString(t, decl, ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
 };
 // The stage body: the segment's text with `this` -> col, and `continue` (of the ant loop) -> copy out, return true.
+// The colony parameter's name: `col`, or the first free one if the moved code has a local by that name.
+const taken = new Set();
+seg.forEach((st) => {
+  const v = (n) => {
+    if (ts.isIdentifier(n)) taken.add(n.text);
+    ts.forEachChild(n, v);
+  };
+  v(st);
+});
+const CN = ["col", "c", "colony", "self"].find((n) => !taken.has(n));
 const edits = [];
 const writtenIn = inputs.filter((v) => v.written);
 const copyOut = (vars) => vars.map((v) => `s.${v.name} = ${v.name};`).join(" ");
 let hasContinue = false;
 const visitSeg = (n, inLoop) => {
-  if (n.kind === ts.SyntaxKind.ThisKeyword) edits.push({ pos: n.getStart(), end: n.getEnd(), text: "col" });
+  if (n.kind === ts.SyntaxKind.ThisKeyword) edits.push({ pos: n.getStart(), end: n.getEnd(), text: CN });
   if (ts.isContinueStatement(n) && !inLoop && !n.label) {
     hasContinue = true;
     const out = copyOut(writtenIn);
@@ -174,7 +184,7 @@ const epilogue = [copyOut([...writtenIn, ...outputs]), hasContinue ? "return fal
   .map((l) => "  " + l)
   .join("\n");
 const ret = hasContinue ? "boolean" : "void";
-const fn = `${header.trim()}\nexport function ${name}(col: Colony, i: number, s: AntStep): ${ret} {\n${prologue}\n  ${ind(segText, 2).trimStart()}\n${epilogue}\n}\n`;
+const fn = `${header.trim()}\nexport function ${name}(${CN}: Colony, i: number, s: AntStep): ${ret} {\n${prologue}\n  ${ind(segText, 2).trimStart()}\n${epilogue}\n}\n`;
 // The call site in tick.
 const pad = " ".repeat(6);
 const callLines = [];
