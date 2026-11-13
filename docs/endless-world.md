@@ -1,6 +1,6 @@
 # Endless world: chunks from the seed, many lines, far ground frozen
 
-*Design note, 2026-11-13, epic `ja-qpv` (MR 9). Nothing here is built. It answers the owner's request (2026-11-13) to start on an endless world, and builds on [one-world](one-world.md), whose model it extends. Decisions: PRD §66. Revised after the review of #124 (2026-11-13). Code references are to `web/src/` on main at 13a144f.*
+*Design note, 2026-11-13, epic `ja-qpv` (MR 9). Nothing here is built. It answers the owner's request (2026-11-13) to start on an endless world, and builds on [one-world](one-world.md), whose model it extends. Decisions: PRD §66. Revised after the review of #124 (2026-11-13). Code references are to `web/src/` on main at b610e1c.*
 
 ## TL;DR
 
@@ -40,7 +40,7 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 - The chunk table is a dense bounding box (`chunks.ts`, `#cover`): two busy spots far apart allocate every slot between them, and `forEach`, saves and the golden hash walk all of them.
 - A save writes every allocated chunk of every layer, rock included, though the plane's rock never changes.
 
-**Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, `EDGE`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). `cellKey` (`colony.ts:6535`) is `y · 65536 + x`, so columns are capped at ±32k.
+**Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, with `EDGE` in `tuning.ts`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). `cellKey` (`grid.ts:60`) is `y · 65536 + x`, so columns are capped at ±32k.
 
 **Two colonies assumed:** `generateOneWorld` refuses more than two nests; `Game.rival` is `colonies[1]`; "the world's own colonies" are `colonies.length − founded.length` (`fallen`, `outcome`); names go by index (the minimap colours by odour since PRD §65); `MAX_COLONIES` is 6 (`game.ts:120`). `ja-fnd.5.4.2` (Game over N colony specs) replaces these.
 
@@ -79,7 +79,7 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 
 ## 4. Wild colonies
 
-**Sites are pure.** The plane is divided into regions of R × R chunks. Each region draws one candidate point from `hash(seed, region)` and keeps it when:
+**Sites are pure.** The plane is divided into regions of R × R chunks, R ≥ 3 (proposed 4, one site per region at most). At R ≥ 3 a site's reserved line (its hole and 64 cells each way, plus the 12-cell clearance) reaches only the eight regions round its own, which are the ones its check reads. Each region draws one candidate point from `hash(seed, region)` and keeps it when:
 - it is open ground, and an `escapes` check within the region's neighbourhood says ants could walk out of it;
 - it is more than `NEW_LINE_GAP` (140, §5) from the start nests, and at least `WILD_GAP` from its neighbours' candidates (proposed: 140 too);
 - the one-hole line it will start (its hole plus a margin each way along a heading drawn from the same hash) keeps the clearance from the start line and from its neighbours' sites' lines;
@@ -115,6 +115,8 @@ How big that should be is the owner's choice (§10). Mature and stronger than a 
 2. **Else, if the nearest hole is an end of its line** (never an unwoken site), that line grows by today's rules 1–3 ([one-world §3](one-world.md#3-the-line-and-where-a-new-nest-may-go)).
 3. **Otherwise** it is refused, and `nearestValid` moves it as today.
 
+A far landing whose new line would break the clearance is refused under rule 1 and falls to rule 2 or 3: `nearestValid` moves it to the nearest point within `FOUND_RADIUS` where rule 1 or 2 holds, and if none does the flight fails, as today.
+
 The 140 is measured to holes only. The clearance check does the geometry. The new-line test runs first, because today's rule 1 has no length limit and would send every far point to the nearest line's end.
 
 Rule 2's clearance holds between lines as well as within one: no new segment or margin comes within the clearance of another line or a site's reserved line. One plane cell never lies over two curtains.
@@ -146,15 +148,21 @@ Rule 2's clearance holds between lines as well as within one: no new segment or 
 
 **Groups.** Colonies whose ants have been within sensing range of each other in the last T seconds form a group. A group freezes and wakes together. Without this, two neighbours that forage over each other's ground, such as the start colonies 140 apart, would keep each other awake for good.
 
-**Only the fungus wakes** (owner, 2026-11-13). A frozen group wakes when the awake fungus comes within W of one of its holes: its body on the plane or in an awake curtain, or an awake host. Frozen hosts and the fungus's body inside a frozen curtain wake nothing. A wild site wakes the same way, generated the first time (§4). Other ants never wake anything, so waking can't chain from one colony to the next, however close the sites are. **Proposed:** W = 2 U (280 cells), the far end of a forager's reach ([nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game)).
+**Only the fungus wakes** (owner, 2026-11-13). A frozen group, or an unwoken wild site, wakes in two ways:
+- **The fungus's body** (on the plane, or in an awake curtain) comes within W of one of its holes.
+- **An awake host enters its nest ground** (owner, 2026-11-13, D4 of the third review): a disc round a hole where it meets the residents, proposed at 16 cells (`HOLE_GAP_2D`, about the mound's reach). A host merely foraging past, within W, wakes nothing.
+
+Frozen hosts and the fungus's body inside a frozen curtain wake nothing. A wild site is generated the first time it wakes (§4). Other ants never wake anything, so waking can't chain from one colony to the next, however close the sites are. **Proposed:** W = 2 U (280 cells), the far end of a forager's reach ([nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game)). A host forages past many sites (1–2 U out, within W of about 8–16), but enters few nests, so waking stays rare.
 
 **A group freezes** when no member has had the awake fungus within W of its hole for T seconds. The start colonies are awake from the first tick and freeze by the same rule, together, once the fungus has left them. A daughter that lands beyond the fungus's reach freezes after T as a lone queen, until the fungus follows her.
 
 **The awake cap may freeze a colony the fungus lives in** (owner, 2026-11-13, by rank). The number of awake colonies is capped (proposed: 6, today's `MAX_COLONIES`, which PRD §50 took from the page's colony names, not from the tick; E4 measures the tick at the cap and may lower it).
-- **The rank** of an awake colony is how long since the fungus last spread in it: a new host, or its body growing within W of the hole. The freshest spread ranks highest.
-- **When the fungus reaches a frozen colony** and waking it would pass the cap, the lowest-ranked awake colony freezes in its place, with its hosts, and leaves its group. A colony reached just now ranks highest, so it always wakes.
-- **Hysteresis.** A colony frozen by the cap may not wake again for T, and then only when the fungus reaches it again and it outranks the lowest awake colony. Its own frozen hosts don't count as reaching it.
-- **A test:** at the cap, no colony freezes and wakes more than once within T.
+- **The rank** of a colony is how long since the fungus last *touched* it: a host entering its nest ground, a new host made there, or the fungus's body growing within W of its hole. The most recent touch ranks highest. A colony woken just now was touched just now, so it ranks highest by the same rule.
+- **When a colony wakes** and the cap would be passed, the lowest-ranked awake groups freeze, with their hosts, until there is room. A group freezes whole, so it never splits. A group larger than the cap on its own may run over it; E4 counts how often.
+- **Hysteresis.** A colony frozen by the cap may not wake again for T.
+- **Room comes back.** When a slot frees (a group freezes by itself, or a colony dies), the highest-ranked cap-frozen colony that still holds the fungus (frozen hosts, or the fungus's body in its curtain) wakes, once its T has passed. Without this, a colony frozen by the cap could be stranded: if every host in the awake colonies died, nothing could reach it again.
+- **At the cap the colonies rotate.** Each new nest the fungus enters freezes the stalest one, and none can come back for T, so the awake set turns over no faster than once a T. That is the steady state, not a fault.
+- **Tests:** at the cap, no colony freezes and wakes more than once within T; with every awake host dead, a cap-frozen colony holding the fungus wakes when a slot frees.
 
 The tick is then bounded by the cap, not by the world. The player sees part of their organism pause when it spreads over more colonies than the cap: the page draws a frozen colony's hosts as asleep.
 
@@ -206,7 +214,7 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 | E1 storage (`ja-qpv.1`) | generator on miss, drop and eviction, the table chosen by bench; flat keys re-keyed; `#outField` windowed; `cellKey` widened; sleeping pheromone chunks dropped; `SensedMap` kept per chunk | bounded goldens bit-exact (the hash first made blind to table order and all-empty chunks, re-recorded once); `colony-bench --one` within noise |
 | E2 local generation (`ja-r84`) | per-chunk plane food and curtain food with local reach; the start nests and the wild-site lattice; food totals per chunk | generation in any order is bit-identical; food per chunk within PRD §12's range |
 | E3 many lines (`ja-qpv.2`) | `lines[]`, layer ids, each line salted (the first with 0), wild sites as reserved lines, the generalised founding rule with a local rule 4, a one-hole line, saves | a one-line game bit-exact; property tests that no plane cell lies over two curtains, reserved lines included, and that two lines' curtains differ |
-| E4 awake and frozen (`ja-qpv.3`) | freezing per colony and per group, waking by the fungus only, wild colonies generated on waking, far chunks as deltas, the ranked awake cap | the memory-budget soak; a freeze and thaw is invisible to a colony's journal; a wild colony's ants never wake another; two colonies in contact freeze together after T; at the cap no colony freezes and wakes more than once within T; tick at the awake cap |
+| E4 awake and frozen (`ja-qpv.3`) | freezing per colony and per group, waking by the fungus only (hosts by entering nest ground), wild colonies generated on waking, far chunks as deltas, the ranked awake cap | the memory-budget soak; a freeze and thaw is invisible to a colony's journal; a wild colony's ants never wake another; a host foraging past a site wakes nothing; two colonies in contact freeze together after T; at the cap no colony freezes and wakes more than once within T; a cap-frozen colony holding the fungus wakes when a slot frees; tick at the awake cap |
 | E5 the page (`ja-qpv.4`) | camera, minimap window, fog, canvas eviction, line picking, frozen colonies drawn asleep | `npm run e2e` updated; 60 fps in headless Chromium 20 U from the start |
 | E6 switch and assays (`ja-qpv.5`) | the endless world as the page's game (owner); flight distance and founding radius set without edges; wild density tuned | assays on seeds 1–10, confirmed 11–20; `scripts/lab/flight-failure.mjs` on the endless plane; PRD §66 filled in; unblocks `ja-1vg` |
 
@@ -234,13 +242,14 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 3. **Design first.** This note, PRD §66 and the beads come before code.
 4. **Only the fungus wakes far ground** (review of #124, D1). The awake fungus (its body and its awake hosts) wakes colonies; other ants never do, so waking can't chain. Freezing is per colony, and colonies in contact freeze together.
 5. **Queens fly farther on the endless plane** (review of #124, D2), so daughters start lines of their own. The distance is set at E6.
-6. **The awake cap may freeze a colony the fungus lives in** (re-review of #124, D3), by rank: the colony longest without fresh spread freezes first, with hysteresis, so the fungus can spread over any number of colonies while only the cap's number run.
+6. **The awake cap may freeze a colony the fungus lives in** (re-review of #124, D3), by rank: the colony longest untouched by the fungus freezes first, with hysteresis, and room that comes back goes to the highest-ranked cap-frozen colony holding the fungus. The fungus can spread over any number of colonies while only the cap's number run.
+7. **A host wakes a colony only by entering its nest ground** (third review of #124, D4), about 16 cells round a hole; the fungus's body still wakes within W.
 
 **Still open, each with a recommendation:**
 1. **Wild density.** Recommend one site per 4 × 4 chunks to start, tuned at E6.
 2. **A wild colony's size on waking.** Recommend the size a start colony reaches in 10 minutes, measured in E4.
 3. **What reveals the fog.** Recommend where `SensedMap` says hosts sensed, plus the start nests.
-4. **W, T and the awake cap.** Recommend W = 2 U (280 cells), T = 60 s and a cap of 6, rechecked against the tick at E4.
+4. **W, T, the nest ground and the awake cap.** Recommend W = 2 U (280 cells), T = 60 s, a nest ground of 16 cells and a cap of 6, rechecked against the tick at E4.
 5. **The flight distance.** Recommend 2 U to start, set at E6.
 6. **Lines joining.** Recommend not yet. The clearance keeps them apart until polydomy.
 7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55).

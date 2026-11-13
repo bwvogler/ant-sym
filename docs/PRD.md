@@ -5026,9 +5026,10 @@ No new research was needed; the owner sets the density.
 - **Many lines.** Each group of nests has its own line and curtain. A founding far from every line starts a new line; one near a line's end grows it. Lines keep a clearance from each other, so no plane cell lies over two curtains.
 - **Far ground is frozen.** Only ground near awake things is stepped. A wild colony waits frozen until it is woken. A coarse far-away model and simulating everything were declined.
 - **Design first.** The note, this section and the beads come before code, as §51 did for one world.
-- **Only the fungus wakes far ground** (review of #124, D1). The start colonies, the fungus's body and its hosts wake ground and colonies; other ants never do. With wild sites ~238 units apart and W = 2 U, any ant waking ground would chain through every colony and pin the awake cap.
+- **Only the fungus wakes far ground** (review of #124, D1). The awake fungus (its body and its awake hosts) wakes colonies; other ants never do, the start colonies' included. With wild sites ~238 units apart and W = 2 U, any ant waking ground would chain through every colony and pin the awake cap.
+- **A host wakes a colony only by entering its nest ground** (third review of #124, D4): a disc of about 16 cells round a hole. The fungus's body still wakes within W. A host foraging past wild sites wakes nothing, so the cap doesn't churn.
 - **Queens fly farther on the endless plane** (review of #124, D2). At 140 a daughter lands exactly the new-line gap (140) from her mother's line, so she could never start a line of her own. The flight lengthens towards real queens' 5 U; 2 U is proposed, and E6 sets it.
-- **The awake cap may freeze a colony the fungus lives in, by rank** (re-review of #124, D3). The colony longest without fresh spread freezes first, with hysteresis. The fungus can spread over any number of colonies, but only the cap's number run; the rest of its hosts pause.
+- **The awake cap may freeze a colony the fungus lives in, by rank** (re-review of #124, D3). The rank is how long since the fungus last touched the colony (a host entering, a new host, its body growing near). The lowest-ranked groups freeze first, a cap-frozen colony may not wake for T, and when a slot frees the highest-ranked cap-frozen colony holding the fungus wakes. At the cap the awake set rotates no faster than once a T.
 
 **The design** (proposed, endless-world §2–§8):
 - **The world is the seed plus deltas.** A chunk is generated from `(seed, chunk)` reading only pure inputs (neighbours' `chunkRock` before food clears it, wild-site candidates), so any order of visits gives the same world (`ja-r84`). Underground it is pure given the line, and each line's ground is salted by its first hole. What ants change is kept per chunk.
@@ -5037,7 +5038,7 @@ No new research was needed; the owner sets the density.
 - **Wild sites** are pure, one candidate per region of chunks. A site wakes into a mature colony of the game's species under a preset doctrine, on a line of its own.
 - **New lines first.** The founding rule tests for a new line (farther than 140 from every hole, the clearance kept from every line) before growing a line's end. The first line's salt is 0, so a one-line game keeps today's curtain. Every wild site is a reserved one-hole line from the start, more than 140 from the start nests, so foundings never land in a site's way. With 2 U flights most daughters start lines of their own.
 - **Freezing is per colony** (its ants, its scent unstepped, its curtain). Colonies in contact form a group that freezes and wakes together. A group freezes after T seconds without the awake fungus within W. Frozen hosts wake nothing. Food regrowth steps only near awake colonies or the fungus. The ranked cap bounds the tick. The camera never changes the simulation.
-- **Storage:** chunks generated on a miss and dropped when far, and a table that doesn't grow with the square of the spread (hashed or two-level, by bench). Flat keys are re-keyed, `cellKey` is widened, and `SensedMap` is reduced to a revealed bit per chunk.
+- **Storage:** chunks generated on a miss and dropped when far, and a table that doesn't grow with the square of the spread (hashed or two-level, by bench). Flat keys are re-keyed, `cellKey` is widened, and `SensedMap` keeps full detail only in chunks sensed within `SENSED_FADE`, with a revealed bit per chunk beyond.
 - **Saves** keep the seed, the lines, the kept scent and the deltas.
 - **The page:** an unclamped camera, a minimap window, a fog of war from `SensedMap`, and the side view on the line clicked.
 
@@ -5051,7 +5052,7 @@ No new research was needed; the owner sets the density.
 - a one-line game stays bit-exact, two lines' curtains differ, and no woken site's line overlaps another curtain (E3, E4);
 - the memory-budget soak: heap and chunks grow with awake plus changed area, not explored area (E4);
 - a freeze and thaw leaves a colony's journal unchanged (E4);
-- two colonies in contact freeze together after T, and at the cap no colony freezes and wakes more than once within T (E4);
+- two colonies in contact freeze together after T; at the cap no colony freezes and wakes more than once within T; with every awake host dead, a cap-frozen colony holding the fungus wakes when a slot frees (E4);
 - a wild colony's ants never wake another (E4);
 - the tick at the awake cap against the 10 ms gate (E4);
 - 60 fps far from the start (E5);
