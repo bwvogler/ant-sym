@@ -10,10 +10,11 @@ import { MODES, type LaneWords, type Mode, type Policy, type SpeciesSituation } 
 // has no follow mode and no stance lane; no corpse removal was found (desert-ant.md §5), so it leaves its dead. Still to come, each its own
 // bead: food odour in the air (ja-rf5.4), heat (ja-rf5.5, a field of its situation), the invitation (ja-rf5.6).
 
-/** Its mode lane's fields: what it does, whether it is tired, whether strangers are near. No trails, alarm or stance to sense; heat comes with ja-rf5.5. */
+/** Its mode lane's fields: what it does, whether it is tired, whether it feels hot (ja-rf5.5), whether strangers are near. No trails, alarm or stance to sense. */
 export const DESERT_SCHEMA = defineSchema<SpeciesSituation>([
   { name: "mode", values: MODES },
   { name: "tired", values: [false, true], key: (v) => (v ? "tired" : "fresh") },
+  { name: "hot", values: [false, true], key: (v) => (v ? "hot" : "cool") },
   { name: "enemy", values: ["none", "near"] },
 ]);
 
@@ -25,6 +26,10 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
     fields: [
       ["mode", "mode is what it is doing: explore (out searching for food alone), return (home) or fight; follow does not apply to it. "],
       ["tired", "tired means it has searched long outside without finding food: a desert forager's trips are short. "],
+      [
+        "hot",
+        "hot means its own body is near the heat that kills it: the ground heats over the day, an ant out in the open heats with it and cools only back in the nest, and one that stays out too hot dies. ",
+      ],
       [
         "enemy",
         "enemy says whether ants of another colony are within a few steps: desert ant colonies are hostile to one another. With enemy none there is nobody to fight: an ant that fights then stands where it is and does nothing, and a fight that is over sends it home or back out. ",
@@ -38,12 +43,14 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
     fight: "fight: attack a stranger within reach (only when enemy is near)",
   },
   // 2: fight only with a stranger near (review of #140 D1, owner 2026-11-13: v1 under Warlike fought with nobody near and stalled)
-  version: 2,
+  // 3: the hot field (ja-rf5.5)
+  version: 3,
   schema: DESERT_SCHEMA,
 };
 
-/** Its local rule: home when tired or a fight is over; otherwise out searching, alone (nothing to follow). Strangers in reach are its contact response's. */
+/** Its local rule: home when hot or tired or a fight is over; otherwise out searching, alone (nothing to follow). Strangers in reach are its contact response's. */
 export const desertPolicy: Policy = (s) => {
+  if ((s as SpeciesSituation).hot) return "return";
   if (s.tired) return "return";
   if (s.mode === "fight") return "return";
   return "explore";
@@ -52,6 +59,7 @@ export const desertPolicy: Policy = (s) => {
 /** desertPolicy in words, for the Learn drawer (ruleTextAgrees holds them equal over every situation of DESERT_SCHEMA). */
 export const DESERT_RULE_TEXT: ModeRuleText = {
   rows: [
+    { when: "it is hot (its body near the heat that kills it)", then: "return", test: (s) => (s as SpeciesSituation).hot === true },
     { when: "it is tired (searched long outside without finding food)", then: "return", test: (s) => s.tired },
     { when: "it was fighting", then: "return", test: (s) => s.mode === "fight" },
   ],
@@ -74,10 +82,16 @@ export const DESERT_ANT: Species = {
     // Buehlmann et al. 2014, a pre-publication draft: unverified). One world's nests are 140 cells apart against C. fortis's ~40 m,
     // about 3.5 cells a metre: 6 m is 21 cells. D3 (PRD §60.4): the first find comes sooner on every seed of 1–20.
     foodPlume: 21,
+    // Heat (ja-rf5.5, docs/desert-ant.md §4, PRD §60.5): all design but the critical heat, 53.6 °C (C. bombycina, Gehring & Wehner 1995, read
+    // through later papers: a borrowing, unverified). A 10-minute day, the ground 25 °C at dawn and 60 °C at noon (surfaces reach about 70 °C,
+    // unverified), the nest 30 °C; the body closes on its surroundings in about 20 s, and feels hot at 48 °C.
+    heatDay: 600,
   },
   // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
   // nothing in its jaws fights a stranger it touches, whatever the odds; a carrier takes its load home (owner, review of #138 D1).
+  // It senses its own heat (the sense table's own-body row): hot near the heat that kills it.
+  sense: (c, i) => ({ hot: c.hot[i] === 1 }),
   responses: { ...localResponses, contact: (t) => (t.carrying === "none" ? "fight" : "flee") },
   lanes: { mode: DESERT_MODE_WORDS },
   policy: desertPolicy,

@@ -112,6 +112,10 @@ export const ANT_FIELDS = {
   since: { type: Float32Array, reset: "spawn" },
   /** seconds of unsuccessful search, less rest inside the nest: tired above the colony's patience (ja-q47) */
   fatigue: { type: Float32Array, reset: "spawn" },
+  /** body heat, °C above the nest's (ja-rf5.5, heat.ts): only a species with heat (heatDay > 0) keeps it; 0 otherwise */
+  bodyHeat: { type: Float32Array, reset: "spawn" },
+  /** 1 while it feels hot: from heatFelt until its body is back below heatCool (ja-rf5.5) */
+  hot: { type: Uint8Array, reset: "spawn" },
   /** encounters with nestmates coming home with food, leaking with a half-life of MET_HALF (behaviour MR 5) */
   met: { type: Float32Array, reset: "spawn" },
   /** seconds in contact with strangers, leaking (behaviour MR 5.2): how much of the rival a scout met; more lays a stronger raid trail */

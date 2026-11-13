@@ -1,4 +1,5 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
+import { DESERT_ANT } from "./desertAnt.ts";
 import {
   type Colony,
   type ColonyParams,
@@ -2534,6 +2535,92 @@ export const desertTrips: Assay = {
   score: () => ({}),
 };
 
+/** D5's length: two of the desert ant's 10-minute days (heatDay). */
+export const D5_SECONDS = 1200;
+
+/**
+ * D5 — heat (ja-rf5.5, docs/desert-ant.md §4, PRD §60.5): the desert ant over two days. Its ground heats toward noon; an ant out heats with it,
+ * comes back when it feels hot and dies past its critical heat (53.6 °C, C. bombycina, a borrowing: unverified). Target (b) of desert-ant.md:
+ * the colony forages in the cooler hours and few foragers outlast their heat budget. Pass, all three: ants out on the plane at noon (the day's
+ * hottest quarter) no more than 0.75 of those out at dawn (its coolest); heat deaths a day no more than 16 % of the colony (C. bicolor loses
+ * about 16 % of its foragers a day to every cause: Schmid-Hempel & Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in
+ * every 30 s after the first minute.
+ */
+export const desertHeat: Assay = {
+  id: "d5",
+  title: "D5 heat: the desert ant forages in the cooler hours and few die of heat (one world, two days)",
+  target: "out at noon ≤ 0.75 × out at dawn; heat deaths ≤ 16 % of the colony a day; food every 30 s (design; borrowings unverified)",
+  seconds: D5_SECONDS,
+  spec: (seed) => {
+    let noon = 0;
+    let noonN = 0;
+    let dawn = 0;
+    let dawnN = 0;
+    let aliveSum = 0;
+    let aliveN = 0;
+    let held: Uint8Array = new Uint8Array(0);
+    const bins: number[] = [];
+    const spec = desertSpec(seed, {
+      tick(game) {
+        const c = game.player;
+        const day = c.params.heatDay;
+        if (held.length < c.n) {
+          const grown = new Uint8Array(Math.max(c.n, 64));
+          grown.set(held);
+          held = grown;
+        }
+        let out = 0;
+        let alive = 0;
+        const bin = Math.floor(game.time / 30);
+        while (bins.length <= bin) bins.push(0);
+        for (let i = 0; i < c.n; i++) {
+          if (!c.alive[i]) {
+            held[i] = 0;
+            continue;
+          }
+          alive++;
+          if (c.layer[i] === PLANE) out++;
+          const has = c.layer[i] === PLANE && c.carrying[i] === 1 ? 1 : 0;
+          if (has && !held[i]) bins[bin]!++;
+          held[i] = has;
+        }
+        aliveSum += alive;
+        aliveN++;
+        if (day <= 0) return;
+        const phase = (game.time / day) % 1;
+        if (Math.abs(phase - 0.5) < 0.125) {
+          noon += out;
+          noonN++;
+        } else if (phase < 0.125 || phase > 0.875) {
+          dawn += out;
+          dawnN++;
+        }
+      },
+      summary(game) {
+        const c = game.player;
+        const days = c.params.heatDay > 0 ? game.time / c.params.heatDay : NaN;
+        const outNoon = noon / Math.max(1, noonN);
+        const outDawn = dawn / Math.max(1, dawnN);
+        const ratio = outNoon / outDawn;
+        const deathsADay = c.diedHot / days / (aliveSum / Math.max(1, aliveN));
+        const after = bins.slice(2, Math.floor(game.time / 30));
+        const minPickups = after.length ? Math.min(...after) : NaN;
+        return {
+          outNoon,
+          outDawn,
+          ratio,
+          heatDeaths: c.diedHot,
+          deathsADay,
+          minPickups,
+          pass: ratio <= 0.75 && deathsADay <= 0.16 && minPickups > 0 ? 1 : 0,
+        };
+      },
+    });
+    return { ...spec, seconds: D5_SECONDS, game: { ...spec.game, species: DESERT_ANT } };
+  },
+  score: () => ({}),
+};
+
 /**
  * The assays rerun on one world (`experiment.mjs --one`): A1, A2a, A2b, A3, A4, A5, A5b, A6, A9 and A10 on their arenas
  * made the plane (onPlane), A8 in the curtain, and G1. Same ids as the legacy ones, so `--one bridge` is A1 on the plane.
@@ -2556,6 +2643,7 @@ export const ONE_ASSAYS: Assay[] = [
   desertInvitation,
   desertFirstFind,
   desertTrips,
+  desertHeat,
 ];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). */
