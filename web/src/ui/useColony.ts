@@ -118,6 +118,8 @@ export interface ColonyStats {
   /** policy mode choices per second, over the last second */
   choicesPerSecond: number;
   situationsSeen: number;
+  /** every situation the colonies' mode lane can be asked in: the species' own schema's size, or SITUATIONS (ja-fnd.5.12) */
+  situations: number;
   /** every colony's line: Game.colonies order (Ink, then Amber; ui/names.ts) */
   sides: SideStats[];
   /** the colony that is gone, by index, or −1 */
@@ -326,6 +328,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           counts: sumCounts(game.colonies),
           choicesPerSecond: rate,
           situationsSeen: seenTogether(game.colonies),
+          situations: game.colonies[0]?.seen.length ?? 0,
           sides: game.colonies.map((c) => side(c, game.fungus)),
           fallen: game.fallen(),
           outcome: game.outcome(),

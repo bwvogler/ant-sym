@@ -1,5 +1,5 @@
 import type { JevRequest } from "../../shared/jev.ts";
-import { DEFAULT_MENU, estimateTokens, LANE_KINDS, LANE_LIST, LANES, type LaneName } from "../colony/index.ts";
+import { DEFAULT_MENU, estimateTokens, LANE_KINDS, LANE_LIST, LANES, type LaneName, type LaneWords } from "../colony/index.ts";
 
 // What Jev is sent, pure: the Learn drawer shows the exact request for one
 // situation, and what a question costs. Requests pack many situations behind
@@ -20,13 +20,14 @@ export type Sample = SampleOf<"mode"> | SampleOf<"stance"> | (SampleOf<"fungus">
  * The request lane `lane` would send for these situations under these words (doctrine or aim): the lane's own key and pack, with the ids its
  * items carry. The fungus's request asks the levers its key says a host in that situation is asked (the menu's, a queen's or a worker's).
  */
-export function requestFor(sample: Sample, words: string, n = 1): JevRequest {
+export function requestFor(sample: Sample, words: string, n = 1, laneWords?: LaneWords): JevRequest {
   const lane = LANE_LIST.find((l) => l.name === sample.lane)!;
   const menu = sample.lane === "fungus" ? (sample.menu ?? MENU_ON) : undefined;
-  const key = lane.key(sample.situation, menu);
+  const key = lane.key(sample.situation, menu, laneWords); // a species' own words: its key and its request (ja-fnd.5.13)
   return lane.pack(
     Array.from({ length: n }, (_, k) => ({ id: `${lane.kind.idPrefix}${k}`, key, situation: sample.situation })),
     words,
+    laneWords,
   );
 }
 

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  SITUATIONS,
   DOCTRINES,
   LETHAL,
   LEVERS,
+  inertLevers,
   NEST_ONLY,
   upgradeFor,
   MET,
@@ -124,7 +124,7 @@ function Colonies({ stats }: Props) {
         <Stat label="going home" value={stats ? String(stats.counts.return) : "—"} />
         <Stat label="fighting" value={stats ? String(stats.counts.fight) : "—"} />
         <Stat label="mode choices / s" value={stats ? Math.round(stats.choicesPerSecond).toLocaleString() : "—"} />
-        <Stat label="situations seen" value={stats ? `${stats.situationsSeen} / ${SITUATIONS.toLocaleString()}` : "—"} />
+        <Stat label="situations seen" value={stats ? `${stats.situationsSeen} / ${stats.situations.toLocaleString()}` : "—"} />
       </div>
       {stats && (
         // One line per cell: on a phone the table scrolls sideways in its card rather than wrapping "963 / 871 / 1" over three lines.
@@ -203,7 +203,7 @@ function JevCard({ jev }: Props) {
         <Stat label="situations asked" value={String(jev.state.asked)} />
         <Stat
           label="answers cached"
-          value={`${jev.state.cached} · ${jev.state.stancesCached} stances · ${jev.state.fungusCached} fungus · ${jev.state.growthCached} growth`}
+          value={`${jev.state.cached} · ${jev.state.stanceLane ? `${jev.state.stancesCached} stances` : "no stance lane"} · ${jev.state.fungusCached} fungus · ${jev.state.growthCached} growth`}
         />
         <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
         <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>
@@ -612,6 +612,8 @@ export function LeverChips({
   lock: string | null;
   onChange: (menu: string[]) => void;
 }) {
+  // Levers on channels the game's species lacks have no scent to bend (ja-fnd.5.11): greyed, and their tip says why (ja-fnd.5.12).
+  const inert = new Set(inertLevers(game.player.params.channelSet));
   return (
     <div className="mt-1 flex flex-col gap-1 text-xs">
       {(["perceive", "emit", "lethal"] as const).map((kind) => (
@@ -623,19 +625,22 @@ export function LeverChips({
             const lethal = LETHAL.has(v.id);
             // In the game a lethal lever on the menu does nothing until its upgrade is kept (ja-lo8.16).
             const heldOff = lethal && game.fungus.evolution?.reach()[v.id] === 0;
+            const nothing = inert.has(v.id);
             return (
               <button
                 key={v.id}
                 type="button"
                 aria-pressed={on}
                 disabled={locked}
-                className={`rounded-md border px-2 py-0.5 font-mono disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through opacity-50" : ""}disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
                 title={
                   locked
                     ? (lock ?? undefined)
-                    : heldOff
-                      ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Fungus panel).`
-                      : v.blurb
+                    : nothing
+                      ? `${v.blurb}. Nothing to bend: this species lays and reads none of its scent.`
+                      : heldOff
+                        ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Fungus panel).`
+                        : v.blurb
                 }
                 onClick={() => onChange(on ? menu.filter((id) => id !== v.id) : [...menu, v.id])}
               >
