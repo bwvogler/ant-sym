@@ -191,13 +191,14 @@ function antLane<Sit, Ans extends string>(
   row: Pick<LaneSpec<Sit, Ans, undefined>, "name" | "key" | "pack" | "read" | "valid" | "contextOf"> & { local: (s: Sit) => Ans },
   words: string,
   lw: LaneWords<Ans>,
+  local: (s: Sit) => Ans = row.local,
 ): Lane<Sit, Ans> {
   return lane<Sit, Ans>({
     name: row.name,
     key: (s) => row.key(s, undefined),
     pack: (items, w) => row.pack(items, w, lw),
     read: (a, id, s, key) => row.read(a, id, s, key, lw),
-    local: row.local,
+    local,
     valid: (key, a) => row.valid(key, a, lw),
     contextOf: (w) => row.contextOf(w, undefined, lw),
     words,
@@ -207,7 +208,11 @@ function antLane<Sit, Ans extends string>(
 /** A colony's lanes, asking under `words` (its doctrine) in its species' lane words; a lane the species lacks is null. */
 function colonyLanes(words: string, species: Species): Omit<Driven, "colony"> {
   const { mode, stance } = species.lanes;
-  return { modes: mode ? antLane(LANES.mode, words, mode) : null, stances: stance ? antLane(LANES.stance, words, stance) : null };
+  return {
+    // the stand-in while a situation is unanswered is the species' own local rule (ja-fnd.5.9)
+    modes: mode ? antLane(LANES.mode, words, mode, species.policy ?? LANES.mode.local) : null,
+    stances: stance ? antLane(LANES.stance, words, stance) : null,
+  };
 }
 
 export class ColonyJev {
@@ -426,7 +431,7 @@ export class ColonyJev {
   /** Who decides an ant of colony k in situation `s` right now (the follow card). */
   explain(s: Situation, k = 0): { mode: Mode; by: DecidedBy } {
     const d = this.#driven[k];
-    if (!d?.modes) return { mode: localPolicy(s), by: "local" };
+    if (!d?.modes) return { mode: (this.#species.policy ?? localPolicy)(s), by: "local" };
     const e = this.#explain(d.modes, s);
     return { mode: e.answer, by: e.by };
   }
@@ -434,7 +439,7 @@ export class ColonyJev {
   /** The first colony's ants' policy (kept for a single colony; each attached colony is given its own). */
   readonly policy: Policy = (s) => {
     const d = this.#driven[0];
-    return d?.modes ? this.#lookup(d.modes, s) : localPolicy(s);
+    return d?.modes ? this.#lookup(d.modes, s) : (this.#species.policy ?? localPolicy)(s);
   };
   /** The first colony's strategist's policy, the same way. */
   readonly stancePolicy: StancePolicy = (s) => {
