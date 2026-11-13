@@ -1,7 +1,7 @@
 // Extract a run of top-level statements of tick()'s per-ant loop into a stage function (docs/refactor.md S3.4).
 // From the repo root: node scripts/lab/tick-stage.mjs <firstLine> <lastLine> <name> <file.ts> "<header comment>" [--write]
 // (lines of web/src/colony/colony.ts; without --write it prints what crosses and changes nothing). Imports of the new file
-// and the call's import in colony.ts are left to add by hand (tsc names them).
+// the call's import in colony.ts, and the type imports new step.ts fields need are left to add by hand (tsc names them).
 // Locals crossing the boundary are copied into the per-ant AntStep record (step.ts) before the call and back after it:
 // the code moves verbatim (but `this` -> col), so the RNG draw order is unchanged.
 import { createRequire } from "node:module";
@@ -141,7 +141,12 @@ const visitSeg = (n, inLoop) => {
   if (ts.isContinueStatement(n) && !inLoop && !n.label) {
     hasContinue = true;
     const out = copyOut(writtenIn);
-    edits.push({ pos: n.getStart(), end: n.getEnd(), text: out ? `{ ${out} return true; }` : "return true;" });
+    const bare = ts.isBlock(n.parent); // a statement in a block needs no braces of its own
+    edits.push({
+      pos: n.getStart(),
+      end: n.getEnd(),
+      text: out ? (bare ? `${out} return true;` : `{ ${out} return true; }`) : "return true;",
+    });
   }
   if (ts.isFunctionExpression(n) || ts.isFunctionDeclaration(n)) throw new Error("function expression in segment");
   if (ts.isBreakStatement(n) && !inLoop && !n.label) throw new Error("break of the ant loop in segment");
