@@ -340,3 +340,33 @@ test("in the game, a hypha dug through in the curtain regrows from its stump int
   assert.ok(h.has(x, y), "nothing regrew into the dug cell in 60 s");
   assert.equal(rockAt(g.world!.curtain, x, y), OPEN, "the cell is still dug: the hypha runs on its back wall");
 });
+
+test("with Knots bought, starved tips harden into knots in the game, paid from the body; dug open, a knot stays and fruits its store there (ja-2bw.9)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7; // mutations enough to buy it at once
+  assert.ok(g.fungus.upgrade("knots"));
+  const moved: number[] = [];
+  const lose = e.lose.bind(e);
+  e.lose = (m: number) => {
+    moved.push(m);
+    lose(m);
+  };
+  const h = () => g.fungus.hyphaeOn(CURTAIN);
+  const stocked = () => [...(h()?.knots ?? [])].find(([, n]) => n.store > 0)?.[0];
+  for (let t = 0; t < 300 && stocked() === undefined; t++) runFor(g, 1);
+  const k = stocked();
+  assert.ok(k !== undefined, "no knot with a store formed in the curtain in 300 s");
+  // Its store came out of the body: what moved equals what the knots hold (none has fruited or been cut yet, or less).
+  const held = [PLANE, CURTAIN].flatMap((l) => [...(g.fungus.hyphaeOn(l)?.knots.values() ?? [])]).reduce((a, n) => a + n.store, 0);
+  assert.ok(held <= moved.reduce((a, m) => a + m, 0) + 1e-9);
+  // Dig the knot's own cell: it stays, and fruits its store onto it.
+  const [kx, ky] = keyCell(k);
+  const knot = h()!.knots.get(k)!;
+  const before = knot.store;
+  g.world!.curtain.rock.set(kx, ky, OPEN);
+  runFor(g, 3);
+  assert.ok(h()!.has(kx, ky), "the knot was cut");
+  assert.ok(knot.store < before, "the store put out nothing");
+  assert.ok(g.fungus.sporesOn(CURTAIN)!.spores.get(kx, ky) > 0, "no spores on the knot's dug cell");
+});

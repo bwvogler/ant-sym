@@ -11,6 +11,7 @@ import {
   CORD_DIGS,
   CORD_FLOW,
   ENTER_GAP,
+  KNOT,
   REGROW_ROUNDS,
   sideFor,
   FRUIT_RUN,
@@ -782,4 +783,80 @@ test("a cut drops the fusions that name the dug cell, so the partner's dead end 
   assert.deepEqual(h.fusions, [], "a fusion pair kept the dug cell");
   for (let r = 0; r < 20; r++) h.regress();
   assert.ok(!h.parent.has(partner), "the partner's dead end never faded");
+});
+
+/** A hypha east from (0, 30): a root and `n` grown cells, its tip at the end, starved for `starved` rounds. */
+function starvedLine(n: number, starved: number): Hyphae {
+  const h = new Hyphae();
+  h.root(0, 30, E);
+  const t = h.tips[0]!;
+  for (let k = 0; k < n; k++) assert.ok(h.extend(t, E, 0));
+  t.starved = starved;
+  return h;
+}
+
+test("a tip starved KNOT.rounds rounds hardens into a knot, drawing in its cell and up to KNOT.pull behind it; their mass is its store (ja-2bw.9)", () => {
+  // Not yet starved long enough, or no knots bought: nothing.
+  assert.equal(starvedLine(6, KNOT.rounds[1] - 1).harden(1), 0);
+  assert.equal(starvedLine(6, 99).harden(0), 0);
+  const h = starvedLine(6, KNOT.rounds[1]);
+  const cells = h.length;
+  const stored = h.harden(1);
+  assert.equal(stored, (KNOT.pull + 1) * HYPHA_MASS);
+  assert.equal(h.length, cells - (KNOT.pull + 1), "the drawn-in cells left the hyphae");
+  assert.equal(h.tips.length, 0, "the tip ended");
+  assert.deepEqual([...h.knots.keys()].map(keyCell), [[6 - KNOT.pull - 1, 30]], "the knot sits behind the cells drawn in");
+  assert.equal(h.knots.get(cellKey(6 - KNOT.pull - 1, 30))!.store, stored);
+  // At *many* it hardens sooner.
+  assert.ok(starvedLine(6, KNOT.rounds[2]).harden(2) > 0);
+  assert.ok(KNOT.rounds[2] < KNOT.rounds[1]);
+  // Never onto a root: a tip one cell from its root draws in nothing and stays a tip.
+  const short = starvedLine(1, 99);
+  assert.equal(short.harden(1), 0);
+  assert.equal(short.tips.length, 1);
+  assert.equal(short.tips[0]!.starved, 0, "its count starts again");
+});
+
+test("stepping counts a tip's starved rounds: short supply and nothing grown adds one, a step that grows resets it (ja-2bw.9)", () => {
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  const tip = h.tips[0]!;
+  for (let r = 0; r < 3; r++) stepTips(h, plane(), 0, { free: 0, tips: 1 });
+  assert.equal(tip.starved, 3);
+  stepTips(h, plane(), 0, { free: 1e9, tips: 1 });
+  assert.equal(tip.starved, 0);
+});
+
+test("a knot is hard: digging its cell doesn't cut it, and it never fades; knots save and load (ja-2bw.9)", () => {
+  const h = starvedLine(8, 99);
+  h.harden(1);
+  const [k] = [...h.knots.keys()];
+  const [kx, ky] = keyCell(k!);
+  for (const c of h.parent.keys()) h.soil.add(c);
+  const g: Ground = { topsoil: false, kind: (x, y) => (x === kx && y === ky ? "open" : "soil") };
+  assert.equal(h.cutDug(g), 0, "the knot was cut");
+  assert.ok(h.has(kx, ky));
+  for (let r = 0; r < 30; r++) h.regress();
+  assert.ok(h.has(kx, ky), "the knot faded");
+  h.knots.get(k!)!.age = 12.5;
+  const back = Hyphae.load(JSON.parse(JSON.stringify(h.save())));
+  assert.deepEqual([...back.knots], [...h.knots]);
+});
+
+test("a knot sprouts one tip KNOT.sprout seconds after forming, onward from where it was fed, when supply is ample (ja-2bw.9)", () => {
+  const h = starvedLine(8, 99);
+  h.harden(1);
+  const [k] = [...h.knots.keys()];
+  const knot = h.knots.get(k!)!;
+  const g = plane();
+  knot.age = KNOT.sprout[1] - 1;
+  assert.equal(h.sproutKnots(g, 1, { free: 1e9, tips: 0 }), 0, "too young");
+  knot.age = KNOT.sprout[1];
+  assert.equal(h.sproutKnots(g, 1, { free: 0, tips: 0 }), 0, "short of mass");
+  assert.equal(h.sproutKnots(g, 1, { free: 1e9, tips: 0 }), 1);
+  assert.deepEqual(
+    h.tips.map((t) => [...keyCell(cellKey(t.x, t.y)), t.heading]),
+    [[...keyCell(k!), E]],
+  );
+  assert.equal(h.sproutKnots(g, 1, { free: 1e9, tips: 1 }), 0, "it sprouts once");
 });

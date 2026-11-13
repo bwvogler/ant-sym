@@ -16,7 +16,7 @@ import {
   type FungalPlace,
   type FungalTouch,
 } from "./fungalPolicy.ts";
-import { Evolution, type EvolutionSave } from "./evolution.ts";
+import { BODY, Evolution, type EvolutionSave } from "./evolution.ts";
 import {
   compose,
   decodeLevels,
@@ -42,6 +42,7 @@ import {
   HYPHA_MASS,
   Hyphae,
   type HyphaeSave,
+  KNOT,
   keyCell,
   stepRound,
   TIP_STEP,
@@ -1068,6 +1069,7 @@ export class Fungus {
     const p = this.params;
     const level = Math.min(TIP_STEP.length - 1, e.level("mycelium"));
     const every = TIP_STEP[level] as number;
+    const knots = e.level("knots");
     let length = 0;
     let tips = 0;
     for (const h of this.#hyphae)
@@ -1086,8 +1088,8 @@ export class Fungus {
     let stepped = false;
     while (clock.clock >= every) {
       clock.clock -= every;
-      // Stumps of cut hyphae regrow into the dug cells they lost (ja-2bw.15).
-      for (const { h, g } of maps) budget.tips += h.resprout(g, level, budget);
+      // Stumps of cut hyphae regrow into the dug cells they lost (ja-2bw.15); knots old enough sprout (ja-2bw.9).
+      for (const { h, g } of maps) budget.tips += h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget);
       stepRound(maps, level, budget, this.growthPolicy);
       stepped = true;
     }
@@ -1099,6 +1101,13 @@ export class Fungus {
         h.thicken();
         const corpses = this.#corpses[l] as Map<number, number>;
         h.regress((k) => corpses.has(k));
+      }
+    // Starved tips harden into knots (ja-2bw.9): the cells they draw in leave the hyphae, and their mass leaves the body
+    // for the knot's store, so the free mass is unchanged.
+    if (stepped && knots > 0)
+      for (const { h } of maps) {
+        const stored = h.harden(knots);
+        if (stored > 0) e.lose(stored);
       }
     // Hypha the ants have dug through is cut, and the mass it held is lost (ja-2bw.4: the colonies' counterplay).
     if (stepped)
@@ -1125,6 +1134,30 @@ export class Fungus {
           if (!(this.#corpses[l] as Map<number, number>).has(cellKey(t.x, t.y)) && this.corpseAt!(l, t.x, t.y) > 0)
             this.colonise(l, t.x, t.y);
       });
+    // Knots age, and fruit their store onto a dug cell they touch (their own, dug open, or one beside), paid by the store
+    // (ja-2bw.9: microsclerotia sporulate from their own reserves, Paixão et al. 2021). A buried knot keeps its store.
+    this.#hyphae.forEach((h, l) => {
+      if (!h || h.knots.size === 0) return;
+      const L = this.#layers[l] as SporeLayer;
+      const g = this.#ground(l);
+      const { w } = L.map.size;
+      const { x0 } = L.map;
+      for (const [k, knot] of h.knots) {
+        knot.age += dt;
+        if (knot.store <= 0 || g.topsoil) continue;
+        const [x, y] = keyCell(k);
+        let at: [number, number] | null = g.kind(x, y) === "open" ? [x, y] : null;
+        for (let d = 0; d < 6 && !at; d++) if (g.kind(nx(x, y, d), ny(y, d)) === "open") at = [nx(x, y, d), ny(y, d)];
+        if (!at) continue;
+        const v = L.spores.get(at[0], at[1]);
+        const put = Math.max(0, Math.min(knot.store, KNOT.rate * dt, (p.maxSpores - v) * BODY.sporeMass));
+        if (put <= 0) continue;
+        knot.store -= put;
+        L.spores.set(at[0], at[1], v + put / BODY.sporeMass);
+        L.sporeStrain.set(at[0], at[1], e.strain);
+        L.sporeCells.add(at[1] * w + at[0] - x0);
+      }
+    });
     // The corpses fruit, free: paid by the cadaver, not the mycelium.
     this.#corpses.forEach((corpses, l) => {
       const L = this.#layers[l] as SporeLayer;

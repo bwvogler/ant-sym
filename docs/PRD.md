@@ -5047,6 +5047,21 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **P1 holds on seeds 1–10:** no seed more than 10 % slower (seed 10 +6.5 %, seeds 1 and 3 +1 %), the median 283 → 270 s, the worst seed never → 475 s. Seed 7 is now faster with hyphae (277 → 261 s).
 - Held out, seeds 11–20 (no hyphae → hyphae): 11 353 → 391, 12 242 → 244, 13 259 → 218, 14 165 → 150, 15 343 → 274, 16 324 → 279, 17 252 → 254, 18 252 → 219, 19 315 → 305, 20 475 → 297 s. Median 287 → 264 s, worst seed 475 → 391 s; only seed 11 misses P1, by a hair (+10.8 %, against +13 % in §63.9). `ja-2bw.6` keeps it.
 
+### 63.11 Knots: starved tips harden into microsclerotia (design, ja-2bw.9, 2026-11-13)
+
+**Basis.** [hyphal-growth §7](hyphal-growth.md#7-structures-cords-knots-stalks-and-fusion): *Metarhizium* microsclerotia are hard, pigmented aggregates of hyphae that form under nutrient and oxidative stress, tolerate drying and UV, sporulate from their own reserves with no outside carbon (Paixão et al. 2021), and in soil put out hyphae again after 3–5 days and persist for most of a year (Marciano et al. 2021). Owner (2026-11-13): the trigger and effects most fitting with that; *Knots*, two levels.
+
+**Design.**
+- **The upgrade.** *Knots*, a spread upgrade: *none* → *a few* (400) → *many* (1500).
+- **Forming (starvation).** A tip that has rested on short supply for `KNOT_ROUNDS` rounds in a row (10 at *a few*, 5 at *many*) hardens where it stands: the tip ends, and its cell and up to `KNOT_PULL` (2) dead-end cells behind it (cells nothing else grew from) are drawn in. Their mass becomes the knot's store; the pulled cells leave the mycelium, so no mass is made. A knot never forms on the plane's landing patch base or a root.
+- **Hard.** Digging a knot's cell open does not cut it: it stays in the tunnel, a hard lump.
+- **Spores from its store.** While a dug cell touches it, a knot turns its store into spores on that cell at `KNOT_RATE` a second, paid by the store, not the mycelium. A buried knot keeps its store until a tunnel reaches it, so a colony digging into one releases its spores on the diggers.
+- **Sprouting.** `KNOT_SPROUT` seconds after it formed (60 at *a few*, 30 at *many*, standing in for days), when the supply is ample, a knot puts out one tip on its far side from where it was fed, and is then spent as a sprouter (it stays hard, and keeps fruiting what is left of its store).
+- **Seen.** A knot draws as a dark dot on its cell; the panel's line and Learn text explain it.
+- **Not asked of Jev.** Knots form by the body's state (starvation), not by a growth answer; no lane changes and nothing is spent.
+
+**Assays.** A starved tip hardens after `KNOT_ROUNDS`; a knot survives its cell being dug; a dug cell beside a knot gets spores from its store and none from the mycelium; a knot sprouts after `KNOT_SPROUT`; mass is conserved; P1 (seeds 1–10, 11–20) with *Knots* bought in the progression order.
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.

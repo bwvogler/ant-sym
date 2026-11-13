@@ -19,6 +19,8 @@ export interface Tip {
   first: number;
   /** cells grown since its last branch: the local rule branches at BRANCH_RUN, so length ÷ tips settles at HGU (Trinci 1974) */
   run: number;
+  /** rounds in a row it has rested on short supply, growing nothing (knots, ja-2bw.9) */
+  starved?: number;
 }
 
 /** A cell as one number (columns may be negative: one world's curtain). */
@@ -55,6 +57,20 @@ export const REGROW_ROUNDS = 5;
  * many cells; then it slides along the wall instead (design, ja-2bw.15: tunnels get hyphae along them, spaced).
  */
 export const ENTER_GAP = 6;
+/**
+ * Knots (microsclerotia, ja-2bw.9, PRD §63.11), by the *Knots* upgrade's level (none, a few, many): a tip that has rested
+ * on short supply for `rounds` rounds in a row hardens (Paixão et al. 2021: they form under nutrient and oxidative
+ * stress), drawing in its own cell and up to `pull` more dead-end cells behind it; their mass is its store. A knot is
+ * hard (digging doesn't cut it), fruits its store at `rate` (mass a second) onto a dug cell it touches, and `sprout`
+ * seconds after forming, with supply ample, puts out a tip again (Marciano et al. 2021: hyphae again after 3–5 days in soil).
+ */
+export const KNOT = { rounds: [0, 10, 5], sprout: [0, 60, 30], pull: 2, rate: 0.05 } as const;
+/** A knot: the mass it holds for spores, seconds since it formed, and whether it has sprouted. */
+export interface Knot {
+  store: number;
+  age: number;
+  sprouted: boolean;
+}
 /** A tip fruits only once it has grown this many cells since it set out or last branched (design, ja-2bw.16: a tip rooted on a wall would otherwise end there at once). */
 export const FRUIT_RUN = 2;
 
@@ -129,6 +145,8 @@ export class Hyphae {
   cords = new Set<number>();
   /** hypha cells faded away unused, over the game (regress) */
   fadedCells = 0;
+  /** knots (ja-2bw.9): hard cells holding a store of mass for spores, by cell */
+  knots = new Map<number, Knot>();
   /** stumps (ja-2bw.15): a cut hypha's surviving cell, the dug cell it lost, and the rounds before it regrows into it */
   stumps = new Map<number, { to: number; wait: number }>();
   /** digs taken by cords lying in dug cells (cutDug): a cord is cut at CORD_DIGS */
@@ -262,6 +280,91 @@ export class Hyphae {
   }
 
   /**
+   * Knots form (ja-2bw.9, PRD §63.11): each tip that has rested on short supply for KNOT.rounds[level] rounds hardens.
+   * It draws in its own cell and up to KNOT.pull more cells behind it, each a dead end once the one beyond is gone (no
+   * other branch, tip, cord, fusion or knot on it, never a root); the knot sits on the cell behind the last one drawn
+   * in, and their mass (HYPHA_MASS each) is its store. A tip that can draw in nothing (its cell feeds a branch, or is a
+   * root's first cell) stays a tip. Returns the mass moved into stores: the caller takes it out of the body, so the
+   * mycelium's free mass is unchanged.
+   */
+  harden(level: number): number {
+    const rounds = KNOT.rounds[level] ?? 0;
+    if (rounds <= 0) return 0;
+    const children = new Map<number, number>();
+    for (const p of this.parent.values()) if (p !== ROOT) children.set(p, (children.get(p) ?? 0) + 1);
+    const fused = new Set(this.fusions);
+    const tipCells = new Map<number, number>();
+    for (const t of this.tips) tipCells.set(cellKey(t.x, t.y), (tipCells.get(cellKey(t.x, t.y)) ?? 0) + 1);
+    let stored = 0;
+    for (const tip of this.tips.slice()) {
+      if ((tip.starved ?? 0) < rounds) continue;
+      let c = cellKey(tip.x, tip.y);
+      const drawn: number[] = [];
+      for (let i = 0; i <= KNOT.pull; i++) {
+        const p = this.parent.get(c);
+        // Never a root, nor a cell whose parent is a root (the knot sits on a grown cell); never a shared cell.
+        if (p === undefined || p === ROOT || this.parent.get(p) === ROOT) break;
+        if ((children.get(c) ?? 0) > 0 || this.cords.has(c) || fused.has(c) || this.knots.has(c)) break;
+        if ((tipCells.get(c) ?? 0) > (i === 0 ? 1 : 0)) break;
+        drawn.push(c);
+        children.set(p, (children.get(p) ?? 1) - 1);
+        c = p;
+      }
+      if (drawn.length === 0) {
+        tip.starved = 0;
+        continue;
+      }
+      for (const k of drawn) {
+        this.parent.delete(k);
+        this.soil.delete(k);
+        this.stumps.delete(k);
+      }
+      this.tips = this.tips.filter((t) => t !== tip);
+      const store = drawn.length * HYPHA_MASS;
+      this.knots.set(c, { store, age: 0, sprouted: false });
+      stored += store;
+    }
+    if (stored > 0)
+      this.fruits = this.fruits.filter((f) => {
+        if (this.parent.has(f)) return true;
+        const [x, y] = keyCell(f);
+        for (let d = 0; d < 6; d++) if (this.parent.has(cellKey(nx(x, y, d), ny(y, d)))) return true;
+        return false;
+      });
+    return stored;
+  }
+
+  /**
+   * Knots sprout (ja-2bw.9): each knot KNOT.sprout[level] seconds old that has not sprouted puts out one tip, on the side
+   * away from the cell it grew from (or the nearest free turn), when the free mass is ample for it. Returns the tips put out.
+   */
+  sproutKnots(g: Ground, level: number, budget: { free: number; tips: number }): number {
+    const after = KNOT.sprout[level] ?? 0;
+    if (after <= 0) return 0;
+    let n = 0;
+    for (const [k, knot] of this.knots) {
+      if (knot.sprouted || knot.age < after || !this.parent.has(k)) continue;
+      if (budget.free < HYPHA_MASS * AMPLE_STEPS * Math.max(1, budget.tips + n)) continue;
+      const [x, y] = keyCell(k);
+      const p = this.parent.get(k)!;
+      let on = 0;
+      if (p !== ROOT) {
+        const [px, py] = keyCell(p);
+        for (let d = 0; d < 6; d++) if (nx(px, py, d) === x && ny(py, d) === y) on = d;
+      }
+      for (const t of [0, 1, -1, 2, -2]) {
+        const d = turn(on, t);
+        if (!enterable(this, g, nx(x, y, d), ny(y, d), 1)) continue;
+        this.tips.push({ x, y, heading: d, first: d, run: 0 });
+        knot.sprouted = true;
+        n++;
+        break;
+      }
+    }
+    return n;
+  }
+
+  /**
    * A round of regrowth (ja-2bw.15): each stump whose wait is over puts out a tip into the cell it lost, if that cell is
    * one a tip may enter now (dug open, or soil it may grow through) and no tip stands on the stump. With `budget`, the tip
    * grows straight into that cell when the free mass pays for it (else it waits on the stump, a tip like any other), so
@@ -301,6 +404,8 @@ export class Hyphae {
   cutDug(ground: Ground): number {
     let lost = 0;
     for (const k of [...this.soil]) {
+      // A knot is hard: dug open, it stays (ja-2bw.9).
+      if (this.knots.has(k)) continue;
       const [x, y] = keyCell(k);
       if (ground.kind(x, y) !== "open") {
         this.digs.delete(k); // filled back in: a cord's count starts again (review of #119, N6)
@@ -360,7 +465,17 @@ export class Hyphae {
     for (const [k, p] of this.parent) {
       if (faded >= REGRESS_PER_ROUND) break;
       // (A leaf with no tip feeds none, so it is never a cord after thicken: that check is defensive, for a caller that skips it.)
-      if (p === ROOT || parents.has(k) || tipCells.has(k) || this.cords.has(k) || fused.has(k) || nearSpot(k) || keep(k)) continue;
+      if (
+        p === ROOT ||
+        parents.has(k) ||
+        tipCells.has(k) ||
+        this.cords.has(k) ||
+        fused.has(k) ||
+        this.knots.has(k) ||
+        nearSpot(k) ||
+        keep(k)
+      )
+        continue;
       this.parent.delete(k);
       this.soil.delete(k);
       faded++;
@@ -375,7 +490,8 @@ export class Hyphae {
       parent: [...this.parent],
       soil: [...this.soil],
       cutCells: this.cutCells,
-      tips: this.tips.map((t) => [t.x, t.y, t.heading, t.first, t.run]),
+      tips: this.tips.map((t) => [t.x, t.y, t.heading, t.first, t.run, t.starved ?? 0]),
+      knots: [...this.knots].map(([k, n]) => [k, n.store, n.age, n.sprouted ? 1 : 0]),
       fusions: [...this.fusions],
       fruits: [...this.fruits],
       cords: [...this.cords],
@@ -394,7 +510,8 @@ export class Hyphae {
     for (const [k, p] of r.parent) h.parent.set(k, p);
     for (const k of r.soil) h.soil.add(k);
     h.cutCells = r.cutCells;
-    h.tips = r.tips.map(([x, y, heading, first, run]) => ({ x, y, heading, first, run }) as Tip);
+    h.tips = r.tips.map(([x, y, heading, first, run, starved]) => ({ x, y, heading, first, run, starved: starved ?? 0 }) as Tip);
+    h.knots = new Map((r.knots ?? []).map(([k, store, age, sprouted]) => [k, { store, age, sprouted: sprouted === 1 }]));
     h.fusions = [...r.fusions];
     h.fruits = [...r.fruits];
     h.cords = new Set(r.cords);
@@ -413,7 +530,8 @@ export interface HyphaeSave {
   parent: [number, number][];
   soil: number[];
   cutCells: number;
-  tips: [number, number, number, number, number][];
+  tips: ([number, number, number, number, number] | [number, number, number, number, number, number])[];
+  knots?: [number, number, number, number][];
   fusions: number[];
   fruits: number[];
   cords: number[];
@@ -696,6 +814,8 @@ function stepTip(
     case "rest":
       break;
   }
+  // Starving: rounds in a row it rested short and grew nothing (knots harden from these, ja-2bw.9).
+  tip.starved = s.supply === "short" && grown === 0 ? (tip.starved ?? 0) + 1 : 0;
   // Where a tip still growing has come to a tunnel, grown FRUIT_RUN cells and with no spot of its own within FRUIT_GAP,
   // the body puts a spore spot on the dug cell and the tip grows on (ja-2bw.15, owner 2026-11-13: spots spaced in the
   // body, whatever the policy answers; conidiation where hyphae meet the air, docs/hyphal-growth.md §6).
