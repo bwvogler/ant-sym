@@ -5,12 +5,28 @@
 
 import type { ColonyParams } from "./params.ts";
 
-/** The sun's height at game time t, 0 at dawn (t = 0 and every heatDay after) to 1 at noon (half a day on): the day's one curve. */
-export function sunHeight(p: ColonyParams, t: number): number {
-  return (1 - Math.cos((2 * Math.PI * t) / p.heatDay)) / 2;
+/**
+ * Where game time t falls in the day, 0 to 1: the sun rises at 0 (t = 0, and every heatDay after), stands highest at half the daylight
+ * (1 − heatNight) / 2, sets at 1 − heatNight, and is down until the next rise.
+ */
+export function dayPhase(p: ColonyParams, t: number): number {
+  const f = t / p.heatDay;
+  return f - Math.floor(f);
 }
 
-/** The ground's heat on the plane at game time t (°C): `heatDawn` at dawn, `heatNoon` at noon, following the sun's height. */
+/** Whether the sun is down at game time t: the last heatNight of each day (heatDay 0: no day, never). */
+export function sunDown(p: ColonyParams, t: number): boolean {
+  return p.heatDay > 0 && dayPhase(p, t) >= 1 - p.heatNight;
+}
+
+/** The sun's height at game time t: 0 at sunrise and sunset, 1 at noon (sin² over the daylight); 0 all night. */
+export function sunHeight(p: ColonyParams, t: number): number {
+  const light = 1 - p.heatNight;
+  const f = dayPhase(p, t);
+  return f >= light ? 0 : Math.sin((Math.PI * f) / light) ** 2;
+}
+
+/** The ground's heat on the plane at game time t (°C): `heatDawn` from sunset to sunrise, `heatNoon` at noon, following the sun's height. */
 export function groundHeat(p: ColonyParams, t: number): number {
   return p.heatDawn + (p.heatNoon - p.heatDawn) * sunHeight(p, t);
 }
@@ -18,6 +34,11 @@ export function groundHeat(p: ColonyParams, t: number): number {
 /** Whether the sun stands high at game time t, as an ant that can see the sky sees it (desert-heat.md §2; the threshold is design). */
 export function sunHigh(p: ColonyParams, t: number): boolean {
   return p.heatDay > 0 && sunHeight(p, t) >= p.heatSunHigh;
+}
+
+/** What an ant that can see the sky sees of the sun at game time t: down (night), high, or low. */
+export function sunSeen(p: ColonyParams, t: number): "down" | "high" | "low" {
+  return sunDown(p, t) ? "down" : sunHigh(p, t) ? "high" : "low";
 }
 
 /**

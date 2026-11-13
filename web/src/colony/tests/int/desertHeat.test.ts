@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PLANE } from "../../colony.ts";
+import { RETURN } from "../../vocab.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
 import { Game, gameRng } from "../../game.ts";
-import { bodyHeatAfter, feelsHot, groundHeat, pastCritical, sunHeight, sunHigh } from "../../heat.ts";
+import { bodyHeatAfter, feelsHot, groundHeat, pastCritical, sunHeight, sunHigh, sunSeen } from "../../heat.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { DEFAULT_COLONY, type ColonyParams } from "../../params.ts";
 import { run } from "../builders.ts";
@@ -13,15 +14,18 @@ import { run } from "../builders.ts";
 
 const P: ColonyParams = { ...DEFAULT_COLONY, ...DESERT_ANT.params } as ColonyParams;
 
-test("the day: the sun and the ground are lowest at dawn and highest at noon", () => {
+test("the day: the sun rises at 0, stands highest at noon, sets, and is down for the night; the ground follows it", () => {
+  const light = (1 - P.heatNight) * P.heatDay;
   assert.equal(sunHeight(P, 0), 0);
-  assert.equal(sunHeight(P, P.heatDay / 2), 1);
+  assert.ok(Math.abs(sunHeight(P, light / 2) - 1) < 1e-12, "noon");
   assert.equal(groundHeat(P, 0), P.heatDawn);
-  assert.equal(groundHeat(P, P.heatDay / 2), P.heatNoon);
-  assert.ok(Math.abs(groundHeat(P, P.heatDay) - P.heatDawn) < 1e-9, "a day later, dawn again");
-  assert.equal(sunHigh(P, 0), false);
-  assert.equal(sunHigh(P, P.heatDay / 2), true);
-  assert.equal(sunHigh({ ...P, heatDay: 0 }, 300), false, "no day, no high sun");
+  assert.ok(Math.abs(groundHeat(P, light / 2) - P.heatNoon) < 1e-9);
+  assert.equal(sunSeen(P, 1), "low");
+  assert.equal(sunSeen(P, light / 2), "high");
+  assert.equal(sunSeen(P, light + 1), "down");
+  assert.equal(groundHeat(P, light + 1), P.heatDawn, "the night is cool");
+  assert.equal(sunSeen(P, P.heatDay + 1), "low", "a day later, the sun is up again");
+  assert.equal(sunSeen({ ...P, heatDay: 0 }, 300), "low", "no day: never high, never down");
 });
 
 test("a body heats toward its surroundings and cools back; hot from heatFelt until under heatCool; past heatDeath it is lethal", () => {
@@ -67,7 +71,7 @@ test("a desert ant sees the sun high only where the sky is in view: out on the p
   assert.ok(plane > 0 && deep > 0, `ants on the plane (${plane}) and deep in the nest (${deep})`);
 });
 
-test("heat kills an ant past its critical heat, counted and named in the journal's cause", () => {
+test("heat kills an ant past its critical heat, and it is counted", () => {
   const g = desert({ heatNoon: 70, heatSunHigh: 1.1 }); // a scorching noon, and no sun cue to keep it in
   run(g, P.heatDay / 2);
   assert.ok(g.player.diedHot > 0, `died of heat: ${g.player.diedHot}`);
@@ -82,6 +86,19 @@ test("the sun's cue keeps foragers in at noon and saves lives: fewer heat deaths
   const withCue = deaths(true);
   const without = deaths(false);
   assert.ok(withCue < without, `heat deaths over a day: ${withCue} with the sun's cue, ${without} without`);
+});
+
+test("at night no ant sets out: on the plane in the dark, only ants on their way home (lost carriers searching for the hole)", () => {
+  const g = desert();
+  const light = (1 - P.heatNight) * P.heatDay;
+  const onPlane = () => g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE).length;
+  run(g, light / 6); // mid-morning
+  const morning = onPlane();
+  run(g, light + (P.heatNight * P.heatDay) / 2 - light / 6); // midnight
+  const midnight = onPlane();
+  const away = g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE && g.player.mode[i] !== RETURN).length;
+  assert.ok(morning > 10, `on the plane in the morning: ${morning}`);
+  assert.equal(away, 0, `at midnight ${midnight} on the plane, ${away} of them not on their way home`);
 });
 
 test("the generic ant has no heat: no body heat, no deaths of heat", () => {

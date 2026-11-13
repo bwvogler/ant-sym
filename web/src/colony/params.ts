@@ -172,6 +172,8 @@ export interface ColonyParams {
   heatCool: number;
   /** the sun's height (0 at dawn, 1 at noon) from which an ant that can see the sky sees it stand high (desert-heat.md §2: design) */
   heatSunHigh: number;
+  /** the share of each day the sun is down: the night, cool and dark, after the daylight (owner, 2026-11-13) */
+  heatNight: number;
   /** the critical body heat (°C): past it, the ant dies */
   heatDeath: number;
   /**
@@ -317,6 +319,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   heatFelt: 48,
   heatCool: 34,
   heatSunHigh: 0.8,
+  heatNight: 1 / 3,
   heatDeath: 53.6,
   routeMemory: 0,
   routeStep: 8,

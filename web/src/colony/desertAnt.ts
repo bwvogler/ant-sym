@@ -1,5 +1,5 @@
 import { atGate } from "./crossing.ts";
-import { sunHigh } from "./heat.ts";
+import { sunSeen } from "./heat.ts";
 import { PLANE } from "./vocab.ts";
 import { localResponses } from "./responses.ts";
 import { MARKS } from "./pheromone.ts";
@@ -18,7 +18,7 @@ export const DESERT_SCHEMA = defineSchema<SpeciesSituation>([
   { name: "mode", values: MODES },
   { name: "tired", values: [false, true], key: (v) => (v ? "tired" : "fresh") },
   { name: "hot", values: [false, true], key: (v) => (v ? "hot" : "cool") },
-  { name: "sun", values: ["low", "high"] },
+  { name: "sun", values: ["low", "high", "down"] },
   { name: "enemy", values: ["none", "near"] },
 ]);
 
@@ -36,7 +36,7 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
       ],
       [
         "sun",
-        "sun is how high the sun stands, as it sees the sky from the open ground or the top of its shaft (deeper in the nest it reads low): the ground is hottest while the sun is high, and a trip out then can kill. ",
+        "sun is how high the sun stands, as it sees the sky from the open ground or the top of its shaft (deeper in the nest it reads low): the ground is hottest while the sun is high, and a trip out then can kill; down is night, when a desert ant, which steers by the sky, cannot find its way. ",
       ],
       [
         "enemy",
@@ -51,15 +51,15 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
     fight: "fight: attack a stranger within reach (only when enemy is near)",
   },
   // 2: fight only with a stranger near (review of #140 D1, owner 2026-11-13: v1 under Warlike fought with nobody near and stalled)
-  // 3: the hot field (ja-rf5.5); 4: the sun field (ja-rf5.12)
-  version: 4,
+  // 3: the hot field (ja-rf5.5); 4: the sun field (ja-rf5.12); 5: the sun down at night (owner, 2026-11-13)
+  version: 5,
   schema: DESERT_SCHEMA,
 };
 
 /** Its local rule: home when hot or tired or a fight is over; otherwise out searching, alone (nothing to follow). Strangers in reach are its contact response's. */
 export const desertPolicy: Policy = (s) => {
   if ((s as SpeciesSituation).hot) return "return";
-  if ((s as SpeciesSituation).sun === "high") return "return";
+  if ((s as SpeciesSituation).sun === "high" || (s as SpeciesSituation).sun === "down") return "return";
   if (s.tired) return "return";
   if (s.mode === "fight") return "return";
   return "explore";
@@ -70,6 +70,7 @@ export const DESERT_RULE_TEXT: ModeRuleText = {
   rows: [
     { when: "it is hot (its body near the heat that kills it)", then: "return", test: (s) => (s as SpeciesSituation).hot === true },
     { when: "the sun stands high (a trip out would cook it)", then: "return", test: (s) => (s as SpeciesSituation).sun === "high" },
+    { when: "the sun is down (night: it steers by the sky)", then: "return", test: (s) => (s as SpeciesSituation).sun === "down" },
     { when: "it is tired (searched long outside without finding food)", then: "return", test: (s) => s.tired },
     { when: "it was fighting", then: "return", test: (s) => s.mode === "fight" },
   ],
@@ -102,7 +103,7 @@ export const DESERT_ANT: Species = {
   // nothing in its jaws fights a stranger it touches, whatever the odds; a carrier takes its load home (owner, review of #138 D1).
   // It senses its own heat (the sense table's own-body row): hot near the heat that kills it.
   // It sees the sun's height where the sky is in view: out on the plane, or at the top of its own shaft (desert-heat.md §2).
-  sense: (c, i) => ({ hot: c.hot[i] === 1, sun: (c.layer[i] === PLANE || atGate(c, i)) && sunHigh(c.params, c.time) ? "high" : "low" }),
+  sense: (c, i) => ({ hot: c.hot[i] === 1, sun: c.layer[i] === PLANE || atGate(c, i) ? sunSeen(c.params, c.time) : "low" }),
   responses: { ...localResponses, contact: (t) => (t.carrying === "none" ? "fight" : "flee") },
   lanes: { mode: DESERT_MODE_WORDS },
   policy: desertPolicy,

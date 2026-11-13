@@ -1,5 +1,5 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { sunHigh } from "./heat.ts";
+import { dayPhase, sunDown, sunHigh } from "./heat.ts";
 import { DESERT_ANT } from "./desertAnt.ts";
 import {
   type Colony,
@@ -13,7 +13,7 @@ import {
   PLANE,
   planeMoundReach,
 } from "./colony.ts";
-import { FAINT, MODES, type Mode, type Policy, type Stance, type StancePolicy } from "./vocab.ts";
+import { FAINT, MODES, RETURN, type Mode, type Policy, type Stance, type StancePolicy } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
@@ -2545,19 +2545,23 @@ export const D5_SECONDS = 1200;
  * the colony forages in the cooler hours and few foragers outlast their heat budget. Pass, all three: ants out on the plane at noon (the day's
  * hottest quarter) no more than 0.75 of those out at dawn (its coolest); heat deaths a day no more than 16 % of the colony (C. bicolor loses
  * about 16 % of its foragers a day to every cause: Schmid-Hempel & Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in
- * every 30 s after the first minute outside the high sun (ja-rf5.12, desert-heat.md: a midday lull is the biology, a day without intake a cliff).
+ * every 30 s after the first minute outside the high sun and the night (ja-rf5.12, desert-heat.md: a midday lull is the biology, a day without
+ * intake a cliff); and at night (the sun down: owner, 2026-11-13) no more than a tenth as many out, and not on their way home, as out in
+ * the low sun of the daylight.
  */
 export const desertHeat: Assay = {
   id: "d5",
   title: "D5 heat: the desert ant forages in the cooler hours and few die of heat (one world, two days)",
   target:
-    "out at noon ≤ 0.75 × out at dawn; heat deaths ≤ 16 % of the colony a day; food every 30 s outside the high sun (design; borrowings unverified)",
+    "out at noon ≤ 0.75 × in the low sun; at night ≤ 0.1 ×; heat deaths ≤ 16 % of the colony a day; food every 30 s outside high sun and night (design; borrowings unverified)",
   seconds: D5_SECONDS,
   spec: (seed) => {
     let noon = 0;
     let noonN = 0;
     let dawn = 0;
     let dawnN = 0;
+    let night = 0;
+    let nightN = 0;
     let aliveSum = 0;
     let aliveN = 0;
     let held: Uint8Array = new Uint8Array(0);
@@ -2589,11 +2593,17 @@ export const desertHeat: Assay = {
         aliveSum += alive;
         aliveN++;
         if (day <= 0) return;
-        const phase = (game.time / day) % 1;
-        if (Math.abs(phase - 0.5) < 0.125) {
+        // The day's quarters of daylight: noon, its middle quarter; the low sun, the first and last eighth of it; then the night.
+        const phase = dayPhase(c.params, game.time);
+        const light = 1 - c.params.heatNight;
+        if (phase >= light) {
+          // At night: those out and not on their way home (a lost carrier still searching for the hole is coming home, not setting out).
+          for (let i = 0; i < c.n; i++) if (c.alive[i] && c.layer[i] === PLANE && c.mode[i] !== RETURN) night++;
+          nightN++;
+        } else if (Math.abs(phase - light / 2) < light / 8) {
           noon += out;
           noonN++;
-        } else if (phase < 0.125 || phase > 0.875) {
+        } else if (phase < light / 8 || phase > light - light / 8) {
           dawn += out;
           dawnN++;
         }
@@ -2604,20 +2614,22 @@ export const desertHeat: Assay = {
         const outNoon = noon / Math.max(1, noonN);
         const outDawn = dawn / Math.max(1, dawnN);
         const ratio = outNoon / outDawn;
+        const outNight = night / Math.max(1, nightN);
         const deathsADay = c.diedHot / days / (aliveSum / Math.max(1, aliveN));
         // The 30-s windows after the first minute, but those in the high sun (any moment of them), where a lull is the biology (desert-heat.md §1).
         const after = bins
           .slice(0, Math.floor(game.time / 30))
-          .filter((_, b) => b >= 2 && ![0, 10, 20, 30].some((s) => sunHigh(c.params, b * 30 + s)));
+          .filter((_, b) => b >= 2 && ![0, 10, 20, 30].some((s) => sunHigh(c.params, b * 30 + s) || sunDown(c.params, b * 30 + s)));
         const minPickups = after.length ? Math.min(...after) : NaN;
         return {
           outNoon,
           outDawn,
           ratio,
+          outNight,
           heatDeaths: c.diedHot,
           deathsADay,
           minPickups,
-          pass: ratio <= 0.75 && deathsADay <= 0.16 && minPickups > 0 ? 1 : 0,
+          pass: ratio <= 0.75 && outNight <= 0.1 * outDawn && deathsADay <= 0.16 && minPickups > 0 ? 1 : 0,
         };
       },
     });
