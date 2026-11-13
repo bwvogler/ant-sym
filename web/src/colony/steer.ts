@@ -89,15 +89,15 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     if (col.mill(i, p.speed * dt)) h = col.towardTarget(i);
     else h += noise * p.wander;
   } else if (outward) {
-    // Out on its heading; a bump turned it (below), and while it wanders after one, it wanders.
+    // Out on its heading; a bump turned it (in moveDig, where the step is blocked), and while it wanders after one, it wanders.
     if (detouring) h += noise * p.wander;
     else h = turnToward(h, col.spoilA[i], p.turnRate * dt) + noise * p.wander * 0.25;
   } else if (mode === RETURN) {
     // Homing uses only what an ant has: its home vector (path integration: real ants count steps
     // against a sky compass), its antennae, and touch. A straight line home walks into the same
     // wall forever (reviews reproduced games where every homing ant of a colony was stuck), so a
-    // blocked step starts wall-following by touch (the Bug2 rule, set up where the step is blocked
-    // below): keep the wall on one side until the ant is nearer home than where it met the wall
+    // blocked step starts wall-following by touch (the Bug2 rule, set up in moveDig, where the step is blocked):
+    // keep the wall on one side until the ant is nearer home than where it met the wall
     // and the way home is open.
     const x = col.x[i];
     const y = col.y[i];

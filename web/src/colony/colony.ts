@@ -29,21 +29,7 @@ import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, type Responses, type Where, type Touch } from "./responses.ts";
-import {
-  blocked,
-  digCell,
-  groundTop,
-  isSky,
-  OPEN,
-  takeLoose,
-  rockAt,
-  setTunnelHeading,
-  SOIL,
-  takeFoodCell,
-  qualityAt,
-  type Nest,
-  type WorldMap,
-} from "./world.ts";
+import { blocked, groundTop, isSky, OPEN, takeLoose, rockAt, takeFoodCell, qualityAt, type Nest, type WorldMap } from "./world.ts";
 import { cellAt, type Transect } from "./transect.ts";
 import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
@@ -53,16 +39,12 @@ import {
   CHAMBER_SPREAD,
   CORPSE_GIVE_UP,
   CROWD_HALF,
-  DIG_FACE,
-  DIG_TIME,
   EDGE,
   ENTRANCE_R,
   ENTRANCE_ZONE,
   FLOOR_PER_ANT,
   FOES_HALF,
-  GLANCE,
   HOLE_SIGHT,
-  HUG_TIME,
   INTAKE_NONE,
   INTAKE_PLENTY,
   INTAKE_WINDOW,
@@ -78,49 +60,30 @@ import {
   MOUND_HEIGHT,
   MOUND_REACH,
   M_LINE_WIDTH,
-  NO_FACE,
   PI_DRIFT,
   RECEPTION_MIN,
   REST,
   ROAD_SIGN,
-  ROOMY_DIG,
   SEARCH_GROW_2D,
   SEARCH_START,
   SPOIL_GIVE_UP,
-  START,
-  START_FACE,
   THREAT_HALF,
   WAIT_STEPS,
-  WALL_LOST,
-  WALL_PROBE,
 } from "./tuning.ts";
-import {
-  NO_CELL,
-  SOIL_DUG,
-  SOIL_FILL,
-  SOIL_LOOSE,
-  cellKey,
-  climb,
-  crossedDir,
-  gauss,
-  planeMoundReach,
-  refilled,
-  soilFace,
-  tunnel,
-  wallSide,
-} from "./grid.ts";
+import { NO_CELL, SOIL_DUG, SOIL_FILL, SOIL_LOOSE, cellKey, climb, planeMoundReach } from "./grid.ts";
 import { DEFAULT_COLONY, LOOP_AT, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife, nurse, port, undertake } from "./nestWork.ts";
-import { chamberDug, crust, dropOut, dropPlane, pickPlane, unbury } from "./dig.ts";
+import { dropOut, dropPlane, pickPlane, unbury } from "./dig.ts";
 import { atHome, destMark, fromHomePlane, integrate, outDistAt, routeRecord } from "./homing.ts";
-import { layMark, nestmatesAround, placeOn, returnsAround, touch, touchProbe } from "./sense.ts";
+import { layMark, nestmatesAround, placeOn, returnsAround, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
 import { stanceStep } from "./stance.ts";
 import { decide } from "./decide.ts";
 import { steer } from "./steer.ts";
+import { moveDig } from "./move.ts";
 import { AntStep } from "./step.ts";
-import { atGate, crossDown, crossUp, crossed, mayCrossUp } from "./crossing.ts";
+import { atGate, crossDown, crossUp, crossed } from "./crossing.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -2074,203 +2037,22 @@ export class Colony {
       h = s.h;
       nest = s.nest;
       const digging = s.digging;
-      // Move; rock or the edge turns the ant back somewhere random.
-      // Rounded to float32 first, as stored: checked in float64, 192.999996 is open ground, and stored as
-      // 193.0 it would land the ant inside the soil cell beyond, where every step is blocked.
-      const nx = Math.fround(this.x[i] + Math.cos(h) * p.speed * dt);
-      const ny = Math.fround(this.y[i] + Math.sin(h) * p.speed * dt);
-      this.detour[i] = this.detour[i] - dt;
-      this.bumps[i] = Math.max(0, this.bumps[i] - dt / 4);
-      // The cell the step lands in: open ground (most steps) moves at once, with no more to check.
-      cellOf(Math.fround(nx), Math.fround(ny)); // as stored (Float32), so the cached cell is the stored position's
-      const lx = CELL[0];
-      const ly = CELL[1];
-      // One world's curtain: a step up into its surface rows (sky; the side view draws the strip from the plane, it is
-      // stored nowhere, one-world §8 item 6) is a crossing, judged below (mayCrossUp), whatever the cell holds.
-      const up = map.surfaceRows !== undefined && ly < map.surfaceRows;
-      let landOpen = up || rockAt(map, lx, ly) === OPEN;
-      if (!landOpen) {
-        // A step that stays in the ant's own cell moves even if that cell is solid: a cell filled round an
-        // ant (another colony's ant backfilling, its grids a tick old) must not bury it.
-        this.antCell(i);
-        if (CELL[0] === lx && CELL[1] === ly) landOpen = true;
-      }
-      let face =
-        !landOpen && mode === EXPLORE && !carrying && !pellet
-          ? soilFace(map, this.x[i], this.y[i], nx, ny, h, this.gx[i], this.gy[i], this.time, this.params.backfill.hold)
-          : NO_FACE;
-      if (face === START_FACE) face = digging || (this.digs(i) && rng() < START * (this.crowded() ? 1 : ROOMY_DIG)) ? DIG_FACE : GLANCE;
-      // Zoned by age (slice 6): only the middle-aged dig; others meeting a face turn along it.
-      else if (face === DIG_FACE && !digging && !this.digs(i)) face = GLANCE;
-      // A roomy nest (ja-wii): a tunnel's end met head-on is dug only now and then; turned along the wall otherwise, so the
-      // next tick doesn't simply try again.
-      else if (face === DIG_FACE && !digging && Number.isNaN(this.digAim[i]) && map.chambers && !this.crowded() && rng() > ROOMY_DIG)
-        face = GLANCE; // (an aimed face passed ROOMY_DIG when it was chosen)
-      // A chamber face it aimed at (widening a chamber, or a new one off a tunnel): dug whatever the tunnel rules say,
-      // but not soil put back moments ago (see refilled: #17's hold on refilled cells).
-      if (face !== NO_FACE && this.chamberCell[i] !== NO_KEY && mode === EXPLORE && !carrying && !pellet) {
-        cellOf(nx, ny);
-        if (
-          this.chamberCell[i] === cellKey(CELL[0], CELL[1]) &&
-          rockAt(map, CELL[0], CELL[1]) === SOIL &&
-          this.digs(i) &&
-          this.crowded() &&
-          !refilled(map, CELL[0], CELL[1], this.time, this.params.backfill.hold)
-        )
-          face = DIG_FACE;
-      }
-      if (face === DIG_FACE && map.sky) {
-        cellOf(nx, ny);
-        const looseFace = map.loose?.get(CELL[0], CELL[1]) === 1;
-        this.antCell(i);
-        // Loose soil is picked up only by the rules of pickLoose (spreading, backfill), never dug at head-on: explorers on
-        // the ground line chewed the mound and carried it to the hole and out again. (From below it can't be met: the ground
-        // under the mound is crust, see crust. Digging it "from below in a quarter of the time" never ran: review of MR 15.)
-        if (looseFace || !this.mayDig(CELL[0], CELL[1])) face = GLANCE;
-      }
-      if (face !== NO_FACE) {
-        // Digging: an explorer that meets soil head-on bites at it for DIG_TIME (1–2 s), then the cell
-        // is open and the ant carries the pellet home. Any other touch of soil puts a hand on the wall.
-        if (face === GLANCE) {
-          this.digT[i] = 0; // a face that stopped being diggable (a neighbour dug beside it) is left
-          this.digAim[i] = NaN;
-          this.hugT[i] = HUG_TIME;
-          // Facing along the wall, the soil it touched ahead on its hand side.
-          this.gdir[i] = (crossedDir(map, this.x[i], this.y[i], nx, ny) - this.hand[i] + 6) % 6;
-          this.gx[i] = NO_CELL;
-        } else if (!digging) {
-          cellOf(nx, ny);
-          this.digT[i] = DIG_TIME * (1 + rng());
-        } else {
-          const left = this.digT[i] - dt;
-          this.digT[i] = Math.max(0, left);
-          cellOf(nx, ny);
-          const fx = CELL[0];
-          const fy = CELL[1];
-          if (left <= 0 && crust(this, fx, fy)) {
-            // The side view: the ground line's crust is left (see crust); it turns along it instead.
-            this.digT[i] = 0;
-            this.digAim[i] = NaN;
-            this.hugT[i] = HUG_TIME;
-            this.gx[i] = NO_CELL;
-          } else if (left <= 0 && digCell(map, fx, fy, this.time)) {
-            // A chamber face: the cell joins its chamber (or founds a new one, if there is still room for one there).
-            if (this.chamberCell[i] === cellKey(fx, fy) && map.chambers) chamberDug(this, i, fx, fy);
-            this.chamberCell[i] = NO_KEY;
-            // The new cell carries the tunnel's run on: the heading chosen at the end, or the way it was dug.
-            const aim = this.digAim[i];
-            setTunnelHeading(
-              map,
-              fx,
-              fy,
-              Number.isNaN(aim) ? DIR_ANGLE[crossedDir(map, this.x[i], this.y[i], nx, ny)] + gauss(rng) * this.params.tunnelDrift : aim,
-            );
-            this.digAim[i] = NaN;
-            this.soilDug++;
-            this.pellet[i] = 1;
-            this.since[i] = 0;
-            this.lastDug[i] = cellKey(fx, fy);
-            this.looked[i] = NO_KEY; // a new trip home: every cell on it is looked round afresh
-            this.cameFrom[i] = NO_KEY;
-            this.homeAfresh(i); // a fresh trip home: the bumps and detour it ran up exploring the tunnels are behind it
-            h += Math.PI;
-          }
-        }
-      } else if (!landOpen) {
-        this.digT[i] = 0;
-        // Read afresh: a give-up earlier this tick has just started a wander, and must not start a new wall.
-        const wandering = this.detour[i] > 0;
-        if (mode === RETURN && !wandering && !outward) {
-          // Homing: start (or keep) following this wall by touch instead of turning at random.
-          const x = this.x[i];
-          const y = this.y[i];
-          if (this.wall[i] === 0) {
-            const toNest = Math.atan2(nest.y - y, nest.x - x);
-            // Underground, every wall (soil, or rock in dug ground) is followed cell by cell, and re-anchors the
-            // line home: the review of #10 found carriers circling rock specks in caverns by touch for up to
-            // 120 s, out of reach of every release the cell-by-cell follower has. On open ground, rock keeps the
-            // touch rule. The cell is the landing cell the step was judged on (lx, ly: float32, as stored).
-            const cellWall = map.hasSoil || rockAt(map, lx, ly) === SOIL;
-            const newTrip = Number.isNaN(this.mx[i]);
-            if (newTrip) this.noGain[i] = 0;
-            if (newTrip || cellWall) {
-              // The first rock this trip: remember where, so the line from here to the nest is the way home it
-              // keeps returning to. Walls underground re-anchor it at every wall: in dug ground the ant meets speck
-              // after speck, and heading home from wherever it left the last one it is rarely back on the
-              // first wall's line, so it would circle a speck until it gave up (review of MR 8).
-              this.mx[i] = x;
-              this.my[i] = y;
-            }
-            this.wall[i] = wallSide(
-              touchProbe(this, x, y, toNest - WALL_PROBE, 1.2),
-              touchProbe(this, x, y, toNest + WALL_PROBE, 1.2),
-              rng,
-            );
-            // Underground, the distance to beat is the nearest it has been this trip (re-anchoring the line at
-            // every wall must not forget progress, or it could leave a wall and meet it again for ever).
-            const d = Math.hypot(nest.x - x, nest.y - y);
-            this.hitDist[i] = cellWall && !newTrip ? Math.min(this.hitDist[i], d) : d;
-            // Back on a wall it lost touch with: the clock runs on, or let-go and re-bump would never give up.
-            if (!(this.untouched[i] > WALL_LOST)) this.followT[i] = 0;
-            this.untouched[i] = 0;
-            // Facing the wall it met, turned away from the side it keeps the wall on; the first cell decides the way on.
-            this.gdir[i] = (crossedDir(map, x, y, nx, ny) - this.wall[i] + 6) % 6;
-            this.gx[i] = NO_CELL;
-            cellOf(x, y);
-            const hx = CELL[0];
-            const hy = CELL[1];
-            this.byCell[i] = cellWall || tunnel(map, hx, hy) ? 1 : 0;
-          }
-          if (!this.byCell[i])
-            h -= this.wall[i] * (Math.PI / 2); // by touch: turn away from the wall, along it
-          else {
-            // By cell and blocked: it stands right on its cell's edge (a straight line from inside a cell to a neighbour's
-            // centre never leaves the two), so the way to the next cell grazes the solid one beside it and every step lands
-            // there. A quarter of the way back to its own cell's centre takes it off the edge. Not only when it was already
-            // following a wall (the first rule): where the wall is let go of before the next step (every tick
-            // on the ground line; a release into scent in a tunnel), the ant was blocked the same way every tick, for good
-            // (review of #17: about 20 homing ants frozen in the walkway cell above the hole; 21 at one cell in a tunnel on
-            // seed 3 with the fixes of PRD §40, before this).
-            this.antCell(i);
-            this.x[i] = x + (centreX(CELL[0], CELL[1]) - x) * 0.25;
-            this.y[i] = y + (centreY(CELL[1]) - y) * 0.25;
-          }
-        } else {
-          h += Math.PI / 2 + rng() * Math.PI;
-          // Each bump soon after another doubles the detour: 0.5–1.5 s, then 1–3 s, … up to 8–24 s.
-          // Not for a homing ant already on one (after giving up on a wall): in a tunnel it bumps all
-          // the time, and topping the detour up would keep it from ever trying for home again.
-          this.bumps[i] = Math.min(5, this.bumps[i] + 1);
-          if (mode !== RETURN || outward) this.detour[i] = Math.max(this.detour[i], 0.5 * 2 ** Math.floor(this.bumps[i]) * (0.5 + rng()));
-          // Carrying out on the plane (U3c): on from here the way it turned, not back into the rock.
-          if (outward) this.spoilA[i] = h;
-        }
-      } else if (up) {
-        // One world's curtain: a step up out of a hole (the crust is open nowhere else) is onto the surface, the plane's.
-        // Up it goes if it may (mayCrossUp); else it is pointed back down the shaft, as the side view's young are. Either
-        // way its step ends here.
-        if (mayCrossUp(this, i)) {
-          cellOf(x0, y0);
-          crossUp(this, i, CELL[0], CELL[1]);
-        } else {
-          h = this.pointDown(i, x0, y0, h);
-          // It has touched the surface, as the side view's young step onto the ground before they are put back: its floor
-          // marks start afresh at the next chamber (layMark). Laying on, the young turned back at the hole marked the
-          // shaft's top with brood and royal, which drew more young there (toBrood): in the spike up to 13 were held
-          // there for minutes.
-          this.lastRole[i] = 0;
-        }
-        this.heading[i] = h;
-        continue;
-      } else {
-        this.digT[i] = 0; // the face it was digging opened (another ant dug it), or it turned off it (its aim stays: it is walking up to the face)
-        this.x[i] = nx;
-        this.y[i] = ny;
-        this.cellX[i] = lx;
-        this.cellY[i] = ly;
-        this.cellAtX[i] = this.x[i];
-        this.cellAtY[i] = this.y[i];
-      }
+      s.p = p;
+      s.rng = rng;
+      s.map = map;
+      s.dt = dt;
+      s.h = h;
+      s.carrying = carrying;
+      s.pellet = pellet;
+      s.outward = outward;
+      s.nest = nest;
+      s.x0 = x0;
+      s.y0 = y0;
+      s.mode = mode;
+      s.digging = digging;
+      const moveDigDone = moveDig(this, i, s);
+      h = s.h;
+      if (moveDigDone) continue;
 
       // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
       const ndx = this.x[i] - home.x;

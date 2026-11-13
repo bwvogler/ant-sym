@@ -1,6 +1,7 @@
 // After tick-stage.mjs: add a new stage file's imports, from tsc's "Cannot find name" errors and the colony modules' exports.
 // From the repo root: node scripts/lab/tick-stage-imports.mjs <file.ts>. Then run tsc again. Colony and AntStep come out as `import type`;
-// another class used only as a type comes out as a value import: fix that by hand.
+// another class used only as a type comes out as a value import, and a
+// name imported under another name (nx as stepX) is reported not found: fix those by hand.
 import { execSync } from "node:child_process";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -14,9 +15,11 @@ try {
   out = e.stdout;
 }
 const names = new Set(
-  [...out.matchAll(new RegExp(`src/colony/${file.replace(".", "\\.")}\\(\\d+,\\d+\\): error TS2304: Cannot find name '(\\w+)'`, "g"))].map(
-    (m) => m[1],
-  ),
+  [
+    ...out.matchAll(
+      new RegExp(`src/colony/${file.replace(".", "\\.")}\\(\\d+,\\d+\\): error TS(?:2304|2552): Cannot find name '(\\w+)'`, "g"),
+    ),
+  ].map((m) => m[1]),
 );
 const where = new Map(); // name -> [module, isType]
 for (const f of readdirSync(dir).filter((f) => f.endsWith(".ts") && f !== file)) {
