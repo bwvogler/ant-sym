@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PLANE } from "../../colony.ts";
-import { RETURN } from "../../vocab.ts";
-import { DESERT_ANT } from "../../desertAnt.ts";
+import { RETURN, type SpeciesSituation } from "../../vocab.ts";
+import { atGate } from "../../crossing.ts";
+import { DESERT_ANT, DESERT_SCHEMA, desertPolicy } from "../../desertAnt.ts";
 import { Game, gameRng } from "../../game.ts";
 import { bodyHeatAfter, feelsHot, groundHeat, pastCritical, sunHeight, sunHigh, sunSeen } from "../../heat.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -56,19 +57,40 @@ test("a desert ant sees the sun high only where the sky is in view: out on the p
   (c.params as { heatSunHigh: number }).heatSunHigh = 0.1; // the sun counts as high from here, for the sense alone
   assert.ok(sunHigh(c.params, c.time), "the test's own check");
   let plane = 0;
+  let top = 0;
   let deep = 0;
   for (let i = 0; i < c.n; i++) {
     if (!c.alive[i]) continue;
     const was = c.cur;
     c.bind(c.layer[i]);
     const sun = DESERT_ANT.sense!(c, i).sun;
+    const gate = c.layer[i] !== PLANE && atGate(c, i);
     c.bind(was);
     if (c.layer[i] === PLANE) {
       assert.equal(sun, "high", `ant ${i} on the plane`);
       plane++;
-    } else if (sun === "low") deep++;
+    } else if (gate) {
+      assert.equal(sun, "high", `ant ${i} at the top of its shaft (review of #155, S2)`);
+      top++;
+    } else {
+      assert.equal(sun, "low", `ant ${i} deeper in the nest`);
+      deep++;
+    }
   }
-  assert.ok(plane > 0 && deep > 0, `ants on the plane (${plane}) and deep in the nest (${deep})`);
+  assert.ok(plane > 0 && top > 0 && deep > 0, `ants on the plane (${plane}), at the top of the shaft (${top}) and deeper in (${deep})`);
+});
+
+test("the local rule sends a hot ant home, whatever else it senses (review of #155, S2)", () => {
+  for (let code = 0; code < DESERT_SCHEMA.size; code++) {
+    const sit = DESERT_SCHEMA.decode(code);
+    const hot = sit as SpeciesSituation;
+    if (hot.hot === true) assert.equal(desertPolicy(sit), "return", DESERT_SCHEMA.key(sit));
+  }
+  // A cool, fresh explorer under a low sun with nobody near goes on: the rule above is the heat's, not every answer.
+  assert.equal(
+    desertPolicy({ mode: "explore", tired: false, hot: false, sun: "low", enemy: "none" } as unknown as SpeciesSituation),
+    "explore",
+  );
 });
 
 test("heat kills an ant past its critical heat, and it is counted", () => {

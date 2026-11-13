@@ -1058,10 +1058,10 @@ export default function ColonyField({
         ctx.globalAlpha = 0.28 * k;
         ctx.fillStyle = theme.warn;
         ctx.fillRect(0, 0, v.w, v.h);
-        // Night (the sun down): a dark wash; the desert ants are in.
+        // Night (the sun down): a dark wash; the desert ants are in. Black in both themes: the ink is pale in dark mode (review of #155, S1).
         if (sunDown(hp, colonies[0]!.time)) {
           ctx.globalAlpha = 0.3;
-          ctx.fillStyle = theme.ink;
+          ctx.fillStyle = "#000";
           ctx.fillRect(0, 0, v.w, v.h);
         }
         ctx.globalAlpha = 1;
