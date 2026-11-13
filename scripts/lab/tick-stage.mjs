@@ -126,6 +126,7 @@ for (const [sym, list] of refs) {
 }
 const typeOf = (sym) => {
   const decl = sym.valueDeclaration ?? sym.declarations[0];
+  if (decl.type) return decl.type.getText(); // its annotation, as written (a union of literals stays one)
   let t = checker.getTypeOfSymbolAtLocation(sym, decl);
   t = checker.getBaseTypeOfLiteralType(t);
   return checker.typeToString(t, decl, ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
