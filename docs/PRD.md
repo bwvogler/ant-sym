@@ -5027,6 +5027,24 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **Owner (2026-11-13): ship, record, and tune in `ja-2bw.6`** (`ENTER_GAP`, `REGROW_ROUNDS`, `FRUIT_GAP` join its knobs).
 - Held out, seeds 11–20 (no hyphae → along tunnels): 11 353 → 399, 12 242 → 243, 13 259 → 223, 14 165 → 146, 15 343 → 285, 16 324 → 280, 17 252 → 264, 18 252 → 226, 19 315 → 308, 20 475 → 314 s. Median 287 → 272 s, worst seed 475 → 399 s; P1 fails only on seed 11 (+13 %).
 
+### 63.10 Seed 7 traced; a cut loses only the dug cell (ja-2bw.19, 2026-11-13)
+
+**The baseline moved.** §63.8 found seed 7 29 % slower to a quarter with hyphae than without, on `main`, where §63.7 had them level. Bisected over `main`'s merges between them (#107 to #130, with #130's landing applied at each point): seed 7 without hyphae reaches a quarter at 397 s before #107 (food sensed only through open ground) and at 277 s from #107 on; the hyphae did not get slower.
+
+**Why the hyphae lagged.** From Mycelium level 1 (bought at 23 s) side-view tips grow through undug soil, and on seed 7 the colony digs where they grow. A cut used to kill everything that grew beyond it, with its mass: 14 cells at 90 s, 25 at 112 s from a single trunk cell, 49 by 120 s. The mycelium fell from 19.6 to 12.4 mass while without hyphae it reached 24.5; spores follow mass, so at minute 5 7 % were infected against 47 %.
+
+**Built.** **Owner (2026-11-13): the severed part lives on.** A severed hypha seals the wound and grows on from what it holds: a cut now loses only the dug cell (its `HYPHA_MASS`), and each cell that grew from it becomes a root, with its tips, cords and spots. The stump still regrows into the dug cell (§63.9); a cord still takes `CORD_DIGS` digs; a spot goes only once no hypha touches it. On seed 7: 7 cells cut by 120 s and mass 22.9, against 24.5 without hyphae.
+
+**Measured** (`progression.mjs --map one --evolve`, 600 s, `main` at `b789e8c`):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a quarter, no hyphae (s) | 357 | 363 | 289 | 173 | 228 | never | 277 | never | 240 | 216 |
+| a quarter, hyphae (s) | 361 | 278 | 293 | 162 | 205 | 475 | 261 | 355 | 241 | 230 |
+
+- **P1 holds on seeds 1–10:** no seed more than 10 % slower (seed 10 +6.5 %, seeds 1 and 3 +1 %), the median 283 → 270 s, the worst seed never → 475 s. Seed 7 is now faster with hyphae (277 → 261 s).
+- SEEDS_11_20
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
