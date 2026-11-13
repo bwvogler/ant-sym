@@ -4710,7 +4710,9 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 
 **Cost** (`node scripts/colony-cost.mjs --one --species desert`, offline; `--species` new here): ~479 tokens a question, 9 of its 16 situations met in a 10-minute session, **≈ $0.004/h** while a doctrine is new, against the generic ant's ~828 tokens a question and ≈ $0.11/h on the same run. Cached games spend nothing.
 
-**Not yet:** its precache. Shipping Jev's answers needs a live check (`colony-live`), about 16 situations × 3 preset doctrines ≈ 23,000 tokens ≈ $0.001, at the owner's say (§64); until then it plays its local rule.
+**Its precache, from a live check** (owner's go, 2026-11-13; `ja-rf5.9`): `node scripts/precache.mjs --species desert` (`--species` new here) asks all 16 situations under each preset doctrine: 3 requests, 48 questions, all 16 situations in one request so the legend is shared (the offline ~479 tokens a question was for the page's smaller batches). Shipped as `mode-desert-<doctrine>.json`, marked `species: desert` in `index.json`; `precache.test` checks them against the desert ant's own context, every situation of its schema once, and its choices.
+- **First asking (words v1, $0.0003, ~148 tokens a question):** under Warlike, Jev sent desert ants to fight with no stranger near, and nothing brought them out: offline on seeds 1–3 (60 ants alone, 120 s) all 60 ended up fighting nothing and the colony stored no food (review of #140, D1).
+- **Owner (2026-11-13): reword and re-ask.** Words v2 say fight is for a stranger within reach, and that with nobody near a fighter does nothing. Re-asked: $0.0003, ~159 tokens a question. No doctrine fights with nobody near now. Jev agrees with the local rule on 9 of 16 situations (Forage), 11 (Cautious) and 6 (Warlike); offline, 60 ants alone, seeds 1–3, every doctrine stores 73, 31 and 63 food (the local rule 73, 31, 61), none fighting at the end. Without a rival the doctrines differ only around strangers. Spent on the desert ant in all: $0.0006.
 
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 

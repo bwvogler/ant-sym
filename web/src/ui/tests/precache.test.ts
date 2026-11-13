@@ -22,6 +22,10 @@ import {
   growthContext,
 } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
+import { DESERT_ANT, type Species } from "../../colony/index.ts";
+
+/** The species whose own bundles ship (ja-rf5.9), by id: their bundles are checked against their own words. */
+const SHIPPED_SPECIES: Record<string, Species> = { desert: DESERT_ANT };
 
 // The answers shipped with the page (scripts/precache.mjs → public/precache/) are only worth their bytes if the code
 // still asks under the contexts they were asked under. A legend, question or version change moves the context: then
@@ -65,6 +69,7 @@ test("every shipped bundle is under the context the code asks under, for a prese
   // A lane asked under the fungus's aim (the fungus, its tips' growth) ships a bundle per preset aim; the ants' lanes one per doctrine.
   const byAim = new Set(LANE_LIST.filter((l) => l.wordsField === "aim").map((l) => l.name as string));
   for (const b of index.bundles as (PrecacheIndex["bundles"][number] & { aim?: string })[]) {
+    if (b.species) continue; // a species' own bundle: checked against its own words below
     const d = byAim.has(b.lane) ? AIMS.find((x) => x.id === b.aim) : DOCTRINES.find((x) => x.id === b.doctrine);
     assert.ok(d, `${b.file}: no preset doctrine or aim`);
     const ctx = CONTEXT[b.lane];
@@ -78,7 +83,7 @@ test("every shipped bundle is under the context the code asks under, for a prese
 test("every preset doctrine ships mode and stance answers, each situation once, and only answers the question allows", () => {
   for (const lane of ["mode", "stance"])
     for (const d of DOCTRINES) {
-      const b = index.bundles.find((x) => x.lane === lane && x.doctrine === d.id);
+      const b = index.bundles.find((x) => x.lane === lane && x.doctrine === d.id && !x.species);
       assert.ok(b, `no ${lane} bundle for ${d.id}`);
       const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
       assert.equal(pairs.length, b.answers);
@@ -142,5 +147,35 @@ test("every preset aim ships fungus answers for the side view, each a level for 
     const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
     assert.ok(pairs.length > 50, `${b.file}: only ${pairs.length} situations`);
     for (const [key, answer] of pairs) assert.ok(validLevels(key, answer), `${b.file}: ${key} → ${answer}`);
+  }
+});
+
+test("a species' own bundles: under its own context, every situation of its schema once, only the choices its words allow (ja-rf5.9)", () => {
+  const own = index.bundles.filter((b) => b.species);
+  assert.ok(
+    own.some((b) => b.species === "desert"),
+    "the desert ant ships its answers",
+  );
+  for (const b of own) {
+    const sp = SHIPPED_SPECIES[b.species!];
+    assert.ok(sp, `${b.file}: no species ${b.species} here`);
+    const words = sp.lanes.mode!;
+    const d = DOCTRINES.find((x) => x.id === b.doctrine);
+    assert.ok(d, `${b.file}: no preset doctrine`);
+    assert.equal(b.lane, "mode");
+    assert.equal(
+      b.context,
+      policyContext(d.text, words),
+      `${b.file} was asked under another context: re-run scripts/precache.mjs --species ${b.species}`,
+    );
+    const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
+    assert.equal(pairs.length, b.answers);
+    const keys = new Set(Array.from({ length: words.schema!.size }, (_, c) => words.schema!.key(words.schema!.decode(c))));
+    assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
+    assert.equal(pairs.length, words.schema!.size, `${b.file}: every situation of its schema (review of #140, S1)`);
+    for (const [k, a] of pairs) {
+      assert.ok(keys.has(k), `${b.file}: ${k} is none of its situations`);
+      assert.ok(Object.keys(words.criteria).includes(a), `${b.file}: ${a} is not one of its choices`);
+    }
   }
 });
