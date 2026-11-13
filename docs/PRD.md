@@ -5231,6 +5231,20 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 6. lines joining: not yet;
 7. whether the bounded game stays: as a test bed until E6.
 
+**E1.1 built (`ja-qpv.1.1`, 2026-11-13).** Storage only; behaviour is bit-exact.
+- **Faded scent is freed.** A pheromone chunk that falls asleep is dropped, and its buffers go back to a pool that keeps as many arrays as the most awake channel needs (at least 16). Before, it was kept zeroed for good. A missing chunk reads 0, as the zeroed one did, so nothing an ant senses changes.
+- **The golden hash ignores empty chunks.** The golden helper (`tests/goldens.ts`) leaves out chunks bit-identical to the layer's empty fill and hashes in explicit (cy, cx) order. Whether a layer keeps an empty chunk is storage, not behaviour. The goldens were re-recorded once for that alone, before the drop, and pass unchanged after it, the slow golden included.
+- **Memory** (`node --expose-gc scripts/lab/chunk-memory.mjs`, the page's game, seed 1, 800 + 800 ants, 600 s), the new baseline for E4's soak:
+
+  | | Scent chunks (blank) | Scent MB | Array buffers |
+  |---|---|---|---|
+  | main | 216 (54) | 3.4 | 13.9 MB |
+  | E1.1 | 162 (0) | 2.5 | 13.1 MB |
+
+  The map's layers hold 202 chunks (1.9 MB) and the other layers 110 (1.1 MB, 34 blank), unchanged. The heap is 15.1 MB either way.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, two runs each): main 10.74 and 10.68 ms mean, E1.1 10.88 and 10.65 ms; within noise.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).
