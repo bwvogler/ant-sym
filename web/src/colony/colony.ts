@@ -150,7 +150,7 @@ import {
   wallSide,
 } from "./grid.ts";
 import { DEFAULT_COLONY, LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN, channelParams, type ColonyParams } from "./params.ts";
-import { walkTunnel } from "./tunnel.ts";
+import { fetches, walkTunnel } from "./tunnel.ts";
 import { middenSmell, nestLife, nurse, port, undertake } from "./nestWork.ts";
 import { backfill, chamberDug, chamberGoal, crust, dropOut, dropPlane, enterStale, pickPlane, putDown, staleStep, unbury } from "./dig.ts";
 import {
@@ -3381,7 +3381,30 @@ export class Colony {
         // Food in sight, unless soil stands between (it touched soil a moment ago): then keep a hand on the wall.
         if (seen && !(this.hugT[i] > 0)) h += climb(fl, ff, fr, p.turnRate * dt);
         else if (walkTunnel(this, i, EXPLORE, p.speed * dt)) h = this.towardTarget(i);
-        else if (this.queen?.alive && this.band(i) === 0 && this.under[i])
+        else if (
+          p.restFetch > 0 &&
+          this.queen &&
+          this.under[i] &&
+          !this.carrying[i] &&
+          !this.pellet[i] &&
+          !this.broodHeld[i] &&
+          fetches(this, i)
+        ) {
+          // Fetching in a chamber (ja-4rfr): toward the stores' marks its antennae meet (as toFood in a tunnel), through
+          // open ground; none in reach, it searches the nest (it is not leaving: a hungry old forager headed for the hole).
+          const x = this.x[i];
+          const y = this.y[i];
+          const d = p.sensorDistance;
+          const read = (b: number) => {
+            const sx = x + Math.cos(b) * d;
+            const sy = y + Math.sin(b) * d;
+            return inReach(map, x, y, sx, sy) ? ph.read("store", sx, sy) : 0;
+          };
+          const l = read(h - a);
+          const f = read(h);
+          const r = read(h + a);
+          h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt) : noise * p.wander;
+        } else if (this.queen?.alive && this.band(i) === 0 && this.under[i])
           h = turnToward(h, Math.atan2(this.queen.y - this.y[i], this.queen.x - this.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
         else if (this.entrance && this.outbound(i) && this.under[i])
           h =
