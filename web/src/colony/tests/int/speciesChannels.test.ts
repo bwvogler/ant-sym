@@ -2,8 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
 import { inertLevers } from "../../levers.ts";
-import { CHANNELS, Pheromones, type Channel } from "../../pheromone.ts";
+import { CHANNELS, MARKS, Pheromones, type Channel } from "../../pheromone.ts";
 import { GENERIC_ANT, type Species } from "../../species.ts";
+import type { Policy, Situation } from "../../vocab.ts";
+import { localPolicy } from "../../colony.ts";
 import { generateWorld, mulberry32 } from "../../world.ts";
 import { smallOne } from "../builders.ts";
 
@@ -29,9 +31,14 @@ test("a channel the species lacks takes no scent and reads 0; the others work as
 test("the fungus's levers on channels a species lacks are inert", () => {
   assert.deepEqual(inertLevers(null), [], "the generic ant: none");
   assert.deepEqual(inertLevers(NO_ALARM).sort(), ["alarm", "alarmLaid"]);
-  const trailless = inertLevers(["home"]);
-  for (const id of ["food", "rival", "trail", "leak", "alarm", "alarmLaid", "marks"]) assert.ok(trailless.includes(id), id);
-  assert.ok(!trailless.includes("home"));
+  // home trail only: the food-scent levers have nothing to bend, the trail lever still lays home trail (review of #127, S1)
+  const homeOnly = inertLevers(["home"]);
+  for (const id of ["food", "rival", "leak", "alarm", "alarmLaid", "marks"]) assert.ok(homeOnly.includes(id), id);
+  for (const id of ["home", "trail"]) assert.ok(!homeOnly.includes(id), id);
+  // no home trail but the marks: the home gain still scales the road signs
+  assert.ok(!inertLevers(["food", ...MARKS]).includes("home"));
+  assert.ok(inertLevers(["food"]).includes("home"), "nor home trail nor marks: home is inert");
+  assert.ok(inertLevers(["alarm", "noEntry", "raid"]).includes("trail"), "nothing it lays: trail is inert");
   assert.ok(!inertLevers(["home", "royal"]).includes("marks"), "a lever on several channels still acts while the species has one of them");
 });
 
@@ -48,4 +55,17 @@ test("a species without alarm raises none in a game where the generic ant does",
   };
   assert.equal(alarmed(GENERIC_ANT), true, "the generic ant raises alarm here");
   assert.equal(alarmed(QUIET), false);
+});
+
+test("a species without the chambers' marks can't tell which chamber it is in (owner, review of #127 D1)", () => {
+  const places = (has: readonly Channel[] | null) => {
+    const seen = new Set<Situation["homeTrail"]>();
+    const spy: Policy = (s) => (seen.add(s.homeTrail), localPolicy(s));
+    const species: Species = { ...GENERIC_ANT, id: "s", policy: spy, params: { channelSet: has } };
+    const g = new Game(smallOne(7), { antCount: 60, rival: false, species }, mulberry32(3));
+    for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
+    return [...seen].filter((h) => (MARKS as readonly string[]).includes(h));
+  };
+  assert.ok(places(null).length > 0, "the generic ant reads chamber roles underground");
+  assert.deepEqual(places(CHANNELS.filter((ch) => !(MARKS as readonly string[]).includes(ch))), [], "without the marks: plain tunnel");
 });

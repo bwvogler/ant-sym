@@ -2761,6 +2761,8 @@ export class Colony {
   /** A chamber's role as ant i smells it (nest slice 8): the fungus can blunt its floor marks (it can't tell) or swap brood and store. */
   #perceivedPlace(i: number, role: Mark | null): Mark | null {
     if (!role) return null;
+    // A species without this chamber's mark can't smell which chamber it is in: it reads plain tunnel (owner, review of #127 D1).
+    if (!this.ph.has(role)) return null;
     if (this.gainMarks[i] < 0.5) return null;
     return this.swapMarks[i] >= 0.5 ? swapBroodStore(role) : role;
   }

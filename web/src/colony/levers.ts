@@ -131,7 +131,8 @@ export const LEVERS: readonly Lever[] = [
   },
   {
     id: "home",
-    channels: ["home"],
+    // the home gain scales the road signs too (review of #127)
+    channels: ["home", ...MARKS],
     kind: "perceive",
     name: "home scent",
     blurb: "how strongly the host smells the way home: damped, it ranges far; boosted, it clings to home",
@@ -200,7 +201,8 @@ export const LEVERS: readonly Lever[] = [
   // Emission: what the host gives off.
   {
     id: "trail",
-    channels: ["food"],
+    // it scales every trail and mark the host lays (review of #127)
+    channels: ["food", "home", ...MARKS],
     kind: "emit",
     name: "trail laid",
     blurb: "how much trail the host lays: damped, a quiet host leaves little; boosted, loud trails",
