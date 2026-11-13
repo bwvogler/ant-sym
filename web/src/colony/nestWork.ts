@@ -55,6 +55,7 @@ import {
 import { ENEMY, EXPLORE, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { isSky } from "./world.ts";
 import { climbOut } from "./homing.ts";
+import { around, touch } from "./sense.ts";
 
 export function portView(col: Colony): void {
   if (col.portViewAt === col.time) return;
@@ -198,7 +199,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
         return false;
       }
     }
-    if (!col.responses.drop(col.touch(i, enemy, col.mode[i], "food"))) return false;
+    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"))) return false;
     col.carrying[i] = 0;
     col.stock(c, 1);
     if (col.porter[i]) (col.portTrips++, (col.inJaws -= 1));
@@ -324,7 +325,7 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
     if (b.held < 0 && hexDistance(b.x, b.y, cx, cy) <= 2 && ((inRoyal && b.stage === EGG && to >= 0) || b.chamber < 0)) {
       if (to < 0) to = royal;
       if (to < 0) return;
-      if (!col.responses.get(col.touch(i, enemy, col.mode[i], "none", "brood"))) return;
+      if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "brood"))) return;
       b.held = i;
       if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
       b.chamber = -1;
@@ -356,7 +357,7 @@ export function undertake(col: Colony, i: number, dt: number, calm: boolean): vo
   if (outside ? Math.abs(cx - col.entranceCol) > MIDDEN_NEAR : col.band(i) !== 1 || (mode === FIGHT && !col.inOwnNest(cx, cy))) return;
   for (const k of col.corpses)
     if (k.held < 0 && (k.layer ?? col.home) === col.cur && hexDistance(k.x, k.y, cx, cy) <= 2) {
-      if (!col.responses.get(col.touch(i, !calm, mode, "none", "corpse"))) return;
+      if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"))) return;
       k.held = i;
       col.clearPellet(i);
       col.corpse[i] = 1;
@@ -526,7 +527,7 @@ export function nestLife(col: Colony, dt: number): void {
         // Fed by the nurses round it (the colony's own ants within two cells), from the food lying in its chamber:
         // to its energy first, the rest to its growth. A young colony's queen feeds the brood by her: all of her first
         // brood while she founds alone (ja-lo8.9), then what her nanitics, out foraging, leave untended (ja-lo8.10).
-        let nurses = col.friends ? col.around(col.friends, b.x, b.y) : 2;
+        let nurses = col.friends ? around(col.friends, b.x, b.y) : 2;
         if ((col.founding || col.incipient) && q.alive) {
           // She feeds as two nurses would, beside whatever workers are there (PR #54 review: one nanitic by the brood
           // halved its feeding when she stood in only for none).
@@ -651,7 +652,7 @@ export function alatesOut(col: Colony, dt: number): void {
         const cy = CELL[1];
         const room = col.map.chambers.list[col.map.chambers.at(cx, cy)];
         if (room && room.colony === col.params.nest && room.food > 0) {
-          const nurses = col.friends ? col.around(col.friends, cx, cy) : 2;
+          const nurses = col.friends ? around(col.friends, cx, cy) : 2;
           const take = Math.min(room.food, ALATE_RESERVE - a.food, ALATE_FEED * Math.min(1, nurses / 2) * dt);
           if (take > 0) {
             a.food += take;

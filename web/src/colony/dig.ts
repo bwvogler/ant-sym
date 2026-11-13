@@ -21,6 +21,7 @@ import {
 import { FAINT, PLANE } from "./vocab.ts";
 import { OPEN, dropFood, fillCell, groundTop, heapMound, heapPlane, isSky, openCell, rockAt, takePlane, type Nest } from "./world.ts";
 import { fromHomePlane } from "./homing.ts";
+import { touch } from "./sense.ts";
 
 /** The middle of the midden: its column (side view). */
 export function middenCol(self: Colony): number {
@@ -474,7 +475,7 @@ export function pickPlane(self: Colony, i: number, cx: number, cy: number, enemy
     }
     if (!steep) return false;
   }
-  if (!self.responses.get(self.touch(i, enemy, self.mode[i], "none", "soil"))) return false;
+  if (!self.responses.get(touch(self, i, enemy, self.mode[i], "none", "soil"))) return false;
   if (!takePlane(map, cx, cy)) return false;
   self.pellet[i] = 1;
   self.soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;
