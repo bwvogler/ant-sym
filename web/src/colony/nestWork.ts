@@ -56,6 +56,7 @@ import { ENEMY, EXPLORE, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { isSky } from "./world.ts";
 import { climbOut } from "./homing.ts";
 import { around, touch } from "./sense.ts";
+import { ageWorkers, dropBrood } from "./body.ts";
 
 export function portView(col: Colony): void {
   if (col.portViewAt === col.time) return;
@@ -285,17 +286,17 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
     // In its chamber, or beside it (a chamber a cell or two wide can be passed by), it puts the brood down there;
     // holding it too long (lost round a ring of tunnels: review of slice 4), wherever it is (a held larva goes unfed).
     const to = col.broodTo[i];
-    if (ch.at(cx, cy) === to) col.dropBrood(i);
+    if (ch.at(cx, cy) === to) dropBrood(col, i);
     else {
       for (let d = 0; d < 6; d++) {
         const ax = stepX(cx, cy, d);
         const ay = stepY(cy, d);
         if (ch.at(ax, ay) === to) {
-          col.dropBrood(i, ax, ay);
+          dropBrood(col, i, ax, ay);
           return;
         }
       }
-      if ((col.holdT[i] = col.holdT[i] + dt) > HOLD_MAX) col.dropBrood(i);
+      if ((col.holdT[i] = col.holdT[i] + dt) > HOLD_MAX) dropBrood(col, i);
     }
     return;
   }
@@ -425,7 +426,7 @@ export function worksInside(col: Colony, i: number): boolean {
 export function nestLife(col: Colony, dt: number): void {
   const ch = col.map.chambers!;
   const p = col.params;
-  col.ageWorkers(dt);
+  ageWorkers(col, dt);
   const q = col.queen!;
   if (q.alive) {
     cellOf(q.x, q.y);

@@ -22,6 +22,7 @@ import { FAINT, PLANE } from "./vocab.ts";
 import { OPEN, dropFood, fillCell, groundTop, heapMound, heapPlane, isSky, openCell, rockAt, takePlane, type Nest } from "./world.ts";
 import { fromHomePlane } from "./homing.ts";
 import { touch } from "./sense.ts";
+import { dropBrood } from "./body.ts";
 
 /** The middle of the midden: its column (side view). */
 export function middenCol(self: Colony): number {
@@ -534,7 +535,7 @@ export function putDown(self: Colony, i: number): void {
       self.clearPellet(i);
     } else if (isSky(self.map, cx, cy)) dropOut(self, i, cx);
     else return;
-  } else if (self.broodHeld[i]) self.dropBrood(i);
+  } else if (self.broodHeld[i]) dropBrood(self, i);
   self.mx[i] = NaN;
   self.gx[i] = NO_CELL;
 }
