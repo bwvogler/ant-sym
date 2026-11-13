@@ -1,6 +1,15 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, type Situation, type FungalSituation, generateWorld, mulberry32, OPEN_WORLD } from "../../colony/index.ts";
+import {
+  Colony,
+  DEFAULT_RULE,
+  Fungus,
+  type Situation,
+  type FungalSituation,
+  generateWorld,
+  mulberry32,
+  OPEN_WORLD,
+} from "../../colony/index.ts";
 import { ColonyJev, type CacheStore } from "../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
@@ -183,4 +192,29 @@ test("a 409 ends the run and cancels what is still in flight: Start again asks i
   release();
   await tick(30);
   assert.equal(j.explain(a).by, "jev");
+});
+
+test("one menu: Fungus.configure alone changes the levers Jev asks (ja-d87)", async () => {
+  const { reqs } = proxy({ answer: () => "1" });
+  const j = make();
+  const f = new Fungus(generateWorld(1, OPEN_WORLD));
+  f.configure(DEFAULT_RULE, ["calm", "alarm"]);
+  j.attachFungus(f);
+  j.setAim("x");
+  await j.start();
+  f.configure(DEFAULT_RULE, ["calm"]); // a script or test, with no setMenu
+  j.fungusPolicy(fungal());
+  await tick(40);
+  assert.equal(fungusRequests(reqs).length, 1);
+  assert.deepEqual(
+    Object.keys(fungusRequests(reqs)[0]!.questions),
+    ["h0_calm"],
+    "asked under the fungus's menu, not the one Jev saw first",
+  );
+  assert.deepEqual(j.explainFungus(fungal()), { answer: "1", by: "jev" });
+  f.menu = ["alarm"];
+  assert.notEqual(j.explainFungus(fungal()).by, "jev", "the answer was for calm: the fungus's new menu has no answer yet");
+  j.setMenu(new Set(["calm"]));
+  assert.deepEqual([...f.menu], ["calm"], "setMenu writes the fungus's menu: one source");
+  assert.deepEqual(j.explainFungus(fungal()), { answer: "1", by: "jev" });
 });

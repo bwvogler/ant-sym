@@ -50,7 +50,6 @@ const FIRST_DOCTRINES: DoctrineChoice[] = COLONY_NAMES.map(() => ({ id: DOCTRINE
 export function useColonyJev(
   colonies: readonly Colony[],
   fungus: Fungus,
-  menu: readonly string[],
   backend: Backend | null = null,
   journal: Journal | null = null,
   species: Species = GENERIC_ANT,
@@ -96,9 +95,8 @@ export function useColonyJev(
   const count = colonies.length;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => jev.attachColonies(colonies, species), [jev, colonies, count, species]);
-  // The fungus spans the game: the lane drives each new game's, under the player's menu.
+  // The fungus spans the game: the lane drives each new game's, under the menu the fungus holds (useColony configures it).
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
-  useEffect(() => jev.setMenu(new Set(menu)), [jev, menu]);
 
   // A run starts at the first miss where Jev can run (shouldStart), or by hand (Details → Resume).
   const [starting, setStarting] = useState(false);

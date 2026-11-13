@@ -228,8 +228,10 @@ export class ColonyJev {
   #doctrines: string[] = [];
   #store: CacheStore | null;
   #fungus: Fungus | null = null;
-  /** the menu the fungus lane asks under: the attached fungus's, or every non-lethal lever */
+  /** the menu the fungus lane asks under: a copy of the attached fungus's (one source, ja-d87), or before one, every non-lethal lever */
   #menu: Set<string> = new Set(DEFAULT_MENU);
+  /** the fungus's menuSeq when #menu was copied from it */
+  #menuSeq = -1;
   // The levers asked (the menu's, in table order) are in each key, so a question is packed and its answer read and
   // kept against the levers it asked, whatever the menu is by the time it lands.
   #fungal = lane<FungalSituation, string>({
@@ -265,7 +267,19 @@ export class ColonyJev {
   });
   /** The levers the fungus lane asks for a host in situation s: the menu's, a queen's or a worker's, in table order. */
   #asked(s?: FungalSituation): string[] {
+    this.#followMenu();
     return askedLevers(this.#menu, s?.task === "queen");
+  }
+  /**
+   * Copy the fungus's menu if it changed since (whoever set it: setMenu, Fungus.configure, a load). Queued questions were
+   * keyed under the old menu: dropped, the hosts ask again. Questions in flight are read against the levers they asked.
+   */
+  #followMenu(): void {
+    const f = this.#fungus;
+    if (!f || f.menuSeq === this.#menuSeq) return;
+    this.#menuSeq = f.menuSeq;
+    this.#menu = f.menu; // the fungus drops what its map can't run (NEST_ONLY on top-down maps)
+    this.#fungal.queue.clear();
   }
   /** caches by context, shared by every lane asking under it */
   #caches = new Map<string, PolicyCache<string>>();
@@ -498,7 +512,8 @@ export class ColonyJev {
     this.#fungus = fungus;
     fungus.bindPolicy("fungus", this.fungusPolicy);
     fungus.bindPolicy("growth", this.growthPolicy);
-    this.setMenu(fungus.menu);
+    this.#menuSeq = -1;
+    this.#followMenu();
     this.#recontext(this.#fungal, this.#fungal.words); // the view is part of the fungus's context (fungusContext)
   }
 
@@ -509,17 +524,18 @@ export class ColonyJev {
   }
 
   /**
-   * The player's menu: the levers the fungus may pull. Which levers are asked is part of every question, so it is in
-   * the key: answers under a menu used before still hold. Queued questions were keyed under the old menu: dropped, the
-   * hosts ask again. Questions in flight are read against the levers they asked.
+   * The player's menu: the levers the fungus may pull, set on the attached fungus (the one source: Fungus.configure
+   * changes it as well). Which levers are asked is part of every question, so it is in the key: answers under a menu
+   * used before still hold.
    */
   setMenu(menu: Set<string>): void {
-    this.#menu = new Set(menu);
     if (this.#fungus) {
       this.#fungus.menu = menu;
-      this.#menu = new Set(this.#fungus.menu); // the fungus drops what its map can't run (NEST_ONLY on top-down maps)
+      this.#followMenu();
+    } else {
+      this.#menu = new Set(menu);
+      this.#fungal.queue.clear();
     }
-    this.#fungal.queue.clear();
   }
 
   /**

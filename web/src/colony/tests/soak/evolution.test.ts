@@ -348,7 +348,8 @@ test("the fungus's save holds every private field it declares, or the field is d
   for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
   // Each map's hyphae and the corpses it grows out of (ja-2bw) are saved; the spore spots under its hyphae are rebuilt each round.
   const saved = { evolution: "evolution", menu: "menu", clock: "clock", hyphae: "hyphae", corpses: "corpses" } as Record<string, string>;
-  const derived = ["reach", "evade", "listed"];
+  // menuSeq counts menu changes for readers caching the menu (ja-d87): a load sets the menu, which bumps it.
+  const derived = ["reach", "evade", "listed", "menuSeq"];
   const scratch = ["made", "nb", "sporeSpots"];
   // Each map's spores, base and step grids (ja-lp4.3): layer 0's spore cells and base are saved; its grids are per-step scratch.
   const layered = { layers: ["sporeCells", "base"] } as Record<string, string[]>;

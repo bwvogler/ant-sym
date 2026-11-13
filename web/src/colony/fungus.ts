@@ -227,6 +227,11 @@ const NOTHING = 1e-6;
 /** Ground spores below this are gone. */
 const SPORE_GONE = 1e-3;
 
+/** Ground spores at or above which the field draws a cell (and the panel and minimap count it): a fiftieth of SPORE_FULL. */
+export const SPORE_SHOWN = 0.06;
+/** Ground spores the field draws at full strength. */
+export const SPORE_FULL = 3;
+
 /** The last local coordinate in a chunk. */
 const EDGE = CHUNK - 1;
 /** A cell and its six hex neighbours as offsets into a chunk's flat array, for an even row ([0]) and an odd row ([1]): chunks are 64 wide, so a row's parity in its chunk is its parity on the map. */
@@ -393,6 +398,11 @@ export class Fungus {
   rule: FungusRule = { ...DEFAULT_RULE };
   /** the levers the player has on (§5.1, lever 4): lethal ones start off; the nest's (NEST_ONLY) only where there is a nest */
   #menu: Set<string> = new Set(DEFAULT_MENU);
+  #menuSeq = 0;
+  /** Bumped each time the menu is set (configure, the setter, a load): a reader caching the menu knows it changed (ja-d87). */
+  get menuSeq(): number {
+    return this.#menuSeq;
+  }
   /** A copy: adding to it changes nothing (review of #27: adding "crown" to the live set skipped the NEST_ONLY filter). Set it to change the menu. */
   get menu(): Set<string> {
     return new Set(this.#menu);
@@ -401,6 +411,7 @@ export class Fungus {
     // On the top-down maps there are no chambers or queen: floor marks and crown would do nothing (review of nest slice 8).
     const nest = this.hasNest;
     this.#menu = new Set([...menu].filter((id) => nest || !NEST_ONLY.has(id)));
+    this.#menuSeq++;
   }
   /** Whether any of its maps has a nest underground (chambers, a queen): the side view's, one world's curtain. */
   get hasNest(): boolean {
@@ -491,6 +502,20 @@ export class Fungus {
   get sporeCells(): number {
     let n = 0;
     for (const L of this.#layers) n += L.sporeCells.size;
+    return n;
+  }
+
+  /** Cells holding enough spores for the field to draw them (SPORE_SHOWN), on every map: what the player can see (ja-agx). */
+  get shownSporeCells(): number {
+    let n = 0;
+    for (const L of this.#layers) {
+      const { w } = L.map.size;
+      const { x0 } = L.map;
+      for (const key of L.sporeCells) {
+        const col = key % w;
+        if (L.spores.get(col + x0, (key - col) / w) >= SPORE_SHOWN) n++;
+      }
+    }
     return n;
   }
 
