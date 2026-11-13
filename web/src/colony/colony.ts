@@ -401,6 +401,12 @@ export interface ColonyParams {
   mortalWithoutQueen: boolean;
   /** whether the colony's middle-aged carry its dead out to the midden (#undertake). A species that does not (the desert ant) sets false, and its dead lie where they fell. */
   undertakes: boolean;
+  /**
+   * Whether the species has a follow mode (ja-fnd.5.9): the generic ant does. A species whose mode words drop `follow` (the Game derives this
+   * from them) never enters FOLLOW: an ant that put its load down heads out exploring, a returner leaves as an explorer, and a policy's
+   * `follow` (a stale answer, a rule that offers it) is read as explore. Its action set, not a choice: the policy chooses among the rest.
+   */
+  follows: boolean;
   /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
   odour: number;
   /** odours further apart than this are strangers, as a healthy ant perceives it */
@@ -475,6 +481,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   raidScout: 1 / 90,
   scoutRate: 1 / 90,
   undertakes: true,
+  follows: true,
   lifespan: LIFESPAN,
   youngShare: YOUNG,
   middleShare: MIDDLE,
@@ -676,8 +683,9 @@ export class Colony {
   /** one world: every nest's hole on both layers (HoleCell), indexed by colony as the maps' nests are; empty elsewhere */
   holeCells: HoleCell[] = [];
   params: ColonyParams;
-  policy: Policy;
-  stancePolicy: StancePolicy;
+  /** what an ant of this colony does in a situation, and what the colony's strategist chooses: read here, set through `bindPolicy` (the lane's answers: the local rule, Jev's cached answers, a test's) */
+  readonly policy: Policy;
+  readonly stancePolicy: StancePolicy;
   /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
   responses: Responses = localResponses;
   stance: Stance = "forage";
@@ -1258,6 +1266,18 @@ export class Colony {
     }
     CELL[0] = this.cellX[i];
     CELL[1] = this.cellY[i];
+  }
+
+  /**
+   * Bind a lane's policy to this colony (the one place a policy is set after the constructor: the page's Jev client, the assays and the tests go through it,
+   * not a field). "mode": an ant's choice in its situation; "stance": the colony's strategist.
+   */
+  bindPolicy(lane: "mode", fn: Policy): void;
+  bindPolicy(lane: "stance", fn: StancePolicy): void;
+  bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
+    const own = this as { policy: Policy; stancePolicy: StancePolicy };
+    if (lane === "mode") own.policy = fn as Policy;
+    else own.stancePolicy = fn as StancePolicy;
   }
 
   /** Ant i as a healthy ant: it perceives the world as it is, gives off no calming cue, and smells of its nest alone (from the next odour step). */
@@ -4821,7 +4841,8 @@ export class Colony {
         this.leaveOk[i] = 1;
       }
     } else if (gated && p.arrive !== "return" && this.mode[i] === RETURN && !this.pellet[i] && this.band(i) === 2 && !this.#isTired(i)) {
-      this.mode[i] = p.arrive === "follow" && !this.recruited[i] ? FOLLOW : EXPLORE;
+      // `p.follows` here is defensive (review of #121, N1): no shipped species sets arrive "follow", and the policy guard turns a follower to explore anyway.
+      this.mode[i] = p.arrive === "follow" && p.follows && !this.recruited[i] ? FOLLOW : EXPLORE;
       this.asked[i] = -1;
       this.restT[i] = 0;
     }
@@ -5113,7 +5134,7 @@ export class Colony {
         if (this.loaded[i]) {
           this.loaded[i] = 0;
           if (p.arrive !== "return" && mode === RETURN) {
-            mode = FOLLOW;
+            mode = p.follows ? FOLLOW : EXPLORE;
             this.mode[i] = mode;
           }
         }
@@ -5151,6 +5172,7 @@ export class Colony {
             }),
           );
           if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
+          if (mode === FOLLOW && !p.follows) mode = EXPLORE; // a species with no follow mode can't follow (ja-fnd.5.9)
           // Zoned by age: an ant that may not go out is no raider. Sent raiding, a young one climbed to its hole, was put
           // back down the shaft, and climbed again (review of #26: 70–93 of ~110 young raiders parked at the hole). With
           // no enemy near, it explores (with one near, it fights where it is).
@@ -6044,7 +6066,8 @@ export class Colony {
         (!gate || (!rolled && this.#leaves(i, dt, toEnemy !== null)))
       ) {
         // A raid scout starts exploring, not on a food trail (review of #53, N6).
-        this.mode[i] = p.arrive === "follow" && !this.recruited[i] ? FOLLOW : EXPLORE;
+        // `p.follows`: defensive, as at the gated hole (review of #121, N1).
+        this.mode[i] = p.arrive === "follow" && p.follows && !this.recruited[i] ? FOLLOW : EXPLORE;
         this.asked[i] = -1;
         this.restT[i] = 0;
       }

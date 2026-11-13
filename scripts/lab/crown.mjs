@@ -21,7 +21,7 @@ const map = generateSideWorld(seed);
 const g = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 7919));
 const target = g.colonies[1];
 g.fungus.menu = new Set([...g.fungus.menu, "crown"]);
-g.fungus.policy = (s) => (s.place === "queen" || s.place === "chamber" ? "crown" : "default");
+g.fungus.bindPolicy("fungus", (s) => (s.place === "queen" || s.place === "chamber" ? "crown" : "default"));
 
 let diedAt = -1;
 let painted = false;

@@ -366,12 +366,24 @@ export class Fungus {
   #corpses: Map<number, number>[];
   /** the corpses lying at (x, y) on map `layer` (the midden's), for a hypha that reaches one; set by the game */
   corpseAt: ((layer: number, x: number, y: number) => number) | null = null;
-  /** the growth policy (ja-2bw.5): a tip's answer in its situation, or null for the local rule (hyphae.ts localGrowth) */
-  growthPolicy: ((s: GrowthSituation) => GrowthAnswer | null) | null = null;
+  /** the growth policy (ja-2bw.5): a tip's answer in its situation, or null for the local rule (hyphae.ts localGrowth); set through `bindPolicy` */
+  readonly growthPolicy: ((s: GrowthSituation) => GrowthAnswer | null) | null = null;
   /** loaded ants after the last step or paint: zero (and no spores) means the step has nothing to do */
   hosts = 0;
-  /** the fungus policy: null for the local rule with `rule`; the Jev lane sets its own (ui/colonyJev.ts) */
-  policy: FungusPolicy | null = null;
+  /** the fungus policy: null for the local rule with `rule`; the Jev lane sets its own (ui/colonyJev.ts) through `bindPolicy` */
+  readonly policy: FungusPolicy | null = null;
+
+  /**
+   * Bind a lane's policy to the fungus (the one place it is set: the page's Jev client, the assays and the tests go through it, not a field). "fungus": its
+   * levels for a host in a situation (null: the local rule with `rule`); "growth": a hypha tip's answer (null: the local rule).
+   */
+  bindPolicy(lane: "fungus", fn: FungusPolicy | null): void;
+  bindPolicy(lane: "growth", fn: ((s: GrowthSituation) => GrowthAnswer | null) | null): void;
+  bindPolicy(lane: "fungus" | "growth", fn: FungusPolicy | ((s: GrowthSituation) => GrowthAnswer | null) | null): void {
+    const own = this as { policy: FungusPolicy | null; growthPolicy: ((s: GrowthSituation) => GrowthAnswer | null) | null };
+    if (lane === "fungus") own.policy = fn as FungusPolicy | null;
+    else own.growthPolicy = fn as ((s: GrowthSituation) => GrowthAnswer | null) | null;
+  }
   /** the local rule's settings (the player's thresholds) */
   rule: FungusRule = { ...DEFAULT_RULE };
   /** the levers the player has on (§5.1, lever 4): lethal ones start off; the nest's (NEST_ONLY) only where there is a nest */
@@ -1072,6 +1084,15 @@ export class Fungus {
       stepRound(maps, level, budget, this.growthPolicy);
       stepped = true;
     }
+    // At a web (the Mycelium upgrade's third level, ja-2bw.8): the hyphae feeding many tips thicken into cords, which take
+    // CORD_DIGS digs to cut, and dead ends nothing uses fade, freeing their mass (a corpse's cell is kept).
+    if (stepped && e.level("mycelium") >= 2)
+      for (const [l, h] of this.#hyphae.entries()) {
+        if (!h) continue;
+        h.thicken();
+        const corpses = this.#corpses[l] as Map<number, number>;
+        h.regress((k) => corpses.has(k));
+      }
     // Hypha the ants have dug through is cut, and the mass it held is lost (ja-2bw.4: the colonies' counterplay).
     if (stepped)
       for (const { h, g } of maps) {

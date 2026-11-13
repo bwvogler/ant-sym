@@ -87,11 +87,11 @@ if (isMainThread) {
         )
       : new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
   const menu = g.fungus.menu;
-  g.fungus.policy = (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT;
+  g.fungus.bindPolicy("fungus", (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT);
   if (growth) {
     const { growthKey } = await import("../../web/src/colony/growthBrain.ts");
     const grows = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/growth-${aim}.json`, import.meta.url), "utf8")));
-    g.fungus.growthPolicy = (s) => grows.get(growthKey(s)) ?? null;
+    g.fungus.bindPolicy("growth", (s) => grows.get(growthKey(s)) ?? null);
   }
   g.land(
     0,

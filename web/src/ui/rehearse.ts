@@ -26,11 +26,12 @@ export function copyOf(game: Game, fresh: Game): Game {
   game.colonies.forEach((c, k) => {
     const d = fresh.colonies[k];
     if (!d) throw new Error(`copyOf: the copy has no colony ${k}`);
-    d.policy = c.policy;
-    d.stancePolicy = c.stancePolicy;
+    d.bindPolicy("mode", c.policy);
+    d.bindPolicy("stance", c.stancePolicy);
     d.responses = c.responses;
   });
-  fresh.fungus.policy = game.fungus.policy;
+  fresh.fungus.bindPolicy("fungus", game.fungus.policy);
+  fresh.fungus.bindPolicy("growth", game.fungus.growthPolicy);
   return fresh;
 }
 

@@ -47,12 +47,12 @@ const asked = new Set();
 const queue = new Map();
 let tokens = 0;
 let requests = 0;
-g.fungus.policy = (s) => {
+g.fungus.bindPolicy("fungus", (s) => {
   const levers = g.fungus.asked;
   const key = fungalKey(s, levers);
   if (worthAsking(levers) && !asked.has(key)) queue.set(key, { situation: s, asked: levers });
   return play === "bloom-crown" ? crown(s) : local(s);
-};
+});
 const flush = () => {
   const items = [...queue.entries()].filter(([k]) => !asked.has(k));
   queue.clear();

@@ -111,7 +111,7 @@ test("the game's step holds a lethal answer too: a policy that culls estranges n
   c.strain[0] = GARDEN;
   const f = new Fungus(map);
   f.configure({ hide: false, cull: true }, ["weapon"]);
-  f.policy = () => "cull"; // every situation answered with the odour weapon, as the local rule does in a fight
+  f.bindPolicy("fungus", () => "cull"); // every situation answered with the odour weapon, as the local rule does in a fight
   f.evolve(GARDEN);
   f.hosts = 1; // load set by hand: tell the step there is a host to step
   run(f, [c], 0.2);
@@ -278,7 +278,7 @@ test("the queen's levels are held too: Stealth decides how far she can hide (PR 
   g.land(0, GARDEN, { evolve: true });
   const f = g.fungus;
   const q = g.colonies[0]!.queen!;
-  f.policy = () => "dormant"; // hide: showing at its lowest level
+  f.bindPolicy("fungus", () => "dormant"); // hide: showing at its lowest level
   const settle = () => {
     q.load = 0.5;
     q.strain = GARDEN;

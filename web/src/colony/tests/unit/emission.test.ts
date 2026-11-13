@@ -131,7 +131,7 @@ test("the fungus writes what a host gives off: share is loud and leaks, soothe f
   c.strain[1] = lockpick;
   const f = new Fungus(map, { grooming: 0 });
   f.hosts = 2;
-  f.policy = strainDefault; // these tests are about levers, not the policy
+  f.bindPolicy("fungus", strainDefault); // these tests are about levers, not the policy
   f.step([c], [occupancy(c, new CountGrid())], 1e-6);
   assert.equal(c.expr[0], preset("share"));
   assert.ok(Math.abs(c.layGain[0] - 1.5) < 1e-5);

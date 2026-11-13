@@ -147,7 +147,7 @@ test("one world: a rested returner with empty jaws is held at the top as soon as
   const g = game();
   const c = g.player;
   // Homing rested and empty (a fight over, say): the local rule would send it exploring on the plane at once.
-  c.policy = (s) => (s.mode === "return" ? "return" : s.mode);
+  c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : s.mode));
   const i = 0;
   c.age[i] = ageOf(2);
   const p = planeHole(own(c));

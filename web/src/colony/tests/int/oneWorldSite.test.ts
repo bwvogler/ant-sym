@@ -230,7 +230,7 @@ test("site fidelity: a new colony remembers nothing, the default is off, and a s
 
 test("site fidelity: a trail-follower with a memory is not drawn to it", () => {
   const { g, c, hx, hy } = plane();
-  c.policy = () => "follow";
+  c.bindPolicy("mode", () => "follow");
   c.foodX[0] = -40;
   c.foodY[0] = 0;
   out(c, hx + 12, hy, 0);
