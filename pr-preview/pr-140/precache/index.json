@@ -24,23 +24,23 @@
     {
       "lane": "growth",
       "aim": "peace",
-      "context": "growth-v1-17c7689e",
+      "context": "growth-v2-9c810716",
       "file": "growth-peace.json",
-      "answers": 24
+      "answers": 48
     },
     {
       "lane": "growth",
       "aim": "spread",
-      "context": "growth-v1-21bb1fd3",
+      "context": "growth-v2-84f5a29b",
       "file": "growth-spread.json",
-      "answers": 24
+      "answers": 48
     },
     {
       "lane": "growth",
       "aim": "unite",
-      "context": "growth-v1-7fd0ad37",
+      "context": "growth-v2-19463c4f",
       "file": "growth-unite.json",
-      "answers": 24
+      "answers": 48
     },
     {
       "lane": "mode",
@@ -53,7 +53,7 @@
       "lane": "mode",
       "doctrine": "cautious",
       "species": "desert",
-      "context": "colony-v1-7eec72dd",
+      "context": "colony-v2-bbf1470f",
       "file": "mode-desert-cautious.json",
       "answers": 16
     },
@@ -61,7 +61,7 @@
       "lane": "mode",
       "doctrine": "forage",
       "species": "desert",
-      "context": "colony-v1-5138f896",
+      "context": "colony-v2-cb38db30",
       "file": "mode-desert-forage.json",
       "answers": 16
     },
@@ -69,7 +69,7 @@
       "lane": "mode",
       "doctrine": "warlike",
       "species": "desert",
-      "context": "colony-v1-00767b88",
+      "context": "colony-v2-d07cb2ea",
       "file": "mode-desert-warlike.json",
       "answers": 16
     },
@@ -113,6 +113,6 @@
     "colony": 7,
     "stance": 4,
     "fungus": 8,
-    "growth": 1
+    "growth": 2
   }
 }
