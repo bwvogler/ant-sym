@@ -40,6 +40,7 @@ import {
 import { crust } from "./dig.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { AIR, OPEN, SOIL, isSky, markFork, rockAt, takeFork, tunnelHeading, type Nest } from "./world.ts";
+import { believe, climbOut, destMark, holeMetric, searchOn, targetHole, towardHole } from "./homing.ts";
 
 /**
  * The chance a raider about to step onto a cell of the raided colony's midden (mark v there) turns back. A lone scout
@@ -150,7 +151,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
   // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
   const raiding = mode === FIGHT && col.entrance !== null && col.stanceOf(i) === "raid" && col.raidTarget !== null;
   const onSky = isSky(map, fresh ? hx : col.gx[i], fresh ? hy : col.gy[i]);
-  // Homing underground with the hole still its goal: in at another hole than its own (see goal). It climbs back out.
+  // Homing underground with the hole still its goal: in at another hole than its own (see homeGoal). It climbs back out.
   const climbing = mode === RETURN && col.entrance !== null && !onSky && col.goalKind[i] === 1 && col.pellet[i] === 0;
   const groundHome = carryingOut || climbing || ((mode === RETURN || raiding) && col.entrance !== null && onSky);
   if (fresh && !hugging && !groundHome && col.noTunnel[i] === packed) {
@@ -172,7 +173,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     // Carrying a pellet out (side view): up to the hole if it is still in the shaft, then on along the ground away
     // from it to where it drops it (away from the hole from inside the shaft is down it).
     const inShaft = !isSky(map, cx, cy) && !(cx === col.entranceCol && cy === col.entranceRow);
-    const best = inShaft ? col.towardHole(cx, cy, false) : awayFromHole(col, cx, cy, col.spoilSide[i]);
+    const best = inShaft ? towardHole(col, cx, cy, false) : awayFromHole(col, cx, cy, col.spoilSide[i]);
     if (best < 0) col.spoilTo[i] = Math.min(0, col.spoilTo[i]); // the map's edge, or nowhere farther: it drops it here (one carried back to the midden walks on: undertake)
     dir = best < 0 ? handOnWall(map, cx, cy, dir, -col.hand[i]) : best;
   } else if (raiding) {
@@ -180,7 +181,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     let best: number;
     if (isSky(map, cx, cy)) {
       col.holeX = t.x;
-      best = col.towardHole(cx, cy, true, NaN, t.y);
+      best = towardHole(col, cx, cy, true, NaN, t.y);
       // The rival's midden marks its ground (Pogonomyrmex badius): a raider about to step onto it may turn back, the
       // more surely the stronger it smells and the fewer of its own colony are with it (middenTurn).
       const m = col.raidMarks?.fields.midden;
@@ -189,11 +190,11 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
         if (v >= FAINT && col.rng() < middenTurn(col, v, cx, cy))
           best = rockAt(map, stepX(cx, cy, (dir + 3) % 6), stepY(cy, (dir + 3) % 6)) === OPEN ? (dir + 3) % 6 : -1;
       }
-    } else if (col.inOwnNest(cx, cy) || !col.raidNest) best = col.climbOut(cx, cy);
+    } else if (col.inOwnNest(cx, cy) || !col.raidNest) best = climbOut(col, cx, cy);
     else {
       // In at the rival's hole: down to its chamber (review of slice 7: it climbed back out, to its own hole).
       col.holeX = col.raidNest.x;
-      best = col.towardHole(cx, cy, false, NaN, col.raidNest.y);
+      best = towardHole(col, cx, cy, false, NaN, col.raidNest.y);
     }
     dir = best < 0 ? handOnWall(map, cx, cy, dir, -col.hand[i]) : best;
     col.digAim[i] = NaN;
@@ -207,19 +208,19 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     // the other: start afresh if the target changed.
     if (col.groundRef[i] !== col.holeX) col.groundMin[i] = NaN;
     const min = col.groundMin[i];
-    let best = col.towardHole(cx, cy, true, min);
+    let best = towardHole(col, cx, cy, true, min);
     if (best >= 0) col.groundMin[i] = NaN;
     else if (Number.isNaN(min) && col.holeX !== ent.x && Math.abs(centreX(cx, cy) - col.holeX) < 1) {
       // At the column where it believed the hole was, and no hole in sight: search to either side, farther each time.
       // (Only there: blocked anywhere else, it goes round the obstacle below, or every blocked step would widen the search.)
-      col.searchOn(i);
-      col.holeX = col.believe(i, ent).x;
-      best = col.towardHole(cx, cy, true);
+      searchOn(col, i);
+      col.holeX = believe(col, i, ent).x;
+      best = towardHole(col, cx, cy, true);
     } else if (Number.isNaN(min)) {
       // No open way nearer the hole it heads for (spoil heaped between, a pit beside the mound, a step in the ground):
       // Bug2 on the ground, a hand on the surface until it is somewhere nearer that hole than here. Rocking between
       // the nearest cell and a step away kept whole colonies in such a pit.
-      col.groundMin[i] = col.holeMetric(cx, cy);
+      col.groundMin[i] = holeMetric(col, cx, cy);
       col.groundRef[i] = col.holeX;
       col.groundT[i] = 0;
       // Which hand: feel ahead along the surface both ways (a gully between two heaps: one side leads over toward the
@@ -244,7 +245,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     const field = mode === RETURN ? col.ph.fields.home : col.ph.fields.food;
     // Underground in the side view, homing follows the road signs of where it is going (its chamber's mark); the home
     // trail only where there are none.
-    const signs = mode === RETURN && col.entrance && !isSky(map, cx, cy) ? col.ph.fields[col.destMark(i)] : null;
+    const signs = mode === RETURN && col.entrance && !isSky(map, cx, cy) ? col.ph.fields[destMark(col, i)] : null;
     const signGain = SIGN_WEIGHT * col.gainHome[i] * col.gainMarks[i]; // the fungus's home and marks levers bend road signs
     const byVector = mode === RETURN && col.stallT[i] > TUNNEL_STALL;
     const hx = col.goalX - centreX(cx, cy);
@@ -304,9 +305,9 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     // A young ant keeps with the queen and brood (slice 6): along their marks, deeper into the nest.
     dir = toBrood(col, cx, cy, dir);
     col.digAim[i] = NaN;
-  } else if (mode === EXPLORE && ent && col.outbound(i) && !isSky(map, cx, cy) && col.climbOut(cx, cy) >= 0) {
+  } else if (mode === EXPLORE && ent && col.outbound(i) && !isSky(map, cx, cy) && climbOut(col, cx, cy) >= 0) {
     // An old forager inside the nest heads up and out (slice 6: foragers leave by the shaft, climbing: gravity).
-    dir = col.climbOut(cx, cy);
+    dir = climbOut(col, cx, cy);
     col.digAim[i] = NaN;
   } else {
     const side = col.hand[i];
@@ -512,7 +513,7 @@ export function groundLook(col: Colony, cx: number, cy: number, dir: number, sid
     x = stepX(x, y, d);
     y = stepY(y, d);
     if (rockAt(col.map, x, y) !== OPEN || !isSky(col.map, x, y)) return Infinity;
-    if (col.holeMetric(x, y) < min - 1e-6) return k;
+    if (holeMetric(col, x, y) < min - 1e-6) return k;
   }
   return Infinity;
 }
@@ -524,7 +525,7 @@ export function groundHand(col: Colony, cx: number, cy: number, dir: number, sid
     const k = ((d % 6) + 6) % 6;
     const tx = stepX(cx, cy, k);
     const ty = stepY(cy, k);
-    return rockAt(col.map, tx, ty) === OPEN && (isSky(col.map, tx, ty) || col.targetHole(tx, ty, hy));
+    return rockAt(col.map, tx, ty) === OPEN && (isSky(col.map, tx, ty) || targetHole(col, tx, ty, hy));
   };
   const lost = ok(dir + side) && ok(dir + 2 * side);
   for (const turn of lost ? [0, -side, -2 * side, side, 2 * side, 3] : [side, 0, -side, -2 * side, 2 * side, 3]) {
