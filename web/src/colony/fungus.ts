@@ -1087,7 +1087,7 @@ export class Fungus {
     while (clock.clock >= every) {
       clock.clock -= every;
       // Stumps of cut hyphae regrow into the dug cells they lost (ja-2bw.15).
-      for (const { h, g } of maps) budget.tips += h.resprout(g, level);
+      for (const { h, g } of maps) budget.tips += h.resprout(g, level, budget);
       stepRound(maps, level, budget, this.growthPolicy);
       stepped = true;
     }

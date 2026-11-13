@@ -201,7 +201,7 @@ export class Hyphae {
    * `tip` fruits (PRD §63.1, owner 2026-11-12): it ends as a spore spot on the dug cell it touches: its own cell if dug,
    * else the first dug cell beside it (hex.ts order). Nothing where it touches none (`ground` says what is dug).
    */
-  fruit(tip: Tip, ground: Ground): boolean {
+  fruit(tip: Tip, ground: Ground, end = true): boolean {
     let spot = -1;
     if (ground.kind(tip.x, tip.y) === "open") spot = cellKey(tip.x, tip.y);
     else
@@ -212,7 +212,7 @@ export class Hyphae {
       }
     if (spot < 0 || ground.topsoil) return false;
     if (!this.fruits.includes(spot)) this.fruits.push(spot);
-    this.tips = this.tips.filter((t) => t !== tip);
+    if (end) this.tips = this.tips.filter((t) => t !== tip);
     return true;
   }
 
@@ -312,9 +312,11 @@ export class Hyphae {
 
   /**
    * A round of regrowth (ja-2bw.15): each stump whose wait is over puts out a tip into the cell it lost, if that cell is
-   * one a tip may enter now (dug open, or soil it may grow through) and no tip stands on the stump. Returns the tips put out.
+   * one a tip may enter now (dug open, or soil it may grow through) and no tip stands on the stump. With `budget`, the tip
+   * grows straight into that cell when the free mass pays for it (else it waits on the stump, a tip like any other), so
+   * the cut is regrown whatever the rule would say of a tunnel already holding hypha. Returns the tips put out.
    */
-  resprout(g: Ground, level: number): number {
+  resprout(g: Ground, level: number, budget: { free: number } | null = null): number {
     let n = 0;
     for (const [s, r] of [...this.stumps]) {
       if (!this.parent.has(s)) {
@@ -328,8 +330,13 @@ export class Hyphae {
       if (this.tips.some((t) => t.x === sx && t.y === sy) || !enterable(this, g, tx, ty, level)) continue;
       for (let d = 0; d < 6; d++)
         if (nx(sx, sy, d) === tx && ny(sy, d) === ty) {
-          this.tips.push({ x: sx, y: sy, heading: d, first: d, run: 0 });
+          const tip: Tip = { x: sx, y: sy, heading: d, first: d, run: 0 };
+          this.tips.push(tip);
           n++;
+          if (budget && budget.free >= HYPHA_MASS && this.extend(tip, d, HYPHA_MASS)) {
+            budget.free -= HYPHA_MASS;
+            if (g.kind(tx, ty) === "soil") this.soil.add(cellKey(tx, ty));
+          }
           break;
         }
     }
@@ -733,6 +740,10 @@ function stepTip(
     case "rest":
       break;
   }
+  // Where a tip still growing has come to a tunnel, grown FRUIT_RUN cells and with no spot of its own within FRUIT_GAP,
+  // the body puts a spore spot on the dug cell and the tip grows on (ja-2bw.15, owner 2026-11-13: spots spaced in the
+  // body, whatever the policy answers; conidiation where hyphae meet the air, docs/hyphal-growth.md §6).
+  if (!g.topsoil && h.tips.includes(tip) && exposureAt(g, tip.x, tip.y) !== "buried" && mayFruit(h, tip)) h.fruit(tip, g, false);
   return grown;
 }
 
