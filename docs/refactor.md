@@ -120,9 +120,10 @@ The top-down and side maps are retired.
    | `body` | energy, laying, brood, alates |
    | `layers` | binding a layer, crossing between layers |
    | `grid` | the free helpers |
-4. **`tick()` as a pipeline:** perceive → decide → steer → move and dig → carry and drop → body → cross. Each ant gets a `Perception` record instead of a shared buffer, and RNG draws stay in order.
+4. **`tick()` as a pipeline:** perceive → stance and raid bookkeeping → decide → steer → move and dig → arrive, each a stage function. Each ant's step passes between them through an `AntStep` record (the sensors still fill the shared buffer `col.s`), and RNG draws stay in order.
    - *How* (`ja-fnd.4.4`, children `.1`–`.6`, one stage a PR): a run of top-level statements of the per-ant loop moves, verbatim but for `this` becoming `col`, into a stage function called in its place. The locals that cross the boundary are copied into the per-ant `AntStep` record (`step.ts`, one per tick, reused) before the call and read back after it, so the stage's code is unchanged inside and the draw order with it. The layer switch at the top of the loop stays in `tick` (loop plumbing). Stages, in loop order: perceive (sensors, the enemy heading), stance and raid bookkeeping, decide (goal, mode, the policy ask, contact), steer (the heading per mode, alarm, trails), move and dig (the step, faces, landing), arrive (pick-ups, at the nest, rest, leave, integrate). Once all are out, the copies between them can become the record's fields directly.
-   - Built: perceive (`perceive.ts`, ja-fnd.4.4.1).
+   - The script that finds the crossing locals (with the TypeScript checker: the loop shadows some of tick's own lets, so names alone get them wrong) is `scripts/lab/tick-stage.mjs`.
+   - Built: perceive (`perceive.ts`, 44 lines, ja-fnd.4.4.1; `colony.ts` 3,292 → 3,275, the loop 1,215 → 1,208 lines).
 5. **Tuning by domain**, under `colony/tuning/`.
 6. **`experiment.ts`** splits into a harness (`runGame`, `Arena`, probes) and the assay catalogue. Probes read through the facade.
 
