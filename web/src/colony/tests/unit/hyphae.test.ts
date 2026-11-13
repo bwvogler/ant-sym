@@ -10,6 +10,8 @@ import {
   BRANCH_RUN,
   CORD_DIGS,
   CORD_FLOW,
+  REGROW_ROUNDS,
+  sideFor,
   FRUIT_RUN,
   REGRESS_PER_ROUND,
   HGU,
@@ -571,4 +573,94 @@ test("a tip senses its run: short below BRANCH_RUN, long from it; the preset bra
   assert.equal(situationOf(h, g, tip, 0, 1e9, 1).run, "long");
   assert.equal(localGrowthChoice({ ahead: "soil", exposed: "buried", supply: "ample", run: "long" }), "branch");
   assert.equal(localGrowthChoice({ ahead: "soil", exposed: "buried", supply: "ample", run: "short" }), "grow");
+});
+
+/** A dug tunnel: `legs` of [heading, cells] from (x, y); everything else soil. Returns the ground and its cells in order. */
+function tunnel(x: number, y: number, legs: [number, number][]): { g: Ground; cells: number[] } {
+  const cells = [cellKey(x, y)];
+  for (const [d, n] of legs)
+    for (let i = 0; i < n; i++) {
+      [x, y] = [nx(x, y, d), ny(y, d)];
+      cells.push(cellKey(x, y));
+    }
+  const open = new Set(cells);
+  return { g: { topsoil: false, kind: (cx, cy) => (open.has(cellKey(cx, cy)) ? "open" : "soil") }, cells };
+}
+
+test("in a tunnel the local rule follows it round its bend (ja-2bw.15)", () => {
+  const { g, cells } = tunnel(0, 10, [
+    [E, 6],
+    [SE, 6],
+  ]);
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  // A spot of its own by the start, so the tip doesn't fruit and end along the way (FRUIT_GAP).
+  h.fruits.push(cellKey(3, 10));
+  for (let r = 0; r < 14; r++) stepTips(h, g, 0, { free: 1e9, tips: h.tips.length });
+  const inTunnel = [...h.parent.keys()].filter((k) => cells.includes(k)).length;
+  assert.ok(inTunnel >= 11, `${inTunnel} of ${h.length} hypha cells in the tunnel's 13`);
+  assert.ok(h.has(...keyCell(cells.at(-1)!)), "it reached the tunnel's end round the bend");
+});
+
+test("a policy's turn in a tunnel that bends goes the way the tunnel goes (ja-2bw.15)", () => {
+  for (const [bend, want] of [
+    [SE, "right"],
+    [NE, "left"],
+  ] as const) {
+    const { g } = tunnel(0, 10, [
+      [E, 3],
+      [bend, 3],
+    ]);
+    const h = new Hyphae();
+    h.root(3, 10, E);
+    const tip = h.tips[0]!;
+    const s = situationOf(h, g, tip, 0, 1e9, 1);
+    assert.equal(s.exposed, "open");
+    assert.equal(s.ahead, "soil");
+    assert.equal(sideFor(h, g, tip, s, 0), want, `bend ${bend}`);
+  }
+});
+
+test("from the soil the local rule goes into a tunnel ahead, unless its own hypha already runs in it near (ja-2bw.15)", () => {
+  const { g } = tunnel(6, 8, [[SE, 8]]);
+  const h = new Hyphae();
+  h.root(2, 12, E);
+  h.tips[0]!.run = 3;
+  const tip = h.tips[0]!;
+  // Walk it to the cell before the tunnel.
+  while (situationOf(h, g, tip, 0, 1e9, 1).ahead !== "open") assert.ok(h.extend(tip, E, 0));
+  const s = situationOf(h, g, tip, 0, 1e9, 1);
+  // A spot of its own right there, so fruiting is no choice (FRUIT_GAP): it goes in.
+  h.fruits.push(cellKey(tip.x, tip.y));
+  assert.equal(localGrowth(h, g, tip, s, 0), "grow");
+  // A hypha of its own already in the tunnel close by: it slides along the wall instead.
+  const [ax, ay] = [nx(tip.x, tip.y, E), ny(tip.y, E)];
+  h.addCell(nx(ax, ay, SE), ny(ay, SE));
+  assert.notEqual(localGrowth(h, g, tip, s, 0), "grow");
+});
+
+test("a hypha cut by digging regrows from its stump into the dug cell after REGROW_ROUNDS rounds; stumps are saved (ja-2bw.15)", () => {
+  const dug = new Set<number>();
+  const g: Ground = { topsoil: false, kind: (x, y) => (dug.has(cellKey(x, y)) ? "open" : "soil") };
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  const tip = h.tips[0]!;
+  for (let i = 0; i < 6; i++) assert.ok(h.extend(tip, E, 0));
+  for (let x = 0; x <= 6; x++) h.soil.add(cellKey(x, 10));
+  // The ants dig cell (3, 10): it and what grew from it are cut; (2, 10) is the stump.
+  dug.add(cellKey(3, 10));
+  assert.ok(h.cutDug(g) > 0);
+  assert.equal(h.tips.length, 0);
+  assert.deepEqual([...h.stumps.keys()], [cellKey(2, 10)]);
+  const back = Hyphae.load(JSON.parse(JSON.stringify(h.save())));
+  assert.deepEqual([...back.stumps], [...h.stumps]);
+  for (let r = 1; r < REGROW_ROUNDS; r++) assert.equal(h.resprout(g, 0), 0, `regrew after ${r} rounds`);
+  assert.equal(h.resprout(g, 0), 1);
+  assert.deepEqual(
+    h.tips.map((t) => [t.x, t.y, t.heading]),
+    [[2, 10, E]],
+  );
+  stepTips(h, g, 0, { free: 1e9, tips: 1 });
+  assert.ok(h.has(3, 10), "it grew back into the dug cell");
+  assert.equal(h.stumps.size, 0);
 });
