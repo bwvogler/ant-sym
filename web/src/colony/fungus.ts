@@ -1,7 +1,7 @@
 import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
-import type { Colony, Layer } from "./colony.ts";
+import { CURTAIN, type Colony, type Layer } from "./colony.ts";
 import {
   DEFAULT_RULE,
   HIGH_LOAD,
@@ -32,7 +32,7 @@ import {
   type Reach,
 } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
-import { CELL, cellOf, discOffsets, E, nx, ny, NW, SE, SW, W } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, nx, ny, NW, SE, SW, W } from "./hex.ts";
 import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type WorldMap } from "./world.ts";
 import {
   cellKey,
@@ -364,6 +364,11 @@ export class Fungus {
   #sporeSpots: (number[] | null)[] = [];
   /** each map's corpses the fungus grows out of (ja-2bw.7): cell (hyphae.ts cellKey) → free spores still to put out there; 0 once spent (it is not colonised again) */
   #corpses: Map<number, number>[];
+  /**
+   * One world (ja-2bw.14): the curtain entrance of the hole at or beside plane cell (x, y), or null: a plane tip that
+   * comes to a hole crosses down it into the curtain (rootShaft there) and leaves the plane. Set by the game.
+   */
+  crossAt: ((x: number, y: number) => { x: number; y: number } | null) | null = null;
   /** the corpses lying at (x, y) on map `layer` (the midden's), for a hypha that reaches one; set by the game */
   corpseAt: ((layer: number, x: number, y: number) => number) | null = null;
   /** the growth policy (ja-2bw.5): a tip's answer in its situation, or null for the local rule (hyphae.ts localGrowth); set through `bindPolicy` */
@@ -1099,6 +1104,17 @@ export class Fungus {
         const lost = h.cutDug(g);
         if (lost > 0) e.lose(lost * HYPHA_MASS);
       }
+    // A plane tip that has come to a hole crosses down it (one world, ja-2bw.14): it leaves the plane, and the hyphae root
+    // on the shaft's walls in the curtain (a wall cell whose tip is gone takes a fresh one, ja-2bw.16).
+    if (stepped && this.crossAt && this.#hyphae[0] && this.#layers.length > 1) {
+      const plane = this.#hyphae[0];
+      for (const t of plane.tips.slice()) {
+        const down = this.crossAt(t.x, t.y);
+        if (!down) continue;
+        plane.tips = plane.tips.filter((u) => u !== t);
+        this.rootShaft(CURTAIN, down.x, down.y);
+      }
+    }
     // A tip that has reached a corpse (the midden's) colonises it.
     if (stepped && this.corpseAt)
       this.#hyphae.forEach((h, l) => {
@@ -1192,7 +1208,7 @@ export class Fungus {
    * The evolving fungus takes root on the open cells within `radius` of (x, y) (Game.land): its base, which keeps
    * sporulating at the evolution's `spores` level. Nothing without an evolution.
    */
-  root(x: number, y: number, radius: number, layer = 0): void {
+  root(x: number, y: number, radius: number, layer = 0, toward: { x: number; y: number } | null = null): void {
     if (!this.#evolution) return;
     const L = this.#layers[layer] as SporeLayer;
     const { map } = L;
@@ -1204,7 +1220,8 @@ export class Fungus {
     });
     this.#evolution.root();
     if (!this.params.hyphae) return;
-    // As hyphae: the patch is the hyphae's first cells, and three tips set out from its rim, going outward (a weak start).
+    // As hyphae: the patch is the hyphae's first cells, and three tips set out from its rim, going outward (a weak start):
+    // one heading at `toward` (one world: the hole, ja-2bw.14) and the others a third of the way round each side.
     const h = (this.#hyphae[layer] ??= new Hyphae());
     for (const key of L.base) {
       const col = key % w;
@@ -1214,7 +1231,9 @@ export class Fungus {
     const cx = CELL[0];
     const cy = CELL[1];
     if (rockAt(map, cx, cy)) return;
-    for (const d of ROOT_HEADINGS) {
+    const first = toward ? dirOf(Math.atan2(toward.y - y, toward.x - x)) : null;
+    const headings = first === null ? ROOT_HEADINGS : [first, (first + 2) % 6, (first + 4) % 6];
+    for (const d of headings) {
       // Out from the middle along d to the patch's last cell that way.
       let px = cx;
       let py = cy;
@@ -1225,7 +1244,11 @@ export class Fungus {
         px = qx;
         py = qy;
       }
-      if (h.has(px, py)) h.root(px, py, d);
+      if (!h.has(px, py)) continue;
+      // The tip that heads for `toward` aims from its own cell on the rim, not from the patch's middle (a line from the
+      // middle, set off from the rim, runs past the hole beside it).
+      const aim = toward && d === first ? dirOf(Math.atan2(toward.y - centreY(py), toward.x - centreX(px, py))) : d;
+      h.root(px, py, aim);
     }
   }
 
@@ -1259,7 +1282,10 @@ export class Fungus {
   /**
    * One world: the hyphae also root on the walls of the shaft under a hole (layer `layer`, the curtain; `x`, `y` the
    * hole's entrance there), where `ja-yo3` put the mycelium: walking down the shaft from the entrance, the first soil
-   * cell on each side takes a tip heading down. Nothing without hyphae and an evolving fungus.
+   * cell on each side takes a tip heading down. A wall cell that already has a tip on it takes no other; one that holds
+   * hypha but no tip (its tip grew on, fruited or was cut) takes a fresh one, so later tips reaching the hole keep coming
+   * down it (ja-2bw.16). Nothing without hyphae and an evolving fungus. Since ja-2bw.14 it is reached by growth: a
+   * plane tip that comes to the hole crosses down it (crossAt), rather than the landing rooting it at once.
    */
   rootShaft(layer: number, x: number, y: number): void {
     if (!this.#evolution || !this.params.hyphae) return;
@@ -1275,13 +1301,17 @@ export class Fungus {
     for (let yy = sy; yy <= sy + SHAFT_ROWS && !(left && right); yy++) {
       if (g.kind(sx, yy) !== "open") continue;
       if (!left && g.kind(sx - 1, yy) === "soil") {
-        h.root(sx - 1, yy, SW);
-        h.soil.add(cellKey(sx - 1, yy));
+        if (!h.tips.some((t) => t.x === sx - 1 && t.y === yy)) {
+          h.root(sx - 1, yy, SW);
+          h.soil.add(cellKey(sx - 1, yy));
+        }
         left = true;
       }
       if (!right && g.kind(sx + 1, yy) === "soil") {
-        h.root(sx + 1, yy, SE);
-        h.soil.add(cellKey(sx + 1, yy));
+        if (!h.tips.some((t) => t.x === sx + 1 && t.y === yy)) {
+          h.root(sx + 1, yy, SE);
+          h.soil.add(cellKey(sx + 1, yy));
+        }
         right = true;
       }
     }
