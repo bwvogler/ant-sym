@@ -4710,7 +4710,7 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 
 **Cost** (`node scripts/colony-cost.mjs --one --species desert`, offline; `--species` new here): ~479 tokens a question, 9 of its 16 situations met in a 10-minute session, **≈ $0.004/h** while a doctrine is new, against the generic ant's ~828 tokens a question and ≈ $0.11/h on the same run. Cached games spend nothing.
 
-**Not yet:** its precache. Shipping Jev's answers needs a live check (`colony-live`), about 16 situations × 3 preset doctrines ≈ 23,000 tokens ≈ $0.001, at the owner's say (§64); until then it plays its local rule.
+**Its precache, from a live check** (owner's go, 2026-11-13; `ja-rf5.9`): `node scripts/precache.mjs --species desert` (`--species` new here) asked all 16 situations under each preset doctrine: 3 requests, 48 questions, **$0.0003**, about **148 real input tokens a question** (all 16 in one request, so the legend is shared; the offline estimate of ~479 was for the page's smaller batches). Shipped as `mode-desert-<doctrine>.json`, marked `species: desert` in `index.json`; `precache.test` checks them against the desert ant's own context, keys and choices. Jev agrees with the local rule on 10 of 16 situations under Forage, 9 under Cautious and 3 under Warlike: Forage and Warlike fight a stranger in reach, Cautious goes home from one, Warlike fights almost everywhere, and every doctrine keeps a returning ant returning where the local rule sends it out again.
 
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
