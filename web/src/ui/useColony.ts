@@ -22,6 +22,7 @@ import { journalFromUrl } from "./journal.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
+import { landingOf } from "./landing.ts";
 
 // Owns the one Game (its colonies and the fungus, the player) and its animation
 // loop: React state carries only what the
@@ -61,8 +62,7 @@ export const GAME_SPEED = 4;
 export const MAX_SPEED = 8;
 /** The game's fungus: one species, the player's, which spreads like Garden (PRD §50; the other strains are lab presets). */
 export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
-/** The colony the fungus lands by. */
-export const LANDING_COLONY = 0;
+export { landingColony, landingOf } from "./landing.ts";
 
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   seed: 1,
@@ -270,7 +270,6 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     // views are one game.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [controls.seed, controls.antCount, controls.rival, generation, loads]);
-  const colony = game.player;
   // The player's policy settings outlive a game: apply them to every new one's fungus.
   useEffect(() => {
     game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
@@ -287,7 +286,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     let fpsAt = last;
     // The summary is the whole map's: every colony's (no colony is the player's).
     const decisions = () => game.colonies.reduce((n, c) => n + c.decisions, 0);
-    let rateAt = { t: colony.time, decisions: decisions() };
+    let rateAt = { t: game.time, decisions: decisions() };
     let rate = 0;
     let paceAt = { wall: performance.now(), sim: game.time };
     let pace = controls.playing ? controls.speed : 0;
@@ -313,17 +312,17 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         pace = ((game.time - paceAt.sim) * 1000) / (t - paceAt.wall);
         paceAt = { wall: t, sim: game.time };
       }
-      if (colony.time - rateAt.t >= 1) {
-        rate = (decisions() - rateAt.decisions) / (colony.time - rateAt.t);
-        rateAt = { t: colony.time, decisions: decisions() };
+      if (game.time - rateAt.t >= 1) {
+        rate = (decisions() - rateAt.decisions) / (game.time - rateAt.t);
+        rateAt = { t: game.time, decisions: decisions() };
       }
       if (t - lastStats > 150) {
         setStats({
-          time: colony.time,
+          time: game.time,
           stored: game.colonies.reduce((n, c) => n + c.stored, 0),
-          // One world: both layers' food, as colony.foodLeft counts it (the plane's and the curtain's buried food).
-          foodTotal: game.world ? game.world.plane.foodTotal + game.world.curtain.foodTotal : colony.map.foodTotal,
-          foodLeft: colony.foodLeft,
+          // One world: both layers' food, as Game.foodLeft counts it (the plane's and the curtain's buried food).
+          foodTotal: game.world ? game.world.plane.foodTotal + game.world.curtain.foodTotal : game.map.foodTotal,
+          foodLeft: game.foodLeft,
           counts: sumCounts(game.colonies),
           choicesPerSecond: rate,
           situationsSeen: seenTogether(game.colonies),
@@ -350,12 +349,12 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [game, colony, controls.playing, controls.speed, journal]);
+  }, [game, controls.playing, controls.speed, journal]);
 
   // The dev hook (window.jevAnts, the game and the page's views) is the page's: ColonyApp.
-  // Once the player has pressed Start, every game begins with the fungus landing by the first colony's hole.
+  // Once the player has pressed Start, every game begins with the fungus landing by the hole of the colony its seed chose.
   useEffect(() => {
-    if (controls.started && !game.landed) game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
+    if (controls.started && !game.landed) game.land(landingOf(game), GAME_STRAIN, { evolve: true });
   }, [game, controls.started]);
   /** A saved game, as it was: its world and settings, then its state (Game.load), playing. The player's state is the page's to put back. */
   const loadSave = useCallback((r: SaveRecord) => {
@@ -403,12 +402,12 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** Give adaptations to the next level of upgrade `id` (evolution.UPGRADES); false when the fungus can't. */
   const evolve = useCallback((id: string) => game.fungus.upgrade(id), [game]);
 
-  return { game, colony, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal };
+  return { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal };
 }
 
 /** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */
 function chapterFor(game: Game): ChapterView {
-  const k = game.landed?.colony ?? LANDING_COLONY;
+  const k = landingOf(game);
   const c = game.colonies[k] ?? game.player;
   const f = game.fungus.census(c);
   const line = game.lineage(k);

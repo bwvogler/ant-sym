@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { REPO } from "./guide.ts";
 import { colonyName } from "./names.ts";
-import { LANDING_COLONY } from "./useColony.ts";
+import { landingColony } from "./useColony.ts";
 import { describe, type SaveRecord } from "./saves.ts";
 
 // The fungus game's first screen (ja-lo8.5): what the player is, Start, and Continue the last saved game (ja-lo8.6).
@@ -13,7 +13,10 @@ export default function StartScreen({
   latest,
   onContinue,
   firstGame,
+  colonies,
 }: {
+  /** the colonies a game starts with: the seed chooses which one the fungus lands by */
+  colonies: number;
   seed: number;
   /** Start; `tutorial`: with the tutorial (PRD §61) */
   onStart: (seed: number, tutorial: boolean) => void;
@@ -23,7 +26,7 @@ export default function StartScreen({
   onContinue: (r: SaveRecord) => void;
 }) {
   const [s, setS] = useState(seed);
-  const ink = colonyName(LANDING_COLONY);
+  const ink = colonyName(landingColony(s, colonies));
   return (
     <div
       className="fixed inset-0 z-20 flex items-center justify-center bg-ground/80 px-4 backdrop-blur-sm"

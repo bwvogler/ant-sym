@@ -4714,6 +4714,12 @@ The tutorial watches its own host, so a player who stops following the ant does 
 
 - **The infection dies out at first.** The cards say so: the mycelium by the hole keeps fruiting, so new ants pick the fungus up. That is the "it goes away" the owner asked to show.
 - **`WATCH_LIMIT` = 240 s**, above the worst seed (215 s), so the clean card is the one players see.
+- **Re-measured with the seed choosing the landing colony** (§65, 2026-11-13; odd seeds land by Amber, even by Ink, so the even seeds repeat the table above):
+  - the first host appears on every seed, 3.3–6.9 s after the landing;
+  - 19 of 20 are groomed clean, 45–172 s after they were found;
+  - one died: seed 11, an Amber ant, 114 s after it was found, which the tutorial's "died" card covers;
+  - 18 of 20 went below first.
+  - `WATCH_LIMIT` still holds.
 - **The watch runs at 4×.** At 1× it took about 1.5 minutes, too slow to watch (owner, 2026-11-12). At 4× it takes about 25 s, and 54 s on the slowest seed. Faster takes it to 8×.
 
 ### 61.3 Cost
@@ -4979,3 +4985,28 @@ Tier 3: its own lane with a caste field and no stance (`.3`, on `ja-fnd.5.10`, `
 ### 64.6 Army ants (`ja-ehuv`; [army-ant.md](army-ant.md))
 
 Tier 3, last: foraging that rises with larvae met (`.4`), front recruitment only if raids by size don't emerge from today's rules (`.5`), the bivouac as a nest kind that moves (`.6`, on the Pharaoh ant's emigration and `ja-fnd.5.5`). Assays R1 phases from larvae (Ulrich et al. 2016), R2 raids by size (Chandra et al. 2021), R3 grooming of the exposed (Alciatore et al. 2021) (`.2`). The model (*Eciton* or *O. biroi*) is the owner's.
+
+## 65. What the fungus sees; no colony is the player's (ja-pc72, 2026-11-13)
+
+The owner saw one colony's trails all the time and disliked that Ink (colony 0) was treated as special. Under §50 / #104, a colony's whole trail map showed once any of its ants was infected, and the fungus always landed by Ink, so Ink's trails were always on. Decisions, by the owner, 2026-11-13:
+
+- **Trails and alarm show only where hosts sensed them** (`ui/fungusSight.ts` `SensedMap`, ja-pc72.1).
+  - Every frame, each infected ant of any colony marks the cells within its antennae's reach with the sim time. The reach is `sensorDistance + 1` cells, the probes' reach plus a cell.
+  - Every colony's food trail, home trail and alarm show in a cell as strongly as that mark is fresh, fading to nothing over `SENSED_FADE` = 20 sim-seconds.
+  - Before any host there is no scent on the field. Paths light up as infected foragers walk them, and fade once they move on. Amber's trails appear the moment an Amber ant carries the fungus.
+  - It is a picture only: the game never reads it, and the golden masters are bit-exact.
+  - The spores, the fungus's own body, show as before.
+- **The seed chooses the landing colony** (`landingColony(seed, colonies)` in `ui/useColony.ts`, ja-pc72.2).
+  - With two colonies it is `seed % 2`: odd seeds land by Amber, even by Ink. With one colony, that colony.
+  - The start screen names it as the seed is typed, and the chapters, notices and tutorial follow `game.landed.colony`.
+  - The lab and assays still call `land(0)`. Re-measured first hosts: §61.2.
+- **The page stops reading colony 0** (ja-pc72.3):
+  - the stats' clock, decision rate and food left read the game (`Game.foodLeft`, a getter);
+  - Jev's cached counts cover every colony's doctrine, a doctrine shared by two colonies counting once;
+  - the minimap colours ants by their colony's odour, as the field does.
+- **Left, and why:**
+  - `Game.player` and `Sides` (the "player" and "rival" policies) are the lab's. The page passes no `Sides`, so both colonies get the species' defaults.
+  - The colonies' names and start odours (Ink dark, Amber in the warn tone) are labels.
+  - The dev hook's `fly(mother = 0)` and the lab's `foundBetween` are tools.
+- **Cost:** none. No legend, question or schema changed.
+

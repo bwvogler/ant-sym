@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { landingOf } from "./landing.ts";
 import { PLANE, type Game } from "../colony/index.ts";
 import type { Followed } from "./follow.ts";
 import {
@@ -112,7 +113,7 @@ export function useTutorial({
   );
 
   // The highlight: one attribute on the root, styled in index.css.
-  const card = t ? cardFor(t, game.landed?.colony ?? 0) : null;
+  const card = t ? cardFor(t, landingOf(game)) : null;
   const highlight = card?.highlight ?? "";
   useEffect(() => {
     document.documentElement.dataset.tutorial = highlight;
