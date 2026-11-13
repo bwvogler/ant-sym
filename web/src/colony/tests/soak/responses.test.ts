@@ -215,8 +215,13 @@ test("responsesFromAnswers: cached answers win, the local responses cover the re
 
 test("get is asked for loose soil, corpses and brood too, and refusing one leaves it lying", () => {
   const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
-  /** A side-view game with dead to bury, run for 200 s (brood is first offered at ~171 s); what get was offered, and the most ants holding each item at once. */
-  const run = (refuse: Item | null) => {
+  /** Ticks a run may take at most: brood is first offered anywhere from ~20 s to over 240 s, by map seed (ja-u16k). */
+  const CAP = 30 * 300;
+  /**
+   * A side-view game with dead to bury: what get was offered, the most ants holding each item at once, and the ticks run.
+   * It runs `ticks`, or (null) until every item has been offered and corpse, brood and a loose pellet have each been taken up.
+   */
+  const run = (refuse: Item | null, ticks: number | null) => {
     const map = generateSideWorld(2, SMALL);
     const g = new Game(map, { antCount: 200, rival: false }, mulberry32(4));
     const c = g.player;
@@ -224,7 +229,9 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
     c.responses = responses({ get: (t) => (offered.add(t.offered), t.offered !== refuse && localResponses.get(t)) });
     for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN * (i % 2); // half young (nurses), half middle-aged (undertakers)
     const held: Partial<Record<Item, number>> = {};
-    for (let k = 0; k < 30 * 200; k++) {
+    const all = () => offered.size === 4 && (held.corpse ?? 0) > 0 && (held.brood ?? 0) > 0 && c.loosePicked > 0;
+    let k = 0;
+    for (; k < (ticks ?? CAP) && (ticks !== null || !all()); k++) {
       if (k === 30 * 20)
         for (let i = 0, n = 0; i < c.n && n < 20; i++)
           if (c.alive[i] && c.item(i) === "none" && c.y[i]! > map.nest.entrance!.y + 3) {
@@ -238,14 +245,24 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
         for (const [it, n] of Object.entries(now) as [Item, number][]) held[it] = Math.max(held[it] ?? 0, n);
       }
     }
-    return { offered, held, loose: c.loosePicked };
+    return { offered, held, loose: c.loosePicked, ticks: k };
   };
-  const local = run(null);
+  // The local rule's run stops once it has seen everything; each refusing run goes 30 s past that, so its item is offered
+  // (and refused) many times over, not just the once or twice before the local run stopped (review of #126: a refusal that
+  // gave way after two asks passed).
+  const local = run(null, null);
+  const span = local.ticks + 30 * 30;
   for (const it of ["food", "soil", "corpse", "brood"] as const) assert.ok(local.offered.has(it), `get was offered ${it}`);
   assert.ok((local.held.corpse ?? 0) > 0 && (local.held.brood ?? 0) > 0 && local.loose > 0, JSON.stringify(local));
-  assert.equal(run("corpse").held.corpse ?? 0, 0, "no corpse taken up");
-  assert.equal(run("brood").held.brood ?? 0, 0, "no brood taken up");
-  assert.equal(run("soil").loose, 0, "no loose pellet taken up");
+  const corpse = run("corpse", span);
+  assert.ok(corpse.offered.has("corpse"), "offered a corpse to refuse");
+  assert.equal(corpse.held.corpse ?? 0, 0, "no corpse taken up");
+  const brood = run("brood", span);
+  assert.ok(brood.offered.has("brood"), "offered brood to refuse");
+  assert.equal(brood.held.brood ?? 0, 0, "no brood taken up");
+  const soil = run("soil", span);
+  assert.ok(soil.offered.has("soil"), "offered soil to refuse");
+  assert.equal(soil.loose, 0, "no loose pellet taken up");
 });
 
 test("arrive (ja-qnx): a returner home with empty jaws is no longer returning, though its policy keeps returners returning", () => {
