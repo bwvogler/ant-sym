@@ -1282,8 +1282,9 @@ export class Fungus {
   /**
    * One world: the hyphae also root on the walls of the shaft under a hole (layer `layer`, the curtain; `x`, `y` the
    * hole's entrance there), where `ja-yo3` put the mycelium: walking down the shaft from the entrance, the first soil
-   * cell on each side takes a tip heading down. A wall cell that already holds hypha takes none (a second tip reaching
-   * the hole adds nothing). Nothing without hyphae and an evolving fungus. Since ja-2bw.14 it is reached by growth: a
+   * cell on each side takes a tip heading down. A wall cell that already has a tip on it takes no other; one that holds
+   * hypha but no tip (its tip grew on, fruited or was cut) takes a fresh one, so later tips reaching the hole keep coming
+   * down it (ja-2bw.16). Nothing without hyphae and an evolving fungus. Since ja-2bw.14 it is reached by growth: a
    * plane tip that comes to the hole crosses down it (crossAt), rather than the landing rooting it at once.
    */
   rootShaft(layer: number, x: number, y: number): void {
@@ -1300,14 +1301,14 @@ export class Fungus {
     for (let yy = sy; yy <= sy + SHAFT_ROWS && !(left && right); yy++) {
       if (g.kind(sx, yy) !== "open") continue;
       if (!left && g.kind(sx - 1, yy) === "soil") {
-        if (!h.has(sx - 1, yy)) {
+        if (!h.tips.some((t) => t.x === sx - 1 && t.y === yy)) {
           h.root(sx - 1, yy, SW);
           h.soil.add(cellKey(sx - 1, yy));
         }
         left = true;
       }
       if (!right && g.kind(sx + 1, yy) === "soil") {
-        if (!h.has(sx + 1, yy)) {
+        if (!h.tips.some((t) => t.x === sx + 1 && t.y === yy)) {
           h.root(sx + 1, yy, SE);
           h.soil.add(cellKey(sx + 1, yy));
         }

@@ -4,7 +4,7 @@ import { CURTAIN, PLANE } from "../../colony.ts";
 import { CORPSE, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { cellKey as hyphaKey, HYPHA_MASS, keyCell } from "../../hyphae.ts";
-import { nx, ny } from "../../hex.ts";
+import { CELL, cellOf, nx, ny } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { columnsOver } from "../../transect.ts";
 import { OPEN, rockAt, SOIL } from "../../world.ts";
@@ -239,4 +239,23 @@ test("a spore spot a tip fruited on puts out spores, until it is filled in", () 
   const was = spores.get(x, y);
   runFor(g, 5);
   assert.ok(spores.get(x, y) <= was, "a filled spot kept fruiting");
+});
+
+test("a later tip crossing down the hole puts a fresh tip on a wall cell whose tip is gone, never a second one beside a tip (ja-2bw.16)", () => {
+  const g = game(true);
+  crossDown(g);
+  const h = g.fungus.hyphaeOn(CURTAIN)!;
+  const nest = g.colonies[0]!.layers[PLANE]!.nest;
+  cellOf(nest.x, nest.y);
+  const e = g.fungus.crossAt!(CELL[0], CELL[1])!;
+  const walls = [...h.parent].filter(([, p]) => p === -1).map(([k]) => k);
+  assert.ok(walls.length > 0);
+  // A crossing puts no tip on a cell that has one.
+  g.fungus.rootShaft(CURTAIN, e.x, e.y);
+  const cells = h.tips.map((t) => hyphaKey(t.x, t.y));
+  assert.equal(new Set(cells).size, cells.length, "two tips on one wall cell");
+  // Every tip gone (grown on, fruited or cut): the next crossing seeds each wall cell again.
+  h.tips.length = 0;
+  g.fungus.rootShaft(CURTAIN, e.x, e.y);
+  assert.deepEqual(h.tips.map((t) => hyphaKey(t.x, t.y)).sort(), [...walls].sort(), "fresh tips on the walls");
 });
