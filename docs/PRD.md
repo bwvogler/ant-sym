@@ -5024,7 +5024,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - Against §63.8: seed 7 much faster (393 → 318 s), seeds 5, 6 and 8 faster; seeds 1 and 10 slower (+11 %, +13 %); median 293 → 302 s.
 - Against no hyphae: P1 fails on seeds 7 (+15 %) and 10 (+14 %) and on the median (283 → 302 s); the worst seed improves (never → 474 s). `main` already failed P1 on seed 7 (+42 %, `ja-2bw.19`).
 - **Owner (2026-11-13): ship, record, and tune in `ja-2bw.6`** (`ENTER_GAP`, `REGROW_ROUNDS`, `FRUIT_GAP` join its knobs).
-- SEEDS_11_20
+- Held out, seeds 11–20 (no hyphae → along tunnels): 11 353 → 399, 12 242 → 243, 13 259 → 223, 14 165 → 146, 15 343 → 285, 16 324 → 280, 17 252 → 264, 18 252 → 226, 19 315 → 308, 20 475 → 314 s. Median 287 → 272 s, worst seed 475 → 399 s; P1 fails only on seed 11 (+13 %).
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
