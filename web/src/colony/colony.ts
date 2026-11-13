@@ -144,20 +144,10 @@ import {
   routeRecord,
   searchOn,
 } from "./homing.ts";
-import {
-  enemyHeading,
-  layMark,
-  nestmatesAround,
-  odds,
-  placeOn,
-  raidLevel,
-  raidSmelt,
-  returnsAround,
-  sense,
-  touch,
-  touchProbe,
-} from "./sense.ts";
+import { layMark, nestmatesAround, placeOn, raidLevel, raidSmelt, returnsAround, touch, touchProbe } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
+import { perceive } from "./perceive.ts";
+import { AntStep } from "./step.ts";
 import { atGate, carryOut, crossDown, crossUp, crossed, holdsAt, mayCrossUp } from "./crossing.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
@@ -2002,6 +1992,7 @@ export class Colony {
     let heldNow = 0;
     // Energy and felt hunger (ja-xu6.1): the side view, where there is a queen and brood.
     if (this.queen) body(this, dt);
+    const s = new AntStep();
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       // An ant on another layer than the one bound: bind its own (a colony on one layer never does).
@@ -2012,28 +2003,20 @@ export class Colony {
         ({ gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.cur]!);
       }
       if (map.sky) unbury(this, i);
-      let h = this.heading[i];
-      // Three sensors (left, front, right), each read on every channel at once.
-      const sn = this.s;
-      const ch = Math.cos(h);
-      const sh = Math.sin(h);
-      sense(this, i, ch * ca + sh * sa, sh * ca - ch * sa, 0); // h − a
-      sense(this, i, ch, sh, 1);
-      sense(this, i, ch * ca - sh * sa, sh * ca + ch * sa, 2); // h + a
-      const fl = sn[0];
-      const ff = sn[1];
-      const fr = sn[2];
-      const hl = sn[3];
-      const hf = sn[4];
-      const hr = sn[5];
-      const al = sn[6];
-      // What this ant smells of alarm, for its Touch this tick (behaviour MR 4: graded alarm).
-      this.alarmAnt = i;
-      this.alarmSmelt = trailLevel(Math.max(sn[6], sn[7], sn[8]));
-      const af = sn[7];
-      const ar = sn[8];
-      const toEnemy = enemyHeading(this, i);
-      this.oddsNow = toEnemy === null ? "none" : odds(this, i);
+      s.ca = ca;
+      s.sa = sa;
+      perceive(this, i, s);
+      let h = s.h;
+      const fl = s.fl;
+      const ff = s.ff;
+      const fr = s.fr;
+      const hl = s.hl;
+      const hf = s.hf;
+      const hr = s.hr;
+      const al = s.al;
+      const af = s.af;
+      const ar = s.ar;
+      const toEnemy = s.toEnemy;
       // One world (ja-web): an outgoing forager at the top of its own shaft, its jaws empty and with no pass, is held at the
       // gate there (holdsAt): it waits as a forager home on open ground does, and is asked `leave` (below). With a
       // stranger near it isn't waiting: it isn't asked, and it fights or flees in the shaft as anywhere; but the gate still
