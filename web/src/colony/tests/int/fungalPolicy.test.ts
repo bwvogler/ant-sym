@@ -141,11 +141,11 @@ test("the gate: whatever a policy answers, a host pulls only levers on the menu;
     "a worker's levers on a top-down map: no nest, no queen",
   );
   const levels = Object.fromEntries(asked.map((id) => [id, 0]));
-  f.policy = () => encodeLevels(levels, asked);
+  f.bindPolicy("fungus", () => encodeLevels(levels, asked));
   assert.deepEqual(f.choose(sit(), ID("garden")), levels, "Jev's levels, read over the levers asked");
-  f.policy = () => "1,2";
+  f.bindPolicy("fungus", () => "1,2");
   assert.deepEqual(f.choose(sit(), ID("garden")), PRESETS[preset("blend")]!.levels, "an answer that is not one: the strain's default");
-  f.policy = () => "cull";
+  f.bindPolicy("fungus", () => "cull");
   const c = placed(map, 0, 0, [[20, 6]]);
   f.expressLevels(c, 0, f.choose(sit(), ID("bloom")), 1);
   assert.equal(c.estrange[0], 0, "cull is off the menu: the odour weapon stays as is");
@@ -241,7 +241,7 @@ test("groomed: a host among nestmates is groomed whether or not it hides (judged
     const f = new Fungus(map);
     f.hosts = 1;
     if (hide) c.show[0] = DORMANT_SHOW;
-    f.policy = () => (hide ? "dormant" : "share");
+    f.bindPolicy("fungus", () => (hide ? "dormant" : "share"));
     f.step([c], [occupancy(c, new CountGrid())], 1e-6);
     return decodeFungal(c.fungal[0]).groomed;
   };
@@ -279,7 +279,7 @@ test("hiding needs its lever: with 'fungus showing' off the menu, a dormant host
     c.resist[1] = c.resist[2] = 1;
     const g = new Fungus(arena(6.5));
     g.configure({ hide: true, cull: false }, menu);
-    g.policy = () => "dormant";
+    g.bindPolicy("fungus", () => "dormant");
     g.hosts = 1;
     g.step([c], [occupancy(c, new CountGrid())], 0.5);
     g.step([c], [occupancy(c, new CountGrid())], 0.5);

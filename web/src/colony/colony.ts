@@ -676,8 +676,9 @@ export class Colony {
   /** one world: every nest's hole on both layers (HoleCell), indexed by colony as the maps' nests are; empty elsewhere */
   holeCells: HoleCell[] = [];
   params: ColonyParams;
-  policy: Policy;
-  stancePolicy: StancePolicy;
+  /** what an ant of this colony does in a situation, and what the colony's strategist chooses: read here, set through `bindPolicy` (the lane's answers: the local rule, Jev's cached answers, a test's) */
+  readonly policy: Policy;
+  readonly stancePolicy: StancePolicy;
   /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
   responses: Responses = localResponses;
   stance: Stance = "forage";
@@ -1258,6 +1259,18 @@ export class Colony {
     }
     CELL[0] = this.cellX[i];
     CELL[1] = this.cellY[i];
+  }
+
+  /**
+   * Bind a lane's policy to this colony (the one place a policy is set after the constructor: the page's Jev client, the assays and the tests go through it,
+   * not a field). "mode": an ant's choice in its situation; "stance": the colony's strategist.
+   */
+  bindPolicy(lane: "mode", fn: Policy): void;
+  bindPolicy(lane: "stance", fn: StancePolicy): void;
+  bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
+    const own = this as { policy: Policy; stancePolicy: StancePolicy };
+    if (lane === "mode") own.policy = fn as Policy;
+    else own.stancePolicy = fn as StancePolicy;
   }
 
   /** Ant i as a healthy ant: it perceives the world as it is, gives off no calming cue, and smells of its nest alone (from the next odour step). */

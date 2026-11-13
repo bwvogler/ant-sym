@@ -480,8 +480,8 @@ export class ColonyJev {
   /** Drive the game's fungus: its policy becomes this lane (Jev's cached answer while a run is on, else the fungus's local rule). */
   attachFungus(fungus: Fungus): void {
     this.#fungus = fungus;
-    fungus.policy = this.fungusPolicy;
-    fungus.growthPolicy = this.growthPolicy;
+    fungus.bindPolicy("fungus", this.fungusPolicy);
+    fungus.bindPolicy("growth", this.growthPolicy);
     this.setMenu(fungus.menu);
     this.#recontext(this.#fungal, this.#fungal.words); // the view is part of the fungus's context (fungusContext)
   }
@@ -573,8 +573,8 @@ export class ColonyJev {
       const d: Driven = { colony, ...colonyLanes(words, species) };
       // A lane the species lacks is never asked: the colony keeps the policy the Game gave it (its local rule).
       const { modes, stances } = d;
-      if (modes) colony.policy = (s) => this.#lookup(modes, s);
-      if (stances) colony.stancePolicy = (s) => this.#lookup(stances, s);
+      if (modes) colony.bindPolicy("mode", (s) => this.#lookup(modes, s));
+      if (stances) colony.bindPolicy("stance", (s) => this.#lookup(stances, s));
       colony.reconsider();
       return d;
     });

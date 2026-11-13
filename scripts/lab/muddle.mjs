@@ -17,7 +17,7 @@ const LOCKPICK = STRAINS.findIndex((s) => s.id === "lockpick");
 const DT = 1 / 30;
 const map = generateSideWorld(seed);
 const g = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 7919));
-if (policy === "muddle") g.fungus.policy = () => "muddle";
+if (policy === "muddle") g.fungus.bindPolicy("fungus", () => "muddle");
 let painted = false;
 const strays = g.colonies.map(() => 0);
 let samples = 0;

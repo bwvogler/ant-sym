@@ -52,7 +52,7 @@ test("the queen is asked only her own levers, and her signal lever scales the ro
     c.queen!.load = 1;
     c.queen!.strain = GARDEN;
     f.hosts = 5;
-    f.policy = (s) => (s.task === "queen" ? encodeLevels({ queenSignal: signalLevel }, askedLevers(f.menu, true)) : "default");
+    f.bindPolicy("fungus", (s) => (s.task === "queen" ? encodeLevels({ queenSignal: signalLevel }, askedLevers(f.menu, true)) : "default"));
     f.step([c], [occupancy(c, new CountGrid())], 0.1);
     const signal = c.queen!.signal;
     for (let k = 0; k < 30; k++) c.tick(1 / 30);

@@ -152,7 +152,7 @@ Each module gains direct unit tests; that is where development gets quicker.
 
    One species ships: today's ant, bit-exact. Pheromone channels are per species, and the fungus's levers are gains keyed by channel (perceive, emit) instead of named colony arrays.
 4. **A policy API on the sim.**
-   - `colony.bindPolicy(lane, fn)` replaces the UI assigning `colony.policy`, `stancePolicy` and `fungus.policy`.
+   - `colony.bindPolicy(lane, fn)` replaces the UI assigning `colony.policy`, `stancePolicy` and `fungus.policy` (built, `ja-fnd.5.4.1`: `Colony.bindPolicy("mode" | "stance", fn)`, `Fungus.bindPolicy("fungus" | "growth", fn)`, the fields readonly, a source-scan test).
    - `Game` takes N colony specs instead of a fixed player and rival.
    - Doctrines are keyed by colony and species, not by position.
 5. **A nest-kind interface** (the dug curtain today): chamber roles, entrances, the mound. This is the hook for new final structures.

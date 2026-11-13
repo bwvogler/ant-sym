@@ -49,7 +49,7 @@ test("each colony's midden lies toward the other: a boundary between them", () =
   const g = new Game(map, { antCount: 120, rivalAnts: 120 }, mulberry32(4));
   for (const c of g.colonies) {
     middleAged(c);
-    c.stancePolicy = () => "forage";
+    c.bindPolicy("stance", () => "forage");
     c.stance = "forage";
   }
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
@@ -141,7 +141,7 @@ test("raiders leave their own nest and go in at the rival's hole, down toward it
   const [a, b] = g.colonies as [Colony, Colony];
   middleAged(b);
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
-  b.stancePolicy = () => "raid";
+  b.bindPolicy("stance", () => "raid");
   let rivalSide = 0;
   let inRival = 0;
   for (let k = 0; k < 30 * 40; k++) {
@@ -173,7 +173,7 @@ test("a raiding colony of every age: the young stay in to nurse, not parked at t
   const [a, b] = g.colonies as [Colony, Colony];
   // Ages as a new colony has them (0 to half a lifespan, Colony's constructor): about a third young, every band present.
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
-  b.stancePolicy = () => "raid";
+  b.bindPolicy("stance", () => "raid");
   cellOf(b.nest.entrance!.x, b.nest.entrance!.y);
   const [hx, hy] = [CELL[0], CELL[1]];
   let young = 0;
@@ -226,7 +226,7 @@ test("a raid in force gets past the rival's midden and in at its hole", () => {
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
   assert.ok(a.ph.fields.midden.get(mx, walkway(map, mx)) > 10, "the midden smells (laid from its heap every tick)");
   assert.ok(a.ph.fields.midden.get(mx + 3 * side, walkway(map, mx + 3 * side)) > 1, "over ±3 columns");
-  b.stancePolicy = () => "raid";
+  b.bindPolicy("stance", () => "raid");
   let inRival = 0;
   for (let k = 0; k < 30 * 60; k++) {
     g.tick(1 / 30);
@@ -260,7 +260,7 @@ test("a raider walking at the rival's hole shies from its midden", () => {
     b.y[0] = centreY(walkway(map, sx));
     b.heading[0] = Math.PI;
     middleAged(b); // a raider (review of #26: the young, who may not go out, are no raiders)
-    b.stancePolicy = () => "raid";
+    b.bindPolicy("stance", () => "raid");
     b.stance = "raid";
     b.mode[0] = 3;
     let closest = Infinity;
