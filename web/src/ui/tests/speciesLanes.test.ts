@@ -93,3 +93,19 @@ test("a species with no stance lane has none in the client: nothing seeded, coun
   jev.setDoctrine("raid often"); // a new doctrine re-contexts only the lanes the species has
   assert.equal(jev.state.stancesCached, 0);
 });
+
+test("the species' own local rule stands in while a situation is unanswered (ja-fnd.5.9)", () => {
+  const rule = () => "fight" as const;
+  const { g, jev } = setup({ ...LONE, policy: rule });
+  assert.equal(g.player.policy(sit), "fight", "the colony plays the species' rule, not the generic one");
+  assert.equal(jev.explain(sit).mode, "fight");
+  assert.equal(jev.explain(sit).by, "local");
+});
+
+test("a species with no mode words of its own still has its local rule in the client's fallbacks (review of #121, S2)", () => {
+  const rule = () => "fight" as const;
+  const { jev } = setup({ ...LONE, lanes: {}, policy: rule });
+  assert.equal(jev.explain(sit).mode, "fight", "explain falls back to the species' rule");
+  assert.equal(jev.explain(sit).by, "local");
+  assert.equal(jev.policy(sit), "fight", "and so does the client's policy");
+});
