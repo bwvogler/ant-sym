@@ -4902,6 +4902,8 @@ The mycelium's spore output is fixed by its mass, so every cell added to where i
 
 ### 63.3 Ants digging through a hypha cut it (ja-2bw.4, 2026-11-12)
 
+*(Superseded by §63.10: a cut loses only the dug cell; what grew beyond it lives on as its own piece.)*
+
 **Built** (with `params.hyphae`). Hyphae remember the cells that were soil when they grew in (and the shaft-wall roots); each round, a cell the ants have dug open is cut (`Hyphae.cutDug`). The cell and everything that grew from it die with their tips, the fusions they held and the spore spots only they touched, and the mass the lost hypha held is gone (`Evolution.lose`). A fusion loop that joins the cut-off part to the rest saves it: only the dug cell is lost (Simonin et al. 2012; the rule is design).
 
 **Measured** (seeds 1–10, 600 s, against §63.2): a quarter at 141–401 s → 140–441 s; seed 6 401 → 441 s, seed 9 380 → 398 s, the rest within a few seconds; median about 301 s. The counterplay is mild: at *a thread* the curtain's hyphae run along walls already dug, so the diggers mostly widen the tunnels beside them; it should bite harder once *a borer* takes hyphae into undug soil. P1 holds (worst 441 s against the baseline's "never").

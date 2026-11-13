@@ -301,7 +301,6 @@ export class Hyphae {
   cutDug(ground: Ground): number {
     let lost = 0;
     for (const k of [...this.soil]) {
-      if (!this.soil.has(k)) continue;
       const [x, y] = keyCell(k);
       if (ground.kind(x, y) !== "open") {
         this.digs.delete(k); // filled back in: a cord's count starts again (review of #119, N6)
@@ -317,6 +316,7 @@ export class Hyphae {
       this.digs.delete(k);
       lost += this.cut(k);
     }
+    // Defensive: a cut takes only its own cell's count (above), so this drops counts only for cells gone some other way.
     for (const k of this.digs.keys()) if (!this.parent.has(k)) this.digs.delete(k);
     return lost;
   }
@@ -343,6 +343,8 @@ export class Hyphae {
    * Unused hypha fades (Bebber et al. 2007: links that carry nothing are recycled): up to REGRESS_PER_ROUND dead ends a
    * round, a cell no tip stands on and nothing grew from, unless it is a root, a cord, in a fusion, touching a spore spot,
    * or `keep` holds it (a corpse). Its mass is the body's to spend again (it no longer counts in `length`). Returns the cells faded.
+   * A root never fades, and since §63.10 every piece a cut leaves has one: a piece with no tip left fades down to its
+   * root and keeps that cell (one HYPHA_MASS a piece; review of #152, N3, carried by ja-2bw.6).
    */
   regress(keep: (k: number) => boolean = () => false): number {
     const parents = new Set(this.parent.values());

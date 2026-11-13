@@ -766,3 +766,20 @@ test("a stump puts out no tip where one stands already, nor into a cell it can't
   assert.notEqual(near(5), "grow");
   assert.equal(near(8), "grow");
 });
+
+test("a cut drops the fusions that name the dug cell, so the partner's dead end can fade (review of #152 S2)", () => {
+  // A hypha east from (0, 20) to x = 6; a second from (0, 24) east four cells, fused into (5, 20).
+  const h = new Hyphae();
+  h.root(0, 20, E);
+  for (let k = 0; k < 6; k++) h.extend(h.tips[0]!, E, 0);
+  h.root(0, 24, E);
+  const o = h.tips[1]!;
+  for (let k = 0; k < 4; k++) h.extend(o, E, 0);
+  const partner = cellKey(o.x, o.y);
+  h.fusions.push(partner, cellKey(5, 20));
+  h.tips.length = 0; // nothing grows: only fading moves
+  h.cut(cellKey(5, 20));
+  assert.deepEqual(h.fusions, [], "a fusion pair kept the dug cell");
+  for (let r = 0; r < 20; r++) h.regress();
+  assert.ok(!h.parent.has(partner), "the partner's dead end never faded");
+});
