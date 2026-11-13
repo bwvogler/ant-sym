@@ -15,12 +15,10 @@ import {
   type Situation,
   type SpeciesSituation,
   type Stance,
-  STANCES,
   type StancePolicy,
   type StanceSituation,
   STRONG,
   type Trail,
-  trailLevel,
   EXPLORE,
   FIGHT,
   FOLLOW,
@@ -48,7 +46,7 @@ import {
   type WorldMap,
 } from "./world.ts";
 import { cellAt, type Transect } from "./transect.ts";
-import { MODE_STRIDE, SITUATIONS, decodeSituation, packSituation } from "./situation.ts";
+import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
   BY_VECTOR,
   CHAMBER_GAP,
@@ -129,14 +127,12 @@ import {
 import { DEFAULT_COLONY, LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN, channelParams, type ColonyParams } from "./params.ts";
 import { walkTunnel } from "./tunnel.ts";
 import { middenSmell, nestLife, nurse, port, undertake } from "./nestWork.ts";
-import { backfill, chamberDug, chamberGoal, crust, dropOut, dropPlane, enterStale, pickPlane, putDown, staleStep, unbury } from "./dig.ts";
+import { backfill, chamberDug, crust, dropOut, dropPlane, enterStale, pickPlane, staleStep, unbury } from "./dig.ts";
 import {
   atHome,
   believe,
-  homeGoal,
   destMark,
   fromHomePlane,
-  homeField,
   homeScentNear,
   integrate,
   outDistAt,
@@ -148,6 +144,7 @@ import { layMark, nestmatesAround, placeOn, returnsAround, touch, touchProbe } f
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
 import { stanceStep } from "./stance.ts";
+import { decide } from "./decide.ts";
 import { AntStep } from "./step.ts";
 import { atGate, crossDown, crossUp, crossed, mayCrossUp } from "./crossing.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
@@ -2036,146 +2033,36 @@ export class Colony {
       const nursing = s.nursing;
       const outward = s.outward;
       const reporting = s.reporting;
-      // Where homing heads: the chamber; in the side view, the entrance for a pellet carrier (soil goes up and
-      // out) and for any ant on the ground line (path integration home is to the hole, not through the ground).
-      let goal = homeGoal(this, i, pellet);
-      // A nurse heads for its brood chamber; out on the ground line (lost), for the hole first, like any homing ant. Only
-      // where there is a hole into the layer: one world's plane has no chambers (its carriers home to the hole: crossDown).
-      if (nursing && goal === this.nest && this.entrance) goal = chamberGoal(this, this.broodTo[i]);
-      // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
-      // its food to (a forager: reception, or the royal chamber until there is one).
-      else if (carrying && this.queen && goal === this.nest && this.entrance) goal = chamberGoal(this, this.foodTo(i));
-      let nest = goal;
-      const x0 = this.x[i];
-      const y0 = this.y[i];
-      let mode = this.mode[i];
-      const prevMode = mode;
-      const item: Item = carrying ? "food" : pellet ? (this.corpse[i] ? "corpse" : "soil") : nursing ? "brood" : "none";
-      const resp = this.responses;
-      let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
-      let modeStride = MODE_STRIDE; // the mode field's step in that code: the species' own schema's, when it has one
-      let waiting = false;
-      let rolled = false; // asked `leave` this step already (behaviour MR 5): one roll a step, at the rate it answers
-      if (carrying || pellet || nursing || reporting) {
-        // A carrier takes its load where it belongs (the carry response, above, said so): home, not a mode choice; the next
-        // question comes once the load is down.
-        mode = RETURN;
-        this.mode[i] = mode;
-        this.asked[i] = -1;
-        this.question[i] = -1;
-        if (!reporting) this.loaded[i] = 1;
-      } else {
-        // Its load just put down, wherever that was (spoil on the mound, a corpse on the midden, food in the larder): the
-        // carrying trip is over, so it is not returning any more (ja-qnx; `arrive`). It heads back out along its trail: a
-        // follower, which a fresh ant is asked as the local rule asked a returner (both follow a trail, explore without
-        // one). As an explorer, the middle-aged diggers no longer followed the carriers' scent down to reception, where
-        // they port its food on: food piled up there (A8, seeds 5-6: 30-37 % of the nest's food carried on, main 87-100 %).
-        if (this.loaded[i]) {
-          this.loaded[i] = 0;
-          if (p.arrive !== "return" && mode === RETURN) {
-            mode = p.follows ? FOLLOW : EXPLORE;
-            this.mode[i] = mode;
-          }
-        }
-        const tired = this.isTired(i);
-        const food = trailLevel(Math.max(fl, ff, fr));
-        const home = homeField(this, i, hl, hf, hr);
-        const alarm = trailLevel(Math.max(al, af, ar));
-        const enemy = toEnemy === null ? 0 : 1;
-        const stance = STANCES.indexOf(this.stanceOf(i));
-        // A species' own situation (ja-fnd.5.10): the generic fields and its own, encoded by its schema; the generic ant's stays packSituation.
-        const own = this.own;
-        let asks: SpeciesSituation | null = null;
-        if (own) {
-          asks = {
-            mode: MODES[mode] as Mode,
-            tired,
-            foodTrail: food,
-            homeTrail: home,
-            alarm,
-            enemy: enemy ? "near" : "none",
-            stance: STANCES[stance] as Stance,
-          };
-          if (own.sense) {
-            const sensed = own.sense(this, i);
-            for (const name in sensed) {
-              const ok = own.allowed.get(name);
-              if (ok && !ok.includes(sensed[name]))
-                throw new Error(`sense: "${name}" is ${String(sensed[name])}, not one of its field's values`);
-            }
-            asks = { ...asks, ...sensed };
-          }
-          // Its policy is handed only the fields its schema asks (owner, review of #122 D1): an ant chooses only from what its species senses.
-          asks = own.schema.state(asks);
-          modeStride = own.modeStride;
-        }
-        const before = own ? own.schema.encode(asks!) : packSituation(mode, tired, food, home, alarm, enemy, stance);
-        situation0 = before - mode * modeStride;
-        // Waiting at home (behaviour MR 5): where the colony gates leaving, a forager home in "return" is asked `leave`
-        // (below), not its mode: the mode policy sends any ant out that smells no food trail, gate or no gate.
-        // One world (ja-web): nobody waits on the plane (every returner goes down its hole); an ant held at the gate at the
-        // top of its shaft waits, and rolls `leave` once a step, asked as a returning forager (as a raider if recruited).
-        // A yes is its pass: it climbs out, and its mode policy is asked afresh next step.
-        waiting = held || (gate && mode === RETURN && !enemy && this.atNestTop(i) && !this.inbound(i, mode));
-        if (held) {
-          rolled = true;
-          if (this.leaves(i, dt, false)) {
-            this.leaveOk[i] = 1;
-            this.asked[i] = -1;
-          }
-        }
-        if (before !== this.asked[i] && !waiting) {
-          mode = MODES.indexOf(
-            this.policy(
-              asks ?? {
-                mode: MODES[mode] as Mode,
-                tired,
-                foodTrail: food,
-                homeTrail: home,
-                alarm,
-                enemy: enemy ? "near" : "none",
-                stance: this.stanceOf(i),
-              },
-            ),
-          );
-          if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
-          if (mode === FOLLOW && !p.follows) mode = EXPLORE; // a species with no follow mode can't follow (ja-fnd.5.9)
-          // Zoned by age: an ant that may not go out is no raider. Sent raiding, a young one climbed to its hole, was put
-          // back down the shaft, and climbed again (review of #26: 70–93 of ~110 young raiders parked at the hole). With
-          // no enemy near, it explores (with one near, it fights where it is).
-          if (mode === FIGHT && !enemy && this.stanceOf(i) === "raid" && this.queen && !this.mayGoOut(i)) mode = EXPLORE;
-          if (mode === RETURN && this.mode[i] !== RETURN) this.homeAfresh(i);
-          this.mode[i] = mode;
-          this.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
-          this.seen[before] = 1;
-          // The generic code of the situation it was asked in (its mode before the answer), whatever the species asks: the fungus, the journal and the
-          // ant card read the generic situation (review of #122, S1, S3).
-          this.question[i] = own ? packSituation(MODES.indexOf(asks!.mode), tired, food, home, alarm, enemy, stance) : before;
-          this.decisions++;
-        }
-      }
-      let fleeFrom: number | null = null;
-      // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
-      // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
-      // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
-      if (toEnemy !== null) {
-        const answer = resp.contact(touch(this, i, true, mode, item));
-        if (answer === "fight" && !reporting) {
-          if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
-        } else {
-          if (answer === "drop and run" && (carrying || pellet || nursing)) putDown(this, i);
-          if (mode !== RETURN) this.homeAfresh(i);
-          mode = RETURN;
-          // A carrier flees by taking its load home: turned straight away from the strangers, on the side view's ground
-          // line that was often away from its hole (G seed 5, raid stance: 3–5 carriers held over 120 s between the nests).
-          if (!carrying && !pellet && !nursing) fleeFrom = toEnemy;
-        }
-        this.mode[i] = mode;
-        // The situation as answered, with the mode the contact response set: else the mode policy, asked again next step,
-        // put the ant back on its trail and contact turned it round again, resetting its homing every other step (review
-        // of #38: 6,170 flips in 150 s on G′ seed 1).
-        if (situation0 >= 0) this.asked[i] = situation0 + mode * modeStride;
-      }
+      s.p = p;
+      s.dt = dt;
+      s.gate = gate;
+      s.fl = fl;
+      s.ff = ff;
+      s.fr = fr;
+      s.hl = hl;
+      s.hf = hf;
+      s.hr = hr;
+      s.al = al;
+      s.af = af;
+      s.ar = ar;
+      s.toEnemy = toEnemy;
+      s.held = held;
+      s.carrying = carrying;
+      s.pellet = pellet;
+      s.nursing = nursing;
+      s.reporting = reporting;
+      decide(this, i, s);
+      const goal = s.goal;
+      let nest = s.nest;
+      const x0 = s.x0;
+      const y0 = s.y0;
+      const mode = s.mode;
+      const prevMode = s.prevMode;
+      const item = s.item;
+      const resp = s.resp;
+      const waiting = s.waiting;
+      let rolled = s.rolled;
+      const fleeFrom = s.fleeFrom;
       // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
       // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
       // (Steering it by a drifted one left carriers surfacing off target and dropping spoil in pits beside the hole.)

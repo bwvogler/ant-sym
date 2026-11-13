@@ -2,6 +2,8 @@
 // computed for the ant to the next through it. One record per tick, reused for every ant: each field is written before it is read (initialised only so V8 keeps the numbers unboxed: review of #147).
 
 import type { ColonyParams } from "./params.ts";
+import type { Item, Responses } from "./responses.ts";
+import type { Nest } from "./world.ts";
 
 export class AntStep {
   ca = 0;
@@ -32,4 +34,16 @@ export class AntStep {
   nursing = false;
   outward = false;
   reporting = false;
+  gate = false;
+  goal!: Nest;
+  nest!: Nest;
+  x0 = 0;
+  y0 = 0;
+  mode = 0;
+  prevMode = 0;
+  item!: Item;
+  resp!: Responses;
+  waiting = false;
+  rolled = false;
+  fleeFrom: number | null = null;
 }
