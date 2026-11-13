@@ -7,6 +7,12 @@ import { defineSchema, type Schema } from "./schema.ts";
 export const MODES = ["explore", "follow", "return", "fight"] as const;
 export type Mode = (typeof MODES)[number];
 
+/** A mode's index in MODES (the per-ant `mode` array holds these). */
+export const EXPLORE = 0;
+export const FOLLOW = 1;
+export const RETURN = 2;
+export const FIGHT = 3;
+
 export const STANCES = ["forage", "defend", "raid"] as const;
 export type Stance = (typeof STANCES)[number];
 
