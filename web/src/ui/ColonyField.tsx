@@ -164,7 +164,6 @@ function rgb(hex: string): [number, number, number] {
   return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : [128, 128, 128];
 }
 
-/** The colour of an odour: the first colony's ink at 0, the second's warn tone at 1, mixed between. */
 /** A colony's tone by its odour t (0…1): ink at 0, the warn tone at 1, mixed between. */
 function odourRgb(ink: [number, number, number], warn: [number, number, number], t: number): [number, number, number] {
   const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * Math.min(1, Math.max(0, t)));

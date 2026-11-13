@@ -22,6 +22,7 @@ import { journalFromUrl } from "./journal.ts";
 import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
+import { landingOf } from "./landing.ts";
 
 // Owns the one Game (its colonies and the fungus, the player) and its animation
 // loop: React state carries only what the
@@ -62,7 +63,6 @@ export const MAX_SPEED = 8;
 /** The game's fungus: one species, the player's, which spreads like Garden (PRD §50; the other strains are lab presets). */
 export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 export { landingColony, landingOf } from "./landing.ts";
-import { landingOf } from "./landing.ts";
 
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   seed: 1,
