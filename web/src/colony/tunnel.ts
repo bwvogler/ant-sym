@@ -20,7 +20,7 @@ import {
   walkable,
 } from "./grid.ts";
 import { CELL, DIR_ANGLE, centreX, centreY, dirOf, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
-import { NEED_FETCH, THETA_OLD } from "./hunger.ts";
+import { ADULT_BEG_BELOW, NEED_FETCH, THETA_OLD } from "./hunger.ts";
 import {
   BROOD_PULL,
   CHAMBER_DEPTH,
@@ -94,6 +94,9 @@ export function toFood(col: Colony, cx: number, cy: number, dir: number): number
  * answer a fainter need, NEED_FETCH). There it takes food on to where it is wanted (port), and eats if it is hungry.
  */
 export function fetches(col: Colony, i: number): boolean {
+  // With restFetch (ja-4rfr), its own hunger too: a worker hungry enough to beg goes for food. Without it, the old felt
+  // their nestmates' hunger just under THETA_OLD while starving themselves, and climbed out to forage, and died.
+  if (col.params.restFetch > 0 && col.energy[i] < ADULT_BEG_BELOW) return true;
   return col.need[i] >= (col.band(i) === 2 ? THETA_OLD : NEED_FETCH);
 }
 
