@@ -16,17 +16,20 @@ import { run } from "../builders.ts";
 const P: ColonyParams = { ...DEFAULT_COLONY, ...DESERT_ANT.params } as ColonyParams;
 
 test("the day: the sun rises at 0, stands highest at noon, sets, and is down for the night; the ground follows it", () => {
-  const light = (1 - P.heatNight) * P.heatDay;
-  assert.equal(sunHeight(P, 0), 0);
-  assert.ok(Math.abs(sunHeight(P, light / 2) - 1) < 1e-12, "noon");
-  assert.equal(groundHeat(P, 0), P.heatDawn);
-  assert.ok(Math.abs(groundHeat(P, light / 2) - P.heatNoon) < 1e-9);
-  assert.equal(sunSeen(P, 1), "low");
-  assert.equal(sunSeen(P, light / 2), "high");
-  assert.equal(sunSeen(P, light + 1), "down");
-  assert.equal(groundHeat(P, light + 1), P.heatDawn, "the night is cool");
-  assert.equal(sunSeen(P, P.heatDay + 1), "low", "a day later, the sun is up again");
-  assert.equal(sunSeen({ ...P, heatDay: 0 }, 300), "low", "no day: never high, never down");
+  const Q = { ...P, heatStart: 0 }; // game time 0 at sunrise, for the arithmetic
+  const light = (1 - Q.heatNight) * Q.heatDay;
+  assert.equal(sunHeight(Q, 0), 0);
+  assert.ok(Math.abs(sunHeight(Q, light / 2) - 1) < 1e-12, "noon");
+  assert.equal(groundHeat(Q, 0), Q.heatDawn);
+  assert.ok(Math.abs(groundHeat(Q, light / 2) - Q.heatNoon) < 1e-9);
+  assert.equal(sunSeen(Q, 1), "low");
+  assert.equal(sunSeen(Q, light / 2), "high");
+  assert.equal(sunSeen(Q, light + 1), "down");
+  assert.equal(groundHeat(Q, light + 1), Q.heatDawn, "the night is cool");
+  assert.equal(sunSeen(Q, Q.heatDay + 1), "low", "a day later, the sun is up again");
+  assert.equal(sunSeen({ ...Q, heatDay: 0 }, 300), "low", "no day: never high, never down");
+  assert.equal(sunSeen(P, 0), "high", "a desert game opens as the sun turns high (heatStart)");
+  assert.equal(sunSeen(P, -P.heatStart + 1), "low", "a moment after sunrise, before it does");
 });
 
 test("a body heats toward its surroundings and cools back; hot from heatFelt until under heatCool; past heatDeath it is lethal", () => {
@@ -107,7 +110,7 @@ test("the papers' direction: more desert ants out under the high sun than in the
   let noon = 0;
   for (let t = 0; t < P.heatDay; t += 5) {
     run(g, 5);
-    const at = g.time - Math.floor(g.time / P.heatDay) * P.heatDay;
+    const at = (g.time + P.heatStart) % P.heatDay; // seconds since sunrise
     if (at < light / 8) low += onPlane();
     else if (Math.abs(at - light / 2) < light / 8) noon += onPlane();
   }
@@ -125,12 +128,12 @@ test("at night no ant sets out: on the plane in the dark, only ants on their way
   const g = desert();
   const light = (1 - P.heatNight) * P.heatDay;
   const onPlane = () => g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE).length;
-  run(g, light / 2); // noon: out under the high sun
+  run(g, 80); // the morning's high sun: out (at noon itself they come in to cool, the midday dip)
   const morning = onPlane();
-  run(g, light / 2 + (P.heatNight * P.heatDay) / 2); // midnight
+  run(g, light + (P.heatNight * P.heatDay) / 2 - P.heatStart - 80); // midnight
   const midnight = onPlane();
   const away = g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE && g.player.mode[i] !== RETURN).length;
-  assert.ok(morning > 10, `on the plane at noon: ${morning}`);
+  assert.ok(morning > 10, `on the plane in the morning's high sun: ${morning}`);
   assert.equal(away, 0, `at midnight ${midnight} on the plane, ${away} of them not on their way home`);
 });
 

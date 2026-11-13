@@ -174,6 +174,8 @@ export interface ColonyParams {
   heatSunHigh: number;
   /** the share of each day the sun is down: the night, cool and dark, after the daylight (owner, 2026-11-13) */
   heatNight: number;
+  /** seconds after sunrise at which a game starts: the desert ant's nest opens as the sun turns high, so a game opens then */
+  heatStart: number;
   /** the critical body heat (°C): past it, the ant dies */
   heatDeath: number;
   /**
@@ -313,13 +315,14 @@ export const DEFAULT_COLONY: ColonyParams = {
   foodPlume: 0,
   heatDay: 0,
   heatDawn: 25,
-  heatNoon: 56,
+  heatNoon: 52,
   heatNest: 30,
   heatTau: 30,
   heatFelt: 45,
   heatCool: 34,
-  heatSunHigh: 0.6,
+  heatSunHigh: 0.2,
   heatNight: 1 / 3,
+  heatStart: 0,
   heatDeath: 53.6,
   routeMemory: 0,
   routeStep: 8,

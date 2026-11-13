@@ -98,15 +98,18 @@ export const DESERT_ANT: Species = {
     foodPlume: 21,
     // Heat and the sun (ja-rf5.5, ja-rf5.12; docs/desert-heat.md, PRD §60.5): all design but the critical heat, 53.6 °C (C. bombycina, Gehring &
     // Wehner 1995, read through later papers: a borrowing, unverified; the params.ts default). A 10-minute day, a third of it night (owner,
-    // 2026-11-13); the ground 25 °C from sunset to sunrise and 56 °C at noon (the air at ant height, 6–7 °C under a surface of about 70 °C:
-    // unverified); the nest 30 °C; the body closes on its surroundings in about 30 s, feels hot from 45 °C until back under 34 °C; the sun
-    // counts as high from 0.6 of its noon height. Chosen on D5: seeds 1–10 pass 10/10 by the worst seed.
+    // 2026-11-13). The papers' direction (owner, review of #155 D1): out under the high sun, at the hottest hours, close to their limit; so the
+    // air at ant height at noon, 52 °C, stays just under the critical heat (Cataglyphis forage on ground near 54 °C, the air 6–7 °C cooler:
+    // desert-heat.md §1, partly unverified). The ground is 25 °C from sunset to sunrise; the nest 30 °C; the body closes on its surroundings in
+    // about 30 s and feels hot from 45 °C until back under 34 °C; the sun counts as high from 0.2 of its noon height, and a game opens then,
+    // a minute after sunrise. Chosen on D5 by the worst seed's colony.
     heatDay: 600,
     heatNight: 1 / 3,
-    heatNoon: 56,
+    heatStart: 60,
+    heatNoon: 52,
     heatTau: 30,
     heatFelt: 45,
-    heatSunHigh: 0.6,
+    heatSunHigh: 0.2,
   },
   // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with

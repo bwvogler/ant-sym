@@ -6,11 +6,11 @@
 import type { ColonyParams } from "./params.ts";
 
 /**
- * Where game time t falls in the day, 0 to 1: the sun rises at 0 (t = 0, and every heatDay after), stands highest at half the daylight
+ * Where game time t falls in the day, 0 to 1 (a game starts heatStart seconds after sunrise): the sun rises at 0, stands highest at half the daylight
  * (1 − heatNight) / 2, sets at 1 − heatNight, and is down until the next rise.
  */
 export function dayPhase(p: ColonyParams, t: number): number {
-  const f = t / p.heatDay;
+  const f = (t + p.heatStart) / p.heatDay;
   return f - Math.floor(f);
 }
 
