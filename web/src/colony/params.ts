@@ -157,7 +157,7 @@ export interface ColonyParams {
   /**
    * ja-uvhw: 1 = a sensor reads scent (food, home, alarm trails, and the nest in sight) only where its tip can be reached
    * through open ground within SENSE_STEPS (inReach), as food itself is (ja-juiu); unreachable, it reads none. 0 = scent is
-   * read at the tip whatever lies between: main bit for bit.
+   * read at the tip whatever lies between: main bit for bit. 2 = as 1, but alarm is read at the tip as before.
    */
   scentReach: number;
   /** One world's plane, with routeMemory: cells walked between two stored places. */

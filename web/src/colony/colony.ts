@@ -1799,7 +1799,9 @@ export class Colony {
     const hasFood = map.food.get(cx, cy) > 0;
     const reach = hasFood || this.params.scentReach > 0 ? inReach(map, this.x[i], this.y[i], sx, sy) : true;
     if (!reach && this.params.scentReach > 0) {
-      s[slot] = s[slot + 3] = s[slot + 6] = 0;
+      s[slot] = s[slot + 3] = 0;
+      // 2: alarm is still read (a volatile cue, it spreads fast and far); 1: it is gated too.
+      s[slot + 6] = this.params.scentReach === 2 ? this.ph.fields.alarm.get(cx, cy) * this.gainAlarm[i] : 0;
       return;
     }
     if (hasFood && reach) s[slot] = SEEN;
