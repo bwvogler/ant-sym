@@ -3,7 +3,8 @@
 
 import type { ColonyParams } from "./params.ts";
 import type { Item, Responses } from "./responses.ts";
-import type { Nest } from "./world.ts";
+import type { Pheromones } from "./pheromone.ts";
+import type { Nest, WorldMap } from "./world.ts";
 
 export class AntStep {
   ca = 0;
@@ -46,4 +47,9 @@ export class AntStep {
   waiting = false;
   rolled = false;
   fleeFrom: number | null = null;
+  map!: WorldMap;
+  ph!: Pheromones;
+  home!: Nest;
+  a = 0;
+  digging = false;
 }
