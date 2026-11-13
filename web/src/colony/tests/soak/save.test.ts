@@ -2,7 +2,7 @@ import { ANT_FIELDS } from "../../ants.ts";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, LAYER_STATE, PLANE, type Layer } from "../../colony.ts";
+import { COLONY_SKIP, COLONY_STATE, CURTAIN, LAYER_STATE, PLANE, type Layer } from "../../colony.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { gridsFromLiving, hashGame } from "../saveHash.ts";
 import { STRAINS } from "../../fungus.ts";
@@ -118,21 +118,14 @@ test("a save of another version is refused", () => {
   assert.throws(() => build("top", 2).load({ ...s, version: s.version + 1 }), /version/);
 });
 
-test("a colony's save holds every private field it declares (but its random stream, the game's)", () => {
-  // The save's private list is written out by hand (the per-ant arrays are not: ants.ts's table saves them by its keys): a field
-  // left off it would lose its value on every load, and the restored game would only show it once that field mattered (PR #42
-  // review, S1: tired, holdsBrood (now broodHeld) and cameFrom each slipped past the run-on test). So: every `#field` declared in Colony, and
-  // nothing else, is saved; and every array of ants.ts is saved with the public fields.
-  const src = readFileSync(new URL("../../colony.ts", import.meta.url), "utf8");
-  const body = src.slice(src.indexOf("export class Colony "));
-  const declared = new Set<string>();
-  for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
-  declared.delete("rng");
-  declared.delete("own"); // the species' situation (ja-fnd.5.10): code the Game wires from its species, again on load, not state
+test("what a colony saves: its public properties in `fields`, COLONY_STATE in `private`, and nothing it names as code or rebuilt on load", () => {
+  // The colony's former #private fields are plain members now (docs/refactor.md S3.2). A property the colony gains is saved with the public fields by
+  // default (so a new field cannot be lost on load, as tired, holdsBrood and cameFrom were in PR #42's review, S1); COLONY_STATE keeps the older
+  // state that is written by name in `private` and restored in place; COLONY_SKIP names what is code, wired again by the Game, or the random stream.
+  // That the restore is complete is the run-on tests' job (a loaded game runs on as if never saved): this one holds the lists to each other.
   const g = build("side", 2);
   const c0 = g.colonies[0]!;
   const saved = Object.keys(c0.saveState().private as object);
-  // ants.ts's per-ant arrays are the colony's own properties and travel with its public arrays, in `fields`.
   const fields = Object.keys(c0.saveState().fields as object);
   assert.deepEqual(
     Object.keys(ANT_FIELDS)
@@ -141,9 +134,87 @@ test("a colony's save holds every private field it declares (but its random stre
     [],
     "an ants.ts array not saved with the public fields",
   );
-  assert.ok(declared.size > 25, `found the declarations (${declared.size})`);
-  assert.deepEqual([...declared].filter((k) => !saved.includes(k)).sort(), [], "declared but not saved");
-  assert.deepEqual(saved.filter((k) => !declared.has(k)).sort(), [], "saved but not declared");
+  assert.deepEqual([...saved].sort(), [...COLONY_STATE].sort(), "`private` is COLONY_STATE");
+  // The public properties a save writes into `fields` by default, pinned: a new property of the colony that holds a reference (a map, a cache, the
+  // game) would otherwise be written into every save and poured back on load. Adding one is an edit here, or to COLONY_SKIP when it is code or rebuilt.
+  const SAVED_FIELDS = [
+    "alates",
+    "births",
+    "brood",
+    "broodKilled",
+    "broodStarved",
+    "buried",
+    "carriedDown",
+    "carriedUp",
+    "corpses",
+    "crossedDown",
+    "crossedUp",
+    "decisions",
+    "diedHungry",
+    "diedOld",
+    "eaten",
+    "finds",
+    "flights",
+    "flown",
+    "founding",
+    "gateHeld",
+    "gynes",
+    "gynesCulled",
+    "handedOn",
+    "inNest",
+    "incipient",
+    "intakeRate",
+    "larder",
+    "looseBack",
+    "looseDown",
+    "looseDropped",
+    "looseFilled",
+    "looseLost",
+    "loosePicked",
+    "losses",
+    "midden",
+    "moundLost",
+    "n",
+    "nestOdour",
+    "odourAim",
+    "outside",
+    "params",
+    "ph",
+    "portTrips",
+    "queen",
+    "raidScouts",
+    "raidable",
+    "recentLosses",
+    "recruits",
+    "seen",
+    "soilDug",
+    "soilFilled",
+    "soilLost",
+    "soilOut",
+    "stance",
+    "stored",
+    "time",
+  ];
+  assert.deepEqual(
+    fields.filter((k) => !(k in ANT_FIELDS)).sort(),
+    SAVED_FIELDS,
+    "the colony's saved public properties changed: name the new one here, or in COLONY_SKIP",
+  );
+  // What is code, wired again or the random stream is never saved, whatever a game has in it: `own` is null in this game, so it is held by name.
+  for (const k of ["rng", "own"]) assert.ok(COLONY_SKIP.has(k), `${k} is skipped by name`);
+  const own = Object.keys(c0);
+  assert.ok(own.length > 120, `found the colony's properties (${own.length})`);
+  for (const k of COLONY_STATE) assert.ok(own.includes(k), `${k} is a property of the colony`);
+  assert.deepEqual(
+    fields.filter((k) => COLONY_SKIP.has(k)),
+    [],
+    "a property named as code or rebuilt is also saved",
+  );
+  assert.deepEqual(
+    own.filter((k) => !fields.includes(k) && !COLONY_SKIP.has(k)),
+    [],
+    "a property that nothing saves",
+  );
 });
 
 test("every Layer key is saved per layer (LAYER_STATE) or built again: by the constructor and the world, or wired by the game", () => {

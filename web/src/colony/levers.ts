@@ -9,6 +9,8 @@
 // whose values are exactly the old bundles' (soothe is alarm 0.25, calm 0.8, tolerance +0.3, quiet 0.9 as before). The
 // local rule runs them, so a game the local rule plays runs as it did; Jev answers lever by lever.
 
+import { MARKS, type Channel } from "./pheromone.ts";
+
 /** What the fungus does to a host at full load; a host at load l gets the lerp from "as it is" by l (Fungus.express). */
 export interface Levers {
   /** food scent gain (A1) */
@@ -93,6 +95,8 @@ export interface Lever {
   nest?: boolean;
   /** which hosts it means something in: workers (the default), a queen, or both */
   hosts?: "workers" | "queen" | "both";
+  /** the pheromone channels it acts on (ja-fnd.5.11): on a species that lacks all of them it does nothing (inertLevers) */
+  channels?: readonly Channel[];
 }
 
 const five = (field: keyof Levers, v: readonly number[]): Partial<Levers>[] => v.map((x) => ({ [field]: x }));
@@ -105,6 +109,7 @@ export const LEVERS: readonly Lever[] = [
   // Perception: what the host senses.
   {
     id: "food",
+    channels: ["food"],
     kind: "perceive",
     name: "food scent",
     blurb: "how strongly the host smells food trails: damped, trails fade and it explores; boosted, it piles onto routes",
@@ -115,6 +120,7 @@ export const LEVERS: readonly Lever[] = [
   },
   {
     id: "rival",
+    channels: ["food"],
     kind: "perceive",
     name: "rival trails as food",
     blurb: "the host smells other colonies' food trails as its own, and follows them to their food",
@@ -125,6 +131,8 @@ export const LEVERS: readonly Lever[] = [
   },
   {
     id: "home",
+    // the home gain scales the road signs too (review of #127)
+    channels: ["home", ...MARKS],
     kind: "perceive",
     name: "home scent",
     blurb: "how strongly the host smells the way home: damped, it ranges far; boosted, it clings to home",
@@ -135,6 +143,7 @@ export const LEVERS: readonly Lever[] = [
   },
   {
     id: "alarm",
+    channels: ["alarm"],
     kind: "perceive",
     name: "alarm",
     blurb: "how strongly the host smells alarm: damped, it stays calm under alarm; boosted, it is skittish and routed easily",
@@ -156,6 +165,7 @@ export const LEVERS: readonly Lever[] = [
   },
   {
     id: "marks",
+    channels: MARKS,
     kind: "perceive",
     name: "floor marks",
     blurb:
@@ -191,6 +201,8 @@ export const LEVERS: readonly Lever[] = [
   // Emission: what the host gives off.
   {
     id: "trail",
+    // it scales every trail and mark the host lays (review of #127)
+    channels: ["food", "home", ...MARKS],
     kind: "emit",
     name: "trail laid",
     blurb: "how much trail the host lays: damped, a quiet host leaves little; boosted, loud trails",
@@ -201,6 +213,7 @@ export const LEVERS: readonly Lever[] = [
   },
   {
     id: "leak",
+    channels: ["food"],
     kind: "emit",
     name: "trail leaked to rivals",
     blurb: "carrying food, the host also lays its food trail into other colonies' fields: it shows them where food is",
@@ -211,6 +224,7 @@ export const LEVERS: readonly Lever[] = [
   },
   {
     id: "alarmLaid",
+    channels: ["alarm"],
     kind: "emit",
     name: "alarm laid",
     blurb: "how much alarm the host raises when it fights: damped, a skirmish recruits no defenders; boosted, every fight calls more",
@@ -466,4 +480,13 @@ export function decodeLevels(answer: string, asked: readonly string[]): LeverLev
 export function leverFor(v: Lever, queen: boolean): boolean {
   const h = v.hosts ?? "workers";
   return h === "both" || (h === "queen") === queen;
+}
+
+/**
+ * The levers that do nothing on a species with only these channels (ja-fnd.5.11): every channel a lever acts on is one the species lacks, so
+ * there is no scent for it to bend. The Fungus panel can grey them (ja-fnd.5.12). null: the generic ant, which has every channel: none.
+ */
+export function inertLevers(has: readonly Channel[] | null): string[] {
+  if (!has) return [];
+  return LEVERS.filter((v) => v.channels && v.channels.every((ch) => !has.includes(ch))).map((v) => v.id);
 }

@@ -12,6 +12,7 @@ import {
   extent,
   hexDistance,
   hexLine,
+  hexRuns,
   nx,
   ny,
   R,
@@ -156,4 +157,74 @@ test("hexLine: both ends, one neighbour per step, hexDistance + 1 cells, each wi
     assert.deepEqual(rev, fwd, `edge-aligned (${ax}, ${ay}) ↔ (${bx}, ${by})`);
   }
   assert.deepEqual([...hexLine(0, 0, 4, 0)], [0, 0, 1, 0, 2, 0, 3, 0, 4, 0]);
+});
+
+/** Off the straight line from cell a's centre to cell b's, in world units, for each cell of path p. */
+const offs = (p: Int32Array): number[] => {
+  const n = p.length;
+  const [ax, ay, bx, by] = [centreX(p[0]!, p[1]!), centreY(p[1]!), centreX(p[n - 2]!, p[n - 1]!), centreY(p[n - 1]!)];
+  const len = Math.hypot(bx - ax, by - ay);
+  const out: number[] = [];
+  for (let i = 0; i < n; i += 2)
+    out.push(Math.abs(((centreX(p[i]!, p[i + 1]!) - ax) * (by - ay) - (centreY(p[i + 1]!) - ay) * (bx - ax)) / len));
+  return out;
+};
+/** The way (0–5) of the step from pair index i to i + 1. */
+const wayAt = (p: Int32Array, i: number): number => {
+  for (let d = 0; d < 6; d++) if (nx(p[2 * i]!, p[2 * i + 1]!, d) === p[2 * i + 2] && ny(p[2 * i + 1]!, d) === p[2 * i + 3]) return d;
+  return -1;
+};
+const turnsOf = (p: Int32Array): number => {
+  let t = 0;
+  for (let i = 1; i < p.length / 2 - 1; i++) if (wayAt(p, i) !== wayAt(p, i - 1)) t++;
+  return t;
+};
+
+test("hexRuns: a shortest path in runs, within the band of the straight line, its ends along the nearest way, the same both ways (ja-lp4.17)", () => {
+  let seed = 11;
+  const rand = (n: number) => ((seed = (seed * 16807) % 2147483647) % (2 * n + 1)) - n;
+  for (let k = 0; k < 400; k++) {
+    const [ax, ay, bx, by] = [rand(150), rand(150), rand(150), rand(150)];
+    const p = hexRuns(ax, ay, bx, by, 3);
+    const n = hexDistance(ax, ay, bx, by);
+    assert.equal(p.length, 2 * (n + 1), "hexDistance + 1 cells");
+    assert.deepEqual([p[0], p[1], p[2 * n], p[2 * n + 1]], [ax, ay, bx, by]);
+    const ways = new Set<number>();
+    for (let i = 0; i < n; i++) {
+      const w = wayAt(p, i);
+      assert.ok(w >= 0, "each cell a neighbour of the last");
+      ways.add(w);
+    }
+    assert.ok(ways.size <= 2, `two ways at most, got ${[...ways].join(", ")}`);
+    // The band, and half a cell round the middle cell both halves run to.
+    for (const o of offs(p)) assert.ok(o <= 3.5 + 1e-9, `${o} off`);
+    const back = hexRuns(bx, by, ax, ay, 3);
+    for (let i = 0; i <= n; i++) assert.deepEqual([back[2 * i], back[2 * i + 1]], [p[2 * (n - i)], p[2 * (n - i) + 1]]);
+    if (n < 2) continue;
+    // Both ends leave along the way nearest the straight line (within 30° of it).
+    const ang = Math.atan2(centreY(by) - centreY(ay), centreX(bx, by) - centreX(ax, ay));
+    for (const w of [wayAt(p, 0), wayAt(p, n - 1)]) {
+      let d = Math.abs(DIR_ANGLE[w]! - ang) % (2 * Math.PI);
+      if (d > Math.PI) d = 2 * Math.PI - d;
+      assert.ok(d <= Math.PI / 6 + 1e-9, `an end leaves ${((d * 180) / Math.PI).toFixed(1)}° off the line`);
+    }
+  }
+});
+
+test("hexRuns: a line along a way is one run; a 30° slant turns about every 12 cells where hexLine turns on most steps", () => {
+  const east = hexRuns(0, 0, 80, 0, 3);
+  assert.equal(turnsOf(east), 0);
+  const se = hexRuns(0, 0, 25, 50, 3); // 50 steps south-east exactly
+  assert.equal(turnsOf(se), 0);
+  // (0, 0) to (75, 50): 50 steps south-east and 50 east, a slant of 30° between them.
+  const slant = hexRuns(0, 0, 75, 50, 3);
+  assert.equal(hexDistance(0, 0, 75, 50), 100);
+  assert.ok(turnsOf(slant) <= 10, `${turnsOf(slant)} turns`);
+  // A tie (exactly 30° between E and SE) leaves and arrives along the clockwise way, SE; a tile exactly LINE_BAND off keeps the run.
+  assert.deepEqual([wayAt(slant, 0), wayAt(slant, 99)], [1, 1]);
+  assert.deepEqual([...hexRuns(0, 0, -17, 11, 3)].slice(24, 28), [-9, 7, -9, 8]);
+  assert.ok(turnsOf(hexLine(0, 0, 75, 50)) >= 50, `hexLine: ${turnsOf(hexLine(0, 0, 75, 50))} turns`);
+  // A wider band turns less; a narrower one keeps nearer the line.
+  assert.ok(turnsOf(hexRuns(0, 0, 75, 50, 8)) < turnsOf(slant));
+  for (const o of offs(hexRuns(0, 0, 75, 50, 1))) assert.ok(o <= 1.5 + 1e-9);
 });
