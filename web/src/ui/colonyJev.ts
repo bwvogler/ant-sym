@@ -769,6 +769,7 @@ export class ColonyJev {
 
   #cycle(): void {
     if (this.#state.phase !== "running") return;
+    this.#followMenu(); // a menu changed since the last lookup: drop the questions queued under the old one before sending
     if (this.#cooldown > 0) {
       this.#cooldown--;
       return;

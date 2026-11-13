@@ -365,7 +365,7 @@ test("the fungus's save holds every private field it declares, or the field is d
   // itself or a step's scratch, built again every step.
   const start = src.indexOf("interface SporeLayer {");
   const layerKeys = [...src.slice(start, src.indexOf("\n}\n", start)).matchAll(/^ {2}(?:readonly )?(\w+):/gm)].map((m) => m[1]!);
-  const perStep = ["map", "all", "visible", "taken"];
+  const perStep = ["map", "all", "visible", "taken", "shown"]; // shown: counted again by each fade and on load
   assert.deepEqual(
     [...layerKeys].sort(),
     [...SPORE_LAYER_STATE, ...perStep].sort(),

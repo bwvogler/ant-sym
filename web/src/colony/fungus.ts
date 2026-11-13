@@ -334,6 +334,8 @@ interface SporeLayer {
   readonly visible: LoadGrid[];
   /** spores taken this step, as x, y, amount: taken after every ant has read its cell */
   readonly taken: number[];
+  /** cells at or over SPORE_SHOWN after the last fade (or load): counted in the fade's pass, read by shownSporeCells */
+  shown: number;
 }
 
 export class Fungus {
@@ -399,7 +401,7 @@ export class Fungus {
   /** the levers the player has on (§5.1, lever 4): lethal ones start off; the nest's (NEST_ONLY) only where there is a nest */
   #menu: Set<string> = new Set(DEFAULT_MENU);
   #menuSeq = 0;
-  /** Bumped each time the menu is set (configure, the setter, a load): a reader caching the menu knows it changed (ja-d87). */
+  /** Bumped each time the menu changes (configure, the setter, a load): a reader caching the menu knows it changed (ja-d87). */
   get menuSeq(): number {
     return this.#menuSeq;
   }
@@ -410,7 +412,9 @@ export class Fungus {
   set menu(menu: Iterable<string>) {
     // On the top-down maps there are no chambers or queen: floor marks and crown would do nothing (review of nest slice 8).
     const nest = this.hasNest;
-    this.#menu = new Set([...menu].filter((id) => nest || !NEST_ONLY.has(id)));
+    const next = new Set([...menu].filter((id) => nest || !NEST_ONLY.has(id)));
+    if (next.size === this.#menu.size && [...next].every((id) => this.#menu.has(id))) return; // the same levers: Jev's queue stands
+    this.#menu = next;
     this.#menuSeq++;
   }
   /** Whether any of its maps has a nest underground (chambers, a queen): the side view's, one world's curtain. */
@@ -435,6 +439,7 @@ export class Fungus {
       all: new LoadGrid(),
       visible: [],
       taken: [],
+      shown: 0,
     }));
     this.#hyphae = maps.map(() => null);
     this.#corpses = maps.map(() => new Map());
@@ -505,18 +510,26 @@ export class Fungus {
     return n;
   }
 
-  /** Cells holding enough spores for the field to draw them (SPORE_SHOWN), on every map: what the player can see (ja-agx). */
+  /**
+   * Cells holding enough spores for the field to draw them (SPORE_SHOWN), on every map, as of the last step's fade or a
+   * load: what the player can see (ja-agx). Counted in the fade's pass, so the panel reading it often costs nothing.
+   */
   get shownSporeCells(): number {
     let n = 0;
-    for (const L of this.#layers) {
-      const { w } = L.map.size;
-      const { x0 } = L.map;
-      for (const key of L.sporeCells) {
-        const col = key % w;
-        if (L.spores.get(col + x0, (key - col) / w) >= SPORE_SHOWN) n++;
-      }
-    }
+    for (const L of this.#layers) n += L.shown;
     return n;
+  }
+
+  /** Count layer L's cells at or over SPORE_SHOWN (after a load; a step counts them as it fades them). */
+  #countShown(L: SporeLayer): void {
+    const { w } = L.map.size;
+    const { x0 } = L.map;
+    let n = 0;
+    for (const key of L.sporeCells) {
+      const col = key % w;
+      if (L.spores.get(col + x0, (key - col) / w) >= SPORE_SHOWN) n++;
+    }
+    L.shown = n;
   }
 
   /**
@@ -736,6 +749,7 @@ export class Fungus {
       L.spores.set(x, y, Math.max(0, L.spores.get(x, y) - taken[k + 2]));
     }
     const keep = Math.exp(-p.sporeDecay * dt);
+    let shown = 0;
     for (const key of L.sporeCells) {
       const col = key % w;
       const y = (key - col) / w;
@@ -744,8 +758,12 @@ export class Fungus {
       if (v < SPORE_GONE) {
         L.spores.set(x, y, 0);
         L.sporeCells.delete(key);
-      } else L.spores.set(x, y, v);
+      } else {
+        L.spores.set(x, y, v);
+        if (L.spores.get(x, y) >= SPORE_SHOWN) shown++; // as stored (Float32), as the field reads it
+      }
     }
+    L.shown = shown;
     return hosts;
   }
 
@@ -1573,6 +1591,7 @@ export class Fungus {
       const x = hy[l];
       this.#hyphae[l] = x ? Hyphae.load(x) : null;
     });
+    for (const M of this.#layers) this.#countShown(M);
     this.#sporeSpots = [];
     const corpses = (r.corpses as [number, number][][] | undefined) ?? [];
     this.#corpses.forEach((m, l) => {

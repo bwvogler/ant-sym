@@ -234,10 +234,27 @@ test("the panel counts only the spore cells the field draws (ja-agx): faint ones
   const f = new Fungus(map);
   f.paint([], at(15, 6).x, at(15, 6).y, 0.5, 4, 0, BLOOM);
   f.paint([], at(30, 6).x, at(30, 6).y, 0.5, SPORE_SHOWN / 2, 0, BLOOM);
+  run(f, [], 1 / 30); // counted as a step fades them
   assert.equal(f.sporeCells, 2, "both held");
   assert.equal(f.shownSporeCells, 1, "only the thick one drawn");
   f.paint([], at(30, 6).x, at(30, 6).y, 0.5, SPORE_SHOWN, 0, BLOOM);
+  run(f, [], 1 / 30);
   assert.equal(f.shownSporeCells, 2, "past the threshold it shows");
+  const back = new Fungus(map);
+  back.loadState(f.saveState());
+  assert.equal(back.shownSporeCells, 2, "a load counts them before any step");
+});
+
+test("one world: the panel's count takes in the spores on every map, after a step and after a load (ja-agx, review of #156 S3)", () => {
+  const f = new Fungus([arena(), arena()]);
+  f.paint([], at(15, 6).x, at(15, 6).y, 0.5, 4, 0, BLOOM, 1); // on the second map only
+  f.paint([], at(30, 6).x, at(30, 6).y, 0.5, SPORE_SHOWN / 2, 0, BLOOM, 1);
+  f.stepLayers([], [[], []], 1 / 30);
+  assert.equal(f.sporeCells, 2);
+  assert.equal(f.shownSporeCells, 1, "the second map's thick cell");
+  const back = new Fungus([arena(), arena()]);
+  back.loadState(f.saveState());
+  assert.equal(back.shownSporeCells, 1, "and after a load");
 });
 
 test("spores on the ground: an ant walking onto them picks up load and takes some away; untouched spores fade", () => {
