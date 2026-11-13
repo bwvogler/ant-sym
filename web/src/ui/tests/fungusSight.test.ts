@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CELL, cellOf, centreX, centreY, CURTAIN, INFECTED, PLANE, type Colony } from "../../colony/index.ts";
+import { CELL, cellOf, centreX, centreY, CHUNK, CURTAIN, INFECTED, PLANE, R, type Colony } from "../../colony/index.ts";
 import { REACH_MARGIN, SENSED_FADE, SensedMap, sightOf } from "../fungusSight.ts";
 
 // What the field shows of the colonies' scent (PRD §65): only what the fungus's hosts sensed, fading.
@@ -84,4 +84,26 @@ test("time going back (a restart, a load) forgets what was sensed", () => {
   s.stamp([colony([{ x: 20, y: 20, load: 0.3 }])], 50);
   s.stamp([colony([])], 2);
   assert.equal(at(s, PLANE, 20, 20), 0);
+});
+
+test("the disc is exact both ways, at negative columns (the curtain) and across chunk edges: every cell within reach, none beyond", () => {
+  const r = 3 + REACH_MARGIN;
+  // A point well inside, one at negative x (the curtain runs from the line's s, below 0), and two on chunk edges.
+  for (const [l, x, y] of [
+    [PLANE, 50.5, 40],
+    [CURTAIN, -70.3, 12.2],
+    [PLANE, CHUNK - 0.2, CHUNK * R + 0.1],
+    [CURTAIN, -CHUNK + 0.4, 2 * CHUNK * R - 0.3],
+  ] as const) {
+    const s = new SensedMap();
+    s.stamp([colony([{ x, y, load: 0.2, layer: l }])], 1);
+    let lit = 0;
+    for (let gy = Math.max(0, Math.floor((y - r) / R) - 2); gy <= Math.ceil((y + r) / R) + 2; gy++)
+      for (let gx = Math.floor(x - r) - 2; gx <= Math.ceil(x + r) + 2; gx++) {
+        const inside = Math.hypot(centreX(gx, gy) - x, centreY(gy) - y) <= r;
+        assert.equal(s.sight(l, gx, gy), inside ? 1 : 0, `(${gx}, ${gy}) of the host at (${x}, ${y})`);
+        if (inside) lit++;
+      }
+    assert.ok(lit > 40, `a disc, not a dot (${lit} cells)`);
+  }
 });

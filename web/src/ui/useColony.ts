@@ -61,15 +61,8 @@ export const GAME_SPEED = 4;
 export const MAX_SPEED = 8;
 /** The game's fungus: one species, the player's, which spreads like Garden (PRD §50; the other strains are lab presets). */
 export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
-/**
- * The colony the fungus lands by: chosen by the world's seed among the colonies it starts with, so no colony is the
- * player's (owner, 2026-11-13; PRD §65). One colony: that one.
- */
-export function landingColony(seed: number, colonies: number): number {
-  return colonies > 1 ? seed % colonies : 0;
-}
-/** Where `game`'s fungus lands (or landed). */
-export const landingOf = (game: Game): number => game.landed?.colony ?? landingColony(game.map.seed, game.colonies.length);
+export { landingColony, landingOf } from "./landing.ts";
+import { landingOf } from "./landing.ts";
 
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   seed: 1,

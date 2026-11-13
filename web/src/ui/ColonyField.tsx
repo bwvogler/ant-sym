@@ -165,9 +165,14 @@ function rgb(hex: string): [number, number, number] {
 }
 
 /** The colour of an odour: the first colony's ink at 0, the second's warn tone at 1, mixed between. */
+/** A colony's tone by its odour t (0…1): ink at 0, the warn tone at 1, mixed between. */
+function odourRgb(ink: [number, number, number], warn: [number, number, number], t: number): [number, number, number] {
+  const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * Math.min(1, Math.max(0, t)));
+  return [m(0), m(1), m(2)];
+}
 function odourColour(ink: [number, number, number], warn: [number, number, number], t: number): string {
-  const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * t);
-  return `rgb(${m(0)}, ${m(1)}, ${m(2)})`;
+  const [r, g, b] = odourRgb(ink, warn, t);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
@@ -611,8 +616,7 @@ export default function ColonyField({
       for (let k = colonies.length - 1; k >= 0; k--) {
         const col = colonies[k] as Colony;
         // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
-        const t = Math.min(1, Math.max(0, col.nestOdour));
-        const tone = [0, 1, 2].map((j) => Math.round(theme.inkRgb[j]! + (theme.warnRgb[j]! - theme.inkRgb[j]!) * t));
+        const tone = odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
           const mx = Math.floor((col.x[i] - gx0) / 2);

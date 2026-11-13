@@ -113,6 +113,7 @@ export default function ColonyApp() {
   // The first game's tutorial (ja-7x4, PRD §61).
   const tut = useTutorial({ game, onFrame, update, setFollowed, showAt });
   // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh map for each game: `game` is the key, not an input
   const sensed = useMemo(() => new SensedMap(), [game]);
   useEffect(() => onFrame(() => sensed.stamp(game.colonies, game.time)), [onFrame, game, sensed]);
   const onStart = useCallback(
