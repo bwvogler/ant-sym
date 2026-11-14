@@ -7,10 +7,6 @@ import { INTAKE_NONE, INTAKE_PLENTY, INTAKE_WINDOW } from "./tuning.ts";
 import { MODES, type SpeciesSituation, type StanceSituation } from "./vocab.ts";
 
 /**
- * Bind a lane's policy to this colony (the one place a policy is set after the constructor: the page's Jev client, the assays and the tests go through it,
- * not a field). "mode": an ant's choice in its situation; "stance": the colony's strategist.
- */
-/**
  * Ask the mode policy about the species' own situation (ja-fnd.5.10): `schema` names the fields its key and its question hold, `sense` adds the
  * fields of its own (it must read, not draw from the game's random stream, so the game plays on as before). Null: the generic situation. The
  * schema keeps the mode field with every mode (the tick reads a situation's mode off its code), and stays small enough for the ants' question codes.

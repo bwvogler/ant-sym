@@ -70,11 +70,8 @@ import { moveDig } from "./move.ts";
 import { arrive } from "./arrive.ts";
 import { AntStep } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
-import {} from "./colonySave.ts";
 import { localPolicy, localStance } from "./localRules.ts";
 import { speciesSituation, stanceView } from "./colonySituation.ts";
-import {} from "./colonySituation.ts";
-import {} from "./plane.ts";
 export { localPolicy, localStance } from "./localRules.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
@@ -750,6 +747,10 @@ export class Colony {
     CELL[1] = this.cellY[i];
   }
 
+  /**
+   * Bind a lane's policy to this colony (the one place a policy is set after the constructor: the page's Jev client, the assays and the tests go through it,
+   * not a field). "mode": an ant's choice in its situation; "stance": the colony's strategist.
+   */
   bindPolicy(lane: "mode", fn: Policy): void;
   bindPolicy(lane: "stance", fn: StancePolicy): void;
   bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
