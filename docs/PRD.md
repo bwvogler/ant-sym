@@ -4710,9 +4710,9 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 |---|---|---|
 | A1 double bridge | 8 | **10** |
 | A2a two sources | 10 | 10 |
-| A2b rich vs poor | 9 | 8 (seed 4 fails) |
+| A2b rich vs poor | 9 | 8 (seed 4 fails)¹ |
 | A3 depletion | 10 | 10 |
-| A4 alarm on a trail | 10 | 9 (seed 9 fails) |
+| A4 alarm on a trail | 10 | 9 (seed 9 fails)¹ |
 | A5 / A5b | 0 / 8 | 0 / 8 |
 | A6 narrow pass | 5 | 5 |
 | A9 strangers at food | 3 | **5** |
@@ -4721,7 +4721,9 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 | R1 pocket carriers (6 seeds with a pocket) | 3 of 6 (home within 300 s 77 %) | **6 of 6** (100 %, walked ÷ way round at most 1.70) |
 | S1, F1, D1-D4 | as off | as off (S1 home within 600 s 1.00, median 1.48, as before) |
 
-A1 stays at or above 8/10 (10/10). A2b and A4 each lose one seed (one seed in ten, on plane games that differ from the first stall on; no mechanism in route memory touches either assay's measure, and the 5 % rule, G1 and R1 improve): reported to the owner, not tuned away. S1 is unchanged (its carriers are set down with no path).
+A1 stays at or above 8/10 (10/10). S1 is unchanged (its carriers are set down with no path).
+
+¹ **A2b and A4 are seed flips, not a cost** (`ja-lp4.16.6`, 2026-11-14). This table was measured on the branch before main (#167) was merged in, and the merge changed behaviour. On the squash as shipped (`377c9ab`), A2b seed 4 flips the other way (off 0.583 fails, on 0.779 passes, against the 0.70 mark) and A4 seed 9 passes both ways (back in 16 s off, 19 s on). Over seeds 1–30 on the shipped code: **A2b off 23/30, on 27/30; A4 off 30/30, on 29/30** (seed 26 fails, back in 82 s against 60). The mechanism: off and on are bit-identical until the first ant retraces (about 25–30 s into these assays); its changed steering shifts every later draw from the game's one random-number generator, and all 300 ants differ within 5 s. A retracing carrier lays little trail (retrace starts over 20 s into a carry, and laying fades over 20 s), and retracing does not rise after A4's alarm, so nothing ties route memory to either measure. Single seeds swing: A2b seed 4 sits near the mark with route memory off on both trees (0.776, 0.583), and A2b seed 9 ranges 0.17–0.82 across routeSee and routeStep. A verdict on either assay needs more seeds than one run each. G1's figures above are the branch's too: on the shipped code, seeds 6–8 reach 1/4, 2/4 and 1/1 (`ja-lp4.6.3.1`).
 
 **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, seed 1, 60 s, two runs each, second-half mean): on 13.79 and 13.23 ms; off 13.44 and 13.91 ms. No cost beyond noise (the machine runs slower than `ja-lp4.6.7`'s 10.6-10.8 ms; the pair is the comparison). **Memory:** unchanged from above (512 bytes an ant). **Jev cost:** none; `precache.test` passes.
 
@@ -4756,7 +4758,7 @@ A1 stays at or above 8/10 (10/10). A2b and A4 each lose one seed (one seed in te
 
 Step 3 passes with two seeds to spare; step 4 fails it on seed 1's jam (27); route memory off fails both parts. The ten games run in worker threads in one file (`tests/slow/oneWorldG1.test.ts`, games in `oneWorldG1Game.ts`), replacing the three per-seed files.
 
-**Still open.** The bound of 2 is not met on every seed: with #180 in, 6 of seeds 1-10 meet it at `routeStep` 3 and seed 4 reaches 6 (the table above; before #180, seeds 4, 5 and 9 met it and seeds 3 and 7 reached 3; at step 4, before §67, seeds 6, 7 and 8 reached 4, 5 and 4), and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 one seed down each, and A9 one more at step 3, to watch; the full texts to read when the network allows.
+**Still open.** The bound of 2 is not met on every seed: with #180 in, 6 of seeds 1-10 meet it at `routeStep` 3 and seed 4 reaches 6 (the table above; before #180, seeds 4, 5 and 9 met it and seeds 3 and 7 reached 3; at step 4, before §67, seeds 6, 7 and 8 reached 4, 5 and 4), and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 settled as seed flips at step 4 (¹ above), and A9 one down at step 3, to watch; the full texts to read when the network allows.
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
