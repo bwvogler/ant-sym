@@ -278,8 +278,8 @@ export const ANT_FIELDS = {
   /**
    * What the pellet carried is (with `pellet`; one place for it, review of MR 15: five per-ant arrays each cleared by
    * hand): DUG, soil it dug, to the hole and out, or into unused space on the way; LOOSE, loose soil off the mound (moved,
-   * not dug: not in soilDug), out along the ground; FILL, loose soil taken down into the nest to backfill. #clearPellet
-   * puts the pellet and all its state down at once.
+   * not dug: not in soilDug), out along the ground; FILL, loose soil taken down into the nest to backfill. `clearPellet`
+   * (pellets.ts) puts the pellet and all its state down at once.
    */
   soil: { type: Uint8Array, reset: "spawn" },
   /** the cell it looked from before that (cellKey; NO_KEY none): the way it came, which is never a stale branch */
