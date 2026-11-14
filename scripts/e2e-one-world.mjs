@@ -1114,7 +1114,9 @@ try {
   await lp.mouse.click(hole.x, hole.y);
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
   await lp.keyboard.press("Escape");
-  check((await lensCard.count()) === 0, "Escape closes a pinned card");
+  // Closing a pinned card leaves the pointer's card, if it is over the map: count the pinned one (its × says so).
+  const pinnedCards = () => lensCard.getByRole("button", { name: "Close the lens card" }).count();
+  check((await pinnedCards()) === 0, "Escape closes a pinned card");
   // One Escape closes one thing (review of #196, S1): a pinned card over the Go to menu, then the menu; and the palette
   // over the menu, then the menu.
   const goBtn = lp.getByRole("button", { name: "Go to ▾" });
@@ -1123,7 +1125,7 @@ try {
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
   await goBtn.click();
   await lp.keyboard.press("Escape");
-  check((await lensCard.count()) === 0 && (await goMenu.count()) === 1, "a pinned card and Go to: the first Escape closes the card only");
+  check((await pinnedCards()) === 0 && (await goMenu.count()) === 1, "a pinned card and Go to: the first Escape closes the card only");
   await lp.keyboard.press("Escape");
   check((await goMenu.count()) === 0, "and the second the menu");
   await goBtn.click();
@@ -1142,10 +1144,32 @@ try {
   check((await lensCard.count()) === 0, "pinned above, it hides below");
   await lp.keyboard.press("Escape");
   check((await rail("Mutations").getAttribute("aria-pressed")) === "false", "below, Escape closes the drawer, not the hidden card");
+  // Below, the lens still follows the pointer while that card waits above (review of #196, S6).
+  for (const dx of [0, 40, 80]) await lp.mouse.move(640 + dx, 450);
+  await until(async () => (await lensCard.count()) === 1, "a hover card below while a card waits pinned above", 2000, 50);
+  check((await lensCard.getByRole("button", { name: "Close the lens card" }).count()) === 0, "below, the pointer's card (not pinned)");
   await lp.keyboard.press("v");
-  await lensCard.waitFor({ timeout: 2000 });
-  check(true, "above again, the card is back");
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "above again, the pinned card is back");
   await lp.keyboard.press("Escape");
+  // A command run from the palette closes a pinned card, which would stay over what it opens (review of #196, N4, N8).
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.type("lab and");
+  await lp.keyboard.press("Enter");
+  await lp.getByRole("dialog", { name: "Details" }).waitFor({ timeout: 3000 });
+  check((await lensCard.count()) === 0, "a palette command (Lab and numbers) closes the pinned card");
+  await lp.getByRole("button", { name: "Close Details" }).click();
+  // The lens off and on again starts afresh: no old pinned card (N8).
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("i");
+  await lp.keyboard.press("i");
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0, "i twice: the pinned card is gone");
   await lp.keyboard.press("i");
   await lp.mouse.move(hole.x + 2, hole.y + 2);
   await lp.waitForTimeout(100);

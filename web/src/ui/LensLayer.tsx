@@ -4,10 +4,11 @@ import type { Followed } from "./follow.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import LensCard from "./LensCard.tsx";
 import { lensAnt, lensLines, probe } from "./lens.ts";
-import { clearProbe, useProbe } from "./lensStore.ts";
+import { shownOn, unpin, useLens } from "./lensStore.ts";
 
 // The lens's card over the page (PRD §69.3): it reads the store the map reports to, so only this re-renders as the pointer
-// moves. A point of the view not shown waits (hidden, and not taking Escape) till that view is shown again.
+// moves. A card pinned on the view not shown waits (hidden, and not taking Escape) till that view is shown again; meanwhile
+// the lens follows the pointer on the view shown (lensStore.ts shownOn).
 
 export default function LensLayer({
   on,
@@ -29,8 +30,8 @@ export default function LensLayer({
   trails: { food: boolean; home: boolean };
   onFollow: (f: Followed) => void;
 }) {
-  const p = useProbe();
-  const at = on && p && p.lv === layer ? p : null;
+  const lens = useLens();
+  const at = on ? shownOn(lens, layer) : null;
   const pinned = at?.pinned ?? false;
   // A pinned card: Escape closes it first (before a follow or a drawer), unless a dialog is over it.
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function LensLayer({
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       e.preventDefault();
-      clearProbe();
+      unpin();
     };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
@@ -63,8 +64,8 @@ export default function LensLayer({
       x={at.sx}
       y={at.sy}
       pinned={at.pinned}
-      onClose={clearProbe}
-      onFollow={ant ? () => (onFollow(ant), clearProbe()) : undefined}
+      onClose={unpin}
+      onFollow={ant ? () => (onFollow(ant), unpin()) : undefined}
     />
   );
 }

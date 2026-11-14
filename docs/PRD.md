@@ -5709,7 +5709,7 @@ The second half of stage 2: ways to find any action and to learn what anything o
   - **It says only what the field shows.** Scent shows only where a host sensed it lately (§65), at the field's own thresholds, which are now constants shared by `ColonyField` and `ui/lens.ts`. Where no host sensed lately, the card says so, linking the guide's "what the fungus senses".
   - A click (a tap on a phone, which has no hover) pins the card and follows nothing. Pinned, its links work, an ant on it can be followed, and it stays while the pointer wanders. Escape or its × closes it.
   - The card says it afresh four times a second, so ants walking under a still pointer show. Where the lens looks lives in a small store (`ui/lensStore.ts`) that the map reports to and `LensLayer` reads, so only the card re-renders as the pointer moves, not the page.
-  - A card pinned on one view hides on the other and takes no Escape there; it is back when its view is.
+  - A card pinned on one view hides on the other and takes no Escape there; it is back when its view is. Meanwhile the lens follows the pointer on the view shown: the store keeps the pinned card and the pointer's point apart (`shownOn`).
   - The ground's "no host has smelled here lately" line is said on open ground only: the sky, rock and soil never carry scent.
   - `probe` reads the game at a point and `lensLines` says it: both pure, both tested, one test on a built game.
   - The queen's pen keeps its click.
