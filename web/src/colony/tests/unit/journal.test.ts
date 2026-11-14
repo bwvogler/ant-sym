@@ -28,7 +28,7 @@ const firstAlive = (c: Game["colonies"][number]) => {
 
 test("spec: levels expand to categories, categories add, colony= and ant= narrow, a typo throws", () => {
   assert.deepEqual([...parseJournalSpec("summary").categories], ["colony", "queen", "stance", "jev"]);
-  assert.deepEqual([...parseJournalSpec("detail").categories], ["colony", "queen", "stance", "jev", "birth", "death", "infection"]);
+  assert.deepEqual([...parseJournalSpec("detail").categories], ["colony", "queen", "stance", "jev", "birth", "death", "infection", "dig"]);
   assert.deepEqual([...parseJournalSpec("verbose").categories], [...JOURNAL_CATEGORIES]);
   assert.deepEqual([...parseJournalSpec("summary,death").categories], ["colony", "queen", "stance", "jev", "death"]);
   assert.equal(parseJournalSpec("").categories.size, 0);
@@ -76,6 +76,27 @@ test("mode: a change of mode is written with the situation the policy was asked"
   assert.ok(e, `a mode change with its situation (${k.events.length} mode events)`);
   assert.ok((MODES as readonly string[]).includes(e.data!.to as string));
   assert.match(e.text, /→/);
+});
+
+test("dig: a foraging dig's start, and its end with food in the jaws or with time up (ja-16rp)", () => {
+  const { g, j, c } = watched("dig");
+  const i = firstAlive(c);
+  c.digBout[i] = 30;
+  j.observe(g);
+  c.digBout[i] = 0;
+  c.carrying[i] = 1;
+  j.observe(g);
+  const k = firstAlive({ ...c, alive: c.alive.map((a, n) => (n === i ? 0 : a)) } as typeof c);
+  c.digBout[k] = 30;
+  j.observe(g);
+  c.digBout[k] = 0;
+  j.observe(g);
+  const texts = j.events.map((e) => `${e.ant} ${e.text}`);
+  assert.equal(texts.length, 4, texts.join("; "));
+  assert.match(texts[0]!, new RegExp(`^${i} foraging dig begins \\(-?\\d+ rows down\\)$`));
+  assert.match(texts[1]!, new RegExp(`^${i} foraging dig ends: food in its jaws`));
+  assert.match(texts[2]!, new RegExp(`^${k} foraging dig begins`));
+  assert.match(texts[3]!, new RegExp(`^${k} foraging dig ends: time up`));
 });
 
 test("death: killed, old age and starved are told apart", () => {

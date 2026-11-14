@@ -21,8 +21,8 @@ The game journal (`web/src/colony/journal.ts`, ja-8tb) is a read-only observer: 
 
 Comma-separated words, in any order. A word it doesn't know throws and lists the valid ones.
 
-- **Levels** (each includes the one before): `summary` = colony, queen, stance, jev; `detail` = summary + birth, death, infection; `verbose` = detail + `mode` (every mode change, with the situation).
-- **Categories** (name them instead, or add to a level): `colony queen stance jev birth death mode infection`.
+- **Levels** (each includes the one before): `summary` = colony, queen, stance, jev; `detail` = summary + birth, death, infection, dig; `verbose` = detail + `mode` (every mode change, with the situation).
+- **Categories** (name them instead, or add to a level): `colony queen stance jev birth death mode infection dig` (`dig`: an old forager's foraging dig, begun and ended with food or time up, with its depth; forageDig, ja-16rp).
 - **Filters:** `colony=<k>`, `ant=<i>` (the ant's slot; an event also carries its `gen`, since a slot is reused). Either alone means everything about it.
 
 ## Recipe: why did ant #i do that?

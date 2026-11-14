@@ -12,11 +12,12 @@
 // with ant=<i>.
 import { pastCritical } from "./heat.ts";
 import type { Colony } from "./colony.ts";
+import { CELL, cellOf } from "./hex.ts";
 import { INFECTED } from "./fungus.ts";
 import { Game, type Outcome } from "./game.ts";
 import { MODES, type Situation, type Stance } from "./vocab.ts";
 
-export const JOURNAL_CATEGORIES = ["colony", "queen", "stance", "jev", "birth", "death", "mode", "infection"] as const;
+export const JOURNAL_CATEGORIES = ["colony", "queen", "stance", "jev", "birth", "death", "mode", "infection", "dig"] as const;
 export type JournalCategory = (typeof JOURNAL_CATEGORIES)[number];
 
 export const JOURNAL_LEVELS = ["off", "summary", "detail", "verbose"] as const;
@@ -25,7 +26,7 @@ export type JournalLevel = (typeof JOURNAL_LEVELS)[number];
 const LEVEL_CATEGORIES: Record<JournalLevel, readonly JournalCategory[]> = {
   off: [],
   summary: ["colony", "queen", "stance", "jev"],
-  detail: ["colony", "queen", "stance", "jev", "birth", "death", "infection"],
+  detail: ["colony", "queen", "stance", "jev", "birth", "death", "infection", "dig"],
   verbose: JOURNAL_CATEGORIES,
 };
 
@@ -91,6 +92,8 @@ interface Seen {
   gen: Uint32Array;
   mode: Uint8Array;
   infected: Uint8Array;
+  /** 1 while the ant is on a foraging dig (forageDig, ja-16rp) */
+  digging: Uint8Array;
   stance: Stance;
   queen: boolean | null;
   fallen: boolean;
@@ -204,6 +207,7 @@ export class Journal {
       gen: c.gen.slice(),
       mode: c.mode.slice(),
       infected,
+      digging: Uint8Array.from(c.digBout, (b, i) => (c.alive[i] && b > 0 ? 1 : 0)),
       stance: c.stance,
       queen: c.queen ? c.queen.alive : null,
       fallen: false,
@@ -227,7 +231,12 @@ export class Journal {
     if (beaten && !s.fallen) this.#write({ t, cat: "colony", colony: k, text: "fallen" });
     s.fallen = beaten;
     const f = this.filter;
-    const ants = f.categories.has("birth") || f.categories.has("death") || f.categories.has("mode") || f.categories.has("infection");
+    const ants =
+      f.categories.has("birth") ||
+      f.categories.has("death") ||
+      f.categories.has("mode") ||
+      f.categories.has("infection") ||
+      f.categories.has("dig");
     if (!ants) return;
     if (f.colony !== undefined && f.colony !== k) return;
     const from = f.ant ?? 0;
@@ -263,6 +272,25 @@ export class Journal {
           text: infected ? `infected (load ${c.load[i].toFixed(2)})` : `cleared (load ${c.load[i].toFixed(2)})`,
           data: { load: c.load[i], strain: c.strain[i] },
         });
+      // A foraging dig (ja-16rp): when an old forager starts one, and whether it ended with food in its jaws or ran out.
+      const digging = alive && c.digBout[i] > 0 ? 1 : 0;
+      const dug = born ? 0 : s.digging[i];
+      if (alive && digging !== dug) {
+        cellOf(c.x[i], c.y[i]);
+        const depth = CELL[1] - c.soilTop(CELL[0]);
+        this.#write({
+          t,
+          cat: "dig",
+          colony: k,
+          ant: i,
+          gen: c.gen[i],
+          text: digging
+            ? `foraging dig begins (${depth} rows down)`
+            : `foraging dig ends: ${c.carrying[i] ? "food in its jaws" : "time up"} (${depth} rows down)`,
+          data: { begins: digging === 1, food: c.carrying[i] === 1, depth, x: c.x[i], y: c.y[i], layer: c.layer[i] },
+        });
+      }
+      s.digging[i] = digging;
       s.alive[i] = alive;
       s.gen[i] = c.gen[i];
       s.mode[i] = c.mode[i];
