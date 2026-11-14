@@ -147,8 +147,8 @@ test("route memory records a place every routeStep cells on the way out, from th
 test("route memory off (routeMemory 0) records nothing, and a place set by hand changes nothing", () => {
   assert.deepEqual(
     [DEFAULT_COLONY.routeMemory, DEFAULT_COLONY.routeStep, DEFAULT_COLONY.routeSee],
-    [1, 4, 3],
-    "the shipped defaults: on a stall, every 4 cells, a place seen within 3",
+    [1, 3, 3],
+    "the shipped defaults: on a stall, every 3 cells, a place seen within 3",
   );
   const run = (mem: boolean): number[] => {
     const w = plane({ routeMemory: 0 });

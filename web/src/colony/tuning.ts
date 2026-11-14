@@ -43,7 +43,7 @@ export const SEARCH_START = 3;
 /** One world's plane: seconds a homing ant may get no nearer its belief before it searches on, wherever it is (see tick: it unblocks beliefs in rock, and fires far from the belief too). */
 export const SEARCH_STALL = 3;
 
-// Zoning by age (nest slice 6): see band, #mayGoOut, #digs.
+// Zoning by age (nest slice 6): see band, mayGoOut, digs.
 /** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
 export const REST = 10;
 
@@ -86,10 +86,10 @@ export const WAIT_RIM = 0.9;
  */
 export const WAIT_STEPS = 3;
 
-/** #mill's scratch: the ways open from a cell (no allocation per step) */
+/** mill's scratch: the ways open from a cell (no allocation per step) */
 export const MILL_WAYS = new Int8Array(6);
 
-// The queen and brood (nest slice 4): see #nestLife, #nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
+// The queen and brood (nest slice 4): see nestLife, nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
 /** Food in an egg, and fed to a larva before it pupates. */
 export const EGG_FOOD = 1;
 
@@ -109,7 +109,7 @@ export const CROWN_RATE = 0.05;
 /** Food a larva takes per second with two nurses or more by it. */
 export const FEED_RATE = 0.5;
 
-// The midden (nest slice 7): see #undertake, #dropOut, #middenSmell.
+// The midden (nest slice 7): see undertake, dropOut, middenSmell.
 /** Chance per second an idle middle-aged ant underground picks up a corpse within two cells of it. */
 export const PICK_CORPSE = 1;
 
@@ -138,13 +138,13 @@ export const MIDDEN_AVOID = 1.5;
 /**
  * A raider on the ground turns back from a cell of the rival's midden with chance 1 − exp(−mark / MIDDEN_SCALE), times
  * MIDDEN_CROWD / (its own colony's ants within two cells, itself included) once they are more than MIDDEN_CROWD: a scout
- * or a handful shies, a raid in force presses on (see #middenTurn).
+ * or a handful shies, a raid in force presses on (see middenTurn).
  */
 export const MIDDEN_SCALE = 5;
 
 export const MIDDEN_CROWD = 3;
 
-/** Chance per second an idle ant in reception or a store, with food there, carries a unit on (see #port). */
+/** Chance per second an idle ant in reception or a store, with food there, carries a unit on (see port). */
 export const PORT_RATE = 3;
 
 /** Food the royal chamber is kept stocked with for the queen (a few eggs' worth, and the larvae lying with her). */
@@ -156,12 +156,12 @@ export const PICK_BROOD = 0.5;
 /** Seconds a nurse holds brood before it puts it down wherever it is; a porter, its food, in whichever of its chambers it is by. */
 export const HOLD_MAX = 30;
 
-/** A forager's food goes to reception only once it is a chamber of this many cells (see #foodTo); until then, to the royal chamber. */
+/** A forager's food goes to reception only once it is a chamber of this many cells (see foodTo); until then, to the royal chamber. */
 export const RECEPTION_MIN = 4;
 
 /**
  * Seconds a forager carries its food before it will put it down in any of its colony's food chambers it stands in, not
- * only the one it takes food to (see #port; ja-3ifx). A trip from a pocket by the nest is under a minute when it finds its way.
+ * only the one it takes food to (see port; ja-3ifx). A trip from a pocket by the nest is under a minute when it finds its way.
  */
 export const STORE_AFTER = 60;
 
@@ -182,7 +182,7 @@ export const QUEEN_MARK = 10;
 
 export const QUEEN_FIGHT = 1;
 
-// Floor marks (nest slice 3): see #layMark, #destMark, #roleFor.
+// Floor marks (nest slice 3): see layMark, destMark, roleFor.
 /** Marks are laid at the colony's trail deposit per second just out of a chamber, falling to 1/e after MARK_DECAY seconds away from it. */
 export const MARK_DECAY = 30;
 
@@ -194,7 +194,7 @@ export const RECEPTION_ABOVE = 4;
 
 export const STORE_BELOW = 2;
 
-// Chambers (nest slice 2): see crowded(), #widenWay, #newChamberWay.
+// Chambers (nest slice 2): see crowded(), widenWay, newChamberWay.
 /** Floor cells a nest keeps per ant underground: below it the nest is crowded and digs (Odontomachus ~2 cm² per worker, at the sim's scale). */
 export const FLOOR_PER_ANT = 0.1;
 
@@ -226,7 +226,7 @@ export const ROOMY_DIG = 0.15;
 /** Cells a homing ant follows the ground's surface round spoil before trying the other hand (then twice as far each time: see flipDue). */
 export const GROUND_FLIP = 24;
 
-/** Seconds between rebuilds of the way-out field (#outField) while the ground keeps changing; a cell dug since steps straight toward the hole meanwhile. */
+/** Seconds between rebuilds of the way-out field (outField) while the ground keeps changing; a cell dug since steps straight toward the hole meanwhile. */
 export const OUT_FIELD_EVERY = 0.5;
 
 /** Cells an ant feels ahead along the surface, each way, to choose which hand to follow it with. */
@@ -266,7 +266,7 @@ export const MOUND_HEIGHT = 3;
 /** The side view: the farthest (columns) a pellet is carried from the hole; past it the disc grows higher, not wider. */
 export const MOUND_REACH = 90;
 
-/** The midden lies this many columns from the hole, toward the nearest other colony (see #middenSide): just past the mound's largest reach. */
+/** The midden lies this many columns from the hole, toward the nearest other colony (see middenSide): just past the mound's largest reach. */
 export const MIDDEN_AT = MOUND_REACH + MIDDEN_PAST;
 
 /**

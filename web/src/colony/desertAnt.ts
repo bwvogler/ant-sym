@@ -117,6 +117,17 @@ export const DESERT_ANT: Species = {
     heatTau: 30,
     heatFelt: 45,
     heatSunHigh: 0.2,
+    // The invitation (ja-rf5.6, PRD §60.6; Razin, Eckmann & Feinerman 2013, full text, C. niger): a finder coming down the shaft at 12 cm/s pulls
+    // each nestmate waiting at the top 40 % of the way to its pace, and a crowd damps it back (paceCrowd); its own pace is what it leaves by
+    // (the leave response below). Staged as Razin's chamber over the minute either side (D2c, seeds 1–20): at least 11× more leaving after a
+    // finder in a group of 4 and 8.7× in 8 (sevenfold in the paper's nests of 4–8), and a lower rate in 13 (fewer exits as density rises).
+    // A pull of 0.5 cost D5 2 seeds. paceGain and paceCrowd are design; 8 cm/s and the pace at rest are the paper's.
+    invitePace: 12,
+    paceGain: 0.4,
+    // A lift falling back with a 40 s time constant (not the params.ts 20): Razin counted the minute after an entry (owner, review of #186 D1), and over a minute a
+    // 20 s lift read 4–5×.
+    paceTau: 40,
+    paceCrowd: 0.25,
   },
   // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
@@ -124,7 +135,14 @@ export const DESERT_ANT: Species = {
   // It senses its own heat (the sense table's own-body row): hot near the heat that kills it.
   // It sees the sun's height where the sky is in view: out on the plane, or at the top of its own shaft; deeper in, unseen (desert-heat.md §2).
   sense: (c, i) => ({ hot: c.hot[i] === 1, sun: c.layer[i] === PLANE || atGate(c, i) ? sunSeen(c.params, c.time) : "unseen" }),
-  responses: { ...localResponses, contact: (t) => (t.carrying === "none" ? "fight" : "flee") },
+  responses: {
+    ...localResponses,
+    contact: (t) => (t.carrying === "none" ? "fight" : "flee"),
+    // The invitation (ja-rf5.6, Razin et al. 2013, full text): a waiting ant leaves by its own pace, which the finders passing it raise (its
+    // returns, sense.ts); with none, it waits and only the odd scout goes. Not the generic ant's crowd rule: a crowded shaft with no returns
+    // sent it out as a raid scout, and this species doesn't raid (it was most of its departures: 252 of 328 on seed 1).
+    leave: (t) => (t.returns === "many" ? "now" : t.returns === "few" ? "soon" : "wait"),
+  },
   lanes: { mode: DESERT_MODE_WORDS },
   policy: desertPolicy,
   ruleText: DESERT_RULE_TEXT,
