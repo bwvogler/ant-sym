@@ -86,7 +86,7 @@ export type OneSample = {
     crossedDown: number;
   }[];
   /** with `landed`: the fungus's whole saved state but its params (spores on every layer, hosts, evolution, hyphae, corpses), and each colony's infected */
-  fungus?: { state: string; infected: number[] };
+  fungus?: { state: Record<string, string>; infected: number[] };
 };
 
 const DT = 1 / 30;
@@ -186,11 +186,12 @@ function recordOne(s: Scenario): OneSample[] {
   return out;
 }
 
-/** The fungus's saved state but its params, hashed (a change of a default param shows only if it changes what the fungus does), and each colony's infected. */
-function fungusSample(game: Game): { state: string; infected: number[] } {
+/** The fungus's saved state but its params, hashed part by part (a change of a default param shows only if it changes what the fungus does), and each colony's infected. */
+function fungusSample(game: Game): { state: Record<string, string>; infected: number[] } {
   const { params: _, ...state } = game.fungus.saveState();
+  const text = new TextEncoder();
   return {
-    state: fnv([new TextEncoder().encode(JSON.stringify(state))]),
+    state: Object.fromEntries(Object.entries(state).map(([k, v]) => [k, fnv([text.encode(JSON.stringify(v) ?? "")])])),
     infected: game.colonies.map((c) => game.fungus.census(c).infected),
   };
 }
