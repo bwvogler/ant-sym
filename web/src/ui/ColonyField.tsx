@@ -22,6 +22,7 @@ import {
   type Fungus,
   type Hyphae,
   hyphaCell,
+  HYPHA_MASS,
   HYPHA_ROOT,
   type OneWorld,
   STRIP,
@@ -822,6 +823,19 @@ export default function ColonyField({
         const [x, y] = toScreen(c, v, centreX(t.x, t.y), centreY(t.y));
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Mass in transit (ja-tgw9, flow on): a soft glow on each cell it fills, brighter and wider the more there is, so the
+      // player sees where the mycelium is feeding and a front cut off from it going dim.
+      for (const [k, load] of h.loads) {
+        if (load < HYPHA_MASS * 0.1) continue;
+        const [lx, ly] = hyphaCell(k);
+        if (!inView(lx, ly)) continue;
+        const [x, y] = toScreen(c, v, centreX(lx, ly), centreY(ly));
+        const full = Math.min(1, load / (HYPHA_MASS * 2));
+        ctx.globalAlpha = (under ? 0.3 : 0.5) * full;
+        ctx.beginPath();
+        ctx.arc(x, y, r * (1 + full), 0, Math.PI * 2);
         ctx.fill();
       }
       // Knots (ja-2bw.9): a hard, dark lump on the hypha, a little larger than a tip.

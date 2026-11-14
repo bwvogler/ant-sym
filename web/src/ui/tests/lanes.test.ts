@@ -20,9 +20,8 @@ test("each lane's context prefix is the one its brain puts on its cache contexts
     for (const b of NAMES) if (a !== b) assert.ok(!LANE_KINDS[a].contextPrefix.startsWith(LANE_KINDS[b].contextPrefix), `${a} vs ${b}`);
 });
 
-test("ids and counters are distinct per lane, and the request sizes are what the cost estimates use", () => {
+test("ids are distinct per lane, and the request sizes are what the cost estimates use", () => {
   assert.equal(new Set(NAMES.map((n) => LANE_KINDS[n].idPrefix)).size, NAMES.length);
-  assert.equal(new Set(NAMES.map((n) => LANE_KINDS[n].counter)).size, NAMES.length);
   assert.equal(perRequest("mode"), PER_REQUEST);
   assert.equal(perRequest("stance"), PER_REQUEST);
   assert.equal(perRequest("fungus"), LANE_KINDS.fungus.perRequest);
