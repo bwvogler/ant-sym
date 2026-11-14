@@ -255,12 +255,12 @@ test("what the Learn panel and the cost estimates send: the sample requests and 
   );
 });
 
-test("each lane's flags: id prefix, counter, context prefix, hits, reconsidering, situations a request carries", () => {
+test("each lane's flags: id prefix, context prefix, hits, reconsidering, situations a request carries", () => {
   assert.deepEqual(LANE_KINDS, {
-    mode: { idPrefix: "s", counter: "asked", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: 100 },
-    stance: { idPrefix: "c", counter: "stancesAsked", contextPrefix: "stance-", countsHits: false, reconsiders: true, perRequest: 100 },
-    fungus: { idPrefix: "h", counter: "fungusAsked", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
-    growth: { idPrefix: "g", counter: "growthAsked", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 48 },
+    mode: { idPrefix: "s", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: 100 },
+    stance: { idPrefix: "c", contextPrefix: "stance-", countsHits: false, reconsiders: true, perRequest: 100 },
+    fungus: { idPrefix: "h", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
+    growth: { idPrefix: "g", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 48 },
   });
 });
 
@@ -268,22 +268,21 @@ test("the client's state carries these fields, in this order (the page shows and
   assert.deepEqual(Object.keys(new ColonyJev().state), [
     "phase",
     "run",
-    "asked",
-    "stancesAsked",
+    "lanes", // per lane of the registry: { asked, cached } (ja-fnd.5.7)
     "requests",
     "hits",
     "misses",
-    "cached",
-    "stancesCached",
     "stanceLane", // whether there is a stance lane at all (ja-fnd.5.12)
     "doctrineCached",
-    "fungusAsked",
-    "fungusCached",
-    "growthAsked",
-    "growthCached",
     "failures",
     "lastError",
   ]);
+  assert.deepEqual(new ColonyJev().state.lanes, {
+    mode: { asked: 0, cached: 0 },
+    stance: { asked: 0, cached: 0 },
+    fungus: { asked: 0, cached: 0 },
+    growth: { asked: 0, cached: 0 },
+  });
 });
 
 test("every context the shipped precache holds belongs to the lane its bundle says", () => {

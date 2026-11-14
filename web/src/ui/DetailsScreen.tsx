@@ -215,10 +215,10 @@ function JevCard({ jev }: Props) {
         <Stat label="this run" value={run ? usd(run.usd) : "—"} />
         <Stat label="avg $ / hour" value={perHour === null ? "—" : `$${perHour.toFixed(3)}`} />
         <Stat label="tokens" value={run ? run.inputTokens.toLocaleString() : "—"} />
-        <Stat label="situations asked" value={String(jev.state.asked)} />
+        <Stat label="situations asked" value={String(jev.state.lanes.mode.asked)} />
         <Stat
           label="answers cached"
-          value={`${jev.state.cached} · ${jev.state.stanceLane ? `${jev.state.stancesCached} stances` : "no stance lane"} · ${jev.state.fungusCached} fungus · ${jev.state.growthCached} growth`}
+          value={`${jev.state.lanes.mode.cached} · ${jev.state.stanceLane ? `${jev.state.lanes.stance.cached} stances` : "no stance lane"} · ${jev.state.lanes.fungus.cached} fungus · ${jev.state.lanes.growth.cached} growth`}
         />
         <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
         <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>

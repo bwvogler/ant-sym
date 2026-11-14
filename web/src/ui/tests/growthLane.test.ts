@@ -77,8 +77,8 @@ test("in a run, a tip's situation is asked under the aim, and the answer then pl
   await tick(80);
   assert.ok(seen.questions.includes("g0_grow"), `asked ${seen.questions.join(", ")}`);
   assert.equal(j.growthPolicy(tip), "fruit");
-  assert.equal(j.state.growthAsked, 1);
-  assert.equal(j.state.growthCached, 1);
+  assert.equal(j.state.lanes.growth.asked, 1);
+  assert.equal(j.state.lanes.growth.cached, 1);
   // Another aim is another cache: no answer there yet.
   j.setAim("stay buried");
   assert.equal(j.growthPolicy(tip), null);

@@ -121,8 +121,8 @@ test("a player's new aim, with a run on: the hosts' situations and all 48 growth
   assert.equal(counts(reqs, "fungus"), 2, "the two situations the living hosts are in, once each");
   assert.equal(counts(reqs, "growth"), LANES.growth.all().length);
   assert.equal(LANES.growth.all().length, 48);
-  assert.equal(j.state.fungusCached, 2);
-  assert.equal(j.state.growthCached, 48);
+  assert.equal(j.state.lanes.fungus.cached, 2);
+  assert.equal(j.state.lanes.growth.cached, 48);
 });
 
 test("with no run on, a player's new aim wants one, and its questions go when it starts", async () => {
