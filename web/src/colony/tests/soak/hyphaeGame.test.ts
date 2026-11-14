@@ -21,6 +21,8 @@ function game(hyphae: boolean): Game {
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
     { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae } },
     gameRng(7),
+    // routeMemory off: these tests follow one seed's digging, and route memory moves the ants (it is not what they test).
+    { colony: { routeMemory: 0 }, rival: { routeMemory: 0 } },
   );
   g.land(0, GARDEN, { evolve: true });
   return g;
@@ -369,6 +371,7 @@ test("with Knots bought, starved tips harden into knots in the game, paid from t
   assert.ok(h()!.has(kx, ky), "the knot was cut");
   assert.ok(knot.store < before, "the store put out nothing");
   assert.ok(g.fungus.sporesOn(CURTAIN)!.spores.get(kx, ky) > 0, "no spores on the knot's dug cell");
+  g.fungus.sporesOn(CURTAIN)!.spores.forEach((cx, cy) => assert.ok(cy >= 0, `a spore chunk off the map, at chunk (${cx}, ${cy})`));
 });
 
 test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps its store until a cell beside it is dug, then fruits there (review of #161 S1, S3)", () => {

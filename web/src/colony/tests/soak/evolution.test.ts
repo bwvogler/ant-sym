@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { keyX, keyY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
 import { BODY, Evolution, MUTATION, UPGRADES, upgrade } from "../../evolution.ts";
@@ -207,8 +208,7 @@ test("the game's landing: an evolving fungus roots by the hole, keeps sporulatin
   assert.ok(f.evolution && f.base.length > 0);
   assert.equal(f.strains[GARDEN]!.transmission, upgrade("infectivity").values![0], "Garden starts weak");
   assert.equal(STRAINS[GARDEN]!.transmission, 0.3, "the listed strain is untouched");
-  const { w } = g.map.size;
-  const onBase = () => f.base.reduce((n, key) => n + f.spores.get(key % w, Math.floor(key / w)), 0);
+  const onBase = () => f.base.reduce((n, key) => n + f.spores.get(keyX(key), keyY(key)), 0);
   for (let k = 0; k < 30 * 120; k++) g.tick(1 / 30);
   assert.ok(onBase() > 0, "two minutes on, its patch still holds spores (the landing's alone fade at 3 % a second)");
   assert.ok(f.evolution.mutations >= 1, `mutations from its growth: ${f.evolution.mutations}`);
@@ -245,10 +245,9 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
   assert.equal(carried.queen!.load, 0.4);
   assert.equal(g.fungus.evolution!.patches, 2, "it roots by her hole");
   assert.ok(g.fungus.base.length > patches);
-  const { w } = g.map.size;
   const hole = carried.nest.entrance!;
   assert.ok(
-    g.fungus.base.slice(patches).every((key) => Math.abs((key % w) + 0.5 - hole.x) < 8),
+    g.fungus.base.slice(patches).every((key) => Math.abs(keyX(key) + 0.5 - hole.x) < 8),
     "by her hole, as the landing is by the first colony's",
   );
 });
