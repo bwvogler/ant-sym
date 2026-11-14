@@ -665,8 +665,9 @@ export function LeverChips({
   lock: string | null;
   onChange: (menu: string[]) => void;
 }) {
-  // Levers on channels the game's species lacks have no scent to bend (ja-fnd.5.11): greyed, and their tip says why (ja-fnd.5.12).
-  const inert = new Set(inertLevers(game.player.params.channelSet));
+  // Levers on channels the game's species lacks have no scent to bend (ja-fnd.5.11): greyed, and their tip says why (ja-fnd.5.12); an
+  // invite lever (rouse) is inert where the species' finders invite no one (ja-rf5.18).
+  const inert = new Set(inertLevers(game.player.params.channelSet, game.player.params.invitePace > 0));
   return (
     <div className="mt-1 flex flex-col gap-1 text-xs">
       {(["perceive", "emit", "lethal"] as const).map((kind) => (
@@ -690,7 +691,9 @@ export function LeverChips({
                   locked
                     ? (lock ?? undefined)
                     : nothing
-                      ? `${v.blurb}. Nothing to bend: this species lays and reads none of its scent.`
+                      ? v.invite
+                        ? `${v.blurb}. Nothing to bend: this species' finders invite no one out.`
+                        : `${v.blurb}. Nothing to bend: this species lays and reads none of its scent.`
                       : heldOff
                         ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Mutations).`
                         : v.blurb
