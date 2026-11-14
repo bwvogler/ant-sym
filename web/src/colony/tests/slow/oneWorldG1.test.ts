@@ -12,12 +12,13 @@ import { Worker } from "node:worker_threads";
 // 2, 3 or 7 as routeSee moved, and #153 then #180 each took seed 4 over the bound with no change to route memory. Three
 // fixed seeds all pass about one time in five for any setting, so the old guard (seeds 4, 5 and 9) was re-rolled by every
 // plane change. The guard now asks that at least WITHIN of seeds 1-10 meet the bound, and that no seed reaches CEILING (a
-// carrier jam like main's 33 before route memory).
+// carrier jam like main's 33 before route memory). WITHIN was 4 (#183); the owner raised it to 7 once routeEnd took seeds
+// 1-10 to 7 within (#198, 2026-11-14), with no slack: a seed that moves from 2 to 3 fails the guard.
 //
 // Each game takes 3-5 minutes; the ten run in worker threads, as many at a time as the machine has cores.
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const BOUND = 2;
-const WITHIN = 4;
+const WITHIN = 7;
 const CEILING = 10;
 
 interface Held {
