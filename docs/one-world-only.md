@@ -180,9 +180,9 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | `game` G | yes: §42.2, §46.4 | `game1` (G1) | covered | G1 slow guard on seeds 4, 5, 9 passes (route memory, §59) |
 | `gameTop` G′ | yes: §42.2, §46.4 (G′ table) | none | **delete** | report-only bench bed on `OPEN_WORLD`, no queen. G1 replaces it as the whole-game measure |
 | `nestFlow` A8 | yes: §43.4, §46.4 (report only) | `nestFlowOne` | covered | one world: beyond 0.77 (worst 0.37) against 1.00 (one-world.md §5) |
-| `lifecycle` L | yes: §50.19, §50.21 | none | **port** | solo side game with the fungus landed; → `generateOneWorld` solo |
-| `lifecycle-signal` L | yes: §50.19, §50.21 (table), seeds 11–20 too | none | **port** | as above |
-| `lifecycle-scent` L | yes: §50.19, §50.21 | none | **port** | as above |
+| `lifecycle` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §71.2) | solo side game with the fungus landed; → `generateOneWorld` solo |
+| `lifecycle-signal` L | yes: §50.19, §50.21 (table), seeds 11–20 too | `lifecycleOne` | **ported** (PRD §71.2) | as above |
+| `lifecycle-scent` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §71.2) | as above |
 
 ## 3. Slow guards (`tests/slow/*.test.ts`)
 

@@ -5819,3 +5819,21 @@ Stage 2 of the foundation refactor ([refactor.md](refactor.md#stage-2-one-world-
 | A10 | draw | −0.5 (6) | 1.1 | 0.5 |
 
 - **Cost:** none. No situation, legend or question changed.
+
+### 71.2 The lifecycle assays on one world (`ja-fnd.3.2.2`)
+
+`lifecycle`, `lifecycle-signal` and `lifecycle-scent` now also run on a solo one world (`lifecycleOne` in `ONE_ASSAYS`, the same ids; `npm run exp -- --one lifecycle-signal`): `generateOneWorld(seed)`, 600 ants, no rival, Garden landed by the hole at the start, 30 minutes, a queen lever forced in every host as in §50.21. "The daughter's first forager" is now her first ant up on the plane. The side-view versions stay in `ASSAYS` until step 4.
+
+Median (min–max) over seeds 1–10; first gyne over the seeds that rear one. Side view: §50.21.
+
+| arm | seeds with a gyne | first gyne | gynes | daughters | first daughter's ants at 30 min | side view: first gyne, gynes, daughters |
+|---|---|---|---|---|---|---|
+| None (dilution only) | 0/10 | never | 0 | 0 | – | never, 0, 0 |
+| Signal damped | 5/10 | 249 s (191–295) | 0.5 (0–4) | 0.5 (0–4) | 32 (10–244) | 169 s, 4 (1–9), 4 (1–5) |
+| Scent damped | 8/10 | 145 s (35–191) | 1.5 (0–5) | 1.5 (0–4) | 64.5 (11–151) | 37 s, 7 (4–11), 5 (3–5) |
+
+- **Confirmed on seeds 11–20** (signal damped): 5/10 seeds rear a gyne, first at 287 s (188–1,443), gynes 0.5 (0–3), daughters 0.5 (0–3), the first daughter's ants at 30 min 33 (1–170). Side view: first gyne 206 s, gynes 3 (1–7), daughters 3 (1–5).
+- **The fungus reaches the queen** at 43 s (33–100) on every arm and seed.
+- **A daughter's first ant is up on the plane** 11–15 s after her first worker ecloses (medians: 458 s and 447 s with the signal damped; 359 s and 344 s with the scent damped).
+- **One world rears far fewer gynes** than the side view did: half the seeds rear none with the signal damped. The levers still bite, so this is the colony's, not the port's (`ja-lp4.6.10`).
+- **The tick** is 6.6–8.1 ms median (one solo colony of ~880 ants).
