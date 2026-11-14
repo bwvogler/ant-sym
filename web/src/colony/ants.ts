@@ -112,8 +112,6 @@ export const ANT_FIELDS = {
   since: { type: Float32Array, reset: "spawn" },
   /** seconds of unsuccessful search, less rest inside the nest: tired above the colony's patience (ja-q47) */
   fatigue: { type: Float32Array, reset: "spawn" },
-  /** seconds left of a foraging dig (forageDig, ja-16rp): an old forager home from a trip with nothing digs out from the nest */
-  digBout: { type: Float32Array, reset: "spawn" },
   /** encounters with nestmates coming home with food, leaking with a half-life of MET_HALF (behaviour MR 5) */
   met: { type: Float32Array, reset: "spawn" },
   /** seconds in contact with strangers, leaking (behaviour MR 5.2): how much of the rival a scout met; more lays a stronger raid trail */
@@ -307,6 +305,9 @@ export const ANT_FIELDS = {
   bodyHeat: { type: Float32Array, reset: "spawn" },
   /** 1 while it feels hot: from heatFelt until its body is back below heatCool */
   hot: { type: Uint8Array, reset: "spawn" },
+  // ——— the foraging dig (ja-16rp, PRD §68), last for the same reason ———
+  /** seconds left of a foraging dig (forageDig): an old forager home from a trip with nothing digs in the nest for a while */
+  digBout: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };
