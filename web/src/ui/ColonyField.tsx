@@ -228,6 +228,26 @@ export default function ColonyField({
   /** chamber names drawn on the side view's nests (the Labels button); a click on a chamber then inspects it */
   const [labels, setLabels] = useState(false);
   const [goOpen, setGoOpen] = useState(false);
+  const goRef = useRef<HTMLDivElement>(null);
+  // The Go to menu, open: Escape closes it (first, in the capture phase, so a drawer under it stays open) and so does a
+  // press anywhere outside it.
+  useEffect(() => {
+    if (!goOpen) return;
+    const key = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setGoOpen(false);
+    };
+    const outside = (e: globalThis.PointerEvent) => {
+      if (!goRef.current?.contains(e.target as Node)) setGoOpen(false);
+    };
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("pointerdown", outside, true);
+    return () => {
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("pointerdown", outside, true);
+    };
+  }, [goOpen]);
   const labelsOn = useRef(labels);
   useEffect(() => {
     labelsOn.current = labels;
@@ -1676,7 +1696,7 @@ export default function ColonyField({
         onContextMenu={(e) => e.preventDefault()}
       />
       {/* Where to look (PRD §69): one compact menu, so the overlay never runs off a phone's width. */}
-      <div className={`pointer-events-none absolute flex flex-col items-start gap-1 ${toolsAt}`}>
+      <div ref={goRef} className={`pointer-events-none absolute flex flex-col items-start gap-1 ${toolsAt}`}>
         <button
           type="button"
           className={button}
@@ -1687,21 +1707,18 @@ export default function ColonyField({
           Go to ▾
         </button>
         {goOpen && (
-          <div className="pointer-events-auto flex flex-col gap-1 rounded-lg border border-line bg-panel/95 p-1 shadow-lg" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              className={item}
-              onClick={() => (showAll(), setGoOpen(false))}
-              title="Show the whole map (0)"
-            >
+          <div
+            className="pointer-events-auto flex flex-col gap-1 rounded-lg border border-line bg-panel/95 p-1 shadow-lg"
+            role="group"
+            aria-label="go to"
+          >
+            <button type="button" className={item} onClick={() => (showAll(), setGoOpen(false))} title="Show the whole map (0)">
               Whole map
             </button>
             {colonies.map((_, k) => (
               <button
                 key={k}
                 type="button"
-                role="menuitem"
                 className={item}
                 onClick={() => (goNest(k), setGoOpen(false))}
                 title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}
@@ -1712,9 +1729,8 @@ export default function ColonyField({
             {(world ? (view === PLANE ? world.plane : world.curtain) : anyColony.map).chambers && (
               <button
                 type="button"
-                role="menuitemcheckbox"
                 className={labels ? `${item} text-accent` : item}
-                aria-checked={labels}
+                aria-pressed={labels}
                 onClick={() => setLabels((on) => !on)}
                 title="Name each chamber by its role; click a chamber to inspect it in Learn"
               >

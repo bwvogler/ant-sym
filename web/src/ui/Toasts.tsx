@@ -31,7 +31,7 @@ function Item({ t }: { t: Toast }) {
   return (
     <button
       type="button"
-      className={`pointer-events-auto max-w-xl rounded-md border px-3 py-2 text-left text-sm shadow-lg ${TONE[t.tone]}`}
+      className={`pointer-events-auto max-w-xl rounded-md border px-3 py-2 text-left text-sm shadow-lg max-sm:pointer-events-none ${TONE[t.tone]}`}
       onClick={() => dismissToast(t.id)}
       title="Dismiss"
     >

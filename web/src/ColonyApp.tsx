@@ -15,7 +15,7 @@ import {
   GENERIC_ANT,
 } from "./colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AntCard from "./ui/AntCard.tsx";
 import ColonyField, { type FieldApi, type FieldPen } from "./ui/ColonyField.tsx";
 import DetailsScreen, { BareCards, Colonies, SavedGames, type DetailsProps } from "./ui/DetailsScreen.tsx";
@@ -90,6 +90,11 @@ export default function ColonyApp() {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
+  // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
+  const followedNow = useRef<Followed | null>(followed);
+  useEffect(() => {
+    followedNow.current = followed;
+  }, [followed]);
   useNotices(stats, jev.lock, jev.state.phase, controls.menu);
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too. The game is the same either way.
   const oneWorld = game.world;
@@ -280,6 +285,7 @@ export default function ColonyApp() {
         return true;
       },
       view: () => controls.view,
+      followed: () => followedNow.current,
       sensed: (v: View, x: number, y: number) => {
         cellOf(x, y);
         return sensed.sight(v === "above" ? PLANE : CURTAIN, CELL[0], CELL[1]);
@@ -445,7 +451,13 @@ export default function ColonyApp() {
         <IconButton icon="colonies" label="Colonies" active={drawer === "colonies"} onClick={() => toggle("colonies")} />
         <IconButton icon="saves" label="Saved games" active={drawer === "saves"} onClick={() => toggle("saves")} />
         <IconButton icon="learn" label="Learn" onClick={() => openLearn({ tab: "guide" })} />
-        <IconButton icon="settings" label="Settings" active={drawer === "settings"} onClick={() => toggle("settings")} />
+        <IconButton
+          icon="settings"
+          label="Settings"
+          active={drawer === "settings"}
+          badge={backend?.needsPass ? "!" : undefined}
+          onClick={() => toggle("settings")}
+        />
       </nav>
 
       {drawer === "fungus" && (
@@ -475,14 +487,20 @@ export default function ColonyApp() {
       )}
       {drawer === "settings" && (
         <Drawer label="settings" title="Settings" onClose={closeDrawer}>
-          <Settings controls={controls} update={update} openLab={() => (setDrawer(null), setDetails(true))} />
+          <Settings
+            controls={controls}
+            update={update}
+            openLab={() => (setDrawer(null), setDetails(true))}
+            pass={backend?.needsPass ? <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} /> : null}
+          />
         </Drawer>
       )}
 
-      {/* The inspector: the queen's pen while she flies, else the followed ant. A sheet on a phone, under any open drawer. */}
+      {/* The inspector: the queen's pen while she flies, else the followed ant. A sheet on a phone; below 1024 px it waits
+          while a drawer is open, so the two never overlap. */}
       {(penCard || followed) && (
         <div
-          className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] ${drawer ? "max-sm:hidden" : ""}`}
+          className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] ${drawer ? "max-lg:hidden" : ""}`}
         >
           {penCard ? (
             <QueenPen
@@ -516,12 +534,8 @@ export default function ColonyApp() {
           onNext={tut.next}
           onFaster={tut.faster}
           onSkip={tut.skip}
+          high={drawer !== null}
         />
-      )}
-      {backend?.needsPass && (
-        <div className="absolute inset-x-3 top-[7.25rem] z-20 sm:top-[4.5rem] sm:left-1/2 sm:w-[30rem] sm:-translate-x-1/2">
-          <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} />
-        </div>
       )}
 
       <LearnDrawer
@@ -574,13 +588,22 @@ function Settings({
   controls,
   update,
   openLab,
+  pass,
 }: {
   controls: { showFoodTrail: boolean; showHomeTrail: boolean; speed: number };
   update: (patch: { showFoodTrail?: boolean; showHomeTrail?: boolean; speed?: number }) => void;
   openLab: () => void;
+  /** the hosted page's passphrase note, while Jev wants one (the Settings tab carries a badge till then) */
+  pass: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-4">
+      {pass && (
+        <div>
+          <SectionHead>Jev</SectionHead>
+          <div className="mt-2">{pass}</div>
+        </div>
+      )}
       <div>
         <SectionHead>Trails drawn</SectionHead>
         <div className="mt-2 flex overflow-hidden rounded-md border border-line text-sm" role="group" aria-label="trails drawn">

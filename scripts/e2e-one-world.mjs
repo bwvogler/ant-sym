@@ -14,7 +14,7 @@
 //     click outside her flight is refused, and a click inside founds her colony where the preview (Game.settleAt) said;
 //     "Let her fly", by the keyboard, sends the next one on her own flight; and with the hook's flight gone, a queen who
 //     flies while Jev can't read words opens no pen.
-//  6. the Fungus panel's tooltips (ui/Tip.tsx): a hover opens one, Escape closes it, Tab onto a next-level button opens that button's,
+//  6. the Mutations drawer's tooltips (ui/Tip.tsx): a hover opens one, Escape closes it, Tab onto a next-level button opens that button's,
 //     and on a touch page a tap opens one, a second tap or a tap elsewhere closes it.
 //  7. the first game's tutorial (ja-7x4, PRD §61), in a fresh browser: Start runs it, paused at 1× on the landing; the first
 //     host pauses the game and is followed, and its card hides to a strip and comes back; the watch runs at 4×, Faster at 8×;
@@ -82,15 +82,15 @@ function check(ok, what) {
 
 const near = (a, b, eps) => Math.abs(a - b) <= eps;
 
-/**
- * Where a view's camera looks when asked to centre on world (tx, ty) at `zoom`: clamped to its map in the box it is
- * drawn in now (camera.ts clamp, hex.ts extent), in the page.
- */
 /** Whether screen point (sx, sy) is open map: the canvas, not the HUD, the rail, a drawer or the inspector over it (PRD §69). */
 function onField(sx, sy) {
   return document.elementFromPoint(sx, sy) === document.querySelector("canvas");
 }
 
+/**
+ * Where a view's camera looks when asked to centre on world (tx, ty) at `zoom`: clamped to its map in the box it is
+ * drawn in now (camera.ts clamp, hex.ts extent), in the page.
+ */
 function clampCam(layer, tx, ty, zoom) {
   const w = window.jevAnts.game.world;
   const m = layer === "above" ? w.plane : w.curtain;
@@ -440,6 +440,8 @@ try {
             below: t.slice(0, up).filter((f) => f.layer === 1 && f.view === "below").length,
             up: t[up],
             on,
+            // where the camera was judged against: the ant then, or where it surfaced (a one-step pop-up)
+            at: on.layer === 0 ? { x: on.x, y: on.y } : { x: t[up].x, y: t[up].y },
           };
         // Up for 2 s of frames and the view never on it: the carry failed.
         return t.length - up > 120 ? { stuck: t.slice(up, up + 4).concat(t.slice(-2)) } : null;
@@ -457,7 +459,15 @@ try {
   );
   check(
     true,
-    `the view came above with it, the camera on the ant (${carried.on.cam.x.toFixed(1)}, ${carried.on.cam.y.toFixed(1)}) ~ (${carried.on.x.toFixed(1)}, ${carried.on.y.toFixed(1)}), zoom kept ×${carried.on.cam.zoom.toFixed(2)}`,
+    `the view came above with it, the camera on the ant (${carried.on.cam.x.toFixed(1)}, ${carried.on.cam.y.toFixed(1)}) ~ (${carried.at.x.toFixed(1)}, ${carried.at.y.toFixed(1)}), zoom kept ×${carried.on.cam.zoom.toFixed(2)}`,
+  );
+  // Carrying the camera keeps the follow, even for an ant that pops up a hole and straight back (centreOn keepFollow).
+  check(
+    await page.evaluate(({ k, i }) => {
+      const s = window.jevAnts.followed();
+      return s !== null && s.k === k && s.i === i;
+    }, next),
+    "the ant is still followed after the crossing",
   );
 
   // ——— 5. The queen's pen: a click on the top view ———
@@ -632,8 +642,8 @@ try {
   );
   check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
 
-  // ——— 6. The Fungus panel's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
-  console.log("6. the Fungus panel's tooltips");
+  // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
+  console.log("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
   const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first();
   const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first();
