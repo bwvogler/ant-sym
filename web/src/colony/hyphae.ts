@@ -23,6 +23,8 @@ export interface Tip {
   run: number;
   /** rounds in a row it has rested on short supply, growing nothing (knots, ja-2bw.9) */
   starved?: number;
+  /** rounds in a row it grew nothing with supply ample (blocked, or resting by choice): it draws no flow (ja-tgw9) */
+  idle?: number;
 }
 
 /** No parent: a cell the mycelium rooted in. */
@@ -96,6 +98,13 @@ export const AMPLE_STEPS = 2;
  */
 export const FLOW_THIN = 3;
 export const FLOW_CORD = 30;
+/** A tip idle this many rounds in a row (ample, but growing nothing) stops drawing mass: flow follows growth (Heaton et al. 2010). */
+export const IDLE_ROUNDS = 3;
+/**
+ * With flow on, a tip's supply is ample while its own cell holds this many steps (ja-tgw9). One: a tip grows as soon as
+ * one step has reached it, so no mass waits at the tips (with AMPLE_STEPS' two, a tenth of the body sat parked there).
+ */
+export const FLOW_AMPLE_STEPS = 1;
 
 /** What a tip meets ahead. */
 export const AHEADS = ["soil", "open", "rock", "own"] as const;
@@ -269,6 +278,23 @@ export class Hyphae {
     return n;
   }
 
+  /**
+   * The cells on the way from each growing tip (and each of `sinks`, flow's other demand) back to its root (ja-tgw9):
+   * where mass placed now can reach a tip.
+   */
+  feedingCells(sinks: Iterable<number> = []): Set<number> {
+    const out = new Set<number>();
+    const from = [...this.tips.filter((t) => (t.idle ?? 0) < IDLE_ROUNDS).map((t) => cellKey(t.x, t.y)), ...sinks];
+    for (const start of from) {
+      let c: number | undefined = start;
+      for (let guard = 0; c !== undefined && c !== ROOT && !out.has(c) && guard <= this.parent.size; guard++) {
+        out.add(c);
+        c = this.parent.get(c);
+      }
+    }
+    return out;
+  }
+
   /** The load lost with cut cells since the last call (the caller takes it out of the body). */
   takeLost(): number {
     const n = this.#lost;
@@ -332,6 +358,7 @@ export class Hyphae {
     // The tips (and sinks) each cell feeds, along the way back to its root.
     const own = new Map<number, number>();
     for (const t of this.tips) {
+      if ((t.idle ?? 0) >= IDLE_ROUNDS) continue;
       const k = cellKey(t.x, t.y);
       own.set(k, (own.get(k) ?? 0) + 1);
     }
@@ -350,12 +377,19 @@ export class Hyphae {
     const before = [...this.loads];
     this.loads = new Map();
     const put = (k: number, v: number) => this.loads.set(k, (this.loads.get(k) ?? 0) + v);
+    let back = new Set<number>();
     const push = (k: number, v: number, left: number): void => {
       const on = (kids.get(k) ?? []).filter((c) => (fed.get(c) ?? 0) > 0);
       const here = own.get(k) ?? 0;
       const total = here + on.reduce((n, c) => n + fed.get(c)!, 0);
       if (total === 0) {
-        put(k, v);
+        // Nothing growing beyond it: the mass goes back toward the root, to be sent down another branch (flow runs both
+        // ways in real mycelia, Olsson & Gray 1998), while the round's reach lasts.
+        const u = up.get(k);
+        if (u !== undefined && (fed.get(u) ?? 0) > 0 && left >= cost(k) && !back.has(k)) {
+          back.add(k);
+          push(u, v, left - cost(k));
+        } else put(k, v);
         return;
       }
       if (here > 0) put(k, (v * here) / total);
@@ -365,7 +399,11 @@ export class Hyphae {
         else put(k, share);
       }
     };
-    for (const [k, v] of before) if (this.parent.has(k)) push(k, v, FLOW_CORD);
+    for (const [k, v] of before)
+      if (this.parent.has(k)) {
+        back = new Set();
+        push(k, v, FLOW_CORD);
+      }
   }
 
   /**
@@ -629,7 +667,7 @@ export class Hyphae {
       parent: [...this.parent],
       soil: [...this.soil],
       cutCells: this.cutCells,
-      tips: this.tips.map((t) => [t.x, t.y, t.heading, t.first, t.run, t.starved ?? 0]),
+      tips: this.tips.map((t) => [t.x, t.y, t.heading, t.first, t.run, t.starved ?? 0, t.idle ?? 0]),
       knots: [...this.knots].map(([k, n]) => [k, n.store, n.age, n.sprouted ? 1 : 0]),
       fusions: [...this.fusions],
       fruits: [...this.fruits],
@@ -651,7 +689,9 @@ export class Hyphae {
     for (const [k, p] of r.parent) h.parent.set(k, p);
     for (const k of r.soil) h.soil.add(k);
     h.cutCells = r.cutCells;
-    h.tips = r.tips.map(([x, y, heading, first, run, starved]) => ({ x, y, heading, first, run, starved: starved ?? 0 }) as Tip);
+    h.tips = r.tips.map(
+      ([x, y, heading, first, run, starved, idle]) => ({ x, y, heading, first, run, starved: starved ?? 0, idle: idle ?? 0 }) as Tip,
+    );
     h.knots = new Map((r.knots ?? []).map(([k, store, age, sprouted]) => [k, { store, age, sprouted: sprouted === 1 }]));
     h.fusions = [...r.fusions];
     h.fruits = [...r.fruits];
@@ -673,7 +713,11 @@ export interface HyphaeSave {
   parent: [number, number][];
   soil: number[];
   cutCells: number;
-  tips: ([number, number, number, number, number] | [number, number, number, number, number, number])[];
+  tips: (
+    | [number, number, number, number, number]
+    | [number, number, number, number, number, number]
+    | [number, number, number, number, number, number, number]
+  )[];
   knots?: [number, number, number, number][];
   fusions: number[];
   fruits: number[];
@@ -870,7 +914,11 @@ export function stepRound(
       if (!h.tips.includes(tip)) return;
       const k = cellKey(tip.x, tip.y);
       const purse = { free: h.loads.get(k) ?? 0, tips: 1 };
-      grown += stepTip(h, g, tip, level, purse, { free: purse.free, tips: 1 }, policy);
+      const ample = purse.free >= HYPHA_MASS * FLOW_AMPLE_STEPS;
+      // situationOf judges ample at AMPLE_STEPS steps a tip: scale the tip's own load so it judges at FLOW_AMPLE_STEPS.
+      const did = stepTip(h, g, tip, level, purse, { free: (purse.free * AMPLE_STEPS) / FLOW_AMPLE_STEPS, tips: 1 }, policy);
+      tip.idle = ample && did === 0 ? (tip.idle ?? 0) + 1 : 0;
+      grown += did;
       if (purse.free > 0) h.loads.set(k, purse.free);
       else h.loads.delete(k);
       budget.tips += purse.tips - 1;

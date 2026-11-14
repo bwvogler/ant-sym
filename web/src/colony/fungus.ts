@@ -1432,32 +1432,44 @@ export class Fungus {
    */
   #placeMass(e: Evolution): void {
     const plane = this.#hyphae[0];
-    if (plane)
-      for (const { from, to } of this.#links) {
-        const v = plane.loads.get(from) ?? 0;
-        const down = this.#hyphae[CURTAIN];
-        const alive = down ? to.filter((k) => down.parent.has(k)) : [];
-        if (v <= 0 || !down || alive.length === 0) continue;
+    const down = this.#hyphae[CURTAIN];
+    if (plane && down && this.#links.length > 0) {
+      // The shaft's walls are one mat too: mass that came down the hole gathers on the wall roots a growing tip leads back to.
+      const feeds = down.feedingCells();
+      const walls = [...new Set(this.#links.flatMap(({ to }) => to))].filter((k) => down.parent.has(k));
+      const outlets = walls.filter((k) => feeds.has(k));
+      let came = 0;
+      for (const { from } of this.#links) {
+        came += plane.loads.get(from) ?? 0;
         plane.loads.delete(from);
-        for (const k of alive) down.addLoad(k, v / alive.length);
       }
+      if (outlets.length > 0) {
+        // Only from the wall cells no growing tip leads back to: mass on its way down the wall goes on.
+        for (const k of walls) {
+          if (feeds.has(k)) continue;
+          came += down.loads.get(k) ?? 0;
+          down.loads.delete(k);
+        }
+        for (const k of outlets) down.addLoad(k, came / outlets.length);
+      } else if (walls.length > 0) for (const k of walls) down.addLoad(k, came / walls.length);
+      else for (const { from } of this.#links) plane.addLoad(from, came / this.#links.length);
+    }
     let held = 0;
     for (const h of this.#hyphae) if (h) held += h.length * HYPHA_MASS + h.loaded;
     let gap = e.mass - held;
     const patch: { h: Hyphae; k: number }[] = [];
     for (const h of this.#hyphae) if (h) for (const k of h.sources) if (h.parent.has(k)) patch.push({ h, k });
-    // The patch is one mat: the mass on it gathers on the patch cells that hyphae grow from (a tip on it, or a cell grown
-    // from it), so none sits on a patch cell with no way out.
-    const feeds = new Set<number>();
-    for (const h of this.#hyphae) {
-      if (!h) continue;
-      for (const t of h.tips) feeds.add(cellKey(t.x, t.y));
-      for (const p of h.parent.values()) feeds.add(p);
-    }
-    const outlets = patch.filter(({ k }) => feeds.has(k));
+    // The patch is one mat: the mass on it gathers on the patch cells a growing tip's hypha leads back to, so none sits
+    // on a patch cell with no way out.
+    const feeds = new Map<Hyphae, Set<number>>();
+    this.#hyphae.forEach((h, l) => {
+      if (h) feeds.set(h, h.feedingCells(l === 0 ? this.#links.map(({ from }) => from) : []));
+    });
+    const outlets = patch.filter(({ h, k }) => feeds.get(h)!.has(k));
     if (outlets.length > 0 && outlets.length < patch.length) {
       let pooled = 0;
       for (const { h, k } of patch) {
+        if (feeds.get(h)!.has(k)) continue;
         pooled += h.loads.get(k) ?? 0;
         h.loads.delete(k);
       }
