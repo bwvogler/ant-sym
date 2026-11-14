@@ -5246,7 +5246,7 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
-**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, with and without `--hyphae --growth`; seconds to a quarter of the hosts; on main `8f07b85`, after #180, all 40 games in one run):
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, aim *unite*, with and without `--hyphae --growth`; seconds to a quarter of the hosts; on main `8f07b85`, after #180, all 40 games in one run):
 
 | Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -5262,7 +5262,7 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
   - Seeds 1–10: the slowest seed is +7.8 % (seed 1, 231 → 249 s); the worst time improves from 544 to 424 s, and the median from 291 to 262 s.
   - Seeds 11–20: the slowest seed is +5.3 % (seed 15, 342 → 360 s); the worst time improves from never (seed 11) to 420 s, and the median from 335 to 322 s.
 - **No number moved.** The earlier misses (§63.7, §63.9, §63.10) were closed by the changes since: the cut that loses only the dug cell, and main's own changes to scent, the tick and defence. **Owner (2026-11-14): record and close**; a later change that pushes a seed past 10 % is caught by the next P1 check.
-- **`--growth` matters.** These runs play the growth lane's shipped answers, as the page does. §63.13's `main` rows ran without it (the tips' own rule), which is why its hyphae times differ (seed 11: 418 s there).
+- **`--growth` matters.** These runs play the growth lane's shipped answers, as the page does. §63.13's `main` rows ran without it (the tips' own rule) and on an earlier main (`88b5269`, before Stalks, #178, and defence by sight, #180), so its hyphae times differ (seed 8: 552 s there, 424 s here; seed 15: 276 s and 360 s). No run separates the two causes.
 - **Stumps stay.** A piece a cut leaves keeps its root cell even when it has no tip left (one `HYPHA_MASS` a piece), so it can resprout: the owner's "severed part lives on" (§63.10). **Owner (2026-11-14): keep the stump** (review of #152, N3).
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
