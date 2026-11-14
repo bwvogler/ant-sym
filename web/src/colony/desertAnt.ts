@@ -119,10 +119,14 @@ export const DESERT_ANT: Species = {
     heatSunHigh: 0.2,
     // The invitation (ja-rf5.6, PRD §60.6; Razin, Eckmann & Feinerman 2013, full text, C. niger): a finder coming down the shaft at 12 cm/s pulls
     // each nestmate waiting at the top 40 % of the way to its pace, and a crowd damps it back (paceCrowd); its own pace is what it leaves by
-    // (the leave response below). Staged as Razin's chamber (D2c, seeds 1–20): at least 11× more leaving after a finder in a group of 4 and 8×
-    // in 8 (sevenfold in the paper's nests of 4–8), and half the rate in 13 as in 4 (fewer exits as density rises). 0.5 cost D5 2 seeds. paceGain and paceCrowd are design; 8 cm/s and the pace at rest are the paper's.
+    // (the leave response below). Staged as Razin's chamber over the minute either side (D2c, seeds 1–20): at least 11× more leaving after a
+    // finder in a group of 4 and 8.7× in 8 (sevenfold in the paper's nests of 4–8), and a lower rate in 13 (fewer exits as density rises).
+    // A pull of 0.5 cost D5 2 seeds. paceGain and paceCrowd are design; 8 cm/s and the pace at rest are the paper's.
     invitePace: 12,
     paceGain: 0.4,
+    // A lift lasting 40 s (not the params.ts 20): Razin counted the minute after an entry (owner, review of #186 D1), and over a minute a
+    // 20 s lift read 4–5×.
+    paceTau: 40,
     paceCrowd: 0.25,
   },
   // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is

@@ -2498,12 +2498,15 @@ export const desertInvitation: Assay = {
   score: () => ({}),
 };
 
+/** D2c's window either side of a finder's entry (seconds): Razin counted the idle ants leaving in the minute after (owner, review of #186 D1). */
+export const CHAMBER_WINDOW = 60;
+
 /** D2c's group sizes: Razin's entrance chambers held 2–13 ants. */
 export const CHAMBER_SIZES = [2, 4, 8, 13] as const;
 
 /**
- * Razin's chamber, staged (ja-rf5.6): `n` ants waiting at the top of the shaft, at rest; for D2_WINDOW seconds no finder comes (spontaneous
- * leaving), then one finder comes down past them and the next D2_WINDOW seconds are counted. The same rule as the game (invite.ts: the pace a
+ * Razin's chamber, staged (ja-rf5.6): `n` ants waiting at the top of the shaft, at rest; for CHAMBER_WINDOW seconds no finder comes
+ * (spontaneous leaving), then one finder comes down past them and the next CHAMBER_WINDOW seconds are counted. The same rule as the game (invite.ts: the pace a
  * finder raises, damped by the crowd, here the n − 1 still waiting round each; the leave response on it), `trials` times. The game's crowd
  * sense differs (review of #186, S2): it counts every nestmate round the top of the shaft (about 5 on average where about 1.5 wait), so a
  * finder's lift fades about twice as fast in play; and it is wired only where there is a rival (game.ts), so in a game alone it reads 0. An ant that leaves is gone for the trial.
@@ -2516,7 +2519,7 @@ export function invitationChamber(
   rng: () => number,
 ): { before: number; after: number; expBefore: number; expAfter: number } {
   const dt = 1 / 30;
-  const steps = Math.round(D2_WINDOW / dt);
+  const steps = Math.round(CHAMBER_WINDOW / dt);
   let before = 0;
   let after = 0;
   let expBefore = 0;
@@ -2549,8 +2552,8 @@ export function invitationChamber(
 /**
  * D2c — the invitation, staged as Razin's chamber (ja-rf5.6; Razin, Eckmann & Feinerman 2013, full text, C. niger: a recruiter's entry raised
  * the idle ants leaving in the next minute sevenfold, in nests of 4–8; more ants in the nest lowered exits). For each group size in
- * CHAMBER_SIZES, 400 trials (invitationChamber) on the colony's own rule and params: the leaving rate in the 10 s after a finder comes down
- * against the 10 s before. Pass: at least 7× for groups of 4 and 8, and the rate after a finder lower in a group of 13 than of 4 (crowding).
+ * CHAMBER_SIZES, 400 trials (invitationChamber) on the colony's own rule and params: the leaving rate in the minute after a finder comes
+ * down against the minute before. Pass: at least 7× for groups of 4 and 8, and the rate after a finder lower in a group of 13 than of 4 (crowding).
  * The game's own measure, D2, stays beside it (noisy: few isolated returns in a game).
  */
 export const desertChamber: Assay = {
