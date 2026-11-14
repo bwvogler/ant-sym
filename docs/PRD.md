@@ -5521,6 +5521,7 @@ Five seeds take none of the buried food in the hour; the best takes 3.6 %.
 - 120 s is chosen by the guards' worst seed. Over seeds 1–20 it takes 8,858 buried food against 5,162 with no bout (+72 %). Its worst food home is better than with no bout on both seed sets (3,927 vs 3,464; 3,573 vs 3,320), and so are its worst workers alive (613 vs 603; 618 vs 504).
 - 480 s takes more (9,530 over seeds 1–20), but its worst food home falls below no bout on seeds 11–20 (3,231 vs 3,320), and it digs about a quarter more cells than 120 s.
 - The cost is digging and CPU: cells opened up about 60–80 %, ms per tick up 5–10 % (4.89 to 5.40 on seeds 1–10, 4.96 to 5.23 on 11–20; runs share four threads, so this is rough).
+- Two colonies in the side-view game (`npm run exp -- game --seeds 1-20`, 1,200 s): fight losses 8,475 → 8,945 summed (+5.5 %; median per seed 419 → 469, while single seeds swing by up to 350 either way); workers alive and food stored unchanged (medians 835 → 827 and 2,552 → 2,438 for the player's colony); the held-at-once check passes on 17 of 20 seeds against 18 (the misses hold 3 at once, against the limit of 2).
 - Owner (2026-11-14): accept the reach. The far pockets stay mostly untouched; no map change and no soil odour for now.
 
 **Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full).
