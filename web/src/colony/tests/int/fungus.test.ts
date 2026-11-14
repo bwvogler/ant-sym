@@ -258,7 +258,7 @@ test("one world: the panel's count takes in the spores on every map, after a ste
 });
 
 test("one world: spores on the sunlit plane fade `sun` times faster than in the curtain, but not on the mycelium's patch; one map fades as underground (ja-6ip)", () => {
-  const f = new Fungus([arena(), arena()]);
+  const f = new Fungus([arena(), arena()], { sun: 4 }); // the game's default is 1 until ja-19oz chooses it
   const { x, y } = at(15, 6);
   f.paint([], x, y, 0.5, 4, 0, BLOOM, 0);
   f.paint([], x, y, 0.5, 4, 0, BLOOM, 1);
@@ -271,7 +271,7 @@ test("one world: spores on the sunlit plane fade `sun` times faster than in the 
   assert.ok(near(plane, 4 * Math.exp(-sporeDecay * sun)), `the plane: ${plane}`);
   assert.ok(near(curtain, 4 * Math.exp(-sporeDecay)), `the curtain: ${curtain}`);
   // The mycelium's own patch on the plane fruits in the litter: shaded, it fades as underground.
-  const patch = new Fungus([arena(), arena()]);
+  const patch = new Fungus([arena(), arena()], { sun: 4 });
   patch.evolve(BLOOM);
   patch.root(x, y, 0.5, 0);
   patch.evolution!.mass = 0; // so it puts out nothing more while we watch

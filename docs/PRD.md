@@ -5187,7 +5187,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
 
-**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` (4) times faster than `sporeDecay` (0.03/s), a half-life of about 6 s instead of 23 s. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires). In practice the sun takes the spores of hosts that die out on the plane and of corpses on the midden (`ja-2bw.7`, §63.2): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Decided on the owner's behalf (2026-11-14, `ja-6ip`).
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun takes the spores of hosts that die out on the plane and of corpses on the midden (`ja-2bw.7`, §63.2): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Decided on the owner's behalf (2026-11-14, `ja-6ip`).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
 
@@ -5210,11 +5210,13 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 | `main` (s) | 418 | 231 | 203 | 18 | 276 | 352 | 235 | 306 | 269 | 341 |
 | sun ×4, patch shaded (s) | 581 | 231 | 203 | 18 | 283 | 352 | 235 | 332 | 276 | 347 |
 
-- Medians unchanged: 258 → 258 s (seeds 1–10), 273 → 280 s (11–20). The worst of seeds 1–10 is faster (552 → 504 s).
+- Medians: 258 → 258 s (seeds 1–10), 273 → 280 s (11–20). The worst of seeds 1–10 is faster (552 → 504 s); the worst of 11–20 is slower (418 → 581 s, seed 11). **P1 (§63.4) is not met:** seed 5 is 11 % slower and seed 11 39 %, and on seeds 11–20 both the worst seed and the median are worse. No sun above ×1 keeps seed 11 within 10 % (below).
 - **Seed 11 is slower at any sun:** 418 s at ×1 (bit-exact with `main`), 540, 582, 581, 486 and 486 s at ×2–×6. Traced: a ×1 and a ×4 game on seed 11 run identically until 181.6 s, when the first spores of a host dead on the plane appear off the patch; seed 11's later spread runs through them. That is the mechanic's purpose, so the cost is kept; seed 5 is +11 %, seed 18 +8.5 %, the rest within 7 %.
 - The runs are deterministic: seed 11 at ×4 twice gave 581 s both times.
 
-**Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact.
+**Owner (2026-11-14, review of #171, D1): merge the rule at ×1, bit-exact with `main`, and choose the number once Stalks (#178, `ja-2bw.10`) is in**, since stalks lay their spores on the plane and the two interact (`ja-19oz`). The test sets `sun: 4` itself.
+
+**Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 

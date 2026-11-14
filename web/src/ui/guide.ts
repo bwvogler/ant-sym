@@ -284,7 +284,7 @@ export const GUIDE: GuideEntry[] = [
     title: "The fungus",
     swatch: ["var(--spore)"],
     onScreen:
-      "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). Spores lying out above, in the sun, fade four times as fast as below; its own patch there fruits in the litter, shaded. Purple lines are its hyphae, a dot at each growing tip: faint above, just under the surface round where it landed; below, along the shaft's and tunnels' walls. They slide along stones, split against them, and turn from each other; once you keep the borer, they push into undug soil. You are the fungus.",
+      "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). Purple lines are its hyphae, a dot at each growing tip: faint above, just under the surface round where it landed; below, along the shaft's and tunnels' walls. They slide along stones, split against them, and turn from each other; once you keep the borer, they push into undug soil. You are the fungus.",
     realAnts:
       "Real parasites change what an ant perceives, gives off and can do, not its plans. Rickia makes its hosts carry more of one alkane, and they are attacked less by strangers. Ophiocordyceps hosts lose their daily rhythm and communicate less. Grooming off Metarhizium passes low doses that immunise nestmates.",
     inGame:
