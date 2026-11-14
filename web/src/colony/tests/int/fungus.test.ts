@@ -257,7 +257,7 @@ test("one world: the panel's count takes in the spores on every map, after a ste
   assert.equal(back.shownSporeCells, 1, "and after a load");
 });
 
-test("one world: spores on the sunlit plane fade `sun` times faster than in the curtain; one map fades as underground (ja-6ip)", () => {
+test("one world: spores on the sunlit plane fade `sun` times faster than in the curtain, but not on the mycelium's patch; one map fades as underground (ja-6ip)", () => {
   const f = new Fungus([arena(), arena()]);
   const { x, y } = at(15, 6);
   f.paint([], x, y, 0.5, 4, 0, BLOOM, 0);
@@ -270,6 +270,19 @@ test("one world: spores on the sunlit plane fade `sun` times faster than in the 
   const curtain = f.sporesOn(1)!.spores.get(15, 6);
   assert.ok(near(plane, 4 * Math.exp(-sporeDecay * sun)), `the plane: ${plane}`);
   assert.ok(near(curtain, 4 * Math.exp(-sporeDecay)), `the curtain: ${curtain}`);
+  // The mycelium's own patch on the plane fruits in the litter: shaded, it fades as underground.
+  const patch = new Fungus([arena(), arena()]);
+  patch.evolve(BLOOM);
+  patch.root(x, y, 0.5, 0);
+  patch.evolution!.mass = 0; // so it puts out nothing more while we watch
+  const off = at(30, 6);
+  patch.paint([], x, y, 0.5, 4, 0, BLOOM, 0);
+  patch.paint([], off.x, off.y, 0.5, 4, 0, BLOOM, 0);
+  for (let k = 0; k < 30; k++) patch.stepLayers([], [[], []], 1 / 30);
+  const onPatch = patch.sporesOn(0)!.spores.get(15, 6);
+  const offPatch = patch.sporesOn(0)!.spores.get(30, 6);
+  assert.ok(near(onPatch, 4 * Math.exp(-sporeDecay)), `on the patch: ${onPatch}`);
+  assert.ok(near(offPatch, 4 * Math.exp(-sporeDecay * sun)), `off it: ${offPatch}`);
   const one = new Fungus(arena());
   one.paint([], x, y, 0.5, 4, 0, BLOOM);
   run(one, [], 1);

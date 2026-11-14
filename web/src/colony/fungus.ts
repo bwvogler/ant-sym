@@ -148,7 +148,7 @@ export interface FungusParams {
   /** share of ground spores lost per second underground (rain, soil microbes; the curtain, the side and top-down maps) */
   sporeDecay: number;
   /**
-   * how many times faster spores fade on ground open to the sun: one world's plane (ja-6ip). Full sun kills
+   * how many times faster spores fade on ground open to the sun: one world's plane, off the mycelium's own patch (ja-6ip). Full sun kills
    * Metarhizium conidia within about an hour, while in soil they last weeks to months (docs/hyphal-growth.md §6); no
    * paired test gives a ratio, so this is a design number, chosen on the progression (PRD §63.11)
    */
@@ -190,7 +190,7 @@ export interface FungusParams {
 export const DEFAULT_FUNGUS: FungusParams = {
   pickup: 0.3,
   sporeDecay: 0.03,
-  sun: 2,
+  sun: 4,
   maxSpores: 6,
   grooming: 0.12,
   groomers: 4,
@@ -755,15 +755,19 @@ export class Fungus {
       const y = taken[k + 1];
       L.spores.set(x, y, Math.max(0, L.spores.get(x, y) - taken[k + 2]));
     }
-    // One world's plane is the sunlit surface (ja-6ip); on one map (layer −1) and in the curtain the soil shades them.
+    // One world's plane is the sunlit surface (ja-6ip): spores lying out on it fade `sun` times faster, but not on the
+    // mycelium's own patch (its base), which fruits in the litter under the surface (docs/hyphal-growth.md §6). On one
+    // map (layer −1) and in the curtain the soil shades them all.
     const sunlit = layer === PLANE && this.#layers.length > 1;
-    const keep = Math.exp(-p.sporeDecay * (sunlit ? p.sun : 1) * dt);
+    const keep = Math.exp(-p.sporeDecay * dt);
+    const burn = sunlit ? Math.exp(-p.sporeDecay * p.sun * dt) : keep;
+    const shade = sunlit && L.base.length ? new Set(L.base) : null;
     let shown = 0;
     for (const key of L.sporeCells) {
       const col = key % w;
       const y = (key - col) / w;
       const x = col + x0;
-      const v = L.spores.get(x, y) * keep;
+      const v = L.spores.get(x, y) * (sunlit && !shade?.has(key) ? burn : keep);
       if (v < SPORE_GONE) {
         L.spores.set(x, y, 0);
         L.sporeCells.delete(key);
