@@ -378,7 +378,10 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
   assert.equal(map.foodTotal, total, "founding makes no food: her reserve is her body");
   assert.ok(g.founded[0]!.reserve! > 1 && g.founded[0]!.reserve! <= ALATE_RESERVE, `her reserve, her body: ${g.founded[0]!.reserve}`);
   // Her larder as she founds is her body, no more; what her nanitics bring home after is food they found (the books hold).
-  assert.ok(atFounding <= ALATE_RESERVE, `her larder at founding: ${atFounding}`);
+  assert.ok(
+    Math.abs(atFounding - g.founded[0]!.reserve!) < 1e-9,
+    `her larder at founding: ${atFounding}, her body ${g.founded[0]!.reserve}`,
+  );
 });
 
 /** A daughter colony past founding (her first nanitic out), on a wide map; her workers held far off on the ground each tick. */

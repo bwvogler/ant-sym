@@ -105,6 +105,36 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
   );
 });
 
+test("a young ant in a chamber turns toward the queen's scent, not her position (ja-k4k.2.1)", () => {
+  // One young ant mid-chamber facing up, the royal mark under its left antenna, the queen moved to its right and her own
+  // scent off: over many single ticks it turns left, up the mark. By her position (the rule before ja-k4k.2.1) it would
+  // turn right; with no climb, only searching, it would turn either way alike.
+  let turn = 0;
+  const trials = 200;
+  for (let t = 0; t < trials; t++) {
+    const map = generateSideWorld(2, SMALL_SIDE);
+    const c = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(t + 1), () => "explore");
+    aged(c, 0.02);
+    const q = c.queen!;
+    q.signal = 0;
+    const royal = map.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
+    const x = centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow - 5);
+    const y = centreY(royal.floorRow - 5);
+    c.x[0] = x;
+    c.y[0] = y;
+    c.heading[0] = -Math.PI / 2;
+    q.x = x + 6;
+    q.y = y;
+    const { sensorDistance: d, sensorAngle: a } = c.params;
+    cellOf(x + Math.cos(-Math.PI / 2 - a) * d, y + Math.sin(-Math.PI / 2 - a) * d);
+    c.ph.fields.royal.set(CELL[0], CELL[1], 50);
+    c.tick(1 / 30);
+    turn += c.heading[0]! + Math.PI / 2;
+  }
+  // Left is a smaller angle (−a from straight ahead).
+  assert.ok(turn / trials < -0.005, `turned toward the mark: ${(turn / trials).toFixed(4)} rad a tick on average`);
+});
+
 test("an old forager in a dead-end tunnel whose tip lies just under the ground by the hole goes back down and out by the shaft (review of #25)", () => {
   // Stepping straight toward the hole, the tip is nearer it than anything round it: old ants don't dig, so the first cut
   // parked them there until their mode changed. They climb out by the way through the tunnels (#climbOut).
