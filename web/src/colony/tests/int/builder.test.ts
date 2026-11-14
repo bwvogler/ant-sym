@@ -367,10 +367,12 @@ test("undo gives refilled chamber cells back to their chamber (review of #204, N
   const ch = below.chambers!;
   const room = ch.list.find((c) => c.colony === g.colonies[0]!.params.nest)!;
   const before = room.cells;
+  const floor = { room: room.floor, colony: ch.floorOf[room.colony] };
   const points: { x: number; y: number }[] = [];
   for (let y = room.y0; y <= room.y1; y++) for (let x = room.x0; x <= room.x1; x++) if (ch.at(x, y) === room.id) points.push(pt(x, y));
   assert.ok(b.apply({ tool: "dirt", layer: CURTAIN, points }) > 0);
   assert.ok(room.cells < before, "dirt shrinks the chamber");
   assert.ok(b.undo());
   assert.equal(room.cells, before, "undo gives every cell back");
+  assert.deepEqual({ room: room.floor, colony: ch.floorOf[room.colony] }, floor, "and its floor, counted again (review of #204, S5)");
 });
