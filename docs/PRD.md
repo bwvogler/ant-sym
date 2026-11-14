@@ -5313,7 +5313,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
 
-**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun takes the spores of hosts that die out on the plane and of corpses on the midden (`ja-2bw.7`, §63.2): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
 
@@ -5343,6 +5343,20 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 **Owner (2026-11-14, review of #171, D1): merge the rule at ×1, bit-exact with `main`, and choose the number once Stalks (#178, `ja-2bw.10`) is in**, since stalks lay their spores on the plane and the two interact (`ja-19oz`). The test sets `sun: 4` itself.
 
 **Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
+
+**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off).** Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sun ×1 (s) | 250 | 518 | 293 | 146 | 110 | 336 | 265 | 442 | 189 | 240 |
+| sun ×4 (s) | 250 | 318 | 293 | 146 | 136 | 414 | 265 | 585 | 379 | 240 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sun ×1 (s) | 331 | 238 | 199 | 18 | 278 | 352 | 233 | 243 | 244 | 342 |
+| sun ×4 (s) | 543 | 231 | 203 | 18 | 285 | 352 | 245 | 332 | 262 | 361 |
+
+With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off; a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
@@ -5732,6 +5746,48 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 - **Toasts and the tutorial's card** sit above the aim bar on every width, including when it is opened to four lines (the card from 1024 px: review of #189, S5).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
+### 69.3 S2b: the palette, the lens and the keys (ja-mvo9.2, second half)
+The second half of stage 2: ways to find any action and to learn what anything on the map is, without a panel open.
+- **The command palette:**
+  - ⌘K or Ctrl+K (from anywhere, even a text field), or the HUD's search button (from 640 px wide). The page names the key as the machine does: ⌘K on a Mac or an iPhone, Ctrl+K elsewhere.
+  - It lists every action by name: play, the speeds, the views, following a host, the whole map, each nest, each drawer, Learn, Lab and numbers, the lens, the shortcuts sheet, and every guide entry the game's species sees.
+  - Typing narrows the list, ranked by the pure `ui/commands.ts`: the start of a label beats the start of a word in it, which beats a match inside one, which beats the letters in order. Every typed word must match, and a label counts double over its group and extra words.
+  - Arrows choose (wrapping, the choice kept in sight), Enter runs, Escape closes. Entries that can't run now are greyed with why: the speed in use, the view shown. The list's groups are listbox groups.
+  - Running a command closes a pinned lens card, which would otherwise stay over what the command opens.
+- **The lens:**
+  - Toggled with the key i or the HUD's ⓘ button. With it on, a mouse over the map has a card beside it saying what is there, each thing with a "more" link to its guide entry.
+  - What it says, in drawing order:
+    - the ant (its colony, number and mode, whether it carries food, whether it is a host);
+    - a hole;
+    - a chamber (its role, what it is for, and the brood and food in it);
+    - food, alarm, spores, mycelium;
+    - the food or home trail, whichever is stronger;
+    - the mound;
+    - the ground (ground, tunnel, soil, rock, sky).
+  - **It says only what the field shows.** Scent shows only where a host sensed it lately (§65), at the field's own thresholds, which are now constants shared by `ColonyField` and `ui/lens.ts`. Where no host sensed lately, the card says so, linking the guide's "what the fungus senses".
+  - A click (a tap on a phone, which has no hover) pins the card and follows nothing. Pinned, its links work, an ant on it can be followed, and it stays while the pointer wanders. Escape or its × closes it.
+  - The card says it afresh four times a second, so ants walking under a still pointer show. Where the lens looks lives in a small store (`ui/lensStore.ts`) that the map reports to and `LensLayer` reads, so only the card re-renders as the pointer moves, not the page.
+  - A card pinned on one view hides on the other and takes no Escape there; it is back when its view is. Meanwhile the lens follows the pointer on the view shown: the store keeps the pinned card and the pointer's point apart (`shownOn`).
+  - The ground's "no host has smelled here lately" line is said on open ground only: the sky, rock and soil never carry scent.
+  - `probe` reads the game at a point and `lensLines` says it: both pure, both tested, one test on a built game.
+  - The queen's pen keeps its click.
+- **The page's keys:** one table, `ui/keys.ts`, read by the page's key handler (`pageKey`, tested) and by the shortcuts sheet, so the two can't drift.
+  - The keys anywhere:
+    - Space plays or pauses (not on a focused button);
+    - 1–4 set the HUD's speeds;
+    - v switches the view;
+    - f follows the next host, switching the view to it;
+    - i toggles the lens;
+    - ? opens the sheet.
+  - The map's own keys (pan, zoom, 0, n) still need the map focused, and the sheet says so.
+  - The game's keys wait while a dialog has the page (the palette, the sheet, Details, Learn, the start, the queen's pen); ⌘K still works.
+  - **Changed from the plan:** S2's plan put the lens on ?. The key ? is the shortcuts sheet's, as on most sites, and the lens is i. The owner can overrule.
+- **The shortcuts sheet:** the key ?, the palette, or Settings → Keyboard shortcuts.
+- **Escape closes one thing at a time:** the palette or the sheet, then a pinned lens card, then the Go to menu, then the followed ant, then the drawer. The Go to menu leaves an Escape that something above it took.
+- **The phone's HUD:** the speed and view buttons are tighter below 640 px, so the lens button fits from 360 px wide.
+- **The kit gains `Modal`:** a dialog over the page. Focus moves in and comes back, Tab stays inside, and Escape and a press on the backdrop close it. It also gains `Kbd` and two icons.
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change. The field's picture is bit-for-bit the same: its thresholds moved into named constants with the same values.
+
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
 **Research basis:** [foraging-tunnels.md](foraging-tunnels.md):
@@ -5825,3 +5881,43 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 **Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1, built off), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full), ja-16rp.5 (turn option 1 on; after ja-rvli).
 
 **Still open.** Feeding larvae owed their growth food (ja-rvli), then option 1 on (ja-16rp.5); option 2; how deep and how far the network should run; whether two colonies' networks meeting needs handling.
+
+## 71. Brood only in brood chambers big enough to reach (ja-xu6.2, 2026-11-14)
+
+**Problem.** Since energy and hunger (§50.18), `slow/economy.test` world 2 has allowed up to 8 larvae stranded at once, where the bound used to be 5. A larva counts as stranded when it goes unfed for over 120 s while the larder could feed it. Tracing 20 seeds of that test's setup on main showed the cause:
+- Seeds tried: world 1 at n = 1–7 and 9–12; world 2 at n = 0 and 2–9.
+- 13 of the 14 seeds that stranded any larvae had them in brood chambers one or two cells wide. Nurses put brood in whichever brood chamber holds least, so it landed in chambers just begun.
+- A chamber that small is a bulge in a tunnel. No nurse stands within two cells of it, and the porters bound for it don't arrive.
+- The worst case, world 1 n = 11, had 40 larvae waiting in three such chambers, with 5 porters carrying food that never got there.
+
+**Change.** Nurses put brood only in brood chambers of at least `BROOD_MIN` (4) cells. With none that big, it goes to the queen's chamber. This is the same rule as `RECEPTION_MIN` for foragers' food ("a smaller one chokes"). The choice still reads the chamber table (`ja-k4k.4`).
+
+**Measured, the economy test's setup** (the 20 seeds above, one hour each, a probe of the test's own loop, not committed):
+
+| | main | `BROOD_MIN` 4 |
+|---|---|---|
+| worst larvae stranded at once | 40 (world 1 n = 11) | 10 (world 1 n = 6) |
+| seeds stranding more than 5 | 4 | 2 |
+| seeds stranding any | 14 | 7 |
+| the test's own worlds (world 2 n = 0, world 1 n = 1) | 0, 0 | 0, 0 |
+| collapses (under 110 workers) | 0 | 0 |
+
+- What remains is larvae in the royal chamber late in the hour. By then the map's food is gone and the last of it lies in a one-cell store that porters rarely visit.
+- `slow/economy.test`'s world 2 bound returns to 5.
+
+**Assays** (main d80ffd8 → this):
+- **`game`, the side view, seeds 1–10:**
+  - pass (foragers holding food ≤ 2): 9/10 → 8/10
+  - worst foragers holding food: 5 → 4
+  - worst porters holding food: 0 → 2
+- **`game`, seeds 11–20:** pass 9/10 → 9/10; worst porters holding food 23 → 1.
+- **The side-view war reshuffles.** The weaker colony's ants at 600 s, per seed:
+  - The worst seed is lower on both sets: 573 → 226 on seeds 1–10 (seed 5's rival, losses 341 → 641), and 605 → 464 on seeds 11–20.
+  - The mean of each seed's weaker colony is 683 → 678 on seeds 1–10 and 736 → 755 on seeds 11–20.
+  - Which side wins changes on seeds 2, 4, 5 and 6.
+- **`nestFlow`, side view:** 0/10 both ways. Starved larvae, worst seed: 13 → 3.
+- **`game1` (one world), seeds 1–10:** pass 6/10 → 6/10; worst foragers holding food 6 → 8; worst porters 1 → 8.
+- **`game1`, seeds 11–20:** pass 4/10 → 4/10; worst foragers holding food 6 → 5; worst porters 0 → 5.
+- **`nestFlow`, one world:** 0/10 both ways. Starved larvae, worst seed: 6 → 10.
+
+**Unchanged:** no legend, question or schema, so no Jev cost change. The goldens are re-recorded: side view and slow; one world and top-down hold.
