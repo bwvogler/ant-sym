@@ -82,17 +82,19 @@ The goal: a sense, a channel, a lane, a species, a nest kind and a renderer laye
 The top-down and side maps are retired.
 
 **Blocked by:**
-- `ja-d6c`: trail choice, the faint-alarm draw and the raid trail must run on one world's surface.
+- ~~`ja-d6c`: trail choice, the faint-alarm draw and the raid trail must run on one world's surface.~~ Closed 2026-11-14: all four run on the plane, measured by their assays (`one-world.md`, U6a and `ja-web` as built).
 - `ja-lp4.6`: guards and assays on one world.
 
-1. **Inventory.** 35 of the 54 colony test files build an open or side map. List each of them, and each assay in `ASSAYS` and each slow guard, as one of:
+1. **Inventory.** Each test file that builds an open or side map, each assay in `ASSAYS` and each slow guard, as one of:
    - port to one world
    - covered by a one-world test
    - delete
+
+   Done (2026-11-14, `ja-fnd.3.1`): [one-world-only.md](one-world-only.md). 61 test files, 20 assays, 10 slow files; its open questions come before steps 2-4.
 2. **Port the assays that carry PRD baselines** to one world. Record the new baselines in the PRD, choose by the worst seed, and confirm on seeds 11–20.
 3. **Re-record the golden masters on one world only:** fast and slow.
 4. **Delete:**
-   - `generateWorld`, `generateSideWorld`, `OPEN_WORLD`, and whatever of `transect.ts` the curtain does not use
+   - `generateSideWorld`'s own surface, walkway and ground line, the side mound, the top-down soil map (`generateWorld` without `OPEN_WORLD`), and whatever of `transect.ts` the curtain does not use. Not `generateWorld(seed, OPEN_WORLD)` itself: it is one world's plane (`oneWorld.ts`), so it moves into one world as the plane's generator (the endless world's E2 replaces it later). Likewise the curtain reads `SIDE_WORLD.rockiness`, `.soil` and `buryPockets(…, SIDE_WORLD, …)`: those values move into the curtain before `SIDE_WORLD` goes.
    - the view proxies: `#entrance === null`, `map.sky`, and `this.queen` read as "side view"
    - the colony-wide strategist (`StanceSituation`)
    - the side-only and top-only params
