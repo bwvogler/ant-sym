@@ -642,6 +642,49 @@ try {
   );
   check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
 
+  // ——— 5b. The aim bar (PRD §69.2): on a wide screen the aim is a bar under the map, and only there ———
+  console.log("5b. the aim bar");
+  {
+    const aims = page.getByRole("textbox", { name: "aim", exact: true });
+    const shown = () => aims.evaluateAll((els) => els.filter((e) => e.offsetParent !== null).length);
+    check((await shown()) === 1, `one aim on screen at 1280 px (${await shown()})`);
+    // The fungus drawer open: still only the bar's (the drawer's copy is for narrower screens), and the drawer says
+    // why the aim is locked, the reason the bar keeps in its "locked" tooltip.
+    const fungusTab = page.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true });
+    await fungusTab.click();
+    await page.waitForTimeout(150);
+    check((await shown()) === 1, `one aim on screen at 1280 px with The fungus drawer open (${await shown()})`);
+    const locked = await aims.evaluateAll((els) => els.some((e) => e.offsetParent !== null && e.disabled));
+    if (locked) check(await page.getByText("The aim is locked:").isVisible(), "the drawer says why the aim is locked");
+    await fungusTab.click();
+    await page.waitForTimeout(150);
+    const bar = await page
+      .getByLabel("fungus aim")
+      .filter({ has: page.getByRole("group", { name: "aim presets" }) })
+      .boundingBox();
+    const cv = await page.locator("canvas").first().boundingBox();
+    check(bar !== null && cv !== null && bar.y + bar.height > cv.height - 70, "the aim bar sits along the map's bottom");
+    // With an ant followed, the ant panel stops above the bar, the bar opened to four rows included (owner, review of
+    // #189: D1 b): the bar keeps its full width and the panel scrolls.
+    await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
+    await page.getByRole("region", { name: "followed ant" }).waitFor();
+    // Opened if it can be (a locked aim can't take focus: then the three rows it would add, 13 px at 1.375, are counted).
+    if (!(await aims.evaluateAll((els) => els.some((e) => e.offsetParent !== null && e.disabled)))) await aims.first().focus();
+    const gap = await page.evaluate(() => {
+      const panel = document.querySelector('[aria-label="followed ant"]')?.closest(".overflow-y-auto");
+      const bars = [...document.querySelectorAll('[aria-label="fungus aim"]')].filter((e) => e.offsetParent !== null);
+      if (!panel || bars.length !== 1) return null;
+      const b = bars[0].getBoundingClientRect();
+      return {
+        panelBottom: Math.round(panel.getBoundingClientRect().top + parseFloat(getComputedStyle(panel).maxHeight)) /* at its longest */,
+        barTop: Math.round(b.top - (b.height < 60 ? 3 * 18 : 0)),
+      };
+    });
+    check(gap !== null && gap.panelBottom < gap.barTop, `the ant panel, at its longest, stops above the aim bar (${JSON.stringify(gap)})`);
+    await page.locator("canvas").first().focus();
+    if (await page.evaluate(() => window.jevAnts.followed() !== null)) await page.keyboard.press("Escape");
+  }
+
   // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
   console.log("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
@@ -690,7 +733,10 @@ try {
   await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
   await page.getByRole("button", { name: "Go to ▾" }).click();
   await page.locator("canvas").first().focus();
-  check((await page.evaluate(() => window.jevAnts.followed())) !== null, "an ant followed, Go to open");
+  check(
+    (await page.evaluate(() => window.jevAnts.followed())) !== null && (await page.getByRole("group", { name: "go to" }).count()) === 1,
+    "an ant followed, Go to open",
+  );
   await page.keyboard.press("Escape");
   check(
     (await page.getByRole("group", { name: "go to" }).count()) === 0 && (await page.evaluate(() => window.jevAnts.followed())) !== null,
@@ -711,6 +757,19 @@ try {
     () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
     "the touch page's game, landed",
   );
+  // The aim on a phone: no bar; it is in The fungus drawer.
+  check(
+    !(await tpage.getByRole("textbox", { name: "aim", exact: true }).isVisible()),
+    "on a phone there is no aim bar while the drawers are shut",
+  );
+  await tpage.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true }).tap();
+  const inDrawer = await tpage.evaluate(() =>
+    [...document.querySelectorAll('textarea[aria-label="aim"]')].map(
+      (t) => `${t.closest("section")?.getAttribute("aria-label") ?? "-"}:${t.offsetParent !== null}`,
+    ),
+  );
+  check(inDrawer.includes("the fungus:true") && inDrawer.length === 2, `it is in The fungus drawer instead (${inDrawer.join(", ")})`);
+  await tpage.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true }).tap();
   // A phone (PRD §69): the map fills the screen, the rail is a tab bar along the bottom, and a drawer opens as a sheet
   // above it.
   const phone = await tpage.evaluate(() => {
@@ -751,6 +810,19 @@ try {
   const paused = async () => (await tu.getByRole("button", { name: "Play", exact: true }).count()) === 1;
   await until(async () => /You are a fungus/.test((await tcard.textContent()) ?? ""), "the tutorial's first card");
   check(await paused(), "the landing card waits, paused");
+  // From lg the card stops above the aim bar, opened to four lines, as the toasts do (review of #189, S5).
+  {
+    const card = await tcard.boundingBox();
+    const aimBar = await tu
+      .getByLabel("fungus aim")
+      .filter({ has: tu.getByRole("group", { name: "aim presets" }) })
+      .boundingBox();
+    const opened = aimBar && aimBar.y - (aimBar.height < 60 ? 3 * 18 : 0);
+    check(
+      card !== null && opened !== null && card.y + card.height < opened,
+      `the tutorial card stops above the aim bar (${card && Math.round(card.y + card.height)} < ${opened && Math.round(opened)})`,
+    );
+  }
   // What the field shows of scent is what hosts sensed (PRD §65): before any host, nothing, even at the landing.
   check(
     (await tu.evaluate(() => window.jevAnts.sensed("above", window.jevAnts.game.landed.x, window.jevAnts.game.landed.y))) === 0,
@@ -886,6 +958,36 @@ try {
     "a desert game leaves the generic ant's tutorial unplayed",
   );
   await dctx.close();
+
+  // ——— 9. The aim bar's keys with Jev readable (review of #189, N7) ———
+  // The dev server here has no key, so elsewhere the aim is locked and can't take focus. This page is told a key is
+  // set, and every other API call is left unanswered: nothing reaches Jev and nothing is spent, and the page's own start
+  // stays on the wire, which keeps the aim open (a failed start would lock it, policyLock.ts).
+  console.log("9. the aim bar's keys");
+  const kctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  await kctx.route("**/api/health", (r) => r.fulfill({ json: { ok: true, hasKey: true } }));
+  await kctx.route(/\/api\/(?!health)/, () => {}); // never answered
+  const kp = await kctx.newPage();
+  kp.on("pageerror", (e) => errors.push(String(e)));
+  await kp.goto(url);
+  await kp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  const field = kp.getByRole("textbox", { name: "aim", exact: true }).locator("visible=true");
+  await until(() => field.isEnabled(), "the aim unlocked with a key", 10_000, 100);
+  const focused = () => field.evaluate((e) => document.activeElement === e);
+  await field.focus();
+  await field.evaluate((e) => e.setSelectionRange(e.value.length, e.value.length)); // the end of the words, not of a wrapped line
+  const typed = await field.inputValue();
+  await kp.keyboard.type(" Spread");
+  await kp.keyboard.press("Shift+Enter");
+  const kept = (await focused()) && (await field.inputValue()) === `${typed} Spread\n`;
+  check(kept, `Shift+Enter is a new line, the field kept${kept ? "" : ` (${JSON.stringify(await field.inputValue())})`}`);
+  await kp.keyboard.type("now");
+  await kp.keyboard.press("Enter");
+  check(!(await focused()) && (await field.inputValue()) === `${typed} Spread\nnow`, "Enter commits: the field let go, no new line");
+  await field.focus();
+  await kp.keyboard.press("Escape");
+  check(!(await focused()), "Escape gives the keys back to the map");
+  await kctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

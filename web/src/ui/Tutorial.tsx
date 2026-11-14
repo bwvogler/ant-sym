@@ -9,9 +9,10 @@ import { FAST_SPEED, type Card, type TutorialStep } from "./tutorial.ts";
 const ORDER: Record<TutorialStep, number> = { landing: 1, waiting: 2, host: 3, watch: 4, cleared: 5, died: 5, timeout: 5, aim: 6, done: 6 };
 
 // On a phone the card sits above the tab bar, or under the HUD while a drawer is open (`high`), so it never covers the
-// drawer it points into.
+// drawer it points into. From lg it stops above the aim bar, as the toasts do, so it never covers the bar it points at
+// (review of #189, S5).
 const shell =
-  "pointer-events-auto absolute inset-x-2 z-20 rounded-xl border border-spore/50 bg-panel/95 shadow-lg backdrop-blur-sm sm:inset-x-auto sm:top-auto sm:right-3 sm:bottom-3 sm:w-[22rem]";
+  "pointer-events-auto absolute inset-x-2 z-20 rounded-xl border border-spore/50 bg-panel/95 shadow-lg backdrop-blur-sm sm:inset-x-auto sm:top-auto sm:right-3 sm:bottom-3 sm:w-[22rem] lg:bottom-32";
 const low = "bottom-16";
 const highUp = "top-[7.25rem]";
 const primary = "rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:bg-accent-hover";
