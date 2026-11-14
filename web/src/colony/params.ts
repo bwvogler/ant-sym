@@ -380,7 +380,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeStep: 4,
   routeSee: 3,
   routeMax: 64,
-  routeJoin: 1,
+  routeJoin: 2,
   routeEnd: 1,
   routeFight: 0,
   raidGate: 1,
