@@ -5805,7 +5805,7 @@ The second half of stage 2: ways to find any action and to learn what anything o
 Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a notebook that fills as the player plays. Specimens (pin ants and compare them) follow in S3b.
 - **Entries open on first sight.** Each guide entry waits, named and numbered, until the game first shows the player what it is about through the fungus's hosts. Then it opens.
   - **Cues:** the pure `ui/codex.ts` reads a cue from the game twice a second (`cues`); its `UNLOCK` table says which cue opens which entry and what the locked card tells the player to look for.
-    - The fungus, its senses, the line and the curtain, and a species' own entry are open from the start.
+    - The fungus, its senses, how the mycelium feeds its tips, the line and the curtain, and a species' own entry are open from the start.
     - A first host opens Jobs by age.
     - A host carrying food opens the food trail, tasting food, forager trips, the way home and route memory.
     - A host out on the surface opens the home trail, choosing a branch and the "no entry" mark.

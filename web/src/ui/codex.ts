@@ -15,6 +15,7 @@ export const UNLOCK: Record<string, { cue: Cue; hint: string }> = {
   "fungus-senses": { cue: "start", hint: "open from the start" },
   "one-world": { cue: "start", hint: "open from the start" },
   "desert-ant": { cue: "start", hint: "open from the start" },
+  "mass-flow": { cue: "start", hint: "open from the start" }, // the mycelium grows from the landing
   jobs: { cue: "host", hint: "your first host" },
   "food-trail": { cue: "hostCarrying", hint: "a host carrying food home" },
   "food-quality": { cue: "hostCarrying", hint: "a host carrying food home" },
