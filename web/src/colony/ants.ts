@@ -300,6 +300,11 @@ export const ANT_FIELDS = {
   asked: { type: Int16Array, fill: -1, reset: "spawn" },
   /** the question behind each ant's current mode: its situation (with the mode it had) when last asked; −1 = never */
   question: { type: Int16Array, fill: -1, reset: "spawn" },
+  // ——— the desert ant's heat (ja-rf5.5, heat.ts), last so the fields before keep their places (tests/unit/antReset's scribbles) ———
+  /** body heat, °C above the nest's: only a species with heat (heatDay > 0) keeps it; 0 otherwise */
+  bodyHeat: { type: Float32Array, reset: "spawn" },
+  /** 1 while it feels hot: from heatFelt until its body is back below heatCool */
+  hot: { type: Uint8Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

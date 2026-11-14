@@ -8,6 +8,8 @@ import {
   keyY,
   moundRadius,
   PLANE,
+  groundHeat,
+  sunDown,
   CELL,
   cellOf,
   centreX,
@@ -590,6 +592,9 @@ export default function ColonyField({
       const px = miniImg.data;
       const food = theme.accentRgb;
       const spore = theme.sporeRgb;
+      // Infected ants: the spore colour halfway to ink, so a host stands out on the spore wash as on bare ground, in
+      // either theme (ink is light in dark mode) (ja-25sb).
+      const host = [0, 1, 2].map((j) => Math.round((spore[j]! + theme.inkRgb[j]!) / 2)) as [number, number, number];
       for (let my = 0; my < mini.height; my++)
         for (let mx = 0; mx < mini.width; mx++) {
           cellOf(gx0 + mx * 2 + 1, my * 2 + 1);
@@ -629,7 +634,7 @@ export default function ColonyField({
         for (let k = colonies.length - 1; k >= 0; k--) {
           const col = colonies[k] as Colony;
           // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
-          const tone = sick ? spore : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
+          const tone = sick ? host : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
           for (let i = 0; i < col.n; i++) {
             if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || col.load[i] >= INFECTED !== sick) continue;
             const mx = Math.floor((col.x[i] - gx0) / 2);
@@ -1061,6 +1066,21 @@ export default function ColonyField({
           }
         }
       if (hexes) drawHexes(c, v, rx0, rx1, ry0, ry1);
+      // Heat (ja-rf5.5): the plane's ground warms toward noon and cools by dawn; a warm wash over it shows how hot it is now.
+      const hp = colonies[0]?.params;
+      if (hp && hp.heatDay > 0 && (lv === PLANE || (lv < 0 && !m.sky))) {
+        const k = Math.max(0, Math.min(1, (groundHeat(hp, colonies[0]!.time) - hp.heatDawn) / (hp.heatNoon - hp.heatDawn)));
+        ctx.globalAlpha = 0.28 * k;
+        ctx.fillStyle = theme.warn;
+        ctx.fillRect(0, 0, v.w, v.h);
+        // Night (the sun down): a dark wash; the desert ants are in. Black in both themes: the ink is pale in dark mode (review of #155, S1).
+        if (sunDown(hp, colonies[0]!.time)) {
+          ctx.globalAlpha = 0.3;
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, v.w, v.h);
+        }
+        ctx.globalAlpha = 1;
+      }
       const hy = fungus.hyphaeOn(lv < 0 ? 0 : lv);
       if (hy) drawHyphae(hy, c, v, d, lv === PLANE || (lv < 0 && !m.sky), rx0, rx1, ry0, ry1);
 

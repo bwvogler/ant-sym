@@ -9,6 +9,7 @@ import { atHome, destMark, fromHomePlane, integrate, routeRecord } from "./homin
 import { nurse, port, undertake } from "./nestWork.ts";
 import { layMark, nestmatesAround, returnsAround, touch } from "./sense.ts";
 import type { AntStep } from "./step.ts";
+import { fetches } from "./tunnel.ts";
 import { CORPSE_GIVE_UP, MOUND_HEIGHT, MOUND_REACH, REST, ROAD_SIGN, SPOIL_GIVE_UP } from "./tuning.ts";
 import { EXPLORE, FIGHT, FOLLOW, PLANE, RETURN, STRONG } from "./vocab.ts";
 import { isSky, qualityAt, takeFoodCell } from "./world.ts";
@@ -184,7 +185,9 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
       mode === RETURN &&
       !carrying &&
       !pellet &&
-      !colony.isTired(i) &&
+      // Tired, it rests; hungry enough to fetch, it gets up (restFetch, ja-4rfr: the old retired inside sat by the
+      // starving brood).
+      (!colony.isTired(i) || (p.restFetch > 0 && colony.under[i] === 1 && fetches(colony, i))) &&
       !colony.inbound(i, mode) &&
       (colony.restT[i] = colony.restT[i] + dt) > REST &&
       (!gate || ((rolled = true), colony.leaves(i, dt, toEnemy !== null)))
@@ -240,6 +243,8 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     !pellet &&
     !nursing &&
     !colony.isTired(i) &&
+    // A hot one (the desert ant's heat, ja-rf5.5) rests to cool first, as a tired one rests (review of #155, N6); always 0 without heat.
+    !colony.hot[i] &&
     !colony.inbound(i, RETURN) &&
     (ent === null ? atNest : colony.under[i] === 1 && colony.band(i) === 2 && atHome(colony, i)) &&
     (!gate || (!rolled && colony.leaves(i, dt, toEnemy !== null)))
