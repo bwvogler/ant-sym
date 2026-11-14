@@ -111,23 +111,23 @@
     {
       "lane": "steer",
       "doctrine": "cautious",
-      "context": "steer-v4-ec05da1e",
+      "context": "steer-v5-feaeb44d",
       "file": "steer-cautious.json",
-      "answers": 145
+      "answers": 204
     },
     {
       "lane": "steer",
       "doctrine": "forage",
-      "context": "steer-v4-42aaa05b",
+      "context": "steer-v5-022792c6",
       "file": "steer-forage.json",
-      "answers": 145
+      "answers": 204
     },
     {
       "lane": "steer",
       "doctrine": "warlike",
-      "context": "steer-v4-efa3d793",
+      "context": "steer-v5-1be18ef8",
       "file": "steer-warlike.json",
-      "answers": 145
+      "answers": 204
     }
   ],
   "versions": {
