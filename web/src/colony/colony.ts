@@ -1,4 +1,3 @@
-import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
 import { type Channel, type Mark, Pheromones } from "./pheromone.ts";
 import { Brood } from "./brood.ts";
@@ -71,6 +70,8 @@ import { outDistAt } from "./homing.ts";
 import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
+import { loadColony, saveColony } from "./colonySave.ts";
+export { COLONY_SKIP, COLONY_STATE, LAYER_STATE } from "./colonySave.ts";
 import { stanceStep } from "./stance.ts";
 import { decide } from "./decide.ts";
 import { steer } from "./steer.ts";
@@ -78,6 +79,7 @@ import { moveDig } from "./move.ts";
 import { arrive } from "./arrive.ts";
 import { AntStep } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
+import {} from "./colonySave.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -273,17 +275,6 @@ export type Wiring = Partial<
   Pick<Layer, "enemies" | "nestmates" | "friends" | "foreign" | "raidMarks" | "raidTarget" | "raidNest" | "others">
 >;
 
-/**
- * The Layer keys that carry state from tick to tick, which a save keeps for every layer but the bound one (whose values
- * are the colony's own fields, saved with them): its scent, the holes it sees and its cached way out. Every other key
- * is built again: the map, nest and entrance by the constructor and the world, the rest wired by the game (Game.wire,
- * aimAt). tests/save.test.ts holds every key to one list or the other.
- *
- * On today's plane only `ph` changes: it has no entrance, so `seeHoles` leaves its `holes` empty and its way out
- * (`outDist` … `outAt`) is never worked out. Those are saved for completeness, and no test reaches them (#63's review, N3).
- */
-export const LAYER_STATE = ["ph", "holes", "outDist", "outCells", "outVersion", "outAt"] as const satisfies readonly (keyof Layer)[];
-
 /** A layer's own copy of its state, held while another layer is bound (see Colony.layers). */
 type LayerSlots = { -readonly [K in keyof Layer]: Layer[K] };
 
@@ -346,75 +337,6 @@ function gatesFor(p: ColonyParams, open: boolean, one: boolean, dt: number): Gat
     crowdKeep: sgate || hold ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1,
   };
 }
-
-/** The colony's own state that is not a public field or an ants.ts array, saved by name in `private` (a field added to the colony that carries state between ticks is listed here, or in COLONY_SKIP when it is code or rebuilt on load; tests/soak/save.test.ts holds that). */
-export const COLONY_STATE = [
-  "cur",
-  "ti",
-  "alarmAnt",
-  "alarmSmelt",
-  "oddsNow",
-  "t",
-  "outDist",
-  "outCells",
-  "outVersion",
-  "outAt",
-  "layT",
-  "inJaws",
-  "belief",
-  "entrance",
-  "entranceCol",
-  "entranceRow",
-  "holes",
-  "heaped",
-  "goalX",
-  "goalY",
-  "holeX",
-  "storedSeen",
-  "returning",
-  "returned",
-  "holeIn",
-  "holeSeen",
-  "s",
-  "chamberNest",
-  "goalCells",
-  "want",
-  "enRouteTo",
-  "portViewAt",
-] as const;
-
-/** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices), the layers (the maps and scents again) and the policies. */
-export const COLONY_SKIP: ReadonlySet<string> = new Set([
-  ...COLONY_STATE,
-  "plumeTurn", // smellsFood's answer, read in the same tick
-  "policyDrew", // set and read within one ask (policyDraw)
-  "policyDraw", // code: the draw handed to the mode policy
-  "rng",
-  "own",
-  "map",
-  "nest",
-  "layers",
-  "home",
-  "line",
-  "holeCells",
-  "policy",
-  "stancePolicy",
-  "responses",
-  "onBury",
-  "onDie",
-  "enemies",
-  "foreign",
-  "friends",
-  "nestmates",
-  "raidTarget",
-  "raidNest",
-  "raidMarks",
-  "others",
-  "felt",
-  "donors",
-  "scentSum",
-  "perceived",
-]);
 
 /** The per-ant arrays of ants.ts are the colony's own properties. */
 // The arrays are allocated in the constructor (makeAntArrays), which the compiler cannot see: that is the point of the merge.
@@ -2036,53 +1958,13 @@ export class Colony {
     }
   }
 
-  // ——— saving (save.ts, ja-lo8.6) ———
-
-  /**
-   * This colony's state for a save: its public data (not the references the game wires: the map, other colonies'
-   * scent, the grids, its policies; its own scent saves itself), and the state COLONY_STATE lists, by name in `private` (not its random stream: the game saves that,
-   * shared by every colony). tests/soak/save.test.ts holds the lists to the colony's own properties.
-   */
+  /** This colony's state for a save (colonySave.ts saveColony). */
   saveState(): Record<string, unknown> {
-    return {
-      fields: saveFields(this, COLONY_SKIP),
-      // One world (U4b): each layer's own state but the bound one's (null: in `fields` and `private`), by LAYER_STATE.
-      ...(this.layers.length > 1
-        ? {
-            layers: this.layers.map((L, l) => (l === this.cur ? null : Object.fromEntries(LAYER_STATE.map((k) => [k, encodeSave(L[k])])))),
-          }
-        : {}),
-      private: encodeSave(Object.fromEntries(COLONY_STATE.map((k) => [k, (this as unknown as Record<string, unknown>)[k]]))),
-    };
+    return saveColony(this);
   }
 
-  /** A saved state back into this colony (saveState), in place where it can be: a fresh colony of the same world and params. */
+  /** A saved state back into this colony, in place (colonySave.ts loadColony). */
   loadState(saved: Record<string, unknown>): void {
-    const r = saved.private as Record<string, unknown>;
-    // `fields` and the private fields hold the bound layer's scent, map state and way out: the same layer must be bound
-    // here (between ticks it is home, so this only fails for another game's colony).
-    if ("cur" in r && r.cur !== this.cur) throw new Error(`save: a colony saved with layer ${String(r.cur)} bound, here ${this.cur}`);
-    loadFields(this, saved.fields as Record<string, unknown>);
-    for (const k of COLONY_STATE) {
-      if (k === "cur" || !(k in r)) continue;
-      const own = this as unknown as Record<string, unknown>;
-      own[k] = fillLike(own[k], r[k]);
-    }
-    // Every other layer's own state (one world), in place through its view: its slots, since it is not bound.
-    const layers = saved.layers as (Record<string, unknown> | null)[] | undefined;
-    if (layers) {
-      if (layers.length !== this.layers.length)
-        throw new Error(`save: a colony saved on ${layers.length} layers, here ${this.layers.length}`);
-      layers.forEach((x, l) => {
-        if (!x) return;
-        const L = this.layers[l] as unknown as Record<string, unknown>;
-        // In place where it can be (the scent loads itself; its view has no setter for it), else through the view's setter.
-        for (const k of LAYER_STATE)
-          if (k in x) {
-            const v = fillLike(L[k], x[k]);
-            if (v !== L[k]) L[k] = v;
-          }
-      });
-    }
+    loadColony(this, saved);
   }
 }
