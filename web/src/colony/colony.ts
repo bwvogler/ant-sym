@@ -28,26 +28,22 @@ import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, type Responses, type Where, type Touch } from "./responses.ts";
 import { blocked, groundTop, isSky, rockAt, type Nest, type WorldMap } from "./world.ts";
-import { cellAt, type Transect } from "./transect.ts";
+import type { Transect } from "./transect.ts";
 import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
   CHAMBER_GAP,
   CHAMBER_GAP_GROWTH,
   CHAMBER_MIN_DEPTH,
   CHAMBER_SPREAD,
-  CROWD_HALF,
   ENTRANCE_R,
   ENTRANCE_ZONE,
   FLOOR_PER_ANT,
-  FOES_HALF,
   HOLE_SIGHT,
   INTAKE_WINDOW,
   LEAVE_NOW,
   LEAVE_SOON,
-  MET_HALF,
   MIDDEN_AT,
   RECEPTION_MIN,
-  THREAT_HALF,
 } from "./tuning.ts";
 import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from "./grid.ts";
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
@@ -56,7 +52,7 @@ import { unbury } from "./dig.ts";
 import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
-import { layerView, loadLayer, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
+import { layerView, loadLayer, seeHoles, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
 import { loadColony, saveColony } from "./colonySave.ts";
 export { COLONY_SKIP, COLONY_STATE, LAYER_STATE } from "./colonySave.ts";
 import { stanceStep } from "./stance.ts";
@@ -64,7 +60,7 @@ import { decide } from "./decide.ts";
 import { steer } from "./steer.ts";
 import { moveDig } from "./move.ts";
 import { arrive } from "./arrive.ts";
-import { AntStep } from "./step.ts";
+import { AntStep, gatesFor } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
 import { localPolicy, localStance } from "./localRules.ts";
 import { speciesSituation, stanceView } from "./colonySituation.ts";
@@ -247,48 +243,6 @@ export interface HoleCell {
   row: number;
   px: number;
   py: number;
-}
-
-/** One layer's gates for a tick (Colony.tick): whether it gates leaving, raids by trail and each ant's own stance, and their leaks. */
-interface Gates {
-  gate: boolean;
-  /** one world's curtain (ja-web): outgoing foragers are held at the top of their own shaft (the gate) and asked `leave` there */
-  hold: boolean;
-  /** whether `met` leaks on this layer: where the colony gates leaving (one world: on both layers, so it fades on a trip out too) */
-  leak: boolean;
-  metLeak: number;
-  rgate: boolean;
-  foeLeak: number;
-  sgate: boolean;
-  threatLeak: number;
-  crowdKeep: number;
-}
-
-/**
- * A layer's gates for a tick of dt, open ground's only (`open`: no hole into the layer). Activation (behaviour MR 5):
- * `met` leaks over MET_HALF. Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`. Each
- * ant's own stance (docs/stance.md): its threat leaks like `foes`; a waiting ant feels its home's crowd over CROWD_HALF.
- * One world (`one`, ja-web): nobody waits on the plane, where every returner goes down its hole; activation is the
- * curtain's, at the top of each shaft (`hold`), where the waiting ant feels its crowd too. Raids by trail and each ant's
- * own stance stay the plane's.
- */
-function gatesFor(p: ColonyParams, open: boolean, one: boolean, dt: number): Gates {
-  const gate = p.leaveGate > 0 && open && !one;
-  const hold = p.leaveGate > 0 && one && !open;
-  const leak = p.leaveGate > 0 && (open || one);
-  const rgate = p.raidGate > 0 && open;
-  const sgate = p.stanceGate > 0 && open;
-  return {
-    gate,
-    hold,
-    leak,
-    metLeak: leak ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1,
-    rgate,
-    foeLeak: rgate ? Math.exp((-dt * Math.LN2) / FOES_HALF) : 1,
-    sgate,
-    threatLeak: sgate ? Math.exp((-dt * Math.LN2) / THREAT_HALF) : 1,
-    crowdKeep: sgate || hold ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1,
-  };
 }
 
 /** The per-ant arrays of ants.ts are the colony's own properties. */
@@ -631,7 +585,7 @@ export class Colony {
       this.layers = [layerView(this, PLANE, plane), layerView(this, CURTAIN, slots)];
       this.line = world.line;
     } else this.layers = [layerView(this, 0, slots)];
-    this.seeHoles();
+    seeHoles(this);
     const n = this.params.maxAnts;
     this.n = n;
     Object.assign(this, makeAntArrays(n, this.params));
@@ -660,39 +614,6 @@ export class Colony {
     if (this.queen) for (let k = 0; k < this.params.antCount; k++) this.age[k] = this.rng() * 0.5 * this.lifespan[k];
   }
 
-  /** Where the queen lies (world position): the royal chamber's floor row, the cell on it nearest the founding chamber's centre. */
-  /**
-   * Every nest's hole on the map (side view), whose funnels the colony's mound keeps open (world.heapMound). Again
-   * whenever a colony is founded (Game.addColony), so an older colony's mound never buries the new hole (PR #42
-   * review, S3).
-   */
-  seeHoles(): void {
-    // One world: each nest's hole on both layers, by colony (the maps' nests are), the plane cell over its column.
-    const line = this.line;
-    if (line) {
-      const curtain = (this.layers[this.home] as Layer).map;
-      this.holeCells = curtain.nests.map((n) => {
-        const e = n.entrance ?? n;
-        cellOf(e.x, e.y);
-        const col = CELL[0];
-        const row = CELL[1];
-        cellAt(line, col); // the curtain's column is the line's s
-        return { col, row, px: CELL[0], py: CELL[1] };
-      });
-    }
-    // On every layer with a hole into it (the side view's map; one world's curtain).
-    for (const L of this.layers) {
-      if (!L.entrance) continue;
-      const holes: number[] = [];
-      for (const n of L.map.nests ?? [L.nest])
-        if (n.entrance) {
-          cellOf(n.entrance.x, n.entrance.y);
-          holes.push(CELL[0]);
-        }
-      L.holes = holes;
-    }
-  }
-
   /**
    * Bind layer l: the colony's fields become l's (its map, scent, nest, hole, cached way out, wiring), the bound layer's
    * put back in its slots first. Every switch on the map's kind then reads the layer of the ant being stepped. A colony on
@@ -710,6 +631,7 @@ export class Colony {
     Object.assign(this.layers[l] as Layer, patch);
   }
 
+  /** Where the queen lies (world position): the royal chamber's floor row, the cell on it nearest the founding chamber's centre. */
   royalFloor(ch: Chambers): { x: number; y: number } {
     const royal = ch.list.find((c) => c.colony === this.params.nest && c.role === "royal");
     if (!royal) return { x: this.nest.x, y: this.nest.y };
