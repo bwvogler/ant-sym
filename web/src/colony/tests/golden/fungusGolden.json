@@ -47,9 +47,10 @@
      "clock": "350ca8af",
      "evolution": "9a6c51dd",
      "base": "8ea4ab75",
-     "hyphae": "71efab1f",
+     "hyphae": "e2d0371c",
      "corpses": "d08749ad",
      "corpseAges": "d08749ad",
+     "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
@@ -96,18 +97,19 @@
    ],
    "fungus": {
     "state": {
-     "spores": "35800486",
+     "spores": "50a6674a",
      "sporeStrain": "39b457e0",
      "sporeCells": "b1e884a5",
      "hosts": "f32c623b",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "18984287",
+     "evolution": "baee29f0",
      "base": "8ea4ab75",
-     "hyphae": "9492242e",
+     "hyphae": "c8b4976c",
      "corpses": "d08749ad",
      "corpseAges": "d08749ad",
+     "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
@@ -154,18 +156,19 @@
    ],
    "fungus": {
     "state": {
-     "spores": "d2456371",
+     "spores": "d76062cc",
      "sporeStrain": "10396bb5",
      "sporeCells": "b7a42b16",
      "hosts": "bde74deb",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "1cad3c4d",
+     "evolution": "4819179c",
      "base": "8ea4ab75",
-     "hyphae": "7b9c21ac",
+     "hyphae": "89ded758",
      "corpses": "22a79510",
      "corpseAges": "e11b5ca9",
+     "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
@@ -212,19 +215,20 @@
    ],
    "fungus": {
     "state": {
-     "spores": "1fa5052d",
+     "spores": "ccbb942f",
      "sporeStrain": "18c92de5",
      "sporeCells": "13736a2a",
-     "hosts": "37ec8b27",
+     "hosts": "2cec79d6",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "73f67ef1",
+     "evolution": "858d6737",
      "base": "8ea4ab75",
-     "hyphae": "69bb6958",
+     "hyphae": "e0d61734",
      "corpses": "6bda400f",
      "corpseAges": "d88b9c84",
-     "layers": "85eca088"
+     "links": "26717f43",
+     "layers": "484fa50f"
     },
     "infected": [
      43,
