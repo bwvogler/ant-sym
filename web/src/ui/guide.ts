@@ -386,7 +386,7 @@ export const GUIDE: GuideEntry[] = [
       { note: "new-queens", anchor: "3-the-flight-and-founding", label: "The flight and founding" },
     ],
   },
-  // The builder's tools (docs/builder.md, PRD §70, ja-kjj8.6): what you see when you change the world, and what real ants do.
+  // The builder's tools (docs/builder.md, PRD §71, ja-kjj8.6): what you see when you change the world, and what real ants do.
   {
     id: "builder-crayon",
     trail: "food",
@@ -485,6 +485,11 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "trails", title: "Trails", covers: "The double bridge, trail amount by food quality, the “no entry” mark." },
   { note: "combat", title: "Combat", covers: "Narrow ground and the few against the many, graded alarm, meeting a stranger." },
   { note: "tiredness", title: "Tiredness", covers: "When a forager gives up a search and how it recovers." },
+  {
+    note: "foraging-tunnels",
+    title: "Foraging tunnels",
+    covers: "Whether ants dig to reach food, and a digging bout for foragers who come home empty (built, off for now).",
+  },
   {
     note: "activation",
     title: "Activation",

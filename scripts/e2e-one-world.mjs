@@ -22,7 +22,7 @@
 //  8. the desert ant (ja-rf5): chosen on the start screen, which then offers plain Start (no tutorial: it is the generic ant's); its
 //     game is the desert ant's, plays 20 s of game time at 4× and lays no food or home trail on the plane; a reload still offers
 //     the generic ant's tutorial. Its field guide leaves out the trail entries (ja-rf5.11).
-//  10. the builder (ja-kjj8.3), at 390 and 768 px: the tray in the tab bar's place, buttons >= 64 px, sugar by a tap, a
+//  11. the builder (ja-kjj8.3), at 390 and 768 px: the tray in the tab bar's place, buttons >= 64 px, sugar by a tap, a
 //     rock wall and a crayon line by drags, one undo for a drag, Move pans, dig below, Done; saved, reloaded, the wall kept.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
@@ -1007,14 +1007,198 @@ try {
   await kp.keyboard.press("Escape");
   check(!(await focused()), "Escape gives the keys back to the map");
   await kctx.close();
-  // ——— 10. The builder (docs/builder.md, PRD §70, ja-kjj8.3): on a phone and a tablet ———
+
+  // ——— 10. The palette, the page's keys, the shortcuts sheet and the lens (PRD §69.3) ———
+  console.log("10. the palette, the keys and the lens");
+  const lctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const lp = await lctx.newPage();
+  lp.on("pageerror", (e) => errors.push(String(e)));
+  await lp.goto(url);
+  await lp.getByLabel("world seed").fill(String(SEED));
+  await lp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => lp.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null), "a game for the palette");
+  const rail = (name) => lp.getByRole("navigation", { name: "panels" }).getByRole("button", { name, exact: true });
+  const pal = lp.getByRole("dialog", { name: "command palette" });
+  const speedOn = (v) =>
+    lp
+      .getByRole("group", { name: "speed" })
+      .getByRole("button", { name: `${v}×`, exact: true })
+      .getAttribute("aria-pressed");
+  await lp.locator("canvas").first().focus();
+  // ⌘K / Ctrl+K: type part of a name, Enter runs the first.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  check(
+    await lp.getByRole("combobox", { name: "command" }).evaluate((e) => document.activeElement === e),
+    "Ctrl+K opens the palette, its field focused",
+  );
+  await lp.keyboard.type("mutat");
+  check(/^Mutations/.test((await pal.getByRole("option", { selected: true }).textContent()) ?? ""), "typing “mutat” puts Mutations first");
+  await lp.keyboard.press("Enter");
+  check(
+    (await pal.count()) === 0 && (await rail("Mutations").getAttribute("aria-pressed")) === "true",
+    "Enter runs it: the Mutations drawer",
+  );
+  // Escape closes the palette first and leaves the drawer under it.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("Escape");
+  check(
+    (await pal.count()) === 0 && (await rail("Mutations").getAttribute("aria-pressed")) === "true",
+    "Escape closes the palette, not the drawer",
+  );
+  await lp.keyboard.press("Escape"); // and then the drawer
+  // The arrows wrap, and the chosen command stays in sight (review of #196, S3): ↑ from the first is the last.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("ArrowUp");
+  await lp.waitForTimeout(100);
+  const inSight = await pal.evaluate((d) => {
+    const box = d.querySelector('[role="listbox"]').getBoundingClientRect();
+    const o = d.querySelector('[role="option"][aria-selected="true"]').getBoundingClientRect();
+    return o.top >= box.top - 1 && o.bottom <= box.bottom + 1;
+  });
+  check(inSight, "↑ from the first command chooses the last, and scrolls it into sight");
+  await lp.keyboard.press("Escape");
+  // The keys: speeds, Space, the sheet.
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("1");
+  check((await speedOn(1)) === "true", "the key 1: 1×");
+  const playing = () => lp.getByRole("button", { name: "Pause", exact: true }).count();
+  const was = await playing();
+  await lp.keyboard.press(" ");
+  check((await playing()) !== was, "Space plays or pauses");
+  await lp.keyboard.press(" ");
+  // Space on a focused button presses that button, not play (review of #196, S5).
+  const playedBefore = await playing();
+  await lp.getByRole("group", { name: "speed" }).getByRole("button", { name: "2×", exact: true }).focus();
+  await lp.keyboard.press(" ");
+  check((await speedOn(2)) === "true" && (await playing()) === playedBefore, "Space on the focused 2× button: 2×, and play as it was");
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("3");
+  check((await speedOn(4)) === "true", "the key 3: 4×");
+  await lp.keyboard.press("?");
+  const sheetD = lp.getByRole("dialog", { name: "keyboard shortcuts" });
+  await sheetD.waitFor({ timeout: 3000 });
+  check(/command palette/.test((await sheetD.textContent()) ?? ""), "? opens the shortcuts sheet");
+  await lp.keyboard.press("1");
+  check((await speedOn(4)) === "true", "the game's keys wait while the sheet is open");
+  await lp.keyboard.press("Escape");
+  check((await sheetD.count()) === 0, "Escape closes it");
+  // The lens: i turns it on; over Ink's hole it says so; a click pins it and follows nothing; "more" opens the guide.
+  await lp.keyboard.press("i");
+  const lensBtn = lp.getByRole("button", { name: "Lens: say what is under the pointer (i)" });
+  check((await lensBtn.getAttribute("aria-pressed")) === "true", "i turns the lens on");
+  await lp.evaluate(() => window.jevAnts.goNest(0));
+  await lp.waitForTimeout(200);
+  const hole = await lp.evaluate(() => {
+    const g = window.jevAnts.game;
+    const n = g.colonies[0].layers[0].nest;
+    const c = window.jevAnts.camera("above");
+    const cv = document.querySelector("canvas");
+    const k = cv.getBoundingClientRect().width / cv.width;
+    return { x: ((n.x - c.x) * c.zoom + cv.width / 2) * k, y: ((n.y - c.y) * c.zoom + cv.height / 2) * k };
+  });
+  await lp.mouse.move(hole.x, hole.y);
+  const lensCard = lp.getByRole("region", { name: "lens" });
+  await until(async () => (await lensCard.count()) === 1, "the lens card under the pointer", 3000, 50);
+  const said = (await lensCard.textContent()) ?? "";
+  check(/Ink's hole/.test(said), `over Ink's hole it says so${/Ink's hole/.test(said) ? "" : ` (${said.slice(0, 120)})`}`);
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  check((await lp.evaluate(() => window.jevAnts.followed())) === null, "a click with the lens on pins the card and follows nothing");
+  await lp.mouse.move(hole.x + 300, hole.y + 200);
+  check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "pinned, it stays while the pointer wanders");
+  await lensCard.getByRole("button", { name: "More on ink's hole" }).click();
+  await lp.getByRole("dialog", { name: "Learn" }).waitFor({ timeout: 3000 });
+  check((await lensCard.count()) === 0, "“more” opens the guide, and the card goes");
+  await lp.keyboard.press("Escape");
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.keyboard.press("Escape");
+  // Closing a pinned card leaves the pointer's card, if it is over the map: count the pinned one (its × says so).
+  const pinnedCards = () => lensCard.getByRole("button", { name: "Close the lens card" }).count();
+  check((await pinnedCards()) === 0, "Escape closes a pinned card");
+  // One Escape closes one thing (review of #196, S1): a pinned card over the Go to menu, then the menu; and the palette
+  // over the menu, then the menu.
+  const goBtn = lp.getByRole("button", { name: "Go to ▾" });
+  const goMenu = lp.getByRole("group", { name: "go to" });
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await goBtn.click();
+  await lp.keyboard.press("Escape");
+  check((await pinnedCards()) === 0 && (await goMenu.count()) === 1, "a pinned card and Go to: the first Escape closes the card only");
+  await lp.keyboard.press("Escape");
+  check((await goMenu.count()) === 0, "and the second the menu");
+  await goBtn.click();
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("Escape");
+  check((await pal.count()) === 0 && (await goMenu.count()) === 1, "the palette over Go to: the first Escape closes the palette only");
+  await lp.keyboard.press("Escape");
+  // A card pinned on the other view is hidden and doesn't take Escape (review of #196, S2): it waits for its view.
+  await rail("Mutations").click();
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("v");
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0, "pinned above, it hides below");
+  await lp.keyboard.press("Escape");
+  check((await rail("Mutations").getAttribute("aria-pressed")) === "false", "below, Escape closes the drawer, not the hidden card");
+  // Below, the lens still follows the pointer while that card waits above (review of #196, S6).
+  for (const dx of [0, 40, 80]) await lp.mouse.move(640 + dx, 450);
+  await until(async () => (await lensCard.count()) === 1, "a hover card below while a card waits pinned above", 2000, 50);
+  check((await lensCard.getByRole("button", { name: "Close the lens card" }).count()) === 0, "below, the pointer's card (not pinned)");
+  await lp.keyboard.press("v");
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "above again, the pinned card is back");
+  await lp.keyboard.press("Escape");
+  // A command run from the palette closes a pinned card, which would stay over what it opens (review of #196, N4, N8).
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.type("lab and");
+  await lp.keyboard.press("Enter");
+  await lp.getByRole("dialog", { name: "Details" }).waitFor({ timeout: 3000 });
+  check((await lensCard.count()) === 0, "a palette command (Lab and numbers) closes the pinned card");
+  await lp.getByRole("button", { name: "Close Details" }).click();
+  // The lens off and on again starts afresh: no old pinned card (N8).
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("i");
+  await lp.keyboard.press("i");
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0, "i twice: the pinned card is gone");
+  await lp.keyboard.press("i");
+  await lp.mouse.move(hole.x + 2, hole.y + 2);
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0 && (await lensBtn.getAttribute("aria-pressed")) === "false", "i again: the lens off, no card");
+  await lctx.close();
+  // The lens button fits the phone's HUD from 360 px wide (review of #196, S4).
+  const nctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  const np = await nctx.newPage();
+  np.on("pageerror", (e) => errors.push(String(e)));
+  await np.goto(url);
+  await np.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
+  const lb = await np.getByRole("button", { name: "Lens: say what is under the pointer (i)" }).boundingBox();
+  const hudBar = await np.getByLabel("game bar").boundingBox();
+  check(
+    lb !== null && lb.x + lb.width <= 360 - 8 && hudBar.x + hudBar.width <= 360 - 8,
+    `at 360 px the lens button is whole, the bar inside the gutter (${lb && Math.round(lb.x + lb.width)}, ${hudBar && Math.round(hudBar.x + hudBar.width)})`,
+  );
+  await nctx.close();
+
+  // ——— 11. The builder (docs/builder.md, PRD §71, ja-kjj8.3): on a phone and a tablet ———
   // A shovel on the tab bar opens a tray of picture tools in its place: a tap places, a drag paints, Move pans, undo takes
   // a whole drag back, below digs the curtain; the builds go into the game, so a save and a reload keep them.
   for (const [w, h] of [
     [390, 844],
     [768, 1024],
   ]) {
-    console.log(`10. the builder at ${w} px`);
+    console.log(`11. the builder at ${w} px`);
     const bctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
     const bp = await bctx.newPage();
     bp.on("pageerror", (e) => errors.push(String(e)));

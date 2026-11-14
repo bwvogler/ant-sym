@@ -7,7 +7,7 @@ import { CURTAIN, FAINT, PLANE } from "../../vocab.ts";
 import { mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "../../world.ts";
 import { smallOne } from "../builders.ts";
 
-// The builder (docs/builder.md, PRD §70, ja-kjj8.2): a child's tools over the world, guarded, undoable.
+// The builder (docs/builder.md, PRD §71, ja-kjj8.2): a child's tools over the world, guarded, undoable.
 
 const game = (ants = 20) => new Game(smallOne(7), { antCount: ants, rivalAnts: ants, regrow: 0 }, mulberry32(3));
 const key = (x: number, y: number) => (y + 0x8000) * 0x10000 + (x + 0x8000);

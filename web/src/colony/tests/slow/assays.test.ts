@@ -107,7 +107,7 @@ test(
   },
 );
 
-// The builder (PRD §70.1, ja-kjj8.1): B1 passes 10/10 on seeds 1–10 (median 6.4×, worst 4.3); B2 fails 0/10 (delivery
+// The builder (PRD §71.1, ja-kjj8.1): B1 passes 10/10 on seeds 1–10 (median 6.4×, worst 4.3); B2 fails 0/10 (delivery
 // after the wall at a median 14 % of before).
 test("B1 a crayon line is followed: ≥ 3× its undrawn mirror", () => {
   for (const seed of [1, 4]) {

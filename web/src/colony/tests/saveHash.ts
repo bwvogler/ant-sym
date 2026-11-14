@@ -58,7 +58,10 @@ export function hashGame(g: Game): string {
     for (const L of c.layers) {
       for (const f of Object.values(L.ph.fields)) layer(f);
       text([L.holes, L.outCells, L.outVersion, L.outAt]);
-      if (L.outDist) view(L.outDist);
+      if (L.outDist) {
+        text([L.outDist.x0, L.outDist.w, L.outDist.mapX0, L.outDist.mapW]);
+        view(L.outDist.dist);
+      }
     }
     text([
       c.stored,

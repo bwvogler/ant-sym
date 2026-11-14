@@ -1,4 +1,4 @@
-// The builder's tray, pure (docs/builder.md "Young children on a touch screen", PRD §70, ja-kjj8.3, ja-kjj8.5): which tools
+// The builder's tray, pure (docs/builder.md "Young children on a touch screen", PRD §71, ja-kjj8.3, ja-kjj8.5): which tools
 // it shows, their pictures, names and gestures, and the rules for a touch. Pictures are emoji: concrete and in colour, so a
 // child who can't read knows them (Hiniker et al. 2016: abstract symbols fail below 5), with no image files. The names are
 // for the accessible label and the spoken name, never needed to use a tool.
@@ -10,7 +10,7 @@ export type TrayTool = "move" | BuildTool;
 
 /** The full tray (the 7-year-old's), in order. The crayon appears once per colony (up to CRAYONS). */
 export const FULL: readonly TrayTool[] = ["move", "dig", "dirt", "rock", "sugar", "crumb", "crayon", "rain"];
-/** The little-hands tray: four tools only, bigger still (owner, PRD §70). */
+/** The little-hands tray: four tools only, bigger still (owner, PRD §71). */
 export const LITTLE: readonly TrayTool[] = ["move", "sugar", "dig", "rain"];
 /** Crayons shown at most: one per colony, the first few. */
 export const CRAYONS = 4;

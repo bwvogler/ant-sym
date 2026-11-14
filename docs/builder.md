@@ -1,6 +1,6 @@
 # Builder mode: a child changes the world, and the ants answer from their senses
 
-*Research note for the epic `ja-kjj8` (PRD §70). Written 2026-11-14, against code at `d80ffd8`. Full text was read on PubMed Central and journals.biologists.com. Springer, Wiley, Elsevier, the ACM Digital Library and several authors' sites were out of this session's reach. Numbers from abstracts, search summaries or citing papers are marked **unverified**, and anything recalled is marked "(from memory; not fetched)".*
+*Research note for the epic `ja-kjj8` (PRD §71). Written 2026-11-14, against code at `d80ffd8`. Full text was read on PubMed Central and journals.biologists.com. Springer, Wiley, Elsevier, the ACM Digital Library and several authors' sites were out of this session's reach. Numbers from abstracts, search summaries or citing papers are marked **unverified**, and anything recalled is marked "(from memory; not fetched)".*
 
 **The owner's ask (2026-11-14).** A creative mode, like Minecraft's, that their 7-year-old can turn on or off at any point in a normal game. The child should be able to dig, leave food, draw signals and wash them away. A younger sibling who can't read plays too, on a phone or tablet.
 
@@ -201,7 +201,7 @@ Still to measure: B1–B6 on seeds 1–10; the tick cost of a sugar flood; the c
 
 Later notes: floods and rafts (real water), cooperative carrying, aphids, labelling rooms with floor marks, and tweezers (displacement and homing).
 
-## What the builder built (PRD §70.1–70.2)
+## What the builder built (PRD §71.1–70.2)
 
 - **Tools:**
   - pure tools in `colony/builder.ts`, with guards, undo and crayon lines that are saved;

@@ -1,11 +1,11 @@
-// The builder (docs/builder.md, PRD §70, ja-kjj8): a child's tools that change the world. Each one writes only to state the
+// The builder (docs/builder.md, PRD §71, ja-kjj8): a child's tools that change the world. Each one writes only to state the
 // ants already sense (terrain, food and its quality, a colony's food trail) or takes trail away (rain); none tells an ant
 // what to do. A stroke is applied between ticks and draws no random numbers, so a game no stroke touches runs bit for bit
 // as before.
 //
 // Tools: dig (open ground), dirt (soil below; rock on the plane, which has no soil), rock, sugar and crumb (food of quality
 // 1.5 and 0.5, assay A2b's), a crayon per colony (its food trail, kept topped up as it fades at the home trail's rate:
-// the owner's call, PRD §70), and rain (every colony's trails and alarm under the cloud cleared). Guards keep the world
+// the owner's call, PRD §71), and rain (every colony's trails and alarm under the cloud cleared). Guards keep the world
 // sound: no dirt or rock on a nest's hole, on an ant or on brood.
 //
 // Undo is the Builder's, per page session: each stroke records what it changed, and undo puts back what is still its own
@@ -34,7 +34,7 @@ export const BUILD = {
   crumb: 0.5,
   /** a crayon line's food trail at first (STRONG is 1; a busy trail by the nest runs a few) */
   crayonLevel: 4,
-  /** its half-life, seconds: the home trail's (evaporation 0.02/s, t½ ≈ 35 s), the owner's call (PRD §70) */
+  /** its half-life, seconds: the home trail's (evaporation 0.02/s, t½ ≈ 35 s), the owner's call (PRD §71) */
   crayonHalfLife: 35,
   /** cells round a nest's hole no dirt or rock may cover */
   holeGuard: 2,
