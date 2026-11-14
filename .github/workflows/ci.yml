@@ -55,12 +55,13 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm --prefix web ci
       # The flags go before the files: node ignores --test-shard after them (so not `npm run test:int -- ...`).
+      # So the globs are copies of web/package.json's test:int, test:golden and test:soak; ui/tests/ciShards.test.ts holds them equal.
       # Each tier keeps its own per-file limit: 60 s for int and golden, 120 s for soak (a soak file was
       # cancelled at 60 s on a small runner, #78).
-      - name: int and golden, shard ${{ matrix.shard }}/4
-        run: node --test --test-timeout=60000 --test-shard=${{ matrix.shard }}/4 src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
+      - name: int and golden, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: node --test --test-timeout=60000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
         working-directory: web
-      - name: soak, shard ${{ matrix.shard }}/4
+      - name: soak, shard ${{ matrix.shard }}/${{ strategy.job-total }}
         if: ${{ !cancelled() }}
-        run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/4 src/colony/tests/soak/*.test.ts
+        run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/soak/*.test.ts
         working-directory: web
