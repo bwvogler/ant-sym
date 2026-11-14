@@ -137,6 +137,19 @@ test("at night no ant sets out: on the plane in the dark, only ants on their way
   assert.equal(away, 0, `at midnight ${midnight} on the plane, ${away} of them not on their way home`);
 });
 
+test("heat paces the desert ant's day and never kills it: noon is under its critical heat, and nobody dies of heat in a day (owner, review of #155 D2)", () => {
+  assert.ok(P.heatNoon < P.heatDeath, `noon ${P.heatNoon} °C under the critical ${P.heatDeath} °C: a body can't pass the air around it`);
+  const g = desert();
+  run(g, P.heatDay);
+  assert.equal(g.player.diedHot, 0);
+});
+
+test("on its way home and deep in, where it can't see the sky, it keeps going home; only one setting out goes up to look (review of #155, S5)", () => {
+  const s = (mode: string) => desertPolicy({ mode, tired: false, hot: false, sun: "unseen", enemy: "none" } as unknown as SpeciesSituation);
+  assert.equal(s("return"), "return");
+  assert.equal(s("explore"), "explore");
+});
+
 test("the generic ant has no heat: no body heat, no deaths of heat", () => {
   const g = new Game(generateOneWorld(1), { antCount: 60, rival: false }, gameRng(1));
   run(g, 30);

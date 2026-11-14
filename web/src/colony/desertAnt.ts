@@ -63,6 +63,8 @@ export const DESERT_MODE_WORDS: LaneWords<Mode> = {
 export const desertPolicy: Policy = (s) => {
   if ((s as SpeciesSituation).hot) return "return";
   if ((s as SpeciesSituation).sun === "low" || (s as SpeciesSituation).sun === "down") return "return";
+  // On its way home and deep in, where it can't see the sky: it keeps going home; only one setting out goes up to look (review of #155, S5).
+  if (s.mode === "return" && (s as SpeciesSituation).sun === "unseen") return "return";
   if (s.tired) return "return";
   if (s.mode === "fight") return "return";
   return "explore";
@@ -74,6 +76,11 @@ export const DESERT_RULE_TEXT: ModeRuleText = {
     { when: "it is hot (its body near the heat that kills it)", then: "return", test: (s) => (s as SpeciesSituation).hot === true },
     { when: "the sun is low (morning or evening: not its time)", then: "return", test: (s) => (s as SpeciesSituation).sun === "low" },
     { when: "the sun is down (night: it steers by the sky)", then: "return", test: (s) => (s as SpeciesSituation).sun === "down" },
+    {
+      when: "it is on its way home and cannot see the sky",
+      then: "return",
+      test: (s) => s.mode === "return" && (s as SpeciesSituation).sun === "unseen",
+    },
     { when: "it is tired (searched long outside without finding food)", then: "return", test: (s) => s.tired },
     { when: "it was fighting", then: "return", test: (s) => s.mode === "fight" },
   ],

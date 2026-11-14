@@ -430,7 +430,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "desert-heat",
     title: "Desert heat",
     covers:
-      "The desert ant's heat: its limit is its own body, and the sun's height seen at the entrance sets when the nest opens and closes; it stays in at high sun and at night (PRD §60.5).",
+      "The desert ant's heat: its limit is its own body, and the sun's height seen at the entrance sets when the nest opens and closes; it forages under the high sun, comes home to cool, and stays in at a low sun and at night (PRD §60.5).",
   },
   {
     note: "lasius-neglectus",
