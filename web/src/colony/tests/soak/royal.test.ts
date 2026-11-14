@@ -361,20 +361,27 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
   };
   const total = map.foodTotal;
   let founded = -1;
+  let atFounding = -1;
   // Until the daughter is no longer young (ja-lo8.10): through her nanitics and the queen's nursing too (PR #54 review).
   const young = () => g.colonies.length > 1 && (g.colonies[1]!.founding || g.colonies[1]!.incipient);
   for (let k = 0; k < 30 * 600 && (founded < 0 || young() || g.time < founded + 30); k++) {
     c.scentGain.fill(0.001);
     g.tick(DT);
-    if (founded < 0 && g.colonies.length > 1) founded = g.time;
+    if (founded < 0 && g.colonies.length > 1) {
+      founded = g.time;
+      atFounding = g.colonies[1]!.larder;
+    }
     if (k % 30 === 0) worst = Math.max(worst, books());
   }
   assert.ok(founded > 0, "a daughter was founded");
   assert.ok(worst < 1e-6, `food drifted by ${worst}`);
   assert.equal(map.foodTotal, total, "founding makes no food: her reserve is her body");
-  const d = g.colonies[1]!;
   assert.ok(g.founded[0]!.reserve! > 1 && g.founded[0]!.reserve! <= ALATE_RESERVE, `her reserve, her body: ${g.founded[0]!.reserve}`);
-  assert.ok(d.larder <= ALATE_RESERVE);
+  // Her larder as she founds is her body, no more; what her nanitics bring home after is food they found (the books hold).
+  assert.ok(
+    Math.abs(atFounding - g.founded[0]!.reserve!) < 1e-9,
+    `her larder at founding: ${atFounding}, her body ${g.founded[0]!.reserve}`,
+  );
 });
 
 /** A daughter colony past founding (her first nanitic out), on a wide map; her workers held far off on the ground each tick. */

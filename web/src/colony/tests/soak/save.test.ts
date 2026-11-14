@@ -85,7 +85,10 @@ for (const view of ["side", "top"] as const)
     // Game.tick builds the occupancy grids and recognition bands before fights, and the next tick's steps read them, the
     // ants killed since included. A load that built them again from the living diverged on the first tick (U4b).
     const whole = fighting(view);
-    assert.ok(runToFightDeath(whole, 30), "a fight death within 30 s (the test's own check)");
+    // In the side view, the second death: the first one's dead ant can lie where no step reads the grids within 3 s, so
+    // grids rebuilt from the living run on to the same hash (since the young climb the royal mark, ja-k4k.2.1).
+    for (let k = 0; k < (view === "side" ? 2 : 1); k++)
+      assert.ok(runToFightDeath(whole, 30), "a fight death within 30 s (the test's own check)");
     const saved = JSON.parse(JSON.stringify(whole.save())) as GameSave;
     const at = hashGame(whole);
     whole.tick(DT);
