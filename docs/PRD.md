@@ -4192,6 +4192,14 @@ The owner asked for the top-down view and the side view to be two views of one g
 
 **`ja-web` built (2026-11-10).** Activation at the top of each shaft: every outgoing forager is held at a gate within `WAIT_STEPS` of its own hole and asked `leave` there; carriers have a pass; held ants smell the raid trail at their hole. A5b passes 7/10 on one world, A5 0/10 (the middle-aged go out unheld); G1's food carried down is unchanged and raids return; the tick at 1,200 + 1,200 is over the 10 ms gate (10.7–10.8 ms in the second half), and the slow unity guard (seed 3) no longer unifies (skipped behind `ja-lp4.6.6`). §48.6; `one-world.md` §5, "ja-web as built".
 
+**U6b built (`ja-lp4.6.2`, 2026-11-14): the final one-world baselines.** A11 and A12 run on one world (`ONE_ASSAYS`; nothing pending); no behaviour change, the golden masters bit-exact. Seeds 1–10 on `main` (`74a3d822`); the full table, with U6a's and ja-web's beside it, is `one-world.md` §5, "U6b as built".
+- **Assays:** A1 10/10, A2a 10/10, A2b 9/10, A3 10/10, A4 10/10, A5 0/10, A5b 9/10, A6 5/10, A9 5/10, A10 0/10; **A11 10/10** (gain median 4.14, worst 2.47), **A12 8/10** (median 0.84; seeds 7 and 8 at 0.41 and 0.49, accepted as the baseline by the owner, `ja-lp4.6.10`).
+- **A6 is a fight at the nest:** every defender dies on 6 of 10 seeds and 413 of 821 defender deaths are in the curtain. Raiders keep going down a rival's shaft (owner, 2026-11-14); what A6 measures on one world stays open (`ja-lp4.6.5`).
+- **G1:** 6 of seeds 1–10 within 2, worst 6 (seed 7). #205's guard asks for 5. Raids: 166 scouts, 42 finds, 13 recruits, recruits on 4 seeds (`ja-lp4.6.9`).
+- **Unity:** peaks 0.02–0.23 % at 300 + 300 and 0.42–0.56 % at 600 + 600 in 600 s; nobody unifies (`ja-lp4.6.6`).
+- **Tick, over the gate:** 1,200 + 1,200 second-half mean 16.1 / 17.2 ms on the machine measured, about 13 ms scaled to the reference machine (ja-web's merge runs 1.26 times slower there), against the owner's 10 ms; `main` is about 20–25 % slower than ja-web on the same machine. The owner shipped U6b over the gate (2026-11-14); the speed work is next (`ja-lp4.6.7`).
+- **Cost:** none: no situation, legend or question changed.
+
 ## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
 
 The owner asked whether the side view's undiggable crust could become an ant's own choice, and whether colonies could open new entrances (`ja-nzx`, `ja-4h2`, `ja-lp4.9`). `docs/entrances.md` holds the research:
@@ -4403,7 +4411,7 @@ The longer legends cost a few per cent; the top-down stance lane is gone. The es
 
 ## 55. The page plays one world only (ja-97n, 2026-11-10)
 
-The owner (2026-11-10) removed the side-view and top-down games from the page and made one world (§51) its only game, so Details has no Ground choice. This takes the page switch out of U6b (`ja-lp4.6.2`), whose leave and raid assays and final baselines are still open. Only the UI changed:
+The owner (2026-11-10) removed the side-view and top-down games from the page and made one world (§51) its only game, so Details has no Ground choice. This takes the page switch out of U6b (`ja-lp4.6.2`), whose leave and raid assays and final baselines followed (§51, "U6b built", 2026-11-14). Only the UI changed:
 
 - `buildGame` always builds `generateOneWorld(seed)`. `ColonyControls`, the saved settings (`GameSettings`) and `hasNests` no longer carry a ground. Saves made before this change will not load into the same world; there is no migration, because nobody plays yet.
 - The Nest tab, the fungus panel's nest upgrades and the notices no longer check whether the map has nests. The Nest tab's "Switch to the side view" empty state is gone.
