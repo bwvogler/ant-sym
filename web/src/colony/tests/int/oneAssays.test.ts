@@ -14,6 +14,7 @@ import {
   forage1,
   game1,
   heldProbe,
+  lifecycleOne,
   nestFlowProbe,
   occupancyProbe,
   ONE_ASSAYS,
@@ -373,4 +374,17 @@ test("nestFlowProbe reads the curtain's chambers in one world (A8)", () => {
   g.time = 300;
   probe.tick(g, 1);
   assert.equal(probe.summary(g).beyond, 1, "the food lies past reception, in the royal chamber");
+});
+
+test("L on one world: the three lifecycle arms run a solo one world with the fungus landed by the hole, under the legacy ids", () => {
+  assert.deepEqual(
+    lifecycleOne.map((a) => a.id),
+    ["lifecycle", "lifecycle-signal", "lifecycle-scent"],
+  );
+  for (const a of lifecycleOne) assert.ok(ONE_ASSAYS.includes(a), `${a.id} is in ONE_ASSAYS`);
+  const { game, result } = runGame({ ...lifecycleOne[1]!.spec(1), seconds: 2 });
+  assert.ok(game.world && game.colonies.length === 1, "a solo one world");
+  assert.equal(game.landed?.colony, 0, "the fungus has landed by the first colony's hole");
+  assert.equal(game.player.queen?.signal, 0.4, "the signal arm damps the queen's signal");
+  assert.ok(Number.isNaN(result.metrics["t.daughterOut"]), "no daughter yet, 2 s in");
 });
