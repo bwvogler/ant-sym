@@ -425,17 +425,20 @@ function buried(level: number): Game {
   return g;
 }
 
-/** The spores on the plane within hex distance `from`..`to` of the corpse at (60, 40). */
-function sporesNear(g: Game, from: number, to: number): number {
+/** The spores on the plane within hex distance `from`..`to` of cell (cx, cy). */
+function sporesNearAt(g: Game, cx: number, cy: number, from: number, to: number): number {
   const spores = g.fungus.sporesOn(PLANE)!.spores;
   let sum = 0;
-  for (let y = 40 - to - 1; y <= 40 + to + 1; y++)
-    for (let x = 60 - to - 1; x <= 60 + to + 1; x++) {
-      const d = hexDistance(x, y, 60, 40);
+  for (let y = cy - to - 1; y <= cy + to + 1; y++)
+    for (let x = cx - to - 1; x <= cx + to + 1; x++) {
+      const d = hexDistance(x, y, cx, cy);
       if (d >= from && d <= to) sum += spores.get(x, y);
     }
   return sum;
 }
+
+/** The spores on the plane within hex distance `from`..`to` of the corpse at (60, 40). */
+const sporesNear = (g: Game, from: number, to: number) => sporesNearAt(g, 60, 40, from, to);
 
 test("with Stalks bought, a corpse colonised outside grows a stalk after STALK.delay and its spores then fill a ring; the ground holds what the cadaver paid (ja-2bw.10)", () => {
   // The design's numbers (PRD §63.12; the delays the owner's, 2026-11-14): the checks below read them from STALK.
@@ -475,6 +478,29 @@ test("with Stalks bought, a corpse colonised outside grows a stalk after STALK.d
   const spent = buried(1);
   runFor(spent, CORPSE.spores / CORPSE.rate + 2);
   assert.ok(!spent.fungus.stalksOn(PLANE).includes(k), "a spent corpse still has a stalk");
+});
+
+test("a stalk beside rock puts no spores on the rock (ja-2bw.10)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  assert.ok(g.fungus.upgrade("stalks"));
+  assert.ok(g.fungus.upgrade("stalks"));
+  // (55, 30) on seed 7's small plane has rock within a tall stalk's radius (review of #178: 10 cells).
+  const [x, y, radius] = [55, 30, STALK.radius[2]];
+  const map = g.world!.plane;
+  const rocks: [number, number][] = [];
+  for (let cy = y - radius - 1; cy <= y + radius + 1; cy++)
+    for (let cx = x - radius - 1; cx <= x + radius + 1; cx++)
+      if (hexDistance(cx, cy, x, y) <= radius && rockAt(map, cx, cy) !== OPEN) rocks.push([cx, cy]);
+  assert.ok(rocks.length > 0, "no rock round the corpse");
+  g.colonies[0]!.onBury!({ x, y, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
+  const spores = g.fungus.sporesOn(PLANE)!.spores;
+  for (let t = 0; t < STALK.delay[2] + 30; t++) {
+    runFor(g, 1);
+    for (const [cx, cy] of rocks) assert.equal(spores.get(cx, cy), 0, `spores on rock at (${cx}, ${cy}) after ${g.time.toFixed(0)} s`);
+  }
+  assert.ok(sporesNearAt(g, x, y, 1, radius) > 0, "no spores round the corpse");
 });
 
 test("a corpse colonised in the nest (a layer that is not topsoil) never grows a stalk (ja-2bw.10)", () => {
