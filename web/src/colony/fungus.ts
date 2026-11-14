@@ -213,9 +213,10 @@ export const CORPSE = { spores: 12, rate: 0.2, mass: 1, headings: [E, W] as read
 /**
  * Stalks (synnemata, ja-2bw.10, PRD §63.12), by the *Stalks* upgrade's level (none, a stalk, a tall stalk): a colonised
  * corpse outside (on a topsoil map) grows a stalk `delay` seconds after it was colonised (Hughes et al. 2011: 2–3 days
- * after death, and never in the nest), and from then on its free spores fall over every open cell within `radius`.
+ * after death, and never in the nest), and from then on its free spores fall over the open cells within `radius`. The
+ * delays are well inside a lone corpse's 60 s of spores (CORPSE.spores / CORPSE.rate; owner, 2026-11-14).
  */
-export const STALK = { delay: [0, 60, 30], radius: [0, 2, 4] } as const;
+export const STALK = { delay: [0, 20, 10], radius: [0, 2, 4] } as const;
 
 /** How far down the shaft under a hole rootShaft looks for its walls, in rows. */
 const SHAFT_ROWS = 8;
@@ -1209,16 +1210,15 @@ export class Fungus {
         const [x, y] = keyCell(k);
         const spend = Math.min(left, CORPSE.rate * dt);
         corpses.set(k, left - spend);
-        const ring = this.#stalked(l, k, stalks) ? this.#ring(L.map, x, y, STALK.radius[stalks] ?? 0) : [[x, y] as [number, number]];
-        const each = spend / ring.length;
-        for (const [cx, cy] of ring) {
-          const v = L.spores.get(cx, cy);
-          const put = Math.max(0, Math.min(each, p.maxSpores - v));
-          if (put <= 0) continue;
-          L.spores.set(cx, cy, v + put);
-          L.sporeStrain.set(cx, cy, e.strain);
-          L.sporeCells.add(cellKey(cx, cy));
-        }
+        // A stalk puts each step's whole spend on the emptiest open cell round it, so the ring fills evenly over a few
+        // seconds; split over every cell, each share would fall under SPORE_GONE and fade the next step (review of #178).
+        const [cx, cy] = this.#stalked(l, k, stalks) ? this.#emptiest(L, x, y, STALK.radius[stalks] ?? 0) : [x, y];
+        const v = L.spores.get(cx, cy);
+        const put = Math.max(0, Math.min(spend, p.maxSpores - v));
+        if (put <= 0) continue;
+        L.spores.set(cx, cy, v + put);
+        L.sporeStrain.set(cx, cy, e.strain);
+        L.sporeCells.add(cellKey(cx, cy));
       }
     });
     const spots: { L: SporeLayer; cells: number[] }[] = [];
@@ -1364,19 +1364,22 @@ export class Fungus {
     return (this.#corpseAge[layer]?.get(k) ?? 0) >= (STALK.delay[level] ?? Infinity);
   }
 
-  /** The open cells within `radius` of cell (x, y) on `map`: where a stalk's spores fall (its own cell always). */
-  #ring(map: WorldMap, x: number, y: number, radius: number): [number, number][] {
-    const out: [number, number][] = [[x, y]];
-    disc(map, centreX(x, y), centreY(y), radius, (cx, cy) => {
-      if ((cx !== x || cy !== y) && !rockAt(map, cx, cy)) out.push([cx, cy]);
+  /** The open cell within `radius` of cell (x, y) holding the fewest spores, the corpse's own first on a tie: where a stalk's next spores fall. */
+  #emptiest(L: SporeLayer, x: number, y: number, radius: number): [number, number] {
+    let best: [number, number] = [x, y];
+    let least = L.spores.get(x, y);
+    disc(L.map, centreX(x, y), centreY(y), radius, (cx, cy) => {
+      if (rockAt(L.map, cx, cy)) return;
+      const v = L.spores.get(cx, cy);
+      if (v < least) [best, least] = [[cx, cy], v];
     });
-    return out;
+    return best;
   }
 
-  /** Map `layer`'s corpses that have a stalk now (ja-2bw.10), as cells (hex.ts cellKey): the renderer's. */
+  /** Map `layer`'s corpses that have a stalk now (ja-2bw.10) and spores left to raise, as cells (hex.ts cellKey): the renderer's. */
   stalksOn(layer: number): number[] {
     const level = this.#evolution?.level("stalks") ?? 0;
-    return [...(this.#corpses[layer]?.keys() ?? [])].filter((k) => this.#stalked(layer, k, level));
+    return [...(this.#corpses[layer] ?? [])].filter(([k, left]) => left > 0 && this.#stalked(layer, k, level)).map(([k]) => k);
   }
 
   /** Map `layer`'s corpses the fungus has grown out of, and the free spores each still has (the renderer, the tests). */
