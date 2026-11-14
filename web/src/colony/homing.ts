@@ -41,38 +41,90 @@ export function atHome(c: Colony, i: number): boolean {
  */
 export function climbOut(c: Colony, cx: number, cy: number): number {
   const f = outField(c);
-  const { w, h } = c.map.size;
-  const { x0 } = c.map;
-  const here = cx >= x0 && cy >= 0 && cx < x0 + w && cy < h ? f[cy * w + cx - x0] : -1;
+  const here = stepsAt(f, cx, cy);
   if (here === 0) return -1;
   if (here > 0)
     for (const d of UP_FIRST) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (tx >= x0 && ty >= 0 && tx < x0 + w && ty < h && f[ty * w + tx - x0] === here - 1 && rockAt(c.map, tx, ty) === OPEN) return d;
+      if (stepsAt(f, tx, ty) === here - 1 && rockAt(c.map, tx, ty) === OPEN) return d;
     }
   c.holeX = (c.entrance as Nest).x;
   return towardHole(c, cx, cy, false);
 }
 
 /**
- * The side view: steps from each open cell underground to this colony's hole through the tunnels (−1: not joined to it).
+ * A colony's way out of its nest (outField): the steps from each open cell underground to its hole through its tunnels,
+ * over a window of columns round the hole rather than the whole curtain (endless world §7, E1.4: memory per colony no
+ * longer grows with the curtain's width). Cell (x, y) is at y·w + x − x0; −1: not joined to the hole, or outside.
+ */
+export interface OutField {
+  /** the window's first column (the map's own column numbers, like WorldMap.x0) and its width; its rows are the map's */
+  x0: number;
+  w: number;
+  /** the map's first column and width it was built over: a curtain that has grown since builds it afresh */
+  mapX0: number;
+  mapW: number;
+  dist: Int32Array;
+}
+
+/** Half the width of a fresh out-field's window, in columns: a nest's tunnels rarely spread wider; if they do, the window grows. */
+const OUT_HALF = 96;
+
+/** Steps from cell (x, y) to the hole in field `f`, or −1: outside its window or rows, or not joined to the hole. */
+function stepsAt(f: OutField, x: number, y: number): number {
+  const col = x - f.x0;
+  return col >= 0 && col < f.w && y >= 0 && y * f.w < f.dist.length ? f.dist[y * f.w + col] : -1;
+}
+
+/**
+ * The side view: steps from each open cell underground to this colony's hole through the tunnels (see OutField).
  * Cached for the colony, and rebuilt when the ground has changed (cells dug or filled), at most every OUT_FIELD_EVERY
  * seconds, or at once when the map has grown (one world's curtain, Game.addColony): a breadth-first walk over the nest's
- * own tunnels, a few thousand cells. Cell (x, y) is at y·w + x − x0.
+ * own tunnels, a few thousand cells. The walk stays inside the window; one that would step out of it widens the window
+ * (twice as wide, within the map) and walks again, so the field holds every cell the hole reaches, as one over the
+ * whole map would.
  */
-export function outField(c: Colony): Int32Array {
+export function outField(c: Colony): OutField {
   const map = c.map;
   const version = map.dug + map.filled;
-  const { w, h } = map.size;
-  const { x0 } = map;
+  const { w: mw, h } = map.size;
+  const mx0 = map.x0;
   const kept = c.outDist;
-  const have = kept && kept.length === w * h ? kept : null;
+  const have = kept && kept.mapX0 === mx0 && kept.mapW === mw && kept.dist.length === kept.w * h ? kept : null;
   if (have && (c.outVersion === version || c.time - c.outAt < OUT_FIELD_EVERY)) return have;
-  const dist = have ?? new Int32Array(w * h).fill(-1);
-  c.outDist = dist;
+  // A fresh window over columns [lo, hi), within the map: every cell −1, nothing reached yet.
+  const fresh = (lo: number, hi: number): OutField => {
+    const x0 = Math.max(mx0, lo);
+    const w = Math.min(mx0 + mw, hi) - x0;
+    c.outCells.length = 0;
+    return { x0, w, mapX0: mx0, mapW: mw, dist: new Int32Array(w * h).fill(-1) };
+  };
+  let f = have ?? fresh(c.entranceCol - OUT_HALF, c.entranceCol + OUT_HALF + 1);
+  c.outDist = f;
+  while (!walkOut(c, f, h)) {
+    const wider = fresh(f.x0 - f.w, f.x0 + 2 * f.w);
+    // A window that is the whole map never walks out of it, so it always widens; if not, walking again would never end.
+    if (wider.w <= f.w) throw new Error(`outField: the window at ${f.x0} (${f.w} columns) did not widen`);
+    f = wider;
+    c.outDist = f;
+  }
+  c.outVersion = version;
+  c.outAt = c.time;
+  return f;
+}
+
+/**
+ * One breadth-first walk from the hole over field `f`'s window: false (and the field left half-built) if it would step
+ * onto an open cell underground outside the window but on the map, so the window must widen.
+ */
+function walkOut(c: Colony, f: OutField, h: number): boolean {
+  const map = c.map;
+  const { dist, x0, w } = f;
+  const mx0 = map.x0;
+  const mx1 = mx0 + map.size.w;
   const cells = c.outCells;
-  if (have) for (const k of cells) dist[k] = -1;
+  for (const k of cells) dist[k] = -1;
   cells.length = 0;
   const start = c.entranceRow * w + c.entranceCol - x0;
   dist[start] = 0;
@@ -86,16 +138,18 @@ export function outField(c: Colony): Int32Array {
     for (let dir = 0; dir < 6; dir++) {
       const tx = stepX(x, y, dir);
       const ty = stepY(y, dir);
-      if (tx < x0 || ty < 0 || tx >= x0 + w || ty >= h) continue;
+      if (tx < mx0 || ty < 0 || tx >= mx1 || ty >= h) continue;
+      if (tx < x0 || tx >= x0 + w) {
+        if (rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty)) return false;
+        continue;
+      }
       const t = ty * w + tx - x0;
       if (dist[t] >= 0 || rockAt(map, tx, ty) !== OPEN || isSky(map, tx, ty)) continue;
       dist[t] = d;
       cells.push(t);
     }
   }
-  c.outVersion = version;
-  c.outAt = c.time;
-  return dist;
+  return true;
 }
 
 /**
@@ -133,9 +187,7 @@ export function integrate(c: Colony, i: number, x0: number, y0: number, atNest: 
 
 /** The side view: whether cell (cx, cy) is in this colony's nest: open ground underground joined to its hole (see outField). */
 export function ownTunnels(c: Colony, cx: number, cy: number): boolean {
-  const { w, h } = c.map.size;
-  const { x0 } = c.map;
-  return cx >= x0 && cy >= 0 && cx < x0 + w && cy < h && outField(c)[cy * w + cx - x0] >= 0;
+  return stepsAt(outField(c), cx, cy) >= 0;
 }
 
 /** The side view: whether world point (x, y) is at this colony's hole (its cell, or one beside it). */
@@ -483,7 +535,5 @@ export function homeScentNear(c: Colony, x: number, y: number): boolean {
 
 /** Steps from cell (cx, cy) to this colony's hole along its tunnels (outField), or −1: off the map, or not joined to it. */
 export function outDistAt(c: Colony, cx: number, cy: number): number {
-  const { w, h } = c.map.size;
-  const { x0 } = c.map;
-  return cx >= x0 && cy >= 0 && cx < x0 + w && cy < h ? outField(c)[cy * w + cx - x0] : -1;
+  return stepsAt(outField(c), cx, cy);
 }

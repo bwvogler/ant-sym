@@ -342,7 +342,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     )
       next = (dir + 3) % 6;
     // A digger in the side view's nest, crowded: it builds chambers.
-    const builds = mode === EXPLORE && col.entrance !== null && col.mayDig(cx, cy) && col.digs(i) && col.crowded();
+    const builds = mode === EXPLORE && col.entrance !== null && col.mayDig(cx, cy) && col.digs(i) && !col.forageDigs(i) && col.crowded();
     const chamberHere = builds ? (map.chambers?.at(cx, cy) ?? -1) : -1;
     // In a chamber still narrow enough to walk like a tunnel (a new one, a cell or two): widen it along its floor.
     const widen = chamberHere >= 0 && col.rng() < WIDEN ? widenWay(col, cx, cy, dir) : -1;
@@ -377,9 +377,11 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       // Digging is social: the more nestmates round it, the likelier an ant is to dig (and, as the nest
       // grows roomy and they spread out, the less). That is how real colonies stop excavating once
       // they have room (Rasse & Deneubourg 2001); a lone ant at a far tunnel's end still digs now and then.
-      if (dug >= 0 && col.friends && col.rng() > digChance(col.friends, cx, cy)) dug = -1;
+      // A forager on a foraging dig digs on alone and whatever the room (ja-16rp): its tunnels run out to the soil's food.
+      const foraging = col.forageDigs(i);
+      if (dug >= 0 && !foraging && col.friends && col.rng() > digChance(col.friends, cx, cy)) dug = -1;
       // A roomy nest (the side view's chambers have floor enough) barely digs on (ja-wii: digging stops with room).
-      if (dug >= 0 && !col.crowded() && col.rng() > ROOMY_DIG) dug = -1;
+      if (dug >= 0 && !foraging && !col.crowded() && col.rng() > ROOMY_DIG) dug = -1;
       // The other arm two ways round from the way actually dug, on the other side: never next to it, so both
       // stay a tunnel's end (taken from the aim, a dithered dig put the two arms side by side about 1 fork in 8).
       // It carries on at the mirrored heading, drift and all, so its run wanders like any tunnel's.
@@ -398,7 +400,9 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       // a passer-by who won't dig now leaves the fork for the next.
       if (
         fork &&
-        (!col.digs(i) || (col.friends && col.rng() > digChance(col.friends, cx, cy)) || (!col.crowded() && col.rng() > ROOMY_DIG))
+        (!col.digs(i) ||
+          (!col.forageDigs(i) &&
+            ((col.friends && col.rng() > digChance(col.friends, cx, cy)) || (!col.crowded() && col.rng() > ROOMY_DIG))))
       ) {
         markFork(map, cx, cy, fork.dir, fork.aim);
         fd = -1;
@@ -439,7 +443,13 @@ export function hug(col: Colony, i: number, cx: number, cy: number, fresh: boole
   const here = map.chambers?.at(cx, cy) ?? -1;
   const brood = here >= 0 ? map.chambers!.list[here]!.brood : 0;
   const widen =
-    !fresh && here >= 0 && crowded && col.mayDig(cx, cy) && col.digs(i) && col.rng() < WIDEN * (1 + BROOD_PULL * Math.min(brood, 10))
+    !fresh &&
+    here >= 0 &&
+    crowded &&
+    col.mayDig(cx, cy) &&
+    col.digs(i) &&
+    !col.forageDigs(i) &&
+    col.rng() < WIDEN * (1 + BROOD_PULL * Math.min(brood, 10))
       ? widenWay(col, cx, cy, wallDir)
       : -1;
   if (widen >= 0) {
