@@ -2475,7 +2475,10 @@ export const desertInvitation: Assay = {
         let expAfter = 0;
         let expBefore = 0;
         let used = 0;
-        for (const r of returns) {
+        // Only isolated returns, as Razin's recruiter entries were: none other in the 2 windows before. With finders coming down every few
+        // seconds, a waiting ant's pace stays raised through the window before as well, and the ratio reads 1 whatever invites.
+        const isolated = returns.filter((r, k) => k === 0 || r - returns[k - 1]! >= 2 * D2_WINDOW);
+        for (const r of isolated) {
           if (r < D2_WINDOW || r > game.time - D2_WINDOW) continue;
           used++;
           after += leftIn(r, r + D2_WINDOW);
