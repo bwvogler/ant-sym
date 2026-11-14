@@ -93,3 +93,9 @@ test("a newborn's resets follow the colony's parameters: routeGap and tolerance 
   assert.equal(c.routeGap[i], 5, "routeGap starts at the colony's routeStep");
   assert.ok(Math.abs(c.tolerance[i]! - 0.2) < 1e-6, "tolerance at the colony's");
 });
+
+test("every per-ant field that holds a cellKey is a Float64Array: a 32-bit array would truncate the key (hex.ts)", () => {
+  const c = make();
+  for (const k of ["lastDug", "chamberCell", "putAt", "noTunnel", "looked", "cameFrom"])
+    assert.ok(arrays(c)[k] instanceof Float64Array, `${k} holds cellKeys`);
+});
