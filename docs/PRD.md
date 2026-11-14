@@ -5559,3 +5559,34 @@ Asked again, Jev kept its earlier choice in 81–87 % of situations; where it ch
 - The largest share of ants switching mode within one second did not fall (22–41 % either way): that metric is driven by events (alarm, trails meeting), not by lockstep answers alone. A better lockstep measure is open.
 
 **Cost.** None per hour: no legend, question or schema changed, and Jev bills input tokens only.
+
+## 69. The page: the map fills the screen, depth tucked away (ja-mvo9, 2026-11-14)
+
+The owner asked for the map to fill the screen, with drawers and panels for the controls and menus, and with learning and deep experimentation kept but somewhat buried. From a brainstorm of five directions they picked four to combine:
+- **A · Cockpit:** the frame. A full-bleed map, a thin HUD, a rail of drawers, an inspector, and a sheet on a phone.
+- **B · On the map:** nest badges, a "?" lens that explains what is under the pointer, a ⌘K palette, and the aim as a command bar.
+- **C · Field notebook:** a Codex whose guide entries unlock on first sight, and Specimens to pin and compare ants.
+- **D · Play and Lab modes:** a Lab workbench with history charts, a step control, and every lab and debug tool.
+
+They chose to build it directly, in stages: S1 the shell, S2 on the map, S3 the Codex, S4 Lab, S5 polish. Each stage is one PR, under the epic `ja-mvo9`.
+
+### 69.1 S1: the kit and the full-bleed shell (ja-mvo9.1)
+- **`ui/kit.tsx`:** `SectionHead`, `Button`, `IconButton` (its badge read out as a description), inline-SVG `Icon`s (no dependency), the floating surface style `FLOAT`, and `Drawer`.
+  - A `Drawer` is a column under the HUD on a desktop, and a bottom sheet above the tab bar on a phone.
+  - Escape closes it, unless a tooltip, Learn or Details is above it.
+- **The layout:**
+  - **The map:** fills the viewport, with no page scroll and no aspect box.
+  - **The HUD:** play, the speeds, above/below, the clock, the pace warning, and the goal pill. On a phone the clock and the pace move into the goal pill so the bar fits 390 px.
+  - **The rail** (a tab bar on a phone) opens one drawer at a time:
+    - The fungus: infection, unity and the aim;
+    - Mutations: body and upgrades, with a badge when one is affordable;
+    - Colonies: the Details card;
+    - Saved games: the Details card;
+    - Learn;
+    - Settings: trails drawn, "Lab and numbers" (the Details screen until S4), the GitHub link, and on the hosted page the Jev passphrase (owner, 2026-11-14: in Settings, with a badge on its tab until it is unlocked, rather than over the map).
+  - **The inspector,** at the right (a sheet on a phone), shows the followed ant, or the queen's pen while she flies.
+  - **The field's Whole map, nest and Labels buttons** fold into one "Go to" menu centred under the HUD.
+  - **The tutorial card** moves to the lower right (above the tabs on a phone). A card that points at the mutations or the aim opens that drawer.
+- **Carrying the camera:** a followed ant that goes through a hole now asks the field to keep the follow (`centreOn` `keepFollow`). Before, a crossing could re-centre the view still shown and drop the follow.
+- **Unchanged:** the simulation; the golden masters are bit-exact.
+

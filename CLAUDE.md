@@ -36,7 +36,7 @@ npm run test:golden            # the fast golden masters (colony/tests/golden)
 node --test --test-name-pattern='stranger' web/src/colony/tests/int/colony.test.ts   # one file, or the tests of it whose name matches
 npm run format                 # Prettier (width 140, Tailwind class order) over web/src, server, worker, shared and the scripts; `format:check` is what CI runs. A bulk reformat commit goes in .git-blame-ignore-revs
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~16 min locally, ~4 in slow.yml's 4 shards; run before merging colony changes
-npm run e2e                    # one world in Chromium (scripts/e2e-one-world.mjs): switch views, linked clicks, follow through a hole, the pen by a click, the Fungus panel's tooltips, the tutorial; ~40 s; uses the machine's playwright, spends nothing
+npm run e2e                    # one world in Chromium (scripts/e2e-one-world.mjs): switch views, linked clicks, follow through a hole, the pen by a click, the Mutations drawer's tooltips, the tutorial; ~40 s; uses the machine's playwright, spends nothing
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
 npm run exp -- all --seeds 1-10   # behaviour assays (web/src/colony/experiment.ts), offline; --set sweeps, --policy cache:<file> replays Jev
 npm run exp -- game --seeds 1 --log summary   # watch a game, offline: the journal (skill `watching-a-game`; page: ?log=<spec>); every scripts/*.mjs answers --help
