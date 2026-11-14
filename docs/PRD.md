@@ -5246,6 +5246,23 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, two runs each): main 10.74 and 10.68 ms mean, E1.1 10.88 and 10.65 ms; within noise.
 - **Cost:** none. No situation, legend or question changed.
 
+**E1.2 built (`ja-qpv.1.2`, 2026-11-14).** Storage only; behaviour is bit-exact.
+- **`ChunkLayer` keeps its chunks in a box of regions.** Each region is a dense array of 16 × 16 chunk slots, and the dense box grows by whole regions. Before, the box grew chunk by chunk, so every slot between two far places was allocated. A read is still two array indexes, with no hashing and no cache. Two places 100 × 60 chunks apart now need 28 region slots plus two regions, against 7,659 chunk slots.
+- **How it was chosen.** `scripts/lab/chunk-table-bench.mjs` measures 2,400 ants reading 3 × 3 cells on 8 layers, one kind per process.
+
+  | Table | One spot (today's plane) | Two spots 100 × 60 chunks apart |
+  |---|---|---|
+  | dense box of chunks (main) | 15.5–16.8 ns a read | 17.5–17.6 ns, 7,659 slots |
+  | `Map` keyed by chunk, last chunk cached | 19.3–20.4 ns | 19.2–21.3 ns, 198 slots |
+  | map of regions, last region cached | 16.5–20.1 ns | 20.6–20.8 ns, 1,536 slots |
+  | **box of regions (built)** | 18.2 ns | 17.2 ns, 1,584 slots |
+
+  In the game (`colony-bench --one --page`, 1,200 + 1,200 ants), the map of regions with a one-region cache was 4–6 % slower than main's tick. The ants either side of the curtain's column 0 straddle two regions and kept evicting the cache. A two-region cache cut that to 3–8 %. The box of regions brought it within noise: 11.57, 11.48 and 11.58 ms mean against main's 11.12, 11.39 and 11.36 ms, alternating runs, about +2 %, inside main's own spread of 10.70–11.91 ms over the day. The whole-game hash (`--hash`) is identical on every run.
+- **A generator on miss.** A layer may take `generate(cx, cy, a)`. It fills a chunk the first time any read or write touches it, and fills it afresh after a `drop`. No layer uses one yet; E2 gives the plane's rock one.
+- **`drop` hands back the chunk's array**, so its owner can pool or keep it. `regions` and `regionSlots` report what the table costs.
+- **Order.** `forEach` walks chunks in (cy, cx) order whatever the layout, as the old dense table did. That keeps saves and float sums bit-exact.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).
