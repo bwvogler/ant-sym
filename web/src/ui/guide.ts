@@ -410,6 +410,11 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "Tips that extend at a steady rate, branch to keep length per tip constant, slide along or split at walls; where it lives (topsoil, walls, corpses); cords, knots and stalks.",
   },
   {
+    note: "mycelial-transport",
+    title: "Mass flow in a mycelium",
+    covers: "How a mycelium feeds its tips: growth draws mass toward them, cords carry it fast, loops bring it to the edge (not built).",
+  },
+  {
     note: "queens-and-merging",
     title: "Queens and merging",
     covers: "Several queens, adoption, and orphaned colonies merging (not built).",
