@@ -17,9 +17,9 @@
       "Is #41 ready to approve?",
       "Fixes are in on #48, take another look",
       "Create a PR for this branch",
-      "Ants should carry corpses to a midden away from the nest",
+      "Post a review of #160, the author asked for one",
       "Fix the failing golden test on main",
-      "Why did seed 7's colony die out in the journal?",
+      "Dispatch slow.yml on main and tell me if it's green",
       "Can CI be improved?"
     ]
   },

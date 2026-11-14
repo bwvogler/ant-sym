@@ -54,8 +54,8 @@ A failure that is red on `main` too isn't this PR's: say so once on the PR and f
 
 ## Reviews
 
-- After a substantive push (code, tests or docs, not an export-only commit), start a fresh `pr-reviewer` agent in the background with no context from your work. Give it the PR number. It posts one review on the PR.
-- Commit or stash your own work before you start it, and tell it that the checkout is yours: it reviews in its own worktree and must leave yours as it found it. Its clean-up reverts `.beads/issues.jsonl` and expects `git status` to be empty.
+- After a substantive push (code, tests or docs; not an export-only commit, nor a merge of `main` whose only conflict was the export, once CI is green on it), start a fresh `pr-reviewer` agent in the background with no context from your work. Give it the PR number. It posts one review on the PR.
+- Commit or stash your own work before you start it, and tell it that the checkout is yours: it reviews in its own worktree and leaves yours as it found it, reverting `.beads/issues.jsonl` only if its own `bd` sync changed it.
 - Fix blockers and should-fix items in one commit titled `Review of #<n>: …` that names each item (`B1: …`, `S1: …`, `N2: …`), then reply once on the PR listing each item and its commit.
 - Nits ride with the next push: one reply, no push for nits alone.
 - A decision for the owner goes to the user in the session, not into the code. When they decide, post a short PR comment: "Owner's decision on D1 (review of <sha7>): …".
@@ -71,6 +71,6 @@ The PR is ready once all of these hold on the current head:
 - The latest fresh `pr-reviewer` review, posted after the last substantive push, says Approve in its verdict line (its event is always COMMENT, so GitHub never shows the PR as approved), and no blocker or should-fix is open.
 - For a change under `web/src/colony/`: the slow guards (`test:slow`, CLAUDE.md) passed on the head, run by `slow.yml` on the PR's branch, not in the session (owner, 2026-11-14). Start it with `mcp__github__actions_run_trigger` (`method: run_workflow`, `workflow_id: slow.yml`, `ref` the PR's head branch) once the review approves, and check that the run's head sha is the PR's head. Its result may not wake you: look it up with `mcp__github__actions_list` (`list_workflow_runs`, `slow.yml`, that branch), with a `send_later` check-in in case. A red run is a red check (Red CI above). Name the run in the PR.
 
-Ready, and the owner said to: merge by squash (`mcp__github__merge_pull_request`: `merge_method: squash`, `commit_title` the PR title plus ` (#<n>)` as on `main`, `expectedHeadSha` the head the review approved, so a later push fails the merge instead of going in unreviewed). Then close the PR's beads (`bd close <id> --reason="Merged in #<n>"`), run `scripts/beads-sync.sh push`, and unsubscribe from the PR.
+Ready, and the owner said to: merge by squash (`mcp__github__merge_pull_request`: `merge_method: squash`, `commit_title` the PR title plus ` (#<n>)` as on `main`, `expectedHeadSha` the current head, after checking that every commit since the head the review approved is an export-only commit or a merge of `main` whose only conflict was the export, so a later push fails the merge instead of going in unreviewed). Then close the PR's beads (`bd close <id> --reason="Merged in #<n>"`), run `scripts/beads-sync.sh push`, and unsubscribe from the PR.
 
 Ready, and they haven't: tell them once, with the head's short sha, and wait. Don't merge.
