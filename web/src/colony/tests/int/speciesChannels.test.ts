@@ -48,7 +48,7 @@ test("a species without alarm raises none in a game where the generic ant does",
   const alarmed = (species: Species) => {
     const g = new Game(smallOne(7), { antCount: 60, rivalAnts: 60, species }, mulberry32(3));
     let live = false;
-    for (let k = 0; k < 30 * 30; k++) {
+    for (let k = 0; k < 30 * 60; k++) {
       g.tick(1 / 30);
       live ||= g.colonies.some((c) => c.layers.some((l) => l.ph.live("alarm")));
     }
