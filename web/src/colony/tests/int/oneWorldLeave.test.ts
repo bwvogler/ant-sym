@@ -387,3 +387,17 @@ test("one world: a middle-aged forager at the top of its shaft is not held at th
   assert.equal(held, 0, "never held");
   assert.equal(c.layer[0], PLANE, "it goes out with no returns and no scouts");
 });
+
+test("one world: a plane ant's count of strangers met leaks at the plane's rate, though the tick began bound to the curtain", () => {
+  // The layer switch re-sets the bound layer's gates in the step record (review of #157, S1): without foeLeak's, a plane
+  // ant read the curtain's (1) and never forgot the strangers it met.
+  const g = game();
+  const c = g.player;
+  for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(2);
+  const p = planeHole(own(c));
+  c.putAnt(0, CURTAIN, c.x[0]!, c.y[0]!);
+  c.putAnt(1, PLANE, p.x + 12, p.y);
+  c.foes[1] = 1;
+  g.tick(DT);
+  assert.ok(c.foes[1]! < 1, `foes ${c.foes[1]}`);
+});
