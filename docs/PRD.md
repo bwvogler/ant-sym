@@ -5643,5 +5643,5 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
   - When Jev can't run, the bar's presets and field are locked; its "locked" word has the reason as a tooltip, and The fungus drawer says it too.
   - Narrower than 1024 px it stays in The fungus drawer, and the tutorial's aim card opens that drawer only there.
   - Learn → Policy now shows the aim read-only, so the aim has one home.
-- **Toasts** sit above the aim bar on every width, including when it is opened to four lines.
+- **Toasts and the tutorial's card** sit above the aim bar on every width, including when it is opened to four lines (the card from 1024 px: review of #189, S5).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.

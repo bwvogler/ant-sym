@@ -810,6 +810,19 @@ try {
   const paused = async () => (await tu.getByRole("button", { name: "Play", exact: true }).count()) === 1;
   await until(async () => /You are a fungus/.test((await tcard.textContent()) ?? ""), "the tutorial's first card");
   check(await paused(), "the landing card waits, paused");
+  // From lg the card stops above the aim bar, opened to four lines, as the toasts do (review of #189, S5).
+  {
+    const card = await tcard.boundingBox();
+    const aimBar = await tu
+      .getByLabel("fungus aim")
+      .filter({ has: tu.getByRole("group", { name: "aim presets" }) })
+      .boundingBox();
+    const opened = aimBar && aimBar.y - (aimBar.height < 60 ? 3 * 18 : 0);
+    check(
+      card !== null && opened !== null && card.y + card.height < opened,
+      `the tutorial card stops above the aim bar (${card && Math.round(card.y + card.height)} < ${opened && Math.round(opened)})`,
+    );
+  }
   // What the field shows of scent is what hosts sensed (PRD §65): before any host, nothing, even at the landing.
   check(
     (await tu.evaluate(() => window.jevAnts.sensed("above", window.jevAnts.game.landed.x, window.jevAnts.game.landed.y))) === 0,
@@ -945,6 +958,36 @@ try {
     "a desert game leaves the generic ant's tutorial unplayed",
   );
   await dctx.close();
+
+  // ——— 9. The aim bar's keys with Jev readable (review of #189, N7) ———
+  // The dev server here has no key, so elsewhere the aim is locked and can't take focus. This page is told a key is
+  // set, and every other API call is left unanswered: nothing reaches Jev and nothing is spent, and the page's own start
+  // stays on the wire, which keeps the aim open (a failed start would lock it, policyLock.ts).
+  console.log("9. the aim bar's keys");
+  const kctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  await kctx.route("**/api/health", (r) => r.fulfill({ json: { ok: true, hasKey: true } }));
+  await kctx.route(/\/api\/(?!health)/, () => {}); // never answered
+  const kp = await kctx.newPage();
+  kp.on("pageerror", (e) => errors.push(String(e)));
+  await kp.goto(url);
+  await kp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  const field = kp.getByRole("textbox", { name: "aim", exact: true }).locator("visible=true");
+  await until(() => field.isEnabled(), "the aim unlocked with a key", 10_000, 100);
+  const focused = () => field.evaluate((e) => document.activeElement === e);
+  await field.focus();
+  await field.evaluate((e) => e.setSelectionRange(e.value.length, e.value.length)); // the end of the words, not of a wrapped line
+  const typed = await field.inputValue();
+  await kp.keyboard.type(" Spread");
+  await kp.keyboard.press("Shift+Enter");
+  const kept = (await focused()) && (await field.inputValue()) === `${typed} Spread\n`;
+  check(kept, `Shift+Enter is a new line, the field kept${kept ? "" : ` (${JSON.stringify(await field.inputValue())})`}`);
+  await kp.keyboard.type("now");
+  await kp.keyboard.press("Enter");
+  check(!(await focused()) && (await field.inputValue()) === `${typed} Spread\nnow`, "Enter commits: the field let go, no new line");
+  await field.focus();
+  await kp.keyboard.press("Escape");
+  check(!(await focused()), "Escape gives the keys back to the map");
+  await kctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
