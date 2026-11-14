@@ -5686,11 +5686,11 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 
 **Decisions.**
 - Mass flows along the hyphae, chosen over a pool per piece or one pool with near tips first (owner, 2026-11-14). The distance bar built first (`FEED_SPAN`, commit 7aba688) was never merged and is retired.
-- Proposed (needs the owner):
-  - `FLOW_THIN` 3 and `FLOW_CORD` 30 cells a round.
-  - Sources: the patch's roots and a colonised corpse's cell.
-  - Spores taken from the patch's loads.
-  - The growth lane re-asked for the reworded supply and fuse lines, about $0.005.
+- Owner (2026-11-14, on the plan):
+  - `FLOW_THIN` 3 and `FLOW_CORD` 30 cells a round, tuned against P1.
+  - Spores are paid from the patch's loads first.
+  - The growth lane is re-asked for the reworded supply and fuse lines once flow is tuned (about $0.005, approved).
+- Proposed: the sources are the patch's roots and a colonised corpse's cell, which pays its mass in at once.
 
 **The mechanic.**
 - **Loads.** Hypha cells hold loads. Mass enters at sources, and each round the loads move toward the tips, split by the tips fed: up to `FLOW_THIN` cells on thin hypha and `FLOW_CORD` along cords, with a fused pair as an extra edge.
