@@ -148,3 +148,36 @@ export const TOLERANCE = 0.35;
 /** One world's layers (docs/one-world.md §2): the plane, the surface, is layer 0; the curtain, underground, layer 1 (a colony's home there). */
 export const PLANE = 0;
 export const CURTAIN = 1;
+
+/**
+ * The steering weights (staging, ja-ykmu; docs/steering.md "The mechanic"): how strongly an ant out searching or following on one
+ * world's plane weighs each cue, set per situation by the steer policy. `search` (its random turning) and `memory` (its last
+ * find against the food trail) are the ones the biology lets a situation set; `trail`, `home`, `vector` and `nestmates` are
+ * design (the Lab switches them on). Alarm keeps its own response (`alarmGain`).
+ */
+export const STEER_WEIGHTS = ["search", "memory", "trail", "home", "vector", "nestmates"] as const;
+export type SteerWeight = (typeof STEER_WEIGHTS)[number];
+/** Each weight's three levels: −1, 0 (as the game steers without weights) and +1. What each means is the weight's own (steer.ts). */
+export type SteerLevel = -1 | 0 | 1;
+export type Steering = Readonly<Record<SteerWeight, SteerLevel>>;
+/** Every weight at 0: the game's steering as it was. */
+export const NEUTRAL_STEERING: Steering = { search: 0, memory: 0, trail: 0, home: 0, vector: 0, nestmates: 0 };
+/** A steering packed into one number for the per-ant store: Σ (level + 1) × 3^k, k the weight's index. */
+export function encodeSteering(s: Steering): number {
+  let code = 0;
+  for (let k = STEER_WEIGHTS.length - 1; k >= 0; k--) code = code * 3 + (s[STEER_WEIGHTS[k] as SteerWeight] + 1);
+  return code;
+}
+/** The packed code of NEUTRAL_STEERING. */
+export const STEER_NEUTRAL = encodeSteering(NEUTRAL_STEERING);
+/** Weight k's level in a packed code. */
+export function steerLevel(code: number, k: number): SteerLevel {
+  return ((Math.floor(code / 3 ** k) % 3) - 1) as SteerLevel;
+}
+export function decodeSteering(code: number): Steering {
+  const out: Record<string, SteerLevel> = {};
+  STEER_WEIGHTS.forEach((w, k) => (out[w] = steerLevel(code, k)));
+  return out as Steering;
+}
+/** The steer policy: the weights for an ant whose mode policy, in situation `s` (with the mode it now has), sent it exploring or following. */
+export type SteerPolicy = (s: Situation) => Steering;

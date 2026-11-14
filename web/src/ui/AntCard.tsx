@@ -12,6 +12,10 @@ import {
   UPGRADES,
   decodeFungal,
   type FungalSituation,
+  decodeSteering,
+  STEER_NEUTRAL,
+  STEER_WEIGHTS,
+  type SteerWeight,
 } from "../colony/index.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
@@ -114,6 +118,14 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
           {decided?.weights && decided.weights.length > 1 && col.params.sampleTemp > 0 ? (
             <span className="font-mono text-fg-3" title="Jev's probabilities in this situation: the ant drew its mode from them">
               drawn from {decided.weights.map(([m, p]) => `${m} ${Math.round(p * 100)} %`).join(" · ")}
+            </span>
+          ) : null}
+          {col.params.steerLane > 0 && col.steerCode[i] !== STEER_NEUTRAL && (mode === "explore" || mode === "follow") ? (
+            <span
+              className="font-mono text-fg-3"
+              title="The steering weights its policy gave it (staging): how it weighs each cue out here"
+            >
+              steering: {steeringWords(col.steerCode[i])}
             </span>
           ) : null}
           <button
@@ -232,4 +244,22 @@ function chips(s: Situation, fields?: readonly string[]): [string, string, Learn
     ["stance", ["stance", s.stance, { tab: "guide", id: "strangers" }]],
   ];
   return all.filter(([field]) => !fields || fields.includes(field)).map(([, chip]) => chip);
+}
+
+/** What each steering weight's level means, in a few words (staging, ja-ykmu; docs/steering.md). */
+const STEER_WORDS: Record<SteerWeight, [string, string]> = {
+  search: ["searches tight", "ranges wide"],
+  memory: ["ignores its last find", "back to its last find"],
+  trail: ["ignores trails", "holds to trails"],
+  home: ["away from home scent", "near home scent"],
+  vector: ["away from home", "leashed to home"],
+  nestmates: ["spreads out", "gathers"],
+};
+
+/** An ant's non-neutral steering weights, as words. */
+function steeringWords(code: number): string {
+  const s = decodeSteering(code);
+  return STEER_WEIGHTS.filter((w) => s[w] !== 0)
+    .map((w) => STEER_WORDS[w][s[w] < 0 ? 0 : 1])
+    .join(" · ");
 }

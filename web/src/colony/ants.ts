@@ -310,6 +310,8 @@ export const ANT_FIELDS = {
    * ja-nan3); −1 = its last answer was not drawn, so it is asked again only when its situation changes
    */
   redraw: { type: Float32Array, fill: -1, reset: "spawn" },
+  /** the steering weights an ant out exploring or following steers by, packed (vocab.ts encodeSteering; staging, ja-ykmu): STEER_NEUTRAL = none */
+  steerCode: { type: Uint16Array, fill: 364, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

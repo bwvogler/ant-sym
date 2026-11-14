@@ -16,6 +16,8 @@ import {
   type SpeciesSituation,
   type Stance,
   type StancePolicy,
+  type SteerPolicy,
+  NEUTRAL_STEERING,
   type StanceSituation,
   type Trail,
   FIGHT,
@@ -197,6 +199,9 @@ export { swapBroodStore } from "./pheromone.ts";
  * out along it). Going home tired breaks ant mills: without it, followers
  * circled trails to food that was gone until nobody was left exploring.
  */
+/** The steer policy's local rule (staging, ja-ykmu): every weight neutral, the game's steering as it was. */
+export const localSteer: SteerPolicy = () => NEUTRAL_STEERING;
+
 export const localPolicy: Policy = (s) => {
   if (s.tired) return "return";
   if (s.stance === "raid" && (s.mode === "explore" || s.mode === "fight")) return "fight";
@@ -399,6 +404,7 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
   "holeCells",
   "policy",
   "stancePolicy",
+  "steerPolicy",
   "responses",
   "onBury",
   "onDie",
@@ -446,6 +452,8 @@ export class Colony {
   params: ColonyParams;
   /** what an ant of this colony does in a situation, and what the colony's strategist chooses: read here, set through `bindPolicy` (the lane's answers: the local rule, Jev's cached answers, a test's) */
   readonly policy: Policy;
+  /** the weights an ant out exploring or following steers by (staging, ja-ykmu; asked only with params.steerLane): set through `bindPolicy("steer", …)` */
+  readonly steerPolicy: SteerPolicy = localSteer;
   readonly stancePolicy: StancePolicy;
   /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
   responses: Responses = localResponses;
@@ -1063,9 +1071,11 @@ export class Colony {
 
   bindPolicy(lane: "mode", fn: Policy): void;
   bindPolicy(lane: "stance", fn: StancePolicy): void;
-  bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
-    const own = this as { policy: Policy; stancePolicy: StancePolicy };
+  bindPolicy(lane: "steer", fn: SteerPolicy): void;
+  bindPolicy(lane: "mode" | "stance" | "steer", fn: Policy | StancePolicy | SteerPolicy): void {
+    const own = this as { policy: Policy; stancePolicy: StancePolicy; steerPolicy: SteerPolicy };
     if (lane === "mode") own.policy = fn as Policy;
+    else if (lane === "steer") own.steerPolicy = fn as SteerPolicy;
     else own.stancePolicy = fn as StancePolicy;
   }
 

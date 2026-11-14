@@ -87,6 +87,11 @@ export interface ColonyParams {
    */
   reroll: number;
   /**
+   * Whether an ant out exploring or following on one world's plane asks the steer policy for its steering weights (staging,
+   * ja-ykmu; docs/steering.md): 0, never (every weight neutral: main's steering bit for bit); 1, at each mode decision.
+   */
+  steerLane: number;
+  /**
    * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
    * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
    * is raised instead: foodCapTop.)
@@ -324,6 +329,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   followChoice: 1,
   sampleTemp: 1,
   reroll: 10,
+  steerLane: 0,
   foodTrailTop: 1,
   foodCapTop: 80,
   homeTrail: 0.8,
