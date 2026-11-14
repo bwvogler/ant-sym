@@ -10,7 +10,7 @@
 //
 // s is signed. V₀ starts at s = 0 and the line grows at V₀ into negative s, so what is dug underground never renumbers.
 
-import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance, hexRuns } from "./hex.ts";
+import { CELL, cellKey, cellOf, centreX, centreY, discOffsets, hexDistance, hexRuns } from "./hex.ts";
 
 /** A plane cell. */
 export interface Cell {
@@ -163,7 +163,6 @@ export function turnAt(t: Transect, j: number): number {
   return (Math.atan2(ux * wy - uy * wx, ux * wx + uy * wy) * 180) / Math.PI;
 }
 
-const cellKey = (x: number, y: number): number => (y + 32768) * 131072 + (x + 32768);
 const byCell = new WeakMap<Transect, Map<number, number[]>>();
 /** No columns: one shared array, so a miss allocates nothing (the renderer asks for every plane ant, every frame). */
 const NONE: readonly number[] = Object.freeze([]);

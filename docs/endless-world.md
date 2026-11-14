@@ -29,18 +29,18 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 
 **Dense or flat state that assumes a size:**
 - `Colony.#outField` (`colony.ts:1556`): an `Int32Array(w·h)` of the home curtain per colony, rebuilt at most every 0.5 s.
-- The fungus's `sporeCells` and `base`: flat `y·w + x − x0` keys, re-keyed by `regrid` when the curtain grows (`fungus.ts:1294`).
-- Regrowth: `#notePiles` scans every cell once and keeps flat indices (`game.ts:754`).
+- ~~The fungus's `sporeCells` and `base`: flat `y·w + x − x0` keys, re-keyed by `regrid` when the curtain grows (`fungus.ts:1294`).~~ Done in E1.3: keyed by `cellKey`, and `regrid` is gone.
+- ~~Regrowth: `#notePiles` scans every cell once and keeps flat indices (`game.ts:754`).~~ Keyed by `cellKey` in E1.3; noting piles per chunk as it is generated is E2's.
 - The minimap: one bitmap of the whole map, resampled cell by cell twice a second (`ui/ColonyField.tsx`).
 
 **Memory only grows:**
 - ~~`ChunkLayer.drop` exists but only a test calls it.~~ Done in E1.1: a sleeping pheromone chunk is dropped.
 - ~~A pheromone chunk that falls asleep is zeroed but stays allocated (`pheromone.ts`).~~ Done in E1.1 (PRD §66).
-- `SensedMap` (`ui/fungusSight.ts`, PRD §65), one `Float32` chunk layer per layer of where hosts sensed scent, is never dropped. It grows with the ground hosts have walked.
+- ~~`SensedMap` (`ui/fungusSight.ts`, PRD §65), one `Float32` chunk layer per layer of where hosts sensed scent, is never dropped. It grows with the ground hosts have walked.~~ Done in E1.3: a chunk faded right out is dropped and leaves a revealed bit.
 - ~~The chunk table is a dense bounding box (`chunks.ts`, `#cover`): two busy spots far apart allocate every slot between them, and `forEach`, saves and the golden hash walk all of them.~~ Done in E1.2: regions of 16 × 16 chunks (PRD §66).
 - A save writes every allocated chunk of every layer, rock included, though the plane's rock never changes.
 
-**Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, with `EDGE` in `tuning.ts`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). `cellKey` (`grid.ts:60`) is `y · 65536 + x`, so columns are capped at ±32k.
+**Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, with `EDGE` in `tuning.ts`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). ~~`cellKey` (`grid.ts:60`) is `y · 65536 + x`, so columns are capped at ±32k.~~ E1.3: one `cellKey` (`hex.ts`) for every packed cell, ±2,097,152 on both axes.
 
 **Two colonies assumed:** `generateOneWorld` refuses more than two nests; `Game.rival` is `colonies[1]`; "the world's own colonies" are `colonies.length − founded.length` (`fallen`, `outcome`); names go by index (the minimap colours by odour since PRD §65); `MAX_COLONIES` is 6 (`game.ts:120`). `ja-fnd.5.4.2` (Game over N colony specs) replaces these.
 
@@ -180,10 +180,10 @@ The tick is then bounded by the cap, not by the world. The player sees part of t
 **Pheromones:** a chunk that falls asleep is dropped back to the pool, not kept zeroed. The rule pheromone.ts uses for a missing rock chunk ("no ground, holds nothing", and a missing neighbour reads as rock) changes to ask the generator.
 
 **Flat keys go:**
-- the fungus's `sporeCells` and `base` are keyed by chunk and cell (no `regrid`);
+- the fungus's `sporeCells` and `base` are keyed by `cellKey` (no `regrid`) (E1.3);
 - regrowth's piles are noted per chunk when the chunk is generated, not by one scan at the start;
 - `#outField` becomes a window round the colony's own holes on its own line, a few hundred columns wide, not the whole curtain;
-- `cellKey` widens to the chunk key's range.
+- `cellKey` widens to the chunk key's range (E1.3: one key in `hex.ts`, where `grid.ts`, `hyphae.ts`, `transect.ts` and the forks each had their own).
 
 **`SensedMap`** today keeps the time a host last sensed each cell, at full resolution, forever. From E1 it keeps those times only in chunks sensed within `SENSED_FADE` (20 s), which the trails' picture needs. An older chunk is dropped and leaves one revealed bit for the fog (§8).
 

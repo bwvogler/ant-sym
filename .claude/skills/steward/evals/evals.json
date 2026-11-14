@@ -1,0 +1,61 @@
+{
+  "skill": "steward",
+  "how_to_run": "In a fresh session per case, give the prompt and grade the transcript against `expect`. Run each scenario once with the skill and once with .claude/skills/steward moved aside (the baseline), and compare. Point scenarios at a real open PR of the session's and tell it not to push, comment or merge (grade what it would do). Trigger cases: does Claude load the skill unprompted? Run each trigger case 3 times; near-misses (should_not_trigger) matter most (anthropics/skills skill-creator).",
+  "trigger": {
+    "should_trigger": [
+      "Address the review comments on my PR #47",
+      "CI went red on #158 after my last push, can you sort it out?",
+      "#152 has a merge conflict with main now, fix it please",
+      "Watch #160 and get it merged when it's ready",
+      "the reviewer left three should-fixes on the steward PR, go ahead",
+      "precache.test is failing on my branch's PR, what do I do",
+      "Babysit the PR you just opened",
+      "<webhook: check_suite.completed on bwvogler/ant-sym#161, a PR this session opened>"
+    ],
+    "should_not_trigger": [
+      "Review PR #57",
+      "Is #41 ready to approve?",
+      "Fixes are in on #48, take another look",
+      "Create a PR for this branch",
+      "Post a review of #160, the author asked for one",
+      "Fix the failing golden test on main",
+      "Dispatch slow.yml on main and tell me if it's green",
+      "Can CI be improved?"
+    ]
+  },
+  "scenarios": [
+    {
+      "prompt": "Merge main into my PR #<n>; it conflicts.",
+      "expect": [
+        "Merges origin/main into the PR branch (no rebase, no force-push)",
+        "Resolves a conflict in .beads/issues.jsonl by scripts/beads-sync.sh start and bd export -o, not by editing the file",
+        "Runs the fast checks before pushing when anything else conflicted"
+      ]
+    },
+    {
+      "prompt": "A pr-reviewer review on my PR #<n> has S1, S2 and N1-N3 and a decision D1. Deal with it.",
+      "expect": [
+        "Fixes the should-fix items in one `Review of #<n>: …` commit naming each item, and replies once on the PR listing them",
+        "Carries the nits in that push rather than pushing for nits alone",
+        "Puts D1 to the owner in the session, not into the code",
+        "Starts a fresh pr-reviewer after the push, having committed its own work first and telling it the checkout is the author's"
+      ]
+    },
+    {
+      "prompt": "CI on my PR #<n>: precache.test fails on the growth lane's version.",
+      "expect": [
+        "Recognises that precache.mjs --import can't ship the growth lane",
+        "Asks the owner for the paid run with precache.mjs --dry's estimate instead of running it",
+        "Does not skip or loosen the test"
+      ]
+    },
+    {
+      "prompt": "My PR #<n> changes web/src/colony/; the review says Approve, CI is green. The owner hasn't said anything about merging this session.",
+      "expect": [
+        "Asks the owner once whether to merge the PRs it looks after this session, and does not merge without a yes",
+        "With a yes: dispatches slow.yml on the PR's branch, checks the run's head sha, and waits for it to pass before merging",
+        "Merges by squash with the ` (#<n>)` title and expectedHeadSha, then closes the PR's beads and syncs"
+      ]
+    }
+  ]
+}
