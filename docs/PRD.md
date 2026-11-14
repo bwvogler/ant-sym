@@ -5723,8 +5723,18 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 - `ja-kjj8.5` little hands and sounds;
 - `ja-kjj8.6` Learn entries.
 
+**Owner's calls (2026-11-14), all as proposed:**
+- smell vision shows every colony's trails while building, and §65 holds with the builder off;
+- a crayon line fades at the home trail's rate (t½ ≈ 35 s);
+- rock and dirt never cover a hole, an ant or brood;
+- chapter goals keep counting, and the tutorial doesn't start in builder mode;
+- the little-hands tray is a switch inside the builder;
+- sounds come from WebAudio plus speechSynthesis.
+
+Merging is not delegated: PRs wait for the owner.
+
 **Still open.**
-- Owner's calls (builder.md "Open questions"):
+- Owner's calls (builder.md "Open questions"), decided above:
   - smell vision against §65 (proposed: every trail, only while building);
   - how long a crayon line lasts (proposed: the home trail's rate, t½ ≈ 35 s);
   - holes protected (proposed: yes);
@@ -5732,3 +5742,81 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
   - the little-hands tray as a switch or a start-screen button;
   - sounds by WebAudio and speechSynthesis.
 - To measure: B1–B6 on seeds 1–10, the tick cost of a sugar flood, and the gesture rules on a real phone and tablet.
+
+### 70.1 The tools and the assays (ja-kjj8.1, ja-kjj8.2, 2026-11-14)
+
+**Built.**
+- `colony/builder.ts`, pure, exported from `colony/index.ts`. `Builder.apply(stroke)` and `undo()` cover dig, dirt, rock, sugar, crumb, crayon and rain.
+- **Terrain** goes through `digCell` and `fillCell`, so `dug` and `filled` move and the way-out field is rebuilt (`homing.ts` keys it on them).
+- **The plane has no soil,** so dirt there is rock.
+- **Dirt the builder puts down is not a fresh pellet** (`filledAt` −∞), so it doesn't draw builders by its scent.
+- **Guards:** no dirt or rock within 2 cells of any colony's hole, on an ant, on brood or the queen, or over food.
+- **Crayon lines** are `Game.crayons`. They are topped up each tick to 4 × ½^(age/35 s) and dropped below FAINT, about 3.7 min. They are saved with the game.
+- **Rain** zeroes food, home, alarm, no-entry and raid for every colony under the cloud, and the crayon cells there.
+- **Undo** keeps 20 strokes and puts back what is still the stroke's own: soil an ant has dug since stays dug, and sugar eaten stays eaten. So it is not bit-exact, by design (the bead's acceptance is updated to match).
+- **Tests:** `tests/int/builder.test.ts`, 10 tests (3.4 s, too slow for the unit tier). Mutations caught: dropping the guard, and dropping the "never bury food" check.
+- **Bit-exact:** with no stroke, `Game.tick` only checks an empty list, and the golden masters are unchanged.
+
+**Assays** (`colony/builderAssays.ts`, in `ONE_ASSAYS`; `npm run exp -- <id> --one`), seeds 1–10:
+
+| Id | What | Result |
+|---|---|---|
+| B1 `crayonLine` | ants on a crayon line out from the hole across empty ground ÷ on its undrawn mirror, 10–70 s after drawing | median **6.4×**, worst 4.3: passes ≥ 3× in **10/10**. Per seed: 4.4, 4.3, 5.7, 8.7, 5.7, 10.4, 4.9, 8.3, 7.1, 7.9. A first version had a food pile beyond each line: a pile found on the undrawn side laid its own trail and swamped the cue (6/10 passed, seeds 2, 3, 5, 7 under 3×), so the arena has no food, as Choe et al.'s line led to none. |
+| B2 `wall` | delivery 150–270 s after a 31-cell rock wall across the trail ÷ before | median **0.14** (0.04–0.16): **fails 0/10**. Without a wall, the same span runs at a median ≈ 1.0 (0.26–1.61). Carriers stall at the wall; filed as `ja-y94o` (a new behaviour, through adding-mechanics), `todo` in `tests/slow/assays.test.ts`. |
+| B3 `rain` | delivery in the 30 s after rain along the trail ÷ before; 90–210 s after ÷ before | dip median 0.87 (0.41–1.21); after 0.98 (0.45–1.55). Rain barely slows the colony: carriers home by vector and route memory, and the pile is found again at once. |
+| B4 `lateSugar` | the sugar's share of food carried in the 180 s after it is dropped beside a worked crumb pile | median **0.02** (0.01–0.05) of 1,343 carried; 444 sugar put. The colony stays on the crumbs, as Beckers et al. 1990's *Lasius* did. |
+| B5 `crayonRing` | ants per unit length on a crayon ring round the hole ÷ on a ring just outside it | 93× (66–116) in its first 30 s, 11× (4.9–23) at 30–90 s, 1.7× (1.5–3.3) at 90–180 s. Ants crowd it, then leave; no mill. |
+| B6 `fillShaft` | dirt over the colony's largest chamber at 60 s (the queen's, so early); share re-dug 240 s later | 49 of 73 cells filled (46–67; the guards spare the queen, brood and ants), **39 %** (14–52 %) dug out again |
+
+**For play:**
+- B1 and B5 show the crayon working.
+- B4 says a child's sugar dropped late is mostly ignored until scouts find it, which is real ant behaviour; the Learn entry says so.
+- B2 says a wall stops a trail for minutes. Undo or the dig tool opens it again, but rerouting is the ants' gap (`ja-y94o`).
+
+**Cost:** no lane, field, legend or question changed, so tokens per question are unchanged.
+
+### 70.2 The tray, smell vision, little hands, sounds, Learn (ja-kjj8.3–.6, 2026-11-14)
+
+**Built.**
+- **The shovel button** ("Builder") leads the rail, or the tab bar on a phone, and turns the builder on and off at any point in a game.
+  - **On:** the tray takes the tab bar's place along the screen's bottom edge, and the drawers close.
+  - **Hidden while building:** the inspector, the aim bar and the tutorial's card.
+  - **Unchanged:** the HUD (pause, speed, above and below) and the game itself, which keeps running.
+  - **Opening zoomed out:** the view first zooms to ≥ 8 px a cell on the colony the fungus landed by. Zoomed all the way out, one finger's stroke spanned hundreds of cells (1,566 rock cells in the first e2e run).
+- **The tray** (`ui/BuilderTray.tsx`, pure parts in `ui/build.ts`):
+  - **Pictures are emoji:** ✋ ⛏️ 🟫 🪨 🍬 🍪 🖍️ 🌧️, then ↩️ undo, 👃 smell vision, 🧸 little hands and ✅ done. Names are only the accessible labels and the spoken words.
+  - **Sizes:** buttons are 64 px, 88 px in the little tray.
+  - **The tool in hand** grows (×1.1) and takes a thick ring, not a colour change alone.
+  - **Crayons:** one per colony (the first four), each with a band of its colony's tone. None for a species with no food trail (the desert ant).
+- **Gestures** (`ColonyField` `build`):
+  - **With a tool:** a touch builds where it lands and a drag paints. A drag is one undo, and a crayon drag is one line.
+  - **With Move:** the field is as ever (one finger pans, a tap follows an ant).
+  - **Two fingers** pinch and pan for an adult.
+  - **Palms:** a touch wider or taller than 60 px is set aside (design).
+  - **Keys:** Ctrl/⌘+Z undoes; Escape leaves the builder.
+- **Smell vision** (owner): while building and on (the default), every colony's food trail shows everywhere, each in its colony's tone, with the home trail and alarm as before. With the builder off, §65 holds. It is a picture only.
+- **Sugar and crumbs** draw in their own colours (candy pink, biscuit brown); food of quality 1 is unchanged.
+- **Little hands** (owner: a switch in the builder): Move, Sugar, Dig and Rain, at 88 px; no smell vision.
+- **First use:** the first time a tool is picked (per browser), a 👆 shows its gesture over the map, a tap or a drag, for 1.6 s. Reduced motion stills it.
+- **Sounds** (`ui/sounds.ts`, owner: WebAudio plus speechSynthesis):
+  - each tool has its own short sound, made in the browser;
+  - a tool's name is spoken when it is picked;
+  - nothing plays before a touch;
+  - Settings → Sounds turns them off (per browser).
+- **Learn:** five entries (crayon, sugar and crumbs, rocks and walls, digging and filling, rain), each in the guide's shape and citing builder.md. The crayon's is hidden for a species with no food trail. builder.md is in the guide's notes.
+
+**Checks.**
+- `npm run e2e` step 10, at 390 and 768 px on a touch page:
+  - the tray is on the bottom edge in the tab bar's place, every button ≥ 64 px, and there is no sideways scroll;
+  - sugar by a tap, a rock wall and a crayon line by drags, one undo for the whole crayon drag;
+  - Move pans and builds nothing, and digging works below;
+  - Done gives the tab bar back;
+  - saved to a slot, reloaded and continued, the wall is still there.
+- `ui/tests/build.test.ts`: the tray's lists, its sizes and the palm rule.
+- `tests/int/builder.test.ts`: 12 tests.
+- `tests/soak/save.test.ts`: the save's keys now include `crayons`.
+
+**Not done:**
+- the gestures on a real phone and tablet with the children (the owner's);
+- the tick cost of a sugar flood (`npm run colony-bench`, not run);
+- `npm run colony-cost`: not rerun, since no lane, legend or question changed.

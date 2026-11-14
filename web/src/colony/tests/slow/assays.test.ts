@@ -12,6 +12,8 @@ import {
   richPoor,
   runAssay,
   twin,
+  crayonLine,
+  wall,
 } from "../../experiment.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
 
@@ -102,5 +104,23 @@ test(
     // The desert ant (desertSpec sets no species; review of #186, S1), over two days, as its figures were measured.
     const m = runAssay(desertInvitation, 1, { game: { species: DESERT_ANT } }, 1200).metrics;
     assert.equal(m.pass, 1, `ratio ${m.ratio}`);
+  },
+);
+
+// The builder (PRD §70.1, ja-kjj8.1): B1 passes 10/10 on seeds 1–10 (median 6.4×, worst 4.3); B2 fails 0/10 (delivery
+// after the wall at a median 14 % of before).
+test("B1 a crayon line is followed: ≥ 3× its undrawn mirror", () => {
+  for (const seed of [1, 4]) {
+    const m = runAssay(crayonLine, seed).metrics;
+    assert.equal(m.pass, 1, `seed ${seed}: lineRatio ${m.lineRatio}`);
+  }
+});
+
+test(
+  "B2 a rock wall across a trail: food comes home again by another way",
+  { todo: "ja-y94o: carriers stall at the wall (median 14 % of before)" },
+  () => {
+    const m = runAssay(wall, 1).metrics;
+    assert.equal(m.pass, 1, `afterShare ${m.afterShare}`);
   },
 );

@@ -157,8 +157,8 @@ The builder is a set of **player tools that edit the world**. It is not a change
 
 | Id | Question | Target |
 |---|---|---|
-| B1 | A crayon line from the nest toward a pile, ending short of it: do foragers follow it? | **Design mark:** foragers that meet the line follow it for at least 10 cells at least 3× as often as on the same line drawn with no pheromone (the ablation). After Choe et al. 2012: blend 5.0 against 0.2 ants. |
-| B2 | A rock wall dropped across the established trail to a pile: does traffic come back? | Food reaches home again by another way within a design time, in at least 8 of 10 seeds. After Dussutour et al. 2009: 18 of 21 colonies; Reid et al. 2011: 73–93 %. |
+| B1 | A crayon line out from the hole across empty ground: do ants follow it? | **Design mark:** ants on the line ≥ 3× those on its undrawn mirror over the minute after drawing, in ≥ 8 of 10 seeds. After Choe et al. 2012: blend 5.0 against 0.2 ants. |
+| B2 | A rock wall dropped across the established trail to a pile: does traffic come back? | Delivery 150–270 s after the wall ≥ 50 % of before, in ≥ 8 of 10 seeds. After Dussutour et al. 2009: 18 of 21 colonies; Reid et al. 2011: 73–93 %. |
 | B3 | Rain over the trail network, mid-game: how fast does the food rate recover? | Report only (no measurement in the literature). |
 | B4 | Sugar dropped beside a crumb pile the colony already works. | Report only. Beckers et al. 1990: *Lasius* often stays on the old source. |
 | B5 | A crayon circle around the hole: how long do followers circle? | Report only. Butterfield et al. 2025: ants leave after about half a circle; no mill. |
@@ -200,6 +200,25 @@ Owner's calls:
 Still to measure: B1–B6 on seeds 1–10; the tick cost of a sugar flood; the cost of an edited world; the gesture rules on a real phone and tablet.
 
 Later notes: floods and rafts (real water), cooperative carrying, aphids, labelling rooms with floor marks, and tweezers (displacement and homing).
+
+## What the builder built (PRD §70.1–70.2)
+
+- **Tools:**
+  - pure tools in `colony/builder.ts`, with guards, undo and crayon lines that are saved;
+  - picture-only tools in a tray that takes the tab bar's place;
+  - Move for one finger;
+  - smell vision, the little-hands tray, sounds and spoken names;
+  - five Learn entries.
+- **What the assays found** (seeds 1–10):
+  - the crayon line is followed, at 6.4× its undrawn mirror (worst 4.3);
+  - a crayon circle is crowded, then left;
+  - rain barely slows a colony;
+  - late sugar is mostly ignored, as Beckers et al. 1990's *Lasius* did;
+  - a filled chamber is 39 % dug out in 4 min.
+- **What they overturned:** a long rock wall across a trail cuts delivery to 14 % of before, for minutes. The game's ants don't reroute well on open ground. That is a new behaviour to build (`ja-y94o`), not a builder fix.
+- **Changed on the way:**
+  - Zoomed all the way out, one finger's stroke covered hundreds of cells, so the builder now opens zoomed in.
+  - B1's first arena, with a pile beyond each line, measured the piles more than the crayon, so it now has no food, as Choe et al.'s line led to none.
 
 ## Sources
 
