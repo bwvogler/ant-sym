@@ -14,6 +14,7 @@ import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
+import { stepCrayons, type CrayonLine } from "./builder.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -163,6 +164,8 @@ export interface GameSave {
   founded?: Founding[];
   /** alates flown and not yet founded or lost (Game.flights) */
   flights?: Flight[];
+  /** the builder's crayon lines still fading (Game.crayons, builder.ts) */
+  crayons?: CrayonLine[];
   params: unknown;
   map: unknown;
   colonies: Record<string, unknown>[];
@@ -339,6 +342,8 @@ export class Game {
   #regrowClock = 0;
   /** food units that have grown back (map.foodTotal grows by it too) */
   regrown = 0;
+  /** The builder's crayon lines (builder.ts, ja-kjj8): each kept topped up as it fades; none unless a child drew one. */
+  crayons: CrayonLine[] = [];
   /**
    * Per colony: the fungus has been in its queen (ja-lo8.7), so its doctrine is open to the player from then on (PRD
    * §50: colony policy is hidden until the fungus infects a queen). Never closes again.
@@ -1002,6 +1007,7 @@ export class Game {
 
   tick(dt: number): void {
     this.time += dt;
+    if (this.crayons.length) stepCrayons(this, dt);
     for (const c of this.colonies) c.tick(dt);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {
@@ -1207,6 +1213,7 @@ export class Game {
       revealed: [...this.revealed],
       founded: this.founded.map((f) => JSON.parse(JSON.stringify(f)) as Founding),
       flights: this.flights.map((f) => ({ ...f })),
+      crayons: this.crayons.map((l) => ({ ...l, cells: [...l.cells] })),
       // The species is code (functions), not data: the save leaves it out (docs/species.md step 3 saves its id) and a load keeps the game's own.
       params: encode(withoutSpecies(this.params)),
       map: encode(map),
@@ -1277,6 +1284,7 @@ export class Game {
     this.regrown = saved.regrown;
     this.revealed = [...(saved.revealed ?? [])];
     this.flights = (saved.flights ?? []).map((f) => ({ ...f }));
+    this.crayons = (saved.crayons ?? []).map((l) => ({ ...l, cells: [...l.cells] }));
     this.params = { ...(decode(saved.params) as GameParams), species: this.params.species };
     fillLike(this.map, saved.map);
     if (world && sw) fillLike(world.curtain, sw.curtain);

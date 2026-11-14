@@ -36,6 +36,8 @@ import {
 export * from "./harness.ts";
 export * from "./oneAssays.ts";
 export * from "./desertAssays.ts";
+export * from "./builderAssays.ts";
+import { BUILDER_ASSAYS } from "./builderAssays.ts";
 import { desertChamber, desertFirstFind, desertHeat, desertInvitation, desertNoTrail, desertTrips } from "./desertAssays.ts";
 import { forage1, game1, route1, search1 } from "./oneAssays.ts";
 
@@ -1242,6 +1244,7 @@ export const ONE_ASSAYS: Assay[] = [
   desertFirstFind,
   desertTrips,
   desertHeat,
+  ...BUILDER_ASSAYS,
 ];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */
