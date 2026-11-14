@@ -232,6 +232,12 @@ export interface ColonyParams {
    */
   restFetch: number;
   /**
+   * ja-rvli: how strongly a larva begs while it is still owed the food it grows on (felt by touch, as hunger is; hungry
+   * larvae beg by movements nurses feel, Peignier et al. 2019). Without it a larva asked for nothing until hungry, about
+   * two minutes after its last meal, and was fed only when ants hungry themselves happened to fetch food by it. 0 = off.
+   */
+  owedBeg: number;
+  /**
    * ja-16rp (docs/foraging-tunnels.md, PRD §70): seconds an old forager home from a trip with nothing spends digging in
    * the nest instead of climbing straight back out: it stays in, digs on at tunnels' ends and forks whatever the nest's
    * room and with no nestmates by, and stops when the time is up or it picks up food. 0 = off (main before ja-16rp).
@@ -389,6 +395,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   scentReach: 1,
   restFetch: 1,
   forageDig: 120,
+  owedBeg: 0,
   routeStep: 3,
   routeSee: 3,
   routeMax: 64,

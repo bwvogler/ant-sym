@@ -168,3 +168,27 @@ test("an old forager carries food in only when it feels hunger: with none it nev
   assert.equal(run(0), 0, "no hunger felt: an old ant forages, as before");
   assert.ok(run(1) > 0, "a strong need: it carries food in");
 });
+
+test("owedBeg (ja-rvli): a well-fed larva still owed the food it grows on begs a little, felt beside it; with owedBeg 0, or once it is fed, nothing", () => {
+  const run = (owedBeg: number, fed: boolean) => {
+    const map = generateSideWorld(2, SMALL_SIDE);
+    const c = new Colony(map, { antCount: 1, maxAnts: 5, owedBeg }, mulberry32(2), () => "explore");
+    const { b: room, cell } = broodChamber(map);
+    const larva = c.brood.add(cell[0] - 1, cell[1], room.id);
+    room.brood++;
+    larva.stage = LARVA;
+    larva.energy = 1; // not hungry: begOf says nothing
+    larva.fed = fed ? 3 : 0; // a worker larva grows on LARVA_FOOD (3)
+    for (let k = 0; k < 30 * 3; k++) {
+      c.x[0] = centreX(cell[0], cell[1]);
+      c.y[0] = centreY(cell[1]);
+      c.tick(1 / 30);
+    }
+    return c.need[0];
+  };
+  assert.equal(begOf(1), 0, "a larva at full energy is not hungry");
+  const owed = run(0.3, false);
+  assert.ok(owed > 0.2 && owed <= 0.3 + 1e-6, `owed its food, it begs: the ant beside it feels ${owed}`);
+  assert.ok(run(0, false) < 1e-6, "owedBeg 0: nothing, as before");
+  assert.ok(run(0.3, true) < 1e-6, "fed: nothing");
+});
