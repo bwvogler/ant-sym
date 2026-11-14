@@ -5491,6 +5491,24 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 
 Five seeds take none of the buried food in the hour; the best takes 3.6 %.
 
+**Option 1 measured (ja-16rp.2, `forageDig`, seeds 1–10, local rule).** An old forager home from an empty search starts a digging bout of `forageDig` seconds; in it, it digs on at its nest's dead ends exempt from `ROOMY_DIG` and from the middle-aged-only rule. Buried food taken, summed over the ten seeds, and the guards' worst seed:
+
+| Variant | Bout | Buried taken (sum) | Worst seed | Food home (worst) | Workers (worst) | Cells opened (median) |
+|---|---|---|---|---|---|---|
+| none (baseline) | – | 2,900 | 0 (four seeds) | 3,464 | 603 | 2,057 |
+| bout only | 30 s | 3,399 | 0 (three) | 3,530 | 691 | 2,367 |
+| bout only | 60 s | 4,259 | 0 (seed 9) | 3,543 | 648 | 2,698 |
+| bout only | 120 s | 5,222 | 7 (seed 7) | 3,927 | 613 | 3,258 |
+| bout only | 240 s | 4,938 | 0 (seed 9) | 3,806 | 584 | 3,588 |
+| bout only | 480 s | 4,766 | 133 (seed 7) | 3,791 | 641 | 4,145 |
+| + outward aim + fresh-end | 60 s | 3,264 | 0 (seed 4) | 3,059 | 391 | 2,998 |
+| + outward aim + fresh-end | 120 s | 3,935 | 0 (seed 3) | 3,811 | 677 | 3,273 |
+| + outward aim + fresh-end | 240 s | 4,461 | 0 (seed 9) | 3,642 | 362 | 3,946 |
+
+- The bout alone nearly doubles buried food taken at 120 s, without hurting food home or workers; past 120 s it opens more cells for no more food.
+- Two refinements were tried and dropped (`86be58e`): aiming the dig away from the nest (home vector), and following the most recently dug cells to the working face (Pielström & Roces 2013, `dugAt`, cells dug within 120 s). Together they took less food and two colonies fell under 400 workers.
+- The journal's dig category (seed 4) shows why the ceiling is low: most bouts end within 30 cells of the nest, while the map's 44–48 pockets lie 24–54 cells out for the nearest and 60–130+ for the rest. Even the best setting takes about 5 % of the buried food in an hour.
+
 **Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full).
 
 **Still open.** Option 2 (after option 1's results); how deep and how far the network should run; whether two colonies' networks meeting needs handling.

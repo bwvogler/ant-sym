@@ -40,6 +40,8 @@ In the side view about three quarters of the map's food lies in buried pockets (
 - No depth distribution of fire-ant foraging tunnels beyond "1–3 cm" (casts) and the cited "3–10 cm".
 - Full text of Markin et al. 1975, Bernklau et al. 2005, Campora & Grace 2001, Hedlund & Henderson 1999 (out of reach this session).
 
+**Measured (2026-11-14, PRD §68):** built as a setting and dropped. Following the freshest dug cells (within 120 s) took less buried food than a plain digging bout (3,935 against 5,222 summed over seeds 1–10 at a 120 s bout) and two colonies fell under 400 workers. The cue is grounded, but in this map the fresh ends are the nest's own, not arms toward food.
+
 ## The mechanic
 
 Cheapest first. Each is a setting whose 0 is main bit for bit; all are steering or body rules, no new situation field, so **no Jev cost**.
