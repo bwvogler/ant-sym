@@ -7,6 +7,7 @@ import { Game, gameRng } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { SEARCH_START } from "../../tuning.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
+import { ROCK } from "../../world.ts";
 
 // Where a retrace joins the way out, and where the search goes after it (ja-lp4.6.3.1, docs/route-memory.md §5, PRD §59):
 // routeJoin 1 joins at the stored place nearest the carrier, not its newest; routeEnd 1 searches afresh round its first
@@ -106,6 +107,26 @@ test("routeJoin 1: of two places as near, the newer; at the pickup its newest, a
   ]);
   onPlane(w.c, () => routeFail(w.c, 0, true));
   assert.equal(w.c.routeGoal[0], 1, "equidistant: the newer place");
+});
+
+test("routeJoin 1: a place across rock is not in view; the nearest it can see, or else its newest", () => {
+  const { c, hx, hy } = plane({ routeJoin: 1 });
+  // A wall between the carrier and places 1 to 3 (the row y = hy): the nearest it can see is place 6, on its own side.
+  const map = c.layers[PLANE]!.map;
+  for (let y = 0; y <= 2; y++) for (let x = -10; x <= 40; x++) map.rock.set(48 + x, 34 + y, ROCK);
+  const wallY = centreY(34);
+  assert.ok(wallY > hy && wallY < hy + 7, `the wall's row lies between the places and the carrier (${wallY - hy})`);
+  carrier(c, hx + 24, hy + 9, wayOut(hx, hy));
+  onPlane(c, () => routeFail(c, 0, true));
+  assert.equal(c.routeGoal[0], 6, "place 2 is nearer, but behind the wall: place 6");
+  // Walled in on every side: nothing in view, so its newest.
+  const w = plane({ routeJoin: 1 });
+  const m = w.c.layers[PLANE]!.map;
+  for (let y = 0; y < m.size.h; y++)
+    for (let x = 0; x < m.size.w; x++) if (Math.abs(centreY(y) - (w.hy + 15)) > 1.5) m.rock.set(x, y, ROCK);
+  carrier(w.c, w.hx + 24, w.hy + 15, wayOut(w.hx, w.hy));
+  onPlane(w.c, () => routeFail(w.c, 0, true));
+  assert.equal(w.c.routeGoal[0], 11, "no place in view: its newest");
 });
 
 test("routeJoin 1, in a game: a carrier near home walks in, not back out to its pickup", () => {

@@ -299,16 +299,24 @@ export function routeFail(c: Colony, i: number, stalled: boolean): boolean {
   return routeTo(c, i, p.routeJoin > 0 ? routeNearest(c, i) : c.routeN[i] - 1);
 }
 
-/** routeJoin (ja-lp4.6.3.1): the index of ant i's stored place nearest where it stands (the newest of equals). Its own places only. */
+/**
+ * routeJoin (ja-lp4.6.3.1): the index of ant i's stored place nearest where it stands that it can see (a clear straight
+ * line to it: a familiar view is one in view), the newest of equals; none in view, its newest. Its own places only. By
+ * straight distance alone a place across a band of rock was "nearest", and a pocket carrier went back to its wall (G1
+ * seed 4: 44 held, against 4 joining at its newest).
+ */
 export function routeNearest(c: Colony, i: number): number {
   const at = (i * c.routePlaces.length) / c.n;
   const x = c.x[i];
   const y = c.y[i];
-  let best = c.routeN[i] - 1;
+  const newest = c.routeN[i] - 1;
+  let best = newest;
   let bestD = Infinity;
-  for (let k = best; k >= 0; k--) {
-    const d = Math.hypot(c.routePlaces[at + 2 * k] - x, c.routePlaces[at + 2 * k + 1] - y);
-    if (d < bestD) {
+  for (let k = newest; k >= 0; k--) {
+    const px = c.routePlaces[at + 2 * k];
+    const py = c.routePlaces[at + 2 * k + 1];
+    const d = Math.hypot(px - x, py - y);
+    if (d < bestD && c.clearTo(x, y, px, py)) {
       bestD = d;
       best = k;
     }
