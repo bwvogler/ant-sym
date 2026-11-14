@@ -5881,3 +5881,43 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 **Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1, built off), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full), ja-16rp.5 (turn option 1 on; after ja-rvli).
 
 **Still open.** Feeding larvae owed their growth food (ja-rvli), then option 1 on (ja-16rp.5); option 2; how deep and how far the network should run; whether two colonies' networks meeting needs handling.
+
+## 71. Task reversion: old foragers nurse when the young are gone (design, ja-7r7x, 2026-11-14)
+
+**Research basis:** [task-reversion.md](task-reversion.md):
+- In ants, foragers exposed to brood without younger workers revert to brood care, often within 24 h (Symonowicz et al. 2015, citing Ehrhardt 1931, Dobrzańska 1959, Lenoir 1979 and others).
+- With every young worker removed, old *Temnothorax longispinosus* moved inside the nest and cared for brood about as often as the young had (Kohlmeier et al. 2018).
+- In *Solenopsis invicta* micro-colonies, tasks were reassigned within 5 minutes of removing the nurses, depending on the kind of brood (Starkey & Tamborindeguy 2023).
+- Honey bees revert in all-old colonies even without brood (Huang & Robinson 1996, abstract, **unverified**).
+- Workers recognise nestmates' tasks by cuticular hydrocarbons in *Pogonomyrmex* (Greene & Gordon 2003, abstract, **unverified**); recognising a young nurse by contact is **design**.
+
+**The problem (measured, §70).** Larvae still owed their growth food send nothing until they are hungry, and old ants answer the brood's need only by touch at `THETA_OLD`, and nothing brings them to the brood. When a colony's founders age as one cohort, there is a stretch with no young ants at all, and larvae wait beside food. Over `economy.test`'s 16 hour-long games (worlds 1–4 × nudges 0–3), 3 games had more than 8 larvae waiting at once (worst 19); with the foraging dig on (`forageDig: 120`), 15 games (worst 54). The begging fix (`owedBeg`) only moved luck around: the beg is felt only by touch and nobody was beside the larvae (ja-rvli).
+
+**Decisions.**
+- Fix it by task reversion, not by tuning thresholds or changing the test's age structure (owner, 2026-11-14).
+
+**The mechanic (planned).**
+- *Cue:* an old ant at home whose count of young nestmates met by contact (`youngMet`, leaky, like activation's `met`) is low, near brood (the brood and royal marks).
+- *Response:* it stays in, follows the brood marks as the young do, works inside at the young's threshold (`NEED_FETCH`), and takes no foraging dig.
+- *Ending:* it reverts back when it meets young again.
+- *Only a share of the old* revert, each by a threshold drawn at birth (setting `revert`; 0 = off, main bit for bit).
+
+**Assays and targets.**
+- Assay `larvae` lands first: `economy.test`'s `hour()` as an assay. It records the peak of larvae waiting over 120 s beside enough food in each of 16 games, with workers alive and born, starved workers, food stored and food home as guards.
+- **Target:** no game above 8 (`ja-rvli`'s acceptance), food home not worse by the worst game. Then the same with `forageDig: 120` (`ja-16rp.5`).
+
+**Cost (estimated).** None in Jev: body and steering, no situation field. CPU: one per-cell count of the young, and one leaky count per ant.
+
+**Beads.**
+- ja-7r7x: the epic.
+- ja-7r7x.1: assay `larvae`.
+- ja-7r7x.2: the young-met sense.
+- ja-7r7x.3: reversion, off.
+- ja-7r7x.4: tune and turn it on.
+- Then ja-rvli closes, and ja-16rp.5 can turn the foraging dig on.
+
+**Still open.**
+- The share of old ants that can revert (owner's call; no measured share).
+- What ends a reversion (not measured in any paper read).
+- Reading the *Pheidole dentata* papers.
+
