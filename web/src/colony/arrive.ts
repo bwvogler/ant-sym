@@ -243,6 +243,8 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     !pellet &&
     !nursing &&
     !colony.isTired(i) &&
+    // A hot one (the desert ant's heat, ja-rf5.5) rests to cool first, as a tired one rests (review of #155, N6); always 0 without heat.
+    !colony.hot[i] &&
     !colony.inbound(i, RETURN) &&
     (ent === null ? atNest : colony.under[i] === 1 && colony.band(i) === 2 && atHome(colony, i)) &&
     (!gate || (!rolled && colony.leaves(i, dt, toEnemy !== null)))

@@ -122,6 +122,10 @@ The species on the descriptor (`colony/desertAnt.ts`): its own words and 16-situ
 
 Food odour in the air (`colony/plume.ts`, `foodPlume`): every food cell on the plane is a source, and the odour falls step by step through open ground (rock stops it) to nothing at the range, a radial gradient with no wind (Open questions 3). An outside forager with empty jaws and no food in sight climbs it with its three sensors, ahead of its search and of its vector to a remembered spot. The range is **21 cells**: the turn-in distance of about 6 m (Buehlmann et al. 2014, draft) at one world's scale, whose nests are 140 cells apart against *C. fortis*'s about 40 m. The plume is rebuilt at most every 4 s of game time, when the food has changed: odour lags its source, and a rebuild costs about 10 ms. D3: the first find comes sooner than the same seed's blind search on all of seeds 1–20, and about 4.5× as much food is home after 120 s.
 
+## What ja-rf5.5 and ja-rf5.12 built
+
+Heat, the sun's height and a night: [desert-heat.md](desert-heat.md), PRD §60.5.
+
 ## Sources
 
 - Razin N, Eckmann J-P, Feinerman O (2013). Desert ants achieve reliable recruitment across noisy interactions. *J R Soc Interface* 10:20130079. [doi:10.1098/rsif.2013.0079](https://doi.org/10.1098/rsif.2013.0079), [PMC3627090](https://pmc.ncbi.nlm.nih.gov/articles/PMC3627090/) (full text read 2026-11-11)
