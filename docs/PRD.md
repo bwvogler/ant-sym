@@ -5554,6 +5554,12 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.99, 17.27 and 16.99 ms mean, this change 17.85, 17.22 and 17.22 ms; within noise. Counting happens only in `put` and `drop`, off the read path.
 - **Cost:** none. No situation, legend or question changed.
 
+**E1.4 built (`ja-qpv.1.4`, 2026-11-14).** Storage only; behaviour is bit-exact (the goldens pass unchanged, and three 120 s one-world games, 300 + 300 ants, hash every ant's position and mode and each colony's counts equal to main's).
+- **What changed.** A colony's way out of its nest (`outField`, `homing.ts`) was an `Int32Array` over the whole curtain, per colony. It is now an `OutField`: the same steps, over a window of columns round the colony's hole, 193 wide when the curtain allows. A walk that would step onto open ground outside the window widens it (twice as wide, within the map) and walks again, so the field holds every cell the hole reaches, as the walk over the whole curtain did. Tests: `unit/outField.test.ts` checks every cell against a walk over the whole curtain, inside the window and past either edge.
+- **Measured.** In three 600 s one-world games (600 + 600 ants) the window never widened: 161 columns of curtains 277–291 wide (both holes sit near an end, so their windows are clipped). On a curtain founding has grown, each colony's field stays 193 columns, not the curtain's width.
+- **Tick** (`colony-bench --one`, 1,200 + 1,200 ants, 60 s, alternating): main 11.10, 11.17 and 11.18 ms mean, this change 11.23, 11.35 and 11.10 ms; within noise.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).
