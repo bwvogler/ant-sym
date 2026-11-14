@@ -15,6 +15,7 @@ import { CORPSE_GIVE_UP, MOUND_HEIGHT, MOUND_REACH, REST, ROAD_SIGN, SPOIL_GIVE_
 import { EXPLORE, FIGHT, FOLLOW, PLANE, RETURN, STRONG } from "./vocab.ts";
 import { isSky, qualityAt, takeFoodCell } from "./world.ts";
 import { pointDown, rememberSite } from "./plane.ts";
+import { pickLoose } from "./pellets.ts";
 
 export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   const p = s.p;
@@ -150,7 +151,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     mode === EXPLORE &&
     isSky(map, CELL[0], CELL[1]) &&
     colony.enteredCell(i) &&
-    colony.pickLoose(i, CELL[0], CELL[1], toEnemy !== null)
+    pickLoose(colony, i, CELL[0], CELL[1], toEnemy !== null)
   ) {
     // Picked up a loose pellet off the mound (see pickLoose).
   } else if (
