@@ -5450,3 +5450,31 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 
 - The three unguarded games with 9–19 larvae waiting: ja-mprr.
 - Jev cost: none. No legend, question, schema or brain version changed.
+
+## 68. Foraging tunnels: colonies dig out to the soil's food when foraging fails (design, ja-16rp, 2026-11-14)
+
+**Research basis:** [foraging-tunnels.md](foraging-tunnels.md):
+- Fire ants keep a standing network of foraging tunnels under their territory, 1–3 cm deep with surface openings every 50–100 cm, the longest over 15 m in one cast (Tschinkel 2011, read in full; Markin et al. 1975, **unverified**). Nothing shows them aimed at food or grown by hunger: their length tracks soil type, not nest size (Ni et al. 2025).
+- Termites tunnel to find wood; a CO₂ gradient through soil draws some *Reticulitermes* (Bernklau et al. 2005, **unverified**), while *R. grassei*'s tunnels showed no orientation to food. Nothing shows ants smelling food through soil.
+
+**The problem (measured).** About three quarters of the side map's food is buried (§41). One colony of 600, an hour (`scripts/lab/economy-bench.mjs <seed> 3600 600 1 900`, main at `158d4b5`): seed 1 takes about 560 of 20,760 buried food, seed 2 none; the ground's piles fall from about 4,400 to 2,600. Tunnels are dug for room: only the middle-aged dig, and a nest with room digs 15 % as often (`ROOMY_DIG`, gated by `crowded()`, a colony-wide count already in the gap table, `ja-k4k.3`). Food is sensed only through open ground (§67), so pockets a few cells into the soil are invisible.
+
+**Decisions.**
+- Build it (owner, §50.5 and 2026-11-14).
+- Option 1 first, the network (proposed: needs the owner).
+- Option 2, a soil food odour, only on the owner's say; it admits a design-only sense (proposed: needs the owner).
+- Who digs: old foragers, or the middle-aged when hungry (proposed: needs the owner).
+
+**The mechanic.**
+- *Option 1:* a forager whose search outside failed (fatigue past patience) or that feels the colony's hunger (felt need at its threshold), at a dead end in its own nest, digs on outward (home vector) and level or down (gravity), exempt from `ROOMY_DIG` and the middle-aged-only rule for that dig. Food is found by contact, then taken home by what is built (open-ground food sensing, trails, STORE_AFTER). Off (0) is main bit for bit. It adds no global read.
+- *Option 2:* buried food gives off a short odour through soil (a soil version of the desert ant's plume, about 3 cells), read only by a digger at its face.
+
+**Play.** When the ground's piles thin out the nest grows arms under the ground and pockets empty as they open; the fungus's hyphae grow along tunnels (§63.9), so the network is also its road to the pockets and to other colonies. The early game is unchanged. Risks: a digging runaway (mound, ticks), tunnels meeting the rival's (an underground front, `ja-war`), fed colonies raiding sooner (§67's fight losses).
+
+**Assays and targets.** P1 lands first with no behaviour change: buried food home over 3,600 s, one colony of 600 on the app's map, seeds 1–10, with food home, workers alive, cells dug, spoil out and ms per tick as guards. The target is **design**: a measurable share of the buried food home within the hour (baseline about 2.7 % on seed 1, 0 % on seed 2), by the worst seed, confirmed on 11–20; the side-view game's fight losses reported.
+
+**Cost (estimated).** None in Jev: steering and body rules, no new situation field. CPU: more dug cells, measured by P1's ms per tick.
+
+**Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full).
+
+**Still open.** The owner's calls above; how deep and how far the network should run; whether two colonies' networks meeting needs handling.
