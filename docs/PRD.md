@@ -4760,87 +4760,47 @@ Step 3 passes with two seeds to spare; step 4 fails it on seed 1's jam (27); rou
 
 ### 59.1 Where a retrace joins, and where the search goes after it (ja-lp4.6.3.1, 2026-11-14)
 
-**Diagnosis** (scratch probe, `main` at `88b5269`, G1 seeds 6-8, 36 held trips; route-memory.md §5): **C**, most retraces: a carrier's vector brings it 11-40 cells from its hole, the search there stalls, and the retrace starts at its **newest** place, back at the pickup, so it walks 90-190 cells out and the whole trip in again (home 127-172 s after pickup). **B**, the long holds: it had walked home empty in `return` (no places), picked up far from its newest place, and skipped stale places behind rock for 300 s. **D**: the retrace ends near the hole, then the search goes back round the vector's end 30-55 cells off. **A**: it walked out in `fight` and stored nothing.
+**Diagnosis** (scratch probe, `main` at `88b5269`, routeStep 4, G1 seeds 6-8, 36 held trips; route-memory.md §5): **C**, most retraces: a carrier's vector brings it 11-40 cells from its hole, the search there stalls, and the retrace starts at its **newest** place, back at the pickup, so it walks 90-190 cells out and the whole trip in again (home 127-172 s after pickup). **B**, the long holds: it had walked home empty in `return` (no places), picked up far from its newest place, and skipped stale places behind rock for 300 s. **D**: the retrace ends near the hole, then the search goes back round the vector's end 30-55 cells off. **A**: it walked out in `fight` and stored nothing.
 
 **Research basis** ([route-memory.md §5](route-memory.md); two papers read in full, the rest unverified):
 - Backtracking is about 2 m along the last leg, then a systematic search, and only on unfamiliar ground with the vector run down and the nest's surroundings just seen (*Melophorus bagoti*, Wystrach, Schwarz, Baniel & Cheng 2013, full text). No ant walks back to its food once near home.
 - A trail-following harvester (*Veromessor pergandei*) retraces its column leg by leg, and caught at the elbow it takes up the **next** leg, not the first: the route is joined at the stage reached (Freas & Spetch 2024, full text).
 - Near the nest remembered places outweigh a run-down vector, and a search starts at the shifted nest mark (Bregy, Sommer & Wehner 2008: unverified, authors from memory).
 
-**Decisions.**
-- `routeJoin` 1 (on): a retrace starts at the stored place nearest the carrier **that it can see** (a clear straight line), else its newest. Supported in kind (Freas & Spetch 2024; Kohler & Wehner 2005); the clear line is design, and needed: by straight distance alone G1 seed 4 rose to 44 held (a pocket carrier went back to the place across its wall).
-- `routeEnd` 1 (on): a retrace over, the search starts afresh (`SEARCH_START`) round its first stored place, not on round the vector's end. Supported in kind (nest marks near the nest); the place is design.
-- `routeFight` (built, **off**): a fighter walking out stores its places too (case A). The literature is silent; on G1 it moved seed 7's rival to 8 (worst 8 against 4), so it stays off.
-- Not built: recording places while homing empty (a homeward walk retraced backwards leads away from home; doing it properly is a second, forward-followed memory, a new mechanic), and clearing the route on turning home (no basis).
-- No new sense: both read only the ant's own places (the "Route memory" row) and the line to them; steering only, no Jev lane, legend or question changes, so the hourly cost is unchanged.
+**Built** (all on one world's plane, steering only; 0 is `main` bit for bit):
+- `routeEnd` 1: a retrace over, the search starts afresh (`SEARCH_START`) round the ant's first stored place, not on round its vector's end (case D). Supported in kind (nest marks near the nest); the place is design. **On by default.**
+- `routeJoin`: where a retrace joins the stored way out. 1 = at the nearest stored place the carrier can see (a clear straight line), else its newest, but only once its vector has run out near home (it is searching at its belief: its own search state, reset at pickup); 2 = that join at every retrace (the first build). By straight distance alone, without the clear line, G1 seed 4 rose to 44 held (a pocket carrier went back to the place across its wall). Supported in kind (Freas & Spetch 2024; Kohler & Wehner 2005). **Off** (0): see the decision.
+- `routeFight` 1: a fighter walking out stores its places too (case A). The literature is silent; at step 4 it moved seed 7's rival to 8. **Off.**
+- Not built: recording places while homing empty (a homeward walk retraced backwards leads away from home; done properly it is a second, forward-followed memory, a new mechanic), and clearing the route on turning home (no basis).
+- No new sense: the settings read only the ant's own places (the "Route memory" row), its own search state and the line to a place; no Jev lane, legend or question changes, so the hourly cost is unchanged.
 
-**G1** (600 + 600 ants, 600 s; the most held over 120 s at any 10-s sample, you / rival; food carried down, both colonies; births, both). `main` is today's (`88b5269`, route memory 1/4/3); the chosen setting is `routeJoin` 1 and `routeEnd` 1:
+**At routeStep 4 (before §59's re-tune and #180; superseded).** Broad join + end took G1 seeds 1-10 from worst 4 / sum 26 / 5 within 2 to 4 / 14 / 9 (food +4.5 %), but A2b from 50 to 44 of 60 (paired 7 lost / 1 won, p 0.07); narrowed join + end held A2b at 50 but had a worst seed of 6. The owner chose to narrow and then to measure more seeds; main then moved to routeStep 3 with #180, and every figure was re-measured.
 
-| seed | main | chosen | main food | chosen food | main births | chosen births |
-|---|---|---|---|---|---|---|
-| 1 | 4 / 1 | 0 / 0 | 2621 / 2353 | 2966 / 2783 | 650 | 669 |
-| 2 | 2 / 1 | 2 / 1 | 2858 / 1473 | 2884 / 2061 | 731 | 730 |
-| 3 | 2 / 2 | 1 / 4 | 1977 / 2011 | 2314 / 2208 | 633 | 660 |
-| 4 | 4 / 2 | 2 / 1 | 2654 / 3444 | 2886 / 3077 | 896 | 800 |
-| 5 | 0 / 0 | 0 / 0 | 2473 / 1602 | 2659 / 1878 | 910 | 919 |
-| 6 | 1 / 4 | 0 / 1 | 3234 / 3205 | 2613 / 3415 | 781 | 816 |
-| 7 | 2 / 4 | 1 / 2 | 1780 / 1798 | 2127 / 1789 | 604 | 604 |
-| 8 | 1 / 1 | 0 / 2 | 2463 / 3403 | 2679 / 3261 | 835 | 852 |
-| 9 | 3 / 1 | 0 / 0 | 3193 / 2189 | 2788 / 2178 | 688 | 681 |
-| 10 | 2 / 2 | 0 / 1 | 1903 / 2629 | 1664 / 3240 | 621 | 630 |
-| sum 1-10 | | | 49,263 | 51,470 (+4.5 %) | 7,349 | 7,361 (+0.2 %) |
-| 11 | 2 / 1 | 0 / 1 | 3327 / 2712 | 3853 / 2237 | 874 | 680 |
-| 12 | 2 / 1 | 0 / 1 | 2205 / 2992 | 1830 / 3506 | 629 | 612 |
-| 13 | 2 / 2 | 1 / 2 | 2301 / 1680 | 2741 / 1965 | 774 | 758 |
-| 14 | 8 / 2 | 1 / 0 | 3248 / 2419 | 3199 / 2309 | 814 | 795 |
-| 15 | 2 / 1 | 0 / 5 | 2202 / 2158 | 2403 / 1973 | 808 | 776 |
-| 16 | 1 / 2 | 1 / 1 | 2577 / 2585 | 2984 / 2688 | 632 | 651 |
-| 17 | 1 / 0 | 3 / 0 | 2108 / 3236 | 2373 / 3322 | 714 | 724 |
-| 18 | 5 / 0 | 1 / 3 | 1662 / 2301 | 2737 / 2787 | 649 | 670 |
-| 19 | 3 / 2 | 2 / 0 | 1413 / 2857 | 1190 / 3252 | 714 | 663 |
-| 20 | 3 / 5 | 1 / 2 | 2815 / 2244 | 2932 / 2322 | 784 | 804 |
-| sum 11-20 | | | 49,042 | 52,603 (+7.3 %) | 7,392 | 7,133 (-3.5 %) |
+**Measured at main's routeStep 3** (merged tree, `g1-retrace` at `44929a1`; the four settings set on both colonies; G1 600 + 600 ants, 600 s, the most held over 120 s at any 10-s sample per colony, you / rival; food carried down and births against off; #183's guard: at least 4 of seeds 1-10 within 2, none at 10 or more):
 
-**The sweep** (seeds 1-10, worst colony per seed; worst, sum, seeds within the bound; food and births against today's `main`):
+| setting (routeJoin, routeEnd) | G1 seeds 1-20, per seed | worst | sum | within 2 | food | births | #183 guard |
+|---|---|---|---|---|---|---|---|
+| off (0, 0), `main` | 2/0 1/2 2/1 6/2 1/1 1/2 1/3 3/4 3/0 1/0 · 1/1 1/4 2/1 2/2 1/2 0/4 4/1 6/1 3/3 3/3 | 6 | 57 | 10/20 | 97,369 | 14,620 | pass (6 of 10) |
+| **routeEnd alone (0, 1), shipped** | 2/1 1/2 1/2 2/1 0/2 0/2 1/6 2/3 3/0 2/1 · 2/4 1/1 2/3 2/3 1/1 2/2 2/1 2/1 2/2 2/2 | **6** | **48** | **14/20** | **+2.5 %** | **+0.5 %** | pass (7 of 10) |
+| narrowed join + end (1, 1) | 0/0 1/0 1/4 4/1 1/5 1/1 1/4 2/1 0/0 1/0 · 1/8 2/1 2/0 1/1 1/0 1/2 2/1 2/1 2/1 3/2 | 8 | 47 | 14/20 | +1.7 % | -0.3 % | pass (6 of 10) |
+| broad join + end (2, 1) | 0/1 0/2 1/3 1/2 1/0 0/2 1/3 0/1 1/0 1/0 · 1/3 1/2 1/1 1/1 0/1 2/2 2/0 3/0 5/0 0/3 | 5 | 40 | 14/20 | +3.7 % | -1.0 % | pass (8 of 10) |
 
-| setting | worst per seed 1..10 | worst | sum | within 2 | food | births |
-|---|---|---|---|---|---|---|
-| main (route memory 1/4/3) | 4 2 2 4 0 4 4 1 3 2 | 4 | 26 | 5 | 49,263 | 7,349 |
-| `routeJoin` 1, straight distance (first build) | 3 3 7 44 5 4 5 2 2 4 | 44 | 79 | 2 | -1.0 % | -0.5 % |
-| `routeJoin` 1, in view | 2 3 2 3 2 8 5 1 2 2 | 8 | 30 | 6 | +0.9 % | -0.2 % |
-| `routeEnd` 1 | 2 1 1 6 1 2 5 2 2 2 | 6 | 24 | 8 | +0.4 % | +0.2 % |
-| **`routeJoin` 1 and `routeEnd` 1 (chosen)** | 0 2 4 2 0 1 2 2 0 1 | **4** | **14** | **9** | **+4.5 %** | **+0.2 %** |
-| the two and `routeFight` 1 | 2 0 0 2 0 1 8 1 1 1 | 8 | 16 | 9 | +1.6 % | +0.4 % |
+| setting | A2b passes, seeds 1-60 (mark 0.7) | mean / median rich share | Fisher p vs off | paired (exact McNemar) vs off |
+|---|---|---|---|---|
+| off | 51 | 0.791 / 0.908 | – | – |
+| **routeEnd alone** | **51** (the same nine seeds fail) | 0.787 / 0.907 | 1.00 | 0 lost / 0 won |
+| narrowed join + end | 47 | 0.749 / 0.907 | 0.48 | 5 lost / 1 won, p 0.22 |
+| broad join + end | 43 | 0.706 / 0.910 | 0.12 | **9 lost / 1 won, p 0.021** |
 
-- **Choice.** The worst seed ties `main` (4: seed 3's rival, where 2 of the 4 walked out in `fight` and 2 are pocket retraces held 227 and 356 s), and everything else improves: the sum 26 to 14, seeds within the bound 5 to 9, and on seeds 11-20 the worst 8 to 5 and the sum 32 to 21. Food and births keep the 5 % rule on both sets (+4.5 / +0.2 %; +7.3 / -3.5 %). Neither fix alone helps the worst seed; together they do the rest. Single games swing (seeds 1-10 differ from the first change on), so the sets of ten are the judge.
-- **The guard's own seeds fail on today's `main`**: seed 4 at 4 / 2 and seed 9 at 3 / 1 (the build of §59 had 2 / 1 on both; `main` has moved since, #166 and others). With the chosen setting they are 2 / 1 and 0 / 0, and seed 5 0 / 0, so `tests/slow/oneWorld.test.ts` passes again. The bound is not met on every seed of 1-10 (seed 3's rival 4), so the guard's seed list is **not** extended.
-- **Goldens.** The legacy goldens are bit-exact; the one-world golden was re-recorded once (with both settings 0 it is bit-exact).
-- **Tests** (`tests/int/oneWorldRouteJoin.test.ts`), each failing under a mutant: the join at the nearest place (mutant: newest), the newer of equals (`<=`), the clear line (removed), a game where a carrier near home walks in rather than out, the search restarted (reset removed) and centred on the first place (centre removed), and only once the retrace is over (state test removed); `routeFight`'s gate and clause.
+A2b's failures are flips: the colony settles on the poor source (rich share 0.06-0.24), whatever the setting.
 
-**The assays on one world** (`npm run exp -- --one all --seeds 1-10`; today's `main` beside the chosen defaults; passes out of 10):
+**Decision (owner, 2026-11-14).** Ship rule: worst seed over 1-20 no higher than off's 6, at least as many seeds within 2 (10), #183's guard passed, and A2b passes no fewer than off's 51 (or one fewer with paired p > 0.5). **routeEnd alone meets it** (6, 14, pass, 51 with no seed changed) and ships: `routeEnd` 1, `routeJoin` 0, `routeFight` 0. Narrowed join + end was not shipped: its worst seed is 8 (seed 11's rival) and A2b falls 4 (not significant, but not nothing). Broad join + end was not shipped: best on G1 (worst 5, sum 40) but its A2b cost is significant on the paired test. At step 3 the join adds little to G1 beyond what routeEnd and the re-tune already give.
 
-| assay | main today | chosen |
-|---|---|---|
-| A1 double bridge (`bridge`) | 10 | 10 |
-| A2a two sources (`twin`) | 10 | 10 |
-| A2b rich vs poor (`richPoor`) | 9 (fail 10) | **7** (fail 4, 9, 10) |
-| A3 depletion | 10 | 10 |
-| A4 alarm on a trail | 10 | 10 |
-| A5 / A5b (`regulate`, `regulateStop`) | 0 / 8 (fail 7, 9) | 0 / **9** (fail 1) |
-| A6 narrow pass | 5 | 5 |
-| A9 strangers at food (`contact`) | 4 | 4 (seed 3 for seed 10) |
-| A10 (`faintAlarm`) | 0 | 0 |
-| G1 | 5 | **9** (above) |
-| R1 pocket carriers | 6 of 6 with a pocket | 6 of 6 (median walked ÷ way round 1.06 against 1.06) |
-| S1, F1, D1-D5 | as listed | the same passes (S1 home within 600 s 1.00 / 0.95 / 0.875 at its three distances, unchanged; medians within a few per cent) |
+- **Goldens.** The legacy goldens are `main`'s byte for byte; the one-world golden is re-recorded once (with all three settings 0 it is `main`'s).
+- **Tests** (`tests/int/oneWorldRouteJoin.test.ts`), each failing under a mutant: the join at the nearest place (mutant: newest), the newer of equals, the clear line, the narrowing to a searching ant (gate removed, inverted, 2 not always), a game where a carrier near home walks in rather than out, the search restarted and centred on the first place, and only once the retrace is over; `routeFight`'s gate and clause.
+- **Not re-run at step 3:** the full one-world assays and the tick bench. At step 4 the join and end together left the assays as they were but A2b (9 → 7 of 10) and A5b (8 → 9), and the tick within noise (16.19 / 15.73 / 15.84 ms on against 15.47 / 15.66 / 15.91 off); routeEnd reads one stored place once per retrace.
 
-A2b loses two seeds: seed 4's rich share 0.78 to 0.69 (just under the mark) and seed 9's 0.74 to 0.17 (the colony settled on the poor source). It is a symmetry-breaking assay, decided early by which trail wins, and any change to who gets home when moves it (route memory's first build lost seed 4 the same way); route memory touches carriers only, not the trail choice itself. Reported to the owner, not tuned away.
-
-**Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, seed 1, 60 s, three runs each, second-half mean, alternating): on 16.19, 15.73, 15.84 ms; off (today's `main`) 15.47, 15.66, 15.91 ms. Within noise (about 0.2 ms apart on average); the join scans its places once a retrace (with a line test for each nearer place), the end reads one place. **Memory:** none added. **Jev cost:** none (steering only; no situation, legend or question changed).
-
-**Other tests.** `npm test` passes (992); the desert-heat soak test sampled its ants at 150 s, in the heat's trough, when 2 were out on `main` and none with `routeJoin` on: it now samples at 110 s (about 38 out), passing on and off. `npm run test:slow`'s G1 guard passes with the new defaults.
-
-**Still open.** Seed 3's rival (4) and seed 15's rival (5): pocket carriers whose retrace runs out of reachable places, and fighters with no places. `routeFight` was the candidate for the second and lost on seed 7; the owner may want a narrower form (only a fighter that then picks up food far from home). Recording while homing empty, done as a forward-followed homeward memory, is a new mechanic for the owner.
+**Still open.** The bound of 2 on every seed (`ja-lp4.6.3`): with routeEnd on, 14 of seeds 1-20 meet it and seed 7's rival reaches 6. The owner may tighten #183's guard to track this (it passes with 7 of 10 within, against its 4). A narrower `routeFight` (only a fighter that then picks up food far from home) is next.
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
