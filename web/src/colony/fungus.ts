@@ -1132,7 +1132,8 @@ export class Fungus {
     while (clock.clock >= every) {
       clock.clock -= every;
       // Stumps of cut hyphae regrow into the dug cells they lost (ja-2bw.15); knots old enough sprout (ja-2bw.9).
-      for (const { h, g } of maps) budget.tips += h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget);
+      for (const { h, g } of maps)
+        budget.tips += h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeMass));
       stepRound(maps, level, budget, this.growthPolicy);
       stepped = true;
     }

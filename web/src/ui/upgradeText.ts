@@ -33,7 +33,7 @@ const WHY: Record<string, string> = {
   mycelium:
     "The fungus on the ground by the hole is where spores and mutations come from. A thicker patch holds more mass, so it grows faster and can pay for more spores; every bit it grows is a chance to mutate, so a bigger one also earns mutations faster.",
   knots:
-    "Ants digging their nest cut the hyphae in their way. A knot is the fungus's answer: where a hypha runs short of mass it hardens into a knot that digging can't cut. It keeps a little of the hypha's mass as spores for the ants that dig into it, and later sprouts a new thread.",
+    "Ants digging their nest cut the hyphae in their way. A knot is the fungus's answer: where a hypha runs short of mass it hardens into a knot that digging can't cut. Underground it keeps a little of the hypha's mass as spores for the ants that dig into it; on the surface it holds that mass as a reserve. Later it sprouts a new thread (on the surface giving its reserve back).",
   fruiting:
     "Spores lie on the ground for foragers to walk through. A denser fruiting body puts out more of them, but they are paid for out of the mycelium's mass, so the patch settles smaller.",
   evasion:

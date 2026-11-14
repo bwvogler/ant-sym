@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { E, NE, nx, ny, SE, W } from "../../hex.ts";
 import { localGrowthChoice } from "../../growthBrain.ts";
-import type { Ground } from "../../hyphae.ts";
+import type { Ground, Tip } from "../../hyphae.ts";
 import {
   cellKey,
   growthUnit,
@@ -859,4 +859,60 @@ test("a knot sprouts one tip KNOT.sprout seconds after forming, onward from wher
     [[...keyCell(k!), E]],
   );
   assert.equal(h.sproutKnots(g, 1, { free: 1e9, tips: 1 }), 0, "it sprouts once");
+});
+
+test("hardening leaves no orphan: a cell feeding a branch, grown or a bare tip, stops the draw, and a spot no hypha touches goes (review of #161 S2)", () => {
+  // A line east from (0, 30), its tip at (6, 30), and a branch from (4, 30): grown one cell, or a bare tip on (4, 30).
+  for (const grown of [true, false]) {
+    const h = starvedLine(6, 99);
+    const tip = h.tips[0]!;
+    const b: Tip = { x: 4, y: 30, heading: SE, first: SE, run: 0 };
+    h.tips.push(b);
+    if (grown) assert.ok(h.extend(b, SE, 0));
+    // A spot touched only by the tip's cell.
+    const spot = cellKey(nx(6, 30, NE), ny(30, NE));
+    h.fruits.push(spot);
+    assert.ok(h.harden(1) > 0);
+    assert.ok(!h.tips.includes(tip));
+    assert.deepEqual([...h.knots.keys()].map(keyCell), [[4, 30]], `grown ${grown}: the knot sits at the branch point`);
+    for (const [c, p] of h.parent) if (p !== ROOT) assert.ok(h.parent.has(p), `grown ${grown}: ${keyCell(c)} left with a deleted parent`);
+    for (const t of h.tips) assert.ok(h.has(t.x, t.y), `grown ${grown}: a tip left on a deleted cell`);
+    assert.ok(!h.fruits.includes(spot), "a spot no hypha touches was kept");
+  }
+});
+
+test("a knot sprouts onward from where it was fed, also off the east heading; a starved count is saved (review of #161 S3, N2)", () => {
+  const h = new Hyphae();
+  h.root(0, 30, SE);
+  const t = h.tips[0]!;
+  for (let k = 0; k < 6; k++) assert.ok(h.extend(t, SE, 0));
+  t.starved = 99;
+  h.harden(1);
+  const [k] = [...h.knots.keys()];
+  h.knots.get(k!)!.age = KNOT.sprout[1];
+  assert.equal(h.sproutKnots(plane(), 1, { free: 1e9, tips: 0 }), 1);
+  assert.equal(h.tips[0]!.heading, SE);
+  h.tips[0]!.starved = 3;
+  assert.equal(Hyphae.load(JSON.parse(JSON.stringify(h.save()))).tips[0]!.starved, 3);
+});
+
+test("on the plane a knot is a reserve: sprouting gives its store back; underground it keeps it (review of #161 D1)", () => {
+  for (const topsoil of [true, false]) {
+    const h = starvedLine(8, 99);
+    h.harden(1);
+    const [k] = [...h.knots.keys()];
+    const knot = h.knots.get(k!)!;
+    const store = knot.store;
+    knot.age = KNOT.sprout[1];
+    const g: Ground = { topsoil, kind: () => "soil" };
+    const budget = { free: 1e9, tips: 0 };
+    let back = 0;
+    assert.equal(
+      h.sproutKnots(g, 1, budget, 1, (m) => (back += m)),
+      1,
+    );
+    assert.equal(back, topsoil ? store : 0);
+    assert.equal(knot.store, topsoil ? 0 : store);
+    assert.equal(budget.free, 1e9 + back);
+  }
 });

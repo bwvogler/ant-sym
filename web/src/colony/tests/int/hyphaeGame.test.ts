@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
 import { CORPSE, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
-import { cellKey as hyphaKey, HYPHA_MASS, keyCell } from "../../hyphae.ts";
+import { cellKey as hyphaKey, HYPHA_MASS, KNOT, keyCell } from "../../hyphae.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, hexDistance, nx, ny } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { columnsOver } from "../../transect.ts";
@@ -369,4 +369,45 @@ test("with Knots bought, starved tips harden into knots in the game, paid from t
   assert.ok(h()!.has(kx, ky), "the knot was cut");
   assert.ok(knot.store < before, "the store put out nothing");
   assert.ok(g.fungus.sporesOn(CURTAIN)!.spores.get(kx, ky) > 0, "no spores on the knot's dug cell");
+});
+
+test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps its store until a cell beside it is dug, then fruits there (review of #161 S1, S3)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  assert.ok(g.fungus.upgrade("knots"));
+  const curtain = () => g.fungus.hyphaeOn(CURTAIN);
+  const map = g.world!.curtain;
+  // A knot with a store; the dug cells round it filled back in (backfill), so it is buried.
+  const stocked = () => [...(curtain()?.knots ?? [])].find(([, n]) => n.store > 0)?.[0];
+  for (let t = 0; t < 300 && stocked() === undefined; t++) runFor(g, 1);
+  const k = stocked();
+  assert.ok(k !== undefined, "no knot with a store formed in 300 s");
+  {
+    const [x, y] = keyCell(k);
+    for (const [cx, cy] of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])
+      if (rockAt(map, cx, cy) === OPEN) map.rock.set(cx, cy, SOIL);
+  }
+  const h = curtain()!;
+  const knot = h.knots.get(k)!;
+  const [kx, ky] = keyCell(k);
+  const store = knot.store;
+  const age = knot.age;
+  runFor(g, 2);
+  assert.ok(knot.age >= age + 1.9, "the knot did not age");
+  if ([0, 1, 2, 3, 4, 5].every((d) => rockAt(map, nx(kx, ky, d), ny(ky, d)) !== OPEN))
+    assert.equal(knot.store, store, "a buried knot spent its store");
+  // Dig a soil cell beside it: its store fruits there.
+  let dug: [number, number] | null = null;
+  for (let d = 0; d < 6 && !dug; d++) if (rockAt(map, nx(kx, ky, d), ny(ky, d)) === SOIL) dug = [nx(kx, ky, d), ny(ky, d)];
+  assert.ok(dug, "no soil beside the knot");
+  map.rock.set(dug[0], dug[1], OPEN);
+  const was = knot.store;
+  runFor(g, 3);
+  assert.ok(knot.store < was, "the store put out nothing");
+  assert.ok(g.fungus.sporesOn(CURTAIN)!.spores.get(...dug) > 0, "no spores on the dug cell beside it");
+  // Ample mass and time: it sprouts.
+  e.mass += 200;
+  for (let t = 0; t < KNOT.sprout[1] + 10 && !knot.sprouted; t++) runFor(g, 1);
+  assert.ok(knot.sprouted, `no sprout ${KNOT.sprout[1] + 10} s after forming`);
 });

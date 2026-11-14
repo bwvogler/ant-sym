@@ -336,9 +336,17 @@ export class Hyphae {
 
   /**
    * Knots sprout (ja-2bw.9): each knot KNOT.sprout[level] seconds old that has not sprouted puts out one tip, on the side
-   * away from the cell it grew from (or the nearest free turn), when the free mass is ample for it. Returns the tips put out.
+   * away from the cell it grew from (or the nearest free turn) that it may enter at Mycelium level `reach`, when the free
+   * mass is ample for it. A knot on the plane gives its store back to the body as it sprouts (`refund`, and `budget.free`).
+   * Returns the tips put out.
    */
-  sproutKnots(g: Ground, level: number, budget: { free: number; tips: number }): number {
+  sproutKnots(
+    g: Ground,
+    level: number,
+    budget: { free: number; tips: number },
+    reach = 1,
+    refund: (mass: number) => void = () => {},
+  ): number {
     const after = KNOT.sprout[level] ?? 0;
     if (after <= 0) return 0;
     let n = 0;
@@ -354,10 +362,17 @@ export class Hyphae {
       }
       for (const t of [0, 1, -1, 2, -2]) {
         const d = turn(on, t);
-        if (!enterable(this, g, nx(x, y, d), ny(y, d), 1)) continue;
+        if (!enterable(this, g, nx(x, y, d), ny(y, d), reach)) continue;
         this.tips.push({ x, y, heading: d, first: d, run: 0 });
         knot.sprouted = true;
         n++;
+        // On the plane (topsoil, never dug) a knot can't fruit: it is a dormant reserve, and sprouting gives its store back
+        // to the mycelium (owner, review of #161, D1).
+        if (g.topsoil && knot.store > 0) {
+          budget.free += knot.store;
+          refund(knot.store);
+          knot.store = 0;
+        }
         break;
       }
     }
@@ -814,7 +829,8 @@ function stepTip(
     case "rest":
       break;
   }
-  // Starving: rounds in a row it rested short and grew nothing (knots harden from these, ja-2bw.9).
+  // Starving: rounds in a row it rested short and grew nothing (knots harden from these, ja-2bw.9). "Grew nothing" matters
+  // only when a growth policy answers grow while the supply is short: the local rule rests then.
   tip.starved = s.supply === "short" && grown === 0 ? (tip.starved ?? 0) + 1 : 0;
   // Where a tip still growing has come to a tunnel, grown FRUIT_RUN cells and with no spot of its own within FRUIT_GAP,
   // the body puts a spore spot on the dug cell and the tip grows on (ja-2bw.15, owner 2026-11-13: spots spaced in the
