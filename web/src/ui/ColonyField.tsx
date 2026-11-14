@@ -8,6 +8,8 @@ import {
   keyY,
   moundRadius,
   PLANE,
+  groundHeat,
+  sunDown,
   CELL,
   cellOf,
   centreX,
@@ -1064,6 +1066,21 @@ export default function ColonyField({
           }
         }
       if (hexes) drawHexes(c, v, rx0, rx1, ry0, ry1);
+      // Heat (ja-rf5.5): the plane's ground warms toward noon and cools by dawn; a warm wash over it shows how hot it is now.
+      const hp = colonies[0]?.params;
+      if (hp && hp.heatDay > 0 && (lv === PLANE || (lv < 0 && !m.sky))) {
+        const k = Math.max(0, Math.min(1, (groundHeat(hp, colonies[0]!.time) - hp.heatDawn) / (hp.heatNoon - hp.heatDawn)));
+        ctx.globalAlpha = 0.28 * k;
+        ctx.fillStyle = theme.warn;
+        ctx.fillRect(0, 0, v.w, v.h);
+        // Night (the sun down): a dark wash; the desert ants are in. Black in both themes: the ink is pale in dark mode (review of #155, S1).
+        if (sunDown(hp, colonies[0]!.time)) {
+          ctx.globalAlpha = 0.3;
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, v.w, v.h);
+        }
+        ctx.globalAlpha = 1;
+      }
       const hy = fungus.hyphaeOn(lv < 0 ? 0 : lv);
       if (hy) drawHyphae(hy, c, v, d, lv === PLANE || (lv < 0 && !m.sky), rx0, rx1, ry0, ry1);
 
