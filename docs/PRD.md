@@ -5269,7 +5269,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
 
-**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun takes the spores of hosts that die out on the plane and of corpses on the midden (`ja-2bw.7`, §63.2): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
 
@@ -5299,6 +5299,20 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 **Owner (2026-11-14, review of #171, D1): merge the rule at ×1, bit-exact with `main`, and choose the number once Stalks (#178, `ja-2bw.10`) is in**, since stalks lay their spores on the plane and the two interact (`ja-19oz`). The test sets `sun: 4` itself.
 
 **Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
+
+**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off).** Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sun ×1 (s) | 250 | 518 | 293 | 146 | 110 | 336 | 265 | 442 | 189 | 240 |
+| sun ×4 (s) | 250 | 318 | 293 | 146 | 136 | 414 | 265 | 585 | 379 | 240 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sun ×1 (s) | 331 | 238 | 199 | 18 | 278 | 352 | 233 | 243 | 244 | 342 |
+| sun ×4 (s) | 543 | 231 | 203 | 18 | 285 | 352 | 245 | 332 | 262 | 361 |
+
+With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s and one seed's queen is never reached, the worst of 11–20 352 → 543 s. Only seed 2 is faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off; a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
