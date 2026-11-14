@@ -5189,12 +5189,12 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Design.**
 - **The upgrade.** *Stalks*, a spread upgrade: *none* → *a stalk* (600) → *a tall stalk* (2000).
-- **When.** A corpse the fungus has colonised (ja-2bw.7: buried on the midden, or a host dead on the plane) that lies outside (the plane, topsoil) grows a stalk `STALK.delay` seconds after it was colonised (60 at *a stalk*, 30 at *a tall stalk*, standing in for days). A corpse that is carried is not colonised yet, and one in the nest (a layer that is not topsoil) never grows one.
-- **What.** From then on the corpse's free spores, still paid by the cadaver at `CORPSE.rate`, fall evenly over every open cell within `STALK.radius` (2, then 4) instead of its one cell, so more passing foragers pick some up, each less.
+- **When.** A corpse the fungus has colonised (ja-2bw.7: buried on the midden, or a host dead on the plane) that lies outside (the plane, topsoil) grows a stalk `STALK.delay` seconds after it was colonised (20 at *a stalk*, 10 at *a tall stalk*, standing in for days; well inside a lone corpse's 60 s of spores, owner 2026-11-14 on review of #178: first built at 60 and 30, the first level's stalk grew just as a lone corpse ran dry). A corpse that is carried is not colonised yet, and one in the nest (a layer that is not topsoil) never grows one.
+- **What.** From then on the corpse's free spores, still paid by the cadaver at `CORPSE.rate`, go each step to the emptiest open cell within `STALK.radius` (2, then 4) instead of its one cell, so the ring fills evenly over a few seconds and more passing foragers pick some up, each less. (Split over every cell each step, as first built, a share at radius 4 fell under the fade's floor `SPORE_GONE` and vanished the next step: 45 % fewer spore-seconds on the ground than without a stalk, review of #178.)
 - **Seen.** A stalk draws as a short upright stroke on the corpse's cell; the panel's line and Learn text explain it.
 - **Not asked of Jev.** No lane changes; nothing is spent.
 
-**Assays.** A corpse outside grows its stalk after `STALK.delay` and its spores then land in the ring; no stalk without the upgrade, before the delay, or in a layer that is not topsoil; the cadaver pays the same spores either way; corpse ages save and load; P1 with *Stalks* bought (in the order, and at landing with `--grant stalks`).
+**Assays.** A corpse outside grows its stalk after `STALK.delay` and its spores then fill the ring to its edge and no further, with about what the cadaver paid on the ground (within 25 % below, 5 % above: foragers take more from a wider ring), at both levels; a spent corpse's stalk is gone; no stalk without the upgrade, before the delay, or in a layer that is not topsoil; the cadaver pays the same spores either way; corpse ages save and load; P1 with *Stalks* bought (in the order, and at landing with `--grant stalks`).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, seeds 1–10, on main after #153; seconds to a quarter of the hosts):
 

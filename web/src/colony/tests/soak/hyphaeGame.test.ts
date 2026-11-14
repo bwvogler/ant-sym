@@ -438,12 +438,14 @@ function sporesNear(g: Game, from: number, to: number): number {
 }
 
 test("with Stalks bought, a corpse colonised outside grows a stalk after STALK.delay and its spores then fill a ring; the ground holds what the cadaver paid (ja-2bw.10)", () => {
+  // The design's numbers (PRD §63.12; the delays the owner's, 2026-11-14): the checks below read them from STALK.
+  assert.deepEqual(STALK, { delay: [0, 20, 10], radius: [0, 2, 4] });
   const k = hyphaKey(60, 40);
   for (const level of [1, 2]) {
     const g = buried(level);
     const none = buried(0);
-    const delay = STALK.delay[level];
-    const radius = STALK.radius[level];
+    const delay: number = STALK.delay[level] ?? 0;
+    const radius: number = STALK.radius[level] ?? 0;
     runFor(g, delay - 1);
     assert.ok(!g.fungus.stalksOn(PLANE).includes(k), `a stalk before its delay at level ${level}`);
     assert.equal(sporesNear(g, 1, radius), 0, `spores round the corpse before the stalk at level ${level}`);
