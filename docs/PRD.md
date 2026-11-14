@@ -5463,6 +5463,7 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 - Build it (owner, §50.5 and 2026-11-14).
 - Option 1 first, the network; the soil odour (option 2) is decided later, only if pockets stay untouched (owner, 2026-11-14).
 - Old foragers dig the foraging tunnels; the middle-aged keep digging the nest as now (owner, 2026-11-14).
+- Ship the plain bout and accept its reach: far pockets stay mostly untouched; no map change, no soil odour for now (owner, 2026-11-14, after the measurements below).
 
 **The mechanic.**
 - *Option 1:* a forager whose search outside failed (fatigue past patience) or that feels the colony's hunger (felt need at its threshold), at a dead end in its own nest, digs on outward (home vector) and level or down (gravity), exempt from `ROOMY_DIG` and the middle-aged-only rule for that dig. Food is found by contact, then taken home by what is built (open-ground food sensing, trails, STORE_AFTER). Off (0) is main bit for bit. It adds no global read.
