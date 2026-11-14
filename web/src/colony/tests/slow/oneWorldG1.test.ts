@@ -49,11 +49,13 @@ async function all(seeds: number[], jobs: number): Promise<Held[]> {
 
 test(
   `G1, one world: hardly a forager holds its food over 120 s (seeds 1-10, 600 + 600 ants, 600 s; at most ${BOUND} on at least ${WITHIN} seeds, none at ${CEILING} or more)`,
-  { timeout: 1_800_000 },
-  async () => {
+  { timeout: 1_200_000 }, // the file limit of test:slow and slow.yml caps it anyway (20 min; on a runner it took 10.6)
+  async (t) => {
     const held = await all(SEEDS, availableParallelism());
     const within = held.filter((h) => h.worst <= BOUND).length;
     const table = held.map((h) => `seed ${h.seed}: ${h.you} / ${h.rival}`).join("; ");
+    // On record when green too: the margin is what the next change to one world's play is checked against.
+    t.diagnostic(`${within} of ${SEEDS.length} within ${BOUND}: ${table}`);
     assert.ok(within >= WITHIN, `${within} of ${SEEDS.length} seeds within ${BOUND} (need ${WITHIN}): ${table}`);
     const jam = held.filter((h) => h.worst >= CEILING);
     assert.equal(jam.length, 0, `seeds at ${CEILING} or more: ${table}`);
