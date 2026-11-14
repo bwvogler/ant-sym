@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   CELL,
+  cellKey,
   cellOf,
   centreX,
   centreY,
@@ -17,6 +18,9 @@ import {
   ny,
   R,
   SIDE,
+  keyCell,
+  keyX,
+  keyY,
 } from "../../hex.ts";
 
 const near = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -227,4 +231,29 @@ test("hexRuns: a line along a way is one run; a 30° slant turns about every 12 
   // A wider band turns less; a narrower one keeps nearer the line.
   assert.ok(turnsOf(hexRuns(0, 0, 75, 50, 8)) < turnsOf(slant));
   for (const o of offs(hexRuns(0, 0, 75, 50, 1))) assert.ok(o <= 1.5 + 1e-9);
+});
+
+test("cellKey: one whole number per cell, either sign, out to the chunk keys' ±32k chunks; keyX and keyY undo it", () => {
+  const far = 32768 * 64 - 1; // the last cell of the last chunk a chunkKey reaches
+  const cells: [number, number][] = [
+    [0, 0],
+    [-1, 0],
+    [0, -1],
+    [-40000, 12],
+    [40000, -70000],
+    [far, far],
+    [-far - 1, -far - 1],
+  ];
+  const seen = new Set<number>();
+  for (const [x, y] of cells) {
+    const k = cellKey(x, y);
+    assert.ok(Number.isSafeInteger(k) && k >= 0, `${k} is an exact whole number`);
+    assert.deepEqual([keyX(k), keyY(k)], [x, y], `(${x}, ${y})`);
+    assert.deepEqual(keyCell(k), [x, y]);
+    seen.add(k);
+  }
+  assert.equal(seen.size, cells.length, "no two cells share a key");
+  // Neighbours along a row and down a column never collide, across zero.
+  for (let x = -3; x <= 3; x++) for (let y = -3; y <= 3; y++) seen.add(cellKey(x, y));
+  assert.equal(seen.size, cells.length + 49 - 3, "(0,0), (-1,0) and (0,-1) were already in");
 });

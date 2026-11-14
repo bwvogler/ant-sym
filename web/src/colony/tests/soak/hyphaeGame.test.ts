@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
-import { CORPSE, STRAINS } from "../../fungus.ts";
+import { CORPSE, STALK, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
-import { cellKey as hyphaKey, HYPHA_MASS, keyCell } from "../../hyphae.ts";
+import { cellKey as hyphaKey, HYPHA_MASS, KNOT, keyCell } from "../../hyphae.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, hexDistance, nx, ny } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { columnsOver } from "../../transect.ts";
@@ -21,6 +21,8 @@ function game(hyphae: boolean): Game {
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
     { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae } },
     gameRng(7),
+    // routeMemory off: these tests follow one seed's digging, and route memory moves the ants (it is not what they test).
+    { colony: { routeMemory: 0 }, rival: { routeMemory: 0 } },
   );
   g.land(0, GARDEN, { evolve: true });
   return g;
@@ -339,4 +341,180 @@ test("in the game, a hypha dug through in the curtain regrows from its stump int
   for (let t = 0; t < 60 && !h.has(x, y); t++) runFor(g, 1);
   assert.ok(h.has(x, y), "nothing regrew into the dug cell in 60 s");
   assert.equal(rockAt(g.world!.curtain, x, y), OPEN, "the cell is still dug: the hypha runs on its back wall");
+});
+
+test("with Knots bought, starved tips harden into knots in the game, paid from the body; dug open, a knot stays and fruits its store there (ja-2bw.9)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7; // mutations enough to buy it at once
+  assert.ok(g.fungus.upgrade("knots"));
+  const moved: number[] = [];
+  const lose = e.lose.bind(e);
+  e.lose = (m: number) => {
+    moved.push(m);
+    lose(m);
+  };
+  const h = () => g.fungus.hyphaeOn(CURTAIN);
+  const stocked = () => [...(h()?.knots ?? [])].find(([, n]) => n.store > 0)?.[0];
+  for (let t = 0; t < 300 && stocked() === undefined; t++) runFor(g, 1);
+  const k = stocked();
+  assert.ok(k !== undefined, "no knot with a store formed in the curtain in 300 s");
+  // Its store came out of the body: what moved equals what the knots hold (none has fruited or been cut yet, or less).
+  const held = [PLANE, CURTAIN].flatMap((l) => [...(g.fungus.hyphaeOn(l)?.knots.values() ?? [])]).reduce((a, n) => a + n.store, 0);
+  assert.ok(held <= moved.reduce((a, m) => a + m, 0) + 1e-9);
+  // Dig the knot's own cell: it stays, and fruits its store onto it.
+  const [kx, ky] = keyCell(k);
+  const knot = h()!.knots.get(k)!;
+  const before = knot.store;
+  g.world!.curtain.rock.set(kx, ky, OPEN);
+  runFor(g, 3);
+  assert.ok(h()!.has(kx, ky), "the knot was cut");
+  assert.ok(knot.store < before, "the store put out nothing");
+  assert.ok(g.fungus.sporesOn(CURTAIN)!.spores.get(kx, ky) > 0, "no spores on the knot's dug cell");
+  g.fungus.sporesOn(CURTAIN)!.spores.forEach((cx, cy) => assert.ok(cy >= 0, `a spore chunk off the map, at chunk (${cx}, ${cy})`));
+});
+
+test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps its store until a cell beside it is dug, then fruits there (review of #161 S1, S3)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  assert.ok(g.fungus.upgrade("knots"));
+  const curtain = () => g.fungus.hyphaeOn(CURTAIN);
+  const map = g.world!.curtain;
+  // A knot with a store; the dug cells round it filled back in (backfill), so it is buried.
+  const stocked = () => [...(curtain()?.knots ?? [])].find(([, n]) => n.store > 0)?.[0];
+  for (let t = 0; t < 300 && stocked() === undefined; t++) runFor(g, 1);
+  const k = stocked();
+  assert.ok(k !== undefined, "no knot with a store formed in 300 s");
+  {
+    const [x, y] = keyCell(k);
+    for (const [cx, cy] of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])
+      if (rockAt(map, cx, cy) === OPEN) map.rock.set(cx, cy, SOIL);
+  }
+  const h = curtain()!;
+  const knot = h.knots.get(k)!;
+  const [kx, ky] = keyCell(k);
+  const store = knot.store;
+  const age = knot.age;
+  runFor(g, 2);
+  assert.ok(knot.age >= age + 1.9, "the knot did not age");
+  if ([0, 1, 2, 3, 4, 5].every((d) => rockAt(map, nx(kx, ky, d), ny(ky, d)) !== OPEN))
+    assert.equal(knot.store, store, "a buried knot spent its store");
+  // Dig a soil cell beside it: its store fruits there.
+  let dug: [number, number] | null = null;
+  for (let d = 0; d < 6 && !dug; d++) if (rockAt(map, nx(kx, ky, d), ny(ky, d)) === SOIL) dug = [nx(kx, ky, d), ny(ky, d)];
+  assert.ok(dug, "no soil beside the knot");
+  map.rock.set(dug[0], dug[1], OPEN);
+  const was = knot.store;
+  runFor(g, 3);
+  assert.ok(knot.store < was, "the store put out nothing");
+  assert.ok(g.fungus.sporesOn(CURTAIN)!.spores.get(...dug) > 0, "no spores on the dug cell beside it");
+  // Ample mass and time: it sprouts.
+  e.mass += 200;
+  for (let t = 0; t < KNOT.sprout[1] + 10 && !knot.sprouted; t++) runFor(g, 1);
+  assert.ok(knot.sprouted, `no sprout ${KNOT.sprout[1] + 10} s after forming`);
+});
+
+/** A game with *Stalks* bought to `level` and one corpse buried on the plane at (60, 40). */
+function buried(level: number): Game {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  for (let k = 0; k < level; k++) assert.ok(g.fungus.upgrade("stalks"));
+  g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
+  return g;
+}
+
+/** The spores on the plane within hex distance `from`..`to` of cell (cx, cy). */
+function sporesNearAt(g: Game, cx: number, cy: number, from: number, to: number): number {
+  const spores = g.fungus.sporesOn(PLANE)!.spores;
+  let sum = 0;
+  for (let y = cy - to - 1; y <= cy + to + 1; y++)
+    for (let x = cx - to - 1; x <= cx + to + 1; x++) {
+      const d = hexDistance(x, y, cx, cy);
+      if (d >= from && d <= to) sum += spores.get(x, y);
+    }
+  return sum;
+}
+
+/** The spores on the plane within hex distance `from`..`to` of the corpse at (60, 40). */
+const sporesNear = (g: Game, from: number, to: number) => sporesNearAt(g, 60, 40, from, to);
+
+test("with Stalks bought, a corpse colonised outside grows a stalk after STALK.delay and its spores then fill a ring; the ground holds what the cadaver paid (ja-2bw.10)", () => {
+  // The design's numbers (PRD §63.12; the delays the owner's, 2026-11-14): the checks below read them from STALK.
+  assert.deepEqual(STALK, { delay: [0, 20, 10], radius: [0, 2, 4] });
+  const k = hyphaKey(60, 40);
+  for (const level of [1, 2]) {
+    const g = buried(level);
+    const none = buried(0);
+    const delay: number = STALK.delay[level] ?? 0;
+    const radius: number = STALK.radius[level] ?? 0;
+    runFor(g, delay - 1);
+    assert.ok(!g.fungus.stalksOn(PLANE).includes(k), `a stalk before its delay at level ${level}`);
+    assert.equal(sporesNear(g, 1, radius), 0, `spores round the corpse before the stalk at level ${level}`);
+    runFor(g, 2);
+    assert.ok(g.fungus.stalksOn(PLANE).includes(k), `no stalk after its delay at level ${level}`);
+    runFor(g, 20);
+    // Most of what it paid since the stalk lies round it, out to the edge of its radius and no further.
+    assert.ok(sporesNear(g, 1, radius) > 0.5 * CORPSE.rate * 20, `the ring holds little at level ${level}`);
+    assert.ok(sporesNear(g, radius, radius) > 0, `nothing at the ring's edge at level ${level}`);
+    assert.equal(sporesNear(g, radius + 1, radius + 1), 0, `spores past the radius at level ${level}`);
+    // The ground holds about what the cadaver paid, as without a stalk: spread, not lost to the fade, nor made from
+    // nothing. A little less, since more of the ring lies where foragers pass and take some (level 2: 4.0 against 4.6).
+    runFor(none, g.time - none.time);
+    assert.ok(!none.fungus.stalksOn(PLANE).includes(k), "a stalk without the upgrade");
+    const [ours, theirs] = [sporesNear(g, 0, radius), sporesNear(none, 0, radius)];
+    assert.ok(ours > 0.75 * theirs && ours < 1.05 * theirs, `level ${level}: ${ours} on the ground against ${theirs} without a stalk`);
+    assert.ok(Math.abs(none.fungus.corpsesOn(PLANE).get(k)! - g.fungus.corpsesOn(PLANE).get(k)!) < 1e-9, "the cadaver paid differently");
+    if (level !== 1) continue;
+    // A second corpse on the same cell adds its spores and keeps the stalk; its age is saved.
+    g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: g.fungus.evolution!.strain }, PLANE);
+    assert.ok(g.fungus.stalksOn(PLANE).includes(k), "a second corpse reset the stalk");
+    const back = game(true);
+    back.load(JSON.parse(JSON.stringify(g.save())) as GameSave);
+    assert.ok(back.fungus.stalksOn(PLANE).includes(k), "the stalk was not saved");
+  }
+  // A spent corpse's stalk is gone.
+  const spent = buried(1);
+  runFor(spent, CORPSE.spores / CORPSE.rate + 2);
+  assert.ok(!spent.fungus.stalksOn(PLANE).includes(k), "a spent corpse still has a stalk");
+});
+
+test("a stalk beside rock puts no spores on the rock (ja-2bw.10)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  assert.ok(g.fungus.upgrade("stalks"));
+  assert.ok(g.fungus.upgrade("stalks"));
+  // (55, 30) on seed 7's small plane has rock within a tall stalk's radius (review of #178: 10 cells).
+  const [x, y, radius] = [55, 30, STALK.radius[2]];
+  const map = g.world!.plane;
+  const rocks: [number, number][] = [];
+  for (let cy = y - radius - 1; cy <= y + radius + 1; cy++)
+    for (let cx = x - radius - 1; cx <= x + radius + 1; cx++)
+      if (hexDistance(cx, cy, x, y) <= radius && rockAt(map, cx, cy) !== OPEN) rocks.push([cx, cy]);
+  assert.ok(rocks.length > 0, "no rock round the corpse");
+  g.colonies[0]!.onBury!({ x, y, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
+  const spores = g.fungus.sporesOn(PLANE)!.spores;
+  for (let t = 0; t < STALK.delay[2] + 30; t++) {
+    runFor(g, 1);
+    for (const [cx, cy] of rocks) assert.equal(spores.get(cx, cy), 0, `spores on rock at (${cx}, ${cy}) after ${g.time.toFixed(0)} s`);
+  }
+  assert.ok(sporesNearAt(g, x, y, 1, radius) > 0, "no spores round the corpse");
+});
+
+test("a corpse colonised in the nest (a layer that is not topsoil) never grows a stalk (ja-2bw.10)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  assert.ok(g.fungus.upgrade("stalks"));
+  assert.ok(g.fungus.upgrade("stalks"));
+  crossDown(g);
+  const map = g.world!.curtain;
+  let at: [number, number] | null = null;
+  for (let y = 45; y < 80 && !at; y++) for (let x = 0; x < 40 && !at; x++) if (rockAt(map, x, y) === OPEN) at = [x, y];
+  assert.ok(at);
+  g.fungus.colonise(CURTAIN, ...at);
+  runFor(g, STALK.delay[2] + 5);
+  assert.deepEqual(g.fungus.stalksOn(CURTAIN), []);
 });

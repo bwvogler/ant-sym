@@ -5,7 +5,7 @@ import { CURTAIN, MIDDEN_MIN, PLANE, SWELL, type Colony, type Layer } from "../.
 import { MODES } from "../../vocab.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng } from "../../game.ts";
-import { CELL, cellOf, centreX, centreY, hexDistance, nx, ny } from "../../hex.ts";
+import { CELL, cellOf, centreX, centreY, hexDistance, keyX, keyY, nx, ny } from "../../hex.ts";
 import { heapPlane, OPEN, rockAt, ROCK, worldFromArrays, type WorldMap } from "../../world.ts";
 import { DT, ageOf, curtainHole, own, planeHole, smallOne } from "../builders.ts";
 
@@ -270,8 +270,8 @@ test("one world: a corpse carried up goes on the midden, off the mound and at le
   assert.equal(c.layer[i], PLANE, "the undertaker is out on the plane");
   assert.equal(c.midden.size, 1);
   const key = [...c.midden.keys()][0]!;
-  const mx = key % 65536;
-  const my = Math.floor(key / 65536);
+  const mx = keyX(key);
+  const my = keyY(key);
   assert.ok(far >= MIDDEN_MIN, `by its vector ${far.toFixed(1)} from home`);
   assert.equal(under, 0, "no spoil underfoot where it put it down");
   assert.equal(plane.spoil!.get(mx, my), 0, "the midden's cell is off the mound");

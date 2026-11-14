@@ -6,10 +6,10 @@ import { R1_SECONDS, route1, runAssay } from "../../experiment.ts";
 // default plane get home. Target (design: no paper measures a pocket detour): at least 95 % of the pocket pickups home
 // within 300 s, and a median of walked over the way round of at most 4. Measured at the baseline (before routeMemory),
 // seeds 1-10 (`npm run exp -- --one r1`): seeds 1, 2, 6 and 9 have no pocket; of the other six 4 pass (5, 7, 8, 10) and 2 fail
-// (home within 300 s / median ratio: seed 3 22.5 % / 11.2, seed 4 45 % / 13.2).
+// (home within 300 s / median ratio: seed 3 22.5 % / 11.2, seed 4 45 % / 13.2). With route memory at its shipped defaults (ja-lp4.16.4) all six pass (100 % within 300 s, ratio at most 1.70).
 test(
   "R1, one world: carriers from a pocket's pile get home (seeds 1-10; 95 % within 300 s, walked at most 4 times the way round)",
-  { timeout: 1_200_000, todo: "fails on seeds 3 and 4 until route memory (ja-lp4.16.3, ja-lp4.16.4)" },
+  { timeout: 1_200_000 },
   () => {
     const failed: string[] = [];
     for (let seed = 1; seed <= 10; seed++) {

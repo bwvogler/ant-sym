@@ -13,7 +13,7 @@
 // Usage: node scripts/lab/one-world-spike.mjs [seeds=1-3] [seconds=300] [ants=300]
 import { CHUNK, CHUNK_BITS } from "../../web/src/colony/chunks.ts";
 import { GAME_REGROW, Game, gameRng } from "../../web/src/colony/game.ts";
-import { CELL, cellOf, hexDistance } from "../../web/src/colony/hex.ts";
+import { CELL, cellOf, hexDistance, keyX, keyY } from "../../web/src/colony/hex.ts";
 import { generateOneWorld } from "../../web/src/colony/oneWorld.ts";
 
 /** Colony c's mound and midden on the plane: spoil nearer its hole than any other's, and its midden's corpses. */
@@ -38,7 +38,7 @@ function moundOf(plane, c) {
   });
   far.sort((a, b) => a - b);
   const md = [];
-  for (const [key, n] of c.midden) for (let k = 0; k < n; k++) md.push(hexDistance(key % 65536, Math.floor(key / 65536), own.px, own.py));
+  for (const [key, n] of c.midden) for (let k = 0; k < n; k++) md.push(hexDistance(keyX(key), keyY(key), own.px, own.py));
   md.sort((a, b) => a - b);
   return {
     pellets: far.length,

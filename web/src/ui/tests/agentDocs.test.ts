@@ -60,6 +60,20 @@ for (const d of skillDirs) {
   });
 }
 
+// A skill's evals (docs/agent-guide.md, Writing a skill) are read by people and agents, not run by a test: hold their shape.
+for (const d of skillDirs) {
+  const file = join(ROOT, ".claude/skills", d.name, "evals", "evals.json");
+  if (!existsSync(file)) continue;
+  test(`skill ${d.name}: its evals parse, name it, and list prompts that should and shouldn't trigger it`, () => {
+    const evals = JSON.parse(readFileSync(file, "utf8"));
+    assert.equal(evals.skill, d.name, "evals.skill names the folder");
+    for (const k of ["should_trigger", "should_not_trigger"]) {
+      const list: unknown = evals.trigger?.[k];
+      assert.ok(Array.isArray(list) && list.length > 0 && list.every((q) => typeof q === "string"), `trigger.${k}: a list of prompts`);
+    }
+  });
+}
+
 test("the directory CLAUDE.md files stay small, and the root one names the skills it points at", () => {
   const colony = readFileSync(join(ROOT, "web/src/colony/CLAUDE.md"), "utf8");
   assert.ok(colony.split("\n").length <= 20, "web/src/colony/CLAUDE.md loads whenever a colony file is read: keep it to a few lines");

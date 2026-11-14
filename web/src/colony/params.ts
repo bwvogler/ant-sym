@@ -75,6 +75,18 @@ export interface ColonyParams {
    */
   followChoice: number;
   /**
+   * How an ant draws its mode from Jev's probabilities (ja-nan3; colony/weighted.ts): p^(1/T), so 1 as Jev
+   * gave them, under 1 toward the mode Jev chose (0: always it, as before), over 1 toward even. A policy with no
+   * probabilities (the local rule, a bare cached answer) is never drawn from.
+   */
+  sampleTemp: number;
+  /**
+   * Seconds after an ant drew its mode before it draws again in the same situation (ja-nan3): without it an ant
+   * is asked only when its situation changes, so a draw would hold for as long as nothing round it changed. 0 = never
+   * again until the situation changes. Only an ant whose last answer was drawn is re-asked: a game on the local rule is unchanged.
+   */
+  reroll: number;
+  /**
    * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
    * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
    * is raised instead: foodCapTop.)
@@ -152,6 +164,51 @@ export interface ColonyParams {
    * to a remembered spot. 0 = no food odour (the generic ant: main bit for bit).
    */
   foodPlume: number;
+  /**
+   * Heat (ja-rf5.5, docs/desert-ant.md §4, heat.ts): the length of a day in game seconds, over which the plane's ground heats from heatDawn to
+   * heatNoon and back. An ant's body heat moves toward the ground's on the plane and the nest's inside; it senses its own heat (a species' `hot`
+   * field) and dies past heatDeath. 0 = no heat (the generic ant: main bit for bit).
+   */
+  heatDay: number;
+  /** the ground's heat at dawn (°C) */
+  heatDawn: number;
+  /** the ground's heat at noon (°C) */
+  heatNoon: number;
+  /** the nest's heat underground (°C): a body's heat is kept as degrees above it */
+  heatNest: number;
+  /** seconds for a body's heat to close 63 % of the way to its surroundings' */
+  heatTau: number;
+  /** the body heat at which an ant feels hot (°C) */
+  heatFelt: number;
+  /** once hot, an ant feels hot until its body is back below this (°C): it rests to cool, as a tired ant rests until fully rested */
+  heatCool: number;
+  /** the sun's height (0 at dawn, 1 at noon) from which an ant that can see the sky sees it stand high (desert-heat.md §2: design) */
+  heatSunHigh: number;
+  /** the share of each day the sun is down: the night, cool and dark, after the daylight (owner, 2026-11-13) */
+  heatNight: number;
+  /** seconds after sunrise at which a game starts: the desert ant's nest opens as the sun turns high, so a game opens then */
+  heatStart: number;
+  /**
+   * The invitation (ja-rf5.6, docs/desert-ant.md §1, Razin et al. 2013, full text): the pace (cm/s) of a finder coming down the shaft with food.
+   * Each nestmate waiting at the top of the shaft that it passes is pulled toward its pace; an ant's pace relaxes to paceRest, the faster the
+   * more crowded the shaft feels, and its own pace is what its `leave` response reads (returns few from paceFew, many from paceMany). 0 = no
+   * invitation: the generic ant's encounter count of returns (activation.md), main bit for bit.
+   */
+  invitePace: number;
+  /** a waiting ant's pace at rest (cm/s; C. niger idle ants about 1–2 cm/s, the crossing at about 2: Razin 2013) */
+  paceRest: number;
+  /** seconds for a pace to fall back by e toward paceRest */
+  paceTau: number;
+  /** how far one finder passing pulls a waiting ant's pace toward its own (0–1) */
+  paceGain: number;
+  /** how much each nestmate round a waiting ant speeds its pace's fall back to rest: paceTau / (1 + paceCrowd × crowd) (crowding lowers exits) */
+  paceCrowd: number;
+  /** the pace from which an ant's leave response reads its returns as few (cm/s) */
+  paceFew: number;
+  /** the pace from which it reads them as many: the soft threshold for leaving, about 8 cm/s (Razin 2013) */
+  paceMany: number;
+  /** the critical body heat (°C): past it, the ant dies */
+  heatDeath: number;
   /**
    * One world's plane (ja-lp4.16, docs/route-memory.md, PRD §59): a forager keeps its own way out, places stored every
    * `routeStep` cells while it walks out (at most `routeMax`), and a carrier whose home vector fails walks back through
@@ -284,6 +341,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   planePatience: 1,
   restTime: 30,
   followChoice: 1,
+  sampleTemp: 1,
+  reroll: 10,
   foodTrailTop: 1,
   foodCapTop: 80,
   homeTrail: 0.8,
@@ -301,11 +360,29 @@ export const DEFAULT_COLONY: ColonyParams = {
   siteFidelity: 0,
   siteGive: 0,
   foodPlume: 0,
-  routeMemory: 0,
+  heatDay: 0,
+  heatDawn: 25,
+  heatNoon: 52,
+  heatNest: 30,
+  heatTau: 30,
+  heatFelt: 45,
+  heatCool: 34,
+  heatSunHigh: 0.2,
+  heatNight: 1 / 3,
+  heatStart: 0,
+  invitePace: 0,
+  paceRest: 1,
+  paceTau: 20,
+  paceGain: 0.5,
+  paceCrowd: 0.25,
+  paceFew: 4,
+  paceMany: 8,
+  heatDeath: 53.6,
+  routeMemory: 1,
   scentReach: 1,
   restFetch: 1,
-  routeStep: 8,
-  routeSee: 5,
+  routeStep: 3,
+  routeSee: 3,
   routeMax: 64,
   raidGate: 1,
   raidLay: 1,

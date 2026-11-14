@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { keyX, keyY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
 import { BODY, Evolution, MUTATION, UPGRADES, upgrade } from "../../evolution.ts";
@@ -207,8 +208,7 @@ test("the game's landing: an evolving fungus roots by the hole, keeps sporulatin
   assert.ok(f.evolution && f.base.length > 0);
   assert.equal(f.strains[GARDEN]!.transmission, upgrade("infectivity").values![0], "Garden starts weak");
   assert.equal(STRAINS[GARDEN]!.transmission, 0.3, "the listed strain is untouched");
-  const { w } = g.map.size;
-  const onBase = () => f.base.reduce((n, key) => n + f.spores.get(key % w, Math.floor(key / w)), 0);
+  const onBase = () => f.base.reduce((n, key) => n + f.spores.get(keyX(key), keyY(key)), 0);
   for (let k = 0; k < 30 * 120; k++) g.tick(1 / 30);
   assert.ok(onBase() > 0, "two minutes on, its patch still holds spores (the landing's alone fade at 3 % a second)");
   assert.ok(f.evolution.mutations >= 1, `mutations from its growth: ${f.evolution.mutations}`);
@@ -245,10 +245,9 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
   assert.equal(carried.queen!.load, 0.4);
   assert.equal(g.fungus.evolution!.patches, 2, "it roots by her hole");
   assert.ok(g.fungus.base.length > patches);
-  const { w } = g.map.size;
   const hole = carried.nest.entrance!;
   assert.ok(
-    g.fungus.base.slice(patches).every((key) => Math.abs((key % w) + 0.5 - hole.x) < 8),
+    g.fungus.base.slice(patches).every((key) => Math.abs(keyX(key) + 0.5 - hole.x) < 8),
     "by her hole, as the landing is by the first colony's",
   );
 });
@@ -346,8 +345,15 @@ test("the fungus's save holds every private field it declares, or the field is d
   const body = src.slice(src.indexOf("export class Fungus "));
   const declared = new Set<string>();
   for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
-  // Each map's hyphae and the corpses it grows out of (ja-2bw) are saved; the spore spots under its hyphae are rebuilt each round.
-  const saved = { evolution: "evolution", menu: "menu", clock: "clock", hyphae: "hyphae", corpses: "corpses" } as Record<string, string>;
+  // Each map's hyphae and the corpses it grows out of, with their ages (ja-2bw, stalks ja-2bw.10), are saved; the spore spots under its hyphae are rebuilt each round.
+  const saved = {
+    evolution: "evolution",
+    menu: "menu",
+    clock: "clock",
+    hyphae: "hyphae",
+    corpses: "corpses",
+    corpseAge: "corpseAges",
+  } as Record<string, string>;
   // menuSeq counts menu changes for readers caching the menu (ja-d87): a load sets the menu, which bumps it.
   const derived = ["reach", "evade", "listed", "menuSeq"];
   const scratch = ["made", "nb", "sporeSpots"];

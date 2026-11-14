@@ -17,7 +17,7 @@ Everything here is written and committed before the first line of code. The chec
 3. vision.md: sense-table row (new sense), gap-table row (a scripted read added, or one this closes, with its bead).
 4. The PRD section stub.
 5. The bead epic and children, with dependencies.
-6. One commit with the docs and the beads export; then the check; then the owner's review.
+6. One commit with the docs; then the check; then the owner's review.
 
 ## docs/README.md row
 
@@ -66,7 +66,7 @@ The build later adds subsections in the order the earlier MRs used: what was the
 
 ## Beads: epic and children
 
-Change beads only with `bd` (never edit `.beads/issues.jsonl`). Titles are plain claims; labels from the small set in use (`colony`, `fungus`, `research`, `design`, `experiments`, `ui`, `mr`).
+Change beads only with `bd` (`.beads/issues.jsonl` is a local export, not in git). Titles are plain claims; labels from the small set in use (`colony`, `fungus`, `research`, `design`, `experiments`, `ui`, `mr`).
 
 ```sh
 bd create --type=epic --priority=2 --labels=colony,design \
@@ -94,7 +94,7 @@ A child's description names: the doc section, what code it retires, its gate (as
 ## Commit
 
 ```sh
-git add docs/ .beads/issues.jsonl
+git add docs/
 git commit -m "<Mechanic>: research note, PRD §<n>, beads (no code)"
 scripts/beads-sync.sh push   # share the new beads (CLAUDE.md)
 ```

@@ -30,7 +30,7 @@
 import { LEVERS, type Reach } from "./levers.ts";
 
 /** A spread trait an upgrade sets. */
-export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity";
+export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots" | "stalks";
 
 export interface Upgrade {
   id: string;
@@ -91,6 +91,28 @@ export const UPGRADES: readonly Upgrade[] = [
     costs: [2, 400],
     trait: "capacity",
     values: [30, 60, 120],
+  },
+  {
+    // Knots (microsclerotia, ja-2bw.9, PRD §63.11): its value is the level hyphae.ts KNOT reads (0 none, 1 a few, 2 many).
+    id: "knots",
+    kind: "spread",
+    name: "Knots",
+    blurb: "whether starved hyphae harden into knots that digging can't cut, which fruit from their own store and sprout again",
+    steps: ["none", "a few", "many"],
+    costs: [400, 1500],
+    trait: "knots",
+    values: [0, 1, 2],
+  },
+  {
+    // Stalks (ja-2bw.10, PRD §63.12): its value is the level fungus.ts STALK reads (0 none, 1 a stalk, 2 a tall stalk).
+    id: "stalks",
+    kind: "spread",
+    name: "Stalks",
+    blurb: "whether a corpse it has colonised outside grows a stalk that spreads its spores over a ring round it",
+    steps: ["none", "a stalk", "a tall stalk"],
+    costs: [600, 2000],
+    trait: "stalks",
+    values: [0, 1, 2],
   },
   {
     id: "fruiting",
@@ -213,6 +235,10 @@ export interface Traits {
   spores: number;
   /** the most mass its patch holds */
   capacity: number;
+  /** the Knots level (hyphae.ts KNOT): 0 none, 1 a few, 2 many */
+  knots: number;
+  /** the Stalks level (fungus.ts STALK): 0 none, 1 a stalk, 2 a tall stalk */
+  stalks: number;
 }
 
 export interface EvolutionSave {
@@ -332,7 +358,7 @@ export class Evolution {
 
   /** The spread traits at the levels chosen. */
   traits(): Traits {
-    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0 };
+    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0, stalks: 0 };
     for (const u of UPGRADES) if (u.trait && u.values) out[u.trait] = u.values[this.level(u.id)];
     return out;
   }

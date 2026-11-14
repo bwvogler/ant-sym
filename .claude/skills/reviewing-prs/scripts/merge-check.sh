@@ -49,7 +49,7 @@ merge() {
     esac
     real=$(echo "$real" | sed '/^$/d' | tr '\n' ' ' | sed 's/ $//')
     theirs=$(( $(echo "$files" | sed '/^$/d' | wc -l) - $(printf '%s' "$real" | wc -w) ))
-    note=""; echo "$out" | grep -q '^\.beads/issues\.jsonl$' && note=" (+ .beads/issues.jsonl, the bd export: not a real conflict)"
+    note=""; echo "$out" | grep -q '^\.beads/issues\.jsonl$' && note=" (+ .beads/issues.jsonl: a branch from before the export left git; take main's deletion with git rm --cached)"
     [ "$theirs" -gt 0 ] && note="$note (+ $theirs in files this PR doesn't change: its base's or the other side's conflicts, not this PR's)"
     if [ -n "$real" ]; then echo "  $1: CONFLICTS in $real$note"; else echo "  $1: clean$note"; fi
   fi

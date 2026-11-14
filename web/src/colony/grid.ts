@@ -1,6 +1,7 @@
 // The colony's free functions over the map (cells, tunnels, soil, walls, steering helpers): pure, moved out of colony.ts as they were (docs/refactor.md S3.3, the `grid` module).
 
 import { CELL, DIR_ANGLE, R, cellOf, centreX, centreY, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
+export { cellKey, keyX, keyY } from "./hex.ts";
 import { NO_KEY } from "./ants.ts";
 import { BACKFILL } from "./params.ts";
 import {
@@ -22,7 +23,6 @@ import { AIR, OPEN, SOIL, rockAt, type WorldMap } from "./world.ts";
 /** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
 export const NO_CELL = NO_KEY;
 
-/** No cell: a key no cell takes (it would be row −32768). −1 was the old "none", but that is cell (−1, 0). */
 /** What a pellet is (Colony soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
 export const SOIL_DUG = 0;
 
@@ -51,24 +51,6 @@ export const UP_FIRST = [4, 5, 0, 3, 1, 2] as const;
 export function wallSide(leftBlocked: boolean, rightBlocked: boolean, rng: () => number): -1 | 1 {
   if (leftBlocked !== rightBlocked) return leftBlocked ? -1 : 1;
   return rng() < 0.5 ? -1 : 1;
-}
-
-/**
- * A cell as one number, y·65536 + x: the midden's and returns' keys, and an ant's remembered cells. A column may be
- * negative (one world's curtain, whose columns start at the line's sMin), down to −32768; rows never are.
- */
-export function cellKey(x: number, y: number): number {
-  return y * 65536 + x;
-}
-
-/** The row of a cellKey: right for negative columns too (a plain floor of k / 65536 would give the row above). */
-export function keyY(k: number): number {
-  return Math.floor((k + 32768) / 65536);
-}
-
-/** The column of a cellKey. */
-export function keyX(k: number): number {
-  return k - keyY(k) * 65536;
 }
 
 /** A standard normal draw (Box–Muller). */

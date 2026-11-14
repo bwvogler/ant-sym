@@ -5,7 +5,7 @@ import { MODES } from "../../vocab.ts";
 import { decodeFungal } from "../../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
-import { CELL, cellOf, centreX, centreY, hexDistance } from "../../hex.ts";
+import { CELL, cellOf, centreX, centreY, hexDistance, keyX, keyY } from "../../hex.ts";
 import { AIR, generateSideWorld, rockAt, OPEN } from "../../world.ts";
 import { DT, ageOf, curtainHole, editPrivate, own, planeHole, run, smallOne } from "../builders.ts";
 
@@ -196,8 +196,8 @@ test("one world: a corpse carried up goes to the plane's midden, not the hole, a
   assert.equal(c.corpses.length, 0);
   assert.equal(c.layer[i], PLANE);
   const key = [...c.midden.keys()][0]!;
-  const mx = key % 65536;
-  const my = Math.floor(key / 65536);
+  const mx = keyX(key);
+  const my = keyY(key);
   assert.ok(hexDistance(mx, my, h.px, h.py) >= 6, `the midden is out from the hole (${hexDistance(mx, my, h.px, h.py)} cells)`);
   assert.ok(g.fungus.spores.get(mx, my) > 0, "spores on the plane at the midden");
   assert.equal(g.fungus.spores.get(h.px, h.py), 0, "none at the hole");

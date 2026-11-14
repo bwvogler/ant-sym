@@ -1,6 +1,6 @@
 import { Chambers } from "./chambers.ts";
 import { CHUNK, CHUNK_BITS, ChunkLayer, local } from "./chunks.ts";
-import { CELL, cellOf, centreX, centreY, discOffsets, E, extent, hexDistance, NE, NW, nx, ny, R, W } from "./hex.ts";
+import { CELL, cellKey, cellOf, centreX, centreY, discOffsets, E, extent, hexDistance, NE, NW, nx, ny, R, W } from "./hex.ts";
 
 // The colonies' world, pure: a procedural map from a seed, kept in 64×64
 // chunks (chunks.ts). Rock comes from three octaves of hashed value noise:
@@ -412,8 +412,6 @@ export function tunnelHeading(map: WorldMap, x: number, y: number): number {
   return v === 0 ? NaN : ((v - 1) / HEADING_STEPS) * 2 * Math.PI;
 }
 
-const forkKey = (x: number, y: number): number => (y + 32768) * 131072 + (x + 32768);
-
 /** A fork's undug arm: the way from the fork's cell to dig (0–5), and the heading the new tunnel carries on. */
 export interface Fork {
   dir: number;
@@ -426,12 +424,12 @@ export interface Fork {
  * cell straight on touches a 60° arm and so is no longer a tunnel's end (it would never be dug).
  */
 export function markFork(map: WorldMap, x: number, y: number, dir: number, aim: number): void {
-  (map.forks ??= new Map()).set(forkKey(x, y), { dir, aim });
+  (map.forks ??= new Map()).set(cellKey(x, y), { dir, aim });
 }
 
 /** A fork's undug arm at cell (x, y), taken (forgotten) as it is read; null if none. */
 export function takeFork(map: WorldMap, x: number, y: number): Fork | null {
-  const k = forkKey(x, y);
+  const k = cellKey(x, y);
   const f = map.forks?.get(k);
   if (f === undefined) return null;
   map.forks!.delete(k);

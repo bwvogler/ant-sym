@@ -15,6 +15,7 @@ import {
 } from "./colonyBrain.ts";
 import type { FungalSituation } from "./fungalPolicy.ts";
 import { askedLevers } from "./fungus.ts";
+import { weightedValid } from "./weighted.ts";
 import {
   AIMS,
   askedIn,
@@ -38,15 +39,7 @@ import {
   type GrowthChoice,
 } from "./growthBrain.ts";
 import type { GrowthSituation } from "./hyphae.ts";
-import {
-  type LaneWords,
-  STANCE_SCHEMA,
-  type Mode,
-  type Situation,
-  type SpeciesSituation,
-  type Stance,
-  type StanceSituation,
-} from "./vocab.ts";
+import { type LaneWords, STANCE_SCHEMA, type Situation, type SpeciesSituation, type Stance, type StanceSituation } from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -188,7 +181,8 @@ export const SAMPLE_FUNGAL: FungalSituation = {
   groomed: false,
 };
 
-const modeLane: Has<LaneSpec<Situation, Mode, undefined>, "local" | "all"> = {
+// Its answers are strings, not modes: Jev's mode with its probabilities (weighted.ts); `topOf` is the mode it chose, `pick` draws one.
+const modeLane: Has<LaneSpec<Situation, string, undefined>, "local" | "all"> = {
   name: "mode",
   kind: LANE_KINDS.mode,
   counters: { asked: "asked", cached: "cached" },
@@ -201,7 +195,8 @@ const modeLane: Has<LaneSpec<Situation, Mode, undefined>, "local" | "all"> = {
   key: (s, _ctx, lane) => (lane?.schema ? lane.schema.key(s as SpeciesSituation) : situationKey(s)),
   pack: (items, words, lane) => packModeRequest(items, words, lane),
   read: (answers, id, _situation, _key, lane) => readMode(answers, id, lane ? Object.keys(lane.criteria) : undefined),
-  valid: (_key, answer, lane) => Object.keys(lane?.criteria ?? MODE_CRITERIA).includes(answer),
+  // A kept answer is weighted (Jev's probabilities over the modes, weighted.ts) or a bare mode; every option must be one the lane allows.
+  valid: (_key, answer, lane) => weightedValid(answer, (m) => Object.keys(lane?.criteria ?? MODE_CRITERIA).includes(m)),
   contextOf: (words, _variant, lane) => policyContext(words, lane),
   local: localPolicy,
   all: (lane) =>

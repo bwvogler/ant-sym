@@ -11,7 +11,7 @@ check() { # name, expected, actual
 }
 
 repo="$tmp/repo"
-mkdir -p "$repo/docs" "$repo/web/src" "$repo/.beads" "$tmp/bin"
+mkdir -p "$repo/docs" "$repo/web/src" "$tmp/bin"
 git -C "$repo" init -q
 git -C "$repo" config user.email t@t && git -C "$repo" config user.name t
 export CLAUDE_PROJECT_DIR="$repo"
@@ -88,7 +88,6 @@ EOF
 printf '| [foo.md](foo.md) | research |\n' >"$repo/docs/README.md"
 printf 'vision\n' >"$repo/docs/vision.md"
 printf '## 9. Foo (ja-e) docs/foo.md\n' >"$repo/docs/PRD.md"
-: >"$repo/.beads/issues.jsonl"
 git -C "$repo" add -A && git -C "$repo" commit -qm plan
 
 plan() { (cd "$repo" && "$here/check-plan.sh" "$@" >"$tmp/out" 2>&1; echo $?); }
@@ -103,6 +102,7 @@ check "a failed check leaves the gate shut" deny "$(gate "$repo/web/src/a.ts" s4
 
 awk '/^## Play/{s=1; next} /^## Open/{s=0} !s' "$repo/docs/foo.md" >"$tmp/foo" && cat "$tmp/foo" >"$repo/docs/foo.md"
 check "uncommitted docs fail" 1 "$(plan docs/foo.md ja-e --session s5)"
+grep -q "uncommitted docs" "$tmp/out"; check "and says so" 0 $?
 git -C "$repo" commit -qam "drop play"
 check "no Play section fails" 1 "$(plan docs/foo.md ja-e --session s5)"
 grep -q "MISSING a '## Play' section" "$tmp/out"; check "and says so" 0 $?

@@ -53,25 +53,25 @@
       "lane": "mode",
       "doctrine": "cautious",
       "species": "desert",
-      "context": "colony-v2-bbf1470f",
+      "context": "colony-v8-d5da92b3",
       "file": "mode-desert-cautious.json",
-      "answers": 16
+      "answers": 128
     },
     {
       "lane": "mode",
       "doctrine": "forage",
       "species": "desert",
-      "context": "colony-v2-cb38db30",
+      "context": "colony-v8-11470d94",
       "file": "mode-desert-forage.json",
-      "answers": 16
+      "answers": 128
     },
     {
       "lane": "mode",
       "doctrine": "warlike",
       "species": "desert",
-      "context": "colony-v2-d07cb2ea",
+      "context": "colony-v8-24c27036",
       "file": "mode-desert-warlike.json",
-      "answers": 16
+      "answers": 128
     },
     {
       "lane": "mode",

@@ -185,7 +185,8 @@ start|seed)
     if [ "$rs" -eq 0 ]; then
       bootstrap_from_branch || exit 0
     else
-      bootstrap || { echo "beads-sync: bootstrap from .beads/issues.jsonl failed"; exit 0; }
+      # No beads-dolt branch: bd bootstraps from a local .beads/issues.jsonl if one exists (it is no longer in git, ja-w7ef.1).
+      bootstrap || { echo "beads-sync: bootstrap failed (no $BRANCH branch and no local .beads/issues.jsonl)"; exit 0; }
     fi
   fi
   set_ref || { echo "beads-sync: could not set the Dolt remote ref"; exit 0; }

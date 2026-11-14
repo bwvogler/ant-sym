@@ -306,7 +306,7 @@ test("a colony founded beyond an end starts its ants in the curtain, with its qu
   assert.deepEqual([pn.x, pn.y], [centreX(h.px, h.py), centreY(h.py)]);
 });
 
-test("the fungus's spores in the curtain stay on their cells when the curtain grows at V₀ (Fungus.regrid)", () => {
+test("the fungus's spores in the curtain stay on their cells when the curtain grows at V₀ (cellKey is absolute)", () => {
   const g = game(1);
   const c = g.player;
   const h = c.holeCells[c.params.nest]!;

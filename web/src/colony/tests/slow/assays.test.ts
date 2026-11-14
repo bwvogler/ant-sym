@@ -7,8 +7,6 @@ import {
   desertInvitation,
   desertNoTrail,
   faintAlarm,
-  raidFind,
-  raidStop,
   regulate,
   regulateStop,
   richPoor,
@@ -19,7 +17,8 @@ import { DESERT_ANT } from "../../desertAnt.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
-// slow/side.test.ts.)
+// slow/side.test.ts.) A11 and A12, the longest, have files of their own (raidFind, raidStop), so the slow tier's shards
+// balance (slow.yml).
 
 // Behaviour MR 3 with ja-00t (carriers home by trail and vector): seeds 1–10 pass 10/10; 1 and 2 are both sides of the fork.
 test("A1 double bridge: ≥ 80 % on the short branch", () => {
@@ -67,27 +66,6 @@ test("A9 strangers meet at food: few lost per food brought home", () => {
   }
 });
 
-// Behaviour MR 5.2 (PRD §49) with ja-sf1 (§49.7): raids by trail, raiders leaving the trail to search on as scouts. A11's trail gain is
-// 2.04 median (1.32–4.40), 16/20 seeds at its mark of 1.5 (seeds 21–40: 1.84, 13/20); none is stuck.
-test("A11 raiders find the rival: none stuck, and the raid trail gains 1.5× on most seeds", () => {
-  let passed = 0;
-  for (let seed = 1; seed <= 10; seed++) {
-    const m = runAssay(raidFind, seed).metrics;
-    assert.ok((m.stuck as number) <= 0.1, `seed ${seed}: stuck ${m.stuck}`);
-    passed += m.pass as number;
-  }
-  assert.ok(passed >= 6, `${passed}/10 at the mark`);
-});
-
-// Behaviour MR 5.2 (PRD §49.3): A12 passes 20/20 (food stored 1.00 of the forage colony's, worst 0.99); the first version, with raiders
-// waiting for a trail, stored 10 of 7,400.
-test("A12 a raid no one can find doesn't starve the colony", () => {
-  for (const seed of [1, 2]) {
-    const m = runAssay(raidStop, seed).metrics;
-    assert.equal(m.pass, 1, `seed ${seed}: stored ${m.stored} of ${m.control}`);
-  }
-});
-
 test("A10 faint alarm draws explorers", { todo: "ja-je8: the draw is weak (median +1.3 ants)" }, () => {
   const m = runAssay(faintAlarm, 1).metrics;
   assert.equal(m.pass, 1, `draw ${m.draw}`);
@@ -115,7 +93,14 @@ test("D3 food odour brings the first find sooner than a blind search", () => {
   }
 });
 
-test("D2 a returning finder invites nestmates out", { todo: "ja-rf5.6: the invitation (speed passed on by contact)" }, () => {
-  const m = runAssay(desertInvitation, 1).metrics;
-  assert.equal(m.pass, 1, `ratio ${m.ratio}`);
-});
+test(
+  "D2 a returning finder invites nestmates out (in the game: reported; the gate is D2c, the staged chamber, tests/int/desertInvite)",
+  {
+    todo: "ja-rf5.6: few isolated returns a game, so it swings (over two days, 1200 s, with the first build's 20 s lift: median 7.2x, pass 5/10)",
+  },
+  () => {
+    // The desert ant (desertSpec sets no species; review of #186, S1), over two days, as its figures were measured.
+    const m = runAssay(desertInvitation, 1, { game: { species: DESERT_ANT } }, 1200).metrics;
+    assert.equal(m.pass, 1, `ratio ${m.ratio}`);
+  },
+);

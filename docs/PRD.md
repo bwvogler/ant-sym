@@ -3882,6 +3882,10 @@ The review approved once S1 and S2 were settled; both are fixed in code, with te
 
 **No sim change.** The goldens are untouched; requests and contexts are byte-identical, so tokens per question are unchanged.
 
+**A player's new aim is asked at once** (ja-lo8.21, owner 2026-11-14). Until then, a new aim was asked host by host: each host's situation when it next looked it up, the fungus lane gathering up to 2 s per part-full batch, nothing while paused. Now a player's change (the aim buttons, or the text when the box is left) asks Jev at once, in one go, what the new aim has no answer for: every situation the fungus's hosts are in (each living ant's `Colony.fungal`) and all 48 growth situations. They go at the next cycle without the gather wait (`ColonyJev.setAim(text, { askNow: true })`); with no run on, a run is wanted and they go when it starts. Cached answers are not asked, so a preset aim, whose answers ship with the page, usually asks nothing. The first aim and a save's aim coming back stay lazy. A queen's situation is not kept per ant, so hers is asked at the next step, as before.
+- Cost: steady-state $/h unchanged (each of these would be asked when met). Per custom aim change, about 770 tokens a fungal situation (fungus v8, measured: §54 "Fungus lane v8"), ≈ $0.0006 for 20 hosts' situations, and about 15.9k tokens for the 48 growth situations (growth v3, measured), ≈ $0.0007: about $0.0013 in all, some 75 changes a day under the default $0.10 budget. Only growth situations no tip meets would not have been asked anyway.
+- Tests: `ui/tests/aimChange.test.ts`. With a run on, the hosts' two distinct situations (a dead ant's left out) and the 48 growth situations go within 80 ms despite a 10 s gather. With no run on, one run is wanted and the questions go when it starts. Seeded answers are not asked, and an aim with everything cached wants no run. Without `askNow`, or with the same words again, nothing is asked.
+
 ### 50.18 Energy and hunger: old ants answer the brood's hunger (ja-xu6, ja-xu6.1, 2026-11-08)
 
 **The bug** (`ja-xu6`): in long side-view games, larvae starved beside a full larder. `#port` and `#nurse` refused every old ant (age band 2), so when births stalled the colony aged until nobody carried food to the brood or the queen, and births never restarted.
@@ -4591,7 +4595,7 @@ The owner asked for a review of the work needed before the game grows: species w
 - **Cost.** No legend, question or schema changed. S2 changes the Jev contexts that name a view, so its PR re-ships precache from a live check and gives each lane's hourly cost.
 
 
-## 59. A carrier whose home vector points through rock walks back the way it came (design, ja-lp4.16, ja-lp4.6.3, 2026-11-11)
+## 59. A carrier whose home vector points through rock walks back the way it came (built and on, ja-lp4.16, ja-lp4.6.3, 2026-11-14)
 
 **Research basis:** [route-memory.md](route-memory.md). No full text could be fetched (network policy), so every figure is **unverified**.
 - **Route memories beside path integration.** Insects keep several memory-based guidance systems (path integration and image matching) that cooperate and train one another; local vectors from a route memory are dominant over the global vector, and a route is recalled without the vector or against it (Collett, Chittka & Collett 2013; Collett et al. 1998; Mangan & Webb 2012).
@@ -4645,9 +4649,116 @@ The bound of 2 is not yet met (3–5), and single games swing; seeds 1–10 deci
 
 **Cost (estimated).** None in Jev: steering only, no situation, legend or question changed; `precache.test` must still pass and a cached game spends nothing. Per-ant memory above; the tick is checked with `colony-bench --one --page` against `ja-lp4.6.7`'s figure.
 
+**Tuned and turned on (ja-lp4.16.4, 2026-11-14).** Shipped defaults: `routeMemory` 1, `routeStep` 4, `routeSee` 3 (`routeMax` 64); `routeStep` 3 since the re-tune below (ja-qd8l). One world's plane only; the legacy goldens (`golden.json`, `slow/golden.json`) stay bit-exact (with `routeMemory` 0 nothing is recorded); the one-world golden is **re-recorded once** (the plane game now differs from the first stall on).
+
+*The baseline moved.* §58's `main` numbers (food 44,566, births 7,072, worst colony per seed 35, sum 166) were re-measured on today's `main` (after the tick-pipeline stages and ja-2bw.17-19): food 44,137 (-1.0 %), births 7,075 (0.0 %), worst per seed 12 15 24 33 7 25 29 18 11 19 (max 33, sum 193); seeds 4, 5, 9 at 33 / 6, 7 / 3, 11 / 3. The 5 % rule is judged against §58's figures, as the owner set it; the sweep rows give both.
+
+**Sweep** (G1, seeds 1-10, 600 + 600 ants, 600 s; one setting changed at a time from the defaults, then the best pairs; food and births are summed over both colonies and seeds, in brackets against §58's 44,566 and 7,072; the worst per seed is the larger of the two colonies; `routeStep` 8 and `routeSee` 5 are the first build's values, so row "1" is those):
+
+| `routeMemory` and settings | worst per seed 1..10 (more of you / rival) | worst | sum | seeds 4 / 5 / 9 (you / rival) | food carried down | births |
+|---|---|---|---|---|---|---|
+| main (nothing on) | 12 15 24 33 7 25 29 18 11 19 | 33 | 193 | 33/6 · 7/3 · 11/3 | 44,137 (-1.0 %) | 7,075 (0.0 %) |
+| 1 | 5 2 3 4 2 3 2 5 3 4 | 5 | 33 | 4/3 · 1/2 · 3/1 | 47,403 (6.4 %) | 7,230 (2.2 %) |
+| 2 | 3 3 2 7 1 2 7 2 2 3 | 7 | 32 | 7/3 · 1/0 · 2/1 | 48,364 (8.5 %) | 7,281 (3.0 %) |
+| 1, see 3 | 3 2 1 6 1 2 6 3 2 4 | 6 | 30 | 6/1 · 1/1 · 2/2 | 45,866 (2.9 %) | 7,223 (2.1 %) |
+| 2, see 3 | 7 1 4 3 1 3 8 2 0 1 | 8 | 30 | 3/1 · 1/1 · 0/0 | 45,904 (3.0 %) | 7,232 (2.3 %) |
+| 1, step 4 | 1 1 2 4 1 3 4 1 2 3 | 4 | 22 | 4/2 · 1/1 · 2/1 | 46,986 (5.4 %) | 7,279 (2.9 %) |
+| 2, step 4 | 2 2 2 5 1 2 15 2 2 2 | 15 | 35 | 5/1 · 1/1 · 1/2 | 46,451 (4.2 %) | 7,256 (2.6 %) |
+| 1, step 2 | 35 2 2 5 1 1 4 1 3 2 | 35 | 56 | 5/1 · 0/1 · 3/1 | 46,868 (5.2 %) | 7,238 (2.3 %) |
+| 1, step 4, see 3 (chosen) | 2 2 2 2 2 4 5 4 2 2 | 5 | 27 | 2/1 · 2/1 · 2/1 | 46,117 (3.5 %) | 7,340 (3.8 %) |
+| 2, step 4, see 3 | 1 1 1 10 2 1 9 2 1 1 | 10 | 29 | 10/0 · 2/1 · 1/0 | 45,789 (2.7 %) | 7,249 (2.5 %) |
+| 1, step 4, see 8 | 4 3 3 12 3 5 4 2 3 4 | 12 | 43 | 12/0 · 3/2 · 3/0 | 47,900 (7.5 %) | 7,157 (1.2 %) |
+
+- **Choice.** The bound (at most 2 per colony on seeds 4, 5 and 9) is met by **one setting only: `routeMemory` 1, `routeStep` 4, `routeSee` 3** (2 / 1, 2 / 1, 2 / 1). It also keeps the 5 % rule (food +3.5 %, births +3.8 %). Alone, `routeStep` 4 has the lowest worst seed (4) and sum (22) but leaves seed 4 at 4 / 2; `routeStep` 4 with `routeSee` 3 trades a worst seed of 5 (seed 7) and a sum of 27 for the bound on the three seeds the owner named, so it was chosen on those.
+- **`routeMemory` 2** (also at the vector's end) is not better on the worst seed: 7 (seed 4) against 5, and with step 4, 15 (seed 7) against 4; 1 is chosen. 2 raises food a little (+8.5 % against +6.4 % at the first-build values).
+- **`routeStep`:** 4 is the useful one (worst 33 to 4 with 1); 2 spent the 64 places in 128 cells and went back to a single seed at 35; 16 and 32 were worse on the first build's code (worst 9 and 21 with 1; the pre-refactor sweep, not re-run) and 8 is row "1" above. **`routeSee`:** 3 helps only with step 4 (worst 12 with 8; 4 / 4 with 5); `routeSee` 0 (no recognition) was measured on the pre-refactor code only (worst 21, sum 88 with 1, against 33 / 5 and sum 33 at see 5: recognition earns its place) and not re-run.
+- **Not met on every seed:** seeds 7 (5 / 5), 6 (4 / 1) and 8 (2 / 4) are over 2 at the worst sample; the bound the owner set is on 4, 5 and 9.
+
+**G1, chosen against `main` today, per seed (the most held over 120 s at any sample, you / rival), with food carried down and births:**
+
+| seed | main you / rival | chosen you / rival | main food (you / rival) | chosen food | main births | chosen births |
+|---|---|---|---|---|---|---|
+| 1 | 12 / 7 | 1 / 2 | 2791 / 2239 | 2941 / 2203 | 662 | 655 |
+| 2 | 15 / 13 | 1 / 2 | 2747 / 1486 | 2886 / 1559 | 690 | 723 |
+| 3 | 12 / 24 | 2 / 2 | 2059 / 938 | 2124 / 1441 | 581 | 640 |
+| 4 | 33 / 6 | 2 / 1 | 1974 / 3313 | 2445 / 3138 | 842 | 872 |
+| 5 | 7 / 3 | 2 / 1 | 2633 / 1348 | 2606 / 1888 | 753 | 864 |
+| 6 | 11 / 25 | 4 / 1 | 2289 / 3151 | 2295 / 3433 | 838 | 804 |
+| 7 | 29 / 24 | 5 / 5 | 1346 / 1716 | 1674 / 1855 | 589 | 606 |
+| 8 | 18 / 10 | 2 / 4 | 2614 / 2416 | 2539 / 2935 | 804 | 831 |
+| 9 | 11 / 3 | 2 / 1 | 2896 / 1894 | 2946 / 1561 | 691 | 726 |
+| 10 | 19 / 8 | 1 / 2 | 1678 / 2609 | 1525 / 2123 | 625 | 619 |
+| sum 1-10 | | | 44137 | 46117 (4.5 %) | 7075 | 7340 (3.7 %) |
+| 11 | 14 / 12 | 1 / 2 | 3303 / 2415 | 3229 / 2326 | 752 | 752 |
+| 12 | 20 / 9 | 2 / 1 | 2615 / 3236 | 2363 / 2867 | 637 | 613 |
+| 13 | 38 / 47 | 1 / 4 | 2354 / 1423 | 2273 / 1509 | 713 | 742 |
+| 14 | 12 / 11 | 2 / 1 | 2709 / 2181 | 2884 / 1916 | 800 | 783 |
+| 15 | 8 / 13 | 1 / 2 | 1817 / 2012 | 1911 / 1767 | 748 | 725 |
+| 16 | 9 / 61 | 1 / 5 | 2360 / 2957 | 2706 / 3122 | 641 | 650 |
+| 17 | 141 / 16 | 5 / 2 | 1636 / 3065 | 2135 / 3115 | 748 | 702 |
+| 18 | 16 / 7 | 3 / 2 | 2319 / 2759 | 1799 / 2929 | 866 | 732 |
+| 19 | 22 / 6 | 4 / 3 | 834 / 2724 | 793 / 2575 | 672 | 537 |
+| 20 | 11 / 29 | 2 / 7 | 3350 / 2011 | 2546 / 2252 | 753 | 838 |
+| sum 11-20 | | | 48080 | 47017 (-2.2 %) | 7330 | 7074 (-3.5 %) |
+
+- Seeds 1-10: the worst colony per seed falls from 33 to 5 (sum 193 to 27), food +4.5 % against today's `main` (+3.5 % against §58's 44,566), births +3.7 % (+3.8 %). Seeds 11-20, not tuned on: worst 141 to 7 (sum 375 to 36), food -2.2 %, births -3.5 %. The rule holds on both sets.
+- **The guard** (`tests/slow/oneWorld.test.ts`, seeds 4, 5 and 9) is un-skipped, with the defaults as the setting.
+
+**The assays on one world** (`npm run exp -- --one all --seeds 1-10`; today's `main` run beside it with `routeMemory` 0, passes out of 10):
+
+| assay | main today (off) | chosen |
+|---|---|---|
+| A1 double bridge | 8 | **10** |
+| A2a two sources | 10 | 10 |
+| A2b rich vs poor | 9 | 8 (seed 4 fails)¹ |
+| A3 depletion | 10 | 10 |
+| A4 alarm on a trail | 10 | 9 (seed 9 fails)¹ |
+| A5 / A5b | 0 / 8 | 0 / 8 |
+| A6 narrow pass | 5 | 5 |
+| A9 strangers at food | 3 | **5** |
+| A10 | 0 | 0 |
+| G1 | 0 | **7** |
+| R1 pocket carriers (6 seeds with a pocket) | 3 of 6 (home within 300 s 77 %) | **6 of 6** (100 %, walked ÷ way round at most 1.70) |
+| S1, F1, D1-D4 | as off | as off (S1 home within 600 s 1.00, median 1.48, as before) |
+
+A1 stays at or above 8/10 (10/10). S1 is unchanged (its carriers are set down with no path).
+
+¹ **A2b and A4 are seed flips, not a cost** (`ja-lp4.16.6`, 2026-11-14). This table was measured on the branch before main (#167) was merged in, and the merge changed behaviour. On the squash as shipped (`377c9ab`), A2b seed 4 flips the other way (off 0.583 fails, on 0.779 passes, against the 0.70 mark) and A4 seed 9 passes both ways (back in 16 s off, 19 s on). Over seeds 1–30 on the shipped code: **A2b off 23/30, on 27/30; A4 off 30/30, on 29/30** (seed 26 fails, back in 82 s against 60). The mechanism: off and on are bit-identical until the first ant retraces (about 25–30 s into these assays); its changed steering shifts every later draw from the game's one random-number generator, and all 300 ants differ within 5 s. A retracing carrier lays little trail (retrace starts over 20 s into a carry, and laying fades over 20 s), and retracing does not rise after A4's alarm, so nothing ties route memory to either measure. Single seeds swing: A2b seed 4 sits near the mark with route memory off on both trees (0.776, 0.583), and A2b seed 9 ranges 0.17–0.82 across routeSee and routeStep. A verdict on either assay needs more seeds than one run each. G1's figures above are the branch's too: on the shipped code, seeds 6–8 reach 1/4, 2/4 and 1/1 (`ja-lp4.6.3.1`).
+
+**Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, seed 1, 60 s, two runs each, second-half mean): on 13.79 and 13.23 ms; off 13.44 and 13.91 ms. No cost beyond noise (the machine runs slower than `ja-lp4.6.7`'s 10.6-10.8 ms; the pair is the comparison). **Memory:** unchanged from above (512 bytes an ant). **Jev cost:** none; `precache.test` passes.
+
+**Tests added (ja-lp4.16.4, review nits).** In `tests/int/oneWorldRoute.test.ts`, each run against a mutant of the code and failing under it: recording in FOLLOW mode (mutant: only EXPLORE records), the plane guard in `routeFail` (mutant: the `c.cur !== PLANE` test removed), the pellet gate (removed), the stall clock, best distance and wall-follow reset by `routeTo` (the `stallT` reset removed), and an odd `routeMax` halving (`keep = n >> 1` for `(n + 1) >> 1`). The `!carrying` test in the arrive stage is an **equivalent mutant**: the tick turns a carrier for home (RETURN) before the place is due, so dropping that clause changes nothing; the test records the carrying cases and the clause stays as a second guard.
+
 **Beads.** `ja-lp4.16` (epic, blocks `ja-lp4.6.3`), children in build order: `.1` read the full texts (research, does not block); `.2` assay R1 and its baseline (no behaviour change); `.3` route memory behind `routeMemory`; `.4` tune, turn on, G1 and the one-world assays; `.5` docs as built.
 
-**Still open.** The owner's calls above; R1's baseline; the tick; whether the bound of 2 is reachable on seeds 5 and 9 with this alone, or needs `ja-lp4.15`'s shorter search; the full texts to read when the network allows.
+**Re-tuned after §67: `routeStep` 3 (ja-qd8l, 2026-11-14).** The guard failed on `main` (seed 4: 4 / 2, seed 9: 3 / 1). The tuning above was measured on a branch cut before §67 (#153) and never re-run after the branch merged `main`. Seeds 4 and 9, with `routeMemory` 1, step 4, see 3 applied to each `main` commit: 2 / 1 and 2 / 1 up to #157, then 4 / 2 and 3 / 1 from #153 on. On `main` (0477186), §67's switches: as shipped 4 / 2 and 3 / 1; `scentReach` 0: 4 / 1 and 2 / 1; `restFetch` 0: 4 / 2 and 3 / 0; both 0: 2 / 1 and 2 / 1. The two senses together are the whole change, and they stay: the fix is route memory's tuning, with the bound unchanged.
+
+*Sweep on today's `main`* (§67 on; seeds 4, 5, 9, you / rival): step 4 see 3 (shipped) 4/2 · 0/0 · 3/1; step 4 with see 2, 4 or 5: 3/2 · 1/1 · 3/2, 3/2 · 2/1 · 3/1, 7/1 · 1/2 · 3/1; step 5 see 3: 3/1 · 1/1 · 1/1; `routeMemory` 2 step 4 see 3: 3/0 · 0/0 · 1/1. The bound is met by three settings, which seeds 1–10 then decide:
+
+| `routeMemory`, step, see | worst per seed 1..10 | worst | sum | seeds 4 / 5 / 9 | food carried down | births |
+|---|---|---|---|---|---|---|
+| 1, 4, 3 (shipped before) | 4 2 2 4 0 4 4 1 3 2 | 4 | 26 | 4/2 · 0/0 · 3/1 | 49,263 | 7,349 |
+| **1, 3, 3 (chosen)** | 2 2 3 2 2 1 3 2 2 1 | **3** | **20** | 2/1 · 1/2 · 2/0 | 47,427 (−3.7 %; +6.4 % on §58's) | 7,201 (−2.0 %; +1.8 %) |
+| 1, 3, 2 | 1 2 1 2 2 3 3 6 2 2 | 6 | 24 | 2/1 · 1/2 · 2/1 | 48,384 (−1.8 %) | 7,464 (+1.6 %) |
+| 1, 6, 3 | 8 3 2 2 1 3 3 2 2 1 | 8 | 27 | 1/2 · 1/1 · 2/1 | 49,895 (+1.3 %) | 7,219 (−1.8 %) |
+
+- **Choice:** step 3, see 3, by the worst seed (3) and the sum (20); step 3 passes the guard's seeds at see 2 as well, so it sits in a wider passing region than step 4 did. Food and births stay within 5 % of the shipped setting and of §58's figures.
+- **Seeds 11–20, not tuned on:** worst 8 → 5 (2 2 2 8 2 2 1 5 3 5 → 2 4 2 3 2 4 5 4 5 5), sum 32 → 36, food 49,042 → 50,482 (+2.9 %), births 7,392 → 7,503 (+1.5 %).
+- **The one-world assays** (`exp --one`, seeds 1–10, passes, step 4 → 3): A1 10 → 10, A2a 10 → 10, A2b 9 → 9, A3 10 → 10, A4 10 → 10, A5 0 → 0, A5b 8 → **10**, A6 5 → 5, A9 4 → 3 (one seed down), A10 0 → 0; R1 6 of 6 pockets, home within 300 s 100 %, walked ÷ way round median 1.16, at most 1.70; S1 and F1 unchanged (S1's carriers have no path; F1's walk out is not a retrace).
+- **Goldens:** the one-world golden is re-recorded; `golden.json` and `slow/golden.json` are bit-exact (route memory acts only on one world's plane). **Cost:** none (steering only).
+- **The lesson:** the guard's seeds sit near the bound, so any change to one world's foraging can move them. A PR that changes plane behaviour runs the slow guards on its merged head (`slow.yml`, the steward skill) rather than on the branch it was measured on.
+
+**G1 judged on a share of seeds (ja-ysco, owner 2026-11-14).** Two days, two plane changes, two failures of the three-seed guard: #153 took seeds 4 and 9 to 4 / 2 and 3 / 1 (the re-tune above), then #180 (defence on home ground by the ant's own vector) took them to 6 / 2 and 3 / 0 at step 3, with route memory untouched. A seed's figure is the worst of ~60 samples over two colonies in one game; any setting meets the bound on about half the seeds, so three fixed seeds re-roll with every change to one world's play. The bound of 2 stays; the guard now runs seeds 1-10 and asks for **at least 4 within 2, and no seed at 10 or more** (a carrier jam). Measured on `main` with #180 (seeds 1-10 / 11-20, worst colony per seed):
+
+| | seeds 1-10 | within 2 | seeds 11-20 | within 2 | worst | food 1-10 | births 1-10 |
+|---|---|---|---|---|---|---|---|
+| step 3 (shipped) | 2 2 2 6 1 2 3 4 3 1 | 6 | 1 4 2 2 2 4 4 6 3 3 | 4 | 6 | 46,645 | 7,162 |
+| step 4 | 27 2 2 3 2 4 4 2 3 2 | 5 | 2 2 3 8 1 2 3 4 4 5 | 4 | 27 | 50,057 | 7,343 |
+| no route memory (§59's sweep, before §67) | 12 15 24 33 7 25 29 18 11 19 | 0 | | | 33 | | |
+
+Step 3 passes with two seeds to spare; step 4 fails it on seed 1's jam (27); route memory off fails both parts. The ten games run in worker threads in one file (`tests/slow/oneWorldG1.test.ts`, games in `oneWorldG1Game.ts`), replacing the three per-seed files.
+
+**Still open.** The bound of 2 is not met on every seed: with #180 in, 6 of seeds 1-10 meet it at `routeStep` 3 and seed 4 reaches 6 (the table above; before #180, seeds 4, 5 and 9 met it and seeds 3 and 7 reached 3; at step 4, before §67, seeds 6, 7 and 8 reached 4, 5 and 4), and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 settled as seed flips at step 4 (¹ above), and A9 one down at step 3, to watch; the full texts to read when the network allows.
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
@@ -4737,6 +4848,49 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 
   Every seed of 1–20 finds sooner with the plume. `tests/slow/assays.test.ts` holds D3 on seeds 1–3.
 - **Tests:** `tests/int/desertPlume.test.ts`. Mutations, each failing it: leave the plume out of the save; drop the steering line; rebuild every tick; let it run off the plane (the nest's layer).
+
+### 60.5 Heat: the body's limit, the sun's height and the night (ja-rf5.5, ja-rf5.12, 2026-11-13)
+
+- **Problem.** Heat as a body rule alone (`heat.ts`): an ant inside is always cool, so with a noon above its limit it set out and died. On D5 (two days, seeds 1–10) the best body-only setting passed 6 of 10, with heat killing 17–30 % of the colony a day on 4 seeds against 16 %; the dead were ants already on their way home.
+- **Research** ([desert-heat.md](desert-heat.md)): the hot-adapted *Cataglyphis* forage at the hottest hours, close to their limit (full text: de Souza Araujo 2023, Sánchez-García 2022); the sun's elevation seen at the entrance, not the ground's temperature, sets when the nest opens and closes, and a raised sun delayed its closing (*C. floricola*, Amor et al. 2011: **unverified**, abstract only); summer foraging has two peaks with a midday dip (Wehner & Wehner 2011, **unverified**); no antennal thermoreceptor measured covers desert heat (Nagel & Kleineidam 2015, full text: silent above 38 °C).
+- **Decisions (owner, 2026-11-13):** a day cycle; heat sensed as situation fields, the shipped answers asked again; heat kills; the cue at the hole is the sun's height, not the ground's heat; a night (the sun down). Then, on the review of #155 (D1): **follow the papers**, out under the high sun and in at a low or set one; in a mixed-species world (`ja-wfw0`) the other species go in at the hot hours.
+- **Built.** `heat.ts`; `ColonyParams.heat*` (all off for the generic ant: `heatDay` 0; goldens bit-exact); the ants' `bodyHeat` and `hot` arrays (last in the table); `Colony.heatStep` before the tick's per-ant loop, killing past `heatDeath` (`diedHot`, the journal's "died of heat").
+  - **The day:** 600 s, the last third night; a game opens 60 s after sunrise (`heatStart`), as the sun turns high. The sun's height is sin² over the daylight, 0 all night; the ground (the air at ant height) follows it, 25 °C from sunset to sunrise and 52 °C at noon, just under the critical heat (ground near 54 °C where *Cataglyphis* forage, the air 6–7 °C cooler: partly unverified). **Heat paces the day and never kills** (owner, review of #155 D2): a body can't pass the air around it, so no desert ant reaches 53.6 °C; `tests/int/desertHeat.test.ts` pins it (noon under the limit, no deaths over a day). The death rule stays for a hotter world or species.
+  - **The body:** closes on its surroundings with a 30 s time constant (the plane's air out there, the nest's 30 °C inside); hot from 45 °C until back under 34 °C (the way a tired ant rests until fully rested); dies at 53.6 °C (*C. bombycina*, a borrowing, unverified).
+  - **The desert lane:** `hot` (cool, hot) and `sun` (unseen, low, high, down), the sun seen on the plane and at the top of its own shaft (`atGate`), unseen deeper in; the sun counts as high from 0.2 of its noon height. 16 → 128 situations; words version 8. Its local rule returns when hot, at a low sun and at night; out under a high sun, and up to look when unseen.
+  - **On the field:** a warm wash over the plane deepens toward noon; a dark wash (black) at night.
+- **D5** (`npm run exp -- d5 --one`), local rule, pass 10/10 on seeds 1–10 and 10/10 on 11–20:
+
+| seeds | out at noon ÷ in the low sun (median, least) | set out at night | heat deaths | fewest pickups in a 30 s window under the high sun | ants at the end (median, least) | food home (median) |
+|---|---|---|---|---|---|---|
+| 1–10 | 4.2, 1.72 | 0 | 0 | 2 | 200, 152 | 845 |
+| 11–20 | 3.9, 1.70 | 0 | 0 | 2 | 200, 152 | 982 |
+
+  No heat deaths follows from noon under the limit (above), not from the ants' choices. 0.55 ms/tick. Measured with the homing rule of the re-review (S5: a homing ant deep in keeps going home). The noon brings a dip as the foragers cool (the papers' two summer peaks): the fewest pickups, 2 in a 30 s window, is its trough. At a game's start every forager sets out together, so they cool together: on seed 1 the plane goes from about 40 ants to 1–3 for 20–40 s at noon. Watched, not measured.
+- **Jev's answers.** Asked three times for the first direction ($0.0018 each, $0.0054; owner approved each): v5 and v6 answers ignored the sun (replayed offline, they failed D5 on seeds 1–5); v7 conditioned explore on the sun and passed. **Version 8** (the papers' direction) asked once more ($0.0027; $0.0081 for heat in all): its explore reads "go out, or keep searching, alone for food (only while the sun is high or unseen, and it is not hot)". Under Cautious and Warlike no answer explores at a low or set sun or with a hot body; under Forage one does (an ant whose fight is over, at a low sun). Replayed offline (Forage's answers; with no rival the three doctrines play alike), D5 passes 5/5 on seeds 1–5, with no heat deaths and nobody out at night. These are the shipped `mode-desert-*.json`.
+- **Cost:** about 690 tokens a question for the 128-situation lane (`colony-cost --species desert`), $0.0040 an hour while a doctrine is new; the live re-ask measured about 170 input tokens a question over 384. A cached game spends nothing.
+- **Tests:** `tests/int/desertHeat.test.ts` (the day and the game's start, the body, the sun seen only where the sky is and unseen deeper in, the hot rule, the sun's rule, heat deaths counted, more out at noon than in the low sun, nobody setting out at night, no heat for the generic ant). Mutations, each failing it: heat deaths not counted; the ant blind to the sun; the shaft's top not seeing the sky; the hot rule removed.
+- **Open:** Amor 2011 and Wehner & Wehner 2011 in full (`ja-rf5.13`); every ant out at night counted (`ja-rf5.14`); why homing ants stay lost at night (`ja-rf5.15`); the colony in step at noon.
+
+### 60.6 The invitation: a finder's pace, passed on in the shaft (ja-rf5.6, 2026-11-14)
+
+- **Research** ([desert-ant.md §1](desert-ant.md), Razin, Eckmann & Feinerman 2013, full text, *C. niger*): no trail and no location; a finder runs home fast, an ant that meets a faster one speeds up and a slower one slows (crossing at about 2 cm/s), an ant's chance of leaving rises with its own speed past a soft threshold at about 8 cm/s and, given its speed, not with whom it met; a recruiter's entry raises the idle ants leaving in the next minute sevenfold (nests of 4–8); more ants in the nest lower exits.
+- **What the desert ant had:** the generic ant's one-world activation (an ant waiting at the top of its shaft "meets" every carrier that comes down; a leaky count of returns sets its `leave`). Not Razin's mechanism, and the owner chose to build it (2026-11-14).
+- **Built** (`invite.ts`; `ColonyParams.invitePace`, 0 = the generic ant's encounter count, goldens bit-exact; the ants' `pace` array, last in the table). An ant waiting at the top of its shaft keeps a pace: each finder that comes down past it pulls it 40 % of the way to the finder's 12 cm/s (`paceGain`); it relaxes to 1 cm/s at rest with a 40 s time constant (20 s read 4–5× over Razin's minute: owner, review of #186 D1), faster in a crowd (`paceTau / (1 + 0.25 × crowd)`: resting nestmates slow it, as in Razin's chambers). Its `leave` response reads its own pace as its returns (few from 4 cm/s, many from 8): many → now, few → soon, none → wait (a scout at 1/90 s). The desert ant has its own `leave` response, without the generic ant's crowd-to-raid branch. `paceGain`, `paceCrowd` and the finder's pace are **design**; the 8 cm/s threshold and the pace at rest are the paper's. No Jev cost: the desert ant's leave response is local (its response lanes are not asked).
+- **D2c**, Razin's chamber staged (`experiment.ts` `invitationChamber`, the game's own rule; 400 trials per group size; the minute before a finder against the minute after, as Razin counted): pass 20/20 on seeds 1–20.
+
+| group waiting | leaving after a finder ÷ before (median, least) | leaving rate after (per s) |
+|---|---|---|
+| 2 | 12.9, 10.4 | 0.15 |
+| 4 | 12.4, 11.2 | 0.14 |
+| 8 | 9.9, 8.7 | 0.11 |
+| 13 | 7.6, 6.9 | 0.09 |
+
+  Sevenfold or more in the paper's nests of 4–8; the rate after a finder halves from 4 waiting to 13 (crowding). The ablation (`paceGain` 0): about 1× (tests/int/desertInvite.test.ts). **The chamber's crowd is not the game's** (review of #186, S2): the chamber damps each ant by the others waiting, n − 1; the game's crowd sense counts every nestmate round the top of the shaft (about 5 on average where about 1.5 wait), so a finder's lift falls back about twice as fast in play (with the 40 s time constant, about 6.5 s above paceFew against about 12 s staged); and that sense is wired only where there is a rival, so in a game alone (every D assay) it reads 0 and nothing damps the pace. Wiring it alone too is `ja-rf5.17`. **The window:** D2c counts the minute either side, as Razin did (owner, review of #186 D1); with the first build's 20 s lift a minute read only 4–5× in groups of 4–8, so the lift was lengthened to 40 s.
+- **D2 in the game** (reported, not a gate; measured with the first build's 20 s lift: with 40 s, seeds 1–2 over two days read 11.5× and 13.7× against 7.0× and 12.5×): the leaving rate of the ants waiting at the gate in the 10 s after an isolated finder (none other in the 20 s before) against the 10 s before, two days, seeds 1–10: median 7.2× (0.52–86; pass 5/10), against 0.28× with no pull. Few isolated returns a game (3–9), so it swings: hence the staged D2c. D2 was redefined on the way: counting every departure, the finders cycling straight back out (a successful forager has a pass, crossing.ts) swamped the few that wait; counting every return, finders come down every few seconds and a raised pace lasts through the window before as well.
+- **D5 with the invitation:** a pull of 0.5 cost D5 two seeds (a high-sun window with no pickup: the colony goes out in waves); with 0.4 and a 40 s lift, D5 passes 10/10 on seeds 1–10 and 11–20 (no heat deaths; median food home 836 and 937).
+- **Tests:** `tests/int/desertInvite.test.ts` (the rule; D2c on seeds 1–2 and its one-minute window; the ablation; a finder raising waiting ants' pace in a game; a pace rising only for an ant held at the gate; a crowd damping it in a game with a rival; the leave response reading the pace). Mutations, each failing it: no pull in the game; the touch ignoring the pace; the crowd ignored in the game; the pull reaching ants not held at the gate; the time constant back to 20 s; the window back to 10 s.
+- **Next:** the fungus's contact lever on this host (`ja-rf5.7`) acts at this contact.
 
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
@@ -5048,6 +5202,118 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **P1 holds on seeds 1–10:** no seed more than 10 % slower (seed 10 +6.5 %, seeds 1 and 3 +1 %), the median 283 → 270 s, the worst seed never → 475 s. Seed 7 is now faster with hyphae (277 → 261 s).
 - Held out, seeds 11–20 (no hyphae → hyphae): 11 353 → 391, 12 242 → 244, 13 259 → 218, 14 165 → 150, 15 343 → 274, 16 324 → 279, 17 252 → 254, 18 252 → 219, 19 315 → 305, 20 475 → 297 s. Median 287 → 264 s, worst seed 475 → 391 s; only seed 11 misses P1, by a hair (+10.8 %, against +13 % in §63.9). `ja-2bw.6` keeps it.
 
+### 63.11 Knots: starved tips harden into microsclerotia (ja-2bw.9, 2026-11-13)
+
+**Basis.** [hyphal-growth §7](hyphal-growth.md#7-structures-cords-knots-stalks-and-fusion): *Metarhizium* microsclerotia are hard, pigmented aggregates of hyphae that form under nutrient and oxidative stress, tolerate drying and UV, sporulate from their own reserves with no outside carbon (Paixão et al. 2021), and in soil put out hyphae again after 3–5 days and persist for most of a year (Marciano et al. 2021). Owner (2026-11-13): the trigger and effects most fitting with that; *Knots*, two levels.
+
+**Design.**
+- **The upgrade.** *Knots*, a spread upgrade: *none* → *a few* (400) → *many* (1500).
+- **Forming (starvation).** A tip that has rested on short supply for `KNOT.rounds` rounds in a row (10 at *a few*, 5 at *many*) hardens where it stands: the tip ends, and its cell and up to `KNOT.pull` (2) dead-end cells behind it (cells nothing else grew from) are drawn in. Their mass becomes the knot's store; the pulled cells leave the mycelium, so no mass is made. A knot never forms on the plane's landing patch base or a root.
+- **Hard.** Digging a knot's cell open does not cut it: it stays in the tunnel, a hard lump.
+- **Spores from its store.** While a dug cell touches it, a knot turns its store into spores on that cell at `KNOT.rate` a second, paid by the store, not the mycelium. A buried knot keeps its store until a tunnel reaches it, so a colony digging into one releases its spores on the diggers.
+- **On the plane** (topsoil: never exposed, never dug) a knot can't fruit or be dug into: it is a dormant reserve, and as it sprouts its store goes back to the mycelium (owner, review of #161, D1; measured before: on seed 1 with *many* at landing, 4 plane knots locked 1.5 mass away for good by 180 s).
+- **Sprouting.** `KNOT.sprout` seconds after it formed (60 at *a few*, 30 at *many*, standing in for days), when the supply is ample, a knot puts out one tip on its far side from where it was fed, and is then spent as a sprouter (it stays hard, and keeps fruiting what is left of its store).
+- **Seen.** A knot draws as a dark dot on its cell; the panel's line and Learn text explain it.
+- **Not asked of Jev.** Knots form by the body's state (starvation), not by a growth answer; no lane changes and nothing is spent.
+
+**Assays.** A starved tip hardens after `KNOT.rounds`; a knot survives its cell being dug; a dug cell beside a knot gets spores from its store and none from the mycelium; a knot sprouts after `KNOT.sprout`; mass is conserved; P1 (seeds 1–10, 11–20) with *Knots* bought in the progression order.
+
+**Built (2026-11-14)** as designed: `KNOT = { rounds: [0, 10, 5], sprout: [0, 60, 30], pull: 2, rate: 0.05 }` in `colony/hyphae.ts` (`Hyphae.harden`, `sproutKnots`, `knots`; a tip's `starved` count), the upgrade in `colony/evolution.ts` (trait `knots`), wiring in `Fungus.#growHyphae` (forming after the rounds, the store's mass taken out of the body with `Evolution.lose` so the free mass is unchanged; sprouting beside stump regrowth; ageing and fruiting each tick), and a dark dot per knot in `ui/ColonyField.tsx`. On the page with *many* bought at landing, by 180 s seed 1 had 11 knots on the plane and 2 in the side view.
+
+**Measured** (`progression.mjs --map one --evolve --hyphae --growth`, 600 s, time to a quarter):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| no hyphae (§63.10) (s) | 357 | 363 | 289 | 173 | 228 | never | 277 | never | 240 | 216 |
+| hyphae, no knots (§63.10) (s) | 361 | 278 | 293 | 162 | 205 | 475 | 261 | 355 | 241 | 230 |
+| *Knots* in the order after *Senses* (s) | 361 | 278 | 293 | 162 | 205 | 475 | 261 | 355 | 241 | 230 |
+| *Knots* at landing (`--grant knots`) (s) | 282 | 374 | 297 | 188 | 277 | 411 | 280 | 559 | 273 | 221 |
+
+- **In its place in the order** the script buys it at 265–590 s, mostly after a quarter: every time is unchanged on seeds 1–20, so P1 stands as in §63.10.
+- **At landing it is a gamble:** faster on seeds 1, 6 and 10, slower on most (seed 8 +57 %, seeds 2 and 5 +35 %). Early on supply is often short, and a starved tip that hardens no longer waits for mass to come back, so the mycelium has fewer growing tips until its knots sprout. It is the player's choice; nothing is tuned here. `progression.mjs --grant <ids>` gives upgrades at landing for such worst cases (the order can't force one: a cheaper upgrade is bought while a dearer one waits).
+
+### 63.12 Stalks: a colonised corpse outside raises its spores over a ring (ja-2bw.10, 2026-11-14)
+
+**Basis.** [hyphal-growth §7](hyphal-growth.md#7-structures-cords-knots-stalks-and-fusion): *Ophiocordyceps unilateralis* hyphae leave a dead ant 2–3 days after death and a stalk grows from it to release spores; ants remove their dead fast, so a death in the nest leaves no time for one (Hughes et al. 2011, full text). *Metarhizium* fruits as a flat mat on the cadaver; stalks (synnemata) belong to some relatives, so this is a licence. Owner (2026-11-14): *Stalks*, two levels, 600 then 2000.
+
+**Design.**
+- **The upgrade.** *Stalks*, a spread upgrade: *none* → *a stalk* (600) → *a tall stalk* (2000).
+- **When.** A corpse the fungus has colonised (ja-2bw.7: buried on the midden, or a host dead on the plane) that lies outside (the plane, topsoil) grows a stalk `STALK.delay` seconds after it was colonised (20 at *a stalk*, 10 at *a tall stalk*, standing in for days; well inside a lone corpse's 60 s of spores, owner 2026-11-14 on review of #178: first built at 60 and 30, the first level's stalk grew just as a lone corpse ran dry). A corpse that is carried is not colonised yet, and one in the nest (a layer that is not topsoil) never grows one.
+- **What.** From then on the corpse's free spores, still paid by the cadaver at `CORPSE.rate`, go each step to the emptiest open cell within `STALK.radius` (2, then 4) instead of its one cell, so the ring fills evenly over a few seconds and more passing foragers pick some up, each less. (Split over every cell each step, as first built, a share at radius 4 fell under the fade's floor `SPORE_GONE` and vanished the next step: 45 % fewer spore-seconds on the ground than without a stalk, review of #178.)
+- **Seen.** A stalk draws as a short upright stroke on the corpse's cell; the panel's line and Learn text explain it.
+- **Not asked of Jev.** No lane changes; nothing is spent.
+
+**Assays.** A corpse outside grows its stalk after `STALK.delay` and its spores then fill the ring to its edge and no further, with about what the cadaver paid on the ground (within 25 % below, 5 % above: foragers take more from a wider ring), at both levels; a spent corpse's stalk is gone; no stalk without the upgrade, before the delay, or in a layer that is not topsoil; the cadaver pays the same spores either way; corpse ages save and load; P1 with *Stalks* bought (in the order, and at landing with `--grant stalks`).
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, seeds 1–10, with the review's fix: the emptiest-cell rule and delays 20 and 10; on main after #174; seconds to a quarter of the hosts):
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 231 | 416 | 310 | 143 | 150 | 536 | 272 | 492 | 394 | 262 |
+| Hyphae | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| Hyphae, *Stalks* in the order (after *senses*) | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| Hyphae, *Stalks* at landing (`--grant stalks`) | 249 | 418 | 270 | 152 | 110 | 322 | 263 | 531 | 181 | 261 |
+
+- **In the buying order** *Stalks* comes at 323–583 s, after every seed's quarter, so the quarter, half and queen times are the hyphae's. P1 holds: no seed is more than 10 % slower than without hyphae (worst seed 1, +8 %), and the worst seed (418 against 536) and the median are better. The earlier run's seed-9 miss is gone on this main.
+- **Granted at landing** it is a gamble, as knots were (§63.11): faster on seeds 5, 6 and 9 (235 → 181 s), slower on seeds 2 (+16 %) and 8 (+27 %, 531 s, worse than without hyphae). Spread thinner, a corpse's spores reach more foragers but each takes a smaller dose. Not a P1 configuration; recorded under the owner's ship-and-record rule.
+- First built (spores split over every cell, delays 60 and 30), *Stalks* left every seed unchanged even at landing: the top level lost its spores to the fade, and the first level's stalk came as a lone corpse ran dry (review of #178).
+
+### 63.13 Spores lying out in the sun fade faster (ja-6ip, 2026-11-14)
+
+**Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
+
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun takes the spores of hosts that die out on the plane and of corpses on the midden (`ja-2bw.7`, §63.2): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
+
+| | median, seeds 1–10 | worst, 1–10 | median, 11–20 | worst, 11–20 |
+|---|---|---|---|---|
+| `main` | 275 | 559 | 293 | 431 |
+| flat ×2 | 332 | 477 | 293 | never (seed 20) |
+| flat ×4 | 357 | never | | |
+| flat ×8 | 411 | never (2 seeds) | | |
+
+The flat rule hits the patch, the game's main early source of spores, so it was dropped for the shaded one. Then, re-measured on `main` at `88b5269` (route memory on, #168; knots, #161):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `main` (s) | 250 | 337 | 293 | 146 | 116 | 365 | 265 | 552 | 217 | 240 |
+| sun ×4, patch shaded (s) | 250 | 291 | 293 | 146 | 129 | 363 | 265 | 504 | 232 | 240 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `main` (s) | 418 | 231 | 203 | 18 | 276 | 352 | 235 | 306 | 269 | 341 |
+| sun ×4, patch shaded (s) | 581 | 231 | 203 | 18 | 283 | 352 | 235 | 332 | 276 | 347 |
+
+- Medians: 258 → 258 s (seeds 1–10), 273 → 280 s (11–20). The worst of seeds 1–10 is faster (552 → 504 s); the worst of 11–20 is slower (418 → 581 s, seed 11). **P1 (§63.4) is not met:** seed 5 is 11 % slower and seed 11 39 %, and on seeds 11–20 both the worst seed and the median are worse. No sun above ×1 keeps seed 11 within 10 % (below).
+- **Seed 11 is slower at any sun:** 418 s at ×1 (bit-exact with `main`), 540, 582, 581, 486 and 486 s at ×2–×6. Traced: a ×1 and a ×4 game on seed 11 run identically until 181.6 s, when the first spores of a host dead on the plane appear off the patch; seed 11's later spread runs through them. That is the mechanic's purpose; whether it is worth the cost is chosen with Stalks in (below). Seed 5 is +11 %, seed 18 +8.5 %, the rest within 7 %.
+- The runs are deterministic: seed 11 at ×4 twice gave 581 s both times.
+
+**Owner (2026-11-14, review of #171, D1): merge the rule at ×1, bit-exact with `main`, and choose the number once Stalks (#178, `ja-2bw.10`) is in**, since stalks lay their spores on the plane and the two interact (`ja-19oz`). The test sets `sun: 4` itself.
+
+**Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
+
+### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, aim *unite*, with and without `--hyphae --growth`; seconds to a quarter of the hosts; on main `8f07b85`, after #180, all 40 games in one run):
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 231 | 320 | 310 | 143 | 150 | 543 | 272 | 544 | 411 | 262 |
+| Hyphae | 249 | 305 | 270 | 152 | 116 | 394 | 263 | 424 | 220 | 261 |
+
+| Seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | never | 265 | 208 | 18 | 342 | 381 | 239 | 369 | 328 | 468 |
+| Hyphae | 420 | 233 | 195 | 18 | 360 | 372 | 237 | 334 | 310 | 387 |
+
+- **P1 holds on both sets.**
+  - Seeds 1–10: the slowest seed is +7.8 % (seed 1, 231 → 249 s); the worst time improves from 544 to 424 s, and the median from 291 to 262 s.
+  - Seeds 11–20: the slowest seed is +5.3 % (seed 15, 342 → 360 s); the worst time improves from never (seed 11) to 420 s, and the median from 335 to 322 s.
+- **No number moved.** The earlier misses (§63.7, §63.9, §63.10) were closed by the changes since: the cut that loses only the dug cell, and main's own changes to scent, the tick and defence. **Owner (2026-11-14): record and close**; a later change that pushes a seed past 10 % is caught by the next P1 check.
+- **`--growth` matters.** These runs play the growth lane's shipped answers, as the page does. §63.13's `main` rows ran without it (the tips' own rule) and on an earlier main (`88b5269`, before Stalks, #178, and defence by sight, #180), so its hyphae times differ (seed 8: 552 s there, 424 s here; seed 15: 276 s and 360 s). No run separates the two causes.
+- **Stumps stay.** A piece a cut leaves keeps its root cell even when it has no tip left (one `HYPHA_MASS` a piece), so it can resprout: the owner's "severed part lives on" (§63.10). **Owner (2026-11-14): keep the stump** (review of #152, N3).
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
@@ -5263,6 +5529,24 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **Order.** `forEach` walks chunks in (cy, cx) order whatever the layout, as the old dense table did. That keeps saves and float sums bit-exact.
 - **Cost:** none. No situation, legend or question changed.
 
+**E1.3 built (`ja-qpv.1.3`, 2026-11-14).** Storage only; behaviour is bit-exact (the goldens pass unchanged, and `colony-bench --one --page`'s game summary is identical to main's).
+- **One cell key.** `cellKey(x, y)` in `hex.ts` packs both coordinates, either sign, out to ±2,097,152 cells, the chunk keys' ±32k chunks, as a whole number below 2^44. It replaces four packings: `grid.ts`'s `y · 65536 + x` (columns capped at ±32k, rows never negative), `hyphae.ts`'s and `transect.ts`'s, and the forks'. `keyX`, `keyY` and `keyCell` undo it.
+  - The six per-ant fields that hold a key (`lastDug`, `chamberCell`, `putAt`, `noTunnel`, `looked`, `cameFrom`) are `Float64Array`s now. An `Int32Array` would truncate the wider key, which the goldens caught at once.
+  - `antReset`'s fixture changed only for those six fields' scribbles, which a `Float64Array` keeps whole (28.75, not 28). Which fields a reset touches, and to what, is unchanged.
+- **No flat keys.** The fungus's `sporeCells` and `base`, knot fruiting (#161) and the regrowth piles are keyed by `cellKey`, not `y · w + x − x0`. `Fungus.regrid`, which re-keyed them whenever the curtain grew, is gone. Sets keep insertion order, so iteration is unchanged.
+  - The review of #166 found knot fruiting still on the old packing. Its keys decoded two million cells off the map, so with Knots bought spores faded differently and chunks leaked at chunk row −32768. The Knots test now asserts that no spore chunk lies above the map.
+- **`SAVE_VERSION` 11.** Every packed cell a save holds changed, so a version-10 save is refused, not misread (owner, 2026-11-10: older saves are not read).
+- **`SensedMap` forgets.** A chunk no host has sensed for `SENSED_FADE` shows nothing, so it is dropped and leaves one revealed bit (`revealed`, `revealedCount`: the fog of war's, endless-world §8). Before, every chunk ever sensed was kept.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.76, 17.17 and 17.65 ms mean, E1.3 17.03, 16.57 and 17.10 ms; within noise. Keys above 2^31 are doubles in V8, but no slow-down shows.
+- **Cost:** none. No situation, legend or question changed.
+
+**Regions freed (`ja-qpv.1.5`, review of #160 D1, 2026-11-14).** Storage only; behaviour is bit-exact (the goldens pass unchanged, and `colony-bench --one --page --hash`'s whole-game hash equals main's).
+- **What changed.** `ChunkLayer` counts the chunks in each region. When `drop` takes the last one, the region's slot array is freed (`regions` falls), and the next write there makes it again. Before, every region a chunk had ever been written in kept its array for the rest of the game. Since E1.1 drops faded scent and E1.3 drops faded `SensedMap` chunks, that was every region an ant or a host ever reached.
+- **What it doesn't change.** The box of regions (`regionSlots`) still never shrinks. It grows by whole regions, 256 times slower than a box of chunks would (E1.2).
+- **Why now.** Today's plane is one region a layer, so nothing is saved yet. On an endless plane, memory would otherwise grow with every region ever visited. E4's memory soak is meant to rule that out.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.99, 17.27 and 16.99 ms mean, this change 17.85, 17.22 and 17.22 ms; within noise. Counting happens only in `put` and `drop`, off the read path.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).
@@ -5304,3 +5588,89 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 
 - The three unguarded games with 9–19 larvae waiting: ja-mprr.
 - Jev cost: none. No legend, question, schema or brain version changed.
+
+## 68. Ants draw their mode from Jev's probabilities (ja-nan3, 2026-11-14)
+
+*Tried first on the long-lived `staging` branch (deployed at `/ant-sym/pr-preview/staging/`; experiments there are numbered S1, S2, … in its PRD); the owner played it and kept it.*
+
+**Why.** Every ant in one situation took Jev's choice, so whole groups switched mode together. Jev's `choice` answers already come with a probability for every option (§4); nothing kept them.
+
+**What changed.**
+- A mode answer is kept with its probabilities: `follow=0.49,fight=0.3,explore=0.17,return=0.04`, Jev's choice first (`colony/weighted.ts`). A bare mode still reads everywhere, as certain.
+- The colony hands its mode policy a draw from its own seeded rng (`Colony.policyDraw`). A weighted answer is drawn from at `sampleTemp` (p^(1/T); default 1, as Jev gave it; 0 = always Jev's choice). The local rule and bare answers never draw, so the golden masters stay bit-exact.
+- An ant whose mode was drawn draws again after `reroll` seconds (default 10) in the same situation (`redraw`, a per-ant clock); without it a draw would hold until the situation changed.
+- The follow card shows what an ant drew from. Details → Lab → "How ants choose" sets the temperature (0–2) and the draw-again seconds (0–30) for every colony while a game runs (`Game.setChoice`; a lab setting, not saved).
+- `scripts/precache.mjs --reweigh` re-asks only the situations a bundle holds as a bare mode. Run once: $0.0039 for the three doctrines (453 situations); the desert ant's bundles again after main re-shipped them with the sun (192 situations, $0.0027).
+
+**How sharp Jev's answers are.** Probability of Jev's choice, over the shipped situations:
+
+| Bundle | Mean | Under 0.9 | Under 0.7 |
+|---|---|---|---|
+| Forage | 0.73 | 74 % | 44 % |
+| Cautious | 0.81 | 46 % | 31 % |
+| Warlike | 0.69 | 85 % | 54 % |
+| Desert (3 doctrines) | 0.85–0.86 | 45–48 % | 13–22 % |
+
+Asked again, Jev kept its earlier choice in 81–87 % of situations; where it changed, the call was close (Warlike: follow 0.39 against fight 0.35). A top choice that close was a coin toss before.
+
+**Offline, one world** (shipped answers for both colonies, 300 + 300 ants, 300 s, seeds 1–3; the first colony; a scratch script, not an assay):
+
+| | Food stored | Lost | Mode entropy |
+|---|---|---|---|
+| Forage, Jev's choice | 854, 530, 1,142 | 16, 54, 25 | 1.06–1.15 bits |
+| Forage, drawn (T 1) | 687, 519, 646 (−27 %) | 6, 31, 8 | 1.11–1.21 |
+| Forage, T 0.5 | 757, 575, 637 (−22 %) | 10, 27, 5 | 1.12–1.14 |
+| Warlike, Jev's choice | 1,173, 465, 1,000 | 12, 62, 6 | 1.10–1.30 |
+| Warlike, drawn (T 1) | 627, 385, 617 (−38 %) | 11, 15, 0 | 1.27–1.32 |
+| Warlike, T 0.5 | 774, 499, 764 (−23 %) | 9, 33, 4 | 1.22–1.33 |
+
+- Drawn colonies lose fewer ants and bring home less food; T 0.5 keeps most of the variety for about two thirds of the food cost. The worst seed (Forage 3) loses 44 % at T 1 and 44 % at T 0.5.
+- The doctrines' wordings were tuned against Jev's choice (§54.4), not its probabilities; some of the loss may be that.
+- The largest share of ants switching mode within one second did not fall (22–41 % either way): that metric is driven by events (alarm, trails meeting), not by lockstep answers alone. A better lockstep measure is open.
+
+**Cost.** None per hour: no legend, question or schema changed, and Jev bills input tokens only.
+
+## 69. The page: the map fills the screen, depth tucked away (ja-mvo9, 2026-11-14)
+
+The owner asked for the map to fill the screen, with drawers and panels for the controls and menus, and with learning and deep experimentation kept but somewhat buried. From a brainstorm of five directions they picked four to combine:
+- **A · Cockpit:** the frame. A full-bleed map, a thin HUD, a rail of drawers, an inspector, and a sheet on a phone.
+- **B · On the map:** nest badges, a "?" lens that explains what is under the pointer, a ⌘K palette, and the aim as a command bar.
+- **C · Field notebook:** a Codex whose guide entries unlock on first sight, and Specimens to pin and compare ants.
+- **D · Play and Lab modes:** a Lab workbench with history charts, a step control, and every lab and debug tool.
+
+They chose to build it directly, in stages: S1 the shell, S2 on the map, S3 the Codex, S4 Lab, S5 polish. Each stage is one PR, under the epic `ja-mvo9`.
+
+### 69.1 S1: the kit and the full-bleed shell (ja-mvo9.1)
+- **`ui/kit.tsx`:** `SectionHead`, `Button`, `IconButton` (its badge read out as a description), inline-SVG `Icon`s (no dependency), the floating surface style `FLOAT`, and `Drawer`.
+  - A `Drawer` is a column under the HUD on a desktop, and a bottom sheet above the tab bar on a phone.
+  - Escape closes it, unless a tooltip, Learn or Details is above it.
+- **The layout:**
+  - **The map:** fills the viewport, with no page scroll and no aspect box.
+  - **The HUD:** play, the speeds, above/below, the clock, the pace warning, and the goal pill. On a phone the clock and the pace move into the goal pill so the bar fits 390 px.
+  - **The rail** (a tab bar on a phone) opens one drawer at a time:
+    - The fungus: infection, unity and the aim;
+    - Mutations: body and upgrades, with a badge when one is affordable;
+    - Colonies: the Details card;
+    - Saved games: the Details card;
+    - Learn;
+    - Settings: trails drawn, "Lab and numbers" (the Details screen until S4), the GitHub link, and on the hosted page the Jev passphrase (owner, 2026-11-14: in Settings, with a badge on its tab until it is unlocked, rather than over the map).
+  - **The inspector,** at the right (a sheet on a phone), shows the followed ant, or the queen's pen while she flies.
+  - **The field's Whole map, nest and Labels buttons** fold into one "Go to" menu centred under the HUD.
+  - **The tutorial card** moves to the lower right (above the tabs on a phone). A card that points at the mutations or the aim opens that drawer.
+- **Carrying the camera:** a followed ant that goes through a hole now asks the field to keep the follow (`centreOn` `keepFollow`). Before, a crossing could re-centre the view still shown and drop the follow.
+- **Unchanged:** the simulation; the golden masters are bit-exact.
+
+
+### 69.2 S2a: on the map (ja-mvo9.2, first half)
+Stage 2 goes out in two PRs. This first half carries what the map says; the palette, the "?" lens and the shortcuts sheet follow in S2b.
+- **Nest badges:** the name over each hole on the top view is now a badge: the colony's name, the share of its living ants carrying the fungus (once any does, at least 1 %), and its queen (a faint crown when clean, a spore crown when infected, "no queen" when dead). Drawn on the canvas, so it moves with the camera. The words come from the pure `ui/badges.ts` (`nestBadge`, `badgeParts`).
+- **Ant tag:** the followed ant's ring carries a tag with its number and mode (`antTag`).
+- **The aim bar:**
+  - From 1024 px wide, the aim is a bar along the bottom of the map: the presets and the player's words. The field is one unwrapped line until it has focus, then four lines.
+  - It spans the free width, clear of the rail and of an open drawer, at most 46 rem. The inspector stops above it instead (from 1024 px its height is capped at the screen less 12 rem, which clears the bar opened to four lines) and scrolls: the owner chose this over a bar squeezed beside the inspector (review of #189, D1).
+  - Enter commits the words, Shift+Enter is a new line, and Escape gives the keys back to the map; an Enter that confirms an input method's word stays the input method's (`ui/aimKey.ts`).
+  - When Jev can't run, the bar's presets and field are locked; its "locked" word has the reason as a tooltip, and The fungus drawer says it too.
+  - Narrower than 1024 px it stays in The fungus drawer, and the tutorial's aim card opens that drawer only there.
+  - Learn → Policy now shows the aim read-only, so the aim has one home.
+- **Toasts and the tutorial's card** sit above the aim bar on every width, including when it is opened to four lines (the card from 1024 px: review of #189, S5).
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.

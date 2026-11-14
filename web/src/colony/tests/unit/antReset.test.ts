@@ -14,7 +14,9 @@ type Slot = Record<string, (number | string)[]>;
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/antReset.json", import.meta.url), "utf8")) as { spawn: Slot; asIs: Slot };
 
 const make = () =>
-  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 10, rivalAnts: 10, rival: false }, gameRng(7)).player;
+  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 10, rivalAnts: 10, rival: false }, gameRng(7), {
+    colony: { routeStep: 8 }, // the fixture was recorded at routeStep 8; a newborn's routeGap is the colony's routeStep
+  }).player;
 const names = Object.keys(ANT_FIELDS);
 type Arrays = Record<string, { length: number; [i: number]: number }>;
 const arrays = (c: Colony) => c as unknown as Arrays;
@@ -90,4 +92,10 @@ test("a newborn's resets follow the colony's parameters: routeGap and tolerance 
   c.spawn();
   assert.equal(c.routeGap[i], 5, "routeGap starts at the colony's routeStep");
   assert.ok(Math.abs(c.tolerance[i]! - 0.2) < 1e-6, "tolerance at the colony's");
+});
+
+test("every per-ant field that holds a cellKey is a Float64Array: a 32-bit array would truncate the key (hex.ts)", () => {
+  const c = make();
+  for (const k of ["lastDug", "chamberCell", "putAt", "noTunnel", "looked", "cameFrom"])
+    assert.ok(arrays(c)[k] instanceof Float64Array, `${k} holds cellKeys`);
 });
