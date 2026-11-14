@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { check, fixture, record, type Scenario } from "../goldens.ts";
 
 // The landed-fungus golden master (ja-1ldx): one world at full size, seed 5, 600 + 600 ants, the garden strain landed at colony
-// 0's hole and evolving with hyphae on, Stalks and Knots given at landing and the rest bought in progression.mjs's order, on the
+// 0's hole and evolving with hyphae on, Stalks and Knots given at landing at their second level (so a stalk grows and knots form within the
+// 40 s, which level 1 doesn't reach) and the rest bought in progression.mjs's order, on the
 // fungus's local rule. Every 10 s it hashes what oneWorldGolden does and the fungus's whole state (spores on both layers, hosts,
 // evolution, hyphae, corpses). oneWorldGolden runs no fungus and the other goldens are one-map games, so this is the one that
 // fails when a plane rule or a fungus default changes what the fungus does (with FungusParams.sun at 4 it differs from 30 s on).
@@ -17,7 +18,7 @@ const SCENARIOS: Scenario[] = [
     seed: 5,
     ants: 600,
     seconds: 40,
-    landed: { strain: "garden", grant: ["stalks", "knots"] },
+    landed: { strain: "garden", grant: ["stalks", "stalks", "knots", "knots"] },
   },
 ];
 

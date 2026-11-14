@@ -137,11 +137,9 @@ function recordOne(s: Scenario): OneSample[] {
     : new Game(world, { antCount: s.ants, rivalAnts: s.ants }, mulberry32(s.seed * 7919));
   const queue = [...UPGRADE_ORDER];
   if (L) {
-    game.land(
-      0,
-      STRAINS.findIndex((x) => x.id === L.strain),
-      { evolve: true },
-    );
+    const strain = STRAINS.findIndex((x) => x.id === L.strain);
+    if (strain < 0) throw new Error(`${s.name}: no strain ${L.strain}`);
+    game.land(0, strain, { evolve: true });
     for (const id of L.grant ?? []) {
       const e = game.fungus.evolution!;
       const cost = e.cost(id);
