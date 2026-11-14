@@ -2,14 +2,18 @@ import { useState } from "react";
 import { openLearn } from "./learn.ts";
 import { FAST_SPEED, type Card, type TutorialStep } from "./tutorial.ts";
 
-// The tutorial's coach card (ja-7x4, PRD §61), over the field's lower-left corner: one step at a time, the step's
+// The tutorial's coach card (ja-7x4, PRD §61), over the map's lower-right corner (above the tab bar on a phone, PRD §69): one step at a time, the step's
 // button (or nothing while the game decides), Faster on a live step, Hide and Skip. Hide shrinks the card to a strip with
 // the step's button, so the map shows (on a phone the card covers most of it); the next step opens a full card again.
 
 const ORDER: Record<TutorialStep, number> = { landing: 1, waiting: 2, host: 3, watch: 4, cleared: 5, died: 5, timeout: 5, aim: 6, done: 6 };
 
+// On a phone the card sits above the tab bar, or under the HUD while a drawer is open (`high`), so it never covers the
+// drawer it points into.
 const shell =
-  "pointer-events-auto absolute bottom-3 left-3 z-10 w-[min(22rem,calc(100%-1.5rem))] rounded-lg border border-spore/50 bg-panel/95 shadow-lg";
+  "pointer-events-auto absolute inset-x-2 z-20 rounded-xl border border-spore/50 bg-panel/95 shadow-lg backdrop-blur-sm sm:inset-x-auto sm:top-auto sm:right-3 sm:bottom-3 sm:w-[22rem]";
+const low = "bottom-16";
+const highUp = "top-[7.25rem]";
 const primary = "rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:bg-accent-hover";
 
 export default function TutorialCard({
@@ -19,6 +23,7 @@ export default function TutorialCard({
   onNext,
   onFaster,
   onSkip,
+  high = false,
 }: {
   step: TutorialStep;
   card: Card;
@@ -26,12 +31,14 @@ export default function TutorialCard({
   onNext: () => void;
   onFaster: () => void;
   onSkip: () => void;
+  /** a drawer is open: on a phone the card goes under the HUD instead of over the drawer */
+  high?: boolean;
 }) {
   // Hidden for this step only: a different step is a different card, shown in full. (Keyed by the step, so no reset is needed.)
   const [hiddenAt, setHiddenAt] = useState<TutorialStep | null>(null);
   if (hiddenAt === step)
     return (
-      <section className={`${shell} flex items-center gap-2 px-3 py-2 text-sm`} aria-label="tutorial" role="dialog">
+      <section className={`${shell} ${high ? highUp : low} flex items-center gap-2 px-3 py-2 text-sm`} aria-label="tutorial" role="dialog">
         <span className="min-w-0 flex-1 truncate font-medium text-fg">
           <span className="mr-1.5 text-[11px] font-normal text-fg-3 tabular-nums">{ORDER[step]} / 6</span>
           {card.title}
@@ -53,7 +60,7 @@ export default function TutorialCard({
       </section>
     );
   return (
-    <section className={`${shell} p-3 text-sm`} aria-label="tutorial" role="dialog">
+    <section className={`${shell} ${high ? highUp : low} p-3 text-sm`} aria-label="tutorial" role="dialog">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="font-medium text-fg">{card.title}</h2>
         <span className="text-[11px] text-fg-3 tabular-nums">{ORDER[step]} / 6</span>

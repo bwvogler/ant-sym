@@ -322,7 +322,7 @@ export const GUIDE: GuideEntry[] = [
     title: "The fungus's body, and its mutations",
     swatch: ["var(--spore)"],
     onScreen:
-      "The Fungus panel: its mycelium by the hole and the fungus in its hosts, mutations to keep and how fast they come, and what each upgrade does next. On a followed ant's card, a lever your fungus can't yet pull as far as Jev wants shows what it gets and what it wanted.",
+      "The Mutations drawer: its mycelium by the hole and the fungus in its hosts, mutations to keep and how fast they come, and what each upgrade does next. On a followed ant's card, a lever your fungus can't yet pull as far as Jev wants shows what it gets and what it wanted.",
     realAnts:
       "Metarhizium lives for months in soil and around roots without an insect. Passed through groups of grooming ants for ten cycles, it evolved to make more spores and to carry less of the cue groomers detect. In experimental evolution, more replication buys far less than proportionally faster adaptation.",
     inGame:
@@ -336,7 +336,7 @@ export const GUIDE: GuideEntry[] = [
   {
     id: "unity",
     title: "One colony",
-    onScreen: "The Unity bar in the Fungus panel. Ants' colours meet in between as their odours mix.",
+    onScreen: "The Unity bar in The fungus drawer. Ants' colours meet in between as their odours mix.",
     realAnts:
       "Introduced Argentine ants form supercolonies whose nests smell alike and don't fight, across about 6,000 km of southern Europe. Orphaned army-ant colonies fused with a neighbour in 7 of 10 trials.",
     inGame:
