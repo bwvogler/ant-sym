@@ -83,18 +83,18 @@ test("a species asks under its own lane words: its own context, and only its own
   assert.equal(jev.seed(own, [[key, "follow"]], LONE), 0, "follow is not among the species' answers");
   assert.equal(jev.seed(own, [[key, answer]], LONE), 1);
   assert.equal(g.player.policy(sit), answer, "the species' lane reads its own context");
-  assert.equal(jev.state.cached, 1);
+  assert.equal(jev.state.lanes.mode.cached, 1);
 });
 
 test("a species with no stance lane has none in the client: nothing seeded, counted or asked there", () => {
   let before: Game["player"]["stancePolicy"] | undefined;
   const { g, jev } = setup(LONE, (game) => (before = game.player.stancePolicy)); // read before the client attaches
   assert.equal(jev.seed(stanceContext(DOCTRINE), [[stanceKey(stanceSit), "raid"]], LONE), 0);
-  assert.equal(jev.state.stancesCached, 0);
+  assert.equal(jev.state.lanes.stance.cached, 0);
   assert.equal(g.player.stancePolicy, before, "the colony keeps the stance policy the Game gave it");
   assert.equal(jev.stancePolicy(stanceSit), localStance(stanceSit));
   jev.setDoctrine("raid often"); // a new doctrine re-contexts only the lanes the species has
-  assert.equal(jev.state.stancesCached, 0);
+  assert.equal(jev.state.lanes.stance.cached, 0);
 });
 
 test("the species' own local rule stands in while a situation is unanswered (ja-fnd.5.9)", () => {

@@ -15,6 +15,7 @@ import { apiHeaders, apiUrl } from "./backend.ts";
 export type { LaneName } from "../colony/index.ts";
 import {
   LANE_KINDS,
+  LANE_LIST,
   LANES,
   laneOfContext,
   type ErasedLane,
@@ -92,28 +93,34 @@ export interface CacheStore {
 export interface ColonyJevState {
   phase: "off" | "running" | "stopped";
   run: RunSummary | null;
-  /** this run: situations sent to Jev (ant modes and stances, every colony), requests sent */
-  asked: number;
-  stancesAsked: number;
+  /**
+   * Per lane (the registry's names, colony/lanes.ts): this run's situations sent to Jev, and the answers cached under the lane's words now.
+   * An ant lane's are every driven colony's, a doctrine two colonies share counted once; the fungus's are its aim's, under every menu asked.
+   * A lane the colonies' species lacks (Species.lanes) counts 0: see stanceLane.
+   */
+  lanes: Record<LaneName, LaneCounts>;
+  /** this run: requests sent */
   requests: number;
   /** this run: mode choices answered from the cache, and by the local rule while a situation was unanswered */
   hits: number;
   misses: number;
-  /** answers cached under every colony's doctrine (modes, stances): a doctrine two colonies share counts once */
-  cached: number;
-  stancesCached: number;
   /** whether the colonies driven have a stance lane at all (a species may not: Species.lanes, ja-fnd.5.12): the panel says so rather than "0 stances" */
   stanceLane: boolean;
   /** mode answers cached for each colony's doctrine */
   doctrineCached: number[];
-  /** this run: fungal situations sent to Jev; answers cached for the current aim (under every menu asked) */
-  fungusAsked: number;
-  fungusCached: number;
-  /** this run: hyphal tips' situations sent to Jev; answers cached for the current aim (the growth lane, ja-2bw.5) */
-  growthAsked: number;
-  growthCached: number;
   failures: number;
   lastError: string | null;
+}
+
+/** A lane's counts in the panel: situations sent this run, answers cached under its words now. */
+export interface LaneCounts {
+  asked: number;
+  cached: number;
+}
+
+/** A record over every lane of the registry, in its order. */
+function perLane<T>(f: (name: LaneName) => T): Record<LaneName, T> {
+  return Object.fromEntries(LANE_LIST.map((l) => [l.name, f(l.name)])) as Record<LaneName, T>;
 }
 
 type Listener = (s: ColonyJevState) => void;
@@ -308,19 +315,12 @@ export class ColonyJev {
   #state: ColonyJevState = {
     phase: "off",
     run: null,
-    asked: 0,
-    stancesAsked: 0,
+    lanes: perLane(() => ({ asked: 0, cached: 0 })),
     requests: 0,
     hits: 0,
     misses: 0,
-    cached: 0,
-    stancesCached: 0,
     stanceLane: true,
     doctrineCached: [],
-    fungusAsked: 0,
-    fungusCached: 0,
-    growthAsked: 0,
-    growthCached: 0,
     failures: 0,
     lastError: null,
   };
@@ -392,8 +392,8 @@ export class ColonyJev {
     return c;
   }
 
-  /** The cache sizes the panel shows. */
-  #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "stanceLane" | "doctrineCached" | "fungusCached" | "growthCached"> {
+  /** The cache sizes the panel shows (each lane's `asked` is kept as it is). */
+  #counts(): Pick<ColonyJevState, "lanes" | "stanceLane" | "doctrineCached"> {
     // Every colony's, not the first's (PRD §65): one cache per context, so colonies of one doctrine count once.
     const modes = new Map<string, number>();
     const stances = new Map<string, number>();
@@ -402,13 +402,16 @@ export class ColonyJev {
       if (d.stances) stances.set(d.stances.context, this.#cache(d.stances).size);
     }
     const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+    const cached: Record<LaneName, number> = {
+      mode: sum(modes),
+      stance: sum(stances),
+      fungus: this.#cache(this.#fungal).size,
+      growth: this.#cache(this.#growth).size,
+    };
     return {
-      cached: sum(modes),
-      stancesCached: sum(stances),
+      lanes: perLane((name) => ({ asked: this.#state.lanes[name].asked, cached: cached[name] })),
       stanceLane: this.#species.lanes.stance !== undefined,
       doctrineCached: this.#driven.map((d) => (d.modes ? this.#cache(d.modes).size : 0)),
-      fungusCached: this.#cache(this.#fungal).size,
-      growthCached: this.#cache(this.#growth).size,
     };
   }
 
@@ -742,19 +745,17 @@ export class ColonyJev {
     this.#aborter = new AbortController();
     this.#clearQueues();
     this.#cooldown = 0;
+    const counts = this.#counts();
     this.#set({
       phase: "running",
       run,
-      asked: 0,
-      stancesAsked: 0,
-      fungusAsked: 0,
-      growthAsked: 0,
       requests: 0,
       hits: 0,
       misses: 0,
       failures: 0,
       lastError: null,
-      ...this.#counts(),
+      ...counts,
+      lanes: perLane((name) => ({ asked: 0, cached: counts.lanes[name].cached })),
     });
     if (this.#askOnStart) {
       this.#askOnStart = false;
@@ -888,9 +889,12 @@ export class ColonyJev {
       key,
       situation,
     }));
-    const counted = LANE_KINDS[l.name].counter;
+    const counts = this.#state.lanes[l.name];
     this.#inFlight++;
-    this.#set({ [counted]: this.#state[counted] + items.length, requests: this.#state.requests + 1 });
+    this.#set({
+      lanes: { ...this.#state.lanes, [l.name]: { ...counts, asked: counts.asked + items.length } },
+      requests: this.#state.requests + 1,
+    });
     this.journal?.note("jev", -1, `asked ${items.length} ${l.name} situation${items.length === 1 ? "" : "s"}`, {
       lane: l.name,
       keys: items.map((it) => it.key),
@@ -921,7 +925,11 @@ export class ColonyJev {
             if (m.name === l.name && m.context === context)
               for (const it of items)
                 if (m.key(it.situation) === it.key && !this.#cache(m, context).get(it.key)) m.queue.set(it.key, it.situation); // a fungus key built under an older menu is not asked again
-        this.#set({ [counted]: this.#state[counted] - items.length, run: runOf(body) ?? this.#state.run });
+        const back = this.#state.lanes[l.name];
+        this.#set({
+          lanes: { ...this.#state.lanes, [l.name]: { ...back, asked: back.asked - items.length } },
+          run: runOf(body) ?? this.#state.run,
+        });
         return;
       }
       if (!res.ok) error = errorOf(body) ?? `HTTP ${res.status}`;

@@ -256,9 +256,9 @@ test("each lane sends its own ids and feeds its own counter: ants s0.., the stra
     "a host is h<n>",
   );
   // Each counter counts the situations its own lane sent.
-  assert.equal(j.state.asked, ants.length);
-  assert.equal(j.state.stancesAsked, strategist.length);
-  assert.equal(j.state.fungusAsked, hosts.length);
+  assert.equal(j.state.lanes.mode.asked, ants.length);
+  assert.equal(j.state.lanes.stance.asked, strategist.length);
+  assert.equal(j.state.lanes.fungus.asked, hosts.length);
   // Only the ants' modes are tallied as hits and misses: a strategist lookup moves neither.
   assert.ok(j.state.hits + j.state.misses > 0, "the ants' lookups are tallied");
   const tally = j.state.hits + j.state.misses;
