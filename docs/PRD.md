@@ -5316,6 +5316,15 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **Order.** `forEach` walks chunks in (cy, cx) order whatever the layout, as the old dense table did. That keeps saves and float sums bit-exact.
 - **Cost:** none. No situation, legend or question changed.
 
+**E1.3 built (`ja-qpv.1.3`, 2026-11-14).** Storage only; behaviour is bit-exact (the goldens pass unchanged, and `colony-bench --one --page`'s game summary is identical to main's).
+- **One cell key.** `cellKey(x, y)` in `hex.ts` packs both coordinates, either sign, out to ±2,097,152 cells, the chunk keys' ±32k chunks, as a whole number below 2^44. It replaces four packings: `grid.ts`'s `y · 65536 + x` (columns capped at ±32k, rows never negative), `hyphae.ts`'s and `transect.ts`'s, and the forks'. `keyX`, `keyY` and `keyCell` undo it.
+  - The six per-ant fields that hold a key (`lastDug`, `chamberCell`, `putAt`, `noTunnel`, `looked`, `cameFrom`) are `Float64Array`s now. An `Int32Array` would truncate the wider key, which the goldens caught at once.
+  - `antReset`'s fixture changed only for those six fields' scribbles, which a `Float64Array` keeps whole (28.75, not 28). Which fields a reset touches, and to what, is unchanged.
+- **No flat keys.** The fungus's `sporeCells` and `base` and the regrowth piles are keyed by `cellKey`, not `y · w + x − x0`. `Fungus.regrid`, which re-keyed them whenever the curtain grew, is gone. Sets keep insertion order, so iteration is unchanged.
+- **`SensedMap` forgets.** A chunk no host has sensed for `SENSED_FADE` shows nothing, so it is dropped and leaves one revealed bit (`revealed`, `revealedCount`: the fog of war's, endless-world §8). Before, every chunk ever sensed was kept.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.76, 17.17 and 17.65 ms mean, E1.3 17.03, 16.57 and 17.10 ms; within noise. Keys above 2^31 are doubles in V8, but no slow-down shows.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).

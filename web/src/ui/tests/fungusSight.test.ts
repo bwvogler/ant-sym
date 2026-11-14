@@ -107,3 +107,22 @@ test("the disc is exact both ways, at negative columns (the curtain) and across 
     assert.ok(lit > 40, `a disc, not a dot (${lit} cells)`);
   }
 });
+
+test("a chunk faded right out is dropped and leaves a revealed bit; a fresh pass brings it back", () => {
+  const s = new SensedMap();
+  s.stamp([colony([{ x: 20, y: 20, load: INFECTED }])], 100);
+  const grid = s.layer(PLANE)!;
+  assert.ok(grid.count > 0, "the host's reach is held");
+  assert.ok(s.revealed(PLANE, 0, 0), "and its chunk revealed");
+  const away = colony([{ x: 20 + 4 * CHUNK, y: 20, load: INFECTED }]); // four chunks east
+  s.stamp([away], 100 + SENSED_FADE - 1);
+  assert.ok(grid.chunk(0, 0), "still fading: kept");
+  s.stamp([away], 100 + SENSED_FADE);
+  assert.equal(grid.chunk(0, 0), undefined, "faded right out: dropped (it showed nothing)");
+  assert.equal(at(s, PLANE, 20, 20), 0);
+  assert.ok(s.revealed(PLANE, 0, 0), "but it stays revealed");
+  assert.ok(s.revealed(PLANE, 4, 0) && !s.revealed(PLANE, 2, 0), "only where hosts have been");
+  assert.equal(s.revealedCount(PLANE), 2);
+  s.stamp([colony([{ x: 20, y: 20, load: INFECTED }])], 100 + SENSED_FADE + 1);
+  assert.equal(at(s, PLANE, 20, 20), 1, "sensed again");
+});
