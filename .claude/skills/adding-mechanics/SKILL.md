@@ -85,7 +85,7 @@ Follow [reference/plan.md](reference/plan.md) for the templates and commands.
 2. **vision.md**: a sense-table row for a new sense; a gap-table row for any scripted read it adds or closes.
 3. **PRD**: a new numbered section stub in `docs/PRD.md`: the problem, the decisions so far (marking which are the owner's), the plan, the assays and targets, what is still open. Results come later.
 4. **Beads**: one epic for the mechanic, children in build order (research gaps, assays first, then each behaviour change with its gate), dependencies between them, acceptance on each child. Use `bd`, never edit `.beads/issues.jsonl`.
-5. **Commit** the docs (and the beads export) before code, as their own commit.
+5. **Commit** the docs before code, as their own commit; share the beads with `scripts/beads-sync.sh push`.
 
 ## 5. Check and review
 

@@ -28,7 +28,7 @@
       "prompt": "Merge main into my PR #<n>; it conflicts.",
       "expect": [
         "Merges origin/main into the PR branch (no rebase, no force-push)",
-        "Resolves a conflict in .beads/issues.jsonl by scripts/beads-sync.sh start and bd export -o, not by editing the file",
+        "On a branch that still tracks .beads/issues.jsonl, takes main's deletion with git rm --cached, not by editing the file",
         "Runs the fast checks before pushing when anything else conflicted"
       ]
     },
