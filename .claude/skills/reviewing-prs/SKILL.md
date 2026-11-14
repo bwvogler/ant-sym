@@ -1,6 +1,6 @@
 ---
 name: reviewing-prs
-description: "Reviews a pull request on bwvogler/ant-sym (jev-ants) and posts it as one GitHub review, with measured evidence, merge mechanics against main and the other open PRs, and the owner's decisions relayed into the PR and into beads. Use whenever the user asks to review a PR, re-review one, 'check for updates', 'anything new?', 'fixes are in', 'is #N ready', or 'approve what's ready', including stacked PRs, and whenever a lead agent hands a subagent a PR to review (role: helper). Not for writing the fix itself or for designing a mechanic (that is adding-mechanics)."
+description: "Reviews a pull request on bwvogler/ant-sym (jev-ants) and posts it as one GitHub review, with measured evidence, merge mechanics against main and the other open PRs, and the owner's decisions relayed into the PR and into beads. Use whenever the user asks to review a PR, re-review one, 'check for updates', 'anything new?', 'fixes are in', 'is #N ready', or 'approve what's ready', including stacked PRs, and whenever a lead agent hands a subagent a PR to review (role: helper). Not for writing the fix itself (that is steward) or for designing a mechanic (that is adding-mechanics)."
 argument-hint: "[PR number(s), or 'open'] [role: helper]"
 allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/merge-check.sh *), Bash(${CLAUDE_SKILL_DIR}/scripts/fast-checks.sh *)
 hooks:
