@@ -39,7 +39,9 @@ const list = (s) =>
 /** Load the colony modules from a checkout's root. */
 async function colony(root) {
   const at = (f) => pathToFileURL(resolve(root, "web/src/colony", f)).href;
-  const [{ Game }, { generateSideWorld, mulberry32 }, brood, hex] = await Promise.all([at("game.ts"), at("world.ts"), at("brood.ts"), at("hex.ts")].map((u) => import(u)));
+  const [{ Game }, { generateSideWorld, mulberry32 }, brood, hex] = await Promise.all(
+    [at("game.ts"), at("world.ts"), at("brood.ts"), at("hex.ts")].map((u) => import(u)),
+  );
   return { Game, generateSideWorld, mulberry32, LARVA: brood.LARVA, LARVA_FOOD: brood.LARVA_FOOD, isFed: brood.isFed, CELL: hex.CELL };
 }
 
@@ -102,11 +104,13 @@ async function trace(root, w, nudge, params, every) {
     const before = c.diedHungry;
     const alive = Uint8Array.from(c.alive);
     g.tick(1 / 30);
-    if (c.diedHungry > before) for (let i = 0; i < c.n; i++) if (alive[i] && !c.alive[i] && lastE[i] < 0.05) died[last[i]] = (died[last[i]] ?? 0) + 1;
+    if (c.diedHungry > before)
+      for (let i = 0; i < c.n; i++) if (alive[i] && !c.alive[i] && lastE[i] < 0.05) died[last[i]] = (died[last[i]] ?? 0) + 1;
     if (k % (30 * every)) continue;
     const larvae = c.brood.items.filter((b) => b.stage === m.LARVA).length;
     const rooms = {};
-    for (const r of chs.list) if (r.colony === c.params.nest) rooms[r.role] = (rooms[r.role] ? rooms[r.role] + "+" : "") + `${r.food.toFixed(0)}/${r.brood}`;
+    for (const r of chs.list)
+      if (r.colony === c.params.nest) rooms[r.role] = (rooms[r.role] ? rooms[r.role] + "+" : "") + `${r.food.toFixed(0)}/${r.brood}`;
     let n = 0;
     let e = 0;
     let need = 0;
