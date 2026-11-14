@@ -42,8 +42,6 @@ import {
   FLOOR_PER_ANT,
   FOES_HALF,
   HOLE_SIGHT,
-  INTAKE_NONE,
-  INTAKE_PLENTY,
   INTAKE_WINDOW,
   LEAVE_NOW,
   LEAVE_SOON,
@@ -80,6 +78,10 @@ import { arrive } from "./arrive.ts";
 import { AntStep } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
 import {} from "./colonySave.ts";
+import { localPolicy, localStance } from "./localRules.ts";
+import { speciesSituation, stanceView } from "./colonySituation.ts";
+import {} from "./colonySituation.ts";
+export { localPolicy, localStance } from "./localRules.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -190,26 +192,6 @@ export interface Corpse {
 export { swapBroodStore } from "./pheromone.ts";
 
 /**
- * The local rule. (An enemy close by is the contact response's to answer, behaviour MR 4: before it, this rule sent
- * every ant with one near to fight.) Tired: go home. Raiding:
- * explorers (and fighters) go raiding, followers keep foraging. Defending:
- * alarm calls fighters. A fight that is over sends the ant home. Otherwise
- * forage: a strong food trail is followed, none means explore, a faint one
- * keeps what the ant was doing (an ant that just dropped its food heads back
- * out along it). Going home tired breaks ant mills: without it, followers
- * circled trails to food that was gone until nobody was left exploring.
- */
-export const localPolicy: Policy = (s) => {
-  if (s.tired) return "return";
-  if (s.stance === "raid" && (s.mode === "explore" || s.mode === "fight")) return "fight";
-  if (s.stance === "defend" && s.alarm !== "none") return "fight";
-  if (s.mode === "fight") return "return";
-  if (s.foodTrail === "strong") return "follow";
-  if (s.foodTrail === "none") return "explore";
-  return s.mode === "return" ? "follow" : s.mode;
-};
-
-/**
  * A colony's queen (nest slice 4): where she lies, and the fungus in her (ja-lo8.7): her attendants infect her by
  * contact as they would any ant, her nestmates groom it off, and what the fungus does in her is her levers: how much
  * of it she shows, and how much of her royal mark she lays.
@@ -233,14 +215,6 @@ export interface Queen {
   /** her scent not yet passed on (ja-lo8.9, royal.ts): it builds while no ant touches her, up to SCENT_HELD seconds' worth */
   held: number;
 }
-
-/** The local strategist: defend a nest under attack; raid when no food comes in or the colony is full and fed; else forage. */
-export const localStance: StancePolicy = (s) => {
-  if (s.enemyNearNest && s.losses !== "none") return "defend";
-  if (s.intake === "none" && s.ants !== "few") return "raid";
-  if (s.larder === "full" && s.ants === "many") return "raid";
-  return "forage";
-};
 
 /**
  * One map a colony lives on, and what goes with it (one world, docs/one-world.md §2, §4): the map, the colony's scent on
@@ -955,34 +929,6 @@ export class Colony {
     CELL[1] = this.cellY[i];
   }
 
-  /**
-   * Bind a lane's policy to this colony (the one place a policy is set after the constructor: the page's Jev client, the assays and the tests go through it,
-   * not a field). "mode": an ant's choice in its situation; "stance": the colony's strategist.
-   */
-  /**
-   * Ask the mode policy about the species' own situation (ja-fnd.5.10): `schema` names the fields its key and its question hold, `sense` adds the
-   * fields of its own (it must read, not draw from the game's random stream, so the game plays on as before). Null: the generic situation. The
-   * schema keeps the mode field with every mode (the tick reads a situation's mode off its code), and stays small enough for the ants' question codes.
-   */
-  setSituation(
-    own: { schema: Schema<SpeciesSituation>; sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>> } | null,
-  ): void {
-    if (!own) {
-      this.own = null;
-      this.seen = new Uint8Array(SITUATIONS);
-      return;
-    }
-    const at = own.schema.fields.findIndex((f) => f.name === "mode");
-    const values = at < 0 ? [] : (own.schema.fields[at]!.values as readonly unknown[]);
-    if (at < 0 || values.length !== MODES.length || MODES.some((m, k) => values[k] !== m))
-      throw new Error("setSituation: a species' schema keeps the mode field, with every mode in order");
-    if (own.schema.size > 0x7fff)
-      throw new Error(`setSituation: ${own.schema.size} situations; an ant's question code holds at most 32,767`);
-    const allowed = new Map(own.schema.fields.map((f) => [String(f.name), f.values as readonly unknown[]] as const));
-    this.own = { schema: own.schema, sense: own.sense ?? null, modeStride: own.schema.strides[at]!, allowed };
-    this.seen = new Uint8Array(own.schema.size);
-  }
-
   bindPolicy(lane: "mode", fn: Policy): void;
   bindPolicy(lane: "stance", fn: StancePolicy): void;
   bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
@@ -1306,21 +1252,6 @@ export class Colony {
     const c = { explore: 0, follow: 0, return: 0, fight: 0 };
     for (let i = 0; i < this.n; i++) if (this.alive[i]) c[MODES[this.mode[i]] as Mode]++;
     return c;
-  }
-
-  /** The strategist's view of this colony. `enemyNearNest` comes from the game, which sees both colonies. */
-  stanceSituation(enemyNearNest: boolean): StanceSituation {
-    const pop = this.population / this.params.maxAnts;
-    const intake = this.intakeRate / Math.max(1, this.population);
-    return {
-      stance: this.stance,
-      ants: pop < 0.4 ? "few" : pop < 0.8 ? "some" : "many",
-      losses: this.recentLosses < 1 ? "none" : this.recentLosses < 10 ? "some" : "heavy",
-      enemyNearNest,
-      // Until it has watched a whole window the colony can't tell: "some".
-      intake: this.time < INTAKE_WINDOW ? "some" : intake < INTAKE_NONE ? "none" : intake >= INTAKE_PLENTY ? "plenty" : "some",
-      larder: this.spare() >= 2 * this.params.foodPerAnt ? "full" : "low",
-    };
   }
 
   /**
@@ -1966,5 +1897,17 @@ export class Colony {
   /** A saved state back into this colony, in place (colonySave.ts loadColony). */
   loadState(saved: Record<string, unknown>): void {
     loadColony(this, saved);
+  }
+
+  /** Ask the mode policy about the species' own situation (colonySituation.ts speciesSituation). Null: the generic one. */
+  setSituation(
+    own: { schema: Schema<SpeciesSituation>; sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>> } | null,
+  ): void {
+    speciesSituation(this, own);
+  }
+
+  /** The strategist's view of this colony (colonySituation.ts stanceView). `enemyNearNest` comes from the game, which sees both colonies. */
+  stanceSituation(enemyNearNest: boolean): StanceSituation {
+    return stanceView(this, enemyNearNest);
   }
 }
