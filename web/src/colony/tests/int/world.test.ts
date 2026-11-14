@@ -387,6 +387,9 @@ test("ChunkLayer: a region is freed with its last chunk, and made again by the n
   l.set(CHUNK + 5, 5, 2); // a second chunk in the same region
   l.set(far, 5, 3);
   assert.deepEqual([l.count, l.regions], [3, 2]);
+  l.put(0, 0, l.chunk(0, 0)!.slice()); // replacing a chunk adds nothing to its region's count
+  l.drop(2, 0); // nor does dropping one that isn't there take anything away
+  assert.deepEqual([l.count, l.regions], [3, 2]);
   const box = l.regionSlots;
   l.drop(0, 0);
   assert.deepEqual([l.count, l.regions], [2, 2], "one chunk still in the first region: it stays");

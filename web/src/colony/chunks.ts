@@ -135,7 +135,7 @@ export class ChunkLayer<A extends Cells> {
     r[i] = a;
     if (old === undefined) {
       this.#count++;
-      this.#live[ti] = (this.#live[ti] ?? 0) + 1;
+      this.#live[ti] = this.#live[ti]! + 1;
     }
     return old;
   }
@@ -156,7 +156,7 @@ export class ChunkLayer<A extends Cells> {
     if (old !== undefined) {
       this.#count--;
       r[i] = undefined;
-      const live = (this.#live[ti] ?? 1) - 1;
+      const live = this.#live[ti]! - 1;
       this.#live[ti] = live;
       if (live === 0) {
         this.#table[ti] = undefined;
