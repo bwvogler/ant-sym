@@ -86,6 +86,11 @@ const near = (a, b, eps) => Math.abs(a - b) <= eps;
  * Where a view's camera looks when asked to centre on world (tx, ty) at `zoom`: clamped to its map in the box it is
  * drawn in now (camera.ts clamp, hex.ts extent), in the page.
  */
+/** Whether screen point (sx, sy) is open map: the canvas, not the HUD, the rail, a drawer or the inspector over it (PRD §69). */
+function onField(sx, sy) {
+  return document.elementFromPoint(sx, sy) === document.querySelector("canvas");
+}
+
 function clampCam(layer, tx, ty, zoom) {
   const w = window.jevAnts.game.world;
   const m = layer === "above" ? w.plane : w.curtain;
@@ -149,6 +154,7 @@ try {
   });
   const page = await ctx.newPage();
   await page.addInitScript(`window.__clampCam = ${clampCam.toString()};`);
+  await page.addInitScript(`window.__onField = ${onField.toString()};`);
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(url);
   const shot = async (name) => {
@@ -297,7 +303,7 @@ try {
       const wy = (cy + 0.5) * R;
       const sx = r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k;
       const sy = r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k;
-      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30) continue;
+      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30 || !window.__onField(sx, sy)) continue;
       const room = clear(wx, wy, 0);
       if (room > reach && (!best || room > best.room)) best = { s, sx, sy, zoom: c.zoom, room };
     }
@@ -333,7 +339,7 @@ try {
       const wy = (30 + 0.5) * R; // row 30: the sky
       const sx = r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k;
       const sy = r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k;
-      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30) continue;
+      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30 || !window.__onField(sx, sy)) continue;
       const i = s - line.sMin;
       const px = line.cells[2 * i];
       const py = line.cells[2 * i + 1];
@@ -423,7 +429,12 @@ try {
           const e = window.__clampCam("above", f.x, f.y, f.cam.zoom);
           return Math.abs(f.cam.x - e.x) <= 1.5 && Math.abs(f.cam.y - e.y) <= 1.5;
         };
-        const on = t.slice(up).find((f) => f.layer === 0 && f.view === "above" && f.cam && onAnt(f));
+        // The view switch is a React update and can land a frame or two after the ant does (the full-screen page, PRD §69);
+        // an ant that pops up for a single step and drops back is still carried if the top view came, centred where it
+        // surfaced, within a few frames.
+        const on =
+          t.slice(up).find((f) => f.layer === 0 && f.view === "above" && f.cam && onAnt(f)) ??
+          t.slice(up, up + 4).find((f) => f.view === "above" && f.cam && onAnt({ ...f, x: t[up].x, y: t[up].y }));
         if (on)
           return {
             below: t.slice(0, up).filter((f) => f.layer === 1 && f.view === "below").length,
@@ -494,6 +505,7 @@ try {
         const wx = c.x + ((sx - r.left) * k - cv.width / 2) / c.zoom;
         const wy = c.y + ((sy - r.top) * k - cv.height / 2) / c.zoom;
         if (wy < (41 + 6) * R) continue; // underground, well below the strip (a click on the strip or the sky links)
+        if (!window.__onField(sx, sy)) continue;
         let d = Infinity;
         for (const col of game.colonies)
           for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === 1) d = Math.min(d, Math.hypot(col.x[i] - wx, col.y[i] - wy));
@@ -529,7 +541,8 @@ try {
       sx: r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k,
       sy: r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k,
     });
-    const onScreen = ({ sx, sy }) => sx > r.left + 30 && sx < r.right - 30 && sy > r.top + 50 && sy < r.bottom - 30;
+    const onScreen = ({ sx, sy }) =>
+      sx > r.left + 30 && sx < r.right - 30 && sy > r.top + 50 && sy < r.bottom - 30 && window.__onField(sx, sy);
     let inside = null;
     let outside = null;
     for (let a = 0; a < 2 * Math.PI && !(inside && outside); a += Math.PI / 12) {
@@ -624,6 +637,10 @@ try {
   const tips = (p) => p.getByRole("tooltip").count();
   const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first();
   const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first();
+  // The upgrades live in the Mutations drawer (PRD §69): the rail opens it, and the button shows it pressed.
+  const mutations = (p) => p.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Mutations", exact: true });
+  await mutations(page).click();
+  check((await mutations(page).getAttribute("aria-pressed")) === "true", "the rail opens the Mutations drawer");
   await nameOf(page).hover();
   await until(async () => (await tips(page)) === 1, "a hover opens an upgrade's tooltip", 3000, 50);
   await page.keyboard.press("Escape");
@@ -659,6 +676,18 @@ try {
     () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
     "the touch page's game, landed",
   );
+  // A phone (PRD §69): the map fills the screen, the rail is a tab bar along the bottom, and a drawer opens as a sheet
+  // above it.
+  const phone = await tpage.evaluate(() => {
+    const cv = document.querySelector("canvas").getBoundingClientRect();
+    const nav = document.querySelector('nav[aria-label="panels"]').getBoundingClientRect();
+    return { w: innerWidth, h: innerHeight, cv: { w: cv.width, h: cv.height }, navTop: nav.top, navBottom: nav.bottom };
+  });
+  check(phone.cv.w === phone.w && phone.cv.h === phone.h, `on a phone the map fills the screen (${phone.cv.w}×${phone.cv.h})`);
+  check(phone.navBottom > phone.h - 20 && phone.navTop > phone.h / 2, "and the drawers' tabs run along its bottom");
+  await mutations(tpage).tap();
+  const sheet = await tpage.getByRole("region", { name: "mutations" }).boundingBox();
+  check(sheet !== null && sheet.y + sheet.height <= phone.navTop + 1, "a drawer opens as a sheet above the tabs");
   const tname = nameOf(tpage);
   await tname.tap();
   await until(async () => (await tips(tpage)) === 1, "a tap opens an upgrade's tooltip", 3000, 50);
@@ -794,7 +823,9 @@ try {
     await dp.evaluate(() => window.jevAnts.game.colonies.every((c) => !c.layers[0].ph.live("food") && !c.layers[0].ph.live("home"))),
     "no food or home trail on the plane",
   );
-  await dp.getByRole("button", { name: "Details", exact: true }).click();
+  // Details is Settings → Lab and numbers now (PRD §69).
+  await dp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Settings", exact: true }).click();
+  await dp.getByRole("button", { name: "Lab and numbers", exact: true }).click();
   const det = dp.getByRole("dialog", { name: "Details" });
   await det.getByText("Trails drawn").waitFor({ timeout: 5_000 });
   check(

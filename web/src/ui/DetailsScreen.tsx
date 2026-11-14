@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DOCTRINES,
   LETHAL,
@@ -44,6 +44,7 @@ interface Props {
   saves: { list: SaveRecord[]; save: (slot: number) => Promise<void> };
   onLoad: (r: SaveRecord) => void;
 }
+export type DetailsProps = Props;
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 const h2 = "flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-3";
@@ -96,7 +97,20 @@ export default function DetailsScreen(props: Props) {
   );
 }
 
+/** Inside a drawer (PRD §69) a card drops its own frame and heading: the drawer has them. */
+const Bare = createContext(false);
+export function BareCards({ children }: { children: ReactNode }) {
+  return <Bare.Provider value>{children}</Bare.Provider>;
+}
+
 function Card({ label, title, children, wide = false }: { label: string; title: ReactNode; children: ReactNode; wide?: boolean }) {
+  const bare = useContext(Bare);
+  if (bare)
+    return (
+      <section className="min-w-0 text-sm text-fg-2" aria-label={label}>
+        {children}
+      </section>
+    );
   return (
     <section
       className={`min-w-0 rounded-lg border border-line bg-panel px-4 py-3 text-sm text-fg-2 ${wide ? "lg:col-span-2" : ""}`}
@@ -108,7 +122,7 @@ function Card({ label, title, children, wide = false }: { label: string; title: 
   );
 }
 
-function Colonies({ stats }: Props) {
+export function Colonies({ stats }: Props) {
   const share = stats && stats.foodTotal > 0 ? stats.stored / stats.foodTotal : 0;
   return (
     <Card label="colony stats" title="Colonies" wide>
@@ -508,7 +522,7 @@ function Lab({ game, controls, update, stats, jev }: Props) {
 }
 
 /** Saved games: the autosave and the player's slots, each with Load; Save to a slot. */
-function SavedGames({ saves, onLoad, controls }: Props) {
+export function SavedGames({ saves, onLoad, controls }: Props) {
   const slots = Array.from({ length: SLOTS }, (_, k) => k);
   return (
     <Card label="saved games" title="Saved games">

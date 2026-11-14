@@ -2,14 +2,14 @@ import { useState } from "react";
 import { openLearn } from "./learn.ts";
 import { FAST_SPEED, type Card, type TutorialStep } from "./tutorial.ts";
 
-// The tutorial's coach card (ja-7x4, PRD §61), over the field's lower-left corner: one step at a time, the step's
+// The tutorial's coach card (ja-7x4, PRD §61), over the map's lower-right corner (above the tab bar on a phone, PRD §69): one step at a time, the step's
 // button (or nothing while the game decides), Faster on a live step, Hide and Skip. Hide shrinks the card to a strip with
 // the step's button, so the map shows (on a phone the card covers most of it); the next step opens a full card again.
 
 const ORDER: Record<TutorialStep, number> = { landing: 1, waiting: 2, host: 3, watch: 4, cleared: 5, died: 5, timeout: 5, aim: 6, done: 6 };
 
 const shell =
-  "pointer-events-auto absolute bottom-3 left-3 z-10 w-[min(22rem,calc(100%-1.5rem))] rounded-lg border border-spore/50 bg-panel/95 shadow-lg";
+  "pointer-events-auto absolute inset-x-2 bottom-16 z-20 rounded-xl border border-spore/50 bg-panel/95 shadow-lg backdrop-blur-sm sm:inset-x-auto sm:right-3 sm:bottom-3 sm:w-[22rem]";
 const primary = "rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:bg-accent-hover";
 
 export default function TutorialCard({
