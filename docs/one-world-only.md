@@ -10,7 +10,8 @@ Test names are quoted as their prefix: the whole name is in the file at the line
 `nestCount` and `nestGap` from there. So the open-ground generator *is* the plane's generator, and tests of `generateWorld(…, OPEN_WORLD)`
 terrain test the plane: they are **port**, not delete. The top-down soil map is not separate code either: it is `DEFAULT_WORLD`'s `soil`,
 `rockiness` and `patchesPerChunk` with `OPEN_WORLD` left off, so deleting `DEFAULT_WORLD` would change the plane and its golden. The curtain
-reads `SIDE_WORLD`'s `rockiness`, `soil`, `patchesPerChunk`, `foodPerCell` and `foodMinDist` (through `buryPockets`, `world.ts:844-855`), and
+reads `SIDE_WORLD`'s `rockiness`, `soil`, `patchesPerChunk`, `foodPerCell` and `foodMinDist` (through `buryPockets`, `world.ts:837-861`) and its
+`chamberDepth` (`foundNest`'s default depth, `world.ts:1072`, for every curtain nest: `oneWorld.ts:143`, `:222`), and
 uses `groundCell`, the side view's ground rule (`oneWorld.ts`). What S2 does: fold `DEFAULT_WORLD` + `OPEN_WORLD` into one set of plane
 options; move those `SIDE_WORLD` values and `groundCell` into the curtain; then delete `generateSideWorld`'s own surface, walkway, ground line
 and mound.
@@ -22,6 +23,11 @@ Two more points apply across the tables:
   the curtain under it), so its "keep" means **keep (swap to `oneArena`)**. The queenless path a hand-made colony takes (it grows straight from
   its stores, `colony.ts`) goes with the old maps, so a hand-made test of growth, the stores or ageing on that path is **delete** or **port
   (curtain)**, not keep.
+  Most hand-made tests build no `Game`, only a bare `Colony` on the field (about 90 `new Colony(` in 16 files; backfill, emission,
+  perception and sight build nothing else). D1 is about `Game`, so these **keep as they are**: a `Colony` on one field is a single plane layer
+  (`entrance === null` is how a layer is the plane, `colony.ts:1781`, `1944`), and that branch is one world's. Two conditions: step 4's
+  deletion of the `#entrance === null` proxy must leave a one-field `Colony` working as a plane layer, and a bare-`Colony` test that leans on
+  the queenless path goes with it. If step 4 instead makes `Colony` need a line, they move to `oneArena` too (open question below).
 - **The colony-wide strategist** (`StanceSituation`, `localStance`, the stance lane `c0`, `stanceGate 0` broadcast, `strategyChoices`) is deleted by S2.
   So are its tests, even on hand-made maps. I list them under **delete**.
 
@@ -37,7 +43,7 @@ Two more points apply across the tables:
 | unit/backfill.test.ts | H | backfilling unused dead ends, pellets not dug back out, youth guard | keep | hand-made soil field |
 | unit/bindPolicy.test.ts | T-soil 120×80 | policies bound through `bindPolicy`; no outside code assigns a policy field | keep (swap map) | `smallOne()`. Test "a colony's mode and stance policies…": its stance half binds the strategist's lane, so **delete** that half with `StanceSituation` |
 | unit/chapters.test.ts | S (test 2) | chapter order; the landing: spores by the hole, first host within 2 min | port (test 2) | test 1 has no map (keep). "landing: spores fall by the hole…" → `generateOneWorld`. `int/oneWorldGame` "the landing is on the plane by the hole…" covers where it lands and the plane-only dose. It does not cover "nobody dosed", "lands once", "first host < 2 min" or "rival stays clean" |
-| unit/crowd.test.ts | H (own `arena`) | crowd felt builds over CROWD_HALF | keep | |
+| unit/crowd.test.ts | H (own `arena`) | crowd felt builds over CROWD_HALF | keep (swap to `oneArena`) | builds `new Game(arena(), …)` (`:16`) |
 | unit/emission.test.ts | H (`arena(6.5)`) | deposit gain, cross-laying, silent fights, fungus emission levers | keep | not in the grep list (uses builders `arena`) |
 | unit/fungusHome.test.ts | S, one T-soil | what a host feels underfoot; muddle; crown; midden sporulation; corpse load; nest-odour drift | port (curtain), mostly | Tests "what the fungus feels underfoot…", "muddle…", "crown (lethal…)", "crown below a high load…", "a host's corpse keeps its load…" → curtain (`smallOne`, the royal and brood chambers). "on the midden a Bloom host's corpse sporulates; a Garden host's doesn't": the Bloom half is **covered** by `int/oneWorldGame` "a corpse carried up goes to the plane's midden…"; port the Garden negative. "crown grows with a host's load; muddle and crown are offered only where there is a nest": port the load half; **delete** the top-down "no nest" half (`new Fungus(generateWorld(2))`; one world always has a nest, `oneWorldGame` asserts `g.fungus.hasNest`). "the nest's odour drifts toward hosts in its royal chamber…": the royal half is **covered** by `oneWorldGame` "the nest odour drifts toward the ants in the royal chamber…"; port the brood-chamber and disc negatives |
 | unit/hunger.test.ts | S + `broodChamber` | energy use, eating, starving, hunger felt by touch, old foragers carrying to brood | port (curtain) | the two pure tests ("a larva begs…", "the felt grid…") keep. The other four → curtain of `smallOne`. No one-world test covers hunger |
@@ -119,6 +125,14 @@ These are in the guard and golden tables below: `slow/chambers.test.ts`, `slow/e
 | ui/tests/pen.test.ts | O; S (one assert) | the pen | delete (part) | the "none off one world" side game in "the pen's circle…" |
 | ui/tests/saves.test.ts | T-open (one test) | single-map save never offered | keep (fixture) | still a migration guard. After S2 no `Game` can produce a single-map save, so it needs a stored old-format record |
 | ui/tests/rehearseCopy.test.ts | — (binds the `stance` policy) | rehearsal copies the policies | delete (part) | `:9` binds the strategist's `stance` policy and asserts `stancePolicy` |
+| ui/tests/speciesLanes.test.ts | T-soil | species lane words in the client | keep (swap map) | "a species with no stance lane has none in the client…" → **delete** (strategist lane) |
+| ui/tests/speciesLearn.test.ts | T-soil | species rule text and requests | keep (swap map) | "the client says whether the colonies have a stance lane at all" → **delete** |
+| ui/tests/int/colonyJev.test.ts | T-open, T-soil | the Jev client: runs, caches, doctrines, fungus lane | keep (swap map) | "the strategist's stance goes through its own cached lane" and "the stance count is every colony's too…" → **delete**. Lines 888 and 904 `fungusContext(…, g.map.sky ? "side" : "top")` → drop the view |
+| ui/tests/int/laneWiring.char.test.ts | T-soil, O | lane wiring characterisation | split | "the fungus lane asks and answers under the view its game has: top without a nest, side with one" → **delete**. The `fungusContext(AIM,"side")` seeds drop the view. "each lane sends its own ids…": drop the strategist's `c0` |
+| ui/tests/int/speciesAsk.test.ts | T-soil | species requests | keep (swap map) | "…and no stance question" goes with the strategist |
+| ui/tests/laneRegistry.char.test.ts | `fungusContext(a,v)` | lane characterisation hashes | re-record (top only) | "…the fungus's two views" → one context. One world already asks the fungus lane under the `"side"` context (`ui/colonyJev.ts`, `hasNest ? "side" : "top"`; `fungusBrain.ts` adds `-side`), so if the view-less `fungusContext` keeps the `-side` form byte for byte, only the `"top"` variant's hash goes |
+| ui/tests/lanes.test.ts | `fungusContext(…,"side"/"top")` | context prefixes, ids | keep (edit) | drop the view. "…c0 for stances…" goes with the strategist |
+| ui/tests/precache.test.ts | `fungusContext(aim,"side")` | shipped bundles match contexts | keep (if the context keeps `-side`) | "every preset aim ships fungus answers for the side view…": keep the shipped answers by keeping the `-side` form in the view-less context (see laneRegistry). Re-shipping, which needs a live check and costs money, is only needed if the string changes |
 
 ### Strategist tests on no old map (the grep's misses)
 
@@ -137,14 +151,6 @@ These build no open or side map, so the grep missed them, but they test the colo
 | tests/builders.ts | `SMALL_SIDE` (`:16`), `walkway()` (`:62`), `broodChamber()` (`:68`) | delete with the side map, after the ports that use them move to `smallOne()` |
 | tests/hexmaps.ts | `hexMap` | keep, with the hand-made fields |
 | experiment.ts | `runGame`'s default is the side map, and its doc comment (`:87`) still calls it "the page's" default (stale since PRD §55) | port: one world as the default |
-| ui/tests/speciesLanes.test.ts | T-soil | species lane words in the client | keep (swap map) | "a species with no stance lane has none in the client…" → **delete** (strategist lane) |
-| ui/tests/speciesLearn.test.ts | T-soil | species rule text and requests | keep (swap map) | "the client says whether the colonies have a stance lane at all" → **delete** |
-| ui/tests/int/colonyJev.test.ts | T-open, T-soil | the Jev client: runs, caches, doctrines, fungus lane | keep (swap map) | "the strategist's stance goes through its own cached lane" and "the stance count is every colony's too…" → **delete**. Lines 888 and 904 `fungusContext(…, g.map.sky ? "side" : "top")` → drop the view |
-| ui/tests/int/laneWiring.char.test.ts | T-soil, O | lane wiring characterisation | split | "the fungus lane asks and answers under the view its game has: top without a nest, side with one" → **delete**. The `fungusContext(AIM,"side")` seeds drop the view. "each lane sends its own ids…": drop the strategist's `c0` |
-| ui/tests/int/speciesAsk.test.ts | T-soil | species requests | keep (swap map) | "…and no stance question" goes with the strategist |
-| ui/tests/laneRegistry.char.test.ts | `fungusContext(a,v)` | lane characterisation hashes | re-record (top only) | "…the fungus's two views" → one context. One world already asks the fungus lane under the `"side"` context (`ui/colonyJev.ts`, `hasNest ? "side" : "top"`; `fungusBrain.ts` adds `-side`), so if the view-less `fungusContext` keeps the `-side` form byte for byte, only the `"top"` variant's hash goes |
-| ui/tests/lanes.test.ts | `fungusContext(…,"side"/"top")` | context prefixes, ids | keep (edit) | drop the view. "…c0 for stances…" goes with the strategist |
-| ui/tests/precache.test.ts | `fungusContext(aim,"side")` | shipped bundles match contexts | keep (if the context keeps `-side`) | "every preset aim ships fungus answers for the side view…": keep the shipped answers by keeping the `-side` form in the view-less context (see laneRegistry). Re-shipping, which needs a live check and costs money, is only needed if the string changes |
 
 `ui/tests/agentDocs.test.ts` lists `SMALL_SIDE` among the builders' symbols (line 31). Drop that entry when `SMALL_SIDE` goes.
 
@@ -221,7 +227,7 @@ CLAUDE.md asks PRs to quote, since those come from `colony-cost` and `fungus-cos
 
 ## Summary
 
-**Colony test files**: 61 in all. That is the grep's 59 plus `unit/emission` (builders' `arena()`) and `unit/laneBinding` (`fungusContext(view)`). Of these, 58 are in section 1 and 3 slow files are in section 3.
+**Colony test files**: 61 in all, plus 3 strategist-only files (section 1, "Strategist tests on no old map"). That is the grep's 59 plus `unit/emission` (builders' `arena()`) and `unit/laneBinding` (`fungusContext(view)`). Of these, 58 are in section 1 and 3 slow files are in section 3.
 Each file is counted once, under the verdict for most of its tests. Many files are split per test, as the notes say.
 
 | verdict (file level) | count | files |
@@ -229,18 +235,18 @@ Each file is counted once, under the verdict for most of its tests. Many files a
 | port | 22 | soak: mound.soak (two checks). unit: chapters, fungusHome, hunger, nestGuards, queenHost, regrow, restFetch. int: chambers, homing, queen, testSpecies, undertakes, zoning. soak: evolution.soak, food.soak, food, marks, midden, recognition.soak, royal, solo |
 | covered | 2 | addColony, mound (its sandpile test is a delete); mound.soak is now covered in part, its two missing checks ported |
 | delete | 3 | side (one test port, three covered), underground, ageStructure (one test keep) |
-| keep, hand-made field | 6 | backfill, crowd, emission, perception, sight, oneWorldMound |
+| keep, hand-made field | 6 | backfill, emission, perception, sight (bare `Colony`, as they are); crowd (`Game`: swap to `oneArena`); oneWorldMound |
 | keep (swap map) | 8 | bindPolicy, journal, species, weighted, speciesChannels, speciesModes, speciesSituation, desertPlume |
 | keep, with port or delete tests inside | 11 | colony, fungus, fungalPolicy, world, game, recognition, responses, save, evolution, assays, laneBinding |
 | keep, minus one old-map test | 6 | oneWorldGame, oneWorldPatience, oneWorldSaveMutations, oneWorldSettle, oneWorldSite, oneWorldRoute |
 | re-record | 1 (+1 slow) | golden/golden.test.ts (2 scenarios); slow/golden.test.ts (1) |
 
-Per-test totals, counted roughly from the notes: about **93 port**, about **30 covered** and about **35 delete**. The rest keep.
+Per-test totals, counted roughly from the notes: about **97 port**, about **28 covered** and about **41 delete**. The rest keep.
 About 60 of the ports are in-nest mechanics (curtain): chambers, brood, queen, gynes, food flow, hunger, zoning.
 For those, the work is mostly swapping `generateSideWorld(2, SMALL_SIDE)` for `smallOne()` and re-deriving cells in the curtain, since the curtain runs the side view's nest code.
 
 **Assays** (20 in `ASSAYS`): covered 13 (A1, A2a, A2b, A3, A4, A5, A5b, A6, A6-open, A9, A10, G → G1, A8 → nestFlowOne); port 6 (A11, A12, A13, L ×3); delete 1 (G′).
-**Slow guards** (10 files): port 5 (assays' A-tests, chambers, economy, raidFind, raidStop); covered 1 (side → G1); re-record 1 (golden); keep 3 (oneWorld, G1 ×3, route).
+**Slow guards** (12 files, G1's three as one guard): port 5 (assays' A-tests, chambers, economy, raidFind, raidStop); covered 1 (side → G1); re-record 1 (golden); keep 3 (oneWorld, G1 ×3, route).
 
 **Riskiest: a PRD baseline and no one-world coverage**
 1. **A13 `defendHome`** (§54.3): in neither `ONE_ASSAYS` nor `ONE_PENDING`, so it is easy to drop by accident. Its `broadcast` control uses `stanceGate: 0`, which S2 deletes, so the score needs redefining, not only porting.
@@ -255,11 +261,11 @@ For those, the work is mostly swapping `generateSideWorld(2, SMALL_SIDE)` for `s
 
 Also decided (owner, 2026-11-14, review of #181 D2): `ja-d6c` stays closed. The four mechanics run on the plane and are measured there; A5 (0/10) and A10 (0/10) are tracked by their own beads (ja-lp4.6.8, ja-je8), and don't hold S2 up.
 
-
 - ~~**Is a single-map `Game` kept?**~~ **Decided (owner, 2026-11-14, review of #181 D1): no, `Game` becomes one-world only.** About 25 "keep" files move onto `oneArena(field, seed)`; the queenless grow-from-stores path a hand-made colony takes goes with the old maps; `new Fungus(map)`'s one-map save shape (`evolution.test` "…one map: no layers") and `soak/save` "a single-map save's shape" go too.
 - **What exactly is "the strategist"?** I took it to be `StanceSituation`, `localStance`, `stanceSituation()`, the stance lane (`c0`), `strategyChoices` and `stanceGate: 0`'s broadcast stance. Tests that set `c.stance` directly (`journal` "stance, queen and infection", `game.test` "raid stance as a bias…", which uses `stanceGate: 0`) may keep or go, depending on whether a colony-level `stance` field survives.
 - **`addColony` "with the rival off, a founded colony takes the nest it dug…"**: a side-world bug (founding reused the world's unused second nest). I did not check whether `generateOneWorld` with `rival: false` still has a spare second nest that founding could pick, so port vs delete is open.
 - **Arena assays and their gate tests** (`soak/assays` A3/A4, `slow/assays`): these are hand-made top-down arenas, not `generateWorld`. I don't know whether S2 retires the legacy `ASSAYS` list (leaving only `ONE_ASSAYS`) or keeps the arena runs as a bench. If they stay, those tests are keep, not port.
 - **How "covered" the split covers are**: where a one-world test covers only part of an old test (landing, nest odour drift, `autoFound` flights, place sensing in the nest), I wrote "covered in part" and ported the rest. Someone should confirm the parts left over are worth keeping.
-- **The side-world generator constants**: the curtain uses `SIDE_WORLD.rockiness`, `SIDE_WORLD.soil` and `buryPockets(…, SIDE_WORLD, …)`. "Delete `SIDE_WORLD`" has to mean moving those values into the curtain. `soak/side.test.ts`'s golden goes, and `oneWorld.test`'s golden then pins them.
+- ~~**The side-world generator constants**~~ Answered by "Read this first" (top of this note): the values move into the curtain.
+- **Does step 4 keep a one-field `Colony`?** The ~90 bare-`Colony` constructions on hand-made fields keep as they are if a `Colony` on one field stays a plane layer after the `#entrance === null` proxy goes; if `Colony` comes to need a line, they move to `oneArena` too.
 - **Per-test counts are approximate** (I counted from test names and map calls, not by running anything).

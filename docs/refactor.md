@@ -90,18 +90,19 @@ The top-down and side maps are retired.
    - covered by a one-world test
    - delete
 
-   Done (2026-11-14, `ja-fnd.3.1`): [one-world-only.md](one-world-only.md). 61 test files, 20 assays, 10 slow files; its open questions come before steps 2-4.
+   Done (2026-11-14, `ja-fnd.3.1`): [one-world-only.md](one-world-only.md). 61 test files, 20 assays, 12 slow files (G1's three as one guard); its open questions come before steps 2-4.
 2. **Port the assays that carry PRD baselines** to one world. Record the new baselines in the PRD, choose by the worst seed, and confirm on seeds 11–20.
 3. **Re-record the golden masters on one world only:** fast and slow.
 4. **Delete:**
-   - first fold `DEFAULT_WORLD` + `OPEN_WORLD` into one set of plane options (one world's plane is `generateWorld(seed, OPEN_WORLD)`, which the endless world's E2 later replaces), and move `SIDE_WORLD`'s `rockiness`, `soil`, `patchesPerChunk`, `foodPerCell` and `foodMinDist`, and `groundCell`, into the curtain; then delete `generateSideWorld`'s surface, walkway, ground line and mound, and whatever of `transect.ts` the curtain does not use
+   - first fold `DEFAULT_WORLD` + `OPEN_WORLD` into one set of plane options (one world's plane is `generateWorld(seed, OPEN_WORLD)`, which the endless world's E2 later replaces), and move `SIDE_WORLD`'s `rockiness`, `soil`, `patchesPerChunk`, `foodPerCell`, `foodMinDist` and `chamberDepth` (`foundNest`'s default depth), and `groundCell`, into the curtain; then delete `generateSideWorld`'s surface, walkway, ground line and mound, and whatever of `transect.ts` the curtain does not use
+   - the single-map `Game` (owner, #181 D1): tests on hand-made fields that build a `Game` run on `oneArena(field, seed)` (`experiment.ts:1583`); the queenless grow-from-stores path (`colony.ts:2128-2134`) goes. Bare-`Colony` tests on a field keep, as long as a one-field `Colony` stays a plane layer
    - the view proxies: `#entrance === null`, `map.sky`, and `this.queen` read as "side view"
    - the colony-wide strategist (`StanceSituation`)
    - the side-only and top-only params
    - `fungusContext(view)`
    - the plane/curtain twins, merged into one function each: `#believe`, `#dropOut`, `#markMidden`, `heapMound`, `takeLoose`
 
-   Contexts that name a view change, so ship the answers of a live check (`--import`) and note each lane's hourly cost in the PR.
+   `fungusContext` keeps its `-side` form byte for byte, so the shipped fungus answers keep their keys and need no re-ship ([one-world-only.md](one-world-only.md), `precache` row). If a context's string does change, ship the answers of a live check (`--import`) and note each lane's hourly cost in the PR.
 5. **Docs and beads.** Update CLAUDE.md's commands, `one-world.md` and the vision gap table. Close or supersede the beads that were only about the side view.
 
 ## Stage 3: take `Colony` apart (bit-exact)
