@@ -1,6 +1,6 @@
 # Steering: an ant weighs its guidance cues by their reliability and its own state, but trail following itself barely moves
 
-*Research note for epic `ja-steer` (stage 1, research; PRD §S3). Written 2026-11-14, against code at `5fb6a90`. Read in full text (PubMed Central): Wystrach, Mangan & Webb 2015; Hoinville & Wehner 2018; Buehlmann, Mangan & Graham 2020 (first 100,000 characters); Czaczkes et al. 2011 and 2012; Czaczkes et al. 2015; Czaczkes & Heinze 2015; Dussutour et al. 2009; Wenig, Bach & Czaczkes 2021; Popp & Dornhaus 2024 (first 100,000 characters). Everything else comes from abstracts, database records or citing papers, and its numbers are marked **unverified**. Refused by this session's network policy: `journals.biologists.com`, `pubmed.ncbi.nlm.nih.gov`, `link.springer.com` (login redirect), `www.biorxiv.org`, `www.sussex.ac.uk`, `epub.uni-regensburg.de`, `epub.ub.uni-muenchen.de`, `dipot.ulb.ac.be`, `web.stanford.edu`, `www.math.utah.edu`, `groups.csail.mit.edu`. It builds on [route-memory](route-memory.md), [forager-trips](forager-trips.md), [nest-search](nest-search.md), [trails](trails.md), [combat](combat.md), [desert-ant](desert-ant.md) and [ant-communication](ant-communication.md), and does not repeat them.*
+*Research note for epic `ja-ykmu` (stage 1, research; PRD §S3). Written 2026-11-14, against code at `5fb6a90`. Read in full text (PubMed Central): Wystrach, Mangan & Webb 2015; Hoinville & Wehner 2018; Buehlmann, Mangan & Graham 2020 (first 100,000 characters); Czaczkes et al. 2011 and 2012; Czaczkes et al. 2015; Czaczkes & Heinze 2015; Dussutour et al. 2009; Wenig, Bach & Czaczkes 2021; Popp & Dornhaus 2024 (first 100,000 characters). Everything else comes from abstracts, database records or citing papers, and its numbers are marked **unverified**. Refused by this session's network policy: `journals.biologists.com`, `pubmed.ncbi.nlm.nih.gov`, `link.springer.com` (login redirect), `www.biorxiv.org`, `www.sussex.ac.uk`, `epub.uni-regensburg.de`, `epub.ub.uni-muenchen.de`, `dipot.ulb.ac.be`, `web.stanford.edu`, `www.math.utah.edu`, `groups.csail.mit.edu`. It builds on [route-memory](route-memory.md), [forager-trips](forager-trips.md), [nest-search](nest-search.md), [trails](trails.md), [combat](combat.md), [desert-ant](desert-ant.md) and [ant-communication](ant-communication.md), and does not repeat them.*
 
 The game today: for an ant that carries nothing, the colony policy picks one of four modes (`explore`, `follow`, `return`, `fight`) per situation, and each mode is a fixed steering routine in `web/src/colony/steer.ts`. Inside a routine the cues have constant weights (random turning is `noise × wander` while exploring and a quarter of that while following or homing; the home trail leads a homing ant by the share `homeTrail`). The proposal under study is to let the policy set a weight per cue per situation instead. The question this note answers: does a real forager combine trail, home vector, last find, alarm, nestmates and random search into one heading, and does it weight them differently by situation and by its own state (experience, success, load, uncertainty)?
 
@@ -92,6 +92,44 @@ The game today: for an ant that carries nothing, the colony policy picks one of 
 - Any ant changing its own random-turning (error) rate by situation; noise is measured only as a colony-level model term.
 - Attraction to or avoidance of nestmates themselves (not their trails or footprints) by a searching forager.
 - Full texts of Grüter et al. 2011, Legge et al. 2014, Aron et al. 1993, von Thienen et al. 2014 and 2016, Poissonnier et al. 2026, Gordon 1995 and the *Formica schaufussi* papers (network policy; see header).
+
+## The mechanic
+
+**Shape (owner, 2026-11-14: "both, split").** A general mechanism: for an empty-jawed ant on one world's plane in `explore` or `follow`, the policy sets a level for each steering weight per situation, and the steering routine scales its terms by them. The weights the biology says a situation sets are policy-set by default; the weights it does not support are **design**, off unless switched on in the Lab, on `staging` only. The four modes stay: the mode still chooses between going out, going home and fighting; the weights shape how an ant out searches and follows. Homing, tunnels, the curtain, walls and holes keep their routines.
+
+| Weight | Cue (sensed) | Sense row | Basis | Levels (local rule in bold) | Default |
+|---|---|---|---|---|---|
+| `search` | none: its own turning (random search) | Own body | §7: tight after a find, wide when lost; §6: some noise is good | tight ×0.5, **as now ×1**, wide ×2 | policy-set |
+| `memory` | its last find (the vector to it, kept one trip) | Path integration | §3: memory beats the trail after one visit (*L. niger*) | **off (as now)**, half, full: pull toward the last find against the food trail | policy-set (needs `siteFidelity`'s last-find vector) |
+| `alarm` | alarm, graded | Alarm | §9, [combat](combat.md): dose sets the sign | the existing `alarmGain` response, unchanged | policy-set (as now) |
+| `trail` | food trail gradient | Trail pheromones | §5: fidelity is near fixed: **design** | ignore 0, half, **as now 1**, strong 2 | Lab only |
+| `home` | home trail gradient | Trail pheromones | none for a searching ant: **design** | avoid −1, **none 0**, keep near +1 | Lab only |
+| `vector` | its home vector while out (a leash) | Path integration | §1: the vector's weight is a function of its length, not a choice: **design** | **none 0**, loose, tight | Lab only |
+| `nestmates` | nestmates in reach, left and right (the colony's occupancy grid, by contact) | Encounter rate (local crowding) | §8: no forager shown steering by nestmates: **design** | spread −1, **none 0**, gather +1 | Lab only |
+
+- **Response.** A new response for the ant out searching or following: `steer(situation) → levels`, asked once per situation like the mode (the mode lane's `Situation`, only where the mode is `explore` or `follow`). Answers are Jev `score` questions, one per weight switched on, packed with the situation; read as the expected level rounded, like the fungus's levers.
+- **Local rule.** The bold levels: today's arithmetic. **Off** (`steerLane` 0, and every weight at its bold level) is main bit for bit: a weight at its neutral level skips its term rather than multiplying by 1 or adding 0, so no rng draw or float changes.
+- **What it retires.** Nothing scripted: the routines' constant weights become policy levels. It adds no global read (the nestmate weight reads the colony's own occupancy grid at the ant's sensors, as the enemy grid is read today).
+- **Assays (first, with no behaviour change).** (1) *Search tightens after a find*: turning per unit distance of an explorer in the 20 s after a find against one whose vector ran out far from food; target: higher after a find (Fourcassié & Traniello 1993–94, **unverified**: no number used, a ratio > 1). (2) *Memory over trail*: a Y arena where a forager's last find lies off the strong trail; target: with `memory` full, most return to the remembered side (Grüter et al. 2011: 82–100 %, **unverified**). (3) The `lockstep` assay and G1 for food, losses and held carriers, against main's numbers.
+- **Cost (estimated, before code).** A new lane over the explore and follow situations a game meets (about half of the mode lane's: ~75 of the 151 shipped top-down, more on one world). Per situation: the mode lane's legend and state (~200 tokens) plus ~40–60 per score question: ~320–380 tokens with the three default weights, ~500–600 with all seven. At the mode lane's question rate that is roughly $0.01–0.03 an hour on top of its ~$0.024. Shipping answers for the three doctrines: ~200 situations × 3 × ~350 tokens ≈ $0.009. To be measured with `colony-cost` once the request exists.
+
+## Play
+
+- **What the player sees.** Ants out on the plane stop looking like four kinds of walker: some loop tight round a find, some range wide, some go back to their own last find off the trail. The follow card shows the weights an ant is steering by beside its mode; the Learn drawer's policy tab explains each weight and which are biology and which are the Lab's design.
+- **The player's choice.** The player is the fungus (PRD §65). A colony's weights are its nature, set by its doctrine's words. Later, a fungus lever could bend a weight (a perception gain on `search` or `memory`, as today's gains on food and home scent): the mechanism makes that cheap, but it is not part of this epic.
+- **Progression and counterplay.** Unchanged: the weights shape foraging, not grooming or recognition.
+- **Cost.** A cached game still spends nothing; a new doctrine asks its explore and follow situations once (estimate above).
+- **What could make it worse.** Wide search and full memory can strand foragers (held carriers, the G1 guard), cut food home, or make every colony play alike if the policy pins every weight high. We would see it in the assays (food, losses, held carriers, lockstep) and in play on the staging deploy before any of it goes to `main`. The design weights could make ants look busy without making sense; they stay Lab-only for that reason.
+
+## Open questions
+
+- **D1 (owner, decided 2026-11-14):** shape: the split above.
+- **D2:** one lane for the weights, or the weights packed into the mode lane's request (cheaper: one legend; but every mode situation then pays for weights it may not use). Proposed: a separate lane, asked only for explore and follow situations.
+- **D3:** three levels per weight (as above) or five. Proposed: three, so a situation's answer caches and reads cleanly.
+- **D4:** draw from the score answer's probabilities, as the mode now does (#169), or take the expected level. Proposed: the expected level first; drawing later if play wants it.
+- **D5:** whether any design weight ever goes to `main`. Proposed: no, unless play on staging makes the case and the owner says so.
+- **To measure:** the lane's real tokens per question; the two new assays' baselines on main; food and held carriers with the default weights against main.
+- **Found on the way:** [route-memory](route-memory.md) §2 and [forager-trips](forager-trips.md) §2 give *Melophorus* for Wystrach, Mangan & Webb 2015; the paper's ant is *Cataglyphis velox* (§1 here). A docs fix for `main` (`ja-w8ys`).
 
 ## Sources
 

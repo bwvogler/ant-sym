@@ -5511,3 +5511,27 @@ Asked again, Jev kept its earlier choice in 81–87 % of situations; where it ch
 - **Drawing does what it says, within a situation:** agreement falls from 1.00 to 0.89–0.90 at T 1.
 - **The colony as a whole does not swing.** Its mode mix moves 2–3 % a second whatever the policy, and switching is moderately bunched (Fano 1.6–5.4, wide across seeds) under every policy, the local rule included: bursts come from events (alarm, finds, trails meeting), not from shared answers. What reads as "flipping between a few big states" is more likely the four coarse modes themselves than ants switching together.
 - **Only 21–32 % of mode decisions met a shipped answer** offline (`Jev's answers (cache hits)`); the rest played the local rule, which never draws. The bundles hold the 151 situations one top-down live check met; one world meets more. On the page those misses are asked live, so play there is more Jev's than these runs. A one-world live check (`colony-live`) would ship more situations and make these runs closer to play: an owner's call on spend.
+
+## S3. Staging only: steering weights, set by the policy where the biology allows (design, ja-ykmu, 2026-11-14)
+
+**Research basis:** [steering.md](steering.md):
+- A forager's cue weights shift as smooth functions of its state (the vector's weight grows with its length: Wystrach, Mangan & Webb 2015, *Cataglyphis velox*) or switch with the trip's phase (food odour out, vector in); they are not free choices.
+- How faithfully a *Lasius niger* forager follows a trail is near fixed (~75–85 %, Czaczkes et al., **unverified** in part); its own memory overrides the trail after one visit (Grüter et al. 2011, 82–100 %, **unverified**).
+- Search turns tight after a find and wide when lost (*Formica schaufussi*, Fourcassié & Traniello, **unverified**); no forager is shown steering by nearby nestmates.
+
+**The problem (measured).** The policy picks one of four modes; each is a fixed routine with constant weights. PRD S2: ants don't move in lockstep, so what reads as a few big states is likely the coarse action set.
+
+**Decisions.**
+- Shape "both, split" (owner, 2026-11-14): policy-set weights where the biology says a situation sets them (`search`, `memory`; `alarm` already is), design weights (`trail`, `home`, `vector`, `nestmates`) Lab-only on staging.
+- Scope: one world's plane, empty-jawed ants in `explore` or `follow`; homing, tunnels, walls and holes keep their routines (proposed).
+- One lane for the weights, asked only for explore and follow situations; three levels per weight; the expected level, not a draw (proposed: steering.md D2–D4).
+
+**The mechanic.** A `steer` response gives a level per weight per situation; `steer.ts` scales its explore and follow terms by them; neutral levels skip their terms, so `steerLane` 0 is main bit for bit. No new global read (nestmates are read from the colony's occupancy grid at the ant's sensors). Table in steering.md "The mechanic".
+
+**Play.** Ants out on the plane loop tight round finds, range wide, or go back to their own last find off the trail; the follow card shows the weights. A colony's weights are its doctrine's nature; a fungus lever on them is possible later, not in this epic.
+
+**Assays and targets.** First, with no behaviour change: search tightness after a find (ratio > 1) and memory over trail (share to the remembered side); then `lockstep` and G1 (food, losses, held carriers) against main, seeds 1–10, confirmed on 11–20.
+
+**Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.
+
+**Beads.** `ja-ykmu` (this); `ja-ykmu.1` assays, `ja-ykmu.2` steer response and plumbing, `ja-ykmu.3` the policy lane for search and memory, `ja-ykmu.4` design weights in the Lab, `ja-ykmu.5` play, results and the owner's decision. Found on the way: `ja-w8ys` (a species name in two notes).
