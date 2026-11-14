@@ -13,6 +13,7 @@ import { type Cell, type End, nearestValid, outward } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
+import { seeHoles } from "./layers.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -434,7 +435,7 @@ export class Game {
     this.colonies.forEach((c, k) => {
       // One world: the line as it stands (it grows with every founding), before the holes are read off it.
       if (this.world) c.line = this.world.line;
-      c.seeHoles();
+      seeHoles(c);
       this.layers.forEach((m, l) => {
         if (m.hasSoil) c.wire(l, { friends: (this.#grids[l] as CountGrid[])[k] as CountGrid });
       });

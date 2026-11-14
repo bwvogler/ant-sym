@@ -5,7 +5,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { bodyHeatAfter, feelsHot, groundHeat, pastCritical } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
-import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance, nx as stepX, ny as stepY, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
   type CellCounts,
   MODES,
@@ -27,40 +27,32 @@ import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, type Responses, type Where, type Touch } from "./responses.ts";
-import { blocked, groundTop, isSky, OPEN, takeLoose, rockAt, type Nest, type WorldMap } from "./world.ts";
-import { cellAt, type Transect } from "./transect.ts";
+import { blocked, groundTop, isSky, rockAt, type Nest, type WorldMap } from "./world.ts";
+import type { Transect } from "./transect.ts";
 import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
   CHAMBER_GAP,
   CHAMBER_GAP_GROWTH,
   CHAMBER_MIN_DEPTH,
   CHAMBER_SPREAD,
-  CROWD_HALF,
   ENTRANCE_R,
   ENTRANCE_ZONE,
   FLOOR_PER_ANT,
-  FOES_HALF,
   HOLE_SIGHT,
   INTAKE_WINDOW,
   LEAVE_NOW,
   LEAVE_SOON,
-  LOOSE_FILL_PICK,
-  LOOSE_SPREAD,
-  LOOSE_SPREAD_PICK,
-  MET_HALF,
   MIDDEN_AT,
-  MIDDEN_SPREAD,
   RECEPTION_MIN,
-  THREAT_HALF,
 } from "./tuning.ts";
-import { NO_CELL, SOIL_DUG, SOIL_FILL, SOIL_LOOSE, cellKey, climb, planeMoundReach } from "./grid.ts";
+import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from "./grid.ts";
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
 import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
-import { layerView, loadLayer, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
+import { layerView, loadLayer, seeHoles, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
 import { loadColony, saveColony } from "./colonySave.ts";
 export { COLONY_SKIP, COLONY_STATE, LAYER_STATE } from "./colonySave.ts";
 import { stanceStep } from "./stance.ts";
@@ -68,7 +60,7 @@ import { decide } from "./decide.ts";
 import { steer } from "./steer.ts";
 import { moveDig } from "./move.ts";
 import { arrive } from "./arrive.ts";
-import { AntStep } from "./step.ts";
+import { AntStep, gatesFor } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
 import { localPolicy, localStance } from "./localRules.ts";
 import { speciesSituation, stanceView } from "./colonySituation.ts";
@@ -251,48 +243,6 @@ export interface HoleCell {
   row: number;
   px: number;
   py: number;
-}
-
-/** One layer's gates for a tick (Colony.tick): whether it gates leaving, raids by trail and each ant's own stance, and their leaks. */
-interface Gates {
-  gate: boolean;
-  /** one world's curtain (ja-web): outgoing foragers are held at the top of their own shaft (the gate) and asked `leave` there */
-  hold: boolean;
-  /** whether `met` leaks on this layer: where the colony gates leaving (one world: on both layers, so it fades on a trip out too) */
-  leak: boolean;
-  metLeak: number;
-  rgate: boolean;
-  foeLeak: number;
-  sgate: boolean;
-  threatLeak: number;
-  crowdKeep: number;
-}
-
-/**
- * A layer's gates for a tick of dt, open ground's only (`open`: no hole into the layer). Activation (behaviour MR 5):
- * `met` leaks over MET_HALF. Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`. Each
- * ant's own stance (docs/stance.md): its threat leaks like `foes`; a waiting ant feels its home's crowd over CROWD_HALF.
- * One world (`one`, ja-web): nobody waits on the plane, where every returner goes down its hole; activation is the
- * curtain's, at the top of each shaft (`hold`), where the waiting ant feels its crowd too. Raids by trail and each ant's
- * own stance stay the plane's.
- */
-function gatesFor(p: ColonyParams, open: boolean, one: boolean, dt: number): Gates {
-  const gate = p.leaveGate > 0 && open && !one;
-  const hold = p.leaveGate > 0 && one && !open;
-  const leak = p.leaveGate > 0 && (open || one);
-  const rgate = p.raidGate > 0 && open;
-  const sgate = p.stanceGate > 0 && open;
-  return {
-    gate,
-    hold,
-    leak,
-    metLeak: leak ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1,
-    rgate,
-    foeLeak: rgate ? Math.exp((-dt * Math.LN2) / FOES_HALF) : 1,
-    sgate,
-    threatLeak: sgate ? Math.exp((-dt * Math.LN2) / THREAT_HALF) : 1,
-    crowdKeep: sgate || hold ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1,
-  };
 }
 
 /** The per-ant arrays of ants.ts are the colony's own properties. */
@@ -635,7 +585,7 @@ export class Colony {
       this.layers = [layerView(this, PLANE, plane), layerView(this, CURTAIN, slots)];
       this.line = world.line;
     } else this.layers = [layerView(this, 0, slots)];
-    this.seeHoles();
+    seeHoles(this);
     const n = this.params.maxAnts;
     this.n = n;
     Object.assign(this, makeAntArrays(n, this.params));
@@ -664,39 +614,6 @@ export class Colony {
     if (this.queen) for (let k = 0; k < this.params.antCount; k++) this.age[k] = this.rng() * 0.5 * this.lifespan[k];
   }
 
-  /** Where the queen lies (world position): the royal chamber's floor row, the cell on it nearest the founding chamber's centre. */
-  /**
-   * Every nest's hole on the map (side view), whose funnels the colony's mound keeps open (world.heapMound). Again
-   * whenever a colony is founded (Game.addColony), so an older colony's mound never buries the new hole (PR #42
-   * review, S3).
-   */
-  seeHoles(): void {
-    // One world: each nest's hole on both layers, by colony (the maps' nests are), the plane cell over its column.
-    const line = this.line;
-    if (line) {
-      const curtain = (this.layers[this.home] as Layer).map;
-      this.holeCells = curtain.nests.map((n) => {
-        const e = n.entrance ?? n;
-        cellOf(e.x, e.y);
-        const col = CELL[0];
-        const row = CELL[1];
-        cellAt(line, col); // the curtain's column is the line's s
-        return { col, row, px: CELL[0], py: CELL[1] };
-      });
-    }
-    // On every layer with a hole into it (the side view's map; one world's curtain).
-    for (const L of this.layers) {
-      if (!L.entrance) continue;
-      const holes: number[] = [];
-      for (const n of L.map.nests ?? [L.nest])
-        if (n.entrance) {
-          cellOf(n.entrance.x, n.entrance.y);
-          holes.push(CELL[0]);
-        }
-      L.holes = holes;
-    }
-  }
-
   /**
    * Bind layer l: the colony's fields become l's (its map, scent, nest, hole, cached way out, wiring), the bound layer's
    * put back in its slots first. Every switch on the map's kind then reads the layer of the ant being stepped. A colony on
@@ -714,6 +631,7 @@ export class Colony {
     Object.assign(this.layers[l] as Layer, patch);
   }
 
+  /** Where the queen lies (world position): the royal chamber's floor row, the cell on it nearest the founding chamber's centre. */
   royalFloor(ch: Chambers): { x: number; y: number } {
     const royal = ch.list.find((c) => c.colony === this.params.nest && c.role === "royal");
     if (!royal) return { x: this.nest.x, y: this.nest.y };
@@ -1177,31 +1095,6 @@ export class Colony {
   }
 
   /**
-   * One world's plane (U3c): lay `amount` of midden mark on plane cell (x, y), and tapering over MIDDEN_SPREAD cells round
-   * it (the side view's taper along the ground, in 2D), on the plane's scent whichever layer is bound. Rock takes none.
-   */
-  markMiddenPlane(x: number, y: number, amount: number): void {
-    const { map, ph } = this.layers[PLANE] as Layer;
-    const offs = discOffsets(MIDDEN_SPREAD)[y & 1] as Int16Array;
-    for (let k = 0; k < offs.length; k += 2) {
-      const tx = x + offs[k];
-      const ty = y + offs[k + 1];
-      if (rockAt(map, tx, ty) !== OPEN) continue;
-      ph.depositCell("midden", tx, ty, (amount * (MIDDEN_SPREAD + 1 - hexDistance(x, y, tx, ty))) / (MIDDEN_SPREAD + 1));
-    }
-  }
-
-  /** Lay `amount` of midden mark on the ground at column `col`, and tapering over MIDDEN_SPREAD columns either side. */
-  markMidden(col: number, amount: number): void {
-    if (this.map.surfaceRows !== undefined) return; // one world's curtain: the midden is the plane's (U3c), never its ground strip
-    for (let dx = -MIDDEN_SPREAD; dx <= MIDDEN_SPREAD; dx++) {
-      const x = col + dx;
-      if (x < this.map.x0 || x >= this.map.x0 + this.map.size.w) continue;
-      this.ph.depositCell("midden", x, groundTop(this.map, x) - 1, (amount * (MIDDEN_SPREAD + 1 - Math.abs(dx))) / (MIDDEN_SPREAD + 1));
-    }
-  }
-
-  /**
    * Whether the nest is crowded (the side view, nest slice 2): fewer floor cells in the colony's chambers than
    * FLOOR_PER_ANT for each ant underground. A crowded nest digs (chambers first); a roomy one barely digs at all
    * (Odontomachus keeps ~2 cm² of floor per worker whatever its size; Rasse & Deneubourg's digging that stops with room).
@@ -1274,63 +1167,6 @@ export class Colony {
     this.cameFrom[i] = this.looked[i];
     this.looked[i] = packed;
     return true;
-  }
-
-  /** Ant i carries no pellet (or corpse) any more: the pellet, what it was, and where it was taking it, all at once. A newborn gets the same through the table (ants.ts `reset`): a field added here is marked there too. */
-  clearPellet(i: number): void {
-    this.pellet[i] = 0;
-    this.soil[i] = SOIL_DUG;
-    this.corpse[i] = 0;
-    this.spoilTo[i] = NaN;
-    this.staleWalk[i] = 0;
-  }
-
-  /**
-   * The side view: an explorer on the ground beside loose soil now and then picks up a pellet of it (it comes up
-   * easily). From a steep flank (LOOSE_SPREAD_PICK a cell) it carries it a little farther out and drops it again, so
-   * the mound spreads and smooths itself as ants rework their spoil; from anywhere on it (LOOSE_FILL_PICK) it takes
-   * it down into the nest to refill unused space, as leaf-cutting ants refill excess space (Pielström & Roces).
-   * True if it picked one up.
-   */
-  pickLoose(i: number, cx: number, cy: number, enemy: boolean): boolean {
-    const { map } = this;
-    if (!map.loose) return false;
-    const u = this.rng();
-    if (u >= LOOSE_SPREAD_PICK + LOOSE_FILL_PICK) return false;
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(cx, cy, d);
-      const ty = stepY(cy, d);
-      if (map.loose.get(tx, ty) !== 1 || groundTop(map, tx) !== ty) continue; // only off the top: the mound's surface
-      if (this.byAnEntrance(tx, ty)) continue;
-      // Spread from a slope standing at its angle of repose (the next column out a row lower): the steep flanks.
-      const out = tx >= this.entranceCol ? 1 : -1;
-      const steep = groundTop(map, tx + out) - ty >= 1;
-      const fill = u < LOOSE_FILL_PICK;
-      if (!fill && !steep) continue;
-      if (!this.responses.get(touch(this, i, enemy, this.mode[i], "none", "soil"))) return false;
-      if (!takeLoose(map, tx, ty)) continue;
-      this.takeUpLoose(i, tx, fill);
-      return true;
-    }
-    return false;
-  }
-
-  /** Ant i takes up a loose pellet from column `col` (off the mound's top): down to fill, or spreading it farther out. */
-  takeUpLoose(i: number, col: number, fill: boolean): void {
-    this.pellet[i] = 1;
-    this.soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;
-    this.loosePicked++;
-    this.since[i] = 0;
-    this.wall[i] = 0;
-    this.mx[i] = NaN;
-    this.gx[i] = NO_CELL;
-    const out = col >= this.entranceCol ? 1 : -1;
-    if (fill) this.looseDown++;
-    else {
-      this.spoilSide[i] = out;
-      this.spoilTo[i] = Math.abs(col - this.entranceCol) + LOOSE_SPREAD * (0.5 + this.rng());
-      this.spoilT[i] = 0;
-    }
   }
 
   /** The side view: whether cell (x, y) is within ENTRANCE_ZONE of any nest's entrance (a rival's hole is no space to fill either). */
