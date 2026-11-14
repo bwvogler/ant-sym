@@ -70,7 +70,7 @@ export const MAX_LEVEL = 20;
 /** The fewest spare chunk arrays a field keeps for its double buffer and for chunks that wake. */
 const POOL_MIN = 16;
 
-/** A chunk whose every cell is below this is asleep: zeroed and not stepped. Far under any level a sensor acts on (FAINT = 0.05). */
+/** A chunk whose every cell is below this is asleep: dropped (it reads 0) and not stepped. Far under any level a sensor acts on (FAINT = 0.05). */
 export const SLEEP = 1e-4;
 
 const EDGE = CHUNK - 1;
@@ -328,8 +328,7 @@ export class Pheromones {
     for (const { cx, cy, out, max } of next) {
       if (max < SLEEP && !fed.has(chunkKey(cx, cy))) {
         awake.delete(chunkKey(cx, cy));
-        const old = layer.chunk(cx, cy);
-        layer.drop(cx, cy);
+        const old = layer.drop(cx, cy);
         if (old) this.#spare(old);
         this.#spare(out);
         continue;

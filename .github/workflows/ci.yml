@@ -1,27 +1,34 @@
-# Every pull request runs the checks the Pages build does before it deploys (main's gate is
-# pages.yml, which still runs the whole `npm test`): lint, typecheck and the quick tiers in one job,
-# the long soak games sharded three ways beside it. A failure shows on the PR instead of blocking
-# the deploy afterwards (ja-6mj). Only pull_request: a push trigger too would run each PR branch
-# twice. test:slow is not here; it runs nightly (slow.yml).
+# Every pull request runs lint, format, typecheck and every test tier but slow, and pages.yml calls this
+# same workflow before it deploys main, so a failure shows on the PR instead of blocking the deploy
+# afterwards (ja-6mj). Only pull_request: a push trigger too would run each PR branch twice.
+# test:slow is not here; it runs nightly, and on a colony PR's branch before it merges (slow.yml, the steward skill).
+#
+# Wall time is the longest job, so the int, golden and soak files are spread over four shards instead
+# of int and golden running in series after the quick checks (ja-zyi5). Measured 2026-11-13: int and
+# golden ~585 s of file time, soak ~474 s; `check` used to take ~4.5 min (int alone 3m19s) while each
+# soak shard finished in under 1.5 min. node --test shards by file index, not by duration: if one
+# shard grows much longer than the others, split its biggest file or raise the shard count.
 name: CI
 
 on:
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  # A new push to a PR replaces its run; a deploy's run (called from pages.yml) is never cancelled.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.18
           cache: npm
@@ -31,25 +38,30 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm --prefix web run test:unit
-      - run: npm --prefix web run test:int
-      - run: npm --prefix web run test:golden
 
-  soak:
+  tests:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.18
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm --prefix web ci
-      # The flag goes before the files: node ignores --test-shard after them (so not `npm run test:soak -- ...`).
-      # 120 s a file: the files of a shard run side by side on a small runner, and one was cancelled at 60 s (#78).
-      - run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/3 src/colony/tests/soak/*.test.ts
+      # The flags go before the files: node ignores --test-shard after them (so not `npm run test:int -- ...`).
+      # So the globs are copies of web/package.json's test:int, test:golden and test:soak; ui/tests/ciShards.test.ts holds them equal.
+      # Each tier keeps its own per-file limit: 60 s for int and golden, 120 s for soak (a soak file was
+      # cancelled at 60 s on a small runner, #78).
+      - name: int and golden, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: node --test --test-timeout=60000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
+        working-directory: web
+      - name: soak, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+        if: ${{ !cancelled() }}
+        run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/soak/*.test.ts
         working-directory: web

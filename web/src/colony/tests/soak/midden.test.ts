@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, CORPSE_ROT, LIFESPAN, MIDDEN_AT, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game, nearestRival } from "../../game.ts";
-import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
+import { CELL, cellKey, cellOf, centreX, centreY, keyX, keyY } from "../../hex.ts";
 import { generateSideWorld, isSky, mulberry32, takeFoodCell } from "../../world.ts";
 import { SMALL_SIDE, walkway } from "../builders.ts";
 
@@ -10,8 +10,7 @@ import { SMALL_SIDE, walkway } from "../builders.ts";
 // them out to the midden past the mound's edge; the midden marks the colony's ground, and raiders shy from it.
 
 /** The corpses on colony c's midden, one entry each (it keeps a count per cell). */
-const buried = (c: Colony) =>
-  [...c.midden].flatMap(([key, n]) => Array.from({ length: n }, () => ({ x: key % 65536, y: Math.floor(key / 65536) })));
+const buried = (c: Colony) => [...c.midden].flatMap(([key, n]) => Array.from({ length: n }, () => ({ x: keyX(key), y: keyY(key) })));
 
 test("the dead are carried out to the midden on the ground, past the mound; soil accounting is untouched", () => {
   const map = generateSideWorld(2, SMALL_SIDE);
@@ -222,7 +221,7 @@ test("a raid in force gets past the rival's midden and in at its hole", () => {
   // a's midden, as its undertakers leave it: 20 dead in a heap on the ground toward b, 40 % of the way (nests 120 apart).
   const side = Math.sign(col(b) - col(a));
   const mx = col(a) + side * Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(col(b) - col(a))));
-  a.midden.set(walkway(map, mx) * 65536 + mx, 20);
+  a.midden.set(cellKey(mx, walkway(map, mx)), 20);
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
   assert.ok(a.ph.fields.midden.get(mx, walkway(map, mx)) > 10, "the midden smells (laid from its heap every tick)");
   assert.ok(a.ph.fields.midden.get(mx + 3 * side, walkway(map, mx + 3 * side)) > 1, "over ±3 columns");

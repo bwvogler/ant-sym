@@ -2,7 +2,7 @@
 // (colony/evolution.ts UPGRADES) and the lever table (colony/levers.ts LEVERS), so a level's numbers and a lever's name
 // can't drift from what the game does; only the "why it matters" lines are written here. `ui/tests/upgradeText.test.ts`
 // fails when an upgrade, a level or a lever has no explanation.
-import { LEVERS, type Lever, type Trait, type Upgrade } from "../colony/index.ts";
+import { KNOT, LEVERS, type Lever, type Trait, type Upgrade } from "../colony/index.ts";
 
 /** One level of an upgrade: its name, and what it means (the numbers are the table's). */
 export interface LevelText {
@@ -32,6 +32,8 @@ const WHY: Record<string, string> = {
     "A host that clears it slowly keeps it longer, so it stays infectious longer and nestmates have more time to catch it from a host before it is gone. Grooming still takes it off at the same rate.",
   mycelium:
     "The fungus on the ground by the hole is where spores and mutations come from. A thicker patch holds more mass, so it grows faster and can pay for more spores; every bit it grows is a chance to mutate, so a bigger one also earns mutations faster.",
+  knots:
+    "Ants digging their nest cut the hyphae in their way. A knot is the fungus's answer: where a hypha runs short of mass it hardens into a knot that digging can't cut. Underground it keeps a little of the hypha's mass as spores for the ants that dig into it; on the surface it holds that mass as a reserve. Later it sprouts a new thread (on the surface giving its reserve back).",
   fruiting:
     "Spores lie on the ground for foragers to walk through. A denser fruiting body puts out more of them, but they are paid for out of the mycelium's mass, so the patch settles smaller.",
   evasion:
@@ -63,6 +65,10 @@ const SPREAD: Record<Trait, (v: number) => string> = {
       : `a host clears ${pct(v)} of its load a second on its own (half of it in about ${Math.round(Math.LN2 / v)} s), on top of grooming`,
   capacity: (v) => `its patch holds up to ${v} units of mycelium`,
   spores: (v) => `${pct(v)} of the mycelium's mass becomes spores on the ground each second`,
+  knots: (v) =>
+    v === 0
+      ? "starved hyphae stay as they are, and digging cuts them"
+      : `a tip that rests short of mass for ${KNOT.rounds[v]} steps hardens into a knot that digging can't cut; it fruits its store onto a tunnel it touches and sprouts again after ${KNOT.sprout[v]} s`,
   evasion: (v) =>
     v === 0 ? "grooming-built resistance counts in full against it" : `slips past ${pct(v)} of the resistance grooming builds`,
 };

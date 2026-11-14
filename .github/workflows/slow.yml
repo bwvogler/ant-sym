@@ -1,6 +1,7 @@
 # The whole-game guards (web/src/colony/tests/slow, about 5 minutes locally, longer on a runner):
-# nightly, and on demand from the Actions tab. They never gate a PR or a deploy; a red run is a
-# measurement to look at (CLAUDE.md: run them before merging colony changes).
+# nightly, and on demand: from the Actions tab, or dispatched on a colony PR's branch before it merges
+# (the steward skill). They never gate a deploy; a red run is a measurement to look at, and on a PR's
+# branch it holds the merge (CLAUDE.md: run them before merging colony changes).
 name: Slow guards
 
 on:
@@ -16,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.18
           cache: npm

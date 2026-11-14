@@ -153,6 +153,32 @@ export interface ColonyParams {
    */
   foodPlume: number;
   /**
+   * Heat (ja-rf5.5, docs/desert-ant.md §4, heat.ts): the length of a day in game seconds, over which the plane's ground heats from heatDawn to
+   * heatNoon and back. An ant's body heat moves toward the ground's on the plane and the nest's inside; it senses its own heat (a species' `hot`
+   * field) and dies past heatDeath. 0 = no heat (the generic ant: main bit for bit).
+   */
+  heatDay: number;
+  /** the ground's heat at dawn (°C) */
+  heatDawn: number;
+  /** the ground's heat at noon (°C) */
+  heatNoon: number;
+  /** the nest's heat underground (°C): a body's heat is kept as degrees above it */
+  heatNest: number;
+  /** seconds for a body's heat to close 63 % of the way to its surroundings' */
+  heatTau: number;
+  /** the body heat at which an ant feels hot (°C) */
+  heatFelt: number;
+  /** once hot, an ant feels hot until its body is back below this (°C): it rests to cool, as a tired ant rests until fully rested */
+  heatCool: number;
+  /** the sun's height (0 at dawn, 1 at noon) from which an ant that can see the sky sees it stand high (desert-heat.md §2: design) */
+  heatSunHigh: number;
+  /** the share of each day the sun is down: the night, cool and dark, after the daylight (owner, 2026-11-13) */
+  heatNight: number;
+  /** seconds after sunrise at which a game starts: the desert ant's nest opens as the sun turns high, so a game opens then */
+  heatStart: number;
+  /** the critical body heat (°C): past it, the ant dies */
+  heatDeath: number;
+  /**
    * One world's plane (ja-lp4.16, docs/route-memory.md, PRD §59): a forager keeps its own way out, places stored every
    * `routeStep` cells while it walks out (at most `routeMax`), and a carrier whose home vector fails walks back through
    * them, recognising a place within `routeSee` cells (a stand-in, by design, for a familiar view; Collett et al. 2013;
@@ -301,11 +327,22 @@ export const DEFAULT_COLONY: ColonyParams = {
   siteFidelity: 0,
   siteGive: 0,
   foodPlume: 0,
-  routeMemory: 0,
+  heatDay: 0,
+  heatDawn: 25,
+  heatNoon: 52,
+  heatNest: 30,
+  heatTau: 30,
+  heatFelt: 45,
+  heatCool: 34,
+  heatSunHigh: 0.2,
+  heatNight: 1 / 3,
+  heatStart: 0,
+  heatDeath: 53.6,
+  routeMemory: 1,
   scentReach: 1,
   restFetch: 1,
-  routeStep: 8,
-  routeSee: 5,
+  routeStep: 4,
+  routeSee: 3,
   routeMax: 64,
   raidGate: 1,
   raidLay: 1,
