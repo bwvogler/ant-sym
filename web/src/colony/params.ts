@@ -209,8 +209,8 @@ export interface ColonyParams {
   /**
    * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): where a retrace joins the stored way out. 0 = at
    * its newest place (back where it picked up: a carrier whose vector had already brought it near home walked the whole trip
-   * out and in again); 1 = at the stored place nearest where it stands (an ant recognises the place it is at, whatever the
-   * order it saw it in: Kohler & Wehner 2005, Mangan & Webb 2012). Steering only.
+   * out and in again); 1 = at the nearest stored place it can see (a clear straight line), else its newest: a route is taken
+   * up at the stage reached (Freas & Spetch 2024), at the place recognised (Kohler & Wehner 2005). Steering only.
    */
   routeJoin: number;
   /**

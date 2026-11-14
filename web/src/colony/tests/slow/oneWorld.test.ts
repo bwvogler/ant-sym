@@ -14,6 +14,8 @@ import { generateOneWorld } from "../../oneWorld.ts";
 // the most per colony (you / rival) on seed 4: 2 / 1, 5: 2 / 1, 9: 2 / 1 (seeds 1-10, the worst seed 5, sum 27; without it, on main: 33 / 6, 7 / 3,
 // 11 / 3, worst 33, sum 193; PRD §59 has the table). Before it, one world failed the bound on every seed (U6a's measure: 12-44 at worst; the mound's smell,
 // ja-lp4.11, PRD §56: seeds 5 and 9 at 10 and 7). The bound is not loosened (owner, 2026-11-11). Each seed runs about 3-5 minutes.
+// By ja-lp4.6.3.1 main had drifted to seed 4: 4 / 2 and seed 9: 3 / 1; routeJoin 1 and routeEnd 1 (PRD §59.1) bring them to 2 / 1 and 0 / 0
+// (seed 5: 0 / 0). Not every seed of 1-10 meets the bound (seed 3: 1 / 4), so the list stays 4, 5 and 9.
 test(
   "G1, one world: hardly a forager holds its food over 120 s (seeds 4, 5 and 9, 600 + 600 ants, 600 s; bound 2)",
   { timeout: 1_800_000 },
