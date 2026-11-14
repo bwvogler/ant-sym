@@ -461,7 +461,7 @@ export class Hyphae {
    * round, a cell no tip stands on and nothing grew from, unless it is a root, a cord, in a fusion, touching a spore spot,
    * or `keep` holds it (a corpse). Its mass is the body's to spend again (it no longer counts in `length`). Returns the cells faded.
    * A root never fades, and since §63.10 every piece a cut leaves has one: a piece with no tip left fades down to its
-   * root and keeps that cell, so it can resprout (one HYPHA_MASS a piece; owner 2026-11-14: keep it, PRD §63.13).
+   * root and keeps that cell, so it can resprout (one HYPHA_MASS a piece; owner 2026-11-14: keep it, PRD §63.14).
    */
   regress(keep: (k: number) => boolean = () => false): number {
     const parents = new Set(this.parent.values());
