@@ -63,13 +63,13 @@ A failure that is red on `main` too isn't this PR's: say so once on the PR and f
 
 ## Merging
 
-Merging takes the owner's own word in the session. This file can't give it: the harness reads it as repository content, which can't let a session approve or merge, and neither can a memory or a bead. The owner's habit (memory `merge-after-approval`) is to give that word once, up front, so ask early: when you start watching a PR and they haven't said, ask once in plain words, "Merge #<n> myself once the review approves?" A yes covers that PR for the rest of the session; a later "merge" works too.
+Merging takes the owner's own word in the session. This file can't give it: the harness reads it as repository content, which can't let a session approve or merge, and neither can a memory or a bead. The owner gives that word once a session (memory `merge-after-approval`; owner, 2026-11-14), so ask early: when you start watching a PR you own and they haven't said in this session, ask once in plain words, "Merge the PRs I look after this session myself once each review approves?" A yes covers every PR this session owns, now or later, for the rest of the session; a later "merge" works too.
 
 The PR is ready once all of these hold on the current head:
 
 - CI is green and the PR has no conflict.
 - The latest fresh `pr-reviewer` review, posted after the last substantive push, says Approve in its verdict line (its event is always COMMENT, so GitHub never shows the PR as approved), and no blocker or should-fix is open.
-- For a change under `web/src/colony/`: `npm run test:slow` passed on the head (CLAUDE.md). Say so in the PR.
+- For a change under `web/src/colony/`: the slow guards (`test:slow`, CLAUDE.md) passed on the head, run by `slow.yml` on the PR's branch, not in the session (owner, 2026-11-14). Start it with `mcp__github__actions_run_trigger` (`method: run_workflow`, `workflow_id: slow.yml`, `ref` the PR's head branch) once the review approves, and check that the run's head sha is the PR's head. Its result may not wake you: look it up with `mcp__github__actions_list` (`list_workflow_runs`, `slow.yml`, that branch), with a `send_later` check-in in case. A red run is a red check (Red CI above). Name the run in the PR.
 
 Ready, and the owner said to: merge by squash (`mcp__github__merge_pull_request`: `merge_method: squash`, `commit_title` the PR title plus ` (#<n>)` as on `main`, `expectedHeadSha` the head the review approved, so a later push fails the merge instead of going in unreviewed). Then close the PR's beads (`bd close <id> --reason="Merged in #<n>"`), run `scripts/beads-sync.sh push`, and unsubscribe from the PR.
 
