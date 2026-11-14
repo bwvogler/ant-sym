@@ -5435,6 +5435,13 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.76, 17.17 and 17.65 ms mean, E1.3 17.03, 16.57 and 17.10 ms; within noise. Keys above 2^31 are doubles in V8, but no slow-down shows.
 - **Cost:** none. No situation, legend or question changed.
 
+**Regions freed (`ja-qpv.1.5`, review of #160 D1, 2026-11-14).** Storage only; behaviour is bit-exact (the goldens pass unchanged, and `colony-bench --one --page --hash`'s whole-game hash equals main's).
+- **What changed.** `ChunkLayer` counts the chunks in each region. When `drop` takes the last one, the region's slot array is freed (`regions` falls), and the next write there makes it again. Before, every region a chunk had ever been written in kept its array for the rest of the game. Since E1.1 drops faded scent and E1.3 drops faded `SensedMap` chunks, that was every region an ant or a host ever reached.
+- **What it doesn't change.** The box of regions (`regionSlots`) still never shrinks. It grows by whole regions, 256 times slower than a box of chunks would (E1.2).
+- **Why now.** Today's plane is one region a layer, so nothing is saved yet. On an endless plane, memory would otherwise grow with every region ever visited. E4's memory soak is meant to rule that out.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.99, 17.27 and 16.99 ms mean, this change 17.85, 17.22 and 17.22 ms; within noise. Counting happens only in `put` and `drop`, off the read path.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).
@@ -5476,3 +5483,44 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 
 - The three unguarded games with 9–19 larvae waiting: ja-mprr.
 - Jev cost: none. No legend, question, schema or brain version changed.
+
+## 68. Ants draw their mode from Jev's probabilities (ja-nan3, 2026-11-14)
+
+*Tried first on the long-lived `staging` branch (deployed at `/ant-sym/pr-preview/staging/`; experiments there are numbered S1, S2, … in its PRD); the owner played it and kept it.*
+
+**Why.** Every ant in one situation took Jev's choice, so whole groups switched mode together. Jev's `choice` answers already come with a probability for every option (§4); nothing kept them.
+
+**What changed.**
+- A mode answer is kept with its probabilities: `follow=0.49,fight=0.3,explore=0.17,return=0.04`, Jev's choice first (`colony/weighted.ts`). A bare mode still reads everywhere, as certain.
+- The colony hands its mode policy a draw from its own seeded rng (`Colony.policyDraw`). A weighted answer is drawn from at `sampleTemp` (p^(1/T); default 1, as Jev gave it; 0 = always Jev's choice). The local rule and bare answers never draw, so the golden masters stay bit-exact.
+- An ant whose mode was drawn draws again after `reroll` seconds (default 10) in the same situation (`redraw`, a per-ant clock); without it a draw would hold until the situation changed.
+- The follow card shows what an ant drew from. Details → Lab → "How ants choose" sets the temperature (0–2) and the draw-again seconds (0–30) for every colony while a game runs (`Game.setChoice`; a lab setting, not saved).
+- `scripts/precache.mjs --reweigh` re-asks only the situations a bundle holds as a bare mode. Run once: $0.0039 for the three doctrines (453 situations); the desert ant's bundles again after main re-shipped them with the sun (192 situations, $0.0027).
+
+**How sharp Jev's answers are.** Probability of Jev's choice, over the shipped situations:
+
+| Bundle | Mean | Under 0.9 | Under 0.7 |
+|---|---|---|---|
+| Forage | 0.73 | 74 % | 44 % |
+| Cautious | 0.81 | 46 % | 31 % |
+| Warlike | 0.69 | 85 % | 54 % |
+| Desert (3 doctrines) | 0.85–0.86 | 45–48 % | 13–22 % |
+
+Asked again, Jev kept its earlier choice in 81–87 % of situations; where it changed, the call was close (Warlike: follow 0.39 against fight 0.35). A top choice that close was a coin toss before.
+
+**Offline, one world** (shipped answers for both colonies, 300 + 300 ants, 300 s, seeds 1–3; the first colony; a scratch script, not an assay):
+
+| | Food stored | Lost | Mode entropy |
+|---|---|---|---|
+| Forage, Jev's choice | 854, 530, 1,142 | 16, 54, 25 | 1.06–1.15 bits |
+| Forage, drawn (T 1) | 687, 519, 646 (−27 %) | 6, 31, 8 | 1.11–1.21 |
+| Forage, T 0.5 | 757, 575, 637 (−22 %) | 10, 27, 5 | 1.12–1.14 |
+| Warlike, Jev's choice | 1,173, 465, 1,000 | 12, 62, 6 | 1.10–1.30 |
+| Warlike, drawn (T 1) | 627, 385, 617 (−38 %) | 11, 15, 0 | 1.27–1.32 |
+| Warlike, T 0.5 | 774, 499, 764 (−23 %) | 9, 33, 4 | 1.22–1.33 |
+
+- Drawn colonies lose fewer ants and bring home less food; T 0.5 keeps most of the variety for about two thirds of the food cost. The worst seed (Forage 3) loses 44 % at T 1 and 44 % at T 0.5.
+- The doctrines' wordings were tuned against Jev's choice (§54.4), not its probabilities; some of the loss may be that.
+- The largest share of ants switching mode within one second did not fall (22–41 % either way): that metric is driven by events (alarm, trails meeting), not by lockstep answers alone. A better lockstep measure is open.
+
+**Cost.** None per hour: no legend, question or schema changed, and Jev bills input tokens only.

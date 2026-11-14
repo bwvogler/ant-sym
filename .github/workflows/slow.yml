@@ -1,21 +1,47 @@
-# The whole-game guards (web/src/colony/tests/slow, about 5 minutes locally, longer on a runner):
-# nightly, and on demand: from the Actions tab, or dispatched on a colony PR's branch before it merges
-# (the steward skill). They never gate a deploy; a red run is a measurement to look at, and on a PR's
-# branch it holds the merge (CLAUDE.md: run them before merging colony changes).
+# The whole-game guards (web/src/colony/tests/slow): about 16 minutes locally on 4 cores; on runners about 4 minutes in 4
+# shards, against 17 in one job (2026-11-14). --test-shard deals out whole files, so A11, A12 and each of G1's seeds have
+# a file of their own and no file holds a shard much past 4 minutes (ja-jkc9).
+# - Nightly on main, and on demand from the Actions tab: a red run is a measurement to look at.
+# - On a pull request that touches web/src/colony/ or web/shared/ and carries the `slow-guards` label (ja-w7ef.4): the
+#   PR's author adds the label once the review approves (the steward skill), and the run then repeats on every push while
+#   the label stays; the steward removes it after a pass. Its result arrives as the PR's `slow (n)` checks, which wake a watching session like any other
+#   check; a manual dispatch did not (2026-11-14). CLAUDE.md: run them before merging colony changes.
+# The globs and limit are copies of web/package.json's test:slow; ui/tests/ciShards.test.ts holds them equal.
 name: Slow guards
 
 on:
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+    paths:
+      - "web/src/colony/**"
+      - "web/shared/**"
 
 permissions:
   contents: read
 
+concurrency:
+  # A labeled event for another label gets a group of its own: concurrency applies before the job's if:, so it would
+  # otherwise cancel a running slow-guards run and then skip itself (review of #176, S1).
+  group: slow-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'slow-guards' && format('-{0}', github.run_id) || '' }}
+  # A new push to a labelled PR replaces its run; the nightly run is never cancelled.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   slow:
+    # On a PR: only with the label, and for a `labeled` event only when that label is the one added.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'slow-guards') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'slow-guards'))
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -24,4 +50,6 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm --prefix web ci
-      - run: npm --prefix web run test:slow
+      - name: slow guards, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: node --test --test-timeout=1200000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/slow/*.test.ts
+        working-directory: web

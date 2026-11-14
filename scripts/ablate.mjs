@@ -37,7 +37,7 @@ const jobs = opt("jobs", undefined);
 const top = Number(opt("top", "0"));
 const match = opt("match", undefined);
 
-const { localPolicy, localStance } = await import("../web/src/colony/index.ts");
+const { localPolicy, localStance, topOf } = await import("../web/src/colony/index.ts");
 const { localResponses } = await import("../web/src/colony/index.ts");
 
 const cache = JSON.parse(readFileSync(file, "utf8"));
@@ -84,9 +84,11 @@ const add = (g, lane, key) => {
   groups.get(g).push({ lane, key });
 };
 for (const [k, v] of Object.entries(cache.modes ?? {})) {
+  // A mode answer keeps Jev's probabilities (colony/weighted.ts): Jev's choice is what differs from the local rule, or not.
   const l = local.modes(k);
-  if (l !== v)
-    add(`mode: ${k.split("|")[0]}${k.split("|")[1] === "tired" ? " tired" : ""} (stance ${k.split("|")[6]}) ${l} → ${v}`, "modes", k);
+  const top = topOf(v);
+  if (l !== top)
+    add(`mode: ${k.split("|")[0]}${k.split("|")[1] === "tired" ? " tired" : ""} (stance ${k.split("|")[6]}) ${l} → ${top}`, "modes", k);
 }
 for (const [k, v] of Object.entries(cache.stances ?? {})) {
   const l = local.stances(k);
