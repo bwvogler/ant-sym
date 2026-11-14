@@ -64,6 +64,10 @@ import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 import { sightOf, type SensedMap } from "./fungusSight.ts";
 import { antTag, badgeParts, nestBadge } from "./badges.ts";
+import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
+import type { FieldProbe } from "./lensStore.ts";
+
+export type { FieldProbe };
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -116,6 +120,10 @@ interface Props {
   pen?: FieldPen | null;
   /** where the "Go to" menu sits over the field (position classes; the page keeps it clear of its own surfaces) */
   toolsAt?: string;
+  /** the lens is on (PRD §69.3): a mouse over the map reports what is under it, and a click reports it pinned instead of following */
+  lens?: boolean;
+  /** what is under the pointer, with the lens on (null: the pointer left the map) */
+  onProbe?: (p: FieldProbe | null) => void;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -128,6 +136,10 @@ export interface FieldApi {
   centreOn: (view: number, x: number, y: number, how?: { close?: boolean; span?: number; keepFollow?: boolean }) => void;
   /** view `view`'s camera as last drawn (null before it was shown or centred) */
   camera: (view: number) => Camera | null;
+  /** the whole map, in the view shown (the key 0) */
+  showAll: () => void;
+  /** colony k's nest, in the view shown (the key n cycles them) */
+  goNest: (k: number) => void;
 }
 
 /** The pen on the field (one world's top view). */
@@ -222,6 +234,8 @@ export default function ColonyField({
   api,
   pen = null,
   toolsAt = "top-2 left-2",
+  lens = false,
+  onProbe,
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
   const anyColony = colonies[0] as Colony;
@@ -232,11 +246,12 @@ export default function ColonyField({
   const [goOpen, setGoOpen] = useState(false);
   const goRef = useRef<HTMLDivElement>(null);
   // The Go to menu, open: Escape closes it (first, in the capture phase, so a drawer under it stays open) and so does a
-  // press anywhere outside it.
+  // press anywhere outside it. An Escape something above it took (a pinned lens card) or one a dialog over it will take
+  // (the palette) is not its own: one Escape closes one thing (review of #196, S1).
   useEffect(() => {
     if (!goOpen) return;
     const key = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       e.preventDefault();
       setGoOpen(false);
     };
@@ -307,6 +322,12 @@ export default function ColonyField({
   useEffect(() => {
     penRef.current = pen;
   }, [pen]);
+  const lensRef = useRef(!!lens);
+  const probeCb = useRef(onProbe);
+  useEffect(() => {
+    lensRef.current = !!lens;
+    probeCb.current = onProbe;
+  }, [lens, onProbe]);
 
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture>(NO_GESTURE);
@@ -521,8 +542,8 @@ export default function ColonyField({
           // How freshly a host sensed this cell: its scent shows that strongly (trails and alarm alike).
           const w = sensedC ? sightOf(sensedC[i]!, now) : 0;
           let al = 0;
-          if (w > 0) for (const ac of alarmC) al = Math.max(al, w * Math.min(1, ac[i]! / 6));
-          if (al > 0.03) {
+          if (w > 0) for (const ac of alarmC) al = Math.max(al, w * Math.min(1, ac[i]! / ALARM_FULL));
+          if (al > ALARM_SHOWN) {
             px[o] = theme.alarm[0];
             px[o + 1] = theme.alarm[1];
             px[o + 2] = theme.alarm[2];
@@ -552,16 +573,16 @@ export default function ColonyField({
           let h = 0;
           if (w > 0)
             for (const t of trailC) {
-              if (show.food && t.food) f = Math.max(f, w * Math.min(1, t.food[i]! / 4));
+              if (show.food && t.food) f = Math.max(f, w * Math.min(1, t.food[i]! / FOOD_FULL));
               // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
-              if (show.home && t.home) h = Math.max(h, w * Math.min(1, t.home[i]! / 12));
+              if (show.home && t.home) h = Math.max(h, w * Math.min(1, t.home[i]! / HOME_FULL));
             }
-          if (f >= h && f > 0.02) {
+          if (f >= h && f > TRAIL_SHOWN) {
             px[o] = theme.trail[0];
             px[o + 1] = theme.trail[1];
             px[o + 2] = theme.trail[2];
             px[o + 3] = Math.round(f * 150);
-          } else if (h > 0.02) {
+          } else if (h > TRAIL_SHOWN) {
             px[o] = HOME_RGB[0];
             px[o + 1] = HOME_RGB[1];
             px[o + 2] = HOME_RGB[2];
@@ -1563,6 +1584,8 @@ export default function ColonyField({
         s.zoomedIn = zoom > fz * 1.05;
       },
       camera: (v) => cams.current.get(v)?.cam ?? null,
+      showAll: () => showAll(),
+      goNest: (k) => goNest(k),
     };
     return () => {
       api.current = null;
@@ -1658,9 +1681,21 @@ export default function ColonyField({
     } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
   };
 
+  /** Report canvas point (x, y) to the lens: the page's pixels, the world point and the ant there. */
+  const probeAt = (x: number, y: number, pinned: boolean) => {
+    const cv = canvasRef.current;
+    if (!cv || !probeCb.current) return;
+    const r = cv.getBoundingClientRect();
+    const k = cv.width / r.width;
+    const [wx, wy] = toWorld(camera(), viewport(), x, y);
+    probeCb.current({ sx: r.left + x / k, sy: r.top + y / k, lv: world ? shown.current : -1, x: wx, y: wy, ant: pick(x, y), pinned });
+  };
+
   const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
     const [x, y] = devicePoint(e);
     hover.current = [x, y];
+    // The lens follows a mouse over the map (no button down); a finger taps instead (onUp).
+    if (lensRef.current && e.pointerType === "mouse" && pointers.current.size === 0) probeAt(x, y, false);
     const prev = pointers.current.get(e.pointerId);
     if (!prev) return;
     const g = gesture.current;
@@ -1689,7 +1724,10 @@ export default function ColonyField({
     pointers.current.delete(e.pointerId);
     if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
       const pn = penRef.current;
-      if (world && pn && shown.current === PLANE) {
+      if (lensRef.current && !(world && pn && shown.current === PLANE)) {
+        // The lens on: a click (a tap) says what is there, and keeps the card up; it follows nothing. The queen's pen keeps its click.
+        probeAt(p.x, p.y, true);
+      } else if (world && pn && shown.current === PLANE) {
         // The queen's pen: a click on the top view is where she flies (the page founds there, or says why not).
         const [wx, wy] = toWorld(camera(), viewport(), p.x, p.y);
         pn.onPick({ x: wx, y: wy });
@@ -1769,12 +1807,15 @@ export default function ColonyField({
         tabIndex={0}
         className="absolute inset-0 block h-full w-full cursor-grab touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset active:cursor-grabbing"
         role="application"
-        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
+        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it (with the lens on, i, a click says what is there instead)${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        onPointerLeave={() => (hover.current = null)}
+        onPointerLeave={() => {
+          hover.current = null;
+          if (lensRef.current) probeCb.current?.(null);
+        }}
         onKeyDown={onKey}
         onContextMenu={(e) => e.preventDefault()}
       />

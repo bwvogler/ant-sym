@@ -919,7 +919,7 @@ test("on the plane a knot is a reserve: sprouting gives its store back; undergro
   }
 });
 
-// Mass flow (ja-tgw9, docs/mycelial-transport.md, PRD §70): assays F1–F4 on hand-built mycelia.
+// Mass flow (ja-tgw9, docs/mycelial-transport.md, PRD §71): assays F1–F4 on hand-built mycelia.
 
 /** A root at (0, y) and one tip grown `n` cells east of it; returns the hyphae and the tip. */
 function line(n: number, y = 10): { h: Hyphae; tip: Tip } {

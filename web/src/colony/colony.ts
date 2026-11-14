@@ -1,10 +1,11 @@
 import { leaveRate } from "./invite.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
+import type { OutField } from "./homing.ts";
 import { type Channel, type Mark, Pheromones } from "./pheromone.ts";
 import { Brood } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
-import { bodyHeatAfter, feelsHot, groundHeat, pastCritical } from "./heat.ts";
+import { heatStep } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
 import { CELL, cellOf, centreX, centreY, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
@@ -212,7 +213,7 @@ export interface Layer {
   readonly entranceCol: number;
   readonly entranceRow: number;
   holes: number[];
-  outDist: Int32Array | null;
+  outDist: OutField | null;
   outCells: number[];
   outVersion: number;
   outAt: number;
@@ -314,7 +315,7 @@ export class Colony {
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   /** the side view: steps to this colony's hole through its tunnels, per cell (see outField), the cells it reached, and the ground's version and time it was built at */
-  outDist: Int32Array | null = null;
+  outDist: OutField | null = null;
   outCells: number[] = [];
   outVersion = -1;
   outAt = -Infinity;
@@ -841,26 +842,6 @@ export class Colony {
     return t && this.entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.entrance.x))) : MIDDEN_AT;
   }
 
-  /**
-   * Heat (ja-rf5.5, heat.ts): every ant's body heat moves toward the ground's out on one world's plane (on a map with no plane, anywhere outside
-   * its nest's disc) and toward the nest's inside; one past the critical heat dies of it.
-   */
-  heatStep(dt: number): void {
-    const p = this.params;
-    const ground = groundHeat(p, this.time) - p.heatNest;
-    const { nest } = this;
-    for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i]) continue;
-      const open = this.line !== null ? this.layer[i] === PLANE : Math.hypot(this.x[i] - nest.x, this.y[i] - nest.y) >= nest.r;
-      this.bodyHeat[i] = bodyHeatAfter(p, this.bodyHeat[i], open ? ground : 0, dt);
-      this.hot[i] = feelsHot(p, this.bodyHeat[i], this.hot[i] === 1) ? 1 : 0;
-      if (pastCritical(p, this.bodyHeat[i])) {
-        this.kill(i, false);
-        this.diedHot++;
-      }
-    }
-  }
-
   /** The turn up the food plume (smellsFood's answer, radians), read by the caller at once. */
   plumeTurn = 0;
   /** The food plume on the plane (ja-rf5.4, plume.ts PlumeState): built only for a species with foodPlume. */
@@ -893,7 +874,7 @@ export class Colony {
 
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
   outbound(i: number): boolean {
-    return this.queen !== null && this.band(i) === 2;
+    return this.queen !== null && this.band(i) === 2 && !this.forageDigs(i);
   }
 
   /** Whether ant i is an inside worker now: underground, carrying nothing, not allowed out (zoned by age). */
@@ -903,7 +884,16 @@ export class Colony {
 
   /** Whether ant i digs: in the side view with a queen, the middle-aged (the young nurse, the old forage); elsewhere, any explorer. */
   digs(i: number): boolean {
-    return !this.queen || this.band(i) === 1;
+    return !this.queen || this.band(i) === 1 || this.forageDigs(i);
+  }
+
+  /**
+   * Whether ant i is on a foraging dig (forageDig, ja-16rp, docs/foraging-tunnels.md): an old forager home from a trip
+   * with nothing, digging out from the nest at tunnels' ends while its bout lasts. At walkTunnel's dead ends and forks it
+   * digs alone and whatever the nest's room (move.ts and hug's start still damp it); it builds no chambers.
+   */
+  forageDigs(i: number): boolean {
+    return this.params.forageDig > 0 && this.digBout[i] > 0 && this.queen !== null && this.band(i) === 2;
   }
 
   /** Whether the colony has lost its queen (the side view; the top-down maps have none to lose). */
@@ -1331,7 +1321,7 @@ export class Colony {
     // Energy and felt hunger (ja-xu6.1): the side view, where there is a queen and brood.
     if (this.queen) body(this, dt);
     // Heat (ja-rf5.5): only a species with a day of heat.
-    if (this.params.heatDay > 0) this.heatStep(dt);
+    if (this.params.heatDay > 0) heatStep(this, dt);
     const s = new AntStep();
     s.heldNow = 0; // the ants held at the gate this tick (stanceStep counts them)
     // What every stage reads and no stage writes: the tick's own values once, and the bound layer's (again at each layer switch).

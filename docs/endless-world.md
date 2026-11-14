@@ -182,7 +182,7 @@ The tick is then bounded by the cap, not by the world. The player sees part of t
 **Flat keys go:**
 - the fungus's `sporeCells` and `base` are keyed by `cellKey` (no `regrid`) (E1.3);
 - regrowth's piles are noted per chunk when the chunk is generated, not by one scan at the start;
-- `#outField` becomes a window round the colony's own holes on its own line, a few hundred columns wide, not the whole curtain;
+- `#outField` becomes a window round the colony's own hole on its own line, 193 columns wide and widened only when a tunnel reaches its edge, not the whole curtain (E1.4, `OutField` in `homing.ts`);
 - `cellKey` widens to the chunk key's range (E1.3: one key in `hex.ts`, where `grid.ts`, `hyphae.ts`, `transect.ts` and the forks each had their own).
 
 **`SensedMap`** today keeps the time a host last sensed each cell, at full resolution, forever. From E1 it keeps those times only in chunks sensed within `SENSED_FADE` (20 s), which the trails' picture needs. An older chunk is dropped and leaves one revealed bit for the fog (§8).

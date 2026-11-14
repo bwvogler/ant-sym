@@ -278,8 +278,8 @@ export const ANT_FIELDS = {
   /**
    * What the pellet carried is (with `pellet`; one place for it, review of MR 15: five per-ant arrays each cleared by
    * hand): DUG, soil it dug, to the hole and out, or into unused space on the way; LOOSE, loose soil off the mound (moved,
-   * not dug: not in soilDug), out along the ground; FILL, loose soil taken down into the nest to backfill. #clearPellet
-   * puts the pellet and all its state down at once.
+   * not dug: not in soilDug), out along the ground; FILL, loose soil taken down into the nest to backfill. `clearPellet`
+   * (pellets.ts) puts the pellet and all its state down at once.
    */
   soil: { type: Uint8Array, reset: "spawn" },
   /** the cell it looked from before that (cellKey; NO_KEY none): the way it came, which is never a stale branch */
@@ -313,6 +313,9 @@ export const ANT_FIELDS = {
   // ——— the desert ant's invitation (ja-rf5.6), last for the same reason as the heat's ———
   /** its pace (cm/s), waiting at the top of its shaft: what a finder passing raises, and what its leave response reads; 0 at birth */
   pace: { type: Float32Array, reset: "spawn" },
+  // ——— the foraging dig (ja-16rp, PRD §70), last for the same reason ———
+  /** seconds left of a foraging dig (forageDig): an old forager home from a trip with nothing digs in the nest for a while */
+  digBout: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

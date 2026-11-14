@@ -92,7 +92,7 @@ export const REGRESS_PER_ROUND = 1;
 /** A tip's supply is ample while the free mass would pay for this many steps of every tip; less is short. */
 export const AMPLE_STEPS = 2;
 /**
- * Mass flow (ja-tgw9, PRD §70, owner 2026-11-14): with `flow` on, mass moves along the hyphae toward the tips, up to
+ * Mass flow (ja-tgw9, PRD §71, owner 2026-11-14): with `flow` on, mass moves along the hyphae toward the tips, up to
  * FLOW_THIN cells a round through thin hypha and FLOW_CORD along cords (docs/mycelial-transport.md: cords carry 10–100×
  * faster, Tlalka et al. 2008; thin hyphae still outrun their tips, Roper et al. 2013). Design numbers, tuned against P1.
  */

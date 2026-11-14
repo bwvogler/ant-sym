@@ -349,7 +349,8 @@ test("route memory 2 retraces the way out to where it began: its first place, ne
 
 test("route memory: a carrier without food, without places, or already retraced this trip does not retrace", () => {
   const run = (mem: number, how: "food" | "places" | "done"): { state: number; search: number } => {
-    const w = plane({ routeMemory: mem });
+    // routeEnd 0: a retrace done searches round its vector's end, where this carrier stands (with routeEnd 1 it would make for its first place).
+    const w = plane({ routeMemory: mem, routeEnd: 0 });
     const { g, c, hx, hy } = w;
     if (how !== "places")
       store(

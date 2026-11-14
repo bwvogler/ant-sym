@@ -3,7 +3,7 @@
 import type { Colony } from "./colony.ts";
 import { antResets } from "./ants.ts";
 import type { ColonyParams } from "./params.ts";
-import { LARVA } from "./brood.ts";
+import { isFed, LARVA } from "./brood.ts";
 import { SOIL_DUG } from "./grid.ts";
 import { CELL, cellOf, discOffsets, hexDistance } from "./hex.ts";
 import {
@@ -171,7 +171,10 @@ export function body(col: Colony, dt: number): void {
   donors.reset();
   scentSum.reset();
   perceived.reset();
-  for (const b of col.brood.items) if (b.stage === LARVA && b.held < 0) felt.put(b.x, b.y, begOf(b.energy));
+  // A larva begs when it is hungry, and (owedBeg, ja-rvli) a little while it is still owed the food it grows on.
+  const owedBeg = col.params.owedBeg;
+  for (const b of col.brood.items)
+    if (b.stage === LARVA && b.held < 0) felt.put(b.x, b.y, Math.max(begOf(b.energy), isFed(b) ? 0 : owedBeg));
   const q = col.queen;
   // Her cell, when she lives in a nest: a column can be negative (one world's curtain), so whether there is one is its own flag.
   let queenHere = false;
