@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
-import { CORPSE, STRAINS } from "../../fungus.ts";
+import { CORPSE, STALK, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { cellKey as hyphaKey, HYPHA_MASS, KNOT, keyCell } from "../../hyphae.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, hexDistance, nx, ny } from "../../hex.ts";
@@ -410,4 +410,61 @@ test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps 
   e.mass += 200;
   for (let t = 0; t < KNOT.sprout[1] + 10 && !knot.sprouted; t++) runFor(g, 1);
   assert.ok(knot.sprouted, `no sprout ${KNOT.sprout[1] + 10} s after forming`);
+});
+
+test("with Stalks bought, a corpse colonised outside grows a stalk after STALK.delay and its spores then fall over a ring; the cadaver pays the same (ja-2bw.10)", () => {
+  const bury = (stalks: number) => {
+    const g = game(true);
+    const e = g.fungus.evolution!;
+    e.growth = 1e7;
+    for (let k = 0; k < stalks; k++) assert.ok(g.fungus.upgrade("stalks"));
+    g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
+    return g;
+  };
+  const k = hyphaKey(60, 40);
+  // An open plane cell two cells from the corpse.
+  const g = bury(1);
+  let ring: [number, number] | null = null;
+  for (let d = 0; d < 6 && !ring; d++) {
+    const [ax, ay] = [nx(60, 40, d), ny(40, d)];
+    const [bx, by] = [nx(ax, ay, d), ny(ay, d)];
+    if (!rockAt(g.world!.plane, bx, by) && !g.fungus.hyphaeOn(PLANE)!.has(bx, by)) ring = [bx, by];
+  }
+  assert.ok(ring, "no open cell two from the corpse");
+  const spores = g.fungus.sporesOn(PLANE)!.spores;
+  runFor(g, STALK.delay[1] - 2);
+  assert.deepEqual(g.fungus.stalksOn(PLANE), [], "a stalk before its delay");
+  assert.equal(spores.get(...ring), 0, "spores on the ring before the stalk");
+  runFor(g, 4);
+  assert.deepEqual(g.fungus.stalksOn(PLANE), [k]);
+  runFor(g, 3);
+  assert.ok(spores.get(...ring) > 0, "no spores on the ring with a stalk");
+  // The cadaver pays the same either way.
+  const none = bury(0);
+  runFor(none, STALK.delay[1] + 5);
+  assert.deepEqual(none.fungus.stalksOn(PLANE), [], "a stalk without the upgrade");
+  assert.ok(Math.abs(none.fungus.corpsesOn(PLANE).get(k)! - g.fungus.corpsesOn(PLANE).get(k)!) < 1e-9);
+  // A second corpse on the same cell adds its spores and keeps the stalk.
+  g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: g.fungus.evolution!.strain }, PLANE);
+  assert.deepEqual(g.fungus.stalksOn(PLANE), [k], "a second corpse reset the stalk");
+  // Its age is saved.
+  const back = game(true);
+  back.load(JSON.parse(JSON.stringify(g.save())) as GameSave);
+  assert.deepEqual(back.fungus.stalksOn(PLANE), [k]);
+});
+
+test("a corpse colonised in the nest (a layer that is not topsoil) never grows a stalk (ja-2bw.10)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  assert.ok(g.fungus.upgrade("stalks"));
+  assert.ok(g.fungus.upgrade("stalks"));
+  crossDown(g);
+  const map = g.world!.curtain;
+  let at: [number, number] | null = null;
+  for (let y = 45; y < 80 && !at; y++) for (let x = 0; x < 40 && !at; x++) if (rockAt(map, x, y) === OPEN) at = [x, y];
+  assert.ok(at);
+  g.fungus.colonise(CURTAIN, ...at);
+  runFor(g, STALK.delay[2] + 5);
+  assert.deepEqual(g.fungus.stalksOn(CURTAIN), []);
 });

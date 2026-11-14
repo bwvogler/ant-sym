@@ -210,6 +210,13 @@ const ROOT_HEADINGS = [E, SW, NW];
  */
 export const CORPSE = { spores: 12, rate: 0.2, mass: 1, headings: [E, W] as readonly number[] };
 
+/**
+ * Stalks (synnemata, ja-2bw.10, PRD §63.12), by the *Stalks* upgrade's level (none, a stalk, a tall stalk): a colonised
+ * corpse outside (on a topsoil map) grows a stalk `delay` seconds after it was colonised (Hughes et al. 2011: 2–3 days
+ * after death, and never in the nest), and from then on its free spores fall over every open cell within `radius`.
+ */
+export const STALK = { delay: [0, 60, 30], radius: [0, 2, 4] } as const;
+
 /** How far down the shaft under a hole rootShaft looks for its walls, in rows. */
 const SHAFT_ROWS = 8;
 
@@ -372,6 +379,8 @@ export class Fungus {
   #sporeSpots: (number[] | null)[] = [];
   /** each map's corpses the fungus grows out of (ja-2bw.7): cell (hyphae.ts cellKey) → free spores still to put out there; 0 once spent (it is not colonised again) */
   #corpses: Map<number, number>[];
+  /** seconds since each colonised corpse was colonised (stalks, ja-2bw.10), by map and cell */
+  #corpseAge: Map<number, number>[];
   /**
    * One world (ja-2bw.14): the curtain entrance of the hole at or beside plane cell (x, y), or null: a plane tip that
    * comes to a hole crosses down it into the curtain (rootShaft there) and leaves the plane. Set by the game.
@@ -444,6 +453,7 @@ export class Fungus {
     }));
     this.#hyphae = maps.map(() => null);
     this.#corpses = maps.map(() => new Map());
+    this.#corpseAge = maps.map(() => new Map());
     this.params = { ...DEFAULT_FUNGUS, ...params };
     this.#listed = strains.map((s) => ({ ...s }));
     this.strains = strains.map((s) => ({ ...s }));
@@ -1202,21 +1212,30 @@ export class Fungus {
         L.sporeCells.add(at[1] * w + at[0] - x0);
       }
     });
-    // The corpses fruit, free: paid by the cadaver, not the mycelium.
+    // The corpses fruit, free: paid by the cadaver, not the mycelium. A corpse with a stalk (ja-2bw.10) spreads the same
+    // spores over the open cells round it.
+    const stalks = e.level("stalks");
     this.#corpses.forEach((corpses, l) => {
       const L = this.#layers[l] as SporeLayer;
       const { w } = L.map.size;
       const { x0 } = L.map;
+      const ages = this.#corpseAge[l] as Map<number, number>;
       for (const [k, left] of corpses) {
+        ages.set(k, (ages.get(k) ?? 0) + dt);
         if (left <= 0) continue;
         const [x, y] = keyCell(k);
-        const v = L.spores.get(x, y);
-        const put = Math.max(0, Math.min(left, CORPSE.rate * dt, p.maxSpores - v));
-        corpses.set(k, left - Math.min(left, CORPSE.rate * dt));
-        if (put <= 0) continue;
-        L.spores.set(x, y, v + put);
-        L.sporeStrain.set(x, y, e.strain);
-        L.sporeCells.add(y * w + x - x0);
+        const spend = Math.min(left, CORPSE.rate * dt);
+        corpses.set(k, left - spend);
+        const ring = this.#stalked(l, k, stalks) ? this.#ring(L.map, x, y, STALK.radius[stalks] ?? 0) : [[x, y] as [number, number]];
+        const each = spend / ring.length;
+        for (const [cx, cy] of ring) {
+          const v = L.spores.get(cx, cy);
+          const put = Math.max(0, Math.min(each, p.maxSpores - v));
+          if (put <= 0) continue;
+          L.spores.set(cx, cy, v + put);
+          L.sporeStrain.set(cx, cy, e.strain);
+          L.sporeCells.add(cy * w + cx - x0);
+        }
       }
     });
     const spots: { L: SporeLayer; cells: number[] }[] = [];
@@ -1357,10 +1376,32 @@ export class Fungus {
     const corpses = this.#corpses[layer] as Map<number, number>;
     const fresh = !corpses.has(k);
     corpses.set(k, (corpses.get(k) ?? 0) + CORPSE.spores);
+    if (fresh) (this.#corpseAge[layer] as Map<number, number>).set(k, 0);
     e.feed(CORPSE.mass);
     if (!fresh) return;
     if (!h.has(x, y)) h.addCell(x, y);
     for (const d of CORPSE.headings) h.root(x, y, d);
+  }
+
+  /** Whether the colonised corpse at `k` on map `layer` has a stalk at Stalks level `level`: outside (topsoil) and old enough. */
+  #stalked(layer: number, k: number, level: number): boolean {
+    if (level <= 0 || !this.#ground(layer).topsoil) return false;
+    return (this.#corpseAge[layer]?.get(k) ?? 0) >= (STALK.delay[level] ?? Infinity);
+  }
+
+  /** The open cells within `radius` of cell (x, y) on `map`: where a stalk's spores fall (its own cell always). */
+  #ring(map: WorldMap, x: number, y: number, radius: number): [number, number][] {
+    const out: [number, number][] = [[x, y]];
+    disc(map, centreX(x, y), centreY(y), radius, (cx, cy) => {
+      if ((cx !== x || cy !== y) && !rockAt(map, cx, cy)) out.push([cx, cy]);
+    });
+    return out;
+  }
+
+  /** Map `layer`'s corpses that have a stalk now (ja-2bw.10), as cells (hyphae.ts cellKey): the renderer's. */
+  stalksOn(layer: number): number[] {
+    const level = this.#evolution?.level("stalks") ?? 0;
+    return [...(this.#corpses[layer]?.keys() ?? [])].filter((k) => this.#stalked(layer, k, level));
   }
 
   /** Map `layer`'s corpses the fungus has grown out of, and the free spores each still has (the renderer, the tests). */
@@ -1584,6 +1625,7 @@ export class Fungus {
       base: [...L.base],
       hyphae: this.#hyphae.map((h) => h?.save() ?? null),
       corpses: this.#corpses.map((m) => [...m]),
+      corpseAges: this.#corpseAge.map((m) => [...m]),
     };
     // One world (U4b): every other map's spores, their cells and the base there (SPORE_LAYER_STATE), from layer 1 on.
     if (this.#layers.length > 1)
@@ -1631,6 +1673,11 @@ export class Fungus {
     this.#corpses.forEach((m, l) => {
       m.clear();
       for (const [k, v] of corpses[l] ?? []) m.set(k, v);
+    });
+    const ages = (r.corpseAges as [number, number][][] | undefined) ?? [];
+    this.#corpseAge.forEach((m, l) => {
+      m.clear();
+      for (const [k, v] of ages[l] ?? []) m.set(k, v);
     });
     this.#evolved();
   }
