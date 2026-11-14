@@ -1945,6 +1945,25 @@ export class Colony {
     // Heat (ja-rf5.5): only a species with a day of heat.
     if (this.params.heatDay > 0) this.heatStep(dt);
     const s = new AntStep();
+    // What every stage reads and no stage writes: the tick's own values once, and the bound layer's (again at each layer switch).
+    s.p = p;
+    s.rng = rng;
+    s.dt = dt;
+    s.a = a;
+    s.ca = ca;
+    s.sa = sa;
+    s.map = map;
+    s.ph = ph;
+    s.home = home;
+    s.gate = gate;
+    s.hold = hold;
+    s.leak = leak;
+    s.metLeak = metLeak;
+    s.rgate = rgate;
+    s.foeLeak = foeLeak;
+    s.sgate = sgate;
+    s.threatLeak = threatLeak;
+    s.crowdKeep = crowdKeep;
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       // An ant on another layer than the one bound: bind its own (a colony on one layer never does).
@@ -1953,10 +1972,20 @@ export class Colony {
         ({ map, ph } = this);
         home = this.nest;
         ({ gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.cur]!);
+        s.map = map;
+        s.ph = ph;
+        s.home = home;
+        s.gate = gate;
+        s.hold = hold;
+        s.leak = leak;
+        s.metLeak = metLeak;
+        s.rgate = rgate;
+        s.foeLeak = foeLeak;
+        s.sgate = sgate;
+        s.threatLeak = threatLeak;
+        s.crowdKeep = crowdKeep;
       }
       if (map.sky) unbury(this, i);
-      s.ca = ca;
-      s.sa = sa;
       perceive(this, i, s);
       let h = s.h;
       const fl = s.fl;
@@ -1969,14 +1998,6 @@ export class Colony {
       const af = s.af;
       const ar = s.ar;
       const toEnemy = s.toEnemy;
-      s.p = p;
-      s.rng = rng;
-      s.dt = dt;
-      s.hold = hold;
-      s.rgate = rgate;
-      s.foeLeak = foeLeak;
-      s.sgate = sgate;
-      s.threatLeak = threatLeak;
       s.heldNow = heldNow;
       s.toEnemy = toEnemy;
       stanceStep(this, i, s);
@@ -1987,9 +2008,6 @@ export class Colony {
       const nursing = s.nursing;
       const outward = s.outward;
       const reporting = s.reporting;
-      s.p = p;
-      s.dt = dt;
-      s.gate = gate;
       s.fl = fl;
       s.ff = ff;
       s.fr = fr;
@@ -2017,15 +2035,6 @@ export class Colony {
       const waiting = s.waiting;
       let rolled = s.rolled;
       const fleeFrom = s.fleeFrom;
-      s.p = p;
-      s.rng = rng;
-      s.map = map;
-      s.ph = ph;
-      s.home = home;
-      s.a = a;
-      s.dt = dt;
-      s.gate = gate;
-      s.rgate = rgate;
       s.h = h;
       s.fl = fl;
       s.ff = ff;
@@ -2054,10 +2063,6 @@ export class Colony {
       h = s.h;
       nest = s.nest;
       const digging = s.digging;
-      s.p = p;
-      s.rng = rng;
-      s.map = map;
-      s.dt = dt;
       s.h = h;
       s.carrying = carrying;
       s.pellet = pellet;
@@ -2071,18 +2076,6 @@ export class Colony {
       h = s.h;
       if (moveDigDone) continue;
 
-      s.p = p;
-      s.rng = rng;
-      s.map = map;
-      s.ph = ph;
-      s.home = home;
-      s.dt = dt;
-      s.gate = gate;
-      s.hold = hold;
-      s.leak = leak;
-      s.metLeak = metLeak;
-      s.sgate = sgate;
-      s.crowdKeep = crowdKeep;
       s.h = h;
       s.toEnemy = toEnemy;
       s.held = held;

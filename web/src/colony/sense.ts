@@ -101,7 +101,14 @@ export function sense(c: Colony, i: number, dx: number, dy: number, slot: number
   // Scent is read through the ant's perception (gains of 1 and no foreign reading: as it is, exactly).
   const f = c.ph.fields;
   // Food is sensed only through open ground: a pocket sealed off by soil is not, however near (ja-juiu, see inReach).
-  if (map.food.get(cx, cy) > 0 && inReach(map, c.x[i], c.y[i], sx, sy)) s[slot] = SEEN;
+  // With scentReach, so is scent: a tip out of reach (another tunnel, behind a wall) reads none (ja-uvhw).
+  const hasFood = map.food.get(cx, cy) > 0;
+  const reach = hasFood || c.params.scentReach > 0 ? inReach(map, c.x[i], c.y[i], sx, sy) : true;
+  if (!reach && c.params.scentReach > 0) {
+    s[slot] = s[slot + 3] = s[slot + 6] = 0;
+    return;
+  }
+  if (hasFood && reach) s[slot] = SEEN;
   else {
     const wf = c.foreignFood[i];
     s[slot] = f.food.get(cx, cy) * c.gainFood[i] + (wf > 0 && c.foreign ? wf * c.foreign.fields.food.get(cx, cy) : 0);
