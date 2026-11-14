@@ -144,6 +144,7 @@ Each step keeps the golden masters bit-exact and the random draws in order; a sc
 1. **The situation schema as data.**
    - A table of fields (name, values, legend line) generates the encoder, the decoder, `SITUATIONS`, the cache key, the state sent to Jev, `COLONY_LEGEND` and the `policyText` rows.
    - A snapshot test proves every string is byte-identical to today's.
+   - The response lanes' situation too (`ja-fnd.5.6`): `Touch`'s 14 fields are declared once (`responses.ts` `TOUCH_SCHEMA`), and `touchKey`, each hook's `responseKey` and `RESPONSE_LEGEND` come from them. A field's `key` may give null to leave itself out of the key (quality, when fair). `tests/unit/touchSchema.test.ts` checks every key against the hand-written ones over all 28,800 combinations of the key's fields and pins the legend's hash. `packResponseRequest` still picks each lane's fields by hand: the order of the ants' fields in the request is part of what Jev reads.
 2. **A lane registry (`LaneSpec`)**, declared once in `colony/lanes.ts` (one file: three rows do not need a directory; slices in `ja-fnd.5.2`). Each lane lists:
    - its name, id prefix, context and version
    - its schema, question, pack/read/valid and local rule

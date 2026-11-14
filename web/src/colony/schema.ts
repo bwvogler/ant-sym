@@ -3,9 +3,12 @@
 // list, so a new species' lane declares its fields once instead of writing each of them again (they were written four
 // times: colony.ts, colonyBrain.ts and the legend).
 
-/** One field of S: its name, its values (few, so an answer can be cached per situation), and how its value reads in the cache key. */
+/**
+ * One field of S: its name, its values (few, so an answer can be cached per situation), and how its value reads in the cache key
+ * (null leaves the field out of the key, separator and all: the response key omits quality when it is "fair", ja-fnd.5.6).
+ */
 export type FieldOf<S> = {
-  [K in keyof S]: { readonly name: K; readonly values: readonly S[K][]; readonly key?: (v: S[K]) => string };
+  [K in keyof S]: { readonly name: K; readonly values: readonly S[K][]; readonly key?: (v: S[K]) => string | null };
 }[keyof S];
 
 export interface Schema<S> {
@@ -18,7 +21,7 @@ export interface Schema<S> {
   encode(s: S): number;
   /** the situation at an index: the inverse of encode */
   decode(code: number): S;
-  /** the cache key: the fields' values in order, joined by "|" */
+  /** the cache key: the fields' values in order, joined by "|" (a field whose `key` gives null is left out) */
   key(s: S): string;
   /** what a situation looks like in the request to Jev: just the schema's fields, in order */
   state(s: S): S;
@@ -57,8 +60,9 @@ export function defineSchema<S extends object>(fields: readonly FieldOf<S>[]): S
       return fields
         .map((f) => {
           const v = read(s, f);
-          return f.key ? (f.key as (v: unknown) => string)(v) : String(v);
+          return f.key ? (f.key as (v: unknown) => string | null)(v) : String(v);
         })
+        .filter((k) => k !== null)
         .join("|");
     },
     state(s) {
