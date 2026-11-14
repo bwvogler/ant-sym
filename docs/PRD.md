@@ -5551,6 +5551,22 @@ M1 counts only foragers whose spot is at least 60° from the trail: a median 25.
 - `find` added (owner, 2026-11-14): the question says whether the ant is near its last find (by its own memory, within `findNear`, 8 cells), since that is where search turns tight (§7); an ant gets its far weights and, remembering a find, its near ones at each mode decision, and steers by whichever its memory says it is at. Brain version 2.
 - Second ask, $0.0031 (145 situations per doctrine, ~170 tokens a question): **every answer "usual"**, both weights, near and far, all three doctrines. A score is read as its expected level rounded, so a lean short of a whole level is lost, and the bundles keep only the rounded level; the doctrines say nothing about searching or memory. Open: read the score's probabilities (or a nearer threshold) and say in the legend what an ant at a find usually does, then ask again.
 
+- Diagnostic, $0.0001 (10 situations, Forage): Jev leans as the biology does but stays mostly on "usual" (P 0.5–0.8): near a find search 0.70–0.88 (P(tight) 0.20–0.37), memory 1.06–1.25; far, search 1.06–1.20, memory 0.74–0.96. Rounding lost all of it.
+- So answers keep P(low / usual / high) per weight and each ant draws its level (brain v3), as modes do since #169. Third ask, $0.0031 (145 a doctrine, ~170 tokens a question). Mean over the shipped situations, all three doctrines alike: near a find, P(tight) 0.11–0.12, P(wide) 0.11–0.12, memory P(lead) 0.10–0.14, P(ignore) 0.10; far, P(tight) 0.09–0.11, memory P(lead) 0.03, P(ignore) 0.20–0.22. In full requests (~100 situations) search barely tells near from far, unlike the 10-situation diagnostic.
+
+**Measured with the shipped answers** (`npm run exp -- lockstep t1 --one --seeds 1-5` and `m1 --seeds 1-10`, `--policy precache:<d> --set both.steerLane=0,1`; steer answers found for 95–99 % of asks; the first colony, median):
+
+| | Food | Lost | Held > 120 s | lockAgree | T1 ratio | M1 memory |
+|---|---|---|---|---|---|---|
+| Forage, off | 702 | 9 | 0 | 0.90 | 1.00 | 0.06 |
+| Forage, on | 681 | 7 | 0 | 0.90 | 1.01 | 0.04 |
+| Warlike, off | 622 | 4 | 0 | 0.89 | 0.99 | 0.02 |
+| Warlike, on | 679 | 4 | 0 | 0.90 | 0.98 | 0.07 |
+
+- The mechanism works (the weights are asked, cached, drawn and steered by), but the preset doctrines' answers are mostly "usual", so play barely moves and neither target is met (T1 ≥ 1.5, M1 ≥ 0.8).
+- M1's foragers start far from their spot, where Jev reads "memory" as a pull to a spot it is not at and mostly ignores it (P(lead) 0.03 far): the question's wording, not only Jev, is at fault there; the biology's "memory beats the trail" is a choice made setting out, far from the spot.
+- The doctrines say nothing about searching or remembering. What a doctrine that does would get from Jev is not measured yet.
+
 **Cost (estimated from the request, before any spend).** About 1,500 tokens of legend and state a request, ~156 a situation: ~176 tokens a question at ~74 a request (the mode lane: ~229 a situation). Shipping the three doctrines: 3 requests, ≈ 39,000 tokens ≈ $0.0016. In play, a situation is asked once per doctrine; at the mode lane's rate of new situations this is under $0.01 an hour.
 
 **Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.
