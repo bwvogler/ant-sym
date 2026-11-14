@@ -95,9 +95,10 @@ test("D3 food odour brings the first find sooner than a blind search", () => {
 
 test(
   "D2 a returning finder invites nestmates out (in the game: reported; the gate is D2c, the staged chamber, tests/int/desertInvite)",
-  { todo: "ja-rf5.6: few isolated returns a game, so it swings (median 7.2x, pass 5/10)" },
+  { todo: "ja-rf5.6: few isolated returns a game, so it swings (over two days, 1200 s: median 7.2x, pass 5/10)" },
   () => {
-    const m = runAssay(desertInvitation, 1).metrics;
+    // The desert ant (desertSpec sets no species; review of #186, S1), over two days, as its figures were measured.
+    const m = runAssay(desertInvitation, 1, { game: { species: DESERT_ANT } }, 1200).metrics;
     assert.equal(m.pass, 1, `ratio ${m.ratio}`);
   },
 );

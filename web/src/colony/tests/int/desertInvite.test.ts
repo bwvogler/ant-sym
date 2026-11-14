@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DESERT_ANT } from "../../desertAnt.ts";
 import { touch } from "../../sense.ts";
+import { holdsAt } from "../../crossing.ts";
 import { RETURN } from "../../vocab.ts";
 import { desertChamber, invitationChamber, runAssay } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
@@ -73,4 +74,46 @@ test("in a game, what an ant's leave response reads as returns is its own pace",
     c.pace[i] = pace;
     assert.equal(touch(c, i, false, RETURN, "none").returns, returns, `pace ${pace}`);
   }
+});
+
+test("in a game, a pace rises only for an ant held at the top of its shaft (review of #186, S3)", () => {
+  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false, species: DESERT_ANT }, gameRng(1));
+  const c = g.player;
+  let prev = Float32Array.from(c.pace);
+  let rises = 0;
+  for (let k = 0; k < 60 * 30; k++) {
+    // Held before the tick: the pull reaches the ants waiting at the gate as the tick begins.
+    const held = new Uint8Array(c.n);
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i]) continue;
+      const was = c.cur;
+      c.bind(c.layer[i]);
+      held[i] = holdsAt(c, i) ? 1 : 0;
+      c.bind(was);
+    }
+    g.tick(1 / 30);
+    for (let i = 0; i < c.n; i++)
+      if (c.alive[i] && c.pace[i] > (prev[i] ?? 0) + 1e-6 && c.pace[i] > P.paceRest + 1e-6) {
+        rises++;
+        assert.equal(held[i], 1, `ant ${i}'s pace rose (${prev[i]} → ${c.pace[i]}) while not held at the gate`);
+      }
+    prev = Float32Array.from(c.pace);
+  }
+  assert.ok(rises > 0, `paces raised in a minute: ${rises}`);
+});
+
+test("in a game with a rival (where the crowd sense is wired), a crowd at the shaft top damps the pace a finder raised (review of #186, S3)", () => {
+  const raised = (paceCrowd: number) => {
+    const sp = { ...DESERT_ANT, params: { ...DESERT_ANT.params, paceCrowd } };
+    const g = new Game(generateOneWorld(1), { antCount: 60, rivalAnts: 60, species: sp }, gameRng(1));
+    let n = 0;
+    for (let k = 0; k < 60 * 30; k++) {
+      g.tick(1 / 30);
+      for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && g.player.pace[i] >= P.paceFew) n++;
+    }
+    return n;
+  };
+  const damped = raised(P.paceCrowd);
+  const undamped = raised(0);
+  assert.ok(damped < undamped, `raised-pace ant-ticks: ${damped} with the crowd's damping, ${undamped} without`);
 });

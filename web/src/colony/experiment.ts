@@ -2504,7 +2504,9 @@ export const CHAMBER_SIZES = [2, 4, 8, 13] as const;
 /**
  * Razin's chamber, staged (ja-rf5.6): `n` ants waiting at the top of the shaft, at rest; for D2_WINDOW seconds no finder comes (spontaneous
  * leaving), then one finder comes down past them and the next D2_WINDOW seconds are counted. The same rule as the game (invite.ts: the pace a
- * finder raises, damped by the crowd, here the n − 1 still waiting round each; the leave response on it), `trials` times. An ant that leaves is gone for the trial.
+ * finder raises, damped by the crowd, here the n − 1 still waiting round each; the leave response on it), `trials` times. The game's crowd
+ * sense differs (review of #186, S2): it counts every nestmate round the top of the shaft (about 5 on average where about 1.5 wait), so a
+ * finder's lift fades about twice as fast in play; and it is wired only where there is a rival (game.ts), so in a game alone it reads 0. An ant that leaves is gone for the trial.
  */
 export function invitationChamber(
   p: ColonyParams,
