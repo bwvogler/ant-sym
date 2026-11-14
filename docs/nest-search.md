@@ -69,7 +69,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 
   All **unverified**.
 - **Without wind: the colony's own marks on its mound.** *Pogonomyrmex barbatus* coat the pebbles of their 1–2 m mound with colony hydrocarbons, in a gradient that grows stronger toward the entrance. Diluting it with unscented pebbles slowed returning foragers (Sturgis, Greene & Gordon 2011, *J Chem Ecol* 37). That paper measured return speed, not whether ants climb the gradient.
-  - *Lasius niger* leave footprint hydrocarbons densest near the nest. They read them as "home range", with fewer U-turns, more trail laying and more resting, but no study shows them steering up the gradient (Devigne & Detrain 2002, 2006).
+  - *Lasius niger* footprint hydrocarbons are *assumed* densest near the nest (Lenoir et al. 2009, citing Devigne & Detrain 2006); Lenoir's own deposits were equal at the entrance and in the foraging area (15.6 against 17.1 ng, P = 0.28; [ant-communication §3](ant-communication.md#3-rival-colonies)). They read them as "home range", with fewer U-turns, more trail laying and more resting, but no study shows them steering up the gradient (Devigne & Detrain 2002, 2006).
   - Pinpointing a nest among odours needs both antennae (Steck, Knaden & Hansson 2010, *Anim Behav* 79), which points to a left–right comparison.
 
   All **unverified**.

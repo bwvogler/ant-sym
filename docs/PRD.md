@@ -4731,7 +4731,7 @@ A1 stays at or above 8/10 (10/10). S1 is unchanged (its carriers are set down wi
 
 **Beads.** `ja-lp4.16` (epic, blocks `ja-lp4.6.3`), children in build order: `.1` read the full texts (research, does not block); `.2` assay R1 and its baseline (no behaviour change); `.3` route memory behind `routeMemory`; `.4` tune, turn on, G1 and the one-world assays; `.5` docs as built.
 
-**Still open.** The bound of 2 is met on seeds 4, 5 and 9 (the owner's three), not on every seed: seeds 6, 7 and 8 reach 4, 5 and 4 at the worst sample, and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 settled as seed flips (¹ above); the full texts to read when the network allows.
+**Still open.** The bound of 2 is met on seeds 4, 5 and 9 (the owner's three), not on every seed: on the shipped code seeds 6, 7 and 8 reach 4, 4 and 1 at the worst sample (`ja-lp4.6.3.1`; the branch's figures were 4, 5 and 4), and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 settled as seed flips (¹ above); the full texts to read when the network allows.
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
