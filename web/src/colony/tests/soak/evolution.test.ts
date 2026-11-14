@@ -346,8 +346,15 @@ test("the fungus's save holds every private field it declares, or the field is d
   const body = src.slice(src.indexOf("export class Fungus "));
   const declared = new Set<string>();
   for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
-  // Each map's hyphae and the corpses it grows out of (ja-2bw) are saved; the spore spots under its hyphae are rebuilt each round.
-  const saved = { evolution: "evolution", menu: "menu", clock: "clock", hyphae: "hyphae", corpses: "corpses" } as Record<string, string>;
+  // Each map's hyphae and the corpses it grows out of, with their ages (ja-2bw, stalks ja-2bw.10), are saved; the spore spots under its hyphae are rebuilt each round.
+  const saved = {
+    evolution: "evolution",
+    menu: "menu",
+    clock: "clock",
+    hyphae: "hyphae",
+    corpses: "corpses",
+    corpseAge: "corpseAges",
+  } as Record<string, string>;
   // menuSeq counts menu changes for readers caching the menu (ja-d87): a load sets the menu, which bumps it.
   const derived = ["reach", "evade", "listed", "menuSeq"];
   const scratch = ["made", "nb", "sporeSpots"];
