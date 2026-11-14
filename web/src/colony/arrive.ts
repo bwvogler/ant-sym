@@ -286,7 +286,8 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     // heads home the vector is fixed.
     // Carrying spoil or a corpse out (U3c), it counts too: it is on its way out, and drops by the vector it brought.
     if (colony.mode[i] !== RETURN || outward) colony.odoSurf[i] = colony.odoSurf[i] + Math.hypot(colony.x[i] - x0, colony.y[i] - y0);
-    if (p.routeMemory > 0 && (colony.mode[i] === EXPLORE || colony.mode[i] === FOLLOW) && !colony.carrying[i]) routeRecord(colony, i);
+    const out = colony.mode[i] === EXPLORE || colony.mode[i] === FOLLOW || (p.routeFight > 0 && colony.mode[i] === FIGHT);
+    if (p.routeMemory > 0 && out && !colony.carrying[i]) routeRecord(colony, i);
     colony.antCell(i);
     const k = colony.holeAt(CELL[0], CELL[1]);
     if (k >= 0 && (k === p.nest ? colony.wantsIn(i, colony.mode[i]) : colony.mode[i] === FIGHT && colony.stanceOf(i) === "raid")) {

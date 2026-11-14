@@ -221,6 +221,12 @@ export interface ColonyParams {
    */
   routeEnd: number;
   /**
+   * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): 1 = an ant walking out in `fight` mode stores its
+   * places too, as an explorer does (a fighter that then finds food had no way out to retrace: G1 seed 3); 0 = only exploring and
+   * following. The literature is silent on fighters (design). Steering only.
+   */
+  routeFight: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -360,6 +366,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeMax: 64,
   routeJoin: 0,
   routeEnd: 0,
+  routeFight: 0,
   raidGate: 1,
   raidLay: 1,
   findAt: 0.3,

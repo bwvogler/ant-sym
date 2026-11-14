@@ -190,3 +190,24 @@ test("routeEnd 1 changes nothing before a retrace is over", () => {
   });
   assert.ok(Math.abs(bx - (nx + 40 + 10)) < 1e-6 && Math.abs(by - ny) < 1e-6, "searching round its vector's end, as before");
 });
+
+test("routeFight 1: an ant walking out in fight mode stores its places; 0, it does not; with food, never", () => {
+  const FIGHT = MODES.indexOf("fight");
+  // One tick of ant 0 in fight mode with a place due (its last stored place far behind on its odometer): places held after.
+  const stored = (fight: number, carrying: 0 | 1): number => {
+    const { g, c, hx, hy } = plane({ routeStep: 8, routeFight: fight });
+    c.bindPolicy("mode", () => "fight");
+    c.putAnt(0, PLANE, hx + 12, hy);
+    c.mode[0] = FIGHT;
+    c.carrying[0] = carrying;
+    c.heading[0] = 0;
+    c.odoSurf[0] = 12;
+    c.routeAt[0] = 0;
+    c.routeN[0] = 0;
+    g.tick(DT);
+    return c.routeN[0];
+  };
+  assert.equal(stored(1, 0), 1, "routeFight 1: a fighter records");
+  assert.equal(stored(0, 0), 0, "routeFight 0: it does not");
+  assert.equal(stored(1, 1), 0, "routeFight 1, food in its jaws: nothing");
+});
