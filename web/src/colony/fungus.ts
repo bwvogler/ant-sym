@@ -399,7 +399,7 @@ export class Fungus {
   }
   /** the local rule's settings (the player's thresholds) */
   rule: FungusRule = { ...DEFAULT_RULE };
-  /** the levers the player has on (§5.1, lever 4): lethal ones start off; the nest's (NEST_ONLY) only where there is a nest */
+  /** the levers the player has on (fungus-policy.md §5.1, lever 3): lethal ones start off; the nest's (NEST_ONLY) only where there is a nest */
   #menu: Set<string> = new Set(DEFAULT_MENU);
   #menuSeq = 0;
   /** Bumped each time the menu changes (configure, the setter, a load): a reader caching the menu knows it changed (ja-d87). */
@@ -1092,7 +1092,7 @@ export class Fungus {
     return (this.strains[s] as Strain).visibility * c.show[i];
   }
 
-  /** The player's settings: the local rule's thresholds and the menu (§5.1, levers 4 and 5). */
+  /** The player's settings: the local rule's switches and the menu (fungus-policy.md §5.1, levers 3 and 4). */
   configure(rule: FungusRule, menu: Iterable<string>): void {
     this.rule = { ...rule };
     this.menu = menu;

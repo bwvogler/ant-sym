@@ -34,10 +34,10 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 - The minimap: one bitmap of the whole map, resampled cell by cell twice a second (`ui/ColonyField.tsx`).
 
 **Memory only grows:**
-- `ChunkLayer.drop` exists but only a test calls it. A save's restore uses `dropAll`.
-- A pheromone chunk that falls asleep is zeroed but stays allocated (`pheromone.ts`).
+- ~~`ChunkLayer.drop` exists but only a test calls it.~~ Done in E1.1: a sleeping pheromone chunk is dropped.
+- ~~A pheromone chunk that falls asleep is zeroed but stays allocated (`pheromone.ts`).~~ Done in E1.1 (PRD §66).
 - `SensedMap` (`ui/fungusSight.ts`, PRD §65), one `Float32` chunk layer per layer of where hosts sensed scent, is never dropped. It grows with the ground hosts have walked.
-- The chunk table is a dense bounding box (`chunks.ts`, `#cover`): two busy spots far apart allocate every slot between them, and `forEach`, saves and the golden hash walk all of them.
+- ~~The chunk table is a dense bounding box (`chunks.ts`, `#cover`): two busy spots far apart allocate every slot between them, and `forEach`, saves and the golden hash walk all of them.~~ Done in E1.2: regions of 16 × 16 chunks (PRD §66).
 - A save writes every allocated chunk of every layer, rock included, though the plane's rock never changes.
 
 **Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, with `EDGE` in `tuning.ts`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). `cellKey` (`grid.ts:60`) is `y · 65536 + x`, so columns are capped at ±32k.
@@ -57,7 +57,7 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 - food taken or dropped, the plane's spoil and loose pellets, chambers;
 - spores on the ground and hyphae.
 
-**Scent is not part of the delta.** Trails, alarm, the floor marks (`royal`, `brood`, `store`, `reception`) and the midden's mark are all pheromone channels (`pheromone.ts`). They stay in their chunks while those chunks are awake or frozen (§6). A chunk whose every channel has faded below `SLEEP` (1e-4) holds nothing worth keeping and is dropped back to the pool. A level of 1 falls below `SLEEP` after about 13 half-lives, without spreading: ~37 s for alarm, ~154 s for the food trail, ~461 s for the home trail and ~15 min for the floor marks (half-lives 2.8 s, 11.6 s, 34.7 s and 69 s; [ant-communication §2](ant-communication.md#2-distance-and-time-scales)).
+**Scent is not part of the delta.** Trails, alarm, the floor marks (`royal`, `brood`, `store`, `reception`) and the midden's mark are all pheromone channels (`pheromone.ts`). They stay in their chunks while those chunks are awake or frozen (§6). A channel's chunk that has faded below `SLEEP` (1e-4) everywhere holds nothing worth keeping and is dropped back to the pool (built in E1.1). A level of 1 falls below `SLEEP` after about 13 half-lives, without spreading: ~37 s for alarm, ~154 s for the food trail, ~461 s for the home trail and ~15 min for the floor marks (half-lives 2.8 s, 11.6 s, 34.7 s and 69 s; [ant-communication §2](ant-communication.md#2-distance-and-time-scales)).
 
 **Where the delta lives.** Chunks within W of an awake colony or the fungus (§6) are kept as they are. A frozen colony's scent chunks are kept too, unstepped, since scent belongs to a colony (one `Pheromones` per colony and layer, `colony.ts`). Every other chunk keeps only its delta, stored compactly: a list of changed cells, or the whole chunk when most of it changed. A chunk with no delta and no scent holds no memory at all.
 
@@ -175,7 +175,7 @@ The tick is then bounded by the cap, not by the world. The player sees part of t
 **`ChunkLayer`** (`chunks.ts`) gains three things:
 - **A generator on miss** for layers that have one (rock, food, quality). It fills a chunk on its first read, so `rockAt`'s explicit bounds go.
 - **Eviction:** `drop` with a delta kept by the layer's owner.
-- **A table that doesn't grow with the square of the spread.** The choice between a hashed map (`Map<chunkKey, A>`) and a two-level table (regions of 16 × 16 chunks, each a dense table) is made by a bench of `get()` in the ants' sensors, the hottest read in the game. Today it is an index into a dense array, and a `Map` lookup may cost too much there. A cache of the last chunk read may close the gap.
+- **A table that doesn't grow with the square of the spread.** Built in E1.2: a dense box of regions of 16 × 16 chunks, each a dense array of chunk slots, with no map and no cache, so a read is still two array indexes. Chosen by `scripts/lab/chunk-table-bench.mjs` and `colony-bench` (PRD §66): on today's plane it reads about as fast as the dense bounding box it replaced, where a `Map<chunkKey, A>` was 20–30 % slower and a map of regions with a last-region cache lost 4–8 % of the game's tick; two places 100 × 60 chunks apart cost 1,584 slots a layer in the bench against the box's 7,659.
 
 **Pheromones:** a chunk that falls asleep is dropped back to the pool, not kept zeroed. The rule pheromone.ts uses for a missing rock chunk ("no ground, holds nothing", and a missing neighbour reads as rock) changes to ask the generator.
 

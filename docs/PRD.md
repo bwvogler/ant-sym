@@ -437,7 +437,7 @@ The 512×320 map is now something to move around in, not a picture squeezed into
   - Only the ants in view are drawn. Cells past a ragged map edge are transparent.
 - **Minimap.**
   - Zoomed in, a corner inset shows the whole map: ground, food, both colonies' ants, and the view's rectangle. It is redrawn twice a second.
-  - The fungus shows on it too (ja-hcq): cells with spores the field draws (`SPORE_SHOWN`) are washed in the spore colour, and infected ants are dots in it, over their nestmates.
+  - The fungus shows on it too (ja-hcq): cells with spores the field draws (`SPORE_SHOWN`) are washed in the spore colour, and infected ants are dots in the spore colour halfway to ink (so they show on the wash too, ja-25sb), over their nestmates.
   - Click or drag on it to jump.
 - **Following an ant.**
   - Click an ant (yours or the rival's) to follow it: the camera tracks it, with a jade ring around it.
@@ -4738,6 +4738,29 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
   Every seed of 1–20 finds sooner with the plume. `tests/slow/assays.test.ts` holds D3 on seeds 1–3.
 - **Tests:** `tests/int/desertPlume.test.ts`. Mutations, each failing it: leave the plume out of the save; drop the steering line; rebuild every tick; let it run off the plane (the nest's layer).
 
+### 60.5 Heat: the body's limit, the sun's height and the night (ja-rf5.5, ja-rf5.12, 2026-11-13)
+
+- **Problem.** Heat as a body rule alone (`heat.ts`): an ant inside is always cool, so with a noon above its limit it set out and died. On D5 (two days, seeds 1–10) the best body-only setting passed 6 of 10, with heat killing 17–30 % of the colony a day on 4 seeds against 16 %; the dead were ants already on their way home.
+- **Research** ([desert-heat.md](desert-heat.md)): the hot-adapted *Cataglyphis* forage at the hottest hours, close to their limit (full text: de Souza Araujo 2023, Sánchez-García 2022); the sun's elevation seen at the entrance, not the ground's temperature, sets when the nest opens and closes, and a raised sun delayed its closing (*C. floricola*, Amor et al. 2011: **unverified**, abstract only); summer foraging has two peaks with a midday dip (Wehner & Wehner 2011, **unverified**); no antennal thermoreceptor measured covers desert heat (Nagel & Kleineidam 2015, full text: silent above 38 °C).
+- **Decisions (owner, 2026-11-13):** a day cycle; heat sensed as situation fields, the shipped answers asked again; heat kills; the cue at the hole is the sun's height, not the ground's heat; a night (the sun down). Then, on the review of #155 (D1): **follow the papers**, out under the high sun and in at a low or set one; in a mixed-species world (`ja-wfw0`) the other species go in at the hot hours.
+- **Built.** `heat.ts`; `ColonyParams.heat*` (all off for the generic ant: `heatDay` 0; goldens bit-exact); the ants' `bodyHeat` and `hot` arrays (last in the table); `Colony.heatStep` before the tick's per-ant loop, killing past `heatDeath` (`diedHot`, the journal's "died of heat").
+  - **The day:** 600 s, the last third night; a game opens 60 s after sunrise (`heatStart`), as the sun turns high. The sun's height is sin² over the daylight, 0 all night; the ground (the air at ant height) follows it, 25 °C from sunset to sunrise and 52 °C at noon, just under the critical heat (ground near 54 °C where *Cataglyphis* forage, the air 6–7 °C cooler: partly unverified). **Heat paces the day and never kills** (owner, review of #155 D2): a body can't pass the air around it, so no desert ant reaches 53.6 °C; `tests/int/desertHeat.test.ts` pins it (noon under the limit, no deaths over a day). The death rule stays for a hotter world or species.
+  - **The body:** closes on its surroundings with a 30 s time constant (the plane's air out there, the nest's 30 °C inside); hot from 45 °C until back under 34 °C (the way a tired ant rests until fully rested); dies at 53.6 °C (*C. bombycina*, a borrowing, unverified).
+  - **The desert lane:** `hot` (cool, hot) and `sun` (unseen, low, high, down), the sun seen on the plane and at the top of its own shaft (`atGate`), unseen deeper in; the sun counts as high from 0.2 of its noon height. 16 → 128 situations; words version 8. Its local rule returns when hot, at a low sun and at night; out under a high sun, and up to look when unseen.
+  - **On the field:** a warm wash over the plane deepens toward noon; a dark wash (black) at night.
+- **D5** (`npm run exp -- d5 --one`), local rule, pass 10/10 on seeds 1–10 and 10/10 on 11–20:
+
+| seeds | out at noon ÷ in the low sun (median, least) | set out at night | heat deaths | fewest pickups in a 30 s window under the high sun | ants at the end (median, least) | food home (median) |
+|---|---|---|---|---|---|---|
+| 1–10 | 4.2, 1.72 | 0 | 0 | 2 | 200, 152 | 845 |
+| 11–20 | 3.9, 1.70 | 0 | 0 | 2 | 200, 152 | 982 |
+
+  No heat deaths follows from noon under the limit (above), not from the ants' choices. 0.55 ms/tick. Measured with the homing rule of the re-review (S5: a homing ant deep in keeps going home). The noon brings a dip as the foragers cool (the papers' two summer peaks): the fewest pickups, 2 in a 30 s window, is its trough. At a game's start every forager sets out together, so they cool together: on seed 1 the plane goes from about 40 ants to 1–3 for 20–40 s at noon. Watched, not measured.
+- **Jev's answers.** Asked three times for the first direction ($0.0018 each, $0.0054; owner approved each): v5 and v6 answers ignored the sun (replayed offline, they failed D5 on seeds 1–5); v7 conditioned explore on the sun and passed. **Version 8** (the papers' direction) asked once more ($0.0027; $0.0081 for heat in all): its explore reads "go out, or keep searching, alone for food (only while the sun is high or unseen, and it is not hot)". Under Cautious and Warlike no answer explores at a low or set sun or with a hot body; under Forage one does (an ant whose fight is over, at a low sun). Replayed offline (Forage's answers; with no rival the three doctrines play alike), D5 passes 5/5 on seeds 1–5, with no heat deaths and nobody out at night. These are the shipped `mode-desert-*.json`.
+- **Cost:** about 690 tokens a question for the 128-situation lane (`colony-cost --species desert`), $0.0040 an hour while a doctrine is new; the live re-ask measured about 170 input tokens a question over 384. A cached game spends nothing.
+- **Tests:** `tests/int/desertHeat.test.ts` (the day and the game's start, the body, the sun seen only where the sky is and unseen deeper in, the hot rule, the sun's rule, heat deaths counted, more out at noon than in the low sun, nobody setting out at night, no heat for the generic ant). Mutations, each failing it: heat deaths not counted; the ant blind to the sun; the shaft's top not seeing the sky; the hot rule removed.
+- **Open:** Amor 2011 and Wehner & Wehner 2011 in full (`ja-rf5.13`); every ant out at night counted (`ja-rf5.14`); why homing ants stay lost at night (`ja-rf5.15`); the colony in step at noon.
+
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
@@ -5274,6 +5297,23 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 
   The map's layers hold 202 chunks (1.9 MB) and the other layers 110 (1.1 MB, 34 blank), unchanged. The heap is 15.1 MB either way.
 - **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, two runs each): main 10.74 and 10.68 ms mean, E1.1 10.88 and 10.65 ms; within noise.
+- **Cost:** none. No situation, legend or question changed.
+
+**E1.2 built (`ja-qpv.1.2`, 2026-11-14).** Storage only; behaviour is bit-exact.
+- **`ChunkLayer` keeps its chunks in a box of regions.** Each region is a dense array of 16 × 16 chunk slots, and the dense box grows by whole regions. Before, the box grew chunk by chunk, so every slot between two far places was allocated. A read is still two array indexes, with no hashing and no cache. Two places 100 × 60 chunks apart now need 28 region slots plus two regions, against 7,659 chunk slots.
+- **How it was chosen.** `scripts/lab/chunk-table-bench.mjs` measures 2,400 ants reading 3 × 3 cells on 8 layers, one kind per process.
+
+  | Table | One spot (today's plane) | Two spots 100 × 60 chunks apart |
+  |---|---|---|
+  | dense box of chunks (main) | 15.5–16.8 ns a read | 17.5–17.6 ns, 7,659 slots |
+  | `Map` keyed by chunk, last chunk cached | 19.3–20.4 ns | 19.2–21.3 ns, 198 slots |
+  | map of regions, last region cached | 16.5–20.1 ns | 20.6–20.8 ns, 1,536 slots |
+  | **box of regions (built)** | 18.2 ns | 17.2 ns, 1,584 slots |
+
+  In the game (`colony-bench --one --page`, 1,200 + 1,200 ants), the map of regions with a one-region cache was 4–6 % slower than main's tick. The ants either side of the curtain's column 0 straddle two regions and kept evicting the cache. A two-region cache cut that to 3–8 %. The box of regions brought it within noise: 11.57, 11.48 and 11.58 ms mean against main's 11.12, 11.39 and 11.36 ms, alternating runs, about +2 %, inside main's own spread of 10.70–11.91 ms over the day. The whole-game hash (`--hash`) is identical on every run.
+- **A generator on miss.** A layer may take `generate(cx, cy, a)`. It fills a chunk the first time any read or write touches it, and fills it afresh after a `drop`. No layer uses one yet; E2 gives the plane's rock one.
+- **`drop` hands back the chunk's array**, so its owner can pool or keep it. `regions` and `regionSlots` report what the table costs.
+- **Order.** `forEach` walks chunks in (cy, cx) order whatever the layout, as the old dense table did. That keeps saves and float sums bit-exact.
 - **Cost:** none. No situation, legend or question changed.
 
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)

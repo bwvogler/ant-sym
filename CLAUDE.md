@@ -31,7 +31,7 @@ npm test                       # every tier below, ~4 min on 4 cores; node --tes
 npm run test:unit              # the quick tier (files under ~1.5 s alone: ui, server, worker, colony/tests/unit), ~9 s
 npm run test:watch             # the unit tier on every save (node --test --watch)
 npm run test:int               # colony/tests/int and ui/tests/int: files of 1.5-12 s
-npm run test:soak              # colony/tests/soak: files over 12 s and the *.soak.test.ts long games (CI shards it 3 ways: `-- --test-shard=1/3`)
+npm run test:soak              # colony/tests/soak: files over 12 s and the *.soak.test.ts long games (CI shards int, golden and soak 4 ways: `ci.yml`)
 npm run test:golden            # the fast golden masters (colony/tests/golden)
 node --test --test-name-pattern='stranger' web/src/colony/tests/int/colony.test.ts   # one file, or the tests of it whose name matches
 npm run format                 # Prettier (width 140, Tailwind class order) over web/src, server, worker, shared and the scripts; `format:check` is what CI runs. A bulk reformat commit goes in .git-blame-ignore-revs
