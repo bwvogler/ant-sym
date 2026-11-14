@@ -1,4 +1,5 @@
-# The whole-game guards (web/src/colony/tests/slow; about 5 minutes locally, about 12 on a runner in 3 shards).
+# The whole-game guards (web/src/colony/tests/slow; about 16 minutes locally on 4 cores, in 4 shards on runners). No file
+# holds a shard much longer than A11 (~6 minutes): the longest assays and G1's seeds have files of their own (ja-jkc9).
 # - Nightly on main, and on demand from the Actions tab: a red run is a measurement to look at.
 # - On a pull request that touches web/src/colony/ or web/shared/ and carries the `slow-guards` label (ja-w7ef.4): the
 #   PR's author adds the label once the review approves (the steward skill), and the run then repeats on every push while
@@ -39,7 +40,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
