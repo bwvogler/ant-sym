@@ -5,7 +5,8 @@ import {
   NEUTRAL_STEERING,
   SITUATION_SCHEMA,
   STEER_WEIGHTS,
-  type Situation,
+  FINDS,
+  type SteerSituation,
   type SteerLevel,
   type Steering,
   type SteerWeight,
@@ -18,7 +19,7 @@ import {
 // switches them on (ja-ykmu.4), and the weights asked are part of the key, as the fungus's levers are.
 
 /** Bump when the legend, the questions or what an answer means changes: old cached answers no longer apply. */
-export const STEER_BRAIN_VERSION = 1;
+export const STEER_BRAIN_VERSION = 2;
 
 /** The weights asked unless the Lab adds design ones: the two the biology lets a situation set (docs/steering.md §3, §7). */
 export const STEER_ASKED: readonly SteerWeight[] = ["search", "memory"];
@@ -37,7 +38,7 @@ export const STEER_MEANINGS: Record<SteerWeight, string> = {
 
 export const STEER_LEGEND =
   COLONY_LEGEND +
-  " Each ant here has just set out to explore or to follow (its mode). Set how strongly it weighs each cue as it steers, for each weight asked: low, usual (as an ant of this kind usually does) or high. " +
+  " Each ant here has just set out to explore or to follow (its mode). find is where it is relative to where it last found food, by its own memory of the way there: near (at that spot) or far (elsewhere, or it has found none). Set how strongly it weighs each cue as it steers, for each weight asked: low, usual (as an ant of this kind usually does) or high. " +
   STEER_WEIGHTS.map((w) => STEER_MEANINGS[w]).join(". ") +
   ".";
 
@@ -52,13 +53,13 @@ export function steerQuestion(id: string, asked: readonly SteerWeight[] = STEER_
 }
 
 /** Whether the steer lane asks about a situation: only an ant out exploring or following steers by weights. */
-export function steerAsks(s: Situation): boolean {
+export function steerAsks(s: SteerSituation): boolean {
   return s.mode === "explore" || s.mode === "follow";
 }
 
-/** The cache key: the mode lane's situation key, then the weights asked. */
-export function steerKey(s: Situation, asked: readonly SteerWeight[] = STEER_ASKED): string {
-  return `${SITUATION_SCHEMA.key(s)}|${asked.join(",")}`;
+/** The cache key: the mode lane's situation key, where it is relative to its last find, then the weights asked. */
+export function steerKey(s: SteerSituation, asked: readonly SteerWeight[] = STEER_ASKED): string {
+  return `${SITUATION_SCHEMA.key(s)}|${s.find}|${asked.join(",")}`;
 }
 
 /** The weights a key asked about. */
@@ -68,11 +69,11 @@ export function askedOf(key: string): SteerWeight[] {
 }
 
 /** One request for many ants' situations: one shared state (legend, doctrine, ants), a score per weight for each. */
-export function packSteerRequest(items: { id: string; key: string; situation: Situation }[], doctrine: string): JevRequest {
-  const ants: Record<string, Situation> = {};
+export function packSteerRequest(items: { id: string; key: string; situation: SteerSituation }[], doctrine: string): JevRequest {
+  const ants: Record<string, object> = {};
   const questions: JevRequest["questions"] = {};
   for (const it of items) {
-    ants[it.id] = SITUATION_SCHEMA.state(it.situation);
+    ants[it.id] = { ...SITUATION_SCHEMA.state(it.situation), find: it.situation.find };
     Object.assign(questions, steerQuestion(it.id, askedOf(it.key)));
   }
   return { state: { legend: STEER_LEGEND, doctrine, ants }, questions };
@@ -116,12 +117,12 @@ export function steerContext(doctrine: string): string {
   return `steer-v${STEER_BRAIN_VERSION}-${hash(STEER_LEGEND + JSON.stringify(steerQuestion("w0", STEER_WEIGHTS)) + "\u0000" + doctrine.trim())}`;
 }
 
-/** Every situation the lane can be asked in: the mode lane's with the mode explore or follow (the decoded situations of its schema). */
-export function steerSituations(): Situation[] {
-  const out: Situation[] = [];
+/** Every situation the lane can be asked in: the mode lane's with the mode explore or follow, far from and near its last find. */
+export function steerSituations(): SteerSituation[] {
+  const out: SteerSituation[] = [];
   for (let c = 0; c < SITUATION_SCHEMA.size; c++) {
     const s = SITUATION_SCHEMA.decode(c);
-    if (steerAsks(s)) out.push(s);
+    if (s.mode === "explore" || s.mode === "follow") for (const find of FINDS) out.push({ ...s, find });
   }
   return out;
 }

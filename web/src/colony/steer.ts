@@ -82,7 +82,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const noise = (rng() - 0.5) * 2 * dt;
   // Steering weights (staging, ja-ykmu): an empty-jawed ant out exploring or following on one world's plane steers by the weights its
   // steer policy gave it. None (STEER_NEUTRAL, always so with steerLane 0) leaves every term below as it was, bit for bit.
-  const sc = col.steerCode[i];
+  const sc = col.steerNear[i] !== col.steerCode[i] && col.nearFind(i) ? col.steerNear[i] : col.steerCode[i];
   const steered =
     sc !== STEER_NEUTRAL && (mode === EXPLORE || mode === FOLLOW) && !carrying && !pellet && col.line !== null && col.cur === PLANE;
   const sm = steered ? SEARCH_MUL[steerLevel(sc, 0) + 1] : 1;

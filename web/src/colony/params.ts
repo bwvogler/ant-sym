@@ -91,6 +91,8 @@ export interface ColonyParams {
    * ja-ykmu; docs/steering.md): 0, never (every weight neutral: main's steering bit for bit); 1, at each mode decision.
    */
   steerLane: number;
+  /** With steerLane: within this (cells) of where it believes its last find is, an ant steers by its `near` weights (design). */
+  findNear: number;
   /**
    * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
    * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
@@ -330,6 +332,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   sampleTemp: 1,
   reroll: 10,
   steerLane: 0,
+  findNear: 8,
   foodTrailTop: 1,
   foodCapTop: 80,
   homeTrail: 0.8,

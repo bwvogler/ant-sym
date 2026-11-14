@@ -312,6 +312,8 @@ export const ANT_FIELDS = {
   redraw: { type: Float32Array, fill: -1, reset: "spawn" },
   /** the steering weights an ant out exploring or following steers by, packed (vocab.ts encodeSteering; staging, ja-ykmu): STEER_NEUTRAL = none */
   steerCode: { type: Uint16Array, fill: 364, reset: "spawn" },
+  /** the weights it steers by near its last find (find `near`), packed as steerCode; STEER_NEUTRAL = none */
+  steerNear: { type: Uint16Array, fill: 364, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

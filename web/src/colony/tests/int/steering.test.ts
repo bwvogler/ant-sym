@@ -101,3 +101,37 @@ test("each weight off neutral bends the steering", () => {
   assert.notEqual(follow(-1), follow(0), "trail −1 changes how followers steer");
   assert.notEqual(follow(1), follow(0), "trail +1 changes how followers steer");
 });
+
+test("near its last find an ant steers by its near weights, elsewhere by its far ones (find, staging ja-ykmu.3)", () => {
+  // Every ant gets wide search near its find and neutral weights away from it: only ants at their spot steer differently.
+  const run = (nearSpot: boolean) => {
+    const g = world(1);
+    const c = g.player;
+    c.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
+    c.bindPolicy("steer", (s) => (s.find === "near" ? { ...NEUTRAL_STEERING, search: 1 } : NEUTRAL_STEERING));
+    // The remembered spot: under the ant (near) or far off; its vector is fresh (odoSurf 0), so it believes the hole is where it is.
+    const hole = g.world!.plane.nests[c.params.nest]!;
+    for (let i = 0; i < 30; i++) {
+      c.odoSurf[i] = 0;
+      c.foodX[i] = nearSpot ? c.x[i] - hole.x : 60;
+      c.foodY[i] = nearSpot ? c.y[i] - hole.y : 0;
+      c.steerNear[i] = encodeSteering({ ...NEUTRAL_STEERING, search: 1 });
+      c.steerCode[i] = STEER_NEUTRAL;
+    }
+    return trace(g, 1);
+  };
+  const plain = (() => {
+    const g = world(1);
+    g.player.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
+    const hole = g.world!.plane.nests[g.player.params.nest]!;
+    for (let i = 0; i < 30; i++) {
+      g.player.odoSurf[i] = 0;
+      g.player.foodX[i] = 60;
+      g.player.foodY[i] = 0;
+      void hole;
+    }
+    return trace(g, 1);
+  })();
+  assert.equal(run(false), plain, "far from its find: its far (neutral) weights, the plain game");
+  assert.notEqual(run(true), plain, "at its find: its near weights (wide search) change its steering");
+});

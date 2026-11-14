@@ -1483,6 +1483,18 @@ export class Colony {
   }
 
   /**
+   * One world's plane (staging, ja-ykmu.3): whether ant i is within params.findNear of where it believes its last find is (its own
+   * vector and the remembered offset, as siteAim reads them; no true coordinate). False with no find remembered.
+   */
+  nearFind(i: number): boolean {
+    if (Number.isNaN(this.foodX[i])) return false;
+    const odo = this.odoSurf[i];
+    const tx = this.nest.x + odo * this.driftSurf[i] + this.foodX[i];
+    const ty = this.nest.y + odo * this.driftSurfY[i] + this.foodY[i];
+    return Math.hypot(tx - this.x[i], ty - this.y[i]) < this.params.findNear;
+  }
+
+  /**
    * One world's plane (ja-lp4.15): the heading an exploring ant i with a remembered spot (foodX, foodY) steers on. Where it
    * believes the spot is: its vector's own hole (the hole plus odoSurf × drift, as believePlane) plus the remembered offset,
    * walked straight; within LOOP_AT of it, it searches round it, U3b's spiral (a point a quarter turn on and SEARCH_GROW_2D

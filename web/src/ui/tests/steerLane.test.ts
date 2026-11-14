@@ -12,7 +12,7 @@ import {
   steerKey,
   steeringOf,
   validSteer,
-  type Situation,
+  type SteerSituation,
 } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
 import type { RunSummary } from "../../../shared/jev.ts";
@@ -76,7 +76,7 @@ function proxy(score: number): { questions: string[] } {
   return seen;
 }
 
-const out: Situation = {
+const out: SteerSituation = {
   mode: "explore",
   tired: false,
   foodTrail: "none",
@@ -84,12 +84,14 @@ const out: Situation = {
   alarm: "none",
   enemy: "none",
   stance: "forage",
+  find: "far",
 };
 const colony = () => new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 10, rival: false }, mulberry32(3)).player;
 
 test("a request asks a score per default weight; a reply reads as levels, and only answers its weights could give are valid", () => {
   const key = steerKey(out);
-  assert.match(key, /\|search,memory$/);
+  assert.match(key, /\|far\|search,memory$/);
+  assert.notEqual(steerKey({ ...out, find: "near" }), key, "near its last find is another situation");
   const req = packSteerRequest([{ id: "w0", key, situation: out }], DOCTRINES[0]!.text);
   assert.deepEqual(Object.keys(req.questions), ["w0_search", "w0_memory"]);
   assert.equal(

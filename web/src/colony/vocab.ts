@@ -179,5 +179,14 @@ export function decodeSteering(code: number): Steering {
   STEER_WEIGHTS.forEach((w, k) => (out[w] = steerLevel(code, k)));
   return out as Steering;
 }
-/** The steer policy: the weights for an ant whose mode policy, in situation `s` (with the mode it now has), sent it exploring or following. */
-export type SteerPolicy = (s: Situation) => Steering;
+/**
+ * Where an ant out steers relative to its last find, by its own memory (the way to it, kept one trip): `near` within FIND_NEAR of
+ * where it believes the spot is, `far` elsewhere or with no find remembered (staging, ja-ykmu.3; docs/steering.md §7: search turns
+ * tight where food was found).
+ */
+export const FINDS = ["far", "near"] as const;
+export type Find = (typeof FINDS)[number];
+/** The steer lane's situation: the mode lane's, with the mode the ant now has, and where it is relative to its last find. */
+export type SteerSituation = Situation & { readonly find: Find };
+/** The steer policy: the weights for an ant whose mode policy sent it exploring or following, in situation `s`. */
+export type SteerPolicy = (s: SteerSituation) => Steering;

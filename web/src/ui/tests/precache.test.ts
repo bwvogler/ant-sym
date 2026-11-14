@@ -48,8 +48,8 @@ const VALID: Record<string, readonly string[]> = {
   growth: GROWTH_CHOICES,
   steer: LEVELS.flatMap((a) => LEVELS.map((b) => `${a},${b}`)),
 };
-// The steer lane: the mode lane's situations whose mode is explore or follow (half of 3,888).
-const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48, steer: SITUATIONS / 2 };
+// The steer lane: the mode lane's situations whose mode is explore or follow (half of 3,888), far from and near a last find.
+const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48, steer: SITUATIONS };
 
 // The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
 // registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.

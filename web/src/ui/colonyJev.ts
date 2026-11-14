@@ -49,6 +49,7 @@ import {
   type Fungus,
   type GrowthAnswer,
   type GrowthSituation,
+  type SteerSituation,
   type Journal,
   PolicyCache,
   pick,
@@ -192,7 +193,7 @@ interface Driven {
   modes: Lane<Situation, string> | null;
   stances: Lane<StanceSituation, Stance> | null;
   /** its ants' steering weights (staging, ja-ykmu.3): the generic ant's situations only (a species with its own schema has none) */
-  steers: Lane<Situation, string> | null;
+  steers: Lane<SteerSituation, string> | null;
 }
 
 /**
@@ -219,9 +220,9 @@ function antLane<Sit, Ans extends string>(
 }
 
 /** A colony's steer lane (staging, ja-ykmu.3), asking under `words`: the weights STEER_ASKED, only for explorers and followers. */
-function steerLane(words: string): Lane<Situation, string> {
+function steerLane(words: string): Lane<SteerSituation, string> {
   const row = LANES.steer;
-  return lane<Situation, string>({
+  return lane<SteerSituation, string>({
     name: row.name,
     key: (s) => row.key(s, undefined),
     pack: (items, w) => row.pack(items, w),

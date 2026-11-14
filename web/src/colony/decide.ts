@@ -157,9 +157,14 @@ export function decide(col: Colony, i: number, s: AntStep): void {
       col.mode[i] = mode;
       // Its steering weights (staging, ja-ykmu; docs/steering.md): asked for the situation with the mode it now has, when that
       // sends it out exploring or following; any other mode steers by its own routine, so its code goes back to none.
-      if (p.steerLane > 0)
-        col.steerCode[i] =
-          mode === EXPLORE || mode === FOLLOW ? encodeSteering(col.steerPolicy({ ...sit, mode: MODES[mode] as Mode })) : STEER_NEUTRAL;
+      // Its weights away from its last find, and, when it remembers one, near it: steer.ts takes whichever its memory says it is at.
+      if (p.steerLane > 0) {
+        const out = mode === EXPLORE || mode === FOLLOW;
+        const now = { ...sit, mode: MODES[mode] as Mode };
+        col.steerCode[i] = out ? encodeSteering(col.steerPolicy({ ...now, find: "far" })) : STEER_NEUTRAL;
+        col.steerNear[i] =
+          out && !Number.isNaN(col.foodX[i]) ? encodeSteering(col.steerPolicy({ ...now, find: "near" })) : col.steerCode[i];
+      }
       col.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
       col.seen[before] = 1;
       // The generic code of the situation it was asked in (its mode before the answer), whatever the species asks: the fungus, the journal and the

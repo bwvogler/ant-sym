@@ -51,7 +51,15 @@ import {
   validSteer,
 } from "./steerBrain.ts";
 import type { GrowthSituation } from "./hyphae.ts";
-import { type LaneWords, STANCE_SCHEMA, type Situation, type SpeciesSituation, type Stance, type StanceSituation } from "./vocab.ts";
+import {
+  type LaneWords,
+  STANCE_SCHEMA,
+  type Situation,
+  type SpeciesSituation,
+  type Stance,
+  type StanceSituation,
+  type SteerSituation,
+} from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -295,11 +303,11 @@ const growthLane: Has<LaneSpec<GrowthSituation, GrowthChoice, undefined>, "local
   all: () => Array.from({ length: GROWTH_SCHEMA.size }, (_, c) => GROWTH_SCHEMA.decode(c)),
 };
 
-export const SAMPLE_STEER: Situation = { ...SAMPLE_SITUATION, mode: "explore" };
+export const SAMPLE_STEER: SteerSituation = { ...SAMPLE_SITUATION, mode: "explore", find: "far" };
 
 // The steer lane (staging, ja-ykmu.3; docs/steering.md): an ant out exploring or following, asked how strongly it weighs each cue, under
 // its colony's doctrine. The weights asked (STEER_ASKED; the Lab's design ones come with ja-ykmu.4) are in the key.
-const steerLane: Has<LaneSpec<Situation, string, ReadonlySet<string> | undefined>, "local" | "all" | "asks"> = {
+const steerLane: Has<LaneSpec<SteerSituation, string, ReadonlySet<string> | undefined>, "local" | "all" | "asks"> = {
   name: "steer",
   kind: LANE_KINDS.steer,
   counters: { asked: "steerAsked", cached: "steerCached" },

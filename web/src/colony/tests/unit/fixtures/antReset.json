@@ -507,6 +507,9 @@
   ],
   "steerCode": [
    364
+  ],
+  "steerNear": [
+   364
   ]
  },
  "asIs": {
@@ -1016,6 +1019,9 @@
    38.25
   ],
   "steerCode": [
+   38
+  ],
+  "steerNear": [
    38
   ]
  }
