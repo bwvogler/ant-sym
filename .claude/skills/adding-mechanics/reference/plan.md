@@ -17,7 +17,7 @@ Everything here is written and committed before the first line of code. The chec
 3. vision.md: sense-table row (new sense), gap-table row (a scripted read added, or one this closes, with its bead).
 4. The PRD section stub.
 5. The bead epic and children, with dependencies.
-6. One commit with the docs and the beads export; then the check; then the owner's review.
+6. One commit with the docs; then the check; then the owner's review.
 
 ## docs/README.md row
 

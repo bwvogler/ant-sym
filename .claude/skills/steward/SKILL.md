@@ -1,6 +1,6 @@
 ---
 name: steward
-description: "The author's side of an open pull request on bwvogler/ant-sym (jev-ants): keeping it mergeable, answering red CI and reviews, the beads export, and merging once the review approves and the owner has said to. Use whenever you watch, babysit or autofix a PR you opened or were asked to get mergeable, when a PR event arrives (CI result, review, comment, conflict), or before you push to an open PR's branch. Not for reviewing a PR (that is reviewing-prs)."
+description: "The author's side of an open pull request on bwvogler/ant-sym (jev-ants): keeping it mergeable, answering red CI and reviews, and merging once the review approves and the owner has said to. Use whenever you watch, babysit or autofix a PR you opened or were asked to get mergeable, when a PR event arrives (CI result, review, comment, conflict), or before you push to an open PR's branch. Not for reviewing a PR (that is reviewing-prs)."
 ---
 
 # Stewarding a PR
@@ -20,7 +20,7 @@ Read the PR at its head, then work its open items in this order:
 
 `git fetch origin main && git merge origin/main`. Never rebase or force-push a PR branch.
 
-`.beads/issues.jsonl` is not in git (ja-w7ef.1): beads change with `bd` and sync through `scripts/beads-sync.sh`. A branch cut before that change still tracks it, so its first merge of `main` stops on a modify/delete conflict there: take main's side with `git rm --cached .beads/issues.jsonl` (bd keeps the local file) and commit the merge.
+`.beads/issues.jsonl` is not in git (ja-w7ef.1): beads change with `bd` and sync through `scripts/beads-sync.sh`. A branch cut before that change still tracks it. Before its first merge of `main`, drop the local copy (`git checkout -- .beads/issues.jsonl`: git refuses a merge that would delete a modified file). If the branch changed the export since it split, the merge then stops on a modify/delete conflict there: take main's side with `git rm --cached .beads/issues.jsonl` and commit the merge. `bd export -o .beads/issues.jsonl` writes the local file back.
 
 Any other conflict: resolve it, then run the fast checks below before pushing.
 
@@ -46,7 +46,7 @@ A failure that is red on `main` too isn't this PR's: say so once on the PR and f
 
 ## Reviews
 
-- After a substantive push (code, tests or docs; not a merge of `main` that needed no hand resolution, once CI is green on it), start a fresh `pr-reviewer` agent in the background with no context from your work. Give it the PR number. It posts one review on the PR.
+- After a substantive push (code, tests or docs; not a merge of `main` that needed no hand resolution, or whose only one was taking main's deletion of `.beads/issues.jsonl`, once CI is green on it), start a fresh `pr-reviewer` agent in the background with no context from your work. Give it the PR number. It posts one review on the PR.
 - Commit or stash your own work before you start it, and tell it that the checkout is yours: it reviews in its own worktree and leaves yours as it found it.
 - Fix blockers and should-fix items in one commit titled `Review of #<n>: …` that names each item (`B1: …`, `S1: …`, `N2: …`), then reply once on the PR listing each item and its commit.
 - Nits ride with the next push: one reply, no push for nits alone.
@@ -63,6 +63,6 @@ The PR is ready once all of these hold on the current head:
 - The latest fresh `pr-reviewer` review, posted after the last substantive push, says Approve in its verdict line (its event is always COMMENT, so GitHub never shows the PR as approved), and no blocker or should-fix is open.
 - For a change under `web/src/colony/`: the slow guards (`test:slow`, CLAUDE.md) passed on the head, run by `slow.yml` on the PR's branch, not in the session (owner, 2026-11-14). Start it with `mcp__github__actions_run_trigger` (`method: run_workflow`, `workflow_id: slow.yml`, `ref` the PR's head branch) once the review approves, and check that the run's head sha is the PR's head. Its result may not wake you: look it up with `mcp__github__actions_list` (`list_workflow_runs`, `slow.yml`, that branch), with a `send_later` check-in in case. A red run is a red check (Red CI above). Name the run in the PR.
 
-Ready, and the owner said to: merge by squash (`mcp__github__merge_pull_request`: `merge_method: squash`, `commit_title` the PR title plus ` (#<n>)` as on `main`, `expectedHeadSha` the current head, after checking that every commit since the head the review approved (`git log --first-parent <approved>..<head>`) is a merge of `main` that needed no hand resolution (`git show --remerge-diff --format= --name-only <sha>` lists nothing), so a later push fails the merge instead of going in unreviewed). Then close the PR's beads (`bd close <id> --reason="Merged in #<n>"`), run `scripts/beads-sync.sh push`, and unsubscribe from the PR.
+Ready, and the owner said to: merge by squash (`mcp__github__merge_pull_request`: `merge_method: squash`, `commit_title` the PR title plus ` (#<n>)` as on `main`, `expectedHeadSha` the current head, after checking that every commit since the head the review approved (`git log --first-parent <approved>..<head>`) is a merge of `main` that needed no hand resolution (`git show --remerge-diff --format= --name-only <sha>` lists nothing, or only `.beads/issues.jsonl`), so a later push fails the merge instead of going in unreviewed). Then close the PR's beads (`bd close <id> --reason="Merged in #<n>"`), run `scripts/beads-sync.sh push`, and unsubscribe from the PR.
 
 Ready, and they haven't: tell them once, with the head's short sha, and wait. Don't merge.
