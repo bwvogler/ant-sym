@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony } from "../../colony.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
-import { EXPLORE } from "../../vocab.ts";
+import { EXPLORE, RETURN } from "../../vocab.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
 import { SMALL_SIDE, ageOf } from "../builders.ts";
 
@@ -90,4 +90,40 @@ test("forageDig: a bout starts only for an old forager coming home with nothing,
   };
   assert.ok(run(120) > 0, "foragers home empty began bouts");
   assert.equal(run(0), 0, "with the setting off none does");
+});
+
+test('forageDig: the trigger is an old ant\'s: a middle-aged ant home in "return" with nothing gets no bout', () => {
+  const bout = (band: 0 | 1 | 2) => {
+    // A "return" policy keeps it in return at home (the local rule would send a rested ant out first).
+    const c = new Colony(
+      generateSideWorld(2, SMALL_SIDE),
+      { antCount: 1, maxAnts: 1, forageDig: 120 },
+      mulberry32(7),
+      (() => "return") as never,
+    );
+    c.age[0] = ageOf(band);
+    c.x[0] = c.nest.x;
+    c.y[0] = c.nest.y;
+    c.mode[0] = RETURN;
+    c.since[0] = 50; // away 50 s
+    c.carrying[0] = 0;
+    c.tick(1 / 30);
+    return c.digBout[0];
+  };
+  assert.equal(bout(2), 120, "an old forager home empty starts one");
+  assert.equal(bout(1), 0, "a middle-aged one does not");
+  assert.equal(bout(0), 0, "nor a young one");
+});
+
+test("forageDig: a bout runs down only underground: exploring on the ground keeps it", () => {
+  const c = colony(120);
+  c.age[0] = ageOf(2);
+  const e = c.entrance!;
+  c.x[0] = e.x;
+  c.y[0] = e.y - 30; // on the ground above the hole
+  c.mode[0] = EXPLORE;
+  c.digBout[0] = 10;
+  for (let t = 0; t < 30; t++) c.tick(1 / 30);
+  assert.equal(c.under[0], 0, "it is on the ground");
+  assert.ok(c.digBout[0] > 9.9, `a second on the ground took nothing off past its first step (${c.digBout[0]})`);
 });

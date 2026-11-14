@@ -5673,7 +5673,7 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 - **Toasts and the tutorial's card** sit above the aim bar on every width, including when it is opened to four lines (the card from 1024 px: review of #189, S5).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
-## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (design, ja-16rp, 2026-11-14)
+## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
 **Research basis:** [foraging-tunnels.md](foraging-tunnels.md):
 - Fire ants keep a standing network of foraging tunnels under their territory, 1–3 cm deep with surface openings every 50–100 cm, the longest over 15 m in one cast (Tschinkel 2011, read in full; Markin et al. 1975, **unverified**). Nothing shows them aimed at food or grown by hunger: their length tracks soil type, not nest size (Ni et al. 2025).
@@ -5686,9 +5686,10 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 - Option 1 first, the network; the soil odour (option 2) is decided later, only if pockets stay untouched (owner, 2026-11-14).
 - Old foragers dig the foraging tunnels; the middle-aged keep digging the nest as now (owner, 2026-11-14).
 - Ship the plain bout and accept its reach: far pockets stay mostly untouched; no map change, no soil odour for now (owner, 2026-11-14, after the measurements below).
+- Ship it **off** (`forageDig: 0`) until larvae are fed without hungry foragers' help (owner, 2026-11-14, after the slow guards failed: below). The assay, journal category, tests and setting land; `ja-16rp.5` turns it on, after `ja-rvli`.
 
 **The mechanic.**
-- *Option 1 (as built, `forageDig`):* an old forager (age band 2) that comes home from a trip with nothing in its jaws (its own failed search, sensed) starts a digging bout of `forageDig` seconds. In it, it stays in the nest and digs on at tunnels' dead ends and forks, exempt from `ROOMY_DIG`, from the need for nestmates by (`digChance`) and from the middle-aged-only rule; it builds no chambers. The bout ends when the time is up or it picks up food. Food is found by contact, then taken home by what is built (open-ground food sensing, trails, STORE_AFTER). Off (0) is main bit for bit. It adds no global read. *Planned but dropped:* the felt-hunger trigger (the failed-search cue alone was enough to measure), and steering the dig outward and level or down (measured worse, below).
+- *Option 1 (as built, `forageDig`):* an old forager (age band 2) that comes home from a trip with nothing in its jaws (its own failed search, sensed) starts a digging bout of `forageDig` seconds, counted while it explores in the nest (time resting or on the ground doesn't count). In it, it stays in the nest and digs, outside the middle-aged-only rule; at tunnels' dead ends and forks (`walkTunnel`) it digs without the `ROOMY_DIG` damping and without nestmates by (`digChance`), while starting a face from a chamber (`move.ts`) and `hug`'s start still damp it in a roomy nest; it builds and widens no chambers. The bout ends when the time is up or it picks up food. Food is found by contact, then taken home by what is built (open-ground food sensing, trails, STORE_AFTER). Off (0) is main bit for bit. It adds no global read. *Planned but dropped:* the felt-hunger trigger (the failed-search cue alone was enough to measure), and steering the dig outward and level or down (measured worse, below).
 - *Option 2:* buried food gives off a short odour through soil (a soil version of the desert ant's plume, about 3 cells), read only by a digger at its face.
 
 **Play.** When the ground's piles thin out the nest grows arms under the ground and pockets empty as they open; the fungus's hyphae grow along tunnels (§63.9), so the network is also its road to the pockets and to other colonies. The early game is unchanged. Risks: a digging runaway (mound, ticks), tunnels meeting the rival's (an underground front, `ja-war`), fed colonies raiding sooner (§67's fight losses).
@@ -5732,7 +5733,7 @@ Five seeds take none of the buried food in the hour; the best takes 3.6 %.
 - Two refinements were tried and dropped (`86be58e`): aiming the dig away from the nest (home vector), and following the most recently dug cells to the working face (Pielström & Roces 2013, `dugAt`, cells dug within 120 s). Together they took less food and two colonies fell under 400 workers.
 - The journal's dig category (seed 4) shows why the ceiling is low: most bouts end within 30 cells of the nest, while the map's 44–48 pockets lie 24–54 cells out for the nearest and 60–130+ for the rest. Even the best setting takes about 5 % of the buried food in an hour.
 
-**Confirmed on seeds 11–20 and turned on (`forageDig: 120`).**
+**Confirmed on seeds 11–20.**
 
 | Bout | Buried taken (sum) | Worst seed | Food home (worst) | Workers (worst) | Cells opened (median) | ms/tick (median) |
 |---|---|---|---|---|---|---|
@@ -5746,6 +5747,22 @@ Five seeds take none of the buried food in the hour; the best takes 3.6 %.
 - Two colonies in the side-view game (`npm run exp -- game --seeds 1-20`, 600 s, 600 a side): fight losses 8,475 → 8,945 summed (+5.5 %; median per seed 419 → 469, while single seeds swing by up to 350 either way); workers alive and food stored unchanged (medians 835 → 827 and 2,552 → 2,438 for the player's colony); the held-at-once check passes on 17 of 20 seeds against 18 (the misses hold 3 at once, against the limit of 2).
 - Owner (2026-11-14): accept the reach. The far pockets stay mostly untouched; no map change and no soil odour for now.
 
-**Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full).
+**The slow guards fail with it on, so it ships off.** slow.yml on `c769060` (run 43620926486):
+- `economy.test`: larvae waiting over two minutes beside food enough for them, 10 at once (bound 8) and 38 (bound 5).
+- `side.test`: foragers holding food over 120 s, 3 on seed 6's rival (bound 2).
+- `oneWorldG1.test`: past its 20-minute file limit (more digging, more CPU).
 
-**Still open.** Option 2 (after option 1's results); how deep and how far the network should run; whether two colonies' networks meeting needs handling.
+Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs out by about 2,400 s, so nearly every old forager comes home empty and up to 94 of 129 old ants are on a bout at once. On a bout they stay in, where they use half the energy, so at 2,400 s 1 old ant is hungry and none feels the brood's need, against 66 and 18 with it off. Those hungry old ants, fetching for themselves, were what fed larvae still owed their growth food, which send nothing until hungry (`ja-rvli`). Peak larvae waiting over economy.test's 16 hour-long games (worlds 1–4 × nudges 0–3; bound 8 in the test):
+
+| `forageDig` | `owedBeg` | Games over 8 | Worst | Peaks, world 1 n0–3, world 2, 3, 4 |
+|---|---|---|---|---|
+| 0 | 0 (main) | 3 | 19 | 0 0 3 6 · 0 0 1 2 · 5 19 6 2 · 11 9 2 4 |
+| 0 | 0.3 | 5 | 54 | 1 1 2 2 · 11 0 1 54 · 29 27 1 0 · 2 22 6 4 |
+| 120 | 0 | 15 | 54 | 20 38 20 26 · 10 12 23 9 · 40 11 37 18 · 54 11 16 37 |
+| 120 | 0.3 | 8 | 38 | 4 3 29 3 · 1 3 7 12 · 38 31 14 9 · 16 2 5 32 |
+
+`owedBeg` (a larva owed its growth food begs a little, felt by touch; built off) halves the bout's damage but makes main worse on its own, so it stays off; `ja-rvli` needs another cue.
+
+**Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1, built off), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full), ja-16rp.5 (turn option 1 on; after ja-rvli).
+
+**Still open.** Feeding larvae owed their growth food (ja-rvli), then option 1 on (ja-16rp.5); option 2; how deep and how far the network should run; whether two colonies' networks meeting needs handling.
