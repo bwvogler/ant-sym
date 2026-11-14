@@ -1,0 +1,37 @@
+# The beads (bd's Dolt database) live on the beads-dolt branch, and since #174 nowhere else in git (ja-w7ef.1; owner,
+# 2026-11-14: keep a copy off the branch). Each night this saves that branch as a git bundle artifact, so a lost or
+# damaged branch can be put back:
+#   gh run download <run-id> -n beads-dolt-bundle && git fetch beads-dolt.bundle beads-dolt:beads-dolt-restored
+# then push it as beads-dolt (scripts/beads-sync.sh reads the branch). The bundle is the Dolt data itself; making it
+# needs no bd on the runner.
+name: Beads backup
+
+on:
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: bundle the beads-dolt branch
+        env:
+          REPO: ${{ github.server_url }}/${{ github.repository }}
+          TOKEN: ${{ github.token }}
+        run: |
+          git init -q b && cd b
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)" \
+            fetch -q "$REPO" +refs/heads/beads-dolt:refs/heads/beads-dolt
+          git bundle create "$RUNNER_TEMP/beads-dolt.bundle" refs/heads/beads-dolt
+          git bundle verify "$RUNNER_TEMP/beads-dolt.bundle"
+          echo "beads-dolt at $(git rev-parse --short refs/heads/beads-dolt), $(git rev-list --count refs/heads/beads-dolt) commits, $(du -h "$RUNNER_TEMP/beads-dolt.bundle" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: beads-dolt-bundle
+          path: ${{ runner.temp }}/beads-dolt.bundle
+          retention-days: 90

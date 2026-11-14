@@ -58,10 +58,29 @@ jobs:
       # So the globs are copies of web/package.json's test:int, test:golden and test:soak; ui/tests/ciShards.test.ts holds them equal.
       # Each tier keeps its own per-file limit: 60 s for int and golden, 120 s for soak (a soak file was
       # cancelled at 60 s on a small runner, #78).
+      # scripts/ci-report.mjs, beside spec (ja-w7ef.2, .3): failures and files near their limit go to the step summary
+      # and as annotations, and each file's time to a durations artifact; its env names the limit (keep it equal to
+      # --test-timeout) and the files.
       - name: int and golden, shard ${{ matrix.shard }}/${{ strategy.job-total }}
-        run: node --test --test-timeout=60000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
+        env:
+          TEST_FILE_LIMIT_MS: "60000"
+          TEST_REPORT_TITLE: int and golden, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/int-golden-${{ matrix.shard }}.json
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=60000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
         working-directory: web
       - name: soak, shard ${{ matrix.shard }}/${{ strategy.job-total }}
         if: ${{ !cancelled() }}
-        run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/soak/*.test.ts
+        env:
+          TEST_FILE_LIMIT_MS: "120000"
+          TEST_REPORT_TITLE: soak, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/soak-${{ matrix.shard }}.json
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=120000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/soak/*.test.ts
         working-directory: web
+      - name: durations artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-durations-${{ matrix.shard }}
+          path: ${{ runner.temp }}/durations/
+          retention-days: 30
+          if-no-files-found: ignore
