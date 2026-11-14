@@ -29,7 +29,7 @@ The desert ant has no trails, so the fungus's trail and alarm levers do nothing 
 - **Effect:** in `crossDown` (crossing.ts), a host going down its own hole adds its `rouse` to the passes the ants waiting at the top meet next tick (`holeIn`), as a finder adds 1. Nothing else changes: the host keeps no pass back out unless it carries food.
 - **Off:** `rouse` 0, and every species without `invitePace`: goldens bit-exact for the generic ant.
 - **Cost:** the lever's brief joins the fungus's legend (`FUNGUS_LEGEND` lists every lever), so the fungus lane's shipped answers must be asked again: about $0.013 (the v8 re-ship, one lever added, cost $0.0126). Every fungus request carries the longer legend, about +2 % a request (4,941 → 5,041 characters in the default request), so the lane's hourly cost rises by about that.
-- **Assay:** in the staged chamber (`invitationChamber`, D2c), an infected host with rouse strong coming down raises leaving well above the spontaneous rate (a false invitation reaches as far as some of a true one); with rouse none it doesn't. In a game, a desert colony with a roused host sends out more departures from the waiting pool than with none, on seeds 1–5.
+- **Assay (the plan; not met, see What ja-rf5.18 built):** in the staged chamber (`invitationChamber`, D2c), an infected host with rouse strong coming down raises leaving well above the spontaneous rate (a false invitation reaches as far as some of a true one); with rouse none it doesn't. In a game, a desert colony with a roused host sends out more departures from the waiting pool than with none, on seeds 1–5.
 
 ## Play
 
@@ -48,6 +48,8 @@ The desert ant has no trails, so the fungus's trail and alarm levers do nothing 
 ## What ja-rf5.18 built (PRD §60.8)
 
 The lever as planned, with two changes (owner, 2026-11-14): it is on the fungus's menu only in a desert game (`menuFor`), so a generic game's requests don't ask a lever that does nothing; and the fungus lane's answers were asked again, including the situations the earlier ship held but a fresh recording didn't meet (132 an aim).
+
+A desert game asks the fungus with rouse on, so the shipped fungus answers (asked without it) don't serve its workers: without Jev they play the local rule (PRD §60.8).
 
 **What it does, honestly: it raises the passes, not the departures.** Seeds 1–5, 240 s, the fungus landed, rouse strong against none, rich map: the waiting ants meet **+4.6 %** passes, ants held at the top leave about 0.5 s sooner, and departures fall **0.6 %** (fewer on 4 of 5 seeds). Why (ja-rf5.19, measured offline):
 - 85–90 % of departures are finders cycling straight back out with their own pass; rouse doesn't touch them.

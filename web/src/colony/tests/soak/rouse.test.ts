@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Colony, PLANE } from "../../colony.ts";
 import { crossDown } from "../../crossing.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
-import { DEFAULT_MENU, Fungus, STRAINS } from "../../fungus.ts";
+import { DEFAULT_MENU, Fungus, STRAINS, menuFor } from "../../fungus.ts";
 import { Game, gameRng } from "../../game.ts";
 import { encodeLevels, inertLevers } from "../../levers.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -33,6 +33,14 @@ test("rouse: none, some, strong set the host's share of a finder; off the defaul
   assert.equal(c.rouse[0], 0.5, "scaled by how far the fungus has grown in the host (review of #202, S2)");
   assert.ok(!DEFAULT_MENU.includes("rouse"), "the player puts it on the menu");
   assert.ok(inertLevers(null).includes("rouse") && !inertLevers(null, true).includes("rouse"));
+});
+
+test("rouse: a desert game's fungus starts with rouse on its menu; a generic game's does not (owner D2; review of #202, S6)", () => {
+  const desert = new Game(generateOneWorld(1), { antCount: 10, rival: false, species: DESERT_ANT }, gameRng(1));
+  assert.ok(desert.fungus.menu.has("rouse"));
+  const generic = new Game(generateOneWorld(1), { antCount: 10, rival: false }, gameRng(1));
+  assert.ok(!generic.fungus.menu.has("rouse"));
+  assert.deepEqual(menuFor([...DEFAULT_MENU, "rouse"], false), DEFAULT_MENU, "menuFor takes rouse off where finders don't invite");
 });
 
 /** A one-world game of `species` with the fungus landed in the player's colony, its hosts pulling rouse at `level`; passes the waiting ants met. */
