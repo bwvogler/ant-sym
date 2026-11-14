@@ -60,6 +60,7 @@ import { unbury } from "./dig.ts";
 import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
+import { layerView, loadLayer, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
 import { loadColony, saveColony } from "./colonySave.ts";
 export { COLONY_SKIP, COLONY_STATE, LAYER_STATE } from "./colonySave.ts";
 import { stanceStep } from "./stance.ts";
@@ -242,9 +243,6 @@ export type Wiring = Partial<
   Pick<Layer, "enemies" | "nestmates" | "friends" | "foreign" | "raidMarks" | "raidTarget" | "raidNest" | "others">
 >;
 
-/** A layer's own copy of its state, held while another layer is bound (see Colony.layers). */
-type LayerSlots = { -readonly [K in keyof Layer]: Layer[K] };
-
 export { CURTAIN, PLANE } from "./vocab.ts";
 
 /**
@@ -257,11 +255,6 @@ export interface HoleCell {
   px: number;
   py: number;
 }
-
-/** Where a layer's view keeps its slots: a key only this module holds. */
-const SLOTS = Symbol("slots");
-
-type LayerView = Layer & { readonly [SLOTS]: LayerSlots };
 
 /** One layer's gates for a tick (Colony.tick): whether it gates leaving, raids by trail and each ant's own stance, and their leaks. */
 interface Gates {
@@ -613,7 +606,7 @@ export class Colony {
       this.home = CURTAIN;
       this.cur = CURTAIN;
     }
-    this.store(slots);
+    storeLayer(this, slots);
     if (world) {
       // The plane: its nest is the disc round the hole (no entrance: the hole is the way in, not a nest to dig), and the
       // colony's scent there has the top-down food cap, as on any open ground. Its Pheromones draws no random numbers.
@@ -642,9 +635,9 @@ export class Colony {
         raidNest: null,
         others: [],
       };
-      this.layers = [Colony.view(this, PLANE, plane), Colony.view(this, CURTAIN, slots)];
+      this.layers = [layerView(this, PLANE, plane), layerView(this, CURTAIN, slots)];
       this.line = world.line;
-    } else this.layers = [Colony.view(this, 0, slots)];
+    } else this.layers = [layerView(this, 0, slots)];
     this.seeHoles();
     const n = this.params.maxAnts;
     this.n = n;
@@ -708,180 +701,15 @@ export class Colony {
   }
 
   /**
-   * Layer l as `layers` shows it: each field read from the colony while l is bound, else from l's slots (see `layers`).
-   * Static, so the getters reach the colony's private fields without aliasing `this`.
-   */
-  static view(c: Colony, l: number, s: LayerSlots): LayerView {
-    return {
-      [SLOTS]: s,
-      get map() {
-        return c.cur === l ? c.map : s.map;
-      },
-      get ph() {
-        return c.cur === l ? c.ph : s.ph;
-      },
-      get nest() {
-        return c.cur === l ? c.nest : s.nest;
-      },
-      get entrance() {
-        return c.cur === l ? c.entrance : s.entrance;
-      },
-      get entranceCol() {
-        return c.cur === l ? c.entranceCol : s.entranceCol;
-      },
-      get entranceRow() {
-        return c.cur === l ? c.entranceRow : s.entranceRow;
-      },
-      get holes() {
-        return c.cur === l ? c.holes : s.holes;
-      },
-      set holes(v) {
-        if (c.cur === l) c.holes = v;
-        else s.holes = v;
-      },
-      get outDist() {
-        return c.cur === l ? c.outDist : s.outDist;
-      },
-      set outDist(v) {
-        if (c.cur === l) c.outDist = v;
-        else s.outDist = v;
-      },
-      get outCells() {
-        return c.cur === l ? c.outCells : s.outCells;
-      },
-      set outCells(v) {
-        if (c.cur === l) c.outCells = v;
-        else s.outCells = v;
-      },
-      get outVersion() {
-        return c.cur === l ? c.outVersion : s.outVersion;
-      },
-      set outVersion(v) {
-        if (c.cur === l) c.outVersion = v;
-        else s.outVersion = v;
-      },
-      get outAt() {
-        return c.cur === l ? c.outAt : s.outAt;
-      },
-      set outAt(v) {
-        if (c.cur === l) c.outAt = v;
-        else s.outAt = v;
-      },
-      get enemies() {
-        return c.cur === l ? c.enemies : s.enemies;
-      },
-      set enemies(v) {
-        if (c.cur === l) c.enemies = v;
-        else s.enemies = v;
-      },
-      get nestmates() {
-        return c.cur === l ? c.nestmates : s.nestmates;
-      },
-      set nestmates(v) {
-        if (c.cur === l) c.nestmates = v;
-        else s.nestmates = v;
-      },
-      get friends() {
-        return c.cur === l ? c.friends : s.friends;
-      },
-      set friends(v) {
-        if (c.cur === l) c.friends = v;
-        else s.friends = v;
-      },
-      get foreign() {
-        return c.cur === l ? c.foreign : s.foreign;
-      },
-      set foreign(v) {
-        if (c.cur === l) c.foreign = v;
-        else s.foreign = v;
-      },
-      get raidMarks() {
-        return c.cur === l ? c.raidMarks : s.raidMarks;
-      },
-      set raidMarks(v) {
-        if (c.cur === l) c.raidMarks = v;
-        else s.raidMarks = v;
-      },
-      get raidTarget() {
-        return c.cur === l ? c.raidTarget : s.raidTarget;
-      },
-      set raidTarget(v) {
-        if (c.cur === l) c.raidTarget = v;
-        else s.raidTarget = v;
-      },
-      get raidNest() {
-        return c.cur === l ? c.raidNest : s.raidNest;
-      },
-      set raidNest(v) {
-        if (c.cur === l) c.raidNest = v;
-        else s.raidNest = v;
-      },
-      get others() {
-        return c.cur === l ? c.others : s.others;
-      },
-      set others(v) {
-        if (c.cur === l) c.others = v;
-        else s.others = v;
-      },
-    };
-  }
-
-  /** The bound layer's state, from the colony's fields into slots `s`. */
-  store(s: LayerSlots): void {
-    s.map = this.map;
-    s.ph = this.ph;
-    s.nest = this.nest;
-    s.entrance = this.entrance;
-    s.entranceCol = this.entranceCol;
-    s.entranceRow = this.entranceRow;
-    s.holes = this.holes;
-    s.outDist = this.outDist;
-    s.outCells = this.outCells;
-    s.outVersion = this.outVersion;
-    s.outAt = this.outAt;
-    s.enemies = this.enemies;
-    s.nestmates = this.nestmates;
-    s.friends = this.friends;
-    s.foreign = this.foreign;
-    s.raidMarks = this.raidMarks;
-    s.raidTarget = this.raidTarget;
-    s.raidNest = this.raidNest;
-    s.others = this.others;
-  }
-
-  /** Slots `s` into the colony's fields: their layer is the bound one now. */
-  loadLayer(s: LayerSlots): void {
-    this.map = s.map;
-    this.ph = s.ph;
-    this.nest = s.nest;
-    this.entrance = s.entrance;
-    this.entranceCol = s.entranceCol;
-    this.entranceRow = s.entranceRow;
-    this.holes = s.holes;
-    this.outDist = s.outDist;
-    this.outCells = s.outCells;
-    this.outVersion = s.outVersion;
-    this.outAt = s.outAt;
-    this.enemies = s.enemies;
-    this.nestmates = s.nestmates;
-    this.friends = s.friends;
-    this.foreign = s.foreign;
-    this.raidMarks = s.raidMarks;
-    this.raidTarget = s.raidTarget;
-    this.raidNest = s.raidNest;
-    this.others = s.others;
-  }
-
-  /**
    * Bind layer l: the colony's fields become l's (its map, scent, nest, hole, cached way out, wiring), the bound layer's
    * put back in its slots first. Every switch on the map's kind then reads the layer of the ant being stepped. A colony on
    * one layer never swaps: it returns at once.
    */
   bind(l: number): void {
     if (this.layers.length === 1 || l === this.cur) return;
-    this.store((this.layers[this.cur] as LayerView)[SLOTS]);
+    storeLayer(this, (this.layers[this.cur] as LayerView)[SLOTS]);
     this.cur = l;
-    this.loadLayer((this.layers[l] as LayerView)[SLOTS]);
+    loadLayer(this, (this.layers[l] as LayerView)[SLOTS]);
   }
 
   /** The game's wiring for layer l (Game.wire, aimAt): into the colony's fields while l is bound, else into l's slots. */
