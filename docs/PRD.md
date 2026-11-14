@@ -5692,7 +5692,7 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 
 **Change.** Nurses put brood only in brood chambers of at least `BROOD_MIN` (4) cells. With none that big, it goes to the queen's chamber. This is the same rule as `RECEPTION_MIN` for foragers' food ("a smaller one chokes"). The choice still reads the chamber table (`ja-k4k.4`).
 
-**Measured, the economy test's setup** (the 20 seeds above, one hour each; `node scripts/lab`-style probe in the PR):
+**Measured, the economy test's setup** (the 20 seeds above, one hour each, a probe of the test's own loop; its script is in the PR):
 
 | | main | `BROOD_MIN` 4 |
 |---|---|---|
@@ -5713,7 +5713,7 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 - **`game`, seeds 11–20:** pass 9/10 → 9/10; worst porters holding food 23 → 1.
 - **The side-view war reshuffles.** The weaker colony's ants at 600 s, per seed:
   - The worst seed is lower on both sets: 573 → 226 on seeds 1–10 (seed 5's rival, losses 341 → 641), and 605 → 464 on seeds 11–20.
-  - The mean of each seed's weaker colony is 699 → 676 on seeds 1–10 and 736 → 755 on seeds 11–20.
+  - The mean of each seed's weaker colony is 683 → 678 on seeds 1–10 and 736 → 755 on seeds 11–20.
   - Which side wins changes on seeds 2, 4, 5 and 6.
 - **`nestFlow`, side view:** 0/10 both ways. Starved larvae, worst seed: 13 → 3.
 - **`game1` (one world), seeds 1–10:** pass 6/10 → 6/10; worst foragers holding food 6 → 8; worst porters 1 → 8.
