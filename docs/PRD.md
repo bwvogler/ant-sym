@@ -5451,9 +5451,9 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 - The three unguarded games with 9–19 larvae waiting: ja-mprr.
 - Jev cost: none. No legend, question, schema or brain version changed.
 
-## S1. Staging only: ants draw their mode from Jev's probabilities (ja-nan3, 2026-11-14)
+## 68. Ants draw their mode from Jev's probabilities (ja-nan3, 2026-11-14)
 
-*On the `staging` branch, not `main`. Staging sections are numbered S1, S2, … so they never collide with `main`'s; one that proves out moves to `main` under its own number.*
+*Tried first on the long-lived `staging` branch (deployed at `/ant-sym/pr-preview/staging/`; experiments there are numbered S1, S2, … in its PRD); the owner played it and kept it.*
 
 **Why.** Every ant in one situation took Jev's choice, so whole groups switched mode together. Jev's `choice` answers already come with a probability for every option (§4); nothing kept them.
 
@@ -5471,7 +5471,7 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 | Forage | 0.73 | 74 % | 44 % |
 | Cautious | 0.81 | 46 % | 31 % |
 | Warlike | 0.69 | 85 % | 54 % |
-| Desert (3 doctrines) | 0.79–0.87 | 31–75 % | 19–25 % |
+| Desert (3 doctrines) | 0.85–0.86 | 45–48 % | 13–22 % |
 
 Asked again, Jev kept its earlier choice in 81–87 % of situations; where it changed, the call was close (Warlike: follow 0.39 against fight 0.35). A top choice that close was a coin toss before.
 

@@ -111,7 +111,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
             {mode}
           </span>
           <span className="text-fg-3">{decided ? `by ${BY[decided.by]}` : ""}</span>
-          {decided?.weights && decided.weights.length > 1 ? (
+          {decided?.weights && decided.weights.length > 1 && col.params.sampleTemp > 0 ? (
             <span className="font-mono text-fg-3" title="Jev's probabilities in this situation: the ant drew its mode from them">
               drawn from {decided.weights.map(([m, p]) => `${m} ${Math.round(p * 100)} %`).join(" · ")}
             </span>

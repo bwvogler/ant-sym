@@ -115,7 +115,7 @@ export function decide(col: Colony, i: number, s: AntStep): void {
         col.asked[i] = -1;
       }
     }
-    // A drawn mode is drawn afresh after `reroll` seconds in the same situation (staging, ja-nan3): its question is
+    // A drawn mode is drawn afresh after `reroll` seconds in the same situation (ja-nan3): its question is
     // forgotten, so the policy is asked again below. Only an ant whose last answer was drawn has a clock (else −1).
     if (col.redraw[i] > 0 && (col.redraw[i] -= dt) <= 0) {
       col.redraw[i] = -1;

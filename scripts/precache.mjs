@@ -29,7 +29,7 @@
 //        node scripts/precache.mjs --species desert [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --reweigh [--species desert] [--doctrines …] [--budget …] [--dry]
 //
-// --reweigh (staging, ja-nan3): ask again only the mode situations a bundle already holds whose answer is a bare mode, so
+// --reweigh (ja-nan3): ask again only the mode situations a bundle already holds whose answer is a bare mode, so
 // it keeps Jev's probabilities over the modes too (colony/weighted.ts: the ants draw from them). The other situations of
 // the lane stay unasked, as an --import left them. With --species, that species' bundles. Prints how sharp the answers are.
 //
@@ -315,7 +315,7 @@ const answeredNow = [...bundles.values()].reduce((n, b) => n + b.answers.size, 0
 if (answeredNow > 0)
   console.log(`real ≈ ${Math.round(spent / USD_PER_INPUT_TOKEN / answeredNow)} input tokens a question over ${answeredNow} answered`);
 for (const b of bundles.values()) console.log(`  ${b.file}: ${b.answers.size} answers`);
-// How sharp the mode answers are: the ants draw from them, so near-certain answers change little (staging, ja-nan3).
+// How sharp the mode answers are: the ants draw from them, so near-certain answers change little (ja-nan3).
 for (const b of bundles.values()) {
   if (b.lane !== "mode") continue;
   const tops = [...b.answers.values()].map((a) => weightsOf(a)?.[0]?.[1] ?? 1);

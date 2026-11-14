@@ -54,7 +54,7 @@ export interface ColonyControls {
   view: View;
   /** the player pressed Start (the start screen, ja-lo8.5): every game from then on begins with the fungus landing */
   started: boolean;
-  /** the Lab (staging, ja-nan3): how sharply ants draw their mode from Jev's probabilities (ColonyParams.sampleTemp), and how often they draw again (reroll, s) */
+  /** the Lab (ja-nan3): how sharply ants draw their mode from Jev's probabilities (ColonyParams.sampleTemp), and how often they draw again (reroll, s) */
   sampleTemp: number;
   reroll: number;
 }
@@ -291,7 +291,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   useEffect(() => {
     game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
   }, [game, controls.hide, controls.cull, controls.menu]);
-  // So do the Lab's settings for how ants draw their mode (staging, ja-nan3), on every colony, founded later or not.
+  // So do the Lab's settings for how ants draw their mode (ja-nan3), on every colony, founded later or not.
   useEffect(() => {
     game.setChoice({ sampleTemp: controls.sampleTemp, reroll: controls.reroll });
   }, [game, controls.sampleTemp, controls.reroll]);

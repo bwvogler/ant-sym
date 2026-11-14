@@ -1,4 +1,4 @@
-// A choice answer kept with Jev's probabilities (staging, ja-nan3): "follow=0.62,explore=0.3,return=0.08". Jev's choice
+// A choice answer kept with Jev's probabilities (ja-nan3): "follow=0.62,explore=0.3,return=0.08". Jev's choice
 // comes back with a probability for every option; before this the caches kept only the choice, so every ant in one
 // situation did the same thing and whole groups flipped together. The choice Jev gave comes first, so `topOf` is the
 // answer the caches held before; a bare choice ("follow") is a certain one and still reads everywhere. A leaf: no colony
@@ -18,7 +18,8 @@ export const MIN_WEIGHT = 0.005;
 
 /**
  * The answer to keep for a choice: `top` (Jev's choice) with the probabilities of the options `allowed`, most likely
- * after it, rounded to three places; just `top` when there are no probabilities or every other option is under MIN_WEIGHT.
+ * after it, rounded to three places; `top=1` when every other option is under MIN_WEIGHT (Jev was asked and was certain:
+ * `precache.mjs --reweigh` does not ask it again); just `top` when there are no probabilities.
  */
 export function weigh(top: string, probabilities: Readonly<Record<string, number>> | null | undefined, allowed: readonly string[]): string {
   if (!probabilities) return top;
@@ -28,7 +29,7 @@ export function weigh(top: string, probabilities: Readonly<Record<string, number
   const total = kept.reduce((a, [, p]) => a + p, 0);
   if (!(total > 0) || !kept.some(([c]) => c === top)) return top;
   const rest = kept.filter(([c]) => c !== top).sort((a, b) => b[1] - a[1]);
-  if (rest.length === 0) return top;
+  if (rest.length === 0) return `${top}=1`;
   const part = (c: string, p: number) => `${c}=${Number((p / total).toFixed(3))}`;
   return [part(top, kept.find(([c]) => c === top)![1]), ...rest.map(([c, p]) => part(c, p))].join(",");
 }
@@ -67,7 +68,7 @@ export function weightedValid(answer: string, ok: (choice: string) => boolean): 
 /**
  * The option to act on: one drawn by its probability, sharpened or flattened by the temperature (p^(1/T): 1 as Jev gave
  * it, under 1 toward its choice, over 1 toward even; `draw.temperature` unless given), with `draw()` called exactly once.
- * With no `draw`, a bare answer, or temperature 0, Jev's choice and `draw` is never called: a game that never meets a
+ * With no `draw`, a bare or certain answer, or temperature 0, Jev's choice and `draw` is never called: a game that never meets a
  * weighted answer draws nothing more than it did (the golden masters).
  */
 export function pick(
@@ -77,7 +78,7 @@ export function pick(
 ): string {
   if (!draw || !isWeighted(answer) || !(temperature > 0)) return topOf(answer);
   const w = weightsOf(answer);
-  if (!w) return topOf(answer);
+  if (!w || w.length < 2) return topOf(answer); // a certain answer ("return=1") is not drawn from
   const scaled = temperature === 1 ? w.map(([, p]) => p) : w.map(([, p]) => p ** (1 / temperature));
   const total = scaled.reduce((a, b) => a + b, 0);
   let u = draw() * total;

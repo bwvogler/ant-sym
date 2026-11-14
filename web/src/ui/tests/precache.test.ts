@@ -89,7 +89,7 @@ test("every preset doctrine ships mode and stance answers, each situation once, 
       assert.equal(pairs.length, b.answers);
       assert.ok(pairs.length > 0 && pairs.length <= SIZE[lane]!, `${b.file}: ${pairs.length} answers`);
       assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
-      // A mode answer keeps Jev's probabilities over the modes (weighted.ts, staging ja-nan3): every option must be a mode.
+      // A mode answer keeps Jev's probabilities over the modes (weighted.ts, ja-nan3): every option must be a mode.
       for (const [, a] of pairs)
         assert.ok(lane === "mode" ? weightedValid(a, (m) => VALID.mode!.includes(m)) : VALID[lane]!.includes(a), `${b.file}: ${a}`);
     }

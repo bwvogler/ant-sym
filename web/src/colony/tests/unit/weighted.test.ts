@@ -8,7 +8,7 @@ import { isWeighted, pick, topOf, weigh, weightedValid, weightsOf } from "../../
 import { MODES, type Mode, type Policy } from "../../vocab.ts";
 import { ticks } from "../builders.ts";
 
-// Jev's mode with its probabilities (staging, ja-nan3; weighted.ts): kept with the answer, drawn from by each ant with its
+// Jev's mode with its probabilities (ja-nan3; weighted.ts): kept with the answer, drawn from by each ant with its
 // colony's rng, and drawn afresh after `reroll` seconds; a policy that never draws leaves the game as it was.
 
 const MODES_ALL = [...MODES];
@@ -21,7 +21,11 @@ test("weigh keeps Jev's choice first, the other allowed modes by probability, an
   // renormalised over what is kept; a choice that is not the most likely still comes first (it is what the caches held)
   assert.equal(weigh("explore", { follow: 0.5, explore: 0.25, fight: 0.25 }, ["follow", "explore"]), "explore=0.333,follow=0.667");
   assert.equal(weigh("return", undefined, MODES_ALL), "return", "no probabilities: a bare mode");
-  assert.equal(weigh("return", { return: 0.999, explore: 0.001 }, MODES_ALL), "return", "nothing else worth drawing: a bare mode");
+  assert.equal(
+    weigh("return", { return: 0.999, explore: 0.001 }, MODES_ALL),
+    "return=1",
+    "nothing else worth drawing: certain, and marked as asked",
+  );
   assert.equal(weigh("fight", { explore: 1 }, MODES_ALL), "fight", "probabilities that miss the choice are not trusted");
 });
 
@@ -66,6 +70,7 @@ test("pick draws once by probability, and not at all without a draw, from a bare
   assert.equal(calls, 3, "one draw a pick");
   calls = 0;
   assert.equal(pick("return", at(0.95)), "return");
+  assert.equal(pick("return=1", at(0.95)), "return");
   assert.equal(
     pick(
       w,
@@ -73,7 +78,7 @@ test("pick draws once by probability, and not at all without a draw, from a bare
     ),
     "follow",
   );
-  assert.equal(calls, 0, "a bare answer and temperature 0 never draw");
+  assert.equal(calls, 0, "a bare or certain answer and temperature 0 never draw");
   // temperature flattens or sharpens: at a high one the three are close to even, at a low one Jev's choice almost always
   const share = (temperature: number) => {
     let follow = 0;
@@ -113,9 +118,21 @@ test("ants of one colony asked the same weighted answer draw different modes, an
     empty.some((i) => c.redraw[i] > 0),
     "an ant that drew has a clock to draw again",
   );
-  const before = c.decisions;
-  ticks(g, Math.round(2.5 * 30));
-  assert.ok(c.decisions > before + empty.length / 2, `asked again on the clock (${c.decisions - before} decisions)`);
+});
+
+test("an ant draws again on the clock: the same game asks its policy more often with `reroll` on than off", () => {
+  // Situations change often in a small world, so the count alone says little: the same game with the clock on and off
+  // does (review of #169, S1: both mutations of the clock, never counted down or not forgetting the question, gave equal counts).
+  const asked = (reroll: number) => {
+    const g = game({ reroll });
+    let n = 0;
+    g.player.bindPolicy("mode", (_s, draw) => (n++, pick("explore=0.5,follow=0.5", draw) as Mode));
+    ticks(g, 5 * 30);
+    return n;
+  };
+  const on = asked(0.5);
+  const off = asked(0);
+  assert.ok(on > off * 1.2, `${on} asks with the clock, ${off} without`);
 });
 
 test("a policy that never draws leaves every ant without a clock (the local rule's game is unchanged)", () => {

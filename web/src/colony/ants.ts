@@ -307,7 +307,7 @@ export const ANT_FIELDS = {
   hot: { type: Uint8Array, reset: "spawn" },
   /**
    * seconds until an ant whose mode was drawn from Jev's probabilities draws again in the same situation (params.reroll;
-   * staging, ja-nan3); −1 = its last answer was not drawn, so it is asked again only when its situation changes
+   * ja-nan3); −1 = its last answer was not drawn, so it is asked again only when its situation changes
    */
   redraw: { type: Float32Array, fill: -1, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;

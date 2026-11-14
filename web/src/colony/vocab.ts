@@ -86,7 +86,7 @@ export const SITUATION_SCHEMA = defineSchema<Situation>([
 /**
  * A mode policy. `draw` (uniform in [0, 1), the colony's own rng, with the temperature it draws at) is for a policy whose answer is a distribution (Jev's
  * probabilities, weighted.ts): it draws once to pick the mode, and the colony re-asks that ant later (`reroll`). A policy
- * that never calls it answers as before, and the game draws nothing more (staging, ja-nan3).
+ * that never calls it answers as before, and the game draws nothing more (ja-nan3).
  */
 export type Policy = (s: Situation, draw?: Draw) => Mode;
 

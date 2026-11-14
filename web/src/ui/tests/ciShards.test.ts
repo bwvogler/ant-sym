@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 
 // .github/workflows/ci.yml runs the int, golden and soak files sharded, with their globs copied from web/package.json (node
 // ignores --test-shard after the file list, so the npm scripts can't take it). PR CI and the deploy (pages.yml calls ci.yml)
@@ -45,4 +45,28 @@ test("the shard steps take the shard count from the matrix, not a copy of it", (
   for (const name of ["int and golden", "soak"]) {
     assert.match(step(name), /--test-shard=\$\{\{ matrix\.shard \}\}\/\$\{\{ strategy\.job-total \}\} /, name);
   }
+});
+
+// Every test file runs somewhere: a *.test.ts outside every glob of npm test and test:slow runs in no tier, locally or in
+// CI, and nothing says so (review of #165: a file moved to an unglobbed folder passed every check).
+const testFiles = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
+    d.name === "node_modules"
+      ? []
+      : d.isDirectory()
+        ? testFiles(join(dir, d.name))
+        : d.name.endsWith(".test.ts")
+          ? [join(dir, d.name)]
+          : [],
+  );
+
+test("every *.test.ts under web/ is in a glob of npm test or test:slow", () => {
+  const web = join(ROOT, "web");
+  const all = [...globs(script("test")), ...globs(script("test:slow"))];
+  for (const g of all) assert.match(g, /^[^*]+\/\*\.test\.ts$/, `${g}: only <dir>/*.test.ts globs are understood here`);
+  const dirs = new Set(all.map((g) => dirname(g)));
+  const missed = testFiles(web)
+    .map((f) => relative(web, f))
+    .filter((f) => !dirs.has(dirname(f)));
+  assert.deepEqual(missed, [], "test files no tier runs: add their folder to an npm script (and ci.yml), or move them");
 });

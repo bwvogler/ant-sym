@@ -176,7 +176,7 @@ export function packModeRequest(
 
 /**
  * A situation's mode from a reply, or null when it is missing or not a mode (not cached; the local rule covers it): Jev's
- * choice with its probabilities over the modes `allowed` (weighted.ts, staging ja-nan3), so an ant can draw its mode.
+ * choice with its probabilities over the modes `allowed` (weighted.ts, ja-nan3), so an ant can draw its mode.
  */
 export function readMode(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = MODES): string | null {
   const a = answers[`${id}_mode`];

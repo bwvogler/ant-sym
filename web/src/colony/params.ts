@@ -75,13 +75,13 @@ export interface ColonyParams {
    */
   followChoice: number;
   /**
-   * How an ant draws its mode from Jev's probabilities (staging, ja-nan3; colony/weighted.ts): p^(1/T), so 1 as Jev
+   * How an ant draws its mode from Jev's probabilities (ja-nan3; colony/weighted.ts): p^(1/T), so 1 as Jev
    * gave them, under 1 toward the mode Jev chose (0: always it, as before), over 1 toward even. A policy with no
    * probabilities (the local rule, a bare cached answer) is never drawn from.
    */
   sampleTemp: number;
   /**
-   * Seconds after an ant drew its mode before it draws again in the same situation (staging, ja-nan3): without it an ant
+   * Seconds after an ant drew its mode before it draws again in the same situation (ja-nan3): without it an ant
    * is asked only when its situation changes, so a draw would hold for as long as nothing round it changed. 0 = never
    * again until the situation changes. Only an ant whose last answer was drawn is re-asked: a game on the local rule is unchanged.
    */

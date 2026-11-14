@@ -672,7 +672,7 @@ export class Colony {
   /** whether the mode policy drew its answer just now (policyDraw): set in the call, read by decide right after it */
   policyDrew = false;
   /**
-   * The `draw` decide hands the mode policy (staging, ja-nan3): the colony's own rng, noting that it was used. A policy
+   * The `draw` decide hands the mode policy (ja-nan3): the colony's own rng, noting that it was used. A policy
    * draws only from an answer with Jev's probabilities (weighted.ts), so a game that never meets one draws as before.
    */
   readonly policyDraw: Draw = Object.defineProperty(
