@@ -5246,22 +5246,23 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
-**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, seconds to a quarter of the hosts; seeds 1–10 on main after #174, 11–20 on main after #159, whose goldens are bit-exact):
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, with and without `--hyphae --growth`; seconds to a quarter of the hosts; on main `8f07b85`, after #180, all 40 games in one run):
 
 | Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| No hyphae | 231 | 416 | 310 | 143 | 150 | 536 | 272 | 492 | 394 | 262 |
-| Hyphae | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| No hyphae | 231 | 320 | 310 | 143 | 150 | 543 | 272 | 544 | 411 | 262 |
+| Hyphae | 249 | 305 | 270 | 152 | 116 | 394 | 263 | 424 | 220 | 261 |
 
 | Seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| No hyphae | 510 | 265 | 205 | 18 | 315 | 381 | 238 | 366 | 292 | 569 |
-| Hyphae | 560 | 233 | 195 | 18 | 326 | 372 | 234 | 334 | 269 | 433 |
+| No hyphae | never | 265 | 208 | 18 | 342 | 381 | 239 | 369 | 328 | 468 |
+| Hyphae | 420 | 233 | 195 | 18 | 360 | 372 | 237 | 334 | 310 | 387 |
 
 - **P1 holds on both sets.**
-  - Seeds 1–10: the worst seed is +8 % (seed 1), the worst seed improves from 536 to 418 s, and the median from 291 to 262 s.
-  - Seeds 11–20: the worst seed is +9.8 % (seed 11, 510 → 560 s, just inside the line), the worst seed improves from 569 to 560 s, and the median from 303.5 to 297.5 s.
-- **No number moved.** The earlier misses (§63.7, §63.9, §63.10) were closed by the changes since: the cut that loses only the dug cell, and the main's own changes to scent and the tick. **Owner (2026-11-14): record and close**; a change that moves seed 11 past 10 % is caught by the next P1 check.
+  - Seeds 1–10: the slowest seed is +7.8 % (seed 1, 231 → 249 s); the worst time improves from 544 to 424 s, and the median from 291 to 262 s.
+  - Seeds 11–20: the slowest seed is +5.3 % (seed 15, 342 → 360 s); the worst time improves from never (seed 11) to 420 s, and the median from 335 to 322 s.
+- **No number moved.** The earlier misses (§63.7, §63.9, §63.10) were closed by the changes since: the cut that loses only the dug cell, and main's own changes to scent, the tick and defence. **Owner (2026-11-14): record and close**; a later change that pushes a seed past 10 % is caught by the next P1 check.
+- **`--growth` matters.** These runs play the growth lane's shipped answers, as the page does. §63.13's `main` rows ran without it (the tips' own rule), which is why its hyphae times differ (seed 11: 418 s there).
 - **Stumps stay.** A piece a cut leaves keeps its root cell even when it has no tip left (one `HYPHA_MASS` a piece), so it can resprout: the owner's "severed part lives on" (§63.10). **Owner (2026-11-14): keep the stump** (review of #152, N3).
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
