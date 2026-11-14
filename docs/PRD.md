@@ -5196,18 +5196,18 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Assays.** A corpse outside grows its stalk after `STALK.delay` and its spores then fill the ring to its edge and no further, with about what the cadaver paid on the ground (within 25 % below, 5 % above: foragers take more from a wider ring), at both levels; a spent corpse's stalk is gone; no stalk without the upgrade, before the delay, or in a layer that is not topsoil; the cadaver pays the same spores either way; corpse ages save and load; P1 with *Stalks* bought (in the order, and at landing with `--grant stalks`).
 
-**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, seeds 1–10, on main after #153; seconds to a quarter of the hosts):
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, seeds 1–10, with the review's fix: the emptiest-cell rule and delays 20 and 10; on main after #174; seconds to a quarter of the hosts):
 
 | Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| No hyphae | 263 | 386 | 331 | 169 | 165 | never | 308 | never | 236 | 249 |
-| Hyphae | 260 | 267 | 298 | 174 | 154 | 368 | 260 | 487 | 271 | 249 |
-| Hyphae, *Stalks* in the order (after *senses*) | 260 | 267 | 298 | 174 | 154 | 368 | 260 | 487 | 271 | 249 |
-| Hyphae, *Stalks* at landing (`--grant stalks`) | 260 | 267 | 298 | 174 | 154 | 368 | 260 | 487 | 271 | 249 |
+| No hyphae | 231 | 416 | 310 | 143 | 150 | 536 | 272 | 492 | 394 | 262 |
+| Hyphae | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| Hyphae, *Stalks* in the order (after *senses*) | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| Hyphae, *Stalks* at landing (`--grant stalks`) | 249 | 418 | 270 | 152 | 110 | 322 | 263 | 531 | 181 | 261 |
 
-- *Stalks* leaves every seed's quarter, half and queen times unchanged, bought in the order (at 380–564 s, after the quarter) or granted at landing: before the quarter no stalked corpse changes who is infected first. P1 against hyphae without it holds exactly.
-- After the quarter it shows: mycelium at 600 s rises on the seeds that bought it early (seed 3 66.4 → 69.9, seed 4 52.4 → 60.4, seed 5 66.0 → 75.1 in the order; 69.0, 60.9, 76.0 granted).
-- The hyphae baseline's own P1 miss stands as before (seed 9, 236 → 271 s, +15 %, recorded under the owner's ship-and-record rule); *Stalks* neither adds nor removes one. Seeds 6 and 8 never reach a quarter without hyphae.
+- **In the buying order** *Stalks* comes at 323–583 s, after every seed's quarter, so the quarter, half and queen times are the hyphae's. P1 holds: no seed is more than 10 % slower than without hyphae (worst seed 1, +8 %), and the worst seed (418 against 536) and the median are better. The earlier run's seed-9 miss is gone on this main.
+- **Granted at landing** it is a gamble, as knots were (§63.11): faster on seeds 5, 6 and 9 (235 → 181 s), slower on seeds 2 (+16 %) and 8 (+27 %, 531 s, worse than without hyphae). Spread thinner, a corpse's spores reach more foragers but each takes a smaller dose. Not a P1 configuration; recorded under the owner's ship-and-record rule.
+- First built (spores split over every cell, delays 60 and 30), *Stalks* left every seed unchanged even at landing: the top level lost its spores to the fade, and the first level's stalk came as a lone corpse ran dry (review of #178).
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
