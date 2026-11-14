@@ -42,7 +42,7 @@ export interface ColonyControls {
   playing: boolean;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
-  /** the fungus's menu: the levers the player has on (§5.1, lever 4; levers.ts) */
+  /** the fungus's menu: the levers the player has on (fungus-policy.md §5.1, lever 3; levers.ts) */
   menu: string[];
   /** the local rule's settings: hide groomed hosts; cull high-load fighters among strangers */
   hide: boolean;
