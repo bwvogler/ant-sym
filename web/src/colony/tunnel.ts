@@ -30,6 +30,7 @@ import {
   MIDDEN_CROWD,
   MIDDEN_SCALE,
   NEW_CHAMBER,
+  FRESH_DIG,
   ROOMY_DIG,
   SIGN_WEIGHT,
   START_HUG,
@@ -66,6 +67,28 @@ export function toBrood(col: Colony, cx: number, cy: number, dir: number): numbe
     if (rockAt(col.map, tx, ty) !== OPEN || isSky(col.map, tx, ty)) continue;
     const v = royal.get(tx, ty) + brood.get(tx, ty);
     if (v > bestV) ((bestV = v), (best = d));
+  }
+  return best;
+}
+
+/**
+ * The way from cell (cx, cy), not back, into the open underground cell dug most recently within FRESH_DIG seconds and
+ * more recently than this one (a tunnel's newest cells are at its working face), or −1 if none (ja-16rp).
+ */
+export function freshWay(col: Colony, cx: number, cy: number, dir: number): number {
+  const map = col.map;
+  let best = -1;
+  let bestT = Math.max(map.dugAt.get(cx, cy), col.time - FRESH_DIG);
+  for (const turn of [0, 1, -1, 2, -2]) {
+    const d = (dir + turn + 6) % 6;
+    const tx = stepX(cx, cy, d);
+    const ty = stepY(cy, d);
+    if (rockAt(map, tx, ty) !== OPEN || isSky(map, tx, ty)) continue;
+    const t = map.dugAt.get(tx, ty);
+    if (t > bestT) {
+      bestT = t;
+      best = d;
+    }
   }
   return best;
 }
@@ -333,7 +356,9 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     col.digAim[i] = NaN;
   } else {
     const side = col.hand[i];
-    let next = handOnWall(map, cx, cy, dir, side);
+    // On a foraging dig (ja-16rp): toward the freshest digging, so it reaches the face nestmates were just digging.
+    const fresh = col.forageDigs(i) ? freshWay(col, cx, cy, dir) : -1;
+    let next = fresh >= 0 ? fresh : handOnWall(map, cx, cy, dir, side);
     // An inside worker at the top of the shaft turns back down rather than step out onto the ground (zoned by age).
     if (
       col.staysIn(i) &&
