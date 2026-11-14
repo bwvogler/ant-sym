@@ -435,8 +435,12 @@ export interface Overrides {
   colony?: ColonyOptions;
   rival?: ColonyOptions;
   game?: Partial<Omit<GameParams, "fight">> & { fight?: Partial<FightParams> };
+  /** parameters for every colony at once (`--set both.sampleTemp=0,1`), under `colony` and `rival` where they set the same one */
+  both?: ColonyOptions;
   /** the player's brains (e.g. Jev's cached answers, replayed); an assay that sets its own policy or stance keeps it */
   policy?: Policy;
+  /** the rival's mode policy, the same way (`--policy precache:<doctrine>` gives both colonies the shipped answers) */
+  rivalPolicy?: Policy;
   stance?: StancePolicy;
   /** the player's responses, hook by hook: they replace the assay's own (or the local ones) only for the hooks they define */
   responses?: Partial<Responses>;
@@ -461,9 +465,14 @@ export interface Assay {
 /** An assay's run with overrides merged in (colony and rival params deep-merged per channel; fight merged; brains as documented on Overrides). */
 export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   const sides: Sides = { ...spec.sides };
+  if (o.both) {
+    sides.colony = mergeColony(sides.colony, o.both);
+    sides.rival = mergeColony(sides.rival, o.both);
+  }
   if (o.colony) sides.colony = mergeColony(sides.colony, o.colony);
   if (o.rival) sides.rival = mergeColony(sides.rival, o.rival);
   if (o.policy && !sides.policy) sides.policy = o.policy;
+  if (o.rivalPolicy && !sides.rivalPolicy) sides.rivalPolicy = o.rivalPolicy;
   if (o.stance && !sides.stance) sides.stance = o.stance;
   if (o.responses) sides.responses = { ...(sides.responses ?? localResponses), ...o.responses };
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
@@ -1653,6 +1662,119 @@ export function gateProbe(): Probe {
 }
 
 /**
+ * How much a colony's ants move in lockstep (staging, ja-0kys): sampled every second from `from` s, over its free ants
+ * (alive, and in the mode their policy chose: `question` ≥ 0; a carrier goes home by rule and is left out).
+ * - `lockAgree`: among ants whose mode answered the same situation, the share in that situation's commonest mode,
+ *   over every such ant (a situation only one ant is in is left out): 1 = every ant in a situation does the same.
+ * - `lockSwing`: how far the colony's mode mix moves from one second to the next (total variation, 0 to 1), averaged.
+ * - `lockBurst`: the Fano factor (variance over mean) of mode switches a second, among ants free at both samples:
+ *   about 1 when ants switch independently of each other, far above when many switch at once.
+ */
+export function lockstepProbe(from = 30): Probe {
+  interface Seen {
+    prev: Int8Array;
+    gen: Uint32Array;
+    agree: number;
+    agreeN: number;
+    swing: number;
+    swingN: number;
+    switches: number[];
+    mix: number[] | null;
+  }
+  const seen: Seen[] = [];
+  let nextAt = from;
+  return {
+    tick(game) {
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 1;
+      game.colonies.forEach((c, k) => {
+        let s = seen[k];
+        if (!s || s.prev.length < c.n) {
+          const prev = new Int8Array(c.n).fill(-1);
+          const gen = new Uint32Array(c.n);
+          if (s) {
+            prev.set(s.prev);
+            gen.set(s.gen);
+          }
+          s = seen[k] = s ? { ...s, prev, gen } : { prev, gen, agree: 0, agreeN: 0, swing: 0, swingN: 0, switches: [], mix: null };
+        }
+        const groups = new Map<number, number[]>();
+        const mix = [0, 0, 0, 0];
+        let free = 0;
+        let switched = 0;
+        for (let i = 0; i < c.n; i++) {
+          const q = c.alive[i] ? c.question[i] : -1;
+          // A slot reused by a newborn is a new ant: it did not switch.
+          if (q < 0 || c.gen[i] !== s.gen[i]) {
+            s.gen[i] = c.gen[i];
+            s.prev[i] = -1;
+            if (q < 0) continue;
+          }
+          const m = c.mode[i];
+          free++;
+          mix[m]++;
+          let g = groups.get(q);
+          if (!g) groups.set(q, (g = [0, 0, 0, 0]));
+          g[m]++;
+          if (s.prev[i] >= 0 && s.prev[i] !== m) switched++;
+          s.prev[i] = m;
+        }
+        for (const g of groups.values()) {
+          const n = g[0]! + g[1]! + g[2]! + g[3]!;
+          if (n < 2) continue;
+          s.agree += Math.max(...g);
+          s.agreeN += n;
+        }
+        if (free) {
+          const now = mix.map((x) => x / free);
+          const before = s.mix;
+          if (before) {
+            s.swing += 0.5 * now.reduce((a, p, j) => a + Math.abs(p - before[j]!), 0);
+            s.swingN++;
+          }
+          s.mix = now;
+        }
+        s.switches.push(switched);
+      });
+    },
+    summary() {
+      const m: Record<string, number> = {};
+      seen.forEach((s, k) => {
+        const side = sideName(k);
+        const sw = s.switches.slice(1); // the first sample has nothing to switch from
+        const mu = mean(sw);
+        const variance = sw.length > 1 ? sw.reduce((a, x) => a + (x - mu) ** 2, 0) / (sw.length - 1) : NaN;
+        m[`${side}.lockAgree`] = s.agreeN ? s.agree / s.agreeN : NaN;
+        m[`${side}.lockSwing`] = s.swingN ? s.swing / s.swingN : NaN;
+        m[`${side}.lockBurst`] = mu > 0 ? variance / mu : NaN;
+        m[`${side}.switchesPerS`] = mu;
+      });
+      return m;
+    },
+  };
+}
+
+/**
+ * L — lockstep, one world (staging, ja-0kys): the page's game, 300 + 300 ants, 300 s, with lockstepProbe and the food
+ * and losses beside it. Report only: compare settings on the same seeds, e.g. the shipped answers for both colonies
+ * drawn and not (`--one lockstep --policy precache:forage --set both.sampleTemp=0,1`).
+ */
+export const lockstep1: Assay = {
+  id: "lockstep",
+  title: "L lockstep: same situation, same act; the mode mix's swings; bursts of switching (one world)",
+  target: "report only: lockAgree (1 = lockstep), lockSwing, lockBurst (≈ 1 = switches independent), switchesPerS, per colony",
+  seconds: 300,
+  spec: (seed) => ({
+    seed,
+    seconds: 300,
+    map: (s) => generateOneWorld(s),
+    game: { antCount: 300, rivalAnts: 300 },
+    probes: [lockstepProbe()],
+  }),
+  score: () => ({}),
+};
+
+/**
  * G1 — the one-world game (docs/one-world.md §6, U6): generateOneWorld(seed), 600 + 600 ants, 10 minutes, as G is for
  * the side view, with its bound (A7): no colony with more than 2 foragers holding food over 120 s at any 10-s sample,
  * counted on both layers (`maxHeldPlane`: those on the plane). Reported beside it: food carried down the holes, births,
@@ -2652,6 +2774,7 @@ export const ONE_ASSAYS: Assay[] = [
   onPlaneAssay(faintAlarm),
   nestFlowOne,
   game1,
+  lockstep1,
   search1,
   forage1,
   route1,
