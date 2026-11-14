@@ -93,6 +93,8 @@ export interface ColonyParams {
   steerLane: number;
   /** With steerLane: within this (cells) of where it believes its last find is, an ant steers by its `near` weights (design). */
   findNear: number;
+  /** With steerLane: how far the `search` weight scales random turning: ÷ this at low (tight), × this at high (wide); 1 = no effect (design). */
+  searchSpan: number;
   /**
    * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
    * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
@@ -333,6 +335,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   reroll: 10,
   steerLane: 0,
   findNear: 8,
+  searchSpan: 1.33,
   foodTrailTop: 1,
   foodCapTop: 80,
   homeTrail: 0.8,

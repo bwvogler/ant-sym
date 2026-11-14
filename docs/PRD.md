@@ -5604,6 +5604,19 @@ M1 counts only foragers whose spot is at least 60° from the trail: a median 25.
 
 By the worst seed (CLAUDE.md), steering as shipped costs food: half on the worst seed of each doctrine, while fewer ants die. Next: which weight costs it (one weight acting at a time, Forage, the same seeds).
 
+**Which weight costs the food, against a placebo** (Forage's shipped answers for both colonies, seeds 1–20, one world, 300 s; `scratchpad` script over `runAssay(lockstep1, …)`). The placebo is steering on with every weight neutral but the same draws made: it changes nothing but the random sequence, and still moves a seed's food from 0.76× to 1.77× of steering off (median 1.12×, 12 of 20 seeds higher). So a single seed's worst ratio says little here; each variant is compared with the placebo, seed by seed.
+
+| Against the placebo | Median ratio | Seeds better |
+|---|---|---|
+| Both weights, as first built (search ×0.5 / ×2) | 0.85–0.86 | 3–4 / 20 |
+| Search alone | 0.91 | 6 / 20 |
+| Memory alone | 0.86 | 4 / 20 |
+| Memory alone, spent spot given up (`siteGive` 1, §58) | 0.96 | 8 / 20 |
+| Both, spent spot given up, search ×0.75 / ×1.33 | **0.95** | 8 / 20 |
+
+- **Built:** with `steerLane` on, the memory weight gives a spent spot up as `siteGive` 1 does (`Colony.siteAim`); the search weight scales turning by `searchSpan`, now 1.33 (design). Both act only with steering on: goldens bit-exact.
+- What is left (~5 %) is within the noise the placebo shows. Fewer ants die with steering on (Forage's median 9.5 → 3).
+
 **Cost (estimated from the request, before any spend).** About 1,500 tokens of legend and state a request, ~156 a situation: ~176 tokens a question at ~74 a request (the mode lane: ~229 a situation). Shipping the three doctrines: 3 requests, ≈ 39,000 tokens ≈ $0.0016. In play, a situation is asked once per doctrine; at the mode lane's rate of new situations this is under $0.01 an hour.
 
 **Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.

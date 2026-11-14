@@ -1525,7 +1525,10 @@ export class Colony {
       const { w, h } = this.map.size;
       s = this.search[i] = Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
       // Widened past what its vector's error covers (a quarter turn each point, so it has been all round at the last): the spot is spent.
-      if (this.params.siteGive > 0 && s > this.params.siteGive * PI_DRIFT * Math.hypot(this.foodX[i], this.foodY[i])) {
+      // With steering weights on (staging, ja-ykmu.3) the memory weight gives a spent spot up as siteGive 1 does: without it, the weight
+      // cost ~14 % of the food against a placebo over seeds 1-20, with it ~4 % (PRD S3).
+      const give = this.params.siteGive > 0 ? this.params.siteGive : this.params.steerLane > 0 ? 1 : 0;
+      if (give > 0 && s > give * PI_DRIFT * Math.hypot(this.foodX[i], this.foodY[i])) {
         this.foodX[i] = this.foodY[i] = NaN;
         this.search[i] = 0;
         this.searchA[i] = 0;

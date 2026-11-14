@@ -27,10 +27,9 @@ import { isSky, OPEN, rockAt } from "./world.ts";
 
 /**
  * The steering weights' effects (staging, ja-ykmu; docs/steering.md "The mechanic"), by level −1, 0, +1: `search` scales random
- * turning; `trail` scales a follower's turn up the food trail; `home`, `vector` and `nestmates` add a turn of their own (away at −1,
+ * turning by params.searchSpan (÷ at −1, × at +1); `trail` scales a follower's turn up the food trail; `home`, `vector` and `nestmates` add a turn of their own (away at −1,
  * toward at +1) at these shares of the turn rate. `memory` +1 lets the last find lead over the food trail; −1 leaves it unused.
  */
-export const SEARCH_MUL = [0.5, 1, 2] as const;
 export const TRAIL_MUL = [0, 1, 2] as const;
 export const HOME_W = 0.5;
 export const VECTOR_W = 0.3;
@@ -85,7 +84,8 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const sc = col.steerNear[i] !== col.steerCode[i] && col.nearFind(i) ? col.steerNear[i] : col.steerCode[i];
   const steered =
     sc !== STEER_NEUTRAL && (mode === EXPLORE || mode === FOLLOW) && !carrying && !pellet && col.line !== null && col.cur === PLANE;
-  const sm = steered ? SEARCH_MUL[steerLevel(sc, 0) + 1] : 1;
+  const sl = steered ? steerLevel(sc, 0) : 0;
+  const sm = sl === 0 ? 1 : sl > 0 ? p.searchSpan : 1 / p.searchSpan;
   const detouring = col.detour[i] > 0;
   if (mode !== EXPLORE) col.digT[i] = 0;
   if (mode !== EXPLORE || pellet) col.hugT[i] = 0;
