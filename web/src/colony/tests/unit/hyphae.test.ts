@@ -1052,6 +1052,7 @@ test("flow (ja-tgw9): a tip idle IDLE_ROUNDS rounds with mass draws no more; the
   // The new mass, and what the idle tip held (back toward the root and down the other branch), all go to the growing tip.
   assert.ok(Math.abs(at(b) - 4) < 1e-9, `the growing tip took the mass: ${at(b)}`);
   assert.equal(at(a), 0);
+  assert.ok(!h.feedingCells().has(cellKey(a.x, a.y)) && h.feedingCells().has(cellKey(b.x, b.y)), "new mass goes to the idle tip");
   // An idle tip counts its rounds: ample, growing nothing.
   const { h: one, tip } = line(2);
   tip.run = 0;
@@ -1060,6 +1061,7 @@ test("flow (ja-tgw9): a tip idle IDLE_ROUNDS rounds with mass draws no more; the
   const budget = { free: 1e9, tips: 1, flow: true };
   for (let r = 0; r < IDLE_ROUNDS; r++) stepTips(one, blocked, 0, budget);
   assert.ok((tip.idle ?? 0) >= IDLE_ROUNDS, `idle ${tip.idle}`);
+  assert.equal(Hyphae.load(one.save()).tips[0]!.idle, tip.idle, "a save keeps the idle rounds");
 });
 
 test("flow (ja-tgw9): mass on a branch with nothing growing beyond goes back and on down the growing branch in a round", () => {
