@@ -361,7 +361,16 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       // little each cell: the end cell nearest that heading is dug, so tunnels wander at any angle
       // rather than run straight along the grid. Now and then it forks, 60° to one side.
       const run = tunnelHeading(map, cx, cy);
-      let aim = (Number.isNaN(run) ? DIR_ANGLE[dir] : run) + gauss(col.rng) * col.params.tunnelDrift;
+      // A foraging dig (ja-16rp) runs out from the nest, level or down: away from home along its vector (path
+      // integration), never up toward the ground's surface (fire ants' foraging tunnels radiate from the mound).
+      const foraging = col.forageDigs(i);
+      let base = Number.isNaN(run) ? DIR_ANGLE[dir] : run;
+      if (foraging) {
+        const ox = centreX(cx, cy) - col.nest.x;
+        const oy = centreY(cy) - col.nest.y;
+        base = oy < 0 ? (ox < 0 ? Math.PI : 0) : Math.atan2(oy, ox);
+      }
+      let aim = base + gauss(col.rng) * col.params.tunnelDrift;
       // A fork is a Y: this arm 60° to one side, the other 60° to the other, dug by the next digger to pass.
       let forkSide = 0;
       if (col.rng() < FORK) {
@@ -378,7 +387,6 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       // grows roomy and they spread out, the less). That is how real colonies stop excavating once
       // they have room (Rasse & Deneubourg 2001); a lone ant at a far tunnel's end still digs now and then.
       // A forager on a foraging dig digs on alone and whatever the room (ja-16rp): its tunnels run out to the soil's food.
-      const foraging = col.forageDigs(i);
       if (dug >= 0 && !foraging && col.friends && col.rng() > digChance(col.friends, cx, cy)) dug = -1;
       // A roomy nest (the side view's chambers have floor enough) barely digs on (ja-wii: digging stops with room).
       if (dug >= 0 && !foraging && !col.crowded() && col.rng() > ROOMY_DIG) dug = -1;
