@@ -56,6 +56,7 @@ import Help from "./ui/Help.tsx";
 import { GUIDE, guideFor, REPO } from "./ui/guide.ts";
 import { MOD_K, pageKey } from "./ui/keys.ts";
 import LensLayer from "./ui/LensLayer.tsx";
+import { useCodex, useCodexWatch } from "./ui/useCodex.ts";
 import { clearProbe, offerProbe } from "./ui/lensStore.ts";
 import Palette, { type Runnable } from "./ui/Palette.tsx";
 import Shortcuts from "./ui/Shortcuts.tsx";
@@ -110,6 +111,9 @@ export default function ColonyApp() {
     followedNow.current = followed;
   }, [followed]);
   useNotices(stats, jev.lock, jev.state.phase, controls.menu);
+  // The Codex (PRD §69.4): guide entries open as the game first shows what they are about; the rail's Learn says how many are new.
+  useCodexWatch(game, onFrame, stats);
+  const codex = useCodex();
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too (the page's key handler, below).
   const oneWorld = game.world;
   const setView = useCallback((view: View) => update({ view }), [update]);
@@ -616,7 +620,13 @@ export default function ColonyApp() {
         />
         <IconButton icon="colonies" label="Colonies" active={drawer === "colonies"} onClick={() => toggle("colonies")} />
         <IconButton icon="saves" label="Saved games" active={drawer === "saves"} onClick={() => toggle("saves")} />
-        <IconButton icon="learn" label="Learn" onClick={() => openLearn({ tab: "guide" })} />
+        <IconButton
+          icon="learn"
+          label="Learn"
+          badge={codex.fresh.length || undefined}
+          badgeLabel="new in the field guide"
+          onClick={() => openLearn({ tab: "guide" })}
+        />
         <IconButton
           icon="settings"
           label="Settings"

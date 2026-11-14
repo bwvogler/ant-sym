@@ -1116,7 +1116,7 @@ try {
   await lp.keyboard.press("Escape");
   // Closing a pinned card leaves the pointer's card, if it is over the map: count the pinned one (its × says so).
   const pinnedCards = () => lensCard.getByRole("button", { name: "Close the lens card" }).count();
-  check((await pinnedCards()) === 0, "Escape closes a pinned card");
+  check((await pinnedCards()) === 0 && (await lensCard.count()) === 1, "Escape closes a pinned card, and the pointer's card is back");
   // One Escape closes one thing (review of #196, S1): a pinned card over the Go to menu, then the menu; and the palette
   // over the menu, then the menu.
   const goBtn = lp.getByRole("button", { name: "Go to ▾" });
@@ -1188,6 +1188,75 @@ try {
     `at 360 px the lens button is whole, the bar inside the gutter (${lb && Math.round(lb.x + lb.width)}, ${hudBar && Math.round(hudBar.x + hudBar.width)})`,
   );
   await nctx.close();
+
+  // ——— 11. The Codex (PRD §69.4): guide entries open as the game first shows what each is about ———
+  console.log("11. the Codex");
+  const cctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const cp = await cctx.newPage();
+  cp.on("pageerror", (e) => errors.push(String(e)));
+  await cp.goto(url);
+  await cp.getByLabel("world seed").fill(String(SEED));
+  await cp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => cp.evaluate(() => window.jevAnts?.game.landed !== null), "a game for the Codex");
+  const learnBtn = cp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Learn", exact: true });
+  const guide = cp.getByRole("dialog", { name: "Learn" });
+  const locked = (title) => guide.getByRole("region", { name: `${title}, not yet seen` });
+  await learnBtn.click();
+  await guide.waitFor({ timeout: 3000 });
+  check((await locked("Jobs by age").count()) === 1, "a new notebook: Jobs by age is not yet seen");
+  check(
+    (await locked("The fungus").count()) === 0 && (await guide.getByRole("heading", { name: "The fungus", exact: true }).count()) === 1,
+    "the fungus's own entry is open from the start",
+  );
+  await guide.getByRole("button", { name: "Close Learn" }).click();
+  // The first host: Jobs by age opens, with a notice and the rail's badge.
+  await cp.evaluate(() => {
+    const c = window.jevAnts.game.colonies[0];
+    c.load[c.alive.indexOf(1)] = 1;
+  });
+  await until(
+    async () => (await cp.getByText(/^New in the field guide: .*Jobs by age/).count()) === 1,
+    "one notice of what opened",
+    3000,
+    50,
+  );
+  await until(
+    async () => /new in the field guide/.test((await learnBtn.getAttribute("title")) ?? ""),
+    "the rail's Learn carries a badge",
+    2000,
+    50,
+  );
+  check(true, "the rail's Learn carries a badge");
+  await learnBtn.click();
+  await guide.waitFor({ timeout: 3000 });
+  check((await locked("Jobs by age").count()) === 0, "Jobs by age is open now");
+  check(!/new in the field guide/.test((await learnBtn.getAttribute("title")) ?? ""), "looked at: the badge goes");
+  // Read it anyway, and show every entry.
+  await locked("Alarm").getByRole("button", { name: "Read it anyway" }).click();
+  check((await locked("Alarm").count()) === 0, "Read it anyway opens one entry");
+  check((await locked("Tiredness and rest").count()) === 1, "and only that one");
+  await guide.getByLabel("Show every entry").check();
+  check((await guide.getByRole("region", { name: /not yet seen$/ }).count()) === 0, "Show every entry opens them all");
+  await guide.getByLabel("Show every entry").uncheck();
+  await guide.getByRole("button", { name: "Close Learn" }).click();
+  // A link straight to an entry opens it, seen or not.
+  await cp.locator("canvas").first().focus();
+  await cp.keyboard.press("Control+k");
+  await cp.keyboard.type("learn tiredness");
+  await cp.keyboard.press("Enter");
+  await guide.waitFor({ timeout: 3000 });
+  check((await locked("Tiredness and rest").count()) === 0, "the palette's Learn: Tiredness and rest opens it though not yet seen");
+  await guide.getByRole("button", { name: "Close Learn" }).click();
+  // The notebook outlives the page.
+  await cp.reload();
+  await cp.getByRole("button", { name: "Start", exact: true }).click();
+  await learnBtn.click();
+  await guide.waitFor({ timeout: 3000 });
+  check(
+    (await locked("Jobs by age").count()) === 0 && (await locked("Tiredness and rest").count()) === 1,
+    "after a reload: Jobs by age still seen, Tiredness and rest not",
+  );
+  await cctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
