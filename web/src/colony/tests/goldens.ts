@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { ChunkLayer } from "../chunks.ts";
 import { PLANE } from "../colony.ts";
-import { Game } from "../game.ts";
+import { MUTATION } from "../evolution.ts";
+import { STRAINS } from "../fungus.ts";
+import { Game, GAME_REGROW, gameRng } from "../game.ts";
 import { generateOneWorld } from "../oneWorld.ts";
 import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD } from "../world.ts";
 
@@ -20,7 +22,19 @@ export interface Scenario {
   seconds: number;
   /** alarm painted by the player's fungus brush at these times (s): at the player's entrance in the side view (where its ants pass), at the map's centre top-down, on the plane at nest 0's hole in one world */
   alarmAt?: number[];
+  /**
+   * One world only: the fungus landed at colony 0's hole, as the page's game plays it (full-size world, rival, regrowth, evolving,
+   * hyphae on) and as scripts/lab/progression.mjs measures it, but on the fungus's local rule (no Jev answers bound, so a precache
+   * re-ship can't move it). `grant` upgrades are given at landing; the rest are bought in UPGRADE_ORDER as soon as affordable.
+   */
+  landed?: { strain: string; grant?: string[] };
 }
+
+/** scripts/lab/progression.mjs's default buy order (the order a player who buys as soon as they can might keep). */
+const UPGRADE_ORDER =
+  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,infectivity,evasion,recognition,trails,royal,fruiting,evasion,royal,stealth".split(
+    ",",
+  );
 
 /** FNV-1a over the raw bytes of typed arrays: equal only if every value is bit-identical. */
 function fnv(arrays: ArrayBufferView[]): string {
@@ -71,6 +85,8 @@ export type OneSample = {
     crossedUp: number;
     crossedDown: number;
   }[];
+  /** with `landed`: the fungus's whole saved state but its params (spores on every layer, hosts, evolution, hyphae, corpses), and each colony's infected */
+  fungus?: { state: Record<string, string>; infected: number[] };
 };
 
 const DT = 1 / 30;
@@ -105,10 +121,33 @@ export function record(s: Scenario): Sample[] | OneSample[] {
   return out;
 }
 
-/** record's one-world branch: a small plane (160 × 100) with the curtain under its line, and alarm on the plane at nest 0's hole. */
+/**
+ * record's one-world branch: a small plane (160 × 100) with the curtain under its line, and alarm on the plane at nest 0's hole.
+ * With `landed`, the full-size world with the fungus landed (Scenario.landed) and its state in each sample.
+ */
 function recordOne(s: Scenario): OneSample[] {
-  const world = generateOneWorld(s.seed, { plane: { size: { w: 160, h: 100 } } });
-  const game = new Game(world, { antCount: s.ants, rivalAnts: s.ants }, mulberry32(s.seed * 7919));
+  const L = s.landed;
+  const world = L ? generateOneWorld(s.seed) : generateOneWorld(s.seed, { plane: { size: { w: 160, h: 100 } } });
+  const game = L
+    ? new Game(
+        world,
+        { antCount: s.ants, rivalAnts: s.ants, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true } },
+        gameRng(s.seed, 0),
+      )
+    : new Game(world, { antCount: s.ants, rivalAnts: s.ants }, mulberry32(s.seed * 7919));
+  const queue = [...UPGRADE_ORDER];
+  if (L) {
+    const strain = STRAINS.findIndex((x) => x.id === L.strain);
+    if (strain < 0) throw new Error(`${s.name}: no strain ${L.strain}`);
+    game.land(0, strain, { evolve: true });
+    for (const id of L.grant ?? []) {
+      const e = game.fungus.evolution!;
+      const cost = e.cost(id);
+      if (cost === null) throw new Error(`${s.name}: can't grant ${id}`);
+      e.growth += cost / MUTATION;
+      if (!game.fungus.upgrade(id)) throw new Error(`${s.name}: grant ${id} not bought`);
+    }
+  }
   const out: OneSample[] = [];
   const alarms = (s.alarmAt ?? []).map((t) => Math.round(t / DT));
   const spot = world.plane.nests[0]!;
@@ -116,6 +155,16 @@ function recordOne(s: Scenario): OneSample[] {
   for (let k = 1; k <= Math.round(s.seconds / DT); k++) {
     if (alarms.includes(k)) game.player.paint("alarm", spot.x, spot.y, 4, 12, PLANE);
     game.tick(DT);
+    const e = L && game.fungus.evolution;
+    // The first upgrade in the order it can keep now, as progression.mjs buys: one it can't yet afford doesn't hold up a cheaper one.
+    if (e)
+      for (let j = 0; j < queue.length; j++) {
+        if (e.cost(queue[j]!) === null) queue.splice(j--, 1);
+        else if (game.fungus.upgrade(queue[j]!)) {
+          queue.splice(j, 1);
+          break;
+        }
+      }
     if (k % every === 0)
       out.push({
         t: Math.round(k * DT),
@@ -131,9 +180,20 @@ function recordOne(s: Scenario): OneSample[] {
           crossedUp: c.crossedUp,
           crossedDown: c.crossedDown,
         })),
+        ...(L && { fungus: fungusSample(game) }),
       });
   }
   return out;
+}
+
+/** The fungus's saved state but its params, hashed part by part (a change of a default param shows only if it changes what the fungus does), and each colony's infected. */
+function fungusSample(game: Game): { state: Record<string, string>; infected: number[] } {
+  const { params: _, ...state } = game.fungus.saveState();
+  const text = new TextEncoder();
+  return {
+    state: Object.fromEntries(Object.entries(state).map(([k, v]) => [k, fnv([text.encode(JSON.stringify(v) ?? "")])])),
+    infected: game.colonies.map((c) => game.fungus.census(c).infected),
+  };
 }
 
 /** The recording for a fixture file. GOLDEN_WRITE=1 writes it afresh and then fails the run, so a stray variable can't pass silently. */
