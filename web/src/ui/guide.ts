@@ -197,7 +197,11 @@ export const GUIDE: GuideEntry[] = [
     inGame:
       "On the plane a forager stores its own position every 4 cells on its way out (at most 64 places; it keeps every second one and doubles the spacing when full) and forgets them at its next trip. A carrier whose home vector stalls (no nearer its belief for 3 s) walks back through them, taking the earliest place it comes within 3 cells of, as a stand-in for a familiar view, and the one before as its next goal; the hole's sight or smell takes over at any moment. It retraces once a trip, and searches as before when the places run out. One trip, its own past only: it holds no coordinate of the hole or a map. Steering only: Jev's cost is unchanged. A design: stronger than the biology shows.",
     sources: [
-      { note: "route-memory", anchor: "1-ants-have-route-memories-beside-path-integration-and-they-cooperate", label: "Route memories beside path integration" },
+      {
+        note: "route-memory",
+        anchor: "1-ants-have-route-memories-beside-path-integration-and-they-cooperate",
+        label: "Route memories beside path integration",
+      },
       {
         note: "route-memory",
         anchor: "3-a-blocked-ant-walks-along-the-barrier-and-a-lost-ant-goes-back-the-way-it-was-going",
