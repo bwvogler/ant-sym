@@ -185,3 +185,34 @@ test("without askNow (the first aim, a save's coming back), or with the same wor
   await tick(80);
   assert.equal(reqs.length, 0, "the same words: no change, nothing asked");
 });
+
+test("an aim changed with no run on is forgotten by Stop or dispose: a later run asks nothing at once", async () => {
+  const { reqs } = proxy();
+  const j = make();
+  j.setAim("first words");
+  j.wantsRun = () => {};
+  j.setAim("new words", { askNow: true });
+  await j.stop();
+  await j.start();
+  await tick(80);
+  assert.equal(reqs.length, 0, "after Stop");
+  const k = make();
+  k.setAim("first words");
+  k.setAim("new words", { askNow: true });
+  k.dispose();
+  await k.start();
+  await tick(80);
+  assert.equal(reqs.length, 0, "after dispose");
+});
+
+test("with no worker lever on the menu, a new aim asks no fungal situation (as #lookup)", async () => {
+  const { reqs } = proxy();
+  const j = make();
+  j.setAim("first words");
+  j.setMenu(new Set());
+  await j.start();
+  j.setAim("new words", { askNow: true });
+  await tick(80);
+  assert.equal(reqs.filter((r) => r.lane === "fungus").length, 0, "no fungus request at all");
+  assert.equal(counts(reqs, "growth"), 48);
+});
