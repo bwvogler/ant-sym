@@ -1,5 +1,7 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
+import { leaveRate, paceAfter, paceReturns } from "./invite.ts";
 import { dayPhase, sunHigh } from "./heat.ts";
+import { holdsAt } from "./crossing.ts";
 import { DESERT_ANT } from "./desertAnt.ts";
 import {
   type Colony,
@@ -20,7 +22,7 @@ import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import type { Journal } from "./journal.ts";
 import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
-import { localResponses, responses, type Responses } from "./responses.ts";
+import { localResponses, responses, type Responses, type Touch } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
 import { encode } from "./save.ts";
 import {
@@ -2409,8 +2411,8 @@ function crossingsProbe(
 export const D2_WINDOW = 10;
 
 /**
- * D2 — a returning finder invites nestmates out. For each forager that comes home with food, the departures in the D2_WINDOW seconds
- * after it against the D2_WINDOW seconds before it, summed over every such return: about 1 when returns invite nobody. Target: at least 7.
+ * D2 — a returning finder invites nestmates out. For each forager that comes home with food, the idle ants' departures (not a finder's
+ * going back out) in the D2_WINDOW seconds after it against the D2_WINDOW seconds before it, summed over every such return: about 1 when returns invite nobody. Target: at least 7.
  * Razin, Eckmann & Feinerman 2013 (full text): a recruiter's entry raises the idle ants leaving in the next minute sevenfold over a
  * spontaneous mover (*C. niger*, lab nests of 4–8 ants). The game's returns come every second or so, so a minute on either side would
  * overlap every other return's: the window is shorter, and the mark is provisional; meeting it is the invitation's (ja-rf5.6).
@@ -2418,31 +2420,169 @@ export const D2_WINDOW = 10;
 export const desertInvitation: Assay = {
   id: "d2",
   title: "D2 a returning finder invites nestmates out (one world)",
-  target: "departures in the 10 s after a return with food ≥ 7× those in the 10 s before (Razin 2013, full text; provisional window)",
+  target:
+    "the leaving rate of ants waiting at the top of the shaft in the 10 s after a finder comes down ≥ 7× that in the 10 s before (Razin 2013, full text; provisional window)",
   seconds: D_SECONDS,
-  spec: (seed) =>
-    desertSpec(
-      seed,
-      crossingsProbe((game, out, back) => {
-        // A returner's own trip back out is not one it invited (review of #134, S1); one in the return's own tick counts as after (N2).
-        const count = (lo: number, hi: number, self: number): number => {
-          let n = 0;
-          for (const o of out) if (o.ant !== self && o.t >= lo && o.t < hi) n++;
-          return n;
-        };
+  spec: (seed) => {
+    // Each tick: how many of the player's ants wait at the gate (held), and which of last tick's waiting ants climbed out (a departure from
+    // the waiting pool). Each finder that comes down the hole with food is a return. The rate is per waiting-ant-second, as Razin's sevenfold
+    // is a rate for the idle ants of the chamber (ja-rf5.6): counted whole, the finders cycling straight back out swamped the few that wait.
+    const exposure: { t: number; held: number }[] = [];
+    const leftAt: number[] = [];
+    const returns: number[] = [];
+    let wasHeld = new Uint8Array(0);
+    let wasLayer = new Int8Array(0);
+    let wasCarrying = new Uint8Array(0);
+    return desertSpec(seed, {
+      tick(game) {
+        const c = game.player;
+        if (wasHeld.length < c.n) {
+          const grow = <T extends Uint8Array | Int8Array>(a: T, make: (n: number) => T) => {
+            const b = make(Math.max(c.n, 64));
+            b.set(a);
+            return b;
+          };
+          wasHeld = grow(wasHeld, (n) => new Uint8Array(n));
+          wasLayer = grow(wasLayer, (n) => new Int8Array(n).fill(-1));
+          wasCarrying = grow(wasCarrying, (n) => new Uint8Array(n));
+        }
+        let held = 0;
+        for (let i = 0; i < c.n; i++) {
+          const alive = c.alive[i] === 1;
+          const layer = alive ? c.layer[i] : -1;
+          if (alive && wasLayer[i] === PLANE && layer !== PLANE && wasCarrying[i] === 1) returns.push(game.time);
+          // It waited since it last came in: its climb out after its pass (several ticks, no longer held) is a departure from the pool.
+          if (alive && wasHeld[i] === 1 && layer === PLANE) leftAt.push(game.time);
+          let h = 0;
+          if (alive && layer !== PLANE) {
+            const was = c.cur;
+            c.bind(layer);
+            h = holdsAt(c, i) ? 1 : 0;
+            c.bind(was);
+          }
+          wasHeld[i] = !alive || layer === PLANE ? 0 : wasHeld[i] === 1 || h === 1 ? 1 : 0;
+          held += h;
+          wasLayer[i] = layer;
+          wasCarrying[i] = alive ? c.carrying[i] : 0;
+        }
+        exposure.push({ t: game.time, held });
+      },
+      summary(game) {
+        const dt = exposure.length > 1 ? exposure[1]!.t - exposure[0]!.t : 1 / 30;
+        const heldIn = (lo: number, hi: number) => exposure.reduce((sum, e) => (e.t > lo && e.t <= hi ? sum + e.held * dt : sum), 0);
+        const leftIn = (lo: number, hi: number) => leftAt.reduce((n, t) => (t > lo && t <= hi ? n + 1 : n), 0);
         let after = 0;
         let before = 0;
-        let returns = 0;
-        for (const b of back) {
-          if (!b.food || b.t < D2_WINDOW || b.t > game.time - D2_WINDOW) continue;
-          returns++;
-          after += count(b.t, b.t + D2_WINDOW, b.ant);
-          before += count(b.t - D2_WINDOW, b.t, b.ant);
+        let expAfter = 0;
+        let expBefore = 0;
+        let used = 0;
+        // Only isolated returns, as Razin's recruiter entries were: none other in the 2 windows before. With finders coming down every few
+        // seconds, a waiting ant's pace stays raised through the window before as well, and the ratio reads 1 whatever invites.
+        const isolated = returns.filter((r, k) => k === 0 || r - returns[k - 1]! >= 2 * D2_WINDOW);
+        for (const r of isolated) {
+          if (r < D2_WINDOW || r > game.time - D2_WINDOW) continue;
+          used++;
+          after += leftIn(r, r + D2_WINDOW);
+          before += leftIn(r - D2_WINDOW, r);
+          expAfter += heldIn(r, r + D2_WINDOW);
+          expBefore += heldIn(r - D2_WINDOW, r);
         }
-        const ratio = before > 0 ? after / before : after > 0 ? Infinity : NaN;
-        return { departures: out.length, returnsWithFood: returns, after, before, ratio, pass: ratio >= 7 ? 1 : 0 };
-      }),
-    ),
+        const rateAfter = expAfter > 0 ? after / expAfter : NaN;
+        const rateBefore = expBefore > 0 ? before / expBefore : NaN;
+        const ratio = rateBefore > 0 ? rateAfter / rateBefore : rateAfter > 0 ? Infinity : NaN;
+        const meanHeld = exposure.length ? exposure.reduce((s2, e) => s2 + e.held, 0) / exposure.length : NaN;
+        return { returnsWithFood: used, leftWaiting: leftAt.length, meanHeld, rateAfter, rateBefore, ratio, pass: ratio >= 7 ? 1 : 0 };
+      },
+    });
+  },
+  score: () => ({}),
+};
+
+/** D2c's window either side of a finder's entry (seconds): Razin counted the idle ants leaving in the minute after (owner, review of #186 D1). */
+export const CHAMBER_WINDOW = 60;
+
+/** D2c's group sizes: Razin's entrance chambers held 2–13 ants. */
+export const CHAMBER_SIZES = [2, 4, 8, 13] as const;
+
+/**
+ * Razin's chamber, staged (ja-rf5.6): `n` ants waiting at the top of the shaft, at rest; for CHAMBER_WINDOW seconds no finder comes
+ * (spontaneous leaving), then one finder comes down past them and the next CHAMBER_WINDOW seconds are counted. The same rule as the game (invite.ts: the pace a
+ * finder raises, damped by the crowd, here the n − 1 still waiting round each; the leave response on it), `trials` times. The game's crowd
+ * sense differs (review of #186, S2): it counts every nestmate round the top of the shaft (about 5 on average where about 1.5 wait), so a
+ * finder's lift fades about twice as fast in play; and it is wired only where there is a rival (game.ts), so in a game alone it reads 0. An ant that leaves is gone for the trial.
+ */
+export function invitationChamber(
+  p: ColonyParams,
+  leave: Responses["leave"],
+  n: number,
+  trials: number,
+  rng: () => number,
+): { before: number; after: number; expBefore: number; expAfter: number } {
+  const dt = 1 / 30;
+  const steps = Math.round(CHAMBER_WINDOW / dt);
+  let before = 0;
+  let after = 0;
+  let expBefore = 0;
+  let expAfter = 0;
+  const pace = new Float64Array(n);
+  const waiting = new Uint8Array(n);
+  for (let k = 0; k < trials; k++) {
+    pace.fill(p.paceRest);
+    waiting.fill(1);
+    for (let step = 0; step < 2 * steps; step++) {
+      const second = step >= steps;
+      const left = waiting.reduce((a, w) => a + w, 0);
+      for (let i = 0; i < n; i++) {
+        if (!waiting[i]) continue;
+        pace[i] = paceAfter(p, pace[i]!, step === steps ? 1 : 0, left - 1, dt);
+        if (second) expAfter += dt;
+        else expBefore += dt;
+        const answer = leave({ returns: paceReturns(p, pace[i]!) } as Touch);
+        if (rng() < 1 - Math.exp(-leaveRate(p, answer) * dt)) {
+          waiting[i] = 0;
+          if (second) after++;
+          else before++;
+        }
+      }
+    }
+  }
+  return { before, after, expBefore, expAfter };
+}
+
+/**
+ * D2c — the invitation, staged as Razin's chamber (ja-rf5.6; Razin, Eckmann & Feinerman 2013, full text, C. niger: a recruiter's entry raised
+ * the idle ants leaving in the next minute sevenfold, in nests of 4–8; more ants in the nest lowered exits). For each group size in
+ * CHAMBER_SIZES, 400 trials (invitationChamber) on the colony's own rule and params: the leaving rate in the minute after a finder comes
+ * down against the minute before. Pass: at least 7× for groups of 4 and 8, and the rate after a finder lower in a group of 13 than of 4 (crowding).
+ * The game's own measure, D2, stays beside it (noisy: few isolated returns in a game).
+ */
+export const desertChamber: Assay = {
+  id: "d2c",
+  title: "D2c the invitation, staged as Razin's chamber: one finder, groups of 2–13 waiting",
+  target: "leaving ≥ 7× after a finder for groups of 4 and 8; lower after-rate at 13 than at 4 (Razin 2013, full text)",
+  seconds: 0.1,
+  spec: (seed) => {
+    const spec = desertSpec(seed, {
+      tick() {},
+      summary(game) {
+        const c = game.player;
+        const rng = mulberry32(seed * 7919 + 17);
+        const out: Record<string, number> = {};
+        const rateAfter: Record<number, number> = {};
+        for (const n of CHAMBER_SIZES) {
+          const r = invitationChamber(c.params, c.responses.leave, n, 400, rng);
+          const ra = r.after / r.expAfter;
+          const rb = r.before / r.expBefore;
+          rateAfter[n] = ra;
+          out[`ratio${n}`] = rb > 0 ? ra / rb : ra > 0 ? Infinity : NaN;
+          out[`after${n}`] = ra;
+        }
+        const pass = out.ratio4! >= 7 && out.ratio8! >= 7 && rateAfter[13]! < rateAfter[4]! ? 1 : 0;
+        return { ...out, pass };
+      },
+    });
+    return { ...spec, seconds: 0.1, game: { ...spec.game, species: DESERT_ANT } };
+  },
   score: () => ({}),
 };
 
@@ -2657,6 +2797,7 @@ export const ONE_ASSAYS: Assay[] = [
   route1,
   desertNoTrail,
   desertInvitation,
+  desertChamber,
   desertFirstFind,
   desertTrips,
   desertHeat,

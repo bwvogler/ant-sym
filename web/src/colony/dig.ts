@@ -23,6 +23,7 @@ import { OPEN, dropFood, fillCell, groundTop, heapMound, heapPlane, isSky, openC
 import { fromHomePlane } from "./homing.ts";
 import { touch } from "./sense.ts";
 import { dropBrood } from "./body.ts";
+import { clearPellet, markMidden, markMiddenPlane } from "./pellets.ts";
 
 /** The middle of the midden: its column (side view). */
 export function middenCol(self: Colony): number {
@@ -87,7 +88,7 @@ export function backfill(self: Colony, i: number, cx: number, cy: number): boole
     // this deep, was measured worse: it soon tires and walks home empty. Seeds 3, 4, 6–8: 12 % less food home.)
     if (self.soil[i] !== SOIL_DUG) self.looseFilled++;
     else self.soilFilled++;
-    self.clearPellet(i);
+    clearPellet(self, i);
     self.since[i] = 0;
     return true;
   }
@@ -342,12 +343,12 @@ export function dropOut(self: Colony, i: number, col: number): void {
         self.corpses.splice(n, 1);
         const key = cellKey(col, row);
         self.midden.set(key, (self.midden.get(key) ?? 0) + 1);
-        self.markMidden(col, MIDDEN_MARK);
+        markMidden(self, col, MIDDEN_MARK);
         self.buried++;
         self.onBury?.(k);
       }
     }
-    self.clearPellet(i);
+    clearPellet(self, i);
     return;
   }
   const side = (self.spoilSide[i] || 1) as -1 | 1;
@@ -377,7 +378,7 @@ export function dropOut(self: Colony, i: number, col: number): void {
       heap();
     }
   }
-  self.clearPellet(i);
+  clearPellet(self, i);
   self.since[i] = 0;
 }
 
@@ -421,11 +422,11 @@ export function dropPlane(self: Colony, i: number, atWill = false): void {
       self.corpses.splice(n, 1);
       const key = cellKey(cx, cy);
       self.midden.set(key, (self.midden.get(key) ?? 0) + 1);
-      self.markMiddenPlane(cx, cy, MIDDEN_MARK);
+      markMiddenPlane(self, cx, cy, MIDDEN_MARK);
       self.buried++;
       self.onBury?.(k, PLANE);
     }
-    self.clearPellet(i);
+    clearPellet(self, i);
     return;
   }
   const holes = planeHoles(self);
@@ -443,7 +444,7 @@ export function dropPlane(self: Colony, i: number, atWill = false): void {
       heap();
     }
   }
-  self.clearPellet(i);
+  clearPellet(self, i);
   self.since[i] = 0;
 }
 
@@ -532,7 +533,7 @@ export function putDown(self: Colony, i: number): void {
       const dy = self.y[i] - self.nest.y;
       if (dx * dx + dy * dy < self.nest.r * self.nest.r) self.soilOut++;
       else self.soilLost++;
-      self.clearPellet(i);
+      clearPellet(self, i);
     } else if (isSky(self.map, cx, cy)) dropOut(self, i, cx);
     else return;
   } else if (self.broodHeld[i]) dropBrood(self, i);

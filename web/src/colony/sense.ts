@@ -1,5 +1,6 @@
 // Sensing (docs/refactor.md S3.3): what an ant feels around it (nestmates, returning foragers, enemies and their heading), the situation it touches, the raid smell, and the floor marks it reads and lays. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c` (and `around`, which never read the colony, losing that parameter).
 
+import { paceReturns } from "./invite.ts";
 import type { Colony, HoleCell, Layer } from "./colony.ts";
 import { cellKey, inReach } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets } from "./hex.ts";
@@ -54,6 +55,8 @@ export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item
   const few = c.params.leaveGate;
   const met = c.met[i];
   t.returns = few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
+  // The invitation (ja-rf5.6): where finders invite by pace, its returns are its own pace, raised by the finders that passed it.
+  if (c.params.invitePace > 0) t.returns = paceReturns(c.params, c.pace[i]);
   t.raid = raidSmelt(c, i);
   t.crowd = c.crowd[i] >= c.params.crowdAt ? "many" : "few";
   return t;

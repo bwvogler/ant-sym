@@ -3,6 +3,8 @@
 // `this` becoming `c` in store and load, and the static view becoming the function layerView.
 
 import type { Colony, Layer } from "./colony.ts";
+import { CELL, cellOf } from "./hex.ts";
+import { cellAt } from "./transect.ts";
 
 /** A layer's own copy of its state, held while another layer is bound (see Colony.layers). */
 export type LayerSlots = { -readonly [K in keyof Layer]: Layer[K] };
@@ -175,4 +177,36 @@ export function loadLayer(c: Colony, s: LayerSlots): void {
   c.raidTarget = s.raidTarget;
   c.raidNest = s.raidNest;
   c.others = s.others;
+}
+
+/**
+ * Every nest's hole on the map (side view), whose funnels the colony's mound keeps open (world.heapMound). Again
+ * whenever a colony is founded (Game.addColony), so an older colony's mound never buries the new hole (PR #42
+ * review, S3).
+ */
+export function seeHoles(c: Colony): void {
+  // One world: each nest's hole on both layers, by colony (the maps' nests are), the plane cell over its column.
+  const line = c.line;
+  if (line) {
+    const curtain = (c.layers[c.home] as Layer).map;
+    c.holeCells = curtain.nests.map((n) => {
+      const e = n.entrance ?? n;
+      cellOf(e.x, e.y);
+      const col = CELL[0];
+      const row = CELL[1];
+      cellAt(line, col); // the curtain's column is the line's s
+      return { col, row, px: CELL[0], py: CELL[1] };
+    });
+  }
+  // On every layer with a hole into it (the side view's map; one world's curtain).
+  for (const L of c.layers) {
+    if (!L.entrance) continue;
+    const holes: number[] = [];
+    for (const n of L.map.nests ?? [L.nest])
+      if (n.entrance) {
+        cellOf(n.entrance.x, n.entrance.y);
+        holes.push(CELL[0]);
+      }
+    L.holes = holes;
+  }
 }
