@@ -5781,3 +5781,41 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 **Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1, built off), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full), ja-16rp.5 (turn option 1 on; after ja-rvli).
 
 **Still open.** Feeding larvae owed their growth food (ja-rvli), then option 1 on (ja-16rp.5); option 2; how deep and how far the network should run; whether two colonies' networks meeting needs handling.
+
+## 71. One world only, step 2: the assays' baselines on one world (ja-fnd.3.2, 2026-11-14)
+
+Stage 2 of the foundation refactor ([refactor.md](refactor.md#stage-2-one-world-only-owner-2026-11-11)) retires the top-down and side maps; step 2 records each assay's baseline on one world before the arena versions go. The inventory is [one-world-only.md](one-world-only.md) §2. Split into `ja-fnd.3.2.1` (these baselines), `.2` (the lifecycle assays), `.3` (A6 and A13 with the attackers walked by the harness), `.4` (A11 and A12, raids by trail) and `.5` (the gate tests on the one-world twins).
+
+### 71.1 The covered twins (`ja-fnd.3.2.1`)
+
+`npm run exp -- bridge twin richPoor deplete alarm regulate regulateStop pass open contact faintAlarm nestFlow --one --seeds 1-20` on main at `9620499` (240 runs, 31 min on 4 threads). "§58" is the last one-world run on seeds 1–10 (§58, "The assays on one world"); the key metric is each assay's own, with its median and worst seed over 1–20.
+
+| assay | mark | seeds 1–10 | seeds 11–20 | §58 (1–10) | key metric: median, worst (seed) | failing seeds |
+|---|---|---|---|---|---|---|
+| A1 bridge | short branch ≥ 80 % | **10/10** | 10/10 | 8/10 | shortShare 0.90, 0.865 (15) | none |
+| A2a twin | busier source ≥ 70 % | 10/10 | 10/10 | 10/10 | majorityShare 0.90, 0.733 (4) | none |
+| A2b richPoor | rich source ≥ 70 % | 9/10 | 8/10 | 9/10 | richShare 0.92, 0.071 (18) | 9, 18, 20 |
+| A3 deplete | crowd < 20 % of peak within 60 s | 10/10 | 10/10 | 10/10 | clearAfter 17 s, 32 s (12) | none |
+| A4 alarm | scatter ≤ 50 %, recover within 60 s | 10/10 | 9/10 | 10/10 | recoverAfter 24 s, 72 s (15) | 15 |
+| A5 regulate | outside before ≤ ½ × after | **0/10** | 0/10 | 0/10 | outside before ÷ after 1.62, 2.27 (5): more ants out *before* food | all |
+| A5b regulateStop | departures fall by half once food is gone | **10/10** | 9/10 | 8/10 | departsGone 120, 142 (15) | 15 |
+| A6 pass | exchange in the pass ≥ 1.5 × open ground | 5/10 | 7/10 | 5/10 | gain 2.10, 0.80 (18) | 5–9, 16–18 |
+| A9 contact | ≤ 4 lost per 100 food home | 3/10 | 5/10 | 3/10 | lostPer100Food 4.26, 7.53 (8) | 2, 4–9, 12, 16–19 |
+| A10 faintAlarm | ≥ 2 more ants near a faint alarm | 0/10 | 2/10 | 0/10 | draw 0.65, −0.5 (6) | all but 14, 19 |
+| A8 nestFlow | report only | — | — | 0.41–1.00 | beyond 0.56 (1–10), 1.00 (11–20); worst 0.17 (6) | — |
+
+- **Better than §58:** A1 (8 → 10/10) and A5b (8 → 10/10), since route memory (§59) and the foraging changes after it.
+- **The same:** A2a, A2b, A3, A4, A5, A6, A9 and A10 on seeds 1–10.
+- **Worse:** A8's worst seed (0.41 → 0.17, seed 6). A8 is report only.
+- **Each failing assay has its bead.** A5: `ja-lp4.6.8` (middle-aged ants forage on the plane unheld by the gate). A6: `ja-lp4.6.5` and `ja-fnd.3.2.3` (its new setup). A9: `ja-lp4.6.4` (one world's foraging yield). A10: `ja-je8`.
+
+**The marks (owner, 2026-11-14).** The assays keep their research and design marks as the target and keep reporting pass counts. The gate tests (`soak/assays`, `slow/assays` on seeds 1–2, `ja-fnd.3.2.5`) check the assays that pass against their marks. For the four that fail (A5, A6, A9, A10) they check only that one world gets no worse than today's worst seed here, and move to the real mark when the bead is fixed. Today's worst seeds over 1–20, and seeds 1 and 2:
+
+| assay | guard metric | worst (seed) | seed 1 | seed 2 |
+|---|---|---|---|---|
+| A5 | outside before ÷ after | 2.27 (5) | 1.77 | 1.48 |
+| A6 | gain | 0.80 (18) | 3.30 | 2.82 |
+| A9 | lost per 100 food | 7.53 (8) | 2.20 | 5.05 |
+| A10 | draw | −0.5 (6) | 1.1 | 0.5 |
+
+- **Cost:** none. No situation, legend or question changed.
