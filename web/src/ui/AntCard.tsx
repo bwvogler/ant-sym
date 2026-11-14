@@ -32,7 +32,7 @@ interface Props {
   colonies: readonly Colony[];
   fungus: Fungus;
   /** who decided, for an ant of colony k */
-  explain: (s: Situation, k: number) => { mode: Mode; by: DecidedBy };
+  explain: (s: Situation, k: number) => { mode: Mode; by: DecidedBy; weights?: [Mode, number][] };
   explainFungus: (s: FungalSituation) => { answer: string; by: DecidedBy };
   onClose: () => void;
   /** the fields the game's species asks about (LaneWords.schema), or the generic ones: the chips show only these (review of #132) */
@@ -111,6 +111,11 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
             {mode}
           </span>
           <span className="text-fg-3">{decided ? `by ${BY[decided.by]}` : ""}</span>
+          {decided?.weights && decided.weights.length > 1 && col.params.sampleTemp > 0 ? (
+            <span className="font-mono text-fg-3" title="Jev's probabilities in this situation: the ant drew its mode from them">
+              drawn from {decided.weights.map(([m, p]) => `${m} ${Math.round(p * 100)} %`).join(" · ")}
+            </span>
+          ) : null}
           <button
             type="button"
             className="text-accent underline-offset-2 hover:underline"

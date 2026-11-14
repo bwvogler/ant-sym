@@ -14,6 +14,7 @@ import { fetches } from "./tunnel.ts";
 import { CORPSE_GIVE_UP, MOUND_HEIGHT, MOUND_REACH, REST, ROAD_SIGN, SPOIL_GIVE_UP } from "./tuning.ts";
 import { EXPLORE, FIGHT, FOLLOW, PLANE, RETURN, STRONG } from "./vocab.ts";
 import { isSky, qualityAt, takeFoodCell } from "./world.ts";
+import { pointDown, rememberSite } from "./plane.ts";
 
 export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   const p = s.p;
@@ -84,7 +85,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   ) {
     colony.carrying[i] = 1;
     colony.quality[i] = qualityAt(map, CELL[0], CELL[1]);
-    if (p.siteFidelity > 0 && colony.line !== null && colony.cur === PLANE) colony.rememberSite(i);
+    if (p.siteFidelity > 0 && colony.line !== null && colony.cur === PLANE) rememberSite(colony, i);
     colony.homeAfresh(i);
     colony.since[i] = 0;
     colony.fatigue[i] = 0; // found food: the search succeeded
@@ -265,7 +266,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     // back down (carriers aside: soil goes out to the mound; food is on its way in).
     if (colony.queen && colony.under[i] && !carrying && !pellet && !colony.mayGoOut(i)) {
       colony.antCell(i);
-      if (isSky(map, CELL[0], CELL[1])) h = colony.pointDown(i, x0, y0, h);
+      if (isSky(map, CELL[0], CELL[1])) h = pointDown(colony, i, x0, y0, h);
     }
     integrate(colony, i, x0, y0, atNest);
     // Road signs: underground, a strong nest trail where it stands tells it where it is, and its memory's error fades

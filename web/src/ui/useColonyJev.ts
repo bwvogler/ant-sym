@@ -157,7 +157,7 @@ export function useColonyJev(
     (a: DoctrineChoice) => {
       if (lockRef.current !== null) return;
       setAimState(a);
-      jev.setAim(a.text);
+      jev.setAim(a.text, { askNow: true }); // a player's change: Jev asks what the new aim lacks at once (ja-lo8.21)
     },
     [jev],
   );

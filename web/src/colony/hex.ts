@@ -259,3 +259,31 @@ export function corners(cx: number, cy: number, s: number): number[] {
 export function extent(w: number, h: number): { w: number; h: number } {
   return { w: w + 0.5, h: h * R + (SIDE - R / 2) };
 }
+
+/** Half the span a cell key covers on each axis: ±2,097,152 cells, the chunk keys' ±32k chunks (endless-world §7). */
+const KEY_OFFSET = 1 << 21;
+const KEY_SPAN = 1 << 22;
+
+/**
+ * A cell as one number, for sets and maps of cells (the midden, an ant's remembered cells, the fungus's spores and
+ * hyphae, the line's index). Both coordinates may be negative (one world's curtain starts at the line's sMin; an endless
+ * plane spreads every way), down to −2,097,152. Keys are whole numbers below 2^44, exact as doubles.
+ */
+export function cellKey(x: number, y: number): number {
+  return (y + KEY_OFFSET) * KEY_SPAN + (x + KEY_OFFSET);
+}
+
+/** The column of a cellKey. */
+export function keyX(k: number): number {
+  return (k % KEY_SPAN) - KEY_OFFSET;
+}
+
+/** The row of a cellKey. */
+export function keyY(k: number): number {
+  return Math.floor(k / KEY_SPAN) - KEY_OFFSET;
+}
+
+/** A cellKey's cell, as [x, y]. */
+export function keyCell(k: number): [number, number] {
+  return [keyX(k), keyY(k)];
+}

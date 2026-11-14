@@ -286,7 +286,10 @@ async function work() {
       count(name, a !== undefined);
       return a ?? local(s);
     };
-    brains.policy = lane(cache.modes, situationKey, localPolicy, "mode");
+    // Mode answers are weighted (Jev's probabilities, colony/weighted.ts): the colony draws from them, as on the page.
+    const { pick } = await import("../web/src/colony/index.ts");
+    const modes = lane(cache.modes, situationKey, localPolicy, "mode");
+    brains.policy = (s, draw) => pick(modes(s), draw);
     brains.stance = lane(cache.stances, stanceKey, localStance, "stance");
     brains.responses = responsesFromAnswers(cache.responses ?? {}, undefined, count);
   }

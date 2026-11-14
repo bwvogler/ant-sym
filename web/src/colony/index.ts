@@ -16,8 +16,8 @@ export * from "./game.ts";
 export * from "./growthBrain.ts";
 export * from "./hex.ts";
 export * from "./hunger.ts";
-// Only what the page needs: hyphae.ts's cellKey would clash with colony.ts's.
-export { Hyphae, keyCell as hyphaCell, ROOT as HYPHA_ROOT, type GrowthAnswer, type GrowthSituation, type Tip } from "./hyphae.ts";
+// Only what the page needs (hyphae.ts re-exports hex.ts's cellKey and keyCell; keyCell is the page's hyphaCell).
+export { Hyphae, KNOT, keyCell as hyphaCell, ROOT as HYPHA_ROOT, type GrowthAnswer, type GrowthSituation, type Tip } from "./hyphae.ts";
 export * from "./journal.ts";
 export * from "./lanes.ts";
 export * from "./levers.ts";
@@ -34,4 +34,5 @@ export * from "./species.ts";
 export * from "./desertAnt.ts";
 export * from "./transect.ts";
 export * from "./vocab.ts";
+export * from "./weighted.ts";
 export * from "./world.ts";

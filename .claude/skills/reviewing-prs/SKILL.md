@@ -1,6 +1,6 @@
 ---
 name: reviewing-prs
-description: "Reviews a pull request on bwvogler/ant-sym (jev-ants) and posts it as one GitHub review, with measured evidence, merge mechanics against main and the other open PRs, and the owner's decisions relayed into the PR and into beads. Use whenever the user asks to review a PR, re-review one, 'check for updates', 'anything new?', 'fixes are in', 'is #N ready', or 'approve what's ready', including stacked PRs, and whenever a lead agent hands a subagent a PR to review (role: helper). Not for writing the fix itself or for designing a mechanic (that is adding-mechanics)."
+description: "Reviews a pull request on bwvogler/ant-sym (jev-ants) and posts it as one GitHub review, with measured evidence, merge mechanics against main and the other open PRs, and the owner's decisions relayed into the PR and into beads. Use whenever the user asks to review a PR, re-review one, 'check for updates', 'anything new?', 'fixes are in', 'is #N ready', or 'approve what's ready', including stacked PRs, and whenever a lead agent hands a subagent a PR to review (role: helper). Not for writing the fix itself (that is steward) or for designing a mechanic (that is adding-mechanics)."
 argument-hint: "[PR number(s), or 'open'] [role: helper]"
 allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/merge-check.sh *), Bash(${CLAUDE_SKILL_DIR}/scripts/fast-checks.sh *)
 hooks:
@@ -28,7 +28,7 @@ A review here is finished when **one GitHub review is posted on the PR** (or, fo
 
 ## Hard rules
 
-Hooks enforce some of these once the skill is invoked in a session, and stay on for the rest of it. **They don't guard subagents:** inside a `pr-reviewer` or helper agent neither the agent file's hooks nor invoking the skill made them fire (tested 2026-11-09), so a subagent keeps these rules by following them, and the lead checks its clean-up. `scripts/guard.sh` refuses a GitHub post without the footer or naming a model, a review submitted as APPROVE or REQUEST_CHANGES, and a worktree path that is relative, right under `/` or built on an unguarded variable; it asks the owner before a merge and before slow or paid runs. `scripts/stop-check.sh` stops you finishing once while a detached worktree or a changed `.beads/issues.jsonl` is left. A refusal says how to fix the call: fix it, don't route around it. Their tests: `scripts/test.sh`.
+Hooks enforce some of these once the skill is invoked in a session, and stay on for the rest of it. **They don't guard subagents:** inside a `pr-reviewer` or helper agent neither the agent file's hooks nor invoking the skill made them fire (tested 2026-11-09), so a subagent keeps these rules by following them, and the lead checks its clean-up. `scripts/guard.sh` refuses a GitHub post without the footer or naming a model, a review submitted as APPROVE or REQUEST_CHANGES, and a worktree path that is relative, right under `/` or built on an unguarded variable; it asks the owner before a merge and before slow or paid runs. `scripts/stop-check.sh` stops you finishing once while a detached worktree is left: remove the ones you made, and leave what was there before you. A refusal says how to fix the call: fix it, don't route around it. Their tests: `scripts/test.sh`.
 
 - `env -u JEV_API_KEY` on every command that runs the game, tests or scripts. No live Jev calls; spend is real and the owner decides it.
 - Worktrees at **absolute** paths under the scratchpad, with the variable guarded: `W="${S:?}/pr57"`. An empty `$S` once put a worktree at `/r53m`.
@@ -36,7 +36,7 @@ Hooks enforce some of these once the skill is invoked in a session, and stay on 
 - **Slow runs are off unless the owner asks**: `npm run test:slow`, 12-minute game runs, G′ over 20 seeds, `side-bench`, `colony-cost --side`, anything multi-minute (`bd memories slow`). List them under "Not re-measured" instead.
 - **One CPU-heavy job at a time.** Never run `npm test` beside a helper's runs or a trial merge's tests; parallel load made test files hit the 60 s timeout on #47 and looked like failures.
 - The reviewer commits nothing, pushes nothing, opens no PR, never force-pushes, and never merges unless the owner asks in this session. Never touch the `beads-dolt` or `__dolt_remote_info__` branches.
-- Beads change only through `bd`. `.beads/issues.jsonl` is an export: revert it (`git checkout -- .beads/issues.jsonl`), never edit or commit it.
+- Beads change only through `bd`; `.beads/issues.jsonl` is a local export, not in git. An author may have started you in their own checkout (the `steward` skill): what was already changed there is theirs.
 - No model name or id in anything posted. Every GitHub post ends with the footer in [reference/comment.md](reference/comment.md).
 
 ## Checklist
@@ -53,7 +53,7 @@ PR #<n> (<head sha7> on <base>) — <first review | re-review since <sha7>>
 - [ ] 5. Verify: mutations, measurements, every blocker re-read in code
 - [ ] 6. Post: one review (COMMENT), body = whole review + footer, inline suggestions for one-liners
 - [ ] 7. Relay: owner summary; decisions → short PR comment + beads
-- [ ] 8. Clean up: worktrees gone, jsonl reverted, git status clean
+- [ ] 8. Clean up: my worktrees gone, git status as I found it
 ```
 
 ```
@@ -67,6 +67,7 @@ Helper, PR #<n> (<head sha7>)
 
 ## 0. Sync
 
+- Note the main checkout's `git status --short` and `git worktree list` before anything else: clean-up restores that, not an empty status.
 - `git fetch origin`; list open PRs (`mcp__github__list_pull_requests`, state open) with head and base branches. "Approve what's ready" means every open PR.
 - `scripts/beads-sync.sh start` so `bd` reads the shared database.
 - Re-review? Find your last review (`mcp__github__pull_request_read`: get_reviews for review bodies, get_review_comments for inline threads and whether they're resolved, get_comments for older single-comment reviews, corrections and the owner's decisions) and the head SHA it reviewed. Review the commits since then, but re-run stages 2 and 4 in full: main moves.
@@ -84,7 +85,7 @@ Helper, PR #<n> (<head sha7>)
 "${CLAUDE_SKILL_DIR}/scripts/merge-check.sh" <n> [--base <branch>] <other open PR numbers…>
 ```
 
-Pass the base branch and the other open PR numbers from stage 0 (git alone can't tell open PRs from closed). It fetches their heads, runs `git merge-tree` of this PR against main, its base and each other open PR, says whether a stacked base is in main yet, and lists files changed on both sides since the PR split from main. A conflict only in `.beads/issues.jsonl` is the bd export and doesn't count. Conflicts or not, read what main changed in files this PR touches: a clean textual merge can still break (#40 renamed `foodLeft` and broke #39's merged tree). When main changed shared code, trial-merge in a worktree and run the tests there ([checks.md](reference/checks.md#trial-merge)).
+Pass the base branch and the other open PR numbers from stage 0 (git alone can't tell open PRs from closed). It fetches their heads, runs `git merge-tree` of this PR against main, its base and each other open PR, says whether a stacked base is in main yet, and lists files changed on both sides since the PR split from main. A conflict only in `.beads/issues.jsonl` means the branch predates the export leaving git (ja-w7ef.1); the author takes main's deletion, and it doesn't count, though GitHub runs no CI on the PR until they do. Conflicts or not, read what main changed in files this PR touches: a clean textual merge can still break (#40 renamed `foodLeft` and broke #39's merged tree). When main changed shared code, trial-merge in a worktree and run the tests there ([checks.md](reference/checks.md#trial-merge)).
 
 ## 3. Route
 
@@ -133,9 +134,10 @@ Typecheck, `npm test` pass/fail counts, lint warnings compared with main's count
 ## 8. Clean up
 
 ```sh
-git worktree remove --force "${S:?}/pr57"; git worktree list     # only the main checkout left
-git checkout -- .beads/issues.jsonl
-git status --short                                                 # empty
+git worktree remove --force "${S:?}/pr57"; git worktree list     # the worktrees you made are gone
+git status --short                                                 # as it was at stage 0
 ```
+
+Remove only the worktrees you made, and never revert, stash, switch or commit anything in the main checkout that was there when you started: it may be an author's work in progress. Report what you left and why.
 
 If you filed beads and the push hook may not have run, `scripts/beads-sync.sh push` by hand.
