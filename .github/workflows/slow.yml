@@ -4,7 +4,7 @@
 # - Nightly on main, and on demand from the Actions tab: a red run is a measurement to look at.
 # - On a pull request that touches web/src/colony/ or web/shared/ and carries the `slow-guards` label (ja-w7ef.4): the
 #   PR's author adds the label once the review approves (the steward skill), and the run then repeats on every push while
-#   the label stays. Its result arrives as the PR's `slow (n)` checks, which wake a watching session like any other
+#   the label stays; the steward removes it after a pass. Its result arrives as the PR's `slow (n)` checks, which wake a watching session like any other
 #   check; a manual dispatch did not (2026-11-14). CLAUDE.md: run them before merging colony changes.
 # The globs and limit are copies of web/package.json's test:slow; ui/tests/ciShards.test.ts holds them equal.
 name: Slow guards
