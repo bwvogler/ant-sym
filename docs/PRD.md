@@ -437,6 +437,7 @@ The 512×320 map is now something to move around in, not a picture squeezed into
   - Only the ants in view are drawn. Cells past a ragged map edge are transparent.
 - **Minimap.**
   - Zoomed in, a corner inset shows the whole map: ground, food, both colonies' ants, and the view's rectangle. It is redrawn twice a second.
+  - The fungus shows on it too (ja-hcq): cells with spores the field draws (`SPORE_SHOWN`) are washed in the spore colour, and infected ants are dots in it, over their nestmates.
   - Click or drag on it to jump.
 - **Following an ant.**
   - Click an ant (yours or the rival's) to follow it: the camera tracks it, with a jade ring around it.
@@ -5259,3 +5260,59 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 5. the flight distance: 2 U to start;
 6. lines joining: not yet;
 7. whether the bounded game stays: as a test bed until E6.
+
+**E1.1 built (`ja-qpv.1.1`, 2026-11-13).** Storage only; behaviour is bit-exact.
+- **Faded scent is freed.** A pheromone chunk that falls asleep is dropped, and its buffers go back to a pool that keeps as many arrays as the most awake channel needs (at least 16). Before, it was kept zeroed for good. A missing chunk reads 0, as the zeroed one did, so nothing an ant senses changes.
+- **The golden hash ignores empty chunks.** The golden helper (`tests/goldens.ts`) leaves out chunks bit-identical to the layer's empty fill and hashes in explicit (cy, cx) order. Whether a layer keeps an empty chunk is storage, not behaviour. The goldens were re-recorded once for that alone, before the drop, and pass unchanged after it, the slow golden included.
+- **Memory** (`node --expose-gc scripts/lab/chunk-memory.mjs`, the page's game, seed 1, 800 + 800 ants, 600 s), the new baseline for E4's soak:
+
+  | | Scent chunks (blank) | Scent MB | Array buffers |
+  |---|---|---|---|
+  | main | 216 (54) | 3.4 | 13.9 MB |
+  | E1.1 | 162 (0) | 2.5 | 13.1 MB |
+
+  The map's layers hold 202 chunks (1.9 MB) and the other layers 110 (1.1 MB, 34 blank), unchanged. The heap is 15.1 MB either way.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, two runs each): main 10.74 and 10.68 ms mean, E1.1 10.88 and 10.65 ms; within noise.
+- **Cost:** none. No situation, legend or question changed.
+
+## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
+
+Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).
+
+**Scent through open ground only (`scentReach`, ja-uvhw).** A sensor reads the food, home and alarm trails, and sees the nest, only where its tip can be reached through open ground within `SENSE_STEPS` (5) cells (`inReach`), as food itself already was (ja-juiu, #107). Out of reach, in another tunnel or behind a wall, it reads nothing. Before, an ant smelled a trail in a parallel tunnel through the soil. `inReach` has a fast path along the hex line, at most 5 lookups.
+
+- Seeds 1–20, off → on:
+  - side-view game: seeds over the held-food bound 5 → 2; food stored (median) 4,172 → 4,368; births 750 → 790; **fight losses (median) 324 → 436**;
+  - A8 nest flow: worst held 86 → 8; worst porter jam 163 → 69;
+  - one-world game: worst 141 → 102.
+- The extra losses are surface fights between the nests: on seed 12 both colonies go forage → raid from about 312 s (off: one colony, at 382 s). Open: ja-ccej.
+- A variant that left alarm read through soil lost 411 instead of 436: the fighting doesn't come from alarm.
+- Fights reaching through soil (ja-yif.3) were measured and don't happen: 26,242 fight contacts in forced raids, none across soil.
+- Cost: ms per tick 15–35 % higher (the reach test per sensor).
+
+**Hunger reaches the stores (`restFetch`, ja-4rfr).** With `scentReach` on, the slow ja-xu6 guard failed: a colony on economy.test's map starved beside about 500 stored food. The bug was already there. Food sent down to a store was never drawn on again: hungry ants follow the store's floor mark (`toFood`, §50.18), but only explorers did, only by the hunger they felt from others, and only in tunnels. The old retire inside in "return", tired, and when hungry they climbed out to forage instead. Four parts, each from a trace:
+
+- an ant's own hunger (below `ADULT_BEG_BELOW`) counts as well as what it feels: the old felt 0.26–0.37 against `THETA_OLD` 0.3 while starving;
+- in a chamber, a hungry ant steers by the store marks its sensors reach through open ground, and stays in (`steer.ts`): before, an old forager in a chamber steered for the hole;
+- hunger ends a tired ant's rest: without it, world 1 (second seed) had 49 larvae waiting at once, with it 0;
+- an ant in "return" by a store takes food on from it, as an explorer does (`port`).
+
+Tried and left out:
+
+- slowing the store mark's fade: each rate collapsed a different world (fewest alive 4 / 9 / 4 / 43 at evaporation 0.01 / 0.003 / 0.001 / 0.0005);
+- porters keeping spare food out of the stores: no starvation, but it sidesteps the stores (the owner chose to rework fetching);
+- a fetcher turning back toward a store's mark, in a tunnel or a chamber: three of the 8 games collapsed;
+- steering a returner along the store's mark in a tunnel: homing takes it out of the tunnel code within a cell or two, and it changed nothing.
+
+The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
+
+| | both off | `scentReach` only | both on |
+|---|---|---|---|
+| max larvae waiting with food in the nest | 9, 1, 6, 7, 0, 4, 8, 0 | 0, 11, 5, 0, 4, 8, 10, 26 | 0, 0, 0, 0, 5, 19, 11, 9 |
+| workers starved | 25 (one game) | 84 (two games) | 0 |
+| fewest alive at 3,600 s | 129 | 4 | 137 |
+
+`restFetch` 0 → 1 over seeds 1–20 changes nothing in the game and A8 assays: hunger doesn't bite in 600–900 s.
+
+- The three unguarded games with 9–19 larvae waiting: ja-mprr.
+- Jev cost: none. No legend, question, schema or brain version changed.

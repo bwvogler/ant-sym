@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
-import { Fungus, INFECTED, STRAINS, type Strain } from "../../fungus.ts";
+import { Fungus, INFECTED, SPORE_SHOWN, STRAINS, type Strain } from "../../fungus.ts";
 import { Game } from "../../game.ts";
 import { generateWorld, mulberry32, OPEN_WORLD, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at } from "../hexmaps.ts";
@@ -227,6 +227,34 @@ test("spore brush: spores on open ground in the stroke, a dose into every ant th
   f.paint([mine, theirs], at(20, 6).x, at(20, 6).y, 0.5, 0, 0.2, BLOOM);
   assert.equal(mine.strain[0], LOCKPICK);
   assert.ok(Math.abs(mine.load[0] - 0.5) < 1e-6);
+});
+
+test("the panel counts only the spore cells the field draws (ja-agx): faint ones are still on the ground, unseen", () => {
+  const map = arena();
+  const f = new Fungus(map);
+  f.paint([], at(15, 6).x, at(15, 6).y, 0.5, 4, 0, BLOOM);
+  f.paint([], at(30, 6).x, at(30, 6).y, 0.5, SPORE_SHOWN / 2, 0, BLOOM);
+  run(f, [], 1 / 30); // counted as a step fades them
+  assert.equal(f.sporeCells, 2, "both held");
+  assert.equal(f.shownSporeCells, 1, "only the thick one drawn");
+  f.paint([], at(30, 6).x, at(30, 6).y, 0.5, SPORE_SHOWN, 0, BLOOM);
+  run(f, [], 1 / 30);
+  assert.equal(f.shownSporeCells, 2, "past the threshold it shows");
+  const back = new Fungus(map);
+  back.loadState(f.saveState());
+  assert.equal(back.shownSporeCells, 2, "a load counts them before any step");
+});
+
+test("one world: the panel's count takes in the spores on every map, after a step and after a load (ja-agx, review of #156 S3)", () => {
+  const f = new Fungus([arena(), arena()]);
+  f.paint([], at(15, 6).x, at(15, 6).y, 0.5, 4, 0, BLOOM, 1); // on the second map only
+  f.paint([], at(30, 6).x, at(30, 6).y, 0.5, SPORE_SHOWN / 2, 0, BLOOM, 1);
+  f.stepLayers([], [[], []], 1 / 30);
+  assert.equal(f.sporeCells, 2);
+  assert.equal(f.shownSporeCells, 1, "the second map's thick cell");
+  const back = new Fungus([arena(), arena()]);
+  back.loadState(f.saveState());
+  assert.equal(back.shownSporeCells, 1, "and after a load");
 });
 
 test("spores on the ground: an ant walking onto them picks up load and takes some away; untouched spores fade", () => {
