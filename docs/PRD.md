@@ -5474,6 +5474,23 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 
 **Cost (estimated).** None in Jev: steering and body rules, no new situation field. CPU: more dug cells, measured by P1's ms per tick.
 
+**P1 baseline (built, ja-16rp.1; `npm run exp -- pockets --seeds 1-10`; no behaviour change, goldens bit-exact).** One colony of 600 on the app's side map, 3,600 s, local rule:
+
+| Seed | Buried food taken (share) | Food home | Workers alive | Cells opened | Spoil out | ms/tick |
+|---|---|---|---|---|---|---|
+| 1 | 559 of 20,760 (2.7 %) | 5,016 | 621 | 1,744 | 2,394 | 4.8 |
+| 2 | 660 of 21,528 (3.1 %) | 4,293 | 812 | 1,923 | 2,635 | 5.5 |
+| 3 | 49 of 18,780 (0.3 %) | 4,091 | 784 | 2,207 | 2,224 | 5.4 |
+| 4 | 0 of 18,108 | 3,868 | 789 | 2,397 | 2,413 | 5.1 |
+| 5 | 444 of 17,856 (2.5 %) | 4,282 | 723 | 2,225 | 2,318 | 5.0 |
+| 6 | 678 of 18,984 (3.6 %) | 4,691 | 876 | 2,059 | 2,123 | 4.7 |
+| 7 | 0 of 18,744 | 4,170 | 845 | 2,327 | 2,367 | 5.0 |
+| 8 | 0 of 17,964 | 4,221 | 881 | 1,900 | 2,081 | 4.6 |
+| 9 | 0 of 19,440 | 3,464 | 603 | 1,893 | 2,004 | 4.8 |
+| 10 | 510 of 15,912 (3.2 %) | 4,545 | 851 | 2,055 | 2,196 | 4.6 |
+
+Five seeds take none of the buried food in the hour; the best takes 3.6 %.
+
 **Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full).
 
 **Still open.** Option 2 (after option 1's results); how deep and how far the network should run; whether two colonies' networks meeting needs handling.
