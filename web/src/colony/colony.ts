@@ -5,7 +5,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { bodyHeatAfter, feelsHot, groundHeat, pastCritical } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
-import { CELL, cellOf, centreX, centreY, DIR_ANGLE, discOffsets, hexDistance, nx as stepX, ny as stepY, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
   type CellCounts,
   MODES,
@@ -36,7 +36,6 @@ import {
   CHAMBER_MIN_DEPTH,
   CHAMBER_SPREAD,
   CROWD_HALF,
-  EDGE,
   ENTRANCE_R,
   ENTRANCE_ZONE,
   FLOOR_PER_ANT,
@@ -51,20 +50,13 @@ import {
   MET_HALF,
   MIDDEN_AT,
   MIDDEN_SPREAD,
-  MILL_WAYS,
-  M_LINE_WIDTH,
-  PI_DRIFT,
   RECEPTION_MIN,
-  SEARCH_GROW_2D,
-  SEARCH_START,
   THREAT_HALF,
-  WAIT_STEPS,
 } from "./tuning.ts";
 import { NO_CELL, SOIL_DUG, SOIL_FILL, SOIL_LOOSE, cellKey, climb, planeMoundReach } from "./grid.ts";
-import { DEFAULT_COLONY, LOOP_AT, channelParams, type ColonyParams } from "./params.ts";
+import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
-import { outDistAt } from "./homing.ts";
 import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
@@ -81,6 +73,7 @@ import {} from "./colonySave.ts";
 import { localPolicy, localStance } from "./localRules.ts";
 import { speciesSituation, stanceView } from "./colonySituation.ts";
 import {} from "./colonySituation.ts";
+import {} from "./plane.ts";
 export { localPolicy, localStance } from "./localRules.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
@@ -1272,22 +1265,6 @@ export class Colony {
     this.stallT[i] = 0;
   }
 
-  /**
-   * Whether ant i at (x, y) is back on its line home: the line from where this trip first met rock
-   * to the nest (Bug2's "m-line"). Leaving walls only there is what guarantees getting round: leaving
-   * anywhere nearer settles ants in the deepest bay facing the nest.
-   */
-  onMLine(i: number, x: number, y: number, width = M_LINE_WIDTH): boolean {
-    const ax = this.mx[i];
-    const ay = this.my[i];
-    if (Number.isNaN(ax)) return true;
-    const dx = this.goalX - ax;
-    const dy = this.goalY - ay;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-6) return true;
-    return Math.abs((x - ax) * dy - (y - ay) * dx) / len < width;
-  }
-
   /** Whether the straight way from (x, y) to (tx, ty) is open, felt every half cell: the nest in plain view (or smell) down a clear passage. */
   clearTo(x: number, y: number, tx: number, ty: number): boolean {
     const steps = Math.ceil(Math.hypot(tx - x, ty - y) * 2);
@@ -1312,60 +1289,6 @@ export class Colony {
     CELL[0] = c0;
     CELL[1] = c1;
     return on;
-  }
-
-  /**
-   * One world's plane (ja-lp4.15): ant i has picked up food where it stands. It keeps where it believes that is, relative to its
-   * hole: where it stands less where its vector says the hole is (the hole plus odoSurf × (driftSurf, driftSurfY): its home
-   * vector, negated). Only its own odometer and drift; no coordinate of the food or the hole's true place. With the plane bound.
-   */
-  rememberSite(i: number): void {
-    const odo = this.odoSurf[i];
-    this.foodX[i] = this.x[i] - (this.nest.x + odo * this.driftSurf[i]);
-    this.foodY[i] = this.y[i] - (this.nest.y + odo * this.driftSurfY[i]);
-  }
-
-  /**
-   * One world's plane (ja-lp4.15): the heading an exploring ant i with a remembered spot (foodX, foodY) steers on. Where it
-   * believes the spot is: its vector's own hole (the hole plus odoSurf × drift, as believePlane) plus the remembered offset,
-   * walked straight; within LOOP_AT of it, it searches round it, U3b's spiral (a point a quarter turn on and SEARCH_GROW_2D
-   * further out each time one is reached; the first heads the way it faces). Its search state is the homing ant's
-   * (search, searchA), zeroed when it turns for home (homeAfresh) or finds food. Never past the plane's edges.
-   */
-  siteAim(i: number): number {
-    const odo = this.odoSurf[i];
-    const x = this.x[i];
-    const y = this.y[i];
-    const lx = this.map.x0 + EDGE;
-    const hx = this.map.x0 + this.map.size.w - EDGE;
-    const hy = this.map.size.h * R - EDGE;
-    const tx = Math.max(lx, Math.min(hx, this.nest.x + odo * this.driftSurf[i] + this.foodX[i]));
-    const ty = Math.max(EDGE, Math.min(hy, this.nest.y + odo * this.driftSurfY[i] + this.foodY[i]));
-    let s = this.search[i];
-    if (s === 0) {
-      if (Math.hypot(tx - x, ty - y) >= LOOP_AT) return Math.atan2(ty - y, tx - x);
-      // There, and nothing in sight: round it, the first point ahead of it.
-      this.searchA[i] = this.heading[i];
-      s = this.search[i] = SEARCH_START;
-    }
-    let a = this.searchA[i];
-    let px = tx + s * Math.cos(a);
-    let py = ty + s * Math.sin(a);
-    if (Math.hypot(px - x, py - y) < LOOP_AT) {
-      a = this.searchA[i] = a + Math.PI / 2;
-      const { w, h } = this.map.size;
-      s = this.search[i] = Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
-      // Widened past what its vector's error covers (a quarter turn each point, so it has been all round at the last): the spot is spent.
-      if (this.params.siteGive > 0 && s > this.params.siteGive * PI_DRIFT * Math.hypot(this.foodX[i], this.foodY[i])) {
-        this.foodX[i] = this.foodY[i] = NaN;
-        this.search[i] = 0;
-        this.searchA[i] = 0;
-        return this.heading[i];
-      }
-      px = tx + s * Math.cos(a);
-      py = ty + s * Math.sin(a);
-    }
-    return Math.atan2(py - y, px - x);
   }
 
   /** The role of this colony's chamber at cell (x, y) (a role-less or another colony's chamber reads as tunnel), or null if in none. */
@@ -1658,73 +1581,6 @@ export class Colony {
     const dx = this.x[i] - this.nest.x;
     const dy = this.y[i] - this.nest.y;
     return dx * dx + dy * dy < this.nest.r * this.nest.r;
-  }
-
-  /**
-   * Ant i, held at the gate, mills among the top cells of its shaft: cell by cell, to an open neighbour at the gate (within
-   * WAIT_STEPS of the hole) at random. Sets its target cell (as walkTunnel does); false if no cell there is open.
-   */
-  mill(i: number, step: number): boolean {
-    const map = this.map;
-    this.antCell(i);
-    const hx = CELL[0];
-    const hy = CELL[1];
-    const gx = this.gx[i];
-    const gy = this.gy[i];
-    const fresh = gx === NO_CELL || hexDistance(gx, gy, hx, hy) > 1 || outDistAt(this, gx, gy) < 0 || outDistAt(this, gx, gy) > WAIT_STEPS;
-    if (!fresh && Math.hypot(centreX(gx, gy) - this.x[i], centreY(gy) - this.y[i]) > step) return true;
-    const cx = fresh ? hx : gx;
-    const cy = fresh ? hy : gy;
-    const ways = MILL_WAYS;
-    let n = 0;
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(cx, cy, d);
-      const ty = stepY(cy, d);
-      const k = outDistAt(this, tx, ty);
-      if (k >= 0 && k <= WAIT_STEPS && rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty)) ways[n++] = d;
-    }
-    if (n === 0) {
-      this.gx[i] = NO_CELL;
-      return false;
-    }
-    const d = ways[Math.floor(this.rng() * n)];
-    this.gdir[i] = d;
-    this.gx[i] = stepX(cx, cy, d);
-    this.gy[i] = stepY(cy, d);
-    return true;
-  }
-
-  /**
-   * Ant i, not to go out, has stepped from (x0, y0) up out of the hole onto the ground: back, and pointed down the shaft
-   * (its deepest open neighbour underground), the walker aimed at that cell. Only turning it round left it in the hole,
-   * which is no tunnel, steering at random into the sky again and again (review of slice 6: ants pinned there up to
-   * 45 s, a tenth to a fifth of their time). Returns its heading, h as it was if there is no way down but back.
-   */
-  pointDown(i: number, x0: number, y0: number, h: number): number {
-    const map = this.map;
-    this.x[i] = x0;
-    this.y[i] = y0;
-    cellOf(x0, y0);
-    const bx = CELL[0];
-    const by = CELL[1];
-    let down = -1;
-    let deepest = -Infinity;
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(bx, by, d);
-      const ty = stepY(by, d);
-      if (rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty) && centreY(ty) > deepest) ((deepest = centreY(ty)), (down = d));
-    }
-    if (down >= 0) {
-      h = DIR_ANGLE[down];
-      this.gdir[i] = down;
-      this.gx[i] = stepX(bx, by, down);
-      this.gy[i] = stepY(by, down);
-    } else {
-      h += Math.PI;
-      this.gx[i] = NO_CELL;
-    }
-    this.cellAtX[i] = NaN; // its cell is worked out afresh
-    return h;
   }
 
   // ——— one world: crossing at the holes (docs/one-world.md §2, ja-lp4.3) ———
