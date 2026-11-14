@@ -188,7 +188,7 @@ export interface FungusParams {
    */
   hyphae: boolean;
   /**
-   * with hyphae, mass flows along them (ja-tgw9, docs/mycelial-transport.md, PRD §71): the body's free mass enters at
+   * with hyphae, mass flows along them (ja-tgw9, docs/mycelial-transport.md, PRD §72): the body's free mass enters at
    * its patch and at colonised corpses and moves toward the tips, which grow from what has reached them; off, every tip
    * shares the body's free mass, as before
    */
@@ -210,7 +210,7 @@ export const DEFAULT_FUNGUS: FungusParams = {
   groomedAt: 0.05,
   borderRatio: 2,
   hyphae: false,
-  // On since 2026-11-14 (owner: turn it on and record the P1 miss, PRD §71.1).
+  // On since 2026-11-14 (owner: turn it on and record the P1 miss, PRD §72.1).
   flow: true,
 };
 
