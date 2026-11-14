@@ -1,6 +1,6 @@
 # Foraging tunnels: ants that dig to reach food, and what tells them where
 
-*Research note for bead `ja-p0k` (PRD §68). Written 2026-11-14, against code at `158d4b5`. Read in full: Tschinkel 2011 (PMC, about 60 % verbatim, the rest as a summary, marked) and Ni et al. 2025 (PMC, in full). Not reached (network allowlist or paywall): Markin, O'Neal & Dillier 1975 (JSTOR), Bernklau et al. 2005 (OUP), the termite tunnelling papers and the leaf-cutting ant CO₂ digging paper; their numbers come from citing papers or search abstracts and are marked **unverified**.*
+*Research note for bead `ja-p0k` (PRD §70). Written 2026-11-14, against code at `158d4b5`. Read in full: Tschinkel 2011 (PMC, about 60 % verbatim, the rest as a summary, marked) and Ni et al. 2025 (PMC, in full). Not reached (network allowlist or paywall): Markin, O'Neal & Dillier 1975 (JSTOR), Bernklau et al. 2005 (OUP), the termite tunnelling papers and the leaf-cutting ant CO₂ digging paper; their numbers come from citing papers or search abstracts and are marked **unverified**.*
 
 In the side view about three quarters of the map's food lies in buried pockets (20,760 of 27,840 on seed 1, PRD §41). Over an hour, one colony of 600 on the app's map takes about 560 of it on seed 1 and none on seed 2 (`scripts/lab/economy-bench.mjs 1|2 3600 600 1 900`, main at `158d4b5`), while the ground's piles fall from about 4,400 to 2,600. Only middle-aged ants dig, and a nest with room digs 15 % as often (`ROOMY_DIG`, gated by `crowded()`, a colony-wide count). So tunnels are dug for room and stop where the nest stops needing it. Food is sensed only through open ground (ja-juiu, ja-uvhw), so a pocket a few cells into the soil is invisible. The question: **do ants dig to reach food, and if so, what tells a digger which way?**
 
@@ -40,7 +40,7 @@ In the side view about three quarters of the map's food lies in buried pockets (
 - No depth distribution of fire-ant foraging tunnels beyond "1–3 cm" (casts) and the cited "3–10 cm".
 - Full text of Markin et al. 1975, Bernklau et al. 2005, Campora & Grace 2001, Hedlund & Henderson 1999 (out of reach this session).
 
-**Measured (2026-11-14, PRD §68):** built as a setting and dropped; the plain foraging dig without it (option 1, `forageDig: 120`) is on. Following the freshest dug cells (within 120 s) took less buried food than a plain digging bout (3,935 against 5,222 summed over seeds 1–10 at a 120 s bout) and two colonies fell under 400 workers. The cue is grounded, but in this map the fresh ends are the nest's own, not arms toward food.
+**Measured (2026-11-14, PRD §70):** built as a setting and dropped; the plain foraging dig without it (option 1, `forageDig: 120`) is on. Following the freshest dug cells (within 120 s) took less buried food than a plain digging bout (3,935 against 5,222 summed over seeds 1–10 at a 120 s bout) and two colonies fell under 400 workers. The cue is grounded, but in this map the fresh ends are the nest's own, not arms toward food.
 
 ## The mechanic
 

@@ -14,7 +14,7 @@
 //     click outside her flight is refused, and a click inside founds her colony where the preview (Game.settleAt) said;
 //     "Let her fly", by the keyboard, sends the next one on her own flight; and with the hook's flight gone, a queen who
 //     flies while Jev can't read words opens no pen.
-//  6. the Fungus panel's tooltips (ui/Tip.tsx): a hover opens one, Escape closes it, Tab onto a next-level button opens that button's,
+//  6. the Mutations drawer's tooltips (ui/Tip.tsx): a hover opens one, Escape closes it, Tab onto a next-level button opens that button's,
 //     and on a touch page a tap opens one, a second tap or a tap elsewhere closes it.
 //  7. the first game's tutorial (ja-7x4, PRD §61), in a fresh browser: Start runs it, paused at 1× on the landing; the first
 //     host pauses the game and is followed, and its card hides to a strip and comes back; the watch runs at 4×, Faster at 8×;
@@ -81,6 +81,11 @@ function check(ok, what) {
 }
 
 const near = (a, b, eps) => Math.abs(a - b) <= eps;
+
+/** Whether screen point (sx, sy) is open map: the canvas, not the HUD, the rail, a drawer or the inspector over it (PRD §69). */
+function onField(sx, sy) {
+  return document.elementFromPoint(sx, sy) === document.querySelector("canvas");
+}
 
 /**
  * Where a view's camera looks when asked to centre on world (tx, ty) at `zoom`: clamped to its map in the box it is
@@ -149,6 +154,7 @@ try {
   });
   const page = await ctx.newPage();
   await page.addInitScript(`window.__clampCam = ${clampCam.toString()};`);
+  await page.addInitScript(`window.__onField = ${onField.toString()};`);
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(url);
   const shot = async (name) => {
@@ -297,7 +303,7 @@ try {
       const wy = (cy + 0.5) * R;
       const sx = r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k;
       const sy = r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k;
-      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30) continue;
+      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30 || !window.__onField(sx, sy)) continue;
       const room = clear(wx, wy, 0);
       if (room > reach && (!best || room > best.room)) best = { s, sx, sy, zoom: c.zoom, room };
     }
@@ -333,7 +339,7 @@ try {
       const wy = (30 + 0.5) * R; // row 30: the sky
       const sx = r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k;
       const sy = r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k;
-      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30) continue;
+      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30 || !window.__onField(sx, sy)) continue;
       const i = s - line.sMin;
       const px = line.cells[2 * i];
       const py = line.cells[2 * i + 1];
@@ -423,12 +429,19 @@ try {
           const e = window.__clampCam("above", f.x, f.y, f.cam.zoom);
           return Math.abs(f.cam.x - e.x) <= 1.5 && Math.abs(f.cam.y - e.y) <= 1.5;
         };
-        const on = t.slice(up).find((f) => f.layer === 0 && f.view === "above" && f.cam && onAnt(f));
+        // The view switch is a React update and can land a frame or two after the ant does (the full-screen page, PRD §69);
+        // an ant that pops up for a single step and drops back is still carried if the top view came, centred where it
+        // surfaced, within a few frames.
+        const on =
+          t.slice(up).find((f) => f.layer === 0 && f.view === "above" && f.cam && onAnt(f)) ??
+          t.slice(up, up + 4).find((f) => f.view === "above" && f.cam && onAnt({ ...f, x: t[up].x, y: t[up].y }));
         if (on)
           return {
             below: t.slice(0, up).filter((f) => f.layer === 1 && f.view === "below").length,
             up: t[up],
             on,
+            // where the camera was judged against: the ant then, or where it surfaced (a one-step pop-up)
+            at: on.layer === 0 ? { x: on.x, y: on.y } : { x: t[up].x, y: t[up].y },
           };
         // Up for 2 s of frames and the view never on it: the carry failed.
         return t.length - up > 120 ? { stuck: t.slice(up, up + 4).concat(t.slice(-2)) } : null;
@@ -446,7 +459,15 @@ try {
   );
   check(
     true,
-    `the view came above with it, the camera on the ant (${carried.on.cam.x.toFixed(1)}, ${carried.on.cam.y.toFixed(1)}) ~ (${carried.on.x.toFixed(1)}, ${carried.on.y.toFixed(1)}), zoom kept ×${carried.on.cam.zoom.toFixed(2)}`,
+    `the view came above with it, the camera on the ant (${carried.on.cam.x.toFixed(1)}, ${carried.on.cam.y.toFixed(1)}) ~ (${carried.at.x.toFixed(1)}, ${carried.at.y.toFixed(1)}), zoom kept ×${carried.on.cam.zoom.toFixed(2)}`,
+  );
+  // Carrying the camera keeps the follow, even for an ant that pops up a hole and straight back (centreOn keepFollow).
+  check(
+    await page.evaluate(({ k, i }) => {
+      const s = window.jevAnts.followed();
+      return s !== null && s.k === k && s.i === i;
+    }, next),
+    "the ant is still followed after the crossing",
   );
 
   // ——— 5. The queen's pen: a click on the top view ———
@@ -494,6 +515,7 @@ try {
         const wx = c.x + ((sx - r.left) * k - cv.width / 2) / c.zoom;
         const wy = c.y + ((sy - r.top) * k - cv.height / 2) / c.zoom;
         if (wy < (41 + 6) * R) continue; // underground, well below the strip (a click on the strip or the sky links)
+        if (!window.__onField(sx, sy)) continue;
         let d = Infinity;
         for (const col of game.colonies)
           for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === 1) d = Math.min(d, Math.hypot(col.x[i] - wx, col.y[i] - wy));
@@ -529,7 +551,8 @@ try {
       sx: r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k,
       sy: r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k,
     });
-    const onScreen = ({ sx, sy }) => sx > r.left + 30 && sx < r.right - 30 && sy > r.top + 50 && sy < r.bottom - 30;
+    const onScreen = ({ sx, sy }) =>
+      sx > r.left + 30 && sx < r.right - 30 && sy > r.top + 50 && sy < r.bottom - 30 && window.__onField(sx, sy);
     let inside = null;
     let outside = null;
     for (let a = 0; a < 2 * Math.PI && !(inside && outside); a += Math.PI / 12) {
@@ -619,11 +642,58 @@ try {
   );
   check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
 
-  // ——— 6. The Fungus panel's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
-  console.log("6. the Fungus panel's tooltips");
+  // ——— 5b. The aim bar (PRD §69.2): on a wide screen the aim is a bar under the map, and only there ———
+  console.log("5b. the aim bar");
+  {
+    const aims = page.getByRole("textbox", { name: "aim", exact: true });
+    const shown = () => aims.evaluateAll((els) => els.filter((e) => e.offsetParent !== null).length);
+    check((await shown()) === 1, `one aim on screen at 1280 px (${await shown()})`);
+    // The fungus drawer open: still only the bar's (the drawer's copy is for narrower screens), and the drawer says
+    // why the aim is locked, the reason the bar keeps in its "locked" tooltip.
+    const fungusTab = page.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true });
+    await fungusTab.click();
+    await page.waitForTimeout(150);
+    check((await shown()) === 1, `one aim on screen at 1280 px with The fungus drawer open (${await shown()})`);
+    const locked = await aims.evaluateAll((els) => els.some((e) => e.offsetParent !== null && e.disabled));
+    if (locked) check(await page.getByText("The aim is locked:").isVisible(), "the drawer says why the aim is locked");
+    await fungusTab.click();
+    await page.waitForTimeout(150);
+    const bar = await page
+      .getByLabel("fungus aim")
+      .filter({ has: page.getByRole("group", { name: "aim presets" }) })
+      .boundingBox();
+    const cv = await page.locator("canvas").first().boundingBox();
+    check(bar !== null && cv !== null && bar.y + bar.height > cv.height - 70, "the aim bar sits along the map's bottom");
+    // With an ant followed, the ant panel stops above the bar, the bar opened to four rows included (owner, review of
+    // #189: D1 b): the bar keeps its full width and the panel scrolls.
+    await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
+    await page.getByRole("region", { name: "followed ant" }).waitFor();
+    // Opened if it can be (a locked aim can't take focus: then the three rows it would add, 13 px at 1.375, are counted).
+    if (!(await aims.evaluateAll((els) => els.some((e) => e.offsetParent !== null && e.disabled)))) await aims.first().focus();
+    const gap = await page.evaluate(() => {
+      const panel = document.querySelector('[aria-label="followed ant"]')?.closest(".overflow-y-auto");
+      const bars = [...document.querySelectorAll('[aria-label="fungus aim"]')].filter((e) => e.offsetParent !== null);
+      if (!panel || bars.length !== 1) return null;
+      const b = bars[0].getBoundingClientRect();
+      return {
+        panelBottom: Math.round(panel.getBoundingClientRect().top + parseFloat(getComputedStyle(panel).maxHeight)) /* at its longest */,
+        barTop: Math.round(b.top - (b.height < 60 ? 3 * 18 : 0)),
+      };
+    });
+    check(gap !== null && gap.panelBottom < gap.barTop, `the ant panel, at its longest, stops above the aim bar (${JSON.stringify(gap)})`);
+    await page.locator("canvas").first().focus();
+    if (await page.evaluate(() => window.jevAnts.followed() !== null)) await page.keyboard.press("Escape");
+  }
+
+  // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
+  console.log("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
   const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first();
   const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first();
+  // The upgrades live in the Mutations drawer (PRD §69): the rail opens it, and the button shows it pressed.
+  const mutations = (p) => p.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Mutations", exact: true });
+  await mutations(page).click();
+  check((await mutations(page).getAttribute("aria-pressed")) === "true", "the rail opens the Mutations drawer");
   await nameOf(page).hover();
   await until(async () => (await tips(page)) === 1, "a hover opens an upgrade's tooltip", 3000, 50);
   await page.keyboard.press("Escape");
@@ -645,6 +715,34 @@ try {
   );
   await page.keyboard.press("Escape");
   check((await tips(page)) === 0, "Escape closes it");
+  // Escape closes one thing at a time (review of #182, S1 and S7): with an ant followed and the map focused, the first
+  // drops the ant and leaves the drawer; the second, with nothing followed, closes the drawer.
+  await page.mouse.move(2, 2);
+  if ((await mutations(page).getAttribute("aria-pressed")) !== "true") await mutations(page).click(); // open, if a step above closed it
+  await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
+  await page.locator("canvas").first().focus();
+  await page.keyboard.press("Escape");
+  check(
+    (await page.evaluate(() => window.jevAnts.followed())) === null && (await mutations(page).getAttribute("aria-pressed")) === "true",
+    "the first Escape drops the followed ant and leaves the drawer open",
+  );
+  await page.keyboard.press("Escape");
+  check((await mutations(page).getAttribute("aria-pressed")) === "false", "the second closes the drawer");
+  // With Go to open and an ant followed, Escape closes the menu only and keeps the follow (review of #182, S8): Go to's
+  // capture listener takes the key first, and the map leaves an Escape already taken.
+  await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
+  await page.getByRole("button", { name: "Go to ▾" }).click();
+  await page.locator("canvas").first().focus();
+  check(
+    (await page.evaluate(() => window.jevAnts.followed())) !== null && (await page.getByRole("group", { name: "go to" }).count()) === 1,
+    "an ant followed, Go to open",
+  );
+  await page.keyboard.press("Escape");
+  check(
+    (await page.getByRole("group", { name: "go to" }).count()) === 0 && (await page.evaluate(() => window.jevAnts.followed())) !== null,
+    "with Go to open, Escape closes the menu and keeps the ant followed",
+  );
+  await page.keyboard.press("Escape"); // and drops the follow, before the touch context
   // A finger: a tap opens, a second tap or a tap elsewhere closes, and a tap inside the bubble leaves it open.
   const touch = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -659,6 +757,31 @@ try {
     () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
     "the touch page's game, landed",
   );
+  // The aim on a phone: no bar; it is in The fungus drawer.
+  check(
+    !(await tpage.getByRole("textbox", { name: "aim", exact: true }).isVisible()),
+    "on a phone there is no aim bar while the drawers are shut",
+  );
+  await tpage.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true }).tap();
+  const inDrawer = await tpage.evaluate(() =>
+    [...document.querySelectorAll('textarea[aria-label="aim"]')].map(
+      (t) => `${t.closest("section")?.getAttribute("aria-label") ?? "-"}:${t.offsetParent !== null}`,
+    ),
+  );
+  check(inDrawer.includes("the fungus:true") && inDrawer.length === 2, `it is in The fungus drawer instead (${inDrawer.join(", ")})`);
+  await tpage.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true }).tap();
+  // A phone (PRD §69): the map fills the screen, the rail is a tab bar along the bottom, and a drawer opens as a sheet
+  // above it.
+  const phone = await tpage.evaluate(() => {
+    const cv = document.querySelector("canvas").getBoundingClientRect();
+    const nav = document.querySelector('nav[aria-label="panels"]').getBoundingClientRect();
+    return { w: innerWidth, h: innerHeight, cv: { w: cv.width, h: cv.height }, navTop: nav.top, navBottom: nav.bottom };
+  });
+  check(phone.cv.w === phone.w && phone.cv.h === phone.h, `on a phone the map fills the screen (${phone.cv.w}×${phone.cv.h})`);
+  check(phone.navBottom > phone.h - 20 && phone.navTop > phone.h / 2, "and the drawers' tabs run along its bottom");
+  await mutations(tpage).tap();
+  const sheet = await tpage.getByRole("region", { name: "mutations" }).boundingBox();
+  check(sheet !== null && sheet.y + sheet.height <= phone.navTop + 1, "a drawer opens as a sheet above the tabs");
   const tname = nameOf(tpage);
   await tname.tap();
   await until(async () => (await tips(tpage)) === 1, "a tap opens an upgrade's tooltip", 3000, 50);
@@ -687,6 +810,19 @@ try {
   const paused = async () => (await tu.getByRole("button", { name: "Play", exact: true }).count()) === 1;
   await until(async () => /You are a fungus/.test((await tcard.textContent()) ?? ""), "the tutorial's first card");
   check(await paused(), "the landing card waits, paused");
+  // From lg the card stops above the aim bar, opened to four lines, as the toasts do (review of #189, S5).
+  {
+    const card = await tcard.boundingBox();
+    const aimBar = await tu
+      .getByLabel("fungus aim")
+      .filter({ has: tu.getByRole("group", { name: "aim presets" }) })
+      .boundingBox();
+    const opened = aimBar && aimBar.y - (aimBar.height < 60 ? 3 * 18 : 0);
+    check(
+      card !== null && opened !== null && card.y + card.height < opened,
+      `the tutorial card stops above the aim bar (${card && Math.round(card.y + card.height)} < ${opened && Math.round(opened)})`,
+    );
+  }
   // What the field shows of scent is what hosts sensed (PRD §65): before any host, nothing, even at the landing.
   check(
     (await tu.evaluate(() => window.jevAnts.sensed("above", window.jevAnts.game.landed.x, window.jevAnts.game.landed.y))) === 0,
@@ -794,7 +930,9 @@ try {
     await dp.evaluate(() => window.jevAnts.game.colonies.every((c) => !c.layers[0].ph.live("food") && !c.layers[0].ph.live("home"))),
     "no food or home trail on the plane",
   );
-  await dp.getByRole("button", { name: "Details", exact: true }).click();
+  // Details is Settings → Lab and numbers now (PRD §69).
+  await dp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Settings", exact: true }).click();
+  await dp.getByRole("button", { name: "Lab and numbers", exact: true }).click();
   const det = dp.getByRole("dialog", { name: "Details" });
   await det.getByText("Trails drawn").waitFor({ timeout: 5_000 });
   check(
@@ -820,6 +958,36 @@ try {
     "a desert game leaves the generic ant's tutorial unplayed",
   );
   await dctx.close();
+
+  // ——— 9. The aim bar's keys with Jev readable (review of #189, N7) ———
+  // The dev server here has no key, so elsewhere the aim is locked and can't take focus. This page is told a key is
+  // set, and every other API call is left unanswered: nothing reaches Jev and nothing is spent, and the page's own start
+  // stays on the wire, which keeps the aim open (a failed start would lock it, policyLock.ts).
+  console.log("9. the aim bar's keys");
+  const kctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  await kctx.route("**/api/health", (r) => r.fulfill({ json: { ok: true, hasKey: true } }));
+  await kctx.route(/\/api\/(?!health)/, () => {}); // never answered
+  const kp = await kctx.newPage();
+  kp.on("pageerror", (e) => errors.push(String(e)));
+  await kp.goto(url);
+  await kp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  const field = kp.getByRole("textbox", { name: "aim", exact: true }).locator("visible=true");
+  await until(() => field.isEnabled(), "the aim unlocked with a key", 10_000, 100);
+  const focused = () => field.evaluate((e) => document.activeElement === e);
+  await field.focus();
+  await field.evaluate((e) => e.setSelectionRange(e.value.length, e.value.length)); // the end of the words, not of a wrapped line
+  const typed = await field.inputValue();
+  await kp.keyboard.type(" Spread");
+  await kp.keyboard.press("Shift+Enter");
+  const kept = (await focused()) && (await field.inputValue()) === `${typed} Spread\n`;
+  check(kept, `Shift+Enter is a new line, the field kept${kept ? "" : ` (${JSON.stringify(await field.inputValue())})`}`);
+  await kp.keyboard.type("now");
+  await kp.keyboard.press("Enter");
+  check(!(await focused()) && (await field.inputValue()) === `${typed} Spread\nnow`, "Enter commits: the field let go, no new line");
+  await field.focus();
+  await kp.keyboard.press("Escape");
+  check(!(await focused()), "Escape gives the keys back to the map");
+  await kctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

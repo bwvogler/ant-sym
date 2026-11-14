@@ -62,6 +62,7 @@ import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 import { sightOf, type SensedMap } from "./fungusSight.ts";
+import { antTag, badgeParts, nestBadge } from "./badges.ts";
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -112,6 +113,8 @@ interface Props {
   api?: RefObject<FieldApi | null>;
   /** one world's queen's pen: her flight's circle on the plane, where she would settle, and a click to found there */
   pen?: FieldPen | null;
+  /** where the "Go to" menu sits over the field (position classes; the page keeps it clear of its own surfaces) */
+  toolsAt?: string;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -121,7 +124,7 @@ export interface FieldApi {
    * with. At the shown view's zoom; `close`: at least LINK_ZOOM, so the place shows; `span`: zoomed so that many world
    * units fit across the box's shorter side.
    */
-  centreOn: (view: number, x: number, y: number, how?: { close?: boolean; span?: number }) => void;
+  centreOn: (view: number, x: number, y: number, how?: { close?: boolean; span?: number; keepFollow?: boolean }) => void;
   /** view `view`'s camera as last drawn (null before it was shown or centred) */
   camera: (view: number) => Camera | null;
 }
@@ -217,6 +220,7 @@ export default function ColonyField({
   onCross,
   api,
   pen = null,
+  toolsAt = "top-2 left-2",
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
   const anyColony = colonies[0] as Colony;
@@ -224,6 +228,27 @@ export default function ColonyField({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** chamber names drawn on the side view's nests (the Labels button); a click on a chamber then inspects it */
   const [labels, setLabels] = useState(false);
+  const [goOpen, setGoOpen] = useState(false);
+  const goRef = useRef<HTMLDivElement>(null);
+  // The Go to menu, open: Escape closes it (first, in the capture phase, so a drawer under it stays open) and so does a
+  // press anywhere outside it.
+  useEffect(() => {
+    if (!goOpen) return;
+    const key = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setGoOpen(false);
+    };
+    const outside = (e: globalThis.PointerEvent) => {
+      if (!goRef.current?.contains(e.target as Node)) setGoOpen(false);
+    };
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("pointerdown", outside, true);
+    return () => {
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("pointerdown", outside, true);
+    };
+  }, [goOpen]);
   const labelsOn = useRef(labels);
   useEffect(() => {
     labelsOn.current = labels;
@@ -363,6 +388,7 @@ export default function ColonyField({
       accent: "",
       warn: "",
       line: "",
+      fg3: "",
       rock: rgb("#c9c2b5"),
       soil: rgb("#e3d5bf"),
       sky: rgb("#e4edf1"),
@@ -385,6 +411,7 @@ export default function ColonyField({
         accent: cssVar("--accent"),
         warn: cssVar("--warn"),
         line: cssVar("--line-strong"),
+        fg3: cssVar("--fg-3"),
         rock: rgb(cssVar("--line-strong")),
         soil: rgb(cssVar("--soil")),
         sky: rgb(cssVar("--sky")),
@@ -790,6 +817,32 @@ export default function ColonyField({
       ctx.restore();
     };
 
+    /** Parts of text side by side in one rounded box, centred on (x, y): a nest's badge, the followed ant's tag (PRD §69.2). */
+    const pill = (parts: { text: string; fill: string }[], x: number, y: number, px: number) => {
+      ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+      const gap = px * 0.45;
+      const widths = parts.map((p) => ctx.measureText(p.text).width);
+      const w = widths.reduce((a, b) => a + b, 0) + gap * (parts.length - 1) + px;
+      const h = px * 1.6;
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = theme.paper;
+      ctx.strokeStyle = theme.line;
+      ctx.lineWidth = Math.max(1, px / 12);
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "start";
+      let at = x - w / 2 + px / 2;
+      parts.forEach((p, n) => {
+        ctx.fillStyle = p.fill;
+        ctx.fillText(p.text, at, y);
+        at += widths[n]! + gap;
+      });
+      ctx.textBaseline = "alphabetic";
+    };
     /** Text with a paper halo, centred at screen (x, y). */
     const label = (text: string, x: number, y: number, px: number, alpha = 1, fill = theme.ink) => {
       ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
@@ -861,7 +914,19 @@ export default function ColonyField({
         let k = -1;
         for (let n = 0; n < holes.length && k < 0; n++) if (holes[n]!.px === h.x && holes[n]!.py === h.y) k = n;
         const [x, y] = toScreen(c, v, wx, wy);
-        label(k >= 0 && colonies[k] ? colonyName(k) : "empty hole", x, y - Math.max(12 * d, 4.5 * c.zoom), px);
+        const above = y - Math.max(12 * d, 4.5 * c.zoom);
+        const col = k >= 0 ? colonies[k] : undefined;
+        if (!col) {
+          label("empty hole", x, above, px);
+          continue;
+        }
+        const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.fg3 };
+        pill(
+          badgeParts(nestBadge(col, k, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
+          x,
+          above - px * 0.2,
+          px,
+        );
       }
     };
 
@@ -1094,6 +1159,29 @@ export default function ColonyField({
       }
       const hy = fungus.hyphaeOn(lv < 0 ? 0 : lv);
       if (hy) drawHyphae(hy, c, v, d, lv === PLANE || (lv < 0 && !m.sky), rx0, rx1, ry0, ry1);
+      // Stalks (ja-2bw.10): a short upright stroke on each colonised corpse that has grown one.
+      const stalks = fungus.stalksOn(lv < 0 ? 0 : lv);
+      if (stalks.length) {
+        ctx.save();
+        ctx.strokeStyle = theme.ink;
+        ctx.lineCap = "round";
+        ctx.globalAlpha = 0.8;
+        ctx.lineWidth = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));
+        const tall = Math.max(6 * d, Math.min(24 * d, c.zoom * 1.2));
+        for (const k of stalks) {
+          const [sx, sy] = hyphaCell(k);
+          if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
+          const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y - tall);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x, y - tall, tall * 0.18, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
 
       // Nests and ants in view, coloured by odour (recognition.ts): the first colony (Ink) starts in ink, the second (Amber) in the
       // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier,
@@ -1315,7 +1403,6 @@ export default function ColonyField({
         ctx.stroke();
       }
       if (strip && world) drawStripAnts(world, c, v, len, crumb, inView);
-      if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
 
       // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
       if (labelsOn.current && m.chambers) {
@@ -1352,11 +1439,16 @@ export default function ColonyField({
       if (f && fcol && fHere) {
         const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
         ctx.beginPath();
-        ctx.arc(x, y, Math.max(9 * d, c.zoom * 1.6), 0, Math.PI * 2);
+        const r = Math.max(9 * d, c.zoom * 1.6);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2 * d;
         ctx.stroke();
+        const tpx = Math.round(11 * d);
+        pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
       }
+      // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
+      if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
       const pn = penRef.current;
       if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);
 
@@ -1440,7 +1532,9 @@ export default function ColonyField({
     api.current = {
       centreOn: (v, x, y, how = {}) => {
         // Looking elsewhere in the view shown ends a follow (as a drag does); a follow carried to the other view goes on.
-        if (v === shown.current && follow.current) unfollow();
+        // `keepFollow`: the page carrying the followed ant itself (an ant that pops up a hole and straight back down asks
+        // for the view still shown), which must not drop it.
+        if (v === shown.current && follow.current && !how.keepFollow) unfollow();
         let s = cams.current.get(v);
         if (!s) cams.current.set(v, (s = NEW_CAM()));
         const we = extentOf(mapOf(v));
@@ -1627,7 +1721,8 @@ export default function ColonyField({
     else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 0.8));
     else if (e.key === "0" || e.key === "Home") showAll();
     else if (key === "n") goNest((nestTurn.current + 1) % colonies.length);
-    else if (e.key === "Escape") unfollow();
+    // Escape drops a follow; with nothing followed it is left for the drawer (review of #182, S7).
+    else if (e.key === "Escape" && follow.current && !e.defaultPrevented) unfollow();
     else return;
     e.preventDefault();
   };
@@ -1650,13 +1745,15 @@ export default function ColonyField({
     setCamera({ x: hx, y: hy, zoom: Math.max(camera().zoom, 8 * dpr()) });
   };
 
-  const button = "pointer-events-auto rounded-md border border-line bg-panel/90 px-2 py-1 text-xs text-fg-2 shadow-sm hover:bg-raised";
+  const button =
+    "pointer-events-auto rounded-md border border-line bg-panel/90 px-2.5 py-1 text-xs text-fg-2 shadow-sm backdrop-blur-sm hover:bg-raised";
+  const item = "rounded-md px-3 py-1.5 text-left text-xs text-fg-2 hover:bg-raised";
   return (
     <>
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        className="absolute inset-0 block h-full w-full cursor-grab touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent active:cursor-grabbing"
+        className="absolute inset-0 block h-full w-full cursor-grab touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset active:cursor-grabbing"
         role="application"
         aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
         onPointerDown={onDown}
@@ -1667,31 +1764,49 @@ export default function ColonyField({
         onKeyDown={onKey}
         onContextMenu={(e) => e.preventDefault()}
       />
-      <div className="pointer-events-none absolute top-2 left-2 flex gap-1.5">
-        <button type="button" className={button} onClick={showAll} title="Show the whole map (0)">
-          Whole map
+      {/* Where to look (PRD §69): one compact menu, so the overlay never runs off a phone's width. */}
+      <div ref={goRef} className={`pointer-events-none absolute flex flex-col items-start gap-1 ${toolsAt}`}>
+        <button
+          type="button"
+          className={button}
+          aria-expanded={goOpen}
+          onClick={() => setGoOpen((o) => !o)}
+          title="Whole map, a colony's nest, chamber labels"
+        >
+          Go to ▾
         </button>
-        {colonies.map((_, k) => (
-          <button
-            key={k}
-            type="button"
-            className={button}
-            onClick={() => goNest(k)}
-            title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}
+        {goOpen && (
+          <div
+            className="pointer-events-auto flex flex-col gap-1 rounded-lg border border-line bg-panel/95 p-1 shadow-lg"
+            role="group"
+            aria-label="go to"
           >
-            {colonyName(k)} nest
-          </button>
-        ))}
-        {(world ? (view === PLANE ? world.plane : world.curtain) : anyColony.map).chambers && (
-          <button
-            type="button"
-            className={labels ? button.replace("border-line", "border-accent").replace("text-fg-2", "text-accent") : button}
-            aria-pressed={labels}
-            onClick={() => setLabels((on) => !on)}
-            title="Name each chamber by its role; click a chamber to inspect it in Learn"
-          >
-            Labels
-          </button>
+            <button type="button" className={item} onClick={() => (showAll(), setGoOpen(false))} title="Show the whole map (0)">
+              Whole map
+            </button>
+            {colonies.map((_, k) => (
+              <button
+                key={k}
+                type="button"
+                className={item}
+                onClick={() => (goNest(k), setGoOpen(false))}
+                title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}
+              >
+                {colonyName(k)} nest
+              </button>
+            ))}
+            {(world ? (view === PLANE ? world.plane : world.curtain) : anyColony.map).chambers && (
+              <button
+                type="button"
+                className={labels ? `${item} text-accent` : item}
+                aria-pressed={labels}
+                onClick={() => setLabels((on) => !on)}
+                title="Name each chamber by its role; click a chamber to inspect it in Learn"
+              >
+                {labels ? "✓ " : ""}Chamber labels
+              </button>
+            )}
+          </div>
         )}
       </div>
     </>

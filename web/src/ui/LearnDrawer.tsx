@@ -26,7 +26,6 @@ import {
   askedIn,
   type Game,
   upgradeFor,
-  AIMS,
   type LaneWords,
 } from "../colony/index.ts";
 import { LeverChips } from "./DetailsScreen.tsx";
@@ -63,8 +62,6 @@ interface Props {
   /** each colony's doctrine (read here: a colony's nature, ja-lo8.2) and the fungus's aim: the same state as the main screen's (useColonyJev) */
   doctrines: DoctrineChoice[];
   aim: DoctrineChoice;
-  setAim: (a: DoctrineChoice) => void;
-  draftAim: (a: DoctrineChoice) => void;
   /** why no policy can change now (policyLock), or null: the aim and the menu are disabled while it is set */
   lock: string | null;
   /** the game (its map, for which levers apply) */
@@ -291,35 +288,15 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         with the same doctrine share every answer.
       </p>
 
-      <section className="flex flex-col gap-2" aria-label="fungus aim">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-medium">
-            <span className="text-spore">Fungus</span> <span className="text-fg-2">aim</span>
-          </h3>
-          <div className="flex overflow-hidden rounded-md border border-line text-sm">
-            {AIMS.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={seg(props.aim.id === a.id)}
-                disabled={props.lock !== null}
-                onClick={() => props.setAim({ id: a.id, text: a.text })}
-              >
-                {a.name}
-              </button>
-            ))}
-          </div>
-        </div>
-        <textarea
-          id="learn-aim"
-          className="w-full resize-y rounded-md border border-line bg-paper px-2 py-1.5 text-[13px] leading-snug text-fg outline-none focus:border-accent"
-          rows={3}
-          value={props.aim.text}
-          disabled={props.lock !== null}
-          onChange={(e) => props.draftAim({ id: "custom", text: e.target.value })}
-          onBlur={(e) => props.setAim({ id: props.aim.id, text: e.target.value })}
-          aria-label="fungus aim"
-        />
+      <section className="flex flex-col gap-2" aria-label="the fungus's aim and levers">
+        <h3 className="font-medium">
+          <span className="text-spore">Fungus</span> <span className="text-fg-2">aim</span>
+        </h3>
+        {/* One home for the aim (PRD §69.2): the bar under the map, or The fungus drawer on a narrow screen. */}
+        <blockquote className="rounded-md border border-line bg-paper px-2 py-1.5 text-[13px] leading-snug text-fg-2" aria-label="your aim">
+          {props.aim.text}
+        </blockquote>
+        <p className="text-xs text-fg-3">Change it in the aim bar under the map (on a narrow screen, in The fungus drawer).</p>
         <div className="text-[13px]">
           <span className="text-fg-2">Levers the fungus may pull</span>
           <LeverChips game={props.game} menu={props.menu} locked={props.lock !== null} lock={props.lock} onChange={props.setMenu} />

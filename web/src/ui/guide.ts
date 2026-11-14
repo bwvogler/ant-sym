@@ -195,7 +195,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Desert ants keep route memories beside their path integrator, and a local memory can override the vector. Lost ants, displaced onto unfamiliar ground, backtrack opposite to the path they had just travelled, which raises the chance of reaching familiar ground. Their route memories are one way, and detours round an obstacle are learnt slowly and by trial. No paper shows an ant reversing a whole outward walk point by point after one trip.",
     inGame:
-      "On the plane a forager stores its own position every 4 cells on its way out (at most 64 places; it keeps every second one and doubles the spacing when full) and forgets them at its next trip. A carrier whose home vector stalls (no nearer its belief for 3 s) walks back through them, taking the earliest place it comes within 3 cells of, as a stand-in for a familiar view, and the one before as its next goal; the hole's sight or smell takes over at any moment. It retraces once a trip, and searches as before when the places run out. One trip, its own past only: it holds no coordinate of the hole or a map. Steering only: Jev's cost is unchanged. A design: stronger than the biology shows.",
+      "On the plane a forager stores its own position every 3 cells on its way out (at most 64 places; it keeps every second one and doubles the spacing when full) and forgets them at its next trip. A carrier whose home vector stalls (no nearer its belief for 3 s) walks back through them, taking the earliest place it comes within 3 cells of, as a stand-in for a familiar view, and the one before as its next goal; the hole's sight or smell takes over at any moment. It retraces once a trip, and searches as before when the places run out. One trip, its own past only: it holds no coordinate of the hole or a map. Steering only: Jev's cost is unchanged. A design: stronger than the biology shows.",
     sources: [
       {
         note: "route-memory",
@@ -322,7 +322,7 @@ export const GUIDE: GuideEntry[] = [
     title: "The fungus's body, and its mutations",
     swatch: ["var(--spore)"],
     onScreen:
-      "The Fungus panel: its mycelium by the hole and the fungus in its hosts, mutations to keep and how fast they come, and what each upgrade does next. On a followed ant's card, a lever your fungus can't yet pull as far as Jev wants shows what it gets and what it wanted.",
+      "The Mutations drawer: its mycelium by the hole and the fungus in its hosts, mutations to keep and how fast they come, and what each upgrade does next. On a followed ant's card, a lever your fungus can't yet pull as far as Jev wants shows what it gets and what it wanted.",
     realAnts:
       "Metarhizium lives for months in soil and around roots without an insect. Passed through groups of grooming ants for ten cycles, it evolved to make more spores and to carry less of the cue groomers detect. In experimental evolution, more replication buys far less than proportionally faster adaptation.",
     inGame:
@@ -336,7 +336,7 @@ export const GUIDE: GuideEntry[] = [
   {
     id: "unity",
     title: "One colony",
-    onScreen: "The Unity bar in the Fungus panel. Ants' colours meet in between as their odours mix.",
+    onScreen: "The Unity bar in The fungus drawer. Ants' colours meet in between as their odours mix.",
     realAnts:
       "Introduced Argentine ants form supercolonies whose nests smell alike and don't fight, across about 6,000 km of southern Europe. Orphaned army-ant colonies fused with a neighbour in 7 of 10 trials.",
     inGame:

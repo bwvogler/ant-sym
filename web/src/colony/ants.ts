@@ -305,7 +305,15 @@ export const ANT_FIELDS = {
   bodyHeat: { type: Float32Array, reset: "spawn" },
   /** 1 while it feels hot: from heatFelt until its body is back below heatCool */
   hot: { type: Uint8Array, reset: "spawn" },
-  // ——— the foraging dig (ja-16rp, PRD §68), last for the same reason ———
+  /**
+   * seconds until an ant whose mode was drawn from Jev's probabilities draws again in the same situation (params.reroll;
+   * ja-nan3); −1 = its last answer was not drawn, so it is asked again only when its situation changes
+   */
+  redraw: { type: Float32Array, fill: -1, reset: "spawn" },
+  // ——— the desert ant's invitation (ja-rf5.6), last for the same reason as the heat's ———
+  /** its pace (cm/s), waiting at the top of its shaft: what a finder passing raises, and what its leave response reads; 0 at birth */
+  pace: { type: Float32Array, reset: "spawn" },
+  // ——— the foraging dig (ja-16rp, PRD §70), last for the same reason ———
   /** seconds left of a foraging dig (forageDig): an old forager home from a trip with nothing digs in the nest for a while */
   digBout: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
