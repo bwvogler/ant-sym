@@ -223,6 +223,11 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
   let s = c.search[i];
   let a = c.searchA[i];
   const p = c.params;
+  // routeEnd (ja-lp4.6.3.1): its retrace over, it searches round its first stored place, not its vector's end.
+  const atFirst = p.routeEnd > 0 && c.routeState[i] === 2 && c.routeN[i] > 0;
+  const at0 = atFirst ? (i * c.routePlaces.length) / c.n : 0;
+  const cx = atFirst ? c.routePlaces[at0] : goal.x + odo * c.driftSurf[i];
+  const cy = atFirst ? c.routePlaces[at0 + 1] : goal.y + odo * c.driftSurfY[i];
   if (p.searchLoops > 0 && s !== 0) {
     // Loops (ja-lp4.11): loop k heads searchTurn × k on from the first; out to its reach at the heading − half its
     // width, across to + half, then back to where the vector ran out.
@@ -237,8 +242,8 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
   const lx = c.map.x0 + EDGE;
   const hx = c.map.x0 + c.map.size.w - EDGE;
   const hy = c.map.size.h * R - EDGE;
-  b.x = Math.max(lx, Math.min(hx, Math.max(lx, Math.min(hx, goal.x + odo * c.driftSurf[i])) + s * Math.cos(a)));
-  b.y = Math.max(lo, Math.min(hy, Math.max(lo, Math.min(hy, goal.y + odo * c.driftSurfY[i])) + s * Math.sin(a)));
+  b.x = Math.max(lx, Math.min(hx, Math.max(lx, Math.min(hx, cx)) + s * Math.cos(a)));
+  b.y = Math.max(lo, Math.min(hy, Math.max(lo, Math.min(hy, cy)) + s * Math.sin(a)));
   b.r = goal.r;
   return b;
 }
@@ -291,7 +296,24 @@ export function routeFail(c: Colony, i: number, stalled: boolean): boolean {
   if (c.routeState[i] !== 0 || c.routeN[i] === 0 || c.carrying[i] !== 1 || c.pellet[i] === 1 || (!stalled && p.routeMemory < 2))
     return false;
   c.routeState[i] = 1;
-  return routeTo(c, i, c.routeN[i] - 1);
+  return routeTo(c, i, p.routeJoin > 0 ? routeNearest(c, i) : c.routeN[i] - 1);
+}
+
+/** routeJoin (ja-lp4.6.3.1): the index of ant i's stored place nearest where it stands (the newest of equals). Its own places only. */
+export function routeNearest(c: Colony, i: number): number {
+  const at = (i * c.routePlaces.length) / c.n;
+  const x = c.x[i];
+  const y = c.y[i];
+  let best = c.routeN[i] - 1;
+  let bestD = Infinity;
+  for (let k = best; k >= 0; k--) {
+    const d = Math.hypot(c.routePlaces[at + 2 * k] - x, c.routePlaces[at + 2 * k + 1] - y);
+    if (d < bestD) {
+      bestD = d;
+      best = k;
+    }
+  }
+  return best;
 }
 
 /** Ant i's goal is its place k, progress judged afresh toward it; none left (k < 0): it has retraced this trip and searches as it did. Always true. */
@@ -303,6 +325,7 @@ export function routeTo(c: Colony, i: number, k: number): boolean {
   if (k < 0) {
     c.routeState[i] = 2;
     c.routeGoal[i] = -1;
+    if (c.params.routeEnd > 0) c.search[i] = 0; // the search starts afresh, round its first place (believePlane)
     searchOn(c, i);
   } else c.routeGoal[i] = k;
   return true;

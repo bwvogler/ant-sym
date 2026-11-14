@@ -207,6 +207,20 @@ export interface ColonyParams {
   /** One world's plane, with routeMemory: places an ant stores (when full it keeps every second and doubles its spacing). Read when the colony is built (the arrays' size). */
   routeMax: number;
   /**
+   * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): where a retrace joins the stored way out. 0 = at
+   * its newest place (back where it picked up: a carrier whose vector had already brought it near home walked the whole trip
+   * out and in again); 1 = at the stored place nearest where it stands (an ant recognises the place it is at, whatever the
+   * order it saw it in: Kohler & Wehner 2005, Mangan & Webb 2012). Steering only.
+   */
+  routeJoin: number;
+  /**
+   * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): where the search goes once a retrace is over.
+   * 0 = round its vector's end, as before the retrace; 1 = afresh (from SEARCH_START) round its first stored place, the
+   * familiar place nearest its hole (near the nest, remembered views outweigh a vector run down: Bregy, Sommer & Wehner
+   * 2008). Steering only.
+   */
+  routeEnd: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -344,6 +358,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeStep: 4,
   routeSee: 3,
   routeMax: 64,
+  routeJoin: 0,
+  routeEnd: 0,
   raidGate: 1,
   raidLay: 1,
   findAt: 0.3,
