@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { FLOAT } from "./kit.tsx";
 import { colonyTone, GESTURE, TRAY_PX, type TrayItem, type TrayTool } from "./build.ts";
 
-// The builder's tray (docs/builder.md, PRD §71, ja-kjj8.3, ja-kjj8.5): picture-only tools along the bottom of the screen,
+// The builder's tray (docs/builder.md, PRD §72, ja-kjj8.3, ja-kjj8.5): picture-only tools along the bottom of the screen,
 // flush to its edge (Anthony et al.: targets at the edge are hit more often), with gaps between them. The tool in hand
 // grows and takes a thick ring, never a glow alone (Hiniker et al. 2015: a look change alone is no prompt). The names are
 // the buttons' accessible labels and their tooltips.

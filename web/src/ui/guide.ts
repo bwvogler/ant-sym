@@ -386,7 +386,7 @@ export const GUIDE: GuideEntry[] = [
       { note: "new-queens", anchor: "3-the-flight-and-founding", label: "The flight and founding" },
     ],
   },
-  // The builder's tools (docs/builder.md, PRD §71, ja-kjj8.6): what you see when you change the world, and what real ants do.
+  // The builder's tools (docs/builder.md, PRD §72, ja-kjj8.6): what you see when you change the world, and what real ants do.
   {
     id: "builder-crayon",
     trail: "food",

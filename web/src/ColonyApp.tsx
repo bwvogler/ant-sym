@@ -132,7 +132,7 @@ export default function ColonyApp() {
   // The species' own guide entry, if it has one (the HUD's sun chip links to it).
   const ownEntry = GUIDE.find((e) => e.species === game.params.species.id)?.id;
   const pointsAt = tut.card?.highlight;
-  // The builder (docs/builder.md, PRD §71, ja-kjj8): a child's tools over the world, on or off at any point in a game. Its
+  // The builder (docs/builder.md, PRD §72, ja-kjj8): a child's tools over the world, on or off at any point in a game. Its
   // builds go into the game itself, so a save keeps them; its undo is this page's, per game.
   const builder = useMemo(() => new Builder(game), [game]);
   const [building, setBuilding] = useState(false);
@@ -972,7 +972,7 @@ function Settings({
   );
 }
 
-/** The builder's sounds and spoken tool names (PRD §71): on unless turned off, per browser. */
+/** The builder's sounds and spoken tool names (PRD §72): on unless turned off, per browser. */
 function SoundSetting() {
   const [on, setOn] = useState(soundOn);
   return (

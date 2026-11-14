@@ -7,7 +7,7 @@ import { CURTAIN, FAINT, PLANE } from "../../vocab.ts";
 import { generateSideWorld, mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "../../world.ts";
 import { SMALL_SIDE, smallOne } from "../builders.ts";
 
-// The builder (docs/builder.md, PRD §71, ja-kjj8.2): a child's tools over the world, guarded, undoable.
+// The builder (docs/builder.md, PRD §72, ja-kjj8.2): a child's tools over the world, guarded, undoable.
 
 const game = (ants = 20) => new Game(smallOne(7), { antCount: ants, rivalAnts: ants, regrow: 0 }, mulberry32(3));
 const key = (x: number, y: number) => (y + 0x8000) * 0x10000 + (x + 0x8000);
@@ -325,7 +325,7 @@ test("a rock ring round a hole leaves every open cell within BUILD.holeGuard of 
   }
 });
 
-test("on one map (the scripts' and assays' side view) the nest's entrance is guarded too (review of #204, N3)", () => {
+test("on one map (the scripts' and assays' side view) the nest and its entrance are guarded too (review of #204, N3, N4)", () => {
   const g = new Game(generateSideWorld(2, SMALL_SIDE), { antCount: 5, rival: false }, mulberry32(1));
   const b = new Builder(g);
   const map = g.layers[0] as WorldMap;
@@ -336,6 +336,14 @@ test("on one map (the scripts' and assays' side view) the nest's entrance is gua
   b.apply({ tool: "dirt", layer: 0, points: [e] });
   assert.equal(rockAt(map, ex, ey), was, "the entrance is left as it was");
   assert.ok(guarded(g, 0).has(key(ex, ey)));
+  // And the nest itself, every cell within holeGuard of its centre (review of #204, N4).
+  const n = g.colonies[0]!.nest;
+  const guard = guarded(g, 0);
+  cellOf(n.x, n.y);
+  const [nx, ny] = [CELL[0], CELL[1]];
+  for (let y = ny - 3; y <= ny + 3; y++)
+    for (let x = nx - 3; x <= nx + 3; x++)
+      if (Math.hypot(centreX(x, y) - n.x, centreY(y) - n.y) <= BUILD.holeGuard) assert.ok(guard.has(key(x, y)), `nest cell ${x},${y}`);
 });
 
 test("builder food counts in the map's total, so a share of it stays a share; undo takes it back off (review of #204, S4)", () => {

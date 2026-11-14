@@ -5882,7 +5882,47 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 
 **Still open.** Feeding larvae owed their growth food (ja-rvli), then option 1 on (ja-16rp.5); option 2; how deep and how far the network should run; whether two colonies' networks meeting needs handling.
 
-## 71. Builder mode: a child changes the world, and the ants answer from their senses (design, ja-kjj8, 2026-11-14)
+## 71. Brood only in brood chambers big enough to reach (ja-xu6.2, 2026-11-14)
+
+**Problem.** Since energy and hunger (§50.18), `slow/economy.test` world 2 has allowed up to 8 larvae stranded at once, where the bound used to be 5. A larva counts as stranded when it goes unfed for over 120 s while the larder could feed it. Tracing 20 seeds of that test's setup on main showed the cause:
+- Seeds tried: world 1 at n = 1–7 and 9–12; world 2 at n = 0 and 2–9.
+- 13 of the 14 seeds that stranded any larvae had them in brood chambers one or two cells wide. Nurses put brood in whichever brood chamber holds least, so it landed in chambers just begun.
+- A chamber that small is a bulge in a tunnel. No nurse stands within two cells of it, and the porters bound for it don't arrive.
+- The worst case, world 1 n = 11, had 40 larvae waiting in three such chambers, with 5 porters carrying food that never got there.
+
+**Change.** Nurses put brood only in brood chambers of at least `BROOD_MIN` (4) cells. With none that big, it goes to the queen's chamber. This is the same rule as `RECEPTION_MIN` for foragers' food ("a smaller one chokes"). The choice still reads the chamber table (`ja-k4k.4`).
+
+**Measured, the economy test's setup** (the 20 seeds above, one hour each, a probe of the test's own loop, not committed):
+
+| | main | `BROOD_MIN` 4 |
+|---|---|---|
+| worst larvae stranded at once | 40 (world 1 n = 11) | 10 (world 1 n = 6) |
+| seeds stranding more than 5 | 4 | 2 |
+| seeds stranding any | 14 | 7 |
+| the test's own worlds (world 2 n = 0, world 1 n = 1) | 0, 0 | 0, 0 |
+| collapses (under 110 workers) | 0 | 0 |
+
+- What remains is larvae in the royal chamber late in the hour. By then the map's food is gone and the last of it lies in a one-cell store that porters rarely visit.
+- `slow/economy.test`'s world 2 bound returns to 5.
+
+**Assays** (main d80ffd8 → this):
+- **`game`, the side view, seeds 1–10:**
+  - pass (foragers holding food ≤ 2): 9/10 → 8/10
+  - worst foragers holding food: 5 → 4
+  - worst porters holding food: 0 → 2
+- **`game`, seeds 11–20:** pass 9/10 → 9/10; worst porters holding food 23 → 1.
+- **The side-view war reshuffles.** The weaker colony's ants at 600 s, per seed:
+  - The worst seed is lower on both sets: 573 → 226 on seeds 1–10 (seed 5's rival, losses 341 → 641), and 605 → 464 on seeds 11–20.
+  - The mean of each seed's weaker colony is 683 → 678 on seeds 1–10 and 736 → 755 on seeds 11–20.
+  - Which side wins changes on seeds 2, 4, 5 and 6.
+- **`nestFlow`, side view:** 0/10 both ways. Starved larvae, worst seed: 13 → 3.
+- **`game1` (one world), seeds 1–10:** pass 6/10 → 6/10; worst foragers holding food 6 → 8; worst porters 1 → 8.
+- **`game1`, seeds 11–20:** pass 4/10 → 4/10; worst foragers holding food 6 → 5; worst porters 0 → 5.
+- **`nestFlow`, one world:** 0/10 both ways. Starved larvae, worst seed: 6 → 10.
+
+**Unchanged:** no legend, question or schema, so no Jev cost change. The goldens are re-recorded: side view and slow; one world and top-down hold.
+
+## 72. Builder mode: a child changes the world, and the ants answer from their senses (design, ja-kjj8, 2026-11-14)
 
 **Research basis:** [builder.md](builder.md):
 - Drawn trails are followed for a while and then fade: an Argentine ant line with the full blend drew 5.0 ± 0.6 ants along its whole length in 2 min, against 0.2 ± 0.1 with one compound alone (Choe et al. 2012). A drawn circle is left after about half of it (*Lasius flavus*, Butterfield et al. 2025). Mills are an army-ant failure (Delsuc 2003).
@@ -5901,7 +5941,7 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - One-finger Move as the main way to move the map, with two-finger pan kept for adults (proposed, from Yadav et al. 2020).
 - Rock and dirt never cover a hole, an ant or brood (proposed).
 
-**The mechanic.** Player tools that edit the world, as pure functions in `colony/builder.ts` (the table in builder.md): `digCell`, `fillCell`, a new `placeRock`, `dropFood` at quality 1.5 or 0.5, `Pheromones.deposit` on one colony's food channel, and a new `Pheromones.clear` for rain. (As built, §71.1: rock is set beside `fillCell` in `setTerrain`, and rain clears each channel's field in place; neither became a new function.) Undo journals the cells each stroke changed. A stroke is applied between ticks and draws no random numbers.
+**The mechanic.** Player tools that edit the world, as pure functions in `colony/builder.ts` (the table in builder.md): `digCell`, `fillCell`, a new `placeRock`, `dropFood` at quality 1.5 or 0.5, `Pheromones.deposit` on one colony's food channel, and a new `Pheromones.clear` for rain. (As built, §72.1: rock is set beside `fillCell` in `setTerrain`, and rain clears each channel's field in place; neither became a new function.) Undo journals the cells each stroke changed. A stroke is applied between ticks and draws no random numbers.
 - **Off:** no stroke means main bit for bit.
 - **What it retires or adds:** no ant choice changes. The ants answer through senses already in vision.md's table (trail, taste, soil faces). No gap row is added or closed.
 
@@ -5943,7 +5983,7 @@ Merging is not delegated: PRs wait for the owner.
   - sounds by WebAudio and speechSynthesis.
 - To measure: B1–B6 on seeds 1–10, the tick cost of a sugar flood, and the gesture rules on a real phone and tablet.
 
-### 71.1 The tools and the assays (ja-kjj8.1, ja-kjj8.2, 2026-11-14)
+### 72.1 The tools and the assays (ja-kjj8.1, ja-kjj8.2, 2026-11-14)
 
 **Built.**
 - `colony/builder.ts`, pure, exported from `colony/index.ts`. `Builder.apply(stroke)` and `undo()` cover dig, dirt, rock, sugar, crumb, crayon and rain.
@@ -5975,7 +6015,7 @@ Merging is not delegated: PRs wait for the owner.
 
 **Cost:** no lane, field, legend or question changed, so tokens per question are unchanged.
 
-### 71.2 The tray, smell vision, little hands, sounds, Learn (ja-kjj8.3–.6, 2026-11-14)
+### 72.2 The tray, smell vision, little hands, sounds, Learn (ja-kjj8.3–.6, 2026-11-14)
 
 **Built.**
 - **The shovel button** ("Builder") leads the rail, or the tab bar on a phone, and turns the builder on and off at any point in a game.

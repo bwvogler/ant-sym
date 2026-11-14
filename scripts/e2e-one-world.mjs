@@ -1191,7 +1191,7 @@ try {
   );
   await nctx.close();
 
-  // ——— 11. The builder (docs/builder.md, PRD §71, ja-kjj8.3): on a phone and a tablet ———
+  // ——— 11. The builder (docs/builder.md, PRD §72, ja-kjj8.3): on a phone and a tablet ———
   // A shovel on the tab bar opens a tray of picture tools in its place: a tap places, a drag paints, Move pans, undo takes
   // a whole drag back, below digs the curtain; the builds go into the game, so a save and a reload keep them.
   for (const [w, h] of [

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems } from "../build.ts";
 
-// The builder's tray, pure (docs/builder.md, PRD §71, ja-kjj8.3, ja-kjj8.5).
+// The builder's tray, pure (docs/builder.md, PRD §72, ja-kjj8.3, ja-kjj8.5).
 
 test("the full tray: every tool, a crayon per colony named for it, Move first", () => {
   const items = trayItems(false, ["Ink", "Amber"]);

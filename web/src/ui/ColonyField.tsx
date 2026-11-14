@@ -125,7 +125,7 @@ interface Props {
   lens?: boolean;
   /** what is under the pointer, with the lens on (null: the pointer left the map) */
   onProbe?: (p: FieldProbe | null) => void;
-  /** the builder (docs/builder.md, PRD §71): the tool in hand, smell vision, and where a stroke goes; null when it is off */
+  /** the builder (docs/builder.md, PRD §72): the tool in hand, smell vision, and where a stroke goes; null when it is off */
   build?: FieldBuild | null;
 }
 
@@ -133,7 +133,7 @@ interface Props {
 export interface FieldBuild {
   /** the tool in hand; null: Move (one finger pans and a tap picks an ant, as ever) */
   tool: BuildTool | null;
-  /** smell vision (owner, PRD §71): every colony's trails and alarm, everywhere, each trail in its colony's tone */
+  /** smell vision (owner, PRD §72): every colony's trails and alarm, everywhere, each trail in its colony's tone */
   smell: boolean;
   /** a piece of a stroke at world points on `layer` (PLANE, CURTAIN, or 0 on one map); `first`: a new drag begins */
   onStroke: (layer: number, points: { x: number; y: number }[], first: boolean) => void;
@@ -368,7 +368,7 @@ export default function ColonyField({
     let strip = false;
     // Each colony's trails on the shown layer; a cell shows them as strongly as a host sensed it lately (PRD §65).
     let trails: { food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array>; odour: number }[] = [];
-    // Smell vision (the builder's, PRD §71): every trail and alarm shown everywhere, each food trail in its colony's tone.
+    // Smell vision (the builder's, PRD §72): every trail and alarm shown everywhere, each food trail in its colony's tone.
     let smellAll = false;
     let sensedLayer: ChunkLayer<Float32Array> | null = null;
     // The map's size and first column: its columns run gx0 … gx0 + gw − 1 (gx0 < 0 on one world's curtain, whose column

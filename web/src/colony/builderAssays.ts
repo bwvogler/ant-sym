@@ -1,4 +1,4 @@
-// The builder's assays B1–B6 (docs/builder.md "The mechanic", PRD §71, ja-kjj8.1): what today's ants do when a child changes
+// The builder's assays B1–B6 (docs/builder.md "The mechanic", PRD §72, ja-kjj8.1): what today's ants do when a child changes
 // their world. Each runs on one world, as the page plays, with a scripted builder stroke applied between ticks (Builder,
 // builder.ts). They measure the ants; nothing here changes how an ant behaves.
 //
@@ -136,7 +136,7 @@ export const wall: Assay = {
   id: "wall",
   title: "B2 a rock wall across a trail: does food come home again by another way?",
   target:
-    "delivery 150–270 s after the wall ≥ 50 % of its rate before, in ≥ 8 of 10 seeds (design mark; Dussutour et al. 2009: 18 of 21 colonies moved to the other branch). Without a wall the same span runs at ≈ 1.0× (PRD §71)",
+    "delivery 150–270 s after the wall ≥ 50 % of its rate before, in ≥ 8 of 10 seeds (design mark; Dussutour et al. 2009: 18 of 21 colonies moved to the other branch). Without a wall the same span runs at ≈ 1.0× (PRD §72)",
   seconds: 420,
   spec: (seed) => {
     const stored: number[] = [];
