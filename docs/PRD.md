@@ -4940,8 +4940,20 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 
 - **What already reaches it.** The levers that act through a channel the desert ant lacks do nothing (`inertLevers`, the Details screen greys them): food scent, rival trails as food, alarm, the trail leaked to rivals, alarm laid. Home scent and trail laid act through its floor marks only. The rest act on it as on the generic ant: time out, stranger scent, floor marks, queen scent and signal, the calming cue, fungal odour, the fungus showing, and the lethal odour weapon and crown.
 - **Host odour first** (owner, 2026-11-11): already built. The fungal-odour lever, stranger scent and the odour weapon act through colony recognition (`recognition.ts`), which the desert ant has; between desert-ant colonies aggression is at its stranger setting (§60.2), so a host made to smell like nobody's is fought.
-- **Contact at an invitation** (owner, 2026-11-14): a new lever, **rouse**. An infected host coming down the shaft raises the pace of the nestmates waiting at the top as a finder does (`invite.ts`), whether or not it carries food: they go out on a false invitation, and the host meets more of them. It acts through the ants' own sense (their pace, §60.6), as the fungus's other levers do. **Design:** no paper shows a fungus doing this; no fungal record in *Cataglyphis* was found at all (desert-ant.md, reading 2026-11-14). Its build is `ja-rf5.18`.
+- **Contact at an invitation** (owner, 2026-11-14): a new lever, **rouse**. An infected host coming down the shaft raises the pace of the nestmates waiting at the top as a finder does (`invite.ts`), whether or not it carries food: they go out on a false invitation, and the host meets more of them. It acts through the ants' own sense (their pace, §60.6), as the fungus's other levers do. **Design:** no paper shows a fungus doing this; no fungal record in *Cataglyphis* was found at all (desert-ant.md, reading 2026-11-14). Its build is `ja-rf5.18`; plan in [rouse.md](rouse.md) (§60.8).
 - **Heat felt by the host:** deferred (owner, 2026-11-11).
+
+### 60.8 Rouse, the plan (ja-rf5.18, 2026-11-14)
+
+- **Research** ([rouse.md](rouse.md)): infected ants are less social, not more (*Metarhizium*: Bos et al. 2012, Heinze & Walter 2010, abstracts only); *Ophiocordyceps* hosts communicate less (and are reported hyperactive before the death grip: secondary, not checked). No parasite is known to rouse the host's nestmates. Rouse is **design**, chosen by the owner.
+- **Plan:** a lever `rouse` (emit; none, some, strong) setting a per-ant `rouse`; a host going down its own hole adds it to the passes the ants waiting at the top meet (`holeIn`), as a finder adds 1. Inert where the species has no invitation (`invitePace` 0): the generic ant bit-exact.
+- **Cost:** the lever joins the fungus's legend, so the fungus lane's shipped answers are asked again, about $0.013 (owner to approve).
+- **Assays:** the staged chamber with a roused host against none; in a game, more departures from the waiting pool with a roused host (seeds 1–5); D5 watched for a colony starved by rouse.
+- **Built** (`levers.ts` `rouse`, emit, none 0 / some 0.5 / strong 1 × the host's load; the ants' `rouse` array, reset with the host's levers; `crossing.ts`: a host going down its own hole with nothing found adds its `rouse` to the passes the waiting ants meet, only where `invitePace` > 0). In the **Trails** upgrade's reach, beside trail, leak and alarm laid. **Off the default menu** (`DEFAULT_MENU` leaves out levers that need an invitation), and **on in a desert game** (`menuFor`, owner 2026-11-14): a generic game's fungus requests don't ask a lever that does nothing. `inertLevers(has, invites)`: inert on a species whose finders don't invite (the generic ant), greyed on the Details screen. Goldens bit-exact.
+- **Measured** (seeds 1–5, one world, 240 s, the fungus landed in the player's colony, rouse strong against none, rich map): the waiting ants meet **+4.6 %** passes and held ants leave about 0.5 s sooner, but **departures fall 0.6 %** (fewer on 4 of 5 seeds). **Why** (ja-rf5.19): 85–90 % of departures are finders cycling straight back out; about one ant waits at the gate and all of them leave anyway (145/145), so a pass only makes one leave sooner; even no gate wait at all gives no more departures (1,799 against 1,837). Variants (rouse at every crossing, or on finders' passes too) moved departures −1.0 % to +0.2 %. Only on a scarce map (1–13 held) does rouse add departures, +0.5 % to +3.8 %. "Strong" expresses only 0.3–0.5 of a finder per host. **The owner chose to merge it as it is and say so (2026-11-14)**; a lever that moves departures must act on a pool that exists (the host itself, or hot foragers cooling inside), a new mechanic, ja-rf5.21 ("strong"'s weak expression: ja-rf5.20).
+- **Re-shipped:** the fungus lane's answers under the new legend (`precache.mjs --lanes fungus`, then `--fungus-also` with main's earlier bundles for the 36 situations a fresh recording didn't meet): 132 situations per preset aim, **$0.0092 + $0.0036**, about 760–784 real tokens a question. The fungus legend gained the lever (1,939 → 2,039 characters), so every fungus request is about **+2 %** longer (4,941 → 5,041 characters in the default request) and the lane's $/h rises by about that.
+- **Desert games and the shipped answers:** a fungus answer is keyed by the levers asked, and the shipped answers were asked under the default menu (no rouse). A desert game asks with rouse on, so its workers' situations miss them (about 1 % of its fungus lookups hit, queen lookups only; review of #202, seeds 1–3): without Jev (the Pages build with no backend) a desert game's fungus plays the local rule for workers; with a run on, it asks about 50 situations an aim (≈ $0.002). Shipping answers under the desert menu is the owner's choice.
+- **Tests:** `tests/soak/rouse.test.ts` (the levels set the share; off the default menu; inert without an invitation; in a game, more passes roused than not; on a species without an invitation, none; a carrier adds exactly one finder's pass; the share scales with load). Mutations, each failing it: the crossing not adding rouse; the invitation guard removed; carriers adding rouse; the load scaling dropped.
 
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
@@ -5139,7 +5151,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 ### 63.5 The growth lane (ja-2bw.5, 2026-11-12)
 
-**Built.** `colony/growthBrain.ts`: the growth situation as a schema (`ahead` × `exposed` × `supply` = 24), its legend, one choice question a tip (grow, turn, branch, rest, fuse, fruit; `turn` leaves the side to the tip, which alone knows which side is free), asked under the fungus's aim (`growth-v1-…`, 24 situations to a request). The registry has its row (`colony/lanes.ts`: id `g`, `growthAsked`/`growthCached`); the client (`ui/colonyJev.ts`) hands a tip Jev's cached answer, or null, and then the tip plays its own fuller local rule (its run, its first heading, spots near it). Its `local` row (`localGrowthChoice`) is the rule as a function of the situation alone, for scripts and live checks.
+**Built.** `colony/growthBrain.ts`: the growth situation as a schema (`ahead` × `exposed` × `supply` = 24), its legend, one choice question a tip (grow, turn, branch, rest, fuse, fruit; `turn` leaves the side to the tip, which alone knows which side is free), asked under the fungus's aim (`growth-v1-…`, 24 situations to a request). The registry has its row (`colony/lanes.ts`: id `g`; its counts in the client are `state.lanes.growth`, ja-fnd.5.7); the client (`ui/colonyJev.ts`) hands a tip Jev's cached answer, or null, and then the tip plays its own fuller local rule (its run, its first heading, spots near it). Its `local` row (`localGrowthChoice`) is the rule as a function of the situation alone, for scripts and live checks.
 
 **Cost.** The owner approved asking every situation for the three preset aims (`node scripts/precache.mjs --lanes growth`): 3 requests, **$0.0009** (about 21k input tokens, about 300 a situation; estimated 27k). Shipped as `public/precache/growth-<aim>.json`. A new aim of the player's own asks 24 situations once, about $0.0003; cached games spend nothing. No other lane changes.
 
@@ -5356,7 +5368,7 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 | sun ×1 (s) | 331 | 238 | 199 | 18 | 278 | 352 | 233 | 243 | 244 | 342 |
 | sun ×4 (s) | 543 | 231 | 203 | 18 | 285 | 352 | 245 | 332 | 262 | 361 |
 
-With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off; a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
+With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off (`tests/golden/fungusGolden.test.ts`, `ja-1ldx`, fails from 30 s on if it is turned on); a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
@@ -5921,3 +5933,117 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - **`nestFlow`, one world:** 0/10 both ways. Starved larvae, worst seed: 6 → 10.
 
 **Unchanged:** no legend, question or schema, so no Jev cost change. The goldens are re-recorded: side view and slow; one world and top-down hold.
+
+## 72. Mass flows along the hyphae to the tips that grow (built, on, ja-tgw9, 2026-11-14)
+
+**Research basis:** [mycelial-transport.md](mycelial-transport.md):
+- Growth draws mass toward the tips: each tip is a sink, and flow in a hypha scales with the tips it feeds (Heaton et al. 2010; Roper et al. 2013, full text). Flow also runs back and pulses in some fungi (Schmieder et al. 2019, **unverified**).
+- Cords carry mass 10–100× faster than thin hyphae: up to 13 mm/h in *Serpula* cords (Tlalka et al. 2008, full text), against µm/s in thin hyphae. *Metarhizium* forms no known cords, so a cord rule is a licence borrowed from wood-decay fungi.
+- Fusion is what brings mass to the edge: non-fusing *Neurospora* kept its tracer by the inoculum (Simonin et al. 2012, full text).
+
+**The problem.** The mycelium's free mass (`Evolution.mass` less its hyphae) is one budget that every tip on both maps shares equally (`hyphae.ts` `stepRound`). A cut-off piece is fed as if it touched the patch, and cords change nothing about feeding (`ja-2bw.13`). Owner (2026-11-14): "I don't think they should all share mass. That seems broken."
+
+**Decisions.**
+- Mass flows along the hyphae, chosen over a pool per piece or one pool with near tips first (owner, 2026-11-14). The distance bar built first (`FEED_SPAN`, commit 7aba688) was never merged and is retired.
+- Owner (2026-11-14, on the plan):
+  - `FLOW_THIN` 3 and `FLOW_CORD` 30 cells a round, tuned against P1.
+  - Spores are paid from the patch's loads first.
+  - The growth lane is re-asked for the reworded supply and fuse lines once flow is tuned (about $0.005, approved).
+- Proposed: the sources are the patch's roots and a colonised corpse's cell, which pays its mass in at once.
+
+**The mechanic.**
+- **Loads.** Hypha cells hold loads. Mass enters at sources, and each round the loads move toward the tips, split by the tips fed: up to `FLOW_THIN` cells on thin hypha and `FLOW_CORD` along cords, with a fused pair as an extra edge.
+- **Tips.** A tip senses `supply` from its own cell's load and pays its steps from it.
+- **Cuts.** A cut cell loses its load. A cut-off piece lives on its own loads, then starves into knots if they are bought.
+- **Off.** Behind `fungus.flow`; off is main bit for bit.
+- **Retires** the shared budget.
+
+**Play.**
+- Cords become supply lines, so *a web* is what feeds a far front, and ants digging a cord starve what lies beyond it.
+- The weak start stays: thin flow only before *a web*.
+- Drawing loads makes this visible.
+
+**Assays and targets.** F1–F4 (flow reaches tips, conservation, a cut piece lives on its store, a loop feeds the edge) land first on hand-built mycelia. Then P1 (§63.4) on seeds 1–10 and 11–20 with flow on, against §63.14. The cliff at *a web* and tips resting per round are measured too.
+
+**Cost (estimated).** No new situation field. One re-ask of the growth lane for the reworded legend: 48 situations × 3 aims × ~770 tokens ≈ $0.005. Cached games spend nothing. Tick cost: one pass over the hypha cells a round.
+
+**Beads.** `ja-tgw9` (this), with children:
+- `ja-tgw9.1`: assays F1–F4.
+- `ja-tgw9.2`: loads and flow behind the setting.
+- `ja-tgw9.3`: tune and turn on.
+- `ja-tgw9.4`: draw loads and a Learn entry.
+
+`ja-2bw.13` is superseded by `ja-tgw9.2`, and `ja-2bw.20` (fusion's effect and the fuse criterion) waits on it.
+
+**Still open.**
+- The flow numbers.
+- Whether a corpse pays its mass in at once.
+- Back-flow and pulsing, left out.
+- How long a cut-off piece's reserves should last: nothing measured, so as long as its loads.
+
+### 72.1 Built, measured, and turned on with a P1 miss (ja-tgw9.1–.4, 2026-11-14)
+
+**Built** (`fungus.flow`, now on by default; off plays as before):
+- **Loads and sources.** Hypha cells hold loads (`Hyphae.loads`). The body's free mass enters each round at the patch, gathered on the patch cells a growing tip leads back to. A colonised corpse pays `CORPSE.mass` in at its own cell, and a knot's store on the plane goes into its cell as it sprouts.
+- **Flow** (`Hyphae.flow`). Each round every load moves along the cheapest path toward the growing tips: a thin cell costs `FLOW_CORD / FLOW_THIN` = 10, a cord cell 1, and a round's reach is 30. At a branch the load splits by the tips each side feeds, and fused pairs are edges.
+  - A tip idle `IDLE_ROUNDS` (3) rounds with mass draws none.
+  - A load with nothing growing beyond it goes back toward the root.
+- **Down the hole.** Mass reaching the plane cell where hyphae crossed a hole (`links`) goes down to the shaft-wall roots that lead to growing tips.
+- **Tips.** A tip senses and pays from its own cell's load, and grows on one step's worth (`FLOW_AMPLE_STEPS`).
+- **Cuts and spores.** A cut cell's load is lost with it. Spores are paid from the patch's loads first.
+- **The growth lane, v4.** *Supply* is "the mass that has reached this tip along its hyphae", and a fuse is "a second, often shorter way for mass to reach the tips beyond it" (`ja-2bw.20`). Re-asked for the three aims: $0.0020, 144 answers, ~333 tokens a question. The answers that changed:
+
+  | Aim | Changed answers |
+  |---|---|
+  | *unite* | 2: open and buried, grow → branch (situations a game can't meet) |
+  | *spread* | fuses in 1 situation (was 4), branches in 17 (was 14), never rests (was 3) |
+  | *peace* | turns in 28 (was 17), rests in 5 (was 17) |
+
+- **Seen.** A glow on each cell holding mass in transit, and a Learn entry ("How the mycelium feeds its tips").
+- **Knots and stumps.** Under flow a knot sprouts once it is old enough, and a cut stump puts out its tip at once. Neither waits for mass: the new tip waits for mass to reach it, like any tip, and a plane knot hands its store to its own cell as it sprouts. Before flow both waited until the shared pool could pay (owner, review of #203, D1: keep it, and say so here).
+- **Saves.** `SAVE_VERSION` 12: loads, the patch's sources, the hole's links and each tip's idle rounds. A version-11 save would load with flow on and no patch to feed, so it is refused (review of #203, S1).
+
+**Bugs a trace of seed 16 found on the way.** Before them, the curtain grew 24 cells with flow on against 52 with flow off, with mass sitting still.
+- Mass placed on patch cells, or shaft-wall roots, that no tip grows from could not move. Gathering it on cells that lead to growing tips fixed this.
+- Gathering pulled mass on its way down the shaft wall back to the top every round. It now takes only from cells that feed nothing.
+- Tips waiting for two steps' worth parked a tenth of the body. Under flow a tip now grows on one step's worth.
+
+**Assays** (unit and soak tests):
+- **F1.** Mass reaches a tip 20 thin cells out in ⌈20/3⌉ = 7 rounds, sooner behind a cord, and splits by tips fed at a branch.
+- **F2.** In a game the hyphae and their loads hold the body's mass within 6 %. Mass reaches the curtain, and under 40 % of the body is in transit.
+- **F3.** A cut-off piece grows only what its own loads pay for.
+- **F4.** A fused loop feeds the far tip sooner than the tree alone.
+- 8 of 9 mutations are caught. The one that survives, gathering stranded patch mass, is nearly equivalent once new mass goes only to feeding cells.
+
+**P1** (§63.4; `progression.mjs --map one --evolve --seconds 600 --hyphae --growth --flow`, aim *unite*; seconds to a quarter of the hosts, against §63.14's rows):
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 231 | 320 | 310 | 143 | 150 | 543 | 272 | 544 | 411 | 262 |
+| Hyphae, shared mass | 249 | 305 | 270 | 152 | 116 | 394 | 263 | 424 | 220 | 261 |
+| Hyphae, flow | 294 | 300 | 296 | 139 | 156 | 380 | 267 | 363 | 343 | 232 |
+
+| Seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | never | 265 | 208 | 18 | 342 | 381 | 239 | 369 | 328 | 468 |
+| Hyphae, shared mass | 420 | 233 | 195 | 18 | 360 | 372 | 237 | 334 | 310 | 387 |
+| Hyphae, flow | 326 | 229 | 199 | 18 | 303 | 444 | 243 | 274 | 297 | 311 |
+
+- **P1 is not met.**
+  - Seed 1 is +27 % (231 → 294 s) and seed 16 +17 % (381 → 444 s).
+  - The median of seeds 1–10 is 295 s, against 291 s without hyphae.
+  - The worst times improve on both sets (544 → 380 s; never → 444 s), and the median of seeds 11–20 improves from 335 to 286 s.
+- **Speed is not the cause.** `FLOW_THIN` 3, 5 and 8 gave the same times on seeds 1 and 16 (284 and 449 s, before the fixes above).
+- **The cause is how mass is shared.** Flow gives every growing tip an equal share, and the plane's tips sit nearer the patch, so the curtain, where spores meet the ants, grows less. On seed 16 at 300 s:
+
+  | Seed 16 at 300 s | Plane | Curtain |
+  |---|---|---|
+  | Flow | 56 cells | 35 cells |
+  | Shared mass | 43 cells | 52 cells |
+
+  Shared mass favoured the curtain through the order in which tips took turns.
+- **The re-asked answers** leave every time unchanged (identical runs before and after): under *unite* only the two unreachable situations changed.
+- **Owner (2026-11-14): turn flow on and record the miss.** Favouring the hole (curtain tips weighing more) was offered and not chosen; it stays open as `ja-tgw9.5`.
+
+**Cost.** The growth legend grew by about 185 characters (~46 tokens), sent once a request. Over a precache request's 48 situations that is about 1 token a question (~333 measured), but a small in-game request carries all of it. Re-shipped for $0.0020. No other lane is touched, and cached games spend nothing.
+

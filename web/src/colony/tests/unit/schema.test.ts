@@ -163,8 +163,9 @@ test("the legends built from the schemas' field passages are byte for byte the o
   assert.equal(sha(COLONY_LEGEND), "887b107af8d7635325fe0a9e079687e1d3e5168147e1de2269642eb0771e9037");
   assert.equal(STRATEGY_LEGEND.length, 706);
   assert.equal(sha(STRATEGY_LEGEND), "7c647d29c54104aa9aa3d7ae19c660f32a913c6e31684010521f8ce3a0194668");
-  assert.equal(FUNGUS_LEGEND.length, 1939);
-  assert.equal(sha(FUNGUS_LEGEND), "c00f981f484dd807fd3e936aa8f7736dbe74b77887a918d7cb48a9fb9c6c519f");
+  // The rouse lever (ja-rf5.18) joined the legend: the fungus lane was re-shipped with it.
+  assert.equal(FUNGUS_LEGEND.length, 2039);
+  assert.equal(sha(FUNGUS_LEGEND), "ab5ab8539c077ba68838569ba088de3a7ff99412c5f2a1edc6c1524ea55050f1");
 });
 
 test("each legend names every field of its schema", () => {

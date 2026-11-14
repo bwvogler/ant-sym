@@ -154,6 +154,7 @@ Each step keeps the golden masters bit-exact and the random draws in order; a sc
 
    Everything else loops over the registry:
    - `ui/colonyJev.ts` keeps only the runtime state.
+     Built for the client's lanes (`ja-fnd.5.7`): the fungus and growth lanes are their rows with the client's menu, view and local rule bound in, as the ants' are their rows with the species' words; `seed` checks a context's answers by its row (`#validFor`), not a lane built for the purpose; and the state's per-lane counters are one record, `state.lanes[name] = { asked, cached }`, so a lane added to the registry gets its counters without a new field.
    - `prompt.ts`, the token estimates, Learn, the follow card and `precache` read from it.
    - The response hooks become entries in it.
 3. **A `Species` descriptor** (designed in [species.md](species.md): three tiers, tier 1 first, one species per game first; slices in `ja-fnd.5.3`) with:
