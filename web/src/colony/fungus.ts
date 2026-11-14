@@ -1,7 +1,7 @@
 import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
-import { CURTAIN, type Colony, type Layer } from "./colony.ts";
+import { CURTAIN, PLANE, type Colony, type Layer } from "./colony.ts";
 import {
   DEFAULT_RULE,
   HIGH_LOAD,
@@ -146,8 +146,15 @@ export const STRAINS: readonly Strain[] = [
 export interface FungusParams {
   /** load an ant takes per second per unit of spores on its cell */
   pickup: number;
-  /** share of ground spores lost per second (sun, rain) */
+  /** share of ground spores lost per second underground (rain, soil microbes; the curtain, the side and top-down maps) */
   sporeDecay: number;
+  /**
+   * how many times faster spores fade on ground open to the sun: one world's plane, off the mycelium's own patch (ja-6ip). Full sun kills
+   * Metarhizium conidia within about an hour, while in soil they last weeks to months (docs/hyphal-growth.md §6); no
+   * paired test gives a ratio, so this is a design number. Off (1) until it is chosen on the progression with Stalks
+   * in (owner, 2026-11-14; PRD §63.13, ja-19oz): at 4 it slowed seed 11 by 39 %
+   */
+  sun: number;
   /** spores a cell holds at most */
   maxSpores: number;
   /** load groomed off per second, per groomer, per unit of a host's visible share */
@@ -185,6 +192,7 @@ export interface FungusParams {
 export const DEFAULT_FUNGUS: FungusParams = {
   pickup: 0.3,
   sporeDecay: 0.03,
+  sun: 1,
   maxSpores: 6,
   grooming: 0.12,
   groomers: 4,
@@ -751,12 +759,19 @@ export class Fungus {
       const y = taken[k + 1];
       L.spores.set(x, y, Math.max(0, L.spores.get(x, y) - taken[k + 2]));
     }
+    // One world's plane is the sunlit surface (ja-6ip): spores lying out on it fade `sun` times faster, but not on the
+    // mycelium's own patch (its base), which fruits in the litter under the surface (docs/hyphal-growth.md §6). On one
+    // map (layer −1) and in the curtain the soil shades them all. The length test is defensive: a game of one map steps
+    // through step() (layer −1); only stepLayers on a fungus of one map would pass layer 0.
+    const sunlit = layer === PLANE && this.#layers.length > 1 && p.sun !== 1;
     const keep = Math.exp(-p.sporeDecay * dt);
+    const burn = sunlit ? Math.exp(-p.sporeDecay * p.sun * dt) : keep;
+    const shade = sunlit && L.base.length ? new Set(L.base) : null;
     let shown = 0;
     for (const key of L.sporeCells) {
       const x = keyX(key);
       const y = keyY(key);
-      const v = L.spores.get(x, y) * keep;
+      const v = L.spores.get(x, y) * (sunlit && !shade?.has(key) ? burn : keep);
       if (v < SPORE_GONE) {
         L.spores.set(x, y, 0);
         L.sporeCells.delete(key);

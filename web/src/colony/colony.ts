@@ -1,4 +1,3 @@
-import { encode as encodeSave, fillLike, loadFields, saveFields } from "./save.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
 import { type Channel, type Mark, Pheromones } from "./pheromone.ts";
 import { Brood } from "./brood.ts";
@@ -6,7 +5,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { bodyHeatAfter, feelsHot, groundHeat, pastCritical } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
-import { CELL, cellOf, centreX, centreY, DIR_ANGLE, discOffsets, hexDistance, nx as stepX, ny as stepY, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
   type CellCounts,
   MODES,
@@ -37,14 +36,11 @@ import {
   CHAMBER_MIN_DEPTH,
   CHAMBER_SPREAD,
   CROWD_HALF,
-  EDGE,
   ENTRANCE_R,
   ENTRANCE_ZONE,
   FLOOR_PER_ANT,
   FOES_HALF,
   HOLE_SIGHT,
-  INTAKE_NONE,
-  INTAKE_PLENTY,
   INTAKE_WINDOW,
   LEAVE_NOW,
   LEAVE_SOON,
@@ -54,23 +50,19 @@ import {
   MET_HALF,
   MIDDEN_AT,
   MIDDEN_SPREAD,
-  MILL_WAYS,
-  M_LINE_WIDTH,
-  PI_DRIFT,
   RECEPTION_MIN,
-  SEARCH_GROW_2D,
-  SEARCH_START,
   THREAT_HALF,
-  WAIT_STEPS,
 } from "./tuning.ts";
 import { NO_CELL, SOIL_DUG, SOIL_FILL, SOIL_LOOSE, cellKey, climb, planeMoundReach } from "./grid.ts";
-import { DEFAULT_COLONY, LOOP_AT, channelParams, type ColonyParams } from "./params.ts";
+import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
-import { outDistAt } from "./homing.ts";
 import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
+import { layerView, loadLayer, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
+import { loadColony, saveColony } from "./colonySave.ts";
+export { COLONY_SKIP, COLONY_STATE, LAYER_STATE } from "./colonySave.ts";
 import { stanceStep } from "./stance.ts";
 import { decide } from "./decide.ts";
 import { steer } from "./steer.ts";
@@ -78,6 +70,9 @@ import { moveDig } from "./move.ts";
 import { arrive } from "./arrive.ts";
 import { AntStep } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
+import { localPolicy, localStance } from "./localRules.ts";
+import { speciesSituation, stanceView } from "./colonySituation.ts";
+export { localPolicy, localStance } from "./localRules.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -188,26 +183,6 @@ export interface Corpse {
 export { swapBroodStore } from "./pheromone.ts";
 
 /**
- * The local rule. (An enemy close by is the contact response's to answer, behaviour MR 4: before it, this rule sent
- * every ant with one near to fight.) Tired: go home. Raiding:
- * explorers (and fighters) go raiding, followers keep foraging. Defending:
- * alarm calls fighters. A fight that is over sends the ant home. Otherwise
- * forage: a strong food trail is followed, none means explore, a faint one
- * keeps what the ant was doing (an ant that just dropped its food heads back
- * out along it). Going home tired breaks ant mills: without it, followers
- * circled trails to food that was gone until nobody was left exploring.
- */
-export const localPolicy: Policy = (s) => {
-  if (s.tired) return "return";
-  if (s.stance === "raid" && (s.mode === "explore" || s.mode === "fight")) return "fight";
-  if (s.stance === "defend" && s.alarm !== "none") return "fight";
-  if (s.mode === "fight") return "return";
-  if (s.foodTrail === "strong") return "follow";
-  if (s.foodTrail === "none") return "explore";
-  return s.mode === "return" ? "follow" : s.mode;
-};
-
-/**
  * A colony's queen (nest slice 4): where she lies, and the fungus in her (ja-lo8.7): her attendants infect her by
  * contact as they would any ant, her nestmates groom it off, and what the fungus does in her is her levers: how much
  * of it she shows, and how much of her royal mark she lays.
@@ -231,14 +206,6 @@ export interface Queen {
   /** her scent not yet passed on (ja-lo8.9, royal.ts): it builds while no ant touches her, up to SCENT_HELD seconds' worth */
   held: number;
 }
-
-/** The local strategist: defend a nest under attack; raid when no food comes in or the colony is full and fed; else forage. */
-export const localStance: StancePolicy = (s) => {
-  if (s.enemyNearNest && s.losses !== "none") return "defend";
-  if (s.intake === "none" && s.ants !== "few") return "raid";
-  if (s.larder === "full" && s.ants === "many") return "raid";
-  return "forage";
-};
 
 /**
  * One map a colony lives on, and what goes with it (one world, docs/one-world.md §2, §4): the map, the colony's scent on
@@ -273,20 +240,6 @@ export type Wiring = Partial<
   Pick<Layer, "enemies" | "nestmates" | "friends" | "foreign" | "raidMarks" | "raidTarget" | "raidNest" | "others">
 >;
 
-/**
- * The Layer keys that carry state from tick to tick, which a save keeps for every layer but the bound one (whose values
- * are the colony's own fields, saved with them): its scent, the holes it sees and its cached way out. Every other key
- * is built again: the map, nest and entrance by the constructor and the world, the rest wired by the game (Game.wire,
- * aimAt). tests/save.test.ts holds every key to one list or the other.
- *
- * On today's plane only `ph` changes: it has no entrance, so `seeHoles` leaves its `holes` empty and its way out
- * (`outDist` … `outAt`) is never worked out. Those are saved for completeness, and no test reaches them (#63's review, N3).
- */
-export const LAYER_STATE = ["ph", "holes", "outDist", "outCells", "outVersion", "outAt"] as const satisfies readonly (keyof Layer)[];
-
-/** A layer's own copy of its state, held while another layer is bound (see Colony.layers). */
-type LayerSlots = { -readonly [K in keyof Layer]: Layer[K] };
-
 export { CURTAIN, PLANE } from "./vocab.ts";
 
 /**
@@ -299,11 +252,6 @@ export interface HoleCell {
   px: number;
   py: number;
 }
-
-/** Where a layer's view keeps its slots: a key only this module holds. */
-const SLOTS = Symbol("slots");
-
-type LayerView = Layer & { readonly [SLOTS]: LayerSlots };
 
 /** One layer's gates for a tick (Colony.tick): whether it gates leaving, raids by trail and each ant's own stance, and their leaks. */
 interface Gates {
@@ -346,75 +294,6 @@ function gatesFor(p: ColonyParams, open: boolean, one: boolean, dt: number): Gat
     crowdKeep: sgate || hold ? Math.exp((-dt * Math.LN2) / CROWD_HALF) : 1,
   };
 }
-
-/** The colony's own state that is not a public field or an ants.ts array, saved by name in `private` (a field added to the colony that carries state between ticks is listed here, or in COLONY_SKIP when it is code or rebuilt on load; tests/soak/save.test.ts holds that). */
-export const COLONY_STATE = [
-  "cur",
-  "ti",
-  "alarmAnt",
-  "alarmSmelt",
-  "oddsNow",
-  "t",
-  "outDist",
-  "outCells",
-  "outVersion",
-  "outAt",
-  "layT",
-  "inJaws",
-  "belief",
-  "entrance",
-  "entranceCol",
-  "entranceRow",
-  "holes",
-  "heaped",
-  "goalX",
-  "goalY",
-  "holeX",
-  "storedSeen",
-  "returning",
-  "returned",
-  "holeIn",
-  "holeSeen",
-  "s",
-  "chamberNest",
-  "goalCells",
-  "want",
-  "enRouteTo",
-  "portViewAt",
-] as const;
-
-/** Colony fields a save leaves out: what the game wires (the map, the nest, other colonies' scent and grids, raid aims: Game saves those as indices), the layers (the maps and scents again) and the policies. */
-export const COLONY_SKIP: ReadonlySet<string> = new Set([
-  ...COLONY_STATE,
-  "plumeTurn", // smellsFood's answer, read in the same tick
-  "policyDrew", // set and read within one ask (policyDraw)
-  "policyDraw", // code: the draw handed to the mode policy
-  "rng",
-  "own",
-  "map",
-  "nest",
-  "layers",
-  "home",
-  "line",
-  "holeCells",
-  "policy",
-  "stancePolicy",
-  "responses",
-  "onBury",
-  "onDie",
-  "enemies",
-  "foreign",
-  "friends",
-  "nestmates",
-  "raidTarget",
-  "raidNest",
-  "raidMarks",
-  "others",
-  "felt",
-  "donors",
-  "scentSum",
-  "perceived",
-]);
 
 /** The per-ant arrays of ants.ts are the colony's own properties. */
 // The arrays are allocated in the constructor (makeAntArrays), which the compiler cannot see: that is the point of the merge.
@@ -724,7 +603,7 @@ export class Colony {
       this.home = CURTAIN;
       this.cur = CURTAIN;
     }
-    this.store(slots);
+    storeLayer(this, slots);
     if (world) {
       // The plane: its nest is the disc round the hole (no entrance: the hole is the way in, not a nest to dig), and the
       // colony's scent there has the top-down food cap, as on any open ground. Its Pheromones draws no random numbers.
@@ -753,9 +632,9 @@ export class Colony {
         raidNest: null,
         others: [],
       };
-      this.layers = [Colony.view(this, PLANE, plane), Colony.view(this, CURTAIN, slots)];
+      this.layers = [layerView(this, PLANE, plane), layerView(this, CURTAIN, slots)];
       this.line = world.line;
-    } else this.layers = [Colony.view(this, 0, slots)];
+    } else this.layers = [layerView(this, 0, slots)];
     this.seeHoles();
     const n = this.params.maxAnts;
     this.n = n;
@@ -819,180 +698,15 @@ export class Colony {
   }
 
   /**
-   * Layer l as `layers` shows it: each field read from the colony while l is bound, else from l's slots (see `layers`).
-   * Static, so the getters reach the colony's private fields without aliasing `this`.
-   */
-  static view(c: Colony, l: number, s: LayerSlots): LayerView {
-    return {
-      [SLOTS]: s,
-      get map() {
-        return c.cur === l ? c.map : s.map;
-      },
-      get ph() {
-        return c.cur === l ? c.ph : s.ph;
-      },
-      get nest() {
-        return c.cur === l ? c.nest : s.nest;
-      },
-      get entrance() {
-        return c.cur === l ? c.entrance : s.entrance;
-      },
-      get entranceCol() {
-        return c.cur === l ? c.entranceCol : s.entranceCol;
-      },
-      get entranceRow() {
-        return c.cur === l ? c.entranceRow : s.entranceRow;
-      },
-      get holes() {
-        return c.cur === l ? c.holes : s.holes;
-      },
-      set holes(v) {
-        if (c.cur === l) c.holes = v;
-        else s.holes = v;
-      },
-      get outDist() {
-        return c.cur === l ? c.outDist : s.outDist;
-      },
-      set outDist(v) {
-        if (c.cur === l) c.outDist = v;
-        else s.outDist = v;
-      },
-      get outCells() {
-        return c.cur === l ? c.outCells : s.outCells;
-      },
-      set outCells(v) {
-        if (c.cur === l) c.outCells = v;
-        else s.outCells = v;
-      },
-      get outVersion() {
-        return c.cur === l ? c.outVersion : s.outVersion;
-      },
-      set outVersion(v) {
-        if (c.cur === l) c.outVersion = v;
-        else s.outVersion = v;
-      },
-      get outAt() {
-        return c.cur === l ? c.outAt : s.outAt;
-      },
-      set outAt(v) {
-        if (c.cur === l) c.outAt = v;
-        else s.outAt = v;
-      },
-      get enemies() {
-        return c.cur === l ? c.enemies : s.enemies;
-      },
-      set enemies(v) {
-        if (c.cur === l) c.enemies = v;
-        else s.enemies = v;
-      },
-      get nestmates() {
-        return c.cur === l ? c.nestmates : s.nestmates;
-      },
-      set nestmates(v) {
-        if (c.cur === l) c.nestmates = v;
-        else s.nestmates = v;
-      },
-      get friends() {
-        return c.cur === l ? c.friends : s.friends;
-      },
-      set friends(v) {
-        if (c.cur === l) c.friends = v;
-        else s.friends = v;
-      },
-      get foreign() {
-        return c.cur === l ? c.foreign : s.foreign;
-      },
-      set foreign(v) {
-        if (c.cur === l) c.foreign = v;
-        else s.foreign = v;
-      },
-      get raidMarks() {
-        return c.cur === l ? c.raidMarks : s.raidMarks;
-      },
-      set raidMarks(v) {
-        if (c.cur === l) c.raidMarks = v;
-        else s.raidMarks = v;
-      },
-      get raidTarget() {
-        return c.cur === l ? c.raidTarget : s.raidTarget;
-      },
-      set raidTarget(v) {
-        if (c.cur === l) c.raidTarget = v;
-        else s.raidTarget = v;
-      },
-      get raidNest() {
-        return c.cur === l ? c.raidNest : s.raidNest;
-      },
-      set raidNest(v) {
-        if (c.cur === l) c.raidNest = v;
-        else s.raidNest = v;
-      },
-      get others() {
-        return c.cur === l ? c.others : s.others;
-      },
-      set others(v) {
-        if (c.cur === l) c.others = v;
-        else s.others = v;
-      },
-    };
-  }
-
-  /** The bound layer's state, from the colony's fields into slots `s`. */
-  store(s: LayerSlots): void {
-    s.map = this.map;
-    s.ph = this.ph;
-    s.nest = this.nest;
-    s.entrance = this.entrance;
-    s.entranceCol = this.entranceCol;
-    s.entranceRow = this.entranceRow;
-    s.holes = this.holes;
-    s.outDist = this.outDist;
-    s.outCells = this.outCells;
-    s.outVersion = this.outVersion;
-    s.outAt = this.outAt;
-    s.enemies = this.enemies;
-    s.nestmates = this.nestmates;
-    s.friends = this.friends;
-    s.foreign = this.foreign;
-    s.raidMarks = this.raidMarks;
-    s.raidTarget = this.raidTarget;
-    s.raidNest = this.raidNest;
-    s.others = this.others;
-  }
-
-  /** Slots `s` into the colony's fields: their layer is the bound one now. */
-  loadLayer(s: LayerSlots): void {
-    this.map = s.map;
-    this.ph = s.ph;
-    this.nest = s.nest;
-    this.entrance = s.entrance;
-    this.entranceCol = s.entranceCol;
-    this.entranceRow = s.entranceRow;
-    this.holes = s.holes;
-    this.outDist = s.outDist;
-    this.outCells = s.outCells;
-    this.outVersion = s.outVersion;
-    this.outAt = s.outAt;
-    this.enemies = s.enemies;
-    this.nestmates = s.nestmates;
-    this.friends = s.friends;
-    this.foreign = s.foreign;
-    this.raidMarks = s.raidMarks;
-    this.raidTarget = s.raidTarget;
-    this.raidNest = s.raidNest;
-    this.others = s.others;
-  }
-
-  /**
    * Bind layer l: the colony's fields become l's (its map, scent, nest, hole, cached way out, wiring), the bound layer's
    * put back in its slots first. Every switch on the map's kind then reads the layer of the ant being stepped. A colony on
    * one layer never swaps: it returns at once.
    */
   bind(l: number): void {
     if (this.layers.length === 1 || l === this.cur) return;
-    this.store((this.layers[this.cur] as LayerView)[SLOTS]);
+    storeLayer(this, (this.layers[this.cur] as LayerView)[SLOTS]);
     this.cur = l;
-    this.loadLayer((this.layers[l] as LayerView)[SLOTS]);
+    loadLayer(this, (this.layers[l] as LayerView)[SLOTS]);
   }
 
   /** The game's wiring for layer l (Game.wire, aimAt): into the colony's fields while l is bound, else into l's slots. */
@@ -1037,30 +751,6 @@ export class Colony {
    * Bind a lane's policy to this colony (the one place a policy is set after the constructor: the page's Jev client, the assays and the tests go through it,
    * not a field). "mode": an ant's choice in its situation; "stance": the colony's strategist.
    */
-  /**
-   * Ask the mode policy about the species' own situation (ja-fnd.5.10): `schema` names the fields its key and its question hold, `sense` adds the
-   * fields of its own (it must read, not draw from the game's random stream, so the game plays on as before). Null: the generic situation. The
-   * schema keeps the mode field with every mode (the tick reads a situation's mode off its code), and stays small enough for the ants' question codes.
-   */
-  setSituation(
-    own: { schema: Schema<SpeciesSituation>; sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>> } | null,
-  ): void {
-    if (!own) {
-      this.own = null;
-      this.seen = new Uint8Array(SITUATIONS);
-      return;
-    }
-    const at = own.schema.fields.findIndex((f) => f.name === "mode");
-    const values = at < 0 ? [] : (own.schema.fields[at]!.values as readonly unknown[]);
-    if (at < 0 || values.length !== MODES.length || MODES.some((m, k) => values[k] !== m))
-      throw new Error("setSituation: a species' schema keeps the mode field, with every mode in order");
-    if (own.schema.size > 0x7fff)
-      throw new Error(`setSituation: ${own.schema.size} situations; an ant's question code holds at most 32,767`);
-    const allowed = new Map(own.schema.fields.map((f) => [String(f.name), f.values as readonly unknown[]] as const));
-    this.own = { schema: own.schema, sense: own.sense ?? null, modeStride: own.schema.strides[at]!, allowed };
-    this.seen = new Uint8Array(own.schema.size);
-  }
-
   bindPolicy(lane: "mode", fn: Policy): void;
   bindPolicy(lane: "stance", fn: StancePolicy): void;
   bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
@@ -1386,21 +1076,6 @@ export class Colony {
     return c;
   }
 
-  /** The strategist's view of this colony. `enemyNearNest` comes from the game, which sees both colonies. */
-  stanceSituation(enemyNearNest: boolean): StanceSituation {
-    const pop = this.population / this.params.maxAnts;
-    const intake = this.intakeRate / Math.max(1, this.population);
-    return {
-      stance: this.stance,
-      ants: pop < 0.4 ? "few" : pop < 0.8 ? "some" : "many",
-      losses: this.recentLosses < 1 ? "none" : this.recentLosses < 10 ? "some" : "heavy",
-      enemyNearNest,
-      // Until it has watched a whole window the colony can't tell: "some".
-      intake: this.time < INTAKE_WINDOW ? "some" : intake < INTAKE_NONE ? "none" : intake >= INTAKE_PLENTY ? "plenty" : "some",
-      larder: this.spare() >= 2 * this.params.foodPerAnt ? "full" : "low",
-    };
-  }
-
   /**
    * Ant i starts a trip home (it picked up food, or its policy sent it home): a detour or a wall left
    * over from foraging would otherwise switch its home vector off, and bumps would keep renewing it.
@@ -1417,22 +1092,6 @@ export class Colony {
     this.untouched[i] = 0;
     this.bestD[i] = Infinity;
     this.stallT[i] = 0;
-  }
-
-  /**
-   * Whether ant i at (x, y) is back on its line home: the line from where this trip first met rock
-   * to the nest (Bug2's "m-line"). Leaving walls only there is what guarantees getting round: leaving
-   * anywhere nearer settles ants in the deepest bay facing the nest.
-   */
-  onMLine(i: number, x: number, y: number, width = M_LINE_WIDTH): boolean {
-    const ax = this.mx[i];
-    const ay = this.my[i];
-    if (Number.isNaN(ax)) return true;
-    const dx = this.goalX - ax;
-    const dy = this.goalY - ay;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-6) return true;
-    return Math.abs((x - ax) * dy - (y - ay) * dx) / len < width;
   }
 
   /** Whether the straight way from (x, y) to (tx, ty) is open, felt every half cell: the nest in plain view (or smell) down a clear passage. */
@@ -1459,60 +1118,6 @@ export class Colony {
     CELL[0] = c0;
     CELL[1] = c1;
     return on;
-  }
-
-  /**
-   * One world's plane (ja-lp4.15): ant i has picked up food where it stands. It keeps where it believes that is, relative to its
-   * hole: where it stands less where its vector says the hole is (the hole plus odoSurf × (driftSurf, driftSurfY): its home
-   * vector, negated). Only its own odometer and drift; no coordinate of the food or the hole's true place. With the plane bound.
-   */
-  rememberSite(i: number): void {
-    const odo = this.odoSurf[i];
-    this.foodX[i] = this.x[i] - (this.nest.x + odo * this.driftSurf[i]);
-    this.foodY[i] = this.y[i] - (this.nest.y + odo * this.driftSurfY[i]);
-  }
-
-  /**
-   * One world's plane (ja-lp4.15): the heading an exploring ant i with a remembered spot (foodX, foodY) steers on. Where it
-   * believes the spot is: its vector's own hole (the hole plus odoSurf × drift, as believePlane) plus the remembered offset,
-   * walked straight; within LOOP_AT of it, it searches round it, U3b's spiral (a point a quarter turn on and SEARCH_GROW_2D
-   * further out each time one is reached; the first heads the way it faces). Its search state is the homing ant's
-   * (search, searchA), zeroed when it turns for home (homeAfresh) or finds food. Never past the plane's edges.
-   */
-  siteAim(i: number): number {
-    const odo = this.odoSurf[i];
-    const x = this.x[i];
-    const y = this.y[i];
-    const lx = this.map.x0 + EDGE;
-    const hx = this.map.x0 + this.map.size.w - EDGE;
-    const hy = this.map.size.h * R - EDGE;
-    const tx = Math.max(lx, Math.min(hx, this.nest.x + odo * this.driftSurf[i] + this.foodX[i]));
-    const ty = Math.max(EDGE, Math.min(hy, this.nest.y + odo * this.driftSurfY[i] + this.foodY[i]));
-    let s = this.search[i];
-    if (s === 0) {
-      if (Math.hypot(tx - x, ty - y) >= LOOP_AT) return Math.atan2(ty - y, tx - x);
-      // There, and nothing in sight: round it, the first point ahead of it.
-      this.searchA[i] = this.heading[i];
-      s = this.search[i] = SEARCH_START;
-    }
-    let a = this.searchA[i];
-    let px = tx + s * Math.cos(a);
-    let py = ty + s * Math.sin(a);
-    if (Math.hypot(px - x, py - y) < LOOP_AT) {
-      a = this.searchA[i] = a + Math.PI / 2;
-      const { w, h } = this.map.size;
-      s = this.search[i] = Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
-      // Widened past what its vector's error covers (a quarter turn each point, so it has been all round at the last): the spot is spent.
-      if (this.params.siteGive > 0 && s > this.params.siteGive * PI_DRIFT * Math.hypot(this.foodX[i], this.foodY[i])) {
-        this.foodX[i] = this.foodY[i] = NaN;
-        this.search[i] = 0;
-        this.searchA[i] = 0;
-        return this.heading[i];
-      }
-      px = tx + s * Math.cos(a);
-      py = ty + s * Math.sin(a);
-    }
-    return Math.atan2(py - y, px - x);
   }
 
   /** The role of this colony's chamber at cell (x, y) (a role-less or another colony's chamber reads as tunnel), or null if in none. */
@@ -1807,73 +1412,6 @@ export class Colony {
     return dx * dx + dy * dy < this.nest.r * this.nest.r;
   }
 
-  /**
-   * Ant i, held at the gate, mills among the top cells of its shaft: cell by cell, to an open neighbour at the gate (within
-   * WAIT_STEPS of the hole) at random. Sets its target cell (as walkTunnel does); false if no cell there is open.
-   */
-  mill(i: number, step: number): boolean {
-    const map = this.map;
-    this.antCell(i);
-    const hx = CELL[0];
-    const hy = CELL[1];
-    const gx = this.gx[i];
-    const gy = this.gy[i];
-    const fresh = gx === NO_CELL || hexDistance(gx, gy, hx, hy) > 1 || outDistAt(this, gx, gy) < 0 || outDistAt(this, gx, gy) > WAIT_STEPS;
-    if (!fresh && Math.hypot(centreX(gx, gy) - this.x[i], centreY(gy) - this.y[i]) > step) return true;
-    const cx = fresh ? hx : gx;
-    const cy = fresh ? hy : gy;
-    const ways = MILL_WAYS;
-    let n = 0;
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(cx, cy, d);
-      const ty = stepY(cy, d);
-      const k = outDistAt(this, tx, ty);
-      if (k >= 0 && k <= WAIT_STEPS && rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty)) ways[n++] = d;
-    }
-    if (n === 0) {
-      this.gx[i] = NO_CELL;
-      return false;
-    }
-    const d = ways[Math.floor(this.rng() * n)];
-    this.gdir[i] = d;
-    this.gx[i] = stepX(cx, cy, d);
-    this.gy[i] = stepY(cy, d);
-    return true;
-  }
-
-  /**
-   * Ant i, not to go out, has stepped from (x0, y0) up out of the hole onto the ground: back, and pointed down the shaft
-   * (its deepest open neighbour underground), the walker aimed at that cell. Only turning it round left it in the hole,
-   * which is no tunnel, steering at random into the sky again and again (review of slice 6: ants pinned there up to
-   * 45 s, a tenth to a fifth of their time). Returns its heading, h as it was if there is no way down but back.
-   */
-  pointDown(i: number, x0: number, y0: number, h: number): number {
-    const map = this.map;
-    this.x[i] = x0;
-    this.y[i] = y0;
-    cellOf(x0, y0);
-    const bx = CELL[0];
-    const by = CELL[1];
-    let down = -1;
-    let deepest = -Infinity;
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(bx, by, d);
-      const ty = stepY(by, d);
-      if (rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty) && centreY(ty) > deepest) ((deepest = centreY(ty)), (down = d));
-    }
-    if (down >= 0) {
-      h = DIR_ANGLE[down];
-      this.gdir[i] = down;
-      this.gx[i] = stepX(bx, by, down);
-      this.gy[i] = stepY(by, down);
-    } else {
-      h += Math.PI;
-      this.gx[i] = NO_CELL;
-    }
-    this.cellAtX[i] = NaN; // its cell is worked out afresh
-    return h;
-  }
-
   // ——— one world: crossing at the holes (docs/one-world.md §2, ja-lp4.3) ———
 
   /**
@@ -2036,53 +1574,25 @@ export class Colony {
     }
   }
 
-  // ——— saving (save.ts, ja-lo8.6) ———
-
-  /**
-   * This colony's state for a save: its public data (not the references the game wires: the map, other colonies'
-   * scent, the grids, its policies; its own scent saves itself), and the state COLONY_STATE lists, by name in `private` (not its random stream: the game saves that,
-   * shared by every colony). tests/soak/save.test.ts holds the lists to the colony's own properties.
-   */
+  /** This colony's state for a save (colonySave.ts saveColony). */
   saveState(): Record<string, unknown> {
-    return {
-      fields: saveFields(this, COLONY_SKIP),
-      // One world (U4b): each layer's own state but the bound one's (null: in `fields` and `private`), by LAYER_STATE.
-      ...(this.layers.length > 1
-        ? {
-            layers: this.layers.map((L, l) => (l === this.cur ? null : Object.fromEntries(LAYER_STATE.map((k) => [k, encodeSave(L[k])])))),
-          }
-        : {}),
-      private: encodeSave(Object.fromEntries(COLONY_STATE.map((k) => [k, (this as unknown as Record<string, unknown>)[k]]))),
-    };
+    return saveColony(this);
   }
 
-  /** A saved state back into this colony (saveState), in place where it can be: a fresh colony of the same world and params. */
+  /** A saved state back into this colony, in place (colonySave.ts loadColony). */
   loadState(saved: Record<string, unknown>): void {
-    const r = saved.private as Record<string, unknown>;
-    // `fields` and the private fields hold the bound layer's scent, map state and way out: the same layer must be bound
-    // here (between ticks it is home, so this only fails for another game's colony).
-    if ("cur" in r && r.cur !== this.cur) throw new Error(`save: a colony saved with layer ${String(r.cur)} bound, here ${this.cur}`);
-    loadFields(this, saved.fields as Record<string, unknown>);
-    for (const k of COLONY_STATE) {
-      if (k === "cur" || !(k in r)) continue;
-      const own = this as unknown as Record<string, unknown>;
-      own[k] = fillLike(own[k], r[k]);
-    }
-    // Every other layer's own state (one world), in place through its view: its slots, since it is not bound.
-    const layers = saved.layers as (Record<string, unknown> | null)[] | undefined;
-    if (layers) {
-      if (layers.length !== this.layers.length)
-        throw new Error(`save: a colony saved on ${layers.length} layers, here ${this.layers.length}`);
-      layers.forEach((x, l) => {
-        if (!x) return;
-        const L = this.layers[l] as unknown as Record<string, unknown>;
-        // In place where it can be (the scent loads itself; its view has no setter for it), else through the view's setter.
-        for (const k of LAYER_STATE)
-          if (k in x) {
-            const v = fillLike(L[k], x[k]);
-            if (v !== L[k]) L[k] = v;
-          }
-      });
-    }
+    loadColony(this, saved);
+  }
+
+  /** Ask the mode policy about the species' own situation (colonySituation.ts speciesSituation). Null: the generic one. */
+  setSituation(
+    own: { schema: Schema<SpeciesSituation>; sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>> } | null,
+  ): void {
+    speciesSituation(this, own);
+  }
+
+  /** The strategist's view of this colony (colonySituation.ts stanceView). `enemyNearNest` comes from the game, which sees both colonies. */
+  stanceSituation(enemyNearNest: boolean): StanceSituation {
+    return stanceView(this, enemyNearNest);
   }
 }
