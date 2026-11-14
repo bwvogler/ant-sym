@@ -4843,6 +4843,26 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **Tests:** `tests/int/desertHeat.test.ts` (the day and the game's start, the body, the sun seen only where the sky is and unseen deeper in, the hot rule, the sun's rule, heat deaths counted, more out at noon than in the low sun, nobody setting out at night, no heat for the generic ant). Mutations, each failing it: heat deaths not counted; the ant blind to the sun; the shaft's top not seeing the sky; the hot rule removed.
 - **Open:** Amor 2011 and Wehner & Wehner 2011 in full (`ja-rf5.13`); every ant out at night counted (`ja-rf5.14`); why homing ants stay lost at night (`ja-rf5.15`); the colony in step at noon.
 
+### 60.6 The invitation: a finder's pace, passed on in the shaft (ja-rf5.6, 2026-11-14)
+
+- **Research** ([desert-ant.md §1](desert-ant.md), Razin, Eckmann & Feinerman 2013, full text, *C. niger*): no trail and no location; a finder runs home fast, an ant that meets a faster one speeds up and a slower one slows (crossing at about 2 cm/s), an ant's chance of leaving rises with its own speed past a soft threshold at about 8 cm/s and, given its speed, not with whom it met; a recruiter's entry raises the idle ants leaving in the next minute sevenfold (nests of 4–8); more ants in the nest lower exits.
+- **What the desert ant had:** the generic ant's one-world activation (an ant waiting at the top of its shaft "meets" every carrier that comes down; a leaky count of returns sets its `leave`). Not Razin's mechanism, and the owner chose to build it (2026-11-14).
+- **Built** (`invite.ts`; `ColonyParams.invitePace`, 0 = the generic ant's encounter count, goldens bit-exact; the ants' `pace` array, last in the table). An ant waiting at the top of its shaft keeps a pace: each finder that comes down past it pulls it 40 % of the way to the finder's 12 cm/s (`paceGain`); it relaxes to 1 cm/s at rest with a 40 s time constant (20 s read 4–5× over Razin's minute: owner, review of #186 D1), faster in a crowd (`paceTau / (1 + 0.25 × crowd)`: resting nestmates slow it, as in Razin's chambers). Its `leave` response reads its own pace as its returns (few from 4 cm/s, many from 8): many → now, few → soon, none → wait (a scout at 1/90 s). The desert ant has its own `leave` response, without the generic ant's crowd-to-raid branch. `paceGain`, `paceCrowd` and the finder's pace are **design**; the 8 cm/s threshold and the pace at rest are the paper's. No Jev cost: the desert ant's leave response is local (its response lanes are not asked).
+- **D2c**, Razin's chamber staged (`experiment.ts` `invitationChamber`, the game's own rule; 400 trials per group size; the minute before a finder against the minute after, as Razin counted): pass 20/20 on seeds 1–20.
+
+| group waiting | leaving after a finder ÷ before (median, least) | leaving rate after (per s) |
+|---|---|---|
+| 2 | 12.9, 10.4 | 0.15 |
+| 4 | 12.4, 11.2 | 0.14 |
+| 8 | 9.9, 8.7 | 0.11 |
+| 13 | 7.6, 6.9 | 0.09 |
+
+  Sevenfold or more in the paper's nests of 4–8; the rate after a finder halves from 4 waiting to 13 (crowding). The ablation (`paceGain` 0): about 1× (tests/int/desertInvite.test.ts). **The chamber's crowd is not the game's** (review of #186, S2): the chamber damps each ant by the others waiting, n − 1; the game's crowd sense counts every nestmate round the top of the shaft (about 5 on average where about 1.5 wait), so a finder's lift falls back about twice as fast in play (with the 40 s time constant, about 6.5 s above paceFew against about 12 s staged); and that sense is wired only where there is a rival, so in a game alone (every D assay) it reads 0 and nothing damps the pace. Wiring it alone too is `ja-rf5.17`. **The window:** D2c counts the minute either side, as Razin did (owner, review of #186 D1); with the first build's 20 s lift a minute read only 4–5× in groups of 4–8, so the lift was lengthened to 40 s.
+- **D2 in the game** (reported, not a gate; measured with the first build's 20 s lift: with 40 s, seeds 1–2 over two days read 11.5× and 13.7× against 7.0× and 12.5×): the leaving rate of the ants waiting at the gate in the 10 s after an isolated finder (none other in the 20 s before) against the 10 s before, two days, seeds 1–10: median 7.2× (0.52–86; pass 5/10), against 0.28× with no pull. Few isolated returns a game (3–9), so it swings: hence the staged D2c. D2 was redefined on the way: counting every departure, the finders cycling straight back out (a successful forager has a pass, crossing.ts) swamped the few that wait; counting every return, finders come down every few seconds and a raised pace lasts through the window before as well.
+- **D5 with the invitation:** a pull of 0.5 cost D5 two seeds (a high-sun window with no pickup: the colony goes out in waves); with 0.4 and a 40 s lift, D5 passes 10/10 on seeds 1–10 and 11–20 (no heat deaths; median food home 836 and 937).
+- **Tests:** `tests/int/desertInvite.test.ts` (the rule; D2c on seeds 1–2 and its one-minute window; the ablation; a finder raising waiting ants' pace in a game; a pace rising only for an ant held at the gate; a crowd damping it in a game with a rival; the leave response reading the pace). Mutations, each failing it: no pull in the game; the touch ignoring the pace; the crowd ignored in the game; the pull reaching ants not held at the gate; the time constant back to 20 s; the window back to 10 s.
+- **Next:** the fungus's contact lever on this host (`ja-rf5.7`) acts at this contact.
+
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
@@ -5243,6 +5263,27 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 **Owner (2026-11-14, review of #171, D1): merge the rule at ×1, bit-exact with `main`, and choose the number once Stalks (#178, `ja-2bw.10`) is in**, since stalks lay their spores on the plane and the two interact (`ja-19oz`). The test sets `sun: 4` itself.
 
 **Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
+
+### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, aim *unite*, with and without `--hyphae --growth`; seconds to a quarter of the hosts; on main `8f07b85`, after #180, all 40 games in one run):
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 231 | 320 | 310 | 143 | 150 | 543 | 272 | 544 | 411 | 262 |
+| Hyphae | 249 | 305 | 270 | 152 | 116 | 394 | 263 | 424 | 220 | 261 |
+
+| Seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | never | 265 | 208 | 18 | 342 | 381 | 239 | 369 | 328 | 468 |
+| Hyphae | 420 | 233 | 195 | 18 | 360 | 372 | 237 | 334 | 310 | 387 |
+
+- **P1 holds on both sets.**
+  - Seeds 1–10: the slowest seed is +7.8 % (seed 1, 231 → 249 s); the worst time improves from 544 to 424 s, and the median from 291 to 262 s.
+  - Seeds 11–20: the slowest seed is +5.3 % (seed 15, 342 → 360 s); the worst time improves from never (seed 11) to 420 s, and the median from 335 to 322 s.
+- **No number moved.** The earlier misses (§63.7, §63.9, §63.10) were closed by the changes since: the cut that loses only the dug cell, and main's own changes to scent, the tick and defence. **Owner (2026-11-14): record and close**; a later change that pushes a seed past 10 % is caught by the next P1 check.
+- **`--growth` matters.** These runs play the growth lane's shipped answers, as the page does. §63.13's `main` rows ran without it (the tips' own rule) and on an earlier main (`88b5269`, before Stalks, #178, and defence by sight, #180), so its hyphae times differ (seed 8: 552 s there, 424 s here; seed 15: 276 s and 360 s). No run separates the two causes.
+- **Stumps stay.** A piece a cut leaves keeps its root cell even when it has no tip left (one `HYPHA_MASS` a piece), so it can resprout: the owner's "severed part lives on" (§63.10). **Owner (2026-11-14): keep the stump** (review of #152, N3).
 
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
